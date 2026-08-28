@@ -26,7 +26,7 @@ import {
   createEmptyLegacyProgressionState,
   resolveLegacyMazeGenerationProfileForProgression
 } from '../../src/legacy-runtime/legacyProgression';
-import { analyzeLegacyMazeAsMazeV2Metrics } from '../../src/domain/mazeV2/metrics';
+import { analyzeLegacyMazeAsMazeV2Metrics, computeLegacyMazeTopologyFingerprint } from '../../src/domain/mazeV2/metrics';
 import { MAZE_V2_CONTRACT_VERSION, type MazeV2MeasuredMetrics } from '../../src/domain/mazeV2/types';
 
 const DEFAULT_OUTPUT_DIR = 'C:\\ATLAS\\tmp\\captures\\mazev2-lab';
@@ -68,6 +68,23 @@ interface LevelSample {
   level: number;
   targetComplexity: number;
   scale: number;
+  // The seed handed to the generator for this level, and the seed it
+  // actually selected (maze.seed) after its own internal bounded candidate
+  // search. Wave 1.5 correction: an earlier version of this lab never
+  // recorded either, so its "structural-fingerprint collision" report
+  // could not tell "the generator's candidate-search window overlapped
+  // enough that two nearby levels selected the literal same maze" (a real,
+  // pre-existing mechanism -- see legacyGeneration's own widened-window
+  // candidate search for high target complexity) apart from "two different
+  // mazes that happen to measure to the same rounded metric vector." Both
+  // are now exported so a collision can be classified correctly.
+  requestedSeed: number;
+  selectedSeed: number;
+  // Exact topology identity (grid + start/goal + selectedSeed), separate
+  // from metrics.structuralFingerprint (a rounded MEASURED-METRIC-VECTOR
+  // hash, which two different mazes can coincidentally share). See
+  // computeLegacyMazeTopologyFingerprint's own comment.
+  topologyFingerprint: string;
   metrics: MazeV2MeasuredMetrics;
 }
 
@@ -90,12 +107,15 @@ const generateSample = (level: number, baseSeed: number): LevelSample => {
   // enough" from "does seed variety alone paper over a flat profile" --
   // the two questions want different seed strategies, so this defaults to
   // the one that matches actual gameplay.
-  const seed = baseSeed + level;
-  const maze = createLegacyRuntimeMazeForMode('play', LAB_BOARD_SCALE, seed, profile, { targetComplexity });
+  const requestedSeed = baseSeed + level;
+  const maze = createLegacyRuntimeMazeForMode('play', LAB_BOARD_SCALE, requestedSeed, profile, { targetComplexity });
   return {
     level,
     targetComplexity,
     scale: LAB_BOARD_SCALE,
+    requestedSeed,
+    selectedSeed: maze.seed,
+    topologyFingerprint: computeLegacyMazeTopologyFingerprint(maze),
     metrics: analyzeLegacyMazeAsMazeV2Metrics(maze)
   };
 };
@@ -106,6 +126,9 @@ const flattenSample = (sample: LevelSample): FlatMetricRow => ({
   level: sample.level,
   targetComplexity: sample.targetComplexity,
   scale: sample.scale,
+  requestedSeed: sample.requestedSeed,
+  selectedSeed: sample.selectedSeed,
+  topologyFingerprint: sample.topologyFingerprint,
   width: sample.metrics.spatial.width,
   height: sample.metrics.spatial.height,
   walkableTileCount: sample.metrics.spatial.walkableTileCount,
@@ -114,6 +137,8 @@ const flattenSample = (sample: LevelSample): FlatMetricRow => ({
   manhattanDistance: sample.metrics.route.manhattanDistance,
   detourRatio: sample.metrics.route.detourRatio,
   routeCoverage: sample.metrics.route.routeCoverage,
+  directFloorPathLength: sample.metrics.route.directFloorPathLength,
+  directFloorDetourRatio: sample.metrics.route.directFloorDetourRatio,
   junctionCount: sample.metrics.decision.junctionCount,
   junctionDensity: sample.metrics.decision.junctionDensity,
   routeJunctionCount: sample.metrics.decision.routeJunctionCount,
@@ -129,7 +154,6 @@ const flattenSample = (sample: LevelSample): FlatMetricRow => ({
   maxStraightRunLength: sample.metrics.turning.maxStraightRunLength,
   straightRunLengthVariance: sample.metrics.turning.straightRunLengthVariance,
   cycleRank: sample.metrics.ambiguity.cycleRank,
-  alternateRouteCount: sample.metrics.ambiguity.alternateRouteCount,
   shortcutCount: sample.metrics.shortcut.shortcutCount,
   routeLengthReduction: sample.metrics.shortcut.routeLengthReduction,
   wrapPairCount: sample.metrics.wrap.wrapPairCount,
@@ -167,7 +191,12 @@ const summarizeAxis = (values: readonly number[]): AxisSummary => {
   };
 };
 
-const buildHtmlReport = (rows: readonly FlatMetricRow[], summaries: Record<string, AxisSummary>, collisions: readonly string[]): string => {
+const buildHtmlReport = (
+  rows: readonly FlatMetricRow[],
+  summaries: Record<string, AxisSummary>,
+  topologyCollisions: readonly string[],
+  coincidentalMetricCollisions: readonly string[]
+): string => {
   const headers = rows.length > 0 ? Object.keys(rows[0]!) : [];
   const tableRows = rows.map((row) => (
     `<tr>${headers.map((h) => `<td>${row[h]}</td>`).join('')}</tr>`
@@ -188,8 +217,12 @@ h1, h2 { font-family: system-ui, sans-serif; }
 <body>
 <h1>Mazer V2 Lab -- ${MAZE_V2_CONTRACT_VERSION}</h1>
 <p>${rows.length} levels analyzed. Measures TODAY's real generator against the new mazeV2 metrics contract -- no V2 generator exists yet (Wave 1 only).</p>
-<h2>Fingerprint collisions (${collisions.length})</h2>
-${collisions.length > 0 ? `<p class="warn">${collisions.join(', ')}</p>` : '<p>None -- every level in this range produced a structurally distinct fingerprint.</p>'}
+<h2>Reused mazes (${topologyCollisions.length})</h2>
+<p>Same grid + start/goal + selected seed across levels -- the generator handed back the literal same maze. This is the real novelty-rule finding.</p>
+${topologyCollisions.length > 0 ? `<p class="warn">${topologyCollisions.join('<br>')}</p>` : '<p>None -- every level in this range selected a distinct maze.</p>'}
+<h2>Coincidental metric-vector matches (${coincidentalMetricCollisions.length})</h2>
+<p>Different mazes whose rounded measured-metric vector happens to match -- not reused mazes, just two topologies that read the same on these axes.</p>
+${coincidentalMetricCollisions.length > 0 ? `<p class="warn">${coincidentalMetricCollisions.join('<br>')}</p>` : '<p>None.</p>'}
 <h2>Per-axis summary</h2>
 <table><tr><th>axis</th><th>min</th><th>mean</th><th>median</th><th>max</th></tr>${summaryRows}</table>
 <h2>Per-level data</h2>
@@ -215,25 +248,64 @@ const main = async (): Promise<void> => {
     summaries[axis] = summarizeAxis(rows.map((row) => row[axis] as number));
   }
 
-  const fingerprintCounts = new Map<string, number[]>();
+  // Wave 1.5 correction: an earlier version of this lab bucketed only by
+  // metrics.structuralFingerprint (a rounded MEASURED-METRIC-VECTOR hash)
+  // and reported every bucket with >1 level as a "collision," without being
+  // able to tell "the generator actually reused the same maze" apart from
+  // "two different mazes happen to measure to the same rounded vector."
+  // Now bucketed by both fingerprints so those two findings are reported
+  // separately and correctly labeled.
+  const metricFingerprintCounts = new Map<string, number[]>();
+  const topologyFingerprintCounts = new Map<string, number[]>();
   for (const sample of samples) {
-    const fingerprint = sample.metrics.structuralFingerprint;
-    const levels = fingerprintCounts.get(fingerprint) ?? [];
-    levels.push(sample.level);
-    fingerprintCounts.set(fingerprint, levels);
-  }
-  const collisions = [...fingerprintCounts.entries()]
-    .filter(([, levels]) => levels.length > 1)
-    .map(([fingerprint, levels]) => `${fingerprint}: levels ${levels.join(', ')}`);
+    const metricLevels = metricFingerprintCounts.get(sample.metrics.structuralFingerprint) ?? [];
+    metricLevels.push(sample.level);
+    metricFingerprintCounts.set(sample.metrics.structuralFingerprint, metricLevels);
 
-  await writeFile(resolve(outputDir, 'metrics.json'), JSON.stringify({ contractVersion: MAZE_V2_CONTRACT_VERSION, samples: rows, summaries, collisions }, null, 2));
+    const topologyLevels = topologyFingerprintCounts.get(sample.topologyFingerprint) ?? [];
+    topologyLevels.push(sample.level);
+    topologyFingerprintCounts.set(sample.topologyFingerprint, topologyLevels);
+  }
+
+  // Real duplicates: the generator handed back the literal same maze (grid
+  // + start/goal + selected seed all identical) -- e.g. the seed-window
+  // candidate search overlapping enough between two nearby requested seeds
+  // that both selected the same winning candidate. This is the actual
+  // novelty-rule violation a later wave should reject.
+  const topologyCollisions = [...topologyFingerprintCounts.entries()]
+    .filter(([, levels]) => levels.length > 1)
+    .map(([fingerprint, levels]) => `${fingerprint}: levels ${levels.join(', ')} -- same maze reused`);
+
+  // Coincidental: different mazes whose rounded measured-metric vector
+  // happens to match -- not a duplicate maze, just two distinct topologies
+  // that read the same on these axes. Worth knowing (it bears on how
+  // discriminating the metric vector itself is) but a different finding
+  // from a reused maze, so kept in its own list rather than merged in.
+  const coincidentalMetricCollisions = [...metricFingerprintCounts.entries()]
+    .filter(([, levels]) => levels.length > 1)
+    .map(([fingerprint, levels]) => ({
+      fingerprint,
+      levels,
+      distinctTopologies: new Set(levels.map((level) => samples.find((sample) => sample.level === level)!.topologyFingerprint)).size
+    }))
+    .filter((group) => group.distinctTopologies > 1)
+    .map((group) => `${group.fingerprint}: levels ${group.levels.join(', ')} -- different mazes, same measured vector`);
+
+  await writeFile(
+    resolve(outputDir, 'metrics.json'),
+    JSON.stringify({ contractVersion: MAZE_V2_CONTRACT_VERSION, samples: rows, summaries, topologyCollisions, coincidentalMetricCollisions }, null, 2)
+  );
   await writeFile(resolve(outputDir, 'metrics.csv'), toCsv(rows));
-  await writeFile(resolve(outputDir, 'report.html'), buildHtmlReport(rows, summaries, collisions));
+  await writeFile(resolve(outputDir, 'report.html'), buildHtmlReport(rows, summaries, topologyCollisions, coincidentalMetricCollisions));
 
   process.stdout.write(`\n${samples.length} levels analyzed -> ${outputDir}\n`);
-  process.stdout.write(`Fingerprint collisions: ${collisions.length}\n`);
-  if (collisions.length > 0) {
-    process.stdout.write(`${collisions.join('\n')}\n`);
+  process.stdout.write(`Reused mazes: ${topologyCollisions.length}\n`);
+  if (topologyCollisions.length > 0) {
+    process.stdout.write(`${topologyCollisions.join('\n')}\n`);
+  }
+  process.stdout.write(`Coincidental metric-vector matches: ${coincidentalMetricCollisions.length}\n`);
+  if (coincidentalMetricCollisions.length > 0) {
+    process.stdout.write(`${coincidentalMetricCollisions.join('\n')}\n`);
   }
 };
 

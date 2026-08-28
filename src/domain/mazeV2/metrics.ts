@@ -6,23 +6,39 @@
 // it does not generate anything itself, and nothing in production gameplay
 // depends on it.
 //
+// Wave 1.5 correction (2026-08-28): route/turning/junction/wrap metrics now
+// measure the playable, wrap-aware shortest route
+// (resolveLegacyPlayableShortestPath) instead of maze.solutionPath, which
+// is the generator's own direct-floor construction route
+// (solutionPathPolicy: 'direct-floor') and is not wrap-aware -- it can
+// disagree with what a player can actually walk once wrap/bleed topology
+// exists. The direct-floor route is still exposed, separately and clearly
+// labeled, under route.directFloorPathLength/directFloorDetourRatio for
+// comparison. Also corrected: ambiguity no longer exposes a mislabeled
+// "alternateRouteCount" (cycle rank is not an upper bound on simple
+// start-to-goal paths -- see MazeV2AmbiguityMetrics's own comment), and
+// dead-end deception now compares the branch's first step (not its
+// terminal) against its root, matching MazeV2DeadEndMetrics's documented
+// definition.
+//
 // Some axes here are exact (spatial, route, decision, turning, wrap --
-// all directly computable from the grid/solution-path/wrap-topology data
-// legacy-runtime already produces). Two are deliberately approximate, and
-// said so at each computation:
-//   - ambiguity.alternateRouteCount: exact route enumeration is
-//     combinatorially expensive in general; cycle rank is used as an
-//     upper-bound proxy (every independent cycle is a POTENTIAL alternate
-//     route, not a guaranteed meaningfully-different one).
+// all directly computable from the grid/playable-route/wrap-topology data
+// legacy-runtime already produces). One is deliberately approximate, and
+// said so at its computation:
 //   - shortcut.routeLengthReduction: a true measurement needs a
 //     counterfactual "the same maze without its shortcuts" to diff
 //     against, which this bridge does not regenerate. Falls back to the
 //     wrap-topology system's own already-exact playableShortcutDelta where
 //     available (wrap shortcuts only), else 0.
-// Wave 2's generator should compute both directly from its own
-// construction process instead of inferring them after the fact.
+// Wave 2's generator should compute this directly from its own
+// construction process instead of inferring it after the fact.
 
-import { resolveLegacyWalkableGridNeighbors, type LegacyMazeSnapshot, type LegacyPoint } from '../../legacy-runtime/legacyMaze';
+import {
+  resolveLegacyPlayableShortestPath,
+  resolveLegacyWalkableGridNeighbors,
+  type LegacyMazeSnapshot,
+  type LegacyPoint
+} from '../../legacy-runtime/legacyMaze';
 import { hashMazeV2Value } from './hashing';
 import { MAZE_V2_CONTRACT_VERSION, type MazeV2MeasuredMetrics } from './types';
 
@@ -101,13 +117,15 @@ const resolveTurningMetrics = (solutionPath: readonly LegacyPoint[]) => {
 
 // Walks backward from a degree-1 terminal along its unique corridor (every
 // intermediate tile has degree exactly 2) until it reaches a junction
-// (degree >= 3) or exhausts the grid, returning the branch root and the
-// number of steps from root to terminal.
+// (degree >= 3) or exhausts the grid, returning the branch root, the number
+// of steps from root to terminal, and the branch's first step away from
+// root (the tile one step into the branch, toward the terminal) -- distinct
+// from the terminal itself once the branch is more than one tile deep.
 const resolveDeadEndBranch = (
   grid: boolean[][],
   terminal: LegacyPoint,
   degreeByKey: Map<string, number>
-): { root: LegacyPoint; depth: number } => {
+): { root: LegacyPoint; depth: number; firstStepFromRoot: LegacyPoint | null } => {
   let depth = 0;
   let previous: LegacyPoint | null = null;
   let current = terminal;
@@ -117,7 +135,13 @@ const resolveDeadEndBranch = (
     const next = neighbors[0];
     const nextDegree = next ? degreeByKey.get(pointKey(next)) ?? 0 : 0;
     if (!next || nextDegree !== 2) {
-      return { root: next ?? current, depth: depth + (next ? 1 : 0) };
+      // `current` is always the neighbor-of-root that lies one step into
+      // the branch (root not yet reassigned this iteration) -- exactly the
+      // branch's first step away from root. When there's no `next` at all
+      // (an isolated tile, not expected given upstream connectivity
+      // guarantees but handled defensively), there is no root distinct
+      // from the terminal to compare against, so this is null.
+      return { root: next ?? current, depth: depth + (next ? 1 : 0), firstStepFromRoot: next ? current : null };
     }
     previous = current;
     current = next;
@@ -130,15 +154,26 @@ export const analyzeLegacyMazeAsMazeV2Metrics = (maze: LegacyMazeSnapshot): Maze
   const graph = summarizeWalkableGraph(grid);
   const floorRatio = graph.walkableTileCount / Math.max(1, width * height);
 
-  const shortestPathLength = Math.max(0, solutionPath.length - 1);
+  // The playable, wrap-aware route -- what the player can actually walk,
+  // including any wrap/bleed border connections. `found` should always be
+  // true here (legacy-runtime guarantees connectivity before a maze reaches
+  // this analyzer); fall back to the direct-floor route defensively rather
+  // than crash if that guarantee is ever violated.
+  const playableResult = resolveLegacyPlayableShortestPath(grid, start, goal);
+  const playablePath = playableResult.found && playableResult.path.length > 0 ? playableResult.path : solutionPath;
+
   const manhattanDistance = resolveManhattanDistance(start, goal);
+  const shortestPathLength = Math.max(0, playablePath.length - 1);
   const detourRatio = shortestPathLength / Math.max(1, manhattanDistance);
-  const routeCoverage = solutionPath.length / Math.max(1, graph.walkableTileCount);
+  const routeCoverage = playablePath.length / Math.max(1, graph.walkableTileCount);
+
+  const directFloorPathLength = Math.max(0, solutionPath.length - 1);
+  const directFloorDetourRatio = directFloorPathLength / Math.max(1, manhattanDistance);
 
   const junctionKeys = [...graph.degreeByKey.entries()].filter(([, degree]) => degree >= 3);
   const junctionCount = junctionKeys.length;
   const junctionDegrees = junctionKeys.map(([, degree]) => degree);
-  const routeJunctionCount = solutionPath.filter((point) => (graph.degreeByKey.get(pointKey(point)) ?? 0) >= 3).length;
+  const routeJunctionCount = playablePath.filter((point) => (graph.degreeByKey.get(pointKey(point)) ?? 0) >= 3).length;
 
   const terminals = [...graph.degreeByKey.entries()]
     .filter(([key, degree]) => degree === 1 && key !== pointKey(start) && key !== pointKey(goal))
@@ -148,13 +183,20 @@ export const analyzeLegacyMazeAsMazeV2Metrics = (maze: LegacyMazeSnapshot): Maze
     });
   const branches = terminals.map((terminal) => resolveDeadEndBranch(grid, terminal, graph.degreeByKey));
   const deadEndDepths = branches.map((branch) => branch.depth);
-  const deceptiveBranches = branches.filter((branch) => {
-    const rootDistance = resolveManhattanDistance(branch.root, goal);
-    const terminalTerminalPoint = terminals[branches.indexOf(branch)]!;
-    return resolveManhattanDistance(terminalTerminalPoint, goal) < rootDistance;
-  });
+  // Deceptive = the branch's FIRST STEP moves closer to the goal than its
+  // root does -- "looks like the real route at a glance," matching
+  // MazeV2DeadEndMetrics.deceptiveBranchFraction's documented definition.
+  // Not the branch's terminal distance (an earlier version compared that
+  // instead, which measures something closer to "does this dead end
+  // eventually get you nearer the goal," a different and less useful
+  // question -- most of a branch's deceptiveness is felt on the first
+  // step, not its dead stop).
+  const deceptiveBranches = branches.filter((branch) => (
+    branch.firstStepFromRoot !== null
+    && resolveManhattanDistance(branch.firstStepFromRoot, goal) < resolveManhattanDistance(branch.root, goal)
+  ));
 
-  const turning = resolveTurningMetrics(solutionPath);
+  const turning = resolveTurningMetrics(playablePath);
 
   // Cycle rank (first Betti number) assumes one connected component --
   // legacy-runtime's own playableTopologyStats already guarantees full
@@ -166,8 +208,8 @@ export const analyzeLegacyMazeAsMazeV2Metrics = (maze: LegacyMazeSnapshot): Maze
   const wrapDiagnostics = maze.wrapTopologyDiagnostics;
   const wrapPairCount = (wrapDiagnostics?.horizontal.pairCount ?? 0) + (wrapDiagnostics?.vertical.pairCount ?? 0);
   let wrapPairsOnRoute = 0;
-  for (let index = 1; index < solutionPath.length; index += 1) {
-    if (resolveManhattanDistance(solutionPath[index - 1]!, solutionPath[index]!) !== 1) {
+  for (let index = 1; index < playablePath.length; index += 1) {
+    if (resolveManhattanDistance(playablePath[index - 1]!, playablePath[index]!) !== 1) {
       wrapPairsOnRoute += 1;
     }
   }
@@ -184,7 +226,9 @@ export const analyzeLegacyMazeAsMazeV2Metrics = (maze: LegacyMazeSnapshot): Maze
       shortestPathLength,
       manhattanDistance,
       detourRatio,
-      routeCoverage
+      routeCoverage,
+      directFloorPathLength,
+      directFloorDetourRatio
     },
     decision: {
       junctionCount,
@@ -204,11 +248,10 @@ export const analyzeLegacyMazeAsMazeV2Metrics = (maze: LegacyMazeSnapshot): Maze
       deceptiveBranchFraction: terminals.length > 0 ? deceptiveBranches.length / terminals.length : 0
     },
     turning,
-    ambiguity: {
-      cycleRank,
-      // See module header: an upper-bound proxy, not exact enumeration.
-      alternateRouteCount: cycleRank
-    },
+    // See MazeV2AmbiguityMetrics's own comment: cycleRank is exposed alone,
+    // not relabeled as an alternate-route count -- it isn't a valid upper
+    // bound on one.
+    ambiguity: { cycleRank },
     shortcut: {
       shortcutCount,
       // See module header: exact only when the wrap-topology system's own
@@ -227,3 +270,27 @@ export const analyzeLegacyMazeAsMazeV2Metrics = (maze: LegacyMazeSnapshot): Maze
     structuralFingerprint: hashMazeV2Value(metricsWithoutFingerprint)
   };
 };
+
+// Exact topology identity -- distinct from structuralFingerprint above,
+// which hashes the MEASURED METRIC VECTOR (rounded, per hashing.ts), so two
+// genuinely different mazes with coincidentally-identical rounded metrics
+// collide there without being the same maze. This hashes the actual grid
+// plus start/goal/seed, so it only collides when the generator handed back
+// the literal same maze -- the signal an offline lab needs to tell "same
+// maze reused" apart from "different maze, same measured vector."
+//
+// This is one exact-identity signal, not the full three-tier fingerprint
+// taxonomy (cheap similarity bucket / exact topology identity / durable
+// recipe-provenance digest) a fuller pass could split MazeV2MeasuredMetrics
+// and MazeV2RunProvenance into -- that's a larger design change tracked
+// separately, out of scope for this correction.
+export const computeLegacyMazeTopologyFingerprint = (maze: LegacyMazeSnapshot): string => (
+  hashMazeV2Value({
+    seed: maze.seed,
+    width: maze.width,
+    height: maze.height,
+    start: maze.start,
+    goal: maze.goal,
+    rows: maze.grid.map((row) => row.map((tile) => (tile ? '1' : '0')).join(''))
+  })
+);

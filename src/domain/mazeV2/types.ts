@@ -147,10 +147,21 @@ export interface MazeV2SpatialMetrics {
 }
 
 export interface MazeV2RouteMetrics {
+  // Playable, wrap-aware shortest route -- the actual route available to
+  // the player (legacyMaze.ts's resolveLegacyPlayableShortestPath, policy
+  // 'playable-wrap-aware'). Difficulty should be measured against these
+  // fields, not the direct-floor pair below.
   shortestPathLength: number;
   manhattanDistance: number;
   detourRatio: number;
   routeCoverage: number;
+  // Direct-floor route (maze.solutionPath, policy 'direct-floor') --
+  // legacy-runtime's own construction-time route, not wrap-aware. Exposed
+  // only for comparison against the playable pair above; a divergence
+  // between the two on a maze with wrap/bleed topology means the direct
+  // route understates or overstates what the player can actually walk.
+  directFloorPathLength: number;
+  directFloorDetourRatio: number;
 }
 
 export interface MazeV2DecisionMetrics {
@@ -182,8 +193,14 @@ export interface MazeV2TurningMetrics {
 export interface MazeV2AmbiguityMetrics {
   // First Betti number of the walkable graph (edges - nodes + components) --
   // the standard graph cycle-rank measure of "how many independent loops."
+  // Deliberately NOT exposed as an "alternate route count" (an earlier
+  // version of this field did, mislabeled) -- cycle rank counts independent
+  // loops in the whole graph, which is not generally an upper bound on the
+  // number of simple start-to-goal paths (a loop that doesn't touch the
+  // route contributes to cycle rank without adding any alternate route at
+  // all). A true alternate-route count needs actual path enumeration,
+  // which this Wave 1 bridge doesn't implement.
   cycleRank: number;
-  alternateRouteCount: number;
 }
 
 export interface MazeV2ShortcutMetrics {
