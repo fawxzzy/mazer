@@ -680,7 +680,13 @@ export const resolveLegacyProgressionDifficultyProfile = (
   };
 };
 
-export const resolveLegacyMazeGenerationProfileForProgression = (
+export interface LegacyMazeGenerationScaleContext {
+  // 0..1 -- see LegacyProgressionScaleDetail.fraction. How close to THIS
+  // device's own physical ceiling the level's board already sits.
+  fraction: number;
+}
+
+const resolveLegacyMazeGenerationBaseProfileForProgression = (
   trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number
 ): LegacyMazeGenerationProfile => {
   const profile = resolveLegacyProgressionDifficultyProfile(trackOrTargetComplexity);
@@ -876,6 +882,34 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
     default:
       return profile.band satisfies never;
   }
+};
+
+export const resolveLegacyMazeGenerationProfileForProgression = (
+  trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number,
+  scaleContext?: LegacyMazeGenerationScaleContext
+): LegacyMazeGenerationProfile => {
+  const profile = resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity);
+  if (scaleContext === undefined || !profile.borderFeederTargetPerSide || profile.borderFeederTargetPerSide <= 0) {
+    return profile;
+  }
+
+  // Bleed/feeder paths are a border-to-border corridor each -- real screen
+  // real estate, not just a difficulty number. A device with little room
+  // to spare (fraction near 0, i.e. this level's board is already close to
+  // this screen's own legibility ceiling) scales the band's target down
+  // instead of cramming in the same feeder count a much larger screen gets
+  // for free. clamped so a band that calls for feeders always gets at
+  // least 1 once its own threshold is reached -- this scales the top end
+  // down for a small device, it doesn't erase the feature outright.
+  const deviceScaledFeederTarget = Math.max(
+    1,
+    Math.round(profile.borderFeederTargetPerSide * (0.5 + (0.5 * scaleContext.fraction)))
+  );
+
+  return {
+    ...profile,
+    borderFeederTargetPerSide: deviceScaledFeederTarget
+  };
 };
 
 const resolveLegacyProgressionColorTier = (targetComplexity: number): number => (
@@ -1533,33 +1567,71 @@ export const resolveLegacyProgressionPalette = (
   };
 };
 
-export const resolveLegacyProgressionGenerationScale = (
+// Mirrors legacyMaze.ts's own LEGACY_MAX_SCALE -- the true, absolute outer
+// bound generation will ever honor regardless of anything below. Never the
+// real limiter in practice; a pure backstop against a pathological
+// viewport reading.
+export const LEGACY_PROGRESSION_ABSOLUTE_MAX_SCALE = 150;
+
+export interface LegacyProgressionScaleDetail {
+  // The resolved board scale a maze will actually be generated at.
+  scale: number;
+  // The device's own ceiling -- the largest scale this viewport can render
+  // without tiles shrinking below a legible/tappable size. This is now
+  // THE ceiling (previously a separate, arbitrary baseScale-derived number
+  // competed with it and sometimes won) -- see resolveLegacyProgressionGenerationScale's
+  // own comment.
+  deviceMaxScale: number;
+  // scale / deviceMaxScale, 0..1 -- how close to this device's own
+  // physical ceiling the current level's board already sits. Meant for
+  // driving other knobs (checkpoint/feeder/dead-end density) proportionally
+  // to actual room available on THIS device, instead of fixed absolute
+  // per-band numbers that assume a screen size no one configured.
+  fraction: number;
+}
+
+// Split out from resolveLegacyProgressionGenerationScale (which still
+// returns just the bare number, unchanged, for every existing caller) so
+// a caller that also wants "how close to this device's max is this level"
+// doesn't have to duplicate this computation to get it.
+export const resolveLegacyProgressionScaleDetail = (
   baseScale: number,
   track: LegacyProgressionTrack,
   options: LegacyProgressionGenerationScaleOptions = {}
-): number => {
+): LegacyProgressionScaleDetail => {
   const profile = resolveLegacyProgressionDifficultyProfile(track);
   const difficultyLevel = resolveLegacyProgressionLevel(track.targetComplexity);
   const progressionScale = profile.targetScale + Math.min(8, Math.max(0, track.targetComplexity - resolveLegacyProgressionLevelBaseTargetComplexity(difficultyLevel)) * 0.8);
   const blendedScale = (baseScale * 0.28) + (progressionScale * 0.72);
-  // Mythic's own curve (targetScale 96, up to +8 more from the in-band
-  // complexity bonus above) can reach 104 -- but the old ceiling here
-  // (min(96, baseScale + 28), 78 at the default baseScale of 50) clamped
-  // that down well before the mythic band's own top end, well before the
-  // device/viewport cap below ever became the real limiter, and well
-  // before the absolute LEGACY_MAX_SCALE (150) generation itself allows.
-  // Raised so the difficulty curve's own top end is what a player actually
-  // reaches -- the viewport cap (screen space vs. a legible tile size) and
-  // the absolute generation ceiling remain the real physical limits.
-  const progressionMaxScale = Math.min(120, baseScale + 60);
-  const viewportMaxScale = resolveLegacyProgressionViewportScaleCap({
+  // The device's actual screen space (pixels -> the largest tile grid that
+  // keeps a tile above a legible/tappable size) is now the real ceiling,
+  // not a difficulty-derived formula. This used to be
+  // min(96, baseScale + 28) (78 at the default baseScale of 50), then
+  // min(120, baseScale + 60) -- both arbitrary numbers a human picked, and
+  // both occasionally competed with (and beat) the device's own real
+  // capability instead of deferring to it. A player's own board-scale
+  // setting (baseScale) still blends into where on that device-bounded
+  // range a given level's board actually sits (see blendedScale above);
+  // it no longer decides the range's outer edge.
+  const deviceMaxScale = resolveLegacyProgressionViewportScaleCap({
     ...options,
     boardScale: baseScale
   });
-  const maxScale = Math.max(25, Math.min(progressionMaxScale, viewportMaxScale));
+  const maxScale = Math.max(25, Math.min(LEGACY_PROGRESSION_ABSOLUTE_MAX_SCALE, deviceMaxScale));
   const minScale = Math.min(25, maxScale);
-  return clampInteger(blendedScale, minScale, maxScale);
+  const scale = clampInteger(blendedScale, minScale, maxScale);
+  return {
+    scale,
+    deviceMaxScale: maxScale,
+    fraction: maxScale > 0 ? Math.min(1, Math.max(0, scale / maxScale)) : 0
+  };
 };
+
+export const resolveLegacyProgressionGenerationScale = (
+  baseScale: number,
+  track: LegacyProgressionTrack,
+  options: LegacyProgressionGenerationScaleOptions = {}
+): number => resolveLegacyProgressionScaleDetail(baseScale, track, options).scale;
 
 export const resolveLegacyProgressionViewportScaleCap = (
   options: LegacyProgressionGenerationScaleOptions
