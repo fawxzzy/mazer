@@ -776,7 +776,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('zeroHoldStartedAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null');
     expect(menuSceneSource).toContain('titleVisiblePieces');
     expect(menuSceneSource).toContain('titleFullyDeconstructed');
-    expect(menuSceneSource).toContain('LEGACY_PLAYER_SPAWN_BEAM_COLOR');
+    // The outbound laser and the diamonds' stored energy now sample the same
+    // midnight-rainbow material the player trail carries
+    // (resolveLegacyIridescentTrailColor), one stop per origin, instead of
+    // the flat green LEGACY_PLAYER_SPAWN_BEAM_COLOR used to share.
+    expect(menuSceneSource).toContain('const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);');
     expect(menuSceneSource).toContain('private drawLegacyBackdropSigils(width: number, height: number, time: number): void');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropGlassShards(');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropDriftRunes(');
