@@ -1,7 +1,16 @@
--- PROPOSED, NOT YET APPLIED. Named without a timestamp prefix deliberately
--- so it does not run as part of the normal migration sequence -- rename
--- with a real timestamp only after someone who owns the live database has
--- reviewed this and confirmed it against the actual current row shapes.
+-- APPLIED to production 2026-08-28 via the Supabase Management API, with
+-- explicit user sign-off first. Preflight found 7 affected rows (spot
+-- checked; the highest, player_level 111 with target_complexity 30 instead
+-- of 400, matched the exact reported symptom -- "level 111 but plays like
+-- level 6"). Postimage confirmed 0 rows remaining inconsistent, both the
+-- player_target_complexity column and the JSON mirror. This file is kept,
+-- renamed from its original PROPOSED_ (no-timestamp) filename, as the
+-- historical record of the fix -- re-running it against the same data is a
+-- no-op (its own WHERE clause only touches rows still inconsistent).
+--
+-- A companion fix for mazer_ai_progression_states (2 affected rows, same
+-- root cause, different table/JSON shape) shipped alongside this file --
+-- see 20260828140100_mazer_ai_progression_target_complexity_closure.sql.
 --
 -- Root cause this repairs: 20260827170000_mazer_progression_ordinal_closure.sql
 -- ("R017 monotonic union") closed the player_level / player_completed_cycles
@@ -111,16 +120,3 @@ end;
 $postimage$;
 
 commit;
-
--- Recommended before applying to production:
--- 1. Run the closure-only SELECT (the "with closure as (...) select * from closure")
---    by itself first against a read replica or in a transaction you roll
---    back, and manually spot-check a handful of affected user_ids against
---    what the client actually shows them, to confirm this matches lived
---    reality before writing anything.
--- 2. Consider whether ai-runner tracks need the identical repair --
---    R017's own closure touched both tracks; this proposal currently
---    covers mazer_progression_states directly by user_id/player_* columns,
---    which is player-track-only. If ai-runner has an equivalent
---    ai_target_complexity column that could have drifted the same way,
---    extend this migration to cover it before applying.
