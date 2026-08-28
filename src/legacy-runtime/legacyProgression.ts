@@ -718,8 +718,10 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
         // rising off zero), then multiple routes to the goal
         // (routeQualityReinforcementMultiplier, already present below) and
         // finally bleed-off/wrap paths (borderFeederTargetPerSide /
-        // requiredOppositeBorderConnections.vertical, both still gated to
-        // starterDepth >= 4 i.e. level 6+, unchanged from before).
+        // requiredOppositeBorderConnections.vertical) -- pushed back to
+        // starterDepth >= 6, the single last level of starter (level 8),
+        // rather than >= 4 (level 6) per feedback that bleed paths were
+        // showing up too early in a player's first handful of levels.
         // minCheckpoints must never sit above checkpointCountOverride --
         // normalizeLegacyMazeGenerationProfile clamps the override up to
         // minCheckpoints, so a flat minCheckpoints: 4 floor was silently
@@ -727,12 +729,12 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
         // back up to 4, undoing the early part of this exact ramp.
         const checkpointCountOverride = [2, 3, 5, 8][starterDepth] ?? null;
         return {
-          borderFeederTargetPerSide: starterDepth >= 4 ? 1 : 0,
+          borderFeederTargetPerSide: starterDepth >= 6 ? 1 : 0,
           checkpointCountMultiplier: 0.44 + (starterDepth * (0.2 / 6)),
           checkpointCountOverride,
           maxDeadEndCount: [0, 1, 2, 3, 5][starterDepth] ?? null,
           minCheckpoints: Math.min(4, checkpointCountOverride ?? 4),
-          requiredOppositeBorderConnections: { horizontal: false, vertical: starterDepth >= 4 },
+          requiredOppositeBorderConnections: { horizontal: false, vertical: starterDepth >= 6 },
           routeQualityReinforcementMultiplier: Math.min(0.35, starterDepth * (0.35 / 6)),
           shortcutCountMultiplier: Math.min(0.35, starterDepth * (0.35 / 6)),
           straightnessBias: Math.max(0.1, 0.6 - (starterDepth * 0.08))

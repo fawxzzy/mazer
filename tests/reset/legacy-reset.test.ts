@@ -857,7 +857,13 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 1000;');
+    // Shortened from 1000ms -- resolveLegacyMenuDeconstructHandoffProgress
+    // computes a real value across this whole window but nothing ever
+    // rendered anything driven by it, so the full second was a genuinely
+    // static, unchanging screen between deconstruct finishing and the next
+    // build starting (the reported "hard pause / screen freeze" between
+    // maze generations).
+    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 300;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = 860;');
     expect(menuSceneSource).toContain("from '../legacy-runtime/legacyPlayerTransfer';");
@@ -888,9 +894,16 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawRowLimit(): number | null');
     expect(menuSceneSource).toContain('private buildLegacyMenuStaticDrawTileOrder(): LegacyPoint[]');
     expect(menuSceneSource).toContain('return buildLegacyMazeRevealOrder(this.maze);');
-    expect(animationCadenceSource).toContain('maze.generationBuildTrace?.pathTiles');
-    expect(animationCadenceSource).toContain('maze.generationBuildTrace?.shortcutTiles');
-    expect(animationCadenceSource).toContain('maze.generationBuildTrace?.reinforcementShortcutTiles');
+    // The reveal order is a plain BFS flood from the start tile through the
+    // maze's own real connectivity now, not an ordering seeded from
+    // generation-trace fields -- a trace-carving-order-then-row-scan
+    // approach could place spatially distant tiles next to each other in
+    // the reveal sequence (a visible "confetti" scatter), where BFS
+    // guarantees a tile only reveals once something already-revealed is
+    // physically adjacent to it.
+    expect(animationCadenceSource).toContain('resolveLegacyWalkableGridNeighbors(grid, point)');
+    expect(animationCadenceSource).not.toContain('generationBuildTrace?.pathTiles');
+    expect(animationCadenceSource).not.toContain('generationBuildTrace?.shortcutTiles');
     expect(menuSceneSource).toContain('private refreshLegacyMenuStaticDrawVisibleTileKeys(): void');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawDemoGateAtMs(): number');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDeconstructDurationMs(): number');

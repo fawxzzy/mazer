@@ -1,11 +1,10 @@
-import type { LegacyPoint } from './legacyMaze';
+import { resolveLegacyWalkableGridNeighbors, type LegacyPoint } from './legacyMaze';
 
 export const LEGACY_ANIMATION_CADENCE_VERSION = 'legacy-animation-cadence-v2' as const;
 export const LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS = 8000;
 export const LEGACY_TRAIL_SHINE_CYCLE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS * 2;
 export const LEGACY_TRAIL_PULSE_SWEEP_PERIOD_MS = 2600;
-export const LEGACY_MAZE_REVEAL_STRATEGY_VERSION = 'interleaved-non-solution-v1' as const;
-export const LEGACY_MAZE_REVEAL_NON_SOLUTION_BURST = 2;
+export const LEGACY_MAZE_REVEAL_STRATEGY_VERSION = 'flood-fill-bfs-v1' as const;
 
 export type LegacyTrailShineDirection = 'away-from-player' | 'toward-player';
 
@@ -124,80 +123,78 @@ export const resolveLegacyTrailPulseSweepMotion = ({
   };
 };
 
+// Floods outward from the start tile through the maze's own real
+// connectivity (a plain grid BFS, reusing the same wrap-aware neighbor
+// resolver the solver itself uses) instead of the old
+// generationBuildTrace-ordered-then-row-scanned approach. The trace order
+// reflected internal carving order, not spatial adjacency, so tiles from
+// opposite corners of the board could land next to each other in the
+// reveal sequence -- a "confetti" scatter that only looked like a single
+// coherent maze once the later full-grid row scan finally caught up and
+// visibly flooded the remaining rows all at once. BFS guarantees a tile
+// only reveals once something already-revealed is physically adjacent to
+// it, so every corridor -- side branch or main route alike -- grows
+// continuously from its own branch point outward, the way water actually
+// spreads through a maze. It also satisfies "don't show the solution
+// first" for free: a BFS frontier reveals every tile at a given graph
+// distance together, so a side branch at the same depth as the solution's
+// next step reveals in the same wave as that step, not after it.
 export const buildLegacyMazeRevealOrder = (maze: LegacyRevealMaze): LegacyPoint[] => {
+  const grid = maze.grid as boolean[][];
   const orderedTiles: LegacyPoint[] = [];
   const seen = new Set<string>();
-  const solutionKeys = new Set(maze.solutionPath.map(pointKey));
-  const appendTile = (target: LegacyPoint[], point: LegacyPoint | undefined): void => {
-    if (!point || maze.grid[point.y]?.[point.x] !== true) {
-      return;
+  const enqueue = (point: LegacyPoint): boolean => {
+    if (grid[point.y]?.[point.x] !== true) {
+      return false;
     }
     const key = pointKey(point);
     if (seen.has(key)) {
-      return;
+      return false;
     }
     seen.add(key);
-    target.push(copyPoint(point));
+    orderedTiles.push(copyPoint(point));
+    return true;
   };
 
-  appendTile(orderedTiles, maze.generationBuildTrace?.start ?? maze.start);
-
-  const nonSolutionTiles: LegacyPoint[] = [];
-  const solutionTiles: LegacyPoint[] = [];
-  const candidateSeen = new Set(seen);
-  const appendCandidate = (target: LegacyPoint[], point: LegacyPoint | undefined): void => {
-    if (!point || maze.grid[point.y]?.[point.x] !== true) {
-      return;
-    }
-    const key = pointKey(point);
-    if (candidateSeen.has(key)) {
-      return;
-    }
-    candidateSeen.add(key);
-    target.push(copyPoint(point));
-  };
-
-  for (const point of maze.generationBuildTrace?.pathTiles ?? []) {
-    if (!solutionKeys.has(pointKey(point))) {
-      appendCandidate(nonSolutionTiles, point);
-    }
-  }
-  for (const point of maze.generationBuildTrace?.shortcutTiles ?? []) {
-    if (!solutionKeys.has(pointKey(point))) {
-      appendCandidate(nonSolutionTiles, point);
-    }
-  }
-  for (const point of maze.generationBuildTrace?.reinforcementShortcutTiles ?? []) {
-    if (!solutionKeys.has(pointKey(point))) {
-      appendCandidate(nonSolutionTiles, point);
-    }
-  }
-  for (let y = 0; y < maze.height; y += 1) {
-    for (let x = 0; x < maze.width; x += 1) {
-      const point = { x, y };
-      if (maze.grid[y]?.[x] === true && !solutionKeys.has(pointKey(point))) {
-        appendCandidate(nonSolutionTiles, point);
+  const seedPoint = maze.generationBuildTrace?.start ?? maze.start;
+  let frontier: LegacyPoint[] = [];
+  if (enqueue(seedPoint)) {
+    frontier = [seedPoint];
+  } else {
+    // Defensive only: a real maze's own start is always walkable. If it
+    // somehow isn't, seed the flood from the first walkable tile found
+    // instead of producing an empty order.
+    outer: for (let y = 0; y < maze.height; y += 1) {
+      for (let x = 0; x < maze.width; x += 1) {
+        const point = { x, y };
+        if (enqueue(point)) {
+          frontier = [point];
+          break outer;
+        }
       }
     }
   }
-  for (const point of maze.solutionPath) {
-    appendCandidate(solutionTiles, point);
+
+  while (frontier.length > 0) {
+    const nextFrontier: LegacyPoint[] = [];
+    for (const point of frontier) {
+      for (const neighbor of resolveLegacyWalkableGridNeighbors(grid, point)) {
+        if (enqueue(neighbor)) {
+          nextFrontier.push(neighbor);
+        }
+      }
+    }
+    frontier = nextFrontier;
   }
 
-  let nonSolutionIndex = 0;
-  let solutionIndex = 0;
-  while (nonSolutionIndex < nonSolutionTiles.length || solutionIndex < solutionTiles.length) {
-    for (
-      let burstIndex = 0;
-      burstIndex < LEGACY_MAZE_REVEAL_NON_SOLUTION_BURST && nonSolutionIndex < nonSolutionTiles.length;
-      burstIndex += 1
-    ) {
-      appendTile(orderedTiles, nonSolutionTiles[nonSolutionIndex]);
-      nonSolutionIndex += 1;
-    }
-    if (solutionIndex < solutionTiles.length) {
-      appendTile(orderedTiles, solutionTiles[solutionIndex]);
-      solutionIndex += 1;
+  // Defensive only: every generated play/menu maze is normalized to one
+  // connected floor component elsewhere, so BFS from a walkable start
+  // should already reach every floor tile. Kept as a fallback so an
+  // unreachable stray tile is still appended rather than silently missing
+  // from the order the draw loop iterates.
+  for (let y = 0; y < maze.height; y += 1) {
+    for (let x = 0; x < maze.width; x += 1) {
+      enqueue({ x, y });
     }
   }
 
