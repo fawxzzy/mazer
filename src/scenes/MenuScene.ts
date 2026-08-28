@@ -1162,6 +1162,13 @@ const MAZER_TILE_FONT_ADVANCE = MAZER_TILE_FONT_GLYPH_WIDTH - 8;
 // Comfortably covers every string this renders today (level numbers are at
 // most a handful of digits) with real headroom.
 const LEGACY_TILE_FONT_GLYPH_POOL_SIZE = 8;
+// The literal "MAZER" wordmark, rendered with the real tile-font raster
+// asset (see drawLegacyMenuPathTitle) instead of the maze-path dot-cell
+// glyph it used to be drawn from exclusively.
+const LEGACY_TITLE_WORD = 'MAZER';
+// "MAZER", "START", and "LOGIN" are all exactly 5 characters -- covers the
+// title wordmark and both primary front-door button labels with no waste.
+const LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE = 5;
 // Native pixel size (square) of the iridescent-diamond VFX source art --
 // see docs/assets/mazer-vfx-source-provenance.md.
 const MAZER_VFX_DIAMOND_SOURCE_SIZE = 1254;
@@ -1478,6 +1485,11 @@ export class MenuScene extends Phaser.Scene {
   // replaces the procedural drawLegacyMenuPathTitleDiamond shape entirely
   // when the texture loaded successfully.
   private titleOrbitDiamondImages: Phaser.GameObjects.Image[] = [];
+  // Pool rendering the literal "MAZER" wordmark from the real tile-font
+  // raster asset (see LEGACY_TITLE_WORD / drawLegacyMenuPathTitle) -- falls
+  // back to the original maze-path dot-cell glyph only if the asset never
+  // loaded.
+  private titleTileFontImagePool: Phaser.GameObjects.Image[] = [];
   private levelAnnouncerLabelText!: Phaser.GameObjects.Text;
   private levelAnnouncerWasVisible = false;
   private levelAnnouncerBuildFadeOutArmed = false;
@@ -1774,6 +1786,13 @@ export class MenuScene extends Phaser.Scene {
       this.add.image(0, 0, MAZER_VFX_DIAMOND_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
     ));
     this.boardZoomContainer.add(this.titleOrbitDiamondImages);
+    // Added to boardZoomContainer, same reasoning as titleOrbitDiamondImages
+    // above: the title wordmark lives in that same local coordinate space
+    // (titleGraphics is a member of it too) and must scale with it.
+    this.titleTileFontImagePool = Array.from({ length: LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE }, () => (
+      this.add.image(0, 0, MAZER_TILE_FONT_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
+    ));
+    this.boardZoomContainer.add(this.titleTileFontImagePool);
     this.menuAiProgressionBadgeText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
       fontSize: '13px',
@@ -4949,7 +4968,31 @@ export class MenuScene extends Phaser.Scene {
     const seed = mode === 'play'
       ? this.createFreshLegacyPlayGenerationSeed()
       : this.createFreshLegacyMenuGenerationSeed();
-    const maze = createLegacyRuntimeMazeForMode(mode, scale, seed, profile, { targetComplexity }, aspectRatio);
+    // candidateCount: 1 deliberately deviates from the normal default
+    // candidate-search selection (3-9 full candidate builds, picked by
+    // closest-to-target complexity -- see
+    // resolveLegacyGenerationDefaultCandidateCount) ONLY for this call site.
+    // This precompute exists specifically to cover a time-critical instant
+    // (the player just touched the goal, or the menu demo bot just did) --
+    // measured (scripts/analysis/ad-hoc-bench-goal-freeze.mjs, not
+    // committed) at 100-150ms with the normal default candidate search at
+    // real play scales, an unmissable freeze against the one-frame defer
+    // this feeds (see LEGACY_PLAY_GOAL_DECONSTRUCT_PRECOMPUTE_DEFER_MS's own
+    // comment). A single candidate measured at roughly 10-30ms typical --
+    // still occasionally spikes into the retry path, but a small fraction of
+    // the default search's cost either way. The very first maze of a play
+    // session (startPlayMode) and the menu's own initial generation are
+    // deliberately NOT touched by this -- those happen during a build/
+    // reveal animation the player is already watching, not mid-motion, so
+    // full candidate-search quality is worth its cost there.
+    const maze = createLegacyRuntimeMazeForMode(
+      mode,
+      scale,
+      seed,
+      profile,
+      { candidateCount: 1, targetComplexity },
+      aspectRatio
+    );
     this.pendingLegacyDeconstructResetMaze = { mode, seed, maze };
   }
 
@@ -7205,10 +7248,21 @@ export class MenuScene extends Phaser.Scene {
     const phaseOffset = index * 1.7;
     const twinkle = (Math.sin((time / LEGACY_GOAL_STAR_SPARKLE_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset) + 1) / 2;
     const sparkleColor = Phaser.Display.Color.HSVToRGB((time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS), 0.8, 1).color;
+    // Offset was tuned (radius*1.3) for the old, much smaller procedural
+    // diamond shape. The real VFX diamond image renders at roughly radius*4
+    // diagonal (see the useVfxDiamond branch above) -- a radius*1.3 offset
+    // landed the sparkle well inside that image's own footprint, and since
+    // titleOrbitDiamondImages is added to boardZoomContainer after
+    // titleGraphics (so it renders on top), the sparkle was being drawn
+    // completely underneath the diamond it was supposed to accent. Only
+    // some diamonds ever showed a visible sliver of it, at the animation
+    // phases where their wave-driven radius briefly shrank. radius*2.3
+    // clears the diamond's own half-extent (~radius*2) so every diamond's
+    // sparkle is actually visible, every frame.
     this.drawLegacyFourPointSparkle(
       this.titleGraphics,
-      centerX + (radius * 1.3),
-      centerY - (radius * 1.3),
+      centerX + (radius * 2.3),
+      centerY - (radius * 2.3),
       radius * (0.35 + (twinkle * 0.3)),
       sparkleColor,
       alpha * (0.4 + (twinkle * 0.6))
@@ -7280,6 +7334,7 @@ export class MenuScene extends Phaser.Scene {
     this.titleGraphics.setVisible(sigilsVisible);
     if (!sigilsVisible) {
       this.titleOrbitDiamondImages.forEach((image) => image.setVisible(false));
+      this.titleTileFontImagePool.forEach((image) => image.setVisible(false));
       return;
     }
     const titleTextVisible = this.mode === 'menu';
@@ -7304,7 +7359,55 @@ export class MenuScene extends Phaser.Scene {
       height: titleLayout.rows
     };
 
-    if (titleTextVisible && visibleCells.length > 0) {
+    // Prefer the real Mazer tile-font raster asset (drawLegacyTileFontWord,
+    // same asset/helper the level announcer uses) for the actual "MAZER"
+    // wordmark -- rainbow-tinted per letter via the same iridescent trail
+    // material every other rainbow accent on screen already shares. Falls
+    // back to the original hand-drawn maze-path-cell wordmark (build/glow/
+    // deconstruct choreography, gem facets, prism sweep) only if the font
+    // asset never loaded, so a broken asset never leaves the title blank.
+    let renderedTitleWithTileFont = false;
+    if (titleTextVisible) {
+      const titleCenterX = titleLayout.left + (titleLayout.width / 2);
+      const titleCenterY = titleLayout.top + (titleLayout.height / 2);
+      const tileFontScale = titleLayout.height / MAZER_TILE_FONT_GLYPH_HEIGHT;
+      const titleTrailAnchor = resolveLegacyIridescentTrailColor(
+        0,
+        1,
+        time,
+        this.resolveActiveLegacyProgressionPalette().trailColor
+      );
+      renderedTitleWithTileFont = this.drawLegacyTileFontWord(
+        this.titleTileFontImagePool,
+        LEGACY_TITLE_WORD,
+        titleCenterX,
+        titleCenterY,
+        tileFontScale,
+        titlePresentation.titleAlpha,
+        (index) => resolveLegacyIridescentTrailColor(index, LEGACY_TITLE_WORD.length, time, titleTrailAnchor)
+      );
+
+      if (renderedTitleWithTileFont) {
+        // Same letter-by-letter build-out the maze-path cells used to do,
+        // just measured in whole letters instead of individual dot cells.
+        const revealProgress = this.resolveLegacyMenuPathTitleProgress();
+        const visibleLetterCount = clamp(
+          Math.ceil(LEGACY_TITLE_WORD.length * revealProgress),
+          0,
+          LEGACY_TITLE_WORD.length
+        );
+        this.titleTileFontImagePool.forEach((image, index) => {
+          if (index >= visibleLetterCount) {
+            image.setVisible(false);
+          }
+        });
+      }
+    }
+    if (!renderedTitleWithTileFont) {
+      this.titleTileFontImagePool.forEach((image) => image.setVisible(false));
+    }
+
+    if (!renderedTitleWithTileFont && titleTextVisible && visibleCells.length > 0) {
       for (const cell of visibleCells) {
         this.drawLegacyMenuPathTitleCell(
           cell,
@@ -7320,9 +7423,7 @@ export class MenuScene extends Phaser.Scene {
           }
         );
       }
-    }
 
-    if (titleTextVisible && visibleCells.length > 0) {
       // A trail-color wipe loops across the title tiles while it's on
       // screen -- see resolveLegacyMenuTitleTrailSweepFrame's comment for
       // the fill/hold/revert/hold cycle this drives.
@@ -7367,16 +7468,18 @@ export class MenuScene extends Phaser.Scene {
 
     this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);
 
-    const cursorCell = visibleCells.at(-1);
-    if (cursorCell && visiblePieceCount < titleLayout.cells.length) {
-      const accentInset = Math.max(titleLayout.coreInset + 1, Math.floor(titleLayout.cellSize * 0.28));
-      this.titleGraphics.fillStyle(LEGACY_MENU_PATH_TITLE_ACCENT, LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA);
-      this.titleGraphics.fillRect(
-        titleLayout.left + (cursorCell.column * titleLayout.cellSize) + accentInset,
-        titleLayout.top + (cursorCell.row * titleLayout.cellSize) + accentInset,
-        Math.max(1, titleLayout.cellSize - (accentInset * 2)),
-        Math.max(1, titleLayout.cellSize - (accentInset * 2))
-      );
+    if (!renderedTitleWithTileFont) {
+      const cursorCell = visibleCells.at(-1);
+      if (cursorCell && visiblePieceCount < titleLayout.cells.length) {
+        const accentInset = Math.max(titleLayout.coreInset + 1, Math.floor(titleLayout.cellSize * 0.28));
+        this.titleGraphics.fillStyle(LEGACY_MENU_PATH_TITLE_ACCENT, LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA);
+        this.titleGraphics.fillRect(
+          titleLayout.left + (cursorCell.column * titleLayout.cellSize) + accentInset,
+          titleLayout.top + (cursorCell.row * titleLayout.cellSize) + accentInset,
+          Math.max(1, titleLayout.cellSize - (accentInset * 2)),
+          Math.max(1, titleLayout.cellSize - (accentInset * 2))
+        );
+      }
     }
   }
 
@@ -8040,8 +8143,16 @@ export class MenuScene extends Phaser.Scene {
     const levelDigits = String(track.level);
 
     // Prefer the real Mazer tile-font raster asset (drawLegacyTileFontWord)
-    // -- same rainbow-per-digit coloring the procedural predecessor used,
-    // now on the actual asset instead of a hand-drawn approximation of it.
+    // -- now on the actual asset instead of a hand-drawn approximation of
+    // it. Tinted with a true full-hue HSV sweep (same formula the goal
+    // star's ring/sparkles already use -- see
+    // drawLegacyMenuPathTitleOrbitSigilTwinkle), NOT
+    // resolveLegacyIridescentTrailColor's "midnight" palette (violet through
+    // orchid -- deliberately no red/orange/yellow, since that material reads
+    // as a moody blue/teal/green shimmer, not a rainbow). Reported as
+    // "should be rainbow, why is it not" against that palette; the real
+    // rainbow treatment already used elsewhere on this same screen is what
+    // this switches to.
     const tileFontScale = (numberFontSize / MAZER_TILE_FONT_GLYPH_HEIGHT) * scale;
     const renderedWithTileFont = this.drawLegacyTileFontWord(
       this.levelAnnouncerNumberGlyphPool,
@@ -8050,7 +8161,11 @@ export class MenuScene extends Phaser.Scene {
       centerY,
       tileFontScale,
       alpha,
-      (index) => resolveLegacyIridescentTrailColor(index, Math.max(1, levelDigits.length), time)
+      (index) => Phaser.Display.Color.HSVToRGB(
+        (time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (index / Math.max(1, levelDigits.length)),
+        0.8,
+        1
+      ).color
     );
 
     if (renderedWithTileFont) {
@@ -8163,8 +8278,16 @@ export class MenuScene extends Phaser.Scene {
       height: layout.rows,
       width: layout.columns
     };
+    // Fallback path (tile-font texture failed to load) -- same true
+    // full-hue HSV rainbow the raster path above now uses, not
+    // resolveLegacyIridescentTrailColor's "midnight" (no red/orange/yellow)
+    // palette, so a broken asset doesn't also change what "rainbow" means.
     for (const cell of layout.cells) {
-      const cellColor = resolveLegacyIridescentTrailColor(cell.column, Math.max(1, layout.columns), time);
+      const cellColor = Phaser.Display.Color.HSVToRGB(
+        (time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (cell.column / Math.max(1, layout.columns)),
+        0.8,
+        1
+      ).color;
       this.drawLegacyPathMaterialTile(
         graphics,
         { x: cell.column, y: cell.row },
@@ -9455,6 +9578,73 @@ export class MenuScene extends Phaser.Scene {
         }
       );
     }
+  }
+
+  // Real tile-font raster asset version of drawLegacyMenuFrontDoorGlyphButton
+  // above -- same build-out lifecycle and single-trail-color wash sweep, just
+  // measured per whole letter (via the pool's Image objects) instead of per
+  // dot cell, since the raster glyphs can't be filled cell-by-cell. Preferred
+  // whenever the tile-font texture is loaded; the dot-cell version above
+  // remains the fallback (drawLegacyMenuFrontDoorGlyphButton is left
+  // untouched and still called when this returns false). Returns false (and
+  // hides the whole pool) without drawing anything if the texture never
+  // loaded, matching drawLegacyTileFontWord's own contract.
+  private drawLegacyMenuFrontDoorTileFontButton(
+    pool: readonly Phaser.GameObjects.Image[],
+    word: string,
+    centerX: number,
+    centerY: number,
+    scale: number,
+    time: number,
+    active: boolean
+  ): boolean {
+    if (!this.textures.exists(MAZER_TILE_FONT_TEXTURE_KEY)) {
+      pool.forEach((image) => image.setVisible(false));
+      return false;
+    }
+    const letters = [...word];
+    const visibleLetterCount = clamp(
+      Math.ceil(letters.length * this.resolveLegacyMenuPathTitleProgress()),
+      0,
+      letters.length
+    );
+    if (visibleLetterCount <= 0) {
+      pool.forEach((image) => image.setVisible(false));
+      return true;
+    }
+
+    const trailSweepFrame = this.resolveLegacyMenuTitleTrailSweepFrame(time);
+    const trailColor = resolveLegacyIridescentTrailColor(
+      0,
+      1,
+      time,
+      this.resolveActiveLegacyProgressionPalette().trailColor
+    );
+    const renderedAny = this.drawLegacyTileFontWord(
+      pool,
+      word,
+      centerX,
+      centerY,
+      scale,
+      active ? 1 : 0.94,
+      (index) => {
+        const cellMetric = this.resolveLegacyMenuTitleTrailCellMetric(
+          { column: index, order: 0, row: 0 },
+          letters.length,
+          1
+        );
+        const fillAmount = this.resolveLegacyMenuTitleTrailCellFillAmount(cellMetric, trailSweepFrame);
+        return fillAmount > 0
+          ? mixLegacyIridescentColor(LEGACY_MENU_PATH_CORE, trailColor, fillAmount)
+          : LEGACY_MENU_PATH_CORE;
+      }
+    );
+    pool.forEach((image, index) => {
+      if (index >= visibleLetterCount) {
+        image.setVisible(false);
+      }
+    });
+    return renderedAny;
   }
 
   private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number {
@@ -13751,6 +13941,13 @@ export class MenuScene extends Phaser.Scene {
     // still read from it) but is invisible -- the visible word is the tile
     // glyphs drawn onto `panel` below.
     let glyphLayout: LegacyGlyphWordLayout | null = null;
+    // Pool used only when the tile-font raster asset is available (see
+    // drawLegacyMenuFrontDoorTileFontButton) -- preferred over the dot-cell
+    // fallback below once it's created. Word length maxes out at 5
+    // ("Start"/"Login") so LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE covers
+    // it with no waste.
+    let titleFontButtonImagePool: Phaser.GameObjects.Image[] = [];
+    let tileFontButtonScale = 0;
     if (isPrimaryFrontDoorButton && isLegacyGlyphWordRenderable(text)) {
       label.setAlpha(0);
       const glyphColumns = resolveLegacyGlyphWordColumns(text);
@@ -13766,6 +13963,31 @@ export class MenuScene extends Phaser.Scene {
       panel.setPosition(x, y);
       glyphLayout = resolveLegacyGlyphWordLayout(text, 0, 0, glyphCellSize);
       this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout, 0, false);
+
+      // Fit the real tile-font raster word within the same padded button
+      // bounds the dot-cell fallback above was sized to.
+      const letters = [...text];
+      const tileFontTotalWidthAtScale1 = (
+        (MAZER_TILE_FONT_ADVANCE * Math.max(0, letters.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
+      );
+      const tileFontScaleFromWidth = Math.max(1, width - (glyphPaddingX * 2)) / tileFontTotalWidthAtScale1;
+      const tileFontScaleFromHeight = Math.max(1, height - (glyphPaddingY * 2)) / MAZER_TILE_FONT_GLYPH_HEIGHT;
+      tileFontButtonScale = Math.min(tileFontScaleFromWidth, tileFontScaleFromHeight);
+      titleFontButtonImagePool = Array.from({ length: LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE }, () => (
+        this.add.image(0, 0, MAZER_TILE_FONT_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
+      ));
+      const renderedWithTileFont = this.drawLegacyMenuFrontDoorTileFontButton(
+        titleFontButtonImagePool,
+        text,
+        x,
+        y,
+        tileFontButtonScale,
+        0,
+        false
+      );
+      if (renderedWithTileFont) {
+        panel.clear();
+      }
     }
 
     const setActive = (active: boolean): void => {
@@ -13797,13 +14019,27 @@ export class MenuScene extends Phaser.Scene {
       text,
       updateFrame: glyphLayout
         ? (time: number) => {
-          this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout!, time, primaryButtonActive);
+          const renderedWithTileFont = this.drawLegacyMenuFrontDoorTileFontButton(
+            titleFontButtonImagePool,
+            text,
+            x,
+            y,
+            tileFontButtonScale,
+            time,
+            primaryButtonActive
+          );
+          if (renderedWithTileFont) {
+            panel.clear();
+          } else {
+            this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout!, time, primaryButtonActive);
+          }
         }
         : undefined,
       destroy: () => {
         panel.destroy();
         background.destroy();
         label.destroy();
+        titleFontButtonImagePool.forEach((image) => image.destroy());
       }
     };
   }
