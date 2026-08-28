@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { MAZER_TILE_FONT_TEXTURE_KEY, MAZER_VFX_DIAMOND_TEXTURE_KEY } from './BootScene';
 import {
   applyMazerCanvasBackingResolution,
   resolveMazerCanvasBackingResolution,
@@ -160,6 +161,7 @@ import {
 } from '../legacy-runtime/legacyMenuBackdrop';
 import {
   LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE,
+  LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS,
   mixLegacyIridescentColor,
   resolveLegacyIridescentPlayerCoreColor,
   resolveLegacyIridescentPlayerAccentColor,
@@ -1136,6 +1138,42 @@ const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;
 const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;
 const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = cyberArcadeMaterial.signal.goalEdge;
+// Full rotation period for the goal marker's rainbow ring (drawLegacyGoalStarMarker)
+// -- the star itself spins slower (0.6x this rate, see that method) so the
+// two read as two independently-moving parts rather than one rigid unit.
+const LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS = 5200;
+// One frame's worth of defer (at 60fps) for the goal-reached maze precompute
+// (applyLegacyWorldTurnPlayerMovement) -- just enough for the arrival
+// frame's render to happen before the still-blocking build runs, with
+// enormous margin left in the 340ms ACTIVE_PLAY_GOAL_RESET_HOLD_MS window
+// this needs to finish inside. See that call site's own comment.
+const LEGACY_PLAY_GOAL_DECONSTRUCT_PRECOMPUTE_DEFER_MS = 16;
+// The Mazer tile-font raster asset (see BootScene.ts's own header comment) --
+// a real image/texture, the first one this scene has ever used, loaded and
+// registered before MenuScene starts. Values mirror the asset's own JSON
+// contract (mazer-font-atlas.json's meta.font/meta.atlas) exactly.
+const MAZER_TILE_FONT_GLYPH_WIDTH = 64;
+const MAZER_TILE_FONT_GLYPH_HEIGHT = 80;
+// meta.font.recommendedLetterSpacing is -8 at 1x atlas scale -- advance
+// between glyph origins is the raw cell width plus that (negative) spacing.
+const MAZER_TILE_FONT_ADVANCE = MAZER_TILE_FONT_GLYPH_WIDTH - 8;
+// Comfortably covers every string this renders today (level numbers are at
+// most a handful of digits) with real headroom.
+const LEGACY_TILE_FONT_GLYPH_POOL_SIZE = 8;
+// Native pixel size (square) of the iridescent-diamond VFX source art --
+// see docs/assets/mazer-vfx-source-provenance.md.
+const MAZER_VFX_DIAMOND_SOURCE_SIZE = 1254;
+// The source art's own long axis runs from its lower-left corner to its
+// upper-right corner at zero rotation -- its pointed tip faces up-and-right,
+// roughly -45 degrees in screen-space angle convention (positive x, negative
+// y). Subtracted out wherever the diamond needs to face a specific absolute
+// direction (see drawLegacyMenuPathTitleOrbitSigils's inward-pointing math).
+const MAZER_VFX_DIAMOND_INTRINSIC_TIP_ANGLE = -Math.PI / 4;
+// Twinkle cadence for the goal star's tiny sparkle glints
+// (drawLegacyGoalStarMarker) -- its own constant, quicker than the ring's
+// full-lap spin, so the little twinkles read as a distinct fast shimmer
+// layered on top of the slower overall rotation.
+const LEGACY_GOAL_STAR_SPARKLE_TWINKLE_PERIOD_MS = 900;
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
 const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = cyberArcadeMaterial.signal.warningEdge;
@@ -1178,6 +1216,12 @@ const LEGACY_LEVEL_ANNOUNCER_MIN_SCALE = 0.72;
 const LEGACY_LEVEL_ANNOUNCER_PULSE_PERIOD_MS = 3600;
 const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA = 0.78;
 const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE = 0.94;
+// Twinkle cadence for the small sparkle accents flanking the level-announcer
+// number (drawLegacyLevelAnnouncerTwinkles) -- deliberately its own, quicker
+// constant rather than reusing the number's own slow ambient breathing
+// pulse above, so the sparkles read as a distinct little twinkle instead of
+// just riding the same breath.
+const LEGACY_LEVEL_ANNOUNCER_TWINKLE_PERIOD_MS = 1400;
 // How long the bleed-off dock corridors (resolveLegacyPathBorderDockContinuation)
 // take to shrink back from the true screen edge to the maze's own edge on
 // deconstruct -- a smooth retract instead of the full-length corridor just
@@ -1414,7 +1458,24 @@ export class MenuScene extends Phaser.Scene {
   // the container itself must remain at 1x so a fresh maze never applies an
   // implicit zoom or desynchronizes visual and input coordinates.
   private boardZoomContainer!: Phaser.GameObjects.Container;
-  private levelAnnouncerNumberText!: Phaser.GameObjects.Text;
+  // Was a Phaser.GameObjects.Text rendered in a plain web font -- now built
+  // from the same tile-block glyph material as the title and Start/Login
+  // (see drawLegacyLevelAnnouncerNumberGlyph), redrawn fresh into this
+  // Graphics object every frame in local coordinates exactly like
+  // drawLegacyMenuFrontDoorGlyphButton's own `panel`.
+  private levelAnnouncerNumberGraphics!: Phaser.GameObjects.Graphics;
+  // Pool of reusable Image GameObjects rendering the level number from the
+  // real Mazer tile-font raster asset (drawLegacyTileFontWord) when it's
+  // available -- levelAnnouncerNumberGraphics becomes twinkle-sparkles-only
+  // in that case, falling back to its own procedural glyph rendering only
+  // if the tile-font texture failed to load.
+  private levelAnnouncerNumberGlyphPool: Phaser.GameObjects.Image[] = [];
+  // Pool of reusable Image GameObjects rendering the real iridescent-diamond
+  // VFX source art (see docs/assets/mazer-vfx-source-provenance.md) for the
+  // title's orbit sigils, one per LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS slot --
+  // replaces the procedural drawLegacyMenuPathTitleDiamond shape entirely
+  // when the texture loaded successfully.
+  private titleOrbitDiamondImages: Phaser.GameObjects.Image[] = [];
   private levelAnnouncerLabelText!: Phaser.GameObjects.Text;
   private levelAnnouncerWasVisible = false;
   private levelAnnouncerBuildFadeOutArmed = false;
@@ -1698,13 +1759,19 @@ export class MenuScene extends Phaser.Scene {
       color: '#36ff7d',
       align: 'center'
     })).setOrigin(0.5).setVisible(false);
-    this.levelAnnouncerNumberText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
-      fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
-      fontSize: '64px',
-      fontStyle: 'bold',
-      color: '#36ff7d',
-      align: 'center'
-    })).setOrigin(0.5).setVisible(false);
+    this.levelAnnouncerNumberGraphics = this.add.graphics().setVisible(false);
+    this.levelAnnouncerNumberGlyphPool = Array.from({ length: LEGACY_TILE_FONT_GLYPH_POOL_SIZE }, () => (
+      this.add.image(0, 0, MAZER_TILE_FONT_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
+    ));
+    // Added to boardZoomContainer (not the top-level scene) so these sit in
+    // the exact same local coordinate space and z-order titleGraphics itself
+    // uses (last child = renders above the board layers, and the container
+    // is what the "Board Zoom" setting scales) -- the orbit-pose math
+    // already computes positions in that same space.
+    this.titleOrbitDiamondImages = Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, () => (
+      this.add.image(0, 0, MAZER_VFX_DIAMOND_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
+    ));
+    this.boardZoomContainer.add(this.titleOrbitDiamondImages);
     this.menuAiProgressionBadgeText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
       fontSize: '13px',
@@ -2010,7 +2077,7 @@ export class MenuScene extends Phaser.Scene {
       // overlay depth, so freezing simulation alone can strand its current
       // frame over an input field. Hide both announcer layers explicitly.
       this.levelAnnouncerLabelText.setVisible(false);
-      this.levelAnnouncerNumberText.setVisible(false);
+      this.levelAnnouncerNumberGraphics.setVisible(false);
       this.expireLegacyPlayerMessages(time);
       for (const button of this.uiButtons) {
         button.updateFrame?.(time);
@@ -5444,20 +5511,37 @@ export class MenuScene extends Phaser.Scene {
       this.playCompletedAtMs ??= this.time.now;
       this.recordMazeCycleCompletion('play');
       this.armLegacyPlayerTransferEnergy(this.time.now);
-      // Build the next maze right now, at the goal-reached instant --
+      // Build the next maze at the goal-reached instant -- but deferred by
+      // one frame (this.time.delayedCall, not called inline here), not
+      // literally synchronous on this exact frame. createLegacyRuntimeMazeForMode
+      // is genuinely slow (up to ~170ms for a complex maze -- see Generation
+      // V2 Wave 1.5's own measured convergence data), and calling it inline,
+      // in the same call stack as the touch/step that just landed the player
+      // on the goal tile, blocked the main thread before THIS frame (the one
+      // showing the player arriving) could even paint -- the reported
+      // "freezes right as you touch the end tile" glitch. Deferring by one
+      // frame lets the arrival frame render first; the still-blocking build
+      // then runs a frame later, which schedulePlayResetReturn's
+      // ACTIVE_PLAY_GOAL_RESET_HOLD_MS hold (340ms, many real frames) has
+      // enormous margin to absorb -- unchanged from the original reasoning
+      // below, just shifted off the exact touch frame:
       // schedulePlayResetReturn below holds for ACTIVE_PLAY_GOAL_RESET_HOLD_MS
-      // (340ms, many real frames) before armLegacyMenuStaticDeconstructStage
-      // ever runs and consumes this. That gives the synchronous build real
-      // wall-clock room to finish well before it's needed, instead of
-      // running inside armLegacyMenuStaticDeconstructStage itself, which
-      // eats directly into the outbound player-transfer-energy timer and
-      // corridor clock it arms in that same call -- both short (a few
-      // hundred ms), wall-clock-timed animation windows that a stall inside
-      // that call can (and does, for anything but a trivial maze) consume
-      // entirely, making the laser and the deconstruct-to-build deceleration
-      // both skip straight to their post-window state instead of visibly
-      // playing.
-      this.precomputeLegacyDeconstructResetMaze('play');
+      // before armLegacyMenuStaticDeconstructStage ever runs and consumes
+      // this. That gives the build real wall-clock room to finish well
+      // before it's needed, instead of running inside
+      // armLegacyMenuStaticDeconstructStage itself, which eats directly into
+      // the outbound player-transfer-energy timer and corridor clock it
+      // arms in that same call -- both short (a few hundred ms), wall-clock-
+      // timed animation windows that a stall inside that call can (and
+      // does, for anything but a trivial maze) consume entirely, making the
+      // laser and the deconstruct-to-build deceleration both skip straight
+      // to their post-window state instead of visibly playing.
+      // consumeLegacyDeconstructResetMaze's own existing "didn't call the
+      // early precompute" fallback covers the (now even less likely) case
+      // where this deferred call hasn't finished by the time it's needed.
+      this.time.delayedCall(LEGACY_PLAY_GOAL_DECONSTRUCT_PRECOMPUTE_DEFER_MS, () => {
+        this.precomputeLegacyDeconstructResetMaze('play');
+      });
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
       this.triggerLegacyHapticPulse([18, 40, 18, 40, 32]);
@@ -7019,6 +7103,7 @@ export class MenuScene extends Phaser.Scene {
     // same relocation the deconstruct handoff burst got earlier, just for
     // the title's sparkle sigils.
     const orbitGeometry = this.resolveLegacyMenuPathTitleOrbitGeometry(titleLayout);
+    const useVfxDiamond = this.textures.exists(MAZER_VFX_DIAMOND_TEXTURE_KEY);
 
     for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
       const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
@@ -7032,24 +7117,92 @@ export class MenuScene extends Phaser.Scene {
       const wave = isLifecycleSpinActive
         ? 0.62 + (Math.sin((orbitPhase * Math.PI * 2) + (index * 1.38)) * 0.28)
         : 0.62;
-      // Smaller than the previous pass and using the same pale-core/teal-rim
-      // colors as the actual corridor and title tiles instead of the
-      // warm/gem gem-tone alternation, so these read as small maze tiles
-      // orbiting the edge rather than jewelry.
       const radius = Math.max(4, Math.round(6 + (wave * 3)));
       const alpha = clamp((0.22 + (wave * 0.3)) * alphaScale, 0.16, 0.56);
 
-      this.drawLegacyMenuPathTitleDiamond(
-        x,
-        y,
-        radius,
-        LEGACY_MENU_PATH_CORE,
-        alpha * 0.85,
-        LEGACY_MENU_PATH_EDGE,
-        alpha,
-        facing
-      );
+      if (useVfxDiamond) {
+        // Real iridescent-diamond VFX source art (see
+        // docs/assets/mazer-vfx-source-provenance.md) instead of the
+        // procedural crystal-facet triangle pair -- already a rainbow/
+        // iridescent image, so no additional tint is applied. Scaled way
+        // down from its native 1254x1254 -- but not all the way down to the
+        // old procedural diamond's own tiny footprint (radius*2.3): at that
+        // extreme a downscale this asset's whole rainbow-crystal detail
+        // washes out to a pale blob, defeating the point of using the real
+        // art. radius*6.5 (screenshot-verified) was recognizable but big
+        // enough to overlap the MAZER/START lettering at some orbit
+        // positions -- radius*4 is the compromise that stayed clear of both
+        // in verification.
+        const image = this.titleOrbitDiamondImages[index];
+        if (image) {
+          const targetDiagonal = radius * 4;
+          // Always points its long axis in toward the true screen center,
+          // regardless of travel direction -- `facing` (from
+          // resolveLegacyMenuPathTitleOrbitPose) follows the travel tangent
+          // while actively spinning, which reads fine for the old symmetric
+          // procedural diamond but looks wrong for this asset's own single
+          // pointed tip. Deliberately this.layout.width/2,height/2 (the
+          // actual viewport center) rather than orbitGeometry's own
+          // centerX/centerY -- that geometry's "center" is the title's own
+          // crest-relative center, which sits well above true screen
+          // center, not what "toward screen center" means here. The source
+          // art's tip points toward the upper-right at zero rotation
+          // (roughly -45 degrees in screen space), so that offset is
+          // subtracted out before applying inwardAngle.
+          const inwardAngle = Math.atan2((this.layout.height / 2) - y, (this.layout.width / 2) - x);
+          image
+            .setPosition(x, y)
+            .setRotation(inwardAngle - MAZER_VFX_DIAMOND_INTRINSIC_TIP_ANGLE)
+            .setScale(targetDiagonal / MAZER_VFX_DIAMOND_SOURCE_SIZE)
+            .setAlpha(alpha)
+            .setVisible(true);
+        }
+        this.drawLegacyMenuPathTitleOrbitSigilTwinkle(index, x, y, radius, alpha, time);
+      } else {
+        // Smaller than the previous pass and using the same pale-core/teal-
+        // rim colors as the actual corridor and title tiles instead of the
+        // warm/gem gem-tone alternation, so these read as small maze tiles
+        // orbiting the edge rather than jewelry.
+        this.drawLegacyMenuPathTitleDiamond(
+          x,
+          y,
+          radius,
+          LEGACY_MENU_PATH_CORE,
+          alpha * 0.85,
+          LEGACY_MENU_PATH_EDGE,
+          alpha,
+          facing
+        );
+      }
     }
+  }
+
+  // A tiny twinkling sparkle riding alongside each orbit-sigil diamond --
+  // same independently-phased sine-pulse technique as
+  // drawLegacyLevelAnnouncerTwinkles and the goal star marker's own surface
+  // glints, drawn into titleGraphics (already cleared/redrawn every frame
+  // as part of the title's own draw pass).
+  private drawLegacyMenuPathTitleOrbitSigilTwinkle(
+    index: number,
+    centerX: number,
+    centerY: number,
+    radius: number,
+    alpha: number,
+    time: number
+  ): void {
+    if (this.prefersLegacyReducedMotion()) {
+      return;
+    }
+    const phaseOffset = index * 1.7;
+    const twinkle = (Math.sin((time / LEGACY_GOAL_STAR_SPARKLE_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset) + 1) / 2;
+    const sparkleColor = Phaser.Display.Color.HSVToRGB((time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS), 0.8, 1).color;
+    this.titleGraphics.fillStyle(sparkleColor, alpha * (0.4 + (twinkle * 0.6)));
+    this.drawLegacyFourPointSparkle(
+      this.titleGraphics,
+      centerX + (radius * 1.3),
+      centerY - (radius * 1.3),
+      radius * (0.35 + (twinkle * 0.3))
+    );
   }
 
   // One continuous loop: fill (0..1), hold, revert (0..1), hold. Fill and
@@ -7116,6 +7269,7 @@ export class MenuScene extends Phaser.Scene {
       && this.overlay === 'none';
     this.titleGraphics.setVisible(sigilsVisible);
     if (!sigilsVisible) {
+      this.titleOrbitDiamondImages.forEach((image) => image.setVisible(false));
       return;
     }
     const titleTextVisible = this.mode === 'menu';
@@ -7856,7 +8010,8 @@ export class MenuScene extends Phaser.Scene {
     const { alpha, scale } = this.resolveLegacyLevelAnnouncerVisualState(time);
     this.levelAnnouncerLabelText.setVisible(false);
     if (alpha <= 0) {
-      this.levelAnnouncerNumberText.setVisible(false);
+      this.levelAnnouncerNumberGraphics.setVisible(false);
+      this.levelAnnouncerNumberGlyphPool.forEach((image) => image.setVisible(false));
       return;
     }
 
@@ -7865,20 +8020,218 @@ export class MenuScene extends Phaser.Scene {
     const centerX = this.layout.width / 2;
     const centerY = this.layout.height / 2;
     const numberFontSize = Math.round(Math.min(this.layout.width, this.layout.height) * 0.16);
-    // Rainbow instead of the track's own difficulty-tier color -- this is
-    // purely a "here's your level" moment now, not a place that still needs
-    // to communicate difficulty color-coding. Same midnight-rainbow material
-    // (and the same cycle speed) the trail already carries elsewhere, so it
-    // reads as the same "Mazer" rainbow rather than a new, unrelated effect.
-    const rainbowColor = toCyberArcadeCssHex(resolveLegacyIridescentTrailColor(0, 1, time));
-    this.levelAnnouncerNumberText
-      .setText(String(track.level))
-      .setFontSize(numberFontSize)
-      .setColor(rainbowColor)
+    const levelDigits = String(track.level);
+
+    // Prefer the real Mazer tile-font raster asset (drawLegacyTileFontWord)
+    // -- same rainbow-per-digit coloring the procedural predecessor used,
+    // now on the actual asset instead of a hand-drawn approximation of it.
+    const tileFontScale = (numberFontSize / MAZER_TILE_FONT_GLYPH_HEIGHT) * scale;
+    const renderedWithTileFont = this.drawLegacyTileFontWord(
+      this.levelAnnouncerNumberGlyphPool,
+      levelDigits,
+      centerX,
+      centerY,
+      tileFontScale,
+      alpha,
+      (index) => resolveLegacyIridescentTrailColor(index, Math.max(1, levelDigits.length), time)
+    );
+
+    if (renderedWithTileFont) {
+      const totalWidth = (
+        (MAZER_TILE_FONT_ADVANCE * Math.max(0, levelDigits.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
+      ) * tileFontScale;
+      this.levelAnnouncerNumberGraphics.clear();
+      this.drawLegacyLevelAnnouncerTwinkles(
+        this.levelAnnouncerNumberGraphics,
+        { left: -(totalWidth / 2), width: totalWidth, cellSize: MAZER_TILE_FONT_GLYPH_WIDTH * tileFontScale * 0.14 },
+        time
+      );
+      this.levelAnnouncerNumberGraphics.setPosition(centerX, centerY).setScale(1).setAlpha(alpha).setVisible(true);
+      return;
+    }
+
+    // Tile-font asset unavailable (failed to load) -- fall back to the
+    // procedural tile-block glyph rendering (same corridor material the
+    // title and Start/Login are built from) rather than showing nothing.
+    this.levelAnnouncerNumberGlyphPool.forEach((image) => image.setVisible(false));
+    const cellSize = Math.max(2, Math.round(numberFontSize / 9));
+    const glyphLayout = resolveLegacyGlyphWordLayout(levelDigits, 0, 0, cellSize);
+    this.drawLegacyLevelAnnouncerNumberGlyph(this.levelAnnouncerNumberGraphics, glyphLayout, time);
+    this.levelAnnouncerNumberGraphics
       .setPosition(centerX, centerY)
       .setScale(scale)
       .setAlpha(alpha)
       .setVisible(true);
+  }
+
+  // Renders `word` from the real Mazer tile-font raster asset (a white-on-
+  // transparent atlas, tinted per-character via Image.setTint -- see
+  // BootScene.ts's own header comment for why this exists and how its
+  // frames get registered) into a reusable pool of Image GameObjects,
+  // hiding whichever pool slots aren't needed. Returns false (and hides the
+  // whole pool) without drawing anything if the texture never loaded, so
+  // callers can fall back to their own procedural glyph rendering.
+  private drawLegacyTileFontWord(
+    pool: readonly Phaser.GameObjects.Image[],
+    word: string,
+    centerX: number,
+    centerY: number,
+    scale: number,
+    alpha: number,
+    tintForIndex: (index: number, char: string) => number
+  ): boolean {
+    if (!this.textures.exists(MAZER_TILE_FONT_TEXTURE_KEY)) {
+      pool.forEach((image) => image.setVisible(false));
+      return false;
+    }
+    const texture = this.textures.get(MAZER_TILE_FONT_TEXTURE_KEY);
+    const characters = [...word];
+    const advance = MAZER_TILE_FONT_ADVANCE * scale;
+    const glyphWidth = MAZER_TILE_FONT_GLYPH_WIDTH * scale;
+    const totalWidth = (advance * Math.max(0, characters.length - 1)) + glyphWidth;
+    const startX = centerX - (totalWidth / 2) + (glyphWidth / 2);
+    let renderedAny = false;
+    characters.forEach((char, index) => {
+      const image = pool[index];
+      if (!image) {
+        return;
+      }
+      const frameKey = char.toUpperCase();
+      if (!texture.has(frameKey)) {
+        image.setVisible(false);
+        return;
+      }
+      image
+        .setTexture(MAZER_TILE_FONT_TEXTURE_KEY, frameKey)
+        .setPosition(startX + (index * advance), centerY)
+        .setScale(scale)
+        .setTint(tintForIndex(index, char))
+        .setAlpha(alpha)
+        .setVisible(true);
+      renderedAny = true;
+    });
+    for (let index = characters.length; index < pool.length; index += 1) {
+      pool[index]?.setVisible(false);
+    }
+    return renderedAny;
+  }
+
+  // Renders the level-announcer's number as tile-block glyph cells (same
+  // corridor material every other glyph word on screen is built from) with
+  // a rainbow sampled across the word's own column span -- the same
+  // midnight-rainbow material (and cycle speed) the trail already carries
+  // elsewhere, spread across the digits instead of flashing every cell the
+  // same color in lockstep, so it reads as one continuous rainbow sweep
+  // across the number. Preserves the plain rendered-text predecessor's
+  // deliberate "rainbow, not difficulty-tier color" choice (see this
+  // method's caller) while switching only the glyph shape to tile-block.
+  //
+  // Also draws two small twinkling sparkle accents flanking the number,
+  // vertically centered on it (local y = 0 is exactly the glyph word's own
+  // vertical center, since resolveLegacyGlyphWordLayout centers the layout
+  // around local (0, 0)) -- drawn into this same Graphics object so they
+  // inherit the caller's position/scale/alpha transform for free instead of
+  // needing their own separately-computed one.
+  private drawLegacyLevelAnnouncerNumberGlyph(
+    graphics: Phaser.GameObjects.Graphics,
+    layout: LegacyGlyphWordLayout,
+    time: number
+  ): void {
+    graphics.clear();
+    if (layout.cells.length <= 0) {
+      return;
+    }
+    const pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'> = {
+      grid: layout.grid,
+      height: layout.rows,
+      width: layout.columns
+    };
+    for (const cell of layout.cells) {
+      const cellColor = resolveLegacyIridescentTrailColor(cell.column, Math.max(1, layout.columns), time);
+      this.drawLegacyPathMaterialTile(
+        graphics,
+        { x: cell.column, y: cell.row },
+        pathSource,
+        layout.left,
+        layout.top,
+        layout.cellSize,
+        {
+          coreAlpha: 0.96,
+          coreColor: cellColor,
+          drawCue: false,
+          edgeAlpha: 0.88,
+          edgeColor: mixLegacyIridescentColor(cellColor, 0x000000, 0.35)
+        }
+      );
+    }
+
+    this.drawLegacyLevelAnnouncerTwinkles(graphics, layout, time);
+  }
+
+  // Two small twinkling sparkle accents, one flanking each side of the
+  // level-announcer number, vertically centered on it. Each side gets a
+  // primary sparkle plus a smaller companion offset above it -- reads as a
+  // little twinkling cluster rather than a single blinking dot -- and the
+  // two sides pulse on independently phased sine waves so they don't blink
+  // in lockstep.
+  private drawLegacyLevelAnnouncerTwinkles(
+    graphics: Phaser.GameObjects.Graphics,
+    layout: Pick<LegacyGlyphWordLayout, 'left' | 'width' | 'cellSize'>,
+    time: number
+  ): void {
+    if (this.prefersLegacyReducedMotion()) {
+      return;
+    }
+    const gap = Math.max(6, layout.cellSize * 2.4);
+    const baseSize = Math.max(3, layout.cellSize * 1.6);
+    const localCenterY = 0;
+
+    const drawTwinkleCluster = (x: number, mirror: number, phaseOffset: number): void => {
+      const primaryPhase = (Math.sin((time / LEGACY_LEVEL_ANNOUNCER_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset) + 1) / 2;
+      const primaryColor = resolveLegacyIridescentTrailColor(0, 1, time);
+      graphics.fillStyle(primaryColor, 0.5 + (primaryPhase * 0.5));
+      this.drawLegacyFourPointSparkle(graphics, x, localCenterY, baseSize * (0.75 + (primaryPhase * 0.4)));
+
+      const secondaryPhase = (Math.sin((time / LEGACY_LEVEL_ANNOUNCER_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset + (Math.PI * 0.6)) + 1) / 2;
+      // Rainbow too, not plain white -- sampled at a time-shifted offset
+      // from the primary sparkle's own color so the two read as two
+      // distinct hues from the same rainbow cycle rather than identical.
+      const secondaryColor = resolveLegacyIridescentTrailColor(0, 1, time + (LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS * 0.3));
+      graphics.fillStyle(secondaryColor, 0.4 + (secondaryPhase * 0.5));
+      this.drawLegacyFourPointSparkle(
+        graphics,
+        x + (baseSize * 0.9 * mirror),
+        localCenterY - (baseSize * 1.1),
+        baseSize * (0.35 + (secondaryPhase * 0.25))
+      );
+    };
+
+    drawTwinkleCluster(layout.left - gap, 1, 0);
+    drawTwinkleCluster(layout.left + layout.width + gap, -1, Math.PI * 0.35);
+  }
+
+  // A small 4-point sparkle/glint glyph (two crossed elongated diamonds),
+  // used for the level-announcer's twinkling accents and the goal star
+  // marker's own surface glints -- reads as a sparkle rather than a plain
+  // dot. Caller sets fillStyle before calling.
+  private drawLegacyFourPointSparkle(
+    graphics: Phaser.GameObjects.Graphics,
+    centerX: number,
+    centerY: number,
+    size: number
+  ): void {
+    graphics.fillPoints([
+      new Phaser.Math.Vector2(centerX, centerY - size),
+      new Phaser.Math.Vector2(centerX + (size * 0.22), centerY),
+      new Phaser.Math.Vector2(centerX, centerY + size),
+      new Phaser.Math.Vector2(centerX - (size * 0.22), centerY)
+    ], true);
+    graphics.fillPoints([
+      new Phaser.Math.Vector2(centerX - size, centerY),
+      new Phaser.Math.Vector2(centerX, centerY - (size * 0.22)),
+      new Phaser.Math.Vector2(centerX + size, centerY),
+      new Phaser.Math.Vector2(centerX, centerY + (size * 0.22))
+    ], true);
   }
 
   // markerRevealAlpha is 0 for the whole beam-travel span (the marker
@@ -8002,7 +8355,7 @@ export class MenuScene extends Phaser.Scene {
     this.menuAiProgressionBadgeLabelText.setVisible(false);
     if (this.overlay === 'auth') {
       this.levelAnnouncerLabelText.setVisible(false);
-      this.levelAnnouncerNumberText.setVisible(false);
+      this.levelAnnouncerNumberGraphics.setVisible(false);
     }
   }
 
@@ -8083,13 +8436,16 @@ export class MenuScene extends Phaser.Scene {
     const left = frame.centerX - (totalWidth / 2);
     const baseline = frame.centerY + outerRadius * 0.72;
 
-    this.boardDynamicGraphics.fillStyle(color, blinkAlpha * 0.86);
-    this.boardDynamicGraphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, blinkAlpha * 0.9);
+    // Thin, hollow, single-tone mint neon-line bars -- matching the actual
+    // reference mockup of this header (plain thin-line icons, no fill, one
+    // consistent glow color), not a filled/two-tone "glassy" treatment.
     for (let index = 0; index < barCount; index += 1) {
       const barHeight = heights[index] ?? heights[0] ?? 1;
       const x = left + (index * (barWidth + barGap));
       const y = baseline - barHeight;
-      this.boardDynamicGraphics.fillRect(x, y, barWidth, barHeight);
+      this.boardDynamicGraphics.lineStyle(Math.max(2, outerRadius * 0.2), color, blinkAlpha * 0.4);
+      this.boardDynamicGraphics.strokeRect(x, y, barWidth, barHeight);
+      this.boardDynamicGraphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, blinkAlpha * 0.92);
       this.boardDynamicGraphics.strokeRect(x, y, barWidth, barHeight);
     }
     this.drawLegacyMarkerGemCatchlight(this.boardDynamicGraphics, frame.centerX, frame.centerY, outerRadius, blinkAlpha * 0.6);
@@ -8529,30 +8885,162 @@ export class MenuScene extends Phaser.Scene {
     kind: 'start' | 'goal',
     time?: number
   ): void {
-    const color = kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_CORE : LEGACY_PLAY_START_MARKER_CORE;
+    if (kind === 'goal') {
+      this.drawLegacyGoalStarMarker(graphics, tileRect, alpha, time);
+      return;
+    }
+    const color = LEGACY_PLAY_START_MARKER_CORE;
     const centerX = tileRect.left + (tileRect.width / 2);
     const centerY = tileRect.top + (tileRect.height / 2);
     const maxRadius = Math.min(tileRect.width, tileRect.height) * 0.5;
-    // A slight continuous pulse on the goal marker only, for extra
-    // visibility -- same sine-blink cadence as the LVL badge/settings cog.
-    // Callers that don't pass `time` (e.g. the Guide overlay's static
-    // legend icon) get no pulse. boardDynamicDirty is already re-armed
-    // every play-mode frame (see the LVL badge's own comment on this in
-    // update()), so this animates continuously for free.
-    const pulse = kind === 'goal' && time !== undefined
-      ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2
-      : 0;
-    const pulseScale = 1 + (pulse * 0.12);
-    const pulseAlphaBoost = pulse * 0.12;
 
-    graphics.fillStyle(color, Math.min(0.9, alpha + pulseAlphaBoost) * 0.22);
-    graphics.fillCircle(centerX, centerY, maxRadius * 1.2 * pulseScale);
-    graphics.fillStyle(color, Math.min(0.9, alpha + pulseAlphaBoost) * 0.45);
-    graphics.fillCircle(centerX, centerY, maxRadius * 0.78 * pulseScale);
-    graphics.fillStyle(color, Math.min(0.96, alpha + pulseAlphaBoost));
-    graphics.fillCircle(centerX, centerY, maxRadius * 0.4 * pulseScale);
+    graphics.fillStyle(color, Math.min(0.9, alpha) * 0.22);
+    graphics.fillCircle(centerX, centerY, maxRadius * 1.2);
+    graphics.fillStyle(color, Math.min(0.9, alpha) * 0.45);
+    graphics.fillCircle(centerX, centerY, maxRadius * 0.78);
+    graphics.fillStyle(color, Math.min(0.96, alpha));
+    graphics.fillCircle(centerX, centerY, maxRadius * 0.4);
     graphics.fillStyle(cyberArcadeMaterial.rail.white, Math.min(0.75, alpha * 0.8));
     graphics.fillCircle(centerX - (maxRadius * 0.14), centerY - (maxRadius * 0.14), maxRadius * 0.13);
+  }
+
+  // The goal marker: a rainbow, hue-cycled ring (with a small bright
+  // orbiting highlight riding it) around a five-pointed star -- the star
+  // itself is deliberately HOLLOW (no fill; the board/starfield show
+  // through its interior, per feedback) with a spinning rainbow outline
+  // instead of a flat or gradient-filled one, plus a handful of tiny
+  // independently-twinkling sparkle glints. Modeled on a reference asset
+  // the user supplied. Drawn procedurally rather than as an imported
+  // texture: every board element in
+  // this scene is already vector Graphics (no image/texture loading
+  // pipeline exists anywhere in MenuScene), so a hand-drawn equivalent
+  // stays consistent with the rest of the renderer and animates for free at
+  // any resolution/zoom instead of needing a raster asset pipeline built
+  // just for this one marker.
+  //
+  // `time` is optional -- same long-standing convention as the glow this
+  // replaces: the Guide overlay's static legend icon (drawLegacyOptionsGuideGlyph)
+  // calls this without a time and gets a fixed rest pose, fully colored but
+  // not spinning, so the guide's icon and the real in-game marker share one
+  // implementation and never drift apart.
+  private drawLegacyGoalStarMarker(
+    graphics: Phaser.GameObjects.Graphics,
+    tileRect: LegacyPixelTileRect,
+    alpha: number,
+    time?: number
+  ): void {
+    const centerX = tileRect.left + (tileRect.width / 2);
+    const centerY = tileRect.top + (tileRect.height / 2);
+    const maxRadius = Math.min(tileRect.width, tileRect.height) * 0.5;
+    const spinPhase = time !== undefined && !this.prefersLegacyReducedMotion()
+      ? time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS
+      : 0;
+
+    // Ring: Graphics has no per-point gradient stroke, so the rainbow is
+    // approximated as short hue-stepped arc segments swept around the full
+    // circle, rotating continuously via spinPhase.
+    const ringRadius = maxRadius * 0.92;
+    const ringSegmentCount = 40;
+    for (let i = 0; i < ringSegmentCount; i += 1) {
+      const hue = i / ringSegmentCount;
+      const angle0 = ((i / ringSegmentCount) + spinPhase) * Math.PI * 2;
+      const angle1 = (((i + 1) / ringSegmentCount) + spinPhase) * Math.PI * 2;
+      const segmentColor = Phaser.Display.Color.HSVToRGB(hue, 0.85, 1).color;
+      graphics.lineStyle(Math.max(1.5, maxRadius * 0.07), segmentColor, alpha * 0.92);
+      graphics.beginPath();
+      graphics.arc(centerX, centerY, ringRadius, angle0, angle1);
+      graphics.strokePath();
+    }
+
+    // Small bright highlight riding the ring, one lap per ring rotation but
+    // offset from the hue cycle's own seam so it reads as a distinct
+    // orbiting satellite rather than part of the ring itself.
+    const orbitAngle = (spinPhase + 0.06) * Math.PI * 2;
+    const orbitX = centerX + (Math.cos(orbitAngle) * ringRadius);
+    const orbitY = centerY + (Math.sin(orbitAngle) * ringRadius);
+    graphics.fillStyle(cyberArcadeMaterial.rail.white, alpha * 0.95);
+    graphics.fillCircle(orbitX, orbitY, maxRadius * 0.1);
+    graphics.fillStyle(Phaser.Display.Color.HSVToRGB(0.54, 0.55, 1).color, alpha * 0.45);
+    graphics.fillCircle(orbitX, orbitY, maxRadius * 0.17);
+
+    // Five-pointed star, deliberately HOLLOW (no fill at all -- the board
+    // and starfield behind it show straight through the interior) with a
+    // spinning rainbow outline instead of a flat or gradient-filled one:
+    // each of the star's 10 edges is traced as several hue-stepped
+    // sub-segments (same technique as the ring above), and the star's own
+    // vertex rotation runs at the SAME rate as the ring's hue cycle
+    // (spinPhase, not a slowed-down fraction of it), so the outline reads as
+    // one continuous rainbow sweeping around a genuinely spinning star
+    // rather than a static gradient.
+    const starRotation = spinPhase * Math.PI * 2;
+    const outerRadius = maxRadius * 0.72;
+    const innerRadius = outerRadius * 0.42;
+    const starPoints: Phaser.Math.Vector2[] = [];
+    for (let i = 0; i < 10; i += 1) {
+      const radius = i % 2 === 0 ? outerRadius : innerRadius;
+      const pointAngle = starRotation - (Math.PI / 2) + (i * Math.PI / 5);
+      starPoints.push(new Phaser.Math.Vector2(
+        centerX + (Math.cos(pointAngle) * radius),
+        centerY + (Math.sin(pointAngle) * radius)
+      ));
+    }
+    const starEdgeSubdivisions = 4;
+    for (let i = 0; i < starPoints.length; i += 1) {
+      const from = starPoints[i]!;
+      const to = starPoints[(i + 1) % starPoints.length]!;
+      for (let s = 0; s < starEdgeSubdivisions; s += 1) {
+        const t0 = s / starEdgeSubdivisions;
+        const t1 = (s + 1) / starEdgeSubdivisions;
+        const hue = (((i + t0) / starPoints.length) + spinPhase) % 1;
+        const segmentColor = Phaser.Display.Color.HSVToRGB(hue, 0.85, 1).color;
+        graphics.lineStyle(Math.max(1, maxRadius * 0.07), segmentColor, alpha * 0.95);
+        graphics.lineBetween(
+          from.x + ((to.x - from.x) * t0),
+          from.y + ((to.y - from.y) * t0),
+          from.x + ((to.x - from.x) * t1),
+          from.y + ((to.y - from.y) * t1)
+        );
+      }
+    }
+
+    // Tiny animated twinkling sparkle glints scattered around the star --
+    // each one pulses its own scale/alpha on an independently phased sine
+    // wave (same technique as the level-announcer's twinkle clusters,
+    // drawLegacyLevelAnnouncerTwinkles) instead of sitting at a fixed size,
+    // so they read as genuinely twinkling rather than static decals.
+    if (time !== undefined && !this.prefersLegacyReducedMotion()) {
+      const sparkleSpecs: ReadonlyArray<{ dx: number; dy: number; size: number; phase: number }> = [
+        { dx: 0, dy: -outerRadius * 0.12, size: maxRadius * 0.15, phase: 0 },
+        { dx: -outerRadius * 0.32, dy: outerRadius * 0.18, size: maxRadius * 0.09, phase: Math.PI * 0.5 },
+        { dx: outerRadius * 0.34, dy: outerRadius * 0.12, size: maxRadius * 0.09, phase: Math.PI },
+        { dx: -outerRadius * 0.1, dy: outerRadius * 0.4, size: maxRadius * 0.07, phase: Math.PI * 1.5 },
+        { dx: outerRadius * 0.05, dy: -outerRadius * 0.42, size: maxRadius * 0.06, phase: Math.PI * 0.8 }
+      ];
+      for (const sparkle of sparkleSpecs) {
+        const twinkle = (Math.sin((time / LEGACY_GOAL_STAR_SPARKLE_TWINKLE_PERIOD_MS * Math.PI * 2) + sparkle.phase) + 1) / 2;
+        graphics.fillStyle(cyberArcadeMaterial.rail.white, alpha * (0.35 + (twinkle * 0.6)));
+        this.drawLegacyFourPointSparkle(
+          graphics,
+          centerX + sparkle.dx,
+          centerY + sparkle.dy,
+          sparkle.size * (0.6 + (twinkle * 0.55))
+        );
+      }
+    } else {
+      // Reduced-motion / static (Guide legend) fallback: fixed mid-twinkle
+      // size and alpha instead of animating.
+      const sparkleSpecs: ReadonlyArray<{ dx: number; dy: number; size: number }> = [
+        { dx: 0, dy: -outerRadius * 0.12, size: maxRadius * 0.13 },
+        { dx: -outerRadius * 0.32, dy: outerRadius * 0.18, size: maxRadius * 0.08 },
+        { dx: outerRadius * 0.34, dy: outerRadius * 0.12, size: maxRadius * 0.08 },
+        { dx: -outerRadius * 0.1, dy: outerRadius * 0.4, size: maxRadius * 0.06 },
+        { dx: outerRadius * 0.05, dy: -outerRadius * 0.42, size: maxRadius * 0.05 }
+      ];
+      graphics.fillStyle(cyberArcadeMaterial.rail.white, alpha * 0.75);
+      for (const sparkle of sparkleSpecs) {
+        this.drawLegacyFourPointSparkle(graphics, centerX + sparkle.dx, centerY + sparkle.dy, sparkle.size);
+      }
+    }
   }
 
   // A small bright arc on the upper-left of a circular shape, as if a
@@ -9141,7 +9629,12 @@ export class MenuScene extends Phaser.Scene {
     const pointCount = teeth * 2;
     const color = active ? activeColor : idleColor;
 
-    graphics.fillStyle(color, (active ? 0.94 : 0.86) * alphaMultiplier);
+    // Thin, hollow, single-tone mint neon-line icon -- matching the user's
+    // actual reference mockup of this header (a plain thin-line gear, no
+    // fill, one consistent glow color), not a filled/two-tone "glassy body"
+    // treatment. A soft wide glow pass underneath a crisp thin line on top,
+    // both in the SAME color, is the whole treatment -- no fill, no second
+    // (white) color.
     graphics.beginPath();
     for (let index = 0; index < pointCount; index += 1) {
       const angle = ((index / pointCount) * Math.PI * 2) - (Math.PI / 2);
@@ -9155,13 +9648,17 @@ export class MenuScene extends Phaser.Scene {
       }
     }
     graphics.closePath();
-    graphics.fillPath();
-    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, (active ? 1 : 0.9) * alphaMultiplier);
+    graphics.lineStyle(Math.max(3, outerRadius * 0.3), color, (active ? 0.4 : 0.28) * alphaMultiplier);
+    graphics.strokePath();
+    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.1)), color, (active ? 1 : 0.92) * alphaMultiplier);
     graphics.strokePath();
 
-    graphics.fillStyle(LEGACY_PLAY_TOUCH_COG_HUB, 0.82 * alphaMultiplier);
-    graphics.fillCircle(rect.centerX, rect.centerY, hubRadius);
-    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, (active ? 0.9 : 0.76) * alphaMultiplier);
+    // Hub hole: no fill at all (the earlier version faked a hole with a
+    // background-colored disc -- unnecessary now that the gear body itself
+    // has no fill to hide, the hub is just this same thin ring).
+    graphics.lineStyle(Math.max(2, outerRadius * 0.2), color, (active ? 0.4 : 0.28) * alphaMultiplier);
+    graphics.strokeCircle(rect.centerX, rect.centerY, hubRadius);
+    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, (active ? 0.95 : 0.85) * alphaMultiplier);
     graphics.strokeCircle(rect.centerX, rect.centerY, hubRadius);
     // Same cut-gem catchlight as the player/start/goal markers -- ties the
     // gear into the crystal-facet family instead of reading as a plain
@@ -9747,7 +10244,7 @@ export class MenuScene extends Phaser.Scene {
     let legendRowIndex = 0;
     drawLegendRow(legendRowIndex, 'start', 'Start', 'begin at gold', cyberArcadeMaterial.signal.start);
     legendRowIndex += 1;
-    drawLegendRow(legendRowIndex, 'end', 'Exit', 'finish at red', cyberArcadeMaterial.signal.goal);
+    drawLegendRow(legendRowIndex, 'end', 'Exit', 'reach the star', cyberArcadeMaterial.signal.goal);
     legendRowIndex += 1;
     drawLegendRow(
       legendRowIndex,
@@ -13474,20 +13971,35 @@ export class MenuScene extends Phaser.Scene {
 
     const color = cyberArcadeMaterial.signal.player;
     const strokeWidth = Math.max(1.6, iconSize * 0.12);
+    const glowStrokeWidth = strokeWidth * 2.4;
     const headRadius = iconSize * 0.2 * scale;
     const headCenterY = centerY - (iconSize * 0.24 * scale);
-    graphics.lineStyle(strokeWidth, color, alpha);
+    // Thin, hollow, single-tone mint neon-line icon -- matching the user's
+    // actual reference mockup (a plain thin-line person glyph, one
+    // consistent glow color), not a two-tone white-cored outline. A soft
+    // wide glow pass underneath a crisp thin line on top, both in the SAME
+    // color, is the whole treatment.
+    graphics.lineStyle(glowStrokeWidth, color, alpha * 0.42);
+    graphics.strokeCircle(centerX, headCenterY, headRadius);
+    graphics.lineStyle(strokeWidth, color, alpha * 0.92);
     graphics.strokeCircle(centerX, headCenterY, headRadius);
 
     const shoulderHalfWidth = iconSize * 0.32 * scale;
     const shoulderRadius = iconSize * 0.26 * scale;
     const shoulderTop = centerY + (iconSize * 0.06 * scale);
     const shoulderBottom = centerY + (iconSize * 0.46 * scale);
-    graphics.beginPath();
-    graphics.arc(centerX, shoulderTop + shoulderRadius, shoulderRadius, Math.PI, 0, false);
-    graphics.lineTo(centerX + shoulderHalfWidth, shoulderBottom);
-    graphics.lineTo(centerX - shoulderHalfWidth, shoulderBottom);
-    graphics.closePath();
+    const buildShoulderPath = (): void => {
+      graphics.beginPath();
+      graphics.arc(centerX, shoulderTop + shoulderRadius, shoulderRadius, Math.PI, 0, false);
+      graphics.lineTo(centerX + shoulderHalfWidth, shoulderBottom);
+      graphics.lineTo(centerX - shoulderHalfWidth, shoulderBottom);
+      graphics.closePath();
+    };
+    buildShoulderPath();
+    graphics.lineStyle(glowStrokeWidth, color, alpha * 0.42);
+    graphics.strokePath();
+    buildShoulderPath();
+    graphics.lineStyle(strokeWidth, color, alpha * 0.92);
     graphics.strokePath();
   }
 
