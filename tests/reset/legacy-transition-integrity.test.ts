@@ -1,6 +1,29 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
+import { MenuScene } from '../../src/scenes/MenuScene';
+
+// MenuScene extends Phaser.Scene; importing the real phaser package needs a
+// DOM (window) this suite's node environment doesn't provide. This suite
+// only needs the class's prototype (a plain method lookup, no instance),
+// so mock just enough of the namespace for the module to load -- same
+// minimal mock tests/reset/legacy-player-progression-flow.test.ts already
+// uses for the identical reason. vi.mock calls are hoisted above imports,
+// so this applies before the MenuScene import above actually runs.
+vi.mock('phaser', () => ({
+  default: {
+    AUTO: 'AUTO',
+    Math: {
+      Clamp: (value: number, min: number, max: number) => Math.max(min, Math.min(max, value)),
+      Linear: (from: number, to: number, t: number) => from + ((to - from) * t)
+    },
+    Scale: {
+      RESIZE: 'RESIZE',
+      CENTER_BOTH: 'CENTER_BOTH'
+    },
+    Scene: class {}
+  }
+}));
 
 const menuSceneSource = readFileSync(
   resolve(process.cwd(), 'src/scenes/MenuScene.ts'),
@@ -105,5 +128,60 @@ describe('legacy scene transition integrity', () => {
     expect(dynamicBoard).toContain("playerTransferEnergy.phase === 'pending'");
     expect(dynamicBoard).toContain("playerTransferEnergy.phase === 'outbound'");
     expect(dynamicBoard).toContain('1 - playerTransferEnergy.outboundProgress');
+  });
+
+  test('cannot leak a pending menu-demo deconstruct arm across a mode switch', () => {
+    // Regression: a menu-demo goal-arrival precompute schedules
+    // pendingMenuDemoDeconstructArmAtMs (and a 'menu'-mode
+    // pendingLegacyDeconstructResetMaze) LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS
+    // in the future. If the player presses Start inside that window and
+    // later returns to the menu, neither field self-invalidated on its
+    // own -- a stale pending arm would fire against the brand-new menu
+    // maze enterMenuMode just built, unprompted by any real goal arrival.
+    // Both mode-transition entry points must clear it before doing
+    // anything else that could be superseded by it.
+    const enterMenu = methodSource(
+      '  private enterMenuMode(): void {',
+      '  private startPlayMode(): void {'
+    );
+    const startPlay = methodSource(
+      '  private startPlayMode(): void {',
+      '  private updateMenuDemo(time: number): void {'
+    );
+
+    expect(enterMenu.indexOf('this.clearPendingLegacyMenuDemoResetTransition();')).toBeGreaterThanOrEqual(0);
+    expect(enterMenu.indexOf('this.clearPendingLegacyMenuDemoResetTransition();')).toBeLessThan(
+      enterMenu.indexOf('this.applyGenerationRequest(')
+    );
+    expect(startPlay.indexOf('this.clearPendingLegacyMenuDemoResetTransition();')).toBeGreaterThanOrEqual(0);
+    expect(startPlay.indexOf('this.clearPendingLegacyMenuDemoResetTransition();')).toBeLessThan(
+      startPlay.indexOf('this.rebuildMaze();')
+    );
+
+    // The clearing method itself, exercised directly against a bare stub --
+    // a real behavioral check, not just a source-text guard that it's
+    // wired in. Mode-scoped: a 'play'-mode precompute (the existing,
+    // unrelated play-mode mechanism from PR #307) must survive; only a
+    // 'menu'-mode one is this method's concern.
+    const clearPendingLegacyMenuDemoResetTransition = (
+      MenuScene.prototype as unknown as { clearPendingLegacyMenuDemoResetTransition: (this: unknown) => void }
+    ).clearPendingLegacyMenuDemoResetTransition;
+
+    const menuStub = {
+      pendingMenuDemoDeconstructArmAtMs: 12345,
+      pendingLegacyDeconstructResetMaze: { mode: 'menu', seed: 1, maze: {} }
+    };
+    clearPendingLegacyMenuDemoResetTransition.call(menuStub);
+    expect(menuStub.pendingMenuDemoDeconstructArmAtMs).toBeNull();
+    expect(menuStub.pendingLegacyDeconstructResetMaze).toBeNull();
+
+    const playStub = {
+      pendingMenuDemoDeconstructArmAtMs: null,
+      pendingLegacyDeconstructResetMaze: { mode: 'play', seed: 2, maze: {} }
+    };
+    const originalPlayPrecompute = playStub.pendingLegacyDeconstructResetMaze;
+    clearPendingLegacyMenuDemoResetTransition.call(playStub);
+    expect(playStub.pendingMenuDemoDeconstructArmAtMs).toBeNull();
+    expect(playStub.pendingLegacyDeconstructResetMaze).toBe(originalPlayPrecompute);
   });
 });

@@ -4874,6 +4874,27 @@ export class MenuScene extends Phaser.Scene {
     return { seed: pending.seed, maze: pending.maze };
   }
 
+  // A menu-demo goal-arrival precompute (see updateMenuDemo's own
+  // pendingMenuDemoDeconstructArmAtMs comment) owns the mode it was
+  // scheduled for -- 'menu'. Neither field self-invalidates on a mode
+  // switch: if the player presses Start inside the 340ms hold window,
+  // switches to play, and later returns to the menu, a stale pending arm
+  // would otherwise fire on the very next update() the return-to-menu
+  // gate (nextDemoMoveAtMs, reset fresh by enterMenuMode's own
+  // applyGenerationRequest call) happens to allow through -- deconstructing
+  // the brand-new menu maze enterMenuMode just built, unprompted by any
+  // real goal arrival, and possibly consuming an equally stale precomputed
+  // maze along with it. Call this from every place that installs a new
+  // mode/episode the pending fields could otherwise leak across
+  // (startPlayMode, enterMenuMode) so a superseded transition can never
+  // fire late.
+  private clearPendingLegacyMenuDemoResetTransition(): void {
+    this.pendingMenuDemoDeconstructArmAtMs = null;
+    if (this.pendingLegacyDeconstructResetMaze?.mode === 'menu') {
+      this.pendingLegacyDeconstructResetMaze = null;
+    }
+  }
+
   private armLegacyMenuStaticDeconstructStage(time: number): void {
     if (this.menuStaticDrawLifecyclePhase === 'deconstructing') {
       return;
@@ -5129,6 +5150,7 @@ export class MenuScene extends Phaser.Scene {
     // A delayed request owns the mode it was created for. If it survives a
     // mode switch, update() can later consume it and overwrite the new surface.
     this.pendingGenerationRequest = null;
+    this.clearPendingLegacyMenuDemoResetTransition();
     // Guest play is an active, local-only session—not a durable account
     // state. Returning to the menu ends that session so a later launch/menu
     // view always returns to the login boundary instead of presenting an
@@ -5168,6 +5190,7 @@ export class MenuScene extends Phaser.Scene {
     // Cancel any delayed menu-demo rebuild before installing the immediate
     // play request. This is the Start -> loading -> menu race.
     this.pendingGenerationRequest = null;
+    this.clearPendingLegacyMenuDemoResetTransition();
     this.mode = 'play';
     this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
@@ -5206,10 +5229,17 @@ export class MenuScene extends Phaser.Scene {
     // The goal-arrival branch below parks the actual deconstruct-arm call
     // here instead of firing it on the same frame the goal was reached --
     // see pendingMenuDemoDeconstructArmAtMs's own comment. nextDemoMoveAtMs
-    // was set to the same hold-end instant, so this only runs once that
-    // hold has genuinely elapsed; the precomputed maze built at arm time is
-    // already waiting for armLegacyMenuStaticDeconstructStage to consume.
-    if (this.pendingMenuDemoDeconstructArmAtMs !== null) {
+    // is set to the same hold-end instant when this is scheduled, so the
+    // gate just above ordinarily already guarantees the hold has elapsed
+    // by the time this is reached -- but nextDemoMoveAtMs can legitimately
+    // be reset for an unrelated reason in between (e.g. enterMenuMode's own
+    // return-to-menu hold), so re-checking time here directly, instead of
+    // trusting that gate alone, is what actually prevents a stale pending
+    // arm from firing early against a maze it was never scheduled for.
+    // clearPendingLegacyMenuDemoResetTransition (called from every mode
+    // transition that could otherwise leak this field across) is the
+    // primary fix; this check is defense in depth, not a substitute for it.
+    if (this.pendingMenuDemoDeconstructArmAtMs !== null && time >= this.pendingMenuDemoDeconstructArmAtMs) {
       this.pendingMenuDemoDeconstructArmAtMs = null;
       this.armLegacyMenuStaticDeconstructStage(time);
       this.boardDynamicDirty = true;
