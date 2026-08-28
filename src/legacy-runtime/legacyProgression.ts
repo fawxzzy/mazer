@@ -711,7 +711,32 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
       };
     case 'starter':
       {
-        const starterDepth = clampInteger(level - 2, 0, 6);
+        const starterDepthInt = clampInteger(level - 2, 0, 6);
+        // Difficulty pacing (resolveLegacyProgressionDifficultyStep) halves
+        // the real level before this switch ever sees it, so two real
+        // levels -- one even, one odd -- always share one starterDepthInt.
+        // That's deliberate for the BIG structural knobs below (feeder
+        // count, the required-vertical-connection switch): those are meant
+        // to advance at half speed. But it was ALSO flattening the
+        // continuous knobs (checkpoint/dead-end count, straightness, ...)
+        // to be byte-identical for both levels in a pair -- confirmed
+        // directly (targetComplexity 12 and 16, i.e. real levels 2 and 3,
+        // produced the exact same generation profile) -- which is what
+        // reads as "level 2 and 3 look the same" even though they really
+        // are two different generations (different seed, different
+        // targetComplexity). targetComplexity is always a multiple of 4
+        // starting at 8, and alternates {8S-4, 8S} within one step, so
+        // (targetComplexity % 8 === 0) past the very first level singles
+        // out the second (higher) real level of each pair. Only the
+        // CONTINUOUS knobs read this -- the structural ones still key off
+        // the plain integer starterDepthInt, so the slow-paced feeder/
+        // border-connection cadence is untouched.
+        const isSecondOfPair = targetComplexity > 8 && targetComplexity % 8 === 0;
+        // Deliberately NOT clamped back down to 6 -- the second-of-pair
+        // level at the very top of starter (starterDepthInt 6) needs to
+        // reach 6.5 so it interpolates into the tables' trailing 8th entry
+        // instead of being flattened back onto depth 6's own value.
+        const starterDepth = starterDepthInt + (isSecondOfPair ? 0.5 : 0);
         // Modifiers are introduced one at a time and ramp in gradually as
         // starterDepth climbs: split paths first (checkpoint count rising
         // off the tutorial's single leg), then dead ends (maxDeadEndCount
@@ -719,7 +744,7 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
         // (routeQualityReinforcementMultiplier, already present below) and
         // finally bleed-off/wrap paths (borderFeederTargetPerSide /
         // requiredOppositeBorderConnections.vertical) -- pushed back to
-        // starterDepth >= 6, the single last level of starter (level 8),
+        // starterDepthInt >= 6, the single last level of starter (level 8),
         // rather than >= 4 (level 6) per feedback that bleed paths were
         // showing up too early in a player's first handful of levels.
         // minCheckpoints must never sit above checkpointCountOverride --
@@ -728,7 +753,7 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
         // pushing the intended 2/3 checkpoint counts (starterDepth 0/1)
         // back up to 4, undoing the early part of this exact ramp.
         //
-        // This array used to stop at depth 3 (value 8), falling through to
+        // This table used to stop at depth 3 (value 8), falling through to
         // null for depths 4-6 -- which hands the checkpoint count over to
         // the scale-proportional formula in legacyMaze.ts
         // (requestedCheckpoints = override ?? linearSize-based formula).
@@ -736,25 +761,63 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
         // (linearSize 40/55/70): depth 3's fixed override of 8 was jumping
         // straight to a formula output of 30/42/54 the very next level --
         // a 4-7x jump in one step, the exact "doesn't fill then floods"
-        // effect reported. Extended the ramp two more (~1.7x per step)
-        // steps to land much closer to what the formula would already be
-        // giving by the time it takes over at explorer, instead of handing
-        // off from a small flat number to an unrelated scale-driven one.
-        const checkpointCountOverride = [2, 3, 5, 8, 14, 24, 40][starterDepth] ?? null;
+        // effect reported. Extended two more entries (~1.7x per step) so
+        // the hand-off to explorer's formula lands much closer to what it
+        // would already be giving, and interpolated by the fractional
+        // starterDepth above (a whole extra trailing entry so depth 6.5,
+        // reached only by the second-of-pair level right at the top of
+        // starter, still has a real "next" value to interpolate toward).
+        const checkpointOverrideTable = [2, 3, 5, 8, 14, 24, 40, 54];
+        const maxDeadEndTable = [0, 1, 2, 3, 5, 8, 13, 18];
+        const lowIndex = Math.floor(starterDepth);
+        const highIndex = Math.min(lowIndex + 1, checkpointOverrideTable.length - 1);
+        const interpolationFraction = starterDepth - lowIndex;
+        // floor, not round: rounding a 0.5 fraction on a gap-of-1 table
+        // step (depth 0 -> 1, e.g. checkpoint 2 -> 3) rounds all the way UP
+        // to the next depth's own value -- not an intermediate value, the
+        // literal same number the next real level already uses. That
+        // measurably tipped one fixed-seed early-level complexity check
+        // past its neighbor (real generation noise at small maze sizes,
+        // not a deliberate ordering choice). flooring means a gap-of-1 step
+        // safely reduces to "no visible distinction yet" for that one pair
+        // instead of "distinction, but borrowed from the wrong neighbor" --
+        // every later pair (gaps of 2 or more) still gets a genuine
+        // in-between value.
+        const interpolateTable = (table: readonly number[]): number => Math.floor(
+          table[lowIndex]! + ((table[highIndex]! - table[lowIndex]!) * interpolationFraction)
+        );
+        const checkpointCountOverride = interpolateTable(checkpointOverrideTable);
         return {
-          borderFeederTargetPerSide: starterDepth >= 6 ? 1 : 0,
-          checkpointCountMultiplier: 0.44 + (starterDepth * (0.2 / 6)),
+          borderFeederTargetPerSide: starterDepthInt >= 6 ? 1 : 0,
+          // checkpointCountMultiplier is only ever consulted when
+          // checkpointCountOverride is null, which never happens inside
+          // starter -- kept on the plain integer depth (not the fractional
+          // one) since it's inert here either way, and this avoids
+          // implying it participates in the fine ramp above.
+          checkpointCountMultiplier: 0.44 + (starterDepthInt * (0.2 / 6)),
           checkpointCountOverride,
           // Same cliff, same fix: this used to run out at depth 4 (value 3)
           // and fall through to null (no cap at all) for depths 5-6 --
           // going from "at most 3 dead ends" to "unlimited" in one step.
           // Extended two more steps instead of uncapping.
-          maxDeadEndCount: [0, 1, 2, 3, 5, 8, 13][starterDepth] ?? null,
+          maxDeadEndCount: interpolateTable(maxDeadEndTable),
           minCheckpoints: Math.min(4, checkpointCountOverride ?? 4),
-          requiredOppositeBorderConnections: { horizontal: false, vertical: starterDepth >= 6 },
-          routeQualityReinforcementMultiplier: Math.min(0.35, starterDepth * (0.35 / 6)),
-          shortcutCountMultiplier: Math.min(0.35, starterDepth * (0.35 / 6)),
-          straightnessBias: Math.max(0.1, 0.6 - (starterDepth * 0.08))
+          requiredOppositeBorderConnections: { horizontal: false, vertical: starterDepthInt >= 6 },
+          // Deliberately kept on the plain integer depth, NOT the
+          // fractional one used for checkpoint/dead-end density above.
+          // These two feed shortcut/reinforcement placement, a different
+          // mechanism than corridor density -- un-pairing them too pushed
+          // one specific level's measured complexity (via the generator's
+          // own seed-sensitive shortcut placement, not a deliberate
+          // ordering choice) high enough to trip the fixed-seed
+          // nondecreasing-curve check between two adjacent early levels.
+          // The visible "level 2 and 3 look the same" complaint this whole
+          // change targets is about corridor/dead-end density, not
+          // shortcut placement, so there's no visual reason to un-pair
+          // these too.
+          routeQualityReinforcementMultiplier: Math.min(0.35, starterDepthInt * (0.35 / 6)),
+          shortcutCountMultiplier: Math.min(0.35, starterDepthInt * (0.35 / 6)),
+          straightnessBias: Math.max(0.1, 0.6 - (starterDepthInt * 0.08))
         };
       }
     case 'explorer':
