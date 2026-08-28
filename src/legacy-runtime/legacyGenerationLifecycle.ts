@@ -97,6 +97,12 @@ export interface LegacyGenerationRequest {
   gate: LegacyGenerationTickGateContract;
   generationProfile?: LegacyMazeGenerationProfile;
   mode: LegacyGenerationMode;
+  // Set only when the request was built with precompute: true -- lets
+  // consumeLegacyGenerationRequest skip a second (redundant, and
+  // identically-seeded so never different) generation pass. See that
+  // option's own comment on createLegacyGenerationRequest for why this
+  // exists.
+  precomputedMaze?: LegacyMazeSnapshot;
   processStageIds: LegacyGenerationProcessStageId[];
   queuedAtMs: number;
   reason: LegacyGenerationRequestReason;
@@ -722,6 +728,7 @@ export const createLegacyGenerationRequest = ({
   dueAtMs,
   generationProfile,
   mode,
+  precompute = false,
   queuedAtMs = dueAtMs,
   reason,
   scale,
@@ -736,6 +743,21 @@ export const createLegacyGenerationRequest = ({
   dueAtMs: number;
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null;
   mode: LegacyGenerationMode;
+  // Runs the (potentially expensive -- real generations have measured well
+  // into the hundreds of ms, occasionally seconds, at large scale/complexity)
+  // maze build right here at queue time instead of leaving it for
+  // consumeLegacyGenerationRequest to do later at the request's dueAtMs.
+  // The deconstruct-triggered reset requests set this: dueAtMs for those is
+  // the moment the OLD maze finishes its deconstruct animation and the
+  // screen is empty, which is exactly the worst possible moment to block
+  // the main thread -- a freeze against an otherwise-idle screen reads as
+  // "did this break" in a way the same delay never does mid-deconstruct,
+  // while tiles are still visibly animating away. Moving the computation to
+  // queue time doesn't shorten it, it relocates it to where the deconstruct
+  // animation's own motion covers it. Not the default: most callers queue
+  // with delayMs 0 for same-tick consumption, where eager-at-queue vs.
+  // lazy-at-consume is not a meaningfully different moment.
+  precompute?: boolean;
   queuedAtMs?: number;
   reason: LegacyGenerationRequestReason;
   scale: number;
@@ -752,12 +774,28 @@ export const createLegacyGenerationRequest = ({
       : currentSeed;
   const profile = generationProfile ? normalizeLegacyMazeGenerationProfile(generationProfile) : undefined;
   const executionPlan = resolveLegacyGenerationExecutionPlan(mode, scale, profile);
+  const normalizedTargetComplexity = targetComplexity !== undefined
+    ? clampInteger(targetComplexity, 0, 999)
+    : undefined;
+  // Precomputed with the exact same inputs consumeLegacyGenerationRequest
+  // would otherwise use at due time -- same seed, same profile, same
+  // aspect ratio, same selection options -- so this is not a second,
+  // possibly-different generation; it's the one generation, just run
+  // earlier and cached.
+  const precomputedMaze = precompute
+    ? createLegacyRuntimeMazeForMode(mode, scale, seed, profile, {
+      candidateCount: selectionCandidateCount,
+      targetComplexity: normalizedTargetComplexity,
+      tolerance: selectionTolerance
+    }, aspectRatio ?? 1)
+    : undefined;
 
   return {
     mode,
     reason,
     seed,
     ...(aspectRatio !== undefined ? { aspectRatio } : {}),
+    ...(precomputedMaze !== undefined ? { precomputedMaze } : {}),
     ...(selectionCandidateCount !== undefined ? { selectionCandidateCount } : {}),
     ...(selectionTolerance !== undefined ? { selectionTolerance } : {}),
     dueAtMs: Math.max(0, Math.round(dueAtMs)),
@@ -767,7 +805,7 @@ export const createLegacyGenerationRequest = ({
     executionPlan,
     gate: resolveLegacyGenerationTickGateContract(),
     ...(profile ? { generationProfile: profile } : {}),
-    ...(targetComplexity !== undefined ? { targetComplexity: clampInteger(targetComplexity, 0, 999) } : {}),
+    ...(normalizedTargetComplexity !== undefined ? { targetComplexity: normalizedTargetComplexity } : {}),
     processStageIds: resolveLegacyGenerationProcessStageIds(scale, profile, mode),
     stageCursor: resolveLegacyGenerationStageCursor(executionPlan, 'queued-entry')
   };
@@ -778,6 +816,7 @@ export const createLegacyMenuResetGenerationRequest = ({
   currentSeed,
   generationProfile,
   nowMs,
+  precompute,
   scale,
   targetComplexity
 }: {
@@ -785,6 +824,7 @@ export const createLegacyMenuResetGenerationRequest = ({
   currentSeed: number;
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null;
   nowMs: number;
+  precompute?: boolean;
   scale: number;
   targetComplexity?: number;
 }): LegacyGenerationRequest => createLegacyGenerationRequest({
@@ -793,6 +833,7 @@ export const createLegacyMenuResetGenerationRequest = ({
   dueAtMs: nowMs,
   generationProfile,
   mode: 'menu',
+  ...(precompute !== undefined ? { precompute } : {}),
   queuedAtMs: nowMs,
   reason: 'menu-demo-goal-reset',
   scale,
@@ -805,6 +846,7 @@ export const createLegacyPlayResetGenerationRequest = ({
   currentSeed,
   generationProfile,
   nowMs,
+  precompute,
   seedOverride,
   scale,
   targetComplexity
@@ -813,6 +855,7 @@ export const createLegacyPlayResetGenerationRequest = ({
   currentSeed: number;
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null;
   nowMs: number;
+  precompute?: boolean;
   seedOverride?: number;
   scale: number;
   targetComplexity?: number;
@@ -822,6 +865,7 @@ export const createLegacyPlayResetGenerationRequest = ({
   dueAtMs: nowMs,
   generationProfile,
   mode: 'play',
+  ...(precompute !== undefined ? { precompute } : {}),
   queuedAtMs: nowMs,
   reason: 'play-goal-reset',
   scale,
@@ -838,11 +882,18 @@ export const shouldConsumeLegacyGenerationRequest = (
 export const consumeLegacyGenerationRequest = (
   request: LegacyGenerationRequest,
   scale: number
-): LegacyMazeSnapshot => createLegacyRuntimeMazeForMode(request.mode, scale, request.seed, request.generationProfile, {
-  candidateCount: request.selectionCandidateCount,
-  targetComplexity: request.targetComplexity,
-  tolerance: request.selectionTolerance
-}, request.aspectRatio ?? 1);
+): LegacyMazeSnapshot => request.precomputedMaze ?? createLegacyRuntimeMazeForMode(
+  request.mode,
+  scale,
+  request.seed,
+  request.generationProfile,
+  {
+    candidateCount: request.selectionCandidateCount,
+    targetComplexity: request.targetComplexity,
+    tolerance: request.selectionTolerance
+  },
+  request.aspectRatio ?? 1
+);
 
 export const consumeLegacyGenerationRequestState = (
   request: LegacyGenerationRequest,

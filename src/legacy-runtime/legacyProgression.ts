@@ -727,12 +727,29 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
         // minCheckpoints, so a flat minCheckpoints: 4 floor was silently
         // pushing the intended 2/3 checkpoint counts (starterDepth 0/1)
         // back up to 4, undoing the early part of this exact ramp.
-        const checkpointCountOverride = [2, 3, 5, 8][starterDepth] ?? null;
+        //
+        // This array used to stop at depth 3 (value 8), falling through to
+        // null for depths 4-6 -- which hands the checkpoint count over to
+        // the scale-proportional formula in legacyMaze.ts
+        // (requestedCheckpoints = override ?? linearSize-based formula).
+        // Verified against that real formula at realistic maze sizes
+        // (linearSize 40/55/70): depth 3's fixed override of 8 was jumping
+        // straight to a formula output of 30/42/54 the very next level --
+        // a 4-7x jump in one step, the exact "doesn't fill then floods"
+        // effect reported. Extended the ramp two more (~1.7x per step)
+        // steps to land much closer to what the formula would already be
+        // giving by the time it takes over at explorer, instead of handing
+        // off from a small flat number to an unrelated scale-driven one.
+        const checkpointCountOverride = [2, 3, 5, 8, 14, 24, 40][starterDepth] ?? null;
         return {
           borderFeederTargetPerSide: starterDepth >= 6 ? 1 : 0,
           checkpointCountMultiplier: 0.44 + (starterDepth * (0.2 / 6)),
           checkpointCountOverride,
-          maxDeadEndCount: [0, 1, 2, 3, 5][starterDepth] ?? null,
+          // Same cliff, same fix: this used to run out at depth 4 (value 3)
+          // and fall through to null (no cap at all) for depths 5-6 --
+          // going from "at most 3 dead ends" to "unlimited" in one step.
+          // Extended two more steps instead of uncapping.
+          maxDeadEndCount: [0, 1, 2, 3, 5, 8, 13][starterDepth] ?? null,
           minCheckpoints: Math.min(4, checkpointCountOverride ?? 4),
           requiredOppositeBorderConnections: { horizontal: false, vertical: starterDepth >= 6 },
           routeQualityReinforcementMultiplier: Math.min(0.35, starterDepth * (0.35 / 6)),
