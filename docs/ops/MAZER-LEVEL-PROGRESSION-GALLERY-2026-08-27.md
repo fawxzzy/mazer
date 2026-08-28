@@ -2,6 +2,11 @@
 
 Date: `2026-08-27`
 
+> **Superseded by `MAZER-LEVEL-PROGRESSION-GALLERY-2026-08-28.md`.** The
+> gallery itself has moved to a 1-500 range with one screenshot per level;
+> this doc's two real-bug findings remain historically accurate and are not
+> repeated in the newer doc. Kept for that history only.
+
 ## Outcome
 
 Single canonical level-progression screenshot gallery for Mazer: every level `1` through `200`, captured **twice per level** (two independent seeds), against real play mode. Saved once, in place, to `C:\ATLAS\tmp\captures\mazer-level-progression-gallery` -- this is the only location; the capture script clears and re-fills it on every run instead of writing a new dated copy alongside the old one. This packet replaces (not supplements) any earlier level-progression or progression-view doc/gallery -- there is exactly one of these going forward.
