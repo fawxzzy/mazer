@@ -184,4 +184,29 @@ describe('legacy scene transition integrity', () => {
     expect(playStub.pendingMenuDemoDeconstructArmAtMs).toBeNull();
     expect(playStub.pendingLegacyDeconstructResetMaze).toBe(originalPlayPrecompute);
   });
+
+  test('invalidates a stale pending menu-demo transition at every maze-install boundary, not only at mode switches', () => {
+    // The mode-switch cleanup above (enterMenuMode/startPlayMode) does not
+    // cover a same-mode maze replacement -- e.g. closing the Options
+    // overlay after a setting change queues an 'overlay-rebuild' request,
+    // which installs a new menu maze through applyGenerationRequest
+    // without ever switching modes. A pending menu-demo transition
+    // scheduled against the OLD maze would otherwise survive and later
+    // fire against the new one. applyGenerationRequest is the one shared
+    // boundary every maze-install path (menu-return, overlay-rebuild,
+    // missing-episode recovery, boot-menu, and the legitimate menu-demo-
+    // goal-reset itself) funnels through, so invalidating there covers all
+    // of them centrally instead of chasing each call site individually.
+    const applyGenerationRequestSignature = '  private applyGenerationRequest(request: LegacyGenerationRequest, nextDemoMoveAtMs = 0): void {';
+    const applyGenerationRequestBody = methodSource(
+      applyGenerationRequestSignature,
+      '  private shouldDelayLegacyMenuDeconstructRebuild('
+    ).slice(applyGenerationRequestSignature.length);
+    const firstStatement = applyGenerationRequestBody
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line.length > 0 && !line.startsWith('//'));
+
+    expect(firstStatement).toBe('this.clearPendingLegacyMenuDemoResetTransition();');
+  });
 });

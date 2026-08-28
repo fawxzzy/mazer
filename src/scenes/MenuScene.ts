@@ -4304,6 +4304,25 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private applyGenerationRequest(request: LegacyGenerationRequest, nextDemoMoveAtMs = 0): void {
+    // The authoritative maze-install boundary -- every path that replaces
+    // the active menu episode (menu-return, overlay-rebuild, missing-
+    // episode recovery, boot-menu, and the legitimate menu-demo-goal-reset
+    // itself) funnels through here, so this is where stale deferred menu-
+    // demo transition state actually needs to be invalidated, not at each
+    // individual call site that might replace a maze. enterMenuMode's and
+    // startPlayMode's own calls (PR #316) stay as defense in depth for the
+    // one instant between a mode switch and its own generation request
+    // reaching this method, not because this call alone is insufficient.
+    //
+    // Safe for the legitimate menu-demo-goal-reset request too: by the
+    // time that request reaches here, armLegacyMenuStaticDeconstructStage
+    // already consumed both pendingMenuDemoDeconstructArmAtMs (nulled
+    // before it's even called, in updateMenuDemo) and
+    // pendingLegacyDeconstructResetMaze (nulled by
+    // consumeLegacyDeconstructResetMaze, called from inside
+    // armLegacyMenuStaticDeconstructStage) -- this call is a no-op for that
+    // path, not a discard of the maze this very call is about to install.
+    this.clearPendingLegacyMenuDemoResetTransition();
     const generationState = consumeLegacyGenerationRequestState(request, request.budget.scale);
     this.mode = request.mode;
     this.mazeSeed = request.seed;
