@@ -690,10 +690,12 @@ describe('legacy reset lane', () => {
     const legacyPlayHudSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayHud.ts'), 'utf8');
     const demoLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuDemoLifecycle.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('resolveLegacyPlayHudFrame({');
-    expect(menuSceneSource).toContain('timerText: this.hudFrame?.timerText ?? null');
-    expect(legacyPlayHudSource).toContain('const timerText = formatLegacyHudClock(input.elapsedMs);');
-    expect(legacyPlayHudSource).toContain('const minutes = Math.floor(totalSeconds / 60) % 10;');
+    // There is no play-mode HUD timer -- it was removed from the app
+    // entirely, computation included, not just the on-screen render.
+    expect(menuSceneSource).not.toContain('resolveLegacyPlayHudFrame');
+    expect(menuSceneSource).not.toContain('hudFrame');
+    expect(legacyPlayHudSource).not.toContain('formatLegacyHudClock');
+    expect(legacyPlayHudSource).not.toContain('resolveLegacyPlayHudFrame');
     expect(menuSceneSource).not.toContain('WASD or arrows to move   P to pause');
     // The compass idea was removed from the app entirely -- the timer now
     // takes the centered slot it used to share space beside.

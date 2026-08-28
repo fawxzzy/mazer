@@ -22,8 +22,12 @@ const PROGRESSION_STORAGE_KEY = 'mazer.progression.v1:user:runtime-diagnostics-a
 // duplicate/stale gallery lying around next to the current one.
 const OUTPUT_DIR = 'C:\\ATLAS\\tmp\\captures\\mazer-level-progression-gallery';
 const DEFAULT_MIN_LEVEL = 1;
-const DEFAULT_MAX_LEVEL = 110;
-const FIXED_SEED = 1;
+const DEFAULT_MAX_LEVEL = 200;
+// Two independent generations per level (different seeds) instead of one --
+// lets a reviewer see real maze-shape variety at a given difficulty, and
+// catch a generation defect that only shows up on one seed's roll, rather
+// than judging each level from a single fixed sample.
+const DEFAULT_SEEDS = Object.freeze([1, 2]);
 const VIEWPORT = Object.freeze({ width: 405, height: 958 });
 const DEVICE_SCALE_FACTOR = 2;
 
@@ -48,16 +52,17 @@ const resolveTargetComplexityForLevel = (level) => {
   return LEGACY_PROGRESSION_MIN_COMPLEXITY + ((clampedLevel - 1) * 4);
 };
 
-const buildCases = (minLevel, maxLevel) => Array.from({ length: maxLevel - minLevel + 1 }, (_, index) => {
-  const level = minLevel + index;
-  return {
-    id: `level-${String(level).padStart(3, '0')}`,
+const buildCases = (minLevel, maxLevel, seeds) => {
+  const levels = Array.from({ length: maxLevel - minLevel + 1 }, (_, index) => minLevel + index);
+  return levels.flatMap((level) => seeds.map((seed, seedIndex) => ({
+    id: `level-${String(level).padStart(3, '0')}-gen${seedIndex + 1}`,
     level: String(level),
+    seedIndex,
     targetComplexity: resolveTargetComplexityForLevel(level),
     pastLegacyBoundary: level > 99,
-    requestedSeed: FIXED_SEED
-  };
-});
+    requestedSeed: seed
+  })));
+};
 
 const runNpmCommand = (args) => {
   if (process.platform === 'win32') {
@@ -157,7 +162,11 @@ const captureCase = async ({ browser, baseUrl, outputDir, testCase }) => {
   });
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
-  const route = `/?content=core-only&mode=play&theme=aurora&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=${testCase.requestedSeed}`;
+  // content= and theme= are the separate visual-proof subsystem's own
+  // params (src/boot/presentation.ts) -- src/boot/main.ts, the real game's
+  // entry point this route actually loads, never reads either one. Left out
+  // entirely rather than carried along inert.
+  const route = `/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=${testCase.requestedSeed}`;
   await page.goto(new URL(route, baseUrl).toString(), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction((key) => {
     const diagnostics = window[key];
@@ -220,7 +229,10 @@ const main = async () => {
   const requestedBaseUrl = normalizeBaseUrl(args.baseUrl ?? DEFAULT_BASE_URL);
   const minLevel = args.minLevel !== undefined ? Number.parseInt(args.minLevel, 10) : DEFAULT_MIN_LEVEL;
   const maxLevel = args.maxLevel !== undefined ? Number.parseInt(args.maxLevel, 10) : DEFAULT_MAX_LEVEL;
-  const cases = buildCases(minLevel, maxLevel);
+  const seeds = args.seeds !== undefined
+    ? args.seeds.split(',').map((value) => Number.parseInt(value.trim(), 10))
+    : DEFAULT_SEEDS;
+  const cases = buildCases(minLevel, maxLevel, seeds);
   const summaryPath = resolve(outputDir, 'summary.json');
   const results = [];
   const currentCommitSha = getCommitSha();
@@ -243,7 +255,7 @@ const main = async () => {
       throw new Error(`Existing gallery case count does not match ${cases.length}.`);
     }
     for (const [index, entry] of existing.results.entries()) {
-      if (entry.id !== cases[index]?.id || entry.requestedSeed !== FIXED_SEED) {
+      if (entry.id !== cases[index]?.id || entry.requestedSeed !== cases[index]?.requestedSeed) {
         throw new Error(`Existing gallery identity mismatch at result ${index}.`);
       }
       await access(entry.screenshotPath);
@@ -295,24 +307,45 @@ const main = async () => {
     }
   }
 
-  const legacyResults = results.filter((entry) => Number(entry.level) <= 99);
-  const firstTenResults = results.filter((entry) => Number(entry.level) <= 10);
-  const targetStepViolations = legacyResults.slice(1).filter((entry, index) => (
-    entry.targetComplexity - legacyResults[index].targetComplexity !== 4
-  )).map((entry) => entry.id);
-  const firstTenMazeSizeRegressions = firstTenResults.slice(1).filter((entry, index) => (
-    entry.mazeSize < firstTenResults[index].mazeSize
-  )).map((entry) => entry.id);
-  const level99 = results.find((entry) => entry.level === '99') ?? null;
-  const clampMismatches = level99 === null ? [] : results.filter((entry) => Number(entry.level) >= 100 && (
-    entry.targetComplexity !== level99?.targetComplexity
-    || entry.mazeSize !== level99?.mazeSize
-    || entry.topologyDigest !== level99?.topologyDigest
-  )).map((entry) => entry.id);
+  // Every check below runs independently per seed generation -- results are
+  // ordered [level1-gen1, level1-gen2, level2-gen1, level2-gen2, ...], and a
+  // "does complexity climb correctly" or "is 99-110 the same clamp"
+  // question only makes sense within one seed's own progression sequence,
+  // not compared across two unrelated seeds.
+  const seedGroups = new Map();
+  for (const entry of results) {
+    const list = seedGroups.get(entry.seedIndex) ?? [];
+    list.push(entry);
+    seedGroups.set(entry.seedIndex, list);
+  }
+  const targetStepViolations = [];
+  const firstTenMazeSizeRegressions = [];
+  const clampMismatches = [];
+  let level99SeenPerGroup = true;
+  for (const groupResults of seedGroups.values()) {
+    const legacyResults = groupResults.filter((entry) => Number(entry.level) <= 99);
+    const firstTenResults = groupResults.filter((entry) => Number(entry.level) <= 10);
+    targetStepViolations.push(...legacyResults.slice(1).filter((entry, index) => (
+      entry.targetComplexity - legacyResults[index].targetComplexity !== 4
+    )).map((entry) => entry.id));
+    firstTenMazeSizeRegressions.push(...firstTenResults.slice(1).filter((entry, index) => (
+      entry.mazeSize < firstTenResults[index].mazeSize
+    )).map((entry) => entry.id));
+    const level99 = groupResults.find((entry) => entry.level === '99') ?? null;
+    if (level99 === null) {
+      level99SeenPerGroup = false;
+      continue;
+    }
+    clampMismatches.push(...groupResults.filter((entry) => Number(entry.level) >= 100 && (
+      entry.targetComplexity !== level99.targetComplexity
+      || entry.mazeSize !== level99.mazeSize
+      || entry.topologyDigest !== level99.topologyDigest
+    )).map((entry) => entry.id));
+  }
   const progressionChecks = {
     clampMismatches,
     firstTenMazeSizeRegressions,
-    level99Through110SameTopology: level99 !== null && clampMismatches.length === 0,
+    level99Through110SameTopology: level99SeenPerGroup && clampMismatches.length === 0,
     targetStepViolations
   };
   const failures = results.filter((entry) => (
@@ -329,9 +362,9 @@ const main = async () => {
     endlessProgressionNote: 'legacyEndlessProgression.ts defines a distinct recipe for level >= 100 '
       + '(LEGACY_ENDLESS_LEVEL_BOUNDARY) but is only consumed by legacyRemoteProgression.ts as of this '
       + 'capture -- the client maze-generation path (legacyProgression.ts / MenuScene) is not wired to it '
-      + 'yet, so levels 100-110 use the same fixed-seed topology as level 99 (targetComplexity clamped to 400). '
+      + 'yet, so any level >= 100 uses the same topology (per seed generation) as level 99 (targetComplexity clamped to 400). '
       + 'This is the real, currently-shipped behavior, captured as-is.',
-    fixedSeed: FIXED_SEED,
+    seeds,
     generatedAt: summaryCapturedAt,
     capturedAt: summaryCapturedAt,
     reconciledAt: reconciliationCommitSha === null ? null : new Date().toISOString(),

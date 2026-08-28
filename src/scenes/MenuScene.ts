@@ -90,11 +90,7 @@ import {
   resolveLegacyCardinalDirectionsFromVector,
   type LegacyCardinalDirection
 } from '../legacy-runtime/legacyDirectionalIntent';
-import {
-  resolveLegacyFrozenElapsedMs,
-  resolveLegacyPlayHudFrame,
-  type LegacyPlayHudFrame
-} from '../legacy-runtime/legacyPlayHud';
+import { resolveLegacyFrozenElapsedMs } from '../legacy-runtime/legacyPlayHud';
 import {
   resolveLegacyPlayerTransferVisualState,
   type LegacyPlayerTransferVisualState
@@ -1403,7 +1399,6 @@ export class MenuScene extends Phaser.Scene {
   private playerTransferEnergyOutboundStartedAtMs: number | null = null;
   private playerTransferEnergyDeliveryStartedAtMs: number | null = null;
   private footerText!: Phaser.GameObjects.Text;
-  private hudTimerText!: Phaser.GameObjects.Text;
   private progressionBadgeText!: Phaser.GameObjects.Text;
   private progressionBadgeLabelText!: Phaser.GameObjects.Text;
   private progressionBadgeBounds: VisualRect | null = null;
@@ -1474,10 +1469,7 @@ export class MenuScene extends Phaser.Scene {
   private legacyReducedMotionMediaQueryListener: ((event: MediaQueryListEvent) => void) | null = null;
   private stars: LegacyMenuBackdropStar[] = [];
   private layout!: LegacyMenuLayout;
-  private hudBounds: VisualRect | null = null;
-  private hudTimerBounds: VisualRect | null = null;
   private hudTouchControlBounds: VisualRect | null = null;
-  private hudFrame: LegacyPlayHudFrame | null = null;
   private playerVisualMotion: {
     durationMs: number;
     from: LegacyPoint;
@@ -1627,22 +1619,6 @@ export class MenuScene extends Phaser.Scene {
       color: '#d7d6de',
       align: 'center'
     })).setOrigin(0.5).setAlpha(0.92);
-    // drawHud computes hudFrame.timerText/timerBounds every frame but never
-    // fed either into an actual rendered object -- clearHudTexts/uiTexts'
-    // own 'hud' data-tag cleanup path (see drawHud, clearPlayHudImmediately)
-    // has no producer anywhere in this file that ever sets that tag, so the
-    // play-mode clock has been computing correctly and reporting itself as
-    // visible in diagnostics while never actually drawing on screen. A
-    // persistent field updated in place each frame, mirroring footerText's
-    // own pattern, is cheaper than recreating a Text object every frame the
-    // way the orphaned uiTexts/hud-tag path implies.
-    this.hudTimerText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
-      fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
-      fontSize: '20px',
-      fontStyle: 'bold',
-      color: '#d7fff8',
-      align: 'center'
-    })).setOrigin(0.5).setVisible(false);
     this.progressionBadgeText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
       fontSize: '13px',
@@ -8724,43 +8700,15 @@ export class MenuScene extends Phaser.Scene {
   private drawHud(time: number): void {
     this.hudGraphics.clear();
     this.clearHudTexts();
-    this.hudBounds = null;
-    this.hudTimerBounds = null;
     this.hudTouchControlBounds = null;
-    this.hudFrame = null;
     if (this.mode !== 'play' || this.overlay !== 'none') {
       this.footerText.setText('');
-      this.hudTimerText.setVisible(false);
       return;
     }
     this.footerText.setText('');
 
     const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
-    const hudFrame = resolveLegacyPlayHudFrame({
-      elapsedMs: this.resolveLegacyPlayElapsedMs(),
-      layoutWidth: this.layout.width,
-      safeAreaTop: readMazerViewportGeometry().safeArea.top
-    });
-
     this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);
-
-    this.hudTimerBounds = createVisualRect(
-      hudFrame.timerBounds.left,
-      hudFrame.timerBounds.top,
-      hudFrame.timerBounds.width,
-      hudFrame.timerBounds.height
-    );
-    this.hudBounds = this.hudTimerBounds;
-    this.hudFrame = hudFrame;
-    this.hudTimerText.setText(hudFrame.timerText);
-    this.fitLegacyUiTextToWidth(
-      this.hudTimerText,
-      hudFrame.timerBounds.width,
-      20,
-      12
-    );
-    this.hudTimerText.setPosition(hudFrame.timerBounds.centerX, hudFrame.timerBounds.centerY);
-    this.hudTimerText.setVisible(true);
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
@@ -8970,13 +8918,9 @@ export class MenuScene extends Phaser.Scene {
 
   private clearPlayHudImmediately(): void {
     this.hudGraphics.clear();
-    this.hudBounds = null;
-    this.hudTimerBounds = null;
     this.hudTouchControlBounds = null;
-    this.hudFrame = null;
     this.clearHudTexts();
     this.footerText.setText('');
-    this.hudTimerText.setVisible(false);
   }
 
   private rebuildUi(): void {
@@ -14670,7 +14614,6 @@ export class MenuScene extends Phaser.Scene {
       { id: 'board', bounds: mazeRenderBounds },
       { id: 'progression-badge', bounds: this.progressionBadgeBounds },
       { id: 'menu-ai-progression-badge', bounds: this.menuAiProgressionBadgeBounds },
-      { id: 'hud', bounds: this.hudBounds },
       { id: 'touch-controls', bounds: touchControls.frame },
       { id: 'overlay', bounds: overlayPanel }
     ].filter((entry): entry is { id: string; bounds: VisualRect } => entry.bounds !== null);
@@ -14695,7 +14638,6 @@ export class MenuScene extends Phaser.Scene {
           ...(overlaps(mazeRenderBounds, this.progressionBadgeBounds) ? ['board-progression-badge'] : []),
           ...(overlaps(mazeRenderBounds, this.menuAiProgressionBadgeBounds) ? ['board-menu-ai-progression-badge'] : []),
           ...(overlaps(this.progressionBadgeBounds, this.menuAiProgressionBadgeBounds) ? ['player-menu-ai-progression-badge'] : []),
-          ...(overlaps(mazeRenderBounds, this.hudBounds) ? ['board-hud'] : []),
         ...(overlaps(mazeRenderBounds, touchControls.frame) ? ['board-touch-controls'] : [])
       ]
       : [];
@@ -15057,12 +14999,17 @@ export class MenuScene extends Phaser.Scene {
       renderSurface: {
         ...renderResolutionDiagnostics
       },
+      // There is no play-mode HUD timer -- it was removed from the app
+      // entirely. This field previously kept computing and reporting
+      // timerText/timerBounds/kind/visible as if a timer were live and
+      // showing on screen, when nothing ever actually rendered it (see
+      // drawHud). Reporting honestly instead of resurrecting it.
       hud: {
-        kind: this.mode === 'play' && this.overlay === 'none' ? 'legacy-play-hud' : null,
-        visible: this.mode === 'play' && this.overlay === 'none',
-        bounds: cloneVisualRect(this.hudBounds),
-        timerBounds: cloneVisualRect(this.hudTimerBounds),
-        timerText: this.hudFrame?.timerText ?? null
+        kind: null,
+        visible: false,
+        bounds: null,
+        timerBounds: null,
+        timerText: null
       },
       touchControls,
       overlayUi: {

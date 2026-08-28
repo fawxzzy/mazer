@@ -1269,10 +1269,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('turnDelayMs: movementSpeedProfile.turnDelayMs');
     expect(menuSceneSource).toContain('Math.min(profile.repeatIntervalMs, LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS)');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);');
-    // The compass idea was removed from the app entirely -- the timer takes
-    // the centered top HUD slot it used to share space beside.
+    // The compass idea, and later the timer that took its old centered top
+    // HUD slot, were both removed from the app entirely -- no HUD timer
+    // exists at all now, computation included.
     expect(menuSceneSource).not.toContain('drawLegacyCompassGlyph');
-    expect(menuSceneSource).toContain('this.hudBounds = this.hudTimerBounds;');
+    expect(menuSceneSource).not.toContain('hudBounds');
+    expect(menuSceneSource).not.toContain('hudTimerBounds');
     expect(menuSceneSource).toContain('touchControls');
     expect(menuSceneSource).toContain('LEGACY_CYBER_PANEL_FILL');
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchLabel');
