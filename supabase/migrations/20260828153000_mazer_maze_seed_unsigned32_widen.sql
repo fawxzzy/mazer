@@ -1,110 +1,80 @@
--- Server-transactional player and menu-AI completion contracts.
+-- Widens maze_seed from a signed 32-bit `integer` to `bigint`, end to end
+-- (mazer_cycle_receipts.maze_seed column, mazer_complete_level's and
+-- mazer_complete_ai_level's p_maze_seed parameters), with an explicit
+-- unsigned-32-bit domain check (0-4294967295) replacing the implicit range
+-- signed int32 used to silently provide.
 --
--- Same schema-location caveat as the prior migration in this pair
--- (20260822000000_mazer_endless_progression_foundation.sql): written
--- against `public`, confirm the real live schema before applying and
--- requalify to `mazer.` if that is where the tables actually live.
+-- Root cause: the client's own maze seeds are genuinely unsigned 32-bit
+-- values (src/legacy-runtime/legacyRuntimeSeed.ts: MAX_LEGACY_RUNTIME_SEED =
+-- 0xffffffff, every seed value passed through `>>> 0`), so roughly half of
+-- all possible seeds (any seed >= 2^31 = 2147483648) exceed signed int32's
+-- positive range (max 2147483647). The completion RPCs declared
+-- `p_maze_seed integer`, and mazer_cycle_receipts.maze_seed was `integer`
+-- too -- any completion whose seed landed in the upper half of the unsigned
+-- range failed the RPC call outright (Postgres: "value ... is out of range
+-- for type integer") before ever inserting a receipt or advancing
+-- progression. Confirmed live: seed 2985895775 (> 2147483647) is exactly
+-- this failure mode.
 --
--- Progression mutation is RPC-only after this migration. Ownership RLS still
--- governs reads, while the SECURITY DEFINER functions below re-check the
--- authenticated user explicitly before performing the narrowly bounded
--- initialize, complete, or reset transaction. Direct progression and receipt
--- writes are revoked so callers cannot bypass receipt/idempotency rules or
--- forge leaderboard ordinals through their otherwise owner-scoped rows.
+-- This explains a real, previously-unresolved production symptom: a
+-- player's local progression (advanced client-side before the remote round
+-- trip) could sit ahead of the server's canonical row indefinitely, because
+-- every retry of the same completion hit the same deterministic overflow
+-- and could never succeed -- not a sync-lag issue, a hard data-domain
+-- mismatch. This is a universal fix: it affects any account whose next
+-- seed happens to fall in the upper half of the unsigned 32-bit range, not
+-- one specific account.
 --
--- What this buys once that follow-up lands: both displayed completion
--- ordinals advance exactly once per accepted run, never regress, and remain
--- independent from bounded difficulty. The player RPC enforces revision plus
--- exact-current-level; the menu-AI RPC enforces exact-current-level. Both use
--- a mandatory per-account run UUID and one transactionally inserted receipt.
---
--- Every parameter is p_-prefixed specifically so it can never collide with
--- a column name of the same concept (client_run_id, player_level, etc.) --
--- PL/pgSQL resolves a bare identifier against table columns before
--- parameters in some contexts, and this sidesteps needing to reason about
--- that case by case.
+-- Function bodies below are copied verbatim from the live
+-- mazer_complete_level / mazer_complete_ai_level definitns (see
+-- supabase/migrations/20260824170159_mazer_master_runtime_contracts.sql,
+-- itself generated from supabase/migrations/20260822000100_mazer_endless_
+-- completion_rpc.sql), with exactly two changes: the p_maze_seed parameter
+-- type (integer -> bigint) and its null-check widened into an explicit
+-- unsigned-32-bit domain check. Every other line -- auth checks, revision
+-- guard, exact-current-level sequencing, idempotency via client_run_id,
+-- receipt shape/size validation, rank/colorTier derivation -- is unchanged.
 
-drop function if exists public.mazer_initialize_progression(uuid);
+begin;
 
-create function public.mazer_initialize_progression(
-  p_expected_user_id uuid
-)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_user_id uuid := (select auth.uid());
+do $preflight$
 begin
-  if v_user_id is null or p_expected_user_id is distinct from v_user_id then
-    raise exception 'mazer_initialize_progression account mismatch' using errcode = '28000';
+  if to_regclass('mazer.mazer_cycle_receipts') is null then
+    raise exception 'MAZER_SEED_WIDEN_PREIMAGE_TABLE_MISSING';
   end if;
-
-  insert into public.mazer_progression_states (
-    user_id,
-    schema_version,
-    state,
-    player_level,
-    player_rank,
-    player_target_complexity,
-    player_completed_cycles,
-    revision
-  ) values (
-    v_user_id,
-    1,
-    '{}'::jsonb,
-    1,
-    'E',
-    8,
-    0,
-    0
-  ) on conflict (user_id) do nothing;
-
-  insert into public.mazer_ai_progression_states (
-    user_id,
-    runner_key,
-    schema_version,
-    state,
-    summary,
-    level,
-    rank,
-    target_complexity,
-    completed_cycles
-  ) values (
-    v_user_id,
-    'menu-runner',
-    1,
-    '{}'::jsonb,
-    '{}'::jsonb,
-    1,
-    'E',
-    8,
-    0
-  ) on conflict (user_id, runner_key) do nothing;
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'mazer'
+      and p.proname = 'mazer_complete_level'
+      and pg_get_function_identity_arguments(p.oid) =
+        'p_expected_revision bigint, p_expected_user_id uuid, p_completed_level text, p_maze_seed integer, p_maze_size integer, p_client_run_id uuid, p_ruleset_id text, p_recipe_version integer, p_recipe_hash text, p_completed_at timestamp with time zone, p_receipt jsonb'
+  ) then
+    raise exception 'MAZER_SEED_WIDEN_PREIMAGE_COMPLETE_LEVEL_SIGNATURE_MISMATCH';
+  end if;
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'mazer'
+      and p.proname = 'mazer_complete_ai_level'
+      and pg_get_function_identity_arguments(p.oid) =
+        'p_expected_user_id uuid, p_completed_level text, p_maze_seed integer, p_maze_size integer, p_client_run_id uuid, p_ruleset_id text, p_recipe_version integer, p_recipe_hash text, p_completed_at timestamp with time zone, p_receipt jsonb'
+  ) then
+    raise exception 'MAZER_SEED_WIDEN_PREIMAGE_COMPLETE_AI_LEVEL_SIGNATURE_MISMATCH';
+  end if;
 end;
-$$;
+$preflight$;
 
-revoke all on function public.mazer_initialize_progression(uuid) from public;
-revoke all on function public.mazer_initialize_progression(uuid) from anon;
-grant execute on function public.mazer_initialize_progression(uuid) to authenticated;
+alter table mazer.mazer_cycle_receipts
+  alter column maze_seed type bigint;
 
-comment on function public.mazer_initialize_progression is
-  'Creates only the authenticated caller''s missing baseline player and menu-AI rows. Existing progression is never changed.';
+alter table mazer.mazer_cycle_receipts
+  add constraint mazer_cycle_receipts_maze_seed_range
+  check (maze_seed >= 0 and maze_seed <= 4294967295);
 
--- An earlier source-only draft used integer for p_completed_level. Drop that
--- exact obsolete overload if a partial provider rehearsal ever created it;
--- PostgREST does not support exposing ambiguous overloaded RPCs.
-drop function if exists public.mazer_complete_level(bigint, integer, integer, integer, uuid, text, integer, text);
-drop function if exists public.mazer_complete_level(bigint, bigint, integer, integer, uuid, text, integer, text);
-drop function if exists public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text);
-drop function if exists public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
-drop function if exists public.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
--- maze_seed widened from integer to bigint (unsigned 32-bit domain) --
--- drop the obsolete integer-seed overload too so PostgREST never sees two.
-drop function if exists public.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
+drop function if exists mazer.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
 
-create or replace function public.mazer_complete_level(
+create function mazer.mazer_complete_level(
   p_expected_revision bigint,
   p_expected_user_id uuid,
   p_completed_level text,
@@ -160,12 +130,9 @@ begin
     raise exception 'maze_size must be a positive integer' using errcode = '22023';
   end if;
 
-  -- Client seeds are genuinely unsigned 32-bit (see legacyRuntimeSeed.ts's
-  -- MAX_LEGACY_RUNTIME_SEED = 0xffffffff and its >>> 0 normalization) --
-  -- validate the real domain explicitly instead of relying on a
-  -- parameter/column type to reject anything out of range. p_maze_seed is
-  -- bigint specifically so this check, not a signed int32 column, is what
-  -- rejects an out-of-domain value.
+  -- Client seeds are genuinely unsigned 32-bit (see this migration's own
+  -- header comment) -- validate the real domain explicitly instead of
+  -- relying on a column/parameter type to reject anything out of range.
   if p_maze_seed is null or p_maze_seed < 0 or p_maze_seed > 4294967295 then
     raise exception 'maze_seed must be within the unsigned 32-bit range (0-4294967295)' using errcode = '22023';
   end if;
@@ -203,7 +170,7 @@ begin
     s.revision,
     s.state
     into v_current
-  from public.mazer_progression_states s
+  from mazer.mazer_progression_states s
   where s.user_id = v_user_id
   for update;
 
@@ -213,7 +180,7 @@ begin
 
   if exists (
     select 1
-    from public.mazer_cycle_receipts r
+    from mazer.mazer_cycle_receipts r
     where r.user_id = v_user_id
       and r.client_run_id = p_client_run_id
   ) then
@@ -227,12 +194,12 @@ begin
         s.level_reached_at,
         s.state,
         s.updated_at
-      from public.mazer_progression_states s
+      from mazer.mazer_progression_states s
       where s.user_id = v_user_id;
     return;
   end if;
 
-  if v_current.revision <> p_expected_revision then
+  if p_expected_revision is null or v_current.revision is distinct from p_expected_revision then
     raise exception 'Progression changed on another device (expected revision %, found %)', p_expected_revision, v_current.revision
       using errcode = '40001';
   end if;
@@ -264,7 +231,7 @@ begin
     greatest(0, ((v_next_target_complexity - 8) / 4) / 5)
   );
 
-  insert into public.mazer_cycle_receipts (
+  insert into mazer.mazer_cycle_receipts (
     user_id,
     surface,
     maze_seed,
@@ -303,7 +270,7 @@ begin
         s.level_reached_at,
         s.state,
         s.updated_at
-      from public.mazer_progression_states s
+      from mazer.mazer_progression_states s
       where s.user_id = v_user_id;
     return;
   end if;
@@ -341,7 +308,7 @@ begin
     true
   );
 
-  update public.mazer_progression_states s
+  update mazer.mazer_progression_states s
   set
     player_level = v_next_level,
     player_rank = v_next_rank,
@@ -364,27 +331,22 @@ begin
       s.level_reached_at,
       s.state,
       s.updated_at
-    from public.mazer_progression_states s
+    from mazer.mazer_progression_states s
     where s.user_id = v_user_id;
 end;
 $$;
 
-revoke all on function public.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
-revoke all on function public.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from anon;
-grant execute on function public.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
+revoke all on function mazer.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
+revoke all on function mazer.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from anon;
+grant execute on function mazer.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
+alter function mazer.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) owner to postgres;
 
-comment on function public.mazer_complete_level is
+comment on function mazer.mazer_complete_level is
   'Auth-bound, idempotent, load-bearing player completion transaction. The client keeps the same run UUID in a durable outbox until this function returns the canonical state. maze_seed is bigint, validated to the unsigned 32-bit domain (0-4294967295) the client actually generates.';
 
-drop function if exists public.mazer_complete_ai_level(bigint, integer, integer, uuid, text, integer, text);
-drop function if exists public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text);
-drop function if exists public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
-drop function if exists public.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
--- maze_seed widened from integer to bigint (unsigned 32-bit domain) --
--- drop the obsolete integer-seed overload too so PostgREST never sees two.
-drop function if exists public.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
+drop function if exists mazer.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
 
-create or replace function public.mazer_complete_ai_level(
+create function mazer.mazer_complete_ai_level(
   p_expected_user_id uuid,
   p_completed_level text,
   p_maze_seed bigint,
@@ -468,7 +430,7 @@ begin
     s.state,
     s.summary
     into v_current
-  from public.mazer_ai_progression_states s
+  from mazer.mazer_ai_progression_states s
   where s.user_id = v_user_id
     and s.runner_key = 'menu-runner'
   for update;
@@ -479,7 +441,7 @@ begin
 
   if exists (
     select 1
-    from public.mazer_cycle_receipts r
+    from mazer.mazer_cycle_receipts r
     where r.user_id = v_user_id
       and r.client_run_id = p_client_run_id
   ) then
@@ -492,7 +454,7 @@ begin
         s.last_completed_cycle_at,
         s.state,
         s.updated_at
-      from public.mazer_ai_progression_states s
+      from mazer.mazer_ai_progression_states s
       where s.user_id = v_user_id
         and s.runner_key = 'menu-runner';
     return;
@@ -522,7 +484,7 @@ begin
     greatest(0, ((v_next_target_complexity - 8) / 4) / 5)
   );
 
-  insert into public.mazer_cycle_receipts (
+  insert into mazer.mazer_cycle_receipts (
     user_id,
     surface,
     maze_seed,
@@ -558,7 +520,7 @@ begin
         s.last_completed_cycle_at,
         s.state,
         s.updated_at
-      from public.mazer_ai_progression_states s
+      from mazer.mazer_ai_progression_states s
       where s.user_id = v_user_id
         and s.runner_key = 'menu-runner';
     return;
@@ -591,7 +553,7 @@ begin
     'targetComplexity', v_next_target_complexity
   );
 
-  update public.mazer_ai_progression_states s
+  update mazer.mazer_ai_progression_states s
   set
     level = v_next_level,
     rank = v_next_rank,
@@ -613,155 +575,71 @@ begin
       s.last_completed_cycle_at,
       s.state,
       s.updated_at
-    from public.mazer_ai_progression_states s
+    from mazer.mazer_ai_progression_states s
     where s.user_id = v_user_id
       and s.runner_key = 'menu-runner';
 end;
 $$;
 
-revoke all on function public.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
-revoke all on function public.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from anon;
-grant execute on function public.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
+revoke all on function mazer.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
+revoke all on function mazer.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from anon;
+grant execute on function mazer.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
+alter function mazer.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) owner to postgres;
 
-comment on function public.mazer_complete_ai_level is
+comment on function mazer.mazer_complete_ai_level is
   'Auth-bound, idempotent, load-bearing menu-AI completion transaction. The client keeps the same run UUID in a durable outbox until this function returns the canonical state. maze_seed is bigint, validated to the unsigned 32-bit domain (0-4294967295) the client actually generates.';
 
-drop function if exists public.mazer_reset_progression(bigint, uuid);
-
-create function public.mazer_reset_progression(
-  p_expected_revision bigint,
-  p_expected_user_id uuid
-)
-returns table (
-  player_level text,
-  player_rank text,
-  player_target_complexity integer,
-  player_completed_cycles text,
-  revision bigint,
-  level_reached_at timestamp with time zone,
-  state jsonb,
-  updated_at timestamp with time zone
-)
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_user_id uuid := (select auth.uid());
-  v_current_revision bigint;
-  v_now timestamp with time zone := pg_catalog.clock_timestamp();
+do $postimage$
 begin
-  if v_user_id is null or p_expected_user_id is distinct from v_user_id then
-    raise exception 'mazer_reset_progression account mismatch' using errcode = '28000';
+  if (
+    select data_type from information_schema.columns
+    where table_schema = 'mazer' and table_name = 'mazer_cycle_receipts' and column_name = 'maze_seed'
+  ) is distinct from 'bigint' then
+    raise exception 'MAZER_SEED_WIDEN_POSTIMAGE_COLUMN_TYPE_FAILED';
   end if;
 
-  insert into public.mazer_progression_states (
-    user_id,
-    schema_version,
-    state,
-    player_level,
-    player_rank,
-    player_target_complexity,
-    player_completed_cycles,
-    revision
-  ) values (
-    v_user_id,
-    1,
-    '{}'::jsonb,
-    1,
-    'E',
-    8,
-    0,
-    0
-  ) on conflict (user_id) do nothing;
-
-  select s.revision
-    into v_current_revision
-  from public.mazer_progression_states s
-  where s.user_id = v_user_id
-  for update;
-
-  if v_current_revision <> p_expected_revision then
-    raise exception 'Progression changed on another device (expected revision %, found %)', p_expected_revision, v_current_revision
-      using errcode = '40001';
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'mazer'
+      and p.proname = 'mazer_complete_level'
+      and pg_get_function_identity_arguments(p.oid) =
+        'p_expected_revision bigint, p_expected_user_id uuid, p_completed_level text, p_maze_seed bigint, p_maze_size integer, p_client_run_id uuid, p_ruleset_id text, p_recipe_version integer, p_recipe_hash text, p_completed_at timestamp with time zone, p_receipt jsonb'
+  ) then
+    raise exception 'MAZER_SEED_WIDEN_POSTIMAGE_COMPLETE_LEVEL_MISSING';
   end if;
 
-  update public.mazer_progression_states s
-  set
-    schema_version = 1,
-    state = '{}'::jsonb,
-    player_level = 1,
-    player_rank = 'E',
-    player_target_complexity = 8,
-    player_completed_cycles = 0,
-    revision = v_current_revision + 1,
-    last_completed_cycle_at = null,
-    level_reached_at = null,
-    updated_at = v_now
-  where s.user_id = v_user_id;
+  if exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'mazer'
+      and p.proname = 'mazer_complete_level'
+      and pg_get_function_identity_arguments(p.oid) like '%p_maze_seed integer%'
+  ) then
+    raise exception 'MAZER_SEED_WIDEN_POSTIMAGE_AMBIGUOUS_OVERLOAD_COMPLETE_LEVEL';
+  end if;
 
-  insert into public.mazer_ai_progression_states (
-    user_id,
-    runner_key,
-    schema_version,
-    state,
-    summary,
-    level,
-    rank,
-    target_complexity,
-    completed_cycles,
-    last_completed_cycle_at,
-    updated_at
-  ) values (
-    v_user_id,
-    'menu-runner',
-    1,
-    '{}'::jsonb,
-    '{}'::jsonb,
-    1,
-    'E',
-    8,
-    0,
-    null,
-    v_now
-  )
-  on conflict (user_id, runner_key) do update
-  set
-    schema_version = excluded.schema_version,
-    state = excluded.state,
-    summary = excluded.summary,
-    level = excluded.level,
-    rank = excluded.rank,
-    target_complexity = excluded.target_complexity,
-    completed_cycles = excluded.completed_cycles,
-    last_completed_cycle_at = excluded.last_completed_cycle_at,
-    updated_at = excluded.updated_at;
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'mazer'
+      and p.proname = 'mazer_complete_ai_level'
+      and pg_get_function_identity_arguments(p.oid) =
+        'p_expected_user_id uuid, p_completed_level text, p_maze_seed bigint, p_maze_size integer, p_client_run_id uuid, p_ruleset_id text, p_recipe_version integer, p_recipe_hash text, p_completed_at timestamp with time zone, p_receipt jsonb'
+  ) then
+    raise exception 'MAZER_SEED_WIDEN_POSTIMAGE_COMPLETE_AI_LEVEL_MISSING';
+  end if;
 
-  return query
-    select
-      s.player_level::text,
-      s.player_rank,
-      s.player_target_complexity,
-      s.player_completed_cycles::text,
-      s.revision,
-      s.level_reached_at,
-      s.state,
-      s.updated_at
-    from public.mazer_progression_states s
-    where s.user_id = v_user_id;
+  if exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'mazer'
+      and p.proname = 'mazer_complete_ai_level'
+      and pg_get_function_identity_arguments(p.oid) like '%p_maze_seed integer%'
+  ) then
+    raise exception 'MAZER_SEED_WIDEN_POSTIMAGE_AMBIGUOUS_OVERLOAD_COMPLETE_AI_LEVEL';
+  end if;
 end;
-$$;
+$postimage$;
 
-revoke all on function public.mazer_reset_progression(bigint, uuid) from public;
-revoke all on function public.mazer_reset_progression(bigint, uuid) from anon;
-grant execute on function public.mazer_reset_progression(bigint, uuid) to authenticated;
-
-comment on function public.mazer_reset_progression is
-  'Atomically resets only the authenticated caller''s player and menu-AI progression after an exact revision check.';
-
--- Authenticated clients retain read access through their existing owner RLS
--- policies, but every progression/receipt mutation now crosses one of the
--- explicit functions above. Profile/settings writes remain unchanged.
-revoke insert, update on table public.mazer_progression_states from authenticated;
-revoke insert, update on table public.mazer_ai_progression_states from authenticated;
-revoke insert on table public.mazer_cycle_receipts from authenticated;
+commit;
