@@ -100,15 +100,12 @@ drop function if exists public.mazer_complete_level(bigint, bigint, integer, int
 drop function if exists public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text);
 drop function if exists public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
 drop function if exists public.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
--- maze_seed widened from integer to bigint (unsigned 32-bit domain) --
--- drop the obsolete integer-seed overload too so PostgREST never sees two.
-drop function if exists public.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
 
 create or replace function public.mazer_complete_level(
   p_expected_revision bigint,
   p_expected_user_id uuid,
   p_completed_level text,
-  p_maze_seed bigint,
+  p_maze_seed integer,
   p_maze_size integer,
   p_client_run_id uuid,
   p_ruleset_id text default null,
@@ -160,14 +157,8 @@ begin
     raise exception 'maze_size must be a positive integer' using errcode = '22023';
   end if;
 
-  -- Client seeds are genuinely unsigned 32-bit (see legacyRuntimeSeed.ts's
-  -- MAX_LEGACY_RUNTIME_SEED = 0xffffffff and its >>> 0 normalization) --
-  -- validate the real domain explicitly instead of relying on a
-  -- parameter/column type to reject anything out of range. p_maze_seed is
-  -- bigint specifically so this check, not a signed int32 column, is what
-  -- rejects an out-of-domain value.
-  if p_maze_seed is null or p_maze_seed < 0 or p_maze_seed > 4294967295 then
-    raise exception 'maze_seed must be within the unsigned 32-bit range (0-4294967295)' using errcode = '22023';
+  if p_maze_seed is null then
+    raise exception 'maze_seed is required' using errcode = '22023';
   end if;
 
   if p_client_run_id is null then
@@ -369,25 +360,22 @@ begin
 end;
 $$;
 
-revoke all on function public.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
-revoke all on function public.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from anon;
-grant execute on function public.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
+revoke all on function public.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
+revoke all on function public.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from anon;
+grant execute on function public.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
 
 comment on function public.mazer_complete_level is
-  'Auth-bound, idempotent, load-bearing player completion transaction. The client keeps the same run UUID in a durable outbox until this function returns the canonical state. maze_seed is bigint, validated to the unsigned 32-bit domain (0-4294967295) the client actually generates.';
+  'Auth-bound, idempotent, load-bearing player completion transaction. The client keeps the same run UUID in a durable outbox until this function returns the canonical state.';
 
 drop function if exists public.mazer_complete_ai_level(bigint, integer, integer, uuid, text, integer, text);
 drop function if exists public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text);
 drop function if exists public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
 drop function if exists public.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
--- maze_seed widened from integer to bigint (unsigned 32-bit domain) --
--- drop the obsolete integer-seed overload too so PostgREST never sees two.
-drop function if exists public.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
 
 create or replace function public.mazer_complete_ai_level(
   p_expected_user_id uuid,
   p_completed_level text,
-  p_maze_seed bigint,
+  p_maze_seed integer,
   p_maze_size integer,
   p_client_run_id uuid,
   p_ruleset_id text default null,
@@ -437,8 +425,8 @@ begin
     raise exception 'maze_size must be a positive integer' using errcode = '22023';
   end if;
 
-  if p_maze_seed is null or p_maze_seed < 0 or p_maze_seed > 4294967295 then
-    raise exception 'maze_seed must be within the unsigned 32-bit range (0-4294967295)' using errcode = '22023';
+  if p_maze_seed is null then
+    raise exception 'maze_seed is required' using errcode = '22023';
   end if;
 
   if p_client_run_id is null then
@@ -619,12 +607,12 @@ begin
 end;
 $$;
 
-revoke all on function public.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
-revoke all on function public.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from anon;
-grant execute on function public.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
+revoke all on function public.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
+revoke all on function public.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from anon;
+grant execute on function public.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
 
 comment on function public.mazer_complete_ai_level is
-  'Auth-bound, idempotent, load-bearing menu-AI completion transaction. The client keeps the same run UUID in a durable outbox until this function returns the canonical state. maze_seed is bigint, validated to the unsigned 32-bit domain (0-4294967295) the client actually generates.';
+  'Auth-bound, idempotent, load-bearing menu-AI completion transaction. The client keeps the same run UUID in a durable outbox until this function returns the canonical state.';
 
 drop function if exists public.mazer_reset_progression(bigint, uuid);
 
