@@ -1462,7 +1462,16 @@ export const resolveLegacyProgressionGenerationScale = (
   const difficultyLevel = resolveLegacyProgressionLevel(track.targetComplexity);
   const progressionScale = profile.targetScale + Math.min(8, Math.max(0, track.targetComplexity - resolveLegacyProgressionLevelBaseTargetComplexity(difficultyLevel)) * 0.8);
   const blendedScale = (baseScale * 0.28) + (progressionScale * 0.72);
-  const progressionMaxScale = Math.min(96, baseScale + 28);
+  // Mythic's own curve (targetScale 96, up to +8 more from the in-band
+  // complexity bonus above) can reach 104 -- but the old ceiling here
+  // (min(96, baseScale + 28), 78 at the default baseScale of 50) clamped
+  // that down well before the mythic band's own top end, well before the
+  // device/viewport cap below ever became the real limiter, and well
+  // before the absolute LEGACY_MAX_SCALE (150) generation itself allows.
+  // Raised so the difficulty curve's own top end is what a player actually
+  // reaches -- the viewport cap (screen space vs. a legible tile size) and
+  // the absolute generation ceiling remain the real physical limits.
+  const progressionMaxScale = Math.min(120, baseScale + 60);
   const viewportMaxScale = resolveLegacyProgressionViewportScaleCap({
     ...options,
     boardScale: baseScale
