@@ -1970,7 +1970,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("const seedOverride = mode === 'play'");
     expect(menuSceneSource).toContain('seedOverride');
     expect(menuSceneSource).toContain('seedOverride: this.createFreshLegacyPlayGenerationSeed()');
-    expect(menuSceneSource).toContain('private resolveLegacyTargetComplexityForMode(mode: RuntimeMode): number');
+    // The menu demo now generates against the player's own track too (see
+    // resolveLegacyProgressionScaleForMode's own comment) -- mode is no
+    // longer read inside this one, hence the leading underscore.
+    expect(menuSceneSource).toContain('private resolveLegacyTargetComplexityForMode(_mode: RuntimeMode): number');
     expect(menuSceneSource).toContain('targetComplexity: this.resolveLegacyTargetComplexityForMode(mode)');
     expect(menuSceneSource).toContain("targetComplexity: this.resolveLegacyTargetComplexityForMode('play')");
     expect(menuSceneSource).toContain("targetComplexity: this.resolveLegacyTargetComplexityForMode('menu')");
