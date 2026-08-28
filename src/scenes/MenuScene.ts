@@ -53,10 +53,12 @@ import {
 import {
   createLegacyMenuResetGenerationRequest,
   createLegacyPlayResetGenerationRequest,
+  createLegacyRuntimeMazeForMode,
   consumeLegacyGenerationRequestState,
   createLegacyGenerationRequest,
   shouldConsumeLegacyGenerationRequest,
   stepLegacyGenerationSeed,
+  type LegacyGenerationMode,
   type LegacyGenerationRequest,
 } from '../legacy-runtime/legacyGenerationLifecycle';
 import {
@@ -1414,6 +1416,19 @@ export class MenuScene extends Phaser.Scene {
   private playerTransferEnergyArmed = false;
   private playerTransferEnergyOutboundStartedAtMs: number | null = null;
   private playerTransferEnergyDeliveryStartedAtMs: number | null = null;
+  // Built at the goal-reached instant (see precomputeLegacyDeconstructResetMaze),
+  // well before armLegacyMenuStaticDeconstructStage runs -- that arm call is
+  // itself what starts the outbound player-transfer-energy timer and the
+  // bleed-dock corridor's own clock, both short (a few hundred ms)
+  // wall-clock-timed animation windows. Generating the next maze
+  // synchronously INSIDE that same arm call (as it used to) could burn more
+  // wall-clock time than either window's own duration, so the very first
+  // frame rendered afterward was already past them -- the outbound laser
+  // never visibly flies, the deceleration never visibly plays, both just
+  // "jump" to their post-window resting state. Precomputing this early
+  // means the arm call consumes an already-built maze and does no
+  // synchronous work of its own.
+  private pendingLegacyDeconstructResetMaze: { mode: LegacyGenerationMode; seed: number; maze: LegacyMazeSnapshot } | null = null;
   private footerText!: Phaser.GameObjects.Text;
   private progressionBadgeText!: Phaser.GameObjects.Text;
   private progressionBadgeLabelText!: Phaser.GameObjects.Text;
@@ -4431,6 +4446,7 @@ export class MenuScene extends Phaser.Scene {
     options: {
       mode?: RuntimeMode;
       precompute?: boolean;
+      precomputedMazeOverride?: LegacyMazeSnapshot;
       seedOverride?: number;
       stepSeed?: boolean;
     } = {}
@@ -4444,6 +4460,7 @@ export class MenuScene extends Phaser.Scene {
       generationProfile: this.resolveLegacyMazeGenerationProfileForMode(mode),
       mode,
       ...(options.precompute !== undefined ? { precompute: options.precompute } : {}),
+      ...(options.precomputedMazeOverride !== undefined ? { precomputedMazeOverride: options.precomputedMazeOverride } : {}),
       queuedAtMs: this.time.now,
       reason,
       scale: generationScale,
@@ -4751,6 +4768,45 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticBuildPhaseStartedAtMs = null;
   }
 
+  // Call at the goal-reached instant (before armLegacyPlayerTransferEnergy /
+  // armLegacyMenuStaticDeconstructStage), NOT inside the arm call itself --
+  // see pendingLegacyDeconstructResetMaze's own comment for why the timing
+  // matters here specifically. Mirrors exactly the scale/profile/aspect
+  // ratio/targetComplexity/seed resolution armLegacyMenuStaticDeconstructStage's
+  // own branches use, so the maze this builds is not a second, possibly-
+  // different generation -- it's the one that call would have built anyway,
+  // just started earlier. Every one of those resolvers reads only
+  // progressionState / settings / current viewport / the OLD (still active)
+  // maze's own tile order, none of which change in the few hundred ms
+  // between this call and the arm call consuming its result.
+  private precomputeLegacyDeconstructResetMaze(mode: LegacyGenerationMode): void {
+    const scale = this.resolveLegacyProgressionScaleForMode(mode);
+    const profile = this.resolveLegacyMazeGenerationProfileForMode(mode);
+    const aspectRatio = this.resolveLegacyBoardAspectRatioForMode(mode, scale);
+    const targetComplexity = this.resolveLegacyTargetComplexityForMode(mode);
+    const seed = mode === 'play'
+      ? this.createFreshLegacyPlayGenerationSeed()
+      : this.createFreshLegacyMenuGenerationSeed();
+    const maze = createLegacyRuntimeMazeForMode(mode, scale, seed, profile, { targetComplexity }, aspectRatio);
+    this.pendingLegacyDeconstructResetMaze = { mode, seed, maze };
+  }
+
+  // Consumes (and clears) a maze precomputeLegacyDeconstructResetMaze already
+  // built for this exact mode, if one is waiting. Returns null when none
+  // matches, so callers fall back to their own precompute:true path -- a
+  // safety net for any deconstruct-triggered reset that didn't call the
+  // early precompute (there shouldn't be one, but this keeps that a
+  // graceful fallback instead of a silent behavior change if one is ever
+  // missed).
+  private consumeLegacyDeconstructResetMaze(mode: LegacyGenerationMode): { seed: number; maze: LegacyMazeSnapshot } | null {
+    const pending = this.pendingLegacyDeconstructResetMaze;
+    if (!pending || pending.mode !== mode) {
+      return null;
+    }
+    this.pendingLegacyDeconstructResetMaze = null;
+    return { seed: pending.seed, maze: pending.maze };
+  }
+
   private armLegacyMenuStaticDeconstructStage(time: number): void {
     if (this.menuStaticDrawLifecyclePhase === 'deconstructing') {
       return;
@@ -4790,29 +4846,36 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     if (this.mode === 'play') {
       const playGenerationScale = this.resolveLegacyProgressionScaleForMode('play');
+      // precomputeLegacyDeconstructResetMaze (called at the goal-reached
+      // instant, well before this arm call) should already have this ready
+      // -- consuming it here means this call does no synchronous generation
+      // work of its own, which is what keeps the outbound player-transfer-
+      // energy timer and the corridor clock (armed a few lines up) from
+      // having their own short wall-clock windows eaten by a build that
+      // used to happen right here. precompute: true stays as a fallback for
+      // the (should never happen) case where nothing was precomputed.
+      const precomputed = this.consumeLegacyDeconstructResetMaze('play');
       this.pendingGenerationRequest = createLegacyPlayResetGenerationRequest({
         aspectRatio: this.resolveLegacyBoardAspectRatioForMode('play', playGenerationScale),
         currentSeed: this.mazeSeed,
         generationProfile: this.resolveLegacyMazeGenerationProfileForMode('play'),
         nowMs: time + this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
-        // Build the next maze right now, while this one is still visibly
-        // deconstructing, instead of leaving it for consumeLegacyGenerationRequest
-        // to build later at dueAtMs -- the moment the screen is empty and a
-        // synchronous build stalling the main thread reads as a freeze. See
-        // createLegacyGenerationRequest's own comment on this option.
-        precompute: true,
-        seedOverride: this.createFreshLegacyPlayGenerationSeed(),
+        ...(precomputed
+          ? { precomputedMazeOverride: precomputed.maze, seedOverride: precomputed.seed }
+          : { precompute: true, seedOverride: this.createFreshLegacyPlayGenerationSeed() }),
         scale: playGenerationScale,
         targetComplexity: this.resolveLegacyTargetComplexityForMode('play')
       });
     } else {
+      const precomputed = this.consumeLegacyDeconstructResetMaze('menu');
       this.queueGenerationRequest(
         'menu-demo-goal-reset',
         this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
         {
           mode: 'menu',
-          precompute: true,
-          seedOverride: this.createFreshLegacyMenuGenerationSeed(),
+          ...(precomputed
+            ? { precomputedMazeOverride: precomputed.maze, seedOverride: precomputed.seed }
+            : { precompute: true, seedOverride: this.createFreshLegacyMenuGenerationSeed() }),
           stepSeed: true
         }
       );
@@ -5238,6 +5301,20 @@ export class MenuScene extends Phaser.Scene {
       this.playCompletedAtMs ??= this.time.now;
       this.recordMazeCycleCompletion('play');
       this.armLegacyPlayerTransferEnergy(this.time.now);
+      // Build the next maze right now, at the goal-reached instant --
+      // schedulePlayResetReturn below holds for ACTIVE_PLAY_GOAL_RESET_HOLD_MS
+      // (340ms, many real frames) before armLegacyMenuStaticDeconstructStage
+      // ever runs and consumes this. That gives the synchronous build real
+      // wall-clock room to finish well before it's needed, instead of
+      // running inside armLegacyMenuStaticDeconstructStage itself, which
+      // eats directly into the outbound player-transfer-energy timer and
+      // corridor clock it arms in that same call -- both short (a few
+      // hundred ms), wall-clock-timed animation windows that a stall inside
+      // that call can (and does, for anything but a trivial maze) consume
+      // entirely, making the laser and the deconstruct-to-build deceleration
+      // both skip straight to their post-window state instead of visibly
+      // playing.
+      this.precomputeLegacyDeconstructResetMaze('play');
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
       this.triggerLegacyHapticPulse([18, 40, 18, 40, 32]);
