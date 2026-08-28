@@ -1197,6 +1197,13 @@ const LEGACY_BLEED_DOCK_GROWTH_MS = 420;
 // inbound player-transfer delivery beam to that same instant), so the
 // corridor visibly reaches the screen edge right as the player arrives.
 const LEGACY_BLEED_DOCK_BUILD_GROWTH_MS = 1100;
+// Mirrors ACTIVE_PLAY_GOAL_RESET_HOLD_MS's own value and purpose exactly
+// (legacyPlayLifecycle.ts), for the menu demo's own goal-arrival precompute
+// -- see updateMenuDemo's own comment on pendingMenuDemoDeconstructArmAtMs
+// for why the demo walker needed its own hold instead of reusing that
+// constant's mechanism directly (a different, DOM-free state machine with
+// no shared request/consume plumbing to play mode's).
+const LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS = 340;
 // The four corner sigils fire a beam toward wherever the player marker is
 // about to appear once the final generation stage settles -- a short travel
 // span for the beams to reach the tile, then a brief impact flash the marker
@@ -1428,6 +1435,22 @@ export class MenuScene extends Phaser.Scene {
   // means the arm call consumes an already-built maze and does no
   // synchronous work of its own.
   private pendingLegacyDeconstructResetMaze: { mode: LegacyGenerationMode; seed: number; maze: LegacyMazeSnapshot } | null = null;
+  // The menu demo's own equivalent of play mode's schedulePlayResetReturn
+  // hold, for the identical reason (see pendingLegacyDeconstructResetMaze's
+  // own comment just above). shouldStartLegacyMenuDeconstructOnGoalArrival
+  // deliberately skips the demo walker's own 3-second ambient goalHoldMs
+  // "celebration" hold when a live maze is already showing (that long a
+  // frozen-looking pause would read as a stalled background loop, not a
+  // deliberate one) -- so unlike play mode, there is no existing hold to
+  // precompute the next maze behind. This field parks the actual
+  // deconstruct-arm call (which starts the outbound laser/corridor's own
+  // wall-clock timers) for LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS after
+  // updateMenuDemo calls precomputeLegacyDeconstructResetMaze at the
+  // goal-reached instant, giving the synchronous build real wall-clock
+  // room to finish before anything that would eat into it fires -- see
+  // updateMenuDemo's own two use sites for exactly where this is set and
+  // consumed.
+  private pendingMenuDemoDeconstructArmAtMs: number | null = null;
   private footerText!: Phaser.GameObjects.Text;
   private progressionBadgeText!: Phaser.GameObjects.Text;
   private progressionBadgeLabelText!: Phaser.GameObjects.Text;
@@ -5180,6 +5203,19 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    // The goal-arrival branch below parks the actual deconstruct-arm call
+    // here instead of firing it on the same frame the goal was reached --
+    // see pendingMenuDemoDeconstructArmAtMs's own comment. nextDemoMoveAtMs
+    // was set to the same hold-end instant, so this only runs once that
+    // hold has genuinely elapsed; the precomputed maze built at arm time is
+    // already waiting for armLegacyMenuStaticDeconstructStage to consume.
+    if (this.pendingMenuDemoDeconstructArmAtMs !== null) {
+      this.pendingMenuDemoDeconstructArmAtMs = null;
+      this.armLegacyMenuStaticDeconstructStage(time);
+      this.boardDynamicDirty = true;
+      return;
+    }
+
     if (!this.menuDemoEpisode || !this.menuDemoState) {
       this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });
       return;
@@ -5215,11 +5251,26 @@ export class MenuScene extends Phaser.Scene {
     this.trail = nextFrame.trail;
     this.nextDemoMoveAtMs = time + nextFrame.delayMs;
     if (this.shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame)) {
-      this.nextDemoMoveAtMs = time;
       this.menuDemoCompletedAtMs ??= time;
       this.recordMazeCycleCompletion('menu-demo');
       this.armLegacyPlayerTransferEnergy(time);
-      this.armLegacyMenuStaticDeconstructStage(time);
+      // Build the next maze right now, at the goal-reached instant --
+      // mirrors applyLegacyWorldTurnPlayerMovement's own play-mode
+      // precompute exactly (see its own comment), just with a purpose-
+      // built hold instead of reusing schedulePlayResetReturn's, since the
+      // demo walker has its own separate state machine with no shared
+      // request/consume plumbing to play mode's. Deferring the actual arm
+      // call (armLegacyPlayerTransferEnergy above already fired -- only
+      // the outbound laser/corridor's own wall-clock timers, armed inside
+      // armLegacyMenuStaticDeconstructStage, are what needed the delay)
+      // to fire once LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS elapses (see the
+      // pendingMenuDemoDeconstructArmAtMs check near the top of this
+      // function) gives the synchronous build real wall-clock room to
+      // finish before those timers start, instead of running inside the
+      // same call that arms them.
+      this.precomputeLegacyDeconstructResetMaze('menu');
+      this.pendingMenuDemoDeconstructArmAtMs = time + LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS;
+      this.nextDemoMoveAtMs = this.pendingMenuDemoDeconstructArmAtMs;
       this.boardDynamicDirty = true;
       return;
     }
