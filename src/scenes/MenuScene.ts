@@ -1010,12 +1010,14 @@ const LEGACY_MENU_PATH_TITLE_FACET_WARM = cyberArcadeMaterial.signal.warning;
 const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;
 const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;
 const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
-// Slowed from 6200 per feedback the orbiting diamonds read as too fast --
+// Slowed from 6200 to 9600 per earlier feedback the orbiting diamonds read
+// as too fast, then slowed again to 14400 (9600 * 1.5, a 33% speed
+// reduction) per feedback the real-asset diamonds still orbited too fast --
 // every sigil reads its phase off this same period (see
 // resolveLegacyMenuPathTitleOrbitPhase), so raising it slows all of them by
 // the same factor and their relative spacing (and thus synchronous timing)
 // is unaffected.
-const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 9600;
+const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 14400;
 const LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE = 2;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;
 // A trail-color wipe across the title tiles: fills bottom-left to top-right
@@ -2078,6 +2080,13 @@ export class MenuScene extends Phaser.Scene {
       // frame over an input field. Hide both announcer layers explicitly.
       this.levelAnnouncerLabelText.setVisible(false);
       this.levelAnnouncerNumberGraphics.setVisible(false);
+      // Bug fix: every call site that hides the level-announcer's number
+      // used to only hide levelAnnouncerNumberGraphics -- the tile-font
+      // Image pool (drawLegacyTileFontWord) added alongside it was never
+      // included, so the number kept showing (e.g. over the auth/login
+      // overlay) whenever it happened to already be visible the instant one
+      // of these paths ran.
+      this.levelAnnouncerNumberGlyphPool.forEach((image) => image.setVisible(false));
       this.expireLegacyPlayerMessages(time);
       for (const button of this.uiButtons) {
         button.updateFrame?.(time);
@@ -7196,12 +7205,13 @@ export class MenuScene extends Phaser.Scene {
     const phaseOffset = index * 1.7;
     const twinkle = (Math.sin((time / LEGACY_GOAL_STAR_SPARKLE_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset) + 1) / 2;
     const sparkleColor = Phaser.Display.Color.HSVToRGB((time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS), 0.8, 1).color;
-    this.titleGraphics.fillStyle(sparkleColor, alpha * (0.4 + (twinkle * 0.6)));
     this.drawLegacyFourPointSparkle(
       this.titleGraphics,
       centerX + (radius * 1.3),
       centerY - (radius * 1.3),
-      radius * (0.35 + (twinkle * 0.3))
+      radius * (0.35 + (twinkle * 0.3)),
+      sparkleColor,
+      alpha * (0.4 + (twinkle * 0.6))
     );
   }
 
@@ -8011,6 +8021,13 @@ export class MenuScene extends Phaser.Scene {
     this.levelAnnouncerLabelText.setVisible(false);
     if (alpha <= 0) {
       this.levelAnnouncerNumberGraphics.setVisible(false);
+      // Bug fix: every call site that hides the level-announcer's number
+      // used to only hide levelAnnouncerNumberGraphics -- the tile-font
+      // Image pool (drawLegacyTileFontWord) added alongside it was never
+      // included, so the number kept showing (e.g. over the auth/login
+      // overlay) whenever it happened to already be visible the instant one
+      // of these paths ran.
+      this.levelAnnouncerNumberGlyphPool.forEach((image) => image.setVisible(false));
       this.levelAnnouncerNumberGlyphPool.forEach((image) => image.setVisible(false));
       return;
     }
@@ -8189,20 +8206,27 @@ export class MenuScene extends Phaser.Scene {
     const drawTwinkleCluster = (x: number, mirror: number, phaseOffset: number): void => {
       const primaryPhase = (Math.sin((time / LEGACY_LEVEL_ANNOUNCER_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset) + 1) / 2;
       const primaryColor = resolveLegacyIridescentTrailColor(0, 1, time);
-      graphics.fillStyle(primaryColor, 0.5 + (primaryPhase * 0.5));
-      this.drawLegacyFourPointSparkle(graphics, x, localCenterY, baseSize * (0.75 + (primaryPhase * 0.4)));
+      this.drawLegacyFourPointSparkle(
+        graphics,
+        x,
+        localCenterY,
+        baseSize * (0.75 + (primaryPhase * 0.4)),
+        primaryColor,
+        0.5 + (primaryPhase * 0.5)
+      );
 
       const secondaryPhase = (Math.sin((time / LEGACY_LEVEL_ANNOUNCER_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset + (Math.PI * 0.6)) + 1) / 2;
       // Rainbow too, not plain white -- sampled at a time-shifted offset
       // from the primary sparkle's own color so the two read as two
       // distinct hues from the same rainbow cycle rather than identical.
       const secondaryColor = resolveLegacyIridescentTrailColor(0, 1, time + (LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS * 0.3));
-      graphics.fillStyle(secondaryColor, 0.4 + (secondaryPhase * 0.5));
       this.drawLegacyFourPointSparkle(
         graphics,
         x + (baseSize * 0.9 * mirror),
         localCenterY - (baseSize * 1.1),
-        baseSize * (0.35 + (secondaryPhase * 0.25))
+        baseSize * (0.35 + (secondaryPhase * 0.25)),
+        secondaryColor,
+        0.4 + (secondaryPhase * 0.5)
       );
     };
 
@@ -8210,28 +8234,44 @@ export class MenuScene extends Phaser.Scene {
     drawTwinkleCluster(layout.left + layout.width + gap, -1, Math.PI * 0.35);
   }
 
-  // A small 4-point sparkle/glint glyph (two crossed elongated diamonds),
-  // used for the level-announcer's twinkling accents and the goal star
-  // marker's own surface glints -- reads as a sparkle rather than a plain
-  // dot. Caller sets fillStyle before calling.
+  // A small 4-point sparkle/glint glyph, used for the level-announcer's
+  // twinkling accents, the title's orbit-sigil twinkles, and the goal
+  // star's own surface glints. Was a single flat crossed-diamond shape at
+  // one ambient fillStyle -- reworked (per feedback it read as "weak"
+  // next to the rest of the UI) into three layered passes matching how a
+  // real sparkle/glint actually reads: a soft wide glow halo, a crisp core
+  // cross, and a tiny hot white catchlight where the rays cross. Takes
+  // color/alpha directly now instead of relying on the caller's ambient
+  // fillStyle, since it needs its own alpha ramp across the three passes.
   private drawLegacyFourPointSparkle(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
     centerY: number,
-    size: number
+    size: number,
+    color: number,
+    alpha: number
   ): void {
-    graphics.fillPoints([
-      new Phaser.Math.Vector2(centerX, centerY - size),
-      new Phaser.Math.Vector2(centerX + (size * 0.22), centerY),
-      new Phaser.Math.Vector2(centerX, centerY + size),
-      new Phaser.Math.Vector2(centerX - (size * 0.22), centerY)
-    ], true);
-    graphics.fillPoints([
-      new Phaser.Math.Vector2(centerX - size, centerY),
-      new Phaser.Math.Vector2(centerX, centerY - (size * 0.22)),
-      new Phaser.Math.Vector2(centerX + size, centerY),
-      new Phaser.Math.Vector2(centerX, centerY + (size * 0.22))
-    ], true);
+    const buildCross = (scale: number): void => {
+      const armLength = size * scale;
+      graphics.fillPoints([
+        new Phaser.Math.Vector2(centerX, centerY - armLength),
+        new Phaser.Math.Vector2(centerX + (armLength * 0.22), centerY),
+        new Phaser.Math.Vector2(centerX, centerY + armLength),
+        new Phaser.Math.Vector2(centerX - (armLength * 0.22), centerY)
+      ], true);
+      graphics.fillPoints([
+        new Phaser.Math.Vector2(centerX - armLength, centerY),
+        new Phaser.Math.Vector2(centerX, centerY - (armLength * 0.22)),
+        new Phaser.Math.Vector2(centerX + armLength, centerY),
+        new Phaser.Math.Vector2(centerX, centerY + (armLength * 0.22))
+      ], true);
+    };
+    graphics.fillStyle(color, alpha * 0.35);
+    buildCross(1.8);
+    graphics.fillStyle(color, alpha);
+    buildCross(1);
+    graphics.fillStyle(cyberArcadeMaterial.rail.white, alpha);
+    graphics.fillCircle(centerX, centerY, size * 0.16);
   }
 
   // markerRevealAlpha is 0 for the whole beam-travel span (the marker
@@ -8356,6 +8396,13 @@ export class MenuScene extends Phaser.Scene {
     if (this.overlay === 'auth') {
       this.levelAnnouncerLabelText.setVisible(false);
       this.levelAnnouncerNumberGraphics.setVisible(false);
+      // Bug fix: every call site that hides the level-announcer's number
+      // used to only hide levelAnnouncerNumberGraphics -- the tile-font
+      // Image pool (drawLegacyTileFontWord) added alongside it was never
+      // included, so the number kept showing (e.g. over the auth/login
+      // overlay) whenever it happened to already be visible the instant one
+      // of these paths ran.
+      this.levelAnnouncerNumberGlyphPool.forEach((image) => image.setVisible(false));
     }
   }
 
@@ -8936,6 +8983,22 @@ export class MenuScene extends Phaser.Scene {
       ? time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS
       : 0;
 
+    // Soft pulsing glow halo, drawn first (behind everything else) --
+    // fixes a real visibility regression: a fully hollow star (background
+    // visible through its interior, per explicit feedback) reads as too
+    // thin/low-contrast against the pale corridor material to spot at a
+    // glance, especially at a distance. This restores an at-a-glance "there
+    // is something here" glow patch on the tile without giving up the
+    // hollow star's own detail -- the glow sits underneath, the spinning
+    // rainbow ring/star still read on top of it.
+    const haloPulse = time !== undefined && !this.prefersLegacyReducedMotion()
+      ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2
+      : 0.5;
+    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha * (0.28 + (haloPulse * 0.14)));
+    graphics.fillCircle(centerX, centerY, maxRadius * (1.05 + (haloPulse * 0.08)));
+    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha * (0.4 + (haloPulse * 0.16)));
+    graphics.fillCircle(centerX, centerY, maxRadius * 0.72);
+
     // Ring: Graphics has no per-point gradient stroke, so the rainbow is
     // approximated as short hue-stepped arc segments swept around the full
     // circle, rotating continuously via spinPhase.
@@ -9018,12 +9081,13 @@ export class MenuScene extends Phaser.Scene {
       ];
       for (const sparkle of sparkleSpecs) {
         const twinkle = (Math.sin((time / LEGACY_GOAL_STAR_SPARKLE_TWINKLE_PERIOD_MS * Math.PI * 2) + sparkle.phase) + 1) / 2;
-        graphics.fillStyle(cyberArcadeMaterial.rail.white, alpha * (0.35 + (twinkle * 0.6)));
         this.drawLegacyFourPointSparkle(
           graphics,
           centerX + sparkle.dx,
           centerY + sparkle.dy,
-          sparkle.size * (0.6 + (twinkle * 0.55))
+          sparkle.size * (0.6 + (twinkle * 0.55)),
+          cyberArcadeMaterial.rail.white,
+          alpha * (0.35 + (twinkle * 0.6))
         );
       }
     } else {
@@ -9036,9 +9100,8 @@ export class MenuScene extends Phaser.Scene {
         { dx: -outerRadius * 0.1, dy: outerRadius * 0.4, size: maxRadius * 0.06 },
         { dx: outerRadius * 0.05, dy: -outerRadius * 0.42, size: maxRadius * 0.05 }
       ];
-      graphics.fillStyle(cyberArcadeMaterial.rail.white, alpha * 0.75);
       for (const sparkle of sparkleSpecs) {
-        this.drawLegacyFourPointSparkle(graphics, centerX + sparkle.dx, centerY + sparkle.dy, sparkle.size);
+        this.drawLegacyFourPointSparkle(graphics, centerX + sparkle.dx, centerY + sparkle.dy, sparkle.size, cyberArcadeMaterial.rail.white, alpha * 0.75);
       }
     }
   }
