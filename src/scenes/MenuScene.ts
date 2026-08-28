@@ -4428,6 +4428,7 @@ export class MenuScene extends Phaser.Scene {
     delayMs = 0,
     options: {
       mode?: RuntimeMode;
+      precompute?: boolean;
       seedOverride?: number;
       stepSeed?: boolean;
     } = {}
@@ -4440,6 +4441,7 @@ export class MenuScene extends Phaser.Scene {
       dueAtMs: this.time.now + Math.max(0, delayMs),
       generationProfile: this.resolveLegacyMazeGenerationProfileForMode(mode),
       mode,
+      ...(options.precompute !== undefined ? { precompute: options.precompute } : {}),
       queuedAtMs: this.time.now,
       reason,
       scale: generationScale,
@@ -4791,6 +4793,12 @@ export class MenuScene extends Phaser.Scene {
         currentSeed: this.mazeSeed,
         generationProfile: this.resolveLegacyMazeGenerationProfileForMode('play'),
         nowMs: time + this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
+        // Build the next maze right now, while this one is still visibly
+        // deconstructing, instead of leaving it for consumeLegacyGenerationRequest
+        // to build later at dueAtMs -- the moment the screen is empty and a
+        // synchronous build stalling the main thread reads as a freeze. See
+        // createLegacyGenerationRequest's own comment on this option.
+        precompute: true,
         seedOverride: this.createFreshLegacyPlayGenerationSeed(),
         scale: playGenerationScale,
         targetComplexity: this.resolveLegacyTargetComplexityForMode('play')
@@ -4801,6 +4809,7 @@ export class MenuScene extends Phaser.Scene {
         this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
         {
           mode: 'menu',
+          precompute: true,
           seedOverride: this.createFreshLegacyMenuGenerationSeed(),
           stepSeed: true
         }
