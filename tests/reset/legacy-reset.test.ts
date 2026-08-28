@@ -883,7 +883,17 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);');
     expect(menuSceneSource).toContain('private advanceLegacyMenuStaticDrawStage(time: number): void {');
     expect(menuSceneSource).toContain('this.menuStaticDrawTilesVisible = Math.min(');
-    expect(menuSceneSource).toContain('this.menuStaticDrawRowsVisible = Math.min(this.maze.height, this.menuStaticDrawRowsVisible + batchSize);');
+    expect(menuSceneSource).toContain('this.menuStaticDrawRowsVisible = Math.min(this.maze.height, this.menuStaticDrawRowsVisible + rowBatchSize);');
+    // Row batch size now scales with maze height the same way the tile
+    // counter already does (resolveLegacyMenuStaticDrawTileBatchSize) --
+    // it used to come from the generation executionPlan's static Draw-stage
+    // contract, a fixed batchSize of 1 regardless of maze height, which was
+    // invisible at a small board but could add multiple extra seconds
+    // between the maze visually finishing (tile reveal, already scaled)
+    // and the build actually settling (which waits for BOTH counters) once
+    // a board is genuinely large.
+    expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawRowBatchSize(): number {');
+    expect(menuSceneSource).toContain('return Math.max(1, Math.ceil(this.maze.height / targetTicks));');
     expect(menuSceneSource).toContain('this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;');
     expect(menuSceneSource).toContain('this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS;');
     expect(menuSceneSource).toContain('private boardPathGraphics!: Phaser.GameObjects.Graphics;');
