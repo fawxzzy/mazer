@@ -1203,7 +1203,6 @@ const LEGACY_BLEED_DOCK_BUILD_GROWTH_MS = 1100;
 // itself pops in under.
 const LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS = 260;
 const LEGACY_PLAYER_SPAWN_FLASH_MS = 240;
-const LEGACY_PLAYER_SPAWN_BEAM_COLOR = 0x36ff7d;
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const smoothstep = (value: number): number => {
   const x = clamp(value, 0, 1);
@@ -7243,6 +7242,11 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const origins = this.resolveLegacyPlayerTransferOrbitPoses(time);
+    // Each beam/diamond takes its own stop along the same midnight-rainbow
+    // material the player trail already carries (resolveLegacyIridescentTrailColor),
+    // spread across the origin count so the whole ring of beams reads as one
+    // rainbow shifting over time, instead of the flat green every beam and
+    // diamond used to share.
     if (state.phase === 'outbound') {
       origins.forEach((origin, index) => {
         const stagger = (index / Math.max(1, origins.length - 1)) * 0.12;
@@ -7250,14 +7254,15 @@ export class MenuScene extends Phaser.Scene {
         if (localProgress <= 0) {
           return;
         }
+        const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);
         const tipX = targetX + ((origin.x - targetX) * localProgress);
         const tipY = targetY + ((origin.y - targetY) * localProgress);
         const beamAlpha = 0.94 * (1 - (localProgress * 0.18));
-        this.playerSpawnBurstGraphics.lineStyle(5, LEGACY_PLAYER_SPAWN_BEAM_COLOR, beamAlpha * 0.28);
+        this.playerSpawnBurstGraphics.lineStyle(5, beamColor, beamAlpha * 0.28);
         this.playerSpawnBurstGraphics.lineBetween(targetX, targetY, tipX, tipY);
-        this.playerSpawnBurstGraphics.lineStyle(1.5, LEGACY_PLAYER_SPAWN_BEAM_COLOR, beamAlpha);
+        this.playerSpawnBurstGraphics.lineStyle(1.5, beamColor, beamAlpha);
         this.playerSpawnBurstGraphics.lineBetween(targetX, targetY, tipX, tipY);
-        this.playerSpawnBurstGraphics.fillStyle(LEGACY_PLAYER_SPAWN_BEAM_COLOR, beamAlpha);
+        this.playerSpawnBurstGraphics.fillStyle(beamColor, beamAlpha);
         this.playerSpawnBurstGraphics.fillCircle(tipX, tipY, 2.6);
       });
     }
@@ -7268,11 +7273,12 @@ export class MenuScene extends Phaser.Scene {
 
     const baseAngle = state.swirlPhase * Math.PI * 2;
     origins.forEach((origin, index) => {
+      const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);
       const alpha = state.energyAlpha;
       const pulseRadius = 5.5 + (Math.sin(baseAngle + index) * 1.2);
-      this.playerSpawnBurstGraphics.fillStyle(LEGACY_PLAYER_SPAWN_BEAM_COLOR, alpha * 0.12);
+      this.playerSpawnBurstGraphics.fillStyle(beamColor, alpha * 0.12);
       this.playerSpawnBurstGraphics.fillCircle(origin.x, origin.y, pulseRadius + 4);
-      this.playerSpawnBurstGraphics.lineStyle(1.4, LEGACY_PLAYER_SPAWN_BEAM_COLOR, alpha * 0.76);
+      this.playerSpawnBurstGraphics.lineStyle(1.4, beamColor, alpha * 0.76);
       const diamondVertices = resolveLegacyMenuPathTitleDiamondVertices(
         origin.x,
         origin.y,
@@ -7283,7 +7289,7 @@ export class MenuScene extends Phaser.Scene {
       for (let particle = 0; particle < 3; particle += 1) {
         const angle = origin.facing + baseAngle + (particle * ((Math.PI * 2) / 3));
         const radius = 2.2 + (particle * 1.35);
-        this.playerSpawnBurstGraphics.fillStyle(LEGACY_PLAYER_SPAWN_BEAM_COLOR, alpha * (0.9 - (particle * 0.18)));
+        this.playerSpawnBurstGraphics.fillStyle(beamColor, alpha * (0.9 - (particle * 0.18)));
         this.playerSpawnBurstGraphics.fillCircle(
           origin.x + (Math.cos(angle) * radius),
           origin.y + (Math.sin(angle) * radius),
@@ -7816,17 +7822,20 @@ export class MenuScene extends Phaser.Scene {
 
     if (state.travelProgress < 1) {
       origins.forEach((origin, index) => {
+        const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);
         const localProgress = clamp(state.travelProgress - staggerFor(index), 0, 1);
         const tipX = origin.x + ((targetX - origin.x) * localProgress);
         const tipY = origin.y + ((targetY - origin.y) * localProgress);
         const beamAlpha = 0.9 * (1 - (localProgress * 0.25));
         // Dim wide glow pass first, bright thin core pass on top -- reads as
-        // a hotter beam than a single flat-color stroke.
-        this.playerSpawnBurstGraphics.lineStyle(4, LEGACY_PLAYER_SPAWN_BEAM_COLOR, beamAlpha * 0.35);
+        // a hotter beam than a single flat-color stroke. Each beam takes its
+        // own stop along the trail's own rainbow material (see
+        // drawLegacyPlayerTransferEnergy's own comment on the same choice).
+        this.playerSpawnBurstGraphics.lineStyle(4, beamColor, beamAlpha * 0.35);
         this.playerSpawnBurstGraphics.lineBetween(origin.x, origin.y, tipX, tipY);
-        this.playerSpawnBurstGraphics.lineStyle(1.5, LEGACY_PLAYER_SPAWN_BEAM_COLOR, beamAlpha);
+        this.playerSpawnBurstGraphics.lineStyle(1.5, beamColor, beamAlpha);
         this.playerSpawnBurstGraphics.lineBetween(origin.x, origin.y, tipX, tipY);
-        this.playerSpawnBurstGraphics.fillStyle(LEGACY_PLAYER_SPAWN_BEAM_COLOR, beamAlpha);
+        this.playerSpawnBurstGraphics.fillStyle(beamColor, beamAlpha);
         this.playerSpawnBurstGraphics.fillCircle(tipX, tipY, 2.5);
       });
       return;
@@ -7836,18 +7845,25 @@ export class MenuScene extends Phaser.Scene {
     if (flashAlpha <= 0) {
       return;
     }
+    // The impact flash lands at one shared point (not per-origin), so it
+    // takes a single rainbow sample rather than a per-index spread --
+    // matches the same instantaneous-sample pattern already used for
+    // rainbow-colored text (see resolveLegacyPlayPerfectPathTrail's own
+    // caller for the toCyberArcadeCssHex(resolveLegacyIridescentTrailColor(0, 1, time))
+    // pattern).
+    const flashColor = resolveLegacyIridescentTrailColor(0, 1, time);
     const flashRadius = 4 + (state.flashProgress * 26);
     // A second, larger trailing ring a beat behind the main one -- reads as
     // a shockwave instead of one flat circle stroking outward.
     const trailProgress = clamp(state.flashProgress - 0.18, 0, 1);
     const trailAlpha = (1 - trailProgress) * 0.5;
     if (trailAlpha > 0) {
-      this.playerSpawnBurstGraphics.lineStyle(Math.max(1, 2 * (1 - trailProgress)), LEGACY_PLAYER_SPAWN_BEAM_COLOR, trailAlpha);
+      this.playerSpawnBurstGraphics.lineStyle(Math.max(1, 2 * (1 - trailProgress)), flashColor, trailAlpha);
       this.playerSpawnBurstGraphics.strokeCircle(targetX, targetY, 4 + (trailProgress * 26));
     }
-    this.playerSpawnBurstGraphics.lineStyle(Math.max(1, 3 * (1 - state.flashProgress)), LEGACY_PLAYER_SPAWN_BEAM_COLOR, flashAlpha);
+    this.playerSpawnBurstGraphics.lineStyle(Math.max(1, 3 * (1 - state.flashProgress)), flashColor, flashAlpha);
     this.playerSpawnBurstGraphics.strokeCircle(targetX, targetY, flashRadius);
-    this.playerSpawnBurstGraphics.fillStyle(LEGACY_PLAYER_SPAWN_BEAM_COLOR, flashAlpha * 0.7);
+    this.playerSpawnBurstGraphics.fillStyle(flashColor, flashAlpha * 0.7);
     this.playerSpawnBurstGraphics.fillCircle(targetX, targetY, Math.max(1, 7 * (1 - state.flashProgress)));
   }
 
