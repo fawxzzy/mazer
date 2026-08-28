@@ -4720,6 +4720,34 @@ export class MenuScene extends Phaser.Scene {
     return Math.max(1, Math.ceil(this.menuStaticDrawTileOrder.length / targetTicks));
   }
 
+  // Mirrors resolveLegacyMenuStaticDrawTileBatchSize's own scaling exactly,
+  // for the same reason: the row-reveal counter's batch size used to come
+  // from the generation executionPlan's static Draw-stage contract
+  // (createLegacyStageContract, id 6), which is a fixed literal batchSize
+  // of 1 -- one row per LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS tick regardless
+  // of maze height. That's invisible at a small board (a handful of rows),
+  // but shouldSettleLegacyStaticDrawStage requires BOTH the row and tile
+  // counters to finish before the build "settles" -- and
+  // resolveLegacyStaticDrawBuildRemainingMs (which
+  // armLegacyPlayerArrivalForFinalBuildStep pins the inbound player-transfer
+  // beam to) takes the LATER of the two. The tile counter already targets a
+  // fixed tick count regardless of size, so at a large board (confirmed:
+  // target_complexity 400, the level-99+ cap) the un-scaled row counter
+  // alone could take multiple seconds longer than the tile reveal the
+  // player actually watches finish -- read as "the maze looks done but the
+  // beam takes forever to fire," reported after a corrective progression
+  // migration made a previously target_complexity-starved account's boards
+  // their real (much larger) size for the first time. Targeting the same
+  // fixed tick count keeps total row-reveal duration roughly constant
+  // regardless of maze height, matching the tile counter's own pacing
+  // instead of scaling unboundedly with it.
+  private resolveLegacyMenuStaticDrawRowBatchSize(): number {
+    const targetTicks = this.mode === 'play'
+      ? LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS
+      : LEGACY_MENU_STATIC_DRAW_TARGET_TICKS;
+    return Math.max(1, Math.ceil(this.maze.height / targetTicks));
+  }
+
   private refreshLegacyMenuStaticDrawVisibleTileKeys(): void {
     this.menuStaticDrawVisibleTileKeys.clear();
     const visibleCount = this.menuStaticDrawTilesVisible ?? this.menuStaticDrawTileOrder.length;
@@ -4946,15 +4974,14 @@ export class MenuScene extends Phaser.Scene {
       this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     }
 
-    const drawStage = this.resolveLegacyMenuStaticDrawStage();
-    const batchSize = Math.max(1, drawStage?.batchSize ?? 1);
+    const rowBatchSize = this.resolveLegacyMenuStaticDrawRowBatchSize();
     const buildRemainingMs = resolveLegacyStaticDrawBuildRemainingMs({
       drawPhase: this.menuStaticDrawLifecyclePhase,
       mazeHeight: this.maze.height,
       nextRowAtMs: this.menuStaticDrawNextRowAtMs,
       nextTileAtMs: this.menuStaticDrawNextTileAtMs,
       nowMs: time,
-      rowBatchSize: batchSize,
+      rowBatchSize,
       rowStepMs: LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS,
       rowsVisible: this.menuStaticDrawRowsVisible,
       tileBatchSize: this.resolveLegacyMenuStaticDrawTileBatchSize(),
@@ -4976,7 +5003,7 @@ export class MenuScene extends Phaser.Scene {
       && this.menuStaticDrawRowsVisible !== null
       && time >= this.menuStaticDrawNextRowAtMs
     ) {
-      this.menuStaticDrawRowsVisible = Math.min(this.maze.height, this.menuStaticDrawRowsVisible + batchSize);
+      this.menuStaticDrawRowsVisible = Math.min(this.maze.height, this.menuStaticDrawRowsVisible + rowBatchSize);
       this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;
       this.boardPathDirty = true;
       this.boardDynamicDirty = true;
