@@ -1143,7 +1143,14 @@ const LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS = 64;
 const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
 const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;
 const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;
-const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 1000;
+// resolveLegacyMenuDeconstructHandoffProgress computes a real 0->1 value
+// across this whole window every frame, but it is only ever read by
+// diagnostics (see its two call sites) -- nothing actually renders
+// anything driven by it, so a full second of this window was a genuinely
+// static, unchanging screen between the old maze finishing deconstruction
+// and the new one starting to build. Shortened to a brief beat rather than
+// removed outright, in case something else relies on a non-zero gap here.
+const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 300;
 const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;
 const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = 860;
 // How long the centered level announcement takes to fade/scale in once the
@@ -1168,17 +1175,24 @@ const LEGACY_LEVEL_ANNOUNCER_PULSE_PERIOD_MS = 3600;
 const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA = 0.78;
 const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE = 0.94;
 // How long the bleed-off dock corridors (resolveLegacyPathBorderDockContinuation)
-// take to grow from the maze's own edge out to the true screen edge, and to
-// shrink back the same way -- a smooth extend/retract instead of the full-
-// length corridor just appearing or vanishing instantly. Growth happens in
-// the CLOSING span of the build phase (most/all tiles, including the
-// corridor's own anchor tile, are already visible by then) and shrink in
-// the OPENING span of deconstruct (before tile removal itself even starts,
-// per LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS/PLAYER_REMOVE_MS/TRAIL_FADE_MS
-// above) -- both windows chosen so the anchor tile is reliably on screen
-// for the whole animation instead of a corridor reaching toward a tile that
-// isn't there yet.
+// take to shrink back from the true screen edge to the maze's own edge on
+// deconstruct -- a smooth retract instead of the full-length corridor just
+// vanishing instantly. Shrink happens in the OPENING span of deconstruct
+// (before tile removal itself even starts, per
+// LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS/PLAYER_REMOVE_MS/TRAIL_FADE_MS
+// above), timed to the same instant the outbound player-transfer laser
+// arms (see armLegacyMenuStaticDeconstructStage) so both start together.
 const LEGACY_BLEED_DOCK_GROWTH_MS = 420;
+// The build-side growth window is deliberately its own, longer constant
+// rather than sharing LEGACY_BLEED_DOCK_GROWTH_MS above -- at 420ms the
+// corridor's outward growth was compressed into the closing sliver of a
+// build that can run for seconds on a large maze, reading as "the corridor
+// just appears" rather than a visible expansion. Widened so the grow is
+// actually perceptible while still finishing at the exact instant the
+// build completes (armLegacyPlayerArrivalForFinalBuildStep pins the
+// inbound player-transfer delivery beam to that same instant), so the
+// corridor visibly reaches the screen edge right as the player arrives.
+const LEGACY_BLEED_DOCK_BUILD_GROWTH_MS = 1100;
 // The four corner sigils fire a beam toward wherever the player marker is
 // about to appear once the final generation stage settles -- a short travel
 // span for the beams to reach the tile, then a brief impact flash the marker
@@ -5832,7 +5846,7 @@ export class MenuScene extends Phaser.Scene {
       }
       const elapsedMs = time - this.menuStaticBuildPhaseStartedAtMs;
       const remainingMs = buildDurationMs - elapsedMs;
-      return 1 - smoothstep(remainingMs / LEGACY_BLEED_DOCK_GROWTH_MS);
+      return 1 - smoothstep(remainingMs / LEGACY_BLEED_DOCK_BUILD_GROWTH_MS);
     }
 
     return 1;
@@ -10221,7 +10235,19 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const availability = await checkLegacyUsernameAvailable(candidate);
+    // mazer_is_username_available checks the whole table, including the
+    // caller's own existing row -- it has no way to know which row is
+    // "self". That's fine for a brand-new name, but a case-only rename
+    // (e.g. "bob" -> "Bob") always case-insensitively matches the caller's
+    // own current row and would be misreported as taken, permanently
+    // blocking the save client-side even though mazer_set_username below
+    // would happily apply it. Skip the availability gate for that one case;
+    // the unique index (and the RPC's own error handling) is still the
+    // real collision authority for every other candidate.
+    const isSelfCaseOnlyRename = candidate.toLowerCase() === this.accountUsernameSavedValue.toLowerCase();
+    const availability = isSelfCaseOnlyRename
+      ? { available: true, error: null }
+      : await checkLegacyUsernameAvailable(candidate);
     if (sequence !== this.accountUsernameSequence) {
       return;
     }

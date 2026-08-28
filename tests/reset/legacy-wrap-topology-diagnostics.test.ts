@@ -214,11 +214,13 @@ describe('legacy wrap topology diagnostics', () => {
   }, 30_000);
 
   test('pairs the starter optional horizontal feeders before independent side filling', () => {
-    // 52, not the 28 this used to be -- resolveLegacyMazeGenerationProfileForProgression's
-    // within-band ramp (starterDepth) now advances at half the real-level
-    // rate too, so reaching the same starterDepth (4, where the optional
-    // horizontal feeder turns on) takes roughly double the real level.
-    const starterProfile = resolveLegacyMazeGenerationProfileForProgression(52);
+    // 60, not 52 -- the optional horizontal feeder's own gate was pushed
+    // back from starterDepth >= 4 to starterDepth >= 6 (the single last
+    // level of starter) per feedback that bleed paths were appearing too
+    // early in a player's first handful of levels. targetComplexity 60
+    // resolves to real level 14, difficulty step 8 (the last starter step),
+    // starterDepth 6 -- the new gate.
+    const starterProfile = resolveLegacyMazeGenerationProfileForProgression(60);
     const failures: unknown[] = [];
 
     for (let seed = 1; seed <= 60; seed += 1) {
