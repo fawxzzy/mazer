@@ -1,12 +1,11 @@
-// Mazer Generation V2 -- Wave 1 offline generation laboratory.
+// Mazer Generation V2 -- Wave 1/1.5 offline generation laboratory.
 //
 // Generates a range of levels through TODAY's real generator
-// (legacy-runtime), measures each one against the new mazeV2 metrics
-// contract (src/domain/mazeV2/metrics.ts), and reports:
-//   - the full per-level measured-metrics vector (JSON + CSV)
+// (legacy-runtime), measures each one against the mazeV2 metrics contract
+// (src/domain/mazeV2/metrics.ts), and reports:
+//   - the full per-sample measured-metrics vector (JSON + CSV)
 //   - summary statistics per axis across the range
-//   - structural-fingerprint collisions (would-be "identical adjacent
-//     recipe" violations under the later-wave novelty rule)
+//   - six distinct collision categories (see mazeV2LabCollisions.ts)
 //   - a plain-HTML data report (no screenshots -- see
 //     capture-level-progression-gallery.mjs for the visual contact sheet;
 //     this is the numeric counterpart Wave 1 needs)
@@ -15,9 +14,16 @@
 // yet. It measures the CURRENT generator's real output so the metric
 // formulas have a validated baseline before anything depends on them.
 //
+// Wave 1.5 correction: seed derivation is now one of three explicit
+// strategies (see mazeV2SeedStrategies.ts's own header comment for why the
+// old implicit `baseSeed + level` default was corrupting this lab's own
+// "felt difficulty flatness" findings), and collisions are classified into
+// six distinct questions (see mazeV2LabCollisions.ts) instead of two.
+//
 // Usage:
 //   npx tsx scripts/analysis/mazev2-lab.ts [--minLevel=1] [--maxLevel=200]
-//     [--outputDir=C:\ATLAS\tmp\captures\mazev2-lab] [--seed=12345]
+//     [--strategy=sequential-nonoverlapping] [--seed=12345]
+//     [--outputDir=C:\ATLAS\tmp\captures\mazev2-lab]
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -26,13 +32,30 @@ import {
   createEmptyLegacyProgressionState,
   resolveLegacyMazeGenerationProfileForProgression
 } from '../../src/legacy-runtime/legacyProgression';
-import { analyzeLegacyMazeAsMazeV2Metrics, computeLegacyMazeTopologyFingerprint } from '../../src/domain/mazeV2/metrics';
-import { MAZE_V2_CONTRACT_VERSION, type MazeV2MeasuredMetrics } from '../../src/domain/mazeV2/types';
+import {
+  analyzeLegacyMazeAsMazeV2Metrics,
+  buildMazeV2CandidateReview,
+  computeLegacyMazeRecipeDigest,
+  computeLegacyMazeTopologyFingerprint
+} from '../../src/domain/mazeV2/metrics';
+import { MAZE_V2_CONTRACT_VERSION, type MazeV2CandidateReview, type MazeV2MeasuredMetrics } from '../../src/domain/mazeV2/types';
+import {
+  classifyMazeV2LabCollisions,
+  type MazeV2LabCollisionGroup
+} from './mazeV2LabCollisions';
+import {
+  findMazeV2LabCandidateWindowOverlap,
+  isMazeV2LabSeedStrategyId,
+  MAZE_V2_LAB_DEFAULT_SEED_CORPUS_VERSION,
+  resolveMazeV2LabSeedPlan,
+  type MazeV2LabSeedStrategyId
+} from './mazeV2SeedStrategies';
 
 const DEFAULT_OUTPUT_DIR = 'C:\\ATLAS\\tmp\\captures\\mazev2-lab';
 const DEFAULT_MIN_LEVEL = 1;
 const DEFAULT_MAX_LEVEL = 200;
 const DEFAULT_SEED = 12345;
+const DEFAULT_STRATEGY: MazeV2LabSeedStrategyId = 'sequential-nonoverlapping';
 // Mirrors legacyProgression.ts's own targetComplexity formula exactly --
 // see this repo's own gallery script for the same mirrored constant, kept
 // in sync there rather than imported so this lab has no dependency on the
@@ -47,6 +70,7 @@ interface CliArgs {
   maxLevel: number;
   outputDir: string;
   seed: number;
+  strategy: MazeV2LabSeedStrategyId;
 }
 
 const parseCliArgs = (): CliArgs => {
@@ -56,35 +80,29 @@ const parseCliArgs = (): CliArgs => {
     const [key, value] = entry.slice(2).split('=');
     if (key) args[key] = value ?? 'true';
   }
+  const strategyArg = args.strategy ?? DEFAULT_STRATEGY;
+  if (!isMazeV2LabSeedStrategyId(strategyArg)) {
+    throw new Error(`Unknown --strategy=${strategyArg}. Expected one of: fixed, sequential-nonoverlapping, corpus.`);
+  }
   return {
     minLevel: args.minLevel !== undefined ? Number.parseInt(args.minLevel, 10) : DEFAULT_MIN_LEVEL,
     maxLevel: args.maxLevel !== undefined ? Number.parseInt(args.maxLevel, 10) : DEFAULT_MAX_LEVEL,
     outputDir: args.outputDir ?? DEFAULT_OUTPUT_DIR,
-    seed: args.seed !== undefined ? Number.parseInt(args.seed, 10) : DEFAULT_SEED
+    seed: args.seed !== undefined ? Number.parseInt(args.seed, 10) : DEFAULT_SEED,
+    strategy: strategyArg
   };
 };
 
 interface LevelSample {
   level: number;
+  corpusIndex: number;
   targetComplexity: number;
   scale: number;
-  // The seed handed to the generator for this level, and the seed it
-  // actually selected (maze.seed) after its own internal bounded candidate
-  // search. Wave 1.5 correction: an earlier version of this lab never
-  // recorded either, so its "structural-fingerprint collision" report
-  // could not tell "the generator's candidate-search window overlapped
-  // enough that two nearby levels selected the literal same maze" (a real,
-  // pre-existing mechanism -- see legacyGeneration's own widened-window
-  // candidate search for high target complexity) apart from "two different
-  // mazes that happen to measure to the same rounded metric vector." Both
-  // are now exported so a collision can be classified correctly.
   requestedSeed: number;
   selectedSeed: number;
-  // Exact topology identity (grid + start/goal + selectedSeed), separate
-  // from metrics.structuralFingerprint (a rounded MEASURED-METRIC-VECTOR
-  // hash, which two different mazes can coincidentally share). See
-  // computeLegacyMazeTopologyFingerprint's own comment.
   topologyFingerprint: string;
+  recipeDigest: string;
+  candidateReview: MazeV2CandidateReview;
   metrics: MazeV2MeasuredMetrics;
 }
 
@@ -94,28 +112,25 @@ interface LevelSample {
 // principle the level-progression gallery script already uses.
 const LAB_BOARD_SCALE = 50;
 
-const generateSample = (level: number, baseSeed: number): LevelSample => {
+const generateSample = (level: number, corpusIndex: number, requestedSeed: number): LevelSample => {
   const baseline = createEmptyLegacyProgressionState();
   const targetComplexity = resolveTargetComplexityForLevel(level);
   const track = { ...baseline.tracks.player, level: String(level), targetComplexity };
   const profile = resolveLegacyMazeGenerationProfileForProgression(track);
-  // Varies per level by default (real play always steps the seed on
-  // completion -- see legacyGenerationLifecycle.ts's stepLegacyGenerationSeed)
-  // rather than reusing one fixed seed across the whole range. A fixed
-  // seed is still available via --seed=X held constant by the caller if
-  // the point is specifically isolating "does the profile alone vary
-  // enough" from "does seed variety alone paper over a flat profile" --
-  // the two questions want different seed strategies, so this defaults to
-  // the one that matches actual gameplay.
-  const requestedSeed = baseSeed + level;
+  const generationStartedAtMs = performance.now();
   const maze = createLegacyRuntimeMazeForMode('play', LAB_BOARD_SCALE, requestedSeed, profile, { targetComplexity });
+  const generationDurationMs = performance.now() - generationStartedAtMs;
+
   return {
     level,
+    corpusIndex,
     targetComplexity,
     scale: LAB_BOARD_SCALE,
     requestedSeed,
     selectedSeed: maze.seed,
     topologyFingerprint: computeLegacyMazeTopologyFingerprint(maze),
+    recipeDigest: computeLegacyMazeRecipeDigest(maze, String(level), requestedSeed, targetComplexity, LAB_BOARD_SCALE),
+    candidateReview: buildMazeV2CandidateReview(maze, requestedSeed, generationDurationMs),
     metrics: analyzeLegacyMazeAsMazeV2Metrics(maze)
   };
 };
@@ -124,11 +139,15 @@ type FlatMetricRow = Record<string, number | string>;
 
 const flattenSample = (sample: LevelSample): FlatMetricRow => ({
   level: sample.level,
+  corpusIndex: sample.corpusIndex,
   targetComplexity: sample.targetComplexity,
   scale: sample.scale,
   requestedSeed: sample.requestedSeed,
   selectedSeed: sample.selectedSeed,
+  candidateCount: sample.candidateReview.candidateSeeds.length,
+  generationDurationMs: sample.candidateReview.generationDurationMs,
   topologyFingerprint: sample.topologyFingerprint,
+  recipeDigest: sample.recipeDigest,
   width: sample.metrics.spatial.width,
   height: sample.metrics.spatial.height,
   walkableTileCount: sample.metrics.spatial.walkableTileCount,
@@ -159,7 +178,7 @@ const flattenSample = (sample: LevelSample): FlatMetricRow => ({
   wrapPairCount: sample.metrics.wrap.wrapPairCount,
   wrapPairsOnRoute: sample.metrics.wrap.wrapPairsOnRoute,
   wrapRouteImpact: sample.metrics.wrap.wrapRouteImpact ?? '',
-  structuralFingerprint: sample.metrics.structuralFingerprint
+  metricFingerprint: sample.metrics.metricFingerprint
 });
 
 const toCsv = (rows: readonly FlatMetricRow[]): string => {
@@ -177,32 +196,42 @@ interface AxisSummary {
   max: number;
   mean: number;
   median: number;
+  p95: number;
 }
 
 const summarizeAxis = (values: readonly number[]): AxisSummary => {
   const sorted = [...values].sort((left, right) => left - right);
   const mid = Math.floor(sorted.length / 2);
   const median = sorted.length % 2 === 0 ? ((sorted[mid - 1]! + sorted[mid]!) / 2) : sorted[mid]!;
+  const p95Index = Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1);
   return {
     min: sorted[0] ?? 0,
     max: sorted[sorted.length - 1] ?? 0,
     mean: values.reduce((total, value) => total + value, 0) / Math.max(1, values.length),
-    median
+    median,
+    p95: sorted[Math.max(0, p95Index)] ?? 0
   };
 };
+
+const renderCollisionGroups = (label: string, description: string, groups: readonly MazeV2LabCollisionGroup[]): string => `
+<h2>${label} (${groups.length})</h2>
+<p>${description}</p>
+${groups.length > 0
+    ? `<p class="warn">${groups.map((group) => `${group.key}: levels ${group.levels.join(', ')}`).join('<br>')}</p>`
+    : '<p>None.</p>'}`;
 
 const buildHtmlReport = (
   rows: readonly FlatMetricRow[],
   summaries: Record<string, AxisSummary>,
-  topologyCollisions: readonly string[],
-  coincidentalMetricCollisions: readonly string[]
+  collisions: ReturnType<typeof classifyMazeV2LabCollisions>,
+  meta: { strategy: MazeV2LabSeedStrategyId; baseSeed: number; minLevel: number; maxLevel: number; cliInvocation: string }
 ): string => {
   const headers = rows.length > 0 ? Object.keys(rows[0]!) : [];
   const tableRows = rows.map((row) => (
     `<tr>${headers.map((h) => `<td>${row[h]}</td>`).join('')}</tr>`
   )).join('\n');
   const summaryRows = Object.entries(summaries).map(([axis, summary]) => (
-    `<tr><td>${axis}</td><td>${summary.min.toFixed(2)}</td><td>${summary.mean.toFixed(2)}</td><td>${summary.median.toFixed(2)}</td><td>${summary.max.toFixed(2)}</td></tr>`
+    `<tr><td>${axis}</td><td>${summary.min.toFixed(2)}</td><td>${summary.mean.toFixed(2)}</td><td>${summary.median.toFixed(2)}</td><td>${summary.p95.toFixed(2)}</td><td>${summary.max.toFixed(2)}</td></tr>`
   )).join('\n');
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>Mazer V2 Lab</title>
@@ -213,19 +242,46 @@ td, th { border: 1px solid #333; padding: 3px 6px; text-align: right; }
 th { background: #1c212b; position: sticky; top: 0; }
 h1, h2 { font-family: system-ui, sans-serif; }
 .warn { color: #f0a94e; }
+code { color: #8ac6ff; }
 </style></head>
 <body>
 <h1>Mazer V2 Lab -- ${MAZE_V2_CONTRACT_VERSION}</h1>
-<p>${rows.length} levels analyzed. Measures TODAY's real generator against the new mazeV2 metrics contract -- no V2 generator exists yet (Wave 1 only).</p>
-<h2>Reused mazes (${topologyCollisions.length})</h2>
-<p>Same grid + start/goal + selected seed across levels -- the generator handed back the literal same maze. This is the real novelty-rule finding.</p>
-${topologyCollisions.length > 0 ? `<p class="warn">${topologyCollisions.join('<br>')}</p>` : '<p>None -- every level in this range selected a distinct maze.</p>'}
-<h2>Coincidental metric-vector matches (${coincidentalMetricCollisions.length})</h2>
-<p>Different mazes whose rounded measured-metric vector happens to match -- not reused mazes, just two topologies that read the same on these axes.</p>
-${coincidentalMetricCollisions.length > 0 ? `<p class="warn">${coincidentalMetricCollisions.join('<br>')}</p>` : '<p>None.</p>'}
+<p>${rows.length} samples analyzed. Measures TODAY's real generator against the mazeV2 metrics contract -- no V2 generator exists yet.</p>
+<p>strategy=<code>${meta.strategy}</code> baseSeed=<code>${meta.baseSeed}</code> levels=<code>${meta.minLevel}-${meta.maxLevel}</code></p>
+<p>CLI: <code>${meta.cliInvocation}</code></p>
+${renderCollisionGroups(
+    'Same requested + selected seed',
+    'Only possible when a strategy deliberately repeats a requested seed across levels. Not itself proof of a reused maze -- target complexity and profile still vary with level.',
+    collisions.sameRequestedAndSelectedSeed
+  )}
+${renderCollisionGroups(
+    'Different requested, same selected seed',
+    'The original Wave 1 bug mechanism: overlapping candidate-search windows converging on one winning candidate. Real evidence of a reused maze.',
+    collisions.differentRequestedSameSelectedSeed
+  )}
+${renderCollisionGroups(
+    'Different selected seed, same topology',
+    'A genuine generator collision independent of seed-window mechanics: two unrelated seeds produced the identical graph.',
+    collisions.differentSelectedSeedSameTopology
+  )}
+${renderCollisionGroups(
+    'Different topology, same metric fingerprint',
+    'Coincidental similarity, not a duplicate maze -- bears on how discriminating the metric vector is.',
+    collisions.differentTopologySameMetricFingerprint
+  )}
+${renderCollisionGroups(
+    'Same recipe digest',
+    'Expected empty for every strategy this lab implements today (no (level, seed) pair repeats within one run).',
+    collisions.sameRecipeDigest
+  )}
+${renderCollisionGroups(
+    'Digest collision across different recipes',
+    'Structurally undetectable by any dataset this lab could produce (SHA-256 collision resistance). Always expected empty; non-empty means a hashing bug, not a maze finding.',
+    collisions.digestCollisionAcrossDifferentRecipes
+  )}
 <h2>Per-axis summary</h2>
-<table><tr><th>axis</th><th>min</th><th>mean</th><th>median</th><th>max</th></tr>${summaryRows}</table>
-<h2>Per-level data</h2>
+<table><tr><th>axis</th><th>min</th><th>mean</th><th>median</th><th>p95</th><th>max</th></tr>${summaryRows}</table>
+<h2>Per-sample data</h2>
 <table><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>${tableRows}</table>
 </body></html>`;
 };
@@ -235,78 +291,85 @@ const main = async (): Promise<void> => {
   const outputDir = resolve(args.outputDir);
   await mkdir(outputDir, { recursive: true });
 
+  const plan = resolveMazeV2LabSeedPlan({
+    strategy: args.strategy,
+    baseSeed: args.seed,
+    minLevel: args.minLevel,
+    maxLevel: args.maxLevel
+  });
+
   const samples: LevelSample[] = [];
-  for (let level = args.minLevel; level <= args.maxLevel; level += 1) {
-    samples.push(generateSample(level, args.seed));
-    if (level % 50 === 0) process.stdout.write(`analyzed level ${level}\n`);
+  let processed = 0;
+  for (const entry of plan) {
+    samples.push(generateSample(entry.level, entry.corpusIndex, entry.requestedSeed));
+    processed += 1;
+    if (processed % 200 === 0) process.stdout.write(`analyzed ${processed}/${plan.length} samples\n`);
+  }
+
+  // Verify the nonoverlapping guarantee against what actually happened,
+  // not just the stride arithmetic -- see findMazeV2LabCandidateWindowOverlap's
+  // own comment on why legacyGenerationLifecycle.ts's real behavior is the
+  // source of truth.
+  if (args.strategy === 'sequential-nonoverlapping') {
+    const overlap = findMazeV2LabCandidateWindowOverlap(
+      samples.map((sample) => ({ level: sample.level, candidateSeeds: sample.candidateReview.candidateSeeds }))
+    );
+    if (overlap) {
+      process.stdout.write(
+        `WARNING: sequential-nonoverlapping strategy still observed a candidate-window overlap between levels ${overlap.firstLevel} and ${overlap.secondLevel} (shared candidate seed ${overlap.sharedSeed}) -- the stride constant in mazeV2SeedStrategies.ts may be stale against legacyGenerationLifecycle.ts's own candidate-search bounds.\n`
+      );
+    }
   }
 
   const rows = samples.map(flattenSample);
-  const numericAxes = Object.keys(rows[0] ?? {}).filter((key) => typeof rows[0]![key] === 'number' && key !== 'level');
+  const numericAxes = Object.keys(rows[0] ?? {}).filter((key) => typeof rows[0]![key] === 'number' && key !== 'level' && key !== 'corpusIndex');
   const summaries: Record<string, AxisSummary> = {};
   for (const axis of numericAxes) {
     summaries[axis] = summarizeAxis(rows.map((row) => row[axis] as number));
   }
 
-  // Wave 1.5 correction: an earlier version of this lab bucketed only by
-  // metrics.structuralFingerprint (a rounded MEASURED-METRIC-VECTOR hash)
-  // and reported every bucket with >1 level as a "collision," without being
-  // able to tell "the generator actually reused the same maze" apart from
-  // "two different mazes happen to measure to the same rounded vector."
-  // Now bucketed by both fingerprints so those two findings are reported
-  // separately and correctly labeled.
-  const metricFingerprintCounts = new Map<string, number[]>();
-  const topologyFingerprintCounts = new Map<string, number[]>();
-  for (const sample of samples) {
-    const metricLevels = metricFingerprintCounts.get(sample.metrics.structuralFingerprint) ?? [];
-    metricLevels.push(sample.level);
-    metricFingerprintCounts.set(sample.metrics.structuralFingerprint, metricLevels);
+  const collisions = classifyMazeV2LabCollisions(samples.map((sample) => ({
+    level: sample.level,
+    requestedSeed: sample.requestedSeed,
+    selectedSeed: sample.selectedSeed,
+    topologyFingerprint: sample.topologyFingerprint,
+    metricFingerprint: sample.metrics.metricFingerprint,
+    recipeDigest: sample.recipeDigest
+  })));
 
-    const topologyLevels = topologyFingerprintCounts.get(sample.topologyFingerprint) ?? [];
-    topologyLevels.push(sample.level);
-    topologyFingerprintCounts.set(sample.topologyFingerprint, topologyLevels);
-  }
-
-  // Real duplicates: the generator handed back the literal same maze (grid
-  // + start/goal + selected seed all identical) -- e.g. the seed-window
-  // candidate search overlapping enough between two nearby requested seeds
-  // that both selected the same winning candidate. This is the actual
-  // novelty-rule violation a later wave should reject.
-  const topologyCollisions = [...topologyFingerprintCounts.entries()]
-    .filter(([, levels]) => levels.length > 1)
-    .map(([fingerprint, levels]) => `${fingerprint}: levels ${levels.join(', ')} -- same maze reused`);
-
-  // Coincidental: different mazes whose rounded measured-metric vector
-  // happens to match -- not a duplicate maze, just two distinct topologies
-  // that read the same on these axes. Worth knowing (it bears on how
-  // discriminating the metric vector itself is) but a different finding
-  // from a reused maze, so kept in its own list rather than merged in.
-  const coincidentalMetricCollisions = [...metricFingerprintCounts.entries()]
-    .filter(([, levels]) => levels.length > 1)
-    .map(([fingerprint, levels]) => ({
-      fingerprint,
-      levels,
-      distinctTopologies: new Set(levels.map((level) => samples.find((sample) => sample.level === level)!.topologyFingerprint)).size
-    }))
-    .filter((group) => group.distinctTopologies > 1)
-    .map((group) => `${group.fingerprint}: levels ${group.levels.join(', ')} -- different mazes, same measured vector`);
+  const cliInvocation = `npx tsx scripts/analysis/mazev2-lab.ts --strategy=${args.strategy} --seed=${args.seed} --minLevel=${args.minLevel} --maxLevel=${args.maxLevel}`;
 
   await writeFile(
     resolve(outputDir, 'metrics.json'),
-    JSON.stringify({ contractVersion: MAZE_V2_CONTRACT_VERSION, samples: rows, summaries, topologyCollisions, coincidentalMetricCollisions }, null, 2)
+    JSON.stringify({
+      contractVersion: MAZE_V2_CONTRACT_VERSION,
+      seedCorpusVersion: args.strategy === 'corpus' ? MAZE_V2_LAB_DEFAULT_SEED_CORPUS_VERSION : null,
+      cliInvocation,
+      strategy: args.strategy,
+      baseSeed: args.seed,
+      samples: rows,
+      summaries,
+      collisions
+    }, null, 2)
   );
   await writeFile(resolve(outputDir, 'metrics.csv'), toCsv(rows));
-  await writeFile(resolve(outputDir, 'report.html'), buildHtmlReport(rows, summaries, topologyCollisions, coincidentalMetricCollisions));
+  await writeFile(
+    resolve(outputDir, 'report.html'),
+    buildHtmlReport(rows, summaries, collisions, {
+      strategy: args.strategy,
+      baseSeed: args.seed,
+      minLevel: args.minLevel,
+      maxLevel: args.maxLevel,
+      cliInvocation
+    })
+  );
 
-  process.stdout.write(`\n${samples.length} levels analyzed -> ${outputDir}\n`);
-  process.stdout.write(`Reused mazes: ${topologyCollisions.length}\n`);
-  if (topologyCollisions.length > 0) {
-    process.stdout.write(`${topologyCollisions.join('\n')}\n`);
-  }
-  process.stdout.write(`Coincidental metric-vector matches: ${coincidentalMetricCollisions.length}\n`);
-  if (coincidentalMetricCollisions.length > 0) {
-    process.stdout.write(`${coincidentalMetricCollisions.join('\n')}\n`);
-  }
+  process.stdout.write(`\n${samples.length} samples analyzed (strategy=${args.strategy}) -> ${outputDir}\n`);
+  process.stdout.write(`Same requested+selected seed: ${collisions.sameRequestedAndSelectedSeed.length}\n`);
+  process.stdout.write(`Different requested, same selected seed (real reuse): ${collisions.differentRequestedSameSelectedSeed.length}\n`);
+  process.stdout.write(`Different selected seed, same topology: ${collisions.differentSelectedSeedSameTopology.length}\n`);
+  process.stdout.write(`Different topology, same metric fingerprint (coincidental): ${collisions.differentTopologySameMetricFingerprint.length}\n`);
+  process.stdout.write(`Same recipe digest: ${collisions.sameRecipeDigest.length}\n`);
 };
 
 await main();

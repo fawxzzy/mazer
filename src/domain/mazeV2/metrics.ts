@@ -39,8 +39,15 @@ import {
   type LegacyMazeSnapshot,
   type LegacyPoint
 } from '../../legacy-runtime/legacyMaze';
-import { hashMazeV2Value } from './hashing';
-import { MAZE_V2_CONTRACT_VERSION, type MazeV2MeasuredMetrics } from './types';
+import { deriveMazeV2CanonicalMazeFromLegacySnapshot } from './canonicalMaze';
+import { createMazeV2MetricFingerprint, createMazeV2RecipeDigest, createMazeV2TopologyFingerprint } from './hashing';
+import {
+  MAZE_V2_CONTRACT_VERSION,
+  MAZE_V2_GENERATOR_VERSION,
+  type MazeV2CandidateReview,
+  type MazeV2MeasuredMetrics,
+  type MazeV2RecipeDigest
+} from './types';
 
 const pointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
 
@@ -214,7 +221,7 @@ export const analyzeLegacyMazeAsMazeV2Metrics = (maze: LegacyMazeSnapshot): Maze
     }
   }
 
-  const metricsWithoutFingerprint: Omit<MazeV2MeasuredMetrics, 'structuralFingerprint'> = {
+  const metricsWithoutFingerprint: Omit<MazeV2MeasuredMetrics, 'metricFingerprint'> = {
     contractVersion: MAZE_V2_CONTRACT_VERSION,
     spatial: {
       width,
@@ -267,30 +274,104 @@ export const analyzeLegacyMazeAsMazeV2Metrics = (maze: LegacyMazeSnapshot): Maze
 
   return {
     ...metricsWithoutFingerprint,
-    structuralFingerprint: hashMazeV2Value(metricsWithoutFingerprint)
+    metricFingerprint: createMazeV2MetricFingerprint(metricsWithoutFingerprint)
   };
 };
 
-// Exact topology identity -- distinct from structuralFingerprint above,
-// which hashes the MEASURED METRIC VECTOR (rounded, per hashing.ts), so two
-// genuinely different mazes with coincidentally-identical rounded metrics
-// collide there without being the same maze. This hashes the actual grid
-// plus start/goal/seed, so it only collides when the generator handed back
-// the literal same maze -- the signal an offline lab needs to tell "same
-// maze reused" apart from "different maze, same measured vector."
-//
-// This is one exact-identity signal, not the full three-tier fingerprint
-// taxonomy (cheap similarity bucket / exact topology identity / durable
-// recipe-provenance digest) a fuller pass could split MazeV2MeasuredMetrics
-// and MazeV2RunProvenance into -- that's a larger design change tracked
-// separately, out of scope for this correction.
-export const computeLegacyMazeTopologyFingerprint = (maze: LegacyMazeSnapshot): string => (
-  hashMazeV2Value({
-    seed: maze.seed,
+// Exact topology identity -- distinct from metricFingerprint above (which
+// hashes the MEASURED METRIC VECTOR, so two genuinely different mazes with
+// coincidentally-identical rounded metrics collide there without being the
+// same maze) and from the recipe digest below (which identifies the RECIPE
+// that was asked for, seed included). This hashes ONLY the actual graph --
+// dimensions, walkable layout, start, goal -- so it only collides when the
+// generator handed back the literal same maze, regardless of what seed
+// produced it. Wave 1.5 correction: an earlier version of this function
+// included maze.seed in the hashed value, which meant two different seeds
+// that happened to produce the identical graph would NOT collide here --
+// backwards for a field whose whole job is topology identity, not
+// generation provenance (see MazeV2TopologyFingerprint's own doc comment in
+// types.ts). Confirmed via tests/mazeV2/identity.test.ts that two distinct
+// requested seeds selecting the same underlying graph now produce the same
+// topology fingerprint.
+export const computeLegacyMazeTopologyFingerprint = (
+  maze: Pick<LegacyMazeSnapshot, 'width' | 'height' | 'grid' | 'start' | 'goal'>
+) => {
+  const canonicalMaze = deriveMazeV2CanonicalMazeFromLegacySnapshot(maze);
+  return createMazeV2TopologyFingerprint({
+    width: canonicalMaze.width,
+    height: canonicalMaze.height,
+    start: canonicalMaze.start,
+    goal: canonicalMaze.goal,
+    walkable: canonicalMaze.walkable.map((row) => row.map((tile) => (tile ? '1' : '0')).join('')),
+    wrapPairs: canonicalMaze.wrapPairs
+  });
+};
+
+// Reconstructs the exact candidate seeds legacyGenerationLifecycle.ts's own
+// bounded candidate search examined, from the requested seed the caller
+// asked for (authoritative -- every caller that generates a maze already
+// knows what seed it requested) and the counts LegacyMazeSnapshot.generation.selection
+// already exposes -- without needing that module to separately export the
+// list itself. Mirrors selectLegacyRuntimeMazeForMode's own inspectCandidate
+// loop exactly: the initial window uses requestedSeed + index for
+// index in [0, candidateCount), a pressure retry (if run) continues from
+// requestedSeed + candidateCount, and an adaptive retry (if run) continues
+// from there -- each computed with the same `>>> 0` unsigned wrap. Falls
+// back to just [requestedSeed, selectedSeed] when the maze wasn't generated
+// through the selection path at all (no generation.selection present, e.g.
+// a maze built without a target-complexity search).
+export const buildMazeV2CandidateReview = (
+  maze: Pick<LegacyMazeSnapshot, 'seed' | 'generation'>,
+  requestedSeed: number,
+  generationDurationMs: number
+): MazeV2CandidateReview => {
+  const selection = maze.generation?.selection;
+  const candidateSeeds: number[] = [];
+  if (selection) {
+    const totalCandidates = selection.candidateCount
+      + selection.pressureRetryCandidateCount
+      + selection.adaptiveRetryCandidateCount;
+    for (let index = 0; index < totalCandidates; index += 1) {
+      candidateSeeds.push((requestedSeed + index) >>> 0);
+    }
+  }
+  if (!candidateSeeds.includes(maze.seed)) {
+    candidateSeeds.push(maze.seed);
+  }
+
+  return {
+    requestedSeed,
+    selectedSeed: maze.seed,
+    candidateSeeds,
+    targetFitDistance: selection?.selectedDistance ?? 0,
+    noveltyDistance: null,
+    generationDurationMs,
+    invariantFailures: []
+  };
+};
+
+// Durable recipe provenance for the legacy-runtime bridge. Digests the
+// fields this bridge actually has available (there is no
+// MazeV2ResolvedGenerationContract yet -- nothing builds one; Wave 2's
+// recipe resolver is what would produce a real one) rather than fabricating
+// values for fields the bridge cannot resolve. Deliberately excludes
+// measured outcome -- see MazeV2RecipeDigest's own doc comment.
+export const computeLegacyMazeRecipeDigest = (
+  maze: Pick<LegacyMazeSnapshot, 'width' | 'height' | 'seed'>,
+  level: string,
+  requestedSeed: number,
+  targetComplexity: number,
+  scale: number
+): MazeV2RecipeDigest => (
+  createMazeV2RecipeDigest({
+    generatorVersion: MAZE_V2_GENERATOR_VERSION,
+    contractVersion: MAZE_V2_CONTRACT_VERSION,
+    level,
+    requestedSeed,
+    selectedSeed: maze.seed,
     width: maze.width,
     height: maze.height,
-    start: maze.start,
-    goal: maze.goal,
-    rows: maze.grid.map((row) => row.map((tile) => (tile ? '1' : '0')).join(''))
+    targetComplexity,
+    scale
   })
 );
