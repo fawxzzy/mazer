@@ -29,6 +29,7 @@ import {
   resolveLegacyProgressionPaceScore,
   resolveLegacyProgressionPerformanceScore,
   resolveLegacyProgressionOrdinalSeedComponent,
+  resolveLegacyProgressionScaleDetail,
   resolveLegacyProgressionViewportScaleCap,
   summarizeLegacyProgressionPacing,
   summarizeLegacyProgressionDiagnostics
@@ -1952,6 +1953,63 @@ describe('legacy progression', () => {
       expect(layout.boardLeft).toBeLessThan(layout.tileSize * 2);
       expect(layout.boardLeft + layout.boardWidth).toBeLessThanOrEqual(normalPhoneViewport.width - 4);
     }
+  });
+
+  test('derives a device-relative scale fraction and scales feeder count by it', () => {
+    const state = createEmptyLegacyProgressionState();
+    const architectTrack = {
+      ...state.tracks.player,
+      targetComplexity: 250 // architect band -- base feeder target 2 per side
+    };
+    const smallViewport = { width: 320, height: 568 };
+    const bigViewport = { width: 1200, height: 1400 };
+
+    const smallDetail = resolveLegacyProgressionScaleDetail(50, architectTrack, {
+      surface: 'play',
+      viewport: smallViewport
+    });
+    const bigDetail = resolveLegacyProgressionScaleDetail(50, architectTrack, {
+      surface: 'play',
+      viewport: bigViewport
+    });
+
+    // scale/deviceMaxScale/fraction stay internally consistent, and the
+    // bare-number function this replaces still returns exactly the scale
+    // field -- no behavior change for any caller that doesn't ask for the
+    // detail.
+    expect(smallDetail.scale).toBe(
+      resolveLegacyProgressionGenerationScale(50, architectTrack, { surface: 'play', viewport: smallViewport })
+    );
+    expect(smallDetail.fraction).toBeCloseTo(smallDetail.scale / smallDetail.deviceMaxScale, 5);
+    expect(smallDetail.fraction).toBeGreaterThanOrEqual(0);
+    expect(smallDetail.fraction).toBeLessThanOrEqual(1);
+    // The bigger viewport has more device headroom for the exact same
+    // level, so this level's board sits proportionally further from ITS
+    // device's own ceiling.
+    expect(bigDetail.deviceMaxScale).toBeGreaterThan(smallDetail.deviceMaxScale);
+    expect(bigDetail.fraction).toBeLessThan(smallDetail.fraction);
+
+    // Omitting the scale context reproduces the exact legacy profile
+    // (feeder count untouched by any device signal) -- fully backward
+    // compatible for every caller that doesn't pass one.
+    const legacyProfile = resolveLegacyMazeGenerationProfileForProgression(architectTrack);
+    expect(legacyProfile.borderFeederTargetPerSide).toBe(2);
+
+    // A device sitting right at its own ceiling (fraction 1) keeps the
+    // band's full feeder target; a device with much more headroom to
+    // spare for this same level scales it down (never below 1 once the
+    // band calls for feeders at all).
+    const maxedFractionProfile = resolveLegacyMazeGenerationProfileForProgression(architectTrack, { fraction: 1 });
+    const flooredFractionProfile = resolveLegacyMazeGenerationProfileForProgression(architectTrack, { fraction: 0 });
+    expect(maxedFractionProfile.borderFeederTargetPerSide).toBe(2);
+    expect(flooredFractionProfile.borderFeederTargetPerSide).toBe(1);
+    expect(flooredFractionProfile).toEqual({ ...legacyProfile, borderFeederTargetPerSide: 1 });
+
+    // Bands whose own feeder target is already 0 (tutorial, and early
+    // starter before its own onset threshold) are untouched by any
+    // fraction -- there's nothing to scale.
+    const tutorialProfile = resolveLegacyMazeGenerationProfileForProgression(state.tracks.player, { fraction: 0 });
+    expect(tutorialProfile.borderFeederTargetPerSide).toBe(0);
   });
 
   test('summarizes diagnostics without exposing full cycle path history', () => {

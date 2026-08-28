@@ -212,10 +212,12 @@ import {
   resolveLegacyProgressionLevel,
   resolveLegacyProgressionOrdinalSeedComponent,
   resolveLegacyProgressionPalette,
+  resolveLegacyProgressionScaleDetail,
   resolveLegacyProgressionTrackIdForSurface,
   summarizeLegacyProgressionDiagnostics,
   writeLegacyProgressionState,
   type LegacyProgressionDiagnostics,
+  type LegacyProgressionGenerationScaleOptions,
   type LegacyProgressionPalette,
   type LegacyProgressionState,
   type LegacyProgressionTrackId
@@ -14054,10 +14056,9 @@ export class MenuScene extends Phaser.Scene {
     return resolveLegacyProgressionPalette(this.progressionState.tracks[trackId], trackId);
   }
 
-  private resolveLegacyProgressionScaleForMode(mode: RuntimeMode): number {
-    const trackId: LegacyProgressionTrackId = mode === 'play' ? 'player' : 'ai-runner';
+  private resolveLegacyProgressionScaleOptionsForMode(mode: RuntimeMode): LegacyProgressionGenerationScaleOptions {
     const browserMobileParity = this.resolveLegacyBrowserMobileParity(this.scale.width, this.scale.height);
-    return resolveLegacyProgressionGenerationScale(this.settings.scale, this.progressionState.tracks[trackId], {
+    return {
       surface: mode === 'play' ? 'play' : 'menu-demo',
       viewport: {
         width: browserMobileParity ? LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH : this.scale.width,
@@ -14071,7 +14072,16 @@ export class MenuScene extends Phaser.Scene {
         safeArea: readMazerViewportGeometry().safeArea,
         useFloatingTouchControls: true
       }
-    });
+    };
+  }
+
+  private resolveLegacyProgressionScaleForMode(mode: RuntimeMode): number {
+    const trackId: LegacyProgressionTrackId = mode === 'play' ? 'player' : 'ai-runner';
+    return resolveLegacyProgressionGenerationScale(
+      this.settings.scale,
+      this.progressionState.tracks[trackId],
+      this.resolveLegacyProgressionScaleOptionsForMode(mode)
+    );
   }
 
   private resolveLegacyBrowserMobileParity(
@@ -14083,7 +14093,18 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyMazeGenerationProfileForMode(mode: RuntimeMode) {
     const trackId: LegacyProgressionTrackId = mode === 'play' ? 'player' : 'ai-runner';
-    return resolveLegacyMazeGenerationProfileForProgression(this.progressionState.tracks[trackId]);
+    const track = this.progressionState.tracks[trackId];
+    // Device-relative: how close this level's board already sits to what
+    // THIS screen can legibly render drives feeder/bleed-path count now,
+    // not just a fixed per-band number that assumes some unconfigured
+    // screen size. See resolveLegacyMazeGenerationProfileForProgression's
+    // own comment on why only feeder count reads this so far.
+    const { fraction } = resolveLegacyProgressionScaleDetail(
+      this.settings.scale,
+      track,
+      this.resolveLegacyProgressionScaleOptionsForMode(mode)
+    );
+    return resolveLegacyMazeGenerationProfileForProgression(track, { fraction });
   }
 
   private resolveLegacyTargetComplexityForMode(mode: RuntimeMode): number {
