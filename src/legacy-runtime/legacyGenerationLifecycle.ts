@@ -729,6 +729,7 @@ export const createLegacyGenerationRequest = ({
   generationProfile,
   mode,
   precompute = false,
+  precomputedMazeOverride,
   queuedAtMs = dueAtMs,
   reason,
   scale,
@@ -757,7 +758,26 @@ export const createLegacyGenerationRequest = ({
   // animation's own motion covers it. Not the default: most callers queue
   // with delayMs 0 for same-tick consumption, where eager-at-queue vs.
   // lazy-at-consume is not a meaningfully different moment.
+  //
+  // Superseded in practice by precomputedMazeOverride below for the
+  // deconstruct-triggered case specifically: even queue-time-in-this-
+  // function eager computation still runs inside the SAME synchronous call
+  // that arms the outbound player-transfer-energy timer and the bleed-dock
+  // corridor's own clock (see MenuScene.armLegacyMenuStaticDeconstructStage)
+  // -- those are wall-clock-timed, short (a few hundred ms) animation
+  // windows, and a multi-hundred-ms generation stall INSIDE that same call
+  // eats directly into them, so the very first frame rendered afterward can
+  // already be past their entire visible window. The caller now
+  // precomputes even earlier (at the goal-reached instant, well before the
+  // arm call) and passes the already-built result via
+  // precomputedMazeOverride instead, so the arm call itself does no
+  // synchronous work at all. precompute stays supported as a fallback for
+  // any caller that can't precompute that early.
   precompute?: boolean;
+  // An already-built maze to use as-is, skipping generation entirely (not
+  // even eagerly at queue time) -- see precompute's own comment for why
+  // this exists. Takes priority over precompute when both are somehow set.
+  precomputedMazeOverride?: LegacyMazeSnapshot;
   queuedAtMs?: number;
   reason: LegacyGenerationRequestReason;
   scale: number;
@@ -782,13 +802,15 @@ export const createLegacyGenerationRequest = ({
   // aspect ratio, same selection options -- so this is not a second,
   // possibly-different generation; it's the one generation, just run
   // earlier and cached.
-  const precomputedMaze = precompute
-    ? createLegacyRuntimeMazeForMode(mode, scale, seed, profile, {
-      candidateCount: selectionCandidateCount,
-      targetComplexity: normalizedTargetComplexity,
-      tolerance: selectionTolerance
-    }, aspectRatio ?? 1)
-    : undefined;
+  const precomputedMaze = precomputedMazeOverride ?? (
+    precompute
+      ? createLegacyRuntimeMazeForMode(mode, scale, seed, profile, {
+        candidateCount: selectionCandidateCount,
+        targetComplexity: normalizedTargetComplexity,
+        tolerance: selectionTolerance
+      }, aspectRatio ?? 1)
+      : undefined
+  );
 
   return {
     mode,
@@ -817,6 +839,7 @@ export const createLegacyMenuResetGenerationRequest = ({
   generationProfile,
   nowMs,
   precompute,
+  precomputedMazeOverride,
   scale,
   targetComplexity
 }: {
@@ -825,6 +848,7 @@ export const createLegacyMenuResetGenerationRequest = ({
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null;
   nowMs: number;
   precompute?: boolean;
+  precomputedMazeOverride?: LegacyMazeSnapshot;
   scale: number;
   targetComplexity?: number;
 }): LegacyGenerationRequest => createLegacyGenerationRequest({
@@ -834,6 +858,7 @@ export const createLegacyMenuResetGenerationRequest = ({
   generationProfile,
   mode: 'menu',
   ...(precompute !== undefined ? { precompute } : {}),
+  ...(precomputedMazeOverride !== undefined ? { precomputedMazeOverride } : {}),
   queuedAtMs: nowMs,
   reason: 'menu-demo-goal-reset',
   scale,
@@ -847,6 +872,7 @@ export const createLegacyPlayResetGenerationRequest = ({
   generationProfile,
   nowMs,
   precompute,
+  precomputedMazeOverride,
   seedOverride,
   scale,
   targetComplexity
@@ -856,6 +882,7 @@ export const createLegacyPlayResetGenerationRequest = ({
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null;
   nowMs: number;
   precompute?: boolean;
+  precomputedMazeOverride?: LegacyMazeSnapshot;
   seedOverride?: number;
   scale: number;
   targetComplexity?: number;
@@ -866,6 +893,7 @@ export const createLegacyPlayResetGenerationRequest = ({
   generationProfile,
   mode: 'play',
   ...(precompute !== undefined ? { precompute } : {}),
+  ...(precomputedMazeOverride !== undefined ? { precomputedMazeOverride } : {}),
   queuedAtMs: nowMs,
   reason: 'play-goal-reset',
   scale,

@@ -108,6 +108,13 @@ interface PlayerProgressionSceneHarness {
   time: { now: number };
   visualDiagnosticsLastPublishedAtMs: number;
   createFreshLegacyPlayGenerationSeed: () => number;
+  // Stubbed to always report "nothing precomputed" -- this harness never
+  // calls precomputeLegacyDeconstructResetMaze (the goal-reached-instant
+  // caller this exists for), so armLegacyMenuStaticDeconstructStage's own
+  // fallback path (precompute: true + createFreshLegacyPlayGenerationSeed
+  // above) is what this test exercises, same as before that fallback
+  // existed.
+  consumeLegacyDeconstructResetMaze: () => null;
 }
 
 const createProgressionMaze = (): LegacyMazeSnapshot => ({
@@ -215,7 +222,8 @@ const createScene = (): { scene: PlayerProgressionSceneHarness; storage: MemoryS
     syncLegacyRemoteProgressionState: vi.fn(),
     time: { now: 8_000 },
     visualDiagnosticsLastPublishedAtMs: 1,
-    createFreshLegacyPlayGenerationSeed: () => 742
+    createFreshLegacyPlayGenerationSeed: () => 742,
+    consumeLegacyDeconstructResetMaze: () => null
   };
 
   return { scene, storage };
