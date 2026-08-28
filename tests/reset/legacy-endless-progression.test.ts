@@ -144,36 +144,14 @@ describe('legacy endless progression ruleset boundary', () => {
       new URL('../../supabase/migrations/20260824013611_repair_progression_rpc_acl_and_conditionals.sql', import.meta.url),
       'utf8'
     ));
-    // forwardRepair (20260824013611) is a completed historical patch, frozen
-    // at the signature live when it was written -- p_maze_seed integer. It
-    // is not re-authored when a later migration widens that signature
-    // (20260828153000_mazer_maze_seed_unsigned32_widen.sql: integer ->
-    // bigint), the same way no earlier migration file is ever edited after
-    // the fact; a fresh replay runs forwardRepair chronologically before the
-    // widen migration, so its own integer signature is still correct for
-    // the moment it executes. completionRpc (20260822000100), by contrast,
-    // is a live source template compose-master-migrations.mjs regenerates
-    // the master migration from, and IS kept current -- it reflects
-    // whatever the true signature is today.
-    const sharedSignatures = [
+    const signatures = [
       'public.mazer_initialize_progression(uuid)',
+      'public.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb)',
+      'public.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb)',
       'public.mazer_reset_progression(bigint, uuid)'
     ];
-    const completionRpcSignatures = [
-      ...sharedSignatures,
-      'public.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb)',
-      'public.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb)'
-    ];
-    const forwardRepairSignatures = [
-      ...sharedSignatures,
-      'public.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb)',
-      'public.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb)'
-    ];
 
-    for (const [source, signatures] of [
-      [completionRpc, completionRpcSignatures],
-      [forwardRepair, forwardRepairSignatures]
-    ] as const) {
+    for (const source of [completionRpc, forwardRepair]) {
       for (const signature of signatures) {
         expect(source).toContain(`revoke all on function ${signature} from public;`);
         expect(source).toContain(`revoke all on function ${signature} from anon;`);

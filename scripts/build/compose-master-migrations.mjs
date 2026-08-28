@@ -135,8 +135,8 @@ ${leaderboardRpc}
 grant usage on schema mazer to anon, authenticated, service_role;
 
 alter function mazer.mazer_initialize_progression(uuid) owner to postgres;
-alter function mazer.mazer_complete_level(bigint, uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) owner to postgres;
-alter function mazer.mazer_complete_ai_level(uuid, text, bigint, integer, uuid, text, integer, text, timestamp with time zone, jsonb) owner to postgres;
+alter function mazer.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) owner to postgres;
+alter function mazer.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) owner to postgres;
 alter function mazer.mazer_reset_progression(bigint, uuid) owner to postgres;
 alter function mazer.mazer_leaderboard_page(integer, integer) owner to postgres;
 alter function mazer.mazer_leaderboard_self_rank() owner to postgres;
