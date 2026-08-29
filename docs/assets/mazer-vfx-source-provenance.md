@@ -137,4 +137,6 @@ any of the three gives the same optical size.
 The active-play pause/settings control now consumes the same settings texture
 and optical bounds as the menu header. Because that texture is a persistent
 Phaser image rather than transient HUD graphics, every HUD teardown path must
-hide it explicitly before an overlay or menu surface is shown.
+hide it explicitly before an overlay or menu surface is shown. This includes
+forced auth-gate and password-recovery transitions, which bypass the normal
+overlay-opening helper and return before the next HUD draw.

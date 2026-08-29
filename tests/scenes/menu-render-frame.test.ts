@@ -1621,6 +1621,30 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(enterMenuSource).toContain('this.clearPlayHudImmediately();');
   });
 
+  test('tears down the persistent play HUD before forced auth and recovery overlays', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const updateSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('public update(time: number, delta: number): void'),
+      menuSceneSource.indexOf('private recordRuntimeFrame(')
+    );
+    const forcedAuthSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private enterForcedLegacyAuthOverlay(): void'),
+      menuSceneSource.indexOf('private rebuildUi(): void')
+    );
+    const recoverySource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private applyLegacyPasswordRecoveryEntry('),
+      menuSceneSource.indexOf('private resolveLegacyRuntimeAuthFixtureSnapshot()')
+    );
+
+    expect(updateSource.match(/this\.enterForcedLegacyAuthOverlay\(\);/g)).toHaveLength(2);
+    expect(updateSource).not.toContain("this.overlay = 'auth';");
+    expect(recoverySource).toContain('this.enterForcedLegacyAuthOverlay();');
+    expect(forcedAuthSource).toContain("if (this.mode === 'play') {\n      this.clearPlayHudImmediately();\n    }");
+    expect(forcedAuthSource.indexOf('this.clearPlayHudImmediately();')).toBeLessThan(
+      forcedAuthSource.indexOf("this.overlay = 'auth';")
+    );
+  });
+
   test('converts each seeded backdrop twinkle cycle to radians', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 

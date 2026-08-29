@@ -2290,11 +2290,11 @@ export class MenuScene extends Phaser.Scene {
     if (this.pendingAuthGateTransition) {
       this.pendingAuthGateTransition = false;
       if (this.isLegacyPasswordRecoveryActive() && this.overlay !== 'auth') {
-        this.overlay = 'auth';
+        this.enterForcedLegacyAuthOverlay();
         this.uiDirty = true;
         this.rebuildUi();
       } else if (this.authGateLocked && this.overlay !== 'auth') {
-        this.overlay = 'auth';
+        this.enterForcedLegacyAuthOverlay();
         this.uiDirty = true;
         this.rebuildUi();
       } else if (!this.authGateLocked && !this.authGateAwaitingResolution && this.overlay === 'auth') {
@@ -10304,6 +10304,15 @@ export class MenuScene extends Phaser.Scene {
     this.footerText.setText('');
   }
 
+  private enterForcedLegacyAuthOverlay(): void {
+    // Forced auth transitions bypass openOverlay() and return through update's
+    // auth-only branch before drawHud() can clear persistent HUD images.
+    if (this.mode === 'play') {
+      this.clearPlayHudImmediately();
+    }
+    this.overlay = 'auth';
+  }
+
   private rebuildUi(): void {
     this.overlayGraphics.clear();
     this.clearUi();
@@ -15153,7 +15162,7 @@ export class MenuScene extends Phaser.Scene {
     this.passwordRecoveryState = nextState;
     this.passwordRecoveryFeedback = null;
     if (this.isLegacyPasswordRecoveryActive()) {
-      this.overlay = 'auth';
+      this.enterForcedLegacyAuthOverlay();
       this.overlayReturn = 'none';
       this.authForm = {
         ...this.authForm,
