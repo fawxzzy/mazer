@@ -1397,13 +1397,13 @@ const LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS = 340;
 // about to appear once the final generation stage settles -- a short travel
 // span for the beams to reach the tile, then a brief impact flash the marker
 // itself pops in under.
-// 260/240 * 1.25 -- a literal 25% slowdown of the whole laser sequence
-// (beams converging on the player, then the arrival moment), matching the
-// same 25% cut applied to LEGACY_PLAYER_TRANSFER_OUTBOUND_MS so the outbound
-// and delivery halves of the effect read at one consistent pace instead of
-// only the first half slowing down.
-const LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS = 325;
-const LEGACY_PLAYER_SPAWN_FLASH_MS = 300;
+// Was 260/240, then 325/300 (a 25% cut matching LEGACY_PLAYER_TRANSFER_OUTBOUND_MS)
+// -- still reported "too fast, slow down" for the diamonds' own spawn-in
+// beams specifically. Slowed further, independent of the outbound laser's
+// own pace now (they're visually separate moments -- reaching the goal vs.
+// landing in the next maze -- so they don't need to match each other 1:1).
+const LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS = 480;
+const LEGACY_PLAYER_SPAWN_FLASH_MS = 340;
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const smoothstep = (value: number): number => {
   const x = clamp(value, 0, 1);
@@ -1714,6 +1714,10 @@ export class MenuScene extends Phaser.Scene {
   // Image lives and dies with that same closure instead.
   private headerSettingsIconImage!: Phaser.GameObjects.Image;
   private headerLeaderboardIconImage!: Phaser.GameObjects.Image;
+  // Same real settings icon as the menu header, for active play's own pause/
+  // settings touch control (drawLegacySettingsCogControl) -- top-level, not
+  // boardZoomContainer, matching hudGraphics' own coordinate space.
+  private touchSettingsCogIconImage!: Phaser.GameObjects.Image;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -1950,6 +1954,7 @@ export class MenuScene extends Phaser.Scene {
     ]);
     this.overlayGraphics = this.add.graphics();
     this.hudGraphics = this.add.graphics();
+    this.touchSettingsCogIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.playerSpawnBurstGraphics = this.add.graphics();
     // Same top-level (non-boardZoomContainer) coordinate space
     // playerSpawnBurstGraphics itself already draws the beam origins/target
@@ -5967,10 +5972,22 @@ export class MenuScene extends Phaser.Scene {
       // uniform white squares with no shimmer read as flat/lifeless at a
       // real starfield's scale.
       const starSeed = ((star.x * 9973) + (star.y * 6151)) % 1;
-      const twinklePhase = backdropMotionEnabled
-        ? (Math.sin((animationTime / 1300) + (starSeed * Math.PI * 2)) + 1) / 2
+      // Was a small (68-100%) alpha-only wobble on a shared 1300ms period --
+      // reported as flickering badly, and asked to "make their size animate
+      // too and fade in and out." Each star gets its own period (+-25%,
+      // seeded off starSeed so they don't all pulse in lockstep) and a much
+      // wider swing (down to near-invisible, not just dimmer) eased through
+      // smoothstep so it lingers at the bright/dim ends and passes quickly
+      // through the middle -- reads as a genuine twinkle in and out, not a
+      // constant shimmer. sizeMultiplier rides the same eased cycle so a
+      // star visibly shrinks as it dims, not just fades.
+      const twinklePeriodMs = 2200 * (0.75 + (starSeed * 0.5));
+      const twinkleRaw = backdropMotionEnabled
+        ? (Math.sin((animationTime / twinklePeriodMs) + (starSeed * Math.PI * 2)) + 1) / 2
         : 0.5;
-      const twinkleAlpha = star.alpha * (0.68 + (twinklePhase * 0.32));
+      const twinklePhase = twinkleRaw * twinkleRaw * (3 - (2 * twinkleRaw));
+      const twinkleAlpha = star.alpha * (0.12 + (twinklePhase * 0.88));
+      const sizeMultiplier = 0.55 + (twinklePhase * 0.65);
       const starColor = starSeed > 0.82 ? 0xbfe3ff : (starSeed < 0.16 ? 0xffe9c2 : 0xffffff);
       // The nearest, biggest stars get the same rainbow four-point sparkle
       // the orbit diamonds/level number/title use, replacing the old flat
@@ -5996,7 +6013,7 @@ export class MenuScene extends Phaser.Scene {
           this.backdropGraphics,
           pixelX,
           pixelY,
-          coreSize * (1.6 + (twinklePhase * 0.5)),
+          coreSize * (1.3 + (twinklePhase * 1.1)) * sizeMultiplier,
           sparkleHue,
           twinkleAlpha * palette.starAlphaScale
         );
@@ -6009,7 +6026,7 @@ export class MenuScene extends Phaser.Scene {
       // with the same two-pass halo underneath is a small, cheap change
       // that makes every single star in the field read as an actual star
       // instead of a tiny tile.
-      const starRadius = coreSize / 2;
+      const starRadius = (coreSize / 2) * sizeMultiplier;
       if (coreSize > 1) {
         this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.22);
         this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 2);
@@ -8054,14 +8071,17 @@ export class MenuScene extends Phaser.Scene {
       const pulseRadius = 5.5 + (Math.sin(baseAngle + index) * 1.2);
       this.playerSpawnBurstGraphics.fillStyle(beamColor, alpha * 0.12);
       this.playerSpawnBurstGraphics.fillCircle(origin.x, origin.y, pulseRadius + 4);
-      this.playerSpawnBurstGraphics.lineStyle(1.4, beamColor, alpha * 0.76);
-      const diamondVertices = resolveLegacyMenuPathTitleDiamondVertices(
-        origin.x,
-        origin.y,
-        pulseRadius,
-        origin.facing
-      );
-      this.strokeLegacyPolyline(this.playerSpawnBurstGraphics, [...diamondVertices, diamondVertices[0]]);
+      // Was also stroking a thin procedural diamond outline
+      // (resolveLegacyMenuPathTitleDiamondVertices) directly over each
+      // origin -- the exact same origin points the orbit sigils' own real
+      // MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY image already renders every
+      // frame (drawLegacyMenuPathTitleOrbitSigils). Reported as "the energy
+      // in the diamonds when the player lasers shoot to them still looks
+      // like the old asset" -- it genuinely was: this leftover pre-real-
+      // asset outline was layered on top of the real diamond image the
+      // whole time the laser was charging/firing, and only during that
+      // window. Removed; the pulse-glow and spark particles below are
+      // enough of an "energy charging here" accent on their own.
       for (let particle = 0; particle < 3; particle += 1) {
         const angle = origin.facing + baseAngle + (particle * ((Math.PI * 2) / 3));
         const radius = 2.2 + (particle * 1.35);
@@ -9002,7 +9022,11 @@ export class MenuScene extends Phaser.Scene {
     const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
     const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuSettingsCogActive ? 0.08 : 0), 0.14, 1);
     const blinkScale = 0.92 + (phase * 0.08) + (this.menuSettingsCogActive ? 0.02 : 0);
-    const desiredSize = Math.min(frame.width, frame.height) * 0.68 * blinkScale;
+    // 1.15x, not 0.68x (the old gear's own outer-diameter ratio) -- the real
+    // icon reads noticeably smaller than the equivalent-diameter procedural
+    // gear at the same bounding size (reported "icons are too small"), so
+    // this is deliberately bigger than the old shape's own footprint.
+    const desiredSize = Math.min(frame.width, frame.height) * 1.15 * blinkScale;
     this.applyLegacyHudIconFrame(
       this.headerSettingsIconImage,
       MAZER_HUD_SETTINGS_ICON_METRICS,
@@ -9042,7 +9066,7 @@ export class MenuScene extends Phaser.Scene {
     const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
     const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuLeaderboardActive ? 0.08 : 0), 0.14, 1);
     const blinkScale = 0.92 + (phase * 0.08) + (this.menuLeaderboardActive ? 0.02 : 0);
-    const desiredSize = Math.min(frame.width, frame.height) * 0.68 * blinkScale;
+    const desiredSize = Math.min(frame.width, frame.height) * 1.15 * blinkScale;
     this.applyLegacyHudIconFrame(
       this.headerLeaderboardIconImage,
       MAZER_HUD_LEADERBOARD_ICON_METRICS,
@@ -10115,6 +10139,7 @@ export class MenuScene extends Phaser.Scene {
     touchControlLayout = this.resolveLegacyPlayTouchControlLayout()
   ): VisualRect | null {
     if (!this.shouldRenderLegacyPlayTouchControls(touchControlLayout)) {
+      this.touchSettingsCogIconImage.setVisible(false);
       return null;
     }
 
@@ -10122,7 +10147,7 @@ export class MenuScene extends Phaser.Scene {
     // No live pressed-state tracking for this control (matches the
     // pre-existing behavior) -- always idle-colored, just now with the
     // same blink pulse as the menu cog.
-    this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause, false, time);
+    this.drawLegacySettingsCogControl(controls.pause, false, time);
 
     if (this.playFloatingStickOrigin === null) {
       return createVisualRect(controls.pause.left, controls.pause.top, controls.pause.width, controls.pause.height);
@@ -10200,17 +10225,17 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.strokeCircle(knobX, knobY, knobRadius);
   }
 
-  // Matches the menu surface's own settings cog's colors and blink pulse
-  // exactly. Size does NOT come along for free just from sharing the
-  // radiusRatio (0.34): the menu cog draws inside resolveLegacyHeaderControl-
-  // Frame's compact 36-40px icon box, while `rect` here is the real touch
-  // hit-target (tuned for thumb reach, deliberately bigger for ergonomics) --
-  // the same ratio applied to a bigger box drew a visibly bigger gear. Drawn
-  // size is pinned to the menu cog's own formula, centered within the real
-  // (unchanged) touch target, so the tap region stays generous while the
-  // glyph itself matches menu.
+  // Matches the menu surface's own real settings icon (same texture,
+  // applyLegacyHudIconFrame, same blink pulse) instead of the procedural
+  // gear it used to share via drawLegacySettingsCog -- reported as "played
+  // game screen never got the ui updates like for icons": this in-play
+  // pause/settings touch control was the one icon on the active-play screen
+  // that got missed when the menu header/overlay icons were replaced.
+  // `rect` here is the real touch hit-target (tuned for thumb reach,
+  // deliberately bigger than the menu's compact header box) -- the glyph's
+  // own display size is still pinned to the same visual footprint the menu
+  // cog uses, not the (bigger) hit target, centered within it.
   private drawLegacySettingsCogControl(
-    graphics: Phaser.GameObjects.Graphics,
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
     active: boolean,
     time: number
@@ -10219,19 +10244,12 @@ export class MenuScene extends Phaser.Scene {
     const blinkAlpha = clamp(0.22 + (phase * 0.78) + (active ? 0.08 : 0), 0.14, 1);
     const blinkScale = 0.92 + (phase * 0.08) + (active ? 0.02 : 0);
     const visualSize = clamp(Math.round(Math.min(this.layout.width, this.layout.height) * 0.085), 36, 40);
-    const visualRect = {
-      centerX: rect.centerX,
-      centerY: rect.centerY,
-      width: visualSize,
-      height: visualSize
-    };
-    this.drawLegacySettingsCog(
-      graphics,
-      visualRect,
-      active,
-      0.34 * blinkScale,
-      cyberArcadeMaterial.signal.player,
-      cyberArcadeMaterial.rail.mint,
+    this.applyLegacyHudIconFrame(
+      this.touchSettingsCogIconImage,
+      MAZER_HUD_SETTINGS_ICON_METRICS,
+      rect.centerX,
+      rect.centerY,
+      visualSize * 1.15 * blinkScale,
       blinkAlpha
     );
   }
@@ -10269,57 +10287,6 @@ export class MenuScene extends Phaser.Scene {
       .setVisible(true);
   }
 
-  private drawLegacySettingsCog(
-    graphics: Phaser.GameObjects.Graphics,
-    rect: Pick<VisualRect, 'centerX' | 'centerY' | 'height' | 'width'>,
-    active = false,
-    radiusRatio = 0.2,
-    idleColor: number = LEGACY_PLAY_TOUCH_ICON,
-    activeColor: number = LEGACY_PLAY_TOUCH_ACCENT,
-    alphaMultiplier = 1
-  ): void {
-    const outerRadius = Math.max(7, Math.round(Math.min(rect.width, rect.height) * radiusRatio));
-    const innerRadius = Math.max(4, Math.round(outerRadius * 0.66));
-    const hubRadius = Math.max(2, Math.round(outerRadius * 0.32));
-    const teeth = 8;
-    const pointCount = teeth * 2;
-    const color = active ? activeColor : idleColor;
-
-    // Thin, hollow, single-tone mint neon-line icon -- matching the user's
-    // actual reference mockup of this header (a plain thin-line gear, no
-    // fill, one consistent glow color), not a filled/two-tone "glassy body"
-    // treatment. A soft wide glow pass underneath a crisp thin line on top,
-    // both in the SAME color, is the whole treatment -- no fill, no second
-    // (white) color.
-    graphics.beginPath();
-    for (let index = 0; index < pointCount; index += 1) {
-      const angle = ((index / pointCount) * Math.PI * 2) - (Math.PI / 2);
-      const pointRadius = index % 2 === 0 ? outerRadius : innerRadius;
-      const px = rect.centerX + (Math.cos(angle) * pointRadius);
-      const py = rect.centerY + (Math.sin(angle) * pointRadius);
-      if (index === 0) {
-        graphics.moveTo(px, py);
-      } else {
-        graphics.lineTo(px, py);
-      }
-    }
-    graphics.closePath();
-    graphics.lineStyle(Math.max(3, outerRadius * 0.3), color, (active ? 0.4 : 0.28) * alphaMultiplier);
-    graphics.strokePath();
-    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.1)), color, (active ? 1 : 0.92) * alphaMultiplier);
-    graphics.strokePath();
-
-    // Hub hole: no fill at all (the earlier version faked a hole with a
-    // background-colored disc -- unnecessary now that the gear body itself
-    // has no fill to hide, the hub is just this same thin ring).
-    graphics.lineStyle(Math.max(2, outerRadius * 0.2), color, (active ? 0.4 : 0.28) * alphaMultiplier);
-    graphics.strokeCircle(rect.centerX, rect.centerY, hubRadius);
-    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, (active ? 0.95 : 0.85) * alphaMultiplier);
-    graphics.strokeCircle(rect.centerX, rect.centerY, hubRadius);
-    // No gem catchlight here -- it's a short diagonal arc calibrated for a
-    // round gem-shaped marker; on the gear's own hollow ring it just reads
-    // as a stray diagonal white line in the corner (reported and removed).
-  }
 
   private clearHudTexts(): void {
     this.uiTexts.forEach((text) => {
@@ -14585,7 +14552,7 @@ export class MenuScene extends Phaser.Scene {
         const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
         const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuProfileActive ? 0.08 : 0), 0.14, 1);
         const blinkScale = 0.92 + (phase * 0.08) + (this.menuProfileActive ? 0.02 : 0);
-        const iconSize = Math.max(18, Math.round(Math.min(frame.width, frame.height) * 0.48));
+        const iconSize = Math.max(18, Math.round(Math.min(frame.width, frame.height) * 0.9));
         this.drawLegacyProfileIcon(
           graphics,
           iconImage,
@@ -14650,7 +14617,7 @@ export class MenuScene extends Phaser.Scene {
   private createLegacyOverlayUsernameButton(panel: OverlayPanelFrame, onClick: () => void, centerX: number): UiButton {
     const chevronSize = Math.max(cyberArcadeMaterial.controls.minimumTouchTarget, this.layout.width < 480 ? 42 : 46);
     const rowY = panel.top + 8 + Math.round(chevronSize / 2);
-    const iconSize = Math.max(18, Math.round(chevronSize * 0.42));
+    const iconSize = Math.max(18, Math.round(chevronSize * 0.78));
 
     const graphics = this.add.graphics();
     const iconImage = this.add.image(0, 0, MAZER_HUD_PROFILE_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
