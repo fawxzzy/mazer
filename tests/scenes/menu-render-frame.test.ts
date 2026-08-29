@@ -1589,6 +1589,45 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
   });
 
+  test('uses meaningful-alpha bounds for the shared HUD icon assets', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('visibility threshold of alpha > 1');
+    expect(menuSceneSource).toContain('const MAZER_HUD_PROFILE_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 729, bboxWidth: 615, bboxX: 320, bboxY: 268 };');
+    expect(menuSceneSource).toContain('const MAZER_HUD_LEADERBOARD_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 524, bboxWidth: 692, bboxX: 281, bboxY: 359 };');
+    expect(menuSceneSource).toContain('const MAZER_HUD_SETTINGS_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 828, bboxWidth: 807, bboxX: 221, bboxY: 204 };');
+    expect(menuSceneSource).not.toContain('bboxHeight: 1193, bboxWidth: 1119, bboxX: 91, bboxY: 21');
+    expect(menuSceneSource).not.toContain('bboxHeight: 1129, bboxWidth: 1111, bboxX: 97, bboxY: 53');
+    expect(menuSceneSource).not.toContain('bboxHeight: 1183, bboxWidth: 1228, bboxX: 0, bboxY: 38');
+  });
+
+  test('hides the persistent play settings texture whenever the play HUD clears', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const drawHudSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private drawHud(time: number): void'),
+      menuSceneSource.indexOf('private hasLegacyPlayTrailPulsePendingFrame')
+    );
+    const clearHudSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private clearPlayHudImmediately(): void'),
+      menuSceneSource.indexOf('private rebuildUi(): void')
+    );
+    const enterMenuSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private enterMenuMode(): void'),
+      menuSceneSource.indexOf('private startPlayMode(): void')
+    );
+
+    expect(drawHudSource).toContain("if (this.mode !== 'play' || this.overlay !== 'none') {\n      this.touchSettingsCogIconImage.setVisible(false);");
+    expect(clearHudSource).toContain('this.touchSettingsCogIconImage.setVisible(false);');
+    expect(enterMenuSource).toContain('this.clearPlayHudImmediately();');
+  });
+
+  test('converts each seeded backdrop twinkle cycle to radians', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('Math.sin(((animationTime / twinklePeriodMs) + starSeed) * Math.PI * 2)');
+    expect(menuSceneSource).not.toContain('Math.sin((animationTime / twinklePeriodMs) + (starSeed * Math.PI * 2))');
+  });
+
   test('keeps settings semantic while the compact active-track level baseline stays free of board decorations', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
