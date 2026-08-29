@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 import {
   extractWorkboxPrecacheEntries,
@@ -8,8 +9,10 @@ import {
 } from '../../scripts/brand/verify-mazer-icon-delivery.mjs';
 
 const BASE_URL = 'https://mazer.fawxzzy.com/';
-const revision = '0123456789abcdef0123456789abcdef';
-const entry = (url) => ({ revision, url });
+const ICON_PAYLOAD = Buffer.from('exact-icon-bytes');
+const revisionFor = (payload) => createHash('md5').update(payload).digest('hex');
+const entry = (url, payload = ICON_PAYLOAD) => ({ revision: revisionFor(payload), url });
+const expectedAsset = (url, payload = ICON_PAYLOAD) => ({ payload, url });
 
 describe('Mazer icon-delivery verifier', () => {
   test('normalizes only equivalent same-origin path forms', () => {
@@ -29,7 +32,12 @@ describe('Mazer icon-delivery verifier', () => {
     ['backslash', 'icons\\favicon.ico'],
     ['empty segment', 'icons//favicon.ico'],
     ['directory', 'icons/'],
-    ['padded path', ' favicon.ico']
+    ['padded path', ' favicon.ico'],
+    ['scheme without slashes', 'https:favicon.ico'],
+    ['scheme with one slash', 'https:/favicon.ico'],
+    ['embedded ASCII whitespace', 'icons/icon 192.png'],
+    ['C1 control', `icons/\u0085icon-192.png`],
+    ['Unicode format control', `icons/\u200bicon-192.png`]
   ])('rejects hostile or ambiguous %s input', (_label, value) => {
     expect(() => normalizeSameOriginPrecacheKey(value, BASE_URL)).toThrow();
   });
@@ -54,7 +62,7 @@ describe('Mazer icon-delivery verifier', () => {
     const result = verifyWorkboxPrecacheCoverage({
       baseUrl: BASE_URL,
       entries: [entry('favicon.ico'), entry('/icons/icon-192.png')],
-      expectedPaths: ['/favicon.ico', 'icons/icon-192.png']
+      expectedAssets: [expectedAsset('/favicon.ico'), expectedAsset('icons/icon-192.png')]
     });
     expect(result.normalizedIconKeys).toEqual(['favicon.ico', 'icons/icon-192.png']);
   });
@@ -63,7 +71,7 @@ describe('Mazer icon-delivery verifier', () => {
     expect(() => verifyWorkboxPrecacheCoverage({
       baseUrl: BASE_URL,
       entries: [entry('favicon.ico'), entry('/favicon.ico')],
-      expectedPaths: ['favicon.ico']
+      expectedAssets: [expectedAsset('favicon.ico')]
     })).toThrow(/Duplicate normalized Workbox precache entry/u);
   });
 
@@ -71,20 +79,28 @@ describe('Mazer icon-delivery verifier', () => {
     expect(() => verifyWorkboxPrecacheCoverage({
       baseUrl: BASE_URL,
       entries: [entry('favicon.ico')],
-      expectedPaths: ['favicon.ico', 'icons/icon-192.png']
+      expectedAssets: [expectedAsset('favicon.ico'), expectedAsset('icons/icon-192.png')]
     })).toThrow(/Missing Workbox precache entry/u);
     expect(() => verifyWorkboxPrecacheCoverage({
       baseUrl: BASE_URL,
       entries: [{ revision: null, url: 'favicon.ico' }],
-      expectedPaths: ['favicon.ico']
+      expectedAssets: [expectedAsset('favicon.ico')]
     })).toThrow(/requires a content revision/u);
+  });
+
+  test('rejects a stale Workbox content revision even when the URL is present', () => {
+    expect(() => verifyWorkboxPrecacheCoverage({
+      baseUrl: BASE_URL,
+      entries: [{ revision: '0123456789abcdef0123456789abcdef', url: 'favicon.ico' }],
+      expectedAssets: [expectedAsset('favicon.ico')]
+    })).toThrow(/content revision mismatch/u);
   });
 
   test('rejects a hostile non-icon entry instead of ignoring it', () => {
     expect(() => verifyWorkboxPrecacheCoverage({
       baseUrl: BASE_URL,
       entries: [entry('favicon.ico'), entry('https://evil.example/foreign.js')],
-      expectedPaths: ['favicon.ico']
+      expectedAssets: [expectedAsset('favicon.ico')]
     })).toThrow(/Foreign-origin/u);
   });
 

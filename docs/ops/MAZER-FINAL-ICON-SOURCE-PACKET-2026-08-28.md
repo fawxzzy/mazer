@@ -67,9 +67,9 @@ Failure Mode: manually copied derivatives drift; byte-identical standard and mas
 
 ## Delivery-verifier correction — 2026-08-29
 
-The canonical delivery verifier is `scripts/brand/verify-mazer-icon-delivery.mjs`. After a production build, `npm run brand:delivery:check` proves that all eight checked-in icon payloads are byte-identical in `dist/` and that every generated Workbox entry is present with a content revision. A later production packet may use the same verifier in read-only remote mode with `npm run brand:delivery:check -- --remote --base-url https://mazer.fawxzzy.com/`.
+The canonical delivery verifier is `scripts/brand/verify-mazer-icon-delivery.mjs`. After a production build, `npm run brand:delivery:check` proves that all eight checked-in icon payloads are byte-identical in `dist/` and that every generated Workbox entry is present with the exact content-derived revision for those bytes. A later production packet may use the same verifier in read-only remote mode with `npm run brand:delivery:check -- --remote --base-url https://mazer.fawxzzy.com/`.
 
-The URL contract normalizes only equivalent same-origin forms: `favicon.ico`, `/favicon.ico`, and the exact canonical-origin absolute URL resolve to one key. It rejects foreign or protocol-relative origins, traversal, percent encoding, backslashes, control characters, query/hash state, empty path segments, missing entries, normalized duplicates, unrevisioned icon entries, redirects, and any delivered-byte mismatch.
+The URL contract normalizes only equivalent same-origin forms: `favicon.ico`, `/favicon.ico`, and the exact canonical-origin absolute URL resolve to one key. It rejects foreign or protocol-relative origins, malformed scheme spellings, traversal, percent encoding, backslashes, Unicode whitespace or control characters, query/hash state, empty path segments, missing entries, normalized duplicates, unrevisioned or stale-revision icon entries, redirects, and any delivered-byte mismatch.
 
 Rule: compare generated Workbox entries as normalized same-origin URL keys, not as consumer spelling.
 

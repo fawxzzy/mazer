@@ -18,6 +18,7 @@ export const MAZER_ICON_DELIVERY_PATHS = Object.freeze([
 ]);
 
 const sha256 = (payload) => createHash('sha256').update(payload).digest('hex');
+const workboxRevision = (payload) => createHash('md5').update(payload).digest('hex');
 
 const parseBaseUrl = (value) => {
   const parsed = new URL(value);
@@ -34,12 +35,12 @@ const parseBaseUrl = (value) => {
   return parsed;
 };
 
-const rejectAmbiguousPathSyntax = (rawValue) => {
+const rejectAmbiguousPathSyntax = (rawValue, base) => {
   if (!rawValue || rawValue.trim() !== rawValue) {
     throw new Error(`Precache URL must be nonempty and unpadded: ${JSON.stringify(rawValue)}`);
   }
-  if (/[\x00-\x1f\x7f\\]/u.test(rawValue)) {
-    throw new Error(`Precache URL contains a control character or backslash: ${JSON.stringify(rawValue)}`);
+  if (/[\p{Cc}\p{Cf}\p{White_Space}\\]/u.test(rawValue)) {
+    throw new Error(`Precache URL contains whitespace, a control character, or backslash: ${JSON.stringify(rawValue)}`);
   }
   if (rawValue.includes('?') || rawValue.includes('#')) {
     throw new Error(`Precache URL must not contain a query or hash: ${rawValue}`);
@@ -51,8 +52,27 @@ const rejectAmbiguousPathSyntax = (rawValue) => {
     throw new Error(`Percent-encoded precache URL is forbidden: ${rawValue}`);
   }
 
-  const absoluteMatch = rawValue.match(/^[a-z][a-z0-9+.-]*:\/\/[^/]*(\/.*)?$/iu);
-  const rawPath = absoluteMatch ? (absoluteMatch[1] ?? '/') : rawValue;
+  let rawPath = rawValue;
+  const schemeMatch = rawValue.match(/^[a-z][a-z0-9+.-]*:/iu);
+  if (schemeMatch) {
+    let absolute;
+    try {
+      absolute = new URL(rawValue);
+    } catch {
+      throw new Error(`Absolute precache URL is invalid: ${rawValue}`);
+    }
+    if (absolute.origin !== base.origin) {
+      throw new Error(`Foreign-origin precache URL is forbidden: ${rawValue}`);
+    }
+    const canonicalPrefix = `${base.origin}/`;
+    if (!rawValue.startsWith(canonicalPrefix)) {
+      throw new Error(`Absolute precache URL must use the exact canonical origin form: ${rawValue}`);
+    }
+    rawPath = rawValue.slice(base.origin.length);
+  }
+  if (!/^\/?[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u.test(rawPath)) {
+    throw new Error(`Precache URL does not match the exact path grammar: ${rawValue}`);
+  }
   if (rawPath.includes('//')) {
     throw new Error(`Precache URL contains an ambiguous empty segment: ${rawValue}`);
   }
@@ -67,7 +87,7 @@ export const normalizeSameOriginPrecacheKey = (value, baseUrl) => {
     throw new Error('Precache URL must be a string.');
   }
   const base = parseBaseUrl(baseUrl);
-  rejectAmbiguousPathSyntax(value);
+  rejectAmbiguousPathSyntax(value, base);
 
   let parsed;
   try {
@@ -145,39 +165,6 @@ export const extractWorkboxPrecacheEntries = (serviceWorkerSource) => {
   return entries;
 };
 
-export const verifyWorkboxPrecacheCoverage = ({ baseUrl, entries, expectedPaths = MAZER_ICON_DELIVERY_PATHS }) => {
-  if (!Array.isArray(entries) || entries.length === 0) {
-    throw new Error('Workbox precache entries must be a nonempty array.');
-  }
-  const normalizedEntries = new Map();
-  for (const entry of entries) {
-    if (!entry || (entry.revision !== null && (typeof entry.revision !== 'string' || !entry.revision))) {
-      throw new Error('Every Workbox precache entry must have a string URL and a null or nonempty revision.');
-    }
-    const key = normalizeSameOriginPrecacheKey(entry.url, baseUrl);
-    if (normalizedEntries.has(key)) {
-      throw new Error(`Duplicate normalized Workbox precache entry: ${key}`);
-    }
-    normalizedEntries.set(key, entry);
-  }
-
-  const expectedKeys = new Set();
-  for (const expectedPath of expectedPaths) {
-    const key = normalizeSameOriginPrecacheKey(expectedPath, baseUrl);
-    if (expectedKeys.has(key)) throw new Error(`Duplicate expected icon path: ${key}`);
-    expectedKeys.add(key);
-    const entry = normalizedEntries.get(key);
-    if (!entry) throw new Error(`Missing Workbox precache entry: ${key}`);
-    if (entry.revision === null) throw new Error(`Icon precache entry requires a content revision: ${key}`);
-  }
-
-  return {
-    expectedIconCount: expectedKeys.size,
-    normalizedEntryCount: normalizedEntries.size,
-    normalizedIconKeys: [...expectedKeys]
-  };
-};
-
 const indexAssetRecords = (records, label, baseUrl) => {
   if (!Array.isArray(records) || records.length === 0) throw new Error(`${label} assets must be a nonempty array.`);
   const indexed = new Map();
@@ -190,6 +177,40 @@ const indexAssetRecords = (records, label, baseUrl) => {
     indexed.set(key, Buffer.from(record.payload));
   }
   return indexed;
+};
+
+export const verifyWorkboxPrecacheCoverage = ({ baseUrl, entries, expectedAssets }) => {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new Error('Workbox precache entries must be a nonempty array.');
+  }
+  const expected = indexAssetRecords(expectedAssets, 'expected', baseUrl);
+  const normalizedEntries = new Map();
+  for (const entry of entries) {
+    if (!entry || (entry.revision !== null && (typeof entry.revision !== 'string' || !entry.revision))) {
+      throw new Error('Every Workbox precache entry must have a string URL and a null or nonempty revision.');
+    }
+    const key = normalizeSameOriginPrecacheKey(entry.url, baseUrl);
+    if (normalizedEntries.has(key)) {
+      throw new Error(`Duplicate normalized Workbox precache entry: ${key}`);
+    }
+    normalizedEntries.set(key, entry);
+  }
+
+  for (const [key, expectedPayload] of expected) {
+    const entry = normalizedEntries.get(key);
+    if (!entry) throw new Error(`Missing Workbox precache entry: ${key}`);
+    if (entry.revision === null) throw new Error(`Icon precache entry requires a content revision: ${key}`);
+    const expectedRevision = workboxRevision(expectedPayload);
+    if (entry.revision !== expectedRevision) {
+      throw new Error(`Workbox content revision mismatch: ${key} expected ${expectedRevision} actual ${entry.revision}`);
+    }
+  }
+
+  return {
+    expectedIconCount: expected.size,
+    normalizedEntryCount: normalizedEntries.size,
+    normalizedIconKeys: [...expected.keys()]
+  };
 };
 
 export const verifyDeliveredAssetBytes = ({ actualAssets, baseUrl, expectedAssets }) => {
@@ -277,7 +298,7 @@ const main = async () => {
     })))
     : await readAssetRecords(options.deliveryRoot, MAZER_ICON_DELIVERY_PATHS);
   const entries = extractWorkboxPrecacheEntries(serviceWorkerSource);
-  const precache = verifyWorkboxPrecacheCoverage({ baseUrl: options.baseUrl, entries });
+  const precache = verifyWorkboxPrecacheCoverage({ baseUrl: options.baseUrl, entries, expectedAssets });
   const assets = verifyDeliveredAssetBytes({ actualAssets, baseUrl: options.baseUrl, expectedAssets });
   console.log(JSON.stringify({
     assets,
