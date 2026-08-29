@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import {
   MAZER_BLEED_PATH_TEXTURE_KEY,
   MAZER_FLOOR_TILE_TEXTURE_KEY,
+  MAZER_PLAYER_TRAIL_TEXTURE_KEY,
   MAZER_TILE_FONT_TEXTURE_KEY,
   MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY,
   MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY
@@ -1225,6 +1226,32 @@ const MAZER_BLEED_PATH_SOURCE_HEIGHT = 724;
 // realistically produces at once (Wave 1.5's own convergence corpus never
 // measured more than a handful of wrap pairs per board), with headroom.
 const LEGACY_BLEED_PATH_IMAGE_POOL_SIZE = 24;
+// Real player-trail VFX art (see docs/assets/mazer-vfx-source-provenance.md):
+// a left glow-blob (an "energy source" node, not used here), a middle strip
+// of same-width square tile segments with a smooth rainbow baked in
+// left-to-right (cyan through green), and a right fade-to-nothing glow (also
+// unused here). drawLegacyPlayerTrailTileOverlay only ever samples a
+// SAMPLE_WIDTH-wide window from within the STRIP region -- one real square
+// tile of the actual handed-off asset per trail cell, exactly the "sample a
+// singular square tile" approach the maze/title text tiles already use --
+// sliding that window along the strip's own pre-rendered rainbow based on
+// how far back in the trail a cell is, since Canvas-mode Phaser can't tint
+// at render time (see MAZER_TILE_FONT_RAINBOW_STEPS's own header comment on
+// that same constraint) and this asset -- unlike the tile-font mask -- is
+// already full of real color, not a tintable white mask.
+// Native source is 2172x724 (see docs/assets/mazer-vfx-source-provenance.md);
+// only the height is needed here since every crop below is a fixed-width
+// horizontal slice of the full height.
+const MAZER_PLAYER_TRAIL_SOURCE_HEIGHT = 724;
+const MAZER_PLAYER_TRAIL_STRIP_LEFT = 420;
+const MAZER_PLAYER_TRAIL_STRIP_WIDTH = 1500;
+const MAZER_PLAYER_TRAIL_SAMPLE_WIDTH = 200;
+// Covers a long real walked path with headroom; older cells beyond the pool
+// simply keep their existing color-only fill (no texture overlay) rather
+// than growing this pool unbounded -- the most recent, most visually
+// prominent stretch of trail nearest the player is what actually gets the
+// real-asset treatment.
+const LEGACY_PLAYER_TRAIL_IMAGE_POOL_SIZE = 128;
 // The source art's own long axis runs from its lower-left corner to its
 // upper-right corner at zero rotation -- its pointed tip faces up-and-right,
 // roughly -45 degrees in screen-space angle convention (positive x, negative
@@ -1647,6 +1674,11 @@ export class MenuScene extends Phaser.Scene {
   // drawLegacyPathBorderDock's own comment.
   private boardBleedPathImages: Phaser.GameObjects.Image[] = [];
   private boardBleedPathImageCursor = 0;
+  // Real player-trail VFX art (see docs/assets/mazer-vfx-source-provenance.md),
+  // one pooled Image per currently-visible trail cell -- see
+  // drawLegacyPlayerTrailTileOverlay's own comment.
+  private playerTrailImages: Phaser.GameObjects.Image[] = [];
+  private playerTrailImageCursor = 0;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -1850,6 +1882,9 @@ export class MenuScene extends Phaser.Scene {
     ));
     this.boardDynamicGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
+    this.playerTrailImages = Array.from({ length: LEGACY_PLAYER_TRAIL_IMAGE_POOL_SIZE }, () => (
+      this.add.image(0, 0, MAZER_PLAYER_TRAIL_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
+    ));
     this.boardZoomContainer.add([
       this.boardStaticGraphics,
       this.boardPathGraphics,
@@ -1857,6 +1892,15 @@ export class MenuScene extends Phaser.Scene {
       this.boardFloorMaskGraphics,
       ...this.boardBleedPathImages,
       this.boardDynamicGraphics,
+      // After boardDynamicGraphics (the trail's own colored fill, and the
+      // start/goal/player markers, are all drawn into that one Graphics
+      // object) so the real trail material actually shows on top of the
+      // color fill instead of being hidden underneath it --
+      // drawLegacyPlayerTrailTileOverlay only ever runs for trail cells the
+      // color-fill loop itself already excludes the start/goal/current-
+      // player tile from, so this never actually paints over those markers
+      // despite sitting above boardDynamicGraphics in the stack.
+      ...this.playerTrailImages,
       this.titleGraphics
     ]);
     this.overlayGraphics = this.add.graphics();
@@ -8063,6 +8107,7 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyProgressionBadge();
     this.drawLegacyLevelAnnouncer(time);
 
+    this.playerTrailImageCursor = 0;
     for (let index = 0; index < visibleTrail.length; index += 1) {
       const point = visibleTrail[index];
       if (!point) {
@@ -8109,6 +8154,15 @@ export class MenuScene extends Phaser.Scene {
       if (resolvedTrailAlpha <= 0) {
         continue;
       }
+      this.drawLegacyPlayerTrailTileOverlay(
+        index,
+        visibleTrail.length,
+        point,
+        mazeLeft,
+        mazeTop,
+        mazeTileSize,
+        resolvedTrailAlpha
+      );
       if (this.mode === 'menu') {
         this.fillLegacyMenuDynamicPathTile(
           point,
@@ -8164,6 +8218,9 @@ export class MenuScene extends Phaser.Scene {
           dynamicTrailPathSource
         );
       }
+    }
+    for (let index = this.playerTrailImageCursor; index < this.playerTrailImages.length; index += 1) {
+      this.playerTrailImages[index]?.setVisible(false);
     }
 
     // Start/end and the player marker are the "cast" of the maze, and all
@@ -9167,6 +9224,44 @@ export class MenuScene extends Phaser.Scene {
       tileRect.width - lineWidth,
       tileRect.height - lineWidth
     );
+  }
+
+  // Real player-trail material overlay for one trail cell -- see
+  // MAZER_PLAYER_TRAIL_STRIP_LEFT's own header comment for the asset/sample
+  // design. Pulled from a shared, single pool (playerTrailImages) via a
+  // per-frame cursor (playerTrailImageCursor, reset once per
+  // drawDynamicBoard call and any unclaimed remainder hidden after the
+  // trail loop finishes) the same way the bleed-path dock images already
+  // work. Silently does nothing past the pool's own length -- older,
+  // farther-back trail cells just keep their existing color-only fill.
+  private drawLegacyPlayerTrailTileOverlay(
+    trailIndex: number,
+    trailLength: number,
+    point: LegacyPoint,
+    originX: number,
+    originY: number,
+    tileSize: number,
+    alpha: number
+  ): void {
+    if (alpha <= 0 || !this.textures.exists(MAZER_PLAYER_TRAIL_TEXTURE_KEY)) {
+      return;
+    }
+    const image = this.playerTrailImages[this.playerTrailImageCursor];
+    this.playerTrailImageCursor += 1;
+    if (!image) {
+      return;
+    }
+    const travel = Math.max(1, trailLength - 1);
+    const progress = clamp(trailIndex / travel, 0, 1);
+    const sampleX = MAZER_PLAYER_TRAIL_STRIP_LEFT
+      + (progress * (MAZER_PLAYER_TRAIL_STRIP_WIDTH - MAZER_PLAYER_TRAIL_SAMPLE_WIDTH));
+    const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
+    image
+      .setPosition(tileRect.left + (tileRect.width / 2), tileRect.top + (tileRect.height / 2))
+      .setCrop(sampleX, 0, MAZER_PLAYER_TRAIL_SAMPLE_WIDTH, MAZER_PLAYER_TRAIL_SOURCE_HEIGHT)
+      .setDisplaySize(tileRect.width, tileRect.height)
+      .setAlpha(alpha * 0.85)
+      .setVisible(true);
   }
 
   private fillLegacyPlayDynamicPathTile(
