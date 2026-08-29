@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
 import {
+  MAZER_BLEED_PATH_TEXTURE_KEY,
   MAZER_FLOOR_TILE_TEXTURE_KEY,
   MAZER_TILE_FONT_RAINBOW_STEPS,
   MAZER_TILE_FONT_TEXTURE_KEY,
   MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY,
+  MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY,
   resolveMazerTileFontRainbowTextureKey
 } from './BootScene';
 import {
@@ -339,7 +341,8 @@ import {
   resolveLegacyMenuBorderDockRenderAreas,
   resolveLegacyPlayerLocatorRenderMetrics,
   resolveLegacyPlayerMarkerRenderMetrics,
-  type LegacyMenuBorderDockDirection
+  type LegacyMenuBorderDockDirection,
+  type LegacyMenuPixelRect
 } from '../legacy-runtime/legacyMenuRender';
 import {
   clearMenuSceneRuntimeDiagnostics,
@@ -1028,14 +1031,16 @@ const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 14400;
 // reported as the orbit diamonds getting "forced to go crazy fast" (2 full
 // laps in the same few seconds the tile reveal used to always take,
 // regardless of maze size, before resolveLegacyMenuStaticDrawTileBatchSize
-// started letting that duration actually grow with tile count). Reduced
-// well below one full rotation so the spin reads as a calm ambient drift
-// even during the shortest (smallest-maze) pass, while keeping the
-// deliberate "always lands in its resting position exactly when generation
-// finishes" sync (see resolveLegacyMenuPathTitleOrbitLifecycleProgress's
-// own comment) instead of decoupling the two, which would need its own
-// separate settle-transition handling.
-const LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE = 0.35;
+// started letting that duration actually grow with tile count). An initial
+// cut to 0.35 overcorrected -- reported right back as "way too slow" against
+// a small/typical maze's own (still just a few seconds) build window. 0.85
+// keeps it well under the original "2 full laps" pace while still reading
+// as an active, lively spin rather than a crawl. Keeps the deliberate
+// "always lands in its resting position exactly when generation finishes"
+// sync (see resolveLegacyMenuPathTitleOrbitLifecycleProgress's own comment)
+// instead of decoupling the two, which would need its own separate
+// settle-transition handling.
+const LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE = 0.85;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;
 // A trail-color wipe across the title tiles: fills bottom-left to top-right
 // (combining "left to right" and "bottom to top" into one diagonal sweep
@@ -1206,12 +1211,43 @@ const MAZER_VFX_DIAMOND_SOURCE_SIZE = 1254;
 // Native pixel size (square) of the floor-tile material source art -- see
 // docs/assets/mazer-vfx-source-provenance.md.
 const MAZER_FLOOR_TILE_SOURCE_SIZE = 1254;
+// Native pixel size of the bleed-path strip source art (see
+// docs/assets/mazer-vfx-source-provenance.md) -- a horizontal strip of
+// tile-like segments, solid on the left, fading to a sparkle point on the
+// right. Not tileable (the fade only happens once), so each dock instance
+// gets its own stretched (non-uniform scale, never tiled) Image, oriented
+// so the solid end always faces back toward the board and the fade points
+// outward -- see drawLegacyPathBorderDock's own comment on the
+// rotation/flip scheme this drives.
+const MAZER_BLEED_PATH_SOURCE_WIDTH = 2172;
+const MAZER_BLEED_PATH_SOURCE_HEIGHT = 724;
+// Comfortably covers every dock instance a maze's wrap-pair count
+// realistically produces at once (Wave 1.5's own convergence corpus never
+// measured more than a handful of wrap pairs per board), with headroom.
+const LEGACY_BLEED_PATH_IMAGE_POOL_SIZE = 24;
 // The source art's own long axis runs from its lower-left corner to its
 // upper-right corner at zero rotation -- its pointed tip faces up-and-right,
 // roughly -45 degrees in screen-space angle convention (positive x, negative
 // y). Subtracted out wherever the diamond needs to face a specific absolute
 // direction (see drawLegacyMenuPathTitleOrbitSigils's inward-pointing math).
 const MAZER_VFX_DIAMOND_INTRINSIC_TIP_ANGLE = -Math.PI / 4;
+// Native pixel size of the teleport-beam source art (see
+// docs/assets/mazer-vfx-source-provenance.md) -- a horizontal strip, a
+// diamond emitter/receiver cap baked into each end, with the full rainbow
+// gradient running through the middle only once (not a repeatable tile),
+// so it's sliced into three crop regions and the center one is stretched
+// (Image.setScale, non-uniform), never tiled, matching
+// CLAUDE-INTEGRATION.md's own "stretchable... center beam strip, do not
+// non-uniformly stretch the entire image" guidance -- these coordinates
+// keep the caps themselves undistorted while only the middle strip
+// stretches to whatever distance a given beam needs to span.
+const MAZER_VFX_TELEPORT_BEAM_SOURCE_WIDTH = 2172;
+const MAZER_VFX_TELEPORT_BEAM_SOURCE_HEIGHT = 724;
+const MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH = 320;
+const MAZER_VFX_TELEPORT_BEAM_STRIP_LEFT = MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH;
+const MAZER_VFX_TELEPORT_BEAM_STRIP_WIDTH = (
+  MAZER_VFX_TELEPORT_BEAM_SOURCE_WIDTH - (MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH * 2)
+);
 // Twinkle cadence for the goal star's tiny sparkle glints
 // (drawLegacyGoalStarMarker) -- its own constant, quicker than the ring's
 // full-lap spin, so the little twinkles read as a distinct fast shimmer
@@ -1238,8 +1274,19 @@ const LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS = 64;
 // build). LEGACY_STATIC_DRAW_MAX_TICKS is still an upper bound so a truly
 // enormous board doesn't take unreasonably long -- batch size widens again
 // only past that.
-const LEGACY_STATIC_DRAW_TARGET_TILES_PER_TICK = 3;
-const LEGACY_STATIC_DRAW_MAX_TICKS = 420;
+//
+// An initial pass (3 tiles/tick, 420-tick cap) overcorrected -- reported
+// right back as "way too slow" even at typical/early-level board sizes,
+// since most real boards are well above the old fixed-tick formula's own
+// small-board crossover point and so were hitting this new, much slower
+// flat rate on every level, not just unusually large ones. 12 tiles/tick
+// matches the old fixed-tick pace almost exactly at typical board sizes
+// (no regression there), with the 160-tick cap keeping even the largest
+// boards well under half the previous cap's worst case -- growing with
+// size, but within a real, considerably tighter middle ground instead of
+// either extreme.
+const LEGACY_STATIC_DRAW_TARGET_TILES_PER_TICK = 12;
+const LEGACY_STATIC_DRAW_MAX_TICKS = 160;
 const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
 const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;
 const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;
@@ -1601,6 +1648,11 @@ export class MenuScene extends Phaser.Scene {
   // still show through underneath it.
   private boardFloorTileSprite!: Phaser.GameObjects.TileSprite;
   private boardFloorMaskGraphics!: Phaser.GameObjects.Graphics;
+  // Real bleed-path VFX art (see docs/assets/mazer-vfx-source-provenance.md),
+  // one pooled Image per currently-visible border-dock instance -- see
+  // drawLegacyPathBorderDock's own comment.
+  private boardBleedPathImages: Phaser.GameObjects.Image[] = [];
+  private boardBleedPathImageCursor = 0;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -1615,6 +1667,17 @@ export class MenuScene extends Phaser.Scene {
   // Cleared and redrawn every frame from within drawDynamicBoard, which
   // already runs in both modes.
   private playerSpawnBurstGraphics!: Phaser.GameObjects.Graphics;
+  // Real teleport-beam VFX art (see docs/assets/mazer-vfx-source-provenance.md)
+  // replacing drawLegacyPlayerTransferEnergy's own plain lineBetween strokes
+  // for the outbound player-spawn beams -- the stretched center strip
+  // spans [target, tip] every frame, plus a receiver-flare cap anchored at
+  // the fixed target point (where the player actually materializes; the
+  // moving `tip` end is just this beam's own current leading edge, not a
+  // real structure, so it gets no cap of its own). One of each per orbit
+  // sigil (LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS), reused every frame rather
+  // than recreated. See drawLegacyPlayerTransferEnergyBeam.
+  private playerTransferBeamStripImages: Phaser.GameObjects.Image[] = [];
+  private playerTransferBeamTargetCapImages: Phaser.GameObjects.Image[] = [];
   private uiTexts: Phaser.GameObjects.Text[] = [];
   private uiGraphics: Phaser.GameObjects.Graphics[] = [];
   private uiButtons: UiButton[] = [];
@@ -1788,6 +1851,9 @@ export class MenuScene extends Phaser.Scene {
     this.boardFloorTileSprite = this.add.tileSprite(0, 0, 1, 1, MAZER_FLOOR_TILE_TEXTURE_KEY).setOrigin(0, 0).setAlpha(0.5);
     this.boardFloorMaskGraphics = this.add.graphics().setVisible(false);
     this.boardFloorTileSprite.setMask(new Phaser.Display.Masks.GeometryMask(this, this.boardFloorMaskGraphics));
+    this.boardBleedPathImages = Array.from({ length: LEGACY_BLEED_PATH_IMAGE_POOL_SIZE }, () => (
+      this.add.image(0, 0, MAZER_BLEED_PATH_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
+    ));
     this.boardDynamicGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
     this.boardZoomContainer.add([
@@ -1795,12 +1861,22 @@ export class MenuScene extends Phaser.Scene {
       this.boardPathGraphics,
       this.boardFloorTileSprite,
       this.boardFloorMaskGraphics,
+      ...this.boardBleedPathImages,
       this.boardDynamicGraphics,
       this.titleGraphics
     ]);
     this.overlayGraphics = this.add.graphics();
     this.hudGraphics = this.add.graphics();
     this.playerSpawnBurstGraphics = this.add.graphics();
+    // Same top-level (non-boardZoomContainer) coordinate space
+    // playerSpawnBurstGraphics itself already draws the beam origins/target
+    // in -- see drawLegacyPlayerTransferEnergyBeam.
+    this.playerTransferBeamStripImages = Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, () => (
+      this.add.image(0, 0, MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY).setOrigin(0, 0.5).setVisible(false)
+    ));
+    this.playerTransferBeamTargetCapImages = Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, () => (
+      this.add.image(0, 0, MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY).setOrigin(0, 0.5).setVisible(false)
+    ));
     this.authGateGraphics = this.add.graphics();
     this.authGateLoadingText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, 'Signing you in…', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
@@ -6524,6 +6600,8 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    this.drawLegacyBleedPathImage(direction, facetRect);
+
     let hasTop = false;
     let hasLeft = false;
     let hasBottom = false;
@@ -6540,6 +6618,57 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.drawLegacyPathTileFacet(graphics, facetRect, intensity, rimColor, hasTop, hasLeft, hasBottom, hasRight);
+  }
+
+  // Real bleed-path VFX art (see docs/assets/mazer-vfx-source-provenance.md)
+  // over exactly the dock's own facet rect -- solid tile segments on the
+  // source art's left, fading to a sparkle point on its right, so it isn't
+  // tileable the way the floor material is; each dock instance gets its own
+  // stretched (non-uniform scale, never tiled) Image instead of a
+  // TileSprite. Oriented so the solid end always faces back toward the
+  // board and the fade points outward into the void, regardless of which
+  // of the four directions this dock pokes past the border in:
+  //   'right' -- source's own natural orientation (solid-left/fade-right
+  //     already matches solid-toward-board/fade-outward), no transform.
+  //   'left' -- mirrored horizontally (flipX) so the fade (still on the
+  //     source's own right) ends up pointing further left/outward instead
+  //     of back into the board.
+  //   'top'/'bottom' -- the source is a horizontal strip; rotating it ±90
+  //     degrees turns its left/right ends into top/bottom ends. -90
+  //     (top) sends left(solid)->bottom, right(fade)->top; +90 (bottom)
+  //     sends left(solid)->top, right(fade)->bottom -- both put the solid
+  //     end on the board-facing side. Local width/height are swapped
+  //     before that rotation (scaleX maps to the rect's own height, scaleY
+  //     to its width) since Image.setScale operates in pre-rotation local
+  //     space.
+  // Pulls from boardBleedPathImages/boardBleedPathImageCursor, reset once
+  // per drawBoardPaths call (not per-dock) -- see that method's own start
+  // and end for the reset/hide-unused-slots bookend.
+  private drawLegacyBleedPathImage(
+    direction: LegacyMenuBorderDockDirection,
+    facetRect: LegacyMenuPixelRect
+  ): void {
+    if (!this.textures.exists(MAZER_BLEED_PATH_TEXTURE_KEY)) {
+      return;
+    }
+    const image = this.boardBleedPathImages[this.boardBleedPathImageCursor];
+    this.boardBleedPathImageCursor += 1;
+    if (!image) {
+      return;
+    }
+    const centerX = facetRect.left + (facetRect.width / 2);
+    const centerY = facetRect.top + (facetRect.height / 2);
+    const isVertical = direction === 'top' || direction === 'bottom';
+    const scaleX = (isVertical ? facetRect.height : facetRect.width) / MAZER_BLEED_PATH_SOURCE_WIDTH;
+    const scaleY = (isVertical ? facetRect.width : facetRect.height) / MAZER_BLEED_PATH_SOURCE_HEIGHT;
+    const rotation = direction === 'top' ? -Math.PI / 2 : direction === 'bottom' ? Math.PI / 2 : 0;
+    image
+      .setPosition(centerX, centerY)
+      .setRotation(rotation)
+      .setFlipX(direction === 'left')
+      .setScale(scaleX, scaleY)
+      .setAlpha(0.85)
+      .setVisible(true);
   }
 
   private hasLegacyBleedOffGlowPendingFrame(): boolean {
@@ -6712,6 +6841,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.boardPathGraphics.clear();
     this.boardFloorMaskGraphics.clear();
+    this.boardBleedPathImageCursor = 0;
     // Real floor-tile material's own scale: its 1254x1254 source maps to
     // exactly one board tile, positioned to line up with mazeLeft/mazeTop
     // exactly like the color fill above. Repositioned/rescaled every call
@@ -6782,6 +6912,10 @@ export class MenuScene extends Phaser.Scene {
           drawPathPoint({ x, y });
         }
       }
+    }
+
+    for (let index = this.boardBleedPathImageCursor; index < this.boardBleedPathImages.length; index += 1) {
+      this.boardBleedPathImages[index]?.setVisible(false);
     }
 
     this.drawLegacyMenuPathTitle(time);
@@ -7743,6 +7877,8 @@ export class MenuScene extends Phaser.Scene {
     time: number
   ): void {
     if (!state.active) {
+      this.playerTransferBeamStripImages.forEach((image) => image.setVisible(false));
+      this.playerTransferBeamTargetCapImages.forEach((image) => image.setVisible(false));
       return;
     }
 
@@ -7753,23 +7889,66 @@ export class MenuScene extends Phaser.Scene {
     // rainbow shifting over time, instead of the flat green every beam and
     // diamond used to share.
     if (state.phase === 'outbound') {
+      const beamTextureReady = this.textures.exists(MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY);
       origins.forEach((origin, index) => {
         const stagger = (index / Math.max(1, origins.length - 1)) * 0.12;
         const localProgress = clamp((state.outboundProgress - stagger) / 0.88, 0, 1);
-        if (localProgress <= 0) {
+        const stripImage = this.playerTransferBeamStripImages[index];
+        const capImage = this.playerTransferBeamTargetCapImages[index];
+        if (localProgress <= 0 || !beamTextureReady) {
+          stripImage?.setVisible(false);
+          capImage?.setVisible(false);
+          if (!beamTextureReady) {
+            // Real asset failed to load -- fall back to the original plain
+            // stroke rather than showing nothing.
+            const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);
+            const tipX = targetX + ((origin.x - targetX) * localProgress);
+            const tipY = targetY + ((origin.y - targetY) * localProgress);
+            const beamAlpha = 0.94 * (1 - (localProgress * 0.18));
+            if (localProgress > 0) {
+              this.playerSpawnBurstGraphics.lineStyle(5, beamColor, beamAlpha * 0.28);
+              this.playerSpawnBurstGraphics.lineBetween(targetX, targetY, tipX, tipY);
+              this.playerSpawnBurstGraphics.lineStyle(1.5, beamColor, beamAlpha);
+              this.playerSpawnBurstGraphics.lineBetween(targetX, targetY, tipX, tipY);
+              this.playerSpawnBurstGraphics.fillStyle(beamColor, beamAlpha);
+              this.playerSpawnBurstGraphics.fillCircle(tipX, tipY, 2.6);
+            }
+          }
           return;
         }
-        const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);
         const tipX = targetX + ((origin.x - targetX) * localProgress);
         const tipY = targetY + ((origin.y - targetY) * localProgress);
         const beamAlpha = 0.94 * (1 - (localProgress * 0.18));
-        this.playerSpawnBurstGraphics.lineStyle(5, beamColor, beamAlpha * 0.28);
-        this.playerSpawnBurstGraphics.lineBetween(targetX, targetY, tipX, tipY);
-        this.playerSpawnBurstGraphics.lineStyle(1.5, beamColor, beamAlpha);
-        this.playerSpawnBurstGraphics.lineBetween(targetX, targetY, tipX, tipY);
-        this.playerSpawnBurstGraphics.fillStyle(beamColor, beamAlpha);
+        const dx = tipX - targetX;
+        const dy = tipY - targetY;
+        const distance = Math.max(1, Math.hypot(dx, dy));
+        const angle = Math.atan2(dy, dx);
+        const thickness = 12;
+        if (stripImage) {
+          stripImage
+            .setPosition(targetX, targetY)
+            .setRotation(angle)
+            .setCrop(MAZER_VFX_TELEPORT_BEAM_STRIP_LEFT, 0, MAZER_VFX_TELEPORT_BEAM_STRIP_WIDTH, MAZER_VFX_TELEPORT_BEAM_SOURCE_HEIGHT)
+            .setScale(distance / MAZER_VFX_TELEPORT_BEAM_STRIP_WIDTH, thickness / MAZER_VFX_TELEPORT_BEAM_SOURCE_HEIGHT)
+            .setAlpha(beamAlpha)
+            .setVisible(true);
+        }
+        if (capImage) {
+          const capWidth = 20;
+          capImage
+            .setPosition(targetX, targetY)
+            .setRotation(angle)
+            .setCrop(0, 0, MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH, MAZER_VFX_TELEPORT_BEAM_SOURCE_HEIGHT)
+            .setScale(capWidth / MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH, (thickness * 2.4) / MAZER_VFX_TELEPORT_BEAM_SOURCE_HEIGHT)
+            .setAlpha(beamAlpha)
+            .setVisible(true);
+        }
+        this.playerSpawnBurstGraphics.fillStyle(0xffffff, beamAlpha);
         this.playerSpawnBurstGraphics.fillCircle(tipX, tipY, 2.6);
       });
+    } else {
+      this.playerTransferBeamStripImages.forEach((image) => image.setVisible(false));
+      this.playerTransferBeamTargetCapImages.forEach((image) => image.setVisible(false));
     }
 
     if (state.energyAlpha <= 0) {
