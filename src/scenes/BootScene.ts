@@ -65,6 +65,13 @@ export const MAZER_FLOOR_TILE_TEXTURE_KEY = 'mazerFloorTile';
 export const MAZER_BLEED_PATH_TEXTURE_KEY = 'mazerBleedPathStrip';
 export const MAZER_PLAYER_TRAIL_TEXTURE_KEY = 'mazerPlayerTrail';
 
+// Real HUD icon source art (see docs/assets/mazer-vfx-source-provenance.md) --
+// the actual profile/leaderboard/settings icons, replacing the procedural
+// thin-line glyphs used until now.
+export const MAZER_HUD_PROFILE_TEXTURE_KEY = 'mazerHudProfile';
+export const MAZER_HUD_LEADERBOARD_TEXTURE_KEY = 'mazerHudLeaderboard';
+export const MAZER_HUD_SETTINGS_TEXTURE_KEY = 'mazerHudSettings';
+
 interface MazerTileFontFrameEntry {
   frame: { x: number; y: number; w: number; h: number };
   advance?: number;
@@ -105,6 +112,9 @@ export class BootScene extends Phaser.Scene {
     this.load.image(MAZER_FLOOR_TILE_TEXTURE_KEY, `/assets/tiles/mazer-floor-tile.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
     this.load.image(MAZER_BLEED_PATH_TEXTURE_KEY, `/assets/tiles/mazer-bleed-path-strip.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
     this.load.image(MAZER_PLAYER_TRAIL_TEXTURE_KEY, `/assets/vfx/trail/mazer-player-trail.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
+    this.load.image(MAZER_HUD_PROFILE_TEXTURE_KEY, `/assets/hud/hud-profile.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
+    this.load.image(MAZER_HUD_LEADERBOARD_TEXTURE_KEY, `/assets/hud/hud-leaderboard.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
+    this.load.image(MAZER_HUD_SETTINGS_TEXTURE_KEY, `/assets/hud/hud-settings.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
   }
 
   public create(): void {

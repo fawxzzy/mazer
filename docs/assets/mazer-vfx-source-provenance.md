@@ -90,3 +90,46 @@ close variants of art already covered by `edge-diamond-iridescent.png` /
   brightest stars to the same rainbow four-point sparkle every other
   element uses, rather than replacing the whole simulated field with a
   static tiled backdrop.
+- `mazer-player-trail.png` -- **wired in** (2026-08-29): one real square
+  tile per visible trail cell (`drawLegacyPlayerTrailTileOverlay`), sampled
+  from the strip's own baked left-to-right rainbow (a window that slides
+  along the strip based on how far back in the trail a cell is), not the
+  path-following renderer the original analysis above assumed was required
+  -- the asset turned out to already be a repeatable tile strip (visible
+  grid seams between segments), not one unbroken gradient. Crop
+  coordinates (`MAZER_PLAYER_TRAIL_STRIP_LEFT/WIDTH`,
+  `MAZER_PLAYER_TRAIL_SAMPLE_WIDTH` in `MenuScene.ts`) are estimated from
+  visually inspecting the asset's proportions, not pixel-measured -- may
+  need a calibration pass once verified against a live screenshot.
+
+## Third asset batch (2026-08-29): HUD icons
+
+User-supplied `mazer-hud-icons-source-bundle.zip`, with its own
+`IMPORT-MANIFEST.json`/`SHA256SUMS.txt` (verified byte-for-byte against the
+bundle before copying, same as the first batch).
+
+| File | Dimensions | SHA-256 |
+|---|---|---|
+| `hud/hud-profile.png` | 1254x1254 | `f3b6ecb436711083b62ac3d3b0706e884da6432c5dd2887a9c94e0c519fd1e37` |
+| `hud/hud-leaderboard.png` | 1254x1254 | `5e1f6ab3707c0fb7429b46b6e32eb06fc44bd384c3d3a864a6429140efc0096a` |
+| `hud/hud-settings.png` | 1254x1254 | `7912689b5935acbc9617222fe301cfd27830fdb658dbe59f342988271b5b4acc` |
+
+**Wired in**, replacing the procedural thin-line gear/bar-chart/head-and-
+shoulders icons for: the main-menu header settings button
+(`drawLegacyMenuSettingsCog`), the main-menu header leaderboard button
+(`drawLegacyMenuLeaderboardIcon`), the main-menu profile/account button
+(`createLegacyMenuProfileButton`), and the Options/Pause overlay's username
+button (`createLegacyOverlayUsernameButton`). The touch-control pause/
+settings cog used during active play (`drawLegacySettingsCogControl`) is a
+distinct, separately-purposed mobile control and was intentionally left on
+its existing procedural rendering.
+
+Each source PNG carries a different amount of transparent padding inside
+its 1254x1254 canvas (measured directly via Python/Pillow
+`Image.getchannel('A').getbbox()`, not eyeballed): the leaderboard glyph's
+own visible bounds are about 9% smaller than the settings glyph's, profile
+about 3% smaller. `applyLegacyHudIconFrame` crops each icon to its own
+measured bounds and scales uniformly off the longer edge, so passing the
+same `desiredSize` to any of the three gives the same optical size --
+exactly the mismatch the bundle's own import contract warned about
+avoiding.

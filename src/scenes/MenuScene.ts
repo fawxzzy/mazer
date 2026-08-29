@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import {
   MAZER_BLEED_PATH_TEXTURE_KEY,
   MAZER_FLOOR_TILE_TEXTURE_KEY,
+  MAZER_HUD_LEADERBOARD_TEXTURE_KEY,
+  MAZER_HUD_PROFILE_TEXTURE_KEY,
+  MAZER_HUD_SETTINGS_TEXTURE_KEY,
   MAZER_PLAYER_TRAIL_TEXTURE_KEY,
   MAZER_TILE_FONT_TEXTURE_KEY,
   MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY,
@@ -1252,6 +1255,27 @@ const MAZER_PLAYER_TRAIL_SAMPLE_WIDTH = 200;
 // prominent stretch of trail nearest the player is what actually gets the
 // real-asset treatment.
 const LEGACY_PLAYER_TRAIL_IMAGE_POOL_SIZE = 128;
+// Real HUD icon source art (see docs/assets/mazer-vfx-source-provenance.md):
+// three 1254x1254 transparent PNGs, each with a different amount of
+// transparent padding baked in around its own glyph. Measured directly from
+// each file's own alpha channel (Python/Pillow Image.getchannel('A').
+// getbbox()), not eyeballed -- rendering all three at the same raw canvas
+// size would make one read as optically bigger than the others (the
+// leaderboard glyph's own visible bounds are ~9% smaller than the settings
+// glyph's, profile ~3% smaller), exactly the mismatch the source bundle's
+// own import contract warned about. applyLegacyHudIconFrame below uses
+// these to crop to each icon's own real visible bounds and scale uniformly
+// off the LONGER of the two, so a `desiredSize` passed by any caller means
+// the same optical size regardless of which of the three icons it is.
+interface LegacyHudIconSourceMetrics {
+  bboxHeight: number;
+  bboxWidth: number;
+  bboxX: number;
+  bboxY: number;
+}
+const MAZER_HUD_PROFILE_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 1193, bboxWidth: 1119, bboxX: 91, bboxY: 21 };
+const MAZER_HUD_LEADERBOARD_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 1129, bboxWidth: 1111, bboxX: 97, bboxY: 53 };
+const MAZER_HUD_SETTINGS_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 1183, bboxWidth: 1228, bboxX: 0, bboxY: 38 };
 // The source art's own long axis runs from its lower-left corner to its
 // upper-right corner at zero rotation -- its pointed tip faces up-and-right,
 // roughly -45 degrees in screen-space angle convention (positive x, negative
@@ -1679,6 +1703,17 @@ export class MenuScene extends Phaser.Scene {
   // drawLegacyPlayerTrailTileOverlay's own comment.
   private playerTrailImages: Phaser.GameObjects.Image[] = [];
   private playerTrailImageCursor = 0;
+  // Real HUD icon art (see docs/assets/mazer-vfx-source-provenance.md) for
+  // the two menu-header icons drawn every frame into the permanent
+  // boardDynamicGraphics/boardZoomContainer space -- one persistent Image
+  // each, same lifetime as boardDynamicGraphics itself. The profile icon's
+  // own Image(s) are NOT scene-level fields: that glyph is drawn from
+  // per-button closures (createLegacyMenuProfileButton/
+  // createLegacyOverlayUsernameButton) whose graphics/background/label are
+  // already created and destroyed alongside each button instance, so its
+  // Image lives and dies with that same closure instead.
+  private headerSettingsIconImage!: Phaser.GameObjects.Image;
+  private headerLeaderboardIconImage!: Phaser.GameObjects.Image;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -1885,6 +1920,8 @@ export class MenuScene extends Phaser.Scene {
     this.playerTrailImages = Array.from({ length: LEGACY_PLAYER_TRAIL_IMAGE_POOL_SIZE }, () => (
       this.add.image(0, 0, MAZER_PLAYER_TRAIL_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
     ));
+    this.headerSettingsIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
+    this.headerLeaderboardIconImage = this.add.image(0, 0, MAZER_HUD_LEADERBOARD_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.boardZoomContainer.add([
       this.boardStaticGraphics,
       this.boardPathGraphics,
@@ -1901,6 +1938,14 @@ export class MenuScene extends Phaser.Scene {
       // player tile from, so this never actually paints over those markers
       // despite sitting above boardDynamicGraphics in the stack.
       ...this.playerTrailImages,
+      // Same boardZoomContainer/boardDynamicGraphics-relative coordinate
+      // space the settings-cog/leaderboard header icons were previously
+      // drawn straight into (this replaces those procedural draws with the
+      // real HUD icon art) -- must stay in this container so the header
+      // frame math (screen-fixed coordinates, computed the same way
+      // whether or not the board is currently zoomed) keeps landing right.
+      this.headerSettingsIconImage,
+      this.headerLeaderboardIconImage,
       this.titleGraphics
     ]);
     this.overlayGraphics = this.add.graphics();
@@ -8937,6 +8982,7 @@ export class MenuScene extends Phaser.Scene {
 
   private drawLegacyMenuSettingsCog(time: number): void {
     if (this.mode !== 'menu' || this.overlay !== 'none') {
+      this.headerSettingsIconImage.setVisible(false);
       return;
     }
 
@@ -8949,27 +8995,20 @@ export class MenuScene extends Phaser.Scene {
       sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
-    // No background panel, tint, or border -- the gear is the whole control,
-    // sized to roughly match the LVL badge's visual weight instead of
-    // sitting inside a chrome-bordered box (the in-play touch pause cog
-    // keeps its smaller default ratio, since that one still has a panel
-    // behind it to leave room inside). The Mazer signature green instead of
-    // the generic white/mint touch-icon colors or cyan, matching the LVL
-    // badge/player/trail green that reads as "Mazer" everywhere else.
-    // Same classic blink/grow-shrink pulse as the Start/Login glyphs --
-    // scales the radius ratio and multiplies every alpha in the draw call
-    // (there's no single object to setScale/setAlpha on here, since the
-    // gear is drawn straight onto the shared board graphics layer).
+    // Same classic blink/grow-shrink pulse the procedural gear had (and the
+    // Start/Login glyphs share) -- applied to the real settings icon
+    // (MAZER_HUD_SETTINGS_TEXTURE_KEY) via applyLegacyHudIconFrame instead
+    // of the hand-drawn thin-line gear this replaced.
     const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
     const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuSettingsCogActive ? 0.08 : 0), 0.14, 1);
     const blinkScale = 0.92 + (phase * 0.08) + (this.menuSettingsCogActive ? 0.02 : 0);
-    this.drawLegacySettingsCog(
-      this.boardDynamicGraphics,
-      frame,
-      this.menuSettingsCogActive,
-      0.34 * blinkScale,
-      cyberArcadeMaterial.signal.player,
-      cyberArcadeMaterial.rail.mint,
+    const desiredSize = Math.min(frame.width, frame.height) * 0.68 * blinkScale;
+    this.applyLegacyHudIconFrame(
+      this.headerSettingsIconImage,
+      MAZER_HUD_SETTINGS_ICON_METRICS,
+      frame.centerX,
+      frame.centerY,
+      desiredSize,
       blinkAlpha
     );
   }
@@ -8982,6 +9021,7 @@ export class MenuScene extends Phaser.Scene {
   // collide with existing, load-bearing UI.
   private drawLegacyMenuLeaderboardIcon(time: number): void {
     if (this.mode !== 'menu' || this.overlay !== 'none') {
+      this.headerLeaderboardIconImage.setVisible(false);
       return;
     }
 
@@ -8995,38 +9035,22 @@ export class MenuScene extends Phaser.Scene {
       slot: 1,
       width: this.layout.width
     });
+    // Same blink/grow-shrink pulse the procedural bar-chart glyph had --
+    // applied to the real leaderboard icon (MAZER_HUD_LEADERBOARD_TEXTURE_KEY)
+    // via applyLegacyHudIconFrame instead of the three hand-drawn bars this
+    // replaced.
     const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
     const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuLeaderboardActive ? 0.08 : 0), 0.14, 1);
     const blinkScale = 0.92 + (phase * 0.08) + (this.menuLeaderboardActive ? 0.02 : 0);
-    const color = this.menuLeaderboardActive ? cyberArcadeMaterial.rail.mint : cyberArcadeMaterial.signal.player;
-    const outerRadius = Math.max(7, Math.round(Math.min(frame.width, frame.height) * 0.34 * blinkScale));
-    // Three ascending bars, like a small podium/bar-chart -- the simplest
-    // unambiguous "ranking" glyph that hand-draws cleanly at this size with
-    // the same solid-fill-plus-rim material every other icon here uses,
-    // rather than attempting a trophy or podium silhouette at 36-40px.
-    const barCount = 3;
-    const barGap = Math.max(1, Math.round(outerRadius * 0.22));
-    const barWidth = Math.max(2, Math.round(((outerRadius * 2) - (barGap * (barCount - 1))) / barCount));
-    const heights = [0.52, 1, 0.74].map((ratio) => Math.max(3, Math.round(outerRadius * 1.7 * ratio)));
-    const totalWidth = (barWidth * barCount) + (barGap * (barCount - 1));
-    const left = frame.centerX - (totalWidth / 2);
-    const baseline = frame.centerY + outerRadius * 0.72;
-
-    // Thin, hollow, single-tone mint neon-line bars -- matching the actual
-    // reference mockup of this header (plain thin-line icons, no fill, one
-    // consistent glow color), not a filled/two-tone "glassy" treatment.
-    for (let index = 0; index < barCount; index += 1) {
-      const barHeight = heights[index] ?? heights[0] ?? 1;
-      const x = left + (index * (barWidth + barGap));
-      const y = baseline - barHeight;
-      this.boardDynamicGraphics.lineStyle(Math.max(2, outerRadius * 0.2), color, blinkAlpha * 0.4);
-      this.boardDynamicGraphics.strokeRect(x, y, barWidth, barHeight);
-      this.boardDynamicGraphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, blinkAlpha * 0.92);
-      this.boardDynamicGraphics.strokeRect(x, y, barWidth, barHeight);
-    }
-    // No gem catchlight here -- it's a short diagonal arc calibrated for a
-    // round gem-shaped marker; on a rectangular bar-chart icon it just reads
-    // as a stray diagonal white line in the corner (reported and removed).
+    const desiredSize = Math.min(frame.width, frame.height) * 0.68 * blinkScale;
+    this.applyLegacyHudIconFrame(
+      this.headerLeaderboardIconImage,
+      MAZER_HUD_LEADERBOARD_ICON_METRICS,
+      frame.centerX,
+      frame.centerY,
+      desiredSize,
+      blinkAlpha
+    );
   }
 
   private resolveLegacyPlayElapsedMs(): number {
@@ -10218,6 +10242,33 @@ export class MenuScene extends Phaser.Scene {
   // the old wireframe cog was the one element on screen still built out of
   // bare line segments, which read as a mismatched, generic "tech icon"
   // instead of belonging to the same crystal-facet family.
+  // Crops `image` to the icon's own real visible bounds (see
+  // LegacyHudIconSourceMetrics's own header comment) and scales it so the
+  // LONGER of its two visible dimensions equals `desiredSize`, uniformly
+  // (never stretched) -- so passing the same desiredSize for two different
+  // HUD icons gives them the same optical footprint regardless of how much
+  // transparent padding either source PNG happens to carry.
+  private applyLegacyHudIconFrame(
+    image: Phaser.GameObjects.Image,
+    metrics: LegacyHudIconSourceMetrics,
+    centerX: number,
+    centerY: number,
+    desiredSize: number,
+    alpha: number
+  ): void {
+    if (alpha <= 0) {
+      image.setVisible(false);
+      return;
+    }
+    const scale = desiredSize / Math.max(metrics.bboxWidth, metrics.bboxHeight);
+    image
+      .setCrop(metrics.bboxX, metrics.bboxY, metrics.bboxWidth, metrics.bboxHeight)
+      .setDisplaySize(metrics.bboxWidth * scale, metrics.bboxHeight * scale)
+      .setPosition(centerX, centerY)
+      .setAlpha(alpha)
+      .setVisible(true);
+  }
+
   private drawLegacySettingsCog(
     graphics: Phaser.GameObjects.Graphics,
     rect: Pick<VisualRect, 'centerX' | 'centerY' | 'height' | 'width'>,
@@ -14473,6 +14524,7 @@ export class MenuScene extends Phaser.Scene {
   // settings-cog envelope so the two header actions feel like one family.
   private createLegacyMenuProfileButton(onClick: () => void): UiButton {
     const graphics = this.add.graphics();
+    const iconImage = this.add.image(0, 0, MAZER_HUD_PROFILE_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     const laneTop = this.layout.lanes.hud?.top ?? 0;
     const frame = resolveLegacyHeaderControlFrame({
       height: this.layout.height,
@@ -14523,6 +14575,7 @@ export class MenuScene extends Phaser.Scene {
         ) {
           graphics.clear();
           background.setVisible(false);
+          iconImage.setVisible(false);
           return;
         }
         if (this.authSnapshot.status === 'authenticated') {
@@ -14535,6 +14588,7 @@ export class MenuScene extends Phaser.Scene {
         const iconSize = Math.max(18, Math.round(Math.min(frame.width, frame.height) * 0.48));
         this.drawLegacyProfileIcon(
           graphics,
+          iconImage,
           frame.centerX,
           frame.centerY,
           iconSize,
@@ -14546,6 +14600,7 @@ export class MenuScene extends Phaser.Scene {
       },
       destroy: () => {
         graphics.destroy();
+        iconImage.destroy();
         background.destroy();
         label.destroy();
       }
@@ -14553,10 +14608,16 @@ export class MenuScene extends Phaser.Scene {
   }
 
   // Shared by the overlay and main-menu profile buttons. Overlay callers
-  // retain the rainbow ring; the menu caller explicitly suppresses it so
-  // only the inner green head-and-shoulders glyph is visible.
+  // retain the rainbow ring (still procedural, drawn into `graphics`); the
+  // menu caller explicitly suppresses it. The glyph itself is now the real
+  // MAZER_HUD_PROFILE_TEXTURE_KEY icon (via applyLegacyHudIconFrame)
+  // instead of the hand-drawn head-and-shoulders outline this replaced --
+  // `image` is owned by the caller (created/destroyed alongside its own
+  // `graphics`), not a shared scene-level field, since both callers are
+  // independently creatable/destroyable UI button instances.
   private drawLegacyProfileIcon(
     graphics: Phaser.GameObjects.Graphics,
+    image: Phaser.GameObjects.Image,
     centerX: number,
     centerY: number,
     iconSize: number,
@@ -14572,39 +14633,7 @@ export class MenuScene extends Phaser.Scene {
       graphics.lineStyle(Math.max(1.6, iconSize * 0.1), ringColor, alpha * 0.82);
       graphics.strokeCircle(centerX, centerY, ringRadius * scale);
     }
-
-    const color = cyberArcadeMaterial.signal.player;
-    const strokeWidth = Math.max(1.6, iconSize * 0.12);
-    const glowStrokeWidth = strokeWidth * 2.4;
-    const headRadius = iconSize * 0.2 * scale;
-    const headCenterY = centerY - (iconSize * 0.24 * scale);
-    // Thin, hollow, single-tone mint neon-line icon -- matching the user's
-    // actual reference mockup (a plain thin-line person glyph, one
-    // consistent glow color), not a two-tone white-cored outline. A soft
-    // wide glow pass underneath a crisp thin line on top, both in the SAME
-    // color, is the whole treatment.
-    graphics.lineStyle(glowStrokeWidth, color, alpha * 0.42);
-    graphics.strokeCircle(centerX, headCenterY, headRadius);
-    graphics.lineStyle(strokeWidth, color, alpha * 0.92);
-    graphics.strokeCircle(centerX, headCenterY, headRadius);
-
-    const shoulderHalfWidth = iconSize * 0.32 * scale;
-    const shoulderRadius = iconSize * 0.26 * scale;
-    const shoulderTop = centerY + (iconSize * 0.06 * scale);
-    const shoulderBottom = centerY + (iconSize * 0.46 * scale);
-    const buildShoulderPath = (): void => {
-      graphics.beginPath();
-      graphics.arc(centerX, shoulderTop + shoulderRadius, shoulderRadius, Math.PI, 0, false);
-      graphics.lineTo(centerX + shoulderHalfWidth, shoulderBottom);
-      graphics.lineTo(centerX - shoulderHalfWidth, shoulderBottom);
-      graphics.closePath();
-    };
-    buildShoulderPath();
-    graphics.lineStyle(glowStrokeWidth, color, alpha * 0.42);
-    graphics.strokePath();
-    buildShoulderPath();
-    graphics.lineStyle(strokeWidth, color, alpha * 0.92);
-    graphics.strokePath();
+    this.applyLegacyHudIconFrame(image, MAZER_HUD_PROFILE_ICON_METRICS, centerX, centerY, iconSize * scale, alpha);
   }
 
   // Same header row the back chevron sits on, toward the left side (the
@@ -14624,6 +14653,7 @@ export class MenuScene extends Phaser.Scene {
     const iconSize = Math.max(18, Math.round(chevronSize * 0.42));
 
     const graphics = this.add.graphics();
+    const iconImage = this.add.image(0, 0, MAZER_HUD_PROFILE_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     const background = this.add.rectangle(centerX, rowY, iconSize + 24, iconSize + 24, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     background.setDepth(3);
@@ -14633,6 +14663,7 @@ export class MenuScene extends Phaser.Scene {
     const drawProfile = (time: number): void => {
       if (this.authSnapshot.status !== 'authenticated') {
         graphics.clear();
+        iconImage.setVisible(false);
         background.setVisible(false);
         return;
       }
@@ -14646,7 +14677,7 @@ export class MenuScene extends Phaser.Scene {
       const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
       const pulseAlpha = clamp(0.5 + (phase * 0.5) + (this.overlayUsernameActive ? 0.1 : 0), 0.4, 1);
       const pulseScale = 0.94 + (phase * 0.06) + (this.overlayUsernameActive ? 0.02 : 0);
-      this.drawLegacyProfileIcon(graphics, centerX, rowY, iconSize, time, pulseAlpha, pulseScale);
+      this.drawLegacyProfileIcon(graphics, iconImage, centerX, rowY, iconSize, time, pulseAlpha, pulseScale);
     };
     drawProfile(this.time.now);
 
@@ -14674,6 +14705,7 @@ export class MenuScene extends Phaser.Scene {
       updateFrame: (time: number) => drawProfile(time),
       destroy: () => {
         graphics.destroy();
+        iconImage.destroy();
         background.destroy();
         label.destroy();
       }
