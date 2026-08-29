@@ -1258,24 +1258,21 @@ const LEGACY_PLAYER_TRAIL_IMAGE_POOL_SIZE = 128;
 // Real HUD icon source art (see docs/assets/mazer-vfx-source-provenance.md):
 // three 1254x1254 transparent PNGs, each with a different amount of
 // transparent padding baked in around its own glyph. Measured directly from
-// each file's own alpha channel (Python/Pillow Image.getchannel('A').
-// getbbox()), not eyeballed -- rendering all three at the same raw canvas
-// size would make one read as optically bigger than the others (the
-// leaderboard glyph's own visible bounds are ~9% smaller than the settings
-// glyph's, profile ~3% smaller), exactly the mismatch the source bundle's
-// own import contract warned about. applyLegacyHudIconFrame below uses
-// these to crop to each icon's own real visible bounds and scale uniformly
-// off the LONGER of the two, so a `desiredSize` passed by any caller means
-// the same optical size regardless of which of the three icons it is.
+// each file's alpha channel with a visibility threshold of alpha > 1, not
+// eyeballed. Alpha == 1 contains a sparse wide noise envelope that is
+// invisible at HUD scale but would shrink the actual glyph by almost half.
+// applyLegacyHudIconFrame below crops to these meaningful visible bounds and
+// scales uniformly off the LONGER of the two, so a `desiredSize` passed by any
+// caller means the same optical size regardless of which icon it is.
 interface LegacyHudIconSourceMetrics {
   bboxHeight: number;
   bboxWidth: number;
   bboxX: number;
   bboxY: number;
 }
-const MAZER_HUD_PROFILE_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 1193, bboxWidth: 1119, bboxX: 91, bboxY: 21 };
-const MAZER_HUD_LEADERBOARD_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 1129, bboxWidth: 1111, bboxX: 97, bboxY: 53 };
-const MAZER_HUD_SETTINGS_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 1183, bboxWidth: 1228, bboxX: 0, bboxY: 38 };
+const MAZER_HUD_PROFILE_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 729, bboxWidth: 615, bboxX: 320, bboxY: 268 };
+const MAZER_HUD_LEADERBOARD_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 524, bboxWidth: 692, bboxX: 281, bboxY: 359 };
+const MAZER_HUD_SETTINGS_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 828, bboxWidth: 807, bboxX: 221, bboxY: 204 };
 // The source art's own long axis runs from its lower-left corner to its
 // upper-right corner at zero rotation -- its pointed tip faces up-and-right,
 // roughly -45 degrees in screen-space angle convention (positive x, negative
@@ -2293,11 +2290,11 @@ export class MenuScene extends Phaser.Scene {
     if (this.pendingAuthGateTransition) {
       this.pendingAuthGateTransition = false;
       if (this.isLegacyPasswordRecoveryActive() && this.overlay !== 'auth') {
-        this.overlay = 'auth';
+        this.enterForcedLegacyAuthOverlay();
         this.uiDirty = true;
         this.rebuildUi();
       } else if (this.authGateLocked && this.overlay !== 'auth') {
-        this.overlay = 'auth';
+        this.enterForcedLegacyAuthOverlay();
         this.uiDirty = true;
         this.rebuildUi();
       } else if (!this.authGateLocked && !this.authGateAwaitingResolution && this.overlay === 'auth') {
@@ -5527,6 +5524,7 @@ export class MenuScene extends Phaser.Scene {
 
   private enterMenuMode(): void {
     this.resetLegacyPlayInputBuffer();
+    this.clearPlayHudImmediately();
     this.resetLegacyPlayerTransferEnergy();
     // A delayed request owns the mode it was created for. If it survives a
     // mode switch, update() can later consume it and overwrite the new surface.
@@ -5983,7 +5981,7 @@ export class MenuScene extends Phaser.Scene {
       // star visibly shrinks as it dims, not just fades.
       const twinklePeriodMs = 2200 * (0.75 + (starSeed * 0.5));
       const twinkleRaw = backdropMotionEnabled
-        ? (Math.sin((animationTime / twinklePeriodMs) + (starSeed * Math.PI * 2)) + 1) / 2
+        ? (Math.sin(((animationTime / twinklePeriodMs) + starSeed) * Math.PI * 2) + 1) / 2
         : 0.5;
       const twinklePhase = twinkleRaw * twinkleRaw * (3 - (2 * twinkleRaw));
       const twinkleAlpha = star.alpha * (0.12 + (twinklePhase * 0.88));
@@ -10105,6 +10103,7 @@ export class MenuScene extends Phaser.Scene {
     this.clearHudTexts();
     this.hudTouchControlBounds = null;
     if (this.mode !== 'play' || this.overlay !== 'none') {
+      this.touchSettingsCogIconImage.setVisible(false);
       this.footerText.setText('');
       return;
     }
@@ -10299,9 +10298,19 @@ export class MenuScene extends Phaser.Scene {
 
   private clearPlayHudImmediately(): void {
     this.hudGraphics.clear();
+    this.touchSettingsCogIconImage.setVisible(false);
     this.hudTouchControlBounds = null;
     this.clearHudTexts();
     this.footerText.setText('');
+  }
+
+  private enterForcedLegacyAuthOverlay(): void {
+    // Forced auth transitions bypass openOverlay() and return through update's
+    // auth-only branch before drawHud() can clear persistent HUD images.
+    if (this.mode === 'play') {
+      this.clearPlayHudImmediately();
+    }
+    this.overlay = 'auth';
   }
 
   private rebuildUi(): void {
@@ -15153,7 +15162,7 @@ export class MenuScene extends Phaser.Scene {
     this.passwordRecoveryState = nextState;
     this.passwordRecoveryFeedback = null;
     if (this.isLegacyPasswordRecoveryActive()) {
-      this.overlay = 'auth';
+      this.enterForcedLegacyAuthOverlay();
       this.overlayReturn = 'none';
       this.authForm = {
         ...this.authForm,

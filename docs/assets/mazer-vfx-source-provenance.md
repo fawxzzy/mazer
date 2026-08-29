@@ -118,18 +118,25 @@ bundle before copying, same as the first batch).
 shoulders icons for: the main-menu header settings button
 (`drawLegacyMenuSettingsCog`), the main-menu header leaderboard button
 (`drawLegacyMenuLeaderboardIcon`), the main-menu profile/account button
-(`createLegacyMenuProfileButton`), and the Options/Pause overlay's username
-button (`createLegacyOverlayUsernameButton`). The touch-control pause/
-settings cog used during active play (`drawLegacySettingsCogControl`) is a
-distinct, separately-purposed mobile control and was intentionally left on
-its existing procedural rendering.
+(`createLegacyMenuProfileButton`), the Options/Pause overlay's username button
+(`createLegacyOverlayUsernameButton`), and the active-play pause/settings
+control (`drawLegacySettingsCogControl`). All settings surfaces now consume the
+same texture and optical bounds instead of retaining a separate procedural cog.
 
 Each source PNG carries a different amount of transparent padding inside
 its 1254x1254 canvas (measured directly via Python/Pillow
-`Image.getchannel('A').getbbox()`, not eyeballed): the leaderboard glyph's
-own visible bounds are about 9% smaller than the settings glyph's, profile
-about 3% smaller. `applyLegacyHudIconFrame` crops each icon to its own
-measured bounds and scales uniformly off the longer edge, so passing the
-same `desiredSize` to any of the three gives the same optical size --
-exactly the mismatch the bundle's own import contract warned about
-avoiding.
+meaningful-alpha threshold (`alpha > 1`), not eyeballed). The discarded
+`alpha == 1` pixels form a sparse, visually transparent noise envelope that
+would otherwise make the legible icon cores render at roughly half their
+intended HUD size. The retained source bounds are profile `615x729` at
+`(320,268)`, leaderboard `692x524` at `(281,359)`, and settings `807x828` at
+`(221,204)`. `applyLegacyHudIconFrame` crops each icon to those measured bounds
+and scales uniformly off the longer edge, so passing the same `desiredSize` to
+any of the three gives the same optical size.
+
+The active-play pause/settings control now consumes the same settings texture
+and optical bounds as the menu header. Because that texture is a persistent
+Phaser image rather than transient HUD graphics, every HUD teardown path must
+hide it explicitly before an overlay or menu surface is shown. This includes
+forced auth-gate and password-recovery transitions, which bypass the normal
+overlay-opening helper and return before the next HUD draw.
