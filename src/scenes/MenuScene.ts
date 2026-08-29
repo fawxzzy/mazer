@@ -1191,6 +1191,14 @@ const LEGACY_TITLE_WORD = 'MAZER';
 // "MAZER", "START", and "LOGIN" are all exactly 5 characters -- covers the
 // title wordmark and both primary front-door button labels with no waste.
 const LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE = 5;
+// drawLegacyWordmarkAmbientSparkles: how many independent sparkle "slots"
+// twinkle around a wordmark's outside edge, how long (roughly) each slot's
+// own appear/vanish cycle takes, and what fraction of that cycle it spends
+// actually visible (centered pulse, eased in/out either side) -- see that
+// method's own header comment for the full random-position/twinkle design.
+const LEGACY_WORDMARK_SPARKLE_COUNT = 9;
+const LEGACY_WORDMARK_SPARKLE_CYCLE_MS = 2400;
+const LEGACY_WORDMARK_SPARKLE_PULSE_HALF_WIDTH = 0.22;
 // Each tile-font glyph is split into this many independently cropped/tinted
 // sub-tiles (see drawLegacyTileFontWordTiled) so construction/deconstruction
 // happens tile-by-tile the way the original maze-path dot-cell glyph did,
@@ -1201,10 +1209,17 @@ const LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE = 5;
 const LEGACY_TILE_FONT_SUB_TILE_COLUMNS = 4;
 const LEGACY_TILE_FONT_SUB_TILE_ROWS = 5;
 const LEGACY_TILE_FONT_TILES_PER_GLYPH = LEGACY_TILE_FONT_SUB_TILE_COLUMNS * LEGACY_TILE_FONT_SUB_TILE_ROWS;
-// Width, in whole tiles, of the soft cross-fade band at the construct/
-// deconstruct sweep's leading edge -- keeps tiles from popping with a hard
-// on/off snap.
-const LEGACY_TILE_FONT_REVEAL_SOFT_BAND_TILES = 1.5;
+// Tile-font reveal used to cross-fade each sub-tile in over this many
+// tile-widths at the construct/deconstruct sweep's leading edge -- reported
+// as "generated tile by tile not like whatever gradient thing they're
+// doing," because a multi-tile soft fade reads as a smooth wipe, not the
+// maze's own tile-by-tile pop (buildLegacyMazeRevealOrder/
+// isLegacyMenuPointVisibleInStaticDraw -- a tile is either fully drawn or
+// not, no partial-alpha band). Kept at 0 (hard on/off snap, no cross-fade)
+// so the wordmark's own reveal matches that exactly; the constant stays
+// named/present rather than deleted in case a future pass wants a very
+// thin band back for a specific word.
+const LEGACY_TILE_FONT_REVEAL_SOFT_BAND_TILES = 0;
 // Native pixel size (square) of the iridescent-diamond VFX source art --
 // see docs/assets/mazer-vfx-source-provenance.md.
 const MAZER_VFX_DIAMOND_SOURCE_SIZE = 1254;
@@ -7648,11 +7663,12 @@ export class MenuScene extends Phaser.Scene {
         const titleWordHalfWidth = (
           (MAZER_TILE_FONT_ADVANCE * Math.max(0, LEGACY_TITLE_WORD.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
         ) * tileFontScale / 2;
-        this.drawLegacyWordmarkFlankingSparkles(
+        this.drawLegacyWordmarkAmbientSparkles(
           this.titleGraphics,
           titleCenterX,
           titleCenterY,
           titleWordHalfWidth,
+          titleLayout.height / 2,
           time,
           titlePresentation.titleAlpha
         );
@@ -8557,9 +8573,10 @@ export class MenuScene extends Phaser.Scene {
     const maxMetric = Math.max(1, (totalColumns - 1) + (LEGACY_TILE_FONT_SUB_TILE_ROWS - 1));
     const totalTiles = Math.max(1, characters.length * LEGACY_TILE_FONT_TILES_PER_GLYPH);
     const clampedRevealProgress = clamp(revealProgress, 0, 1);
-    // Overshoot the sweep's travel by one band-width so progress=1 fully
-    // reveals even the very last tile (metric === maxMetric) instead of
-    // leaving it stuck at the 50%-through point of its own fade-in band.
+    // LEGACY_TILE_FONT_REVEAL_SOFT_BAND_TILES is 0 (see its own comment) --
+    // sweepRange collapses to exactly maxMetric, so progress=1 lands
+    // sweepPosition exactly on the last tile's own metric and the hard
+    // step below (tileVisibility) reveals it, no divide-by-zero band math.
     const sweepRange = maxMetric + LEGACY_TILE_FONT_REVEAL_SOFT_BAND_TILES;
     const sweepPosition = clampedRevealProgress * sweepRange;
     let renderedAny = false;
@@ -8585,13 +8602,15 @@ export class MenuScene extends Phaser.Scene {
           // Bottom-left-to-top-right: column rises left-to-right, row rises
           // bottom-to-top (row 0 is the glyph's own top edge).
           const metric = globalColumn + ((LEGACY_TILE_FONT_SUB_TILE_ROWS - 1) - row);
-          // 0 while the sweep hasn't reached this tile yet, 1 once it's
-          // fully past (by one band-width) -- linear cross-fade in between.
-          const tileVisibility = clamp(
-            (sweepPosition - metric) / LEGACY_TILE_FONT_REVEAL_SOFT_BAND_TILES,
-            0,
-            1
-          );
+          // Hard on/off snap, not a cross-fade -- a tile is either fully
+          // drawn or not drawn at all, exactly like the maze's own reveal
+          // (isLegacyMenuPointVisibleInStaticDraw has no partial-alpha
+          // state either). Reported as "should generate tile by tile like
+          // the maze does," and a multi-tile soft fade band was the actual
+          // bug: it made a whole diagonal swath of tiles visible at partial
+          // alpha simultaneously, reading as a smooth gradient wipe instead
+          // of individual tiles popping in.
+          const tileVisibility = sweepPosition >= metric ? 1 : 0;
           if (tileVisibility <= 0) {
             image.setVisible(false);
             continue;
@@ -8792,39 +8811,125 @@ export class MenuScene extends Phaser.Scene {
     graphics.fillCircle(centerX, centerY, size * 0.16);
   }
 
-  // Two rainbow four-point sparkles flanking a wordmark -- same glyph the
-  // orbit diamonds and level number already twinkle with, added to the
-  // title and Start/Login button so the sparkle treatment reads as one
-  // consistent family across every rainbow element instead of being
-  // exclusive to the diamonds. `halfWidth` is the wordmark's own half-width
-  // (sparkles sit just outside it on both sides); centerY is the
-  // wordmark's own vertical center.
-  private drawLegacyWordmarkFlankingSparkles(
+  // Deterministic pseudo-random unit float (0..1) from any real-numbered
+  // seed -- same "multiply by a big irrational-ish constant, take the
+  // fractional part" trick GLSL shaders use for a cheap hash, used here
+  // (not Math.random()) so a sparkle slot's position/timing stay perfectly
+  // stable frame-to-frame given the same (slot, cycle) seed instead of
+  // jittering every draw call.
+  private resolveLegacyPseudoRandomUnit(seed: number): number {
+    const x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  // A point at fraction `t` (0..1) around the perimeter of a `width` x
+  // `height` rectangle centered on the origin, walking clockwise from the
+  // top-left corner -- used to scatter sparkles anywhere around a
+  // wordmark's outside edge rather than pinning them to fixed left/right
+  // spots.
+  private resolveLegacyWordmarkSparklePerimeterPoint(
+    t: number,
+    width: number,
+    height: number
+  ): { x: number; y: number } {
+    const perimeter = Math.max(1, (width * 2) + (height * 2));
+    let distance = clamp(t, 0, 1) * perimeter;
+    const halfW = width / 2;
+    const halfH = height / 2;
+    if (distance <= width) {
+      return { x: -halfW + distance, y: -halfH };
+    }
+    distance -= width;
+    if (distance <= height) {
+      return { x: halfW, y: -halfH + distance };
+    }
+    distance -= height;
+    if (distance <= width) {
+      return { x: halfW - distance, y: halfH };
+    }
+    distance -= width;
+    return { x: -halfW, y: halfH - distance };
+  }
+
+  // Small rainbow sparkles that twinkle in and out at random points around
+  // a wordmark's outside edge (title, Start/Login button) -- replaces the
+  // old two fixed sparkles pinned one to each side at a size scaled off the
+  // whole word's half-width (huge on a long word). Reported as needing to
+  // be "a lot smaller" and to "twinkle in and out randomly at random
+  // positions around the outside of the text" instead of two fixed spots
+  // constantly pulsing in place.
+  //
+  // Stateless: no sparkle objects persist between frames. Each of
+  // LEGACY_WORDMARK_SPARKLE_COUNT independent "slots" derives its own cycle
+  // length, phase offset, and per-cycle perimeter position + color purely
+  // from (slot index, current cycle number) via resolveLegacyPseudoRandomUnit
+  // -- deterministic given those two integers, so a slot holds still for its
+  // entire blip and only jumps to a new random spot the next time its own
+  // cycle rolls over, rather than drifting every frame the way a
+  // time-seeded random would.
+  private drawLegacyWordmarkAmbientSparkles(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
     centerY: number,
     halfWidth: number,
+    halfHeight: number,
     time: number,
     alpha: number
   ): void {
-    if (this.prefersLegacyReducedMotion() || alpha <= 0) {
+    if (this.prefersLegacyReducedMotion() || alpha <= 0 || halfWidth <= 0 || halfHeight <= 0) {
       return;
     }
-    const gap = Math.max(4, halfWidth * 0.22);
-    [-1, 1].forEach((side) => {
-      const phaseOffset = side * 2.4;
-      const twinkle = (Math.sin((time / LEGACY_GOAL_STAR_SPARKLE_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset) + 1) / 2;
-      const hue = (time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (side > 0 ? 0.5 : 0);
-      const color = Phaser.Display.Color.HSVToRGB(((hue % 1) + 1) % 1, 0.8, 1).color;
+    const margin = Math.max(4, halfHeight * 0.35);
+    const perimeterWidth = (halfWidth * 2) + (margin * 2);
+    const perimeterHeight = (halfHeight * 2) + (margin * 2);
+    // Small relative to a single glyph's own height, not the whole word's
+    // half-width -- the previous formula (halfWidth * 0.14) grew with word
+    // length and read as oversized jewelry on "MAZER"; this stays tiny
+    // regardless of how many letters are in the word.
+    const baseSize = Math.max(1.5, halfHeight * 0.13);
+
+    for (let slot = 0; slot < LEGACY_WORDMARK_SPARKLE_COUNT; slot += 1) {
+      const slotSeed = (slot + 1) * 91.7;
+      const periodMs = LEGACY_WORDMARK_SPARKLE_CYCLE_MS * (0.7 + (this.resolveLegacyPseudoRandomUnit(slotSeed) * 0.9));
+      const phaseOffsetMs = this.resolveLegacyPseudoRandomUnit(slotSeed + 0.31) * periodMs;
+      const cycleTime = time + phaseOffsetMs;
+      const cycleIndex = Math.floor(cycleTime / periodMs);
+      const cyclePhase = (cycleTime - (cycleIndex * periodMs)) / periodMs;
+
+      // Fully invisible outside a short pulse window centered in the
+      // cycle, eased in/out with a cosine -- the actual "twinkle in and
+      // out" (as opposed to the old sparkles' constant partial-visibility
+      // sine pulse that never fully vanished).
+      const distanceFromPulseCenter = Math.abs(cyclePhase - 0.5);
+      if (distanceFromPulseCenter >= LEGACY_WORDMARK_SPARKLE_PULSE_HALF_WIDTH) {
+        continue;
+      }
+      const pulseLinear = 1 - (distanceFromPulseCenter / LEGACY_WORDMARK_SPARKLE_PULSE_HALF_WIDTH);
+      const pulseEased = 0.5 - (0.5 * Math.cos(pulseLinear * Math.PI));
+
+      // A fresh pseudo-random perimeter position + hue + size each time
+      // this slot's cycle rolls over (keyed by cycleIndex, not time) --
+      // "random positions," plural, not one fixed spot reused every cycle.
+      const positionSeed = (slot * 733) + (cycleIndex * 17.13) + 4.1;
+      const perimeterT = this.resolveLegacyPseudoRandomUnit(positionSeed);
+      const { x: offsetX, y: offsetY } = this.resolveLegacyWordmarkSparklePerimeterPoint(
+        perimeterT,
+        perimeterWidth,
+        perimeterHeight
+      );
+      const hue = this.resolveLegacyPseudoRandomUnit(positionSeed + 0.5);
+      const sizeJitter = 0.75 + (this.resolveLegacyPseudoRandomUnit(positionSeed + 0.77) * 0.5);
+      const color = Phaser.Display.Color.HSVToRGB(hue, 0.85, 1).color;
+
       this.drawLegacyFourPointSparkle(
         graphics,
-        centerX + (side * (halfWidth + gap)),
-        centerY,
-        halfWidth * (0.14 + (twinkle * 0.05)),
+        centerX + offsetX,
+        centerY + offsetY,
+        baseSize * sizeJitter,
         color,
-        alpha * (0.55 + (twinkle * 0.45))
+        alpha * pulseEased
       );
-    });
+    }
   }
 
   // markerRevealAlpha is 0 for the whole beam-travel span (the marker
@@ -14386,7 +14491,15 @@ export class MenuScene extends Phaser.Scene {
         const wordHalfWidth = (
           (MAZER_TILE_FONT_ADVANCE * Math.max(0, letters.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
         ) * tileFontButtonScale / 2;
-        this.drawLegacyWordmarkFlankingSparkles(panel, 0, 0, wordHalfWidth, 0, frontDoorChrome?.labelAlpha ?? 0.92);
+        this.drawLegacyWordmarkAmbientSparkles(
+          panel,
+          0,
+          0,
+          wordHalfWidth,
+          (MAZER_TILE_FONT_GLYPH_HEIGHT * tileFontButtonScale) / 2,
+          0,
+          frontDoorChrome?.labelAlpha ?? 0.92
+        );
       }
     }
 
@@ -14434,11 +14547,12 @@ export class MenuScene extends Phaser.Scene {
             const wordHalfWidth = (
               (MAZER_TILE_FONT_ADVANCE * Math.max(0, letters.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
             ) * tileFontButtonScale / 2;
-            this.drawLegacyWordmarkFlankingSparkles(
+            this.drawLegacyWordmarkAmbientSparkles(
               panel,
               0,
               0,
               wordHalfWidth,
+              (MAZER_TILE_FONT_GLYPH_HEIGHT * tileFontButtonScale) / 2,
               time,
               primaryButtonActive ? 1 : (frontDoorChrome?.labelAlpha ?? 0.92)
             );

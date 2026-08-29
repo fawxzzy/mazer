@@ -55,6 +55,8 @@ export const MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY = 'mazerVfxTeleportBeam';
 // of its own linework sidesteps the compositing problem entirely.
 export const MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY = 'mazerVfxEdgeDiamondEnergized';
 const MAZER_VFX_ASSET_BASE_URL = '/assets/vfx/diamonds';
+// See the cache-busting comment in preload() below.
+const MAZER_VFX_ASSET_CACHE_BUST = 'v=20260829';
 
 // Starfield background, floor tile, and bleed-off path strip -- see
 // docs/assets/mazer-vfx-source-provenance.md for provenance/hashes.
@@ -85,11 +87,24 @@ export class BootScene extends Phaser.Scene {
     this.load.image(MAZER_VFX_DIAMOND_ENERGY_CORE_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/edge-diamond-energy-core.png`);
     this.load.image(MAZER_VFX_DIAMOND_ABSORPTION_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/edge-diamond-energy-absorption-state.png`);
     this.load.image(MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/teleport-beam-iridescent.png`);
-    this.load.image(MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/edge-diamond-energized.png`);
-    this.load.image(MAZER_STARFIELD_TEXTURE_KEY, '/assets/vfx/starfield/mazer-starfield-tile.png');
-    this.load.image(MAZER_FLOOR_TILE_TEXTURE_KEY, '/assets/tiles/mazer-floor-tile.png');
-    this.load.image(MAZER_BLEED_PATH_TEXTURE_KEY, '/assets/tiles/mazer-bleed-path-strip.png');
-    this.load.image(MAZER_PLAYER_TRAIL_TEXTURE_KEY, '/assets/vfx/trail/mazer-player-trail.png');
+    // MAZER_VFX_ASSET_CACHE_BUST query suffix: this project's PWA service
+    // worker (vite-plugin-pwa generateSW, see vite.config.ts) precaches
+    // every built asset by bare URL. If a device already had an older
+    // build's service worker installed and its cache/update cycle didn't
+    // pick up a same-filename asset swap for any reason, the SW's
+    // cache-first fetch handler serves the stale bytes forever regardless
+    // of this server's own Cache-Control headers (which do correctly
+    // revalidate -- verified live: fresh fetch, matching etag/content-
+    // length/last-modified for the current file). Appending a query string
+    // makes the actual runtime request URL one the old precache manifest
+    // never had an entry for, so it always falls through to a real network
+    // fetch. Bump the suffix whenever one of these specific files' content
+    // changes again.
+    this.load.image(MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/edge-diamond-energized.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
+    this.load.image(MAZER_STARFIELD_TEXTURE_KEY, `/assets/vfx/starfield/mazer-starfield-tile.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
+    this.load.image(MAZER_FLOOR_TILE_TEXTURE_KEY, `/assets/tiles/mazer-floor-tile.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
+    this.load.image(MAZER_BLEED_PATH_TEXTURE_KEY, `/assets/tiles/mazer-bleed-path-strip.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
+    this.load.image(MAZER_PLAYER_TRAIL_TEXTURE_KEY, `/assets/vfx/trail/mazer-player-trail.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
   }
 
   public create(): void {
