@@ -19,7 +19,13 @@ export interface LegacyPlayerTransferVisualInput {
   reducedMotion?: boolean;
 }
 
-export const LEGACY_PLAYER_TRANSFER_OUTBOUND_MS = 360;
+// 360 * 1.25 -- a literal 25% slowdown per feedback the laser "glitches,
+// pauses, doesn't have enough time to shoot out." The other half of that
+// complaint was resolveLegacyPlayerTransferVisualState's own energyAlpha
+// curve (see below): it held the beam fully invisible for the first ~52%
+// of this whole duration, so even the beam's actual travel window was
+// roughly half what this constant suggests -- both are fixed together.
+export const LEGACY_PLAYER_TRANSFER_OUTBOUND_MS = 450;
 export const LEGACY_PLAYER_TRANSFER_SWIRL_PERIOD_MS = 1200;
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
