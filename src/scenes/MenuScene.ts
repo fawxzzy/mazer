@@ -2,11 +2,9 @@ import Phaser from 'phaser';
 import {
   MAZER_BLEED_PATH_TEXTURE_KEY,
   MAZER_FLOOR_TILE_TEXTURE_KEY,
-  MAZER_TILE_FONT_RAINBOW_STEPS,
   MAZER_TILE_FONT_TEXTURE_KEY,
   MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY,
-  MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY,
-  resolveMazerTileFontRainbowTextureKey
+  MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY
 } from './BootScene';
 import {
   applyMazerCanvasBackingResolution,
@@ -169,7 +167,6 @@ import {
 } from '../legacy-runtime/legacyMenuBackdrop';
 import {
   LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE,
-  LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS,
   mixLegacyIridescentColor,
   resolveLegacyIridescentPlayerCoreColor,
   resolveLegacyIridescentPlayerAccentColor,
@@ -1032,15 +1029,24 @@ const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 14400;
 // laps in the same few seconds the tile reveal used to always take,
 // regardless of maze size, before resolveLegacyMenuStaticDrawTileBatchSize
 // started letting that duration actually grow with tile count). An initial
-// cut to 0.35 overcorrected -- reported right back as "way too slow" against
-// a small/typical maze's own (still just a few seconds) build window. 0.85
-// keeps it well under the original "2 full laps" pace while still reading
-// as an active, lively spin rather than a crawl. Keeps the deliberate
-// "always lands in its resting position exactly when generation finishes"
-// sync (see resolveLegacyMenuPathTitleOrbitLifecycleProgress's own comment)
-// instead of decoupling the two, which would need its own separate
-// settle-transition handling.
-const LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE = 0.85;
+// cut to 0.35 overcorrected -- reported right back as "way too slow." A
+// follow-up cut to 0.85 fixed the speed complaint but introduced a real,
+// separate bug: resolveLegacyMenuPathTitleOrbitLifecyclePhase's easing
+// reaches exactly `direction * ROTATIONS_PER_PHASE` at progress=1, then
+// `% 1`s it back into [0, 1) for the next phase -- with an INTEGER value
+// that always lands back on exactly the same angle (0) the next phase
+// starts from, but 0.85 lands on 0.85 (306 degrees), a full 306-degree
+// mismatch between "where this phase ended" and "where the next phase
+// starts." resolveLegacyMenuPathTitleOrbitSettlePhase eases across that gap
+// on the settled (non-spinning) side of a transition, but a large gap like
+// this reads as a visible extra spin-to-catch-up rather than a smooth stop,
+// and any transition that skips or interrupts the settle window (deconstruct
+// starting again before settle finishes, which the "multiple times this
+// happens" report describes) shows it as an outright jump. 1 full rotation
+// keeps essentially the same perceived speed as 0.85 while landing exactly
+// back on phase 0 every time, every phase boundary, by construction -- no
+// settle-side smoothing required to hide a gap that no longer exists.
+const LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE = 1;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;
 // A trail-color wipe across the title tiles: fills bottom-left to top-right
 // (combining "left to right" and "bottom to top" into one diagonal sweep
@@ -1172,15 +1178,6 @@ const LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS = 5200;
 // enormous margin left in the 340ms ACTIVE_PLAY_GOAL_RESET_HOLD_MS window
 // this needs to finish inside. See that call site's own comment.
 const LEGACY_PLAY_GOAL_DECONSTRUCT_PRECOMPUTE_DEFER_MS = 16;
-// The Mazer tile-font raster asset (see BootScene.ts's own header comment) --
-// a real image/texture, the first one this scene has ever used, loaded and
-// registered before MenuScene starts. Values mirror the asset's own JSON
-// contract (mazer-font-atlas.json's meta.font/meta.atlas) exactly.
-const MAZER_TILE_FONT_GLYPH_WIDTH = 64;
-const MAZER_TILE_FONT_GLYPH_HEIGHT = 80;
-// meta.font.recommendedLetterSpacing is -8 at 1x atlas scale -- advance
-// between glyph origins is the raw cell width plus that (negative) spacing.
-const MAZER_TILE_FONT_ADVANCE = MAZER_TILE_FONT_GLYPH_WIDTH - 8;
 // Comfortably covers every string this renders today (level numbers are at
 // most a handful of digits) with real headroom.
 const LEGACY_TILE_FONT_GLYPH_POOL_SIZE = 8;
@@ -1199,27 +1196,15 @@ const LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE = 5;
 const LEGACY_WORDMARK_SPARKLE_COUNT = 9;
 const LEGACY_WORDMARK_SPARKLE_CYCLE_MS = 2400;
 const LEGACY_WORDMARK_SPARKLE_PULSE_HALF_WIDTH = 0.22;
-// Each tile-font glyph is split into this many independently cropped/tinted
-// sub-tiles (see drawLegacyTileFontWordTiled) so construction/deconstruction
-// happens tile-by-tile the way the original maze-path dot-cell glyph did,
-// instead of a whole letter popping in/out as one unit -- and so the
-// rainbow sweep reads at fine (tile) grain instead of one flat color per
-// letter. 4x5 keeps per-letter tile count (20) reasonably close to the old
-// 5x7 dot-matrix's own resolution without the pool sizes below exploding.
+// Sizes the two dead-but-still-allocated raster tile-font Image pools
+// (titleTileFontImagePool, and the per-button pool created in createButton)
+// -- both are always hidden now that title/Start/Login/the level number all
+// render through drawLegacyGlyphWordTileBlock instead (see that method's
+// own header comment for why: the raster atlas could only ever be cropped
+// into chunks, never actually sampled as one repeatable square tile).
 const LEGACY_TILE_FONT_SUB_TILE_COLUMNS = 4;
 const LEGACY_TILE_FONT_SUB_TILE_ROWS = 5;
 const LEGACY_TILE_FONT_TILES_PER_GLYPH = LEGACY_TILE_FONT_SUB_TILE_COLUMNS * LEGACY_TILE_FONT_SUB_TILE_ROWS;
-// Tile-font reveal used to cross-fade each sub-tile in over this many
-// tile-widths at the construct/deconstruct sweep's leading edge -- reported
-// as "generated tile by tile not like whatever gradient thing they're
-// doing," because a multi-tile soft fade reads as a smooth wipe, not the
-// maze's own tile-by-tile pop (buildLegacyMazeRevealOrder/
-// isLegacyMenuPointVisibleInStaticDraw -- a tile is either fully drawn or
-// not, no partial-alpha band). Kept at 0 (hard on/off snap, no cross-fade)
-// so the wordmark's own reveal matches that exactly; the constant stays
-// named/present rather than deleted in case a future pass wants a very
-// thin band back for a specific word.
-const LEGACY_TILE_FONT_REVEAL_SOFT_BAND_TILES = 0;
 // Native pixel size (square) of the iridescent-diamond VFX source art --
 // see docs/assets/mazer-vfx-source-provenance.md.
 const MAZER_VFX_DIAMOND_SOURCE_SIZE = 1254;
@@ -1336,12 +1321,6 @@ const LEGACY_LEVEL_ANNOUNCER_MIN_SCALE = 0.72;
 const LEGACY_LEVEL_ANNOUNCER_PULSE_PERIOD_MS = 3600;
 const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA = 0.78;
 const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE = 0.94;
-// Twinkle cadence for the small sparkle accents flanking the level-announcer
-// number (drawLegacyLevelAnnouncerTwinkles) -- deliberately its own, quicker
-// constant rather than reusing the number's own slow ambient breathing
-// pulse above, so the sparkles read as a distinct little twinkle instead of
-// just riding the same breath.
-const LEGACY_LEVEL_ANNOUNCER_TWINKLE_PERIOD_MS = 1400;
 // How long the bleed-off dock corridors (resolveLegacyPathBorderDockContinuation)
 // take to shrink back from the true screen edge to the maze's own edge on
 // deconstruct -- a smooth retract instead of the full-length corridor just
@@ -1372,8 +1351,13 @@ const LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS = 340;
 // about to appear once the final generation stage settles -- a short travel
 // span for the beams to reach the tile, then a brief impact flash the marker
 // itself pops in under.
-const LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS = 260;
-const LEGACY_PLAYER_SPAWN_FLASH_MS = 240;
+// 260/240 * 1.25 -- a literal 25% slowdown of the whole laser sequence
+// (beams converging on the player, then the arrival moment), matching the
+// same 25% cut applied to LEGACY_PLAYER_TRANSFER_OUTBOUND_MS so the outbound
+// and delivery halves of the effect read at one consistent pace instead of
+// only the first half slowing down.
+const LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS = 325;
+const LEGACY_PLAYER_SPAWN_FLASH_MS = 300;
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const smoothstep = (value: number): number => {
   const x = clamp(value, 0, 1);
@@ -5907,12 +5891,18 @@ export class MenuScene extends Phaser.Scene {
       // The nearest, biggest stars get the same rainbow four-point sparkle
       // the orbit diamonds/level number/title use, replacing the old flat
       // bloom-square treatment -- reported as "the starfield never got
-      // updated... replace the backdrop stars w the sparkles." Left to only
-      // the standout-bright stars (coreSize > 3, already the ones singled
-      // out for extra treatment below) rather than every star in the field:
-      // there are hundreds of tiny background stars, and a full sparkle on
-      // every one of them would read as visual noise instead of depth.
-      if (coreSize > 3) {
+      // updated... replace the backdrop stars w the sparkles." Real bug
+      // found here: radius is 0.6 + (depth * 2.7) + jitter with
+      // depth = random() * random() (a product of two uniforms, so it
+      // clusters near 0 and never actually reaches 1) -- `coreSize > 3`
+      // required depth > ~1.07, which is mathematically unreachable. Every
+      // single star always fell through to the plain bloom-square path
+      // below, so this "already shipped" fix was invisible in practice --
+      // exactly what "why do you keep missing edits" was reporting. `>= 3`
+      // needs only depth above roughly 0.7 (about the brightest 5% of stars
+      // by this depth distribution's own math), which real stars actually
+      // reach.
+      if (coreSize >= 3) {
         const sparkleHue = Phaser.Display.Color.HSVToRGB(
           (animationTime / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + starSeed,
           0.8,
@@ -7511,6 +7501,16 @@ export class MenuScene extends Phaser.Scene {
   // drawLegacyLevelAnnouncerTwinkles and the goal star marker's own surface
   // glints, drawn into titleGraphics (already cleared/redrawn every frame
   // as part of the title's own draw pass).
+  // Was a single fixed sparkle pinned to one corner of the diamond's own
+  // footprint -- reported as needing "stars twinkling in and out all
+  // around them, not just in one position." Reuses the same scattered-
+  // perimeter ambient-sparkle system the title/Start-Login/level-number
+  // wordmarks use (drawLegacyWordmarkAmbientSparkles), just centered on the
+  // diamond's own bounding box instead of a word's, with fewer slots (a
+  // small diamond doesn't need 9 sparkles crowding it) and this diamond's
+  // own index as the seed salt so all 8 orbit diamonds -- which otherwise
+  // share the same `time` -- don't all twinkle in the same relative spot in
+  // lockstep.
   private drawLegacyMenuPathTitleOrbitSigilTwinkle(
     index: number,
     centerX: number,
@@ -7519,30 +7519,16 @@ export class MenuScene extends Phaser.Scene {
     alpha: number,
     time: number
   ): void {
-    if (this.prefersLegacyReducedMotion()) {
-      return;
-    }
-    const phaseOffset = index * 1.7;
-    const twinkle = (Math.sin((time / LEGACY_GOAL_STAR_SPARKLE_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset) + 1) / 2;
-    const sparkleColor = Phaser.Display.Color.HSVToRGB((time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS), 0.8, 1).color;
-    // Offset was tuned (radius*1.3) for the old, much smaller procedural
-    // diamond shape. The real VFX diamond image renders at roughly radius*4
-    // diagonal (see the useVfxDiamond branch above) -- a radius*1.3 offset
-    // landed the sparkle well inside that image's own footprint, and since
-    // titleOrbitDiamondImages is added to boardZoomContainer after
-    // titleGraphics (so it renders on top), the sparkle was being drawn
-    // completely underneath the diamond it was supposed to accent. Only
-    // some diamonds ever showed a visible sliver of it, at the animation
-    // phases where their wave-driven radius briefly shrank. radius*2.3
-    // clears the diamond's own half-extent (~radius*2) so every diamond's
-    // sparkle is actually visible, every frame.
-    this.drawLegacyFourPointSparkle(
+    this.drawLegacyWordmarkAmbientSparkles(
       this.titleGraphics,
-      centerX + (radius * 2.3),
-      centerY - (radius * 2.3),
-      radius * (0.35 + (twinkle * 0.3)),
-      sparkleColor,
-      alpha * (0.4 + (twinkle * 0.6))
+      centerX,
+      centerY,
+      radius * 2,
+      radius * 2,
+      time,
+      alpha,
+      4,
+      index + 1
     );
   }
 
@@ -7636,47 +7622,45 @@ export class MenuScene extends Phaser.Scene {
       height: titleLayout.rows
     };
 
-    // Prefer the real Mazer tile-font raster asset (drawLegacyTileFontWordTiled,
-    // same asset/helper the level announcer uses) for the actual "MAZER"
-    // wordmark -- tile-by-tile build/deconstruct and a fine-grained rainbow
-    // sweep, both driven by the same shared lifecycle progress the maze-path
-    // dot-cell wordmark used to consume directly. Falls back to the original
-    // hand-drawn maze-path-cell wordmark (build/glow/deconstruct
-    // choreography, gem facets, prism sweep) only if the font asset never
-    // loaded, so a broken asset never leaves the title blank.
+    // drawLegacyGlyphWordTileBlock: the actual "MAZER" wordmark is sampled
+    // from ONE real corridor-material square tile and rebuilt letter by
+    // letter from a 5x7 bitmap grid -- the same real tile the maze itself is
+    // built from, tile-by-tile reveal included -- not the old raster
+    // tile-font atlas (a pre-drawn glyph image merely cropped into chunks,
+    // never actually made of discrete tiles). No asset load to fail, so
+    // (unlike the old raster path) this never needs a fallback: the
+    // hand-drawn maze-path-cell wordmark below (gem facets, prism sweep) is
+    // therefore permanently unreachable dead code, kept in place rather than
+    // torn out in the same pass as this rewrite.
     let renderedTitleWithTileFont = false;
     if (titleTextVisible) {
       const titleCenterX = titleLayout.left + (titleLayout.width / 2);
       const titleCenterY = titleLayout.top + (titleLayout.height / 2);
-      const tileFontScale = titleLayout.height / MAZER_TILE_FONT_GLYPH_HEIGHT;
-      renderedTitleWithTileFont = this.drawLegacyTileFontWordTiled(
-        this.titleTileFontImagePool,
-        LEGACY_TITLE_WORD,
-        titleCenterX,
-        titleCenterY,
-        tileFontScale,
-        titlePresentation.titleAlpha,
+      // resolveLegacyGlyphWordLayout's bitmap grid is always 7 rows tall
+      // (LEGACY_GLYPH_LETTER_ROWS in legacyMenuTitle.ts) -- deriving the
+      // per-tile pixel size from the title's own already-computed height
+      // keeps this the same overall footprint the raster path used to fill.
+      const titleGlyphCellSize = Math.max(1, Math.round(titleLayout.height / 7));
+      const titleGlyphLayout = resolveLegacyGlyphWordLayout(LEGACY_TITLE_WORD, titleCenterX, titleCenterY, titleGlyphCellSize);
+      this.drawLegacyGlyphWordTileBlock(
+        this.titleGraphics,
+        titleGlyphLayout,
         time,
+        titlePresentation.titleAlpha,
         this.resolveLegacyMenuPathTitleProgress()
       );
-      if (renderedTitleWithTileFont) {
-        const titleWordHalfWidth = (
-          (MAZER_TILE_FONT_ADVANCE * Math.max(0, LEGACY_TITLE_WORD.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
-        ) * tileFontScale / 2;
-        this.drawLegacyWordmarkAmbientSparkles(
-          this.titleGraphics,
-          titleCenterX,
-          titleCenterY,
-          titleWordHalfWidth,
-          titleLayout.height / 2,
-          time,
-          titlePresentation.titleAlpha
-        );
-      }
+      renderedTitleWithTileFont = true;
+      this.drawLegacyWordmarkAmbientSparkles(
+        this.titleGraphics,
+        titleCenterX,
+        titleCenterY,
+        titleGlyphLayout.width / 2,
+        titleGlyphLayout.height / 2,
+        time,
+        titlePresentation.titleAlpha
+      );
     }
-    if (!renderedTitleWithTileFont) {
-      this.titleTileFontImagePool.forEach((image) => image.setVisible(false));
-    }
+    this.titleTileFontImagePool.forEach((image) => image.setVisible(false));
 
     if (!renderedTitleWithTileFont && titleTextVisible && visibleCells.length > 0) {
       for (const cell of visibleCells) {
@@ -8450,7 +8434,7 @@ export class MenuScene extends Phaser.Scene {
   // same menuStaticDrawLifecyclePhase transition, so this needs no mode
   // branch of its own beyond picking which track's level to show.
   private drawLegacyLevelAnnouncer(time: number): void {
-    const { alpha, scale, revealProgress } = this.resolveLegacyLevelAnnouncerVisualState(time);
+    const { alpha, scale } = this.resolveLegacyLevelAnnouncerVisualState(time);
     this.levelAnnouncerLabelText.setVisible(false);
     if (alpha <= 0) {
       this.levelAnnouncerNumberGraphics.setVisible(false);
@@ -8472,42 +8456,14 @@ export class MenuScene extends Phaser.Scene {
     const numberFontSize = Math.round(Math.min(this.layout.width, this.layout.height) * 0.16);
     const levelDigits = String(track.level);
 
-    // Prefer the real Mazer tile-font raster asset (drawLegacyTileFontWordTiled)
-    // -- tile-by-tile construct/deconstruct (driven by revealProgress, the
-    // same fade envelope alpha uses but pinned through the breathing pulse
-    // -- see applyLegacyLevelAnnouncerPulse) and a true full-hue HSV rainbow
-    // sweep, matching the title/Start-Login treatment exactly instead of a
-    // flat fade-in/out.
-    const tileFontScale = (numberFontSize / MAZER_TILE_FONT_GLYPH_HEIGHT) * scale;
-    const renderedWithTileFont = this.drawLegacyTileFontWordTiled(
-      this.levelAnnouncerNumberGlyphPool,
-      levelDigits,
-      centerX,
-      centerY,
-      tileFontScale,
-      alpha,
-      time,
-      revealProgress,
-      'tile'
-    );
-
-    if (renderedWithTileFont) {
-      const totalWidth = (
-        (MAZER_TILE_FONT_ADVANCE * Math.max(0, levelDigits.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
-      ) * tileFontScale;
-      this.levelAnnouncerNumberGraphics.clear();
-      this.drawLegacyLevelAnnouncerTwinkles(
-        this.levelAnnouncerNumberGraphics,
-        { left: -(totalWidth / 2), width: totalWidth, cellSize: MAZER_TILE_FONT_GLYPH_WIDTH * tileFontScale * 0.14 },
-        time
-      );
-      this.levelAnnouncerNumberGraphics.setPosition(centerX, centerY).setScale(1).setAlpha(alpha).setVisible(true);
-      return;
-    }
-
-    // Tile-font asset unavailable (failed to load) -- fall back to the
-    // procedural tile-block glyph rendering (same corridor material the
-    // title and Start/Login are built from) rather than showing nothing.
+    // drawLegacyGlyphWordTileBlock -- same real corridor-tile material the
+    // maze itself, the title, and Start/Login are all built from, not the
+    // raster tile-font atlas (a pre-drawn glyph image merely cropped into
+    // sub-tile chunks -- never actually made of discrete square tiles).
+    // revealProgress isn't threaded through here: this banner's own fade
+    // envelope (`alpha`, applied to the whole Graphics object below) already
+    // covers its in/out, and it's a short between-mazes flash rather than a
+    // tile-by-tile build.
     this.levelAnnouncerNumberGlyphPool.forEach((image) => image.setVisible(false));
     const cellSize = Math.max(2, Math.round(numberFontSize / 9));
     const glyphLayout = resolveLegacyGlyphWordLayout(levelDigits, 0, 0, cellSize);
@@ -8517,149 +8473,6 @@ export class MenuScene extends Phaser.Scene {
       .setScale(scale)
       .setAlpha(alpha)
       .setVisible(true);
-  }
-
-  // Renders `word` from the real Mazer tile-font raster asset (a white-on-
-  // transparent atlas -- see BootScene.ts's own header comment for why this
-  // exists and how its frames get registered), split into
-  // LEGACY_TILE_FONT_SUB_TILE_COLUMNS x LEGACY_TILE_FONT_SUB_TILE_ROWS
-  // independently cropped/tinted tiles per character (Image.setCrop, which
-  // clips a sub-rect of the frame's own pixel space while leaving the
-  // object's position/scale/rotation untouched -- so every tile of one
-  // letter sits at that letter's single position and only their crop rects
-  // differ). This is what restores the original maze-path dot-cell
-  // renderer's "individual tiles build/collapse one at a time" choreography
-  // on top of the crisp raster asset (a whole-letter-at-a-time version of
-  // this regressed that on the first pass -- see this method's own git
-  // history), and gives the rainbow sweep tile-grain resolution instead of
-  // one flat color per letter.
-  //
-  // revealProgress is a 0 (nothing built) .. 1 (fully built) value owned by
-  // the caller -- ramping it down after 1 is what plays deconstruct, since
-  // the reveal test below is symmetric. Tiles reveal/collapse in a bottom-
-  // left-to-top-right diagonal sweep across the WHOLE word (same convention
-  // resolveLegacyMenuTitleTrailCellMetric already uses for the trail wipe),
-  // most-letter-significant tile first, so it reads as one continuous sweep
-  // rather than each letter popping in as a unit.
-  //
-  // Returns false (and hides the whole pool) without drawing anything if the
-  // texture never loaded, so callers can fall back to their own procedural
-  // glyph rendering. `pool` must have at least word.length *
-  // LEGACY_TILE_FONT_TILES_PER_GLYPH slots.
-  private drawLegacyTileFontWordTiled(
-    pool: readonly Phaser.GameObjects.Image[],
-    word: string,
-    centerX: number,
-    centerY: number,
-    scale: number,
-    alpha: number,
-    time: number,
-    revealProgress: number,
-    colorGrain: 'letter' | 'tile' = 'letter'
-  ): boolean {
-    if (!this.textures.exists(MAZER_TILE_FONT_TEXTURE_KEY)) {
-      pool.forEach((image) => image.setVisible(false));
-      return false;
-    }
-    const texture = this.textures.get(MAZER_TILE_FONT_TEXTURE_KEY);
-    const characters = [...word];
-    const advance = MAZER_TILE_FONT_ADVANCE * scale;
-    const glyphWidth = MAZER_TILE_FONT_GLYPH_WIDTH * scale;
-    const totalWidth = (advance * Math.max(0, characters.length - 1)) + glyphWidth;
-    const startX = centerX - (totalWidth / 2) + (glyphWidth / 2);
-    const tileWidth = MAZER_TILE_FONT_GLYPH_WIDTH / LEGACY_TILE_FONT_SUB_TILE_COLUMNS;
-    const tileHeight = MAZER_TILE_FONT_GLYPH_HEIGHT / LEGACY_TILE_FONT_SUB_TILE_ROWS;
-    const totalColumns = characters.length * LEGACY_TILE_FONT_SUB_TILE_COLUMNS;
-    const maxMetric = Math.max(1, (totalColumns - 1) + (LEGACY_TILE_FONT_SUB_TILE_ROWS - 1));
-    const totalTiles = Math.max(1, characters.length * LEGACY_TILE_FONT_TILES_PER_GLYPH);
-    const clampedRevealProgress = clamp(revealProgress, 0, 1);
-    // LEGACY_TILE_FONT_REVEAL_SOFT_BAND_TILES is 0 (see its own comment) --
-    // sweepRange collapses to exactly maxMetric, so progress=1 lands
-    // sweepPosition exactly on the last tile's own metric and the hard
-    // step below (tileVisibility) reveals it, no divide-by-zero band math.
-    const sweepRange = maxMetric + LEGACY_TILE_FONT_REVEAL_SOFT_BAND_TILES;
-    const sweepPosition = clampedRevealProgress * sweepRange;
-    let renderedAny = false;
-    let poolCursor = 0;
-
-    characters.forEach((char, charIndex) => {
-      const frameKey = char.toUpperCase();
-      const frameExists = texture.has(frameKey);
-      const letterCenterX = startX + (charIndex * advance);
-      for (let row = 0; row < LEGACY_TILE_FONT_SUB_TILE_ROWS; row += 1) {
-        for (let col = 0; col < LEGACY_TILE_FONT_SUB_TILE_COLUMNS; col += 1) {
-          const image = pool[poolCursor];
-          const globalTileIndex = poolCursor;
-          poolCursor += 1;
-          if (!image) {
-            continue;
-          }
-          if (!frameExists) {
-            image.setVisible(false);
-            continue;
-          }
-          const globalColumn = (charIndex * LEGACY_TILE_FONT_SUB_TILE_COLUMNS) + col;
-          // Bottom-left-to-top-right: column rises left-to-right, row rises
-          // bottom-to-top (row 0 is the glyph's own top edge).
-          const metric = globalColumn + ((LEGACY_TILE_FONT_SUB_TILE_ROWS - 1) - row);
-          // Hard on/off snap, not a cross-fade -- a tile is either fully
-          // drawn or not drawn at all, exactly like the maze's own reveal
-          // (isLegacyMenuPointVisibleInStaticDraw has no partial-alpha
-          // state either). Reported as "should generate tile by tile like
-          // the maze does," and a multi-tile soft fade band was the actual
-          // bug: it made a whole diagonal swath of tiles visible at partial
-          // alpha simultaneously, reading as a smooth gradient wipe instead
-          // of individual tiles popping in.
-          const tileVisibility = sweepPosition >= metric ? 1 : 0;
-          if (tileVisibility <= 0) {
-            image.setVisible(false);
-            continue;
-          }
-          // Phaser's Canvas renderer (this project runs Phaser in Canvas
-          // mode, not WebGL -- see BootScene.ts's own header comment on
-          // MAZER_TILE_FONT_RAINBOW_STEPS) never applies Image tint at all,
-          // so Image.setTint()/setTintFill() here would be a silent no-op --
-          // confirmed by reading CanvasRenderer.batchSprite and by direct
-          // pixel testing (every glyph rendered plain white regardless of
-          // the tint requested). Selecting one of BootScene's pre-baked
-          // hue-rotated texture copies instead of tinting at render time is
-          // what actually works under Canvas rendering.
-          // 'letter' mode: one flat hue per LETTER (not a smooth sweep
-          // across individual tiles) -- matching the actual reference
-          // mockup, where each letter of the wordmark is its own solid
-          // color, not a rainbow gradient running through it. Used for the
-          // title/Start-Login, reported as "should be generated tile by
-          // tile, not like a gradient" against a shared per-tile-index hue
-          // (still used in 'tile' mode, for the level number, where a
-          // fine-grained rainbow was explicitly and repeatedly asked for) --
-          // per-tile hues are close enough between neighboring tiles across
-          // a whole multi-letter word to read as one continuous gradient
-          // wipe rather than distinct letters.
-          const hue = (time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (
-            colorGrain === 'letter'
-              ? charIndex / Math.max(1, characters.length)
-              : globalTileIndex / totalTiles
-          );
-          const hueStep = Math.floor(((hue % 1) + 1) % 1 * MAZER_TILE_FONT_RAINBOW_STEPS);
-          const rainbowTextureKey = resolveMazerTileFontRainbowTextureKey(hueStep);
-          const tileTextureKey = this.textures.exists(rainbowTextureKey)
-            ? rainbowTextureKey
-            : MAZER_TILE_FONT_TEXTURE_KEY;
-          image
-            .setTexture(tileTextureKey, frameKey)
-            .setPosition(letterCenterX, centerY)
-            .setScale(scale)
-            .setCrop(col * tileWidth, row * tileHeight, tileWidth, tileHeight)
-            .setAlpha(alpha * tileVisibility)
-            .setVisible(true);
-          renderedAny = true;
-        }
-      }
-    });
-    for (; poolCursor < pool.length; poolCursor += 1) {
-      pool[poolCursor]?.setVisible(false);
-    }
-    return renderedAny;
   }
 
   // Renders the level-announcer's number as tile-block glyph cells (same
@@ -8678,13 +8491,43 @@ export class MenuScene extends Phaser.Scene {
   // around local (0, 0)) -- drawn into this same Graphics object so they
   // inherit the caller's position/scale/alpha transform for free instead of
   // needing their own separately-computed one.
-  private drawLegacyLevelAnnouncerNumberGlyph(
+  // The one shared renderer for every tile-block word on screen (title,
+  // Start/Login, and the level number): samples ONE square tile -- the same
+  // corridor material function the maze itself is built from
+  // (drawLegacyPathMaterialTile) -- and rebuilds the word's letters/digits
+  // piece by piece from a 5x7 bitmap grid (resolveLegacyGlyphWordLayout),
+  // exactly the way the maze itself is built from repeated square tiles.
+  // Replaced three separate, inconsistent renderers: the raster tile-font
+  // atlas (a pre-drawn glyph image merely cropped into sub-tile chunks, not
+  // actually made of discrete tiles -- couldn't be "sampled as a singular
+  // square" because there wasn't one), and two earlier hand-tuned dot-cell
+  // fallbacks (title's own prism-sweep gem cells, buttons' own trail-wipe
+  // cells) that used this same material but a flat two-tone palette instead
+  // of a rainbow.
+  //
+  // Color: every cell samples the exact same full-hue HSV rainbow formula
+  // the level number always used (time-shifting hue keyed off the cell's
+  // absolute column across the WHOLE word) -- continuous across letter
+  // boundaries, not one flat color per letter, so it reads as a shifting
+  // mirage sweeping across the word instead of color-blocked letters.
+  // Reveal: revealProgress (default 1, i.e. fully drawn -- the level number
+  // never animates in) gates how many cells from the front of `layout.cells`
+  // are drawn at all, via the same ceil-based piece count title/buttons
+  // already used for their own tile-by-tile build -- a cell is either fully
+  // drawn or not drawn, never partially faded, matching the maze's own
+  // reveal.
+  // Border: a thin black stroke around each cell's own outer edge (centered
+  // on the boundary, so it bleeds slightly outside the fill) for contrast/
+  // visibility against the busy rainbow-on-rainbow background.
+  private drawLegacyGlyphWordTileBlock(
     graphics: Phaser.GameObjects.Graphics,
     layout: LegacyGlyphWordLayout,
-    time: number
+    time: number,
+    alpha: number,
+    revealProgress: number = 1
   ): void {
     graphics.clear();
-    if (layout.cells.length <= 0) {
+    if (layout.cells.length <= 0 || alpha <= 0) {
       return;
     }
     const pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'> = {
@@ -8692,11 +8535,10 @@ export class MenuScene extends Phaser.Scene {
       height: layout.rows,
       width: layout.columns
     };
-    // Fallback path (tile-font texture failed to load) -- same true
-    // full-hue HSV rainbow the raster path above now uses, not
-    // resolveLegacyIridescentTrailColor's "midnight" (no red/orange/yellow)
-    // palette, so a broken asset doesn't also change what "rainbow" means.
-    for (const cell of layout.cells) {
+    const visibleCellCount = clamp(Math.ceil(layout.cells.length * clamp(revealProgress, 0, 1)), 0, layout.cells.length);
+    const borderWidth = Math.max(1, Math.round(layout.cellSize * 0.08));
+    for (let index = 0; index < visibleCellCount; index += 1) {
+      const cell = layout.cells[index];
       const cellColor = Phaser.Display.Color.HSVToRGB(
         (time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (cell.column / Math.max(1, layout.columns)),
         0.8,
@@ -8710,65 +8552,26 @@ export class MenuScene extends Phaser.Scene {
         layout.top,
         layout.cellSize,
         {
-          coreAlpha: 0.96,
+          coreAlpha: 0.96 * alpha,
           coreColor: cellColor,
           drawCue: false,
-          edgeAlpha: 0.88,
+          edgeAlpha: 0.88 * alpha,
           edgeColor: mixLegacyIridescentColor(cellColor, 0x000000, 0.35)
         }
       );
+      const tileRect = this.resolveLegacyPixelTileRect(layout.left, layout.top, layout.cellSize, { x: cell.column, y: cell.row });
+      graphics.lineStyle(borderWidth, 0x000000, 0.85 * alpha);
+      graphics.strokeRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
     }
-
-    this.drawLegacyLevelAnnouncerTwinkles(graphics, layout, time);
   }
 
-  // Two small twinkling sparkle accents, one flanking each side of the
-  // level-announcer number, vertically centered on it. Each side gets a
-  // primary sparkle plus a smaller companion offset above it -- reads as a
-  // little twinkling cluster rather than a single blinking dot -- and the
-  // two sides pulse on independently phased sine waves so they don't blink
-  // in lockstep.
-  private drawLegacyLevelAnnouncerTwinkles(
+  private drawLegacyLevelAnnouncerNumberGlyph(
     graphics: Phaser.GameObjects.Graphics,
-    layout: Pick<LegacyGlyphWordLayout, 'left' | 'width' | 'cellSize'>,
+    layout: LegacyGlyphWordLayout,
     time: number
   ): void {
-    if (this.prefersLegacyReducedMotion()) {
-      return;
-    }
-    const gap = Math.max(6, layout.cellSize * 2.4);
-    const baseSize = Math.max(3, layout.cellSize * 1.6);
-    const localCenterY = 0;
-
-    const drawTwinkleCluster = (x: number, mirror: number, phaseOffset: number): void => {
-      const primaryPhase = (Math.sin((time / LEGACY_LEVEL_ANNOUNCER_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset) + 1) / 2;
-      const primaryColor = resolveLegacyIridescentTrailColor(0, 1, time);
-      this.drawLegacyFourPointSparkle(
-        graphics,
-        x,
-        localCenterY,
-        baseSize * (0.75 + (primaryPhase * 0.4)),
-        primaryColor,
-        0.5 + (primaryPhase * 0.5)
-      );
-
-      const secondaryPhase = (Math.sin((time / LEGACY_LEVEL_ANNOUNCER_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset + (Math.PI * 0.6)) + 1) / 2;
-      // Rainbow too, not plain white -- sampled at a time-shifted offset
-      // from the primary sparkle's own color so the two read as two
-      // distinct hues from the same rainbow cycle rather than identical.
-      const secondaryColor = resolveLegacyIridescentTrailColor(0, 1, time + (LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS * 0.3));
-      this.drawLegacyFourPointSparkle(
-        graphics,
-        x + (baseSize * 0.9 * mirror),
-        localCenterY - (baseSize * 1.1),
-        baseSize * (0.35 + (secondaryPhase * 0.25)),
-        secondaryColor,
-        0.4 + (secondaryPhase * 0.5)
-      );
-    };
-
-    drawTwinkleCluster(layout.left - gap, 1, 0);
-    drawTwinkleCluster(layout.left + layout.width + gap, -1, Math.PI * 0.35);
+    this.drawLegacyGlyphWordTileBlock(graphics, layout, time, 1);
+    this.drawLegacyWordmarkAmbientSparkles(graphics, layout.left + (layout.width / 2), 0, layout.width / 2, layout.height / 2, time, 1);
   }
 
   // A small 4-point sparkle/glint glyph, used for the level-announcer's
@@ -8874,7 +8677,9 @@ export class MenuScene extends Phaser.Scene {
     halfWidth: number,
     halfHeight: number,
     time: number,
-    alpha: number
+    alpha: number,
+    slotCount: number = LEGACY_WORDMARK_SPARKLE_COUNT,
+    seedSalt: number = 0
   ): void {
     if (this.prefersLegacyReducedMotion() || alpha <= 0 || halfWidth <= 0 || halfHeight <= 0) {
       return;
@@ -8888,8 +8693,13 @@ export class MenuScene extends Phaser.Scene {
     // regardless of how many letters are in the word.
     const baseSize = Math.max(1.5, halfHeight * 0.13);
 
-    for (let slot = 0; slot < LEGACY_WORDMARK_SPARKLE_COUNT; slot += 1) {
-      const slotSeed = (slot + 1) * 91.7;
+    for (let slot = 0; slot < slotCount; slot += 1) {
+      // seedSalt lets multiple independent callers (each orbit diamond, in
+      // addition to the one wordmark) share this same method without their
+      // sparkle patterns all landing in lockstep -- every seed below mixes
+      // it in, so two callers with different salts get fully independent
+      // positions/timing/color even at the same `time` and `slot` index.
+      const slotSeed = ((slot + 1) * 91.7) + (seedSalt * 13.37);
       const periodMs = LEGACY_WORDMARK_SPARKLE_CYCLE_MS * (0.7 + (this.resolveLegacyPseudoRandomUnit(slotSeed) * 0.9));
       const phaseOffsetMs = this.resolveLegacyPseudoRandomUnit(slotSeed + 0.31) * periodMs;
       const cycleTime = time + phaseOffsetMs;
@@ -8910,7 +8720,7 @@ export class MenuScene extends Phaser.Scene {
       // A fresh pseudo-random perimeter position + hue + size each time
       // this slot's cycle rolls over (keyed by cycleIndex, not time) --
       // "random positions," plural, not one fixed spot reused every cycle.
-      const positionSeed = (slot * 733) + (cycleIndex * 17.13) + 4.1;
+      const positionSeed = (slot * 733) + (cycleIndex * 17.13) + 4.1 + (seedSalt * 5.51);
       const perimeterT = this.resolveLegacyPseudoRandomUnit(positionSeed);
       const { x: offsetX, y: offsetY } = this.resolveLegacyWordmarkSparklePerimeterPoint(
         perimeterT,
@@ -9013,26 +8823,27 @@ export class MenuScene extends Phaser.Scene {
     if (flashAlpha <= 0) {
       return;
     }
-    // The impact flash lands at one shared point (not per-origin), so it
-    // takes a single rainbow sample rather than a per-index spread --
-    // matches the same instantaneous-sample pattern already used for
-    // rainbow-colored text (see resolveLegacyPlayPerfectPathTrail's own
-    // caller for the toCyberArcadeCssHex(resolveLegacyIridescentTrailColor(0, 1, time))
-    // pattern).
-    const flashColor = resolveLegacyIridescentTrailColor(0, 1, time);
-    const flashRadius = 4 + (state.flashProgress * 26);
-    // A second, larger trailing ring a beat behind the main one -- reads as
-    // a shockwave instead of one flat circle stroking outward.
-    const trailProgress = clamp(state.flashProgress - 0.18, 0, 1);
-    const trailAlpha = (1 - trailProgress) * 0.5;
-    if (trailAlpha > 0) {
-      this.playerSpawnBurstGraphics.lineStyle(Math.max(1, 2 * (1 - trailProgress)), flashColor, trailAlpha);
-      this.playerSpawnBurstGraphics.strokeCircle(targetX, targetY, 4 + (trailProgress * 26));
+    // Was a double-ring shockwave stroking out to a 26px radius -- reported
+    // as "a weird massive circle of laser at player position... remove the
+    // massive UI part, we only want the lasers coming from player, maybe a
+    // 'poof' animation w some stars that twinkle out." Replaced with exactly
+    // that: a small one-shot burst of sparkles scattered around the landing
+    // point, expanding slightly and fading out as flashProgress advances,
+    // instead of a large stroked ring.
+    const poofSparkleCount = 6;
+    const poofRadius = 3 + (state.flashProgress * 12);
+    for (let index = 0; index < poofSparkleCount; index += 1) {
+      const angle = ((index / poofSparkleCount) * Math.PI * 2) + (state.flashProgress * 0.6);
+      const sparkleColor = resolveLegacyIridescentTrailColor(index, poofSparkleCount, time);
+      this.drawLegacyFourPointSparkle(
+        this.playerSpawnBurstGraphics,
+        targetX + (Math.cos(angle) * poofRadius),
+        targetY + (Math.sin(angle) * poofRadius),
+        Math.max(1, 3.5 * flashAlpha),
+        sparkleColor,
+        flashAlpha
+      );
     }
-    this.playerSpawnBurstGraphics.lineStyle(Math.max(1, 3 * (1 - state.flashProgress)), flashColor, flashAlpha);
-    this.playerSpawnBurstGraphics.strokeCircle(targetX, targetY, flashRadius);
-    this.playerSpawnBurstGraphics.fillStyle(flashColor, flashAlpha * 0.7);
-    this.playerSpawnBurstGraphics.fillCircle(targetX, targetY, Math.max(1, 7 * (1 - state.flashProgress)));
   }
 
   private clearLegacyPlayerProgressionBadge(): void {
@@ -9653,12 +9464,18 @@ export class MenuScene extends Phaser.Scene {
     // rainbow ring/star still read on top of it. Bumped noticeably brighter
     // and wider a second time -- still reported hard to spot at the
     // previous (0.28-0.42 alpha) intensity.
+    // Toned down a second time -- at the previous 0.48-0.9 alpha range this
+    // glow itself read as a solid blob that swallowed the crisp ring/star
+    // linework underneath it ("I can't even tell it's a star anymore, looks
+    // like a blob, use well-defined lines"). Kept only bright enough to
+    // still register as "something is here" at a glance -- the ring and
+    // star below carry the actual shape now, not this halo.
     const haloPulse = time !== undefined && !this.prefersLegacyReducedMotion()
       ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2
       : 0.5;
-    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha * (0.48 + (haloPulse * 0.2)));
+    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha * (0.22 + (haloPulse * 0.1)));
     graphics.fillCircle(centerX, centerY, maxRadius * (1.3 + (haloPulse * 0.15)));
-    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha * (0.68 + (haloPulse * 0.22)));
+    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha * (0.32 + (haloPulse * 0.12)));
     graphics.fillCircle(centerX, centerY, maxRadius * 0.85);
 
     // Thin pulsing rainbow outline tracing the tile's own square boundary --
@@ -10070,81 +9887,23 @@ export class MenuScene extends Phaser.Scene {
     time: number,
     active = false
   ): void {
-    graphics.clear();
-    const pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'> = {
-      grid: layout.grid,
-      height: layout.rows,
-      width: layout.columns
-    };
+    // drawLegacyGlyphWordTileBlock: same real corridor-tile material and
+    // full-hue rainbow mirage every other tile-block word on screen uses
+    // (see that method's own header comment) -- replaces this button's own
+    // separate flat progression-palette + trail-wipe coloring so Start/Login
+    // reads as the same material as the title and level number instead of a
+    // third, visually distinct treatment.
     const visiblePieceCount = this.resolveLegacyMenuPathTitleVisiblePieces(layout.cells.length);
-    const visibleCells = layout.cells.slice(0, visiblePieceCount);
-    if (visibleCells.length <= 0) {
-      return;
-    }
-
-    const trailSweepFrame = this.resolveLegacyMenuTitleTrailSweepFrame(time);
-    const trailColor = resolveLegacyIridescentTrailColor(
-      0,
-      1,
+    const revealProgress = layout.cells.length > 0 ? visiblePieceCount / layout.cells.length : 1;
+    this.drawLegacyGlyphWordTileBlock(graphics, layout, time, active ? 1 : 0.95, revealProgress);
+    this.drawLegacyWordmarkAmbientSparkles(
+      graphics,
+      layout.left + (layout.width / 2),
+      layout.top + (layout.height / 2),
+      layout.width / 2,
+      layout.height / 2,
       time,
-      this.resolveActiveLegacyProgressionPalette().trailColor
-    );
-    for (const cell of visibleCells) {
-      const cellMetric = this.resolveLegacyMenuTitleTrailCellMetric(
-        { column: cell.column, order: 0, row: cell.row },
-        layout.columns,
-        layout.rows
-      );
-      const fillAmount = this.resolveLegacyMenuTitleTrailCellFillAmount(cellMetric, trailSweepFrame);
-      const cellCoreColor = fillAmount > 0
-        ? mixLegacyIridescentColor(LEGACY_MENU_PATH_CORE, trailColor, fillAmount)
-        : LEGACY_MENU_PATH_CORE;
-      const cellEdgeColor = fillAmount > 0
-        ? mixLegacyIridescentColor(LEGACY_MENU_PATH_EDGE, trailColor, fillAmount)
-        : LEGACY_MENU_PATH_EDGE;
-      this.drawLegacyPathMaterialTile(
-        graphics,
-        { x: cell.column, y: cell.row },
-        pathSource,
-        layout.left,
-        layout.top,
-        layout.cellSize,
-        {
-          coreAlpha: active ? 1 : 0.95,
-          coreColor: cellCoreColor,
-          drawCue: false,
-          edgeAlpha: active ? 0.94 : 0.85,
-          edgeColor: cellEdgeColor
-        }
-      );
-    }
-  }
-
-  // Real tile-font raster asset version of drawLegacyMenuFrontDoorGlyphButton
-  // above -- delegates straight to drawLegacyTileFontWordTiled for the same
-  // tile-by-tile build/deconstruct and fine-grained rainbow sweep the title
-  // wordmark uses, driven by the same shared lifecycle progress. Preferred
-  // whenever the tile-font texture is loaded; the dot-cell version above
-  // remains the fallback (drawLegacyMenuFrontDoorGlyphButton is left
-  // untouched and still called when this returns false).
-  private drawLegacyMenuFrontDoorTileFontButton(
-    pool: readonly Phaser.GameObjects.Image[],
-    word: string,
-    centerX: number,
-    centerY: number,
-    scale: number,
-    time: number,
-    active: boolean
-  ): boolean {
-    return this.drawLegacyTileFontWordTiled(
-      pool,
-      word,
-      centerX,
-      centerY,
-      scale,
-      active ? 1 : 0.94,
-      time,
-      this.resolveLegacyMenuPathTitleProgress()
+      active ? 1 : 0.92
     );
   }
 
@@ -14441,13 +14200,6 @@ export class MenuScene extends Phaser.Scene {
     // still read from it) but is invisible -- the visible word is the tile
     // glyphs drawn onto `panel` below.
     let glyphLayout: LegacyGlyphWordLayout | null = null;
-    // Pool used only when the tile-font raster asset is available (see
-    // drawLegacyMenuFrontDoorTileFontButton) -- preferred over the dot-cell
-    // fallback below once it's created. Word length maxes out at 5
-    // ("Start"/"Login") so LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE covers
-    // it with no waste.
-    let titleFontButtonImagePool: Phaser.GameObjects.Image[] = [];
-    let tileFontButtonScale = 0;
     if (isPrimaryFrontDoorButton && isLegacyGlyphWordRenderable(text)) {
       label.setAlpha(0);
       const glyphColumns = resolveLegacyGlyphWordColumns(text);
@@ -14463,44 +14215,6 @@ export class MenuScene extends Phaser.Scene {
       panel.setPosition(x, y);
       glyphLayout = resolveLegacyGlyphWordLayout(text, 0, 0, glyphCellSize);
       this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout, 0, false);
-
-      // Fit the real tile-font raster word within the same padded button
-      // bounds the dot-cell fallback above was sized to.
-      const letters = [...text];
-      const tileFontTotalWidthAtScale1 = (
-        (MAZER_TILE_FONT_ADVANCE * Math.max(0, letters.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
-      );
-      const tileFontScaleFromWidth = Math.max(1, width - (glyphPaddingX * 2)) / tileFontTotalWidthAtScale1;
-      const tileFontScaleFromHeight = Math.max(1, height - (glyphPaddingY * 2)) / MAZER_TILE_FONT_GLYPH_HEIGHT;
-      tileFontButtonScale = Math.min(tileFontScaleFromWidth, tileFontScaleFromHeight);
-      titleFontButtonImagePool = Array.from(
-        { length: LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE * LEGACY_TILE_FONT_TILES_PER_GLYPH },
-        () => this.add.image(0, 0, MAZER_TILE_FONT_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
-      );
-      const renderedWithTileFont = this.drawLegacyMenuFrontDoorTileFontButton(
-        titleFontButtonImagePool,
-        text,
-        x,
-        y,
-        tileFontButtonScale,
-        0,
-        false
-      );
-      if (renderedWithTileFont) {
-        panel.clear();
-        const wordHalfWidth = (
-          (MAZER_TILE_FONT_ADVANCE * Math.max(0, letters.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
-        ) * tileFontButtonScale / 2;
-        this.drawLegacyWordmarkAmbientSparkles(
-          panel,
-          0,
-          0,
-          wordHalfWidth,
-          (MAZER_TILE_FONT_GLYPH_HEIGHT * tileFontButtonScale) / 2,
-          0,
-          frontDoorChrome?.labelAlpha ?? 0.92
-        );
-      }
     }
 
     const setActive = (active: boolean): void => {
@@ -14532,40 +14246,13 @@ export class MenuScene extends Phaser.Scene {
       text,
       updateFrame: glyphLayout
         ? (time: number) => {
-          const renderedWithTileFont = this.drawLegacyMenuFrontDoorTileFontButton(
-            titleFontButtonImagePool,
-            text,
-            x,
-            y,
-            tileFontButtonScale,
-            time,
-            primaryButtonActive
-          );
-          if (renderedWithTileFont) {
-            panel.clear();
-            const letters = [...text];
-            const wordHalfWidth = (
-              (MAZER_TILE_FONT_ADVANCE * Math.max(0, letters.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
-            ) * tileFontButtonScale / 2;
-            this.drawLegacyWordmarkAmbientSparkles(
-              panel,
-              0,
-              0,
-              wordHalfWidth,
-              (MAZER_TILE_FONT_GLYPH_HEIGHT * tileFontButtonScale) / 2,
-              time,
-              primaryButtonActive ? 1 : (frontDoorChrome?.labelAlpha ?? 0.92)
-            );
-          } else {
-            this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout!, time, primaryButtonActive);
-          }
+          this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout!, time, primaryButtonActive);
         }
         : undefined,
       destroy: () => {
         panel.destroy();
         background.destroy();
         label.destroy();
-        titleFontButtonImagePool.forEach((image) => image.destroy());
       }
     };
   }
