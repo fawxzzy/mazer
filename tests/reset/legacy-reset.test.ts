@@ -778,7 +778,17 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('backdropDirty: this.backdropDirty');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropPalette');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropShards');
-    expect(menuSceneSource).not.toContain('this.backdropGraphics.fillCircle');
+    // Angular shards/runes must stay angular, not regress back to the round
+    // orbs/motes this replaced -- scoped to that one method's own body, not
+    // the whole file, since the starfield's individual stars legitimately
+    // use fillCircle now (round points of light instead of flat square
+    // pixels -- "the stars kinda suck").
+    const shardMethodStart = menuSceneSource.indexOf('private drawLegacyBackdropShard(');
+    const shardMethodEnd = menuSceneSource.indexOf('\n  private ', shardMethodStart + 1);
+    expect(shardMethodStart).toBeGreaterThan(-1);
+    expect(shardMethodEnd).toBeGreaterThan(shardMethodStart);
+    const shardMethodSource = menuSceneSource.slice(shardMethodStart, shardMethodEnd);
+    expect(shardMethodSource).not.toContain('fillCircle');
   });
 
   test('cleans up localhost service workers before booting Phaser', () => {
