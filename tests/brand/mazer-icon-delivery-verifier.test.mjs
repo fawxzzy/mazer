@@ -53,7 +53,11 @@ describe('Mazer icon-delivery verifier', () => {
   test.each([
     'self.workbox.precacheAndRoute([{url:"favicon.ico"}],{});',
     'self.workbox.precacheAndRoute(dynamicEntries,{});',
-    'self.workbox.precacheAndRoute([{url:"favicon.ico",revision:"abc"}],{});self.workbox.precacheAndRoute([],{});'
+    'self.workbox.precacheAndRoute([{url:"favicon.ico",revision:"abc"}],{});self.workbox.precacheAndRoute([],{});',
+    'self.workbox.precacheAndRoute([{url:"favicon.ico",revision:"abc"},...dynamicEntries],{});',
+    'self.workbox.precacheAndRoute([{url:"favicon.ico",revision:"abc"},"favicon.ico"],{});',
+    'self.workbox.precacheAndRoute([{url:"favicon.ico",revision:"abc"},{revision:"stale"}],{});',
+    'self.workbox.precacheAndRoute([{url:"favicon.ico",revision:"abc"},],{});'
   ])('rejects incomplete or ambiguous Workbox source', (source) => {
     expect(() => extractWorkboxPrecacheEntries(source)).toThrow();
   });

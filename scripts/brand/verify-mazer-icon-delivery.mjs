@@ -153,14 +153,37 @@ export const extractWorkboxPrecacheEntries = (serviceWorkerSource) => {
     throw new Error('Service-worker source must be a nonempty string.');
   }
   const arraySource = findSinglePrecacheArray(serviceWorkerSource);
-  const urlTokenCount = [...arraySource.matchAll(/\burl\s*:/gu)].length;
-  const entryPattern = /\{\s*url\s*:\s*("(?:\\.|[^"\\])*")\s*,\s*revision\s*:\s*(null|"(?:\\.|[^"\\])*")\s*\}/gu;
-  const entries = [...arraySource.matchAll(entryPattern)].map((match) => ({
-    revision: match[2] === 'null' ? null : JSON.parse(match[2]),
-    url: JSON.parse(match[1])
-  }));
-  if (entries.length === 0 || entries.length !== urlTokenCount) {
-    throw new Error(`Unable to parse every Workbox precache entry: parsed ${entries.length} of ${urlTokenCount}.`);
+  const content = arraySource.slice(1, -1);
+  const entryPattern = /^\{\s*url\s*:\s*("(?:\\.|[^"\\])*")\s*,\s*revision\s*:\s*(null|"(?:\\.|[^"\\])*")\s*\}/u;
+  const entries = [];
+  let cursor = 0;
+  const skipWhitespace = () => {
+    while (/\s/u.test(content[cursor] ?? '')) cursor += 1;
+  };
+  skipWhitespace();
+  while (cursor < content.length) {
+    const match = content.slice(cursor).match(entryPattern);
+    if (!match) {
+      throw new Error(`Unable to parse complete Workbox precache array at offset ${cursor}.`);
+    }
+    entries.push({
+      revision: match[2] === 'null' ? null : JSON.parse(match[2]),
+      url: JSON.parse(match[1])
+    });
+    cursor += match[0].length;
+    skipWhitespace();
+    if (cursor === content.length) break;
+    if (content[cursor] !== ',') {
+      throw new Error(`Unexpected Workbox precache array syntax at offset ${cursor}.`);
+    }
+    cursor += 1;
+    skipWhitespace();
+    if (cursor === content.length) {
+      throw new Error('Trailing comma in Workbox precache array is forbidden.');
+    }
+  }
+  if (entries.length === 0) {
+    throw new Error('Workbox precache entry array must not be empty.');
   }
   return entries;
 };
