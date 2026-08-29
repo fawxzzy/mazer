@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import {
+  MAZER_FLOOR_TILE_TEXTURE_KEY,
   MAZER_TILE_FONT_RAINBOW_STEPS,
   MAZER_TILE_FONT_TEXTURE_KEY,
-  MAZER_VFX_DIAMOND_ENERGY_CORE_TEXTURE_KEY,
-  MAZER_VFX_DIAMOND_TEXTURE_KEY,
+  MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY,
   resolveMazerTileFontRainbowTextureKey
 } from './BootScene';
 import {
@@ -1024,7 +1024,18 @@ const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
 // the same factor and their relative spacing (and thus synchronous timing)
 // is unaffected.
 const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 14400;
-const LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE = 2;
+// Was 2 full rotations packed into a single building/deconstructing pass --
+// reported as the orbit diamonds getting "forced to go crazy fast" (2 full
+// laps in the same few seconds the tile reveal used to always take,
+// regardless of maze size, before resolveLegacyMenuStaticDrawTileBatchSize
+// started letting that duration actually grow with tile count). Reduced
+// well below one full rotation so the spin reads as a calm ambient drift
+// even during the shortest (smallest-maze) pass, while keeping the
+// deliberate "always lands in its resting position exactly when generation
+// finishes" sync (see resolveLegacyMenuPathTitleOrbitLifecycleProgress's
+// own comment) instead of decoupling the two, which would need its own
+// separate settle-transition handling.
+const LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE = 0.35;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;
 // A trail-color wipe across the title tiles: fills bottom-left to top-right
 // (combining "left to right" and "bottom to top" into one diagonal sweep
@@ -1192,6 +1203,9 @@ const LEGACY_TILE_FONT_REVEAL_SOFT_BAND_TILES = 1.5;
 // Native pixel size (square) of the iridescent-diamond VFX source art --
 // see docs/assets/mazer-vfx-source-provenance.md.
 const MAZER_VFX_DIAMOND_SOURCE_SIZE = 1254;
+// Native pixel size (square) of the floor-tile material source art -- see
+// docs/assets/mazer-vfx-source-provenance.md.
+const MAZER_FLOOR_TILE_SOURCE_SIZE = 1254;
 // The source art's own long axis runs from its lower-left corner to its
 // upper-right corner at zero rotation -- its pointed tip faces up-and-right,
 // roughly -45 degrees in screen-space angle convention (positive x, negative
@@ -1211,6 +1225,21 @@ const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;
 const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;
 const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;
 const LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS = 64;
+// Comfortable tile-reveal rate (how many tiles pop in per tick) at typical
+// board sizes -- resolveLegacyMenuStaticDrawTileBatchSize below prefers
+// this over LEGACY_*_STATIC_DRAW_TARGET_TICKS' own fixed-tick-count
+// formula once a board's tile count would otherwise force a bigger batch,
+// so build/deconstruct duration actually grows with maze size instead of
+// compressing into the same fixed total regardless of it (reported: "the
+// mazes generate at a hardcoded speed... they don't need to meet a
+// hardcoded speed as they get bigger" -- a huge board's tile reveal used
+// to batch dozens of tiles per tick to fit the same fixed tick count a
+// tiny board also used, reading as a near-instant flash instead of a
+// build). LEGACY_STATIC_DRAW_MAX_TICKS is still an upper bound so a truly
+// enormous board doesn't take unreasonably long -- batch size widens again
+// only past that.
+const LEGACY_STATIC_DRAW_TARGET_TILES_PER_TICK = 3;
+const LEGACY_STATIC_DRAW_MAX_TICKS = 420;
 const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
 const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;
 const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;
@@ -1505,9 +1534,6 @@ export class MenuScene extends Phaser.Scene {
   // replaces the procedural drawLegacyMenuPathTitleDiamond shape entirely
   // when the texture loaded successfully.
   private titleOrbitDiamondImages: Phaser.GameObjects.Image[] = [];
-  // The "energy core" VFX art, layered on top of/inside each orbit diamond
-  // above -- see drawLegacyMenuPathTitleOrbitSigils's own comment.
-  private titleOrbitDiamondEnergyCoreImages: Phaser.GameObjects.Image[] = [];
   // Pool rendering the literal "MAZER" wordmark from the real tile-font
   // raster asset (see LEGACY_TITLE_WORD / drawLegacyMenuPathTitle) -- falls
   // back to the original maze-path dot-cell glyph only if the asset never
@@ -1566,6 +1592,15 @@ export class MenuScene extends Phaser.Scene {
   private backdropGraphics!: Phaser.GameObjects.Graphics;
   private boardStaticGraphics!: Phaser.GameObjects.Graphics;
   private boardPathGraphics!: Phaser.GameObjects.Graphics;
+  // Real floor-tile material (see docs/assets/mazer-vfx-source-provenance.md)
+  // tiled across exactly the walkable-cell shape via boardFloorMaskGraphics
+  // (a GeometryMask, rebuilt every drawBoardPaths call from the identical
+  // per-cell rects the color fill itself uses) and layered on top of
+  // boardPathGraphics at partial alpha -- an overlay, not a replacement, so
+  // the existing progression-palette/trail coloring and rim-light glow
+  // still show through underneath it.
+  private boardFloorTileSprite!: Phaser.GameObjects.TileSprite;
+  private boardFloorMaskGraphics!: Phaser.GameObjects.Graphics;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -1746,11 +1781,20 @@ export class MenuScene extends Phaser.Scene {
     this.boardZoomContainer = this.add.container(0, 0);
     this.boardStaticGraphics = this.add.graphics();
     this.boardPathGraphics = this.add.graphics();
+    // 1x1 placeholder size -- resized/repositioned every drawBoardPaths call
+    // once the real maze render frame is known. Masked to
+    // boardFloorMaskGraphics so it only ever shows through the actual
+    // walkable-cell shape, never over walls/void.
+    this.boardFloorTileSprite = this.add.tileSprite(0, 0, 1, 1, MAZER_FLOOR_TILE_TEXTURE_KEY).setOrigin(0, 0).setAlpha(0.5);
+    this.boardFloorMaskGraphics = this.add.graphics().setVisible(false);
+    this.boardFloorTileSprite.setMask(new Phaser.Display.Masks.GeometryMask(this, this.boardFloorMaskGraphics));
     this.boardDynamicGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
     this.boardZoomContainer.add([
       this.boardStaticGraphics,
       this.boardPathGraphics,
+      this.boardFloorTileSprite,
+      this.boardFloorMaskGraphics,
       this.boardDynamicGraphics,
       this.titleGraphics
     ]);
@@ -1807,16 +1851,9 @@ export class MenuScene extends Phaser.Scene {
     // is what the "Board Zoom" setting scales) -- the orbit-pose math
     // already computes positions in that same space.
     this.titleOrbitDiamondImages = Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, () => (
-      this.add.image(0, 0, MAZER_VFX_DIAMOND_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
+      this.add.image(0, 0, MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
     ));
     this.boardZoomContainer.add(this.titleOrbitDiamondImages);
-    // Added after (so it renders on top of) the outer shell pool above --
-    // see drawLegacyMenuPathTitleOrbitSigils's own comment on why this
-    // exists.
-    this.titleOrbitDiamondEnergyCoreImages = Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, () => (
-      this.add.image(0, 0, MAZER_VFX_DIAMOND_ENERGY_CORE_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
-    ));
-    this.boardZoomContainer.add(this.titleOrbitDiamondEnergyCoreImages);
     // Added to boardZoomContainer, same reasoning as titleOrbitDiamondImages
     // above: the title wordmark lives in that same local coordinate space
     // (titleGraphics is a member of it too) and must scale with it.
@@ -4899,10 +4936,20 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyMenuStaticDrawTileBatchSize(): number {
+    const tileCount = this.menuStaticDrawTileOrder.length;
     const targetTicks = this.mode === 'play'
       ? LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS
       : LEGACY_MENU_STATIC_DRAW_TARGET_TICKS;
-    return Math.max(1, Math.ceil(this.menuStaticDrawTileOrder.length / targetTicks));
+    // Below the old fixed-tick-count's own crossover point, keep matching
+    // it exactly (no regression for the board sizes this was always tuned
+    // against). Past it, prefer the flat per-tick rate instead of widening
+    // the batch further to force-fit the same tick count -- duration grows
+    // with tile count instead of staying constant. minBatchSize is the
+    // safety net past LEGACY_STATIC_DRAW_MAX_TICKS for boards large enough
+    // that even the flat rate would run unreasonably long.
+    const fixedTickBatchSize = Math.max(1, Math.ceil(tileCount / targetTicks));
+    const minBatchSize = Math.max(1, Math.ceil(tileCount / LEGACY_STATIC_DRAW_MAX_TICKS));
+    return Math.max(minBatchSize, Math.min(fixedTickBatchSize, LEGACY_STATIC_DRAW_TARGET_TILES_PER_TICK));
   }
 
   // Mirrors resolveLegacyMenuStaticDrawTileBatchSize's own scaling exactly,
@@ -5766,13 +5813,29 @@ export class MenuScene extends Phaser.Scene {
         : 0.5;
       const twinkleAlpha = star.alpha * (0.68 + (twinklePhase * 0.32));
       const starColor = starSeed > 0.82 ? 0xbfe3ff : (starSeed < 0.16 ? 0xffe9c2 : 0xffffff);
-      // The nearest, biggest stars get an extra outer bloom pass -- a single
-      // halo size read as flat once depth-correlated radii introduced real
-      // standout-bright stars; a wider third pass gives those a genuine glow
-      // instead of just a bigger flat square.
+      // The nearest, biggest stars get the same rainbow four-point sparkle
+      // the orbit diamonds/level number/title use, replacing the old flat
+      // bloom-square treatment -- reported as "the starfield never got
+      // updated... replace the backdrop stars w the sparkles." Left to only
+      // the standout-bright stars (coreSize > 3, already the ones singled
+      // out for extra treatment below) rather than every star in the field:
+      // there are hundreds of tiny background stars, and a full sparkle on
+      // every one of them would read as visual noise instead of depth.
       if (coreSize > 3) {
-        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.12);
-        this.backdropGraphics.fillRect(pixelX - 4, pixelY - 4, coreSize + 8, coreSize + 8);
+        const sparkleHue = Phaser.Display.Color.HSVToRGB(
+          (animationTime / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + starSeed,
+          0.8,
+          1
+        ).color;
+        this.drawLegacyFourPointSparkle(
+          this.backdropGraphics,
+          pixelX,
+          pixelY,
+          coreSize * (1.6 + (twinklePhase * 0.5)),
+          sparkleHue,
+          twinkleAlpha * palette.starAlphaScale
+        );
+        continue;
       }
       if (coreSize > 1) {
         this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.22);
@@ -6109,7 +6172,8 @@ export class MenuScene extends Phaser.Scene {
     originX: number,
     originY: number,
     tileSize: number,
-    options: LegacyPathMaterialOptions
+    options: LegacyPathMaterialOptions,
+    floorMaskGraphics?: Phaser.GameObjects.Graphics
   ): void {
     if (pathSource.grid[point.y]?.[point.x] !== true) {
       return;
@@ -6136,6 +6200,15 @@ export class MenuScene extends Phaser.Scene {
 
     graphics.fillStyle(options.coreColor, options.coreAlpha);
     graphics.fillRect(fillLeft, fillTop, fillRight - fillLeft, fillBottom - fillTop);
+    // Board callers pass their own mask graphics so the real floor-tile
+    // texture (boardFloorTileSprite) only ever shows through exactly the
+    // same connectivity-aware shape the color fill above just drew -- title/
+    // level-number/button callers of this same method never pass one, so
+    // they're unaffected.
+    if (floorMaskGraphics) {
+      floorMaskGraphics.fillStyle(0xffffff, 1);
+      floorMaskGraphics.fillRect(fillLeft, fillTop, fillRight - fillLeft, fillBottom - fillTop);
+    }
     this.drawLegacyPathTileFacet(
       graphics,
       tileRect,
@@ -6638,6 +6711,18 @@ export class MenuScene extends Phaser.Scene {
       : LEGACY_PLAY_PATH_EDGE;
 
     this.boardPathGraphics.clear();
+    this.boardFloorMaskGraphics.clear();
+    // Real floor-tile material's own scale: its 1254x1254 source maps to
+    // exactly one board tile, positioned to line up with mazeLeft/mazeTop
+    // exactly like the color fill above. Repositioned/rescaled every call
+    // since tileSize and the maze's own pixel origin both change with
+    // layout/zoom/board size.
+    this.boardFloorTileSprite.setPosition(mazeLeft, mazeTop);
+    this.boardFloorTileSprite.setSize(
+      Math.max(1, this.maze.width * tileSize),
+      Math.max(1, this.maze.height * tileSize)
+    );
+    this.boardFloorTileSprite.setTileScale(tileSize / MAZER_FLOOR_TILE_SOURCE_SIZE, tileSize / MAZER_FLOOR_TILE_SOURCE_SIZE);
     const drawPathPoint = (point: LegacyPoint): void => {
       this.drawLegacyPathMaterialTile(
         this.boardPathGraphics,
@@ -6653,7 +6738,8 @@ export class MenuScene extends Phaser.Scene {
           drawCue: false,
           edgeAlpha: isMenuMode ? LEGACY_MENU_PATH_EDGE_ALPHA : LEGACY_PLAY_PATH_EDGE_ALPHA,
           edgeColor: isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE
-        }
+        },
+        this.boardFloorMaskGraphics
       );
       this.drawLegacyPathBorderDock(
         this.boardPathGraphics,
@@ -7187,7 +7273,7 @@ export class MenuScene extends Phaser.Scene {
     // same relocation the deconstruct handoff burst got earlier, just for
     // the title's sparkle sigils.
     const orbitGeometry = this.resolveLegacyMenuPathTitleOrbitGeometry(titleLayout);
-    const useVfxDiamond = this.textures.exists(MAZER_VFX_DIAMOND_TEXTURE_KEY);
+    const useVfxDiamond = this.textures.exists(MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY);
 
     for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
       const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
@@ -7217,8 +7303,16 @@ export class MenuScene extends Phaser.Scene {
         // enough to overlap the MAZER/START lettering at some orbit
         // positions -- radius*4 is the compromise that stayed clear of both
         // in verification.
+        //
+        // Uses MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY, a single image with
+        // its own visible internal energy linework, NOT the plain shell
+        // composited with a separate energy-core overlay -- that composite
+        // was a real bug: edge-diamond-energy-core.png is a symmetric
+        // diamond shape with no inherent "point toward center" orientation,
+        // so stacking it near the shell's own scale read as "an extra
+        // diamond... not pointing to mid," exactly as reported. One image,
+        // one rotation, no compositing.
         const image = this.titleOrbitDiamondImages[index];
-        const energyCoreImage = this.titleOrbitDiamondEnergyCoreImages[index];
         if (image) {
           const targetDiagonal = radius * 4;
           // Always points its long axis in toward the true screen center,
@@ -7242,34 +7336,9 @@ export class MenuScene extends Phaser.Scene {
             .setScale(targetDiagonal / MAZER_VFX_DIAMOND_SOURCE_SIZE)
             .setAlpha(alpha)
             .setVisible(true);
-          // The "energy core" VFX source art (see
-          // docs/assets/mazer-vfx-source-provenance.md) nested inside the
-          // outer shell -- what was reported missing as "the energy in the
-          // diamonds." At this render size the outer shell's own dominant
-          // color reads as teal/green (its rainbow facet detail is too fine
-          // to hold up this small); the energy core is a much more evenly
-          // balanced full-spectrum rainbow and a bright white center, so
-          // layering it inside is what actually makes each diamond read as
-          // "carrying rainbow energy" rather than "green." Always shown at
-          // full presence (never built up over time) per "load with the
-          // energy in the diamonds already." 1.4x the shell's own scale
-          // factor since the core's visible diamond fills noticeably less
-          // of its own canvas than the shell's does -- screenshot-verified
-          // to sit nested inside the shell, not spill past it.
-          if (energyCoreImage) {
-            energyCoreImage
-              .setPosition(x, y)
-              .setRotation(rotation)
-              .setScale((targetDiagonal / MAZER_VFX_DIAMOND_SOURCE_SIZE) * 1.4)
-              .setAlpha(alpha)
-              .setVisible(true);
-          }
-        } else if (energyCoreImage) {
-          energyCoreImage.setVisible(false);
         }
         this.drawLegacyMenuPathTitleOrbitSigilTwinkle(index, x, y, radius, alpha, time);
       } else {
-        this.titleOrbitDiamondEnergyCoreImages[index]?.setVisible(false);
         // Smaller than the previous pass and using the same pale-core/teal-
         // rim colors as the actual corridor and title tiles instead of the
         // warm/gem gem-tone alternation, so these read as small maze tiles
@@ -7393,7 +7462,6 @@ export class MenuScene extends Phaser.Scene {
     this.titleGraphics.setVisible(sigilsVisible);
     if (!sigilsVisible) {
       this.titleOrbitDiamondImages.forEach((image) => image.setVisible(false));
-      this.titleOrbitDiamondEnergyCoreImages.forEach((image) => image.setVisible(false));
       this.titleTileFontImagePool.forEach((image) => image.setVisible(false));
       return;
     }
@@ -7442,6 +7510,19 @@ export class MenuScene extends Phaser.Scene {
         time,
         this.resolveLegacyMenuPathTitleProgress()
       );
+      if (renderedTitleWithTileFont) {
+        const titleWordHalfWidth = (
+          (MAZER_TILE_FONT_ADVANCE * Math.max(0, LEGACY_TITLE_WORD.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
+        ) * tileFontScale / 2;
+        this.drawLegacyWordmarkFlankingSparkles(
+          this.titleGraphics,
+          titleCenterX,
+          titleCenterY,
+          titleWordHalfWidth,
+          time,
+          titlePresentation.titleAlpha
+        );
+      }
     }
     if (!renderedTitleWithTileFont) {
       this.titleTileFontImagePool.forEach((image) => image.setVisible(false));
@@ -8211,7 +8292,8 @@ export class MenuScene extends Phaser.Scene {
       tileFontScale,
       alpha,
       time,
-      revealProgress
+      revealProgress,
+      'tile'
     );
 
     if (renderedWithTileFont) {
@@ -8277,7 +8359,8 @@ export class MenuScene extends Phaser.Scene {
     scale: number,
     alpha: number,
     time: number,
-    revealProgress: number
+    revealProgress: number,
+    colorGrain: 'letter' | 'tile' = 'letter'
   ): boolean {
     if (!this.textures.exists(MAZER_TILE_FONT_TEXTURE_KEY)) {
       pool.forEach((image) => image.setVisible(false));
@@ -8343,7 +8426,22 @@ export class MenuScene extends Phaser.Scene {
           // the tint requested). Selecting one of BootScene's pre-baked
           // hue-rotated texture copies instead of tinting at render time is
           // what actually works under Canvas rendering.
-          const hue = (time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (globalTileIndex / totalTiles);
+          // 'letter' mode: one flat hue per LETTER (not a smooth sweep
+          // across individual tiles) -- matching the actual reference
+          // mockup, where each letter of the wordmark is its own solid
+          // color, not a rainbow gradient running through it. Used for the
+          // title/Start-Login, reported as "should be generated tile by
+          // tile, not like a gradient" against a shared per-tile-index hue
+          // (still used in 'tile' mode, for the level number, where a
+          // fine-grained rainbow was explicitly and repeatedly asked for) --
+          // per-tile hues are close enough between neighboring tiles across
+          // a whole multi-letter word to read as one continuous gradient
+          // wipe rather than distinct letters.
+          const hue = (time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (
+            colorGrain === 'letter'
+              ? charIndex / Math.max(1, characters.length)
+              : globalTileIndex / totalTiles
+          );
           const hueStep = Math.floor(((hue % 1) + 1) % 1 * MAZER_TILE_FONT_RAINBOW_STEPS);
           const rainbowTextureKey = resolveMazerTileFontRainbowTextureKey(hueStep);
           const tileTextureKey = this.textures.exists(rainbowTextureKey)
@@ -8513,6 +8611,41 @@ export class MenuScene extends Phaser.Scene {
     buildCross(1);
     graphics.fillStyle(cyberArcadeMaterial.rail.white, alpha);
     graphics.fillCircle(centerX, centerY, size * 0.16);
+  }
+
+  // Two rainbow four-point sparkles flanking a wordmark -- same glyph the
+  // orbit diamonds and level number already twinkle with, added to the
+  // title and Start/Login button so the sparkle treatment reads as one
+  // consistent family across every rainbow element instead of being
+  // exclusive to the diamonds. `halfWidth` is the wordmark's own half-width
+  // (sparkles sit just outside it on both sides); centerY is the
+  // wordmark's own vertical center.
+  private drawLegacyWordmarkFlankingSparkles(
+    graphics: Phaser.GameObjects.Graphics,
+    centerX: number,
+    centerY: number,
+    halfWidth: number,
+    time: number,
+    alpha: number
+  ): void {
+    if (this.prefersLegacyReducedMotion() || alpha <= 0) {
+      return;
+    }
+    const gap = Math.max(4, halfWidth * 0.22);
+    [-1, 1].forEach((side) => {
+      const phaseOffset = side * 2.4;
+      const twinkle = (Math.sin((time / LEGACY_GOAL_STAR_SPARKLE_TWINKLE_PERIOD_MS * Math.PI * 2) + phaseOffset) + 1) / 2;
+      const hue = (time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (side > 0 ? 0.5 : 0);
+      const color = Phaser.Display.Color.HSVToRGB(((hue % 1) + 1) % 1, 0.8, 1).color;
+      this.drawLegacyFourPointSparkle(
+        graphics,
+        centerX + (side * (halfWidth + gap)),
+        centerY,
+        halfWidth * (0.14 + (twinkle * 0.05)),
+        color,
+        alpha * (0.55 + (twinkle * 0.45))
+      );
+    });
   }
 
   // markerRevealAlpha is 0 for the whole beam-travel span (the marker
@@ -8736,7 +8869,9 @@ export class MenuScene extends Phaser.Scene {
       this.boardDynamicGraphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, blinkAlpha * 0.92);
       this.boardDynamicGraphics.strokeRect(x, y, barWidth, barHeight);
     }
-    this.drawLegacyMarkerGemCatchlight(this.boardDynamicGraphics, frame.centerX, frame.centerY, outerRadius, blinkAlpha * 0.6);
+    // No gem catchlight here -- it's a short diagonal arc calibrated for a
+    // round gem-shaped marker; on a rectangular bar-chart icon it just reads
+    // as a stray diagonal white line in the corner (reported and removed).
   }
 
   private resolveLegacyPlayElapsedMs(): number {
@@ -9362,23 +9497,11 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // A small bright arc on the upper-left of a circular shape, as if a
-  // single light source were catching a cut facet -- same "light hits one
-  // corner" convention as drawLegacyPathTileFacet, for the round settings
-  // gear icon (the start/goal markers are square now and use the tile rim
-  // treatment directly instead of this).
-  private drawLegacyMarkerGemCatchlight(
-    graphics: Phaser.GameObjects.Graphics,
-    centerX: number,
-    centerY: number,
-    outerRadius: number,
-    alpha: number
-  ): void {
-    graphics.lineStyle(Math.max(1, outerRadius * 0.16), cyberArcadeMaterial.rail.white, Math.min(0.85, alpha * 0.9));
-    graphics.beginPath();
-    graphics.arc(centerX, centerY, outerRadius * 0.62, Phaser.Math.DegToRad(200), Phaser.Math.DegToRad(260));
-    graphics.strokePath();
-  }
+  // Retired: drawLegacyMarkerGemCatchlight used to draw a short diagonal
+  // highlight arc here, calibrated for round gem-shaped markers. Applied to
+  // the settings cog, leaderboard bars, and header house icon, it read as a
+  // stray diagonal white line in each icon's corner (reported and removed
+  // from all three call sites).
 
   private fillLegacyPlayerMarkerTile(
     point: LegacyPoint,
@@ -10007,10 +10130,9 @@ export class MenuScene extends Phaser.Scene {
     graphics.strokeCircle(rect.centerX, rect.centerY, hubRadius);
     graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, (active ? 0.95 : 0.85) * alphaMultiplier);
     graphics.strokeCircle(rect.centerX, rect.centerY, hubRadius);
-    // Same cut-gem catchlight as the player/start/goal markers -- ties the
-    // gear into the crystal-facet family instead of reading as a plain
-    // generic tech icon.
-    this.drawLegacyMarkerGemCatchlight(graphics, rect.centerX, rect.centerY, outerRadius, (active ? 0.9 : 0.7) * alphaMultiplier);
+    // No gem catchlight here -- it's a short diagonal arc calibrated for a
+    // round gem-shaped marker; on the gear's own hollow ring it just reads
+    // as a stray diagonal white line in the corner (reported and removed).
   }
 
   private clearHudTexts(): void {
@@ -14082,6 +14204,10 @@ export class MenuScene extends Phaser.Scene {
       );
       if (renderedWithTileFont) {
         panel.clear();
+        const wordHalfWidth = (
+          (MAZER_TILE_FONT_ADVANCE * Math.max(0, letters.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
+        ) * tileFontButtonScale / 2;
+        this.drawLegacyWordmarkFlankingSparkles(panel, 0, 0, wordHalfWidth, 0, frontDoorChrome?.labelAlpha ?? 0.92);
       }
     }
 
@@ -14125,6 +14251,18 @@ export class MenuScene extends Phaser.Scene {
           );
           if (renderedWithTileFont) {
             panel.clear();
+            const letters = [...text];
+            const wordHalfWidth = (
+              (MAZER_TILE_FONT_ADVANCE * Math.max(0, letters.length - 1)) + MAZER_TILE_FONT_GLYPH_WIDTH
+            ) * tileFontButtonScale / 2;
+            this.drawLegacyWordmarkFlankingSparkles(
+              panel,
+              0,
+              0,
+              wordHalfWidth,
+              time,
+              primaryButtonActive ? 1 : (frontDoorChrome?.labelAlpha ?? 0.92)
+            );
           } else {
             this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout!, time, primaryButtonActive);
           }
@@ -14491,11 +14629,7 @@ export class MenuScene extends Phaser.Scene {
     // itself, both breathing on the classic blink/grow-shrink pulse the
     // settings cog and Start/Login glyphs already use -- redrawn every
     // frame via updateFrame instead of the old static once-drawn icon. The
-    // house itself is filled with a darker-rim edge, a cut door, and the
-    // same cut-gem catchlight the settings cog and player/goal markers use
-    // (drawLegacyMarkerGemCatchlight), instead of a flat two-stroke outline
-    // -- ties it into the same "crystal-facet" icon family as everything
-    // else in the header instead of reading as a plain line glyph.
+    // house itself is filled with a darker-rim edge and a cut door.
     const drawHome = (time: number): void => {
       graphics.clear();
       const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
@@ -14535,7 +14669,9 @@ export class MenuScene extends Phaser.Scene {
       graphics.lineStyle(Math.max(1, iconSize * 0.05), rimColor, pulseAlpha * 0.8);
       graphics.strokeRect(centerX - doorHalfWidth, doorTop, doorHalfWidth * 2, baseBottom - doorTop);
 
-      this.drawLegacyMarkerGemCatchlight(graphics, centerX, rowY - (iconSize * 0.06 * pulseScale), halfWidth, pulseAlpha * 0.8);
+      // No gem catchlight here -- it's a short diagonal arc calibrated for a
+      // round gem-shaped marker; on this house glyph it just reads as a
+      // stray diagonal white line in the corner (reported and removed).
     };
     drawHome(this.time.now);
 
