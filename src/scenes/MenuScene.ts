@@ -1248,11 +1248,6 @@ const MAZER_VFX_TELEPORT_BEAM_STRIP_LEFT = MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH;
 const MAZER_VFX_TELEPORT_BEAM_STRIP_WIDTH = (
   MAZER_VFX_TELEPORT_BEAM_SOURCE_WIDTH - (MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH * 2)
 );
-// Twinkle cadence for the goal star's tiny sparkle glints
-// (drawLegacyGoalStarMarker) -- its own constant, quicker than the ring's
-// full-lap spin, so the little twinkles read as a distinct fast shimmer
-// layered on top of the slower overall rotation.
-const LEGACY_GOAL_STAR_SPARKLE_TWINKLE_PERIOD_MS = 900;
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
 const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = cyberArcadeMaterial.signal.warningEdge;
@@ -9558,30 +9553,24 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    // Tiny animated twinkling sparkle glints scattered around the star --
-    // each one pulses its own scale/alpha on an independently phased sine
-    // wave (same technique as the level-announcer's twinkle clusters,
-    // drawLegacyLevelAnnouncerTwinkles) instead of sitting at a fixed size,
-    // so they read as genuinely twinkling rather than static decals.
+    // Twinkling sparkle glints scattered all around the star, in and out at
+    // random positions -- same drawLegacyWordmarkAmbientSparkles system the
+    // title/Start-Login/level-number/orbit-diamonds all use now, reused here
+    // instead of this marker's own separate five-fixed-spot white sparkles
+    // ("add twinkling stars to the end tile too," and consistency with
+    // every other twinkle on screen).
     if (time !== undefined && !this.prefersLegacyReducedMotion()) {
-      const sparkleSpecs: ReadonlyArray<{ dx: number; dy: number; size: number; phase: number }> = [
-        { dx: 0, dy: -outerRadius * 0.12, size: maxRadius * 0.15, phase: 0 },
-        { dx: -outerRadius * 0.32, dy: outerRadius * 0.18, size: maxRadius * 0.09, phase: Math.PI * 0.5 },
-        { dx: outerRadius * 0.34, dy: outerRadius * 0.12, size: maxRadius * 0.09, phase: Math.PI },
-        { dx: -outerRadius * 0.1, dy: outerRadius * 0.4, size: maxRadius * 0.07, phase: Math.PI * 1.5 },
-        { dx: outerRadius * 0.05, dy: -outerRadius * 0.42, size: maxRadius * 0.06, phase: Math.PI * 0.8 }
-      ];
-      for (const sparkle of sparkleSpecs) {
-        const twinkle = (Math.sin((time / LEGACY_GOAL_STAR_SPARKLE_TWINKLE_PERIOD_MS * Math.PI * 2) + sparkle.phase) + 1) / 2;
-        this.drawLegacyFourPointSparkle(
-          graphics,
-          centerX + sparkle.dx,
-          centerY + sparkle.dy,
-          sparkle.size * (0.6 + (twinkle * 0.55)),
-          cyberArcadeMaterial.rail.white,
-          alpha * (0.35 + (twinkle * 0.6))
-        );
-      }
+      this.drawLegacyWordmarkAmbientSparkles(
+        graphics,
+        centerX,
+        centerY,
+        outerRadius,
+        outerRadius,
+        time,
+        alpha,
+        5,
+        41
+      );
     } else {
       // Reduced-motion / static (Guide legend) fallback: fixed mid-twinkle
       // size and alpha instead of animating.
