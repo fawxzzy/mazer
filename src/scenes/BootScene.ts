@@ -43,7 +43,25 @@ export const MAZER_VFX_DIAMOND_TEXTURE_KEY = 'mazerVfxEdgeDiamond';
 export const MAZER_VFX_DIAMOND_ENERGY_CORE_TEXTURE_KEY = 'mazerVfxEdgeDiamondEnergyCore';
 export const MAZER_VFX_DIAMOND_ABSORPTION_TEXTURE_KEY = 'mazerVfxEdgeDiamondAbsorption';
 export const MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY = 'mazerVfxTeleportBeam';
+// A second-pass diamond render with visible internal "energy" linework
+// baked directly into the same source art -- used instead of compositing
+// the separate energy-core image on top of MAZER_VFX_DIAMOND_TEXTURE_KEY.
+// That composite (two independently-shaped diamond silhouettes stacked at
+// nearly the same scale) was reported as "an extra diamond appearing over
+// them... not pointing to mid" -- a real bug: edge-diamond-energy-core.png
+// is its own symmetric diamond shape with no inherent "point toward
+// center" orientation, so no rotation of it ever aligned with the outer
+// shell's elongated shape. One single image with the energy already part
+// of its own linework sidesteps the compositing problem entirely.
+export const MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY = 'mazerVfxEdgeDiamondEnergized';
 const MAZER_VFX_ASSET_BASE_URL = '/assets/vfx/diamonds';
+
+// Starfield background, floor tile, and bleed-off path strip -- see
+// docs/assets/mazer-vfx-source-provenance.md for provenance/hashes.
+export const MAZER_STARFIELD_TEXTURE_KEY = 'mazerStarfieldTile';
+export const MAZER_FLOOR_TILE_TEXTURE_KEY = 'mazerFloorTile';
+export const MAZER_BLEED_PATH_TEXTURE_KEY = 'mazerBleedPathStrip';
+export const MAZER_PLAYER_TRAIL_TEXTURE_KEY = 'mazerPlayerTrail';
 
 interface MazerTileFontFrameEntry {
   frame: { x: number; y: number; w: number; h: number };
@@ -67,6 +85,11 @@ export class BootScene extends Phaser.Scene {
     this.load.image(MAZER_VFX_DIAMOND_ENERGY_CORE_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/edge-diamond-energy-core.png`);
     this.load.image(MAZER_VFX_DIAMOND_ABSORPTION_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/edge-diamond-energy-absorption-state.png`);
     this.load.image(MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/teleport-beam-iridescent.png`);
+    this.load.image(MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/edge-diamond-energized.png`);
+    this.load.image(MAZER_STARFIELD_TEXTURE_KEY, '/assets/vfx/starfield/mazer-starfield-tile.png');
+    this.load.image(MAZER_FLOOR_TILE_TEXTURE_KEY, '/assets/tiles/mazer-floor-tile.png');
+    this.load.image(MAZER_BLEED_PATH_TEXTURE_KEY, '/assets/tiles/mazer-bleed-path-strip.png');
+    this.load.image(MAZER_PLAYER_TRAIL_TEXTURE_KEY, '/assets/vfx/trail/mazer-player-trail.png');
   }
 
   public create(): void {
