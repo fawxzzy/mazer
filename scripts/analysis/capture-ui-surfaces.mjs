@@ -1670,10 +1670,10 @@ const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {
   if (material.iconTarget !== 'public/icons/mazer-app-icon.png') {
     issues.push(`${surfaceId}:iconTarget=${material.iconTarget ?? 'missing'}`);
   }
-  if (material.iconQualityTargetVersion !== 'mazer-icon-quality-target-v1') {
+  if (material.iconQualityTargetVersion !== 'mazer-icon-quality-target-v2') {
     issues.push(`${surfaceId}:iconQualityTargetVersion=${material.iconQualityTargetVersion ?? 'missing'}`);
   }
-  if (material.iconTargetSha256 !== '91764e546b8c1488b3d48baeda927ae18600b088178e190244fb9d8ce35e2440') {
+  if (material.iconTargetSha256 !== 'ede90e596682795d10f97bed615071ca1f60e08e290eacf1ea143006df914d78') {
     issues.push(`${surfaceId}:iconTargetSha256=${material.iconTargetSha256 ?? 'missing'}`);
   }
   if (missingRoles.length > 0) {

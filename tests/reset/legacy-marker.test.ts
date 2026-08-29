@@ -392,7 +392,7 @@ describe('Mazer completion markers', () => {
     expect(markerDoc).toContain('| Icon-quality 2026 visual target | 100% |');
     expect(markerDoc).toContain('versioned, hash-pinned brand authority');
     expect(markerDoc).toContain('icon target version and canonical SHA');
-    expect(markerDoc).toContain('data/atlas/brand/mazer/mazer-app-icon-2026-07-09-source.png');
+    expect(markerDoc).toContain('src/brand/source-art/mazer-app-icon-master.png');
     expect(markerDoc).toContain('| Shifting color player/trail/pulse material | 50% |');
     expect(markerDoc).toContain('| Diagonal paths and true diagonal travel | 8% |');
     expect(markerDoc).toContain('| Unified player-facing message system | 78% |');

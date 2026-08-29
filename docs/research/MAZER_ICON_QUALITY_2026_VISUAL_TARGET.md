@@ -1,56 +1,48 @@
-# Mazer Icon-Quality 2026 Visual Target
+# Mazer Final Icon Source Contract
 
-Status: canonical target contract v1
-
-Runtime material: `mazer-cyber-arcade-material-v1`
+Status: canonical target contract v2
 
 Contract owner: `src/brand/mazerIconQualityTarget.ts`
 
-## Authority
+## Sole design authority
 
-The approved Mazer app icon is the visual north star for shared game, browser, install, future link, and account-facing surfaces. The raw source remains source-linked in ATLAS rather than copied into more repositories:
+`src/brand/source-art/mazer-app-icon-master.png` is the only authoritative Mazer icon artwork. Its locked identity is 1024x1024, 1,173,366 bytes, and SHA-256 `ede90e596682795d10f97bed615071ca1f60e08e290eacf1ea143006df914d78`.
 
-- `data/atlas/brand/mazer/mazer-app-icon-2026-07-09-source.png`
-- `data/atlas/ui-visual-proof/mazer/app-icon-2026-07-09/reference.png`
+The repository copy is byte-identical to the operator-supplied final master. Downloads, ATLAS data references, generated delivery assets, and legacy emblem files are not design authorities or runtime dependencies. Do not redesign, recolor, reinterpret, destructively crop, add text to, or regenerate the master with generative tooling.
 
-Both source references were read back on 2026-07-14 with SHA-256 `55677db4dff3896979d3e00e1b9ebcb85fd9fc04f106d5a67701cee61ea467d1`. They are durable future references for Link Me, Stripe, auth, and other separately admitted product surfaces; this Mazer packet does not mutate them.
+## Deterministic generation
 
-The canonical shipped target is `public/icons/mazer-app-icon.png`, a 1024x1024 derived binary with SHA-256 `91764e546b8c1488b3d48baeda927ae18600b088178e190244fb9d8ce35e2440`. Its versioned lineage and every browser/PWA delivery binary are declared in `MAZER_ICON_QUALITY_TARGET` and pinned by focused tests.
+Run `npm run brand:icons` after an authorized master change. Run `npm run brand:icons:check` to fail when any checked-in derivative is stale or missing. `scripts/brand/generate-mazer-icons.mjs` validates the master identity before it writes anything, uses Sharp Lanczos3 with fixed PNG settings, and emits a deterministic PNG-backed ICO directory.
 
-## Visual language
+The standard 1024 delivery asset is a byte-identical copy. Standard PNG and ICO frames are high-quality downscales. Maskable derivatives place the complete square master inside the centered circle with an 80% canvas diameter on an opaque black background. That conservative padding protects both the outer rainbow frame and central maze from platform masks.
 
-Runtime surfaces translate the icon rather than reproducing it literally:
+## Delivery matrix
 
-- deep navy is the substrate, never flat gray or muddy black;
-- hard cyan and mint rails establish maze, frame, title, and control hierarchy;
-- the player and traveled path remain a fixed green signal with sparse white shine;
-- goal and direction signals remain red; start remains yellow;
-- violet and warm warning colors are bounded accents, not ambient wash;
-- glow may reinforce a signal but must not soften tile edges, text, or one-pixel rails;
-- shared fills use integer logical pixels, odd-width strokes use half-pixel centers, and the backing store remains DPR-aware up to 2x.
+| Consumer | Repository asset | Sizes | Derivation |
+| --- | --- | --- | --- |
+| Default browser favicon | `public/favicon.ico` | 16, 32, 48, 64, 128, 256 | PNG-backed ICO |
+| Windows shortcut | `public/icons/mazer-app-icon.ico` | 16, 32, 48, 64, 128, 256 | PNG-backed ICO |
+| Apple touch | `public/icons/apple-touch-icon.png` | 180 | direct downscale |
+| PWA standard | `public/icons/icon-192.png`, `public/icons/icon-512.png` | 192, 512 | direct downscale |
+| PWA maskable | `public/icons/icon-192-maskable.png`, `public/icons/icon-512-maskable.png` | 192, 512 | safe-zone padded |
+| PWA high resolution and existing social preview | `public/icons/mazer-app-icon.png` | 1024 | byte-identical copy |
 
-The executable color and geometry authority is `src/render/cyberArcadeMaterial.ts`. It imports the canonical icon path from the brand contract, publishes the icon target version and SHA in runtime diagnostics, and remains the only shared runtime palette owner.
+`index.html`, both watch-pass HTML entries, `public/manifest.webmanifest`, `vite.config.ts`, and `scripts/windows/Prepare-MazerShortcut.ps1` are the current consumers. Workbox content revisions own invalidation; the explicit `mazer-final-icon-v2` query is ignored only for precache matching so versioned browser and manifest URLs resolve to those revisioned assets offline. There is no native iOS, Android, Capacitor, Electron, or Tauri catalog in this repository.
 
-## Delivery surfaces
+The existing Open Graph and Twitter metadata deliberately consume the app icon. This contract does not establish a general rule that social-preview artwork must equal the app icon.
 
-- Browser favicon: `public/icons/mazer-app-icon.ico`.
-- Browser PNG favicons: `public/icons/icon-192.png`, `public/icons/icon-512.png`.
-- Apple touch: `public/icons/apple-touch-icon.png`.
-- Standard PWA: 192px and 512px PNG assets.
-- Maskable PWA: 192px and 512px maskable declarations.
-- Canonical high-resolution manifest asset: `public/icons/mazer-app-icon.png`.
-- Windows shortcut: `scripts/windows/Prepare-MazerShortcut.ps1` consumes the ICO asset.
+## Superseded evidence
 
-`index.html`, `public/manifest.webmanifest`, and `vite.config.ts` remain the delivery owners. `tests/brand/mazer-icon-quality-target.test.ts` verifies their relationship to the versioned contract without reading machine-specific ATLAS paths during normal repo verification.
+The older ATLAS data references and `public/icons/mazer-emblem.svg` / `public/icons/mazer-emblem.ico` remain non-authoritative historical evidence because this packet has no deletion or retention-change authority. They must not be restored as consumers. Historical packet documents may describe their former authority and are not current instructions.
 
-## Proof policy
+## Verification and rollback
 
-Completion requires all of the following:
+Acceptance requires exact master identity, byte-identical two-pass generation, declared output hashes and dimensions, standard-versus-maskable divergence, ICO frame coverage, browser and manifest resolution, Workbox precache coverage, route-aware favicon/install proof, a stale-reference classification, the affected repository checks, and independent exact-head review.
 
-1. Repository binaries match the contract's dimensions and SHA-256 values.
-2. Browser, Apple touch, PWA, maskable, manifest, and Windows shortcut wiring remain exact.
-3. The cyber-arcade material diagnostic reports the target version, canonical path, and canonical SHA.
-4. Actual current-main menu and play captures show the icon-derived hierarchy on phone and desktop widths with clean console/page diagnostics.
-5. The protected `tests/ai/demo-walker.test.ts` remains outside the packet.
+Rollback is source-only: revert the complete icon contract change as one unit. Do not partially restore old binaries, metadata, or cache configuration because their identities and consumers are coupled.
 
-Changing the approved artwork or any pinned binary requires a separately reviewed target-version bump, regenerated delivery assets, updated hashes, and fresh route-aware proof. A routine material or layout packet must not silently replace the icon target.
+Rule: one locked repository master owns every app-icon derivative.
+
+Pattern: validate identity, generate a minimum consumer matrix deterministically, bind content hashes, then prove consumer and cache wiring.
+
+Failure Mode: manually replacing delivery binaries creates competing authorities; declaring an edge-to-edge square asset maskable allows platform crops to remove the identifying frame.

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "brand:icons": "node ./scripts/brand/generate-mazer-icons.mjs",
+    "brand:icons:check": "node ./scripts/brand/generate-mazer-icons.mjs --check",
     "build": "node ./scripts/build/run-build.mjs",
     "build:raw": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173 --strictPort",
@@ -78,6 +80,7 @@
   "devDependencies": {
     "@types/node": "^22.15.3",
     "playwright": "^1.59.1",
+    "sharp": "0.35.4",
     "supabase": "^2.109.1",
     "typescript": "^5.8.3",
     "vite": "^7.0.0",
