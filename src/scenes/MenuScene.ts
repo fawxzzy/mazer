@@ -5957,14 +5957,22 @@ export class MenuScene extends Phaser.Scene {
         );
         continue;
       }
+      // Round, not square: the vast majority of stars (every one below the
+      // sparkle threshold above -- the bulk of the field) used to be a flat
+      // fillRect square, which reads as a blocky pixel rather than a point
+      // of light ("the stars in the starfield kinda suck"). A soft circle
+      // with the same two-pass halo underneath is a small, cheap change
+      // that makes every single star in the field read as an actual star
+      // instead of a tiny tile.
+      const starRadius = coreSize / 2;
       if (coreSize > 1) {
         this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.22);
-        this.backdropGraphics.fillRect(pixelX - 2, pixelY - 2, coreSize + 4, coreSize + 4);
+        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 2);
         this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.18);
-        this.backdropGraphics.fillRect(pixelX - 1, pixelY - 1, coreSize + 2, coreSize + 2);
+        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 1);
       }
       this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale);
-      this.backdropGraphics.fillRect(pixelX, pixelY, coreSize, coreSize);
+      this.backdropGraphics.fillCircle(pixelX, pixelY, Math.max(0.6, starRadius));
       // Fading tail instead of a uniform-alpha dashed line -- brightest
       // where it meets the star core, tapering to nothing at the far end, so
       // fast/near stars read as a warp streak rather than a dotted trail.

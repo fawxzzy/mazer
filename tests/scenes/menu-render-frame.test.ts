@@ -788,7 +788,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('driftRunes: LEGACY_MENU_DRIFT_RUNE_COUNT');
     expect(menuSceneSource).toContain('drawLegacyBackdropShard(');
     expect(menuSceneSource).toContain('drawLegacyBackdropRune(');
-    expect(menuSceneSource).not.toContain('this.backdropGraphics.fillCircle');
+    // Angular shards/runes must stay angular (fillPoints/strokePath), not
+    // regress back to the round orbs/motes this replaced -- scoped to just
+    // that one method's own body, not the whole file, since the starfield's
+    // individual stars legitimately use fillCircle now (round points of
+    // light instead of flat square pixels -- "the stars kinda suck").
+    const shardMethodStart = menuSceneSource.indexOf('private drawLegacyBackdropShard(');
+    const shardMethodEnd = menuSceneSource.indexOf('\n  private ', shardMethodStart + 1);
+    expect(shardMethodStart).toBeGreaterThan(-1);
+    expect(shardMethodEnd).toBeGreaterThan(shardMethodStart);
+    const shardMethodSource = menuSceneSource.slice(shardMethodStart, shardMethodEnd);
+    expect(shardMethodSource).not.toContain('fillCircle');
     expect(legacyMenuRenderSource).toContain('resolveLegacyMenuPathStrokeSegments');
     expect(menuSceneSource).toContain('skip it entirely in menu mode. Play mode\'s gameplay');
   });
