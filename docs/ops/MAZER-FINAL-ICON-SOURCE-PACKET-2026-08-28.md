@@ -64,3 +64,15 @@ Rule: one exact repository master is the only icon design authority.
 Pattern: fan out deterministic minimum derivatives, hash every result, and test every real consumer.
 
 Failure Mode: manually copied derivatives drift; byte-identical standard and maskable files expose edge artwork to destructive platform crops.
+
+## Delivery-verifier correction — 2026-08-29
+
+The canonical delivery verifier is `scripts/brand/verify-mazer-icon-delivery.mjs`. After a production build, `npm run brand:delivery:check` proves that all eight checked-in icon payloads are byte-identical in `dist/` and that every generated Workbox entry is present with a content revision. A later production packet may use the same verifier in read-only remote mode with `npm run brand:delivery:check -- --remote --base-url https://mazer.fawxzzy.com/`.
+
+The URL contract normalizes only equivalent same-origin forms: `favicon.ico`, `/favicon.ico`, and the exact canonical-origin absolute URL resolve to one key. It rejects foreign or protocol-relative origins, traversal, percent encoding, backslashes, control characters, query/hash state, empty path segments, missing entries, normalized duplicates, unrevisioned icon entries, redirects, and any delivered-byte mismatch.
+
+Rule: compare generated Workbox entries as normalized same-origin URL keys, not as consumer spelling.
+
+Pattern: validate hostile URL structure before normalization, then enforce coverage, uniqueness, revision, and exact bytes after normalization.
+
+Failure Mode: direct slash-prefixed string comparison can produce a false negative after deployment even when Workbox correctly stores an equivalent relative precache key.
