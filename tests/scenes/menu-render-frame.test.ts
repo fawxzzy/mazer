@@ -955,7 +955,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // The compass idea was removed from the app entirely.
     expect(menuSceneSource).not.toContain('drawLegacyCompassGlyph');
     expect(menuSceneSource).not.toContain('private drawLegacyPlayCompass(');
-    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause, false, time);');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(controls.pause, false, time);');
     expect(menuSceneSource).not.toContain('this.drawLegacyPlayTouchButton(');
     expect(menuSceneSource).not.toContain('this.hudGraphics.strokeRect(');
     // Player-facing toast/message cards were removed from the game entirely
@@ -1562,9 +1562,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('fillStyle(0x05070a');
     expect(menuSceneSource).toContain('private drawLegacySettingsCogControl(');
     // No panel/border chrome behind the play cog at all, and now the same
-    // color/size/blink pulse as the menu surface's own settings cog too --
-    // not just "no box" but the actual same icon.
-    expect(menuSceneSource).toMatch(/drawLegacySettingsCogControl\([\s\S]*?this\.drawLegacySettingsCog\(\s*graphics,\s*visualRect,\s*active,\s*0\.34 \* blinkScale,/);
+    // real settings icon (not the old procedural gear) as the menu
+    // surface's own settings icon too -- not just "no box" but the actual
+    // same icon/texture.
+    expect(menuSceneSource).toMatch(/drawLegacySettingsCogControl\([\s\S]*?this\.applyLegacyHudIconFrame\(\s*this\.touchSettingsCogIconImage,\s*MAZER_HUD_SETTINGS_ICON_METRICS,/);
     expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(time: number): void');
     expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog(time);');
     // The menu cog's blink is drawn inside drawBoardPaths, gated by
@@ -1574,8 +1575,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // whatever else happens to touch boardPathDirty and jumps on the next
     // unrelated redraw instead of pulsing smoothly.
     expect(menuSceneSource).toContain("if (this.mode === 'menu' && this.overlay === 'none' && !this.prefersLegacyReducedMotion()) {\n      this.boardPathDirty = true;\n    }");
-    expect(menuSceneSource).toContain('cyberArcadeMaterial.signal.player,\n      cyberArcadeMaterial.rail.mint,\n      blinkAlpha\n    );');
-    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause, false, time);');
+    // Both the menu header settings icon and this touch-control settings
+    // icon share the exact same source metrics (real icon, not a
+    // procedural gear duplicated per surface).
+    expect(menuSceneSource.match(/MAZER_HUD_SETTINGS_ICON_METRICS/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(controls.pause, false, time);');
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
     expect(menuSceneSource).toContain('const background = this.add.rectangle(\n      pauseRect.centerX,');
