@@ -344,7 +344,7 @@ Severity per the redesign brief's own scale.
   surfaced anywhere in the UI itself; could back a future "about/version"
   debug panel.
 
-## 7. Correction: a deterministic visual-proof harness already exists and works
+## 7. Correction: a real visual-proof harness exists and works — but needs a pinned seed to be deterministic
 
 `npm run visual:ui-surfaces` (`scripts/analysis/capture-ui-surfaces.mjs`) is
 a real, working Playwright-based capture-and-assert harness — 39 checks
@@ -361,6 +361,22 @@ pre-existing failing checks unrelated to this audit
 (`options-bottom-account-action`, `mobile-overlay-scroll-reachability` —
 both about a missing "Account" label at the bottom of the Options/Pause
 scroll area) — genuine signal this harness produces, not noise.
+
+**Correction, real gap (2026-08-30):** the harness's default invocation is
+**not** deterministic, despite earlier framing in this section and in
+`UI-MIGRATION-PLAN.md`. `resolveRoute()` in `capture-ui-surfaces.mjs` only
+sets the `mazeSeed` URL param when an explicit `--maze-seed` CLI arg is
+passed (`resolveCaptureTarget`, line ~621). Without it,
+`resolveInitialLegacyRuntimeSeed()` (`src/legacy-runtime/legacyRuntimeSeed.ts`)
+falls through to `createLegacyRuntimeRandomSeed()`, which mixes
+`Date.now()` and `Math.random()` — a genuinely different maze every run.
+Every command in this PR set (including this document's own) that invokes
+`npm run visual:ui-surfaces` without `--maze-seed` produces
+non-reproducible, non-diffable screenshots for any topology-sensitive
+check, contradicting the "deterministic"/"diffable" framing used
+throughout. **The required gate must pin a fixed `--maze-seed` value**
+(or the harness should default one) before its output can be trusted as
+a regression baseline rather than a fresh random sample each run.
 
 **Recorded gap, not yet fixed:** the harness's own `surfaces` object
 (`capture-ui-surfaces.mjs`) captures and checks exactly menu, auth,

@@ -67,10 +67,24 @@ this harness already covers well. User- or ChatGPT-supplied screenshots
 and recordings are useful
 *supplementary* evidence — subjective visual feedback, physical-device
 behavior, animation timing, production-only rendering defects — but they
-do not replace it: they aren't deterministic, don't run the same 39
-assertion set on every change, and can't be diffed the way a committed
-`report.md`/`summary.json` can. No migration PR should waive this gate in
+do not replace it: the harness (once pinned, see below) is reproducible
+and diffable in a way ad hoc screenshots never are, and runs the same 39
+assertion set on every change. No migration PR should waive this gate in
 favor of manually-supplied images.
+
+**Pin a fixed maze seed — the default invocation is not deterministic.**
+An earlier version of this document and `UI-AUDIT.md` §7 called this
+harness "deterministic" outright. That's only true with an explicit seed:
+`capture-ui-surfaces.mjs`'s `resolveRoute()` only sets the `mazeSeed` URL
+param when a `--maze-seed` CLI arg is passed; without it,
+`resolveInitialLegacyRuntimeSeed()` mixes `Date.now()`/`Math.random()`
+into a fresh seed every run (`src/legacy-runtime/legacyRuntimeSeed.ts`).
+Every command in this plan that invokes `npm run visual:ui-surfaces`
+without `--maze-seed` captures a different maze each time — not
+reliably diffable for anything topology-sensitive. **Always pass a fixed
+`--maze-seed`** (or push a default into the harness itself) before
+treating a run's output as a regression baseline rather than a fresh
+random sample.
 
 **Baseline this before enforcing it as a hard pass/fail gate.** This
 session's own run of the harness (`UI-AUDIT.md` §7) already found this
@@ -89,7 +103,8 @@ baseline question before wiring the gate into CI as blocking.
 Failure procedure, if the harness fails locally (as it did once this
 session — see §7's crash-then-retry note):
 
-1. Run `npm run visual:ui-surfaces` and capture the exact stdout/stderr.
+1. Run `npm run visual:ui-surfaces -- --maze-seed=<fixed value>` (never
+   the bare, seedless invocation) and capture the exact stdout/stderr.
 2. Classify the failure before treating it as a harness defect: browser
    binary missing/outdated, preview server didn't start or wasn't ready,
    the capture route (`?content=core-only&theme=aurora&runtimeDiagnostics=1`)
