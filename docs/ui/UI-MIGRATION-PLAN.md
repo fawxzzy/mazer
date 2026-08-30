@@ -22,13 +22,19 @@ not to propose a competing one.
 | 2B | Topology/path geometry contract | done |
 | 2C | Asset/icon generator | unclear (no spec) |
 | **3A** | **Command bridge / live-scene mapping** | **not started — the actual next wave** |
-| 3B | Auth migration (`legacyAuth.ts`, `legacyPlayerMessage.ts`), owner `auth-migration-integrator` | not started |
+| 3B | Auth migration (`legacyAuth.ts`, `legacyPlayerMessage.ts`), owner `auth-migration-integrator` | not started, gated behind 3A |
 | 4D | Phaser board/title renderer switch | not started, gated behind 3A — **must ship before 3C starts, per AGENTS.md's board-first rule** |
 | 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started, gated behind 3A **and** 4D |
 
-No explicit gating edge is registered between 3A and 3B — 3B has its own
-exclusive owner over a disjoint path set and isn't recorded as blocked on
-3A landing first (see `UI-AUDIT.md`'s ordering note).
+**Correction (2026-08-30):** an earlier version of this note said no
+dependency was registered between 3A and 3B. Wrong — `scripts/check-decision-registry.mjs`'s
+`INTEGRATOR_WAVE_ORDER = ['0C', '1B', '1C', '3A', '3B', '5B']` is enforced
+as a locked dependency order (see `UI-AUDIT.md`'s ordering correction for
+the exact mechanism). 3B follows 3A in the registered integrator
+sequence — it has its own exclusive owner and disjoint path set, but that
+doesn't make it unordered relative to 3A. Independently, no ordering
+between 3B and 4D is invented here; the board-first sequence (3A → 4D →
+3C) is its own separate contract.
 
 ## Who owns Wave 3A
 
@@ -160,9 +166,12 @@ start the DOM proof "in parallel" or "as a smaller first step" ahead of
 the board renderer.
 
 Wave 3B (auth migration, `auth-migration-integrator`) keeps its own
-existing registered scope and dependency status exactly as the decision
-registry states it — no gating edge to 3A or 3C is invented here; this
-section only fixes the 3C-vs-4D ordering, not 3B's independent standing.
+existing registered scope exactly as the decision registry states it —
+except that, per the ordering correction above (`INTEGRATOR_WAVE_ORDER`),
+3B does follow 3A in the registered dependency sequence. No ordering
+between 3B and 3C, or between 3B and 4D, is invented here; this section
+fixes the 3C-vs-4D ordering and 3B's real 3A dependency, not an
+independence 3B never actually had.
 
 Once Wave 4D has landed, the Wave 3C proof would still need to prove:
 

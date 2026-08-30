@@ -67,11 +67,25 @@ the 3 current HUD icons:
   Arial, sans-serif'`), used across the auth fields, labels, and actions
   (12 call sites, e.g. `MenuScene.ts:11730-12088`, `12375`) — a genuinely
   different font stack from the token, not just a different name for the
-  same thing. Whoever migrates Auth under Wave 3B needs to decide: adopt
-  `designTokens.fonts.ui` there too, or document this as an intentional
-  exception (native-OS-style form fields reading differently from game
-  chrome, say) — left undecided, a migration could preserve two body-font
-  systems while still appearing contract-compliant on paper.
+  same thing.
+
+  **Ownership correction (2026-08-30):** an earlier version of this note
+  assigned the resolution to "whoever migrates Auth under Wave 3B." That's
+  wrong — the constant and every one of its call sites live in
+  `MenuScene.ts`, which the decision registry assigns exclusively to Wave
+  3A, not Wave 3B (Wave 3B's exclusive paths are `legacyAuth.ts` and
+  `legacyPlayerMessage.ts` — auth behavior/messages/domain migration, not
+  Phaser presentation). The real ownership:
+  - **Wave 3A** owns any change to this existing Phaser Auth/Account font
+    constant or its `MenuScene.ts` call sites.
+  - **Wave 3B** owns auth behavior, messages, and auth-domain migration —
+    not Phaser presentation; it has no standing to decide this.
+  - **Wave 3C**, after Wave 4D under the board-first sequence, owns the
+    final DOM Auth/Account typography once that surface is actually
+    mounted.
+  - Until one of those waves acts, `LEGACY_AUTH_UI_FONT_FAMILY` is
+    documented here as a transitional legacy exception, not an open
+    decision assigned to any wave in particular.
 
 ## Motion
 

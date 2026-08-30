@@ -42,19 +42,27 @@ Wave status, read directly from `docs/architecture/MAZER-UI-REWORK-*.md`
 | 2A / 2A.1 | DOM primitives (`src/ui/dom/*`) | done, deliberately unmounted |
 | 2B | Topology/path geometry contract (`src/geometry/topologyPath.ts`) | done |
 | 2C | Asset/icon generator | no spec file existed; status unclear |
-| **3A** | **Command bridge / live-scene mapping — gates 3C and 4D** | **not started — next** |
-| 3B | Auth migration (`src/legacy-runtime/legacyAuth.ts`, `legacyPlayerMessage.ts`), owner `auth-migration-integrator` | not started |
+| **3A** | **Command bridge / live-scene mapping — gates 3C, 4D, and 3B** | **not started — next** |
+| 3B | Auth migration (`src/legacy-runtime/legacyAuth.ts`, `legacyPlayerMessage.ts`), owner `auth-migration-integrator` | not started, gated behind 3A |
 | 4D | Actual Phaser board/title renderer switch (topology contract + tokens) | not started, gated behind 3A — **must ship before 3C starts, per AGENTS.md's board-first rule** |
 | 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started, gated behind 3A **and** 4D |
 
-Ordering note: the registry's own `integratorWaveOwnership.assignments`
-doesn't record an explicit dependency/gating edge between 3A and 3B the
-way it does for 3A→3C/4D — 3B is a separate registered wave with its own
-exclusive owner (`auth-migration-integrator`) over a disjoint path set
-(`legacyAuth.ts`, `legacyPlayerMessage.ts`, not `MenuScene.ts`). Relevant
-here because this audit's own scope explicitly includes auth/profile
-(see the header above) — don't assume 3B is blocked on 3A landing first,
-and don't route auth-path work through whoever picks up 3A.
+**Ordering correction (2026-08-30):** an earlier version of this note
+claimed no dependency was registered between 3A and 3B, and said not to
+assume 3B is blocked on 3A. That's wrong — `scripts/check-decision-registry.mjs`
+defines `INTEGRATOR_WAVE_ORDER = ['0C', '1B', '1C', '3A', '3B', '5B']` and
+enforces it as a locked dependency order: `checkIntegratorWaveOwnership`
+rejects any `integratorWaveOwnership.assignments` entry whose wave sorts
+earlier in that array than a wave already seen, with the violation
+message itself stating assignments "must follow the locked 0C -> 1B ->
+1C -> 3A -> 3B -> 5B dependency order." 3B does have its own exclusive
+owner (`auth-migration-integrator`) over a disjoint path set
+(`legacyAuth.ts`, `legacyPlayerMessage.ts`, not `MenuScene.ts`) — that
+part was right — but disjoint ownership doesn't mean unordered: 3B
+follows 3A in the registered sequence and doesn't start before it.
+Separately, the board-first sequence (3A → 4D → 3C) is its own
+independent contract — no ordering between 3B and 4D is invented here,
+and auth-path work is never routed through whoever picks up 3A.
 
 **Correction (second pass):** an earlier version of this paragraph claimed
 `MenuScene.ts` "isn't yet assigned to a specific wave's exclusive-writer
