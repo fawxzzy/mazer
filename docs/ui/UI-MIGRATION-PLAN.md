@@ -118,11 +118,29 @@ bridge / live-scene mapping) is the first incomplete registered
 integrator wave.** It gates both 3C (DOM mounting) and 4D (renderer
 switch) — neither can start correctly before it.
 
-Once Wave 3A's prerequisites are satisfied, the recommended first *mounted
-DOM* proof is the **progression-reset confirmation dialog**, built on the
-existing `ConfirmDialog` primitive (`src/ui/dom/*`) — not a cosmetic
-Phaser glyph swap like the leaderboard icon (see below). It's narrow
-enough to still prove real architecture:
+**Correction: this isn't settled to a single recommendation.** An earlier
+version of this section recommended the progression-reset confirmation
+dialog (Wave 3C, `ConfirmDialog` primitive) as *the* first mounted proof,
+without weighing it against `AGENTS.md`'s own build-discipline rule:
+"core board simulation and rendering precede shell polish"
+(`AGENTS.md:12`). A DOM confirmation dialog is exactly shell polish under
+that rule; Wave 4D's board/title renderer switch is exactly core board
+rendering. Once Wave 3A unblocks both 3C and 4D, that AGENTS.md rule
+reads as favoring 4D first, not 3C — this document does not have the
+standing to override it, and doesn't try to here.
+
+Two candidate first proofs, not one, for whoever sequences Wave 3A's
+follow-on work to decide between (or reconcile with AGENTS.md directly):
+
+**Option A — Wave 4D's board/title renderer switch**, per AGENTS.md's
+board-first rule. Proves the topology contract (Wave 2B) and design
+tokens (Wave 1B) actually drive shipped rendering, not just pass their
+own isolated tests.
+
+**Option B — the progression-reset confirmation dialog** (Wave 3C,
+`ConfirmDialog` primitive, `src/ui/dom/*`), if a narrow DOM-mounting
+architecture proof is wanted before the larger renderer swap. Would
+still need to prove:
 
 - one DOM root mounted above the Phaser canvas, with real mount/cleanup;
 - DOM-to-game command dispatch through the Wave 1A command model;
@@ -131,11 +149,16 @@ enough to still prove real architecture:
 - keyboard focus trap, Escape-to-cancel, and focus restoration to the
   invoking control on close;
 - responsive/safe-area placement;
-- a passing `visual:ui-surfaces` capture of the new surface.
+- a passing `visual:ui-surfaces` capture of the new surface — **currently
+  impossible as stated**: the harness doesn't open or capture the
+  progression-reset confirmation overlay at all (`UI-AUDIT.md` §7's
+  recorded gap). Extending the harness to cover it would need to happen
+  before this criterion can be satisfied, DOM or Phaser.
 
-This document does not implement that proof — it stays documentation-only,
-per this PR's own scope. It's recorded here so whoever picks up Wave 3A
-next has a concrete, low-risk first slice instead of re-deriving one.
+This document does not implement either option or pick between them — it
+stays documentation-only, per this PR's own scope. It's recorded here so
+whoever picks up Wave 3A next has the real tension named instead of an
+unweighed recommendation.
 
 ## What this session's own future UI work should keep doing regardless
 

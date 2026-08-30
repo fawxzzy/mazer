@@ -24,13 +24,32 @@ HUD chrome), and a handful of standalone top-level Graphics/Image objects
 | Leaderboard | `openOverlay('leaderboard')` | `buildLeaderboardOverlay`, `drawLegacyLeaderboardTitleGlyph`, `resolveLegacyLeaderboardRowAccent` | `overlayGraphics` + `uiButtons` | none (own icon glyph, own row rendering) |
 | Progression reset confirm | `openOverlay('confirm-progression-reset')` | `buildProgressionResetConfirmationOverlay` | `overlayGraphics` + `uiButtons` | shares the generic `drawOverlayPanel`/`createOverlayTitle`/`createOverlayBackChevronButton` shell every overlay uses |
 
-## Shared shell (every overlay kind routes through this)
+## Shared shell (correction: only one function is actually common to all 5)
 
 `rebuildUi()` -> `drawOverlayPanel()` -> `switch (this.overlay)` -> one
-`build*Overlay()` call. `drawOverlayPanel`, `createOverlayTitle`,
-`createOverlayBackChevronButton`, `drawLegacyCyberPanel`, and
-`drawLegacyOverlayScrollFacade` are genuinely shared across all 5 overlay
-kinds already — this part of the architecture is in reasonable shape.
+`build*Overlay()` call. Only `drawOverlayPanel()` (`MenuScene.ts:10371`,
+one call site) is genuinely common to all 5 overlay kinds through
+`rebuildUi()`. An earlier version of this section also claimed
+`createOverlayTitle`, `createOverlayBackChevronButton`,
+`drawLegacyCyberPanel`, and `drawLegacyOverlayScrollFacade` were shared
+across all 5 — checked against actual call sites, none of them are:
+
+- `createOverlayTitle`: called by Leaderboard, Progression-reset-confirm,
+  and Auth (4 call sites) — **not** by Options or Pause.
+- `createOverlayBackChevronButton`: called by Options, Pause, Leaderboard,
+  and Auth (4 call sites) — **not** by the progression-reset confirmation.
+- `drawLegacyCyberPanel`: one of its 4 call sites is inside Options'
+  own Guide subsection; the other 3 are elsewhere in the file entirely
+  unrelated to any overlay builder. Not a shared outer-overlay shell at
+  all.
+- `drawLegacyOverlayScrollFacade`: only 2 call sites, Options and Pause —
+  the two overlays that share scrollable content per §2, not all 5.
+
+Net correction: this shell is thinner than previously documented. Only
+`drawOverlayPanel()`'s outer dispatch is a real, universal primitive.
+Whoever plans Wave 3C's extraction should treat the other four as
+partially-shared, per-overlay-subset helpers, not as an existing
+all-overlay primitive ready to lift as-is.
 
 ## Z-order (menu/play board space, `boardZoomContainer` children, in paint order)
 

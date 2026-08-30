@@ -217,10 +217,15 @@ serve:
 `drawLegacyGlyphWordTileBlock` (the shared tile-font renderer, genuinely
 reused well — see §6).
 
-**Overlay shell (shared by all 5 overlay kinds):**
-`drawLegacyCyberPanel`, `drawOverlayPanel`,
-`drawLegacyOverlayScrollFacade`, `createOverlayTitle`,
-`createOverlayBackChevronButton`, `createButton`.
+**Overlay shell (correction: only `drawOverlayPanel` is actually shared by
+all 5 — see `UI-SCREEN-MAP.md`'s "Shared shell" correction for the
+per-function call-site breakdown):**
+`drawLegacyCyberPanel` (used by Options' Guide subsection plus 3 unrelated
+non-overlay call sites), `drawOverlayPanel` (genuinely universal, 1 call
+site), `drawLegacyOverlayScrollFacade` (Options + Pause only),
+`createOverlayTitle` (Leaderboard, confirm, Auth — not Options/Pause),
+`createOverlayBackChevronButton` (Options, Pause, Leaderboard, Auth — not
+confirm), `createButton`.
 
 **Per-overlay content (NOT shared, one implementation per screen even
 where the content overlaps — see §2):**
@@ -305,6 +310,19 @@ pre-existing failing checks unrelated to this audit
 both about a missing "Account" label at the bottom of the Options/Pause
 scroll area) — genuine signal this harness produces, not noise.
 
+**Recorded gap, not yet fixed:** the harness's own `surfaces` object
+(`capture-ui-surfaces.mjs`) captures and checks exactly menu, auth,
+options, and pause (plus play) — it never opens or captures the
+Leaderboard overlay or the progression-reset confirmation overlay. Two
+of the file's 5 real `LegacyOverlayKind` screens have **zero** automated
+visual coverage today. This means the required gate can pass while
+either of those two Phaser overlays is broken, and — relevant to
+`UI-MIGRATION-PLAN.md`'s recommended first mounted-DOM proof — it cannot
+today verify a progression-reset confirmation dialog migration at all,
+DOM or Phaser. Extending the harness to open and check both (or
+explicitly carrying this as a known-uncovered exception) should happen
+before either surface is treated as gate-verified.
+
 This directly corrects the previous version of this section, which claimed
 no reliable screenshot capture existed in "this environment." That claim
 was accurate for the ad-hoc Browser-pane tooling used earlier in this
@@ -365,8 +383,13 @@ of these primitives are load-bearing:
   Motion section) — needs the same single gate on the DOM side, not a
   second implementation.
 - **Automated visual acceptance** — once mounted, DOM surfaces need their
-  own `visual:ui-surfaces` coverage (§7), the same as every Phaser screen
-  already gets.
+  own `visual:ui-surfaces` coverage (§7). Correction: not "the same as
+  every Phaser screen already gets" — 2 of the file's 5 real overlay
+  kinds (Leaderboard, progression-reset confirm) have no harness coverage
+  today either (§7's recorded gap). A DOM-mounted surface without an
+  existing Phaser equivalent (e.g. a newly-extracted Guide screen) starts
+  from the same zero-coverage baseline those two already have, not from
+  parity with a fully-covered set.
 
 None of the above is a reason to build a second, competing primitive
 system, or to push `MenuScene.ts`, stores, providers, persistence, or
