@@ -70,11 +70,14 @@ The shared DOM shell now also gives the canvas an explicit accessible name, keyb
   - `Start`
   - `Options`
 - The current runtime preserves the one-overlay-at-a-time rule.
-- The current overlay family is:
+- The current overlay family (`LegacyOverlayKind`, `src/legacy-runtime/legacyOverlayRouting.ts`) is the top-level runtime overlay set:
   - options
-  - features
-  - game modes
   - pause
+  - auth (also reached as `Login/Account`)
+  - confirm-progression-reset
+  - leaderboard
+  - **Correction (2026-08-30):** this bullet previously read `options / features / game modes / pause`. That's stale — there is no live `'features'` or `'game modes'` top-level overlay kind in current source, and a repo-wide search of `MenuScene.ts` found no nested Features/Game Modes panel under those names either. Feature toggles and game-mode-style settings exist today as ordinary rows inside the single `options`/`pause` overlay content (`createFeatureControlRows`), not as their own overlay or sub-panel. The `auth`, `confirm-progression-reset`, and `leaderboard` overlay kinds were missing from the old bullet entirely.
+- Options and Pause currently do **not** render a Move Speed slider. Every `buildOptionsOverlay()` and `buildPauseOverlay()` call site passes `includeMovementSpeed: false`; no call site in `MenuScene.ts` passes `true`. (Whether to reintroduce it is a separate future product/UI decision, not current runtime behavior.)
 - The current menu shell is intentionally simpler and closer to the archived Unreal menu composition than the previous recovery shell.
 
 ## Current completion marker

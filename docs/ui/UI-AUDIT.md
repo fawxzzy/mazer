@@ -147,25 +147,20 @@ through Pause duplicating Settings' own content directly, not by
 navigating into the `'options'` overlay kind — see §2, and
 `UI-SCREEN-MAP.md`'s Settings/Pause rows.
 
-**Flagged discrepancy, not resolved here:** `docs/current-truth.md`
-("Current overlay family") lists a different, narrower set — options /
-features / game modes / pause — with no mention of auth, leaderboard, or
-confirm-progression-reset. Per `AGENTS.md`, `current-truth.md` is the
-designated anti-drift override when docs disagree, so this audit does not
-just assert its own code-read inventory over it. But `features` and `game
-modes` also appear elsewhere in `current-truth.md` as nested *sub-panels*
-reached by routing from Options/Pause ("nested overlay routing from
-`Options`/`Pause` back through `Features` and `Game Modes`"), which reads
-as a different, narrower concept — legacy in-panel navigation depth — than
-the top-level `LegacyOverlayKind` union this section documents, and
-`current-truth.md`'s list predates (or simply never mentions) the
-auth/leaderboard/confirm-progression-reset overlay kinds that verifiably
-exist in current source and are reachable (`openOverlay('auth')`,
-`openOverlay('leaderboard')`, `openOverlay('confirm-progression-reset')`
-all have live call sites in `MenuScene.ts`). Whether that's `current-truth.md`
-being stale on this one bullet, or describing a genuinely different
-"overlay family" concept than this table, needs the doc owner's call, not
-a unilateral fix in this docs-only PR.
+**Reconciled (2026-08-30), per explicit owner decision:** an earlier
+version of this section flagged, but declined to resolve, a conflict with
+`docs/current-truth.md` ("Current overlay family" listed options/
+features/game modes/pause with no auth/leaderboard/confirm-progression-
+reset). The owner has since directed that the live runtime overlay model
+is authoritative for current-truth purposes, and `docs/current-truth.md`
+has been corrected accordingly: its overlay-family bullet now lists the
+real top-level `LegacyOverlayKind` set (options, pause, auth, confirm-
+progression-reset, leaderboard), and the old `features`/`game modes`
+entries are marked stale — a repo-wide search of `MenuScene.ts` found no
+live top-level overlay or nested panel under those names; feature/game-
+mode-style settings exist today only as ordinary rows inside the single
+`options`/`pause` overlay content (`createFeatureControlRows`). This is
+no longer an open conflict between docs.
 
 ## 2. Confirmed: Pause is literally Settings' own content, reused
 
@@ -183,13 +178,14 @@ Settings. It isn't — every call site in both `buildOptionsOverlay()`
 (`MenuScene.ts:11063,11085`) passes `includeMovementSpeed: false`; no call
 site anywhere in the file ever passes `true`. Neither current surface
 renders a Move Speed slider today — it's dead, flag-gated functionality
-on both, not an asymmetry between them. This also conflicts with
-`docs/current-truth.md:268`, which states both surfaces "separate the
-Move Speed label and slider lanes" as if the slider is present. Per the
-same current-truth.md precedence rule as §1's overlay-family note, that
-conflict is flagged here for the doc owner to reconcile (is the slider
-supposed to be re-enabled, or is current-truth.md's line stale?), not
-resolved unilaterally in this docs-only PR. Everything else — guide
+on both, not an asymmetry between them. **Reconciled (2026-08-30), per
+explicit owner decision:** this previously conflicted with
+`docs/current-truth.md:268`'s claim that both surfaces "separate the
+Move Speed label and slider lanes." `docs/current-truth.md` has been
+corrected to state plainly that neither surface currently renders the
+slider, with re-introduction left as a separate future product/UI
+decision rather than described as current behavior. No longer an open
+conflict. Everything else — guide
 cards, every other settings row, the scroll behavior — is the *exact
 same function call* Settings makes. This is direct, code-level
 confirmation of "Pause behaves too much like another settings screen,"

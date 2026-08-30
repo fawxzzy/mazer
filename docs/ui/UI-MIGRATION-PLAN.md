@@ -140,29 +140,31 @@ bridge / live-scene mapping) is the first incomplete registered
 integrator wave.** It gates both 3C (DOM mounting) and 4D (renderer
 switch) — neither can start correctly before it.
 
-**Correction: this isn't settled to a single recommendation.** An earlier
-version of this section recommended the progression-reset confirmation
-dialog (Wave 3C, `ConfirmDialog` primitive) as *the* first mounted proof,
-without weighing it against `AGENTS.md`'s own build-discipline rule:
-"core board simulation and rendering precede shell polish"
-(`AGENTS.md:12`). A DOM confirmation dialog is exactly shell polish under
-that rule; Wave 4D's board/title renderer switch is exactly core board
-rendering. Once Wave 3A unblocks both 3C and 4D, that AGENTS.md rule
-reads as favoring 4D first, not 3C — this document does not have the
-standing to override it, and doesn't try to here.
+**Ordering is settled, per explicit owner decision (2026-08-30):** an
+earlier version of this section presented Wave 4D's board renderer and
+Wave 3C's DOM-mounting proof as two interchangeable candidates, on the
+reasoning that `AGENTS.md`'s board-first rule ("core board simulation and
+rendering precede shell polish," `AGENTS.md:12`) "reads as favoring 4D"
+without actually enforcing that reading. That was flagged as a real gap:
+presenting them as a free choice still let an implementer start the DOM
+proof first. The order is now explicit and mandatory:
 
-Two candidate first proofs, not one, for whoever sequences Wave 3A's
-follow-on work to decide between (or reconcile with AGENTS.md directly):
-
-**Option A — Wave 4D's board/title renderer switch**, per AGENTS.md's
-board-first rule. Proves the topology contract (Wave 2B) and design
+**Wave 3A → Wave 4D → Wave 3C.** Wave 3A (command bridge) unblocks both.
+Wave 4D (board/title renderer switch) comes next, per AGENTS.md's
+board-first rule — it proves the topology contract (Wave 2B) and design
 tokens (Wave 1B) actually drive shipped rendering, not just pass their
-own isolated tests.
+own isolated tests. **Wave 3C's DOM-mounting proof (the progression-reset
+`ConfirmDialog`, `src/ui/dom/*`) does not start until Wave 4D has
+shipped.** This is a hard sequencing rule, not a preference — do not
+start the DOM proof "in parallel" or "as a smaller first step" ahead of
+the board renderer.
 
-**Option B — the progression-reset confirmation dialog** (Wave 3C,
-`ConfirmDialog` primitive, `src/ui/dom/*`), if a narrow DOM-mounting
-architecture proof is wanted before the larger renderer swap. Would
-still need to prove:
+Wave 3B (auth migration, `auth-migration-integrator`) keeps its own
+existing registered scope and dependency status exactly as the decision
+registry states it — no gating edge to 3A or 3C is invented here; this
+section only fixes the 3C-vs-4D ordering, not 3B's independent standing.
+
+Once Wave 4D has landed, the Wave 3C proof would still need to prove:
 
 - one DOM root mounted above the Phaser canvas, with real mount/cleanup;
 - DOM-to-game command dispatch through the Wave 1A command model;
@@ -180,20 +182,29 @@ still need to prove:
   script exclusively to Wave 0C's `measured-baseline-integrator`. Doing it
   as an ad hoc part of a Wave 3C proof would itself violate the same
   wave-ownership rule this whole plan otherwise insists on. Whoever picks
-  up Option B needs an explicit Wave 0C handoff (or a registry amendment)
-  for the harness extension, not a same-PR fix.
-- fixing, or at minimum explicitly not silently reproducing, the real
-  routing defect already confirmed at this exact surface: it has two
-  entry points (Account and Pause, see `UI-AUDIT.md`'s P1 issue log and
+  up this proof needs an explicit Wave 0C handoff (or a registry
+  amendment) for the harness extension, not a same-PR fix.
+- fixing the real routing defect already confirmed at this exact surface,
+  not silently reproducing it in DOM form: the overlay has two entry
+  points (Account and Pause, see `UI-AUDIT.md`'s P1 issue log and
   `UI-SCREEN-MAP.md`'s progression-reset row) but Cancel always returns to
-  Pause regardless of which one opened it. A DOM `ConfirmDialog` migration
-  that ports this behavior unchanged would carry the same defect forward
-  in new form, not fix it.
+  Pause regardless of which one opened it. **This is recorded as its own
+  separate P1 follow-on, not fixed in this docs-only PR** — either as a
+  Wave 3A correctness-acceptance item (since 3A owns the command-bridge
+  work this dialog's routing would run through) or as its own narrowly
+  authorized bugfix PR that respects the decision registry's
+  `MenuScene.ts` wave-3A ownership. The desired contract, for whoever
+  picks it up: opened from Account → Cancel returns to Account; opened
+  from Pause → Cancel returns to Pause; a confirmed reset follows its own
+  explicit post-reset destination, independent of both. The fix should
+  preserve an explicit invocation/return context rather than hardcoding a
+  destination, the same shape `openOverlay`'s existing `overlayReturn`
+  field already handles for other overlays.
 
-This document does not implement either option or pick between them — it
-stays documentation-only, per this PR's own scope. It's recorded here so
-whoever picks up Wave 3A next has the real tension named instead of an
-unweighed recommendation.
+This document does not implement Wave 4D or the Wave 3C proof — it stays
+documentation-only, per this PR's own scope. It's recorded here so
+whoever picks up Wave 3A next has the real ordering and the known defect
+named up front, not re-derived from scratch.
 
 ## What this session's own future UI work should keep doing regardless
 
