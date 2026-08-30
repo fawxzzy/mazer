@@ -23,8 +23,8 @@ not to propose a competing one.
 | 2C | Asset/icon generator | unclear (no spec) |
 | **3A** | **Command bridge / live-scene mapping** | **not started — the actual next wave** |
 | 3B | Auth migration (`legacyAuth.ts`, `legacyPlayerMessage.ts`), owner `auth-migration-integrator` | not started |
-| 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started, gated behind 3A |
-| 4D | Phaser board/title renderer switch | not started, gated behind 3A |
+| 4D | Phaser board/title renderer switch | not started, gated behind 3A — **must ship before 3C starts, per AGENTS.md's board-first rule** |
+| 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started, gated behind 3A **and** 4D |
 
 No explicit gating edge is registered between 3A and 3B — 3B has its own
 exclusive owner over a disjoint path set and isn't recorded as blocked on
