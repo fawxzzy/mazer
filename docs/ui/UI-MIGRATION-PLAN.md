@@ -48,8 +48,17 @@ audit pass. If the owner wants this session specifically to pick up Wave
 ## Visual verification gate (required, not supplementary — with a baseline caveat)
 
 `npm run visual:ui-surfaces` (see `UI-AUDIT.md` §7) is a required automated
-gate for every UI migration PR under Wave 3A/3C/4D, not a nice-to-have.
-User- or ChatGPT-supplied screenshots and recordings are useful
+gate for every UI migration PR under Wave 3A/3B/3C/4D, not a nice-to-have.
+**Correction:** an earlier version of this line omitted 3B. It shouldn't
+have — this audit's own scope explicitly covers auth/profile, the harness
+already captures the Auth surface, and a Wave 3B PR touching
+`legacyAuth.ts`/`legacyPlayerMessage.ts` has just as much potential to
+regress the sign-in screen as a 3A/3C/4D PR has to regress anything else.
+Combined with the Deployment Contract section's own finding that
+`verify.yml` doesn't run this harness at all, an excluded 3B would have
+meant no automatic *and* no plan-required manual check on the one surface
+this harness already covers well. User- or ChatGPT-supplied screenshots
+and recordings are useful
 *supplementary* evidence — subjective visual feedback, physical-device
 behavior, animation timing, production-only rendering defects — but they
 do not replace it: they aren't deterministic, don't run the same 39

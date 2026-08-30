@@ -95,15 +95,29 @@ surface. There is no per-screen file/component split at all today.
 | Surface | Entry point | Overlay kind |
 |---|---|---|
 | Boot/loading | `BootScene.ts` (separate scene) | n/a |
-| Auth gate (blocking, pre-menu) | drawn inline in menu render path | n/a (`authGateGraphics`, not an `OverlayKind`) |
 | Main Menu | `mode === 'menu'`, `overlay === 'none'` | `'none'` |
 | Active Play | `mode === 'play'`, `overlay === 'none'` | `'none'` |
 | Settings (menu context) | `openOverlay('options')` from menu/QA entry points only | `'options'` |
 | Pause | `openOverlay('pause')` from play | `'pause'` |
-| Login/Account (auth) | `openOverlay('auth')` | `'auth'` |
+| Login/Account (auth), incl. the blocking pre-menu gate | `openOverlay('auth')`, or `update()` force-setting `overlay = 'auth'` when the auth gate locks on boot | `'auth'` |
 | Leaderboard | `openOverlay('leaderboard')` | `'leaderboard'` |
 | Progression reset confirm | `openOverlay('confirm-progression-reset')` | `'confirm-progression-reset'` |
 | Guide | **not a screen** — a section rendered inline inside Settings/Pause via `createLegacyOptionsInfoSection` | n/a |
+
+**Correction:** an earlier version of this table listed a separate "Auth
+gate (blocking, pre-menu)" row with overlay kind "n/a" alongside
+"Login/Account (auth)". That split misstates the routing: `update()`
+force-sets `this.overlay = 'auth'` the moment the auth gate locks (whether
+or not resolution is still pending), and `rebuildUi()` dispatches that
+same `'auth'` state to `buildAuthOverlay()` exactly as the menu-triggered
+`openOverlay('auth')` does. `authGateGraphics`/`syncLegacyAuthGateLoadingScreen`
+only draws a transient loading blocker on top while resolution is pending
+(`authGateAwaitingResolution`) — it isn't a second overlay-kind state.
+There is one `'auth'` overlay with two visual phases (loading blocker,
+then the actual sign-in form), not two separate surfaces. Getting this
+right matters for Wave 3C's one-overlay-at-a-time enforcement — treating
+it as two surfaces would give that invariant two apparent active states
+for what is actually one.
 
 `LegacyOverlayKind` (`src/legacy-runtime/legacyOverlayRouting.ts:2`) is the
 complete list, read directly from the live type: `'none' | 'options' |
