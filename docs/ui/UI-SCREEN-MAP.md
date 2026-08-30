@@ -22,7 +22,7 @@ HUD chrome), and a handful of standalone top-level Graphics/Image objects
 | Guide | not a screen; a section inside Settings/Pause | `createLegacyOptionsInfoSection`, `createLegacyOptionsGuideHeaderButton`, `drawLegacyOptionsGuideGlyph(s)` | inside the Settings/Pause overlay content | n/a |
 | Login/Account (auth) | `openOverlay('auth')` | `buildAuthOverlay`, `createLegacyAuthActionButton`, `createLegacyAuthPasswordVisibilityButton` | `overlayGraphics` + `uiButtons` | none |
 | Leaderboard | `openOverlay('leaderboard')` | `buildLeaderboardOverlay`, `drawLegacyLeaderboardTitleGlyph`, `resolveLegacyLeaderboardRowAccent` | `overlayGraphics` + `uiButtons` | none (own icon glyph, own row rendering) |
-| Progression reset confirm | `openOverlay('confirm-progression-reset')` | `buildProgressionResetConfirmationOverlay` | `overlayGraphics` + `uiButtons` | shares the generic `drawOverlayPanel`/`createOverlayTitle`/`createOverlayBackChevronButton` shell every overlay uses |
+| Progression reset confirm | `openOverlay('confirm-progression-reset')` | `buildProgressionResetConfirmationOverlay` | `overlayGraphics` + `uiButtons` | shares `drawOverlayPanel` (universal) and `createOverlayTitle`; does **not** call `createOverlayBackChevronButton` — see the corrected "Shared shell" section below |
 
 ## Shared shell (correction: only one function is actually common to all 5)
 

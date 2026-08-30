@@ -94,9 +94,22 @@ CI verification, a local production build, a preview deployment, and an
 actual production deployment are four separate steps with different
 authorization requirements — this plan does not blur them:
 
-- **CI verification** (tsc, vitest, the architecture/decision-registry
-  test, `visual:ui-surfaces`): runs automatically per PR, no approval
-  needed.
+- **CI verification, as it actually runs today** (`.github/workflows/verify.yml`,
+  the only PR workflow): type-check (`npm run lint`), a curated subset of
+  `vitest` suites, `npm run build`, and 10 sharded AI-navigation-acceptance
+  runs. Runs automatically per PR, no approval needed. **Correction: an
+  earlier version of this bullet also listed the architecture/
+  decision-registry test and `visual:ui-surfaces` here — neither actually
+  runs in CI.** `tests/architecture/decision-registry-contract.test.ts`
+  has only ever been run manually in this session (via `npx vitest run`),
+  never by the workflow, and `visual:ui-surfaces` isn't referenced
+  anywhere under `.github/workflows/`. Until one of the two happens —
+  wiring the baseline-aware visual gate (and the decision-registry test)
+  into `verify.yml`, or explicitly documenting them as required *manual*
+  checks a reviewer runs before approving — a UI migration PR can merge
+  with green CI despite neither having actually run. Whoever picks up the
+  first migration PR should close this gap rather than let "required"
+  keep meaning "required if someone remembers to run it locally."
 - **Local production build** (`npm run build`) and **preview deployment**
   (e.g. `vercel` without `--prod`): routine engineering steps, no
   additional approval needed beyond the standing pipeline authorization
