@@ -261,10 +261,11 @@ named up front, not re-derived from scratch.
 - Before proposing any new token, component, or architecture decision for
   Mazer's UI, check `docs/architecture/MAZER-UI-REWORK-*.md` first. This
   plan's own first draft didn't, and it showed.
-- Use `npm run visual:ui-surfaces` (see `UI-AUDIT.md` §7) for visual
-  verification going forward instead of ad-hoc Browser-pane screenshots —
-  it actually works in this environment and already encodes real
-  assertions, not just images.
+- Use `npm run visual:ui-surfaces -- --maze-seed 3749` (see `UI-AUDIT.md`
+  §7) for visual verification going forward instead of ad-hoc Browser-pane
+  screenshots — it actually works in this environment and already encodes
+  real assertions, not just images. Always the canonical seed, never the
+  bare invocation.
 - The one concrete, low-risk cleanup this audit found — `drawLegacyLeaderboardTitleGlyph`'s
   procedural bars could be swapped for the same `applyLegacyHudIconFrame`
   call the header button already uses (`UI-AUDIT.md` §3) — is **not**

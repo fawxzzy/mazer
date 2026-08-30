@@ -20,7 +20,7 @@ HUD chrome), and a handful of standalone top-level Graphics/Image objects
 | Settings | `openOverlay('options')` (menu only — there is no route from Pause into this overlay) | `buildOptionsOverlay` -> `createLegacyOptionsInfoSection` (Guide) + `createFeatureControlRows` | `overlayGraphics` + `uiButtons` | **Pause** (Pause calls the same two builder functions directly, not by navigating here — see below) |
 | Pause | `openOverlay('pause')` from play (a distinct overlay kind, not reached through Settings) | `buildPauseOverlay` -> the *same* `createLegacyOptionsInfoSection` + `createFeatureControlRows` calls Settings makes, inlined directly, plus `createLegacyOverlayHomeButton` | `overlayGraphics` + `uiButtons` | **Settings** (see `UI-AUDIT.md` §2 — this is direct content duplication between two independent overlay kinds, not a navigation relationship) |
 | Guide | not a screen; a section inside Settings/Pause | `createLegacyOptionsInfoSection`, `createLegacyOptionsGuideHeaderButton`, `drawLegacyOptionsGuideGlyph(s)` | inside the Settings/Pause overlay content | n/a |
-| Login/Account (auth) | `openOverlay('auth')`, or `update()` force-setting `overlay='auth'` once resolution finishes locked (signed-out, no guest access) | `buildAuthOverlay`, `createLegacyAuthActionButton`, `createLegacyAuthPasswordVisibilityButton` — same `'auth'` overlay kind either way (correction: this row and the boot-blocker row above were previously merged into one; they're genuinely two different states — see `UI-AUDIT.md` §1's third-pass correction) | `overlayGraphics` + `uiButtons` | none |
+| Login/Account (auth) | `openOverlay('auth')`, or `update()` force-setting `overlay='auth'` once resolution finishes locked (signed-out, no guest access) | `buildAuthOverlay`, `createLegacyAuthActionButton`, `createLegacyAuthPasswordVisibilityButton` — same `'auth'` overlay kind either way (correction: this row and the boot-blocker row above were previously merged into one; they're genuinely two different states — see `UI-AUDIT.md` §1's third-pass correction) | `overlayGraphics` + `uiButtons`, **plus a real native DOM input layer outside both — see below** | none |
 | Leaderboard | `openOverlay('leaderboard')` | `buildLeaderboardOverlay`, `drawLegacyLeaderboardTitleGlyph`, `resolveLegacyLeaderboardRowAccent` | `overlayGraphics` + `uiButtons` | none (own icon glyph, own row rendering) |
 | Progression reset confirm | **Two entry points, one hardcoded return** — from the authenticated Account section of the Auth overlay (`buildAuthenticatedAccountSection`, `MenuScene.ts:11491`) and from Pause (`applyLegacyPauseCommand('reset-progression')`, `MenuScene.ts:14951`), both via `openOverlay('confirm-progression-reset')` | `buildProgressionResetConfirmationOverlay` | `overlayGraphics` + `uiButtons` | shares `drawOverlayPanel` (universal) and `createOverlayTitle`; does **not** call `createOverlayBackChevronButton` — see the corrected "Shared shell" section below. **Confirmed defect, not just a doc gap:** `legacyOverlayRouting.ts:31-35` always routes Cancel/back from this overlay to `'pause'`, unconditionally — so cancelling from the Account entry point currently opens the play-oriented Pause surface while still in menu mode. `UI-MIGRATION-PLAN.md`'s first-integration-proof section requires restoring focus to the invoking control; a Wave 3C proof built only against the Pause path would miss this and could ship the same defect in DOM form. |
 
@@ -50,6 +50,59 @@ Net correction: this shell is thinner than previously documented. Only
 Whoever plans Wave 3C's extraction should treat the other four as
 partially-shared, per-overlay-subset helpers, not as an existing
 all-overlay primitive ready to lift as-is.
+
+## Auth/Account's real native DOM input layer (missing from earlier passes)
+
+The Auth/Account surface isn't Phaser-only. Focusing an Auth or Account
+field creates a real `<input>` element outside the Phaser canvas
+entirely, via three symmetric pairs of methods in `MenuScene.ts`:
+
+- **Auth form fields** (email/password/etc.): `createLegacyAuthNativeInput(fieldId)`
+  (`MenuScene.ts:13278`), `positionLegacyAuthNativeInput(fieldId, bounds)`
+  (`:13405`), `destroyLegacyAuthNativeInput()` (`:13433`).
+- **Account username field**: `createAccountUsernameNativeInput()`
+  (`MenuScene.ts:11835`), `positionAccountUsernameNativeInput(bounds)`
+  (`:11886`), `destroyAccountUsernameNativeInput()` (`:11905`).
+
+Both `create*` methods append their `<input>` directly to
+`document.body` (`document.body.appendChild(input)`, `:13368` and
+`:11881`) at `zIndex: '2147483647'` (`:13303` and `:11857`) — the
+maximum valid CSS z-index, placed above everything the Phaser canvas or
+any overlay chrome can render. Each pair keeps its own stored element
+reference, position/size sync, event listeners, and destroy path,
+independent of `overlayGraphics`/`uiButtons`; the Auth-field input and
+the Account-username input are two separate instances with two separate
+lifecycles, not one shared control.
+
+**Current teardown coverage** (so a Wave 3C migration doesn't
+accidentally drop any of it): both `destroy*` calls fire together at
+scene/mode shutdown (`MenuScene.ts:2090-2091`), together on overlay close
+while `overlay === 'auth'` (`:14897-14898`), and `destroyLegacyAuthNativeInput()`
+alone fires on auth-form field reset (`:13583`) and at several other
+form-state-change points. This existing coverage is real, not
+theoretical — but it's scattered across call sites rather than centralized,
+which is exactly the kind of thing a DOM migration can silently miss one
+of.
+
+**Wave 3C migration invariant, recorded here so it isn't rediscovered the
+hard way:** a replacement DOM Auth/Account form must not mount while a
+legacy shadow input is still alive.
+
+- Legacy inputs must be destroyed (or explicitly retired) before a
+  replacement DOM control takes ownership of focus, pointer input,
+  keyboard input, or browser-native password-manager/autocomplete/autofill
+  behavior for the same logical field.
+- At most one intended active input should exist for a given field at any
+  time — never a legacy shadow input plus a new DOM control both present.
+- Closing or unmounting the Auth/Account surface must remove every native
+  input and listener this layer owns, the same way the current
+  overlay-close/scene-shutdown/field-reset paths already do.
+- A new DOM form rendering visually above a surviving legacy input is not
+  sufficient — the legacy input is still focusable/interactive at
+  `z-index: 2147483647` even if visually obscured.
+
+This section documents current ownership and the required teardown
+boundary only — it does not redesign the Auth screen.
 
 ## Z-order (menu/play board space, `boardZoomContainer` children, in paint order)
 
