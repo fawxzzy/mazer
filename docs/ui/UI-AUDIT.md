@@ -344,7 +344,7 @@ Severity per the redesign brief's own scale.
   surfaced anywhere in the UI itself; could back a future "about/version"
   debug panel.
 
-## 7. Correction: a real visual-proof harness exists and works — but needs a pinned seed to be deterministic
+## 7. Correction: a real visual-proof harness exists and works — but needs a canonical pinned seed for topology determinism, and isn't pixel-deterministic even then
 
 `npm run visual:ui-surfaces` (`scripts/analysis/capture-ui-surfaces.mjs`) is
 a real, working Playwright-based capture-and-assert harness — 39 checks
@@ -372,11 +372,28 @@ falls through to `createLegacyRuntimeRandomSeed()`, which mixes
 `Date.now()` and `Math.random()` — a genuinely different maze every run.
 Every command in this PR set (including this document's own) that invokes
 `npm run visual:ui-surfaces` without `--maze-seed` produces
-non-reproducible, non-diffable screenshots for any topology-sensitive
-check, contradicting the "deterministic"/"diffable" framing used
-throughout. **The required gate must pin a fixed `--maze-seed` value**
-(or the harness should default one) before its output can be trusted as
-a regression baseline rather than a fresh random sample each run.
+non-reproducible, non-diffable results for any topology-sensitive check,
+contradicting the "deterministic"/"diffable" framing used throughout.
+**The required gate must pin a fixed, canonical `--maze-seed`, not an
+arbitrary per-caller value** — this repo already has one:
+`--maze-seed 3749`, the existing maintained proof seed used this exact
+way elsewhere (`docs/research/MAZER_UI_VISUAL_SYSTEM_NEXT_CHUNK_PLAN.md:22`
+and dozens of other scripts/docs/tests). Every invocation of this gate
+should use exactly that value.
+
+**Second correction, narrower than the first:** pinning `--maze-seed`
+only makes the maze *topology* and the 39 structural assertions
+reproducible — it does not make the raw PNG screenshots pixel-diffable.
+`createLegacyMenuBackdropStars()` (the animated starfield visible behind
+menu/auth/options/pause) is called with no arguments at its one live
+call site (`MenuScene.ts:5911`) and defaults its `random` parameter to
+`Math.random`; nothing in `capture-ui-surfaces.mjs` or its URL params
+reaches that seam, and animation timing keeps advancing the stars before
+capture regardless. So even at a pinned seed, repeated runs can still
+produce different pixels on every screen carrying the backdrop layer.
+"Deterministic and diffable" should be read as topology/assertion
+determinism, not screenshot-level reproducibility, until the backdrop RNG
+gets its own seedable seam.
 
 **Recorded gap, not yet fixed:** the harness's own `surfaces` object
 (`capture-ui-surfaces.mjs`) captures and checks exactly menu, auth,

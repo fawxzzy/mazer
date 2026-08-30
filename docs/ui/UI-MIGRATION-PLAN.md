@@ -67,24 +67,45 @@ this harness already covers well. User- or ChatGPT-supplied screenshots
 and recordings are useful
 *supplementary* evidence — subjective visual feedback, physical-device
 behavior, animation timing, production-only rendering defects — but they
-do not replace it: the harness (once pinned, see below) is reproducible
-and diffable in a way ad hoc screenshots never are, and runs the same 39
-assertion set on every change. No migration PR should waive this gate in
-favor of manually-supplied images.
+do not replace it: at a pinned seed (see below) the harness's maze
+topology and 39-check assertion results are reproducible run to run in a
+way ad hoc screenshots never are — the raw PNGs themselves are not yet
+full pixel-diff material (see below). No migration PR should waive this
+gate in favor of manually-supplied images.
 
-**Pin a fixed maze seed — the default invocation is not deterministic.**
-An earlier version of this document and `UI-AUDIT.md` §7 called this
-harness "deterministic" outright. That's only true with an explicit seed:
-`capture-ui-surfaces.mjs`'s `resolveRoute()` only sets the `mazeSeed` URL
-param when a `--maze-seed` CLI arg is passed; without it,
-`resolveInitialLegacyRuntimeSeed()` mixes `Date.now()`/`Math.random()`
-into a fresh seed every run (`src/legacy-runtime/legacyRuntimeSeed.ts`).
-Every command in this plan that invokes `npm run visual:ui-surfaces`
-without `--maze-seed` captures a different maze each time — not
-reliably diffable for anything topology-sensitive. **Always pass a fixed
-`--maze-seed`** (or push a default into the harness itself) before
-treating a run's output as a regression baseline rather than a fresh
-random sample.
+**Pin the repository's canonical seed — the default invocation is not
+even topology-deterministic, and pinning a seed still doesn't make the
+screenshots pixel-deterministic.** Two corrections, not one:
+
+1. **Use `3749`, not a placeholder.** An earlier version of this line
+   said "pass a fixed `--maze-seed`" with a bare `<fixed value>`
+   placeholder — literal shell syntax Bash parses as redirection, and
+   even fixed, an arbitrary per-caller value would mean captures from
+   different PRs share no comparable baseline. `3749` is the repository's
+   own existing maintained proof seed, already used this exact way
+   elsewhere (`docs/research/MAZER_UI_VISUAL_SYSTEM_NEXT_CHUNK_PLAN.md:22`:
+   `npm run visual:ui-surfaces -- --skip-build --maze-seed 3749`) and
+   across dozens of other scripts/docs/tests. **Every invocation of this
+   gate must use exactly `--maze-seed 3749`**, not an arbitrary value
+   each caller picks. (Without it, `capture-ui-surfaces.mjs`'s
+   `resolveRoute()` never sets the `mazeSeed` URL param, and
+   `resolveInitialLegacyRuntimeSeed()` mixes `Date.now()`/`Math.random()`
+   into a fresh maze every run —
+   `src/legacy-runtime/legacyRuntimeSeed.ts`.)
+2. **Pinning the maze seed only fixes maze topology, not the screenshot
+   pixels.** `createLegacyMenuBackdropStars()` — the animated starfield
+   visible behind menu/auth/options/pause — is called with no arguments
+   at its one live call site (`MenuScene.ts:5911`) and defaults its `random`
+   parameter to `Math.random`; nothing in `capture-ui-surfaces.mjs` or its
+   URL params reaches that seam. Animation timing also advances the stars
+   before capture. So even at `--maze-seed 3749`, repeated runs can still
+   produce different pixels on every screen with the backdrop layer. The
+   gate's *topology* and *assertion* results (the 39 structural checks) are
+   reproducible at a pinned seed; the *raw PNGs* are not full pixel-diff
+   material until the backdrop RNG gets its own deterministic seam (or
+   pixel-diffing is dropped in favor of the assertion set, which is what
+   this gate actually enforces today). Don't oversell this as
+   screenshot-level reproducibility — it isn't, yet.
 
 **Baseline this before enforcing it as a hard pass/fail gate.** This
 session's own run of the harness (`UI-AUDIT.md` §7) already found this
@@ -103,8 +124,9 @@ baseline question before wiring the gate into CI as blocking.
 Failure procedure, if the harness fails locally (as it did once this
 session — see §7's crash-then-retry note):
 
-1. Run `npm run visual:ui-surfaces -- --maze-seed=<fixed value>` (never
-   the bare, seedless invocation) and capture the exact stdout/stderr.
+1. Run `npm run visual:ui-surfaces -- --maze-seed 3749` (never the bare,
+   seedless invocation, and never a different ad hoc seed value) and
+   capture the exact stdout/stderr.
 2. Classify the failure before treating it as a harness defect: browser
    binary missing/outdated, preview server didn't start or wasn't ready,
    the capture route (`?content=core-only&theme=aurora&runtimeDiagnostics=1`)
