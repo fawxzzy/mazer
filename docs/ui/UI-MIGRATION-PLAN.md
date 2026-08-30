@@ -1,84 +1,61 @@
-# Mazer UI Migration Plan (draft, Phase 0 output)
+# Mazer UI Migration Plan (corrected)
 
-Companion to `UI-AUDIT.md` and `UI-DESIGN-CONTRACT.md`. This is the proposed
-PR sequence for the actual redesign work, adjusted for two real constraints
-discovered during the audit that the original brief didn't know about:
+An earlier draft of this document proposed a fresh 8-PR migration sequence
+(tokens -> primitives -> per-screen migrations) as if this were a new
+initiative. It is not. Per `UI-AUDIT.md` §0, a real dependency-ordered "UI
+rework" wave system already exists, already on `main`, with its own
+governance (`docs/architecture/MAZER-UI-REWORK-*.md`,
+`docs/contracts/mazer-ui-rework-*.v1.json`,
+`tests/architecture/decision-registry-contract.test.ts`). This document's
+job is now just to state the real current status and defer to that system,
+not to propose a competing one.
 
-1. **`src/ui/dom/*` already exists** (tested, unused) — see `UI-AUDIT.md` §0.
-   This must be resolved before Phase 1 starts, or Phase 1 risks building a
-   third system.
-2. **No reliable in-browser screenshot capture in this working environment.**
-   The original brief's verification steps assume deterministic screenshots
-   at every phase gate. That assumption doesn't hold here today. The plan
-   below routes visual verification through the user + an external tool
-   (screenshots/recordings supplied back into the conversation) instead of
-   an automated harness, until/unless that capability is fixed.
+## Current status (read directly from the wave docs, 2026-08-29)
 
-Per the user's own direction: work through this **one PR at a time**, not
-in parallel waves, and don't start PR N+1 until PR N is reviewed.
+| Wave | Scope | Status |
+|---|---|---|
+| 0A | Decision registry, architecture guardrails | done |
+| 1A | Shared state/commands/view-models foundation | done |
+| 1B | Design tokens | done |
+| 1C | Diagnostics schema split | skipped (no spec) |
+| 2A / 2A.1 | DOM primitives (`src/ui/dom/*`) | done, deliberately unmounted |
+| 2B | Topology/path geometry contract | done |
+| 2C | Asset/icon generator | unclear (no spec) |
+| **3A** | **Command bridge / live-scene mapping** | **not started — the actual next wave** |
+| 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started, gated behind 3A |
+| 4D | Phaser board/title renderer switch | not started, gated behind 3A |
 
-## Gate 0 (this document set) — DONE, no code changed
+## Who owns Wave 3A
 
-`UI-AUDIT.md`, `UI-SCREEN-MAP.md`, `UI-DESIGN-CONTRACT.md`, this file. Needs
-your review, specifically on the `src/ui/dom/*` question, before Gate 1
-starts.
+Not this worktree/branch by default. This session's own work
+(`claude/mazer-menu-row-button-geometry-fix-rescued`) has been targeted
+bug/visual fixes to the existing `MenuScene.ts` rendering, confirmed to not
+conflict with the registry's wave-ownership lock
+(`tests/architecture/decision-registry-contract.test.ts` passes against
+these changes). Implementing Wave 3A itself — mapping the live scene into
+the Wave 1A state/command model, making the bridge load-bearing — is a
+separate, larger undertaking with its own registered scope and, per this
+account's own working notes, is more likely to be the other agent/process
+that authored Waves 0A-2B than something to start unprompted from an
+audit pass. If the owner wants this session specifically to pick up Wave
+3A, say so explicitly — it hasn't been assumed here.
 
-## Gate 1 — resolve the DOM-vs-Phaser question
+## What this session's own future UI work should keep doing regardless
 
-Not a code PR. A decision, informed by actually reading `src/ui/dom/*`'s
-current state against `cyberArcadeMaterial`'s current tokens (do the colors/
-radii/motion values still match, or has one drifted from the other since
-whichever of them was built more recently?). Output: one paragraph, in this
-file, recording the decision and why.
-
-## Gate 2 — first real PR, scoped to prove the pattern on ONE screen
-
-Deliberately the smallest real migration, not the token/primitive
-mega-PR the original brief proposed as "Phase 1." Candidate: **the
-Leaderboard title icon fix from `UI-AUDIT.md` §3** — replace
-`drawLegacyLeaderboardTitleGlyph`'s procedural bars with
-`applyLegacyHudIconFrame` + `MAZER_HUD_LEADERBOARD_ICON_METRICS`, the same
-call every other leaderboard-icon placement already uses. Small, concrete,
-already-diagnosed, and it exercises the exact "shared primitive, multiple
-call sites, no duplication" pattern the whole redesign is trying to
-generalize — a good test of whether that pattern actually holds up before
-committing to it everywhere.
-
-## Gate 3 onward — pick the next single item, one at a time
-
-Not pre-sequenced into rigid phases/waves the way the original brief did,
-per your own "work thru it systematically" direction. After each item
-ships, come back with what's next rather than committing to a fixed
-8-PR order now. Reasonable next candidates, roughly in order of how
-concretely they're already diagnosed:
-
-1. **Pause vs. Settings** (`UI-AUDIT.md` §2): give Pause its own
-   `resume/restart/guide/settings/main-menu` hierarchy instead of inlining
-   Settings' own content directly. This is the biggest structural fix
-   named in the original brief and the audit found the exact code proving
-   it's needed.
-2. **A real `'guide'` overlay kind**, extracted out of Settings/Pause into
-   its own screen, using the shared overlay shell (`drawOverlayPanel`,
-   `createOverlayTitle`, `createOverlayBackChevronButton`) every other
-   overlay already uses.
-3. **Icon-size token**: formalize the `desiredSize` contract from
-   `UI-DESIGN-CONTRACT.md` so the next icon placement doesn't need another
-   eyeball-and-bump pass.
-4. Main Menu / Active Play / Profile / Leaderboard content-level redesign
-   (the actual visual layout changes in the original brief's Phase 2-5) —
-   deferred until 1-3 land and prove the primitive pattern, and until
-   there's a working way to get visual proof back (screenshots/recordings
-   from you, per the workflow you described).
-
-## What every PR in this plan should still do, regardless of which item it is
-
-- Run the full existing test suite + `tsc --noEmit`.
-- Follow this branch's existing shipping pipeline (PR -> CI -> merge ->
-  clean-checkout deploy -> live verification) already established this
-  session.
-- Not bundle unrelated gameplay/VFX changes in with UI-structure changes
-  (per the original brief's own rule, which is a good one).
-- Get visual proof back from you (screenshot/recording) before being
-  marked done, since automated capture isn't reliable here yet — this
-  replaces the original brief's "deterministic screenshot harness" gate
-  for now, not permanently.
+- Keep bug/visual fixes to `MenuScene.ts` scoped and small, the way the
+  last several PRs in this branch already have been — that's consistent
+  with `no-big-bang-menuscene-rewrite` and hasn't tripped the wave-ownership
+  test so far.
+- Before proposing any new token, component, or architecture decision for
+  Mazer's UI, check `docs/architecture/MAZER-UI-REWORK-*.md` first. This
+  plan's own first draft didn't, and it showed.
+- Use `npm run visual:ui-surfaces` (see `UI-AUDIT.md` §7) for visual
+  verification going forward instead of ad-hoc Browser-pane screenshots —
+  it actually works in this environment and already encodes real
+  assertions, not just images.
+- The one concrete, low-risk cleanup this audit found that doesn't touch
+  wave-owned territory: `drawLegacyLeaderboardTitleGlyph`'s procedural
+  bars could be swapped for the same `applyLegacyHudIconFrame` call the
+  header button already uses (`UI-AUDIT.md` §3). Small, scoped, consistent
+  with this branch's existing pattern of icon fixes — worth doing whenever
+  it's next convenient, not urgent.

@@ -100,10 +100,14 @@ preventing it by construction. Any new primitive-based rendering should
 make this order a real, enforced constant, not an emergent property of
 `.add()` call sequence.
 
-## Open architectural decision (blocks Phase 1 start)
+## Correction: this is not an open decision
 
-Per `UI-AUDIT.md` §0: is `src/ui/dom/*` in scope? This contract deliberately
-does not answer that. Whichever way it's resolved, the *rules* above (icon
-normalization, spacing/motion token consumption, typography split, z-order)
-apply equally — only the *implementation surface* (DOM components vs.
-Phaser-native primitives) changes.
+An earlier draft of this document left "is `src/ui/dom/*` in scope"
+unanswered. Per `UI-AUDIT.md` §0, it's already answered by the existing
+`renderer-ownership-split` decision and the Wave 2A/2A.1 DOM-primitives
+doc: yes, in scope, deliberately unmounted pending Wave 3C. The rules above
+(icon normalization, spacing/motion token consumption, typography split,
+z-order) apply to whichever wave implements them — this document doesn't
+need to re-litigate the renderer choice, only make sure the rules are
+consistent with the tokens Wave 1B already shipped
+(`src/theme/tokens.ts`/`.css`) rather than proposing new ones.

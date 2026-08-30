@@ -8,47 +8,60 @@ component layers that already exist elsewhere in the repo.
 This is a documentation-only pass. No rendering code changed as part of this
 audit.
 
-## 0. The one finding that changes everything else
+## 0. Correction (post-review): this redesign is already underway, under its own governance
 
-**A real, tested, unused DOM component library already exists at
-`src/ui/dom/`:** `AppShell`, `StageShell`, `MazerPanel`, `MazerButton`,
-`MazerIconButton`, `MazerIcon`, `MazerField`, `MazerPasswordField`,
-`MazerSlider`, `MazerSwitch`, `MazerSegmentedControl`, `MazerScrollArea`,
-`SettingRow`, `SettingsSection`, `ConfirmDialog`, `StatusBanner`, plus an
-`icons.ts` and barrel `index.ts`. It has its own test coverage
-(`tests/ui/dom-settings-primitives.test.ts`, part of this branch's known
-pre-existing baseline-failure set — one test in it times out, unrelated to
-this audit).
+**The first version of this audit got this wrong.** It searched `src/` for
+consumers of `src/ui/dom/*` and, finding none, framed "adopt vs. shelve
+`src/ui/dom/*`" as an open decision for this PR to make. It is not open. A
+real, dependency-ordered "UI rework" wave system already exists, already
+merged to `main`, governed by `docs/architecture/MAZER-UI-REWORK-*.md` and
+`docs/contracts/mazer-ui-rework-*.v1.json`, enforced by
+`tests/architecture/decision-registry-contract.test.ts`. This audit simply
+never searched `docs/architecture/` or `docs/contracts/` broadly enough to
+find it — a real gap in the first pass, not a disagreement to negotiate.
 
-**Nothing outside `src/ui/dom/` imports from it.** `index.html` mounts a single
-`<div id="app">` for the Phaser canvas; there is no second DOM root. This
-library is not wired into the shipping app at all right now.
+The registry's own locked `renderer-ownership-split` decision already
+states: Phaser owns world/maze presentation; DOM owns application shell,
+HUD, touch controls, settings, dialogs, and system chrome; tokens, state,
+commands, geometry, and diagnostics are shared contracts owned by neither
+renderer alone. `src/ui/dom/*` (Wave 2A/2A.1) was **deliberately** built and
+left unmounted — its own doc says so explicitly: "These primitives are
+DOM-only... They remain unreferenced by shipping runtime entrypoints until
+a later dependency-ordered integrator wave owns composition and cleanup."
+Not abandoned. Not a question for this audit to reopen.
 
-There is also a real design-token layer underneath the Phaser-side
-`cyberArcadeMaterial` (`src/render/cyberArcadeMaterial.ts`), sourced from
-`src/theme/tokens.ts`'s `designTokens`: a color map, `spacingPx` scale,
-`radiusPx` (control/panel/sheet/round), `strokePx`, `motionMs`
-(instant/press/panel/emphasis), `touchTargetMinPx`/`preferredTouchTargetPx`,
-and font family tokens (ui/metrics/title). `cyberArcadeMaterial` re-exposes a
-Phaser-friendly subset of these as numeric colors instead of CSS variables.
+Wave status, read directly from `docs/architecture/MAZER-UI-REWORK-*.md`
+(2026-08-29):
 
-**Before any Phase 1 "build shared primitives" work starts, this needs a
-decision, not an assumption:**
-- Is `src/ui/dom/*` viable and current (same visual direction, same token
-  version), just never finished being wired in? If so, the actual Phase 1
-  work is *integration* (how does a DOM overlay coexist with the Phaser
-  canvas' own coordinate system, safe-area, and input handling — the
-  "mixing DOM and Phaser ownership" risk the redesign brief itself names),
-  not *invention*.
-- Or is it stale/abandoned from an earlier direction that no longer matches
-  `cyberArcadeMaterial`'s current palette/tokens? If so, it's reference
-  material at best, and Phase 1 primitives should be built Phaser-native,
-  consuming the *existing* `designTokens`/`cyberArcadeMaterial` layer rather
-  than inventing a second token system.
+| Wave | Scope | Status |
+|---|---|---|
+| 0A | Decision registry, architecture guardrails | done |
+| 1A | Shared state/commands/view-models foundation | done |
+| 1B | Design tokens (`src/theme/tokens.ts`/`.css`) | done |
+| 1C | Diagnostics schema split | skipped (no spec file existed in the source handoff) |
+| 2A / 2A.1 | DOM primitives (`src/ui/dom/*`) | done, deliberately unmounted |
+| 2B | Topology/path geometry contract (`src/geometry/topologyPath.ts`) | done |
+| 2C | Asset/icon generator | no spec file existed; status unclear |
+| **3A** | **Command bridge / live-scene mapping — gates 3C and 4D** | **not started — next** |
+| 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started |
+| 4D | Actual Phaser board/title renderer switch (topology contract + tokens) | not started, gated behind 3A |
 
-Either answer is fine. Proceeding with Phase 1 without asking this question
-first risks building a third, parallel component system next to two that
-already exist.
+`tests/architecture/decision-registry-contract.test.ts` currently passes
+against this session's own changes (verified: `npx vitest run
+tests/architecture/decision-registry-contract.test.ts`, 29/29) — this
+session's bug/visual-fix work on `MenuScene.ts` has not violated the
+registry, because `MenuScene.ts` isn't yet assigned to a specific wave's
+exclusive-writer lock. That does not make further ad-hoc `MenuScene.ts`
+patches a substitute for Wave 3A; it means they've stayed out of the
+registry's way so far, which is a lower bar.
+
+**What this means for scope:** the actual redesign implementation (mounting
+`src/ui/dom/*`, wiring Wave 3A's command bridge, Wave 4D's renderer switch)
+already has an owner and a plan. This audit's job is to *not duplicate that
+plan*, and to flag where this session's own work should stay clear of it.
+Sections 1-6 below are corrected against that reality; §7 (the original
+draft's proposed migration plan) has been removed in favor of pointing at
+the real wave docs — see `UI-MIGRATION-PLAN.md`.
 
 ## 1. Screen inventory
 
@@ -180,14 +193,13 @@ where the content overlaps — see §2):**
 
 Severity per the redesign brief's own scale.
 
-**P0 — structural / blocking for a coherent redesign**
+**P0 — structural, already tracked by the wave system (§0), not new findings for this PR to resolve**
 - No dedicated `'guide'` overlay kind; Guide is a section glued into
-  Settings/Pause, not a real screen (§2).
-- `src/ui/dom/*` component library exists, is tested, and is completely
-  disconnected from the shipping app (§0) — must be resolved (adopt or
-  shelve) before Phase 1 primitive work starts, or the project risks a
-  third parallel system.
-- Pause has no content of its own distinct from Settings (§2).
+  Settings/Pause, not a real screen (§2) — in scope for Wave 3C's mounting
+  work per the DOM-primitives doc's own settings-boundary section.
+- Pause has no content of its own distinct from Settings (§2) — same,
+  Wave 3C's "one-overlay enforcement" and route-aware wiring is the
+  natural place this gets resolved, once `src/ui/dom/*` is actually mounted.
 
 **P1 — major hierarchy/duplication**
 - Leaderboard screen's own title icon is a second, procedural
@@ -215,10 +227,36 @@ Severity per the redesign brief's own scale.
   surfaced anywhere in the UI itself; could back a future "about/version"
   debug panel.
 
-## 7. What this audit does NOT cover
+## 7. Correction: a deterministic visual-proof harness already exists and works
 
-No screenshots are included. Per the standing note from prior sessions,
-reliable in-browser screenshot capture has not worked consistently in this
-environment; the "visual-proof harness" the redesign brief calls for is a
-real open task, not something this pass could produce. Everything above is
-derived from reading the actual source, not from visual inspection.
+`npm run visual:ui-surfaces` (`scripts/analysis/capture-ui-surfaces.mjs`) is
+a real, working Playwright-based capture-and-assert harness — 39 checks
+covering per-screen color contracts, text-label presence/bounds, scroll
+affordance/reachability, console/page-error cleanliness, reduced-motion
+behavior, and mobile layout invariants, plus real PNG screenshots of menu/
+auth/options/play/pause. Verified by actually running it in this session:
+a first attempt (immediately after a fresh `npm run build`) hit `page.goto:
+Page crashed`; a second attempt with `--skip-build` against the already-
+built `dist/` succeeded cleanly (build-then-immediately-preview may need a
+brief settle or a retry — worth a small hardening pass, not evidence the
+harness itself is broken). The successful run surfaced two real,
+pre-existing failing checks unrelated to this audit
+(`options-bottom-account-action`, `mobile-overlay-scroll-reachability` —
+both about a missing "Account" label at the bottom of the Options/Pause
+scroll area) — genuine signal this harness produces, not noise.
+
+This directly corrects the previous version of this section, which claimed
+no reliable screenshot capture existed in "this environment." That claim
+was accurate for the ad-hoc Browser-pane tooling used earlier in this
+session, but wrong as a statement about the repository: a real harness was
+sitting in `scripts/analysis/` the whole time and just hadn't been found.
+
+One caveat for whoever uses this next: the default capture route
+(`?content=core-only&theme=aurora&runtimeDiagnostics=1`) renders a reduced
+"core-only" surface — the header settings/leaderboard/profile icons in the
+captured menu screenshot render as thin-line glyphs, not the real bitmap
+HUD assets this session wired in. Whether that's this test mode
+deliberately stripping asset-dependent rendering for speed/determinism, or
+an actual asset-loading gap under `core-only`, wasn't resolved in this
+pass — worth checking before relying on these screenshots to verify
+icon-asset-specific work.

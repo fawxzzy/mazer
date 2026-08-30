@@ -17,9 +17,8 @@ HUD chrome), and a handful of standalone top-level Graphics/Image objects
 | Auth gate | blocks menu until auth resolves | inline in menu render path, `authGateGraphics` | top-level | nothing |
 | Main Menu | `mode='menu'`, `overlay='none'` | `rebuildUi()`'s `overlay==='none'` branch, `drawLegacyMenuSettingsCog`, `drawLegacyMenuLeaderboardIcon`, `createLegacyMenuProfileButton`, `drawLegacyMenuPathTitle` | `boardZoomContainer` (title/icons), top-level buttons | Active Play (shares the whole board/backdrop/title rendering pipeline) |
 | Active Play | `mode='play'` | `drawDynamicBoard`, `drawHud`, `drawLegacyPlayTouchControls` | `boardZoomContainer` + `hudGraphics` | Main Menu (board pipeline); Pause (touch cog uses the same real settings icon as the menu header) |
-| Settings (from menu) | `openOverlay('options')` | `buildOptionsOverlay` -> `createLegacyOptionsInfoSection` (Guide) + `createFeatureControlRows` | `overlayGraphics` + `uiButtons` | **Pause** (identical Guide + control-row calls) |
-| Settings (from Pause) | Pause -> Settings | same `buildOptionsOverlay` call | same | same as above |
-| Pause | `openOverlay('pause')` from play | `buildPauseOverlay` -> same `createLegacyOptionsInfoSection` + `createFeatureControlRows` as Settings, plus `createLegacyOverlayHomeButton` | `overlayGraphics` + `uiButtons` | **Settings** (see §2 of the audit) |
+| Settings | `openOverlay('options')` (menu only — there is no route from Pause into this overlay) | `buildOptionsOverlay` -> `createLegacyOptionsInfoSection` (Guide) + `createFeatureControlRows` | `overlayGraphics` + `uiButtons` | **Pause** (Pause calls the same two builder functions directly, not by navigating here — see below) |
+| Pause | `openOverlay('pause')` from play (a distinct overlay kind, not reached through Settings) | `buildPauseOverlay` -> the *same* `createLegacyOptionsInfoSection` + `createFeatureControlRows` calls Settings makes, inlined directly, plus `createLegacyOverlayHomeButton` | `overlayGraphics` + `uiButtons` | **Settings** (see `UI-AUDIT.md` §2 — this is direct content duplication between two independent overlay kinds, not a navigation relationship) |
 | Guide | not a screen; a section inside Settings/Pause | `createLegacyOptionsInfoSection`, `createLegacyOptionsGuideHeaderButton`, `drawLegacyOptionsGuideGlyph(s)` | inside the Settings/Pause overlay content | n/a |
 | Login/Account (auth) | `openOverlay('auth')` | `buildAuthOverlay`, `createLegacyAuthActionButton`, `createLegacyAuthPasswordVisibilityButton` | `overlayGraphics` + `uiButtons` | none |
 | Leaderboard | `openOverlay('leaderboard')` | `buildLeaderboardOverlay`, `drawLegacyLeaderboardTitleGlyph`, `resolveLegacyLeaderboardRowAccent` | `overlayGraphics` + `uiButtons` | none (own icon glyph, own row rendering) |
@@ -55,13 +54,16 @@ obvious from any one place in the file and had to be traced call-by-call
 for this map. That traceability gap is itself a P1-worthy finding for
 whatever replaces this structure.
 
-## Open questions this map surfaces for the migration plan
+## Open questions this map surfaces
 
-1. Does "Active Play" get its own Guide/Settings entry point independent of
-   Pause, or does Pause remain the only path to Settings during play (per
-   the redesign brief's own Pause hierarchy, yes — but that means Guide,
-   today reachable from both Settings contexts, needs an explicit decision
-   about whether it's reachable from the main menu directly too).
-2. Is `src/ui/dom/*` in scope for Settings/Pause/Guide/Leaderboard/Profile,
-   or are those staying Phaser-native indefinitely? This changes the
-   answer to almost every other question in this map.
+1. Does Active Play get its own Guide/Settings entry point independent of
+   Pause, or does Pause remain the only path to Settings during play?
+   Today there is no route at all from Pause into the `options` overlay —
+   Pause duplicates Settings' content instead of navigating to it (see the
+   table above). Whichever screen Wave 3C's mounting work settles on,
+   Guide (currently reachable only as a section inside both) needs an
+   explicit decision about whether it becomes reachable from the main
+   menu directly too.
+
+(The `src/ui/dom/*` question previously listed here is resolved — see
+`UI-AUDIT.md` §0. It is in scope; Wave 3C owns when/how it gets mounted.)
