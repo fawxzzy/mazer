@@ -59,7 +59,19 @@ the 3 current HUD icons:
   use `cyberArcadeMaterial.typography.ui`/`.metrics` today; this is a rule
   to *preserve*, not a violation to fix.
 - One body font family for everything else, already token-backed
-  (`designTokens.fonts.ui`).
+  (`designTokens.fonts.ui`, `"Space Grotesk, ui-sans-serif, system-ui"`
+  per `docs/contracts/mazer-ui-rework-design-tokens.v1.json`).
+  **Correction, one real exception, not yet reconciled:** the Auth/Account
+  surface doesn't use it. `MenuScene.ts:980` defines a separate hardcoded
+  `LEGACY_AUTH_UI_FONT_FAMILY` (`'"Segoe UI Variable", "Helvetica Neue",
+  Arial, sans-serif'`), used across the auth fields, labels, and actions
+  (12 call sites, e.g. `MenuScene.ts:11730-12088`, `12375`) — a genuinely
+  different font stack from the token, not just a different name for the
+  same thing. Whoever migrates Auth under Wave 3B needs to decide: adopt
+  `designTokens.fonts.ui` there too, or document this as an intentional
+  exception (native-OS-style form fields reading differently from game
+  chrome, say) — left undecided, a migration could preserve two body-font
+  systems while still appearing contract-compliant on paper.
 
 ## Motion
 
