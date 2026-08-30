@@ -260,3 +260,59 @@ deliberately stripping asset-dependent rendering for speed/determinism, or
 an actual asset-loading gap under `core-only`, wasn't resolved in this
 pass — worth checking before relying on these screenshots to verify
 icon-asset-specific work.
+
+## 8. DOM primitive status and adaptation needs
+
+`src/ui/dom/*` (MazerButton, MazerPanel, MazerIconButton, MazerIcon,
+MazerField, MazerPasswordField, MazerSlider, MazerSwitch,
+MazerSegmentedControl, MazerScrollArea, SettingRow, SettingsSection,
+ConfirmDialog, StatusBanner, AppShell, StageShell) is current, deliberate,
+token-backed (consumes `designTokens`/`.css`, not its own palette), and
+covered by its own Wave 2A/2A.1 tests. It is not finished UI, though —
+being built and being wired into the live app are different milestones,
+and treating "the components exist" as "the migration is done" would be
+its own mistake in the other direction. What's still missing before any
+of these primitives are load-bearing:
+
+- **Canonical image-backed icon support.** `MazerIconButton`/`MazerIcon`
+  currently render a named vector icon at a fixed internal size. The 3
+  real HUD assets (profile/leaderboard/settings) are bitmaps with
+  non-uniform internal padding — the same problem `applyLegacyHudIconFrame`
+  solves on the Phaser side (§5) needs an equivalent asset-backed icon
+  slot or shared image-icon child here, while keeping the primitive's
+  existing button semantics (native button element, accessible label,
+  pointer target, pressed state, focus ring) untouched.
+- **One mounted DOM application root above the Phaser canvas** — doesn't
+  exist yet; this is Wave 3C's job, not something to improvise per-screen.
+- **Shared responsive/safe-area geometry** between the DOM root and the
+  Phaser canvas underneath it (notch/home-indicator insets, viewport
+  resize) — currently only solved ad hoc inside `MenuScene.ts`'s own
+  layout-resolver functions (§5); needs a contract both renderers read.
+- **Pointer-event and z-index ownership** between DOM overlays and the
+  Phaser canvas beneath them — nothing currently defines who wins during
+  the transition window when a DOM modal opens over live gameplay.
+- **DOM view-model projection** from the Wave 1A state/command model into
+  whatever these primitives render — the primitives themselves are
+  stateless factories today and correctly so; they don't yet have
+  anything live to project.
+- **Command bridge into current gameplay state** (Wave 3A, not started —
+  see `UI-MIGRATION-PLAN.md`) — without it, a mounted `ConfirmDialog`'s
+  confirm/cancel buttons have nothing real to dispatch to.
+- **Route-aware lifecycle and cleanup** — mount/unmount tied to overlay
+  open/close, not just component existence.
+- **Reduced-motion behavior** consistent with `prefersLegacyReducedMotion()`
+  (already centrally checked on the Phaser side per `UI-DESIGN-CONTRACT.md`'s
+  Motion section) — needs the same single gate on the DOM side, not a
+  second implementation.
+- **Automated visual acceptance** — once mounted, DOM surfaces need their
+  own `visual:ui-surfaces` coverage (§7), the same as every Phaser screen
+  already gets.
+
+None of the above is a reason to build a second, competing primitive
+system, or to push `MenuScene.ts`, stores, providers, persistence, or
+network clients into these stateless primitive factories — that would
+turn tested, reusable factories into screen-specific one-offs and defeat
+the point of building them ahead of the mounting wave. It's a reason to
+treat "the primitives exist" as necessary but not sufficient, and to route
+the actual mounting/wiring work through Wave 3A → 3C in order, per
+`UI-MIGRATION-PLAN.md`.

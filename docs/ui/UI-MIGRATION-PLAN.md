@@ -40,6 +40,84 @@ that authored Waves 0A-2B than something to start unprompted from an
 audit pass. If the owner wants this session specifically to pick up Wave
 3A, say so explicitly — it hasn't been assumed here.
 
+## Visual verification gate (required, not supplementary)
+
+`npm run visual:ui-surfaces` (see `UI-AUDIT.md` §7) is a required automated
+gate for every UI migration PR under Wave 3A/3C/4D, not a nice-to-have.
+User- or ChatGPT-supplied screenshots and recordings are useful
+*supplementary* evidence — subjective visual feedback, physical-device
+behavior, animation timing, production-only rendering defects — but they
+do not replace it: they aren't deterministic, don't run the same 39
+assertion set on every change, and can't be diffed the way a committed
+`report.md`/`summary.json` can. No migration PR should waive this gate in
+favor of manually-supplied images.
+
+Failure procedure, if the harness fails locally (as it did once this
+session — see §7's crash-then-retry note):
+
+1. Run `npm run visual:ui-surfaces` and capture the exact stdout/stderr.
+2. Classify the failure before treating it as a harness defect: browser
+   binary missing/outdated, preview server didn't start or wasn't ready,
+   the capture route (`?content=core-only&theme=aurora&runtimeDiagnostics=1`)
+   didn't resolve, `window.__MAZER_QA__`/runtime diagnostics never
+   populated, filesystem/output-directory permissions, a timeout, or an
+   actual capture/assertion bug.
+3. Repair the local environment (reinstall Playwright browsers, retry
+   with `--skip-build` against an already-built `dist/`, etc.) or run the
+   gate in a known-good clean checkout.
+4. Never merge a UI migration PR on the basis that the gate "couldn't run
+   here" — get it running, or get a clean-checkout run, before treating
+   the change as verified.
+
+## Deployment contract
+
+CI verification, a local production build, a preview deployment, and an
+actual production deployment are four separate steps with different
+authorization requirements — this plan does not blur them:
+
+- **CI verification** (tsc, vitest, the architecture/decision-registry
+  test, `visual:ui-surfaces`): runs automatically per PR, no approval
+  needed.
+- **Local production build** (`npm run build`) and **preview deployment**
+  (e.g. `vercel` without `--prod`): routine engineering steps, no
+  additional approval needed beyond the standing pipeline authorization
+  already in effect for this session.
+- **Production deployment, promotion, alias cutover, or rollback**:
+  per `AGENTS.md` (`AGENTS.md:9-11`), approval-gated. Requires fresh,
+  explicit operator wording in the current thread — `deploy to
+  production`, `deploy to prod`, or `promote Mazer on Vercel`. PR
+  approval, plan approval, "continue," or "proceed" does not authorize a
+  production mutation, per those same lines. This applies to any future
+  UI-migration PR exactly as it already applies to this session's own
+  bug-fix PRs — the wave system doesn't get a separate, looser deployment
+  rule.
+
+## First integration proof (not implemented in this PR)
+
+Dependency-status report, per the wave table above: **Wave 3A (command
+bridge / live-scene mapping) is the first incomplete registered
+integrator wave.** It gates both 3C (DOM mounting) and 4D (renderer
+switch) — neither can start correctly before it.
+
+Once Wave 3A's prerequisites are satisfied, the recommended first *mounted
+DOM* proof is the **progression-reset confirmation dialog**, built on the
+existing `ConfirmDialog` primitive (`src/ui/dom/*`) — not a cosmetic
+Phaser glyph swap like the leaderboard icon (see below). It's narrow
+enough to still prove real architecture:
+
+- one DOM root mounted above the Phaser canvas, with real mount/cleanup;
+- DOM-to-game command dispatch through the Wave 1A command model;
+- one-overlay enforcement against the existing overlay state;
+- Phaser input suspension while the DOM modal is open;
+- keyboard focus trap, Escape-to-cancel, and focus restoration to the
+  invoking control on close;
+- responsive/safe-area placement;
+- a passing `visual:ui-surfaces` capture of the new surface.
+
+This document does not implement that proof — it stays documentation-only,
+per this PR's own scope. It's recorded here so whoever picks up Wave 3A
+next has a concrete, low-risk first slice instead of re-deriving one.
+
 ## What this session's own future UI work should keep doing regardless
 
 - Keep bug/visual fixes to `MenuScene.ts` scoped and small, the way the
@@ -53,9 +131,15 @@ audit pass. If the owner wants this session specifically to pick up Wave
   verification going forward instead of ad-hoc Browser-pane screenshots —
   it actually works in this environment and already encodes real
   assertions, not just images.
-- The one concrete, low-risk cleanup this audit found that doesn't touch
-  wave-owned territory: `drawLegacyLeaderboardTitleGlyph`'s procedural
-  bars could be swapped for the same `applyLegacyHudIconFrame` call the
-  header button already uses (`UI-AUDIT.md` §3). Small, scoped, consistent
-  with this branch's existing pattern of icon fixes — worth doing whenever
-  it's next convenient, not urgent.
+- The one concrete, low-risk cleanup this audit found — `drawLegacyLeaderboardTitleGlyph`'s
+  procedural bars could be swapped for the same `applyLegacyHudIconFrame`
+  call the header button already uses (`UI-AUDIT.md` §3) — is **not**
+  scheduled here as an independent Gate 2 or a second migration
+  authority. `MenuScene.ts` is assigned to the Wave 3A command-bridge
+  integrator under `dependency-ordered-integrator-wave-ownership`; shared
+  paths change only inside their declared wave with a fresh-main
+  preflight and exclusive ownership. This fix is recorded as known
+  migration debt for that wave to pick up (or, if it's genuinely wanted
+  sooner, only after the decision registry is explicitly amended through
+  the repository's own governance process — not by this plan asserting a
+  parallel authority over the same file).
