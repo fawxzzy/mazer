@@ -95,29 +95,48 @@ surface. There is no per-screen file/component split at all today.
 | Surface | Entry point | Overlay kind |
 |---|---|---|
 | Boot/loading | `BootScene.ts` (separate scene) | n/a |
+| Auth-resolution boot blocker | automatic on boot while `authGateAwaitingResolution` is true; `overlay` stays `'none'` throughout | n/a — not a `LegacyOverlayKind`, see correction below |
 | Main Menu | `mode === 'menu'`, `overlay === 'none'` | `'none'` |
 | Active Play | `mode === 'play'`, `overlay === 'none'` | `'none'` |
 | Settings (menu context) | `openOverlay('options')` from menu/QA entry points only | `'options'` |
 | Pause | `openOverlay('pause')` from play | `'pause'` |
-| Login/Account (auth), incl. the blocking pre-menu gate | `openOverlay('auth')`, or `update()` force-setting `overlay = 'auth'` when the auth gate locks on boot | `'auth'` |
+| Login/Account (auth) | `openOverlay('auth')`, or `update()` force-setting `overlay = 'auth'` once resolution finishes locked (signed-out, no guest access) | `'auth'` |
 | Leaderboard | `openOverlay('leaderboard')` | `'leaderboard'` |
 | Progression reset confirm | `openOverlay('confirm-progression-reset')` | `'confirm-progression-reset'` |
 | Guide | **not a screen** — a section rendered inline inside Settings/Pause via `createLegacyOptionsInfoSection` | n/a |
 
-**Correction:** an earlier version of this table listed a separate "Auth
-gate (blocking, pre-menu)" row with overlay kind "n/a" alongside
-"Login/Account (auth)". That split misstates the routing: `update()`
-force-sets `this.overlay = 'auth'` the moment the auth gate locks (whether
-or not resolution is still pending), and `rebuildUi()` dispatches that
-same `'auth'` state to `buildAuthOverlay()` exactly as the menu-triggered
-`openOverlay('auth')` does. `authGateGraphics`/`syncLegacyAuthGateLoadingScreen`
-only draws a transient loading blocker on top while resolution is pending
-(`authGateAwaitingResolution`) — it isn't a second overlay-kind state.
-There is one `'auth'` overlay with two visual phases (loading blocker,
-then the actual sign-in form), not two separate surfaces. Getting this
-right matters for Wave 3C's one-overlay-at-a-time enforcement — treating
-it as two surfaces would give that invariant two apparent active states
-for what is actually one.
+**Correction (third pass — got this wrong in both directions across two
+earlier corrections):** there are genuinely **three** distinct auth-related
+states, not one and not two:
+
+1. **Awaiting resolution** (`authGateAwaitingResolution = true`, the
+   default on boot, `MenuScene.ts:1475`): `overlay` stays `'none'` the
+   entire time — `update()`'s `pendingAuthGateTransition` branch
+   (`MenuScene.ts:2292-2308`) that would ever set `overlay = 'auth'` is
+   itself only reachable once `applyLegacyAuthSnapshot()` clears this
+   flag. Independently of `overlay`, `syncLegacyAuthGateLoadingScreen()`
+   (`MenuScene.ts:15734`) draws a full-screen, max-depth interactive
+   blocker every frame while this flag is true — its own comment states
+   its purpose is blocking "every click from reaching whatever the menu
+   front door is doing underneath." This is a real, distinct boot-phase
+   surface with no `LegacyOverlayKind` at all — a second correction's
+   attempt to merge it entirely into the `'auth'` overlay (previous
+   version of this section) was itself wrong.
+2. **Resolved, locked** (`authGateLocked = true` — signed out, no guest
+   access, set in `applyLegacyAuthSnapshot()`): `update()` now does set
+   `overlay = 'auth'`, dispatched to `buildAuthOverlay()` exactly like
+   `openOverlay('auth')` from the menu. This genuinely is the same
+   `'auth'` overlay kind as the manually-triggered one — the very first
+   version of this table was wrong to give this its own separate "n/a"
+   row alongside Login/Account.
+3. **Resolved, not locked** (signed in, or guest access granted):
+   `overlay` stays/returns to `'none'`; the gate is fully invisible.
+
+Net effect for Wave 3C's one-overlay-at-a-time invariant: the boot
+blocker (state 1) needs its own accounted-for input-blocking behavior
+*before* any overlay exists to enforce "one at a time" over — removing it
+while only preserving the `'auth'` overlay's enforcement would drop real
+input protection during that window, not just simplify bookkeeping.
 
 `LegacyOverlayKind` (`src/legacy-runtime/legacyOverlayRouting.ts:2`) is the
 complete list, read directly from the live type: `'none' | 'options' |
