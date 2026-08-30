@@ -43,8 +43,18 @@ Wave status, read directly from `docs/architecture/MAZER-UI-REWORK-*.md`
 | 2B | Topology/path geometry contract (`src/geometry/topologyPath.ts`) | done |
 | 2C | Asset/icon generator | no spec file existed; status unclear |
 | **3A** | **Command bridge / live-scene mapping — gates 3C and 4D** | **not started — next** |
+| 3B | Auth migration (`src/legacy-runtime/legacyAuth.ts`, `legacyPlayerMessage.ts`), owner `auth-migration-integrator` | not started |
 | 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started |
 | 4D | Actual Phaser board/title renderer switch (topology contract + tokens) | not started, gated behind 3A |
+
+Ordering note: the registry's own `integratorWaveOwnership.assignments`
+doesn't record an explicit dependency/gating edge between 3A and 3B the
+way it does for 3A→3C/4D — 3B is a separate registered wave with its own
+exclusive owner (`auth-migration-integrator`) over a disjoint path set
+(`legacyAuth.ts`, `legacyPlayerMessage.ts`, not `MenuScene.ts`). Relevant
+here because this audit's own scope explicitly includes auth/profile
+(see the header above) — don't assume 3B is blocked on 3A landing first,
+and don't route auth-path work through whoever picks up 3A.
 
 **Correction (second pass):** an earlier version of this paragraph claimed
 `MenuScene.ts` "isn't yet assigned to a specific wave's exclusive-writer
@@ -131,12 +141,26 @@ a unilateral fix in this docs-only PR.
 - `this.createLegacyOptionsInfoSection(...)` — the Guide section
 - `this.createFeatureControlRows(...)` — the settings toggle/slider rows
 
-Pause's own additions on top of that shared content are just: a different
-header (Home + back-chevron instead of the menu's own header icons) and
-`includeMovementSpeed: false` on the control-row builder. Everything else —
-guide cards, every settings row, the scroll behavior — is the *exact same
-function call* Settings makes. This is direct, code-level confirmation of
-"Pause behaves too much like another settings screen," not just a visual
+Pause's own addition on top of that shared content is just a different
+header (Home + back-chevron instead of the menu's own header icons).
+**Correction:** an earlier version of this line also cited
+`includeMovementSpeed: false` as a Pause-specific difference from
+Settings. It isn't — every call site in both `buildOptionsOverlay()`
+(`MenuScene.ts:10554,10577,10593`) and `buildPauseOverlay()`
+(`MenuScene.ts:11063,11085`) passes `includeMovementSpeed: false`; no call
+site anywhere in the file ever passes `true`. Neither current surface
+renders a Move Speed slider today — it's dead, flag-gated functionality
+on both, not an asymmetry between them. This also conflicts with
+`docs/current-truth.md:268`, which states both surfaces "separate the
+Move Speed label and slider lanes" as if the slider is present. Per the
+same current-truth.md precedence rule as §1's overlay-family note, that
+conflict is flagged here for the doc owner to reconcile (is the slider
+supposed to be re-enabled, or is current-truth.md's line stale?), not
+resolved unilaterally in this docs-only PR. Everything else — guide
+cards, every other settings row, the scroll behavior — is the *exact
+same function call* Settings makes. This is direct, code-level
+confirmation of "Pause behaves too much like another settings screen,"
+not just a visual
 impression from a screenshot.
 
 ## 3. Confirmed: icon duplication survives past this session's own icon work

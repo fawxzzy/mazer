@@ -22,8 +22,13 @@ not to propose a competing one.
 | 2B | Topology/path geometry contract | done |
 | 2C | Asset/icon generator | unclear (no spec) |
 | **3A** | **Command bridge / live-scene mapping** | **not started — the actual next wave** |
+| 3B | Auth migration (`legacyAuth.ts`, `legacyPlayerMessage.ts`), owner `auth-migration-integrator` | not started |
 | 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started, gated behind 3A |
 | 4D | Phaser board/title renderer switch | not started, gated behind 3A |
+
+No explicit gating edge is registered between 3A and 3B — 3B has its own
+exclusive owner over a disjoint path set and isn't recorded as blocked on
+3A landing first (see `UI-AUDIT.md`'s ordering note).
 
 ## Who owns Wave 3A
 
