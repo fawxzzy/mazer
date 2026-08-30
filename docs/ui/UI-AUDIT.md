@@ -79,10 +79,13 @@ that ad-hoc edits to an assigned file are pre-approved indefinitely. The
 assignment to Wave 3A is real and should be treated as the actual owner
 going forward, not as inactive metadata.
 
-**What this means for scope:** the actual redesign implementation (mounting
-`src/ui/dom/*`, wiring Wave 3A's command bridge, Wave 4D's renderer switch)
-already has an owner and a plan. This audit's job is to *not duplicate that
-plan*, and to flag where this session's own work should stay clear of it.
+**What this means for scope:** the actual redesign implementation — wiring
+Wave 3A's command bridge, then Wave 4D's board/title renderer switch, then
+mounting `src/ui/dom/*` under Wave 3C (in that mandatory order, per
+`UI-MIGRATION-PLAN.md`'s ordering section — Wave 3C does not start before
+Wave 4D ships) — already has an owner and a plan. This audit's job is to
+*not duplicate that plan*, and to flag where this session's own work
+should stay clear of it.
 Sections 1-6 below are corrected against that reality; §7 (the original
 draft's proposed migration plan) has been removed in favor of pointing at
 the real wave docs — see `UI-MIGRATION-PLAN.md`.
