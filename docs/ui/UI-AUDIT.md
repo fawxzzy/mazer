@@ -38,7 +38,7 @@ Wave status, read directly from `docs/architecture/MAZER-UI-REWORK-*.md`
 | 0A | Decision registry, architecture guardrails | done |
 | 1A | Shared state/commands/view-models foundation | done |
 | 1B | Design tokens (`src/theme/tokens.ts`/`.css`) | done |
-| 1C | Diagnostics schema split | skipped (no spec file existed in the source handoff) |
+| 1C | Diagnostics schema split (`docs/architecture/MAZER-UI-REWORK-DIAGNOSTICS-V1.md`) | done |
 | 2A / 2A.1 | DOM primitives (`src/ui/dom/*`) | done, deliberately unmounted |
 | 2B | Topology/path geometry contract (`src/geometry/topologyPath.ts`) | done |
 | 2C | Asset/icon generator | no spec file existed; status unclear |
@@ -46,14 +46,28 @@ Wave status, read directly from `docs/architecture/MAZER-UI-REWORK-*.md`
 | 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started |
 | 4D | Actual Phaser board/title renderer switch (topology contract + tokens) | not started, gated behind 3A |
 
+**Correction (second pass):** an earlier version of this paragraph claimed
+`MenuScene.ts` "isn't yet assigned to a specific wave's exclusive-writer
+lock." That's factually wrong — `docs/contracts/mazer-ui-rework-decision-registry.v1.json`'s
+`integratorWaveOwnership.assignments` explicitly assigns
+`src/scenes/MenuScene.ts` to Wave 3A, owner `command-bridge-integrator`.
+
 `tests/architecture/decision-registry-contract.test.ts` currently passes
 against this session's own changes (verified: `npx vitest run
-tests/architecture/decision-registry-contract.test.ts`, 29/29) — this
-session's bug/visual-fix work on `MenuScene.ts` has not violated the
-registry, because `MenuScene.ts` isn't yet assigned to a specific wave's
-exclusive-writer lock. That does not make further ad-hoc `MenuScene.ts`
-patches a substitute for Wave 3A; it means they've stayed out of the
-registry's way so far, which is a lower bar.
+tests/architecture/decision-registry-contract.test.ts`, 29/29), but the
+real reason is narrower than "not violated": the specific check the
+"real working tree" test runs, `collectIntegratorWaveMixViolations`,
+flags a changeset only when it touches paths assigned to *two or more
+different* registered waves at once. It doesn't (in that invocation)
+enforce "only the Wave 3A integrator may ever touch this file" against a
+branch that isn't itself claiming to operate under a different wave — that
+stricter check exists too (`collectIntegratorWaveOwnershipViolations`,
+which takes an explicit current-wave argument) but isn't what's being run
+here. So this session's `MenuScene.ts` edits passing this test is real
+signal that they haven't mixed wave-owned paths, not a registry statement
+that ad-hoc edits to an assigned file are pre-approved indefinitely. The
+assignment to Wave 3A is real and should be treated as the actual owner
+going forward, not as inactive metadata.
 
 **What this means for scope:** the actual redesign implementation (mounting
 `src/ui/dom/*`, wiring Wave 3A's command bridge, Wave 4D's renderer switch)
@@ -74,19 +88,41 @@ surface. There is no per-screen file/component split at all today.
 | Auth gate (blocking, pre-menu) | drawn inline in menu render path | n/a (`authGateGraphics`, not an `OverlayKind`) |
 | Main Menu | `mode === 'menu'`, `overlay === 'none'` | `'none'` |
 | Active Play | `mode === 'play'`, `overlay === 'none'` | `'none'` |
-| Settings (menu context) | `openOverlay('options')` from menu | `'options'` |
-| Settings (play context, via Pause) | reached through Pause | `'options'` (same builder) |
+| Settings (menu context) | `openOverlay('options')` from menu/QA entry points only | `'options'` |
 | Pause | `openOverlay('pause')` from play | `'pause'` |
 | Login/Account (auth) | `openOverlay('auth')` | `'auth'` |
 | Leaderboard | `openOverlay('leaderboard')` | `'leaderboard'` |
 | Progression reset confirm | `openOverlay('confirm-progression-reset')` | `'confirm-progression-reset'` |
 | Guide | **not a screen** — a section rendered inline inside Settings/Pause via `createLegacyOptionsInfoSection` | n/a |
 
-`LegacyOverlayKind` (`src/legacy-runtime/legacyOverlayRouting.ts`) is the
-complete list: `'none' | 'options' | 'pause' | 'auth' |
-'confirm-progression-reset' | 'leaderboard'`. There is no dedicated
-`'guide'` kind — confirmed below, this is a real structural issue, not just
-a visual one.
+`LegacyOverlayKind` (`src/legacy-runtime/legacyOverlayRouting.ts:2`) is the
+complete list, read directly from the live type: `'none' | 'options' |
+'pause' | 'auth' | 'confirm-progression-reset' | 'leaderboard'`. There is
+no dedicated `'guide'` kind — confirmed below, this is a real structural
+issue, not just a visual one. Play-context Settings is reached only
+through Pause duplicating Settings' own content directly, not by
+navigating into the `'options'` overlay kind — see §2, and
+`UI-SCREEN-MAP.md`'s Settings/Pause rows.
+
+**Flagged discrepancy, not resolved here:** `docs/current-truth.md`
+("Current overlay family") lists a different, narrower set — options /
+features / game modes / pause — with no mention of auth, leaderboard, or
+confirm-progression-reset. Per `AGENTS.md`, `current-truth.md` is the
+designated anti-drift override when docs disagree, so this audit does not
+just assert its own code-read inventory over it. But `features` and `game
+modes` also appear elsewhere in `current-truth.md` as nested *sub-panels*
+reached by routing from Options/Pause ("nested overlay routing from
+`Options`/`Pause` back through `Features` and `Game Modes`"), which reads
+as a different, narrower concept — legacy in-panel navigation depth — than
+the top-level `LegacyOverlayKind` union this section documents, and
+`current-truth.md`'s list predates (or simply never mentions) the
+auth/leaderboard/confirm-progression-reset overlay kinds that verifiably
+exist in current source and are reachable (`openOverlay('auth')`,
+`openOverlay('leaderboard')`, `openOverlay('confirm-progression-reset')`
+all have live call sites in `MenuScene.ts`). Whether that's `current-truth.md`
+being stale on this one bullet, or describing a genuinely different
+"overlay family" concept than this table, needs the doc owner's call, not
+a unilateral fix in this docs-only PR.
 
 ## 2. Confirmed: Pause is literally Settings' own content, reused
 

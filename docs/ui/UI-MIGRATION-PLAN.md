@@ -17,7 +17,7 @@ not to propose a competing one.
 | 0A | Decision registry, architecture guardrails | done |
 | 1A | Shared state/commands/view-models foundation | done |
 | 1B | Design tokens | done |
-| 1C | Diagnostics schema split | skipped (no spec) |
+| 1C | Diagnostics schema split (`docs/architecture/MAZER-UI-REWORK-DIAGNOSTICS-V1.md`) | done |
 | 2A / 2A.1 | DOM primitives (`src/ui/dom/*`) | done, deliberately unmounted |
 | 2B | Topology/path geometry contract | done |
 | 2C | Asset/icon generator | unclear (no spec) |
@@ -40,7 +40,7 @@ that authored Waves 0A-2B than something to start unprompted from an
 audit pass. If the owner wants this session specifically to pick up Wave
 3A, say so explicitly — it hasn't been assumed here.
 
-## Visual verification gate (required, not supplementary)
+## Visual verification gate (required, not supplementary — with a baseline caveat)
 
 `npm run visual:ui-surfaces` (see `UI-AUDIT.md` §7) is a required automated
 gate for every UI migration PR under Wave 3A/3C/4D, not a nice-to-have.
@@ -51,6 +51,20 @@ do not replace it: they aren't deterministic, don't run the same 39
 assertion set on every change, and can't be diffed the way a committed
 `report.md`/`summary.json` can. No migration PR should waive this gate in
 favor of manually-supplied images.
+
+**Baseline this before enforcing it as a hard pass/fail gate.** This
+session's own run of the harness (`UI-AUDIT.md` §7) already found this
+checkout fails 2 checks today — `options-bottom-account-action` and
+`mobile-overlay-scroll-reachability` — unrelated to any UI-migration work,
+and `capture-ui-surfaces.mjs` exits nonzero on any failing check. Requiring
+"the gate passes" verbatim would make every future migration PR fail CI
+on day one for a pre-existing reason it didn't cause. Before treating this
+as a hard required gate: either fix those 2 checks first, or record them
+as an explicit known-baseline exception (e.g. an allow-list the harness
+checks new failures against) so "required" means "no new failures beyond
+the recorded baseline," not "zero failures including ones nobody
+introduced." Whoever picks up the first migration PR should resolve this
+baseline question before wiring the gate into CI as blocking.
 
 Failure procedure, if the harness fails locally (as it did once this
 session — see §7's crash-then-retry note):
