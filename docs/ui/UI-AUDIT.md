@@ -44,8 +44,8 @@ Wave status, read directly from `docs/architecture/MAZER-UI-REWORK-*.md`
 | 2C | Asset/icon generator | no spec file existed; status unclear |
 | **3A** | **Command bridge / live-scene mapping — gates 3C and 4D** | **not started — next** |
 | 3B | Auth migration (`src/legacy-runtime/legacyAuth.ts`, `legacyPlayerMessage.ts`), owner `auth-migration-integrator` | not started |
-| 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started |
-| 4D | Actual Phaser board/title renderer switch (topology contract + tokens) | not started, gated behind 3A |
+| 4D | Actual Phaser board/title renderer switch (topology contract + tokens) | not started, gated behind 3A — **must ship before 3C starts, per AGENTS.md's board-first rule** |
+| 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started, gated behind 3A **and** 4D |
 
 Ordering note: the registry's own `integratorWaveOwnership.assignments`
 doesn't record an explicit dependency/gating edge between 3A and 3B the
@@ -441,5 +441,6 @@ network clients into these stateless primitive factories — that would
 turn tested, reusable factories into screen-specific one-offs and defeat
 the point of building them ahead of the mounting wave. It's a reason to
 treat "the primitives exist" as necessary but not sufficient, and to route
-the actual mounting/wiring work through Wave 3A → 3C in order, per
-`UI-MIGRATION-PLAN.md`.
+the actual mounting/wiring work through Wave 3A → 4D → 3C in that
+mandatory order — DOM mounting under Wave 3C does not start before Wave
+4D's board renderer ships — per `UI-MIGRATION-PLAN.md`.
