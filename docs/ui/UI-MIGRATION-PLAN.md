@@ -172,10 +172,23 @@ still need to prove:
   invoking control on close;
 - responsive/safe-area placement;
 - a passing `visual:ui-surfaces` capture of the new surface — **currently
-  impossible as stated**: the harness doesn't open or capture the
-  progression-reset confirmation overlay at all (`UI-AUDIT.md` §7's
-  recorded gap). Extending the harness to cover it would need to happen
-  before this criterion can be satisfied, DOM or Phaser.
+  impossible as stated, and not this PR's (or this proof's) call to fix
+  directly**: the harness doesn't open or capture the progression-reset
+  confirmation overlay at all (`UI-AUDIT.md` §7's recorded gap). Extending
+  `capture-ui-surfaces.mjs` isn't a free-standing task either — the
+  decision registry (`integratorWaveOwnership.assignments`) assigns that
+  script exclusively to Wave 0C's `measured-baseline-integrator`. Doing it
+  as an ad hoc part of a Wave 3C proof would itself violate the same
+  wave-ownership rule this whole plan otherwise insists on. Whoever picks
+  up Option B needs an explicit Wave 0C handoff (or a registry amendment)
+  for the harness extension, not a same-PR fix.
+- fixing, or at minimum explicitly not silently reproducing, the real
+  routing defect already confirmed at this exact surface: it has two
+  entry points (Account and Pause, see `UI-AUDIT.md`'s P1 issue log and
+  `UI-SCREEN-MAP.md`'s progression-reset row) but Cancel always returns to
+  Pause regardless of which one opened it. A DOM `ConfirmDialog` migration
+  that ports this behavior unchanged would carry the same defect forward
+  in new form, not fix it.
 
 This document does not implement either option or pick between them — it
 stays documentation-only, per this PR's own scope. It's recorded here so

@@ -22,7 +22,7 @@ HUD chrome), and a handful of standalone top-level Graphics/Image objects
 | Guide | not a screen; a section inside Settings/Pause | `createLegacyOptionsInfoSection`, `createLegacyOptionsGuideHeaderButton`, `drawLegacyOptionsGuideGlyph(s)` | inside the Settings/Pause overlay content | n/a |
 | Login/Account (auth) | `openOverlay('auth')`, or `update()` force-setting `overlay='auth'` once resolution finishes locked (signed-out, no guest access) | `buildAuthOverlay`, `createLegacyAuthActionButton`, `createLegacyAuthPasswordVisibilityButton` — same `'auth'` overlay kind either way (correction: this row and the boot-blocker row above were previously merged into one; they're genuinely two different states — see `UI-AUDIT.md` §1's third-pass correction) | `overlayGraphics` + `uiButtons` | none |
 | Leaderboard | `openOverlay('leaderboard')` | `buildLeaderboardOverlay`, `drawLegacyLeaderboardTitleGlyph`, `resolveLegacyLeaderboardRowAccent` | `overlayGraphics` + `uiButtons` | none (own icon glyph, own row rendering) |
-| Progression reset confirm | `openOverlay('confirm-progression-reset')` | `buildProgressionResetConfirmationOverlay` | `overlayGraphics` + `uiButtons` | shares `drawOverlayPanel` (universal) and `createOverlayTitle`; does **not** call `createOverlayBackChevronButton` — see the corrected "Shared shell" section below |
+| Progression reset confirm | **Two entry points, one hardcoded return** — from the authenticated Account section of the Auth overlay (`buildAuthenticatedAccountSection`, `MenuScene.ts:11491`) and from Pause (`applyLegacyPauseCommand('reset-progression')`, `MenuScene.ts:14951`), both via `openOverlay('confirm-progression-reset')` | `buildProgressionResetConfirmationOverlay` | `overlayGraphics` + `uiButtons` | shares `drawOverlayPanel` (universal) and `createOverlayTitle`; does **not** call `createOverlayBackChevronButton` — see the corrected "Shared shell" section below. **Confirmed defect, not just a doc gap:** `legacyOverlayRouting.ts:31-35` always routes Cancel/back from this overlay to `'pause'`, unconditionally — so cancelling from the Account entry point currently opens the play-oriented Pause surface while still in menu mode. `UI-MIGRATION-PLAN.md`'s first-integration-proof section requires restoring focus to the invoking control; a Wave 3C proof built only against the Pause path would miss this and could ship the same defect in DOM form. |
 
 ## Shared shell (correction: only one function is actually common to all 5)
 
@@ -60,18 +60,29 @@ all-overlay primitive ready to lift as-is.
 5. `boardDynamicGraphics` (trail color fill, start/goal/player markers, endpoint glow — all one Graphics object)
 6. `playerTrailImages` (real trail asset overlay, pooled) — **above** `boardDynamicGraphics`, so it can't render under the player/start/goal markers without also being excluded from those specific cells (it is, via the same exclusion the color-fill loop uses)
 7. `headerSettingsIconImage`, `headerLeaderboardIconImage` (real HUD icons)
-8. `titleGraphics` (title text, orbit diamond sigils, orbit-diamond twinkles)
+8. `titleGraphics` (title text)
+9. `titleOrbitDiamondImages` (orbit diamond sigils/twinkles)
+10. `titleTileFontImagePool` (the tile-font wordmark glyph pool)
+
+**Correction:** an earlier version of this list ended at `titleGraphics`
+and separately, incorrectly, called `titleOrbitDiamondImages` top-level.
+Both `titleOrbitDiamondImages` (`MenuScene.ts:2017-2020`) and
+`titleTileFontImagePool` (`MenuScene.ts:2024-2028`) are added to
+`boardZoomContainer` via their own `.add()` calls *after* the main array
+that ends with `titleGraphics` (`MenuScene.ts:1929-1953`) — both paint
+above `titleGraphics`, and `titleTileFontImagePool` was omitted from this
+list entirely. Getting this right matters because `UI-DESIGN-CONTRACT.md`'s
+Z-order section proposes formalizing this exact map as Wave 4D's enforced
+renderer order — an incomplete sequence here would make that wave
+reproduce the title layers in the wrong stacking order.
 
 Top-level (screen-fixed, outside `boardZoomContainer`): `overlayGraphics`,
 `hudGraphics`, `touchSettingsCogIconImage`, `playerSpawnBurstGraphics`,
-`playerTransferBeamStripImages`/`playerTransferBeamTargetCapImages`,
-`titleOrbitDiamondImages`... — **note:** `titleOrbitDiamondImages` is
-actually inside `boardZoomContainer` (added via a separate `.add()` call
-right after the main array), not top-level; listed here only to flag that
-the "which objects are board-space vs screen-fixed" boundary is not
-obvious from any one place in the file and had to be traced call-by-call
-for this map. That traceability gap is itself a P1-worthy finding for
-whatever replaces this structure.
+`playerTransferBeamStripImages`/`playerTransferBeamTargetCapImages`. The
+"which objects are board-space vs screen-fixed" boundary is not obvious
+from any one place in the file and had to be traced call-by-call for this
+map — that traceability gap is itself a P1-worthy finding for whatever
+replaces this structure.
 
 ## Open questions this map surfaces
 

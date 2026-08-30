@@ -300,6 +300,18 @@ Severity per the redesign brief's own scale.
   natural place this gets resolved, once `src/ui/dom/*` is actually mounted.
 
 **P1 — major hierarchy/duplication**
+- **Confirmed runtime defect, not just a doc gap:** the progression-reset
+  confirmation overlay has two entry points — the authenticated Account
+  section of the Auth overlay (`buildAuthenticatedAccountSection`,
+  `MenuScene.ts:11491`) and Pause (`MenuScene.ts:14951`) — but
+  `legacyOverlayRouting.ts:31-35` always routes its Cancel/back action to
+  `'pause'` unconditionally, regardless of which context opened it.
+  Cancelling from Account currently opens the play-oriented Pause surface
+  while still in menu mode. See `UI-SCREEN-MAP.md`'s progression-reset row
+  for the exact call sites. Relevant to `UI-MIGRATION-PLAN.md`'s
+  recommended ConfirmDialog first-proof (Option B): that proof's own
+  focus-restoration requirement would need to fix this, not just port the
+  Pause-only behavior into DOM form.
 - Leaderboard screen's own title icon is a second, procedural
   reimplementation of an icon that already has a real asset one screen
   away (§3).
