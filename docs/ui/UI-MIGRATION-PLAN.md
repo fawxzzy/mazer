@@ -26,6 +26,77 @@ not to propose a competing one.
 | 4D | Phaser board/title renderer switch | not started, gated behind 3A — **must ship before 3C starts, per AGENTS.md's board-first rule** |
 | 3C | DOM primitive mounting, view-model projection, one-overlay enforcement | not started, gated behind 3A **and** 4D |
 
+## Missing step, added per owner direction (2026-08-30): a systematic per-asset/animation pass
+
+Nothing in this document, or anywhere in the registered wave system,
+currently covers going through **every individual UI graphic and
+animation one at a time** — auditing whether it already uses a real
+asset, deciding if it needs a new one made and integrated, or confirming
+it's fine to stay procedural. Wave 2C ("Asset/icon generator") is the
+only wave-table slot that could plausibly hold this, and it has **zero
+backing**: no spec file, and no entry at all in
+`docs/contracts/mazer-ui-rework-decision-registry.v1.json` (confirmed —
+searched for `"2C"` and `icon-generator`/`asset-generator`, no matches).
+Nobody has ever defined this wave's scope, owner, or paths. That's the
+gap this section records.
+
+**Known universe of individual UI graphics/animations**, compiled from
+this session's own audit work (`UI-AUDIT.md` §4's full 64-function
+inventory is the authoritative list — this is a summary, not a
+replacement for it):
+
+- **Real bitmap assets already wired in** (this session): the 3 canonical
+  HUD icons (profile/leaderboard/settings header icons, menu profile
+  button, overlay username button, touch-control settings cog) via
+  `applyLegacyHudIconFrame`; the player trail overlay
+  (`drawLegacyPlayerTrailTileOverlay`); the bleed-path material
+  (`drawLegacyBleedPathImage`); the floor material
+  (`boardFloorTileSprite`); the energized-diamond and teleport-beam
+  textures used by the title's orbit sigils and player-transfer beams.
+- **Still procedural, not yet given a real asset**: the Leaderboard
+  screen's own title icon (`drawLegacyLeaderboardTitleGlyph`) — a
+  hand-drawn "three ascending bars" reimplementation of an icon that
+  already has a real asset one screen away (`UI-AUDIT.md` §3); the
+  Guide's illustrative icons (`drawLegacyOptionsGuideGlyph(s)`,
+  move/trail concept icons) — a third procedural visual language,
+  distinct from both the HUD icons and the real gameplay VFX assets they
+  describe; the backdrop starfield (`drawBackdrop`'s star loop) —
+  redesigned this session for twinkle/size behavior, but still rendered
+  as procedural circles/sparkles, not an asset; the title/orbit-diamond
+  choreography (`drawLegacyMenuPathTitleCell/PrismSweep/GemFacets/Diamond/OrbitSigils(Twinkle)`),
+  player spawn burst (`drawLegacyPlayerSpawnBurst`), and the pulse-glow/
+  spark elements inside `drawLegacyPlayerTransferEnergy`.
+- **Deliberately procedural, not a gap**: the shared tile-font glyph
+  renderer (`drawLegacyGlyphWordTileBlock` — title, level number,
+  Start/Login only) is a typographic system, not a missing image asset;
+  don't "fix" this one by generating a picture for it.
+
+**Why this can't just be done freestanding:** almost every function above
+lives in `src/scenes/MenuScene.ts`, which the decision registry assigns
+exclusively to Wave 3A, and every one of them is Phaser-side world/board
+presentation, which `renderer-ownership-split` assigns to Phaser and — for
+the actual shipped renderer — to Wave 4D specifically. A per-asset pass
+has to route through the same wave-ownership rules as everything else in
+this plan (fresh-main preflight, exclusive writer, no drive-by edits from
+outside the assigned wave), not happen as an ad hoc side effort. Two ways
+this could be structured, for whoever picks it up:
+
+1. **Define Wave 2C for real** — write the missing spec, register it,
+   and scope it to the audit-and-source half of this work (deciding what
+   needs a new asset, sourcing/generating it — e.g. the ChatGPT-image
+   workflow the owner has described elsewhere — and handing off finished
+   assets), leaving the actual `MenuScene.ts` integration to whichever
+   wave owns rendering at the time (today 3A/4D).
+2. **Fold it into Wave 4D's own scope** as an explicit checklist item —
+   the renderer-switch wave already touches this exact rendering code, so
+   auditing/replacing individual graphics as part of that pass avoids a
+   second wave needing write access to the same files.
+
+This document doesn't pick between those two — it's recorded here so the
+next redesign step doesn't skip straight from "wire the architecture" to
+"ship" without ever systematically working through the asset list itself,
+which was an explicit part of the original ask.
+
 **Correction (2026-08-30):** an earlier version of this note said no
 dependency was registered between 3A and 3B. Wrong — `scripts/check-decision-registry.mjs`'s
 `INTEGRATOR_WAVE_ORDER = ['0C', '1B', '1C', '3A', '3B', '5B']` is enforced
