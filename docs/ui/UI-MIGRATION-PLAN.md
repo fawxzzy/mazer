@@ -40,62 +40,112 @@ searched for `"2C"` and `icon-generator`/`asset-generator`, no matches).
 Nobody has ever defined this wave's scope, owner, or paths. That's the
 gap this section records.
 
-**Known universe of individual UI graphics/animations**, compiled from
-this session's own audit work (`UI-AUDIT.md` §4's full 64-function
-inventory is the authoritative list — this is a summary, not a
-replacement for it):
+**Correction (2026-08-30, second pass):** the first version of this
+section got two things wrong, both fixed below: it implied every listed
+visual belongs to Phaser/Wave 4D (some are DOM's eventual home under
+`renderer-ownership-split`), and it treated "still procedural" as
+inherently unfinished, when several of these should stay procedural by
+design regardless of asset work elsewhere.
 
-- **Real bitmap assets already wired in** (this session): the 3 canonical
-  HUD icons (profile/leaderboard/settings header icons, menu profile
-  button, overlay username button, touch-control settings cog) via
-  `applyLegacyHudIconFrame`; the player trail overlay
-  (`drawLegacyPlayerTrailTileOverlay`); the bleed-path material
-  (`drawLegacyBleedPathImage`); the floor material
-  (`boardFloorTileSprite`); the energized-diamond and teleport-beam
-  textures used by the title's orbit sigils and player-transfer beams.
-- **Still procedural, not yet given a real asset**: the Leaderboard
-  screen's own title icon (`drawLegacyLeaderboardTitleGlyph`) — a
-  hand-drawn "three ascending bars" reimplementation of an icon that
-  already has a real asset one screen away (`UI-AUDIT.md` §3); the
-  Guide's illustrative icons (`drawLegacyOptionsGuideGlyph(s)`,
-  move/trail concept icons) — a third procedural visual language,
-  distinct from both the HUD icons and the real gameplay VFX assets they
-  describe; the backdrop starfield (`drawBackdrop`'s star loop) —
-  redesigned this session for twinkle/size behavior, but still rendered
-  as procedural circles/sparkles, not an asset; the title/orbit-diamond
-  choreography (`drawLegacyMenuPathTitleCell/PrismSweep/GemFacets/Diamond/OrbitSigils(Twinkle)`),
-  player spawn burst (`drawLegacyPlayerSpawnBurst`), and the pulse-glow/
-  spark elements inside `drawLegacyPlayerTransferEnergy`.
-- **Deliberately procedural, not a gap**: the shared tile-font glyph
-  renderer (`drawLegacyGlyphWordTileBlock` — title, level number,
-  Start/Login only) is a typographic system, not a missing image asset;
-  don't "fix" this one by generating a picture for it.
+**Renderer ownership, per the locked `renderer-ownership-split` decision**
+(`docs/contracts/mazer-ui-rework-decision-registry.v1.json`, quoted
+exactly: "Phaser owns world/maze simulation-facing presentation (board
+rendering, title path animation, world-space entities, camera/world
+effects, menu demonstration maze, world diagnostics). DOM owns
+application shell, forms, HUD, touch controls, settings, dialogs,
+guide/confirmations, and system chrome... icon definitions... are shared
+contracts owned by neither renderer alone.") — split by eventual
+integration owner, not current implementation location (nearly all of
+this is drawn in `MenuScene.ts` today regardless of which column it's in):
 
-**Why this can't just be done freestanding:** almost every function above
-lives in `src/scenes/MenuScene.ts`, which the decision registry assigns
-exclusively to Wave 3A, and every one of them is Phaser-side world/board
-presentation, which `renderer-ownership-split` assigns to Phaser and — for
-the actual shipped renderer — to Wave 4D specifically. A per-asset pass
-has to route through the same wave-ownership rules as everything else in
-this plan (fresh-main preflight, exclusive writer, no drive-by edits from
-outside the assigned wave), not happen as an ad hoc side effort. Two ways
-this could be structured, for whoever picks it up:
+| Visual | Correct integration owner |
+|---|---|
+| Maze/corridor material, floor material, player trail, goal star, bleed-off paths | Wave 4D / Phaser |
+| Perimeter diamonds, diamond energy, teleport beam, spawn burst, transfer energy | Wave 4D / Phaser |
+| Title path and orbit-diamond choreography | Wave 4D / Phaser |
+| Background starfield and ambient world effects | Wave 4D / Phaser |
+| Header/profile/settings/leaderboard icon controls (HUD chrome) | Wave 3C / DOM |
+| Leaderboard screen's own title icon and row presentation | Wave 3C / DOM |
+| Guide illustrations and cards | Wave 3C / DOM |
+| Auth form visuals (after legacy native-input retirement, see `UI-SCREEN-MAP.md`) | Wave 3C / DOM |
+| Icon *definitions* (the canonical asset each icon renders from) | shared contract, owned by neither renderer alone |
+| State/command exposure a visual needs to react to | Wave 3A (exposes only — not a visual-polish dumping ground) |
+| Auth behavior and messages (not presentation) | Wave 3B |
 
-1. **Define Wave 2C for real** — write the missing spec, register it,
-   and scope it to the audit-and-source half of this work (deciding what
-   needs a new asset, sourcing/generating it — e.g. the ChatGPT-image
-   workflow the owner has described elsewhere — and handing off finished
-   assets), leaving the actual `MenuScene.ts` integration to whichever
-   wave owns rendering at the time (today 3A/4D).
-2. **Fold it into Wave 4D's own scope** as an explicit checklist item —
-   the renderer-switch wave already touches this exact rendering code, so
-   auditing/replacing individual graphics as part of that pass avoids a
-   second wave needing write access to the same files.
+**Classification, not just "has an asset / doesn't have an asset."** Every
+visual in the eventual acceptance matrix (below) gets exactly one of:
 
-This document doesn't pick between those two — it's recorded here so the
-next redesign step doesn't skip straight from "wire the architecture" to
-"ship" without ever systematically working through the asset list itself,
-which was an explicit part of the original ask.
+- `ADOPT_AS_IS` — already correct, no work needed.
+- `REFINE_SOURCE_ART` — real asset exists, needs polish (the leaderboard
+  icon's own screen presentation, once the real asset is threaded through
+  there too, is a candidate).
+- `REPLACE_SOURCE_ART` — real asset exists but the wrong one, or none
+  exists and one should be sourced/generated (the Guide's illustrative
+  icons, currently a third procedural visual language distinct from both
+  the HUD icons and the real gameplay VFX assets they're describing, are
+  a candidate).
+- `HYBRID_ASSET_AND_PROCEDURAL` — canonical source art driven by runtime
+  transforms/particles/masking/state (the title/orbit-diamond
+  choreography and the spawn-burst/transfer-energy pulses are candidates:
+  procedural motion around canonical sprites, not a static image).
+- `KEEP_PROCEDURAL` — correct as procedural, not a gap to close. The
+  shared tile-font glyph renderer (title, level number, Start/Login only)
+  is a typographic system, not a missing image asset. The starfield's
+  star *placement and twinkle timing* should normally stay procedural
+  even if individual sparkle textures eventually become assets — a
+  full-screen generated image is not a substitute for a
+  responsive/reduced-motion-aware field of moving points.
+- `RETIRE` — dead code once its replacement ships (e.g. whichever
+  procedural leaderboard-icon implementation loses out once the DOM
+  migration lands).
+
+Procedural is not, by itself, evidence of unfinished work. This section
+exists so nobody defaults every procedural visual straight to
+`REPLACE_SOURCE_ART` without asking whether it should actually be
+`KEEP_PROCEDURAL` or `HYBRID_ASSET_AND_PROCEDURAL` instead.
+
+**One execution model, not an open choice between two:**
+
+1. **Wave 2C** — proposed, **not yet formally registered** (no spec file,
+   no entry in `docs/contracts/mazer-ui-rework-decision-registry.v1.json`
+   — confirmed by searching for both). A separate follow-on must write
+   its architecture spec, register it, and define its ownership boundary
+   and tests before anyone treats it as active. Once it exists, it owns:
+   visual inventory and classification; source-art requirements;
+   source-art generation/import (e.g. the owner's ChatGPT-image
+   workflow); immutable source provenance and hashes; deterministic
+   derivative generation; visual reference fixtures; handoff contracts.
+   It does **not** own `MenuScene.ts` runtime integration, DOM mounting,
+   application state, command dispatch, authentication behavior,
+   gameplay, or production deployment — sourcing and classifying an asset
+   is a different job from wiring it into a live renderer.
+2. **Wave 4D** integrates the Phaser/world entries from the table above,
+   once Wave 2C (or an interim manual equivalent) has classified them.
+3. **Wave 3C** integrates the DOM/application entries from the table
+   above, once Wave 4D has shipped (board-first).
+4. Shared contracts (icon definitions, motion semantics, tokens) stay
+   renderer-neutral regardless of which wave consumes them.
+
+A visual should not enter a renderer wave without: an accepted
+classification, a canonical source or an explicit `KEEP_PROCEDURAL`
+decision, an owning wave, and responsive/animation/reduced-motion/
+verification criteria defined for it.
+
+**Required deliverable: one asset/animation acceptance matrix**, with
+these fields per visual: visual ID; player-facing surface; current
+implementation; target classification (one of the six above); canonical
+source-art path; source hash; deterministic derivative-generation
+command; target renderer; integration wave; animation/state contract;
+responsive constraints; reduced-motion behavior; visual evidence;
+migration wave; status. At minimum it must inventory: the profile,
+leaderboard, and settings icons; the leaderboard screen's own title icon;
+the Guide illustrations; the tile font; the floor material; the player
+trail; the goal star; the bleed-off paths; the perimeter diamonds;
+diamond energy; the teleport beam; the spawn burst; transfer energy; the
+title/orbit choreography; the starfield; and the ambient edge shards.
+This document doesn't build that matrix — it records the requirement so
+whoever formally registers Wave 2C has the field list and minimum scope
+already settled instead of re-deriving them.
 
 **Correction (2026-08-30):** an earlier version of this note said no
 dependency was registered between 3A and 3B. Wrong — `scripts/check-decision-registry.mjs`'s
