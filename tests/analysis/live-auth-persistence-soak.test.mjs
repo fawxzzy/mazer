@@ -4,9 +4,12 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
+  AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
   RETIRED_GUEST_ENTRY_BUTTON,
   SIGNED_OUT_AUTH_GATE_BUTTONS,
   buildAuthPersistenceRoute,
+  createFixtureSettingsRestorePlan,
+  evaluateTrailShineChangedStatePersistence,
   isExternalMutationRequest,
   persistAuthPersistenceFailureEvidence,
   resolveAuthPersistenceArtifactPath,
@@ -14,6 +17,7 @@ import {
   sanitizeAuthPersistenceDiagnosticUrl,
   settleAuthPersistenceResources,
   summarizeAuthPersistenceSoak,
+  resolveTrailShineUiState,
   surfaceMatchesAuthPersistenceExpectation
 } from '../../scripts/analysis/live-auth-persistence-soak.mjs';
 
@@ -22,6 +26,7 @@ const passingSteps = [
   'signed-out-empty-submit-stays-gated',
   'diagnostics-fixture-entry',
   'diagnostics-fixture-options',
+  'diagnostics-fixture-trail-shine-changed',
   'authenticated-reload',
   'authenticated-options-reload',
   'diagnostics-fixture-play',
@@ -75,10 +80,74 @@ describe('live auth persistence soak contract', () => {
     expect(source).toContain("id: 'diagnostics-fixture-play'");
     expect(source).toContain("buttons: ['Back', 'Guide', 'Trail Shine', 'Main Menu']");
     expect(source).toContain("id: 'diagnostics-fixture-account'");
-    expect(source).not.toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Trail Shine'");
+    expect(source).toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Trail Shine'");
+    expect(source).toContain('evaluateTrailShineChangedStatePersistence({');
+    expect(source).toContain('fixture_settings_restore');
     expect(source).not.toContain('const logoutPoint =');
     expect(source.match(/Play as guest/gu)).toHaveLength(1);
     expect(source).toContain('forbiddenButtons: [RETIRED_GUEST_ENTRY_BUTTON]');
+  });
+
+  test('requires an opposite Trail Shine state in runtime and visible UI before and after reload', () => {
+    const passing = evaluateTrailShineChangedStatePersistence({
+      initialRuntime: true,
+      initialUi: true,
+      changedRuntime: false,
+      changedUi: false,
+      reloadedRuntime: false,
+      reloadedUi: false
+    });
+    expect(passing).toMatchObject({
+      pass: true,
+      expectedChanged: false,
+      changed: { runtime: false, ui: false },
+      reloaded: { runtime: false, ui: false }
+    });
+  });
+
+  test('rejects no-op persistence and same-default-before-and-after evidence', () => {
+    const sameDefault = {
+      initialRuntime: true,
+      initialUi: true,
+      changedRuntime: true,
+      changedUi: true,
+      reloadedRuntime: true,
+      reloadedUi: true
+    };
+    expect(evaluateTrailShineChangedStatePersistence(sameDefault).pass).toBe(false);
+    expect(evaluateTrailShineChangedStatePersistence({
+      ...sameDefault,
+      changedRuntime: false,
+      changedUi: false,
+      reloadedRuntime: true,
+      reloadedUi: true
+    }).pass).toBe(false);
+  });
+
+  test('derives the visible Trail Shine state from labels inside the actual control bounds', () => {
+    const createVisual = (text) => ({
+      buttons: [{ text: 'Trail Shine', bounds: { left: 10, right: 210, top: 20, bottom: 80 } }],
+      textLabels: [{ text, bounds: { centerX: 180, centerY: 50 } }]
+    });
+    expect(resolveTrailShineUiState(createVisual('On'))).toBe(true);
+    expect(resolveTrailShineUiState(createVisual('Trail Shine: Off'))).toBe(false);
+    expect(resolveTrailShineUiState({
+      ...createVisual('On'),
+      textLabels: [{ text: 'On', bounds: { centerX: 300, centerY: 50 } }]
+    })).toBe(null);
+  });
+
+  test('restores only the authenticated fixture settings key', () => {
+    expect(createFixtureSettingsRestorePlan({ present: false, value: null })).toEqual({
+      action: 'remove',
+      key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
+      value: null
+    });
+    expect(createFixtureSettingsRestorePlan({ present: true, value: '{"toggleTrailPulse":false}' })).toEqual({
+      action: 'set',
+      key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
+      value: '{"toggleTrailPulse":false}'
+    });
   });
 
   test('blocks external mutation methods while allowing local fixture traffic and read-only requests', () => {
@@ -109,11 +178,12 @@ describe('live auth persistence soak contract', () => {
   test('settles every resource even when evidence and browser cleanup fail', async () => {
     const settled = [];
     const errors = await settleAuthPersistenceResources([
+      { name: 'fixture_settings_restore', run: async () => { settled.push('fixture'); } },
       { name: 'failure_evidence', run: async () => { throw new Error('write failed'); } },
       { name: 'browser_close', run: async () => { settled.push('browser'); throw new Error('close failed'); } },
       { name: 'preview_stop', run: async () => { settled.push('preview'); } }
     ]);
-    expect(settled).toEqual(['browser', 'preview']);
+    expect(settled).toEqual(['fixture', 'browser', 'preview']);
     expect(errors).toEqual(['failure_evidence:write failed', 'browser_close:close failed']);
   });
 

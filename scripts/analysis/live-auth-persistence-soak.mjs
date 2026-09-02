@@ -30,6 +30,7 @@ export const SIGNED_OUT_AUTH_GATE_BUTTONS = Object.freeze([
   'Sign in'
 ]);
 export const RETIRED_GUEST_ENTRY_BUTTON = 'Play as guest';
+export const AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY = 'mazer.game-toggles.v1:user:runtime-diagnostics-auth-fixture';
 
 const normalizeControlLabel = (value) => String(value).trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
 const normalizedLabelsMatchExactly = (actual, expected) => {
@@ -38,6 +39,65 @@ const normalizedLabelsMatchExactly = (actual, expected) => {
   return actualLabels.length === expectedLabels.length
     && actualLabels.every((label, index) => label === expectedLabels[index]);
 };
+
+export const resolveTrailShineUiState = (visual) => {
+  const trailShineButton = (visual?.buttons ?? []).find(
+    (button) => normalizeControlLabel(button?.text) === 'trail shine'
+  );
+  if (!trailShineButton?.bounds) {
+    return null;
+  }
+
+  const labelsWithinButton = (visual?.textLabels ?? [])
+    .filter((label) => {
+      const centerX = label?.bounds?.centerX;
+      const centerY = label?.bounds?.centerY;
+      return Number.isFinite(centerX)
+        && Number.isFinite(centerY)
+        && centerX >= trailShineButton.bounds.left
+        && centerX <= trailShineButton.bounds.right
+        && centerY >= trailShineButton.bounds.top
+        && centerY <= trailShineButton.bounds.bottom;
+    })
+    .map((label) => normalizeControlLabel(label.text));
+
+  if (labelsWithinButton.some((label) => label === 'on' || label === 'trail shine: on')) {
+    return true;
+  }
+  if (labelsWithinButton.some((label) => label === 'off' || label === 'trail shine: off')) {
+    return false;
+  }
+  return null;
+};
+
+export const evaluateTrailShineChangedStatePersistence = ({
+  initialRuntime,
+  initialUi,
+  changedRuntime,
+  changedUi,
+  reloadedRuntime,
+  reloadedUi
+}) => {
+  const expectedChanged = typeof initialRuntime === 'boolean' ? !initialRuntime : null;
+  return {
+    pass: expectedChanged !== null
+      && initialUi === initialRuntime
+      && changedRuntime === expectedChanged
+      && changedUi === expectedChanged
+      && reloadedRuntime === expectedChanged
+      && reloadedUi === expectedChanged,
+    initial: { runtime: initialRuntime, ui: initialUi },
+    expectedChanged,
+    changed: { runtime: changedRuntime, ui: changedUi },
+    reloaded: { runtime: reloadedRuntime, ui: reloadedUi }
+  };
+};
+
+export const createFixtureSettingsRestorePlan = (preimage) => (
+  preimage?.present === true && typeof preimage.value === 'string'
+    ? { action: 'set', key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY, value: preimage.value }
+    : { action: 'remove', key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY, value: null }
+);
 
 export const surfaceMatchesAuthPersistenceExpectation = (surface, expected) => (
   (expected.authenticated === undefined || (surface?.authStatus === 'authenticated') === expected.authenticated)
@@ -162,6 +222,7 @@ const summarizeSurface = ({ runtime, visual }) => ({
   mode: visual?.runtime?.mode ?? null,
   overlay: visual?.runtime?.overlay ?? null,
   trailShineEnabled: runtime?.gameToggles?.trailPulse?.enabled ?? null,
+  trailShineUiEnabled: resolveTrailShineUiState(visual),
   userIdPresent: runtime?.auth?.userIdPresent === true
 });
 
@@ -203,6 +264,23 @@ const waitForSurface = async (page, expected) => {
     throw new Error(`surface_timeout:${JSON.stringify({ expected, observed })}`, { cause: error });
   }
   return summarizeSurface(await readDiagnostics(page));
+};
+
+const waitForTrailShineState = async (page, enabled, expectedSurface) => {
+  const deadline = Date.now() + TIMEOUT_MS;
+  let observed = null;
+  while (Date.now() < deadline) {
+    observed = summarizeSurface(await readDiagnostics(page));
+    if (
+      surfaceMatchesAuthPersistenceExpectation(observed, expectedSurface)
+      && observed.trailShineEnabled === enabled
+      && observed.trailShineUiEnabled === enabled
+    ) {
+      return observed;
+    }
+    await page.waitForTimeout(25);
+  }
+  throw new Error(`trail_shine_state_timeout:${JSON.stringify({ enabled, expectedSurface, observed })}`);
 };
 
 const captureFailureState = async ({
@@ -375,6 +453,7 @@ export const summarizeAuthPersistenceSoak = (steps, consoleMessages, pageErrors)
     'signed-out-empty-submit-stays-gated',
     'diagnostics-fixture-entry',
     'diagnostics-fixture-options',
+    'diagnostics-fixture-trail-shine-changed',
     'authenticated-reload',
     'authenticated-options-reload',
     'diagnostics-fixture-play',
@@ -410,6 +489,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
   let preview = null;
   let browser = null;
+  let context = null;
   let page = null;
   const consoleMessages = [];
   const pageErrors = [];
@@ -423,6 +503,15 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   let currentPhase = 'initialization';
   let completed = false;
   let terminalError = null;
+  let fixtureSettingsPreimage = null;
+  let fixtureSettingsTouched = false;
+  let fixtureSettingsCleanup = {
+    attempted: false,
+    fixtureOnly: true,
+    restored: false,
+    storageScope: 'authenticated-diagnostics-fixture/game-toggles'
+  };
+  const cleanupEvidencePath = resolveAuthPersistenceArtifactPath(outputDir, label, '.fixture-cleanup.json');
   const enterPhase = (phase) => {
     currentPhase = phase;
     phaseTimings.push({ phase, elapsedMs: Date.now() - runStartedAt });
@@ -431,7 +520,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   try {
     preview = await launchPreviewServer({ previewTimeoutMs: options.previewTimeoutMs });
     browser = await chromium.launch({ headless: options.headless !== false });
-    const context = await browser.newContext({
+    context = await browser.newContext({
       deviceScaleFactor: MOBILE_DPR,
       hasTouch: true,
       isMobile: true,
@@ -528,6 +617,10 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       surface: authenticatedEntry,
       fixtureOnly: true
     });
+    fixtureSettingsPreimage = await page.evaluate((key) => {
+      const value = window.localStorage.getItem(key);
+      return { present: value !== null, value };
+    }, AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY);
 
     enterPhase('diagnostics-fixture-options');
     await openOptionsViaQa(page);
@@ -538,10 +631,32 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     if (typeof initialTrailShine !== 'boolean') {
       throw new Error('trail_shine_diagnostic_missing');
     }
+    if (optionsSurface.trailShineUiEnabled !== initialTrailShine) {
+      throw new Error('trail_shine_initial_ui_runtime_mismatch');
+    }
     steps.push({
       id: 'diagnostics-fixture-options',
-      pass: optionsSurface.userIdPresent && optionsSurface.trailShineEnabled === initialTrailShine,
+      pass: optionsSurface.userIdPresent
+        && optionsSurface.trailShineEnabled === initialTrailShine
+        && optionsSurface.trailShineUiEnabled === initialTrailShine,
       surface: optionsSurface,
+      fixtureOnly: true
+    });
+
+    enterPhase('diagnostics-fixture-trail-shine-changed');
+    const changedTrailShine = !initialTrailShine;
+    const trailShinePoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Trail Shine');
+    fixtureSettingsTouched = true;
+    await page.mouse.click(trailShinePoint.x, trailShinePoint.y);
+    const changedOptionsSurface = await waitForTrailShineState(page, changedTrailShine, {
+      authenticated: true, buttons: ['Trail Shine', 'Account'], mode: 'menu', overlay: 'options'
+    });
+    steps.push({
+      id: 'diagnostics-fixture-trail-shine-changed',
+      pass: changedOptionsSurface.userIdPresent
+        && changedOptionsSurface.trailShineEnabled === changedTrailShine
+        && changedOptionsSurface.trailShineUiEnabled === changedTrailShine,
+      surface: changedOptionsSurface,
       fixtureOnly: true
     });
 
@@ -552,19 +667,28 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     });
     steps.push({
       id: 'authenticated-reload',
-      pass: authenticatedReload.userIdPresent && authenticatedReload.trailShineEnabled === initialTrailShine,
+      pass: authenticatedReload.userIdPresent && authenticatedReload.trailShineEnabled === changedTrailShine,
       surface: authenticatedReload
     });
 
     await openOptionsViaQa(page);
-    const authenticatedOptionsReload = await waitForSurface(page, {
-      authenticated: true, buttons: ['Account'], mode: 'menu', overlay: 'options'
+    const authenticatedOptionsReload = await waitForTrailShineState(page, changedTrailShine, {
+      authenticated: true, buttons: ['Trail Shine', 'Account'], mode: 'menu', overlay: 'options'
+    });
+    const changedStatePersistence = evaluateTrailShineChangedStatePersistence({
+      initialRuntime: initialTrailShine,
+      initialUi: optionsSurface.trailShineUiEnabled,
+      changedRuntime: changedOptionsSurface.trailShineEnabled,
+      changedUi: changedOptionsSurface.trailShineUiEnabled,
+      reloadedRuntime: authenticatedOptionsReload.trailShineEnabled,
+      reloadedUi: authenticatedOptionsReload.trailShineUiEnabled
     });
     steps.push({
       id: 'authenticated-options-reload',
-      pass: authenticatedOptionsReload.userIdPresent
-        && authenticatedOptionsReload.trailShineEnabled === initialTrailShine,
-      surface: authenticatedOptionsReload
+      pass: authenticatedOptionsReload.userIdPresent && changedStatePersistence.pass,
+      surface: authenticatedOptionsReload,
+      changedStatePersistence,
+      fixtureOnly: true
     });
     screenshots.authenticatedOptions = resolveAuthPersistenceArtifactPath(outputDir, label, '-authenticated-options.png');
     await page.screenshot({ path: screenshots.authenticatedOptions });
@@ -594,7 +718,8 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     steps.push({
       id: 'authenticated-pause-reentry',
       pass: authenticatedPauseReentry.userIdPresent
-        && authenticatedPauseReentry.trailShineEnabled === initialTrailShine,
+        && authenticatedPauseReentry.trailShineEnabled === changedTrailShine
+        && authenticatedPauseReentry.trailShineUiEnabled === changedTrailShine,
       surface: authenticatedPauseReentry
     });
     screenshots.authenticatedPause = resolveAuthPersistenceArtifactPath(outputDir, label, '-authenticated-pause.png');
@@ -629,7 +754,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     });
     steps.push({
       id: 'fixture-reentry',
-      pass: reentry.userIdPresent && reentry.trailShineEnabled === initialTrailShine,
+      pass: reentry.userIdPresent && reentry.trailShineEnabled === changedTrailShine,
       surface: reentry,
       fixtureOnly: true
     });
@@ -656,14 +781,19 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       label,
       generatedAt: new Date().toISOString(),
       fixtureOnly: true,
-      note: 'This verifies the exact current signed-out account gate and the authenticated diagnostics fixture across menu Options, reload, gameplay, Pause, Account, and re-entry without using credentials, mutating settings or sessions, or relying on retired guest-entry controls.',
+      note: 'This verifies the exact current signed-out account gate and an opposite fixture-local Trail Shine value through the real Settings control, reload, gameplay, Pause, Account, and re-entry without credentials, external settings/session writes, or retired guest-entry controls.',
       viewport: MOBILE_VIEWPORT,
       deviceScaleFactor: MOBILE_DPR,
       result,
       consoleMessages: sanitizedConsoleMessages,
       pageErrors: sanitizedPageErrors,
       blockedMutationRequests,
-      artifacts: { screenshotPath, screenshots }
+      fixtureSettings: {
+        changedFromDefault: changedTrailShine !== initialTrailShine,
+        cleanupEvidencePath,
+        storageScope: fixtureSettingsCleanup.storageScope
+      },
+      artifacts: { cleanupEvidencePath, screenshotPath, screenshots }
     };
     const summaryPath = resolveAuthPersistenceArtifactPath(outputDir, label, '.summary.json');
     await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
@@ -676,6 +806,46 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   } finally {
     const failedPhase = currentPhase;
     const cleanupErrors = await settleAuthPersistenceResources([
+      {
+        name: 'fixture_settings_restore',
+        run: page === null || fixtureSettingsPreimage === null || fixtureSettingsTouched === false
+          ? null
+          : async () => {
+            fixtureSettingsCleanup = {
+              ...fixtureSettingsCleanup,
+              attempted: true
+            };
+            const restorePlan = createFixtureSettingsRestorePlan(fixtureSettingsPreimage);
+            try {
+              const restored = await page.evaluate((plan) => {
+                if (plan.action === 'set') {
+                  window.localStorage.setItem(plan.key, plan.value);
+                } else {
+                  window.localStorage.removeItem(plan.key);
+                }
+                const current = window.localStorage.getItem(plan.key);
+                return plan.action === 'set' ? current === plan.value : current === null;
+              }, restorePlan);
+              fixtureSettingsCleanup = {
+                ...fixtureSettingsCleanup,
+                action: restorePlan.action,
+                restored
+              };
+              if (!restored) {
+                throw new Error('fixture_settings_restore_readback_mismatch');
+              }
+            } catch (error) {
+              fixtureSettingsCleanup = {
+                ...fixtureSettingsCleanup,
+                error: sanitizeAuthPersistenceDiagnosticText(
+                  error instanceof Error ? error.message : String(error)
+                ),
+                restored: false
+              };
+              throw error;
+            }
+          }
+      },
       {
         name: 'failure_evidence',
         run: completed ? null : async () => {
@@ -721,6 +891,15 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
               : (path) => page.screenshot({ path, fullPage: true })
           });
         }
+      },
+      {
+        name: 'fixture_cleanup_evidence',
+        run: fixtureSettingsPreimage === null
+          ? null
+          : () => writeFile(cleanupEvidencePath, `${JSON.stringify({
+            schema: 'mazer.live-auth-persistence-fixture-cleanup.v1',
+            ...fixtureSettingsCleanup
+          }, null, 2)}\n`, 'utf8')
       },
       {
         name: 'browser_close',
