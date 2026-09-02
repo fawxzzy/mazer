@@ -380,10 +380,19 @@ export interface MazeV2AmbiguityMetrics {
 }
 
 export interface MazeV2ShortcutMetrics {
-  shortcutCount: number;
+  // null means "not measured for this sample" (the source engine/bridge
+  // doesn't yet expose enough provenance to count shortcuts), distinct from
+  // 0 ("measured, and there are none"). Wave 1.5 correction: the neutral
+  // canonical-maze analyzer (canonicalAnalyzer.ts) used to hardcode this to
+  // 0 for every sample regardless of whether shortcuts were actually
+  // observable, which silently claimed "zero shortcuts" for engines whose
+  // shortcut provenance simply wasn't wired through yet -- a real
+  // measurement gap, not a real zero.
+  shortcutCount: number | null;
   // Total route-length reduction shortcuts are responsible for, i.e.
   // (naive spanning-tree route length) - (actual shortest path length).
-  routeLengthReduction: number;
+  // Same null-means-unmeasured convention as shortcutCount.
+  routeLengthReduction: number | null;
 }
 
 export interface MazeV2WrapMetrics {

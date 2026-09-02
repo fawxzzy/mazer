@@ -61,10 +61,9 @@ const resolveWrapNeighbors = (
 // legacy-runtime's own 'playable-wrap-aware' graph, generalized to any
 // MazeV2CanonicalMaze regardless of which engine produced it. Returns an
 // empty wrap-neighbor list (falling back to plain 4-directional adjacency)
-// when wrapPairs is empty, which is the honest current state for BOTH
-// engines' bridges today (see canonicalMaze.ts's own comment on the
-// legacy-runtime bridge-fidelity gap; src/domain/maze has no wrap concept
-// at all).
+// when wrapPairs is empty. The legacy bridge derives real pairs from
+// opposite walkable border cells; src/domain/maze has no wrap concept and
+// therefore always supplies an empty list.
 const resolveNeighbors = (maze: MazeV2CanonicalMaze, point: CanonicalPoint): CanonicalPoint[] => {
   const candidates: CanonicalPoint[] = [
     { x: point.x, y: point.y - 1 },
@@ -73,7 +72,11 @@ const resolveNeighbors = (maze: MazeV2CanonicalMaze, point: CanonicalPoint): Can
     { x: point.x + 1, y: point.y },
     ...resolveWrapNeighbors(maze.wrapPairs, point)
   ];
-  return candidates.filter((candidate) => isWalkable(maze, candidate));
+  const unique = new Map<string, CanonicalPoint>();
+  for (const candidate of candidates) {
+    if (isWalkable(maze, candidate)) unique.set(pointKey(candidate), candidate);
+  }
+  return [...unique.values()];
 };
 
 interface WalkableGraphSummary {
@@ -134,11 +137,24 @@ const resolveShortestPath = (
   return path;
 };
 
-const resolveTurnHeading = (from: CanonicalPoint, to: CanonicalPoint): string => (
-  `${Math.sign(to.x - from.x)},${Math.sign(to.y - from.y)}`
-);
+const resolveTurnHeading = (
+  from: CanonicalPoint,
+  to: CanonicalPoint,
+  width: number,
+  height: number
+): string => {
+  const rawDx = to.x - from.x;
+  const rawDy = to.y - from.y;
+  const dx = from.y === to.y && width > 2 && Math.abs(rawDx) === width - 1
+    ? -Math.sign(rawDx)
+    : Math.sign(rawDx);
+  const dy = from.x === to.x && height > 2 && Math.abs(rawDy) === height - 1
+    ? -Math.sign(rawDy)
+    : Math.sign(rawDy);
+  return `${dx},${dy}`;
+};
 
-const resolveTurningMetrics = (path: readonly CanonicalPoint[]) => {
+const resolveTurningMetrics = (path: readonly CanonicalPoint[], width: number, height: number) => {
   if (path.length < 3) {
     return {
       turnCount: 0,
@@ -150,10 +166,10 @@ const resolveTurningMetrics = (path: readonly CanonicalPoint[]) => {
   }
   const runLengths: number[] = [];
   let turnCount = 0;
-  let currentHeading = resolveTurnHeading(path[0]!, path[1]!);
+  let currentHeading = resolveTurnHeading(path[0]!, path[1]!, width, height);
   let currentRunLength = 1;
   for (let index = 1; index < path.length - 1; index += 1) {
-    const nextHeading = resolveTurnHeading(path[index]!, path[index + 1]!);
+    const nextHeading = resolveTurnHeading(path[index]!, path[index + 1]!, width, height);
     if (nextHeading === currentHeading) {
       currentRunLength += 1;
       continue;
@@ -198,7 +214,24 @@ const resolveDeadEndBranch = (
   }
 };
 
-export const analyzeMazeV2CanonicalMaze = (maze: MazeV2CanonicalMaze): MazeV2MeasuredMetrics => {
+// Shortcut provenance isn't part of MazeV2CanonicalMaze itself (that shape
+// is meant to describe the final GRAPH, not construction history -- an
+// engine's own shortcut bookkeeping is a fact about how the maze was BUILT,
+// not what it IS), so it's passed to the analyzer separately, by whichever
+// caller actually has it (an adapter that read it off the engine's own
+// generation result). Optional and null by default: when a caller has no
+// shortcut provenance to offer, the analyzer reports "unmeasured" (null),
+// never a fabricated 0 -- see this function's own shortcut-field comment
+// below, and MazeV2ShortcutMetrics's own doc comment in types.ts.
+export interface MazeV2CanonicalShortcutProvenance {
+  shortcutCount: number;
+  routeLengthReduction: number | null;
+}
+
+export const analyzeMazeV2CanonicalMaze = (
+  maze: MazeV2CanonicalMaze,
+  shortcutProvenance: MazeV2CanonicalShortcutProvenance | null = null
+): MazeV2MeasuredMetrics => {
   const graph = summarizeWalkableGraph(maze);
   const floorRatio = graph.walkableTileCount / Math.max(1, maze.width * maze.height);
   const path = resolveShortestPath(maze, maze.start, maze.goal);
@@ -225,7 +258,7 @@ export const analyzeMazeV2CanonicalMaze = (maze: MazeV2CanonicalMaze): MazeV2Mea
     && resolveManhattanDistance(branch.firstStepFromRoot, maze.goal) < resolveManhattanDistance(branch.root, maze.goal)
   ));
 
-  const turning = resolveTurningMetrics(path);
+  const turning = resolveTurningMetrics(path, maze.width, maze.height);
   const cycleRank = Math.max(0, graph.edgeCount - graph.walkableTileCount + 1);
 
   let wrapPairsOnRoute = 0;
@@ -277,14 +310,14 @@ export const analyzeMazeV2CanonicalMaze = (maze: MazeV2CanonicalMaze): MazeV2Mea
     turning,
     ambiguity: { cycleRank },
     shortcut: {
-      // Neither adapter currently reports a construction-time shortcut
-      // count into MazeV2CanonicalMaze (that's an engine-internal
-      // bookkeeping detail, not part of the neutral shape) -- 0 rather
-      // than a guess. Wave 2's own generator, built against this contract
-      // from the start, should report this directly instead of it being
-      // inferred after the fact.
-      shortcutCount: 0,
-      routeLengthReduction: 0
+      // Wave 1.5 correction (PR D): this used to hardcode both fields to 0
+      // for every sample regardless of whether shortcuts were actually
+      // observable, which silently claimed "zero shortcuts" for engines
+      // whose real shortcut count just wasn't wired through -- a
+      // measurement gap, not a real zero. Now genuinely unmeasured (null)
+      // unless the caller supplies real provenance.
+      shortcutCount: shortcutProvenance?.shortcutCount ?? null,
+      routeLengthReduction: shortcutProvenance?.routeLengthReduction ?? null
     },
     wrap: {
       wrapPairCount: maze.wrapPairs.length,

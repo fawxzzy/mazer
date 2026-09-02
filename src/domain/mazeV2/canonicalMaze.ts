@@ -2,27 +2,53 @@
 // neutral MazeV2CanonicalMaze shape -- see that type's own doc comment in
 // types.ts for why it exists (one exchange shape both engines convert into,
 // so one analyzer and one identity scheme can measure either without
-// engine-specific branching). The generator-convergence work (a later PR in
-// this same wave) adds the matching src/domain/maze/ -> MazeV2CanonicalMaze
-// bridge; this file only covers the legacy-runtime side, which is what
-// metrics.ts already depends on.
+// engine-specific branching).
 
 import type { LegacyMazeSnapshot } from '../../legacy-runtime/legacyMaze';
 import type { MazeV2CanonicalMaze, MazeV2WrapPair } from './types';
 
-// legacy-runtime's own wrap-topology diagnostics record aggregate pair
-// counts (mazer.mazer_progression_states-adjacent reporting fields), not
-// the actual list of connected tile pairs -- there is currently no per-pair
-// list anywhere in LegacyMazeSnapshot to bridge from. Rather than fabricate
-// wrap pairs this bridge cannot actually observe, this returns an empty
-// list and topology identity/metrics fall back to whatever the snapshot's
-// own grid/solutionPath-derived measurements already capture. Documented
-// here rather than silently done, since it means a legacy-runtime maze with
-// real wrap connections currently bridges into a MazeV2CanonicalMaze that
-// looks wrap-free -- a genuine bridge-fidelity gap, not a bug in this
-// function, and one only legacy-runtime exposing the real pair list (or a
-// future generator building on MazeV2CanonicalMaze natively) can close.
-const deriveLegacyWrapPairs = (): readonly MazeV2WrapPair[] => [];
+// Wave 1.5 correction (PR D): the previous version of this function always
+// returned an empty list, on the claim that legacy-runtime's own snapshot
+// has no per-pair wrap list to read -- true, but beside the point. The
+// actual wrap-connectivity rule lives in legacyMaze.ts's own
+// resolveLegacyGridStepTarget: stepping off the left edge lands on the
+// right edge of the SAME ROW (and vice versa), stepping off the top lands
+// on the bottom of the SAME COLUMN (and vice versa), whenever both
+// endpoints are walkable. That rule is exactly "two opposite-border
+// walkable cells sharing a row/column are wrap-connected" -- fully
+// derivable from the grid alone, which is what this now does, instead of
+// silently reporting every legacy maze as wrap-free regardless of whether
+// its wrap topology is actually in use. Confirmed against
+// resolveLegacyGridStepTarget's own same-point guard (irrelevant above
+// width/height 1, included here for consistency on degenerate inputs).
+const deriveLegacyWrapPairs = (
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'height' | 'width'>
+): readonly MazeV2WrapPair[] => {
+  const { grid, width, height } = maze;
+  const pairs: MazeV2WrapPair[] = [];
+
+  if (width > 1) {
+    for (let y = 0; y < height; y += 1) {
+      const leftWalkable = grid[y]?.[0] === true;
+      const rightWalkable = grid[y]?.[width - 1] === true;
+      if (leftWalkable && rightWalkable) {
+        pairs.push({ from: { x: 0, y }, to: { x: width - 1, y }, axis: 'horizontal' });
+      }
+    }
+  }
+
+  if (height > 1) {
+    for (let x = 0; x < width; x += 1) {
+      const topWalkable = grid[0]?.[x] === true;
+      const bottomWalkable = grid[height - 1]?.[x] === true;
+      if (topWalkable && bottomWalkable) {
+        pairs.push({ from: { x, y: 0 }, to: { x, y: height - 1 }, axis: 'vertical' });
+      }
+    }
+  }
+
+  return pairs;
+};
 
 export const deriveMazeV2CanonicalMazeFromLegacySnapshot = (
   maze: Pick<LegacyMazeSnapshot, 'width' | 'height' | 'grid' | 'start' | 'goal'>
@@ -32,5 +58,5 @@ export const deriveMazeV2CanonicalMazeFromLegacySnapshot = (
   walkable: maze.grid.map((row) => [...row]),
   start: { x: maze.start.x, y: maze.start.y },
   goal: { x: maze.goal.x, y: maze.goal.y },
-  wrapPairs: deriveLegacyWrapPairs()
+  wrapPairs: deriveLegacyWrapPairs(maze)
 });

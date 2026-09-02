@@ -1,52 +1,55 @@
 // MazeV2EngineAdapter for src/domain/maze -- the OTHER existing generator in
 // this repository (presentation/demo-only today, not production gameplay;
-// see this module's own doc comment in generator.ts). Investigated fresh for
-// this PR: types.ts, grid.ts, generator.ts, core.ts's public exports, and
-// batch.ts (its own comparison-batch runner, which this adapter deliberately
-// does not reuse -- it evaluates via src/domain/maze's OWN MazeMetrics,
-// whereas this harness needs the one shared canonicalAnalyzer.ts instead, so
-// building a fresh sample per spec via buildMaze() directly is the correct
-// integration point, not runBatch()).
+// see this module's own doc comment in generator.ts).
 //
-// src/domain/maze has no targetComplexity axis, no wrap/bleed topology, and
-// no recipe-resolver concept at all -- it takes width/height/seed/braidRatio/
-// minSolutionLength directly. Translating a neutral 0-100 targetComplexity
-// dial into those knobs is a heuristic this adapter owns and documents below,
-// not something the engine itself defines -- exactly the kind of "adaptable"
-// capability gap this comparison exists to surface honestly.
+// Wave 1.5 correction (PR D): the original version of this adapter only
+// ever called the low-level buildMaze() directly, which exercises none of
+// this engine's own higher-level family/difficulty/candidate-search
+// surface (generateMaze, generateMazeForDifficulty, MazeFamily resolution,
+// FAMILY_TUNING) -- the finding that "domain/maze is inherently too dense"
+// was really only ever a finding about one specific low-level buildMaze
+// configuration, not about this engine's real, tunable capability. Lane B
+// (production-pipeline) below now goes through generateMazeForDifficulty,
+// this engine's own real candidate-search/difficulty-targeting entry
+// point, exactly analogous to legacy-runtime's bounded candidate search.
+// Lane A (raw-carving) keeps the original direct buildMaze() call, which is
+// the correct choice for that lane's own purpose (isolate raw carving
+// behavior, no search on either side).
+//
+// spec.requireWrap (the wrap-demand recipe) is explicitly classified as
+// unsupported here -- this engine has no wrap/bleed topology concept
+// anywhere in its type contract (see wrapPressure: 'unsupported' below),
+// so reporting a successful wrap measurement would be false.
 
-import { buildMaze } from '../../maze/generator';
+import { buildMaze, classifyMazeDifficulty, generateMazeForDifficulty } from '../../maze/generator';
+import type { MazeConfig, MazeDifficulty } from '../../maze/types';
 import { deriveMazeV2CanonicalMazeFromDomainMazeRaster } from './canonicalMazeFromDomainMaze';
 import type { MazeV2CapabilityAssessment, MazeV2ComparisonSampleResult, MazeV2ComparisonSampleSpec, MazeV2EngineAdapter } from './types';
 
 const DOMAIN_MAZE_CAPABILITIES: readonly MazeV2CapabilityAssessment[] = [
   { axis: 'spatialLoad', status: 'adaptable', note: 'width/height/braidRatio are direct inputs, but the engine quantizes requested width/height through an internal logical-carving lattice (normalizeLogicalSize) before rendering the playable raster -- the real output size is only approximately what was requested, not exact.' },
-  { axis: 'routeBurden', status: 'adaptable', note: 'minSolutionLength is a direct floor, not a precise target -- the generator accepts any solution at or above it.' },
+  { axis: 'routeBurden', status: 'adaptable', note: 'minSolutionLength is a direct floor, not a precise target -- the generator accepts any solution at or above it. generateMazeForDifficulty (production-pipeline lane) searches multiple seeds for a target MazeDifficulty band, which is a real search but over difficulty classification, not route length directly.' },
   { axis: 'decisionBurden', status: 'indirect', note: 'Junction count is an emergent effect of family/braid tuning (MazeFamily presets), not a direct dial.' },
   { axis: 'deadEndDeception', status: 'unsupported', note: 'No deceptive-branch placement concept found in generator.ts/core.ts\'s public surface.' },
   { axis: 'turningLoad', status: 'native', note: 'Has an explicit anti-straightness generation phase (MazeGenerationPhase includes \'anti-straightness\') directly targeting turn frequency.' },
   { axis: 'routeAmbiguity', status: 'adaptable', note: 'braidRatio adds loops/cycles, which raises ambiguity, but is not itself an ambiguity target.' },
-  { axis: 'shortcutRelief', status: 'native', note: 'MazeEpisode.shortcutsCreated and shortcutCountModifier are first-class generator concepts -- legacy-runtime has no equivalent at all.' },
+  { axis: 'shortcutRelief', status: 'native', note: 'MazeEpisode.shortcutsCreated and shortcutCountModifier are first-class generator concepts -- legacy-runtime has an equivalent (shortcutCountMultiplier, PR D correction), so this is no longer a unique differentiator, just a genuinely native capability on both sides.' },
   { axis: 'wrapPressure', status: 'unsupported', note: 'No wrap/bleed topology concept anywhere in this engine\'s type contract.' }
 ];
 
-// Heuristic braid-ratio curve: 0 complexity -> tightly a perfect maze (no
-// loops), 100 -> the same upper bound batch.ts's own default run uses
-// (0.08) is treated as a MID-range reference point here rather than a
-// ceiling, since braidRatio's own valid range in this engine is not
-// otherwise documented in types.ts. Scaled linearly to 0.16 at the top of
-// the dial so the curve has real range instead of only ever probing the low
-// half of what the generator can do.
+// Heuristic braid-ratio curve for Lane A (raw-carving) only -- Lane B goes
+// through generateMazeForDifficulty's own real shortcutCountModifier/
+// checkPointModifier inputs instead of this heuristic. 0 complexity -> a
+// tight perfect maze (no loops); 100 -> 0.16, scaled linearly. batch.ts's
+// own default run uses 0.08 as a reference midpoint, not a documented
+// ceiling -- this engine's own valid braidRatio range isn't otherwise
+// specified in types.ts.
 const resolveBraidRatioForTargetComplexity = (targetComplexity: number): number => (
   (Math.min(100, Math.max(0, targetComplexity)) / 100) * 0.16
 );
 
 // Mirrors batch.ts's own default minSolutionLength heuristic
-// (Math.min(width,height)**2 / 5), scaled by the complexity dial so a low
-// dial asks for a shorter floor and a high dial asks for closer to that
-// same reference ceiling -- deliberately not exceeding it, since nothing in
-// this investigation established that ceiling as anything other than
-// batch.ts's own convention.
+// (Math.min(width,height)**2 / 5), scaled by the complexity dial. Lane A only.
 const resolveMinSolutionLengthForTargetComplexity = (
   targetComplexity: number,
   width: number,
@@ -55,11 +58,85 @@ const resolveMinSolutionLengthForTargetComplexity = (
   Math.floor(((Math.min(width, height) ** 2) / 5) * (Math.min(100, Math.max(0, targetComplexity)) / 100))
 );
 
+// Maps the neutral 0-100 targetComplexity dial onto this engine's own
+// MazeDifficulty band for Lane B's generateMazeForDifficulty call --
+// documented as a real, if coarse, mapping (4 bands over 100 points),
+// distinct from legacy-runtime's continuous targetComplexity axis.
+const resolveMazeDifficultyForTargetComplexity = (targetComplexity: number): MazeDifficulty => {
+  const clamped = Math.min(100, Math.max(0, targetComplexity));
+  if (clamped < 25) return 'chill';
+  if (clamped < 50) return 'standard';
+  if (clamped < 75) return 'spicy';
+  return 'brutal';
+};
+
+const resolveDomainMazeSampleSupport = (spec: MazeV2ComparisonSampleSpec): MazeV2ComparisonSampleResult['support'] => {
+  if (spec.requireWrap === true) {
+    return {
+      status: 'unsupported',
+      reason: 'src/domain/maze has no wrap/bleed topology contract; an explicit requireWrap sample cannot be represented in either comparison lane.'
+    };
+  }
+  if (spec.lane === 'production-pipeline' && spec.width !== spec.height) {
+    return {
+      status: 'unsupported',
+      reason: 'src/domain/maze generateMazeForDifficulty accepts one scale and produces a square footprint; rectangular production-pipeline recipes cannot be represented without extending that engine contract.'
+    };
+  }
+  return { status: 'supported', reason: null };
+};
+
 export const createMazeV2DomainMazeAdapter = (): MazeV2EngineAdapter => ({
   engineId: 'domain-maze',
   engineLabel: 'src/domain/maze (presentation/demo generator)',
   capabilities: DOMAIN_MAZE_CAPABILITIES,
   generateSample(spec: MazeV2ComparisonSampleSpec): MazeV2ComparisonSampleResult {
+    if (spec.lane === 'production-pipeline') {
+      const clamped = Math.min(100, Math.max(0, spec.targetComplexity)) / 100;
+      const config: MazeConfig = {
+        scale: Math.max(spec.width, spec.height),
+        seed: spec.seed,
+        checkPointModifier: clamped,
+        shortcutCountModifier: clamped
+      };
+      const targetDifficulty = resolveMazeDifficultyForTargetComplexity(spec.targetComplexity);
+      const generationStartedAtMs = performance.now();
+      const resolved = generateMazeForDifficulty(config, targetDifficulty);
+      const generationDurationMs = performance.now() - generationStartedAtMs;
+      const episode = resolved.episode;
+      const achievedDifficulty = classifyMazeDifficulty(
+        episode.metrics,
+        episode.raster.width,
+        episode.raster.height,
+        episode.shortcutsCreated,
+        episode.routeMotifs
+      );
+
+      return {
+        spec,
+        support: resolveDomainMazeSampleSupport(spec),
+        canonicalMaze: deriveMazeV2CanonicalMazeFromDomainMazeRaster(episode.raster),
+        generationDurationMs,
+        shortcutProvenance: {
+          shortcutCount: episode.shortcutsCreated,
+          routeLengthReduction: null
+        },
+        realizedWidth: episode.raster.width,
+        realizedHeight: episode.raster.height,
+        engineNotes: {
+          lane: spec.lane,
+          requestedSeed: spec.seed,
+          selectedSeed: resolved.seed,
+          targetDifficulty,
+          achievedDifficulty: achievedDifficulty.difficulty,
+          difficultyScore: achievedDifficulty.score,
+          reportedCanonicalDifficulty: episode.difficulty,
+          accepted: episode.accepted,
+          family: episode.family
+        }
+      };
+    }
+
     const braidRatio = resolveBraidRatioForTargetComplexity(spec.targetComplexity);
     const minSolutionLength = resolveMinSolutionLengthForTargetComplexity(spec.targetComplexity, spec.width, spec.height);
     const generationStartedAtMs = performance.now();
@@ -74,13 +151,20 @@ export const createMazeV2DomainMazeAdapter = (): MazeV2EngineAdapter => ({
 
     return {
       spec,
+      support: resolveDomainMazeSampleSupport(spec),
       canonicalMaze: deriveMazeV2CanonicalMazeFromDomainMazeRaster(episode.raster),
       generationDurationMs,
+      shortcutProvenance: {
+        shortcutCount: episode.shortcutsCreated,
+        routeLengthReduction: null
+      },
+      realizedWidth: episode.raster.width,
+      realizedHeight: episode.raster.height,
       engineNotes: {
+        lane: spec.lane,
         braidRatio,
         minSolutionLength,
         accepted: episode.accepted,
-        shortcutsCreated: episode.shortcutsCreated,
         family: episode.family,
         difficulty: episode.difficulty,
         difficultyScore: episode.difficultyScore

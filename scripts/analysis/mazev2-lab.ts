@@ -173,8 +173,11 @@ const flattenSample = (sample: LevelSample): FlatMetricRow => ({
   maxStraightRunLength: sample.metrics.turning.maxStraightRunLength,
   straightRunLengthVariance: sample.metrics.turning.straightRunLengthVariance,
   cycleRank: sample.metrics.ambiguity.cycleRank,
-  shortcutCount: sample.metrics.shortcut.shortcutCount,
-  routeLengthReduction: sample.metrics.shortcut.routeLengthReduction,
+  // null means "unmeasured" (see MazeV2ShortcutMetrics's own doc comment in
+  // types.ts) -- same empty-string convention wrapRouteImpact already uses
+  // just below for its own nullable field.
+  shortcutCount: sample.metrics.shortcut.shortcutCount ?? '',
+  routeLengthReduction: sample.metrics.shortcut.routeLengthReduction ?? '',
   wrapPairCount: sample.metrics.wrap.wrapPairCount,
   wrapPairsOnRoute: sample.metrics.wrap.wrapPairsOnRoute,
   wrapRouteImpact: sample.metrics.wrap.wrapRouteImpact ?? '',
