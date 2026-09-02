@@ -26,10 +26,11 @@
 // legacy-runtime already produces). One is deliberately approximate, and
 // said so at its computation:
 //   - shortcut.routeLengthReduction: a true measurement needs a
-//     counterfactual "the same maze without its shortcuts" to diff
-//     against, which this bridge does not regenerate. Falls back to the
-//     wrap-topology system's own already-exact playableShortcutDelta where
-//     available (wrap shortcuts only), else 0.
+//     counterfactual "the same maze without its carved shortcuts" to diff
+//     against, which this bridge does not regenerate. It reports null when
+//     shortcuts exist but their reduction is unmeasured, and 0 only when
+//     no shortcuts exist. The independent wrap-only delta remains under
+//     wrap.wrapRouteImpact and is never relabeled as shortcut reduction.
 // Wave 2's generator should compute this directly from its own
 // construction process instead of inferring it after the fact.
 
@@ -83,21 +84,34 @@ const summarizeWalkableGraph = (grid: boolean[][]): WalkableGraphSummary => {
   return { degreeByKey, walkableTileCount, edgeCount: degreeSum / 2 };
 };
 
-const resolveTurnHeading = (from: LegacyPoint, to: LegacyPoint): string => (
-  `${Math.sign(to.x - from.x)},${Math.sign(to.y - from.y)}`
-);
+const resolveTurnHeading = (
+  from: LegacyPoint,
+  to: LegacyPoint,
+  width: number,
+  height: number
+): string => {
+  const rawDx = to.x - from.x;
+  const rawDy = to.y - from.y;
+  const dx = from.y === to.y && width > 2 && Math.abs(rawDx) === width - 1
+    ? -Math.sign(rawDx)
+    : Math.sign(rawDx);
+  const dy = from.x === to.x && height > 2 && Math.abs(rawDy) === height - 1
+    ? -Math.sign(rawDy)
+    : Math.sign(rawDy);
+  return `${dx},${dy}`;
+};
 
-const resolveTurningMetrics = (solutionPath: readonly LegacyPoint[]) => {
+const resolveTurningMetrics = (solutionPath: readonly LegacyPoint[], width: number, height: number) => {
   if (solutionPath.length < 3) {
     return { turnCount: 0, turnRatio: 0, meanStraightRunLength: Math.max(0, solutionPath.length - 1), maxStraightRunLength: Math.max(0, solutionPath.length - 1), straightRunLengthVariance: 0 };
   }
 
   const runLengths: number[] = [];
   let turnCount = 0;
-  let currentHeading = resolveTurnHeading(solutionPath[0]!, solutionPath[1]!);
+  let currentHeading = resolveTurnHeading(solutionPath[0]!, solutionPath[1]!, width, height);
   let currentRunLength = 1;
   for (let index = 1; index < solutionPath.length - 1; index += 1) {
-    const nextHeading = resolveTurnHeading(solutionPath[index]!, solutionPath[index + 1]!);
+    const nextHeading = resolveTurnHeading(solutionPath[index]!, solutionPath[index + 1]!, width, height);
     if (nextHeading === currentHeading) {
       currentRunLength += 1;
       continue;
@@ -203,7 +217,7 @@ export const analyzeLegacyMazeAsMazeV2Metrics = (maze: LegacyMazeSnapshot): Maze
     && resolveManhattanDistance(branch.firstStepFromRoot, goal) < resolveManhattanDistance(branch.root, goal)
   ));
 
-  const turning = resolveTurningMetrics(playablePath);
+  const turning = resolveTurningMetrics(playablePath, width, height);
 
   // Cycle rank (first Betti number) assumes one connected component --
   // legacy-runtime's own playableTopologyStats already guarantees full
@@ -261,9 +275,10 @@ export const analyzeLegacyMazeAsMazeV2Metrics = (maze: LegacyMazeSnapshot): Maze
     ambiguity: { cycleRank },
     shortcut: {
       shortcutCount,
-      // See module header: exact only when the wrap-topology system's own
-      // playableShortcutDelta applies; 0 otherwise rather than a guess.
-      routeLengthReduction: wrapDiagnostics?.playableShortcutDelta ?? 0
+      // A wrap-only route delta is not evidence about carved shortcuts.
+      // Report unmeasured (null) when shortcuts exist, and 0 only when the
+      // engine reports that no shortcuts were created.
+      routeLengthReduction: shortcutCount > 0 ? null : 0
     },
     wrap: {
       wrapPairCount,

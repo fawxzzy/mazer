@@ -156,8 +156,11 @@ const flattenSample = (sample: LevelSample): FlatMetricRow => ({
   manhattanDistance: sample.metrics.route.manhattanDistance,
   detourRatio: sample.metrics.route.detourRatio,
   routeCoverage: sample.metrics.route.routeCoverage,
-  directFloorPathLength: sample.metrics.route.directFloorPathLength,
-  directFloorDetourRatio: sample.metrics.route.directFloorDetourRatio,
+  // A wrap-only route has no direct-floor counterfactual. Preserve that
+  // distinction as an empty CSV cell rather than serializing a fabricated
+  // playable-route length or the string "null".
+  directFloorPathLength: sample.metrics.route.directFloorPathLength ?? '',
+  directFloorDetourRatio: sample.metrics.route.directFloorDetourRatio ?? '',
   junctionCount: sample.metrics.decision.junctionCount,
   junctionDensity: sample.metrics.decision.junctionDensity,
   routeJunctionCount: sample.metrics.decision.routeJunctionCount,
@@ -173,8 +176,11 @@ const flattenSample = (sample: LevelSample): FlatMetricRow => ({
   maxStraightRunLength: sample.metrics.turning.maxStraightRunLength,
   straightRunLengthVariance: sample.metrics.turning.straightRunLengthVariance,
   cycleRank: sample.metrics.ambiguity.cycleRank,
-  shortcutCount: sample.metrics.shortcut.shortcutCount,
-  routeLengthReduction: sample.metrics.shortcut.routeLengthReduction,
+  // null means "unmeasured" (see MazeV2ShortcutMetrics's own doc comment in
+  // types.ts) -- same empty-string convention wrapRouteImpact already uses
+  // just below for its own nullable field.
+  shortcutCount: sample.metrics.shortcut.shortcutCount ?? '',
+  routeLengthReduction: sample.metrics.shortcut.routeLengthReduction ?? '',
   wrapPairCount: sample.metrics.wrap.wrapPairCount,
   wrapPairsOnRoute: sample.metrics.wrap.wrapPairsOnRoute,
   wrapRouteImpact: sample.metrics.wrap.wrapRouteImpact ?? '',

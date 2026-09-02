@@ -53,7 +53,7 @@
 
 export const MAZE_V2_GENERATOR_VERSION = 'mazev2-generator-v1-unimplemented' as const;
 export const MAZE_V2_PROGRESSION_VERSION = 'mazev2-progression-v1-unimplemented' as const;
-export const MAZE_V2_CONTRACT_VERSION = 'mazev2-contract-v2' as const;
+export const MAZE_V2_CONTRACT_VERSION = 'mazev2-contract-v3' as const;
 export const MAZE_V2_LOGICAL_CAPACITY_VERSION = 'mazev2-logical-capacity-v1' as const;
 export const MAZE_V2_WORK_BUDGET_VERSION = 'mazev2-work-budget-v1' as const;
 
@@ -332,13 +332,13 @@ export interface MazeV2RouteMetrics {
   manhattanDistance: number;
   detourRatio: number;
   routeCoverage: number;
-  // Direct-floor route (maze.solutionPath, policy 'direct-floor') --
-  // legacy-runtime's own construction-time route, not wrap-aware. Exposed
-  // only for comparison against the playable pair above; a divergence
-  // between the two on a maze with wrap/bleed topology means the direct
-  // route understates or overstates what the player can actually walk.
-  directFloorPathLength: number;
-  directFloorDetourRatio: number;
+  // Direct-floor/non-wrap route -- legacy-runtime supplies its construction
+  // route while the canonical analyzer removes wrap edges from the same
+  // graph. Exposed only for comparison against the playable pair above. null
+  // means no non-wrap start-to-goal route exists; substituting the playable
+  // length would falsely claim a direct-floor route was measured.
+  directFloorPathLength: number | null;
+  directFloorDetourRatio: number | null;
 }
 
 export interface MazeV2DecisionMetrics {
@@ -380,10 +380,19 @@ export interface MazeV2AmbiguityMetrics {
 }
 
 export interface MazeV2ShortcutMetrics {
-  shortcutCount: number;
+  // null means "not measured for this sample" (the source engine/bridge
+  // doesn't yet expose enough provenance to count shortcuts), distinct from
+  // 0 ("measured, and there are none"). Wave 1.5 correction: the neutral
+  // canonical-maze analyzer (canonicalAnalyzer.ts) used to hardcode this to
+  // 0 for every sample regardless of whether shortcuts were actually
+  // observable, which silently claimed "zero shortcuts" for engines whose
+  // shortcut provenance simply wasn't wired through yet -- a real
+  // measurement gap, not a real zero.
+  shortcutCount: number | null;
   // Total route-length reduction shortcuts are responsible for, i.e.
   // (naive spanning-tree route length) - (actual shortest path length).
-  routeLengthReduction: number;
+  // Same null-means-unmeasured convention as shortcutCount.
+  routeLengthReduction: number | null;
 }
 
 export interface MazeV2WrapMetrics {

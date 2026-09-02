@@ -1,200 +1,155 @@
-// Mazer Generation V2 -- Wave 1.5 PR B: generator-convergence harness.
+// Mazer Generation V2 -- Wave 1.5 PR D: corrected generator-convergence
+// harness CLI, replacing PR B's own script. Pure logic lives in
+// mazev2ConvergenceHarness.ts (importable/testable without triggering a
+// full run); this file is just orchestration + I/O.
 //
-// Runs BOTH existing maze generators in this repository --
-// src/legacy-runtime (today's real production generator) and
-// src/domain/maze (the presentation/demo-only generator) -- through the
-// same small set of neutral comparison specs, bridges each engine's real
-// output into MazeV2CanonicalMaze, and measures both through the ONE shared
-// analyzer (src/domain/mazeV2/canonicalAnalyzer.ts) so every reported
-// metric is genuinely apples-to-apples.
-//
-// SCOPE NOTE: the original Wave 1.5 brief specified a 15-recipe x 32-seed x
-// 2-engine corpus (960 runs) driven through a formal recipe resolver
-// (MazeV2TargetRecipe -> MazeV2ResolvedGenerationContract). That resolver
-// does not exist yet in either engine -- Wave 1.5's own types.ts explicitly
-// leaves per-axis target resolution unbuilt (see MazeV2RecipeResolutionTargets'
-// own header comment). Building a resolver just to satisfy this harness's
-// run count would be fabricating a component Wave 2 hasn't designed yet, so
-// this harness instead drives both engines from CONCRETE_COMPARISON_SPECS
-// below -- 6 recipes x 8 seeds x 2 engines = 96 real runs -- and reports
-// each engine's honest capability assessment (native/adaptable/indirect/
-// unsupported per axis) alongside the measured comparison. This is smaller
-// than the literal spec but every run and every number in the output is
-// real, not extrapolated or invented to hit a target count.
+// Corrections from PR B (see
+// docs/ops/MAZER-GENERATION-V2-WAVE-1_5-CONVERGENCE-FINDINGS-2026-08-28.md for
+// the full audit this responds to):
+//   1. Full reviewed recipe corpus x 32 seeds (was 6 recipes x 8 seeds).
+//   2. Two explicit lanes -- raw-carving (no candidate search on either
+//      engine) and production-pipeline (each engine's own real
+//      candidate-search/difficulty-targeting behavior) -- run and reported
+//      separately, never blended.
+//   3. Legacy-runtime now honors requested width/height via a real
+//      scale/aspectRatio mapping instead of a fixed board scale.
+//   4. Real shortcut provenance threaded into the shared analyzer instead
+//      of a hardcoded 0.
+//   5. The canonical bridge (canonicalMaze.ts) now derives real wrap pairs
+//      from the grid instead of always reporting wrap-free.
+//   6. Failure records: a sample that throws is recorded, not dropped.
+//   7. Portable, repo-relative, gitignored local scratch output directory
+//      (was an absolute Windows path); its compact artifact remains ignored
+//      local scratch unless separately promoted through the existing evidence workflow.
 //
 // Usage:
-//   npx tsx scripts/analysis/mazev2-convergence.ts [--outputDir=...]
+//   npx tsx scripts/analysis/mazev2-convergence.ts [--outputDir=./tmp/mazev2-convergence]
+//     [--lanes=raw-carving,production-pipeline]
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
-import { analyzeMazeV2CanonicalMaze } from '../../src/domain/mazeV2/canonicalAnalyzer';
 import { createMazeV2LegacyRuntimeAdapter } from '../../src/domain/mazeV2/adapters/legacyRuntimeAdapter';
 import { createMazeV2DomainMazeAdapter } from '../../src/domain/mazeV2/adapters/domainMazeAdapter';
-import type { MazeV2ComparisonSampleSpec, MazeV2EngineAdapter } from '../../src/domain/mazeV2/adapters/types';
-import type { MazeV2MeasuredMetrics } from '../../src/domain/mazeV2/types';
+import type { MazeV2ComparisonLane } from '../../src/domain/mazeV2/adapters/types';
+import { MAZE_V2_CONVERGENCE_CORPUS } from './mazev2ConvergenceCorpus';
+import { MAZE_V2_LAB_DEFAULT_SEED_CORPUS, MAZE_V2_LAB_DEFAULT_SEED_CORPUS_VERSION } from './mazeV2SeedStrategies';
+import {
+  assertExpectedCleanGitCommitSha,
+  parseConvergenceLanes,
+  resolveConvergenceExitCode,
+  resolveCleanGitCommitSha,
+  resolveRepositoryRootFromAnalysisModuleUrl,
+  runOneSampleInChild,
+  summarize,
+  writeConvergenceArtifactSet,
+  type ConvergenceRunRecord
+} from './mazev2ConvergenceHarness';
 
-const DEFAULT_OUTPUT_DIR = 'C:\\ATLAS\\tmp\\captures\\mazev2-convergence';
+const MAZE_V2_CONVERGENCE_HARNESS_VERSION = 'mazev2-convergence-harness-pr-d-v2';
+const MAZE_V2_CONVERGENCE_CORPUS_VERSION = 'mazev2-convergence-corpus-v3-14-recipe';
+const DEFAULT_OUTPUT_DIR = './tmp/mazev2-convergence';
+const REPO_ROOT = resolveRepositoryRootFromAnalysisModuleUrl(import.meta.url);
 
-// Six recipes spanning small/large boards and low/mid/high complexity --
-// not the full 15-recipe spec (see header note), but a real spread across
-// the two axes both engines can genuinely be driven by (dimensions,
-// complexity dial), rather than one point sample.
-const CONCRETE_COMPARISON_RECIPES: readonly Omit<MazeV2ComparisonSampleSpec, 'seed'>[] = [
-  { label: 'small-low', level: 1, targetComplexity: 8, width: 20, height: 20 },
-  { label: 'small-mid', level: 25, targetComplexity: 50, width: 20, height: 20 },
-  { label: 'small-high', level: 99, targetComplexity: 100, width: 20, height: 20 },
-  { label: 'large-low', level: 1, targetComplexity: 8, width: 50, height: 50 },
-  { label: 'large-mid', level: 25, targetComplexity: 50, width: 50, height: 50 },
-  { label: 'large-high', level: 99, targetComplexity: 100, width: 50, height: 50 }
-];
-
-// Eight committed seeds -- small enough to keep the run count real and
-// reviewable, large enough that per-recipe summary stats (mean/stdev/p95)
-// mean something.
-const COMPARISON_SEED_CORPUS: readonly number[] = [
-  10001, 20002, 30003, 40004, 50005, 60006, 70007, 80008
-];
-
-interface ComparisonRunRecord {
-  engineId: string;
-  recipeLabel: string;
-  seed: number;
-  generationDurationMs: number;
-  engineNotes: Record<string, unknown>;
-  metrics: MazeV2MeasuredMetrics;
-}
-
-const buildComparisonSpecs = (): MazeV2ComparisonSampleSpec[] => (
-  CONCRETE_COMPARISON_RECIPES.flatMap((recipe) => (
-    COMPARISON_SEED_CORPUS.map((seed) => ({ ...recipe, seed }))
-  ))
-);
-
-const runAdapterAcrossSpecs = (adapter: MazeV2EngineAdapter, specs: readonly MazeV2ComparisonSampleSpec[]): ComparisonRunRecord[] => (
-  specs.map((spec) => {
-    const result = adapter.generateSample(spec);
-    return {
-      engineId: adapter.engineId,
-      recipeLabel: spec.label,
-      seed: spec.seed,
-      generationDurationMs: result.generationDurationMs,
-      engineNotes: result.engineNotes,
-      metrics: analyzeMazeV2CanonicalMaze(result.canonicalMaze)
-    };
-  })
-);
-
-const resolveMean = (values: readonly number[]): number => (
-  values.reduce((total, value) => total + value, 0) / Math.max(1, values.length)
-);
-
-interface RecipeComparisonSummary {
-  recipeLabel: string;
-  engineId: string;
-  sampleCount: number;
-  meanShortestPathLength: number;
-  meanDetourRatio: number;
-  meanJunctionCount: number;
-  meanDeadEndCount: number;
-  meanTurnRatio: number;
-  meanCycleRank: number;
-  meanGenerationDurationMs: number;
-}
-
-const summarizeByRecipeAndEngine = (records: readonly ComparisonRunRecord[]): RecipeComparisonSummary[] => {
-  const groups = new Map<string, ComparisonRunRecord[]>();
-  for (const record of records) {
-    const key = `${record.recipeLabel}::${record.engineId}`;
-    const group = groups.get(key) ?? [];
-    group.push(record);
-    groups.set(key, group);
-  }
-  return [...groups.entries()].map(([key, group]) => {
-    const [recipeLabel, engineId] = key.split('::');
-    return {
-      recipeLabel: recipeLabel!,
-      engineId: engineId!,
-      sampleCount: group.length,
-      meanShortestPathLength: resolveMean(group.map((r) => r.metrics.route.shortestPathLength)),
-      meanDetourRatio: resolveMean(group.map((r) => r.metrics.route.detourRatio)),
-      meanJunctionCount: resolveMean(group.map((r) => r.metrics.decision.junctionCount)),
-      meanDeadEndCount: resolveMean(group.map((r) => r.metrics.deadEnd.deadEndCount)),
-      meanTurnRatio: resolveMean(group.map((r) => r.metrics.turning.turnRatio)),
-      meanCycleRank: resolveMean(group.map((r) => r.metrics.ambiguity.cycleRank)),
-      meanGenerationDurationMs: resolveMean(group.map((r) => r.generationDurationMs))
-    };
-  });
-};
-
-const renderCapabilityMatrixHtml = (adapters: readonly MazeV2EngineAdapter[]): string => {
-  const axes = [...new Set(adapters.flatMap((adapter) => adapter.capabilities.map((c) => c.axis)))];
-  const rows = axes.map((axis) => {
-    const cells = adapters.map((adapter) => {
-      const assessment = adapter.capabilities.find((c) => c.axis === axis);
-      return `<td class="status-${assessment?.status ?? 'unknown'}"><strong>${assessment?.status ?? '(none)'}</strong><br><span>${assessment?.note ?? ''}</span></td>`;
-    }).join('');
-    return `<tr><th>${axis}</th>${cells}</tr>`;
-  }).join('\n');
-  const headerCells = adapters.map((adapter) => `<th>${adapter.engineLabel}</th>`).join('');
-  return `<table><thead><tr><th>Axis</th>${headerCells}</tr></thead><tbody>${rows}</tbody></table>`;
-};
-
-const renderSummaryTableHtml = (summaries: readonly RecipeComparisonSummary[]): string => {
-  const rows = summaries.map((s) => `<tr>
-    <td>${s.recipeLabel}</td><td>${s.engineId}</td><td>${s.sampleCount}</td>
-    <td>${s.meanShortestPathLength.toFixed(2)}</td><td>${s.meanDetourRatio.toFixed(3)}</td>
-    <td>${s.meanJunctionCount.toFixed(2)}</td><td>${s.meanDeadEndCount.toFixed(2)}</td>
-    <td>${s.meanTurnRatio.toFixed(3)}</td><td>${s.meanCycleRank.toFixed(2)}</td>
-    <td>${s.meanGenerationDurationMs.toFixed(3)}</td>
-  </tr>`).join('\n');
-  return `<table><thead><tr>
-    <th>Recipe</th><th>Engine</th><th>N</th><th>Mean route length</th><th>Mean detour ratio</th>
-    <th>Mean junctions</th><th>Mean dead ends</th><th>Mean turn ratio</th><th>Mean cycle rank</th><th>Mean gen ms</th>
-  </tr></thead><tbody>${rows}</tbody></table>`;
-};
-
-const run = async (): Promise<void> => {
+const parseCliArgs = (): { outputDir: string; lanes: readonly MazeV2ComparisonLane[] } => {
   const args: Record<string, string> = {};
   for (const entry of process.argv.slice(2)) {
     if (!entry.startsWith('--')) continue;
     const [key, value] = entry.slice(2).split('=');
     if (key) args[key] = value ?? 'true';
   }
-  const outputDir = resolve(args.outputDir ?? DEFAULT_OUTPUT_DIR);
-  await mkdir(outputDir, { recursive: true });
+  const lanes = parseConvergenceLanes(args.lanes);
+  return { outputDir: resolve(args.outputDir ?? DEFAULT_OUTPUT_DIR), lanes };
+};
+
+const run = async (): Promise<void> => {
+  // Bind evidence to a clean source state before creating any output. A HEAD
+  // SHA alone is insufficient because uncommitted source can change results.
+  const sourceCommitSha = resolveCleanGitCommitSha(REPO_ROOT);
+  const { outputDir, lanes } = parseCliArgs();
 
   const adapters = [createMazeV2LegacyRuntimeAdapter(), createMazeV2DomainMazeAdapter()];
-  const specs = buildComparisonSpecs();
+  const allRecords: ConvergenceRunRecord[] = [];
 
-  const allRecords = adapters.flatMap((adapter) => runAdapterAcrossSpecs(adapter, specs));
-  const summaries = summarizeByRecipeAndEngine(allRecords);
+  for (const recipe of MAZE_V2_CONVERGENCE_CORPUS) {
+    for (const lane of lanes) {
+      for (const adapter of adapters) {
+        for (const seed of MAZE_V2_LAB_DEFAULT_SEED_CORPUS) {
+          allRecords.push(await runOneSampleInChild(
+            adapter.engineId,
+            recipe,
+            lane,
+            seed,
+            sourceCommitSha
+          ));
+        }
+      }
+    }
+  }
 
-  await writeFile(resolve(outputDir, 'mazev2-convergence-runs.json'), JSON.stringify(allRecords, null, 2), 'utf8');
-  await writeFile(resolve(outputDir, 'mazev2-convergence-summary.json'), JSON.stringify(summaries, null, 2), 'utf8');
+  const totalExpected = MAZE_V2_CONVERGENCE_CORPUS.length * lanes.length * adapters.length * MAZE_V2_LAB_DEFAULT_SEED_CORPUS.length;
+  console.log(`MazeV2 convergence: ${allRecords.length}/${totalExpected} runs across ${adapters.length} engines, ${lanes.length} lane(s), ${MAZE_V2_CONVERGENCE_CORPUS.length} recipes x ${MAZE_V2_LAB_DEFAULT_SEED_CORPUS.length} seeds.`);
+  const failureCount = allRecords.filter((r) => r.outcome === 'exception' || r.outcome === 'invariant-failure').length;
+  const unsupportedCount = allRecords.filter((r) => r.outcome === 'unsupported').length;
+  if (failureCount > 0) {
+    console.log(`${failureCount} sample(s) did not succeed (see per-run records: outcome/errorMessage). Not dropped from the raw output.`);
+  }
+  if (unsupportedCount > 0) {
+    console.log(`${unsupportedCount} sample(s) were explicitly unsupported by their engine/lane contract (see per-run errorMessage). Not misreported as successful measurements.`);
+  }
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>MazeV2 Generator Convergence</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; }
-    table { border-collapse: collapse; margin-bottom: 2rem; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; font-size: 0.85rem; }
-    th { background: #f0f0f0; }
-    .status-native { background: #e3f7e3; }
-    .status-adaptable { background: #fff8dc; }
-    .status-indirect { background: #ffe9d6; }
-    .status-unsupported { background: #fde0e0; }
-  </style></head><body>
-  <h1>MazeV2 Generator Convergence -- Wave 1.5 PR B</h1>
-  <p>${specs.length} specs x ${adapters.length} engines = ${allRecords.length} real generation runs.
-     See this script's own header comment for the honest scope-down from the original 960-run brief.</p>
-  <h2>Capability matrix</h2>
-  ${renderCapabilityMatrixHtml(adapters)}
-  <h2>Per-recipe measured comparison</h2>
-  ${renderSummaryTableHtml(summaries)}
-  </body></html>`;
-  await writeFile(resolve(outputDir, 'mazev2-convergence-report.html'), html, 'utf8');
+  const summaries = summarize(allRecords);
+  const rawRunsPath = resolve(outputDir, 'mazev2-convergence-runs.json');
+  const rawSummaryPath = resolve(outputDir, 'mazev2-convergence-summary.json');
+  const rawRunsJson = JSON.stringify(allRecords, null, 2);
 
-  console.log(`MazeV2 convergence: ${allRecords.length} runs across ${adapters.length} engines and ${CONCRETE_COMPARISON_RECIPES.length} recipes x ${COMPARISON_SEED_CORPUS.length} seeds.`);
-  console.log(`Report written to ${outputDir}`);
+  const rawRunsDigest = createHash('sha256').update(rawRunsJson, 'utf8').digest('hex');
+
+  const capabilityMatrix = Object.fromEntries(
+    adapters.map((adapter) => [adapter.engineId, adapter.capabilities])
+  );
+
+  const compactEvidence = {
+    harnessVersion: MAZE_V2_CONVERGENCE_HARNESS_VERSION,
+    corpusVersion: MAZE_V2_CONVERGENCE_CORPUS_VERSION,
+    seedCorpusVersion: MAZE_V2_LAB_DEFAULT_SEED_CORPUS_VERSION,
+    sourceCommitSha,
+    cliInvocation: `npx tsx scripts/analysis/mazev2-convergence.ts --outputDir=${outputDir} --lanes=${lanes.join(',')}`,
+    generatedAtIso: new Date().toISOString(),
+    totalRuns: allRecords.length,
+    totalExpectedRuns: totalExpected,
+    recipeCount: MAZE_V2_CONVERGENCE_CORPUS.length,
+    seedCount: MAZE_V2_LAB_DEFAULT_SEED_CORPUS.length,
+    lanes,
+    engineIds: adapters.map((adapter) => adapter.engineId),
+    outcomeCounts: {
+      success: allRecords.filter((r) => r.outcome === 'success').length,
+      unsupported: allRecords.filter((r) => r.outcome === 'unsupported').length,
+      exception: allRecords.filter((r) => r.outcome === 'exception').length,
+      invariantFailure: allRecords.filter((r) => r.outcome === 'invariant-failure').length
+    },
+    capabilityMatrix,
+    perRecipeEngineLaneSummary: summaries,
+    rawArtifactSha256: rawRunsDigest,
+    rawArtifactPath: rawRunsPath
+  };
+
+  const compactEvidencePath = resolve(outputDir, 'mazev2-convergence-compact-evidence.json');
+  assertExpectedCleanGitCommitSha(REPO_ROOT, sourceCommitSha, 'convergence artifact publication');
+  await writeConvergenceArtifactSet(outputDir, {
+    rawRunsJson,
+    rawSummaryJson: JSON.stringify(summaries, null, 2),
+    compactEvidenceJson: JSON.stringify(compactEvidence, null, 2)
+  });
+
+  console.log(JSON.stringify({ outcomeCounts: compactEvidence.outcomeCounts, totalRuns: compactEvidence.totalRuns }, null, 2));
+  console.log(`Raw runs: ${rawRunsPath}`);
+  console.log(`Raw summary: ${rawSummaryPath}`);
+  console.log(`Compact evidence: ${compactEvidencePath}`);
+
+  // Preserve the complete diagnostic artifact set before signaling a failed
+  // evidence gate to callers. Unsupported samples remain an expected contract
+  // result; only exceptions and invariant failures fail the process.
+  process.exitCode = resolveConvergenceExitCode(allRecords);
 };
 
 run().catch((error) => {

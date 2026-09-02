@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { analyzeMazeV2CanonicalMaze } from '../../src/domain/mazeV2/canonicalAnalyzer';
-import type { MazeV2CanonicalMaze } from '../../src/domain/mazeV2/types';
+import { MAZE_V2_CONTRACT_VERSION, type MazeV2CanonicalMaze } from '../../src/domain/mazeV2/types';
 
 const canonicalMaze = (overrides: Partial<MazeV2CanonicalMaze>): MazeV2CanonicalMaze => ({
   width: 5,
@@ -16,6 +16,7 @@ describe('analyzeMazeV2CanonicalMaze -- straight corridor', () => {
   test('reports the full length as the shortest path with zero turns, junctions, and dead ends', () => {
     const metrics = analyzeMazeV2CanonicalMaze(canonicalMaze({}));
     expect(metrics.route.shortestPathLength).toBe(4);
+    expect(metrics.contractVersion).toBe(MAZE_V2_CONTRACT_VERSION);
     expect(metrics.route.manhattanDistance).toBe(4);
     expect(metrics.route.detourRatio).toBe(1);
     expect(metrics.decision.junctionCount).toBe(0);
@@ -95,8 +96,11 @@ describe('analyzeMazeV2CanonicalMaze -- wrap pairs', () => {
       wrapPairs: [{ from: { x: 0, y: 0 }, to: { x: 4, y: 0 }, axis: 'horizontal' }]
     }));
     expect(metrics.route.shortestPathLength).toBe(1);
+    expect(metrics.route.directFloorPathLength).toBeNull();
+    expect(metrics.route.directFloorDetourRatio).toBeNull();
     expect(metrics.wrap.wrapPairCount).toBe(1);
     expect(metrics.wrap.wrapPairsOnRoute).toBe(1);
+    expect(metrics.wrap.wrapRouteImpact).toBeNull();
   });
 
   test('reports zero wrap pairs on route when the declared pair only connects two already-adjacent tiles', () => {

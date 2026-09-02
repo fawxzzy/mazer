@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["vitest/globals", "node"]
+  },
+  "include": [
+    "src/domain/mazeV2/**/*.ts",
+    "scripts/analysis/mazev2-*.ts",
+    "scripts/analysis/mazeV2*.ts",
+    "tests/mazeV2/**/*.ts",
+    "tests/analysis/mazev2-*.ts"
+  ]
+}
