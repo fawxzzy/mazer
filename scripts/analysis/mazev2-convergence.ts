@@ -34,6 +34,7 @@ import type { MazeV2ComparisonLane } from '../../src/domain/mazeV2/adapters/type
 import { MAZE_V2_CONVERGENCE_CORPUS } from './mazev2ConvergenceCorpus';
 import { MAZE_V2_LAB_DEFAULT_SEED_CORPUS, MAZE_V2_LAB_DEFAULT_SEED_CORPUS_VERSION } from './mazeV2SeedStrategies';
 import {
+  assertExpectedCleanGitCommitSha,
   parseConvergenceLanes,
   resolveConvergenceExitCode,
   resolveCleanGitCommitSha,
@@ -73,7 +74,13 @@ const run = async (): Promise<void> => {
     for (const lane of lanes) {
       for (const adapter of adapters) {
         for (const seed of MAZE_V2_LAB_DEFAULT_SEED_CORPUS) {
-          allRecords.push(await runOneSampleInChild(adapter.engineId, recipe, lane, seed));
+          allRecords.push(await runOneSampleInChild(
+            adapter.engineId,
+            recipe,
+            lane,
+            seed,
+            sourceCommitSha
+          ));
         }
       }
     }
@@ -127,6 +134,7 @@ const run = async (): Promise<void> => {
   };
 
   const compactEvidencePath = resolve(outputDir, 'mazev2-convergence-compact-evidence.json');
+  assertExpectedCleanGitCommitSha(REPO_ROOT, sourceCommitSha, 'convergence artifact publication');
   await writeConvergenceArtifactSet(outputDir, {
     rawRunsJson,
     rawSummaryJson: JSON.stringify(summaries, null, 2),

@@ -53,7 +53,7 @@
 
 export const MAZE_V2_GENERATOR_VERSION = 'mazev2-generator-v1-unimplemented' as const;
 export const MAZE_V2_PROGRESSION_VERSION = 'mazev2-progression-v1-unimplemented' as const;
-export const MAZE_V2_CONTRACT_VERSION = 'mazev2-contract-v2' as const;
+export const MAZE_V2_CONTRACT_VERSION = 'mazev2-contract-v3' as const;
 export const MAZE_V2_LOGICAL_CAPACITY_VERSION = 'mazev2-logical-capacity-v1' as const;
 export const MAZE_V2_WORK_BUDGET_VERSION = 'mazev2-work-budget-v1' as const;
 

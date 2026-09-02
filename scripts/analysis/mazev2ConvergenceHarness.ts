@@ -38,6 +38,33 @@ export const resolveCleanGitCommitSha = (repoRoot: string): string => {
   }
   return resolveGitCommitSha(repoRoot);
 };
+
+export interface ConvergenceSourceIdentity {
+  status: 'clean' | 'dirty';
+  commitSha: string;
+}
+
+export const resolveConvergenceSourceIdentity = (repoRoot: string): ConvergenceSourceIdentity => {
+  try {
+    return { status: 'clean', commitSha: resolveCleanGitCommitSha(repoRoot) };
+  } catch {
+    return { status: 'dirty', commitSha: resolveGitCommitSha(repoRoot) };
+  }
+};
+
+export const assertExpectedCleanGitCommitSha = (
+  repoRoot: string,
+  expectedCommitSha: string,
+  context: string
+): string => {
+  const actualCommitSha = resolveCleanGitCommitSha(repoRoot);
+  if (actualCommitSha !== expectedCommitSha) {
+    throw new Error(
+      `Refusing ${context}: expected clean Git commit ${expectedCommitSha}, received ${actualCommitSha}.`
+    );
+  }
+  return actualCommitSha;
+};
 export const DEFAULT_MAZE_V2_COMPARISON_LANES: readonly MazeV2ComparisonLane[] = [
   'raw-carving',
   'production-pipeline'
@@ -86,6 +113,7 @@ export interface ConvergenceSampleChildRequest {
   recipe: MazeV2ConvergenceRecipe;
   lane: MazeV2ComparisonLane;
   seed: number;
+  expectedSourceCommitSha: string;
 }
 
 export interface ConvergenceSampleChildOptions {
@@ -114,6 +142,7 @@ interface ChildCloseState {
 interface ChildReadyMessage {
   contractVersion: typeof CONVERGENCE_CHILD_MESSAGE_VERSION;
   type: 'ready';
+  sourceIdentity: ConvergenceSourceIdentity;
 }
 
 interface ChildResultMessage {
@@ -130,6 +159,9 @@ const isChildReadyMessage = (value: unknown): value is ChildReadyMessage => (
   isRecord(value)
   && value.contractVersion === CONVERGENCE_CHILD_MESSAGE_VERSION
   && value.type === 'ready'
+  && isRecord(value.sourceIdentity)
+  && (value.sourceIdentity.status === 'clean' || value.sourceIdentity.status === 'dirty')
+  && typeof value.sourceIdentity.commitSha === 'string'
 );
 
 const isChildResultMessage = (
@@ -184,6 +216,31 @@ const createTimeoutRecord = (
   realizedHeight: null,
   engineNotes: {
     generationDeadlineMs: timeoutMs,
+    childProcessTermination: 'terminated-and-reaped'
+  },
+  metrics: null
+});
+
+const createSourceIdentityFailureRecord = (
+  request: ConvergenceSampleChildRequest,
+  sourceIdentity: ConvergenceSourceIdentity
+): ConvergenceRunRecord => ({
+  engineId: request.engineId,
+  recipeName: request.recipe.name,
+  lane: request.lane,
+  seed: request.seed,
+  outcome: 'invariant-failure',
+  errorMessage: `sample child source identity was ${sourceIdentity.status} at ${sourceIdentity.commitSha}; expected clean ${request.expectedSourceCommitSha}; child process terminated and reaped before generation`,
+  generationDurationMs: null,
+  requestedWidth: request.recipe.width,
+  requestedHeight: request.recipe.height,
+  realizedWidth: null,
+  realizedHeight: null,
+  engineNotes: {
+    expectedSourceCommitSha: request.expectedSourceCommitSha,
+    actualSourceCommitSha: sourceIdentity.commitSha,
+    sourceIdentityStatus: sourceIdentity.status,
+    generationStarted: false,
     childProcessTermination: 'terminated-and-reaped'
   },
   metrics: null
@@ -247,14 +304,24 @@ export const runOneSampleInChild = (
   recipe: MazeV2ConvergenceRecipe,
   lane: MazeV2ComparisonLane,
   seed: number,
+  expectedSourceCommitSha: string,
   options: ConvergenceSampleChildOptions = {}
 ): Promise<ConvergenceRunRecord> => {
   const timeoutMs = options.timeoutMs ?? GENERATION_TIMEOUT_DEADLINE_MS;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new Error('A convergence generation deadline must be a positive finite number of milliseconds.');
   }
+  if (!/^[0-9a-f]{40}$/u.test(expectedSourceCommitSha)) {
+    throw new Error('The expected convergence source commit must be a lowercase 40-character Git SHA.');
+  }
 
-  const request: ConvergenceSampleChildRequest = { engineId, recipe, lane, seed };
+  const request: ConvergenceSampleChildRequest = {
+    engineId,
+    recipe,
+    lane,
+    seed,
+    expectedSourceCommitSha
+  };
   const repoRoot = resolveRepositoryRootFromAnalysisModuleUrl(import.meta.url);
   const childEntrypoint = options.childEntrypoint
     ?? fileURLToPath(new URL('./mazev2-convergence-sample-child.ts', import.meta.url));
@@ -274,6 +341,7 @@ export const runOneSampleInChild = (
   let resultRecord: ConvergenceRunRecord | null = null;
   let readyReceived = false;
   let timedOut = false;
+  let sourceIdentityRejected = false;
   let settled = false;
   const closed = new Promise<ChildCloseState>((resolveClosed) => {
     child.once('close', (code, signal) => resolveClosed({ code, signal }));
@@ -300,6 +368,15 @@ export const runOneSampleInChild = (
     child.on('message', (message: unknown) => {
       if (isChildReadyMessage(message) && !readyReceived) {
         readyReceived = true;
+        if (message.sourceIdentity.status !== 'clean'
+          || message.sourceIdentity.commitSha !== request.expectedSourceCommitSha) {
+          sourceIdentityRejected = true;
+          clearTimeout(deadline);
+          void terminateAndReapChild(child, closed).then(() => {
+            settle(createSourceIdentityFailureRecord(request, message.sourceIdentity));
+          });
+          return;
+        }
         clearTimeout(deadline);
         deadline = setTimeout(onDeadline, timeoutMs);
         child.send({
@@ -319,7 +396,7 @@ export const runOneSampleInChild = (
     });
 
     void closed.then(({ code, signal }) => {
-      if (timedOut) return;
+      if (timedOut || sourceIdentityRejected) return;
       if (resultRecord !== null && code === 0) {
         settle(resultRecord);
         return;
@@ -502,7 +579,10 @@ export const runOneSample = (
 
 export const resolvePercentile = (sortedValues: readonly number[], percentile: number): number | null => {
   if (sortedValues.length === 0) return null;
-  const index = Math.min(sortedValues.length - 1, Math.floor(percentile * sortedValues.length));
+  const index = Math.min(
+    sortedValues.length - 1,
+    Math.max(0, Math.ceil(percentile * sortedValues.length) - 1)
+  );
   return sortedValues[index] ?? null;
 };
 

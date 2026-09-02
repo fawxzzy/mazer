@@ -24,7 +24,12 @@
 // internal solution path or metrics -- the whole point of a neutral
 // analyzer is that it doesn't need to trust either engine's bookkeeping.
 
-import type { MazeV2CanonicalMaze, MazeV2MeasuredMetrics, MazeV2WrapPair } from './types';
+import {
+  MAZE_V2_CONTRACT_VERSION,
+  type MazeV2CanonicalMaze,
+  type MazeV2MeasuredMetrics,
+  type MazeV2WrapPair
+} from './types';
 import { createMazeV2MetricFingerprint } from './hashing';
 
 interface CanonicalPoint {
@@ -278,7 +283,7 @@ export const analyzeMazeV2CanonicalMaze = (
   }
 
   const metricsWithoutFingerprint: Omit<MazeV2MeasuredMetrics, 'metricFingerprint'> = {
-    contractVersion: 'mazev2-contract-v2',
+    contractVersion: MAZE_V2_CONTRACT_VERSION,
     spatial: {
       width: maze.width,
       height: maze.height,

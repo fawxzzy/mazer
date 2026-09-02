@@ -3,6 +3,7 @@ import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyG
 import { analyzeLegacyMazeAsMazeV2Metrics, computeLegacyMazeTopologyFingerprint } from '../../src/domain/mazeV2/metrics';
 import { deriveMazeV2CanonicalMazeFromLegacySnapshot } from '../../src/domain/mazeV2/canonicalMaze';
 import { analyzeMazeV2CanonicalMaze } from '../../src/domain/mazeV2/canonicalAnalyzer';
+import { MAZE_V2_CONTRACT_VERSION } from '../../src/domain/mazeV2/types';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 
 const sampleMaze = () => ({
@@ -213,6 +214,7 @@ describe('mazeV2 canonical bridge -- wrap pair derivation (Wave 1.5 PR D correct
     });
 
     expect(metrics.route.shortestPathLength).toBe(1);
+    expect(metrics.contractVersion).toBe(MAZE_V2_CONTRACT_VERSION);
     expect(metrics.route.directFloorPathLength).toBe(4);
     expect(metrics.shortcut.routeLengthReduction).toBeNull();
     expect(metrics.wrap.wrapRouteImpact).toBe(3);
@@ -232,6 +234,7 @@ describe('mazeV2 canonical bridge -- wrap pair derivation (Wave 1.5 PR D correct
     };
     const metrics = analyzeLegacyMazeAsMazeV2Metrics(maze);
 
+    expect(metrics.contractVersion).toBe(MAZE_V2_CONTRACT_VERSION);
     expect(metrics.shortcut.routeLengthReduction).toBeNull();
     expect(metrics.wrap.wrapRouteImpact).toBe(7);
   });

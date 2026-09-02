@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import {
+  assertExpectedCleanGitCommitSha,
   parseConvergenceLanes,
   resolveCleanGitCommitSha,
   resolveConvergenceExitCode,
@@ -20,6 +21,7 @@ import { execFileSync } from 'node:child_process';
 import { createMazeV2LegacyRuntimeAdapter } from '../../src/domain/mazeV2/adapters/legacyRuntimeAdapter';
 import { createMazeV2DomainMazeAdapter } from '../../src/domain/mazeV2/adapters/domainMazeAdapter';
 import { MAZE_V2_CONVERGENCE_CORPUS } from '../../scripts/analysis/mazev2ConvergenceCorpus';
+import { MAZE_V2_CONTRACT_VERSION } from '../../src/domain/mazeV2/types';
 
 describe('runOneSample (Wave 1.5 PR D)', () => {
   test('a real generation succeeds and produces measured metrics', () => {
@@ -133,13 +135,17 @@ describe('resolvePercentile', () => {
     expect(resolvePercentile([], 0.5)).toBeNull();
   });
 
-  test('resolves the median of a sorted array', () => {
-    expect(resolvePercentile([1, 2, 3, 4, 5], 0.5)).toBe(3);
+  test('returns the only value for a singleton', () => {
+    expect(resolvePercentile([7], 0.5)).toBe(7);
   });
 
-  test('resolves a high percentile toward the end of the array', () => {
+  test('uses nearest rank for an even-sized median', () => {
+    expect(resolvePercentile([1, 2, 3, 4], 0.5)).toBe(2);
+  });
+
+  test('uses nearest rank for a high percentile', () => {
     const sorted = Array.from({ length: 100 }, (_, i) => i + 1);
-    expect(resolvePercentile(sorted, 0.99)).toBe(100);
+    expect(resolvePercentile(sorted, 0.99)).toBe(99);
   });
 });
 
@@ -194,6 +200,7 @@ describe('interruptible convergence generation', () => {
 
   test('reaps a hung sample, continues with the next sample, and preserves all failure artifacts', async () => {
     const recipe = MAZE_V2_CONVERGENCE_CORPUS[0]!;
+    const expectedSourceCommitSha = '1111111111111111111111111111111111111111';
     const hangingChild = resolve(
       process.cwd(),
       'tests/analysis/fixtures/mazev2-hanging-sample-child.mjs'
@@ -205,6 +212,7 @@ describe('interruptible convergence generation', () => {
       recipe,
       'raw-carving',
       1,
+      expectedSourceCommitSha,
       {
         timeoutMs: 250,
         childEntrypoint: hangingChild,
@@ -229,9 +237,11 @@ describe('interruptible convergence generation', () => {
       'legacy-runtime',
       recipe,
       'raw-carving',
-      2
+      2,
+      expectedSourceCommitSha,
+      { childEntrypoint: hangingChild }
     );
-    expect(nextRecord.outcome).toBe('success');
+    expect(nextRecord.outcome).toBe('unsupported');
     const unsupportedRecipe = MAZE_V2_CONVERGENCE_CORPUS.find(
       (entry) => entry.name === 'endpoint-placement-unsupported'
     )!;
@@ -239,7 +249,9 @@ describe('interruptible convergence generation', () => {
       'legacy-runtime',
       unsupportedRecipe,
       'raw-carving',
-      3
+      3,
+      expectedSourceCommitSha,
+      { childEntrypoint: hangingChild }
     );
     expect(unsupportedRecord.outcome).toBe('unsupported');
     expect(resolveConvergenceExitCode([nextRecord, unsupportedRecord])).toBe(0);
@@ -264,6 +276,46 @@ describe('interruptible convergence generation', () => {
       rmSync(outputDir, { recursive: true, force: true });
     }
   }, 30_000);
+
+  test.each([
+    ['dirty-source-fixture', 'dirty'],
+    ['mismatched-source-fixture', 'clean']
+  ] as const)(
+    'rejects and reaps a %s child before generation',
+    async (engineId, sourceIdentityStatus) => {
+      const recipe = MAZE_V2_CONVERGENCE_CORPUS[0]!;
+      const childEntrypoint = resolve(
+        process.cwd(),
+        'tests/analysis/fixtures/mazev2-hanging-sample-child.mjs'
+      );
+      const expectedSourceCommitSha = '1111111111111111111111111111111111111111';
+      let childPid: number | null = null;
+
+      const record = await runOneSampleInChild(
+        engineId,
+        recipe,
+        'raw-carving',
+        2,
+        expectedSourceCommitSha,
+        {
+          childEntrypoint,
+          onSpawn: (pid) => { childPid = pid; }
+        }
+      );
+
+      expect(record.outcome).toBe('invariant-failure');
+      expect(record.errorMessage).toContain(`source identity was ${sourceIdentityStatus}`);
+      expect(record.errorMessage).toContain(`expected clean ${expectedSourceCommitSha}`);
+      expect(record.engineNotes).toMatchObject({
+        expectedSourceCommitSha,
+        sourceIdentityStatus,
+        generationStarted: false,
+        childProcessTermination: 'terminated-and-reaped'
+      });
+      expect(childPid).not.toBeNull();
+      expect(isProcessAlive(childPid!)).toBe(false);
+    }
+  );
 });
 
 describe('parseConvergenceLanes', () => {
@@ -298,7 +350,14 @@ describe('convergence source provenance', () => {
       execFileSync('git', ['add', 'tracked.txt'], { cwd: repoRoot });
       execFileSync('git', ['commit', '-m', 'fixture'], { cwd: repoRoot });
 
-      expect(resolveCleanGitCommitSha(repoRoot)).toMatch(/^[0-9a-f]{40}$/);
+      const cleanCommitSha = resolveCleanGitCommitSha(repoRoot);
+      expect(cleanCommitSha).toMatch(/^[0-9a-f]{40}$/);
+      expect(assertExpectedCleanGitCommitSha(repoRoot, cleanCommitSha, 'test evidence')).toBe(cleanCommitSha);
+      expect(() => assertExpectedCleanGitCommitSha(
+        repoRoot,
+        '0000000000000000000000000000000000000000',
+        'test evidence'
+      )).toThrow('expected clean Git commit');
       writeFileSync(join(repoRoot, 'tracked.txt'), 'dirty\n', 'utf8');
       expect(() => resolveCleanGitCommitSha(repoRoot)).toThrow('tracked.txt');
 
@@ -316,6 +375,13 @@ describe('convergence source provenance', () => {
     expect(script).toContain("const DEFAULT_OUTPUT_DIR = './tmp/mazev2-convergence';");
     expect(script).toContain('compact artifact remains ignored');
     expect(script).toContain('resolveCleanGitCommitSha(REPO_ROOT)');
+    expect(script).toContain('seed,\n            sourceCommitSha');
+    const finalSourceCheck = script.indexOf(
+      "assertExpectedCleanGitCommitSha(REPO_ROOT, sourceCommitSha, 'convergence artifact publication');"
+    );
+    const artifactWrite = script.indexOf('await writeConvergenceArtifactSet(outputDir, {');
+    expect(finalSourceCheck).toBeGreaterThanOrEqual(0);
+    expect(finalSourceCheck).toBeLessThan(artifactWrite);
     expect(script).not.toContain('committed compact evidence summary');
     expect(gitignore.split(/\r?\n/u)).toContain('/tmp/');
   });
@@ -336,7 +402,7 @@ describe('summarize (Wave 1.5 PR D)', () => {
     realizedHeight: 20,
     engineNotes: {},
     metrics: {
-      contractVersion: 'mazev2-contract-v2',
+      contractVersion: MAZE_V2_CONTRACT_VERSION,
       spatial: { width: 20, height: 20, walkableTileCount: 100, floorRatio: 0.25 },
       route: { shortestPathLength: 10, manhattanDistance: 8, detourRatio: 1.25, routeCoverage: 0.1, directFloorPathLength: 10, directFloorDetourRatio: 1.25 },
       decision: { junctionCount: 2, junctionDensity: 0.02, routeJunctionCount: 1, meanJunctionDegree: 3, maxJunctionDegree: 3 },

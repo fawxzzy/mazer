@@ -2,9 +2,13 @@ import { createMazeV2DomainMazeAdapter } from '../../src/domain/mazeV2/adapters/
 import { createMazeV2LegacyRuntimeAdapter } from '../../src/domain/mazeV2/adapters/legacyRuntimeAdapter';
 import {
   CONVERGENCE_CHILD_MESSAGE_VERSION,
+  resolveConvergenceSourceIdentity,
+  resolveRepositoryRootFromAnalysisModuleUrl,
   runOneSample,
   type ConvergenceSampleChildRequest
 } from './mazev2ConvergenceHarness';
+
+const REPO_ROOT = resolveRepositoryRootFromAnalysisModuleUrl(import.meta.url);
 
 const encodedRequest = process.argv.at(-1);
 if (encodedRequest === undefined) {
@@ -53,5 +57,6 @@ process.once('message', (message: unknown) => {
 
 process.send({
   contractVersion: CONVERGENCE_CHILD_MESSAGE_VERSION,
-  type: 'ready'
+  type: 'ready',
+  sourceIdentity: resolveConvergenceSourceIdentity(REPO_ROOT)
 });
