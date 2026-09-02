@@ -11,10 +11,13 @@ import { analyzeMazeV2CanonicalMaze } from '../../src/domain/mazeV2/canonicalAna
 import type { MazeV2ComparisonLane, MazeV2ComparisonSampleSpec, MazeV2EngineAdapter } from '../../src/domain/mazeV2/adapters/types';
 import type { MazeV2MeasuredMetrics } from '../../src/domain/mazeV2/types';
 import type { MazeV2ConvergenceRecipe } from './mazev2ConvergenceCorpus';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const GENERATION_TIMEOUT_GUARD_MS = 10_000;
+export const GENERATION_TIMEOUT_DEADLINE_MS = 10_000;
+export const CONVERGENCE_CHILD_MESSAGE_VERSION = 'mazev2-convergence-sample-child-v1';
 
 export const resolveRepositoryRootFromAnalysisModuleUrl = (moduleUrl: string): string => (
   fileURLToPath(new URL('../..', moduleUrl))
@@ -77,6 +80,273 @@ export interface ConvergenceRunRecord {
   engineNotes: Record<string, unknown> | null;
   metrics: MazeV2MeasuredMetrics | null;
 }
+
+export interface ConvergenceSampleChildRequest {
+  engineId: string;
+  recipe: MazeV2ConvergenceRecipe;
+  lane: MazeV2ComparisonLane;
+  seed: number;
+}
+
+export interface ConvergenceSampleChildOptions {
+  timeoutMs?: number;
+  childEntrypoint?: string;
+  onSpawn?: (pid: number) => void;
+}
+
+export interface ConvergenceArtifactPayload {
+  rawRunsJson: string;
+  rawSummaryJson: string;
+  compactEvidenceJson: string;
+}
+
+export interface ConvergenceArtifactPaths {
+  rawRunsPath: string;
+  rawSummaryPath: string;
+  compactEvidencePath: string;
+}
+
+interface ChildCloseState {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+}
+
+interface ChildReadyMessage {
+  contractVersion: typeof CONVERGENCE_CHILD_MESSAGE_VERSION;
+  type: 'ready';
+}
+
+interface ChildResultMessage {
+  contractVersion: typeof CONVERGENCE_CHILD_MESSAGE_VERSION;
+  type: 'result';
+  record: ConvergenceRunRecord;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  typeof value === 'object' && value !== null
+);
+
+const isChildReadyMessage = (value: unknown): value is ChildReadyMessage => (
+  isRecord(value)
+  && value.contractVersion === CONVERGENCE_CHILD_MESSAGE_VERSION
+  && value.type === 'ready'
+);
+
+const isChildResultMessage = (
+  value: unknown,
+  request: ConvergenceSampleChildRequest
+): value is ChildResultMessage => {
+  if (!isRecord(value)
+    || value.contractVersion !== CONVERGENCE_CHILD_MESSAGE_VERSION
+    || value.type !== 'result'
+    || !isRecord(value.record)) {
+    return false;
+  }
+  return value.record.engineId === request.engineId
+    && value.record.recipeName === request.recipe.name
+    && value.record.lane === request.lane
+    && value.record.seed === request.seed;
+};
+
+const createChildFailureRecord = (
+  request: ConvergenceSampleChildRequest,
+  errorMessage: string
+): ConvergenceRunRecord => ({
+  engineId: request.engineId,
+  recipeName: request.recipe.name,
+  lane: request.lane,
+  seed: request.seed,
+  outcome: 'exception',
+  errorMessage,
+  generationDurationMs: null,
+  requestedWidth: request.recipe.width,
+  requestedHeight: request.recipe.height,
+  realizedWidth: null,
+  realizedHeight: null,
+  engineNotes: null,
+  metrics: null
+});
+
+const createTimeoutRecord = (
+  request: ConvergenceSampleChildRequest,
+  timeoutMs: number
+): ConvergenceRunRecord => ({
+  engineId: request.engineId,
+  recipeName: request.recipe.name,
+  lane: request.lane,
+  seed: request.seed,
+  outcome: 'invariant-failure',
+  errorMessage: `generation exceeded ${timeoutMs}ms deadline; child process terminated and reaped`,
+  generationDurationMs: timeoutMs,
+  requestedWidth: request.recipe.width,
+  requestedHeight: request.recipe.height,
+  realizedWidth: null,
+  realizedHeight: null,
+  engineNotes: {
+    generationDeadlineMs: timeoutMs,
+    childProcessTermination: 'terminated-and-reaped'
+  },
+  metrics: null
+});
+
+const resolveInheritedTsxLoaderArgs = (): string[] => {
+  const loaderArgs: string[] = [];
+  for (let index = 0; index < process.execArgv.length - 1; index += 1) {
+    const flag = process.execArgv[index];
+    const value = process.execArgv[index + 1];
+    if ((flag === '--require' || flag === '--import') && value?.toLowerCase().includes('tsx')) {
+      loaderArgs.push(flag, value);
+      index += 1;
+    }
+  }
+  return loaderArgs;
+};
+
+const resolveChildInvocationArgs = (
+  childEntrypoint: string,
+  encodedRequest: string,
+  repoRoot: string
+): string[] => {
+  const inheritedTsxLoaderArgs = resolveInheritedTsxLoaderArgs();
+  if (inheritedTsxLoaderArgs.length > 0) {
+    return [...inheritedTsxLoaderArgs, childEntrypoint, encodedRequest];
+  }
+  return [
+    resolve(repoRoot, 'node_modules', 'vite-node', 'vite-node.mjs'),
+    '--script',
+    childEntrypoint,
+    encodedRequest
+  ];
+};
+
+const terminateAndReapChild = async (
+  child: ChildProcess,
+  closed: Promise<ChildCloseState>
+): Promise<void> => {
+  if (child.exitCode === null && child.signalCode === null) {
+    if (process.platform === 'win32' && child.pid !== undefined) {
+      await new Promise<void>((resolveTermination) => {
+        const killer = spawn(
+          'taskkill',
+          ['/pid', String(child.pid), '/t', '/f'],
+          { stdio: 'ignore', windowsHide: true }
+        );
+        killer.once('error', () => resolveTermination());
+        killer.once('close', () => resolveTermination());
+      });
+    }
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill('SIGKILL');
+    }
+  }
+  await closed;
+};
+
+export const runOneSampleInChild = (
+  engineId: string,
+  recipe: MazeV2ConvergenceRecipe,
+  lane: MazeV2ComparisonLane,
+  seed: number,
+  options: ConvergenceSampleChildOptions = {}
+): Promise<ConvergenceRunRecord> => {
+  const timeoutMs = options.timeoutMs ?? GENERATION_TIMEOUT_DEADLINE_MS;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new Error('A convergence generation deadline must be a positive finite number of milliseconds.');
+  }
+
+  const request: ConvergenceSampleChildRequest = { engineId, recipe, lane, seed };
+  const repoRoot = resolveRepositoryRootFromAnalysisModuleUrl(import.meta.url);
+  const childEntrypoint = options.childEntrypoint
+    ?? fileURLToPath(new URL('./mazev2-convergence-sample-child.ts', import.meta.url));
+  const encodedRequest = Buffer.from(JSON.stringify(request), 'utf8').toString('base64url');
+  const child = spawn(
+    process.execPath,
+    resolveChildInvocationArgs(childEntrypoint, encodedRequest, repoRoot),
+    {
+      cwd: repoRoot,
+      stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
+      windowsHide: true
+    }
+  );
+  child.stderr?.resume();
+  if (child.pid !== undefined) options.onSpawn?.(child.pid);
+
+  let resultRecord: ConvergenceRunRecord | null = null;
+  let readyReceived = false;
+  let timedOut = false;
+  let settled = false;
+  const closed = new Promise<ChildCloseState>((resolveClosed) => {
+    child.once('close', (code, signal) => resolveClosed({ code, signal }));
+  });
+
+  return new Promise<ConvergenceRunRecord>((resolveRecord) => {
+    const settle = (record: ConvergenceRunRecord): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      resolveRecord(record);
+    };
+
+    const onDeadline = (): void => {
+      if (settled || timedOut) return;
+      timedOut = true;
+      void terminateAndReapChild(child, closed).then(() => {
+        settle(createTimeoutRecord(request, timeoutMs));
+      });
+    };
+
+    let deadline = setTimeout(onDeadline, timeoutMs);
+
+    child.on('message', (message: unknown) => {
+      if (isChildReadyMessage(message) && !readyReceived) {
+        readyReceived = true;
+        clearTimeout(deadline);
+        deadline = setTimeout(onDeadline, timeoutMs);
+        child.send({
+          contractVersion: CONVERGENCE_CHILD_MESSAGE_VERSION,
+          type: 'start'
+        });
+        return;
+      }
+      if (isChildResultMessage(message, request)) {
+        resultRecord = message.record;
+      }
+    });
+
+    child.once('error', () => {
+      // The close event is the single terminal path so even spawn failures are
+      // classified only after the process handle has been fully released.
+    });
+
+    void closed.then(({ code, signal }) => {
+      if (timedOut) return;
+      if (resultRecord !== null && code === 0) {
+        settle(resultRecord);
+        return;
+      }
+      settle(createChildFailureRecord(
+        request,
+        `sample child exited before returning a valid record (exit=${code ?? 'none'}, signal=${signal ?? 'none'})`
+      ));
+    });
+  });
+};
+
+export const writeConvergenceArtifactSet = async (
+  outputDir: string,
+  payload: ConvergenceArtifactPayload
+): Promise<ConvergenceArtifactPaths> => {
+  await mkdir(outputDir, { recursive: true });
+  const paths = {
+    rawRunsPath: resolve(outputDir, 'mazev2-convergence-runs.json'),
+    rawSummaryPath: resolve(outputDir, 'mazev2-convergence-summary.json'),
+    compactEvidencePath: resolve(outputDir, 'mazev2-convergence-compact-evidence.json')
+  };
+  await writeFile(paths.rawRunsPath, payload.rawRunsJson, 'utf8');
+  await writeFile(paths.rawSummaryPath, payload.rawSummaryJson, 'utf8');
+  await writeFile(paths.compactEvidencePath, payload.compactEvidenceJson, 'utf8');
+  return paths;
+};
 
 export const resolveConvergenceExitCode = (records: readonly ConvergenceRunRecord[]): 0 | 1 => (
   records.some((record) => record.outcome === 'exception' || record.outcome === 'invariant-failure') ? 1 : 0
@@ -141,26 +411,7 @@ export const runOneSample = (
         metrics: null
       };
     }
-    const startedAtMs = performance.now();
     const result = adapter.generateSample(spec);
-    const elapsedMs = performance.now() - startedAtMs;
-    if (elapsedMs > GENERATION_TIMEOUT_GUARD_MS) {
-      return {
-        engineId: adapter.engineId,
-        recipeName: recipe.name,
-        lane,
-        seed,
-        outcome: 'invariant-failure',
-        errorMessage: `generation exceeded ${GENERATION_TIMEOUT_GUARD_MS}ms guard (${elapsedMs.toFixed(0)}ms) -- treated as a failure, not silently kept`,
-        generationDurationMs: elapsedMs,
-        requestedWidth: recipe.width,
-        requestedHeight: recipe.height,
-        realizedWidth: result.realizedWidth,
-        realizedHeight: result.realizedHeight,
-        engineNotes: result.engineNotes,
-        metrics: null
-      };
-    }
     if (result.support.status === 'unsupported') {
       return {
         engineId: adapter.engineId,

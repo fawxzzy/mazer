@@ -26,7 +26,6 @@
 //   npx tsx scripts/analysis/mazev2-convergence.ts [--outputDir=./tmp/mazev2-convergence]
 //     [--lanes=raw-carving,production-pipeline]
 
-import { mkdir, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { createMazeV2LegacyRuntimeAdapter } from '../../src/domain/mazeV2/adapters/legacyRuntimeAdapter';
@@ -39,8 +38,9 @@ import {
   resolveConvergenceExitCode,
   resolveCleanGitCommitSha,
   resolveRepositoryRootFromAnalysisModuleUrl,
-  runOneSample,
+  runOneSampleInChild,
   summarize,
+  writeConvergenceArtifactSet,
   type ConvergenceRunRecord
 } from './mazev2ConvergenceHarness';
 
@@ -65,7 +65,6 @@ const run = async (): Promise<void> => {
   // SHA alone is insufficient because uncommitted source can change results.
   const sourceCommitSha = resolveCleanGitCommitSha(REPO_ROOT);
   const { outputDir, lanes } = parseCliArgs();
-  await mkdir(outputDir, { recursive: true });
 
   const adapters = [createMazeV2LegacyRuntimeAdapter(), createMazeV2DomainMazeAdapter()];
   const allRecords: ConvergenceRunRecord[] = [];
@@ -74,7 +73,7 @@ const run = async (): Promise<void> => {
     for (const lane of lanes) {
       for (const adapter of adapters) {
         for (const seed of MAZE_V2_LAB_DEFAULT_SEED_CORPUS) {
-          allRecords.push(runOneSample(adapter, recipe, lane, seed));
+          allRecords.push(await runOneSampleInChild(adapter.engineId, recipe, lane, seed));
         }
       }
     }
@@ -95,8 +94,6 @@ const run = async (): Promise<void> => {
   const rawRunsPath = resolve(outputDir, 'mazev2-convergence-runs.json');
   const rawSummaryPath = resolve(outputDir, 'mazev2-convergence-summary.json');
   const rawRunsJson = JSON.stringify(allRecords, null, 2);
-  await writeFile(rawRunsPath, rawRunsJson, 'utf8');
-  await writeFile(rawSummaryPath, JSON.stringify(summaries, null, 2), 'utf8');
 
   const rawRunsDigest = createHash('sha256').update(rawRunsJson, 'utf8').digest('hex');
 
@@ -130,7 +127,11 @@ const run = async (): Promise<void> => {
   };
 
   const compactEvidencePath = resolve(outputDir, 'mazev2-convergence-compact-evidence.json');
-  await writeFile(compactEvidencePath, JSON.stringify(compactEvidence, null, 2), 'utf8');
+  await writeConvergenceArtifactSet(outputDir, {
+    rawRunsJson,
+    rawSummaryJson: JSON.stringify(summaries, null, 2),
+    compactEvidenceJson: JSON.stringify(compactEvidence, null, 2)
+  });
 
   console.log(JSON.stringify({ outcomeCounts: compactEvidence.outcomeCounts, totalRuns: compactEvidence.totalRuns }, null, 2));
   console.log(`Raw runs: ${rawRunsPath}`);

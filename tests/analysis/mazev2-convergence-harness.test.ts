@@ -7,8 +7,10 @@ import {
   resolveGitCommitSha,
   resolveRepositoryRootFromAnalysisModuleUrl,
   runOneSample,
+  runOneSampleInChild,
   resolvePercentile,
   summarize,
+  writeConvergenceArtifactSet,
   type ConvergenceRunRecord
 } from '../../scripts/analysis/mazev2ConvergenceHarness';
 import { pathToFileURL } from 'node:url';
@@ -172,17 +174,96 @@ describe('resolveConvergenceExitCode', () => {
   test('the CLI assigns the outcome-derived exit status only after every artifact write', () => {
     const script = readFileSync(resolve(process.cwd(), 'scripts/analysis/mazev2-convergence.ts'), 'utf8');
     const exitStatusAssignment = script.indexOf('process.exitCode = resolveConvergenceExitCode(allRecords);');
-    const artifactWrites = [
-      script.indexOf("await writeFile(rawRunsPath, rawRunsJson, 'utf8');"),
-      script.indexOf("await writeFile(rawSummaryPath, JSON.stringify(summaries, null, 2), 'utf8');"),
-      script.indexOf("await writeFile(compactEvidencePath, JSON.stringify(compactEvidence, null, 2), 'utf8');")
-    ];
+    const artifactWrite = script.indexOf('await writeConvergenceArtifactSet(outputDir, {');
+    expect(script).toContain('allRecords.push(await runOneSampleInChild(');
     expect(exitStatusAssignment).toBeGreaterThanOrEqual(0);
-    expect(artifactWrites).not.toContain(-1);
-    for (const artifactWrite of artifactWrites) {
-      expect(exitStatusAssignment).toBeGreaterThan(artifactWrite);
-    }
+    expect(artifactWrite).toBeGreaterThanOrEqual(0);
+    expect(exitStatusAssignment).toBeGreaterThan(artifactWrite);
   });
+});
+
+describe('interruptible convergence generation', () => {
+  const isProcessAlive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  test('reaps a hung sample, continues with the next sample, and preserves all failure artifacts', async () => {
+    const recipe = MAZE_V2_CONVERGENCE_CORPUS[0]!;
+    const hangingChild = resolve(
+      process.cwd(),
+      'tests/analysis/fixtures/mazev2-hanging-sample-child.mjs'
+    );
+    let hungPid: number | null = null;
+    const startedAt = performance.now();
+    const timedOut = await runOneSampleInChild(
+      'legacy-runtime',
+      recipe,
+      'raw-carving',
+      1,
+      {
+        timeoutMs: 250,
+        childEntrypoint: hangingChild,
+        onSpawn: (pid) => { hungPid = pid; }
+      }
+    );
+
+    expect(performance.now() - startedAt).toBeLessThan(5_000);
+    expect(timedOut.outcome).toBe('invariant-failure');
+    expect(timedOut.errorMessage).toBe(
+      'generation exceeded 250ms deadline; child process terminated and reaped'
+    );
+    expect(timedOut.generationDurationMs).toBe(250);
+    expect(timedOut.engineNotes).toEqual({
+      generationDeadlineMs: 250,
+      childProcessTermination: 'terminated-and-reaped'
+    });
+    expect(hungPid).not.toBeNull();
+    expect(isProcessAlive(hungPid!)).toBe(false);
+
+    const nextRecord = await runOneSampleInChild(
+      'legacy-runtime',
+      recipe,
+      'raw-carving',
+      2
+    );
+    expect(nextRecord.outcome).toBe('success');
+    const unsupportedRecipe = MAZE_V2_CONVERGENCE_CORPUS.find(
+      (entry) => entry.name === 'endpoint-placement-unsupported'
+    )!;
+    const unsupportedRecord = await runOneSampleInChild(
+      'legacy-runtime',
+      unsupportedRecipe,
+      'raw-carving',
+      3
+    );
+    expect(unsupportedRecord.outcome).toBe('unsupported');
+    expect(resolveConvergenceExitCode([nextRecord, unsupportedRecord])).toBe(0);
+
+    const outputDir = mkdtempSync(join(tmpdir(), 'mazer-convergence-timeout-artifacts-'));
+    try {
+      const records = [timedOut, nextRecord];
+      const artifacts = await writeConvergenceArtifactSet(outputDir, {
+        rawRunsJson: JSON.stringify(records, null, 2),
+        rawSummaryJson: JSON.stringify(summarize(records), null, 2),
+        compactEvidenceJson: JSON.stringify({
+          outcomeCounts: { invariantFailure: 1, success: 1 }
+        }, null, 2)
+      });
+      expect(JSON.parse(readFileSync(artifacts.rawRunsPath, 'utf8'))).toHaveLength(2);
+      expect(JSON.parse(readFileSync(artifacts.rawSummaryPath, 'utf8'))).toHaveLength(1);
+      expect(JSON.parse(readFileSync(artifacts.compactEvidencePath, 'utf8'))).toEqual({
+        outcomeCounts: { invariantFailure: 1, success: 1 }
+      });
+      expect(resolveConvergenceExitCode(records)).toBe(1);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  }, 30_000);
 });
 
 describe('parseConvergenceLanes', () => {
