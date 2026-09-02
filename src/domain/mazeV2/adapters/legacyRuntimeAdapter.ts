@@ -23,7 +23,7 @@ const LEGACY_RUNTIME_CAPABILITIES: readonly MazeV2CapabilityAssessment[] = [
   {
     axis: 'spatialLoad',
     status: 'adaptable',
-    note: 'Board scale and floor density are direct, tuned generator inputs, but the generator takes one device-relative "scale" plus an aspect ratio, not literal width/height -- this adapter now maps requested width/height onto scale=max(width,height), aspectRatio=width/height (PR D; was previously held fixed at scale=50 regardless of the requested spec, a real bug this correction fixes) rather than a direct pixel-exact mapping.'
+    note: 'Board scale and floor density are direct, tuned generator inputs, but the generator takes one device-relative "scale" plus an aspect ratio, not literal width/height -- this adapter maps requested width/height onto an area-preserving geometric-mean scale with aspectRatio=width/height (PR D; was previously held fixed at scale=50 regardless of the requested spec) rather than a direct pixel-exact mapping.'
   },
   { axis: 'routeBurden', status: 'native', note: 'targetComplexity directly drives the bounded-candidate-search route-length target.' },
   { axis: 'decisionBurden', status: 'adaptable', note: 'Junction frequency is an emergent effect of carving parameters, not a direct dial.' },
@@ -46,14 +46,19 @@ const LEGACY_RUNTIME_CAPABILITIES: readonly MazeV2CapabilityAssessment[] = [
 // spec.width/height, so the "small-*"/"large-*" recipes silently produced
 // the identical board for this engine (findings the original convergence
 // report itself flagged as a known gap). Board "size" for legacy-runtime is
-// one scale number plus an aspect ratio, not literal width/height, so the
-// mapping below is a genuine translation, not a pixel-exact match --
-// realized dimensions are always reported back in the result (realizedWidth/
-// realizedHeight) rather than assumed to equal what was requested.
-const resolveLegacyBoardGeometry = (width: number, height: number): { scale: number; aspectRatio: number } => ({
-  scale: Math.max(9, Math.round(Math.max(width, height))),
-  aspectRatio: height > 0 ? width / height : 1
-});
+// one scale number plus an aspect ratio, not literal width/height. Because the
+// generator derives dimensions as scale*sqrt(aspect) and scale/sqrt(aspect),
+// the geometric mean preserves requested area while the aspect ratio preserves
+// shape. Realized dimensions are always reported back in the result
+// (realizedWidth/realizedHeight) rather than assumed to equal what was requested.
+const resolveLegacyBoardGeometry = (width: number, height: number): { scale: number; aspectRatio: number } => {
+  const safeWidth = Number.isFinite(width) && width > 0 ? width : 1;
+  const safeHeight = Number.isFinite(height) && height > 0 ? height : 1;
+  return {
+    scale: Math.max(9, Math.round(Math.sqrt(safeWidth * safeHeight))),
+    aspectRatio: safeWidth / safeHeight
+  };
+};
 
 export const createMazeV2LegacyRuntimeAdapter = (): MazeV2EngineAdapter => ({
   engineId: 'legacy-runtime',

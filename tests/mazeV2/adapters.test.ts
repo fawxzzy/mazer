@@ -91,6 +91,30 @@ describe('legacy-runtime adapter', () => {
     expect(large.realizedHeight).toBeGreaterThan(small.realizedHeight);
   });
 
+  test('maps rectangular requests with area-preserving geometric-mean scale while keeping square behavior unchanged', () => {
+    const adapter = createMazeV2LegacyRuntimeAdapter();
+    const wide = adapter.generateSample({ ...sampleSpec, width: 60, height: 20, seed: 111 });
+    const tall = adapter.generateSample({ ...sampleSpec, width: 20, height: 60, seed: 111 });
+    const square = adapter.generateSample({ ...sampleSpec, width: 20, height: 20, seed: 111 });
+
+    expect(wide.engineNotes.requestedScale).toBe(35);
+    expect(wide.engineNotes.requestedAspectRatio).toBe(3);
+    expect(tall.engineNotes.requestedScale).toBe(35);
+    expect(tall.engineNotes.requestedAspectRatio).toBeCloseTo(1 / 3);
+    expect([wide.realizedWidth, wide.realizedHeight]).toEqual([61, 25]);
+    expect([tall.realizedWidth, tall.realizedHeight]).toEqual([25, 61]);
+    expect(wide.realizedWidth).toBe(tall.realizedHeight);
+    expect(wide.realizedHeight).toBe(tall.realizedWidth);
+
+    const requestedArea = 60 * 20;
+    expect(Math.abs((Number(wide.engineNotes.requestedScale) ** 2) - requestedArea))
+      .toBeLessThanOrEqual(35);
+
+    expect(square.engineNotes.requestedScale).toBe(20);
+    expect(square.engineNotes.requestedAspectRatio).toBe(1);
+    expect([square.realizedWidth, square.realizedHeight]).toEqual([25, 25]);
+  });
+
   test('PR D regression: raw-carving lane examines exactly one candidate (no search)', () => {
     const adapter = createMazeV2LegacyRuntimeAdapter();
     const result = adapter.generateSample({ ...sampleSpec, lane: 'raw-carving', targetComplexity: 95 });
@@ -101,6 +125,14 @@ describe('legacy-runtime adapter', () => {
 
 describe('src/domain/maze adapter', () => {
   exerciseAdapterContract(createMazeV2DomainMazeAdapter());
+
+  test('raw-carving lane disables candidate search with an exact one-attempt ceiling', () => {
+    const adapter = createMazeV2DomainMazeAdapter();
+    const result = adapter.generateSample({ ...sampleSpec, lane: 'raw-carving', targetComplexity: 95 });
+    expect(result.engineNotes.requestedSeed).toBe(result.engineNotes.selectedSeed);
+    expect(result.engineNotes.maxAttempts).toBe(1);
+    expect(result.engineNotes.candidateSearch).toBe('disabled');
+  });
 
   test('reports no wrap topology support, matching the engine having no wrap concept at all', () => {
     const adapter = createMazeV2DomainMazeAdapter();

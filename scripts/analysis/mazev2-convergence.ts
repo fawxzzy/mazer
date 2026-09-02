@@ -18,8 +18,9 @@
 //   5. The canonical bridge (canonicalMaze.ts) now derives real wrap pairs
 //      from the grid instead of always reporting wrap-free.
 //   6. Failure records: a sample that throws is recorded, not dropped.
-//   7. Portable, repo-relative, gitignored raw output directory (was an
-//      absolute Windows path) plus a committed compact evidence summary.
+//   7. Portable, repo-relative, gitignored local scratch output directory
+//      (was an absolute Windows path); its compact artifact remains ignored
+//      local scratch unless separately promoted through the existing evidence workflow.
 //
 // Usage:
 //   npx tsx scripts/analysis/mazev2-convergence.ts [--outputDir=./tmp/mazev2-convergence]

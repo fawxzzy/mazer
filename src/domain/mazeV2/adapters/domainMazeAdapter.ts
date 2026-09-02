@@ -12,9 +12,9 @@
 // (production-pipeline) below now goes through generateMazeForDifficulty,
 // this engine's own real candidate-search/difficulty-targeting entry
 // point, exactly analogous to legacy-runtime's bounded candidate search.
-// Lane A (raw-carving) keeps the original direct buildMaze() call, which is
-// the correct choice for that lane's own purpose (isolate raw carving
-// behavior, no search on either side).
+// Lane A (raw-carving) keeps the original direct buildMaze() call with an
+// explicit one-attempt ceiling, which is the correct choice for that lane's
+// own purpose (isolate one raw carve, with no candidate search on either side).
 //
 // spec.requireWrap (the wrap-demand recipe) is explicitly classified as
 // unsupported here -- this engine has no wrap/bleed topology concept
@@ -57,6 +57,8 @@ const resolveMinSolutionLengthForTargetComplexity = (
 ): number => (
   Math.floor(((Math.min(width, height) ** 2) / 5) * (Math.min(100, Math.max(0, targetComplexity)) / 100))
 );
+
+const RAW_CARVING_MAX_ATTEMPTS = 1;
 
 // Maps the neutral 0-100 targetComplexity dial onto this engine's own
 // MazeDifficulty band for Lane B's generateMazeForDifficulty call --
@@ -145,7 +147,8 @@ export const createMazeV2DomainMazeAdapter = (): MazeV2EngineAdapter => ({
       height: spec.height,
       seed: spec.seed,
       braidRatio,
-      minSolutionLength
+      minSolutionLength,
+      maxAttempts: RAW_CARVING_MAX_ATTEMPTS
     });
     const generationDurationMs = performance.now() - generationStartedAtMs;
 
@@ -162,8 +165,12 @@ export const createMazeV2DomainMazeAdapter = (): MazeV2EngineAdapter => ({
       realizedHeight: episode.raster.height,
       engineNotes: {
         lane: spec.lane,
+        requestedSeed: spec.seed,
+        selectedSeed: episode.seed,
         braidRatio,
         minSolutionLength,
+        maxAttempts: RAW_CARVING_MAX_ATTEMPTS,
+        candidateSearch: 'disabled',
         accepted: episode.accepted,
         family: episode.family,
         difficulty: episode.difficulty,

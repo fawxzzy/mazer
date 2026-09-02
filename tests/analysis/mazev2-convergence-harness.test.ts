@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   parseConvergenceLanes,
   resolveGitCommitSha,
@@ -107,6 +108,15 @@ describe('convergence source provenance', () => {
     const repoRoot = resolveRepositoryRootFromAnalysisModuleUrl(scriptUrl);
     expect(resolve(repoRoot)).toBe(resolve(process.cwd()));
     expect(resolveGitCommitSha(repoRoot)).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  test('classifies the default compact artifact as gitignored local scratch, not committed evidence', () => {
+    const script = readFileSync(resolve(process.cwd(), 'scripts/analysis/mazev2-convergence.ts'), 'utf8');
+    const gitignore = readFileSync(resolve(process.cwd(), '.gitignore'), 'utf8');
+    expect(script).toContain("const DEFAULT_OUTPUT_DIR = './tmp/mazev2-convergence';");
+    expect(script).toContain('compact artifact remains ignored');
+    expect(script).not.toContain('committed compact evidence summary');
+    expect(gitignore.split(/\r?\n/u)).toContain('/tmp/');
   });
 });
 
