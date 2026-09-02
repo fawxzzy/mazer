@@ -95,8 +95,11 @@ describe('analyzeMazeV2CanonicalMaze -- wrap pairs', () => {
       wrapPairs: [{ from: { x: 0, y: 0 }, to: { x: 4, y: 0 }, axis: 'horizontal' }]
     }));
     expect(metrics.route.shortestPathLength).toBe(1);
+    expect(metrics.route.directFloorPathLength).toBeNull();
+    expect(metrics.route.directFloorDetourRatio).toBeNull();
     expect(metrics.wrap.wrapPairCount).toBe(1);
     expect(metrics.wrap.wrapPairsOnRoute).toBe(1);
+    expect(metrics.wrap.wrapRouteImpact).toBeNull();
   });
 
   test('reports zero wrap pairs on route when the declared pair only connects two already-adjacent tiles', () => {

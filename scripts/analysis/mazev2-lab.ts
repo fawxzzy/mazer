@@ -156,8 +156,11 @@ const flattenSample = (sample: LevelSample): FlatMetricRow => ({
   manhattanDistance: sample.metrics.route.manhattanDistance,
   detourRatio: sample.metrics.route.detourRatio,
   routeCoverage: sample.metrics.route.routeCoverage,
-  directFloorPathLength: sample.metrics.route.directFloorPathLength,
-  directFloorDetourRatio: sample.metrics.route.directFloorDetourRatio,
+  // A wrap-only route has no direct-floor counterfactual. Preserve that
+  // distinction as an empty CSV cell rather than serializing a fabricated
+  // playable-route length or the string "null".
+  directFloorPathLength: sample.metrics.route.directFloorPathLength ?? '',
+  directFloorDetourRatio: sample.metrics.route.directFloorDetourRatio ?? '',
   junctionCount: sample.metrics.decision.junctionCount,
   junctionDensity: sample.metrics.decision.junctionDensity,
   routeJunctionCount: sample.metrics.decision.routeJunctionCount,

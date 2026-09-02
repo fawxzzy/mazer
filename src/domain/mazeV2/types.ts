@@ -332,13 +332,13 @@ export interface MazeV2RouteMetrics {
   manhattanDistance: number;
   detourRatio: number;
   routeCoverage: number;
-  // Direct-floor route (maze.solutionPath, policy 'direct-floor') --
-  // legacy-runtime's own construction-time route, not wrap-aware. Exposed
-  // only for comparison against the playable pair above; a divergence
-  // between the two on a maze with wrap/bleed topology means the direct
-  // route understates or overstates what the player can actually walk.
-  directFloorPathLength: number;
-  directFloorDetourRatio: number;
+  // Direct-floor/non-wrap route -- legacy-runtime supplies its construction
+  // route while the canonical analyzer removes wrap edges from the same
+  // graph. Exposed only for comparison against the playable pair above. null
+  // means no non-wrap start-to-goal route exists; substituting the playable
+  // length would falsely claim a direct-floor route was measured.
+  directFloorPathLength: number | null;
+  directFloorDetourRatio: number | null;
 }
 
 export interface MazeV2DecisionMetrics {

@@ -242,9 +242,11 @@ export const analyzeMazeV2CanonicalMaze = (
   const shortestPathLength = Math.max(0, path.length - 1);
   const nonWrapPathLength = nonWrapPath.length > 0
     ? Math.max(0, nonWrapPath.length - 1)
-    : shortestPathLength;
+    : null;
   const detourRatio = shortestPathLength / Math.max(1, manhattanDistance);
-  const nonWrapDetourRatio = nonWrapPathLength / Math.max(1, manhattanDistance);
+  const nonWrapDetourRatio = nonWrapPathLength === null
+    ? null
+    : nonWrapPathLength / Math.max(1, manhattanDistance);
   const routeCoverage = path.length / Math.max(1, graph.walkableTileCount);
 
   const junctionKeys = [...graph.degreeByKey.entries()].filter(([, degree]) => degree >= 3);
@@ -327,7 +329,7 @@ export const analyzeMazeV2CanonicalMaze = (
     wrap: {
       wrapPairCount: maze.wrapPairs.length,
       wrapPairsOnRoute,
-      wrapRouteImpact: path.length > 0 && nonWrapPath.length > 0
+      wrapRouteImpact: path.length > 0 && nonWrapPathLength !== null
         ? nonWrapPathLength - shortestPathLength
         : null
     }
