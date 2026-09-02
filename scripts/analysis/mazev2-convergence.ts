@@ -36,6 +36,7 @@ import { MAZE_V2_CONVERGENCE_CORPUS } from './mazev2ConvergenceCorpus';
 import { MAZE_V2_LAB_DEFAULT_SEED_CORPUS, MAZE_V2_LAB_DEFAULT_SEED_CORPUS_VERSION } from './mazeV2SeedStrategies';
 import {
   parseConvergenceLanes,
+  resolveConvergenceExitCode,
   resolveCleanGitCommitSha,
   resolveRepositoryRootFromAnalysisModuleUrl,
   runOneSample,
@@ -135,6 +136,11 @@ const run = async (): Promise<void> => {
   console.log(`Raw runs: ${rawRunsPath}`);
   console.log(`Raw summary: ${rawSummaryPath}`);
   console.log(`Compact evidence: ${compactEvidencePath}`);
+
+  // Preserve the complete diagnostic artifact set before signaling a failed
+  // evidence gate to callers. Unsupported samples remain an expected contract
+  // result; only exceptions and invariant failures fail the process.
+  process.exitCode = resolveConvergenceExitCode(allRecords);
 };
 
 run().catch((error) => {

@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import {
   parseConvergenceLanes,
   resolveCleanGitCommitSha,
+  resolveConvergenceExitCode,
   resolveGitCommitSha,
   resolveRepositoryRootFromAnalysisModuleUrl,
   runOneSample,
@@ -137,6 +138,50 @@ describe('resolvePercentile', () => {
   test('resolves a high percentile toward the end of the array', () => {
     const sorted = Array.from({ length: 100 }, (_, i) => i + 1);
     expect(resolvePercentile(sorted, 0.99)).toBe(100);
+  });
+});
+
+describe('resolveConvergenceExitCode', () => {
+  const recordFor = (outcome: ConvergenceRunRecord['outcome']): ConvergenceRunRecord => ({
+    engineId: 'test-engine',
+    recipeName: 'test-recipe',
+    lane: 'raw-carving',
+    seed: 1,
+    outcome,
+    errorMessage: outcome === 'success' ? null : outcome,
+    generationDurationMs: outcome === 'success' ? 1 : null,
+    requestedWidth: 20,
+    requestedHeight: 20,
+    realizedWidth: outcome === 'success' ? 20 : null,
+    realizedHeight: outcome === 'success' ? 20 : null,
+    engineNotes: outcome === 'success' ? {} : null,
+    metrics: null
+  });
+
+  test('keeps success and explicitly unsupported samples at exit status zero', () => {
+    expect(resolveConvergenceExitCode([recordFor('success'), recordFor('unsupported')])).toBe(0);
+  });
+
+  test.each(['exception', 'invariant-failure'] as const)(
+    'returns exit status one when a run contains an %s outcome',
+    (outcome) => {
+      expect(resolveConvergenceExitCode([recordFor('success'), recordFor(outcome)])).toBe(1);
+    }
+  );
+
+  test('the CLI assigns the outcome-derived exit status only after every artifact write', () => {
+    const script = readFileSync(resolve(process.cwd(), 'scripts/analysis/mazev2-convergence.ts'), 'utf8');
+    const exitStatusAssignment = script.indexOf('process.exitCode = resolveConvergenceExitCode(allRecords);');
+    const artifactWrites = [
+      script.indexOf("await writeFile(rawRunsPath, rawRunsJson, 'utf8');"),
+      script.indexOf("await writeFile(rawSummaryPath, JSON.stringify(summaries, null, 2), 'utf8');"),
+      script.indexOf("await writeFile(compactEvidencePath, JSON.stringify(compactEvidence, null, 2), 'utf8');")
+    ];
+    expect(exitStatusAssignment).toBeGreaterThanOrEqual(0);
+    expect(artifactWrites).not.toContain(-1);
+    for (const artifactWrite of artifactWrites) {
+      expect(exitStatusAssignment).toBeGreaterThan(artifactWrite);
+    }
   });
 });
 
@@ -279,7 +324,7 @@ describe('summarize (Wave 1.5 PR D)', () => {
   });
 });
 
-describe('createMazeV2DomainMazeAdapter production-pipeline lane (Wave 1.5 PR D)', () => {
+describe('createMazeV2DomainMazeAdapter convergence lanes (Wave 1.5 PR D)', () => {
   test('exercises the higher-level generateMazeForDifficulty entry point, not just raw buildMaze', () => {
     const adapter = createMazeV2DomainMazeAdapter();
     const recipe = MAZE_V2_CONVERGENCE_CORPUS.find((r) => r.name === 'baseline-small')!;
@@ -290,17 +335,21 @@ describe('createMazeV2DomainMazeAdapter production-pipeline lane (Wave 1.5 PR D)
     expect(record.engineNotes?.reportedCanonicalDifficulty).toBe('chill');
   });
 
-  test('classifies a rectangular production-pipeline sample as unsupported rather than a successful square measurement', () => {
+  test.each(['raw-carving', 'production-pipeline'] as const)(
+    'classifies a rectangular %s sample as unsupported rather than a successful padded-square measurement',
+    (lane) => {
     const adapter = createMazeV2DomainMazeAdapter();
     const recipe = MAZE_V2_CONVERGENCE_CORPUS.find((r) => r.name === 'wide-rectangular-footprint')!;
-    const record = runOneSample(adapter, recipe, 'production-pipeline', 999);
+    const record = runOneSample(adapter, recipe, lane, 999);
     expect(record.outcome).toBe('unsupported');
     expect(record.errorMessage).toContain('rectangular');
+    expect(record.errorMessage).toContain(lane);
     expect(record.metrics).toBeNull();
     expect(record.generationDurationMs).toBeNull();
     expect(record.realizedWidth).toBeNull();
     expect(record.engineNotes).toBeNull();
-  });
+    }
+  );
 
   test.each(['raw-carving', 'production-pipeline'] as const)(
     'classifies explicit wrap demand as unsupported in the %s lane',

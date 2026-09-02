@@ -27,7 +27,7 @@ import { deriveMazeV2CanonicalMazeFromDomainMazeRaster } from './canonicalMazeFr
 import type { MazeV2CapabilityAssessment, MazeV2ComparisonSampleResult, MazeV2ComparisonSampleSpec, MazeV2ComparisonSampleSupport, MazeV2EngineAdapter } from './types';
 
 const DOMAIN_MAZE_CAPABILITIES: readonly MazeV2CapabilityAssessment[] = [
-  { axis: 'spatialLoad', status: 'adaptable', note: 'width/height/braidRatio are direct inputs, but the engine quantizes requested width/height through an internal logical-carving lattice (normalizeLogicalSize) before rendering the playable raster -- the real output size is only approximately what was requested, not exact.' },
+  { axis: 'spatialLoad', status: 'adaptable', note: 'Square width/height requests and braidRatio are direct inputs, but the engine quantizes the requested size through an internal logical-carving lattice (normalizeLogicalSize) before rendering the playable raster -- the real output size is only approximately what was requested, not exact. Rectangular requests are unsupported because the engine carves a square core and only pads it to the requested footprint.' },
   { axis: 'routeBurden', status: 'adaptable', note: 'minSolutionLength is a direct floor, not a precise target -- the generator accepts any solution at or above it. generateMazeForDifficulty (production-pipeline lane) searches multiple seeds for a target MazeDifficulty band, which is a real search but over difficulty classification, not route length directly.' },
   { axis: 'decisionBurden', status: 'indirect', note: 'Junction count is an emergent effect of family/braid tuning (MazeFamily presets), not a direct dial.' },
   { axis: 'deadEndDeception', status: 'unsupported', note: 'No deceptive-branch placement concept found in generator.ts/core.ts\'s public surface.' },
@@ -79,10 +79,10 @@ const resolveDomainMazeSampleSupport = (spec: MazeV2ComparisonSampleSpec): MazeV
       reason: 'src/domain/maze has no wrap/bleed topology contract; an explicit requireWrap sample cannot be represented in either comparison lane.'
     };
   }
-  if (spec.lane === 'production-pipeline' && spec.width !== spec.height) {
+  if (spec.width !== spec.height) {
     return {
       status: 'unsupported',
-      reason: 'src/domain/maze generateMazeForDifficulty accepts one scale and produces a square footprint; rectangular production-pipeline recipes cannot be represented without extending that engine contract.'
+      reason: `src/domain/maze carves a square core in the ${spec.lane} lane; rectangular recipes would only pad that core and cannot be represented without extending the engine contract.`
     };
   }
   return { status: 'supported', reason: null };

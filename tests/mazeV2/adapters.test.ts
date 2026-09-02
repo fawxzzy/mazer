@@ -148,12 +148,18 @@ describe('src/domain/maze adapter', () => {
     }
   });
 
-  test('classifies rectangular production-pipeline requests as unsupported instead of silently measuring a square substitute', () => {
+  test.each([
+    ['raw-carving', 60, 20],
+    ['raw-carving', 20, 60],
+    ['production-pipeline', 60, 20],
+    ['production-pipeline', 20, 60]
+  ] as const)('classifies a %s %sx%s request as unsupported instead of measuring a padded square core', (lane, width, height) => {
     const adapter = createMazeV2DomainMazeAdapter();
-    const spec = { ...productionLaneSpec, width: 60, height: 20 };
+    const spec = { ...sampleSpec, lane, width, height };
     const support = adapter.assessSupport(spec);
     expect(support.status).toBe('unsupported');
     expect(support.reason).toContain('rectangular');
+    expect(support.reason).toContain(lane);
     expect(() => adapter.generateSample(spec)).toThrow('Unsupported domain-maze sample reached generation');
   });
 });

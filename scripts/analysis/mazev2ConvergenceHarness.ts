@@ -78,6 +78,10 @@ export interface ConvergenceRunRecord {
   metrics: MazeV2MeasuredMetrics | null;
 }
 
+export const resolveConvergenceExitCode = (records: readonly ConvergenceRunRecord[]): 0 | 1 => (
+  records.some((record) => record.outcome === 'exception' || record.outcome === 'invariant-failure') ? 1 : 0
+);
+
 // Runs exactly one (adapter, recipe, lane, seed) sample and classifies the
 // outcome -- never throws; a sample that fails is recorded (outcome:
 // 'exception' or 'invariant-failure' with a real errorMessage), never
