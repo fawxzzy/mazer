@@ -246,6 +246,29 @@ const createSourceIdentityFailureRecord = (
   metrics: null
 });
 
+const createOnSpawnFailureRecord = (
+  request: ConvergenceSampleChildRequest,
+  error: unknown
+): ConvergenceRunRecord => ({
+  engineId: request.engineId,
+  recipeName: request.recipe.name,
+  lane: request.lane,
+  seed: request.seed,
+  outcome: 'exception',
+  errorMessage: `onSpawn callback failed before generation: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}; child process terminated and reaped`,
+  generationDurationMs: null,
+  requestedWidth: request.recipe.width,
+  requestedHeight: request.recipe.height,
+  realizedWidth: null,
+  realizedHeight: null,
+  engineNotes: {
+    lifecycleHook: 'onSpawn',
+    generationStarted: false,
+    childProcessTermination: 'terminated-and-reaped'
+  },
+  metrics: null
+});
+
 const resolveInheritedTsxLoaderArgs = (): string[] => {
   const loaderArgs: string[] = [];
   for (let index = 0; index < process.execArgv.length - 1; index += 1) {
@@ -336,12 +359,12 @@ export const runOneSampleInChild = (
     }
   );
   child.stderr?.resume();
-  if (child.pid !== undefined) options.onSpawn?.(child.pid);
 
   let resultRecord: ConvergenceRunRecord | null = null;
   let readyReceived = false;
   let timedOut = false;
   let sourceIdentityRejected = false;
+  let onSpawnFailed = false;
   let settled = false;
   const closed = new Promise<ChildCloseState>((resolveClosed) => {
     child.once('close', (code, signal) => resolveClosed({ code, signal }));
@@ -366,6 +389,7 @@ export const runOneSampleInChild = (
     let deadline = setTimeout(onDeadline, timeoutMs);
 
     child.on('message', (message: unknown) => {
+      if (onSpawnFailed) return;
       if (isChildReadyMessage(message) && !readyReceived) {
         readyReceived = true;
         if (message.sourceIdentity.status !== 'clean'
@@ -396,7 +420,7 @@ export const runOneSampleInChild = (
     });
 
     void closed.then(({ code, signal }) => {
-      if (timedOut || sourceIdentityRejected) return;
+      if (timedOut || sourceIdentityRejected || onSpawnFailed) return;
       if (resultRecord !== null && code === 0) {
         settle(resultRecord);
         return;
@@ -406,6 +430,18 @@ export const runOneSampleInChild = (
         `sample child exited before returning a valid record (exit=${code ?? 'none'}, signal=${signal ?? 'none'})`
       ));
     });
+
+    if (child.pid !== undefined && options.onSpawn !== undefined) {
+      try {
+        options.onSpawn(child.pid);
+      } catch (error) {
+        onSpawnFailed = true;
+        clearTimeout(deadline);
+        void terminateAndReapChild(child, closed).then(() => {
+          settle(createOnSpawnFailureRecord(request, error));
+        });
+      }
+    }
   });
 };
 

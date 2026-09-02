@@ -127,6 +127,35 @@ describe('legacy-runtime adapter', () => {
 describe('src/domain/maze adapter', () => {
   exerciseAdapterContract(createMazeV2DomainMazeAdapter());
 
+  test.each(['raw-carving', 'production-pipeline'] as const)(
+    '%s lane records an exact zero reduction when no shortcuts were created',
+    (lane) => {
+      const adapter = createMazeV2DomainMazeAdapter();
+      const result = adapter.generateSample({
+        ...sampleSpec,
+        lane,
+        targetComplexity: 0,
+        seed: 2
+      });
+
+      expect(result.shortcutProvenance).toEqual({
+        shortcutCount: 0,
+        routeLengthReduction: 0
+      });
+    }
+  );
+
+  test.each(['raw-carving', 'production-pipeline'] as const)(
+    '%s lane retains null reduction only for a positive unmeasured shortcut count',
+    (lane) => {
+      const adapter = createMazeV2DomainMazeAdapter();
+      const result = adapter.generateSample({ ...sampleSpec, lane });
+
+      expect(result.shortcutProvenance?.shortcutCount).toBeGreaterThan(0);
+      expect(result.shortcutProvenance?.routeLengthReduction).toBeNull();
+    }
+  );
+
   test('raw-carving lane disables candidate search with an exact one-attempt ceiling', () => {
     const adapter = createMazeV2DomainMazeAdapter();
     const result = adapter.generateSample({ ...sampleSpec, lane: 'raw-carving', targetComplexity: 95 });

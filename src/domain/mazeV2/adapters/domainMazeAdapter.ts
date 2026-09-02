@@ -60,6 +60,10 @@ const resolveMinSolutionLengthForTargetComplexity = (
 
 const RAW_CARVING_MAX_ATTEMPTS = 1;
 
+const resolveRouteLengthReduction = (shortcutsCreated: number): number | null => (
+  shortcutsCreated === 0 ? 0 : null
+);
+
 // Maps the neutral 0-100 targetComplexity dial onto this engine's own
 // MazeDifficulty band for Lane B's generateMazeForDifficulty call --
 // documented as a real, if coarse, mapping (4 bands over 100 points),
@@ -126,7 +130,7 @@ export const createMazeV2DomainMazeAdapter = (): MazeV2EngineAdapter => ({
         generationDurationMs,
         shortcutProvenance: {
           shortcutCount: episode.shortcutsCreated,
-          routeLengthReduction: null
+          routeLengthReduction: resolveRouteLengthReduction(episode.shortcutsCreated)
         },
         realizedWidth: episode.raster.width,
         realizedHeight: episode.raster.height,
@@ -164,7 +168,7 @@ export const createMazeV2DomainMazeAdapter = (): MazeV2EngineAdapter => ({
       generationDurationMs,
       shortcutProvenance: {
         shortcutCount: episode.shortcutsCreated,
-        routeLengthReduction: null
+        routeLengthReduction: resolveRouteLengthReduction(episode.shortcutsCreated)
       },
       realizedWidth: episode.raster.width,
       realizedHeight: episode.raster.height,

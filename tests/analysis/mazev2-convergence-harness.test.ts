@@ -316,6 +316,89 @@ describe('interruptible convergence generation', () => {
       expect(isProcessAlive(childPid!)).toBe(false);
     }
   );
+
+  test('installs lifecycle guards before onSpawn and reaps the child when the callback throws', async () => {
+    const recipe = MAZE_V2_CONVERGENCE_CORPUS[0]!;
+    const childEntrypoint = resolve(
+      process.cwd(),
+      'tests/analysis/fixtures/mazev2-hanging-sample-child.mjs'
+    );
+    const expectedSourceCommitSha = '1111111111111111111111111111111111111111';
+    let childPid: number | null = null;
+
+    const record = await runOneSampleInChild(
+      'legacy-runtime',
+      recipe,
+      'raw-carving',
+      1,
+      expectedSourceCommitSha,
+      {
+        timeoutMs: 5_000,
+        childEntrypoint,
+        onSpawn: (pid) => {
+          childPid = pid;
+          throw new Error('synthetic callback failure');
+        }
+      }
+    );
+
+    expect(record.outcome).toBe('exception');
+    expect(record.errorMessage).toBe(
+      'onSpawn callback failed before generation: Error: synthetic callback failure; child process terminated and reaped'
+    );
+    expect(record.engineNotes).toEqual({
+      lifecycleHook: 'onSpawn',
+      generationStarted: false,
+      childProcessTermination: 'terminated-and-reaped'
+    });
+    expect(childPid).not.toBeNull();
+    expect(isProcessAlive(childPid!)).toBe(false);
+
+    const outputDir = mkdtempSync(join(tmpdir(), 'mazer-convergence-callback-artifacts-'));
+    try {
+      const artifacts = await writeConvergenceArtifactSet(outputDir, {
+        rawRunsJson: JSON.stringify([record], null, 2),
+        rawSummaryJson: JSON.stringify(summarize([record]), null, 2),
+        compactEvidenceJson: JSON.stringify({ outcomeCounts: { exception: 1 } }, null, 2)
+      });
+      expect(JSON.parse(readFileSync(artifacts.rawRunsPath, 'utf8'))).toHaveLength(1);
+      expect(JSON.parse(readFileSync(artifacts.rawSummaryPath, 'utf8'))).toHaveLength(1);
+      expect(JSON.parse(readFileSync(artifacts.compactEvidencePath, 'utf8'))).toEqual({
+        outcomeCounts: { exception: 1 }
+      });
+      expect(resolveConvergenceExitCode([record])).toBe(1);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  test('records a child startup error only after the process has closed', async () => {
+    const recipe = MAZE_V2_CONVERGENCE_CORPUS[0]!;
+    const missingRoot = mkdtempSync(join(tmpdir(), 'mazer-convergence-missing-child-'));
+    const childEntrypoint = join(missingRoot, 'missing-child.mjs');
+    let childPid: number | null = null;
+    try {
+      const record = await runOneSampleInChild(
+        'legacy-runtime',
+        recipe,
+        'raw-carving',
+        2,
+        '1111111111111111111111111111111111111111',
+        {
+          timeoutMs: 5_000,
+          childEntrypoint,
+          onSpawn: (pid) => { childPid = pid; }
+        }
+      );
+
+      expect(record.outcome).toBe('exception');
+      expect(record.errorMessage).toContain('sample child exited before returning a valid record');
+      expect(childPid).not.toBeNull();
+      expect(isProcessAlive(childPid!)).toBe(false);
+    } finally {
+      rmSync(missingRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('parseConvergenceLanes', () => {
