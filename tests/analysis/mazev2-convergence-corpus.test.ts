@@ -3,8 +3,9 @@ import { MAZE_V2_CONVERGENCE_CORPUS } from '../../scripts/analysis/mazev2Converg
 import { MAZE_V2_LAB_DEFAULT_SEED_CORPUS } from '../../scripts/analysis/mazeV2SeedStrategies';
 
 describe('MAZE_V2_CONVERGENCE_CORPUS (Wave 1.5 PR D)', () => {
-  test('has exactly the 15 required recipes', () => {
-    expect(MAZE_V2_CONVERGENCE_CORPUS).toHaveLength(15);
+  test('has 13 executable recipes and one explicit unsupported endpoint axis', () => {
+    expect(MAZE_V2_CONVERGENCE_CORPUS).toHaveLength(14);
+    expect(MAZE_V2_CONVERGENCE_CORPUS.filter((recipe) => !recipe.unsupportedReason)).toHaveLength(13);
   });
 
   test('every recipe has a unique name', () => {
@@ -43,18 +44,20 @@ describe('MAZE_V2_CONVERGENCE_CORPUS (Wave 1.5 PR D)', () => {
     expect(wrapRecipes[0]?.name).toBe('explicit-wrap-bleed-demand');
   });
 
-  test('the distant-corner and noncorner-offaxis endpoint recipes are paired on every controllable input', () => {
-    // Per the recipe's own honest note: neither engine exposes placement
-    // control, so these two are only meaningfully comparable if every OTHER
-    // input matches -- otherwise a measured difference could be attributed
-    // to the wrong cause.
-    const distant = MAZE_V2_CONVERGENCE_CORPUS.find((recipe) => recipe.name === 'distant-corner-endpoints');
-    const noncorner = MAZE_V2_CONVERGENCE_CORPUS.find((recipe) => recipe.name === 'noncorner-offaxis-endpoints');
-    expect(distant).toBeDefined();
-    expect(noncorner).toBeDefined();
-    expect(distant!.width).toBe(noncorner!.width);
-    expect(distant!.height).toBe(noncorner!.height);
-    expect(distant!.targetComplexity).toBe(noncorner!.targetComplexity);
+  test('has no duplicate executable recipe inputs and marks endpoint placement unsupported once', () => {
+    const executable = MAZE_V2_CONVERGENCE_CORPUS.filter((recipe) => !recipe.unsupportedReason);
+    const signatures = executable.map((recipe) => JSON.stringify({
+      width: recipe.width,
+      height: recipe.height,
+      targetComplexity: recipe.targetComplexity,
+      requireWrap: recipe.requireWrap ?? false
+    }));
+    expect(new Set(signatures).size).toBe(signatures.length);
+
+    const unsupported = MAZE_V2_CONVERGENCE_CORPUS.filter((recipe) => recipe.unsupportedReason);
+    expect(unsupported).toHaveLength(1);
+    expect(unsupported[0]?.name).toBe('endpoint-placement-unsupported');
+    expect(unsupported[0]?.unsupportedReason).toContain('endpoint-placement');
   });
 });
 

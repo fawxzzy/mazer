@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import {
   parseConvergenceLanes,
+  resolveCleanGitCommitSha,
   resolveGitCommitSha,
   resolveRepositoryRootFromAnalysisModuleUrl,
   runOneSample,
@@ -10,7 +11,9 @@ import {
   type ConvergenceRunRecord
 } from '../../scripts/analysis/mazev2ConvergenceHarness';
 import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { createMazeV2LegacyRuntimeAdapter } from '../../src/domain/mazeV2/adapters/legacyRuntimeAdapter';
 import { createMazeV2DomainMazeAdapter } from '../../src/domain/mazeV2/adapters/domainMazeAdapter';
 import { MAZE_V2_CONVERGENCE_CORPUS } from '../../scripts/analysis/mazev2ConvergenceCorpus';
@@ -31,6 +34,7 @@ describe('runOneSample (Wave 1.5 PR D)', () => {
       engineId: 'throwing-test-engine',
       engineLabel: 'Throwing test engine',
       capabilities: [],
+      assessSupport: () => ({ status: 'supported' as const, reason: null }),
       generateSample: () => {
         throw new Error('synthetic failure for the failure-record test');
       }
@@ -47,6 +51,7 @@ describe('runOneSample (Wave 1.5 PR D)', () => {
       engineId: 'no-route-test-engine',
       engineLabel: 'No-route test engine',
       capabilities: [],
+      assessSupport: () => ({ status: 'supported' as const, reason: null }),
       generateSample: (spec: { width: number; height: number }) => ({
         spec,
         support: { status: 'supported' as const, reason: null },
@@ -70,6 +75,53 @@ describe('runOneSample (Wave 1.5 PR D)', () => {
     const record = runOneSample(noRouteAdapter as any, recipe, 'raw-carving', 1);
     expect(record.outcome).toBe('invariant-failure');
     expect(record.errorMessage).toContain('no walkable route');
+  });
+
+  test('rejects adapter-unsupported samples before generation or timing begins', () => {
+    let generationCalls = 0;
+    const unsupportedAdapter = {
+      engineId: 'unsupported-test-engine',
+      engineLabel: 'Unsupported test engine',
+      capabilities: [],
+      assessSupport: () => ({ status: 'unsupported' as const, reason: 'synthetic unsupported axis' }),
+      generateSample: () => {
+        generationCalls += 1;
+        throw new Error('generation must not run');
+      }
+    };
+    const recipe = MAZE_V2_CONVERGENCE_CORPUS[0]!;
+    const record = runOneSample(unsupportedAdapter, recipe, 'raw-carving', 1);
+
+    expect(generationCalls).toBe(0);
+    expect(record.outcome).toBe('unsupported');
+    expect(record.generationDurationMs).toBeNull();
+    expect(record.realizedWidth).toBeNull();
+    expect(record.engineNotes).toBeNull();
+  });
+
+  test('rejects an explicitly unsupported recipe before consulting or generating with an adapter', () => {
+    let supportChecks = 0;
+    let generationCalls = 0;
+    const adapter = {
+      engineId: 'recipe-unsupported-test-engine',
+      engineLabel: 'Recipe unsupported test engine',
+      capabilities: [],
+      assessSupport: () => {
+        supportChecks += 1;
+        return { status: 'supported' as const, reason: null };
+      },
+      generateSample: () => {
+        generationCalls += 1;
+        throw new Error('generation must not run');
+      }
+    };
+    const recipe = MAZE_V2_CONVERGENCE_CORPUS.find((entry) => entry.name === 'endpoint-placement-unsupported')!;
+    const record = runOneSample(adapter, recipe, 'raw-carving', 1);
+
+    expect(supportChecks).toBe(0);
+    expect(generationCalls).toBe(0);
+    expect(record.outcome).toBe('unsupported');
+    expect(record.generationDurationMs).toBeNull();
   });
 });
 
@@ -110,11 +162,34 @@ describe('convergence source provenance', () => {
     expect(resolveGitCommitSha(repoRoot)).toMatch(/^[0-9a-f]{40}$/);
   });
 
+  test('binds a clean commit but rejects and identifies tracked or untracked dirty source', () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), 'mazer-convergence-provenance-'));
+    try {
+      execFileSync('git', ['init'], { cwd: repoRoot });
+      execFileSync('git', ['config', 'user.email', 'test@example.invalid'], { cwd: repoRoot });
+      execFileSync('git', ['config', 'user.name', 'Mazer Test'], { cwd: repoRoot });
+      writeFileSync(join(repoRoot, 'tracked.txt'), 'clean\n', 'utf8');
+      execFileSync('git', ['add', 'tracked.txt'], { cwd: repoRoot });
+      execFileSync('git', ['commit', '-m', 'fixture'], { cwd: repoRoot });
+
+      expect(resolveCleanGitCommitSha(repoRoot)).toMatch(/^[0-9a-f]{40}$/);
+      writeFileSync(join(repoRoot, 'tracked.txt'), 'dirty\n', 'utf8');
+      expect(() => resolveCleanGitCommitSha(repoRoot)).toThrow('tracked.txt');
+
+      writeFileSync(join(repoRoot, 'tracked.txt'), 'clean\n', 'utf8');
+      writeFileSync(join(repoRoot, 'untracked.txt'), 'untracked\n', 'utf8');
+      expect(() => resolveCleanGitCommitSha(repoRoot)).toThrow('untracked.txt');
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   test('classifies the default compact artifact as gitignored local scratch, not committed evidence', () => {
     const script = readFileSync(resolve(process.cwd(), 'scripts/analysis/mazev2-convergence.ts'), 'utf8');
     const gitignore = readFileSync(resolve(process.cwd(), '.gitignore'), 'utf8');
     expect(script).toContain("const DEFAULT_OUTPUT_DIR = './tmp/mazev2-convergence';");
     expect(script).toContain('compact artifact remains ignored');
+    expect(script).toContain('resolveCleanGitCommitSha(REPO_ROOT)');
     expect(script).not.toContain('committed compact evidence summary');
     expect(gitignore.split(/\r?\n/u)).toContain('/tmp/');
   });
@@ -222,6 +297,9 @@ describe('createMazeV2DomainMazeAdapter production-pipeline lane (Wave 1.5 PR D)
     expect(record.outcome).toBe('unsupported');
     expect(record.errorMessage).toContain('rectangular');
     expect(record.metrics).toBeNull();
+    expect(record.generationDurationMs).toBeNull();
+    expect(record.realizedWidth).toBeNull();
+    expect(record.engineNotes).toBeNull();
   });
 
   test.each(['raw-carving', 'production-pipeline'] as const)(
@@ -233,6 +311,9 @@ describe('createMazeV2DomainMazeAdapter production-pipeline lane (Wave 1.5 PR D)
       expect(record.outcome).toBe('unsupported');
       expect(record.errorMessage).toContain('wrap');
       expect(record.metrics).toBeNull();
+      expect(record.generationDurationMs).toBeNull();
+      expect(record.realizedWidth).toBeNull();
+      expect(record.engineNotes).toBeNull();
     }
   );
 });

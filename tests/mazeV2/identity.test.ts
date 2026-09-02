@@ -197,4 +197,42 @@ describe('mazeV2 canonical bridge -- wrap pair derivation (Wave 1.5 PR D correct
     });
     expect(analyzeMazeV2CanonicalMaze(canonical).ambiguity.cycleRank).toBe(1);
   });
+
+  test('keeps wrap-only route savings out of shortcut reduction in the shared canonical analyzer', () => {
+    const canonical = {
+      width: 5,
+      height: 1,
+      walkable: [[true, true, true, true, true]],
+      start: { x: 0, y: 0 },
+      goal: { x: 4, y: 0 },
+      wrapPairs: [{ from: { x: 0, y: 0 }, to: { x: 4, y: 0 }, axis: 'horizontal' as const }]
+    };
+    const metrics = analyzeMazeV2CanonicalMaze(canonical, {
+      shortcutCount: 1,
+      routeLengthReduction: null
+    });
+
+    expect(metrics.route.shortestPathLength).toBe(1);
+    expect(metrics.route.directFloorPathLength).toBe(4);
+    expect(metrics.shortcut.routeLengthReduction).toBeNull();
+    expect(metrics.wrap.wrapRouteImpact).toBe(3);
+  });
+
+  test('keeps legacy playableShortcutDelta exclusively under wrapRouteImpact', () => {
+    const generated = createLegacyRuntimeMazeForMode('play', 30, 777, {
+      requiredOppositeBorderConnections: { horizontal: true, vertical: true }
+    }, { targetComplexity: 40 });
+    const maze = {
+      ...generated,
+      shortcutsCreated: 1,
+      wrapTopologyDiagnostics: {
+        ...generated.wrapTopologyDiagnostics!,
+        playableShortcutDelta: 7
+      }
+    };
+    const metrics = analyzeLegacyMazeAsMazeV2Metrics(maze);
+
+    expect(metrics.shortcut.routeLengthReduction).toBeNull();
+    expect(metrics.wrap.wrapRouteImpact).toBe(7);
+  });
 });

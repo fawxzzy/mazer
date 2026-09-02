@@ -53,11 +53,16 @@ export interface MazeV2ComparisonSampleSpec {
   // requiredOppositeBorderConnections profile flag on both axes so this
   // recipe genuinely exercises wrap topology instead of leaving it to
   // chance. src/domain/maze has no wrap concept at all (see its own
-  // capability matrix, wrapPressure: 'unsupported'), so this flag is inert
-  // there -- the domain adapter documents that rather than silently
-  // ignoring it. Optional and false by default so every other recipe's
-  // behavior is unchanged.
+  // capability matrix, wrapPressure: 'unsupported'), so the domain adapter
+  // rejects it during support preflight rather than silently ignoring it.
+  // Optional and false by default so every other recipe's behavior is
+  // unchanged.
   requireWrap?: boolean;
+}
+
+export interface MazeV2ComparisonSampleSupport {
+  status: 'supported' | 'unsupported';
+  reason: string | null;
 }
 
 export interface MazeV2ComparisonSampleResult {
@@ -65,10 +70,7 @@ export interface MazeV2ComparisonSampleResult {
   // Whether this engine/lane can honestly represent the requested sample.
   // Unsupported samples remain in the convergence corpus as explicit
   // evidence instead of being silently measured through a lossy mapping.
-  support: {
-    status: 'supported' | 'unsupported';
-    reason: string | null;
-  };
+  support: MazeV2ComparisonSampleSupport;
   canonicalMaze: MazeV2CanonicalMaze;
   generationDurationMs: number;
   // Real shortcut provenance the adapter could read off its own engine's
@@ -106,5 +108,8 @@ export interface MazeV2EngineAdapter {
   readonly engineId: string;
   readonly engineLabel: string;
   readonly capabilities: readonly MazeV2CapabilityAssessment[];
+  // Support must be classified before generation so unsupported samples do
+  // not consume generator time or produce placeholder measurements.
+  assessSupport(spec: MazeV2ComparisonSampleSpec): MazeV2ComparisonSampleSupport;
   generateSample(spec: MazeV2ComparisonSampleSpec): MazeV2ComparisonSampleResult;
 }

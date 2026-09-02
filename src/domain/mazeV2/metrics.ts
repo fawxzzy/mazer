@@ -26,12 +26,11 @@
 // legacy-runtime already produces). One is deliberately approximate, and
 // said so at its computation:
 //   - shortcut.routeLengthReduction: a true measurement needs a
-//     counterfactual "the same maze without its shortcuts" to diff
-//     against, which this bridge does not regenerate. Falls back to the
-//     wrap-topology system's own already-exact playableShortcutDelta where
-//     available (wrap shortcuts only). Otherwise it reports null when
+//     counterfactual "the same maze without its carved shortcuts" to diff
+//     against, which this bridge does not regenerate. It reports null when
 //     shortcuts exist but their reduction is unmeasured, and 0 only when
-//     no shortcuts exist.
+//     no shortcuts exist. The independent wrap-only delta remains under
+//     wrap.wrapRouteImpact and is never relabeled as shortcut reduction.
 // Wave 2's generator should compute this directly from its own
 // construction process instead of inferring it after the fact.
 
@@ -276,14 +275,10 @@ export const analyzeLegacyMazeAsMazeV2Metrics = (maze: LegacyMazeSnapshot): Maze
     ambiguity: { cycleRank },
     shortcut: {
       shortcutCount,
-      // Exact when the wrap-topology system's own playableShortcutDelta
-      // applies (wrap shortcuts only). When shortcuts exist but aren't wrap
-      // shortcuts, their route-length effect isn't computed here -- report
-      // unmeasured (null), not 0, since a real non-wrap shortcut with an
-      // unknown effect is not the same claim as "shortcuts have zero
-      // effect." 0 is only reported when there really are no shortcuts at
-      // all.
-      routeLengthReduction: wrapDiagnostics?.playableShortcutDelta ?? (shortcutCount > 0 ? null : 0)
+      // A wrap-only route delta is not evidence about carved shortcuts.
+      // Report unmeasured (null) when shortcuts exist, and 0 only when the
+      // engine reports that no shortcuts were created.
+      routeLengthReduction: shortcutCount > 0 ? null : 0
     },
     wrap: {
       wrapPairCount,

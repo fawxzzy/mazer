@@ -1,7 +1,7 @@
 // Pure harness logic for the Wave 1.5 PR D generator-convergence
 // comparison -- split out from mazev2-convergence.ts (the CLI script) so
 // this can be imported and unit-tested without triggering a full
-// 1,920-generation run as a side effect of import (that script has a
+// full corpus run as a side effect of import (that script has a
 // top-level auto-run; this module deliberately does not, matching the
 // existing mazeV2SeedStrategies.ts/mazeV2LabCollisions.ts convention of
 // keeping testable logic in a plain utility module, separate from the
@@ -23,6 +23,18 @@ export const resolveRepositoryRootFromAnalysisModuleUrl = (moduleUrl: string): s
 export const resolveGitCommitSha = (repoRoot: string): string => (
   execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim()
 );
+
+export const resolveCleanGitCommitSha = (repoRoot: string): string => {
+  const status = execFileSync(
+    'git',
+    ['status', '--porcelain=v1', '--untracked-files=all'],
+    { cwd: repoRoot, encoding: 'utf8' }
+  ).trim();
+  if (status.length > 0) {
+    throw new Error(`Refusing convergence evidence from a dirty Git worktree:\n${status}`);
+  }
+  return resolveGitCommitSha(repoRoot);
+};
 export const DEFAULT_MAZE_V2_COMPARISON_LANES: readonly MazeV2ComparisonLane[] = [
   'raw-carving',
   'production-pipeline'
@@ -90,6 +102,41 @@ export const runOneSample = (
   };
 
   try {
+    if (recipe.unsupportedReason) {
+      return {
+        engineId: adapter.engineId,
+        recipeName: recipe.name,
+        lane,
+        seed,
+        outcome: 'unsupported',
+        errorMessage: recipe.unsupportedReason,
+        generationDurationMs: null,
+        requestedWidth: recipe.width,
+        requestedHeight: recipe.height,
+        realizedWidth: null,
+        realizedHeight: null,
+        engineNotes: null,
+        metrics: null
+      };
+    }
+    const support = adapter.assessSupport(spec);
+    if (support.status === 'unsupported') {
+      return {
+        engineId: adapter.engineId,
+        recipeName: recipe.name,
+        lane,
+        seed,
+        outcome: 'unsupported',
+        errorMessage: support.reason,
+        generationDurationMs: null,
+        requestedWidth: recipe.width,
+        requestedHeight: recipe.height,
+        realizedWidth: null,
+        realizedHeight: null,
+        engineNotes: null,
+        metrics: null
+      };
+    }
     const startedAtMs = performance.now();
     const result = adapter.generateSample(spec);
     const elapsedMs = performance.now() - startedAtMs;
@@ -116,8 +163,8 @@ export const runOneSample = (
         recipeName: recipe.name,
         lane,
         seed,
-        outcome: 'unsupported',
-        errorMessage: result.support.reason,
+        outcome: 'invariant-failure',
+        errorMessage: `adapter generated a sample after declaring support, then returned unsupported: ${result.support.reason ?? 'no reason provided'}`,
         generationDurationMs: result.generationDurationMs,
         requestedWidth: recipe.width,
         requestedHeight: recipe.height,

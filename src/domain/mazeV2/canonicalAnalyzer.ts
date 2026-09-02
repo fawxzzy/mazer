@@ -10,9 +10,9 @@
 // Deliberately NOT the same function as metrics.ts's own
 // analyzeLegacyMazeAsMazeV2Metrics, which stays legacy-runtime-specific
 // (PR A shipped and tested it against LegacyMazeSnapshot's own
-// solutionPath/wrapTopologyDiagnostics fields, including the
-// legacy-only "direct floor route vs playable route" comparison that has
-// no equivalent concept in a generator with no wrap topology at all).
+// solutionPath/wrapTopologyDiagnostics fields). This analyzer derives its
+// neutral no-wrap counterfactual from the canonical graph itself instead of
+// trusting either engine's generation diagnostics.
 // Unifying the two analyzer entry points is a reasonable future cleanup
 // once this comparison proves out -- not attempted here, to avoid touching
 // PR A's already-shipped, already-tested contract while still meeting
@@ -235,9 +235,16 @@ export const analyzeMazeV2CanonicalMaze = (
   const graph = summarizeWalkableGraph(maze);
   const floorRatio = graph.walkableTileCount / Math.max(1, maze.width * maze.height);
   const path = resolveShortestPath(maze, maze.start, maze.goal);
+  const nonWrapPath = maze.wrapPairs.length > 0
+    ? resolveShortestPath({ ...maze, wrapPairs: [] }, maze.start, maze.goal)
+    : path;
   const manhattanDistance = resolveManhattanDistance(maze.start, maze.goal);
   const shortestPathLength = Math.max(0, path.length - 1);
+  const nonWrapPathLength = nonWrapPath.length > 0
+    ? Math.max(0, nonWrapPath.length - 1)
+    : shortestPathLength;
   const detourRatio = shortestPathLength / Math.max(1, manhattanDistance);
+  const nonWrapDetourRatio = nonWrapPathLength / Math.max(1, manhattanDistance);
   const routeCoverage = path.length / Math.max(1, graph.walkableTileCount);
 
   const junctionKeys = [...graph.degreeByKey.entries()].filter(([, degree]) => degree >= 3);
@@ -281,14 +288,12 @@ export const analyzeMazeV2CanonicalMaze = (
       manhattanDistance,
       detourRatio,
       routeCoverage,
-      // A generic canonical maze has no separate "direct floor" concept
-      // distinct from its one measured route -- see this module's own
-      // header comment. Set equal to the playable pair rather than left at
-      // a misleading 0, so a comparison report that happens to read this
-      // field doesn't see a false "huge divergence" for every domain/maze
-      // sample.
-      directFloorPathLength: shortestPathLength,
-      directFloorDetourRatio: detourRatio
+      // For canonical mazes, "direct floor" means the same walkable graph
+      // with wrap edges removed. Non-wrap engines therefore remain equal to
+      // the playable route, while wrap-aware engines expose the real
+      // counterfactual instead of mixing it into shortcut metrics.
+      directFloorPathLength: nonWrapPathLength,
+      directFloorDetourRatio: nonWrapDetourRatio
     },
     decision: {
       junctionCount,
@@ -322,7 +327,9 @@ export const analyzeMazeV2CanonicalMaze = (
     wrap: {
       wrapPairCount: maze.wrapPairs.length,
       wrapPairsOnRoute,
-      wrapRouteImpact: null
+      wrapRouteImpact: path.length > 0 && nonWrapPath.length > 0
+        ? nonWrapPathLength - shortestPathLength
+        : null
     }
   };
 

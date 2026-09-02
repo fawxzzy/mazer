@@ -1,4 +1,4 @@
-// Wave 1.5 PR D -- the 15-recipe corpus for the generator-convergence
+// Wave 1.5 PR D -- the convergence recipe corpus for the generator-convergence
 // harness (mazev2-convergence.ts), replacing PR B's own 6-recipe corpus.
 //
 // Honesty note, read before trusting any recipe as more independently
@@ -27,6 +27,10 @@ export interface MazeV2ConvergenceRecipe {
   height: number;
   targetComplexity: number;
   requireWrap?: boolean;
+  // A requested axis neither engine can currently control remains in the
+  // corpus as one explicit unsupported observation, never as one or more
+  // duplicate executable recipes that imply a comparison occurred.
+  unsupportedReason?: string;
 }
 
 export const MAZE_V2_CONVERGENCE_CORPUS: readonly MazeV2ConvergenceRecipe[] = [
@@ -111,20 +115,13 @@ export const MAZE_V2_CONVERGENCE_CORPUS: readonly MazeV2ConvergenceRecipe[] = [
     targetComplexity: 70
   },
   {
-    name: 'distant-corner-endpoints',
-    reason: 'Stresses maximum start/goal separation.',
-    note: 'Neither engine exposes a placement-strategy input through its public build options (both choose start/goal placement internally) -- confirmed by inspecting MazeBuildOptions/MazeConfig and legacy-runtime\'s own generation entry points. This recipe cannot independently control endpoint placement; it is included as a same-size, same-complexity pairing against the noncorner recipe below so at least the OTHER inputs are held constant while acknowledging placement itself is emergent, not requested.',
+    name: 'endpoint-placement-unsupported',
+    reason: 'Records that endpoint placement cannot yet be controlled for either engine.',
+    note: 'Neither engine exposes a placement-strategy input through its public build options. This single explicitly unsupported entry replaces two duplicate executable recipes that differed only by name and therefore could not measure distant-corner versus noncorner-offaxis behavior.',
     width: 30,
     height: 30,
-    targetComplexity: 30
-  },
-  {
-    name: 'noncorner-offaxis-endpoints',
-    reason: 'Stresses non-corner, non-axis-aligned start/goal placement.',
-    note: 'Same placement-control gap as distant-corner-endpoints -- paired with it (same width/height/targetComplexity) specifically so any measured difference between the two is attributable to seed variation, not a deliberately different placement request neither engine can actually accept.',
-    width: 30,
-    height: 30,
-    targetComplexity: 30
+    targetComplexity: 30,
+    unsupportedReason: 'Neither engine exposes a controllable endpoint-placement input; no maze is generated for this recipe.'
   },
   {
     name: 'wide-rectangular-footprint',
@@ -145,7 +142,7 @@ export const MAZE_V2_CONVERGENCE_CORPUS: readonly MazeV2ConvergenceRecipe[] = [
   {
     name: 'explicit-wrap-bleed-demand',
     reason: 'Stresses wrap/bleed edge topology directly, not left to chance.',
-    note: 'requireWrap: true forces legacy-runtime\'s own requiredOppositeBorderConnections profile flag on both axes (a genuine, independent, engine-native control -- see legacyRuntimeAdapter.ts). src/domain/maze has no wrap concept at all (wrapPressure: \'unsupported\' in its own capability matrix) -- requireWrap is inert there, and that engine\'s samples for this recipe are expected to report zero wrap pairs, which is the honest, correct result for an engine that cannot express this feature, not a harness defect.',
+    note: 'requireWrap: true forces legacy-runtime\'s own requiredOppositeBorderConnections profile flag on both axes (a genuine, independent, engine-native control -- see legacyRuntimeAdapter.ts). src/domain/maze has no wrap concept at all (wrapPressure: \'unsupported\' in its own capability matrix), so that adapter rejects the sample during support preflight before generation or timing instead of fabricating a wrap-free result.',
     width: 25,
     height: 25,
     targetComplexity: 50,

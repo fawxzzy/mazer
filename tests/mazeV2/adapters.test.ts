@@ -32,6 +32,7 @@ const exerciseAdapterContract = (adapter: MazeV2EngineAdapter): void => {
     // each adapter's own spatialLoad capability note) -- only that a real,
     // non-empty, connected board comes back. realizedWidth/realizedHeight
     // are the honest field for that, and must always be positive.
+    expect(adapter.assessSupport(sampleSpec)).toEqual({ status: 'supported', reason: null });
     const result = adapter.generateSample(sampleSpec);
     expect(result.support.status).toBe('supported');
     expect(result.canonicalMaze.width).toBeGreaterThan(0);
@@ -139,18 +140,20 @@ describe('src/domain/maze adapter', () => {
     const wrapCapability = adapter.capabilities.find((c) => c.axis === 'wrapPressure');
     expect(wrapCapability?.status).toBe('unsupported');
     for (const lane of ['raw-carving', 'production-pipeline'] as const) {
-      const result = adapter.generateSample({ ...sampleSpec, lane, requireWrap: true });
-      expect(result.support.status).toBe('unsupported');
-      expect(result.support.reason).toContain('wrap');
-      expect(result.canonicalMaze.wrapPairs).toEqual([]);
+      const spec = { ...sampleSpec, lane, requireWrap: true };
+      const support = adapter.assessSupport(spec);
+      expect(support.status).toBe('unsupported');
+      expect(support.reason).toContain('wrap');
+      expect(() => adapter.generateSample(spec)).toThrow('Unsupported domain-maze sample reached generation');
     }
   });
 
   test('classifies rectangular production-pipeline requests as unsupported instead of silently measuring a square substitute', () => {
     const adapter = createMazeV2DomainMazeAdapter();
-    const result = adapter.generateSample({ ...productionLaneSpec, width: 60, height: 20 });
-    expect(result.support.status).toBe('unsupported');
-    expect(result.support.reason).toContain('rectangular');
-    expect(result.realizedWidth).toBe(result.realizedHeight);
+    const spec = { ...productionLaneSpec, width: 60, height: 20 };
+    const support = adapter.assessSupport(spec);
+    expect(support.status).toBe('unsupported');
+    expect(support.reason).toContain('rectangular');
+    expect(() => adapter.generateSample(spec)).toThrow('Unsupported domain-maze sample reached generation');
   });
 });

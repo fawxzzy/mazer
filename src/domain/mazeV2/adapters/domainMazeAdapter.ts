@@ -24,7 +24,7 @@
 import { buildMaze, classifyMazeDifficulty, generateMazeForDifficulty } from '../../maze/generator';
 import type { MazeConfig, MazeDifficulty } from '../../maze/types';
 import { deriveMazeV2CanonicalMazeFromDomainMazeRaster } from './canonicalMazeFromDomainMaze';
-import type { MazeV2CapabilityAssessment, MazeV2ComparisonSampleResult, MazeV2ComparisonSampleSpec, MazeV2EngineAdapter } from './types';
+import type { MazeV2CapabilityAssessment, MazeV2ComparisonSampleResult, MazeV2ComparisonSampleSpec, MazeV2ComparisonSampleSupport, MazeV2EngineAdapter } from './types';
 
 const DOMAIN_MAZE_CAPABILITIES: readonly MazeV2CapabilityAssessment[] = [
   { axis: 'spatialLoad', status: 'adaptable', note: 'width/height/braidRatio are direct inputs, but the engine quantizes requested width/height through an internal logical-carving lattice (normalizeLogicalSize) before rendering the playable raster -- the real output size is only approximately what was requested, not exact.' },
@@ -72,7 +72,7 @@ const resolveMazeDifficultyForTargetComplexity = (targetComplexity: number): Maz
   return 'brutal';
 };
 
-const resolveDomainMazeSampleSupport = (spec: MazeV2ComparisonSampleSpec): MazeV2ComparisonSampleResult['support'] => {
+const resolveDomainMazeSampleSupport = (spec: MazeV2ComparisonSampleSpec): MazeV2ComparisonSampleSupport => {
   if (spec.requireWrap === true) {
     return {
       status: 'unsupported',
@@ -92,7 +92,12 @@ export const createMazeV2DomainMazeAdapter = (): MazeV2EngineAdapter => ({
   engineId: 'domain-maze',
   engineLabel: 'src/domain/maze (presentation/demo generator)',
   capabilities: DOMAIN_MAZE_CAPABILITIES,
+  assessSupport: resolveDomainMazeSampleSupport,
   generateSample(spec: MazeV2ComparisonSampleSpec): MazeV2ComparisonSampleResult {
+    const support = resolveDomainMazeSampleSupport(spec);
+    if (support.status === 'unsupported') {
+      throw new Error(`Unsupported domain-maze sample reached generation: ${support.reason}`);
+    }
     if (spec.lane === 'production-pipeline') {
       const clamped = Math.min(100, Math.max(0, spec.targetComplexity)) / 100;
       const config: MazeConfig = {
@@ -116,7 +121,7 @@ export const createMazeV2DomainMazeAdapter = (): MazeV2EngineAdapter => ({
 
       return {
         spec,
-        support: resolveDomainMazeSampleSupport(spec),
+        support,
         canonicalMaze: deriveMazeV2CanonicalMazeFromDomainMazeRaster(episode.raster),
         generationDurationMs,
         shortcutProvenance: {
@@ -154,7 +159,7 @@ export const createMazeV2DomainMazeAdapter = (): MazeV2EngineAdapter => ({
 
     return {
       spec,
-      support: resolveDomainMazeSampleSupport(spec),
+      support,
       canonicalMaze: deriveMazeV2CanonicalMazeFromDomainMazeRaster(episode.raster),
       generationDurationMs,
       shortcutProvenance: {

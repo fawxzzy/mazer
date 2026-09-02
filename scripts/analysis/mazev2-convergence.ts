@@ -6,7 +6,7 @@
 // Corrections from PR B (see
 // docs/ops/MAZER-GENERATION-V2-WAVE-1_5-CONVERGENCE-FINDINGS-2026-08-28.md for
 // the full audit this responds to):
-//   1. Full 15-recipe x 32-seed corpus (was 6 recipes x 8 seeds).
+//   1. Full reviewed recipe corpus x 32 seeds (was 6 recipes x 8 seeds).
 //   2. Two explicit lanes -- raw-carving (no candidate search on either
 //      engine) and production-pipeline (each engine's own real
 //      candidate-search/difficulty-targeting behavior) -- run and reported
@@ -36,15 +36,15 @@ import { MAZE_V2_CONVERGENCE_CORPUS } from './mazev2ConvergenceCorpus';
 import { MAZE_V2_LAB_DEFAULT_SEED_CORPUS, MAZE_V2_LAB_DEFAULT_SEED_CORPUS_VERSION } from './mazeV2SeedStrategies';
 import {
   parseConvergenceLanes,
-  resolveGitCommitSha,
+  resolveCleanGitCommitSha,
   resolveRepositoryRootFromAnalysisModuleUrl,
   runOneSample,
   summarize,
   type ConvergenceRunRecord
 } from './mazev2ConvergenceHarness';
 
-const MAZE_V2_CONVERGENCE_HARNESS_VERSION = 'mazev2-convergence-harness-pr-d-v1';
-const MAZE_V2_CONVERGENCE_CORPUS_VERSION = 'mazev2-convergence-corpus-v2-15-recipe';
+const MAZE_V2_CONVERGENCE_HARNESS_VERSION = 'mazev2-convergence-harness-pr-d-v2';
+const MAZE_V2_CONVERGENCE_CORPUS_VERSION = 'mazev2-convergence-corpus-v3-14-recipe';
 const DEFAULT_OUTPUT_DIR = './tmp/mazev2-convergence';
 const REPO_ROOT = resolveRepositoryRootFromAnalysisModuleUrl(import.meta.url);
 
@@ -60,6 +60,9 @@ const parseCliArgs = (): { outputDir: string; lanes: readonly MazeV2ComparisonLa
 };
 
 const run = async (): Promise<void> => {
+  // Bind evidence to a clean source state before creating any output. A HEAD
+  // SHA alone is insufficient because uncommitted source can change results.
+  const sourceCommitSha = resolveCleanGitCommitSha(REPO_ROOT);
   const { outputDir, lanes } = parseCliArgs();
   await mkdir(outputDir, { recursive: true });
 
@@ -104,7 +107,7 @@ const run = async (): Promise<void> => {
     harnessVersion: MAZE_V2_CONVERGENCE_HARNESS_VERSION,
     corpusVersion: MAZE_V2_CONVERGENCE_CORPUS_VERSION,
     seedCorpusVersion: MAZE_V2_LAB_DEFAULT_SEED_CORPUS_VERSION,
-    sourceCommitSha: resolveGitCommitSha(REPO_ROOT),
+    sourceCommitSha,
     cliInvocation: `npx tsx scripts/analysis/mazev2-convergence.ts --outputDir=${outputDir} --lanes=${lanes.join(',')}`,
     generatedAtIso: new Date().toISOString(),
     totalRuns: allRecords.length,

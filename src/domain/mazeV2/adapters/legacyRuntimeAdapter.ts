@@ -64,6 +64,7 @@ export const createMazeV2LegacyRuntimeAdapter = (): MazeV2EngineAdapter => ({
   engineId: 'legacy-runtime',
   engineLabel: 'Legacy Runtime (production generator)',
   capabilities: LEGACY_RUNTIME_CAPABILITIES,
+  assessSupport: () => ({ status: 'supported', reason: null }),
   generateSample(spec: MazeV2ComparisonSampleSpec): MazeV2ComparisonSampleResult {
     const baseline = createEmptyLegacyProgressionState();
     const track = { ...baseline.tracks.player, level: String(spec.level), targetComplexity: spec.targetComplexity };
@@ -106,7 +107,10 @@ export const createMazeV2LegacyRuntimeAdapter = (): MazeV2EngineAdapter => ({
       generationDurationMs,
       shortcutProvenance: shortcutCount === null ? null : {
         shortcutCount,
-        routeLengthReduction: maze.wrapTopologyDiagnostics?.playableShortcutDelta ?? null
+        // playableShortcutDelta belongs exclusively to wrapRouteImpact. The
+        // legacy snapshot has no same-maze-without-carved-shortcuts
+        // counterfactual, so a non-zero shortcut count remains unmeasured.
+        routeLengthReduction: shortcutCount > 0 ? null : 0
       },
       realizedWidth: maze.width,
       realizedHeight: maze.height,
