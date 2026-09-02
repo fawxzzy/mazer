@@ -17,6 +17,7 @@ import {
   measureAuthPersistenceElapsedMs,
   persistAuthPersistenceFailureEvidence,
   publishAuthPersistenceSuccessAfterCleanup,
+  requireFixtureSettingsCleanupPage,
   resolveAuthPersistenceArtifactPath,
   sanitizeAuthPersistenceDiagnosticText,
   sanitizeAuthPersistenceDiagnosticUrl,
@@ -263,6 +264,14 @@ describe('live auth persistence soak contract', () => {
       promoteLatest: async () => { events.push('latest'); }
     })).resolves.toEqual({ published: true, promoted: true });
     expect(events).toEqual(['summary', 'latest']);
+  });
+
+  test('treats a closed page after preimage capture as cleanup failure', () => {
+    expect(() => requireFixtureSettingsCleanupPage({
+      page: { isClosed: () => true },
+      preimage: fixtureSettingsPreimage
+    })).toThrow('fixture_settings_cleanup_page_unavailable');
+    expect(requireFixtureSettingsCleanupPage({ page: null, preimage: null })).toBe(false);
   });
 
   test('measures delayed failure at evidence-capture time from the monotonic run start', () => {

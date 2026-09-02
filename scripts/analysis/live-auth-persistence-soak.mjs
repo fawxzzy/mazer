@@ -160,6 +160,16 @@ export const createFixtureSettingsRestorePlan = (preimage) => (
     : { action: 'remove', key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY, value: null }
 );
 
+export const requireFixtureSettingsCleanupPage = ({ page, preimage }) => {
+  if (preimage === null) {
+    return false;
+  }
+  if (page === null || page.isClosed()) {
+    throw new Error('fixture_settings_cleanup_page_unavailable');
+  }
+  return true;
+};
+
 export const measureAuthPersistenceElapsedMs = (
   runStartedAt,
   capturedAt = performance.now()
@@ -954,11 +964,12 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     cleanupErrors.push(...await settleAuthPersistenceResources([
       {
         name: 'fixture_settings_restore',
-        run: page === null || page.isClosed() || fixtureSettingsPreimage === null
+        run: fixtureSettingsPreimage === null
           ? null
           : async () => {
             const restorePlan = createFixtureSettingsRestorePlan(fixtureSettingsPreimage);
             try {
+              requireFixtureSettingsCleanupPage({ page, preimage: fixtureSettingsPreimage });
               if (fixtureSettingsTouched) {
                 await page.evaluate((plan) => {
                   if (plan.action === 'set') {
