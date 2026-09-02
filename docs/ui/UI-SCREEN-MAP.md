@@ -84,6 +84,36 @@ theoretical — but it's scattered across call sites rather than centralized,
 which is exactly the kind of thing a DOM migration can silently miss one
 of.
 
+**Correction, real confirmed gap in that coverage (2026-08-30):** an
+earlier version of this section implied every transition out of Auth is
+covered by the above. It isn't. The authenticated Account section's
+"Reset progress" action calls `this.openOverlay('confirm-progression-reset')`
+directly (`MenuScene.ts:11491`) — not `closeOverlay()`. Verified against
+both functions: `openOverlay()` (`:14848-14890`) never checks whether the
+overlay being left was `'auth'` and never calls either `destroy*Native
+Input()`; the destroy calls only live inside `closeOverlay()`
+(`:14892-14899`), gated on `this.overlay === 'auth'` — and by the time any
+cleanup code could run, `this.overlay` is already
+`'confirm-progression-reset'`, so that gate never fires for this path
+either. Concretely:
+
+```
+authenticated Account, username input active (accountUsernameActive = true)
+  -> "Reset progress" -> this.openOverlay('confirm-progression-reset')
+  -> account username <input> remains mounted, focused, z-index 2147483647
+  -> the confirmation overlay opens with that input still live underneath/above it
+```
+
+Consequences: the invisible input may retain keyboard focus and keep
+receiving keyboard events; autocomplete/autofill may keep targeting it;
+it remains interactive at maximum z-index regardless of what the
+confirmation overlay renders; and closing the confirmation doesn't
+necessarily clean it up either, since the active overlay by then is no
+longer `'auth'`. This is the same root cause, and the same surface, as
+the progression-reset Cancel-routing defect already logged in
+`UI-AUDIT.md`'s P1 issue log — record both there together, not as two
+separate findings.
+
 **Wave 3C migration invariant, recorded here so it isn't rediscovered the
 hard way:** a replacement DOM Auth/Account form must not mount while a
 legacy shadow input is still alive.

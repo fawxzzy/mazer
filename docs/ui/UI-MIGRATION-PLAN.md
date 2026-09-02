@@ -351,22 +351,52 @@ Once Wave 4D has landed, the Wave 3C proof would still need to prove:
   wave-ownership rule this whole plan otherwise insists on. Whoever picks
   up this proof needs an explicit Wave 0C handoff (or a registry
   amendment) for the harness extension, not a same-PR fix.
-- fixing the real routing defect already confirmed at this exact surface,
-  not silently reproducing it in DOM form: the overlay has two entry
-  points (Account and Pause, see `UI-AUDIT.md`'s P1 issue log and
-  `UI-SCREEN-MAP.md`'s progression-reset row) but Cancel always returns to
-  Pause regardless of which one opened it. **This is recorded as its own
+- fixing the real defects already confirmed at this exact surface, not
+  silently reproducing them in DOM form. **This is recorded as its own
   separate P1 follow-on, not fixed in this docs-only PR** — either as a
   Wave 3A correctness-acceptance item (since 3A owns the command-bridge
-  work this dialog's routing would run through) or as its own narrowly
-  authorized bugfix PR that respects the decision registry's
-  `MenuScene.ts` wave-3A ownership. The desired contract, for whoever
-  picks it up: opened from Account → Cancel returns to Account; opened
-  from Pause → Cancel returns to Pause; a confirmed reset follows its own
-  explicit post-reset destination, independent of both. The fix should
-  preserve an explicit invocation/return context rather than hardcoding a
-  destination, the same shape `openOverlay`'s existing `overlayReturn`
-  field already handles for other overlays.
+  work this dialog's routing/lifecycle would run through) or as its own
+  narrowly authorized bugfix PR that respects the decision registry's
+  `MenuScene.ts` wave-3A ownership. Two confirmed defects, one root cause
+  (`UI-AUDIT.md`'s P1 issue log has the full verification):
+  1. **Routing:** the overlay has two entry points (Account and Pause)
+     but Cancel always returns to Pause regardless of which one opened
+     it.
+  2. **Native-input leak:** opening the confirmation directly from
+     Account (`this.openOverlay(...)`, not `closeOverlay()`) never runs
+     Auth exit cleanup, so a focused native `<input>` can remain mounted
+     at `z-index: 2147483647` underneath/above the confirmation.
+
+  **Root cause:** overlay transitions are bare state assignments, not a
+  lifecycle. The eventual fix needs one authoritative transition boundary
+  — not a name mandated here, just the shape:
+
+  ```
+  previous overlay exit
+    -> native-input and listener cleanup
+    -> next overlay state
+    -> next overlay mount/focus
+  ```
+
+  The existing `overlayReturn` field (already used for `auth`'s own
+  return routing) is a real precedent for the "remember where this came
+  from" half of this, but doesn't by itself cover the cleanup half.
+
+  **Runtime acceptance criteria to record**, for whoever picks this up:
+  - Focus the Account username field, then open Reset progress.
+  - No legacy Auth or Account native input remains mounted.
+  - `accountUsernameActive` and any equivalent field-active state is
+    cleared.
+  - The confirmation overlay owns keyboard and pointer interaction —
+    nothing underneath it is still focusable.
+  - Cancel returns to Account when invoked from Account.
+  - Cancel returns to Pause when invoked from Pause.
+  - A confirmed reset follows its own explicit post-reset destination,
+    independent of either entry point.
+  - Refocusing the username field after returning creates exactly one
+    intended input, not a duplicate.
+  - Scene shutdown and sign-out leave no native input or listener behind,
+    same as today's existing (if scattered) coverage.
 
 This document does not implement Wave 4D or the Wave 3C proof — it stays
 documentation-only, per this PR's own scope. It's recorded here so

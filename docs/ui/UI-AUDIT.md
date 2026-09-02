@@ -307,18 +307,41 @@ Severity per the redesign brief's own scale.
   natural place this gets resolved, once `src/ui/dom/*` is actually mounted.
 
 **P1 — major hierarchy/duplication**
-- **Confirmed runtime defect, not just a doc gap:** the progression-reset
-  confirmation overlay has two entry points — the authenticated Account
-  section of the Auth overlay (`buildAuthenticatedAccountSection`,
-  `MenuScene.ts:11491`) and Pause (`MenuScene.ts:14951`) — but
-  `legacyOverlayRouting.ts:31-35` always routes its Cancel/back action to
-  `'pause'` unconditionally, regardless of which context opened it.
-  Cancelling from Account currently opens the play-oriented Pause surface
-  while still in menu mode. See `UI-SCREEN-MAP.md`'s progression-reset row
-  for the exact call sites. Relevant to `UI-MIGRATION-PLAN.md`'s
-  recommended ConfirmDialog first-proof (Option B): that proof's own
-  focus-restoration requirement would need to fix this, not just port the
-  Pause-only behavior into DOM form.
+- **Confirmed runtime defect, not just a doc gap — two symptoms of one
+  root problem:** the progression-reset confirmation overlay has two
+  entry points — the authenticated Account section of the Auth overlay
+  (`buildAuthenticatedAccountSection`, `MenuScene.ts:11491`) and Pause
+  (`MenuScene.ts:14951`) — and neither entry point runs a proper exit
+  lifecycle for the surface it's leaving:
+  1. **Routing:** `legacyOverlayRouting.ts:31-35` always routes its
+     Cancel/back action to `'pause'` unconditionally, regardless of which
+     context opened it. Cancelling from Account currently opens the
+     play-oriented Pause surface while still in menu mode.
+  2. **Native-input leak (2026-08-30, confirmed):** the Account entry
+     point calls `this.openOverlay('confirm-progression-reset')` directly
+     (`MenuScene.ts:11491`), not `closeOverlay()`. Verified against both
+     functions: `openOverlay()` (`:14848-14890`) never runs any Auth exit
+     cleanup regardless of what overlay is being left, and the
+     `destroyLegacyAuthNativeInput()`/`destroyAccountUsernameNativeInput()`
+     calls inside `closeOverlay()` (`:14892-14899`) are gated on
+     `this.overlay === 'auth'` — a gate that can never fire for this path,
+     since `this.overlay` is already `'confirm-progression-reset'` by the
+     time any cleanup could run. If the Account username field was active,
+     its native `<input>` (`z-index: 2147483647`, appended to
+     `document.body`) remains mounted and focused while the confirmation
+     overlay is open.
+
+  **Root cause, common to both:** overlay changes in the current code are
+  bare state assignments (`this.overlay = kind`), not lifecycle-governed
+  transitions — leaving a surface doesn't guarantee that surface's own
+  exit cleanup runs before the next surface becomes active. See
+  `UI-SCREEN-MAP.md`'s progression-reset row for the exact call sites, and
+  `UI-MIGRATION-PLAN.md`'s progression-reset follow-on for the required
+  runtime fix (an explicit transition boundary, not two separate patches).
+  Relevant to `UI-MIGRATION-PLAN.md`'s Wave 3C first-proof recommendation
+  (the progression-reset `ConfirmDialog`): that proof's own focus-trap/
+  focus-restoration requirement would need to fix both defects, not just
+  port the current Pause-only, cleanup-optional behavior into DOM form.
 - Leaderboard screen's own title icon is a second, procedural
   reimplementation of an icon that already has a real asset one screen
   away (§3).

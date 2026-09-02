@@ -106,25 +106,71 @@ spacing above).
 - Respect `prefersLegacyReducedMotion()` (already exists and is checked
   broadly) as the one central gate for all of the above.
 
-## Z-order contract (proposed, formalizing what's implicit today)
+## Z-order contract (staged — correction, 2026-08-30: was a single flat sequence that omitted the title layers and put orbit diamonds before HUD, contradicting the real paint order)
+
+An earlier version of this contract proposed one flat sequence for all
+time. That's wrong on two counts, both fixed below: it put "gameplay VFX
+(orbit diamonds...)" *before* "HUD (header icons...)", when
+`boardZoomContainer`'s real child order does the opposite (header icons
+paint before the title/orbit layers — see `UI-SCREEN-MAP.md`'s corrected
+list); and it folded the title, orbit-diamond, and tile-font-pool layers
+into a vague "gameplay VFX" bucket instead of naming them. Current
+implementation order and eventual renderer ownership are related but not
+identical — this contract needs both a "what ships now" stage and a
+"what Wave 3C changes" stage, not one sequence pretending to cover both.
+
+**Stage A — current Phaser composition, in force through Wave 4D.** Wave
+4D must preserve this verified relative order unless a separately
+approved visual change deliberately supersedes it (`boardZoomContainer`
+child order, `MenuScene.ts:1929-2028`, exactly as corrected in
+`UI-SCREEN-MAP.md`'s Z-order section):
 
 ```
-background/starfield
-  -> maze (static walls, corridor material)
-  -> path/trail (color fill + real trail material overlay)
-  -> gameplay VFX (orbit diamonds, laser, spawn burst, endpoint glow)
-  -> HUD (header icons, touch controls)
-  -> overlays (Settings/Pause/Guide/Leaderboard/Auth/Confirm)
-  -> modal/blocking interaction (auth gate, confirm dialogs)
+board/static material (walls, corridor fill, floor, bleed paths)
+  -> dynamic path and markers (trail fill, start/goal/player, endpoint glow)
+  -> real trail material overlay
+  -> transitional legacy Phaser header icons (settings/leaderboard)
+  -> titleGraphics (title text)
+  -> titleOrbitDiamondImages (orbit diamond sigils/twinkles)
+  -> titleTileFontImagePool (tile-font wordmark glyph pool)
 ```
 
-This already roughly matches `boardZoomContainer`'s real child order (see
-`UI-SCREEN-MAP.md`), but it has never been written down, which is how the
-player-trail overlay ended up needing an explicit per-cell exclusion
-workaround to avoid painting over markers instead of the layering simply
-preventing it by construction. Any new primitive-based rendering should
-make this order a real, enforced constant, not an emergent property of
-`.add()` call sequence.
+Screen-fixed effects — `playerSpawnBurstGraphics`,
+`playerTransferBeamStripImages`/`playerTransferBeamTargetCapImages`,
+`hudGraphics`, `touchSettingsCogIconImage`, `overlayGraphics` — live
+outside `boardZoomContainer` in their own top-level coordinate-space
+stack (see `UI-SCREEN-MAP.md`) and must not be inferred from the sequence
+above; Wave 4D needs to account for both stacks, not assume one implies
+the other.
+
+**Stage B — final composite, once Wave 3C mounts.** The HUD moves from
+transitional Phaser chrome to DOM, and sits above the Phaser canvas
+entirely rather than interleaved with world-space layers:
+
+```
+Phaser canvas:
+  background/starfield
+    -> maze and corridor material
+    -> player/trail/start/goal
+    -> world-space diamonds, beams, spawn/transfer effects
+    -> title and orbit choreography
+
+DOM application layer (above the Phaser canvas):
+  HUD and touch controls
+    -> application overlays (Settings/Guide/Leaderboard/Auth/Confirm)
+    -> confirmation/modal surfaces
+    -> blocking/auth interaction surfaces
+```
+
+Rules that hold across both stages: Wave 4D owns Phaser/world ordering
+and must not prematurely delete, move, or reclassify the legacy Phaser
+HUD elements before Wave 3C actually owns their DOM replacement; the
+title wordmark, orbit diamonds, and tile-font pool must never be silently
+dropped from whichever stage's contract is currently in force; and the
+player-trail overlay's existing per-cell exclusion workaround (needed
+today because layering alone doesn't prevent it from painting over
+markers) is exactly the kind of thing a real, enforced ordering constant
+should retire, not something either stage's contract should paper over.
 
 ## Correction: this is not an open decision
 
