@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { copyFile, writeFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import {
@@ -31,6 +32,13 @@ export const SIGNED_OUT_AUTH_GATE_BUTTONS = Object.freeze([
 ]);
 export const RETIRED_GUEST_ENTRY_BUTTON = 'Play as guest';
 export const AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY = 'mazer.game-toggles.v1:user:runtime-diagnostics-auth-fixture';
+export const GUEST_FIXTURE_SETTINGS_STORAGE_KEY = 'mazer.game-toggles.v1:guest';
+export const UNSCOPED_SETTINGS_STORAGE_KEY = 'mazer.game-toggles.v1';
+export const FIXTURE_SETTINGS_STORAGE_KEYS = Object.freeze({
+  authenticated: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
+  guest: GUEST_FIXTURE_SETTINGS_STORAGE_KEY,
+  unscoped: UNSCOPED_SETTINGS_STORAGE_KEY
+});
 
 const normalizeControlLabel = (value) => String(value).trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
 const normalizedLabelsMatchExactly = (actual, expected) => {
@@ -93,11 +101,82 @@ export const evaluateTrailShineChangedStatePersistence = ({
   };
 };
 
+const readTrailShineFromStoredSettings = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed?.toggleTrailPulse === 'boolean' ? parsed.toggleTrailPulse : null;
+  } catch {
+    return null;
+  }
+};
+
+export const evaluateFixtureSettingsIsolation = ({
+  preimage,
+  changed,
+  reloaded,
+  expectedTrailShine
+}) => {
+  const expectedKeyChanged = changed.authenticated !== preimage.authenticated;
+  const expectedKeyPersisted = reloaded.authenticated === changed.authenticated;
+  const changedValueMatches = readTrailShineFromStoredSettings(changed.authenticated) === expectedTrailShine;
+  const reloadedValueMatches = readTrailShineFromStoredSettings(reloaded.authenticated) === expectedTrailShine;
+  const guestByteIdentical = changed.guest === preimage.guest && reloaded.guest === preimage.guest;
+  const unscopedByteIdentical = changed.unscoped === preimage.unscoped
+    && reloaded.unscoped === preimage.unscoped;
+  return {
+    pass: expectedKeyChanged
+      && expectedKeyPersisted
+      && changedValueMatches
+      && reloadedValueMatches
+      && guestByteIdentical
+      && unscopedByteIdentical,
+    expectedKeyChanged,
+    expectedKeyPersisted,
+    changedValueMatches,
+    reloadedValueMatches,
+    guestByteIdentical,
+    unscopedByteIdentical
+  };
+};
+
+export const evaluateFixtureSettingsCleanup = ({ preimage, postimage }) => {
+  const authenticatedByteIdentical = postimage.authenticated === preimage.authenticated;
+  const guestByteIdentical = postimage.guest === preimage.guest;
+  const unscopedByteIdentical = postimage.unscoped === preimage.unscoped;
+  return {
+    pass: authenticatedByteIdentical && guestByteIdentical && unscopedByteIdentical,
+    authenticatedByteIdentical,
+    guestByteIdentical,
+    unscopedByteIdentical
+  };
+};
+
 export const createFixtureSettingsRestorePlan = (preimage) => (
-  preimage?.present === true && typeof preimage.value === 'string'
-    ? { action: 'set', key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY, value: preimage.value }
+  typeof preimage?.authenticated === 'string'
+    ? { action: 'set', key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY, value: preimage.authenticated }
     : { action: 'remove', key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY, value: null }
 );
+
+export const measureAuthPersistenceElapsedMs = (
+  runStartedAt,
+  capturedAt = performance.now()
+) => Math.max(0, Math.round(capturedAt - runStartedAt));
+
+export const publishAuthPersistenceSuccessAfterCleanup = async ({
+  cleanupErrors,
+  writeSummary,
+  promoteLatest
+}) => {
+  if (cleanupErrors.length > 0) {
+    return { published: false, promoted: false };
+  }
+  await writeSummary();
+  await promoteLatest();
+  return { published: true, promoted: true };
+};
 
 export const surfaceMatchesAuthPersistenceExpectation = (surface, expected) => (
   (expected.authenticated === undefined || (surface?.authStatus === 'authenticated') === expected.authenticated)
@@ -216,6 +295,12 @@ const readDiagnostics = async (page) => ({
   visual: await readJsonAttribute(page, VISUAL_DIAGNOSTICS_ATTRIBUTE)
 });
 
+const readFixtureSettingsStorageSnapshot = async (page) => page.evaluate((keys) => ({
+  authenticated: window.localStorage.getItem(keys.authenticated),
+  guest: window.localStorage.getItem(keys.guest),
+  unscoped: window.localStorage.getItem(keys.unscoped)
+}), FIXTURE_SETTINGS_STORAGE_KEYS);
+
 const summarizeSurface = ({ runtime, visual }) => ({
   authStatus: runtime?.auth?.status ?? null,
   buttons: (visual?.buttons ?? []).map((button) => button.text),
@@ -285,6 +370,7 @@ const waitForTrailShineState = async (page, enabled, expectedSurface) => {
 
 const captureFailureState = async ({
   page,
+  runStartedAt,
   currentPhase,
   phaseTimings,
   terminalError,
@@ -293,7 +379,7 @@ const captureFailureState = async ({
   failedRequests,
   pendingRequests
 }) => {
-  const elapsedMs = phaseTimings.at(-1)?.elapsedMs ?? 0;
+  const elapsedMs = measureAuthPersistenceElapsedMs(runStartedAt);
   if (page.isClosed()) {
     return {
       capturedAt: new Date().toISOString(),
@@ -476,11 +562,14 @@ export const summarizeAuthPersistenceSoak = (steps, consoleMessages, pageErrors)
 };
 
 export const runLiveAuthPersistenceSoak = async (options = {}) => {
+  const runStartedAt = performance.now();
   const artifactRoot = resolve(options.artifactRoot ?? DEFAULT_ARTIFACT_ROOT);
   const sessionId = resolveSessionId(options.sessionId);
   const outputDir = resolve(artifactRoot, sessionId);
   const label = options.label ?? 'auth-persistence-soak';
-  resolveAuthPersistenceArtifactPath(outputDir, label, '.summary.json');
+  const summaryPath = resolveAuthPersistenceArtifactPath(outputDir, label, '.summary.json');
+  const cleanupFailureEvidencePath = resolveAuthPersistenceArtifactPath(outputDir, label, '.cleanup-failure.json');
+  const latestSummaryPath = resolve(artifactRoot, 'latest.summary.json');
   await ensureDir(outputDir);
 
   if (options.skipBuild !== true) {
@@ -498,13 +587,13 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   const blockedMutationRequests = [];
   const steps = [];
   const screenshots = {};
-  const runStartedAt = Date.now();
   const phaseTimings = [];
   let currentPhase = 'initialization';
-  let completed = false;
+  let pendingSummary = null;
   let terminalError = null;
   let fixtureSettingsPreimage = null;
   let fixtureSettingsTouched = false;
+  let cleanupErrors = [];
   let fixtureSettingsCleanup = {
     attempted: false,
     fixtureOnly: true,
@@ -514,7 +603,52 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   const cleanupEvidencePath = resolveAuthPersistenceArtifactPath(outputDir, label, '.fixture-cleanup.json');
   const enterPhase = (phase) => {
     currentPhase = phase;
-    phaseTimings.push({ phase, elapsedMs: Date.now() - runStartedAt });
+    phaseTimings.push({ phase, elapsedMs: measureAuthPersistenceElapsedMs(runStartedAt) });
+  };
+  const persistCurrentFailureEvidence = async (failedPhase) => {
+    enterPhase('failure-evidence');
+    const pageAvailable = page !== null && !page.isClosed();
+    const evidence = pageAvailable
+      ? await captureFailureState({
+        page,
+        runStartedAt,
+        currentPhase: failedPhase,
+        phaseTimings,
+        terminalError,
+        consoleMessages,
+        pageErrors,
+        failedRequests,
+        pendingRequests
+      })
+      : {
+        capturedAt: new Date().toISOString(),
+        currentPhase: failedPhase,
+        elapsedMs: measureAuthPersistenceElapsedMs(runStartedAt),
+        phaseTimings,
+        error: sanitizeAuthPersistenceDiagnosticText(
+          terminalError instanceof Error ? terminalError.message : terminalError ?? 'unknown_failure'
+        ),
+        url: null,
+        title: null,
+        document: null,
+        controls: [],
+        canvas: null,
+        surface: null,
+        failedRequests,
+        pendingRequests: [...pendingRequests.values()],
+        consoleMessages: consoleMessages.map(sanitizeAuthPersistenceDiagnosticText),
+        pageErrors: pageErrors.map(sanitizeAuthPersistenceDiagnosticText),
+        serviceWorker: null,
+        captureState: 'page_unavailable'
+      };
+    await persistAuthPersistenceFailureEvidence({
+      outputDir,
+      label,
+      evidence,
+      screenshot: pageAvailable
+        ? (path) => page.screenshot({ path, fullPage: true })
+        : async () => { throw new Error('page_unavailable'); }
+    });
   };
 
   try {
@@ -617,10 +751,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       surface: authenticatedEntry,
       fixtureOnly: true
     });
-    fixtureSettingsPreimage = await page.evaluate((key) => {
-      const value = window.localStorage.getItem(key);
-      return { present: value !== null, value };
-    }, AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY);
+    fixtureSettingsPreimage = await readFixtureSettingsStorageSnapshot(page);
 
     enterPhase('diagnostics-fixture-options');
     await openOptionsViaQa(page);
@@ -651,6 +782,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     const changedOptionsSurface = await waitForTrailShineState(page, changedTrailShine, {
       authenticated: true, buttons: ['Trail Shine', 'Account'], mode: 'menu', overlay: 'options'
     });
+    const changedSettingsSnapshot = await readFixtureSettingsStorageSnapshot(page);
     steps.push({
       id: 'diagnostics-fixture-trail-shine-changed',
       pass: changedOptionsSurface.userIdPresent
@@ -665,6 +797,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     const authenticatedReload = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
+    const reloadedSettingsSnapshot = await readFixtureSettingsStorageSnapshot(page);
     steps.push({
       id: 'authenticated-reload',
       pass: authenticatedReload.userIdPresent && authenticatedReload.trailShineEnabled === changedTrailShine,
@@ -683,11 +816,20 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       reloadedRuntime: authenticatedOptionsReload.trailShineEnabled,
       reloadedUi: authenticatedOptionsReload.trailShineUiEnabled
     });
+    const fixtureSettingsIsolation = evaluateFixtureSettingsIsolation({
+      preimage: fixtureSettingsPreimage,
+      changed: changedSettingsSnapshot,
+      reloaded: reloadedSettingsSnapshot,
+      expectedTrailShine: changedTrailShine
+    });
     steps.push({
       id: 'authenticated-options-reload',
-      pass: authenticatedOptionsReload.userIdPresent && changedStatePersistence.pass,
+      pass: authenticatedOptionsReload.userIdPresent
+        && changedStatePersistence.pass
+        && fixtureSettingsIsolation.pass,
       surface: authenticatedOptionsReload,
       changedStatePersistence,
+      fixtureSettingsIsolation,
       fixtureOnly: true
     });
     screenshots.authenticatedOptions = resolveAuthPersistenceArtifactPath(outputDir, label, '-authenticated-options.png');
@@ -776,7 +918,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         pageErrors: sanitizedPageErrors
       })}`);
     }
-    const summary = {
+    pendingSummary = {
       schema: 'mazer.live-auth-persistence-soak.v1',
       label,
       generatedAt: new Date().toISOString(),
@@ -790,49 +932,56 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       blockedMutationRequests,
       fixtureSettings: {
         changedFromDefault: changedTrailShine !== initialTrailShine,
+        storageIsolation: fixtureSettingsIsolation,
         cleanupEvidencePath,
-        storageScope: fixtureSettingsCleanup.storageScope
+        storageScope: fixtureSettingsCleanup.storageScope,
+        cleanup: null
       },
       artifacts: { cleanupEvidencePath, screenshotPath, screenshots }
     };
-    const summaryPath = resolveAuthPersistenceArtifactPath(outputDir, label, '.summary.json');
-    await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
-    await copyFile(summaryPath, resolve(artifactRoot, 'latest.summary.json'));
-    completed = true;
-    return { ...summary, summaryPath };
   } catch (error) {
     terminalError = error;
-    throw error;
   } finally {
     const failedPhase = currentPhase;
-    const cleanupErrors = await settleAuthPersistenceResources([
+    if (terminalError !== null) {
+      cleanupErrors.push(...await settleAuthPersistenceResources([
+        {
+          name: 'failure_evidence',
+          run: () => persistCurrentFailureEvidence(failedPhase)
+        }
+      ]));
+    }
+    cleanupErrors.push(...await settleAuthPersistenceResources([
       {
         name: 'fixture_settings_restore',
-        run: page === null || fixtureSettingsPreimage === null || fixtureSettingsTouched === false
+        run: page === null || page.isClosed() || fixtureSettingsPreimage === null
           ? null
           : async () => {
-            fixtureSettingsCleanup = {
-              ...fixtureSettingsCleanup,
-              attempted: true
-            };
             const restorePlan = createFixtureSettingsRestorePlan(fixtureSettingsPreimage);
             try {
-              const restored = await page.evaluate((plan) => {
-                if (plan.action === 'set') {
-                  window.localStorage.setItem(plan.key, plan.value);
-                } else {
-                  window.localStorage.removeItem(plan.key);
-                }
-                const current = window.localStorage.getItem(plan.key);
-                return plan.action === 'set' ? current === plan.value : current === null;
-              }, restorePlan);
+              if (fixtureSettingsTouched) {
+                await page.evaluate((plan) => {
+                  if (plan.action === 'set') {
+                    window.localStorage.setItem(plan.key, plan.value);
+                  } else {
+                    window.localStorage.removeItem(plan.key);
+                  }
+                }, restorePlan);
+              }
+              const postimage = await readFixtureSettingsStorageSnapshot(page);
+              const cleanupVerification = evaluateFixtureSettingsCleanup({
+                preimage: fixtureSettingsPreimage,
+                postimage
+              });
               fixtureSettingsCleanup = {
                 ...fixtureSettingsCleanup,
-                action: restorePlan.action,
-                restored
+                attempted: fixtureSettingsTouched,
+                action: fixtureSettingsTouched ? restorePlan.action : 'none',
+                restored: cleanupVerification.pass,
+                verification: cleanupVerification
               };
-              if (!restored) {
-                throw new Error('fixture_settings_restore_readback_mismatch');
+              if (!cleanupVerification.pass) {
+                throw new Error('fixture_settings_complete_postimage_mismatch');
               }
             } catch (error) {
               fixtureSettingsCleanup = {
@@ -847,52 +996,6 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
           }
       },
       {
-        name: 'failure_evidence',
-        run: completed ? null : async () => {
-          enterPhase('failure-evidence');
-          const evidence = page === null
-            ? {
-              capturedAt: new Date().toISOString(),
-              currentPhase: failedPhase,
-              elapsedMs: phaseTimings.at(-1)?.elapsedMs ?? 0,
-              phaseTimings,
-              error: sanitizeAuthPersistenceDiagnosticText(
-                terminalError instanceof Error ? terminalError.message : terminalError ?? 'unknown_failure'
-              ),
-              url: null,
-              title: null,
-              document: null,
-              controls: [],
-              canvas: null,
-              surface: null,
-              failedRequests,
-              pendingRequests: [...pendingRequests.values()],
-              consoleMessages: consoleMessages.map(sanitizeAuthPersistenceDiagnosticText),
-              pageErrors: pageErrors.map(sanitizeAuthPersistenceDiagnosticText),
-              serviceWorker: null,
-              captureState: 'page_unavailable'
-            }
-            : await captureFailureState({
-              page,
-              currentPhase: failedPhase,
-              phaseTimings,
-              terminalError,
-              consoleMessages,
-              pageErrors,
-              failedRequests,
-              pendingRequests
-            });
-          await persistAuthPersistenceFailureEvidence({
-            outputDir,
-            label,
-            evidence,
-            screenshot: page === null
-              ? async () => { throw new Error('page_unavailable'); }
-              : (path) => page.screenshot({ path, fullPage: true })
-          });
-        }
-      },
-      {
         name: 'fixture_cleanup_evidence',
         run: fixtureSettingsPreimage === null
           ? null
@@ -902,6 +1005,10 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
           }, null, 2)}\n`, 'utf8')
       },
       {
+        name: 'context_close',
+        run: context === null ? null : () => context.close()
+      },
+      {
         name: 'browser_close',
         run: browser === null ? null : () => browser.close()
       },
@@ -909,15 +1016,54 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         name: 'preview_stop',
         run: preview?.child ? () => stopPreviewServer(preview.child) : null
       }
-    ]);
+    ]));
     if (cleanupErrors.length > 0) {
+      const cleanupFailure = {
+        schema: 'mazer.live-auth-persistence-cleanup-failure.v1',
+        capturedAt: new Date().toISOString(),
+        currentPhase: failedPhase,
+        elapsedMs: measureAuthPersistenceElapsedMs(runStartedAt),
+        cleanupErrors,
+        fixtureSettingsCleanup
+      };
+      try {
+        await writeFile(cleanupFailureEvidencePath, `${JSON.stringify(cleanupFailure, null, 2)}\n`, 'utf8');
+      } catch (error) {
+        cleanupErrors.push(`cleanup_failure_evidence:${sanitizeAuthPersistenceDiagnosticText(
+          error instanceof Error ? error.message : String(error)
+        )}`);
+      }
       if (terminalError instanceof Error) {
         terminalError.cleanupErrors = cleanupErrors;
       } else {
-        throw new AggregateError(cleanupErrors.map((message) => new Error(message)), 'auth_persistence_cleanup_failed');
+        terminalError = new AggregateError(
+          cleanupErrors.map((message) => new Error(message)),
+          'auth_persistence_cleanup_failed'
+        );
+        cleanupErrors.push(...await settleAuthPersistenceResources([
+          {
+            name: 'failure_evidence',
+            run: () => persistCurrentFailureEvidence(failedPhase)
+          }
+        ]));
       }
     }
   }
+
+  if (terminalError !== null) {
+    throw terminalError;
+  }
+  if (pendingSummary === null) {
+    throw new Error('auth_persistence_summary_unavailable');
+  }
+
+  pendingSummary.fixtureSettings.cleanup = fixtureSettingsCleanup;
+  await publishAuthPersistenceSuccessAfterCleanup({
+    cleanupErrors,
+    writeSummary: () => writeFile(summaryPath, `${JSON.stringify(pendingSummary, null, 2)}\n`, 'utf8'),
+    promoteLatest: () => copyFile(summaryPath, latestSummaryPath)
+  });
+  return { ...pendingSummary, summaryPath };
 };
 
 if (isDirectRun) {

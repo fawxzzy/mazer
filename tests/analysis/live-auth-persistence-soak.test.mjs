@@ -5,13 +5,18 @@ import { join, resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
   AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
+  FIXTURE_SETTINGS_STORAGE_KEYS,
   RETIRED_GUEST_ENTRY_BUTTON,
   SIGNED_OUT_AUTH_GATE_BUTTONS,
   buildAuthPersistenceRoute,
   createFixtureSettingsRestorePlan,
+  evaluateFixtureSettingsCleanup,
+  evaluateFixtureSettingsIsolation,
   evaluateTrailShineChangedStatePersistence,
   isExternalMutationRequest,
+  measureAuthPersistenceElapsedMs,
   persistAuthPersistenceFailureEvidence,
+  publishAuthPersistenceSuccessAfterCleanup,
   resolveAuthPersistenceArtifactPath,
   sanitizeAuthPersistenceDiagnosticText,
   sanitizeAuthPersistenceDiagnosticUrl,
@@ -51,6 +56,16 @@ const currentSignedOutSurface = {
   overlay: 'auth',
   userIdPresent: false
 };
+
+const fixtureSettingsPreimage = Object.freeze({
+  authenticated: '{"toggleTrailPulse":true}',
+  guest: '{"toggleTrailPulse":false,"volume":0.25}',
+  unscoped: '{"toggleTrailPulse":true,"volume":0.5}'
+});
+const fixtureSettingsChanged = Object.freeze({
+  ...fixtureSettingsPreimage,
+  authenticated: '{"toggleTrailPulse":false}'
+});
 
 describe('live auth persistence soak contract', () => {
   test('recognizes the current signed-out account gate and rejects the retired guest expectation', () => {
@@ -138,16 +153,124 @@ describe('live auth persistence soak contract', () => {
   });
 
   test('restores only the authenticated fixture settings key', () => {
-    expect(createFixtureSettingsRestorePlan({ present: false, value: null })).toEqual({
+    expect(createFixtureSettingsRestorePlan({ authenticated: null })).toEqual({
       action: 'remove',
       key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
       value: null
     });
-    expect(createFixtureSettingsRestorePlan({ present: true, value: '{"toggleTrailPulse":false}' })).toEqual({
+    expect(createFixtureSettingsRestorePlan({ authenticated: '{"toggleTrailPulse":false}' })).toEqual({
       action: 'set',
       key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
       value: '{"toggleTrailPulse":false}'
     });
+    expect(FIXTURE_SETTINGS_STORAGE_KEYS).toEqual({
+      authenticated: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
+      guest: 'mazer.game-toggles.v1:guest',
+      unscoped: 'mazer.game-toggles.v1'
+    });
+  });
+
+  test('accepts changed-state persistence only when the authenticated key changes alone and cleanup is exact', () => {
+    expect(evaluateFixtureSettingsIsolation({
+      preimage: fixtureSettingsPreimage,
+      changed: fixtureSettingsChanged,
+      reloaded: fixtureSettingsChanged,
+      expectedTrailShine: false
+    })).toEqual({
+      pass: true,
+      expectedKeyChanged: true,
+      expectedKeyPersisted: true,
+      changedValueMatches: true,
+      reloadedValueMatches: true,
+      guestByteIdentical: true,
+      unscopedByteIdentical: true
+    });
+    expect(evaluateFixtureSettingsCleanup({
+      preimage: fixtureSettingsPreimage,
+      postimage: fixtureSettingsPreimage
+    })).toEqual({
+      pass: true,
+      authenticatedByteIdentical: true,
+      guestByteIdentical: true,
+      unscopedByteIdentical: true
+    });
+  });
+
+  test('rejects a UI change that does not persist in the authenticated settings key', () => {
+    expect(evaluateFixtureSettingsIsolation({
+      preimage: fixtureSettingsPreimage,
+      changed: fixtureSettingsChanged,
+      reloaded: fixtureSettingsPreimage,
+      expectedTrailShine: false
+    })).toMatchObject({
+      pass: false,
+      expectedKeyChanged: true,
+      expectedKeyPersisted: false,
+      reloadedValueMatches: false
+    });
+  });
+
+  test('rejects mutation of the guest key instead of the authenticated fixture key', () => {
+    const wrongKeyMutation = {
+      ...fixtureSettingsPreimage,
+      guest: '{"toggleTrailPulse":true,"volume":0.25}'
+    };
+    expect(evaluateFixtureSettingsIsolation({
+      preimage: fixtureSettingsPreimage,
+      changed: wrongKeyMutation,
+      reloaded: wrongKeyMutation,
+      expectedTrailShine: false
+    })).toMatchObject({
+      pass: false,
+      expectedKeyChanged: false,
+      changedValueMatches: false,
+      guestByteIdentical: false
+    });
+  });
+
+  test('rejects collateral guest or unscoped key mutation even when authenticated persistence succeeds', () => {
+    for (const collateralKey of ['guest', 'unscoped']) {
+      const collateralMutation = {
+        ...fixtureSettingsChanged,
+        [collateralKey]: `${fixtureSettingsChanged[collateralKey]}-mutated`
+      };
+      expect(evaluateFixtureSettingsIsolation({
+        preimage: fixtureSettingsPreimage,
+        changed: collateralMutation,
+        reloaded: collateralMutation,
+        expectedTrailShine: false
+      })).toMatchObject({ pass: false, [`${collateralKey}ByteIdentical`]: false });
+    }
+  });
+
+  test('cleanup mismatch prevents success publication and latest promotion', async () => {
+    const events = [];
+    expect(evaluateFixtureSettingsCleanup({
+      preimage: fixtureSettingsPreimage,
+      postimage: fixtureSettingsChanged
+    })).toMatchObject({ pass: false, authenticatedByteIdentical: false });
+
+    await expect(publishAuthPersistenceSuccessAfterCleanup({
+      cleanupErrors: ['fixture_settings_restore:fixture_settings_complete_postimage_mismatch'],
+      writeSummary: async () => { events.push('summary'); },
+      promoteLatest: async () => { events.push('latest'); }
+    })).resolves.toEqual({ published: false, promoted: false });
+    expect(events).toEqual([]);
+
+    await expect(publishAuthPersistenceSuccessAfterCleanup({
+      cleanupErrors: [],
+      writeSummary: async () => { events.push('summary'); },
+      promoteLatest: async () => { events.push('latest'); }
+    })).resolves.toEqual({ published: true, promoted: true });
+    expect(events).toEqual(['summary', 'latest']);
+  });
+
+  test('measures delayed failure at evidence-capture time from the monotonic run start', () => {
+    expect(measureAuthPersistenceElapsedMs(100, 30_100)).toBe(30_000);
+    expect(measureAuthPersistenceElapsedMs(100, 30_100)).toBeGreaterThan(29_000);
+    const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/live-auth-persistence-soak.mjs'), 'utf8');
+    expect(source).not.toContain("elapsedMs: phaseTimings.at(-1)?.elapsedMs");
+    expect(source).toContain('elapsedMs: measureAuthPersistenceElapsedMs(runStartedAt)');
   });
 
   test('blocks external mutation methods while allowing local fixture traffic and read-only requests', () => {
