@@ -140,3 +140,53 @@ Phaser image rather than transient HUD graphics, every HUD teardown path must
 hide it explicitly before an overlay or menu surface is shown. This includes
 forced auth-gate and password-recovery transitions, which bypass the normal
 overlay-opening helper and return before the next HUD draw.
+
+## Fourth asset batch (2026-08-28, catalogued 2026-09-02): goal-star reference frames and one full-scene concept
+
+Five files from the same Downloads drop as the second batch above (same
+Aug 28 session, an earlier window within it) were never reviewed or
+catalogued at the time -- found during Navigation Core visual-direction
+work on 2026-09-02, after a mockup built without them was found to
+contradict the live `drawLegacyGoalStarMarker` implementation. Copied
+byte-for-byte; SHA-256 verified identical between the Downloads originals
+and the repo copies immediately after copying (Python `hashlib.sha256`,
+not `sha256sum`, but the same verification -- read-hash-before,
+copy, read-hash-after, compare).
+
+| File | Source (Downloads) | Dimensions | Mode | SHA-256 |
+|---|---|---|---|---|
+| `vfx/goal-star/edge-goal-star-frame-0.png` | `Codex Image Aug 28, 2026, 02_18_54 PM.png` | 1254x1254 | RGB, opaque | `8760126792f1e056e2b88dc392d5f46fb9121b39e85834194183423fc09d854b` |
+| `vfx/goal-star/edge-goal-star-frame-1.png` | `Codex Image Aug 28, 2026, 02_18_59 PM.png` | 1254x1254 | RGB, opaque | `7bba30a7b1c345ca85e1cd2f89d08a3b358e1b121dcd1a1dd9a56f197d887d87` |
+| `vfx/goal-star/edge-goal-star-frame-2.png` | `Codex Image Aug 28, 2026, 02_19_08 PM.png` | 1254x1254 | RGB, opaque | `6a76f178667706430de6810ede7571ac59c8351a653a0fef2490ceb729eb5628` |
+| `vfx/goal-star/edge-goal-star-frame-3.png` | `Codex Image Aug 28, 2026, 02_19_13 PM.png` | 1254x1254 | RGB, opaque | `ba77574457e58c5226c17ec6d2b58447ad1808501173f8c9591a6279ff07dfb4` |
+| `docs/assets/reference/mazer-active-play-concept.png` | `Codex Image Aug 28, 2026, 03_12_47 PM.png` | 941x1672 | RGB, opaque | `4b5aea573c4ef2d9a44f20a8e392a2e870d7d5305f3f3227d81bfebeb92c87b8` |
+
+**Goal-star frames**: four rotation phases of one design -- a hollow
+five-point star (rainbow gradient stroke), sparkle glints scattered across
+the interior, a bright core flare, and an orbiting ring with a small
+satellite dot riding it. This matches the live `drawLegacyGoalStarMarker`
+(`src/scenes/MenuScene.ts:9590-9713`) closely enough -- hollow star,
+rainbow outline, ring, orbiting highlight, twinkle sparkles -- that it is
+almost certainly the actual reference asset that function's own comment
+refers to ("Modeled on a reference asset the user supplied"). **Not
+game-ready as-is**: all four are opaque RGB on a near-white
+(`253,253,253`) rounded-card background, no alpha channel -- reference/
+concept renders, not drop-in transparent runtime assets, the same
+category as the previously-reviewed-but-not-copied `04_24_52 PM` diamond
+render. **Status: found, reviewed, not yet wired into anything.** If
+runtime integration is ever wanted, this needs either a transparent
+re-render from the same source, or a background-removal derivative
+generated into a separate directory (documented here, originals kept
+untouched) -- consistent with this file's own standing rule.
+
+**Active-play concept**: one full composed scene (header with title/
+profile/settings icons, a generated maze, a player marker at the start
+tile, a rainbow trail departing it, an end-star marker on a small backing
+plate at the goal tile). Stored under `docs/assets/reference/`, not
+`public/assets/`, deliberately -- **this is a visual-direction reference,
+not a candidate production asset**: it's a single flattened composite
+image, not a set of isolated per-element sources, and the trail/header
+treatment shown doesn't necessarily match what any individual asset
+batch above actually is. Use it to judge overall hierarchy, board feel,
+and how the goal-star and player are meant to relate to each other and
+the maze -- not as something to crop pieces out of and ship.
