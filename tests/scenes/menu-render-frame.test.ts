@@ -1017,7 +1017,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const visibleTrail = trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point));');
     expect(menuSceneSource).toContain('trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))');
     expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.maze;');
-    expect(menuSceneSource).toContain('const shouldFadeTrailByAge = this.mode === \'play\' || this.settings.toggleTrailFade;');
+    expect(menuSceneSource).toContain('const alpha = this.settings.toggleTrailFade');
     expect(menuSceneSource).toContain('this.drawLegacyDynamicTrailBorderDock(');
     expect(menuSceneSource).toContain('private drawLegacyDynamicTrailBorderDock(');
     expect(menuSceneSource).toContain('this.drawLegacyPathBorderDock(');
@@ -1069,13 +1069,18 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const falloff = smoothstep(1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW));');
     expect(menuSceneSource).not.toContain('drawLegacyDynamicTrailShine');
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_DYNAMIC_TRAIL_SHINE');
-    expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
-    expect(menuSceneSource).toContain('LEGACY_PLAY_PATH_EDGE,');
-    expect(menuSceneSource).toContain('LEGACY_PLAY_PATH_EDGE_ALPHA,');
+    // Navigation Core v1: the real play trail is now one continuous path
+    // (drawLegacyContinuousPlayTrail), not the old per-cell
+    // fillLegacyPlayDynamicPathTile -- that function is gone.
+    expect(menuSceneSource).not.toContain('private fillLegacyPlayDynamicPathTile(');
+    expect(menuSceneSource).toContain('private drawLegacyContinuousPlayTrail(');
+    expect(menuSceneSource).toContain('this.drawLegacyContinuousPlayTrail(time, mazeLeft, mazeTop, mazeTileSize, renderedPlayerPoint, menuTrailAlphaMultiplier);');
     expect(menuSceneSource).toContain('this.hasLegacyPlayTrailPulsePendingFrame(time)');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;');
     expect(menuSceneSource).toContain('private legacyPlayTrailPulseNextFrameAtMs = 0;');
-    expect(menuSceneSource).toContain('if (this.isLegacyTrailShineVisible()) {');
+    // The old per-cell pulse window is menu-only now -- the real play
+    // trail draws its own shared shine inside drawLegacyContinuousPlayTrail.
+    expect(menuSceneSource).toContain('if (this.mode === \'menu\' && this.isLegacyTrailShineVisible()) {');
     expect(menuSceneSource).toContain('this.drawLegacyPlayDynamicTrailPulse(');
     expect(menuSceneSource).toContain('resolvedBoardLeft,');
     expect(menuSceneSource).toContain('mazeRenderFrame.boardWidth,');

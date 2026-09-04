@@ -20,6 +20,12 @@ import {
 } from '../boot/canvasResolution';
 import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameToViewport } from '../boot/viewportGeometry';
 import {
+  advanceTrailShineState,
+  buildContinuousTrailPath,
+  resampleTrailVertices,
+  sampleTrailEnergyColor
+} from '../render/navigationCoreTrail';
+import {
   collectDemoWalkerRouteDiagnostics,
   type DemoRunnerTelemetry,
   type DemoWalkerConfig,
@@ -172,6 +178,7 @@ import {
 } from '../legacy-runtime/legacyMenuBackdrop';
 import {
   LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE,
+  LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS,
   mixLegacyIridescentColor,
   resolveLegacyIridescentPlayerCoreColor,
   resolveLegacyIridescentPlayerAccentColor,
@@ -1109,6 +1116,43 @@ const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;
 const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
 const LEGACY_PLAY_WALL_FILL = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;
+// Navigation Core v1's continuous play trail (src/render/navigationCoreTrail.ts) --
+// every ratio taken from the frozen reference where it gives one (16% width,
+// tile*0.3 player trim); the rest (color cycle pacing, shine speed, quiet-gap
+// length) are this integration's own reasonable choices where the reference
+// only describes the qualitative behavior, documented here rather than left
+// as unexplained magic numbers.
+const LEGACY_PLAY_TRAIL_WIDTH_RATIO = 0.16;
+const LEGACY_PLAY_TRAIL_CORNER_RADIUS_RATIO = 0.16;
+const LEGACY_PLAY_TRAIL_PLAYER_TRIM_RATIO = 0.3;
+// Fine resampling interval for color/alpha continuity -- see
+// resampleTrailVertices's own header for why Canvas-mode Phaser Graphics
+// needs this at all (no per-vertex gradient stroke).
+const LEGACY_PLAY_TRAIL_RESAMPLE_INTERVAL_PX = 4;
+// One full trip around the ENERGY palette spans this many tiles of trail --
+// slow enough to read as a flowing gradient rather than a rainbow banding
+// every step.
+const LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE = 6;
+// Reuses the same pacing as the player's own (retired) rainbow cycle for
+// consistency with the rest of this file's animation timing.
+const LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS = LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS;
+// The frozen reference's own numbers: shine ~9.5% of visible path length,
+// fading in/out over ~4% of the shine's own length.
+const LEGACY_PLAY_TRAIL_SHINE_LENGTH_RATIO = 0.095;
+const LEGACY_PLAY_TRAIL_SHINE_FADE_RATIO = 0.04;
+// Additional quiet-interval length once the shine reaches the player, as a
+// fraction of the trail's own current length, before it restarts at the
+// origin -- the reference asks for "a quiet interval" without giving an
+// exact number.
+const LEGACY_PLAY_TRAIL_SHINE_QUIET_GAP_RATIO = 0.35;
+const LEGACY_PLAY_TRAIL_SHINE_SPEED_TILES_PER_SEC = 4.2;
+// Below this trail length (in tiles), suppress the shine entirely rather
+// than an unstable sliver or a rapid, distracting loop -- the frozen
+// contract's explicit "very short trail" case.
+const LEGACY_PLAY_TRAIL_SHINE_MIN_TILES = 3;
+const LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR = 0xffffff;
+const LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN = 0.34;
+const LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX = 1;
 const LEGACY_PATH_TILE_CUE_COLOR = cyberArcadeMaterial.path.edge;
 const LEGACY_PATH_TILE_CUE_ALPHA = 0.42;
 const LEGACY_PATH_CONNECTOR_SEAM_PAD_RATIO = 0.16;
@@ -1900,6 +1944,12 @@ export class MenuScene extends Phaser.Scene {
     to: LegacyPoint;
   } | null = null;
   private lastPlayerVisualMotionSnapReason: LegacyPlayerVisualMotionSnapReason = null;
+  // The continuous play trail's shared shine lap-start timestamp (see
+  // advanceTrailShineState's own header for why this must be explicit,
+  // caller-persisted state rather than a value derived fresh each frame).
+  // Reset to the current time wherever this.trail itself resets to a fresh
+  // run, so a new maze/run never inherits the previous run's shine phase.
+  private trailShineLapStartedAtMs = 0;
   private boardStaticDirty = true;
   private boardPathDirty = true;
   private boardDynamicDirty = true;
@@ -4993,6 +5043,7 @@ export class MenuScene extends Phaser.Scene {
       this.player = generationState.initialPlayer;
       this.syncLegacyPlayerVisualMotionTo(generationState.initialPlayer);
       this.trail = generationState.initialTrail;
+      this.trailShineLapStartedAtMs = this.time.now;
       this.playCyclePath = generationState.initialTrail.map(copyPoint);
       this.playCycleResetUsed = false;
       this.playCompletedAtMs = null;
@@ -8488,62 +8539,57 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyLevelAnnouncer(time);
 
     this.playerTrailImageCursor = 0;
-    for (let index = 0; index < visibleTrail.length; index += 1) {
-      const point = visibleTrail[index];
-      if (!point) {
-        continue;
-      }
-      // Never color the start/goal tiles or whichever tile the player is
-      // currently standing on -- the start/goal markers already draw their
-      // own glow on top (a trail fill underneath just muddies it), and
-      // leaving the player's own tile uncolored reads as "you are here"
-      // more clearly than a solid trail-colored square the marker sits on.
-      // This must compare against the LOGICAL position (this.player, always
-      // a whole tile) and not the animated glide position
-      // (renderedPlayerPoint, a fractional in-between point while moving) --
-      // comparing against the fractional point meant it never exactly
-      // equaled either tile's integer coordinates for virtually the entire
-      // glide, so neither the departure nor the destination tile was
-      // excluded while the player visually traveled between them: the
-      // destination tile's trail mark was popping in the instant the move
-      // was made (while still visually entering it) instead of waiting
-      // until the player had genuinely moved on.
-      const isStartTile = point.x === this.maze.start.x && point.y === this.maze.start.y;
-      const isGoalTile = point.x === this.maze.goal.x && point.y === this.maze.goal.y;
-      const isCurrentPlayerTile = point.x === this.player.x && point.y === this.player.y;
-      if (isStartTile || isGoalTile || isCurrentPlayerTile) {
-        continue;
-      }
+    if (this.mode === 'menu') {
+      for (let index = 0; index < visibleTrail.length; index += 1) {
+        const point = visibleTrail[index];
+        if (!point) {
+          continue;
+        }
+        // Never color the start/goal tiles or whichever tile the player is
+        // currently standing on -- the start/goal markers already draw
+        // their own glow on top (a trail fill underneath just muddies it),
+        // and leaving the player's own tile uncolored reads as "you are
+        // here" more clearly than a solid trail-colored square the marker
+        // sits on. This must compare against the LOGICAL position
+        // (this.player, always a whole tile) and not the animated glide
+        // position (renderedPlayerPoint, a fractional in-between point
+        // while moving) -- comparing against the fractional point meant it
+        // never exactly equaled either tile's integer coordinates for
+        // virtually the entire glide, so neither the departure nor the
+        // destination tile was excluded while the player visually traveled
+        // between them: the destination tile's trail mark was popping in
+        // the instant the move was made (while still visually entering it)
+        // instead of waiting until the player had genuinely moved on.
+        const isStartTile = point.x === this.maze.start.x && point.y === this.maze.start.y;
+        const isGoalTile = point.x === this.maze.goal.x && point.y === this.maze.goal.y;
+        const isCurrentPlayerTile = point.x === this.player.x && point.y === this.player.y;
+        if (isStartTile || isGoalTile || isCurrentPlayerTile) {
+          continue;
+        }
 
-      const shouldFadeTrailByAge = this.mode === 'play' || this.settings.toggleTrailFade;
-      const alpha = shouldFadeTrailByAge
-        ? this.mode === 'play'
-          ? clamp(0.34 + ((index / Math.max(1, visibleTrail.length - 1)) * 0.66), 0.34, 1)
-          : clamp(0.22 + ((index / Math.max(1, visibleTrail.length - 1)) * 0.82), 0.22, 1)
-        : 0.94;
-      const trailColor = resolveLegacyIridescentTrailColor(
-        index,
-        visibleTrail.length,
-        time,
-        progressionPalette.trailColor
-      );
-      const trailAlpha = this.settings.darkMode && this.mode === 'menu'
-        ? clamp(alpha + 0.08, 0, 1)
-        : alpha;
-      const resolvedTrailAlpha = trailAlpha * menuTrailAlphaMultiplier;
-      if (resolvedTrailAlpha <= 0) {
-        continue;
-      }
-      this.drawLegacyPlayerTrailTileOverlay(
-        index,
-        visibleTrail.length,
-        point,
-        mazeLeft,
-        mazeTop,
-        mazeTileSize,
-        resolvedTrailAlpha
-      );
-      if (this.mode === 'menu') {
+        const alpha = this.settings.toggleTrailFade
+          ? clamp(0.22 + ((index / Math.max(1, visibleTrail.length - 1)) * 0.82), 0.22, 1)
+          : 0.94;
+        const trailColor = resolveLegacyIridescentTrailColor(
+          index,
+          visibleTrail.length,
+          time,
+          progressionPalette.trailColor
+        );
+        const trailAlpha = this.settings.darkMode ? clamp(alpha + 0.08, 0, 1) : alpha;
+        const resolvedTrailAlpha = trailAlpha * menuTrailAlphaMultiplier;
+        if (resolvedTrailAlpha <= 0) {
+          continue;
+        }
+        this.drawLegacyPlayerTrailTileOverlay(
+          index,
+          visibleTrail.length,
+          point,
+          mazeLeft,
+          mazeTop,
+          mazeTileSize,
+          resolvedTrailAlpha
+        );
         this.fillLegacyMenuDynamicPathTile(
           point,
           trailColor,
@@ -8570,34 +8616,18 @@ export class MenuScene extends Phaser.Scene {
           mazeTileSize,
           dynamicTrailPathSource
         );
-      } else {
-        this.fillLegacyPlayDynamicPathTile(
-          point,
-          trailColor,
-          mazeLeft,
-          mazeTop,
-          mazeTileSize,
-          resolvedTrailAlpha
-        );
-        this.drawLegacyDynamicTrailBorderDock(
-          point,
-          trailColor,
-          LEGACY_PLAY_PATH_EDGE,
-          LEGACY_PLAY_PATH_EDGE_ALPHA,
-          0.96,
-          resolvedTrailAlpha,
-          resolvedBoardLeft,
-          resolvedBoardTop,
-          boardWidth,
-          boardHeight,
-          mazeLeft,
-          mazeTop,
-          mazeRenderFrame.boardWidth,
-          mazeRenderFrame.boardHeight,
-          mazeTileSize,
-          dynamicTrailPathSource
-        );
       }
+    } else {
+      // Navigation Core v1: one continuous path instead of per-cell tiles --
+      // see drawLegacyContinuousPlayTrail. Deliberately does not call
+      // drawLegacyPlayerTrailTileOverlay (no per-tile stamping of
+      // mazer-player-trail.png) or drawLegacyDynamicTrailBorderDock (the
+      // menu-only bleed-off dock continuation is out of scope for this
+      // pass -- a wraparound trail crossing the board edge in play mode
+      // still splits into a correct separate visual subpath on the far
+      // side, it just doesn't yet visually bleed into the dock strip the
+      // way the menu's per-cell trail does).
+      this.drawLegacyContinuousPlayTrail(time, mazeLeft, mazeTop, mazeTileSize, renderedPlayerPoint, menuTrailAlphaMultiplier);
     }
     for (let index = this.playerTrailImageCursor; index < this.playerTrailImages.length; index += 1) {
       this.playerTrailImages[index]?.setVisible(false);
@@ -8640,7 +8670,10 @@ export class MenuScene extends Phaser.Scene {
       );
     }
 
-    if (this.isLegacyTrailShineVisible()) {
+    // Navigation Core v1's continuous play trail draws its own shared shine
+    // inside drawLegacyContinuousPlayTrail above -- this old per-cell pulse
+    // window stays menu-only now, or play mode would show both.
+    if (this.mode === 'menu' && this.isLegacyTrailShineVisible()) {
       if (menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
         this.drawLegacyPlayDynamicTrailPulse(
           visibleTrail,
@@ -8656,7 +8689,7 @@ export class MenuScene extends Phaser.Scene {
         time,
         dynamicTrailPathSource,
           progressionPalette,
-          this.mode === 'play'
+          false
         );
       }
     }
@@ -9627,25 +9660,116 @@ export class MenuScene extends Phaser.Scene {
       .setVisible(true);
   }
 
-  private fillLegacyPlayDynamicPathTile(
-    point: LegacyPoint,
-    color: number,
+  // Navigation Core v1's continuous play trail -- one logically continuous
+  // path instead of the old per-cell hollow-frame/texture-overlay/pulse-
+  // window trio (still used by the menu's own ambient demo above,
+  // deliberately unchanged). Builds fresh from
+  // resolveLegacyPlayPerfectPathTrail() every call rather than caching the
+  // committed geometry separately from the live head segment -- a real
+  // perf optimization (the frozen contract's own "static body plus dynamic
+  // head" pattern) is a reasonable follow-up, but this path is at most a
+  // few dozen points and rebuilding it is cheap next to everything else
+  // this scene already redraws every frame.
+  private drawLegacyContinuousPlayTrail(
+    time: number,
     originX: number,
     originY: number,
     tileSize: number,
-    alpha: number
+    renderedPlayerPoint: LegacyPoint,
+    alphaMultiplier: number
   ): void {
-    this.drawLegacyTrailBorder(
-      this.boardDynamicGraphics,
-      point,
+    if (alphaMultiplier <= 0 || tileSize <= 0) {
+      return;
+    }
+    const perfectPath = this.resolveLegacyPlayPerfectPathTrail();
+    if (perfectPath.length === 0) {
+      return;
+    }
+    // The perfect-path's own final point is always this.player (the
+    // logical, already-arrived tile) -- replaced here with the caller's
+    // rendered/interpolated player point so the trail visibly extends
+    // during a glide instead of popping to full length the instant a move
+    // commits. See navigationCoreTrail.ts's BuildContinuousTrailPathOptions
+    // for why this must be the interpolated point, not the logical one.
+    const gridPath = perfectPath.length > 1
+      ? [...perfectPath.slice(0, -1), renderedPlayerPoint]
+      : [copyPoint(perfectPath[0]!), renderedPlayerPoint];
+
+    const geometry = buildContinuousTrailPath({
+      gridPath,
       originX,
       originY,
       tileSize,
-      color,
-      Math.min(0.96, 0.96 * alpha),
-      LEGACY_PLAY_PATH_EDGE,
-      Math.min(LEGACY_PLAY_PATH_EDGE_ALPHA, LEGACY_PLAY_PATH_EDGE_ALPHA * alpha)
-    );
+      cornerRadiusRatio: LEGACY_PLAY_TRAIL_CORNER_RADIUS_RATIO,
+      playerTrimRatio: LEGACY_PLAY_TRAIL_PLAYER_TRIM_RATIO
+    });
+    if (geometry.totalLength <= 0 || geometry.vertices.length < 2) {
+      return;
+    }
+    const vertices = resampleTrailVertices(geometry.vertices, LEGACY_PLAY_TRAIL_RESAMPLE_INTERVAL_PX);
+
+    // Trail Shine setting + reduced motion share this one gate (see
+    // isLegacyTrailShineVisible's own definition) -- reduced motion keeps
+    // the connected base trail fully visible, it just never gets the
+    // traveling highlight.
+    const shineEnabled = this.isLegacyTrailShineVisible();
+    let shineState: ReturnType<typeof advanceTrailShineState> | null = null;
+    if (shineEnabled) {
+      shineState = advanceTrailShineState(geometry.totalLength, time, this.trailShineLapStartedAtMs, {
+        speedPxPerMs: (tileSize * LEGACY_PLAY_TRAIL_SHINE_SPEED_TILES_PER_SEC) / 1000,
+        lengthRatio: LEGACY_PLAY_TRAIL_SHINE_LENGTH_RATIO,
+        fadeRatio: LEGACY_PLAY_TRAIL_SHINE_FADE_RATIO,
+        quietGapRatio: LEGACY_PLAY_TRAIL_SHINE_QUIET_GAP_RATIO,
+        minTotalLengthForShine: tileSize * LEGACY_PLAY_TRAIL_SHINE_MIN_TILES
+      });
+      this.trailShineLapStartedAtMs = shineState.lapStartedAtMs;
+    }
+
+    const colorOptions = {
+      distancePeriodPx: tileSize * LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE,
+      timePeriodMs: LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS
+    };
+    const trailWidth = Math.max(1, tileSize * LEGACY_PLAY_TRAIL_WIDTH_RATIO);
+    const graphics = this.boardDynamicGraphics;
+
+    for (let i = 1; i < vertices.length; i += 1) {
+      const previous = vertices[i - 1]!;
+      const current = vertices[i]!;
+      // A subpath break is a topology discontinuity (e.g. a wraparound
+      // crossing) -- distance/color/shine still read continuously across
+      // it (see navigationCoreTrail.ts), but no line is drawn between the
+      // two sides.
+      if (current.newSubpath) {
+        continue;
+      }
+
+      const midDistance = (previous.distance + current.distance) / 2;
+      const ageAlpha = clamp(
+        LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN
+          + ((midDistance / geometry.totalLength) * (LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX - LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN)),
+        LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN,
+        LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX
+      );
+
+      let color = sampleTrailEnergyColor(midDistance, time, colorOptions);
+      let alpha = ageAlpha * alphaMultiplier;
+
+      if (shineState && shineState.visible && shineState.halfLength > 0) {
+        const distanceFromShineCenter = Math.abs(midDistance - shineState.centerDistance);
+        if (distanceFromShineCenter <= shineState.halfLength) {
+          const taper = 1 - clamp(distanceFromShineCenter / shineState.halfLength, 0, 1);
+          const highlightStrength = taper * shineState.envelopeAlpha;
+          color = mixLegacyIridescentColor(color, LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR, highlightStrength * 0.85);
+          alpha = Math.min(1, alpha + (highlightStrength * 0.5));
+        }
+      }
+
+      graphics.lineStyle(trailWidth, color, alpha);
+      graphics.beginPath();
+      graphics.moveTo(previous.x, previous.y);
+      graphics.lineTo(current.x, current.y);
+      graphics.strokePath();
+    }
   }
 
   private drawLegacyPlayDynamicTrailPulse(
@@ -15418,6 +15542,7 @@ export class MenuScene extends Phaser.Scene {
       this.player = result.nextPlayer;
       this.syncLegacyPlayerVisualMotionTo(result.nextPlayer);
       this.trail = result.nextTrail ?? [copyPoint(result.nextPlayer)];
+      this.trailShineLapStartedAtMs = this.time.now;
       this.playCyclePath = [copyPoint(result.nextPlayer)];
       this.playCycleResetUsed = true;
       this.playStartedAtMs = this.time.now;
