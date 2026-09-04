@@ -244,6 +244,10 @@ const checkRedesignComplete = (registry) => {
   return violations;
 };
 
+// Required ACTIVE owner per especially sensitive shared path -- an independent safety net
+// alongside the registry JSON itself. Resolved against activePathOwners (below), which only
+// counts status:'active' assignments: a wave that has completed and handed a path off no longer
+// satisfies this check for that path, and cannot be used as an active exception.
 const REQUIRED_INTEGRATOR_WAVE_BY_PATH = Object.freeze({
   'scripts/analysis/capture-auth-capability-surfaces.mjs': '0C',
   'scripts/analysis/capture-ui-surfaces.mjs': '0C',
@@ -258,14 +262,100 @@ const REQUIRED_INTEGRATOR_WAVE_BY_PATH = Object.freeze({
   'src/scenes/diagnostics/menuCaptureMetadataDiagnostics.ts': '1C',
   'src/scenes/diagnostics/menuRuntimeDiagnosticsCompatibility.ts': '1C',
   'src/scenes/menuRuntimeDiagnostics.ts': '1C',
-  'src/scenes/MenuScene.ts': '3A',
+  'src/scenes/MenuScene.ts': '4D-A',
   'src/legacy-runtime/legacyAuth.ts': '3B',
   'src/legacy-runtime/legacyPlayerMessage.ts': '3B',
   'vite.config.ts': '5B',
   'package.json': '5B'
 });
 
-const INTEGRATOR_WAVE_ORDER = Object.freeze(['0C', '1B', '1C', '3A', '3B', '5B']);
+const INTEGRATOR_WAVE_STATUSES = Object.freeze(['active', 'completed']);
+
+// Resolves the dependency graph and detects two structural defects a flat ordered list can't
+// express: a dependsOn edge naming a wave that isn't itself a registered assignment, and a cycle
+// (which would make "depends on" meaningless). Depth-first with a three-color visited set is
+// sufficient at this graph's size and keeps the failure path a real cycle, not a stack overflow.
+const collectWaveDependencyGraphViolations = (assignments) => {
+  const violations = [];
+  const waveIds = new Set(assignments.map((assignment) => assignment?.wave).filter(Boolean));
+  const dependsOnByWave = new Map(assignments.map((assignment) => [
+    assignment?.wave,
+    Array.isArray(assignment?.dependsOn) ? assignment.dependsOn : []
+  ]));
+
+  for (const [wave, dependsOn] of dependsOnByWave) {
+    for (const dependency of dependsOn) {
+      if (!waveIds.has(dependency)) {
+        violations.push(violation(
+          'integrator-wave-dependency-missing',
+          `integratorWaveOwnership.assignments[${wave}].dependsOn`,
+          `Wave ${wave} depends on "${dependency}", which is not a registered wave.`
+        ));
+      }
+    }
+  }
+
+  const UNVISITED = 0;
+  const VISITING = 1;
+  const VISITED = 2;
+  const state = new Map(Array.from(waveIds, (wave) => [wave, UNVISITED]));
+  const cyclesReported = new Set();
+
+  const visit = (wave, path) => {
+    if (state.get(wave) === VISITED) {
+      return;
+    }
+    if (state.get(wave) === VISITING) {
+      const cycleKey = [...path, wave].sort().join('>');
+      if (!cyclesReported.has(cycleKey)) {
+        cyclesReported.add(cycleKey);
+        violations.push(violation(
+          'integrator-wave-dependency-cycle',
+          'integratorWaveOwnership.assignments',
+          `dependency cycle detected: ${[...path, wave].join(' -> ')}.`
+        ));
+      }
+      return;
+    }
+    state.set(wave, VISITING);
+    for (const dependency of dependsOnByWave.get(wave) ?? []) {
+      if (waveIds.has(dependency)) {
+        visit(dependency, [...path, wave]);
+      }
+    }
+    state.set(wave, VISITED);
+  };
+
+  for (const wave of waveIds) {
+    visit(wave, []);
+  }
+
+  return violations;
+};
+
+// Only status:'active' assignments count as the current owner of a path -- a completed wave's
+// paths remain in the registry as historical record but are not enforceable ownership going
+// forward, and do not conflict with whichever wave is now active for that same path (a real,
+// intended handoff, not a duplicate). Exported so both the git-diff ownership guards below and
+// tests can resolve "who actively owns this path right now" from one authoritative place instead
+// of each re-deriving it (and risking silently falling out of sync with each other).
+export const resolveActivePathOwnersWithDuplicates = (assignments) => {
+  const owners = new Map();
+  const duplicates = [];
+  for (const assignment of assignments) {
+    if (assignment?.status !== 'active') {
+      continue;
+    }
+    for (const path of (assignment?.paths ?? [])) {
+      if (owners.has(path)) {
+        duplicates.push({ path, first: owners.get(path), second: assignment.wave });
+      } else {
+        owners.set(path, assignment.wave);
+      }
+    }
+  }
+  return { owners, duplicates };
+};
 
 const checkIntegratorWaveOwnership = (registry) => {
   const violations = [];
@@ -279,11 +369,11 @@ const checkIntegratorWaveOwnership = (registry) => {
   }
 
   const ownership = registry?.integratorWaveOwnership;
-  if (!ownership || ownership.mode !== 'dependency-ordered-single-owner' || !Array.isArray(ownership.assignments)) {
+  if (!ownership || ownership.mode !== 'dependency-graph-single-active-owner' || !Array.isArray(ownership.assignments)) {
     violations.push(violation(
       'integrator-wave-ownership-missing',
       'integratorWaveOwnership',
-      'shared UI/auth paths require dependency-ordered single-owner wave assignments.'
+      'shared UI/auth paths require dependency-graph single-active-owner wave assignments.'
     ));
     return violations;
   }
@@ -309,39 +399,34 @@ const checkIntegratorWaveOwnership = (registry) => {
     }
   }
 
-  const pathAssignments = new Map();
-  let priorWaveIndex = -1;
   for (const assignment of ownership.assignments) {
-    const waveIndex = INTEGRATOR_WAVE_ORDER.indexOf(assignment?.wave);
-    if (waveIndex === -1 || waveIndex < priorWaveIndex) {
+    if (!INTEGRATOR_WAVE_STATUSES.includes(assignment?.status)) {
       violations.push(violation(
-        'integrator-wave-order-invalid',
+        'integrator-wave-status-invalid',
         `integratorWaveOwnership.assignments[${assignment?.wave ?? 'unknown'}]`,
-        'integrator assignments must follow the locked 0C -> 1B -> 1C -> 3A -> 3B -> 5B dependency order.'
+        `status must be one of ${INTEGRATOR_WAVE_STATUSES.join(', ')}, found ${JSON.stringify(assignment?.status)}.`
       ));
-    }
-    priorWaveIndex = Math.max(priorWaveIndex, waveIndex);
-
-    for (const path of (assignment?.paths ?? [])) {
-      if (pathAssignments.has(path)) {
-        violations.push(violation(
-          'duplicate-integrator-path-owner',
-          `integratorWaveOwnership.assignments[${assignment.wave}]`,
-          `"${path}" is assigned to both Wave ${pathAssignments.get(path)} and Wave ${assignment.wave}.`
-        ));
-      } else {
-        pathAssignments.set(path, assignment.wave);
-      }
     }
   }
 
+  violations.push(...collectWaveDependencyGraphViolations(ownership.assignments));
+
+  const { owners: activePathOwners, duplicates } = resolveActivePathOwnersWithDuplicates(ownership.assignments);
+  for (const { path, first, second } of duplicates) {
+    violations.push(violation(
+      'duplicate-active-integrator-path-owner',
+      `integratorWaveOwnership.assignments[${second}]`,
+      `"${path}" is actively assigned to both Wave ${first} and Wave ${second}; exactly one wave may actively own a path at a time.`
+    ));
+  }
+
   for (const [path, expectedWave] of Object.entries(REQUIRED_INTEGRATOR_WAVE_BY_PATH)) {
-    const actualWave = pathAssignments.get(path);
+    const actualWave = activePathOwners.get(path);
     if (actualWave !== expectedWave) {
       violations.push(violation(
         'integrator-path-wave-mismatch',
         path,
-        `"${path}" must belong to Wave ${expectedWave}, found ${actualWave ?? 'unassigned'}.`
+        `"${path}" must be actively owned by Wave ${expectedWave}, found ${actualWave ?? 'unassigned'}.`
       ));
     }
   }
@@ -375,13 +460,20 @@ export const collectEntrypointExistenceViolations = (registry, root = repoRoot) 
   return violations;
 };
 
-// Pure, independently-testable: an assigned path may change only in its declared dependency-
-// ordered integrator wave. Ownership is deliberately independent of branch names and old PRs.
+// Resolves which wave actively owns each assigned path right now -- ignores completed/historical
+// assignments entirely, so a wave that has handed a path off cannot be used as an active exception
+// for it, and the current active owner (e.g. Wave 4D-A for src/scenes/MenuScene.ts after the Wave
+// 3A handoff) is the only one a real diff is checked against.
+export const resolveActiveIntegratorPathOwners = (registry) => (
+  resolveActivePathOwnersWithDuplicates(registry?.integratorWaveOwnership?.assignments ?? []).owners
+);
+
+// Pure, independently-testable: an assigned path may change only in its currently active
+// integrator wave. Ownership is deliberately independent of branch names and old PRs, and a
+// wave's own historical (completed) ownership of a path does not grant it permission to keep
+// changing that path after an explicit handoff to a new active owner.
 export const collectIntegratorWaveOwnershipViolations = (changedFiles, registry, claimedWave) => {
-  const assignments = registry?.integratorWaveOwnership?.assignments ?? [];
-  const owners = new Map(assignments.flatMap((assignment) => (
-    (assignment.paths ?? []).map((path) => [path, assignment.wave])
-  )));
+  const owners = resolveActiveIntegratorPathOwners(registry);
   const violations = [];
   for (const file of changedFiles) {
     const normalized = file.replace(/\\/g, '/');
@@ -403,10 +495,7 @@ export const collectIntegratorWaveOwnershipViolations = (changedFiles, registry,
 // ceilings still bind the specific active wave; the pure claimed-wave checker above remains the
 // authoritative unit for testing an explicit wave claim.
 export const collectIntegratorWaveMixViolations = (changedFiles, registry) => {
-  const assignments = registry?.integratorWaveOwnership?.assignments ?? [];
-  const owners = new Map(assignments.flatMap((assignment) => (
-    (assignment.paths ?? []).map((path) => [path, assignment.wave])
-  )));
+  const owners = resolveActiveIntegratorPathOwners(registry);
   const ownedChanges = changedFiles
     .map((file) => file.replace(/\\/g, '/'))
     .map((path) => ({ path, wave: owners.get(path) }))

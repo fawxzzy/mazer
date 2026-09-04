@@ -86,7 +86,7 @@
       "id": "dependency-ordered-integrator-wave-ownership",
       "category": "governance",
       "locked": true,
-      "statement": "The former PR #83 and PR #131 implementation vehicles are superseded. Shared UI and authentication paths are no longer held behind a branch-specific exception; each path may change only in its assigned dependency-ordered integrator wave with a fresh current-main preflight and exclusive writer ownership.",
+      "statement": "The former PR #83 and PR #131 implementation vehicles are superseded. Shared UI and authentication paths are no longer held behind a branch-specific exception; each path may change only in its currently active integrator wave, resolved from an explicit per-wave dependency graph (not one total ordering), with a fresh current-main preflight and exclusive active-writer ownership. A wave's own historical (completed) ownership of a path never grants it permission to keep changing that path after an explicit handoff to a new active owner; two waves with no dependency relationship to each other (e.g. an auth-domain wave and a renderer wave that both merely depend on the same prior wave) may hold active ownership of different paths at once without a dependency edge being invented between them.",
       "sourceRef": "blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md#file-ownership-guardrails"
     },
     {
@@ -298,10 +298,13 @@
     "decisionRef": "no-big-bang-menuscene-rewrite"
   },
   "integratorWaveOwnership": {
-    "mode": "dependency-ordered-single-owner",
+    "mode": "dependency-graph-single-active-owner",
+    "modeNote": "Each assignment declares its own dependsOn (an array of prerequisite wave ids), not a position in one shared total order -- a wave with no dependency relationship to another may be active at the same time, over different paths, without a dependency edge between them. status distinguishes completed (historical record; no longer enforceable as active ownership of its paths) from active (the current, single, exclusive writer for its paths). Exactly one assignment may be status:'active' for any given path at a time; multiple completed assignments may reference the same path as history (a real handoff), which is not a violation.",
     "assignments": [
       {
         "wave": "0C",
+        "status": "active",
+        "dependsOn": [],
         "owner": "measured-baseline-integrator",
         "paths": [
           "scripts/analysis/capture-auth-capability-surfaces.mjs",
@@ -311,6 +314,8 @@
       },
       {
         "wave": "1B",
+        "status": "active",
+        "dependsOn": [],
         "owner": "semantic-token-integrator",
         "paths": [
           "src/theme/tokens.ts",
@@ -319,6 +324,8 @@
       },
       {
         "wave": "1C",
+        "status": "active",
+        "dependsOn": [],
         "owner": "diagnostics-integrator",
         "paths": [
           "src/scenes/diagnostics/menuSurfaceStateDiagnostics.ts",
@@ -333,14 +340,20 @@
       },
       {
         "wave": "3A",
+        "status": "completed",
+        "dependsOn": [],
         "owner": "command-bridge-integrator",
         "paths": [
           "src/scenes/MenuScene.ts",
           "src/state/uiLegacyBridge.ts"
-        ]
+        ],
+        "completedAtCommit": "063c9a56846097751b6bd41a5b58ea78cec969ef",
+        "completionNote": "PR #343, squash-merged to main. Made the Wave 1A shared UI command/state contracts load-bearing against the real running scene. src/scenes/MenuScene.ts's active ownership hands off to Wave 4D-A below (Navigation Core runtime); src/state/uiLegacyBridge.ts has no active claimant after this handoff and is available to a future wave that needs it."
       },
       {
         "wave": "3B",
+        "status": "active",
+        "dependsOn": ["3A"],
         "owner": "auth-migration-integrator",
         "paths": [
           "src/legacy-runtime/legacyAuth.ts",
@@ -348,7 +361,19 @@
         ]
       },
       {
+        "wave": "4D-A",
+        "status": "active",
+        "dependsOn": ["3A"],
+        "owner": "navigation-core-integrator",
+        "paths": [
+          "src/scenes/MenuScene.ts"
+        ],
+        "note": "Implements the frozen docs/assets/reference/navigation-core-v1/ visual authority into the real Phaser runtime. Depends only on Wave 3A's completion (the command bridge it builds on top of); no dependency edge to Wave 3B is required or implied -- the two waves own disjoint paths and neither's work gates the other."
+      },
+      {
         "wave": "5B",
+        "status": "active",
+        "dependsOn": [],
         "owner": "system-pwa-integrator",
         "paths": [
           "vite.config.ts",
@@ -356,7 +381,7 @@
         ]
       }
     ],
-    "note": "Assignments preserve the handoff packet's single-owner guardrails while replacing the obsolete pull-request hold with current dependency-ordered wave ownership. The Wave 1B token exports are concrete and assigned. Wave 2A's base DOM primitives and Wave 2A.1's settings extensions remain stateless and unwired; no branch name or stale pull-request state grants an exception.",
+    "note": "Assignments preserve the handoff packet's single-owner guardrails while replacing the obsolete pull-request hold with current dependency-graph wave ownership. The Wave 1B token exports are concrete and assigned. Wave 2A's base DOM primitives and Wave 2A.1's settings extensions remain stateless and unwired; no branch name or stale pull-request state grants an exception.",
     "decisionRef": "dependency-ordered-integrator-wave-ownership"
   },
   "redesignComplete": {
