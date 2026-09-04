@@ -93,6 +93,20 @@ export const MAZER_PLAYER_TRAIL_TEXTURE_KEY = 'mazerPlayerTrail';
 export const MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY = 'mazerFloorTileInterior';
 export const MAZER_FLOOR_TILE_INTERIOR_CROP = Object.freeze({ x: 260, y: 260, width: 730, height: 730 });
 
+// Whether generateMazerFloorTileInteriorTexture() below actually succeeded
+// this boot -- MenuScene's floor overlay must check this (or the texture's
+// own existence) before ever activating MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY.
+// If Canvas 2D or the source texture is unavailable, the key never gets
+// registered with Phaser at all, and requesting a nonexistent texture key
+// from a TileSprite renders Phaser's own default "missing texture"
+// placeholder (a visible purple/black checkerboard) -- unacceptable, and
+// silently falling back to the RAW bordered mazer-floor-tile.png instead
+// would reintroduce the exact per-cell border-duplication defect this
+// texture was created to fix. The only safe fallback is: no floor-texture
+// accent at all, procedural corridor material only.
+let mazerFloorTileInteriorTextureAvailable = false;
+export const isMazerFloorTileInteriorTextureAvailable = (): boolean => mazerFloorTileInteriorTextureAvailable;
+
 // Real HUD icon source art (see docs/assets/mazer-vfx-source-provenance.md) --
 // the actual profile/leaderboard/settings icons, replacing the procedural
 // thin-line glyphs used until now.
@@ -239,11 +253,18 @@ export class BootScene extends Phaser.Scene {
   // MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY for why the raw asset can't be
   // repeated directly. Same getSourceImage-into-canvas technique as
   // generateMazerTileFontRainbowVariants above, minus the recolor pass.
-  // Silently no-ops (leaving the interior texture missing) if the source
-  // texture or Canvas 2D isn't available, matching that method's own
-  // never-fatal-to-boot stance.
+  // Never fatal to boot: on any failure this leaves
+  // mazerFloorTileInteriorTextureAvailable false and logs one diagnostic
+  // warning, rather than throwing or leaving a half-registered texture key
+  // that could resolve to Phaser's own missing-texture placeholder.
+  // MenuScene's floor overlay must check isMazerFloorTileInteriorTextureAvailable()
+  // (or the texture's own existence) before activating this key, and must
+  // render with no floor-texture accent at all when it's false -- never the
+  // raw bordered source, which would silently reintroduce the original
+  // per-cell border-duplication defect.
   private generateMazerFloorTileInteriorTexture(): void {
     if (!this.textures.exists(MAZER_FLOOR_TILE_TEXTURE_KEY)) {
+      console.warn('[Mazer] Navigation Core v1: mazer-floor-tile.png source texture missing at boot -- floor-texture accent disabled, procedural corridor material only.');
       return;
     }
     const sourceImage = this.textures.get(MAZER_FLOOR_TILE_TEXTURE_KEY).getSourceImage();
@@ -254,6 +275,7 @@ export class BootScene extends Phaser.Scene {
       canvas.height = crop.height;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
+        console.warn('[Mazer] Navigation Core v1: Canvas 2D unavailable at boot -- floor-texture accent disabled, procedural corridor material only.');
         return;
       }
       ctx.drawImage(
@@ -271,10 +293,9 @@ export class BootScene extends Phaser.Scene {
         this.textures.remove(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY);
       }
       this.textures.addCanvas(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY, canvas);
-    } catch {
-      // Canvas 2D unavailable/erroring -- leave the interior texture
-      // missing; MenuScene's floor overlay guards its own texture-exists
-      // check the same way boardFloorTileSprite's other callers do.
+      mazerFloorTileInteriorTextureAvailable = true;
+    } catch (error) {
+      console.warn('[Mazer] Navigation Core v1: floor-tile interior texture generation failed -- floor-texture accent disabled, procedural corridor material only.', error);
     }
   }
 }

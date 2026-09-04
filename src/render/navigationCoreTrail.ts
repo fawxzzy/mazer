@@ -368,10 +368,21 @@ export function sampleTrailEnergyColor(distance: number, timeMs: number, options
 export interface TrailShineOptions {
   /** Constant physical speed, px of path distance per ms -- the shine always advances at this rate; nothing here is normalized by the trail's current length. */
   speedPxPerMs: number;
-  /** Shine length as a fraction of the trail's CURRENT total length (the frozen contract's ~9.5%) -- its size scales with the trail, but see advanceTrailShineState for why its motion still doesn't remap when that length changes. */
+  /** Shine BODY length as a fraction of the trail's CURRENT total length (the frozen contract's ~9.5%) -- its size scales with the trail, but see advanceTrailShineState for why its motion still doesn't remap when that length changes. This is the shine's own visible extent, not the fade window -- see travelEnvelopeRatio for that. */
   lengthRatio: number;
-  /** Fraction of the shine's OWN length used for its fade-in/fade-out taper at each end (the frozen contract's ~4%). */
-  fadeRatio: number;
+  /**
+   * Fraction of the trail's CURRENT TOTAL LENGTH used for the whole-shine
+   * fade-in (near the origin) and fade-out (near the player), per the
+   * frozen contract's "fading in over the first ~4% of its travel and
+   * fading out over the final ~4%" -- travel across the whole path, not 4%
+   * of the shine's own (~9.5%-length) body. Confusing this with a fraction
+   * of lengthRatio previously made the actual fade window 0.095 * 0.04 =
+   * 0.38% of the path (~10x too short), which reads as a hard on/off flick
+   * instead of a smooth emerge/vanish. Deliberately a separate ratio from
+   * lengthRatio -- one sizes the shine body, the other sizes the envelope
+   * that fades it in/out over the journey.
+   */
+  travelEnvelopeRatio: number;
   /** Extra quiet-interval length, as a fraction of total length, appended after the shine reaches the player end before it restarts at the origin. */
   quietGapRatio: number;
   /** Below this absolute total length (px), suppress the shine entirely rather than rendering an unstable sliver or a rapid loop. */
@@ -382,12 +393,15 @@ export interface TrailShineState {
   visible: boolean;
   /** Distance (px) along the trail where the shine's own center currently sits. */
   centerDistance: number;
+  /** Half of the shine BODY's own length (lengthRatio * totalLength / 2) -- used for the front/rear taper internal to the shine, not the whole-path fade envelope. */
   halfLength: number;
-  fadeLength: number;
+  /** The whole-path travel-envelope length (travelEnvelopeRatio * totalLength) used for envelopeAlpha below -- see TrailShineOptions.travelEnvelopeRatio. */
+  travelEnvelopeLength: number;
   /**
    * Smooth 0..1 multiplier fading the whole shine out as its center
    * approaches the trail's two ends (origin fade-in / pre-player fade-out),
-   * separate from the shine's own front/rear taper across its width.
+   * ramped over travelEnvelopeLength -- separate from the shine's own
+   * front/rear taper across its own body width (halfLength).
    */
   envelopeAlpha: number;
   /** Caller must persist this and pass it back in as previousLapStartedAtMs next frame. */
@@ -414,14 +428,14 @@ export function advanceTrailShineState(
   options: TrailShineOptions
 ): TrailShineState {
   const shineLength = totalLength * options.lengthRatio;
-  const fadeLength = shineLength * options.fadeRatio;
+  const travelEnvelopeLength = totalLength * options.travelEnvelopeRatio;
 
   if (totalLength < options.minTotalLengthForShine || shineLength <= EPSILON || options.speedPxPerMs <= 0) {
     return {
       visible: false,
       centerDistance: 0,
       halfLength: shineLength / 2,
-      fadeLength,
+      travelEnvelopeLength,
       envelopeAlpha: 0,
       lapStartedAtMs: previousLapStartedAtMs
     };
@@ -440,16 +454,16 @@ export function advanceTrailShineState(
 
   const visible = traveled <= totalLength;
   const centerDistance = Math.min(traveled, totalLength);
-  const fadeWindow = Math.max(fadeLength, EPSILON);
-  const rampIn = Math.min(1, centerDistance / fadeWindow);
-  const rampOut = Math.min(1, (totalLength - centerDistance) / fadeWindow);
+  const envelopeWindow = Math.max(travelEnvelopeLength, EPSILON);
+  const rampIn = Math.min(1, centerDistance / envelopeWindow);
+  const rampOut = Math.min(1, (totalLength - centerDistance) / envelopeWindow);
   const envelopeAlpha = visible ? Math.max(0, Math.min(rampIn, rampOut)) : 0;
 
   return {
     visible,
     centerDistance,
     halfLength: shineLength / 2,
-    fadeLength,
+    travelEnvelopeLength,
     envelopeAlpha,
     lapStartedAtMs
   };

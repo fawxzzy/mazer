@@ -3,6 +3,7 @@ import {
   MAZER_BLEED_PATH_TEXTURE_KEY,
   MAZER_FLOOR_TILE_INTERIOR_CROP,
   MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY,
+  isMazerFloorTileInteriorTextureAvailable,
   MAZER_HUD_LEADERBOARD_TEXTURE_KEY,
   MAZER_HUD_PROFILE_TEXTURE_KEY,
   MAZER_HUD_SETTINGS_TEXTURE_KEY,
@@ -1123,6 +1124,15 @@ const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;
 // only describes the qualitative behavior, documented here rather than left
 // as unexplained magic numbers.
 const LEGACY_PLAY_TRAIL_WIDTH_RATIO = 0.16;
+// Amendment 6.2's neon-tube glow refinement: a soft outer spectral glow
+// pass drawn from the same canonical geometry/color as the crisp core,
+// wider but bounded well under the player/goal markers' own glow alpha
+// (compare LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_ALPHA's effective ~0.24) so
+// the trail never reads brighter than the things it's leading to. Both
+// ratios scale with tileSize like everything else here, so the glow stays
+// a crisp accent rather than a blurred bar at compact/mobile tile sizes.
+const LEGACY_PLAY_TRAIL_GLOW_WIDTH_RATIO = 0.3;
+const LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO = 0.22;
 const LEGACY_PLAY_TRAIL_CORNER_RADIUS_RATIO = 0.16;
 const LEGACY_PLAY_TRAIL_PLAYER_TRIM_RATIO = 0.3;
 // Fine resampling interval for color/alpha continuity -- see
@@ -1136,10 +1146,14 @@ const LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE = 6;
 // Reuses the same pacing as the player's own (retired) rainbow cycle for
 // consistency with the rest of this file's animation timing.
 const LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS = LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS;
-// The frozen reference's own numbers: shine ~9.5% of visible path length,
-// fading in/out over ~4% of the shine's own length.
+// The frozen reference's own numbers: shine body ~9.5% of visible path
+// length, whole-shine fade-in/fade-out over ~4% of the PATH'S TOTAL
+// length (travel envelope) -- not 4% of the shine's own ~9.5% body. That
+// distinction matters: 0.095 * 0.04 would be 0.38% of the path, ~10x too
+// short, and reads as an on/off flick instead of a smooth emerge/vanish.
+// See advanceTrailShineState's own TrailShineOptions.travelEnvelopeRatio.
 const LEGACY_PLAY_TRAIL_SHINE_LENGTH_RATIO = 0.095;
-const LEGACY_PLAY_TRAIL_SHINE_FADE_RATIO = 0.04;
+const LEGACY_PLAY_TRAIL_SHINE_TRAVEL_ENVELOPE_RATIO = 0.04;
 // Additional quiet-interval length once the shine reaches the player, as a
 // fraction of the trail's own current length, before it restarts at the
 // origin -- the reference asks for "a quiet interval" without giving an
@@ -1944,16 +1958,37 @@ export class MenuScene extends Phaser.Scene {
     to: LegacyPoint;
   } | null = null;
   private lastPlayerVisualMotionSnapReason: LegacyPlayerVisualMotionSnapReason = null;
-  // The continuous play trail's shared shine lap-start timestamp (see
+  // One shared, PAUSABLE animation clock for Navigation Core v1's continuous
+  // trail (base spectral color phase + shared shine distance + its quiet
+  // interval) -- deliberately not driven directly from Phaser's raw scene
+  // time, which keeps ticking while Pause is open or another overlay covers
+  // the board. trailAnimationElapsedMs only accumulates real elapsed time
+  // while Active Play is genuinely visible (resolveLegacyTrailAnimationClock's
+  // own gate) and reduced motion is off; it freezes otherwise, so Pause
+  // freezes the exact visual phase and Resume continues from it instead of
+  // jumping to wherever an uninterrupted clock would now say it should be.
+  // trailAnimationLastRealMs is the bookkeeping checkpoint (the real
+  // timestamp last seen while actively accumulating) -- reset to null
+  // whenever accumulation stops, so the next active frame adds only its own
+  // real delta instead of the whole paused/reduced-motion gap.
+  private trailAnimationElapsedMs = 0;
+  private trailAnimationLastRealMs: number | null = null;
+  // The continuous play trail's shared shine lap-start timestamp, expressed
+  // in trailAnimationElapsedMs units (not raw scene time) -- see
   // advanceTrailShineState's own header for why this must be explicit,
-  // caller-persisted state rather than a value derived fresh each frame).
-  // Reset to the current time wherever this.trail itself resets to a fresh
-  // run, so a new maze/run never inherits the previous run's shine phase.
+  // caller-persisted state rather than a value derived fresh each frame.
+  // Reset to 0 wherever this.trail itself resets to a fresh run, so a new
+  // maze/run never inherits the previous run's shine phase.
   private trailShineLapStartedAtMs = 0;
   // A one-way latch for the start marker's pre-spawn -> post-spawn
-  // transition (see fillPlayDynamicMarkerTile) -- must not flip back to
-  // false just because the player revisits the start tile later. Reset
-  // alongside trailShineLapStartedAtMs at the same fresh-run sites.
+  // transition -- must not flip back to false just because the player
+  // revisits the start tile later. Flipped only from
+  // markLegacyPlayerLeftStartIfApplicable(), called at the authoritative
+  // accepted-movement commit boundary (applyLegacyWorldTurnPlayerMovement
+  // for real play, the equivalent menu-demo step commit) right after
+  // this.player is updated -- never from rendering. Rendering
+  // (fillPlayDynamicMarkerTile) only ever reads this field. Reset alongside
+  // trailShineLapStartedAtMs at the same fresh-run sites.
   private hasPlayerEverLeftStart = false;
   private boardStaticDirty = true;
   private boardPathDirty = true;
@@ -2077,7 +2112,25 @@ export class MenuScene extends Phaser.Scene {
     // once the real maze render frame is known. Masked to
     // boardFloorMaskGraphics so it only ever shows through the actual
     // walkable-cell shape, never over walls/void.
-    this.boardFloorTileSprite = this.add.tileSprite(0, 0, 1, 1, MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY).setOrigin(0, 0).setAlpha(0.5);
+    //
+    // The derived interior texture (BootScene.generateMazerFloorTileInteriorTexture)
+    // can fail to generate (missing source, no Canvas 2D) -- if it does,
+    // this MUST NOT request MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY anyway:
+    // Phaser silently substitutes its own built-in __MISSING placeholder
+    // (a visible purple/black checkerboard) for an unknown texture key, and
+    // falling back to the raw bordered mazer-floor-tile.png would silently
+    // reintroduce the exact per-cell border-duplication defect this texture
+    // exists to fix. The only safe fallback is no floor-texture accent at
+    // all -- Phaser's own always-registered '__DEFAULT' texture, held
+    // permanently invisible below, so the procedural corridor material
+    // (drawBoardPaths) is the only thing that ever shows.
+    const floorTileTextureKey = isMazerFloorTileInteriorTextureAvailable()
+      ? MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY
+      : '__DEFAULT';
+    this.boardFloorTileSprite = this.add.tileSprite(0, 0, 1, 1, floorTileTextureKey).setOrigin(0, 0).setAlpha(0.5);
+    if (floorTileTextureKey === '__DEFAULT') {
+      this.boardFloorTileSprite.setVisible(false);
+    }
     this.boardFloorMaskGraphics = this.add.graphics().setVisible(false);
     this.boardFloorTileSprite.setMask(new Phaser.Display.Masks.GeometryMask(this, this.boardFloorMaskGraphics));
     this.boardBleedPathImages = Array.from({ length: LEGACY_BLEED_PATH_IMAGE_POOL_SIZE }, () => (
@@ -5048,7 +5101,9 @@ export class MenuScene extends Phaser.Scene {
       this.player = generationState.initialPlayer;
       this.syncLegacyPlayerVisualMotionTo(generationState.initialPlayer);
       this.trail = generationState.initialTrail;
-      this.trailShineLapStartedAtMs = this.time.now;
+      this.trailAnimationElapsedMs = 0;
+      this.trailAnimationLastRealMs = null;
+      this.trailShineLapStartedAtMs = 0;
       this.hasPlayerEverLeftStart = false;
       this.playCyclePath = generationState.initialTrail.map(copyPoint);
       this.playCycleResetUsed = false;
@@ -6011,6 +6066,7 @@ export class MenuScene extends Phaser.Scene {
     this.menuDemoState = nextFrame.state;
     const previousPlayer = copyPoint(this.player);
     this.player = nextFrame.player;
+    this.markLegacyPlayerLeftStartIfApplicable(this.maze.start);
     this.armLegacyPlayerVisualMotion(
       previousPlayer,
       nextFrame.player,
@@ -6135,6 +6191,21 @@ export class MenuScene extends Phaser.Scene {
     return receipt.admitted;
   }
 
+  // The one authoritative place hasPlayerEverLeftStart may flip from false
+  // to true -- called right after this.player is updated at an accepted
+  // movement commit (both the real play step below and the menu-demo's own
+  // step commit), never from rendering. A pure position comparison against
+  // whichever point currently owns "start" for that surface; the one-way
+  // latch semantics (never flips back) live on the field itself.
+  private markLegacyPlayerLeftStartIfApplicable(startPoint: LegacyPoint): void {
+    if (this.hasPlayerEverLeftStart) {
+      return;
+    }
+    if (this.player.x !== startPoint.x || this.player.y !== startPoint.y) {
+      this.hasPlayerEverLeftStart = true;
+    }
+  }
+
   private applyLegacyWorldTurnPlayerMovement(): WorldTurnPhaseResult {
     const move = this.legacyWorldTurnMove;
     if (move === null) {
@@ -6156,6 +6227,7 @@ export class MenuScene extends Phaser.Scene {
 
     const previousPlayer = copyPoint(this.player);
     this.player = nextStep.player;
+    this.markLegacyPlayerLeftStartIfApplicable(this.maze.start);
     this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, this.resolveLegacyPlayerVisualMoveDurationMs());
     this.trail = nextStep.trail;
     this.appendLegacyPlayCyclePoint(nextStep.player);
@@ -9666,16 +9738,45 @@ export class MenuScene extends Phaser.Scene {
       .setVisible(true);
   }
 
+  // Advances trailAnimationElapsedMs -- the one shared, PAUSABLE clock for
+  // the continuous trail's color phase, shared shine distance, and quiet
+  // interval -- by this frame's real delta, but ONLY while Active Play is
+  // genuinely visible (mode==='play' and no overlay covering the board) and
+  // reduced motion is off. Otherwise leaves the accumulated total exactly
+  // where it is and clears the real-time checkpoint, so the next active
+  // frame adds only its own delta instead of the whole paused/reduced-
+  // motion gap -- this is what makes Pause freeze the exact visual phase
+  // and Resume continue from it rather than jumping to wherever an
+  // uninterrupted clock would now say it should be. Deliberately keyed only
+  // to mode/overlay/reduced-motion -- viewport resize, board zoom, Trail
+  // Fade changes, and ordinary path extension never touch it.
+  private advanceLegacyTrailAnimationClock(time: number): number {
+    const isActivePlayVisible = this.mode === 'play' && this.overlay === 'none';
+    if (isActivePlayVisible && !this.prefersLegacyReducedMotion()) {
+      if (this.trailAnimationLastRealMs !== null) {
+        this.trailAnimationElapsedMs += Math.max(0, time - this.trailAnimationLastRealMs);
+      }
+      this.trailAnimationLastRealMs = time;
+    } else {
+      this.trailAnimationLastRealMs = null;
+    }
+    return this.trailAnimationElapsedMs;
+  }
+
   // Navigation Core v1's continuous play trail -- one logically continuous
   // path instead of the old per-cell hollow-frame/texture-overlay/pulse-
   // window trio (still used by the menu's own ambient demo above,
   // deliberately unchanged). Builds fresh from
   // resolveLegacyPlayPerfectPathTrail() every call rather than caching the
-  // committed geometry separately from the live head segment -- a real
-  // perf optimization (the frozen contract's own "static body plus dynamic
-  // head" pattern) is a reasonable follow-up, but this path is at most a
-  // few dozen points and rebuilding it is cheap next to everything else
-  // this scene already redraws every frame.
+  // committed geometry separately from the live head segment -- see
+  // Wave 4D-A's own frame-time measurement (docs/current-truth.md) for why
+  // that's an acceptable simplification at today's path lengths rather than
+  // premature caching.
+  //
+  // Renders one canonical geometry through three bounded passes -- a soft
+  // outer spectral glow, the crisp 16%-tile core, then the tapered shared
+  // shine blended into the core -- all from the same per-point color/alpha,
+  // never independent per-cell effects or separately clocked layers.
   private drawLegacyContinuousPlayTrail(
     time: number,
     originX: number,
@@ -9684,6 +9785,7 @@ export class MenuScene extends Phaser.Scene {
     renderedPlayerPoint: LegacyPoint,
     alphaMultiplier: number
   ): void {
+    const animationTime = this.advanceLegacyTrailAnimationClock(time);
     if (alphaMultiplier <= 0 || tileSize <= 0) {
       return;
     }
@@ -9717,14 +9819,16 @@ export class MenuScene extends Phaser.Scene {
     // Trail Shine setting + reduced motion share this one gate (see
     // isLegacyTrailShineVisible's own definition) -- reduced motion keeps
     // the connected base trail fully visible, it just never gets the
-    // traveling highlight.
+    // traveling highlight. Driven by the pausable animationTime, not raw
+    // scene time, so Pause freezes it and reduced motion holds it static
+    // rather than snapping to a random phase whenever it's re-enabled.
     const shineEnabled = this.isLegacyTrailShineVisible();
     let shineState: ReturnType<typeof advanceTrailShineState> | null = null;
     if (shineEnabled) {
-      shineState = advanceTrailShineState(geometry.totalLength, time, this.trailShineLapStartedAtMs, {
+      shineState = advanceTrailShineState(geometry.totalLength, animationTime, this.trailShineLapStartedAtMs, {
         speedPxPerMs: (tileSize * LEGACY_PLAY_TRAIL_SHINE_SPEED_TILES_PER_SEC) / 1000,
         lengthRatio: LEGACY_PLAY_TRAIL_SHINE_LENGTH_RATIO,
-        fadeRatio: LEGACY_PLAY_TRAIL_SHINE_FADE_RATIO,
+        travelEnvelopeRatio: LEGACY_PLAY_TRAIL_SHINE_TRAVEL_ENVELOPE_RATIO,
         quietGapRatio: LEGACY_PLAY_TRAIL_SHINE_QUIET_GAP_RATIO,
         minTotalLengthForShine: tileSize * LEGACY_PLAY_TRAIL_SHINE_MIN_TILES
       });
@@ -9735,8 +9839,15 @@ export class MenuScene extends Phaser.Scene {
       distancePeriodPx: tileSize * LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE,
       timePeriodMs: LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS
     };
-    const trailWidth = Math.max(1, tileSize * LEGACY_PLAY_TRAIL_WIDTH_RATIO);
+    const coreWidth = Math.max(1, tileSize * LEGACY_PLAY_TRAIL_WIDTH_RATIO);
+    const glowWidth = Math.max(coreWidth, tileSize * LEGACY_PLAY_TRAIL_GLOW_WIDTH_RATIO);
     const graphics = this.boardDynamicGraphics;
+    // Trail Fade OFF: the full retained trail stays at one stable, uniform
+    // base alpha (still subject to lifecycle/deconstruction alpha via
+    // alphaMultiplier) -- no age gradient. Trail Fade ON: the existing
+    // smooth age/distance opacity, continuous by distance so there is no
+    // per-cell alpha step.
+    const trailFadeEnabled = this.settings.toggleTrailFade;
 
     for (let i = 1; i < vertices.length; i += 1) {
       const previous = vertices[i - 1]!;
@@ -9750,27 +9861,43 @@ export class MenuScene extends Phaser.Scene {
       }
 
       const midDistance = (previous.distance + current.distance) / 2;
-      const ageAlpha = clamp(
-        LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN
-          + ((midDistance / geometry.totalLength) * (LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX - LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN)),
-        LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN,
-        LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX
-      );
+      const ageAlpha = trailFadeEnabled
+        ? clamp(
+          LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN
+            + ((midDistance / geometry.totalLength) * (LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX - LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN)),
+          LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN,
+          LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX
+        )
+        : LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX;
 
-      let color = sampleTrailEnergyColor(midDistance, time, colorOptions);
-      let alpha = ageAlpha * alphaMultiplier;
+      const baseColor = sampleTrailEnergyColor(midDistance, animationTime, colorOptions);
+      let coreColor = baseColor;
+      let coreAlpha = ageAlpha * alphaMultiplier;
+      let highlightStrength = 0;
 
       if (shineState && shineState.visible && shineState.halfLength > 0) {
         const distanceFromShineCenter = Math.abs(midDistance - shineState.centerDistance);
         if (distanceFromShineCenter <= shineState.halfLength) {
           const taper = 1 - clamp(distanceFromShineCenter / shineState.halfLength, 0, 1);
-          const highlightStrength = taper * shineState.envelopeAlpha;
-          color = mixLegacyIridescentColor(color, LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR, highlightStrength * 0.85);
-          alpha = Math.min(1, alpha + (highlightStrength * 0.5));
+          highlightStrength = taper * shineState.envelopeAlpha;
+          coreColor = mixLegacyIridescentColor(baseColor, LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR, highlightStrength * 0.85);
+          coreAlpha = Math.min(1, coreAlpha + (highlightStrength * 0.5));
         }
       }
 
-      graphics.lineStyle(trailWidth, color, alpha);
+      // Pass 1: soft outer spectral glow -- the same base energy color,
+      // wide and dim, bounded well under the player/goal markers' own glow
+      // intensity (LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO). Scales with tileSize
+      // like everything else here, so it stays a crisp accent rather than a
+      // blurred bar at compact/mobile tile sizes.
+      graphics.lineStyle(glowWidth, baseColor, coreAlpha * LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO);
+      graphics.beginPath();
+      graphics.moveTo(previous.x, previous.y);
+      graphics.lineTo(current.x, current.y);
+      graphics.strokePath();
+
+      // Pass 2: the crisp 16%-tile core (shine-blended where applicable).
+      graphics.lineStyle(coreWidth, coreColor, coreAlpha);
       graphics.beginPath();
       graphics.moveTo(previous.x, previous.y);
       graphics.lineTo(current.x, current.y);
@@ -9970,13 +10097,12 @@ export class MenuScene extends Phaser.Scene {
     // point, so the glow lands pixel-identical in size/position to the real
     // tile underneath it.
     const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
-    // A one-way latch, not a live position comparison -- once the player has
-    // genuinely left the start tile, returning to it later (a real, normal
-    // thing to do while exploring) must not re-arm the pre-spawn rings/dot.
-    // See hasPlayerEverLeftStart's own declaration for the reset sites.
-    if (kind === 'start' && !this.hasPlayerEverLeftStart) {
-      this.hasPlayerEverLeftStart = this.player.x !== point.x || this.player.y !== point.y;
-    }
+    // Reads the one-way latch only -- it is flipped exclusively at the
+    // authoritative accepted-movement commit boundary
+    // (markLegacyPlayerLeftStartIfApplicable), never here. Rendering must
+    // never be the place persistent lifecycle state changes: a skipped
+    // render, a hidden tab, or a future renderer swap must never be able to
+    // affect whether the player "has left start".
     const hasLeftStart = kind === 'start' ? this.hasPlayerEverLeftStart : false;
     this.drawLegacyEndpointGlow(this.boardDynamicGraphics, tileRect, alpha, kind, time, hasLeftStart);
   }
@@ -15553,7 +15679,9 @@ export class MenuScene extends Phaser.Scene {
       this.player = result.nextPlayer;
       this.syncLegacyPlayerVisualMotionTo(result.nextPlayer);
       this.trail = result.nextTrail ?? [copyPoint(result.nextPlayer)];
-      this.trailShineLapStartedAtMs = this.time.now;
+      this.trailAnimationElapsedMs = 0;
+      this.trailAnimationLastRealMs = null;
+      this.trailShineLapStartedAtMs = 0;
       this.hasPlayerEverLeftStart = false;
       this.playCyclePath = [copyPoint(result.nextPlayer)];
       this.playCycleResetUsed = true;

@@ -347,10 +347,17 @@ describe('sampleTrailEnergyColor', () => {
 });
 
 describe('advanceTrailShineState', () => {
+  // The exact production ratios, per the frozen contract -- deliberately
+  // NOT a test-only inflated value (an earlier version of this test used
+  // fadeRatio: 0.4, which silently protected nothing about the real 0.04
+  // contract). travelEnvelopeRatio is a fraction of TOTAL PATH LENGTH, not
+  // of the shine's own (lengthRatio) body -- see TrailShineOptions' own
+  // header for why conflating the two made the real fade window 10x too
+  // short (0.095 * 0.04 = 0.38% of the path instead of 4%).
   const options = {
     speedPxPerMs: 1,
     lengthRatio: 0.095,
-    fadeRatio: 0.4,
+    travelEnvelopeRatio: 0.04,
     quietGapRatio: 0.5,
     minTotalLengthForShine: 20
   };
@@ -411,5 +418,64 @@ describe('advanceTrailShineState', () => {
   it('is a no-op speed guard against zero/negative speed', () => {
     const result = advanceTrailShineState(1000, 500, 0, { ...options, speedPxPerMs: 0 });
     expect(result.visible).toBe(false);
+  });
+
+  it('computes the travel envelope as 4% of TOTAL path length, not 4% of the shine body', () => {
+    // totalLength=1000 -> travelEnvelopeLength must be 40 (4% of 1000), not
+    // 0.095*1000*0.04=3.8 (4% of the ~9.5%-length shine body).
+    const result = advanceTrailShineState(1000, 10, 0, options);
+    expect(result.travelEnvelopeLength).toBeCloseTo(40, 6);
+  });
+
+  it('is at exactly zero envelope alpha at the trail origin (distance 0) and ramps up smoothly across the first 4% of path length', () => {
+    // At t=0 the shine sits at distance 0 -- envelopeAlpha must start at 0
+    // (a real fade-IN, not an instant pop to full brightness) and reach 1.0
+    // once it has traveled the full 40px (4% of 1000) envelope window.
+    const atOrigin = advanceTrailShineState(1000, 0, 0, options);
+    expect(atOrigin.envelopeAlpha).toBeCloseTo(0, 6);
+    const quarterIntoEnvelope = advanceTrailShineState(1000, 10, 0, options); // distance 10 of 40
+    expect(quarterIntoEnvelope.envelopeAlpha).toBeCloseTo(0.25, 6);
+    const halfwayIntoEnvelope = advanceTrailShineState(1000, 20, 0, options); // distance 20 of 40
+    expect(halfwayIntoEnvelope.envelopeAlpha).toBeCloseTo(0.5, 6);
+    const fullyFadedIn = advanceTrailShineState(1000, 40, 0, options); // distance 40 of 40
+    expect(fullyFadedIn.envelopeAlpha).toBeCloseTo(1, 6);
+  });
+
+  it('ramps down smoothly across the final 4% of path length before reaching the player, not a hard cut', () => {
+    // totalLength=1000, envelope window=40 -- fade-out starts at distance
+    // 960 and reaches exactly 0 at distance 1000.
+    const beforeFadeOutWindow = advanceTrailShineState(1000, 950, 0, options);
+    expect(beforeFadeOutWindow.envelopeAlpha).toBeCloseTo(1, 6);
+    const tenIntoFadeOut = advanceTrailShineState(1000, 970, 0, options); // 30 of 40 remaining
+    expect(tenIntoFadeOut.envelopeAlpha).toBeCloseTo(0.75, 6);
+    const nearEnd = advanceTrailShineState(1000, 990, 0, options); // 10 of 40 remaining
+    expect(nearEnd.envelopeAlpha).toBeCloseTo(0.25, 6);
+    const atPlayerEnd = advanceTrailShineState(1000, 1000, 0, options);
+    expect(atPlayerEnd.envelopeAlpha).toBeCloseTo(0, 6);
+  });
+
+  it('holds full brightness (envelopeAlpha === 1) through the entire middle of the path, outside both envelope windows', () => {
+    // totalLength=1000, envelope window=40 -- full brightness expected
+    // anywhere in [40, 960].
+    for (const distance of [40, 100, 300, 500, 700, 900, 960]) {
+      const result = advanceTrailShineState(1000, distance, 0, options);
+      expect(result.envelopeAlpha).toBeCloseTo(1, 6);
+    }
+  });
+
+  it('is fully invisible (envelopeAlpha 0) during the quiet reset interval, not merely dim', () => {
+    const result = advanceTrailShineState(1000, 1250, 0, options); // mid-quiet-gap (interval is [1000,1500])
+    expect(result.visible).toBe(false);
+    expect(result.envelopeAlpha).toBe(0);
+  });
+
+  it('does not hard-cut at either the origin or the player end -- envelope alpha is continuous, not a step function', () => {
+    // Sample densely across the fade-in window and assert monotonic, gapless increase.
+    const samples = [0, 5, 10, 15, 20, 25, 30, 35, 40].map(
+      (d) => advanceTrailShineState(1000, d, 0, options).envelopeAlpha
+    );
+    for (let i = 1; i < samples.length; i += 1) {
+      expect(samples[i]).toBeGreaterThan(samples[i - 1]!);
+    }
   });
 });
