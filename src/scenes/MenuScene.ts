@@ -1234,6 +1234,34 @@ const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent
 const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;
 const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;
 const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;
+// Navigation Core v1's reference (startPreSpawnSVG/startPostSpawnSVG in
+// docs/assets/reference/navigation-core-v1/mazer-navigation-core-v1-approved.html)
+// gives the start tile two states, not one persistent glow: a visible
+// pre-spawn marker (two thin PLAYER_HALO rings + a small pulsing dot,
+// while the player still occupies the tile) that gives way, once the
+// player has moved off it, to what the reference's own source comment
+// calls a "near-silent residue, not the loud three-ring effect that
+// otherwise sits under the whole run" -- a faint rounded-square outline
+// plus a tiny dim center dot. Both states use PLAYER_HALO
+// (cyberArcadeMaterial.signal.playerHalo, #A7E7D9), never the gold
+// LEGACY_PLAY_START_MARKER_CORE above, which the old single-state glow
+// used for the entire run -- exactly the "loud... under the whole run"
+// effect the reference replaces. Every ratio below is that reference's
+// own SVG numbers divided by its 64 viewBox unit.
+const LEGACY_PLAY_START_MARKER_PRE_SPAWN_OUTER_RING_RADIUS_RATIO = 14.5 / 64;
+const LEGACY_PLAY_START_MARKER_PRE_SPAWN_INNER_RING_RADIUS_RATIO = 10 / 64;
+const LEGACY_PLAY_START_MARKER_PRE_SPAWN_RING_STROKE_RATIO = 1.3 / 64;
+const LEGACY_PLAY_START_MARKER_PRE_SPAWN_OUTER_RING_ALPHA = 0.45;
+const LEGACY_PLAY_START_MARKER_PRE_SPAWN_INNER_RING_ALPHA = 0.72;
+const LEGACY_PLAY_START_MARKER_PRE_SPAWN_CORE_RADIUS_RATIO = 0.22 / 2;
+const LEGACY_PLAY_START_MARKER_PRE_SPAWN_PULSE_PERIOD_MS = 2000;
+const LEGACY_PLAY_START_MARKER_PRE_SPAWN_PULSE_AMOUNT = 0.12;
+const LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_HALF_RATIO = 12 / 64;
+const LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_CORNER_RATIO = 3 / 64;
+const LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_STROKE_RATIO = 1 / 64;
+const LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_ALPHA = 0.26;
+const LEGACY_PLAY_START_MARKER_POST_SPAWN_DOT_RADIUS_RATIO = 2.6 / 64;
+const LEGACY_PLAY_START_MARKER_POST_SPAWN_DOT_ALPHA = 0.45;
 const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = cyberArcadeMaterial.signal.goalEdge;
 // Navigation Core v1's reference end-star (endStarNode/.end-halo in
@@ -8595,7 +8623,7 @@ export class MenuScene extends Phaser.Scene {
     // on top of the trail's coloring instead of getting painted over
     // whenever the trail passes through those cells.
     if (markersBuiltIn && markerDeconstructAlpha > 0 && this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
-      this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start');
+      this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start', time);
     }
     if (markersBuiltIn && markerDeconstructAlpha > 0 && this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
       this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal', time);
@@ -9812,7 +9840,10 @@ export class MenuScene extends Phaser.Scene {
     // point, so the glow lands pixel-identical in size/position to the real
     // tile underneath it.
     const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
-    this.drawLegacyEndpointGlow(this.boardDynamicGraphics, tileRect, alpha, kind, time);
+    const hasLeftStart = kind === 'start'
+      ? (this.player.x !== point.x || this.player.y !== point.y)
+      : false;
+    this.drawLegacyEndpointGlow(this.boardDynamicGraphics, tileRect, alpha, kind, time, hasLeftStart);
   }
 
   // The actual maze tile underneath is left completely alone (drawBoardPaths
@@ -9826,25 +9857,65 @@ export class MenuScene extends Phaser.Scene {
     tileRect: LegacyPixelTileRect,
     alpha: number,
     kind: 'start' | 'goal',
-    time?: number
+    time?: number,
+    hasLeftStart: boolean = false
   ): void {
     if (kind === 'goal') {
       this.drawLegacyGoalStarMarker(graphics, tileRect, alpha, time);
       return;
     }
-    const color = LEGACY_PLAY_START_MARKER_CORE;
     const centerX = tileRect.left + (tileRect.width / 2);
     const centerY = tileRect.top + (tileRect.height / 2);
-    const maxRadius = Math.min(tileRect.width, tileRect.height) * 0.5;
+    const tileSize = Math.min(tileRect.width, tileRect.height);
+    const haloColor = LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_COLOR;
 
-    graphics.fillStyle(color, Math.min(0.9, alpha) * 0.22);
-    graphics.fillCircle(centerX, centerY, maxRadius * 1.2);
-    graphics.fillStyle(color, Math.min(0.9, alpha) * 0.45);
-    graphics.fillCircle(centerX, centerY, maxRadius * 0.78);
-    graphics.fillStyle(color, Math.min(0.96, alpha));
-    graphics.fillCircle(centerX, centerY, maxRadius * 0.4);
-    graphics.fillStyle(cyberArcadeMaterial.rail.white, Math.min(0.75, alpha * 0.8));
-    graphics.fillCircle(centerX - (maxRadius * 0.14), centerY - (maxRadius * 0.14), maxRadius * 0.13);
+    if (hasLeftStart) {
+      // Post-spawn: "near-silent residue" per the reference's own comment
+      // -- a faint rounded-square outline plus a tiny dim center dot,
+      // nothing that competes with the trail/player once the run is under
+      // way.
+      const half = tileSize * LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_HALF_RATIO;
+      graphics.lineStyle(
+        Math.max(1, tileSize * LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_STROKE_RATIO),
+        haloColor,
+        LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_ALPHA * alpha
+      );
+      graphics.strokeRoundedRect(
+        centerX - half,
+        centerY - half,
+        half * 2,
+        half * 2,
+        tileSize * LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_CORNER_RATIO
+      );
+      graphics.fillStyle(haloColor, LEGACY_PLAY_START_MARKER_POST_SPAWN_DOT_ALPHA * alpha);
+      graphics.fillCircle(centerX, centerY, tileSize * LEGACY_PLAY_START_MARKER_POST_SPAWN_DOT_RADIUS_RATIO);
+      return;
+    }
+
+    // Pre-spawn: two thin concentric rings plus a small pulsing core dot
+    // and catchlight glint, all in PLAYER_HALO -- visible while the player
+    // still occupies the start tile.
+    graphics.lineStyle(
+      Math.max(1, tileSize * LEGACY_PLAY_START_MARKER_PRE_SPAWN_RING_STROKE_RATIO),
+      haloColor,
+      LEGACY_PLAY_START_MARKER_PRE_SPAWN_OUTER_RING_ALPHA * alpha
+    );
+    graphics.strokeCircle(centerX, centerY, tileSize * LEGACY_PLAY_START_MARKER_PRE_SPAWN_OUTER_RING_RADIUS_RATIO);
+    graphics.lineStyle(
+      Math.max(1, tileSize * LEGACY_PLAY_START_MARKER_PRE_SPAWN_RING_STROKE_RATIO),
+      haloColor,
+      LEGACY_PLAY_START_MARKER_PRE_SPAWN_INNER_RING_ALPHA * alpha
+    );
+    graphics.strokeCircle(centerX, centerY, tileSize * LEGACY_PLAY_START_MARKER_PRE_SPAWN_INNER_RING_RADIUS_RATIO);
+
+    const pulse = time !== undefined && !this.prefersLegacyReducedMotion()
+      ? 1 + (Math.sin((time / LEGACY_PLAY_START_MARKER_PRE_SPAWN_PULSE_PERIOD_MS) * Math.PI * 2) * LEGACY_PLAY_START_MARKER_PRE_SPAWN_PULSE_AMOUNT)
+      : 1;
+    const coreRadius = tileSize * LEGACY_PLAY_START_MARKER_PRE_SPAWN_CORE_RADIUS_RATIO * pulse;
+    graphics.fillStyle(haloColor, alpha);
+    graphics.fillCircle(centerX, centerY, coreRadius);
+    graphics.fillStyle(cyberArcadeMaterial.rail.white, 0.85 * alpha);
+    graphics.fillCircle(centerX - (coreRadius * 0.3), centerY - (coreRadius * 0.3), coreRadius * 0.32);
   }
 
   // The goal marker: a rainbow, hue-cycled ring (with a small bright
