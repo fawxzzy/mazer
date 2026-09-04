@@ -65,6 +65,34 @@ export const MAZER_FLOOR_TILE_TEXTURE_KEY = 'mazerFloorTile';
 export const MAZER_BLEED_PATH_TEXTURE_KEY = 'mazerBleedPathStrip';
 export const MAZER_PLAYER_TRAIL_TEXTURE_KEY = 'mazerPlayerTrail';
 
+// mazer-floor-tile.png (1254x1254) is a standalone "tile" icon -- a bright
+// two-pixel corner-bracket border plus a soft outer glow halo, wrapped
+// around a pale interior with its own faint crosshair subdivision -- not an
+// edge-to-edge-tileable material swatch. The live corridor floor repeats
+// this whole image once per maze cell via a TileSprite (see
+// boardFloorTileSprite in MenuScene.ts), which duplicates that border/glow
+// at every single cell boundary: a Navigation Core v1 review (see
+// docs/assets/reference/navigation-core-v1/README.md) confirmed by pixel-
+// sampling this exact file that this per-cell border duplication -- not the
+// connectivity-aware color fill/rim-light, which already suppresses its own
+// stroke on shared interior edges -- is the root cause of the maze reading
+// as a "checkerboard of separate beveled chiclets" instead of one connected
+// corridor. Sampling a horizontal scanline through the image's vertical
+// center found: outer glow (alpha < 253) below x=228 and above x=1024; the
+// bright bezel spike itself (all channels >240) at x=230-238 and x=1018-
+// 1022; a stable pale interior baseline (~rgb(165,236,225), alpha 253) from
+// roughly x=250 to x=1002. MAZER_FLOOR_TILE_INTERIOR_CROP below crops to
+// [260,260]-[990,990] -- comfortably inside that measured baseline band on
+// all four sides (the source is square, so the same bounds apply to Y) --
+// keeping the interior's own subtle crosshair detail (the reference design
+// explicitly wants "visible floor texture depth ... not a bleached,
+// featureless slab") while fully excluding the border/glow that caused the
+// duplication artifact. generateMazerFloorTileInteriorTexture() below bakes
+// this crop into its own texture once at boot; MenuScene's floor overlay
+// must repeat that derived texture, never the raw MAZER_FLOOR_TILE_TEXTURE_KEY.
+export const MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY = 'mazerFloorTileInterior';
+export const MAZER_FLOOR_TILE_INTERIOR_CROP = Object.freeze({ x: 260, y: 260, width: 730, height: 730 });
+
 // Real HUD icon source art (see docs/assets/mazer-vfx-source-provenance.md) --
 // the actual profile/leaderboard/settings icons, replacing the procedural
 // thin-line glyphs used until now.
@@ -120,6 +148,7 @@ export class BootScene extends Phaser.Scene {
   public create(): void {
     this.registerMazerTileFontFrames(MAZER_TILE_FONT_TEXTURE_KEY);
     this.generateMazerTileFontRainbowVariants();
+    this.generateMazerFloorTileInteriorTexture();
     this.scene.start('MenuScene');
   }
 
@@ -202,6 +231,50 @@ export class BootScene extends Phaser.Scene {
         // Canvas 2D unavailable/erroring on this step -- leave it
         // unregistered, see this method's own header comment.
       }
+    }
+  }
+
+  // Bakes MAZER_FLOOR_TILE_INTERIOR_CROP out of the raw floor-tile source
+  // once at boot -- see the border-duplication comment above
+  // MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY for why the raw asset can't be
+  // repeated directly. Same getSourceImage-into-canvas technique as
+  // generateMazerTileFontRainbowVariants above, minus the recolor pass.
+  // Silently no-ops (leaving the interior texture missing) if the source
+  // texture or Canvas 2D isn't available, matching that method's own
+  // never-fatal-to-boot stance.
+  private generateMazerFloorTileInteriorTexture(): void {
+    if (!this.textures.exists(MAZER_FLOOR_TILE_TEXTURE_KEY)) {
+      return;
+    }
+    const sourceImage = this.textures.get(MAZER_FLOOR_TILE_TEXTURE_KEY).getSourceImage();
+    const crop = MAZER_FLOOR_TILE_INTERIOR_CROP;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = crop.width;
+      canvas.height = crop.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        return;
+      }
+      ctx.drawImage(
+        sourceImage as CanvasImageSource,
+        crop.x,
+        crop.y,
+        crop.width,
+        crop.height,
+        0,
+        0,
+        crop.width,
+        crop.height
+      );
+      if (this.textures.exists(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY)) {
+        this.textures.remove(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY);
+      }
+      this.textures.addCanvas(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY, canvas);
+    } catch {
+      // Canvas 2D unavailable/erroring -- leave the interior texture
+      // missing; MenuScene's floor overlay guards its own texture-exists
+      // check the same way boardFloorTileSprite's other callers do.
     }
   }
 }

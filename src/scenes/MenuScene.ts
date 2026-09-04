@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import {
   MAZER_BLEED_PATH_TEXTURE_KEY,
-  MAZER_FLOOR_TILE_TEXTURE_KEY,
+  MAZER_FLOOR_TILE_INTERIOR_CROP,
+  MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY,
   MAZER_HUD_LEADERBOARD_TEXTURE_KEY,
   MAZER_HUD_PROFILE_TEXTURE_KEY,
   MAZER_HUD_SETTINGS_TEXTURE_KEY,
@@ -1230,9 +1231,13 @@ const LEGACY_TILE_FONT_TILES_PER_GLYPH = LEGACY_TILE_FONT_SUB_TILE_COLUMNS * LEG
 // Native pixel size (square) of the iridescent-diamond VFX source art --
 // see docs/assets/mazer-vfx-source-provenance.md.
 const MAZER_VFX_DIAMOND_SOURCE_SIZE = 1254;
-// Native pixel size (square) of the floor-tile material source art -- see
-// docs/assets/mazer-vfx-source-provenance.md.
-const MAZER_FLOOR_TILE_SOURCE_SIZE = 1254;
+// Native pixel size (square) of the *derived interior-crop* floor-tile
+// texture (MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY, baked once at boot from
+// MAZER_FLOOR_TILE_INTERIOR_CROP) -- not the raw 1254x1254 source art, which
+// includes a per-tile border/glow that must never be repeated directly. See
+// the border-duplication comment above MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY
+// in BootScene.ts.
+const MAZER_FLOOR_TILE_SOURCE_SIZE = MAZER_FLOOR_TILE_INTERIOR_CROP.width;
 // Native pixel size of the bleed-path strip source art (see
 // docs/assets/mazer-vfx-source-provenance.md) -- a horizontal strip of
 // tile-like segments, solid on the left, fading to a sparkle point on the
@@ -1931,7 +1936,7 @@ export class MenuScene extends Phaser.Scene {
     // once the real maze render frame is known. Masked to
     // boardFloorMaskGraphics so it only ever shows through the actual
     // walkable-cell shape, never over walls/void.
-    this.boardFloorTileSprite = this.add.tileSprite(0, 0, 1, 1, MAZER_FLOOR_TILE_TEXTURE_KEY).setOrigin(0, 0).setAlpha(0.5);
+    this.boardFloorTileSprite = this.add.tileSprite(0, 0, 1, 1, MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY).setOrigin(0, 0).setAlpha(0.5);
     this.boardFloorMaskGraphics = this.add.graphics().setVisible(false);
     this.boardFloorTileSprite.setMask(new Phaser.Display.Masks.GeometryMask(this, this.boardFloorMaskGraphics));
     this.boardBleedPathImages = Array.from({ length: LEGACY_BLEED_PATH_IMAGE_POOL_SIZE }, () => (
@@ -6585,21 +6590,27 @@ export class MenuScene extends Phaser.Scene {
     const hasBottom = pathSource.grid[point.y + 1]?.[point.x] === true;
     const hasRight = pathSource.grid[point.y]?.[point.x + 1] === true;
 
-    // Adjacent connected tiles overlap their fill by 1px into each other
-    // instead of exactly abutting -- two mathematically adjacent fillRects
-    // with identical rounded edges still render a faint 1px seam where they
-    // meet (antialiasing partial-coverage at the shared boundary), visible
-    // as thin grey lines through the corridor at larger tile sizes. A small
-    // overlap guarantees solid double-covered color at every internal
-    // boundary instead of a hairline gap.
-    const overlap = 1;
-    const fillLeft = tileRect.left - (hasLeft ? overlap : 0);
-    const fillTop = tileRect.top - (hasTop ? overlap : 0);
-    const fillRight = tileRect.left + tileRect.width + (hasRight ? overlap : 0);
-    const fillBottom = tileRect.top + tileRect.height + (hasBottom ? overlap : 0);
-
+    // A Navigation Core v1 review (see
+    // docs/assets/reference/navigation-core-v1/README.md) traced the maze's
+    // "checkerboard of separate chiclets" seam artifact to exactly this
+    // line, empirically -- by A/B-disabling this method's own fill and
+    // drawLegacyPathTileFacet independently against the real running
+    // renderer (not by inspecting source alone): resolveLegacyPixelTileRect
+    // already rounds every tile's edges from the same shared originX/originY
+    // + tileSize formula, so two connected tiles' shared edge is always the
+    // exact same integer pixel coordinate -- there is no sub-pixel gap for a
+    // 1px overlap to correct. The overlap this comment used to describe
+    // ("guarantees solid double-covered color... instead of a hairline
+    // gap") instead double-composited this coreAlpha (< 1, a deliberately
+    // translucent "glass" material) fill onto itself in that 1px strip,
+    // which is what actually produced a visible brighter seam line at every
+    // internal tile boundary -- confirmed by removing the overlap entirely
+    // (exact abutment only) while leaving drawLegacyPathTileFacet
+    // unchanged: the seam disappeared and the rim-light still correctly
+    // traces only the corridor's true outer boundary. Do not reintroduce an
+    // overlap here without re-verifying against the live renderer first.
     graphics.fillStyle(options.coreColor, options.coreAlpha);
-    graphics.fillRect(fillLeft, fillTop, fillRight - fillLeft, fillBottom - fillTop);
+    graphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
     // Board callers pass their own mask graphics so the real floor-tile
     // texture (boardFloorTileSprite) only ever shows through exactly the
     // same connectivity-aware shape the color fill above just drew -- title/
@@ -6607,7 +6618,7 @@ export class MenuScene extends Phaser.Scene {
     // they're unaffected.
     if (floorMaskGraphics) {
       floorMaskGraphics.fillStyle(0xffffff, 1);
-      floorMaskGraphics.fillRect(fillLeft, fillTop, fillRight - fillLeft, fillBottom - fillTop);
+      floorMaskGraphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
     }
     this.drawLegacyPathTileFacet(
       graphics,

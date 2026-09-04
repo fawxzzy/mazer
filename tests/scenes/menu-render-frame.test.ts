@@ -738,7 +738,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });');
     expect(menuSceneSource).toContain('const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);');
     expect(menuSceneSource).toContain('graphics.fillStyle(options.coreColor, options.coreAlpha);');
-    expect(menuSceneSource).toContain('graphics.fillRect(fillLeft, fillTop, fillRight - fillLeft, fillBottom - fillTop);');
+    expect(menuSceneSource).toContain('graphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);');
     expect(menuSceneSource).toContain('private drawLegacyPathTileFacet(');
     expect(menuSceneSource).toContain('const facetRect = resolveLegacyMenuBorderDockFacetRect(direction, frame, {');
     expect(menuSceneSource).not.toContain('const top = mazeBottom;');
