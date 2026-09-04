@@ -405,6 +405,7 @@ describe('Mazer UI rework state model contract', () => {
       const input = Object.freeze({
         mode: 'play',
         overlay: 'pause',
+        overlayReturn: 'none',
         gamePhase: 'active',
         authPhase: 'authenticated',
         connectionPhase: 'online',
@@ -438,7 +439,26 @@ describe('Mazer UI rework state model contract', () => {
         ok: true,
         snapshot: expect.objectContaining({ primarySurface: 'account', modalSurface: 'none' })
       });
-      expect(projectLegacyUiState({ ...input, mode: 'menu', overlay: 'confirm-progression-reset' })).toEqual({
+      // confirm-progression-reset must keep the surface it was actually opened
+      // from (Account or Pause), not fall through to a generic 'home' default.
+      expect(projectLegacyUiState({
+        ...input, mode: 'menu', overlay: 'confirm-progression-reset', overlayReturn: 'auth'
+      })).toEqual({
+        ok: true,
+        snapshot: expect.objectContaining({ primarySurface: 'account', modalSurface: 'confirm-reset-progress' })
+      });
+      expect(projectLegacyUiState({
+        ...input, mode: 'menu', overlay: 'confirm-progression-reset', overlayReturn: 'pause'
+      })).toEqual({
+        ok: true,
+        snapshot: expect.objectContaining({
+          primarySurface: 'play', modalSurface: 'confirm-reset-progress', gamePhase: 'paused'
+        })
+      });
+      // Unrecorded origin (overlayReturn: 'none') keeps the old safe fallback.
+      expect(projectLegacyUiState({
+        ...input, mode: 'menu', overlay: 'confirm-progression-reset', overlayReturn: 'none'
+      })).toEqual({
         ok: true,
         snapshot: expect.objectContaining({ primarySurface: 'home', modalSurface: 'confirm-reset-progress' })
       });

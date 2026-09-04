@@ -382,6 +382,15 @@ import {
   summarizeCyberArcadeMaterial,
   toCyberArcadeCssHex
 } from '../render/cyberArcadeMaterial';
+import {
+  UiLegacyBridge,
+  type LegacyRuntimeFacts,
+  type UiLegacyBridgeAdapter,
+  type UiLegacyBridgeDiagnostics,
+  type UiLegacyBridgeDispatchResult
+} from '../state/uiLegacyBridge';
+import type { UiStateSnapshot } from '../state/uiState';
+import type { UiViewModels } from '../state/uiViewModels';
 
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
@@ -957,6 +966,12 @@ interface LegacyQaDiagnosticsApi {
   openPauseOverlay(): LegacyQaOverlayResult;
   startGuestPlayMode(): LegacyQaOverlayResult;
   startPlayMode(): LegacyQaOverlayResult;
+  // Wave 3A bridge QA surface -- calls the same live UiLegacyBridge instance
+  // the real scene uses, not a test-only duplicate.
+  getUiStateSnapshot(): UiStateSnapshot | null;
+  getUiViewModels(): UiViewModels | null;
+  dispatchUiCommand(command: unknown): UiLegacyBridgeDispatchResult;
+  getUiBridgeDiagnostics(): UiLegacyBridgeDiagnostics | null;
 }
 
 declare global {
@@ -1551,6 +1566,9 @@ export class MenuScene extends Phaser.Scene {
   private mode: RuntimeMode = 'menu';
   private overlay: OverlayKind = 'none';
   private overlayReturn: OverlayKind = 'none';
+  // Wave 3A live command/state bridge -- see src/state/uiLegacyBridge.ts.
+  // Null only before create() installs it and after shutdown destroys it.
+  private uiBridge: UiLegacyBridge | null = null;
   private pendingGenerationRequest: LegacyGenerationRequest | null = null;
   private menuDemoEpisode: MazeEpisode | null = null;
   private menuDemoState: DemoWalkerState | null = null;
@@ -2068,6 +2086,7 @@ export class MenuScene extends Phaser.Scene {
     }
     this.installInput();
     this.installLegacyPlayFocusGuards();
+    this.uiBridge = new UiLegacyBridge(this.createUiBridgeAdapter());
     this.installLegacyQaDiagnosticsSurface();
 
     this.scale.on('resize', () => {
@@ -2095,6 +2114,8 @@ export class MenuScene extends Phaser.Scene {
       this.detachLegacyPlayKeyboardFallback();
       this.detachLegacyPlayTouchControlFallback();
       this.detachLegacyQaDiagnosticsSurface();
+      this.uiBridge?.destroy();
+      this.uiBridge = null;
       this.detachLegacyReducedMotionPreference();
       if (this.viewportGeometryListener !== null && typeof window !== 'undefined') {
         window.removeEventListener(MAZER_VIEWPORT_CHANGE_EVENT, this.viewportGeometryListener);
@@ -2105,6 +2126,64 @@ export class MenuScene extends Phaser.Scene {
     });
     this.publishVisualDiagnostics(this.time.now, true);
     this.publishRuntimeDiagnostics(this.time.now, true);
+  }
+
+  /**
+   * Real legacy facts for the Wave 3A bridge's projection. gamePhase,
+   * connectionPhase, installPhase, and effectsQuality are honest, disclosed
+   * simplifications: MenuScene does not yet track a richer generating/
+   * preroll/complete lifecycle, a live connection-phase signal, an
+   * install-phase signal, or a per-effect quality setting as a distinct
+   * live field, so those three are approximated/fixed rather than sourced
+   * from a real signal that does not exist yet. mode, overlay,
+   * overlayReturn, authPhase, controlMode, and motionMode are real.
+   */
+  private resolveUiBridgeFacts(): LegacyRuntimeFacts {
+    const authPhase: UiStateSnapshot['authPhase'] =
+      this.authSnapshot.status === 'authenticated'
+        ? 'authenticated'
+        : this.authSnapshot.status === 'guest'
+          ? 'guest'
+          : 'failed';
+    const reducedMotionPreferred = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return {
+      mode: this.mode,
+      overlay: this.overlay,
+      overlayReturn: this.overlayReturn,
+      gamePhase: this.overlay === 'pause' ? 'paused' : this.mode === 'play' ? 'active' : 'idle',
+      authPhase,
+      connectionPhase: 'online',
+      installPhase: 'hidden',
+      controlMode: this.settings.controlMode,
+      motionMode: reducedMotionPreferred ? 'reduced' : 'system',
+      effectsQuality: 'balanced'
+    };
+  }
+
+  /**
+   * Maps shared UiCommand verbs to the same existing MenuScene methods the
+   * current UI already calls -- this adds no new behavior, it only names
+   * the seam. A command with no real runtime equivalent yet (install-related
+   * commands, preference/control-mode writes with no matching live setting,
+   * directional-intent release) is intentionally omitted so
+   * UiLegacyBridge.dispatch() fails closed instead of silently no-op-ing.
+   */
+  private createUiBridgeAdapter(): UiLegacyBridgeAdapter {
+    return {
+      getFacts: (): LegacyRuntimeFacts => this.resolveUiBridgeFacts(),
+      openSettings: (): void => this.openOverlay('options'),
+      openAccount: (): void => this.openOverlay('auth'),
+      openLeaderboard: (): void => this.openOverlay('leaderboard'),
+      closeTopOverlay: (): void => this.handleBackAction(),
+      startRun: (): void => this.startPlayMode(),
+      pauseRun: (): void => this.openOverlay('pause'),
+      resumeRun: (): void => { this.applyLegacyPauseCommand('resume'); },
+      resetRun: (): void => { this.applyLegacyPauseCommand('reset-player'); },
+      resetProgress: (): void => this.resetLegacyPlayerProgression(),
+      returnHome: (): void => this.enterMenuMode(),
+      logOut: (): void => { void this.handleLegacyAuthSignOut(); }
+    };
   }
 
   private installLegacyQaDiagnosticsSurface(): void {
@@ -2118,7 +2197,13 @@ export class MenuScene extends Phaser.Scene {
       openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay(),
       openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay(),
       startGuestPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartGuestPlayMode(),
-      startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode()
+      startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode(),
+      getUiStateSnapshot: (): UiStateSnapshot | null => this.uiBridge?.getSnapshot() ?? null,
+      getUiViewModels: (): UiViewModels | null => this.uiBridge?.getViewModels() ?? null,
+      dispatchUiCommand: (command: unknown): UiLegacyBridgeDispatchResult => (
+        this.uiBridge?.dispatch(command) ?? { ok: false, reason: 'bridge-not-installed' }
+      ),
+      getUiBridgeDiagnostics: (): UiLegacyBridgeDiagnostics | null => this.uiBridge?.getDiagnostics() ?? null
     };
   }
 
@@ -5558,6 +5643,7 @@ export class MenuScene extends Phaser.Scene {
       }),
       this.time.now + INITIAL_MENU_DEMO_HOLD_MS
     );
+    this.uiBridge?.refreshProjection('mode-change');
   }
 
   private startPlayMode(): void {
@@ -5581,6 +5667,7 @@ export class MenuScene extends Phaser.Scene {
     this.boardPathDirty = true;
     this.boardDynamicDirty = true;
     this.uiDirty = true;
+    this.uiBridge?.refreshProjection('mode-change');
   }
 
   private updateMenuDemo(time: number): void {
@@ -11343,7 +11430,11 @@ export class MenuScene extends Phaser.Scene {
     // Confirm keeps its own explicit destination (openOverlay('pause') in
     // resetLegacyPlayerProgression) independent of this routing.
     const cancel = (): void => this.handleBackAction();
-    const confirm = (): void => this.resetLegacyPlayerProgression();
+    const confirm = (): void => {
+      if (!this.uiBridge || !this.uiBridge.dispatch({ type: 'RESET_PROGRESS' }).ok) {
+        this.resetLegacyPlayerProgression();
+      }
+    };
     if (compact) {
       const width = Math.floor((buttonWidth - 12) / 2);
       this.uiButtons.push(
@@ -14911,6 +15002,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.mode === 'play') {
       this.publishInteractionDiagnostics();
     }
+    this.uiBridge?.refreshProjection('overlay-open');
   }
 
   private closeOverlay(): void {
@@ -14934,6 +15026,7 @@ export class MenuScene extends Phaser.Scene {
       this.titleGraphics.setVisible(false);
       this.boardDynamicDirty = true;
       this.uiDirty = true;
+      this.uiBridge?.refreshProjection('overlay-close');
       return;
     }
     this.overlay = 'none';
@@ -14951,6 +15044,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.mode === 'play') {
       this.publishInteractionDiagnostics();
     }
+    this.uiBridge?.refreshProjection('overlay-close');
   }
 
   private closeLegacyAuthOverlayToMainMenu(): void {
@@ -15294,6 +15388,11 @@ export class MenuScene extends Phaser.Scene {
     // crash that silently aborted the rest of boot). update() can't fire
     // until create() has fully returned, so consuming the flag there
     // instead guarantees everything it needs already exists.
+    // uiBridge may still be null here if this runs during the synchronous
+    // auth-fixture path inside create() itself, before the bridge is
+    // constructed -- optional chaining makes that a safe no-op, and the
+    // bridge's own constructor projects the (by-then-current) auth state.
+    this.uiBridge?.refreshProjection('auth-change');
   }
 
   private hasLegacyPlayAccess(): boolean {
