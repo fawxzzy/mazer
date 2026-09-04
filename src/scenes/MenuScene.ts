@@ -1497,16 +1497,12 @@ export class MenuScene extends Phaser.Scene {
   private authSubmitting = false;
   private authSubmitAttemptId = 0;
   private authInvalidFields: ReadonlySet<LegacyAuthFieldId> = new Set();
-  // Check-only (never auto-saves -- there's no account to save to yet
-  // until sign-up actually succeeds). A signup with a checked-available
-  // username saves it right after account creation in
-  // applyLegacyAuthSubmitResult; anything else (empty, unchecked, taken,
-  // invalid) is silently skipped and can be set later from the account
-  // screen instead.
-  private authUsernameStatus: 'available' | 'checking' | 'error' | 'idle' | 'taken' = 'idle';
+  // Signed-out signup validates syntax locally only. Availability and the
+  // final lower(username) race are owned transactionally by the Auth hook
+  // and profile trigger; the authenticated availability RPC below remains
+  // scoped to later account-screen renames.
+  private authUsernameStatus: 'error' | 'idle' = 'idle';
   private authUsernameStatusMessage: string | null = null;
-  private authUsernameSequence = 0;
-  private authUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private menuLeaderboardActive = false;
   private menuProfileActive = false;
   private overlayUsernameActive = false;
@@ -11981,16 +11977,11 @@ export class MenuScene extends Phaser.Scene {
       );
       const usernameStatusText = this.resolveAuthUsernameStatusText();
       if (usernameStatusText) {
-        const statusColor = this.authUsernameStatus === 'available'
-          ? '#72e0bf'
-          : this.authUsernameStatus === 'taken' || this.authUsernameStatus === 'error'
-            ? '#ff9d9d'
-            : '#7894a0';
         this.createAuthInfoText(
           usernameStatusText,
           rowY + (fieldHeight / 2) + 14,
           panel,
-          statusColor,
+          '#ff9d9d',
           stacked ? 11 : 12
         );
       }
@@ -13504,13 +13495,6 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private scheduleAuthUsernameEvaluation(): void {
-    if (this.authUsernameDebounceTimer !== null) {
-      clearTimeout(this.authUsernameDebounceTimer);
-      this.authUsernameDebounceTimer = null;
-    }
-    this.authUsernameSequence += 1;
-    const sequence = this.authUsernameSequence;
-
     const candidate = this.authForm.username.trim();
     if (candidate.length === 0) {
       this.authUsernameStatus = 'idle';
@@ -13526,42 +13510,13 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    this.authUsernameStatus = 'checking';
+    this.authUsernameStatus = 'idle';
     this.authUsernameStatusMessage = null;
-    this.uiDirty = true;
-
-    this.authUsernameDebounceTimer = setTimeout(() => {
-      this.authUsernameDebounceTimer = null;
-      void this.evaluateAuthUsername(candidate, sequence);
-    }, 700);
-  }
-
-  private async evaluateAuthUsername(candidate: string, sequence: number): Promise<void> {
-    const availability = await checkLegacyUsernameAvailable(candidate);
-    if (sequence !== this.authUsernameSequence) {
-      return;
-    }
-
-    if (availability.error) {
-      this.authUsernameStatus = 'error';
-      this.authUsernameStatusMessage = 'Could not check that username right now.';
-      this.uiDirty = true;
-      return;
-    }
-
-    this.authUsernameStatus = availability.available === false ? 'taken' : 'available';
-    this.authUsernameStatusMessage = availability.available === false ? 'That username is already taken.' : null;
     this.uiDirty = true;
   }
 
   private resolveAuthUsernameStatusText(): string | null {
     switch (this.authUsernameStatus) {
-      case 'checking':
-        return 'Checking availability...';
-      case 'available':
-        return 'Username available.';
-      case 'taken':
-        return this.authUsernameStatusMessage ?? 'That username is already taken.';
       case 'error':
         return this.authUsernameStatusMessage ?? 'Something went wrong.';
       default:
@@ -13570,11 +13525,6 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resetAuthUsernameEvaluation(): void {
-    if (this.authUsernameDebounceTimer !== null) {
-      clearTimeout(this.authUsernameDebounceTimer);
-      this.authUsernameDebounceTimer = null;
-    }
-    this.authUsernameSequence += 1;
     this.authUsernameStatus = 'idle';
     this.authUsernameStatusMessage = null;
   }
@@ -13878,28 +13828,6 @@ export class MenuScene extends Phaser.Scene {
     });
     const shouldReturnToMainMenuAfterLogin = this.authForm.mode === 'login'
       && result.snapshot.status === 'authenticated';
-    // A confirmed-available username typed during signup only ever gets
-    // this far as a checked candidate, never auto-saved (there was no
-    // account to save it to until this exact result came back) -- now
-    // that one exists, save it. Anything else (empty, unchecked, taken,
-    // invalid) is silently skipped; it can still be set later from the
-    // account screen.
-    if (
-      this.authForm.mode === 'signup'
-      && result.snapshot.status === 'authenticated'
-      && result.snapshot.userId
-      && this.authUsernameStatus === 'available'
-    ) {
-      const usernameToSave = this.authForm.username.trim();
-      void saveLegacyAccountUsername(result.snapshot.userId, usernameToSave).then((saveResult) => {
-        if (saveResult.ok) {
-          this.accountUsernameDraft = usernameToSave;
-          this.accountUsernameSavedValue = usernameToSave;
-          this.accountUsernameLoadedForUserId = result.snapshot.userId;
-          this.uiDirty = true;
-        }
-      });
-    }
     this.resetAuthUsernameEvaluation();
     this.applyLegacyAuthSnapshot(result.snapshot);
     if (shouldReturnToMainMenuAfterLogin) {
