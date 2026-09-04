@@ -366,9 +366,10 @@
         "dependsOn": ["3A"],
         "owner": "navigation-core-integrator",
         "paths": [
-          "src/scenes/MenuScene.ts"
+          "src/scenes/MenuScene.ts",
+          "src/render/navigationCoreTrail.ts"
         ],
-        "note": "Implements the frozen docs/assets/reference/navigation-core-v1/ visual authority into the real Phaser runtime. Depends only on Wave 3A's completion (the command bridge it builds on top of); no dependency edge to Wave 3B is required or implied -- the two waves own disjoint paths and neither's work gates the other."
+        "note": "Implements the frozen docs/assets/reference/navigation-core-v1/ visual authority into the real Phaser runtime. Depends only on Wave 3A's completion (the command bridge it builds on top of); no dependency edge to Wave 3B is required or implied -- the two waves own disjoint paths and neither's work gates the other. src/render/navigationCoreTrail.ts is a new pure geometry/color/shine module extracted out of MenuScene.ts for the continuous trail (arc-length path building, corner rounding, energy-palette color sampling, shared shine timing) -- added here explicitly rather than left unowned."
       },
       {
         "wave": "5B",
