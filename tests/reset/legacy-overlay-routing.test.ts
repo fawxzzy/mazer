@@ -36,4 +36,35 @@ describe('legacy overlay routing', () => {
       kind: 'close-overlay'
     });
   });
+
+  test('routes confirm-progression-reset back to its real origin, not always pause', () => {
+    expect(resolveLegacyOverlayBackAction({
+      mode: 'play',
+      overlay: 'confirm-progression-reset',
+      overlayReturn: 'pause'
+    })).toEqual({
+      kind: 'open-overlay',
+      overlay: 'pause'
+    });
+
+    expect(resolveLegacyOverlayBackAction({
+      mode: 'menu',
+      overlay: 'confirm-progression-reset',
+      overlayReturn: 'auth'
+    })).toEqual({
+      kind: 'open-overlay',
+      overlay: 'auth'
+    });
+
+    // Unknown/unrecorded origin falls back to the prior always-pause behavior
+    // rather than routing somewhere it was never actually opened from.
+    expect(resolveLegacyOverlayBackAction({
+      mode: 'play',
+      overlay: 'confirm-progression-reset',
+      overlayReturn: 'none'
+    })).toEqual({
+      kind: 'open-overlay',
+      overlay: 'pause'
+    });
+  });
 });

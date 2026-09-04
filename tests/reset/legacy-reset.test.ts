@@ -1038,7 +1038,13 @@ describe('legacy reset lane', () => {
     expect(pauseLifecycleSource).toContain("export type LegacyPauseCommand = 'reset-player' | 'return-menu' | 'resume' | 'reset-progression';");
     expect(pauseLifecycleSource).toContain('resolveLegacyPauseCommand');
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('resume')");
-    expect(menuSceneSource).toContain("this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu'), panel.centerX)");
+    // Now routed through the Wave 3A bridge first (bridge.dispatch(RETURN_HOME)),
+    // falling back to this same real call only if the bridge rejects or is
+    // unavailable -- checked as the bare call (not the full multi-line
+    // createLegacyOverlayHomeButton(...) wrapper) so this assertion doesn't
+    // depend on exact line-wrapping/line-ending formatting.
+    expect(menuSceneSource).toContain('createLegacyOverlayHomeButton');
+    expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('return-menu')");
     expect(menuSceneSource).toContain('private applyLegacyPauseCommand(command: LegacyPauseCommand): void {');
     expect(menuSceneSource).toContain('const result = resolveLegacyPauseCommand(command, this.maze.start, this.trail);');
     expect(menuSceneSource).toContain('this.playCyclePath = [copyPoint(result.nextPlayer)];');

@@ -335,7 +335,8 @@
         "wave": "3A",
         "owner": "command-bridge-integrator",
         "paths": [
-          "src/scenes/MenuScene.ts"
+          "src/scenes/MenuScene.ts",
+          "src/state/uiLegacyBridge.ts"
         ]
       },
       {

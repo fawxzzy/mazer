@@ -9,7 +9,7 @@ export interface LegacyOverlayRoutingState {
 
 export type LegacyOverlayBackAction =
   | { kind: 'noop' }
-  | { kind: 'open-overlay'; overlay: 'pause' }
+  | { kind: 'open-overlay'; overlay: 'pause' | 'auth' }
   | { kind: 'close-overlay' };
 
 export const resolveLegacyOverlayBackAction = (
@@ -29,9 +29,14 @@ export const resolveLegacyOverlayBackAction = (
   }
 
   if (state.overlay === 'confirm-progression-reset') {
+    // The confirmation can be opened from either Pause or the authenticated
+    // Account screen (see MenuScene's two openOverlay('confirm-progression-reset')
+    // call sites). Route back to whichever one actually opened it instead of
+    // always landing on Pause -- overlayReturn is the recorded origin, and
+    // 'pause' is the safe fallback when no origin was recorded.
     return {
       kind: 'open-overlay',
-      overlay: 'pause'
+      overlay: state.overlayReturn === 'auth' ? 'auth' : 'pause'
     };
   }
 

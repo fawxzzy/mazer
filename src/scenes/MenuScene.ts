@@ -382,6 +382,18 @@ import {
   summarizeCyberArcadeMaterial,
   toCyberArcadeCssHex
 } from '../render/cyberArcadeMaterial';
+import {
+  UiLegacyBridge,
+  type LegacyRuntimeFacts,
+  type UiLegacyBridgeAdapter,
+  type UiLegacyBridgeDiagnostics,
+  type UiLegacyBridgeDispatchResult
+} from '../state/uiLegacyBridge';
+import type { UiStateSnapshot } from '../state/uiState';
+import type { UiViewModels } from '../state/uiViewModels';
+import type { UiCommand } from '../state/uiCommands';
+import { PLATFORM_PROFILES, type UiPlatformProfile } from '../state/uiProfiles';
+import { dismissInstallSurface, getInstallSurfaceState, promptInstallSurface } from '../boot/installSurface';
 
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
@@ -957,6 +969,12 @@ interface LegacyQaDiagnosticsApi {
   openPauseOverlay(): LegacyQaOverlayResult;
   startGuestPlayMode(): LegacyQaOverlayResult;
   startPlayMode(): LegacyQaOverlayResult;
+  // Wave 3A bridge QA surface -- calls the same live UiLegacyBridge instance
+  // the real scene uses, not a test-only duplicate.
+  getUiStateSnapshot(): UiStateSnapshot | null;
+  getUiViewModels(): UiViewModels | null;
+  dispatchUiCommand(command: unknown): UiLegacyBridgeDispatchResult;
+  getUiBridgeDiagnostics(): UiLegacyBridgeDiagnostics | null;
 }
 
 declare global {
@@ -1551,6 +1569,9 @@ export class MenuScene extends Phaser.Scene {
   private mode: RuntimeMode = 'menu';
   private overlay: OverlayKind = 'none';
   private overlayReturn: OverlayKind = 'none';
+  // Wave 3A live command/state bridge -- see src/state/uiLegacyBridge.ts.
+  // Null only before create() installs it and after shutdown destroys it.
+  private uiBridge: UiLegacyBridge | null = null;
   private pendingGenerationRequest: LegacyGenerationRequest | null = null;
   private menuDemoEpisode: MazeEpisode | null = null;
   private menuDemoState: DemoWalkerState | null = null;
@@ -2068,6 +2089,7 @@ export class MenuScene extends Phaser.Scene {
     }
     this.installInput();
     this.installLegacyPlayFocusGuards();
+    this.uiBridge = new UiLegacyBridge(this.createUiBridgeAdapter(), this.resolveUiPlatformProfile());
     this.installLegacyQaDiagnosticsSurface();
 
     this.scale.on('resize', () => {
@@ -2095,6 +2117,8 @@ export class MenuScene extends Phaser.Scene {
       this.detachLegacyPlayKeyboardFallback();
       this.detachLegacyPlayTouchControlFallback();
       this.detachLegacyQaDiagnosticsSurface();
+      this.uiBridge?.destroy();
+      this.uiBridge = null;
       this.detachLegacyReducedMotionPreference();
       if (this.viewportGeometryListener !== null && typeof window !== 'undefined') {
         window.removeEventListener(MAZER_VIEWPORT_CHANGE_EVENT, this.viewportGeometryListener);
@@ -2105,6 +2129,186 @@ export class MenuScene extends Phaser.Scene {
     });
     this.publishVisualDiagnostics(this.time.now, true);
     this.publishRuntimeDiagnostics(this.time.now, true);
+  }
+
+  /**
+   * Real legacy facts for the Wave 3A bridge's projection.
+   *
+   * Real, live-sourced fields: mode, overlay, overlayReturn, authPhase
+   * (LegacyAuthStatus's full 'guest'/'authenticated'/'unavailable' domain),
+   * controlMode (settings.controlMode), motionMode (prefers-reduced-motion),
+   * installPhase (the real boot-time installSurface module's own state),
+   * and gamePhase (menuStaticDrawLifecyclePhase / playCompletedAtMs /
+   * isLegacyPlayLifecycleInputLocked() -- covers generating/paused/complete/
+   * input-locked/active/idle; 'preroll'/'ready'/'reset-pending'/'failed'
+   * have no confidently-identified real signal yet).
+   *
+   * connectionPhase and effectsQuality have no real distinct live signal in
+   * the current runtime at all (no online/offline tracking; no per-effect
+   * quality tier, only a boolean animated-backdrop toggle that isn't the
+   * same concept) -- both are named in `placeholderFields` so
+   * UiLegacyBridge diagnostics can report their provenance honestly instead
+   * of implying they are real projected state.
+   */
+  private resolveUiBridgeFacts(): LegacyRuntimeFacts {
+    const authPhase: UiStateSnapshot['authPhase'] =
+      this.authSnapshot.status === 'authenticated'
+        ? 'authenticated'
+        : this.authSnapshot.status === 'guest'
+          ? 'guest'
+          : 'failed';
+    const reducedMotionPreferred = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const installSurfaceState = getInstallSurfaceState();
+    const installPhase: UiStateSnapshot['installPhase'] = installSurfaceState.installed
+      ? 'installed'
+      : installSurfaceState.mode === 'available'
+        ? 'available'
+        : installSurfaceState.mode === 'manual' || installSurfaceState.mode === 'ios-open-in-browser'
+          ? 'manual'
+          : 'hidden';
+    return {
+      mode: this.mode,
+      overlay: this.overlay,
+      overlayReturn: this.overlayReturn,
+      gamePhase: this.resolveUiBridgeGamePhase(),
+      authPhase,
+      connectionPhase: 'online',
+      installPhase,
+      controlMode: this.settings.controlMode,
+      motionMode: reducedMotionPreferred ? 'reduced' : 'system',
+      effectsQuality: 'balanced',
+      placeholderFields: ['connectionPhase', 'effectsQuality']
+    };
+  }
+
+  private resolveUiBridgeGamePhase(): UiStateSnapshot['gamePhase'] {
+    if (this.overlay === 'pause') {
+      return 'paused';
+    }
+    if (this.menuStaticDrawLifecyclePhase === 'building' || this.menuStaticDrawLifecyclePhase === 'deconstructing') {
+      return 'generating';
+    }
+    if (this.mode === 'play') {
+      if (this.playCompletedAtMs !== null) {
+        return 'complete';
+      }
+      if (this.isLegacyPlayLifecycleInputLocked()) {
+        return 'input-locked';
+      }
+      return 'active';
+    }
+    return 'idle';
+  }
+
+  /** True mobile/touch context picks the 'mobile' shared platform profile
+   * instead of always defaulting to 'web' -- checked once at bridge
+   * construction time since the profile is passed into the constructor, not
+   * re-read per frame. */
+  private resolveUiPlatformProfile(): UiPlatformProfile {
+    if (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) {
+      return PLATFORM_PROFILES.mobile;
+    }
+    return PLATFORM_PROFILES.web;
+  }
+
+  /**
+   * Maps shared UiCommand verbs to the same existing MenuScene methods (or a
+   * real boot-time seam, for install commands) the current UI already
+   * calls -- this adds no new behavior, it only names the seam and reports
+   * whether the real operation actually accepted. A command with no real
+   * runtime equivalent found (CANCEL_GENERATION, SET_PREFERENCE, SUBMIT_AUTH,
+   * APPLY_UPDATE, RETRY_SYSTEM_ACTION, RELEASE_DIRECTIONAL_INTENT) is
+   * intentionally omitted so UiLegacyBridge.dispatch() fails closed instead
+   * of silently no-op-ing or mapping to an unrelated action.
+   */
+  private createUiBridgeAdapter(): UiLegacyBridgeAdapter {
+    return {
+      getFacts: (): LegacyRuntimeFacts => this.resolveUiBridgeFacts(),
+      openSettings: (): boolean => { this.openOverlay('options'); return true; },
+      openAccount: (): boolean => { this.openOverlay('auth'); return true; },
+      openLeaderboard: (): boolean => { this.openOverlay('leaderboard'); return true; },
+      openResetProgressConfirmation: (): boolean => { this.openOverlay('confirm-progression-reset'); return true; },
+      closeTopOverlay: (): boolean => { this.handleBackAction(); return true; },
+      startRun: (): boolean => {
+        if (!this.hasLegacyPlayAccess()) {
+          return false;
+        }
+        this.startPlayMode();
+        return true;
+      },
+      pauseRun: (): boolean => {
+        if (this.mode !== 'play' || this.overlay === 'pause') {
+          return false;
+        }
+        this.openOverlay('pause');
+        return true;
+      },
+      resumeRun: (): boolean => {
+        if (this.overlay !== 'pause') {
+          return false;
+        }
+        this.applyLegacyPauseCommand('resume');
+        return true;
+      },
+      resetRun: (): boolean => {
+        if (this.mode !== 'play') {
+          return false;
+        }
+        this.applyLegacyPauseCommand('reset-player');
+        return true;
+      },
+      resetProgress: (): boolean => { this.resetLegacyPlayerProgression(); return true; },
+      returnHome: (): boolean => { this.enterMenuMode(); return true; },
+      logOut: (): boolean => { void this.handleLegacyAuthSignOut(); return true; },
+      setControlMode: (mode): boolean => {
+        if (mode !== 'stick' && mode !== 'arrows') {
+          return false;
+        }
+        if (this.settings.controlMode !== mode) {
+          this.applyOverlayToggleFieldChange('controlMode');
+        }
+        return true;
+      },
+      installApp: (): boolean => {
+        if (getInstallSurfaceState().mode !== 'available') {
+          return false;
+        }
+        void promptInstallSurface();
+        return true;
+      },
+      dismissInstall: (): boolean => {
+        if (getInstallSurfaceState().mode === 'hidden') {
+          return false;
+        }
+        dismissInstallSurface();
+        return true;
+      },
+      dispatchDirectionalIntent: (intent): boolean => {
+        if (this.mode !== 'play' || this.overlay !== 'none') {
+          return false;
+        }
+        return this.handleLegacyQaPlayMove(`move_${intent}`).accepted;
+      }
+    };
+  }
+
+  /**
+   * UI event -> bridge.dispatch(command) -> adapter -> low-level runtime
+   * operation. Every live click handler this wave converts calls this
+   * instead of the low-level method directly; the adapter methods
+   * themselves still call the low-level methods directly (never back into
+   * the bridge), so there is no dispatch recursion. Falls back to the
+   * direct low-level call only if the bridge is not yet installed or
+   * legitimately rejects the command -- the low-level methods carry their
+   * own guards (e.g. startPlayMode()'s own hasLegacyPlayAccess() check), so
+   * this fallback is idempotent with the bridge's own rejection, not a way
+   * to bypass it.
+   */
+  private dispatchUiBridgeCommand(command: UiCommand, fallback: () => void): void {
+    if (!this.uiBridge || !this.uiBridge.dispatch(command).ok) {
+      fallback();
+    }
   }
 
   private installLegacyQaDiagnosticsSurface(): void {
@@ -2118,7 +2322,13 @@ export class MenuScene extends Phaser.Scene {
       openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay(),
       openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay(),
       startGuestPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartGuestPlayMode(),
-      startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode()
+      startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode(),
+      getUiStateSnapshot: (): UiStateSnapshot | null => this.uiBridge?.getSnapshot() ?? null,
+      getUiViewModels: (): UiViewModels | null => this.uiBridge?.getViewModels() ?? null,
+      dispatchUiCommand: (command: unknown): UiLegacyBridgeDispatchResult => (
+        this.uiBridge?.dispatch(command) ?? { ok: false, reason: 'bridge-not-installed' }
+      ),
+      getUiBridgeDiagnostics: (): UiLegacyBridgeDiagnostics | null => this.uiBridge?.getDiagnostics() ?? null
     };
   }
 
@@ -5558,6 +5768,7 @@ export class MenuScene extends Phaser.Scene {
       }),
       this.time.now + INITIAL_MENU_DEMO_HOLD_MS
     );
+    this.uiBridge?.refreshProjection('mode-change');
   }
 
   private startPlayMode(): void {
@@ -5581,6 +5792,7 @@ export class MenuScene extends Phaser.Scene {
     this.boardPathDirty = true;
     this.boardDynamicDirty = true;
     this.uiDirty = true;
+    this.uiBridge?.refreshProjection('mode-change');
   }
 
   private updateMenuDemo(time: number): void {
@@ -10351,7 +10563,7 @@ export class MenuScene extends Phaser.Scene {
               primaryButtonWidth,
               this.layout.buttonHeight,
               'Login',
-              () => this.openOverlay('auth'),
+              () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth')),
               { fullScreenHitArea: true }
             )
           );
@@ -10363,14 +10575,20 @@ export class MenuScene extends Phaser.Scene {
               primaryButtonWidth,
               this.layout.buttonHeight,
               startLabel,
-              () => this.startPlayMode(),
+              () => this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode()),
               { fullScreenHitArea: true }
             )
           );
         }
-        this.uiButtons.push(this.createLegacyMenuSettingsCogButton(() => this.openOverlay('options')));
-        this.uiButtons.push(this.createLegacyMenuLeaderboardButton(() => this.openOverlay('leaderboard')));
-        this.uiButtons.push(this.createLegacyMenuProfileButton(() => this.openOverlay('auth')));
+        this.uiButtons.push(this.createLegacyMenuSettingsCogButton(
+          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'))
+        ));
+        this.uiButtons.push(this.createLegacyMenuLeaderboardButton(
+          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'leaderboard' }, () => this.openOverlay('leaderboard'))
+        ));
+        this.uiButtons.push(this.createLegacyMenuProfileButton(
+          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth'))
+        ));
       }
 
       this.uiDirty = false;
@@ -10548,7 +10766,11 @@ export class MenuScene extends Phaser.Scene {
     });
     let rowY = shell.contentTop;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    this.uiButtons.push(this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth'), panel.centerX));
+    this.uiButtons.push(this.createLegacyOverlayUsernameButton(
+      panel,
+      () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth')),
+      panel.centerX
+    ));
 
     if (!showAdvancedOptions) {
       const viewportTop = rowY + (compact ? 4 : 6);
@@ -11055,12 +11277,19 @@ export class MenuScene extends Phaser.Scene {
       actionRows: 1,
       panel
     });
-    this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand('resume')));
+    this.uiButtons.push(this.createOverlayBackChevronButton(
+      panel,
+      () => this.dispatchUiBridgeCommand({ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume'))
+    ));
     // Account is not an entry point from the in-play Pause screen -- home
     // (return to menu) is the only header icon here, centered alone the
     // same way the menu-context Options screen centers its own profile
     // icon (see createLegacyOverlayUsernameButton's Options call site).
-    this.uiButtons.push(this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu'), panel.centerX));
+    this.uiButtons.push(this.createLegacyOverlayHomeButton(
+      panel,
+      () => this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')),
+      panel.centerX
+    ));
     const viewportTop = shell.contentTop;
     const viewport = createVisualRect(
       shell.contentLeft,
@@ -11185,7 +11414,7 @@ export class MenuScene extends Phaser.Scene {
         buttonWidth,
         buttonHeight,
         'Go to Account',
-        () => this.openOverlay('auth'),
+        () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth')),
         'primary'
       ));
       return;
@@ -11338,8 +11567,16 @@ export class MenuScene extends Phaser.Scene {
     })), bodyWidth, compact ? 16 : 18, 13).setOrigin(0.5, 0.5);
     this.uiTexts.push(body);
 
-    const cancel = (): void => this.openOverlay('pause');
-    const confirm = (): void => this.resetLegacyPlayerProgression();
+    // Route through the same resolver Escape/back-chevron use so Cancel and
+    // the back action can never disagree about where this overlay returns.
+    // Confirm keeps its own explicit destination (openOverlay('pause') in
+    // resetLegacyPlayerProgression) independent of this routing.
+    const cancel = (): void => this.handleBackAction();
+    const confirm = (): void => {
+      if (!this.uiBridge || !this.uiBridge.dispatch({ type: 'RESET_PROGRESS' }).ok) {
+        this.resetLegacyPlayerProgression();
+      }
+    };
     if (compact) {
       const width = Math.floor((buttonWidth - 12) / 2);
       this.uiButtons.push(
@@ -11496,7 +11733,10 @@ export class MenuScene extends Phaser.Scene {
       panel.centerX,
       panel.top + panel.height - 104,
       'Reset progress',
-      () => this.openOverlay('confirm-progression-reset'),
+      () => this.dispatchUiBridgeCommand(
+        { type: 'OPEN_MODAL', modal: 'confirm-reset-progress' },
+        () => this.openOverlay('confirm-progression-reset')
+      ),
       '#ff9bb5'
     );
     this.createLegacyBottomActionBar(
@@ -14856,6 +15096,15 @@ export class MenuScene extends Phaser.Scene {
 
   private openOverlay(kind: OverlayKind): void {
     const previousOverlay = this.overlay;
+    if (previousOverlay === 'auth' && kind !== 'auth') {
+      // Leaving Account for anything else (not just an explicit close) must
+      // tear down its native DOM input first -- otherwise it stays mounted
+      // and focused at the auth layer's high z-index underneath whatever
+      // overlay opens next (e.g. Account -> Reset Progress).
+      this.destroyLegacyAuthNativeInput();
+      this.destroyAccountUsernameNativeInput();
+      this.accountUsernameActive = false;
+    }
     if (kind === 'options' || kind === 'pause') {
       this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
       this.pendingOverlayMazeRebuild = false;
@@ -14887,15 +15136,18 @@ export class MenuScene extends Phaser.Scene {
       this.clearPlayHudImmediately();
     }
     this.overlay = kind;
-    this.overlayReturn = kind === 'auth' && (previousOverlay === 'pause' || previousOverlay === 'options')
-      ? previousOverlay
-      : 'none';
+    this.overlayReturn =
+      (kind === 'auth' && (previousOverlay === 'pause' || previousOverlay === 'options'))
+      || (kind === 'confirm-progression-reset' && (previousOverlay === 'pause' || previousOverlay === 'auth'))
+        ? previousOverlay
+        : 'none';
     this.titleGraphics.setVisible(false);
     this.boardDynamicDirty = true;
     this.uiDirty = true;
     if (this.mode === 'play') {
       this.publishInteractionDiagnostics();
     }
+    this.uiBridge?.refreshProjection('overlay-open');
   }
 
   private closeOverlay(): void {
@@ -14907,7 +15159,9 @@ export class MenuScene extends Phaser.Scene {
       this.destroyAccountUsernameNativeInput();
       this.accountUsernameActive = false;
     }
-    const returnOverlay = this.overlay === 'auth' ? this.overlayReturn : 'none';
+    const returnOverlay = (this.overlay === 'auth' || this.overlay === 'confirm-progression-reset')
+      ? this.overlayReturn
+      : 'none';
     this.resetLegacyOverlayScrollState();
     if (returnOverlay !== 'none') {
       this.overlay = returnOverlay;
@@ -14917,6 +15171,7 @@ export class MenuScene extends Phaser.Scene {
       this.titleGraphics.setVisible(false);
       this.boardDynamicDirty = true;
       this.uiDirty = true;
+      this.uiBridge?.refreshProjection('overlay-close');
       return;
     }
     this.overlay = 'none';
@@ -14934,6 +15189,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.mode === 'play') {
       this.publishInteractionDiagnostics();
     }
+    this.uiBridge?.refreshProjection('overlay-close');
   }
 
   private closeLegacyAuthOverlayToMainMenu(): void {
@@ -15277,6 +15533,11 @@ export class MenuScene extends Phaser.Scene {
     // crash that silently aborted the rest of boot). update() can't fire
     // until create() has fully returned, so consuming the flag there
     // instead guarantees everything it needs already exists.
+    // uiBridge may still be null here if this runs during the synchronous
+    // auth-fixture path inside create() itself, before the bridge is
+    // constructed -- optional chaining makes that a safe no-op, and the
+    // bridge's own constructor projects the (by-then-current) auth state.
+    this.uiBridge?.refreshProjection('auth-change');
   }
 
   private hasLegacyPlayAccess(): boolean {

@@ -270,6 +270,7 @@ describe('Mazer UI rework decision registry contract', () => {
         'src/scenes/diagnostics/menuRuntimeDiagnosticsCompatibility.ts': '1C',
         'src/scenes/menuRuntimeDiagnostics.ts': '1C',
         'src/scenes/MenuScene.ts': '3A',
+        'src/state/uiLegacyBridge.ts': '3A',
         'src/legacy-runtime/legacyAuth.ts': '3B',
         'src/legacy-runtime/legacyPlayerMessage.ts': '3B',
         'vite.config.ts': '5B',

@@ -49,6 +49,11 @@ const fieldViolation = (field: string, value: unknown, allowed: readonly string[
   message: `${field} must be one of ${allowed.join(', ')}.`
 });
 
+// 'none' is a legitimate overlayReturn value (most overlays don't track an
+// origin at all), so it's accepted alongside the real overlay kinds rather
+// than treated as a violation.
+const LEGACY_UI_OVERLAY_RETURNS = [...LEGACY_UI_OVERLAYS, 'none'] as const;
+
 export const projectLegacyUiState = (input: unknown): LegacyUiProjectionResult => {
   if (!isPlainRecord(input)) {
     return Object.freeze({
@@ -60,6 +65,7 @@ export const projectLegacyUiState = (input: unknown): LegacyUiProjectionResult =
   const fields: ReadonlyArray<readonly [string, readonly string[]]> = [
     ['mode', LEGACY_UI_MODES],
     ['overlay', LEGACY_UI_OVERLAYS],
+    ['overlayReturn', LEGACY_UI_OVERLAY_RETURNS],
     ['gamePhase', GAME_PHASES],
     ['authPhase', AUTH_PHASES],
     ['connectionPhase', CONNECTION_PHASES],
@@ -76,7 +82,17 @@ export const projectLegacyUiState = (input: unknown): LegacyUiProjectionResult =
   }
 
   const overlay = input.overlay as (typeof LEGACY_UI_OVERLAYS)[number];
+  const overlayReturn = input.overlayReturn as (typeof LEGACY_UI_OVERLAY_RETURNS)[number];
   const primarySurface = (() => {
+    // confirm-progression-reset is reachable from either Pause or the
+    // authenticated Account screen (see MenuScene's two
+    // openOverlay('confirm-progression-reset') call sites) -- it must keep
+    // whichever surface actually opened it instead of falling through to the
+    // generic default, which would incorrectly read as 'home'.
+    if (overlay === 'confirm-progression-reset') {
+      if (overlayReturn === 'auth') return 'account';
+      if (overlayReturn === 'pause') return 'play';
+    }
     switch (overlay) {
       case 'auth': return 'account';
       case 'options': return 'settings';
@@ -86,10 +102,11 @@ export const projectLegacyUiState = (input: unknown): LegacyUiProjectionResult =
     }
   })();
   const modalSurface = overlay === 'confirm-progression-reset' ? 'confirm-reset-progress' : 'none';
+  const isPausedOrigin = overlay === 'pause' || (overlay === 'confirm-progression-reset' && overlayReturn === 'pause');
   const snapshot: UiStateSnapshot = {
     primarySurface,
     modalSurface,
-    gamePhase: overlay === 'pause' ? 'paused' : input.gamePhase as UiStateSnapshot['gamePhase'],
+    gamePhase: isPausedOrigin ? 'paused' : input.gamePhase as UiStateSnapshot['gamePhase'],
     authPhase: input.authPhase as UiStateSnapshot['authPhase'],
     connectionPhase: input.connectionPhase as UiStateSnapshot['connectionPhase'],
     installPhase: input.installPhase as UiStateSnapshot['installPhase'],
