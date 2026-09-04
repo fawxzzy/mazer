@@ -1177,6 +1177,51 @@ const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.72;
 // radius ratios above, which only remain as inputs to the halo/locator
 // metrics and diagnostics below.
 const LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO = 0.85;
+// Navigation Core v1 (docs/assets/reference/navigation-core-v1/) locks the
+// real play-mode player to an exact 64x64-viewBox reference SVG:
+// <rect x="12.8" y="12.8" width="38.4" height="38.4" rx="5" .../> plus
+// filter: drop-shadow(0 0 3px accent) drop-shadow(0 0 8px core) and a soft
+// radial halo circle (r=21) underneath. These ratios are every one of
+// those numbers divided by the 64 viewBox unit so they scale with the
+// real, non-fixed tile size this renderer computes -- see the frozen
+// reference's own header comment on why 64px/26px are verified checkpoints,
+// not literal breakpoints. Deliberately separate from the menu-demo-
+// walker's own LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO above (85%) -- the
+// ambient menu demo predates and is out of scope for this reference; only
+// the real play marker (fillLegacyPlayerMarkerTile's showLocatorTicks
+// branch) uses these.
+const LEGACY_PLAY_PLAYER_MARKER_SQUARE_FILL_RATIO = 38.4 / 64;
+const LEGACY_PLAY_PLAYER_MARKER_CORNER_RADIUS_RATIO = 5 / 64;
+const LEGACY_PLAY_PLAYER_MARKER_STROKE_RATIO = 2.4 / 64;
+// The reference's two drop-shadow layers, as (extraSpreadRatio, alphaHex)
+// pairs -- "ee"/"99" alpha suffixes from the reference's own template
+// string, approximated here as flat alpha since Canvas-mode Phaser (see
+// BootScene.ts's tint comment) has no CSS filter/blur to reproduce a true
+// Gaussian drop-shadow; a soft-then-crisp layered rounded-rect stack is
+// this file's existing convention for faking glow (see
+// drawLegacyPathTileFacet, drawLegacyGoalStarMarker).
+const LEGACY_PLAY_PLAYER_MARKER_GLOW_TIGHT_SPREAD_RATIO = 3 / 64;
+const LEGACY_PLAY_PLAYER_MARKER_GLOW_TIGHT_ALPHA = 0xee / 0xff;
+const LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_SPREAD_RATIO = 8 / 64;
+const LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_ALPHA = 0x99 / 0xff;
+// The reference's ambient halo circle: diameter 42/64 of the tile, a
+// radial gradient from 55% opacity at 45% of its own radius down to 0% at
+// its edge. Canvas-mode Phaser Graphics has no radial-gradient fill, so
+// this is approximated with a small stack of concentric, decreasing-alpha
+// circles standing in for that falloff.
+const LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_DIAMETER_RATIO = 42 / 64;
+const LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_PEAK_ALPHA = 0.55;
+// cyberArcadeMaterial.signal.playerHalo already resolves to the exact
+// reference --player-halo (#A7E7D9, src/theme/tokens.css's line-active
+// token) -- confirmed by comparing hex values, not assumed.
+const LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_COLOR = cyberArcadeMaterial.signal.playerHalo;
+// The reference's --player-accent (#2BB868) is a distinct, darker green
+// from this codebase's existing cyberArcadeMaterial.signal.playerAccent
+// (brand.mint, #C3F4B9 -- a much lighter mint used broadly elsewhere in
+// the UI). Kept as its own literal, scoped to only the real play-mode
+// player's stroke/glow, rather than repointing the shared brand.mint
+// token and risking changing unrelated UI that also reads it.
+const LEGACY_PLAY_PLAYER_MARKER_ACCENT_COLOR = 0x2bb868;
 // The menu's demo AI is always visibly gliding between tiles on a loop, so
 // its squash-and-stretch-on-move animation alone is enough to read as
 // alive. The real play-mode player sits still between moves far more often
@@ -9994,7 +10039,9 @@ export class MenuScene extends Phaser.Scene {
     // directly to movement is what gives the marker any sense of motion
     // instead of a rigid icon sliding in a straight line.
     const motion = this.playerVisualMotion;
-    const halfSide = (tileSize * LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO) / 2;
+    const halfSide = (tileSize * (showLocatorTicks
+      ? LEGACY_PLAY_PLAYER_MARKER_SQUARE_FILL_RATIO
+      : LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO)) / 2;
     let coreRadiusX = halfSide;
     let coreRadiusY = halfSide;
     if (motion !== null && motion.durationMs > 0 && time < motion.startedAtMs + motion.durationMs) {
@@ -10018,36 +10065,103 @@ export class MenuScene extends Phaser.Scene {
       coreRadiusY *= breatheScale;
     }
 
-    // No more shadow disc or halo/beacon rings -- the square (which already
-    // color-shifts through the midnight-rainbow cycle) is the whole marker
-    // now, plus its cut-gem catchlight.
-    this.boardDynamicGraphics.fillStyle(playerCoreColor, alpha);
-    this.boardDynamicGraphics.fillRect(
-      centerX - coreRadiusX,
-      centerY - coreRadiusY,
-      coreRadiusX * 2,
-      coreRadiusY * 2
-    );
-    this.boardDynamicGraphics.lineStyle(
-      Math.max(1, playerMetrics.strokeWidth * 0.58),
-      showLocatorTicks ? LEGACY_PLAY_PLAYER_BEACON_ACCENT : iridescentAccentColor,
-      Math.min(0.86, alpha * 0.86)
-    );
-    this.boardDynamicGraphics.strokeRect(
-      centerX - coreRadiusX,
-      centerY - coreRadiusY,
-      coreRadiusX * 2,
-      coreRadiusY * 2
-    );
-    // Same facet-catchlight convention as the tiles/endpoint markers, cut
-    // into the top-left corner of the player's own square core.
-    this.boardDynamicGraphics.fillStyle(cyberArcadeMaterial.rail.white, Math.min(0.6, alpha * 0.65));
-    this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(centerX - coreRadiusX, centerY - coreRadiusY);
-    this.boardDynamicGraphics.lineTo(centerX - (coreRadiusX * 0.35), centerY - coreRadiusY);
-    this.boardDynamicGraphics.lineTo(centerX - coreRadiusX, centerY - (coreRadiusY * 0.35));
-    this.boardDynamicGraphics.closePath();
-    this.boardDynamicGraphics.fillPath();
+    if (showLocatorTicks) {
+      // Navigation Core v1's exact reference player: 60%-fill rounded
+      // square, a neon-tube glow (two layered drop-shadows in the
+      // reference, approximated here as two soft rounded-rect fills since
+      // Canvas-mode Phaser has no blur filter), and a soft ambient halo
+      // underneath standing in for the reference's radial-gradient circle.
+      // See LEGACY_PLAY_PLAYER_MARKER_* above for where every ratio here
+      // comes from.
+      const haloRadiusPx = (tileSize * LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_DIAMETER_RATIO) / 2;
+      const haloSteps = 3;
+      for (let step = 0; step < haloSteps; step += 1) {
+        const stepProgress = step / (haloSteps - 1);
+        this.boardDynamicGraphics.fillStyle(
+          LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_COLOR,
+          LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_PEAK_ALPHA * (1 - stepProgress) * alpha
+        );
+        this.boardDynamicGraphics.fillCircle(centerX, centerY, haloRadiusPx * (0.55 + (stepProgress * 0.45)));
+      }
+
+      const cornerRadius = tileSize * LEGACY_PLAY_PLAYER_MARKER_CORNER_RADIUS_RATIO;
+      const wideSpread = tileSize * LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_SPREAD_RATIO;
+      const tightSpread = tileSize * LEGACY_PLAY_PLAYER_MARKER_GLOW_TIGHT_SPREAD_RATIO;
+      this.boardDynamicGraphics.fillStyle(
+        playerCoreColor,
+        LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_ALPHA * 0.4 * alpha
+      );
+      this.boardDynamicGraphics.fillRoundedRect(
+        centerX - coreRadiusX - wideSpread,
+        centerY - coreRadiusY - wideSpread,
+        (coreRadiusX + wideSpread) * 2,
+        (coreRadiusY + wideSpread) * 2,
+        cornerRadius + wideSpread
+      );
+      this.boardDynamicGraphics.fillStyle(
+        LEGACY_PLAY_PLAYER_MARKER_ACCENT_COLOR,
+        LEGACY_PLAY_PLAYER_MARKER_GLOW_TIGHT_ALPHA * 0.55 * alpha
+      );
+      this.boardDynamicGraphics.fillRoundedRect(
+        centerX - coreRadiusX - tightSpread,
+        centerY - coreRadiusY - tightSpread,
+        (coreRadiusX + tightSpread) * 2,
+        (coreRadiusY + tightSpread) * 2,
+        cornerRadius + tightSpread
+      );
+
+      this.boardDynamicGraphics.fillStyle(playerCoreColor, alpha);
+      this.boardDynamicGraphics.fillRoundedRect(
+        centerX - coreRadiusX,
+        centerY - coreRadiusY,
+        coreRadiusX * 2,
+        coreRadiusY * 2,
+        cornerRadius
+      );
+      this.boardDynamicGraphics.lineStyle(
+        Math.max(1, tileSize * LEGACY_PLAY_PLAYER_MARKER_STROKE_RATIO),
+        LEGACY_PLAY_PLAYER_MARKER_ACCENT_COLOR,
+        Math.min(0.86, alpha * 0.86)
+      );
+      this.boardDynamicGraphics.strokeRoundedRect(
+        centerX - coreRadiusX,
+        centerY - coreRadiusY,
+        coreRadiusX * 2,
+        coreRadiusY * 2,
+        cornerRadius
+      );
+    } else {
+      // Menu-demo walker: unchanged flat square + catchlight, out of scope
+      // for Navigation Core v1 (see LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO's
+      // own comment).
+      this.boardDynamicGraphics.fillStyle(playerCoreColor, alpha);
+      this.boardDynamicGraphics.fillRect(
+        centerX - coreRadiusX,
+        centerY - coreRadiusY,
+        coreRadiusX * 2,
+        coreRadiusY * 2
+      );
+      this.boardDynamicGraphics.lineStyle(
+        Math.max(1, playerMetrics.strokeWidth * 0.58),
+        iridescentAccentColor,
+        Math.min(0.86, alpha * 0.86)
+      );
+      this.boardDynamicGraphics.strokeRect(
+        centerX - coreRadiusX,
+        centerY - coreRadiusY,
+        coreRadiusX * 2,
+        coreRadiusY * 2
+      );
+      // Same facet-catchlight convention as the tiles/endpoint markers, cut
+      // into the top-left corner of the player's own square core.
+      this.boardDynamicGraphics.fillStyle(cyberArcadeMaterial.rail.white, Math.min(0.6, alpha * 0.65));
+      this.boardDynamicGraphics.beginPath();
+      this.boardDynamicGraphics.moveTo(centerX - coreRadiusX, centerY - coreRadiusY);
+      this.boardDynamicGraphics.lineTo(centerX - (coreRadiusX * 0.35), centerY - coreRadiusY);
+      this.boardDynamicGraphics.lineTo(centerX - coreRadiusX, centerY - (coreRadiusY * 0.35));
+      this.boardDynamicGraphics.closePath();
+      this.boardDynamicGraphics.fillPath();
+    }
 
     if (!showLocatorTicks) {
       return;
