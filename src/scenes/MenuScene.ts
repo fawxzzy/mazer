@@ -391,6 +391,9 @@ import {
 } from '../state/uiLegacyBridge';
 import type { UiStateSnapshot } from '../state/uiState';
 import type { UiViewModels } from '../state/uiViewModels';
+import type { UiCommand } from '../state/uiCommands';
+import { PLATFORM_PROFILES, type UiPlatformProfile } from '../state/uiProfiles';
+import { dismissInstallSurface, getInstallSurfaceState, promptInstallSurface } from '../boot/installSurface';
 
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
@@ -2086,7 +2089,7 @@ export class MenuScene extends Phaser.Scene {
     }
     this.installInput();
     this.installLegacyPlayFocusGuards();
-    this.uiBridge = new UiLegacyBridge(this.createUiBridgeAdapter());
+    this.uiBridge = new UiLegacyBridge(this.createUiBridgeAdapter(), this.resolveUiPlatformProfile());
     this.installLegacyQaDiagnosticsSurface();
 
     this.scale.on('resize', () => {
@@ -2129,14 +2132,23 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /**
-   * Real legacy facts for the Wave 3A bridge's projection. gamePhase,
-   * connectionPhase, installPhase, and effectsQuality are honest, disclosed
-   * simplifications: MenuScene does not yet track a richer generating/
-   * preroll/complete lifecycle, a live connection-phase signal, an
-   * install-phase signal, or a per-effect quality setting as a distinct
-   * live field, so those three are approximated/fixed rather than sourced
-   * from a real signal that does not exist yet. mode, overlay,
-   * overlayReturn, authPhase, controlMode, and motionMode are real.
+   * Real legacy facts for the Wave 3A bridge's projection.
+   *
+   * Real, live-sourced fields: mode, overlay, overlayReturn, authPhase
+   * (LegacyAuthStatus's full 'guest'/'authenticated'/'unavailable' domain),
+   * controlMode (settings.controlMode), motionMode (prefers-reduced-motion),
+   * installPhase (the real boot-time installSurface module's own state),
+   * and gamePhase (menuStaticDrawLifecyclePhase / playCompletedAtMs /
+   * isLegacyPlayLifecycleInputLocked() -- covers generating/paused/complete/
+   * input-locked/active/idle; 'preroll'/'ready'/'reset-pending'/'failed'
+   * have no confidently-identified real signal yet).
+   *
+   * connectionPhase and effectsQuality have no real distinct live signal in
+   * the current runtime at all (no online/offline tracking; no per-effect
+   * quality tier, only a boolean animated-backdrop toggle that isn't the
+   * same concept) -- both are named in `placeholderFields` so
+   * UiLegacyBridge diagnostics can report their provenance honestly instead
+   * of implying they are real projected state.
    */
   private resolveUiBridgeFacts(): LegacyRuntimeFacts {
     const authPhase: UiStateSnapshot['authPhase'] =
@@ -2147,43 +2159,156 @@ export class MenuScene extends Phaser.Scene {
           : 'failed';
     const reducedMotionPreferred = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const installSurfaceState = getInstallSurfaceState();
+    const installPhase: UiStateSnapshot['installPhase'] = installSurfaceState.installed
+      ? 'installed'
+      : installSurfaceState.mode === 'available'
+        ? 'available'
+        : installSurfaceState.mode === 'manual' || installSurfaceState.mode === 'ios-open-in-browser'
+          ? 'manual'
+          : 'hidden';
     return {
       mode: this.mode,
       overlay: this.overlay,
       overlayReturn: this.overlayReturn,
-      gamePhase: this.overlay === 'pause' ? 'paused' : this.mode === 'play' ? 'active' : 'idle',
+      gamePhase: this.resolveUiBridgeGamePhase(),
       authPhase,
       connectionPhase: 'online',
-      installPhase: 'hidden',
+      installPhase,
       controlMode: this.settings.controlMode,
       motionMode: reducedMotionPreferred ? 'reduced' : 'system',
-      effectsQuality: 'balanced'
+      effectsQuality: 'balanced',
+      placeholderFields: ['connectionPhase', 'effectsQuality']
     };
   }
 
+  private resolveUiBridgeGamePhase(): UiStateSnapshot['gamePhase'] {
+    if (this.overlay === 'pause') {
+      return 'paused';
+    }
+    if (this.menuStaticDrawLifecyclePhase === 'building' || this.menuStaticDrawLifecyclePhase === 'deconstructing') {
+      return 'generating';
+    }
+    if (this.mode === 'play') {
+      if (this.playCompletedAtMs !== null) {
+        return 'complete';
+      }
+      if (this.isLegacyPlayLifecycleInputLocked()) {
+        return 'input-locked';
+      }
+      return 'active';
+    }
+    return 'idle';
+  }
+
+  /** True mobile/touch context picks the 'mobile' shared platform profile
+   * instead of always defaulting to 'web' -- checked once at bridge
+   * construction time since the profile is passed into the constructor, not
+   * re-read per frame. */
+  private resolveUiPlatformProfile(): UiPlatformProfile {
+    if (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) {
+      return PLATFORM_PROFILES.mobile;
+    }
+    return PLATFORM_PROFILES.web;
+  }
+
   /**
-   * Maps shared UiCommand verbs to the same existing MenuScene methods the
-   * current UI already calls -- this adds no new behavior, it only names
-   * the seam. A command with no real runtime equivalent yet (install-related
-   * commands, preference/control-mode writes with no matching live setting,
-   * directional-intent release) is intentionally omitted so
-   * UiLegacyBridge.dispatch() fails closed instead of silently no-op-ing.
+   * Maps shared UiCommand verbs to the same existing MenuScene methods (or a
+   * real boot-time seam, for install commands) the current UI already
+   * calls -- this adds no new behavior, it only names the seam and reports
+   * whether the real operation actually accepted. A command with no real
+   * runtime equivalent found (CANCEL_GENERATION, SET_PREFERENCE, SUBMIT_AUTH,
+   * APPLY_UPDATE, RETRY_SYSTEM_ACTION, RELEASE_DIRECTIONAL_INTENT) is
+   * intentionally omitted so UiLegacyBridge.dispatch() fails closed instead
+   * of silently no-op-ing or mapping to an unrelated action.
    */
   private createUiBridgeAdapter(): UiLegacyBridgeAdapter {
     return {
       getFacts: (): LegacyRuntimeFacts => this.resolveUiBridgeFacts(),
-      openSettings: (): void => this.openOverlay('options'),
-      openAccount: (): void => this.openOverlay('auth'),
-      openLeaderboard: (): void => this.openOverlay('leaderboard'),
-      closeTopOverlay: (): void => this.handleBackAction(),
-      startRun: (): void => this.startPlayMode(),
-      pauseRun: (): void => this.openOverlay('pause'),
-      resumeRun: (): void => { this.applyLegacyPauseCommand('resume'); },
-      resetRun: (): void => { this.applyLegacyPauseCommand('reset-player'); },
-      resetProgress: (): void => this.resetLegacyPlayerProgression(),
-      returnHome: (): void => this.enterMenuMode(),
-      logOut: (): void => { void this.handleLegacyAuthSignOut(); }
+      openSettings: (): boolean => { this.openOverlay('options'); return true; },
+      openAccount: (): boolean => { this.openOverlay('auth'); return true; },
+      openLeaderboard: (): boolean => { this.openOverlay('leaderboard'); return true; },
+      openResetProgressConfirmation: (): boolean => { this.openOverlay('confirm-progression-reset'); return true; },
+      closeTopOverlay: (): boolean => { this.handleBackAction(); return true; },
+      startRun: (): boolean => {
+        if (!this.hasLegacyPlayAccess()) {
+          return false;
+        }
+        this.startPlayMode();
+        return true;
+      },
+      pauseRun: (): boolean => {
+        if (this.mode !== 'play' || this.overlay === 'pause') {
+          return false;
+        }
+        this.openOverlay('pause');
+        return true;
+      },
+      resumeRun: (): boolean => {
+        if (this.overlay !== 'pause') {
+          return false;
+        }
+        this.applyLegacyPauseCommand('resume');
+        return true;
+      },
+      resetRun: (): boolean => {
+        if (this.mode !== 'play') {
+          return false;
+        }
+        this.applyLegacyPauseCommand('reset-player');
+        return true;
+      },
+      resetProgress: (): boolean => { this.resetLegacyPlayerProgression(); return true; },
+      returnHome: (): boolean => { this.enterMenuMode(); return true; },
+      logOut: (): boolean => { void this.handleLegacyAuthSignOut(); return true; },
+      setControlMode: (mode): boolean => {
+        if (mode !== 'stick' && mode !== 'arrows') {
+          return false;
+        }
+        if (this.settings.controlMode !== mode) {
+          this.applyOverlayToggleFieldChange('controlMode');
+        }
+        return true;
+      },
+      installApp: (): boolean => {
+        if (getInstallSurfaceState().mode !== 'available') {
+          return false;
+        }
+        void promptInstallSurface();
+        return true;
+      },
+      dismissInstall: (): boolean => {
+        if (getInstallSurfaceState().mode === 'hidden') {
+          return false;
+        }
+        dismissInstallSurface();
+        return true;
+      },
+      dispatchDirectionalIntent: (intent): boolean => {
+        if (this.mode !== 'play' || this.overlay !== 'none') {
+          return false;
+        }
+        return this.handleLegacyQaPlayMove(`move_${intent}`).accepted;
+      }
     };
+  }
+
+  /**
+   * UI event -> bridge.dispatch(command) -> adapter -> low-level runtime
+   * operation. Every live click handler this wave converts calls this
+   * instead of the low-level method directly; the adapter methods
+   * themselves still call the low-level methods directly (never back into
+   * the bridge), so there is no dispatch recursion. Falls back to the
+   * direct low-level call only if the bridge is not yet installed or
+   * legitimately rejects the command -- the low-level methods carry their
+   * own guards (e.g. startPlayMode()'s own hasLegacyPlayAccess() check), so
+   * this fallback is idempotent with the bridge's own rejection, not a way
+   * to bypass it.
+   */
+  private dispatchUiBridgeCommand(command: UiCommand, fallback: () => void): void {
+    if (!this.uiBridge || !this.uiBridge.dispatch(command).ok) {
+      fallback();
+    }
   }
 
   private installLegacyQaDiagnosticsSurface(): void {
@@ -10438,7 +10563,7 @@ export class MenuScene extends Phaser.Scene {
               primaryButtonWidth,
               this.layout.buttonHeight,
               'Login',
-              () => this.openOverlay('auth'),
+              () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth')),
               { fullScreenHitArea: true }
             )
           );
@@ -10450,14 +10575,20 @@ export class MenuScene extends Phaser.Scene {
               primaryButtonWidth,
               this.layout.buttonHeight,
               startLabel,
-              () => this.startPlayMode(),
+              () => this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode()),
               { fullScreenHitArea: true }
             )
           );
         }
-        this.uiButtons.push(this.createLegacyMenuSettingsCogButton(() => this.openOverlay('options')));
-        this.uiButtons.push(this.createLegacyMenuLeaderboardButton(() => this.openOverlay('leaderboard')));
-        this.uiButtons.push(this.createLegacyMenuProfileButton(() => this.openOverlay('auth')));
+        this.uiButtons.push(this.createLegacyMenuSettingsCogButton(
+          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'))
+        ));
+        this.uiButtons.push(this.createLegacyMenuLeaderboardButton(
+          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'leaderboard' }, () => this.openOverlay('leaderboard'))
+        ));
+        this.uiButtons.push(this.createLegacyMenuProfileButton(
+          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth'))
+        ));
       }
 
       this.uiDirty = false;
@@ -10635,7 +10766,11 @@ export class MenuScene extends Phaser.Scene {
     });
     let rowY = shell.contentTop;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    this.uiButtons.push(this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth'), panel.centerX));
+    this.uiButtons.push(this.createLegacyOverlayUsernameButton(
+      panel,
+      () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth')),
+      panel.centerX
+    ));
 
     if (!showAdvancedOptions) {
       const viewportTop = rowY + (compact ? 4 : 6);
@@ -11142,12 +11277,19 @@ export class MenuScene extends Phaser.Scene {
       actionRows: 1,
       panel
     });
-    this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand('resume')));
+    this.uiButtons.push(this.createOverlayBackChevronButton(
+      panel,
+      () => this.dispatchUiBridgeCommand({ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume'))
+    ));
     // Account is not an entry point from the in-play Pause screen -- home
     // (return to menu) is the only header icon here, centered alone the
     // same way the menu-context Options screen centers its own profile
     // icon (see createLegacyOverlayUsernameButton's Options call site).
-    this.uiButtons.push(this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu'), panel.centerX));
+    this.uiButtons.push(this.createLegacyOverlayHomeButton(
+      panel,
+      () => this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')),
+      panel.centerX
+    ));
     const viewportTop = shell.contentTop;
     const viewport = createVisualRect(
       shell.contentLeft,
@@ -11272,7 +11414,7 @@ export class MenuScene extends Phaser.Scene {
         buttonWidth,
         buttonHeight,
         'Go to Account',
-        () => this.openOverlay('auth'),
+        () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth')),
         'primary'
       ));
       return;
@@ -11591,7 +11733,10 @@ export class MenuScene extends Phaser.Scene {
       panel.centerX,
       panel.top + panel.height - 104,
       'Reset progress',
-      () => this.openOverlay('confirm-progression-reset'),
+      () => this.dispatchUiBridgeCommand(
+        { type: 'OPEN_MODAL', modal: 'confirm-reset-progress' },
+        () => this.openOverlay('confirm-progression-reset')
+      ),
       '#ff9bb5'
     );
     this.createLegacyBottomActionBar(

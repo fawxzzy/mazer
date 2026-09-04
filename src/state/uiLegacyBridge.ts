@@ -8,13 +8,13 @@
  *
  * Architecture rule this module exists to enforce: the legacy runtime
  * remains the authoritative domain/runtime state during this migration wave.
- * getSnapshot()/getViewModels() are always derived fresh from real legacy
- * facts via projectLegacyUiState() -- never from an independently-mutated
- * local reducer that could drift from the live scene. createUiStore()'s own
- * reducer intentionally no-ops most runtime/domain commands (start, pause,
- * resume, reset, auth, install, directional input); this bridge is what
- * actually executes those commands against the real scene through the
- * injected LegacyRuntimeAdapter, then re-projects the resulting real state.
+ * getSnapshot()/getViewModels() always re-read real legacy facts via
+ * projectLegacyUiState() -- never an independently-mutated local reducer
+ * that could drift from the live scene. createUiStore()'s own reducer
+ * intentionally no-ops most runtime/domain commands (start, pause, resume,
+ * reset, auth, install, directional input); this bridge is what actually
+ * executes those commands against the real scene through the injected
+ * LegacyRuntimeAdapter, then re-projects the resulting real state.
  *
  * This module has no Phaser import and no DOM dependency -- it is testable
  * with a plain fake adapter, and MenuScene.ts is the only call site expected
@@ -37,6 +37,12 @@ import { createUiViewModels, type UiViewModels } from './uiViewModels';
  * and value spaces intentionally mirror MenuScene's own private fields
  * (mode, overlay, overlayReturn) and the shared enums (gamePhase, authPhase,
  * etc.) rather than inventing a parallel vocabulary.
+ *
+ * `placeholderFields` names any of the fields above that have no real live
+ * signal backing them yet (see MenuScene.resolveUiBridgeFacts()) -- callers
+ * must not treat those specific fields as real projected state, only as the
+ * least-misleading registered fallback. This is surfaced in diagnostics
+ * rather than silently claimed as real.
  */
 export interface LegacyRuntimeFacts {
   readonly mode: 'menu' | 'play';
@@ -49,37 +55,57 @@ export interface LegacyRuntimeFacts {
   readonly controlMode: UiStateSnapshot['controlMode'];
   readonly motionMode: UiStateSnapshot['motionMode'];
   readonly effectsQuality: UiStateSnapshot['effectsQuality'];
+  readonly placeholderFields?: readonly string[];
 }
 
 /**
+ * An adapter action may return void (no known failure mode -- always
+ * accepted once called) or boolean (the real runtime explicitly accepted or
+ * rejected the operation, e.g. start while access is denied). `call()`
+ * treats `undefined`/`true` as accepted and `false` as rejected.
+ */
+type AdapterActionResult = void | boolean;
+
+/**
  * Real runtime operations the bridge can invoke. Each maps to an existing
- * MenuScene method (or an equivalent) -- this interface adds no new
- * behavior of its own, it only names the seam. A method that has no real
- * runtime equivalent yet is simply omitted from a given adapter; dispatch()
- * fails closed with 'unsupported' rather than calling a missing method.
+ * MenuScene method (or a small wrapper around one) -- this interface adds no
+ * new domain behavior of its own, it only names the seam and, where the real
+ * operation can fail, reports whether it was actually accepted. A method
+ * with no real runtime equivalent yet is simply omitted from a given
+ * adapter; dispatch() fails closed with an explicit `*-unsupported` reason
+ * rather than calling a missing method or silently no-op-ing.
  */
 export interface UiLegacyBridgeAdapter {
   getFacts(): LegacyRuntimeFacts;
-  openSettings?(): void;
-  openAccount?(): void;
-  openLeaderboard?(): void;
-  closeTopOverlay?(): void;
-  startRun?(): void;
-  pauseRun?(): void;
-  resumeRun?(): void;
-  resetRun?(): void;
-  resetProgress?(): void;
-  returnHome?(): void;
-  setControlMode?(mode: UiStateSnapshot['controlMode']): void;
-  setPreference?(key: 'motionMode' | 'effectsQuality', value: string): void;
-  submitAuth?(intent: string, payload: Readonly<Record<string, string>>): void;
-  logOut?(): void;
-  installApp?(): void;
-  dismissInstall?(): void;
-  applyUpdate?(): void;
-  retrySystemAction?(): void;
-  dispatchDirectionalIntent?(intent: string, source: string): void;
-  releaseDirectionalIntent?(source: string): void;
+  openSettings?(): AdapterActionResult;
+  openAccount?(): AdapterActionResult;
+  openLeaderboard?(): AdapterActionResult;
+  /** Opens confirm-progression-reset from whatever the current real overlay
+   * is (Account or Pause) -- the bridge only calls this after confirming the
+   * current overlay is actually one of those two valid origins. */
+  openResetProgressConfirmation?(): AdapterActionResult;
+  closeTopOverlay?(): AdapterActionResult;
+  startRun?(): AdapterActionResult;
+  /** No real seam exists in the current runtime (generation is not
+   * independently user-cancellable today) -- intentionally omitted by every
+   * real adapter so dispatch() fails closed rather than mapping this to an
+   * unrelated action like closing an overlay. */
+  cancelGeneration?(): AdapterActionResult;
+  pauseRun?(): AdapterActionResult;
+  resumeRun?(): AdapterActionResult;
+  resetRun?(): AdapterActionResult;
+  resetProgress?(): AdapterActionResult;
+  returnHome?(): AdapterActionResult;
+  setControlMode?(mode: UiStateSnapshot['controlMode']): AdapterActionResult;
+  setPreference?(key: 'motionMode' | 'effectsQuality', value: string): AdapterActionResult;
+  submitAuth?(intent: string, payload: Readonly<Record<string, string>>): AdapterActionResult;
+  logOut?(): AdapterActionResult;
+  installApp?(): AdapterActionResult;
+  dismissInstall?(): AdapterActionResult;
+  applyUpdate?(): AdapterActionResult;
+  retrySystemAction?(): AdapterActionResult;
+  dispatchDirectionalIntent?(intent: string, source: string): AdapterActionResult;
+  releaseDirectionalIntent?(source: string): AdapterActionResult;
 }
 
 export interface UiLegacyBridgeDispatchResult {
@@ -97,6 +123,7 @@ export interface UiLegacyBridgeDiagnostics {
   readonly visibleViewModelNames: readonly string[];
   readonly projectionViolationCount: number;
   readonly commandFailureCount: number;
+  readonly placeholderFacts: readonly string[];
   readonly destroyed: boolean;
 }
 
@@ -110,12 +137,15 @@ const VIEW_MODEL_VISIBILITY_KEYS = [
   'systemStatus', 'watchPass'
 ] as const;
 
+const RESET_CONFIRMATION_VALID_ORIGINS = new Set(['auth', 'pause']);
+
 export class UiLegacyBridge {
   private readonly adapter: UiLegacyBridgeAdapter;
   private readonly profile: UiPlatformProfile;
   private readonly commandBus: UiCommandBus;
   private snapshot: UiStateSnapshot | null = null;
   private lastFactsKey: string | null = null;
+  private lastPlaceholderFields: readonly string[] = [];
   private projectionRevision = 0;
   private dispatchCount = 0;
   private lastCommandType: UiCommandType | null = null;
@@ -131,15 +161,19 @@ export class UiLegacyBridge {
     this.refreshProjection('bridge-installation');
   }
 
-  /** Re-derives the snapshot from real legacy facts. Deduplicates: if the
-   * facts are unchanged since the last call, returns the cached snapshot
-   * without bumping projectionRevision or allocating a new object -- callers
-   * are expected to invoke this at deterministic state boundaries (mode
-   * changes, overlay transitions, command completion, etc.), not once per
-   * animation frame. */
+  /** Re-derives the snapshot from real legacy facts right now. Deduplicates:
+   * if the facts are unchanged since the last call, returns the cached
+   * snapshot without bumping projectionRevision or allocating a new object.
+   * Cheap enough to call from getSnapshot() itself (see below) so a caller
+   * that forgets to invoke this explicitly after some transition still sees
+   * fresh state -- the dedup check is what keeps that non-fatal instead of
+   * allocating every frame. */
   refreshProjection(reason: string): UiStateSnapshot {
     if (this.destroyed) {
-      throw new Error('UiLegacyBridge.refreshProjection() called after destroy().');
+      if (this.snapshot !== null) {
+        return this.snapshot;
+      }
+      throw new Error('UiLegacyBridge.refreshProjection() called after destroy() with no prior snapshot.');
     }
     const facts = this.adapter.getFacts();
     const key = factsKey(facts);
@@ -160,15 +194,23 @@ export class UiLegacyBridge {
     }
     this.snapshot = result.snapshot;
     this.lastFactsKey = key;
+    this.lastPlaceholderFields = facts.placeholderFields ?? [];
     this.projectionRevision += 1;
     return this.snapshot;
   }
 
+  /** Always re-reads live facts (via the same deduplicated refreshProjection
+   * path) rather than trusting a possibly-stale cache -- a caller that forgot
+   * to call refreshProjection() after some real transition still gets
+   * current state, not last-known-stale state. */
   getSnapshot(): UiStateSnapshot {
-    if (this.snapshot === null) {
-      return this.refreshProjection('lazy-initial-read');
+    if (this.destroyed) {
+      if (this.snapshot === null) {
+        throw new Error('UiLegacyBridge.getSnapshot() called before any snapshot existed, after destroy().');
+      }
+      return this.snapshot;
     }
-    return this.snapshot;
+    return this.refreshProjection('get-snapshot');
   }
 
   getViewModels(): UiViewModels {
@@ -176,9 +218,9 @@ export class UiLegacyBridge {
   }
 
   /** Validates, then executes, a UiCommand against the real runtime through
-   * the injected adapter. Always re-projects after a real action so the
-   * returned/cached snapshot reflects what the scene actually did, not what
-   * a local reducer assumed would happen. */
+   * the injected adapter. Always re-projects after a successful real action
+   * so the returned/cached snapshot reflects what the scene actually did,
+   * not what a local reducer assumed would happen. */
   dispatch(command: unknown): UiLegacyBridgeDispatchResult {
     if (this.destroyed) {
       return { ok: false, reason: 'destroyed' };
@@ -223,12 +265,22 @@ export class UiLegacyBridge {
         }
       case 'OPEN_MODAL':
         switch (command.modal) {
-          case 'confirm-reset-progress': return this.call(a.openAccount ?? a.pauseRun, 'open-modal-unsupported');
+          case 'confirm-reset-progress': {
+            const currentOverlay = a.getFacts().overlay;
+            if (!RESET_CONFIRMATION_VALID_ORIGINS.has(currentOverlay)) {
+              return unsupported('confirm-reset-progress-invalid-origin');
+            }
+            return this.call(a.openResetProgressConfirmation, 'openResetProgressConfirmation-unsupported');
+          }
           default: return unsupported(`modal:${command.modal}-unsupported`);
         }
       case 'CLOSE_MODAL': return this.call(a.closeTopOverlay, 'closeTopOverlay-unsupported');
       case 'START_RUN': return this.call(a.startRun, 'startRun-unsupported');
-      case 'CANCEL_GENERATION': return this.call(a.closeTopOverlay, 'cancelGeneration-unsupported');
+      case 'CANCEL_GENERATION':
+        // No real generation-cancellation seam exists in the current runtime
+        // (generation is not independently user-cancellable today) -- fail
+        // closed rather than mapping to an unrelated overlay-close action.
+        return this.call(a.cancelGeneration, 'cancelGeneration-unsupported');
       case 'PAUSE_RUN': return this.call(a.pauseRun, 'pauseRun-unsupported');
       case 'RESUME_RUN': return this.call(a.resumeRun, 'resumeRun-unsupported');
       case 'RESET_RUN': return this.call(a.resetRun, 'resetRun-unsupported');
@@ -259,11 +311,14 @@ export class UiLegacyBridge {
     }
   }
 
-  private call(fn: (() => void) | undefined, reasonIfMissing: string): UiLegacyBridgeDispatchResult {
+  private call(fn: (() => AdapterActionResult) | undefined, reasonIfMissing: string): UiLegacyBridgeDispatchResult {
     if (typeof fn !== 'function') {
       return { ok: false, reason: reasonIfMissing };
     }
-    fn();
+    const accepted = fn();
+    if (accepted === false) {
+      return { ok: false, reason: 'rejected' };
+    }
     return { ok: true };
   }
 
@@ -281,6 +336,7 @@ export class UiLegacyBridge {
         : [],
       projectionViolationCount: this.projectionViolationCount,
       commandFailureCount: this.commandFailureCount,
+      placeholderFacts: this.lastPlaceholderFields,
       destroyed: this.destroyed
     });
   }

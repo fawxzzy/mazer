@@ -1308,7 +1308,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // createLegacyOverlayHomeButton). Account is not an entry point from
     // Pause at all.
     expect(menuSceneSource).not.toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
-    expect(menuSceneSource).toContain("this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu'), panel.centerX)");
+    // Now routes through the Wave 3A bridge first (bridge.dispatch(RETURN_HOME)),
+    // falling back to the same real applyLegacyPauseCommand('return-menu')
+    // call only if the bridge rejects or is unavailable.
+    expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
+      'this.uiButtons.push(this.createLegacyOverlayHomeButton(\n'
+      + '      panel,\n'
+      + '      () => this.dispatchUiBridgeCommand({ type: \'RETURN_HOME\' }, () => this.applyLegacyPauseCommand(\'return-menu\')),\n'
+      + '      panel.centerX\n'
+      + '    ));'
+    );
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
     expect(menuSceneSource).toContain('this.playDirectionalIntent.step(this.maze, this.player, {');
@@ -1671,7 +1680,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       menuSceneSource.indexOf('private drawLegacyProfileIcon(')
     );
 
-    expect(menuSceneSource).toContain('this.createLegacyMenuProfileButton(() => this.openOverlay(\'auth\'))');
+    // Now routes through the Wave 3A bridge first (bridge.dispatch(NAVIGATE
+    // account)), falling back to the same real openOverlay('auth') call only
+    // if the bridge rejects or is unavailable.
+    expect(menuSceneSource).toContain(
+      'this.uiButtons.push(this.createLegacyMenuProfileButton(\n'
+      + '          () => this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openOverlay(\'auth\'))\n'
+      + '        ));'
+    );
     expect(menuSceneSource).not.toContain('createLegacyMenuUsernameButton');
     expect(menuSceneSource).not.toContain('drawLegacyMenuUsernameLabel');
     expect(profileButtonSource).toContain("placement: 'leading'");
@@ -1739,13 +1755,23 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private closeLegacyAuthOverlayToMainMenu(): void');
     expect(menuSceneSource).toContain('const playAccessAllowed = this.hasLegacyPlayAccess();');
     expect(menuSceneSource).toContain('if (!playAccessAllowed) {');
-    expect(menuSceneSource).toContain('startLabel,\n              () => this.startPlayMode()');
+    // Now routes through the Wave 3A bridge first (bridge.dispatch(START_RUN)),
+    // falling back to the same real startPlayMode() call only if the bridge
+    // rejects or is unavailable.
+    expect(menuSceneSource).toContain(
+      'startLabel,\n              () => this.dispatchUiBridgeCommand({ type: \'START_RUN\' }, () => this.startPlayMode()),'
+    );
     expect(menuSceneSource).toContain("menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest'");
     expect(menuSceneSource).toContain("const previousMenuActionMode = this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest';");
     expect(menuSceneSource).toContain("const menuActionMode = snapshot.status === 'authenticated' ? 'authenticated' : 'guest';");
     expect(menuSceneSource).toContain('previousMenuActionMode !== menuActionMode');
     expect(menuSceneSource).toContain('this.refreshLayout();');
-    expect(menuSceneSource).toContain("'Login',\n              () => this.openOverlay('auth')");
+    // Now routes through the Wave 3A bridge first (bridge.dispatch(NAVIGATE
+    // account)), falling back to the same real openOverlay('auth') call only
+    // if the bridge rejects or is unavailable.
+    expect(menuSceneSource).toContain(
+      "'Login',\n              () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth')),"
+    );
     expect(menuSceneSource).toContain('this.layout.centerButtonX,');
     expect(menuSceneSource).toContain('this.layout.centerButtonY,');
     expect(menuSceneSource).not.toContain('const accountActionLabel =');
@@ -1754,8 +1780,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // button -- there's no "go to main menu" equivalent here since you're
     // already at the main menu, so the bottom of the panel is simply empty.
     expect(menuSceneSource).not.toContain('private createLegacyOptionsAccountActionRow(');
+    // Now routes through the Wave 3A bridge first (bridge.dispatch(NAVIGATE
+    // account)), falling back to the same real openOverlay('auth') call only
+    // if the bridge rejects or is unavailable.
     expect(menuSceneSource).toContain(
-      "this.uiButtons.push(this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth'), panel.centerX));"
+      'this.uiButtons.push(this.createLegacyOverlayUsernameButton(\n'
+      + '      panel,\n'
+      + '      () => this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openOverlay(\'auth\')),\n'
+      + '      panel.centerX\n'
+      + '    ));'
     );
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain('Account access is unavailable right now. You can still play as a guest.');
@@ -2180,7 +2213,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');
     expect(menuSceneSource).toContain('private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void');
     expect(menuSceneSource).toContain('private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton');
-    expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand(\'resume\')));');
+    // Pause's back-chevron now routes through the Wave 3A bridge first
+    // (bridge.dispatch(RESUME_RUN)), falling back to the same real
+    // applyLegacyPauseCommand('resume') call only if the bridge rejects or
+    // is unavailable -- the underlying action is unchanged.
+    expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
+      'this.uiButtons.push(this.createOverlayBackChevronButton(\n'
+      + '      panel,\n'
+      + '      () => this.dispatchUiBridgeCommand({ type: \'RESUME_RUN\' }, () => this.applyLegacyPauseCommand(\'resume\'))\n'
+      + '    ));'
+    );
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));');
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain('return resolveLegacyOverlayPanelLayout(\n      this.layout.width,\n      this.layout.height,\n      readMazerViewportGeometry().safeArea\n    );');
     expect(menuSceneSource).toContain('const shell = resolveLegacyOverlayShellLayout({');

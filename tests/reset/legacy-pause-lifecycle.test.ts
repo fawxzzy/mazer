@@ -50,7 +50,13 @@ describe('legacy pause lifecycle', () => {
     // Menu no longer lives in a bottom action bar at all -- it's a home
     // icon sharing the header row with the back chevron instead (see
     // createLegacyOverlayHomeButton), leaving the bottom of the panel empty.
-    expect(pauseOverlaySource).toContain("this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu'), panel.centerX)");
+    // Now routed through the Wave 3A bridge first (bridge.dispatch(RETURN_HOME)),
+    // falling back to this same real call only if the bridge rejects or is
+    // unavailable -- checked as the bare call, not the full multi-line
+    // createLegacyOverlayHomeButton(...) wrapper, so this doesn't depend on
+    // exact line-wrapping/line-ending formatting.
+    expect(pauseOverlaySource).toContain('createLegacyOverlayHomeButton');
+    expect(pauseOverlaySource).toContain("this.applyLegacyPauseCommand('return-menu')");
     expect(pauseOverlaySource).not.toContain("'Resume'");
     expect(pauseOverlaySource).not.toContain('resumeAction');
     expect(menuSceneSource).toContain("this.createLegacyAuthActionButton(");
