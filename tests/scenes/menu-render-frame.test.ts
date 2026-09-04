@@ -2334,3 +2334,53 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(manifest.icons.filter((icon) => icon.purpose === 'maskable')).toHaveLength(2);
   });
 });
+
+// Navigation Core v1's end-star (drawLegacyGoalStarMarker) has no exposed
+// pure boundary the way the trail geometry does -- it's procedural Graphics
+// calls inline in a 16k-line Scene class -- so these pin the specific,
+// reviewed-against-the-frozen-reference fixes at the source level, matching
+// this file's own established convention for hard-to-harness Scene
+// internals.
+describe('Navigation Core v1 end-star: canonical energy palette, no orbiting dot, one-cell halo, no permanent sparkles', () => {
+  const menuSceneSource = normalizeSourceLineEndings(
+    readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
+  );
+
+  test('samples the canonical cool-dominant ENERGY stops (shared with the trail), never a raw equal-weight HSV rainbow, for the ring and star', () => {
+    expect(menuSceneSource).toContain('resolveLegacyIridescentMidnightColor(position, NAVIGATION_CORE_TRAIL_ENERGY_STOPS)');
+    expect(menuSceneSource).toContain('const segmentColor = energyColorAt((i / ringSegmentCount) + spinPhase);');
+    expect(menuSceneSource).toContain('const segmentColor = energyColorAt(((i + t0) / starPoints.length) + spinPhase);');
+    // The ring/star must not call Phaser's HSV helper directly any more --
+    // that was the raw equal-weight-rainbow mechanism being replaced.
+    expect(menuSceneSource).not.toContain('Phaser.Display.Color.HSVToRGB(hue, 0.85, 1).color;\n      graphics.lineStyle(Math.max(1.5, maxRadius * 0.07)');
+  });
+
+  test('never draws the orbiting white highlight that rides the ring', () => {
+    expect(menuSceneSource).not.toContain('orbitAngle');
+    expect(menuSceneSource).not.toContain('orbitX');
+    expect(menuSceneSource).not.toContain('orbiting satellite');
+  });
+
+  test('the halo stays inside one cell (reference-accurate radii, not the old 1.3-1.45x overflow)', () => {
+    expect(menuSceneSource).toContain('graphics.fillCircle(centerX, centerY, maxRadius * (0.72 + (haloPulse * 0.08)));');
+    expect(menuSceneSource).toContain('graphics.fillCircle(centerX, centerY, maxRadius * 0.48);');
+    expect(menuSceneSource).not.toContain('maxRadius * (1.3 + (haloPulse * 0.15))');
+    expect(menuSceneSource).not.toContain('graphics.fillCircle(centerX, centerY, maxRadius * 0.85);');
+  });
+
+  test('draws no sparkles at all under reduced motion or the static Guide legend icon -- no permanent decorative dots', () => {
+    expect(menuSceneSource).not.toContain('sparkleSpecs');
+    expect(menuSceneSource).not.toContain('Reduced-motion / static (Guide legend) fallback');
+  });
+
+  test('the star remains hollow and one-cell (unchanged geometry, never filled)', () => {
+    expect(menuSceneSource).toContain('const outerRadius = maxRadius * 0.72;');
+    expect(menuSceneSource).toContain('const innerRadius = outerRadius * 0.42;');
+    // The star's own polygon (starPoints) is only ever stroked edge-by-edge
+    // (lineBetween below), never handed to a fill call -- that's what makes
+    // it hollow (background visible through the interior).
+    expect(menuSceneSource).not.toContain('fillPoints(starPoints');
+    expect(menuSceneSource).not.toContain('graphics.fillPath(starPoints');
+    expect(menuSceneSource).toContain("graphics.lineBetween(\n          from.x + ((to.x - from.x) * t0),");
+  });
+});

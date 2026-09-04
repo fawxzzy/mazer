@@ -23,6 +23,7 @@ import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameTo
 import {
   advanceTrailShineState,
   buildContinuousTrailPath,
+  NAVIGATION_CORE_TRAIL_ENERGY_STOPS,
   resampleTrailVertices,
   sampleTrailEnergyColor
 } from '../render/navigationCoreTrail';
@@ -181,6 +182,7 @@ import {
   LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE,
   LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS,
   mixLegacyIridescentColor,
+  resolveLegacyIridescentMidnightColor,
   resolveLegacyIridescentPlayerCoreColor,
   resolveLegacyIridescentPlayerAccentColor,
   resolveLegacyIridescentPlayerHaloColor,
@@ -970,8 +972,30 @@ interface LegacyQaOverlayResult {
   reason: string | null;
 }
 
+// Real, measured frame-time evidence for Navigation Core v1's continuous
+// trail (Wave 4D-A's own frame-time measurement requirement) -- populated
+// at the end of every drawLegacyContinuousPlayTrail call, not estimated.
+// vertexCountBeforeResample/afterResample and strokeSegmentCount answer
+// "how much geometry" (a long visible route should scale these up
+// predictably); geometryBuildMs/drawMs/totalMs answer "how long did it
+// actually take" this frame, for a caller to aggregate p50/p95/max over a
+// real capture window.
+interface LegacyTrailPerfDiagnostics {
+  vertexCountBeforeResample: number;
+  vertexCountAfterResample: number;
+  strokeSegmentCount: number;
+  geometryBuildMs: number;
+  drawMs: number;
+  totalMs: number;
+  totalLengthPx: number;
+  tileSize: number;
+  shineEnabled: boolean;
+  trailFadeEnabled: boolean;
+}
+
 interface LegacyQaDiagnosticsApi {
   movePlayPlayer(move: string): LegacyQaMoveResult;
+  getTrailPerfDiagnostics(): LegacyTrailPerfDiagnostics | null;
   /** Player-facing Settings action; the internal overlay id remains options. */
   openSettingsOverlay(): LegacyQaOverlayResult;
   openOptionsOverlay(): LegacyQaOverlayResult;
@@ -1980,6 +2004,10 @@ export class MenuScene extends Phaser.Scene {
   // Reset to 0 wherever this.trail itself resets to a fresh run, so a new
   // maze/run never inherits the previous run's shine phase.
   private trailShineLapStartedAtMs = 0;
+  // See LegacyTrailPerfDiagnostics's own header comment. Overwritten every
+  // drawLegacyContinuousPlayTrail call in play mode; null until the first
+  // one runs (or if the trail is empty/off-screen that frame).
+  private lastTrailPerfDiagnostics: LegacyTrailPerfDiagnostics | null = null;
   // A one-way latch for the start marker's pre-spawn -> post-spawn
   // transition -- must not flip back to false just because the player
   // revisits the start tile later. Flipped only from
@@ -2527,7 +2555,8 @@ export class MenuScene extends Phaser.Scene {
       dispatchUiCommand: (command: unknown): UiLegacyBridgeDispatchResult => (
         this.uiBridge?.dispatch(command) ?? { ok: false, reason: 'bridge-not-installed' }
       ),
-      getUiBridgeDiagnostics: (): UiLegacyBridgeDiagnostics | null => this.uiBridge?.getDiagnostics() ?? null
+      getUiBridgeDiagnostics: (): UiLegacyBridgeDiagnostics | null => this.uiBridge?.getDiagnostics() ?? null,
+      getTrailPerfDiagnostics: (): LegacyTrailPerfDiagnostics | null => this.lastTrailPerfDiagnostics
     };
   }
 
@@ -9803,6 +9832,12 @@ export class MenuScene extends Phaser.Scene {
       ? [...perfectPath.slice(0, -1), renderedPlayerPoint]
       : [copyPoint(perfectPath[0]!), renderedPlayerPoint];
 
+    // Real, measured frame-time evidence (Wave 4D-A's own frame-time
+    // measurement requirement) -- geometryBuildMs covers path building +
+    // corner rounding + resampling; drawMs (below) covers the actual
+    // stroke calls. performance.now() unconditionally: this method only
+    // ever runs in a real browser Scene.
+    const perfBuildStartedAtMs = performance.now();
     const geometry = buildContinuousTrailPath({
       gridPath,
       originX,
@@ -9815,6 +9850,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
     const vertices = resampleTrailVertices(geometry.vertices, LEGACY_PLAY_TRAIL_RESAMPLE_INTERVAL_PX);
+    const perfBuildEndedAtMs = performance.now();
 
     // Trail Shine setting + reduced motion share this one gate (see
     // isLegacyTrailShineVisible's own definition) -- reduced motion keeps
@@ -9848,6 +9884,7 @@ export class MenuScene extends Phaser.Scene {
     // smooth age/distance opacity, continuous by distance so there is no
     // per-cell alpha step.
     const trailFadeEnabled = this.settings.toggleTrailFade;
+    let perfStrokeSegmentCount = 0;
 
     for (let i = 1; i < vertices.length; i += 1) {
       const previous = vertices[i - 1]!;
@@ -9859,6 +9896,7 @@ export class MenuScene extends Phaser.Scene {
       if (current.newSubpath) {
         continue;
       }
+      perfStrokeSegmentCount += 1;
 
       const midDistance = (previous.distance + current.distance) / 2;
       const ageAlpha = trailFadeEnabled
@@ -9903,6 +9941,20 @@ export class MenuScene extends Phaser.Scene {
       graphics.lineTo(current.x, current.y);
       graphics.strokePath();
     }
+
+    const perfDrawEndedAtMs = performance.now();
+    this.lastTrailPerfDiagnostics = {
+      vertexCountBeforeResample: geometry.vertices.length,
+      vertexCountAfterResample: vertices.length,
+      strokeSegmentCount: perfStrokeSegmentCount,
+      geometryBuildMs: perfBuildEndedAtMs - perfBuildStartedAtMs,
+      drawMs: perfDrawEndedAtMs - perfBuildEndedAtMs,
+      totalMs: perfDrawEndedAtMs - perfBuildStartedAtMs,
+      totalLengthPx: geometry.totalLength,
+      tileSize,
+      shineEnabled,
+      trailFadeEnabled
+    };
   }
 
   private drawLegacyPlayDynamicTrailPulse(
@@ -10179,19 +10231,26 @@ export class MenuScene extends Phaser.Scene {
     graphics.fillCircle(centerX - (coreRadius * 0.3), centerY - (coreRadius * 0.3), coreRadius * 0.32);
   }
 
-  // The goal marker: a rainbow, hue-cycled ring (with a small bright
-  // orbiting highlight riding it) around a five-pointed star -- the star
-  // itself is deliberately HOLLOW (no fill; the board/starfield show
-  // through its interior, per feedback) with a spinning rainbow outline
-  // instead of a flat or gradient-filled one, plus a handful of tiny
-  // independently-twinkling sparkle glints. Modeled on a reference asset
-  // the user supplied. Drawn procedurally rather than as an imported
-  // texture: every board element in
-  // this scene is already vector Graphics (no image/texture loading
-  // pipeline exists anywhere in MenuScene), so a hand-drawn equivalent
-  // stays consistent with the rest of the renderer and animates for free at
-  // any resolution/zoom instead of needing a raster asset pipeline built
-  // just for this one marker.
+  // The goal marker: a hollow five-pointed star (no fill -- the board and
+  // starfield show through its interior, per the frozen contract's own
+  // "hollow star" requirement) with a spinning outline, ringed by a
+  // matching ring, both cycling through Navigation Core v1's canonical
+  // cool-dominant ENERGY palette -- the exact same cyclic stops the
+  // continuous trail samples (NAVIGATION_CORE_TRAIL_ENERGY_STOPS), so the
+  // goal reads as visually related to the trail leading to it, not an
+  // independent equal-weight rainbow. A review against the frozen
+  // reference (docs/assets/reference/navigation-core-v1/) found this
+  // marker was still using a full equal-weight HSV rainbow (wrong hue
+  // weighting), an orbiting white highlight riding the ring (not in the
+  // reference at all), and a reduced-motion fallback that drew five
+  // sparkles at constant, never-fading alpha (exactly the "permanent
+  // decorative dots" the reference's own visual contract prohibits) --
+  // all removed here. Drawn procedurally rather than as an imported
+  // texture: every board element in this scene is already vector Graphics
+  // (no image/texture loading pipeline exists anywhere in MenuScene), so a
+  // hand-drawn equivalent stays consistent with the rest of the renderer
+  // and animates for free at any resolution/zoom instead of needing a
+  // raster asset pipeline built just for this one marker.
   //
   // `time` is optional -- same long-standing convention as the glow this
   // replaces: the Guide overlay's static legend icon (drawLegacyOptionsGuideGlyph)
@@ -10210,67 +10269,53 @@ export class MenuScene extends Phaser.Scene {
     const spinPhase = time !== undefined && !this.prefersLegacyReducedMotion()
       ? time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS
       : 0;
+    const energyColorAt = (position: number): number => (
+      resolveLegacyIridescentMidnightColor(position, NAVIGATION_CORE_TRAIL_ENERGY_STOPS)
+    );
 
-    // Soft pulsing glow halo, drawn first (behind everything else) --
-    // fixes a real visibility regression: a fully hollow star (background
-    // visible through its interior, per explicit feedback) reads as too
-    // thin/low-contrast against the pale corridor material to spot at a
-    // glance, especially at a distance. This restores an at-a-glance "there
-    // is something here" glow patch on the tile without giving up the
-    // hollow star's own detail -- the glow sits underneath, the spinning
-    // rainbow ring/star still read on top of it. Bumped noticeably brighter
-    // and wider a second time -- still reported hard to spot at the
-    // previous (0.28-0.42 alpha) intensity.
-    // Toned down a second time -- at the previous 0.48-0.9 alpha range this
-    // glow itself read as a solid blob that swallowed the crisp ring/star
-    // linework underneath it ("I can't even tell it's a star anymore, looks
-    // like a blob, use well-defined lines"). Kept only bright enough to
-    // still register as "something is here" at a glance -- the ring and
-    // star below carry the actual shape now, not this halo.
+    // Soft pulsing glow halo, drawn first (behind everything else). The
+    // frozen reference's own .end-halo is a radial gradient on a div sized
+    // to exactly the tile (scale 1.05), fading to zero opacity by 75% of
+    // its own radius -- i.e. its true visible extent tops out around
+    // maxRadius * 1.05 * 0.75 =~ 0.79 * maxRadius, well inside one cell.
+    // The previous 1.3-1.45x radii here visibly overflowed the tile
+    // (flagged directly against the reference's adjacent/compact evidence)
+    // -- pulled in to fit the same one-cell footprint.
     const haloPulse = time !== undefined && !this.prefersLegacyReducedMotion()
       ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2
       : 0.5;
-    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR, alpha * (0.22 + (haloPulse * 0.1)));
-    graphics.fillCircle(centerX, centerY, maxRadius * (1.3 + (haloPulse * 0.15)));
-    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_INNER_COLOR, alpha * (0.32 + (haloPulse * 0.12)));
-    graphics.fillCircle(centerX, centerY, maxRadius * 0.85);
+    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR, alpha * (0.24 + (haloPulse * 0.12)));
+    graphics.fillCircle(centerX, centerY, maxRadius * (0.72 + (haloPulse * 0.08)));
+    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_INNER_COLOR, alpha * (0.34 + (haloPulse * 0.14)));
+    graphics.fillCircle(centerX, centerY, maxRadius * 0.48);
 
-    // Ring: Graphics has no per-point gradient stroke, so the rainbow is
-    // approximated as short hue-stepped arc segments swept around the full
-    // circle, rotating continuously via spinPhase.
+    // Ring: Graphics has no per-point gradient stroke, so the canonical
+    // energy cycle is approximated as short color-stepped arc segments
+    // swept around the full circle, rotating continuously via spinPhase.
+    // Ring diameter (1.84 * maxRadius) stays inside the tile's own full
+    // width (2 * maxRadius) -- one-cell hard geometry.
     const ringRadius = maxRadius * 0.92;
     const ringSegmentCount = 40;
     for (let i = 0; i < ringSegmentCount; i += 1) {
-      const hue = i / ringSegmentCount;
       const angle0 = ((i / ringSegmentCount) + spinPhase) * Math.PI * 2;
       const angle1 = (((i + 1) / ringSegmentCount) + spinPhase) * Math.PI * 2;
-      const segmentColor = Phaser.Display.Color.HSVToRGB(hue, 0.85, 1).color;
+      const segmentColor = energyColorAt((i / ringSegmentCount) + spinPhase);
       graphics.lineStyle(Math.max(1.5, maxRadius * 0.07), segmentColor, alpha * 0.92);
       graphics.beginPath();
       graphics.arc(centerX, centerY, ringRadius, angle0, angle1);
       graphics.strokePath();
     }
 
-    // Small bright highlight riding the ring, one lap per ring rotation but
-    // offset from the hue cycle's own seam so it reads as a distinct
-    // orbiting satellite rather than part of the ring itself.
-    const orbitAngle = (spinPhase + 0.06) * Math.PI * 2;
-    const orbitX = centerX + (Math.cos(orbitAngle) * ringRadius);
-    const orbitY = centerY + (Math.sin(orbitAngle) * ringRadius);
-    graphics.fillStyle(cyberArcadeMaterial.rail.white, alpha * 0.95);
-    graphics.fillCircle(orbitX, orbitY, maxRadius * 0.1);
-    graphics.fillStyle(Phaser.Display.Color.HSVToRGB(0.54, 0.55, 1).color, alpha * 0.45);
-    graphics.fillCircle(orbitX, orbitY, maxRadius * 0.17);
-
     // Five-pointed star, deliberately HOLLOW (no fill at all -- the board
     // and starfield behind it show straight through the interior) with a
-    // spinning rainbow outline instead of a flat or gradient-filled one:
-    // each of the star's 10 edges is traced as several hue-stepped
-    // sub-segments (same technique as the ring above), and the star's own
-    // vertex rotation runs at the SAME rate as the ring's hue cycle
-    // (spinPhase, not a slowed-down fraction of it), so the outline reads as
-    // one continuous rainbow sweeping around a genuinely spinning star
-    // rather than a static gradient.
+    // spinning canonical-energy outline instead of a flat or gradient-
+    // filled one: each of the star's 10 edges is traced as several color-
+    // stepped sub-segments (same technique as the ring above), and the
+    // star's own vertex rotation runs at the SAME rate as the ring's color
+    // cycle (spinPhase, not a slowed-down fraction of it), so the outline
+    // reads as one continuous energy sweep around a genuinely spinning
+    // star rather than a static gradient. Star diameter (1.44 * maxRadius)
+    // also stays inside the tile's own width -- one-cell hard geometry.
     const starRotation = spinPhase * Math.PI * 2;
     const outerRadius = maxRadius * 0.72;
     const innerRadius = outerRadius * 0.42;
@@ -10290,8 +10335,7 @@ export class MenuScene extends Phaser.Scene {
       for (let s = 0; s < starEdgeSubdivisions; s += 1) {
         const t0 = s / starEdgeSubdivisions;
         const t1 = (s + 1) / starEdgeSubdivisions;
-        const hue = (((i + t0) / starPoints.length) + spinPhase) % 1;
-        const segmentColor = Phaser.Display.Color.HSVToRGB(hue, 0.85, 1).color;
+        const segmentColor = energyColorAt(((i + t0) / starPoints.length) + spinPhase);
         graphics.lineStyle(Math.max(1, maxRadius * 0.07), segmentColor, alpha * 0.95);
         graphics.lineBetween(
           from.x + ((to.x - from.x) * t0),
@@ -10302,12 +10346,17 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    // Twinkling sparkle glints scattered all around the star, in and out at
-    // random positions -- same drawLegacyWordmarkAmbientSparkles system the
-    // title/Start-Login/level-number/orbit-diamonds all use now, reused here
-    // instead of this marker's own separate five-fixed-spot white sparkles
-    // ("add twinkling stars to the end tile too," and consistency with
-    // every other twinkle on screen).
+    // Transient four-point glints only, matching the reference's own
+    // staggered fixed-position sparkle divs (each individually fading in
+    // and out on its own cycle, never all constantly on at once) -- see
+    // drawLegacyWordmarkAmbientSparkles's own "fully invisible outside a
+    // short pulse window" behavior for the fade-to-zero guarantee. Only
+    // drawn when actually animating (a real time and motion is allowed):
+    // the previous reduced-motion/static fallback drew five sparkles at a
+    // constant, never-fading alpha -- exactly the "permanent decorative
+    // dots" the frozen contract prohibits -- so reduced motion and the
+    // static Guide legend icon now correctly show none at all, just the
+    // static halo/ring/star shape.
     if (time !== undefined && !this.prefersLegacyReducedMotion()) {
       this.drawLegacyWordmarkAmbientSparkles(
         graphics,
@@ -10320,19 +10369,6 @@ export class MenuScene extends Phaser.Scene {
         5,
         41
       );
-    } else {
-      // Reduced-motion / static (Guide legend) fallback: fixed mid-twinkle
-      // size and alpha instead of animating.
-      const sparkleSpecs: ReadonlyArray<{ dx: number; dy: number; size: number }> = [
-        { dx: 0, dy: -outerRadius * 0.12, size: maxRadius * 0.13 },
-        { dx: -outerRadius * 0.32, dy: outerRadius * 0.18, size: maxRadius * 0.08 },
-        { dx: outerRadius * 0.34, dy: outerRadius * 0.12, size: maxRadius * 0.08 },
-        { dx: -outerRadius * 0.1, dy: outerRadius * 0.4, size: maxRadius * 0.06 },
-        { dx: outerRadius * 0.05, dy: -outerRadius * 0.42, size: maxRadius * 0.05 }
-      ];
-      for (const sparkle of sparkleSpecs) {
-        this.drawLegacyFourPointSparkle(graphics, centerX + sparkle.dx, centerY + sparkle.dy, sparkle.size, cyberArcadeMaterial.rail.white, alpha * 0.75);
-      }
     }
   }
 
