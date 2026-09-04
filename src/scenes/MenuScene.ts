@@ -1236,6 +1236,19 @@ const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;
 const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;
 const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = cyberArcadeMaterial.signal.goalEdge;
+// Navigation Core v1's reference end-star (endStarNode/.end-halo in
+// docs/assets/reference/navigation-core-v1/mazer-navigation-core-v1-approved.html)
+// glows via a radial gradient from magenta (0% stop) through violet (60%
+// stop, fading to transparent by 75%) -- both from the reference's own
+// ENERGY palette array, never red. drawLegacyGoalStarMarker's halo used to
+// anchor on LEGACY_PLAY_GOAL_MARKER_CORE (#FF405D, semantic.danger red)
+// instead, contradicting the reference's own canonical-palette rule ("red
+// ... as brief accents" -- never a resting/anchor color). Canvas-mode
+// Phaser Graphics has no radial-gradient fill, so this is approximated
+// with two concentric circles standing in for the gradient's two color
+// stops (see drawLegacyGoalStarMarker).
+const LEGACY_PLAY_GOAL_MARKER_HALO_INNER_COLOR = 0xe030c0;
+const LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR = 0x8b3ff0;
 // Full rotation period for the goal marker's rainbow ring (drawLegacyGoalStarMarker)
 // -- the star itself spins slower (0.6x this rate, see that method) so the
 // two read as two independently-moving parts rather than one rigid unit.
@@ -9885,23 +9898,10 @@ export class MenuScene extends Phaser.Scene {
     const haloPulse = time !== undefined && !this.prefersLegacyReducedMotion()
       ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2
       : 0.5;
-    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha * (0.22 + (haloPulse * 0.1)));
+    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR, alpha * (0.22 + (haloPulse * 0.1)));
     graphics.fillCircle(centerX, centerY, maxRadius * (1.3 + (haloPulse * 0.15)));
-    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha * (0.32 + (haloPulse * 0.12)));
+    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_INNER_COLOR, alpha * (0.32 + (haloPulse * 0.12)));
     graphics.fillCircle(centerX, centerY, maxRadius * 0.85);
-
-    // Thin pulsing rainbow outline tracing the tile's own square boundary --
-    // frames the goal tile distinctly without recoloring the corridor
-    // material underneath it (deliberately left alone, see
-    // drawLegacyEndpointGlow's own comment). Addresses "hard to spot" with
-    // graphics around the tile instead of the tile's own fill.
-    const frameHue = (spinPhase * 0.5) % 1;
-    graphics.lineStyle(
-      Math.max(1.5, maxRadius * 0.09),
-      Phaser.Display.Color.HSVToRGB(frameHue, 0.85, 1).color,
-      alpha * (0.55 + (haloPulse * 0.25))
-    );
-    graphics.strokeRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
 
     // Ring: Graphics has no per-point gradient stroke, so the rainbow is
     // approximated as short hue-stepped arc segments swept around the full
