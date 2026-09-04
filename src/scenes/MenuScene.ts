@@ -11338,7 +11338,11 @@ export class MenuScene extends Phaser.Scene {
     })), bodyWidth, compact ? 16 : 18, 13).setOrigin(0.5, 0.5);
     this.uiTexts.push(body);
 
-    const cancel = (): void => this.openOverlay('pause');
+    // Route through the same resolver Escape/back-chevron use so Cancel and
+    // the back action can never disagree about where this overlay returns.
+    // Confirm keeps its own explicit destination (openOverlay('pause') in
+    // resetLegacyPlayerProgression) independent of this routing.
+    const cancel = (): void => this.handleBackAction();
     const confirm = (): void => this.resetLegacyPlayerProgression();
     if (compact) {
       const width = Math.floor((buttonWidth - 12) / 2);
@@ -14856,6 +14860,15 @@ export class MenuScene extends Phaser.Scene {
 
   private openOverlay(kind: OverlayKind): void {
     const previousOverlay = this.overlay;
+    if (previousOverlay === 'auth' && kind !== 'auth') {
+      // Leaving Account for anything else (not just an explicit close) must
+      // tear down its native DOM input first -- otherwise it stays mounted
+      // and focused at the auth layer's high z-index underneath whatever
+      // overlay opens next (e.g. Account -> Reset Progress).
+      this.destroyLegacyAuthNativeInput();
+      this.destroyAccountUsernameNativeInput();
+      this.accountUsernameActive = false;
+    }
     if (kind === 'options' || kind === 'pause') {
       this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
       this.pendingOverlayMazeRebuild = false;
@@ -14887,9 +14900,11 @@ export class MenuScene extends Phaser.Scene {
       this.clearPlayHudImmediately();
     }
     this.overlay = kind;
-    this.overlayReturn = kind === 'auth' && (previousOverlay === 'pause' || previousOverlay === 'options')
-      ? previousOverlay
-      : 'none';
+    this.overlayReturn =
+      (kind === 'auth' && (previousOverlay === 'pause' || previousOverlay === 'options'))
+      || (kind === 'confirm-progression-reset' && (previousOverlay === 'pause' || previousOverlay === 'auth'))
+        ? previousOverlay
+        : 'none';
     this.titleGraphics.setVisible(false);
     this.boardDynamicDirty = true;
     this.uiDirty = true;
@@ -14907,7 +14922,9 @@ export class MenuScene extends Phaser.Scene {
       this.destroyAccountUsernameNativeInput();
       this.accountUsernameActive = false;
     }
-    const returnOverlay = this.overlay === 'auth' ? this.overlayReturn : 'none';
+    const returnOverlay = (this.overlay === 'auth' || this.overlay === 'confirm-progression-reset')
+      ? this.overlayReturn
+      : 'none';
     this.resetLegacyOverlayScrollState();
     if (returnOverlay !== 'none') {
       this.overlay = returnOverlay;
