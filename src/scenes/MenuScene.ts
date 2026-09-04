@@ -1950,6 +1950,11 @@ export class MenuScene extends Phaser.Scene {
   // Reset to the current time wherever this.trail itself resets to a fresh
   // run, so a new maze/run never inherits the previous run's shine phase.
   private trailShineLapStartedAtMs = 0;
+  // A one-way latch for the start marker's pre-spawn -> post-spawn
+  // transition (see fillPlayDynamicMarkerTile) -- must not flip back to
+  // false just because the player revisits the start tile later. Reset
+  // alongside trailShineLapStartedAtMs at the same fresh-run sites.
+  private hasPlayerEverLeftStart = false;
   private boardStaticDirty = true;
   private boardPathDirty = true;
   private boardDynamicDirty = true;
@@ -5044,6 +5049,7 @@ export class MenuScene extends Phaser.Scene {
       this.syncLegacyPlayerVisualMotionTo(generationState.initialPlayer);
       this.trail = generationState.initialTrail;
       this.trailShineLapStartedAtMs = this.time.now;
+      this.hasPlayerEverLeftStart = false;
       this.playCyclePath = generationState.initialTrail.map(copyPoint);
       this.playCycleResetUsed = false;
       this.playCompletedAtMs = null;
@@ -9964,9 +9970,14 @@ export class MenuScene extends Phaser.Scene {
     // point, so the glow lands pixel-identical in size/position to the real
     // tile underneath it.
     const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
-    const hasLeftStart = kind === 'start'
-      ? (this.player.x !== point.x || this.player.y !== point.y)
-      : false;
+    // A one-way latch, not a live position comparison -- once the player has
+    // genuinely left the start tile, returning to it later (a real, normal
+    // thing to do while exploring) must not re-arm the pre-spawn rings/dot.
+    // See hasPlayerEverLeftStart's own declaration for the reset sites.
+    if (kind === 'start' && !this.hasPlayerEverLeftStart) {
+      this.hasPlayerEverLeftStart = this.player.x !== point.x || this.player.y !== point.y;
+    }
+    const hasLeftStart = kind === 'start' ? this.hasPlayerEverLeftStart : false;
     this.drawLegacyEndpointGlow(this.boardDynamicGraphics, tileRect, alpha, kind, time, hasLeftStart);
   }
 
@@ -15543,6 +15554,7 @@ export class MenuScene extends Phaser.Scene {
       this.syncLegacyPlayerVisualMotionTo(result.nextPlayer);
       this.trail = result.nextTrail ?? [copyPoint(result.nextPlayer)];
       this.trailShineLapStartedAtMs = this.time.now;
+      this.hasPlayerEverLeftStart = false;
       this.playCyclePath = [copyPoint(result.nextPlayer)];
       this.playCycleResetUsed = true;
       this.playStartedAtMs = this.time.now;
