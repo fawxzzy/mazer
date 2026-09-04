@@ -190,3 +190,25 @@ treatment shown doesn't necessarily match what any individual asset
 batch above actually is. Use it to judge overall hierarchy, board feel,
 and how the goal-star and player are meant to relate to each other and
 the maze -- not as something to crop pieces out of and ship.
+
+## Approved visual-authority packages (2026-09-03/04)
+
+Two design programs built from the source assets catalogued above went
+through direct visual review (real rendered exports, not prose claims) and
+were approved and frozen as the repository's authoritative visual
+specification for their respective systems. Unlike the asset batches above
+(raw source material), these are **finished design authorities** -- self-
+contained reference HTML plus evidence PNGs plus a plain-language contract
+-- not raw inputs awaiting integration:
+
+- [`docs/assets/reference/navigation-core-v1/`](reference/navigation-core-v1/README.md)
+  -- Navigation Core v1 (Revision 6 + Amendment 6.1 + Amendment 6.2),
+  APPROVED — FROZEN. Implementation owner: Wave 4D-A.
+- [`docs/assets/reference/teleport-system-v1/`](reference/teleport-system-v1/README.md)
+  -- Teleport System v1 (Revision 2.4), APPROVED — FROZEN. Implementation
+  owner: Wave 4D-B.
+
+These packages are implementation contracts for the waves above, not public
+or runtime assets themselves -- do not load their HTML/PNG files at
+runtime. See each package's own `README.md` for its full visual contract,
+prohibited regressions, and remaining runtime verification still required.

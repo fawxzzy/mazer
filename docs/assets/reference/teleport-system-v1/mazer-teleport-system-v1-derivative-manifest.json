@@ -1,0 +1,142 @@
+{
+  "_revision": {
+    "revision": "2.4",
+    "label": "Teleport System v1 — Final Candidate",
+    "note": "No new derivative crops introduced in Revision 2.4. Every fix (closed-state rail removal, diamond rotation, canonical energy-material, four-point sparkles, target-tile containment) is a CSS/JS transform layer over the same full-canvas source images already catalogued below (edge-diamond-energized.png used directly, rotated in-place via CSS transform: rotate() -- no re-cropped or re-exported derivative asset). All entries below are carried forward unchanged from Revision 2.3.2; source_sha256 values were not re-verified in this pass since no source file was touched.",
+    "measured_for_rotation": {
+      "source": "edge-diamond-energized.png",
+      "canvas_px": [1254, 1254],
+      "canvas_center_px": [627, 627],
+      "measured_tip_px": [920, 131],
+      "native_tip_angle_deg": -59.43,
+      "method": "alpha-channel bounding analysis (PIL), not eyeballed"
+    }
+  },
+  "ref-diamond-energized.png": {
+    "source": "edge-diamond-energized.png",
+    "source_sha256": "f2f63b98ea816a98de917ac83afe8cec46d9d3c4bf3e0e89fca29673a4081639",
+    "transform": "downscaled (LANCZOS) full canvas to fit 480x480, alpha preserved",
+    "output_size": [
+      480,
+      480
+    ],
+    "status": "REFERENCE_ONLY",
+    "runtimeUse": "none (documentation gallery only)"
+  },
+  "ref-diamond-iridescent.png": {
+    "source": "edge-diamond-iridescent.png",
+    "source_sha256": "bc6ae2a4a3edd277abee14cb643fc41a81da335457d0a622b5096e6d5a42b23e",
+    "transform": "downscaled (LANCZOS) full canvas to fit 480x480, alpha preserved",
+    "output_size": [
+      480,
+      480
+    ],
+    "status": "REFERENCE_ONLY",
+    "runtimeUse": "none (documentation gallery only)"
+  },
+  "ref-diamond-energy-core.png": {
+    "source": "edge-diamond-energy-core.png",
+    "source_sha256": "2db494ef6efec978a5e6e72e21bf6d89d4cda0c1a88735896ac05ccc1d6d4d45",
+    "transform": "downscaled (LANCZOS) full canvas to fit 480x480, alpha preserved",
+    "output_size": [
+      480,
+      480
+    ],
+    "status": "REFERENCE_ONLY",
+    "runtimeUse": "none (documentation gallery only)"
+  },
+  "ref-diamond-absorption.png": {
+    "source": "edge-diamond-energy-absorption-state.png",
+    "source_sha256": "6024cf1fab38fde9b5da44b1a39683557bcdd5fc1283ee92144008ec2754f1e1",
+    "transform": "downscaled (LANCZOS) full canvas to fit 480x480, alpha preserved",
+    "output_size": [
+      480,
+      480
+    ],
+    "status": "REFERENCE_ONLY",
+    "runtimeUse": "none (documentation gallery only)",
+    "notes": "Not selected for Teleport System v1 runtime keyframes -- extraction absorb/stored states use edge-diamond-energized.png only (unchanged in Revision 2.4)."
+  },
+  "derivative-core-gem-crop.png": {
+    "source": "edge-diamond-energy-core.png",
+    "source_sha256": "2db494ef6efec978a5e6e72e21bf6d89d4cda0c1a88735896ac05ccc1d6d4d45",
+    "crop_box_source_px": [
+      497,
+      507,
+      757,
+      767
+    ],
+    "transform": "tight crop to central faceted gem only (excludes the outer nested-diamond/ring silhouette), downscaled to fit 220x220",
+    "output_size": [
+      220,
+      220
+    ],
+    "intended_role": "small additive core-glow layer composited onto edge-diamond-energized.png's own existing center convergence point, NOT the full energy-core canvas",
+    "status": "REJECTED_EXPERIMENT",
+    "reason": "Reads as a second, independently-shaped diamond when composited live over the shell -- superseded by the real codebase precedent: edge-diamond-energized.png already has the energy linework baked into one image, no compositing needed.",
+    "selectedReplacement": "edge-diamond-energized.png (used directly, no derivative)",
+    "runtimeUse": "none"
+  },
+  "derivative-beam-cap-left.png": {
+    "source": "teleport-beam-iridescent.png",
+    "source_sha256": "262132c66fd6786d9b34da6ec1e71a51857f541a6c91594804bad32fdb5bd97e",
+    "crop_box_source_px": [
+      0,
+      0,
+      460,
+      724
+    ],
+    "transform": "crop to left source-diamond cap region (alpha column-height profile analysis), downscaled",
+    "output_size": [
+      191,
+      300
+    ],
+    "status": "MATCHES_RUNTIME_PRECEDENT",
+    "runtimeUse": "illustrative only -- the real runtime (MenuScene.ts playerTransferBeamStripImages / playerTransferBeamTargetCapImages) crops teleport-beam-iridescent.png directly at render time, not from these files"
+  },
+  "derivative-beam-cap-right.png": {
+    "source": "teleport-beam-iridescent.png",
+    "source_sha256": "262132c66fd6786d9b34da6ec1e71a51857f541a6c91594804bad32fdb5bd97e",
+    "crop_box_source_px": [
+      1712,
+      0,
+      2172,
+      724
+    ],
+    "transform": "crop to right target-diamond cap region, downscaled",
+    "output_size": [
+      191,
+      300
+    ],
+    "status": "MATCHES_RUNTIME_PRECEDENT",
+    "runtimeUse": "illustrative only -- the real runtime (MenuScene.ts playerTransferBeamStripImages / playerTransferBeamTargetCapImages) crops teleport-beam-iridescent.png directly at render time, not from these files"
+  },
+  "derivative-beam-center.png": {
+    "source": "teleport-beam-iridescent.png",
+    "source_sha256": "262132c66fd6786d9b34da6ec1e71a51857f541a6c91594804bad32fdb5bd97e",
+    "crop_box_source_px": [
+      886,
+      0,
+      1386,
+      724
+    ],
+    "transform": "crop to representative center beam-only segment (constant-height alpha region), downscaled",
+    "output_size": [
+      104,
+      150
+    ],
+    "status": "MATCHES_RUNTIME_PRECEDENT",
+    "runtimeUse": "illustrative only -- the real runtime (MenuScene.ts playerTransferBeamStripImages / playerTransferBeamTargetCapImages) crops teleport-beam-iridescent.png directly at render time, not from these files"
+  },
+  "ref-beam-full.png": {
+    "source": "teleport-beam-iridescent.png",
+    "source_sha256": "262132c66fd6786d9b34da6ec1e71a51857f541a6c91594804bad32fdb5bd97e",
+    "transform": "downscaled full canvas",
+    "output_size": [
+      900,
+      300
+    ],
+    "status": "REFERENCE_ONLY",
+    "runtimeUse": "none (documentation gallery only)"
+  }
+}
