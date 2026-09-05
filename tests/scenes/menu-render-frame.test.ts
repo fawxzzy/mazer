@@ -2483,3 +2483,61 @@ describe('Navigation Core v1 trail canvas: lifecycle and resolution integration'
     expect(glowBlurIndex).toBeGreaterThan(fnStart);
   });
 });
+
+describe('Navigation Core v1 player marker glow: real shadowBlur compositor, not nested solid rounded-rect bodies', () => {
+  const menuSceneSource = normalizeSourceLineEndings(
+    readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
+  );
+
+  test('the real-play branch draws the glow via the canvas compositor, not two flat fillRoundedRect "shells"', () => {
+    const fnStart = menuSceneSource.indexOf('private fillLegacyPlayerMarkerTile(');
+    expect(fnStart).toBeGreaterThan(-1);
+    const glowCallIndex = menuSceneSource.indexOf(
+      'this.drawPlayerGlowCanvas(centerX, centerY, coreRadiusX, coreRadiusY, cornerRadius, tileSize, alpha, playerCoreColor);',
+      fnStart
+    );
+    expect(glowCallIndex).toBeGreaterThan(fnStart);
+    // The old flat-rect approximation must actually be gone, not just
+    // shadowed by the new call -- both drew into boardDynamicGraphics with
+    // these exact ratio constants, so their absence here is a real check.
+    const crispCoreIndex = menuSceneSource.indexOf('this.boardDynamicGraphics.fillStyle(playerCoreColor, alpha);', glowCallIndex);
+    expect(crispCoreIndex).toBeGreaterThan(glowCallIndex);
+    const oldFlatGlowBetween = menuSceneSource
+      .slice(glowCallIndex, crispCoreIndex)
+      .includes('LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_ALPHA * 0.4');
+    expect(oldFlatGlowBetween).toBe(false);
+  });
+
+  test('drawPlayerGlowCanvas scales shadowBlur by the backing resolution, same correction as the trail\'s glow', () => {
+    const fnStart = menuSceneSource.indexOf('private drawPlayerGlowCanvas(');
+    expect(fnStart).toBeGreaterThan(-1);
+    expect(menuSceneSource).toContain('wideGlowBlurPx: wideGlowBlurPx * resolution');
+    expect(menuSceneSource).toContain('tightGlowBlurPx: tightGlowBlurPx * resolution');
+  });
+
+  test('never trusts the canvas texture/image without a null guard -- a failed texture creation must not throw, just skip drawing the glow', () => {
+    expect(menuSceneSource).toContain('if (!this.playerGlowCanvasTexture || !this.playerGlowCanvasImage) {');
+  });
+
+  test('hides the player glow image by default every drawDynamicBoard call -- fillLegacyPlayerMarkerTile\'s real-play branch is itself gated behind playerAlpha/markersBuiltIn/on-screen checks, so some dirty frames never redraw it', () => {
+    const fnStart = menuSceneSource.indexOf('private drawDynamicBoard(time: number): void {');
+    expect(fnStart).toBeGreaterThan(-1);
+    const hideIndex = menuSceneSource.indexOf('this.playerGlowCanvasImage?.setVisible(false);', fnStart);
+    const clearIndex = menuSceneSource.indexOf('this.boardDynamicGraphics.clear();', fnStart);
+    expect(hideIndex).toBeGreaterThan(clearIndex);
+  });
+
+  test('also hides the player glow image entering menu mode, same ghost-image risk as the trail canvas', () => {
+    const fnStart = menuSceneSource.indexOf('private enterMenuMode(): void {');
+    expect(fnStart).toBeGreaterThan(-1);
+    const hideIndex = menuSceneSource.indexOf('this.playerGlowCanvasImage?.setVisible(false);', fnStart);
+    const modeAssignIndex = menuSceneSource.indexOf("this.mode = 'menu';", fnStart);
+    expect(hideIndex).toBeGreaterThan(fnStart);
+    expect(hideIndex).toBeLessThan(modeAssignIndex);
+  });
+
+  test('registers a unique-per-instance texture key and removes it on scene shutdown', () => {
+    expect(menuSceneSource).toContain('`legacy-nav-core-player-glow-${nextMenuSceneInstanceId()}`');
+    expect(menuSceneSource).toContain('this.textures.remove(this.playerGlowCanvasTextureKey);');
+  });
+});

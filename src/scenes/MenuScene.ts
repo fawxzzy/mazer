@@ -35,6 +35,10 @@ import {
   type TrailCanvasSegment
 } from '../render/navigationCoreTrailCanvas';
 import {
+  computePlayerGlowCanvasBounds,
+  drawPlayerGlowToCanvasContext
+} from '../render/navigationCorePlayerGlowCanvas';
+import {
   collectDemoWalkerRouteDiagnostics,
   type DemoRunnerTelemetry,
   type DemoWalkerConfig,
@@ -1942,6 +1946,26 @@ export class MenuScene extends Phaser.Scene {
   private trailCanvasWidth = 0;
   private trailCanvasHeight = 0;
   private trailCanvasResolution = 0;
+  // Same real-2D-canvas compositor pattern as trailCanvasImage above, for
+  // the play-mode player marker's own two drop-shadow glow layers (see
+  // navigationCorePlayerGlowCanvas.ts's own header comment for why a
+  // Graphics-only approximation reads as nested solid bodies instead of
+  // light). Sized to the player's own current shape bounds plus glow
+  // padding, not a full-board canvas -- redrawn every frame
+  // fillLegacyPlayerMarkerTile's real-play branch runs (the idle breathing
+  // pulse means that's effectively every dirty frame in play mode, same
+  // redraw cadence the trail already pays). Positioned just before
+  // boardDynamicGraphics so the crisp core+stroke drawn into that Graphics
+  // object still render on top of it. Hidden (not destroyed) on every path
+  // that also hides trailCanvasImage, so a menu-mode frame never leaves a
+  // stale glow showing behind the ambient demo walker (which never uses the
+  // showLocatorTicks branch this glow belongs to).
+  private playerGlowCanvasTextureKey: string | null = null;
+  private playerGlowCanvasTexture: Phaser.Textures.CanvasTexture | null = null;
+  private playerGlowCanvasImage: Phaser.GameObjects.Image | null = null;
+  private playerGlowCanvasWidth = 0;
+  private playerGlowCanvasHeight = 0;
+  private playerGlowCanvasResolution = 0;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
   private overlayGuideGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -2230,6 +2254,12 @@ export class MenuScene extends Phaser.Scene {
     this.trailCanvasTextureKey = `legacy-nav-core-trail-${nextMenuSceneInstanceId()}`;
     this.trailCanvasTexture = this.textures.createCanvas(this.trailCanvasTextureKey, 1, 1);
     this.trailCanvasImage = this.add.image(0, 0, this.trailCanvasTextureKey).setOrigin(0, 0).setVisible(false);
+    // Same real-2D-canvas approach as the trail above, for the play-mode
+    // player marker's own drop-shadow glow layers -- see the field's own
+    // comment.
+    this.playerGlowCanvasTextureKey = `legacy-nav-core-player-glow-${nextMenuSceneInstanceId()}`;
+    this.playerGlowCanvasTexture = this.textures.createCanvas(this.playerGlowCanvasTextureKey, 1, 1);
+    this.playerGlowCanvasImage = this.add.image(0, 0, this.playerGlowCanvasTextureKey).setOrigin(0, 0).setVisible(false);
     this.boardDynamicGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
     this.playerTrailImages = Array.from({ length: LEGACY_PLAYER_TRAIL_IMAGE_POOL_SIZE }, () => (
@@ -2245,8 +2275,11 @@ export class MenuScene extends Phaser.Scene {
       ...this.boardBleedPathImages,
       // Before boardDynamicGraphics: the play trail's canvas-composited
       // core/glow render here, underneath the start/goal/player markers
-      // drawn into boardDynamicGraphics right after it.
+      // drawn into boardDynamicGraphics right after it. The player marker's
+      // own canvas-composited glow sits right after the trail's, same
+      // reason -- both must render before the crisp shapes Graphics draws.
       this.trailCanvasImage,
+      this.playerGlowCanvasImage,
       this.boardDynamicGraphics,
       // After boardDynamicGraphics (the trail's own colored fill, and the
       // start/goal/player markers, are all drawn into that one Graphics
@@ -2408,6 +2441,12 @@ export class MenuScene extends Phaser.Scene {
       this.trailCanvasTexture = null;
       this.trailCanvasImage = null;
       this.trailCanvasTextureKey = null;
+      if (this.playerGlowCanvasTextureKey !== null && this.textures.exists(this.playerGlowCanvasTextureKey)) {
+        this.textures.remove(this.playerGlowCanvasTextureKey);
+      }
+      this.playerGlowCanvasTexture = null;
+      this.playerGlowCanvasImage = null;
+      this.playerGlowCanvasTextureKey = null;
       if (this.remoteSettingsSyncTimer !== null) {
         clearTimeout(this.remoteSettingsSyncTimer);
         this.remoteSettingsSyncTimer = null;
@@ -6056,8 +6095,12 @@ export class MenuScene extends Phaser.Scene {
     // drawDynamicBoard itself is dirty-flag-gated, not called every frame
     // regardless. Without this, a trail still visible the instant play mode
     // ends would stay stuck on screen, frozen, showing through/behind the
-    // menu that regenerates underneath it.
+    // menu that regenerates underneath it. The player marker's own glow
+    // canvas only ever gets (re)drawn from that same play-mode branch (via
+    // fillLegacyPlayerMarkerTile's showLocatorTicks path), so it is exactly
+    // as exposed to this same ghost-image risk -- hidden here too.
     this.trailCanvasImage?.setVisible(false);
+    this.playerGlowCanvasImage?.setVisible(false);
     this.resetLegacyPlayInputBuffer();
     this.clearPlayHudImmediately();
     this.resetLegacyPlayerTransferEnergy();
@@ -8702,6 +8745,13 @@ export class MenuScene extends Phaser.Scene {
     const { boardLeft, boardTop, boardWidth, boardHeight } = this.layout;
     this.boardDynamicGraphics.clear();
     this.playerSpawnBurstGraphics.clear();
+    // Same "hidden by default, shown only if actually redrawn this frame"
+    // convention as trailCanvasImage (see drawLegacyContinuousPlayTrail) --
+    // fillLegacyPlayerMarkerTile's showLocatorTicks branch (the only one
+    // that draws into this image) is itself gated behind playerAlpha > 0 /
+    // markersBuiltIn / on-screen checks further down, so there are real
+    // dirty frames where it never runs at all.
+    this.playerGlowCanvasImage?.setVisible(false);
 
     // resolveLegacyPlayPerfectPathTrail only ever reads this.maze/this.trail/
     // this.player -- the exact same shared fields the menu demo AI already
@@ -10703,30 +10753,13 @@ export class MenuScene extends Phaser.Scene {
       }
 
       const cornerRadius = tileSize * LEGACY_PLAY_PLAYER_MARKER_CORNER_RADIUS_RATIO;
-      const wideSpread = tileSize * LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_SPREAD_RATIO;
-      const tightSpread = tileSize * LEGACY_PLAY_PLAYER_MARKER_GLOW_TIGHT_SPREAD_RATIO;
-      this.boardDynamicGraphics.fillStyle(
-        playerCoreColor,
-        LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_ALPHA * 0.4 * alpha
-      );
-      this.boardDynamicGraphics.fillRoundedRect(
-        centerX - coreRadiusX - wideSpread,
-        centerY - coreRadiusY - wideSpread,
-        (coreRadiusX + wideSpread) * 2,
-        (coreRadiusY + wideSpread) * 2,
-        cornerRadius + wideSpread
-      );
-      this.boardDynamicGraphics.fillStyle(
-        LEGACY_PLAY_PLAYER_MARKER_ACCENT_COLOR,
-        LEGACY_PLAY_PLAYER_MARKER_GLOW_TIGHT_ALPHA * 0.55 * alpha
-      );
-      this.boardDynamicGraphics.fillRoundedRect(
-        centerX - coreRadiusX - tightSpread,
-        centerY - coreRadiusY - tightSpread,
-        (coreRadiusX + tightSpread) * 2,
-        (coreRadiusY + tightSpread) * 2,
-        cornerRadius + tightSpread
-      );
+      // Real shadowBlur-based glow (see navigationCorePlayerGlowCanvas.ts's
+      // own header comment) instead of two flat, hard-edged fillRoundedRect
+      // "shells" -- those read as nested solid rounded-rectangle bodies
+      // stepping outward from the core rather than light fading away from
+      // it, since a flat fill has a hard edge at its own boundary
+      // regardless of how low its alpha is.
+      this.drawPlayerGlowCanvas(centerX, centerY, coreRadiusX, coreRadiusY, cornerRadius, tileSize, alpha, playerCoreColor);
 
       this.boardDynamicGraphics.fillStyle(playerCoreColor, alpha);
       this.boardDynamicGraphics.fillRoundedRect(
@@ -10802,6 +10835,84 @@ export class MenuScene extends Phaser.Scene {
     drawLocatorTick(centerX + locatorMetrics.innerRadius, centerY, centerX + locatorMetrics.outerRadius, centerY);
     drawLocatorTick(centerX, centerY - locatorMetrics.outerRadius, centerX, centerY - locatorMetrics.innerRadius);
     drawLocatorTick(centerX, centerY + locatorMetrics.innerRadius, centerX, centerY + locatorMetrics.outerRadius);
+  }
+
+  // Real shadowBlur glow for the play-mode player marker's two drop-shadow
+  // layers -- see navigationCorePlayerGlowCanvas.ts's own header comment and
+  // drawTrailCanvasSegments's sibling comment on the DPR/zoom-aware backing
+  // resolution and the shadowBlur*resolution correction (Canvas 2D
+  // shadowBlur is a raw device-pixel radius the context transform does not
+  // touch, verified empirically -- see that method's own comment). Sized to
+  // the player's own current shape bounds (already computed by the caller,
+  // including squash-stretch and idle breathing) plus enough padding that
+  // the wider of the two blur passes is never clipped at the canvas edge.
+  private drawPlayerGlowCanvas(
+    centerX: number,
+    centerY: number,
+    coreRadiusX: number,
+    coreRadiusY: number,
+    cornerRadius: number,
+    tileSize: number,
+    alpha: number,
+    playerCoreColor: number
+  ): void {
+    if (!this.playerGlowCanvasTexture || !this.playerGlowCanvasImage) {
+      return;
+    }
+    const shapeLeft = centerX - coreRadiusX;
+    const shapeTop = centerY - coreRadiusY;
+    const shapeWidth = coreRadiusX * 2;
+    const shapeHeight = coreRadiusY * 2;
+    const wideGlowBlurPx = tileSize * LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_SPREAD_RATIO;
+    const tightGlowBlurPx = tileSize * LEGACY_PLAY_PLAYER_MARKER_GLOW_TIGHT_SPREAD_RATIO;
+    // A blurred shape's own visible falloff reaches well past its own
+    // nominal blur radius (a Gaussian tail, not a hard cutoff at
+    // shadowBlur's own value) -- 2.5x the wider pass's radius is a
+    // generous, empirically-checked margin (see the trail canvas's own
+    // padding comment for the same reasoning applied to glowWidth there).
+    const padding = Math.ceil(wideGlowBlurPx * 2.5);
+    const bounds = computePlayerGlowCanvasBounds(shapeLeft, shapeTop, shapeWidth, shapeHeight, padding);
+    const width = Math.max(1, Math.ceil(bounds.width));
+    const height = Math.max(1, Math.ceil(bounds.height));
+    const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
+    const resolution = Math.min(
+      MAZER_CANVAS_RESOLUTION_MAX * 2,
+      resolveMazerCanvasResolution() * zoomScale
+    );
+    const backingWidth = Math.max(1, Math.ceil(width * resolution));
+    const backingHeight = Math.max(1, Math.ceil(height * resolution));
+    if (
+      backingWidth !== this.playerGlowCanvasWidth
+      || backingHeight !== this.playerGlowCanvasHeight
+      || resolution !== this.playerGlowCanvasResolution
+    ) {
+      this.playerGlowCanvasTexture.setSize(backingWidth, backingHeight);
+      this.playerGlowCanvasWidth = backingWidth;
+      this.playerGlowCanvasHeight = backingHeight;
+      this.playerGlowCanvasResolution = resolution;
+    } else {
+      this.playerGlowCanvasTexture.clear(0, 0, backingWidth, backingHeight, false);
+    }
+    this.playerGlowCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
+    drawPlayerGlowToCanvasContext(this.playerGlowCanvasTexture.context, {
+      originX: bounds.left,
+      originY: bounds.top,
+      shapeLeft,
+      shapeTop,
+      shapeWidth,
+      shapeHeight,
+      cornerRadius,
+      wideGlowColor: playerCoreColor,
+      wideGlowAlpha: LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_ALPHA * 0.4 * alpha,
+      wideGlowBlurPx: wideGlowBlurPx * resolution,
+      tightGlowColor: LEGACY_PLAY_PLAYER_MARKER_ACCENT_COLOR,
+      tightGlowAlpha: LEGACY_PLAY_PLAYER_MARKER_GLOW_TIGHT_ALPHA * 0.55 * alpha,
+      tightGlowBlurPx: tightGlowBlurPx * resolution
+    });
+    this.playerGlowCanvasTexture.refresh();
+    this.playerGlowCanvasImage.setPosition(bounds.left, bounds.top);
+    this.playerGlowCanvasImage.setDisplaySize(width, height);
+    this.playerGlowCanvasImage.setVisible(true);
   }
 
   // Movement had zero tactile feedback anywhere in the codebase (confirmed
