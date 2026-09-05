@@ -77,21 +77,42 @@ export const MAZER_PLAYER_TRAIL_TEXTURE_KEY = 'mazerPlayerTrail';
 // connectivity-aware color fill/rim-light, which already suppresses its own
 // stroke on shared interior edges -- is the root cause of the maze reading
 // as a "checkerboard of separate beveled chiclets" instead of one connected
-// corridor. Sampling a horizontal scanline through the image's vertical
-// center found: outer glow (alpha < 253) below x=228 and above x=1024; the
-// bright bezel spike itself (all channels >240) at x=230-238 and x=1018-
-// 1022; a stable pale interior baseline (~rgb(165,236,225), alpha 253) from
-// roughly x=250 to x=1002. MAZER_FLOOR_TILE_INTERIOR_CROP below crops to
-// [260,260]-[990,990] -- comfortably inside that measured baseline band on
-// all four sides (the source is square, so the same bounds apply to Y) --
-// keeping the interior's own subtle crosshair detail (the reference design
-// explicitly wants "visible floor texture depth ... not a bleached,
-// featureless slab") while fully excluding the border/glow that caused the
-// duplication artifact. generateMazerFloorTileInteriorTexture() below bakes
-// this crop into its own texture once at boot; MenuScene's floor overlay
-// must repeat that derived texture, never the raw MAZER_FLOOR_TILE_TEXTURE_KEY.
+// corridor.
+//
+// [260,260]-[990,990] (730x730) was this constant's first cut at excluding
+// the border -- it does stay inside the raw asset's own bright-bezel band
+// (measured at x=230-238/1018-1022) and its outer glow (alpha<253 below
+// x=228/above x=1024). But a later live-renderer check (driving the real
+// running MenuScene via getImageData, not just sampling the static PNG)
+// found that crop still reads as a per-cell "breathe" once actually tiled
+// at real tile sizes. A getImageData scanline down a straight,
+// fully-connected corridor column, averaged per row, measured the
+// brightness swing per tile at each candidate crop (all under the same
+// live scanline, boardFloorTileSprite otherwise unchanged):
+//   - boardFloorTileSprite hidden entirely (procedural fill/rim alone): 175-176
+//   - raw 1254x1254 source, no crop at all:                             174-248
+//   - this constant's old value, [260,260]-[990,990] (730x730):         194-246
+//   - [427,427]-[827,827] (400x400), centered on the source's true
+//     center (627,627), pulling every kept pixel further from the
+//     border falloff:                                                  206-249
+// Shrinking further (tried 300x300, 200x200, 100x100 at the same center)
+// did not reduce the swing any more -- it plateaus around 205-249
+// regardless of crop size once the border/glow band itself is excluded,
+// which reads as a Canvas 2D TileSprite minification artifact (this
+// source art was never designed as a seamless swatch, so any crop of it
+// still carries a faint radial shade that naive per-repeat resampling
+// turns into a per-tile ripple at these heavily-downscaled tile sizes),
+// not something a differently-chosen crop rectangle can fix further.
+// 400x400 keeps the interior's own crosshair centered per tile (the
+// reference design explicitly wants "visible floor texture depth ... not
+// a bleached, featureless slab") while cutting the swing from the old
+// crop's 52 units down to 43 -- a real, measured reduction, not a
+// complete elimination. generateMazerFloorTileInteriorTexture() below
+// bakes this crop into its own texture once at boot; MenuScene's floor
+// overlay must repeat that derived texture, never the raw
+// MAZER_FLOOR_TILE_TEXTURE_KEY.
 export const MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY = 'mazerFloorTileInterior';
-export const MAZER_FLOOR_TILE_INTERIOR_CROP = Object.freeze({ x: 260, y: 260, width: 730, height: 730 });
+export const MAZER_FLOOR_TILE_INTERIOR_CROP = Object.freeze({ x: 427, y: 427, width: 400, height: 400 });
 
 // Whether generateMazerFloorTileInteriorTexture() below actually succeeded
 // this boot -- MenuScene's floor overlay must check this (or the texture's
