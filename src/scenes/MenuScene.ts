@@ -1638,6 +1638,76 @@ const buildPathTrail = (
   return points.slice(Math.max(0, points.length - limit)).map((point) => ({ x: point.x, y: point.y }));
 };
 
+interface LegacyTrailStrokeSegment {
+  previous: { x: number; y: number };
+  current: { x: number; y: number };
+  color: number;
+  alpha: number;
+}
+
+const LEGACY_TRAIL_STROKE_CHUNK_COLOR_TOLERANCE = 4;
+const LEGACY_TRAIL_STROKE_CHUNK_ALPHA_TOLERANCE = 0.02;
+
+const legacyTrailColorChannelsClose = (a: number, b: number, tolerance: number): boolean => {
+  const ar = (a >> 16) & 0xff;
+  const ag = (a >> 8) & 0xff;
+  const ab = a & 0xff;
+  const br = (b >> 16) & 0xff;
+  const bg = (b >> 8) & 0xff;
+  const bb = b & 0xff;
+  return Math.abs(ar - br) <= tolerance && Math.abs(ag - bg) <= tolerance && Math.abs(ab - bb) <= tolerance;
+};
+
+// Draws the trail as ONE continuous multi-point stroke per run of visually
+// indistinguishable segments (within a small color/alpha tolerance), not one
+// independent stroke call per ~4px resampled segment. The per-segment
+// version stroked each tiny segment as its own moveTo/lineTo/strokePath --
+// with round line caps applied AT EVERY SEGMENT'S OWN ENDPOINTS (not a
+// shared join with its neighbor), consecutive short segments meeting at a
+// bend fan out into a "toothed"/radiating look instead of one smooth
+// rounded corner, and along straight runs the repeated overlapping caps
+// read as a faint banding texture. Chaining many lineTo calls into ONE
+// beginPath/strokePath instead lets the renderer's own line-join logic
+// (which handles bends between consecutive points of the SAME path) draw
+// the bend once, smoothly -- not many small independent caps piling up.
+// The color/alpha tolerance is small enough that batching doesn't visibly
+// change the gradient: a chunk boundary only starts where consecutive
+// segments already differ enough to need their own draw call anyway (e.g.
+// where the shine highlight is actively sweeping through).
+const drawLegacyTrailStrokeChunks = (
+  graphics: Phaser.GameObjects.Graphics,
+  segments: readonly LegacyTrailStrokeSegment[],
+  width: number
+): void => {
+  let i = 0;
+  while (i < segments.length) {
+    const chunkStart = segments[i]!;
+    let j = i;
+    while (
+      j + 1 < segments.length
+      // Segments can be non-adjacent in world space (a subpath break --
+      // e.g. a wraparound crossing -- skips drawing the connecting
+      // segment entirely, see the caller). Chunking must never bridge that
+      // gap with a stray line just because the colors either side happen
+      // to be close.
+      && segments[j]!.current.x === segments[j + 1]!.previous.x
+      && segments[j]!.current.y === segments[j + 1]!.previous.y
+      && legacyTrailColorChannelsClose(segments[j + 1]!.color, chunkStart.color, LEGACY_TRAIL_STROKE_CHUNK_COLOR_TOLERANCE)
+      && Math.abs(segments[j + 1]!.alpha - chunkStart.alpha) <= LEGACY_TRAIL_STROKE_CHUNK_ALPHA_TOLERANCE
+    ) {
+      j += 1;
+    }
+    graphics.lineStyle(width, chunkStart.color, chunkStart.alpha);
+    graphics.beginPath();
+    graphics.moveTo(chunkStart.previous.x, chunkStart.previous.y);
+    for (let k = i; k <= j; k += 1) {
+      graphics.lineTo(segments[k]!.current.x, segments[k]!.current.y);
+    }
+    graphics.strokePath();
+    i = j + 1;
+  }
+};
+
 export class MenuScene extends Phaser.Scene {
   private settings: LegacySettings = copyLegacySettings(LEGACY_DEFAULTS);
   private optionFieldDrafts: LegacyOptionFieldDrafts = createLegacyOptionFieldDrafts(LEGACY_DEFAULTS);
@@ -9964,6 +10034,17 @@ export class MenuScene extends Phaser.Scene {
     const trailFadeEnabled = this.settings.toggleTrailFade;
     let perfStrokeSegmentCount = 0;
 
+    // Style is computed once per segment, then drawn in two SEPARATE
+    // complete passes over every segment (all glow, then all core) rather
+    // than interleaved glow-then-core-then-next-segment's-glow. Interleaving
+    // meant a LATER segment's wide, soft glow stroke was composited on top
+    // of an EARLIER segment's already-drawn crisp core -- most visible
+    // right where the path bends, where consecutive short resampled
+    // segments change direction quickly and their round-capped strokes
+    // overlap. Splitting into two full passes means every core stroke ends
+    // up on top of every glow stroke, with no draw-order dependency on
+    // segment index.
+    const segments = [];
     for (let i = 1; i < vertices.length; i += 1) {
       const previous = vertices[i - 1]!;
       const current = vertices[i]!;
@@ -9996,36 +10077,50 @@ export class MenuScene extends Phaser.Scene {
       const baseColor = sampleTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions);
       let coreColor = baseColor;
       let coreAlpha = ageAlpha * alphaMultiplier;
-      let highlightStrength = 0;
 
       if (shineState && shineState.visible && shineState.halfLength > 0) {
         const distanceFromShineCenter = Math.abs(midDistance - shineState.centerDistance);
         if (distanceFromShineCenter <= shineState.halfLength) {
           const taper = 1 - clamp(distanceFromShineCenter / shineState.halfLength, 0, 1);
-          highlightStrength = taper * shineState.envelopeAlpha;
+          const highlightStrength = taper * shineState.envelopeAlpha;
           coreColor = mixLegacyIridescentColor(baseColor, LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR, highlightStrength * 0.85);
           coreAlpha = Math.min(1, coreAlpha + (highlightStrength * 0.5));
         }
       }
 
-      // Pass 1: soft outer spectral glow -- the same base energy color,
-      // wide and dim, bounded well under the player/goal markers' own glow
-      // intensity (LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO). Scales with tileSize
-      // like everything else here, so it stays a crisp accent rather than a
-      // blurred bar at compact/mobile tile sizes.
-      graphics.lineStyle(glowWidth, baseColor, coreAlpha * LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO);
-      graphics.beginPath();
-      graphics.moveTo(previous.x, previous.y);
-      graphics.lineTo(current.x, current.y);
-      graphics.strokePath();
-
-      // Pass 2: the crisp 16%-tile core (shine-blended where applicable).
-      graphics.lineStyle(coreWidth, coreColor, coreAlpha);
-      graphics.beginPath();
-      graphics.moveTo(previous.x, previous.y);
-      graphics.lineTo(current.x, current.y);
-      graphics.strokePath();
+      segments.push({ previous, current, baseColor, coreColor, coreAlpha });
     }
+
+    // Pass 1: soft outer spectral glow -- the same base energy color, wide
+    // and dim, bounded well under the player/goal markers' own glow
+    // intensity (LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO). Scales with tileSize
+    // like everything else here, so it stays a crisp accent rather than a
+    // blurred bar at compact/mobile tile sizes. Chunked (see
+    // drawLegacyTrailStrokeChunks) so consecutive segments share real line
+    // joins instead of each getting its own independent end caps.
+    drawLegacyTrailStrokeChunks(
+      graphics,
+      segments.map((segment) => ({
+        previous: segment.previous,
+        current: segment.current,
+        color: segment.baseColor,
+        alpha: segment.coreAlpha * LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO
+      })),
+      glowWidth
+    );
+
+    // Pass 2: the crisp 16%-tile core (shine-blended where applicable),
+    // entirely on top of every glow stroke from pass 1.
+    drawLegacyTrailStrokeChunks(
+      graphics,
+      segments.map((segment) => ({
+        previous: segment.previous,
+        current: segment.current,
+        color: segment.coreColor,
+        alpha: segment.coreAlpha
+      })),
+      coreWidth
+    );
 
     const perfDrawEndedAtMs = performance.now();
     this.lastTrailPerfDiagnostics = {
