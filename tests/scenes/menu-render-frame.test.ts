@@ -2443,3 +2443,36 @@ describe('Navigation Core v1 final correctness pass: Trail Fade origin, shine sh
     expect(matches.length).toBe(2);
   });
 });
+
+describe('Navigation Core v1 trail canvas: lifecycle and resolution integration', () => {
+  const menuSceneSource = normalizeSourceLineEndings(
+    readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
+  );
+
+  test('hides the trail canvas image when entering menu mode -- fixes a real ghost-trail regression, verified live in scripts/analysis/verify-trail-canvas-lifecycle.mjs', () => {
+    const fnStart = menuSceneSource.indexOf('private enterMenuMode(): void {');
+    expect(fnStart).toBeGreaterThan(-1);
+    const hideIndex = menuSceneSource.indexOf('this.trailCanvasImage?.setVisible(false);', fnStart);
+    const modeAssignIndex = menuSceneSource.indexOf("this.mode = 'menu';", fnStart);
+    expect(hideIndex).toBeGreaterThan(fnStart);
+    expect(hideIndex).toBeLessThan(modeAssignIndex);
+  });
+
+  test('never trusts the canvas texture/image without a null guard -- a failed texture creation must not throw, just skip drawing', () => {
+    expect(menuSceneSource).toContain('if (!this.trailCanvasTexture || !this.trailCanvasImage || segments.length === 0) {');
+  });
+
+  test('sizes the backing pixel buffer by devicePixelRatio-derived resolution (and the board container\'s own zoom), not 1:1 with logical board-space units', () => {
+    expect(menuSceneSource).toContain('resolveMazerCanvasResolution() * zoomScale');
+    expect(menuSceneSource).toContain('this.trailCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);');
+    // The Image's own DISPLAY size must stay in logical units -- only the
+    // backing buffer is supersampled -- or the trail would render at the
+    // wrong on-screen size.
+    expect(menuSceneSource).toContain('this.trailCanvasImage.setDisplaySize(width, height);');
+  });
+
+  test('registers a unique-per-instance texture key and removes it on scene shutdown (the TextureManager outlives the scene, unlike a Graphics object or Image)', () => {
+    expect(menuSceneSource).toContain('`legacy-nav-core-trail-${nextMenuSceneInstanceId()}`');
+    expect(menuSceneSource).toContain('this.textures.remove(this.trailCanvasTextureKey);');
+  });
+});
