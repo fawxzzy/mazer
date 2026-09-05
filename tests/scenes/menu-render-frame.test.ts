@@ -2541,3 +2541,59 @@ describe('Navigation Core v1 player marker glow: real shadowBlur compositor, not
     expect(menuSceneSource).toContain('this.textures.remove(this.playerGlowCanvasTextureKey);');
   });
 });
+
+describe('Navigation Core v1 goal halo: real radial-gradient compositor, not two flat "target" discs', () => {
+  const menuSceneSource = normalizeSourceLineEndings(
+    readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
+  );
+
+  test('the real on-board goal marker draws its halo via the canvas compositor, scoped to graphics === boardDynamicGraphics only', () => {
+    const fnStart = menuSceneSource.indexOf('private drawLegacyGoalStarMarker(');
+    expect(fnStart).toBeGreaterThan(-1);
+    const branchIndex = menuSceneSource.indexOf('if (graphics === this.boardDynamicGraphics) {', fnStart);
+    expect(branchIndex).toBeGreaterThan(fnStart);
+    const glowCallIndex = menuSceneSource.indexOf(
+      'this.drawGoalHaloCanvas(',
+      branchIndex
+    );
+    expect(glowCallIndex).toBeGreaterThan(branchIndex);
+  });
+
+  test('the Options/Guide legend\'s separate static goal icon keeps the prior flat-disc Graphics halo unchanged', () => {
+    const fnStart = menuSceneSource.indexOf('private drawLegacyGoalStarMarker(');
+    const elseIndex = menuSceneSource.indexOf('} else {', fnStart);
+    expect(elseIndex).toBeGreaterThan(fnStart);
+    const oldDiscIndex = menuSceneSource.indexOf('LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR', elseIndex);
+    const closeIndex = menuSceneSource.indexOf('}', menuSceneSource.indexOf('graphics.fillCircle(centerX, centerY, maxRadius * 0.48);', elseIndex));
+    expect(oldDiscIndex).toBeGreaterThan(elseIndex);
+    expect(oldDiscIndex).toBeLessThan(closeIndex);
+  });
+
+  test('drawGoalHaloCanvas uses one radial gradient, not a resolution-scaled shadowBlur -- gradient geometry is already logical-space and the transform scales it correctly on its own', () => {
+    const fnStart = menuSceneSource.indexOf('private drawGoalHaloCanvas(');
+    expect(fnStart).toBeGreaterThan(-1);
+    expect(menuSceneSource).toContain('drawGoalHaloToCanvasContext(this.goalHaloCanvasTexture.context, {');
+  });
+
+  test('never trusts the canvas texture/image without a null guard', () => {
+    expect(menuSceneSource).toContain('if (!this.goalHaloCanvasTexture || !this.goalHaloCanvasImage) {');
+  });
+
+  test('hides the goal halo image by default every drawDynamicBoard call, and entering menu mode', () => {
+    const drawDynamicStart = menuSceneSource.indexOf('private drawDynamicBoard(time: number): void {');
+    const hideInDraw = menuSceneSource.indexOf('this.goalHaloCanvasImage?.setVisible(false);', drawDynamicStart);
+    const clearIndex = menuSceneSource.indexOf('this.boardDynamicGraphics.clear();', drawDynamicStart);
+    expect(hideInDraw).toBeGreaterThan(clearIndex);
+
+    const menuModeStart = menuSceneSource.indexOf('private enterMenuMode(): void {');
+    const hideInMenu = menuSceneSource.indexOf('this.goalHaloCanvasImage?.setVisible(false);', menuModeStart);
+    const modeAssignIndex = menuSceneSource.indexOf("this.mode = 'menu';", menuModeStart);
+    expect(hideInMenu).toBeGreaterThan(menuModeStart);
+    expect(hideInMenu).toBeLessThan(modeAssignIndex);
+  });
+
+  test('registers a unique-per-instance texture key and removes it on scene shutdown', () => {
+    expect(menuSceneSource).toContain('`legacy-nav-core-goal-halo-${nextMenuSceneInstanceId()}`');
+    expect(menuSceneSource).toContain('this.textures.remove(this.goalHaloCanvasTextureKey);');
+  });
+});

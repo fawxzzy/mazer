@@ -39,6 +39,10 @@ import {
   drawPlayerGlowToCanvasContext
 } from '../render/navigationCorePlayerGlowCanvas';
 import {
+  computeGoalHaloCanvasBounds,
+  drawGoalHaloToCanvasContext
+} from '../render/navigationCoreGoalHaloCanvas';
+import {
   collectDemoWalkerRouteDiagnostics,
   type DemoRunnerTelemetry,
   type DemoWalkerConfig,
@@ -1966,6 +1970,22 @@ export class MenuScene extends Phaser.Scene {
   private playerGlowCanvasWidth = 0;
   private playerGlowCanvasHeight = 0;
   private playerGlowCanvasResolution = 0;
+  // Same real-2D-canvas pattern as playerGlowCanvasImage above, for the
+  // goal star's own ambient halo (see navigationCoreGoalHaloCanvas.ts's own
+  // header comment) -- a real radial gradient, replacing two flat
+  // fillCircle discs that read as sharply bounded "target" rings instead of
+  // one soft glow. Only used for the real on-board goal marker
+  // (drawLegacyGoalStarMarker called with graphics === boardDynamicGraphics);
+  // the Options/Guide legend's own miniature goal icon (a different,
+  // static, non-gameplay caller passing overlayGraphics instead) keeps the
+  // prior Graphics-only halo unchanged -- out of scope for this reference,
+  // and never composited into boardZoomContainer where this image lives.
+  private goalHaloCanvasTextureKey: string | null = null;
+  private goalHaloCanvasTexture: Phaser.Textures.CanvasTexture | null = null;
+  private goalHaloCanvasImage: Phaser.GameObjects.Image | null = null;
+  private goalHaloCanvasWidth = 0;
+  private goalHaloCanvasHeight = 0;
+  private goalHaloCanvasResolution = 0;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
   private overlayGuideGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -2260,6 +2280,11 @@ export class MenuScene extends Phaser.Scene {
     this.playerGlowCanvasTextureKey = `legacy-nav-core-player-glow-${nextMenuSceneInstanceId()}`;
     this.playerGlowCanvasTexture = this.textures.createCanvas(this.playerGlowCanvasTextureKey, 1, 1);
     this.playerGlowCanvasImage = this.add.image(0, 0, this.playerGlowCanvasTextureKey).setOrigin(0, 0).setVisible(false);
+    // Same real-2D-canvas approach as the player glow above, for the goal
+    // star's own ambient halo -- see the field's own comment.
+    this.goalHaloCanvasTextureKey = `legacy-nav-core-goal-halo-${nextMenuSceneInstanceId()}`;
+    this.goalHaloCanvasTexture = this.textures.createCanvas(this.goalHaloCanvasTextureKey, 1, 1);
+    this.goalHaloCanvasImage = this.add.image(0, 0, this.goalHaloCanvasTextureKey).setOrigin(0, 0).setVisible(false);
     this.boardDynamicGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
     this.playerTrailImages = Array.from({ length: LEGACY_PLAYER_TRAIL_IMAGE_POOL_SIZE }, () => (
@@ -2280,6 +2305,7 @@ export class MenuScene extends Phaser.Scene {
       // reason -- both must render before the crisp shapes Graphics draws.
       this.trailCanvasImage,
       this.playerGlowCanvasImage,
+      this.goalHaloCanvasImage,
       this.boardDynamicGraphics,
       // After boardDynamicGraphics (the trail's own colored fill, and the
       // start/goal/player markers, are all drawn into that one Graphics
@@ -2447,6 +2473,12 @@ export class MenuScene extends Phaser.Scene {
       this.playerGlowCanvasTexture = null;
       this.playerGlowCanvasImage = null;
       this.playerGlowCanvasTextureKey = null;
+      if (this.goalHaloCanvasTextureKey !== null && this.textures.exists(this.goalHaloCanvasTextureKey)) {
+        this.textures.remove(this.goalHaloCanvasTextureKey);
+      }
+      this.goalHaloCanvasTexture = null;
+      this.goalHaloCanvasImage = null;
+      this.goalHaloCanvasTextureKey = null;
       if (this.remoteSettingsSyncTimer !== null) {
         clearTimeout(this.remoteSettingsSyncTimer);
         this.remoteSettingsSyncTimer = null;
@@ -6101,6 +6133,7 @@ export class MenuScene extends Phaser.Scene {
     // as exposed to this same ghost-image risk -- hidden here too.
     this.trailCanvasImage?.setVisible(false);
     this.playerGlowCanvasImage?.setVisible(false);
+    this.goalHaloCanvasImage?.setVisible(false);
     this.resetLegacyPlayInputBuffer();
     this.clearPlayHudImmediately();
     this.resetLegacyPlayerTransferEnergy();
@@ -8750,8 +8783,11 @@ export class MenuScene extends Phaser.Scene {
     // fillLegacyPlayerMarkerTile's showLocatorTicks branch (the only one
     // that draws into this image) is itself gated behind playerAlpha > 0 /
     // markersBuiltIn / on-screen checks further down, so there are real
-    // dirty frames where it never runs at all.
+    // dirty frames where it never runs at all. Same reasoning for the
+    // goal's own halo canvas -- drawLegacyGoalStarMarker's real-board branch
+    // is reached only when the goal tile itself is on-screen/revealed.
     this.playerGlowCanvasImage?.setVisible(false);
+    this.goalHaloCanvasImage?.setVisible(false);
 
     // resolveLegacyPlayPerfectPathTrail only ever reads this.maze/this.trail/
     // this.player -- the exact same shared fields the menu demo AI already
@@ -10584,10 +10620,28 @@ export class MenuScene extends Phaser.Scene {
     const haloPulse = time !== undefined && !this.prefersLegacyReducedMotion()
       ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2
       : 0.5;
-    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR, alpha * (0.24 + (haloPulse * 0.12)));
-    graphics.fillCircle(centerX, centerY, maxRadius * (0.72 + (haloPulse * 0.08)));
-    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_INNER_COLOR, alpha * (0.34 + (haloPulse * 0.14)));
-    graphics.fillCircle(centerX, centerY, maxRadius * 0.48);
+    if (graphics === this.boardDynamicGraphics) {
+      // Real shadowBlur-sibling technique (a real radial gradient this
+      // time, not a blurred shape -- see navigationCoreGoalHaloCanvas.ts's
+      // own header comment): one continuous soft glow instead of two flat,
+      // hard-edged "target" discs.
+      this.drawGoalHaloCanvas(
+        centerX,
+        centerY,
+        maxRadius * (0.72 + (haloPulse * 0.08)),
+        alpha,
+        haloPulse
+      );
+    } else {
+      // The Options/Guide legend's own miniature static goal icon -- a
+      // different, non-gameplay caller (graphics === overlayGraphics), out
+      // of scope for this reference; keeps the prior Graphics-only
+      // approximation unchanged.
+      graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR, alpha * (0.24 + (haloPulse * 0.12)));
+      graphics.fillCircle(centerX, centerY, maxRadius * (0.72 + (haloPulse * 0.08)));
+      graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_INNER_COLOR, alpha * (0.34 + (haloPulse * 0.14)));
+      graphics.fillCircle(centerX, centerY, maxRadius * 0.48);
+    }
 
     // Ring: Graphics has no per-point gradient stroke, so the canonical
     // energy cycle is approximated as short color-stepped arc segments
@@ -10670,6 +10724,68 @@ export class MenuScene extends Phaser.Scene {
         41
       );
     }
+  }
+
+  // Real radial-gradient halo for the real on-board goal marker -- see
+  // navigationCoreGoalHaloCanvas.ts's own header comment, and
+  // drawPlayerGlowCanvas's sibling comment on the DPR/zoom-aware backing
+  // resolution this reuses verbatim. innerColor/outerColor and their base
+  // alphas match this file's existing LEGACY_PLAY_GOAL_MARKER_HALO_*
+  // constants exactly -- only the RENDERING technique changed (one
+  // gradient fill instead of two flat discs), not the tuned palette.
+  private drawGoalHaloCanvas(
+    centerX: number,
+    centerY: number,
+    radius: number,
+    alpha: number,
+    haloPulse: number
+  ): void {
+    if (!this.goalHaloCanvasTexture || !this.goalHaloCanvasImage) {
+      return;
+    }
+    const padding = Math.ceil(radius * 0.25);
+    const bounds = computeGoalHaloCanvasBounds(centerX, centerY, radius, padding);
+    const width = Math.max(1, Math.ceil(bounds.width));
+    const height = Math.max(1, Math.ceil(bounds.height));
+    const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
+    const resolution = Math.min(
+      MAZER_CANVAS_RESOLUTION_MAX * 2,
+      resolveMazerCanvasResolution() * zoomScale
+    );
+    const backingWidth = Math.max(1, Math.ceil(width * resolution));
+    const backingHeight = Math.max(1, Math.ceil(height * resolution));
+    if (
+      backingWidth !== this.goalHaloCanvasWidth
+      || backingHeight !== this.goalHaloCanvasHeight
+      || resolution !== this.goalHaloCanvasResolution
+    ) {
+      this.goalHaloCanvasTexture.setSize(backingWidth, backingHeight);
+      this.goalHaloCanvasWidth = backingWidth;
+      this.goalHaloCanvasHeight = backingHeight;
+      this.goalHaloCanvasResolution = resolution;
+    } else {
+      this.goalHaloCanvasTexture.clear(0, 0, backingWidth, backingHeight, false);
+    }
+    // Unlike shadowBlur, a canvas gradient's own coordinates/radii ARE
+    // logical-space values scaled correctly by the transform -- no
+    // resolution multiplication needed here (radialGradient stops are
+    // plain path-space geometry, not a device-pixel effect radius).
+    this.goalHaloCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
+    drawGoalHaloToCanvasContext(this.goalHaloCanvasTexture.context, {
+      originX: bounds.left,
+      originY: bounds.top,
+      centerX,
+      centerY,
+      radius,
+      innerColor: LEGACY_PLAY_GOAL_MARKER_HALO_INNER_COLOR,
+      innerAlpha: alpha * (0.34 + (haloPulse * 0.14)),
+      outerColor: LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR,
+      outerAlpha: alpha * (0.24 + (haloPulse * 0.12))
+    });
+    this.goalHaloCanvasTexture.refresh();
+    this.goalHaloCanvasImage.setPosition(bounds.left, bounds.top);
+    this.goalHaloCanvasImage.setDisplaySize(width, height);
+    this.goalHaloCanvasImage.setVisible(true);
   }
 
   // Retired: drawLegacyMarkerGemCatchlight used to draw a short diagonal
