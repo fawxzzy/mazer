@@ -586,4 +586,65 @@ describe('advanceTrailShineState', () => {
       expect(afterOriginalCycleElapses.centerDistance).toBeCloseTo(1, 0);
     });
   });
+
+  // Locking the wrap threshold at lap-start (the shrink fix above, in
+  // isolation) introduces the opposite bug: if the path GROWS enough
+  // before that stale, smaller threshold would have completed, the shine
+  // phantom-wraps back near the origin even though it hasn't actually
+  // reached the (now farther away) player end -- itself a visible jump.
+  // The fix must satisfy growth and shrink together, not trade one bug for
+  // the other.
+  describe('path growth continuity (no phantom early wrap)', () => {
+    it('does not reset when the path grows enough that the ORIGINAL (now-stale) cycle length would have elapsed, but the CURRENT one has not', () => {
+      const growOptions = { ...options, quietGapRatio: 0.35 };
+      // Locked cycle at lap start: 100 * 1.35 = 135.
+      const atLapStart = advanceTrailShineState(100, 0, 0, 0, growOptions);
+      // Path grows to 200 well before t=135.
+      const at100 = advanceTrailShineState(200, 100, atLapStart.lapStartedAtMs, atLapStart.lapCycleLength, growOptions);
+      expect(at100.visible).toBe(true);
+      expect(at100.centerDistance).toBeCloseTo(100, 6);
+
+      // t=134: still under the STALE 135 threshold -- must not have wrapped.
+      const at134 = advanceTrailShineState(200, 134, at100.lapStartedAtMs, at100.lapCycleLength, growOptions);
+      expect(at134.visible).toBe(true);
+      expect(at134.centerDistance).toBeCloseTo(134, 6);
+
+      // t=136: past the STALE 135 threshold, but the path is now 200 long,
+      // so a real lap isn't due to complete until (200*1.35=270). Must
+      // keep advancing smoothly, NOT reset back near the origin.
+      const at136 = advanceTrailShineState(200, 136, at134.lapStartedAtMs, at134.lapCycleLength, growOptions);
+      expect(at136.visible).toBe(true);
+      expect(at136.centerDistance).toBeCloseTo(136, 6);
+    });
+
+    it('still wraps correctly once the CURRENT (grown) cycle genuinely elapses', () => {
+      const growOptions = { ...options, quietGapRatio: 0.35 };
+      const atLapStart = advanceTrailShineState(100, 0, 0, 0, growOptions);
+      const grown = advanceTrailShineState(200, 100, atLapStart.lapStartedAtMs, atLapStart.lapCycleLength, growOptions);
+      // Real cycle for a length-200 path: 200 * 1.35 = 270.
+      const justBeforeWrap = advanceTrailShineState(200, 269, grown.lapStartedAtMs, grown.lapCycleLength, growOptions);
+      expect(justBeforeWrap.visible).toBe(false); // past totalLength(200), in the quiet gap
+      const justAfterWrap = advanceTrailShineState(200, 271, justBeforeWrap.lapStartedAtMs, justBeforeWrap.lapCycleLength, growOptions);
+      expect(justAfterWrap.visible).toBe(true);
+      expect(justAfterWrap.centerDistance).toBeCloseTo(1, 0);
+    });
+
+    it('survives growth and shrink together in the same lap without any jump', () => {
+      const growOptions = { ...options, quietGapRatio: 0.35 };
+      let state = advanceTrailShineState(100, 0, 0, 0, growOptions);
+      const lengths = [100, 200, 150, 250, 90, 300];
+      let previousT = 0;
+      for (let i = 0; i < lengths.length; i += 1) {
+        const t = i * 20;
+        const previous = state;
+        state = advanceTrailShineState(lengths[i]!, t, state.lapStartedAtMs, state.lapCycleLength, growOptions);
+        const noWrapHappened = state.lapStartedAtMs === previous.lapStartedAtMs;
+        if (noWrapHappened && previous.visible && state.visible) {
+          const expectedDistance = previous.centerDistance + ((t - previousT) * growOptions.speedPxPerMs);
+          expect(state.centerDistance).toBeCloseTo(expectedDistance, 6);
+        }
+        previousT = t;
+      }
+    });
+  });
 });

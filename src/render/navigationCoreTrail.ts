@@ -421,23 +421,39 @@ export interface TrailShineState {
  * farther the current lap has to travel before it completes; it can never
  * retroactively move or teleport a shine that's already in flight.
  *
- * The lap-completion (wrap) threshold is likewise locked in at
- * previousLapCycleLength and only refreshed once a wrap genuinely happens --
- * NOT recomputed from totalLength on every call. totalLength can shrink
- * mid-lap (the path's own perfect-path recompute is a shortest-path search,
- * so backtracking or a Trail-Fade origin advance can make it shorter than it
- * was a moment ago) even though `traveled` itself never jumps -- if the wrap
- * threshold were recomputed from that shrunk length every call, a `traveled`
- * value that was always a valid, continuous position under the OLD, longer
- * cycle could suddenly appear to be "past" the NEW, shorter cycle, and
- * `traveled % cycleLength` would then remap it to an unrelated earlier
- * position: a visible teleport, not a wrap. Locking the threshold at
- * lap-start means a shrink instead just lets `visible` (computed against the
- * CURRENT totalLength) fade the in-flight shine toward invisible until
- * either the path grows back past its position (no jump -- its physical
- * center was never touched) or the lap's original, larger cycle genuinely
- * elapses and a fresh lap begins from whatever the path measures at that
- * moment.
+ * The lap-completion (wrap) threshold is the LARGER of previousLapCycleLength
+ * and the path's own current length-derived cycle -- never simply
+ * recomputed from totalLength on every call, and never simply locked at
+ * lap-start either (both of those were tried and each broke one direction
+ * of change):
+ *
+ * - Recomputing live breaks on SHRINK: totalLength can shrink mid-lap (the
+ *   path's own perfect-path recompute is a shortest-path search, so
+ *   backtracking or a Trail-Fade origin advance can make it shorter than it
+ *   was a moment ago) even though `traveled` itself never jumps -- if the
+ *   wrap threshold were recomputed from that shrunk length every call, a
+ *   `traveled` value that was always a valid, continuous position under the
+ *   OLD, longer cycle could suddenly appear to be "past" the NEW, shorter
+ *   cycle, and `traveled % cycleLength` would then remap it to an unrelated
+ *   earlier position: a visible teleport, not a wrap.
+ * - Locking the threshold at lap-start (and never revisiting it until a
+ *   wrap) breaks on GROWTH: if the path grows enough mid-lap, the STALE,
+ *   smaller locked threshold can make an in-flight `traveled` value look
+ *   like it's already completed a full lap it hasn't actually finished
+ *   (the player hasn't reached the now-farther-away end yet), triggering a
+ *   phantom early wrap that resets a still-visible shine back near the
+ *   origin -- itself a visible jump, just in the opposite direction.
+ *
+ * Taking the max of the two gives both directions what they need: on
+ * growth, the live cycle (now larger) raises the effective threshold before
+ * `traveled` ever reaches the stale locked one, so no phantom wrap fires.
+ * On shrink, the locked cycle (still the larger, pre-shrink value) stays
+ * the floor, so `traveled` is never compared against a threshold smaller
+ * than what was already valid this lap -- `visible` (computed against the
+ * CURRENT totalLength, separately) is what fades the shine out while
+ * shrunk, not an early wrap. Only an actual wrap (traveled finally
+ * exceeding the largest cycle length this lap ever reached) resets
+ * lapCycleLength, fresh, from whatever the path measures at that moment.
  */
 export function advanceTrailShineState(
   totalLength: number,
@@ -462,7 +478,8 @@ export function advanceTrailShineState(
   }
 
   const quietGap = totalLength * options.quietGapRatio;
-  let lapCycleLength = previousLapCycleLength > EPSILON ? previousLapCycleLength : (totalLength + quietGap);
+  const liveCycleLength = totalLength + quietGap;
+  let lapCycleLength = Math.max(previousLapCycleLength, liveCycleLength);
   let lapStartedAtMs = previousLapStartedAtMs;
   let traveled = Math.max(0, (timeMs - lapStartedAtMs) * options.speedPxPerMs);
 
@@ -471,8 +488,9 @@ export function advanceTrailShineState(
     lapStartedAtMs = timeMs - (overshoot / options.speedPxPerMs);
     traveled = overshoot;
     // A fresh lap starts now -- its own wrap threshold is whatever the path
-    // measures at THIS moment, locked in until the next genuine wrap.
-    lapCycleLength = totalLength + quietGap;
+    // measures at THIS moment, becoming the new floor until the next
+    // genuine wrap.
+    lapCycleLength = liveCycleLength;
   }
 
   const visible = traveled <= totalLength;

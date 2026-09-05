@@ -60,28 +60,21 @@ const runBuild = () => {
   execFileSync('npm', ['run', 'build'], { cwd: REPO_ROOT, stdio: 'inherit' });
 };
 
-const DIRECTIONS = ['move_up', 'move_down', 'move_left', 'move_right'];
-const LONG_ROUTE_TARGET_ACCEPTED_MOVES = 120;
 const SAMPLE_FRAME_COUNT = 90;
 const SAMPLE_FRAME_INTERVAL_MS = 16;
 const FULL_FRAME_SAMPLE_DURATION_MS = 800;
-
-// A deterministic PRNG (mulberry32), not Math.random() -- so the walked
-// route, its resulting trail length, and every measurement below are the
-// same on every run, making reruns directly comparable rather than
-// measuring a different route each time.
-const createDeterministicRandom = (seed) => {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-};
-const ROUTE_RANDOM_SEED = 0xc0ffee;
-const shuffled = (arr, random) => arr.map((v) => [random(), v]).sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+// The rendered trail is resolveLegacyPlayPerfectPathTrail's shortest path
+// through VISITED tiles, not raw accepted-move count -- a review correctly
+// found that a preferred-direction random walk could still net-collapse to
+// a near-zero rendered path (observed: 120 accepted moves producing as
+// little as ~0.5px / 1 stroke segment on some viewports) if the walker
+// happened to loop back near its own start through a real maze's corridors.
+// "120 accepted moves" is not itself evidence of a long-route workload; the
+// walk below is replaced with a deterministic BFS solve straight to the
+// maze's own goal (an actual long, real route by construction, driven via
+// the same real movePlayPlayer calls), and the resulting rendered length is
+// asserted afterward rather than assumed.
+const MIN_REQUIRED_STROKE_SEGMENTS = 20;
 
 const percentile = (sorted, p) => {
   if (sorted.length === 0) return 0;
@@ -89,48 +82,104 @@ const percentile = (sorted, p) => {
   return sorted[idx];
 };
 
-// A pure-random direction each step frequently doubles back on itself --
-// and the rendered trail is resolveLegacyPlayPerfectPathTrail (the
-// shortest route through VISITED tiles), which deliberately collapses
-// exactly that kind of backtracking (see navigationCoreTrail.ts's own
-// header comment). A random walk therefore often ends up with a genuinely
-// SHORT rendered trail even after many accepted moves. To actually stress
-// a long visible route, keep moving in the current preferred direction
-// (net progress) and only reshuffle to a new direction when the current
-// one is blocked -- much closer to how a real long corridor traversal
-// looks, and confirmed against this exact seed to produce a real
-// 100+ px trail rather than a ~1px one.
-const walkLongRoute = async (page, targetAcceptedMoves, random) => {
+const readMazeSnapshot = (page) => page.evaluate(() => {
+  const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+  return { grid: scene.maze.grid, start: scene.maze.start, goal: scene.maze.goal, player: scene.player };
+});
+
+// Plain 4-directional BFS, computed in Node from the real maze grid the
+// browser reports -- deterministic (no randomness at all) and, for any real
+// generated maze, a genuinely long route from wherever the player currently
+// stands to the maze's own goal.
+const computeBfsPath = (grid, from, to) => {
+  const key = (p) => `${p.x},${p.y}`;
+  const queue = [from];
+  const previous = new Map([[key(from), null]]);
+  const deltas = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current.x === to.x && current.y === to.y) break;
+    for (const [dx, dy] of deltas) {
+      const next = { x: current.x + dx, y: current.y + dy };
+      if (grid[next.y]?.[next.x] !== true) continue;
+      const nextKey = key(next);
+      if (previous.has(nextKey)) continue;
+      previous.set(nextKey, current);
+      queue.push(next);
+    }
+  }
+  if (!previous.has(key(to))) {
+    return null;
+  }
+  const path = [];
+  let cursor = to;
+  while (cursor) {
+    path.push(cursor);
+    cursor = previous.get(key(cursor)) ?? null;
+  }
+  path.reverse();
+  return path;
+};
+
+const directionForStep = (dx, dy) => {
+  if (dx === 1) return 'move_right';
+  if (dx === -1) return 'move_left';
+  if (dy === 1) return 'move_down';
+  if (dy === -1) return 'move_up';
+  return null;
+};
+
+// Drives the exact solved path via real, individual movePlayPlayer calls --
+// the same authoritative movement-commit boundary real input uses, not a
+// direct scene.player/scene.trail assignment. Real gameplay start locks
+// input (movePlayPlayer reports reason:'lifecycle-locked') until the real
+// maze's own build/reveal animation settles, which for an actual generated
+// maze can take longer than a fixed short wait -- retries each step (rather
+// than firing once and moving on regardless) until it's actually accepted
+// or a generous timeout elapses, so the walk doesn't silently no-op through
+// its own startup window.
+const walkPathViaRealMoves = async (page, path) => {
   let accepted = 0;
-  let attempts = 0;
-  const maxAttempts = targetAcceptedMoves * 30;
-  let preferredOrder = shuffled(DIRECTIONS, random);
-  while (accepted < targetAcceptedMoves && attempts < maxAttempts) {
-    attempts += 1;
-    let moved = false;
-    for (const move of preferredOrder) {
+  for (let i = 1; i < path.length; i += 1) {
+    const move = directionForStep(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+    if (!move) continue;
+    let stepAccepted = false;
+    for (let attempt = 0; attempt < 100 && !stepAccepted; attempt += 1) {
       // eslint-disable-next-line no-await-in-loop
       const result = await page.evaluate((m) => window.__MAZER_QA__.movePlayPlayer(m), move);
       if (result?.accepted) {
+        stepAccepted = true;
         accepted += 1;
-        moved = true;
-        // Keep trying the SAME direction first next time (net progress);
-        // only when it fails do we fall through to the rest of this
-        // shuffled order, which itself gets reshuffled below.
-        preferredOrder = [move, ...preferredOrder.filter((d) => d !== move)];
+      } else if (result?.reason !== 'lifecycle-locked') {
+        // A real, non-startup rejection (e.g. genuinely blocked) -- retrying
+        // won't help; move on rather than spinning.
         break;
+      } else {
+        // eslint-disable-next-line no-await-in-loop
+        await page.waitForTimeout(50);
       }
     }
-    if (!moved) {
-      // Every direction in the current order failed (a dead end/corner) --
-      // reshuffle so the next attempt tries a fresh combination rather than
-      // repeating the same failing order forever.
-      preferredOrder = shuffled(DIRECTIONS, random);
-    }
     // eslint-disable-next-line no-await-in-loop
-    await page.waitForTimeout(20);
+    await page.waitForTimeout(5);
   }
   return accepted;
+};
+
+// Solves and walks a real, deterministic, long route (current player ->
+// maze goal); if the maze's own generation already placed the player at
+// the goal (degenerate, shouldn't happen for a real generated maze), falls
+// back to walking start -> goal instead so there's always a real workload.
+const walkDeterministicLongRoute = async (page) => {
+  const snapshot = await readMazeSnapshot(page);
+  let path = computeBfsPath(snapshot.grid, snapshot.player, snapshot.goal);
+  if (!path || path.length < 2) {
+    path = computeBfsPath(snapshot.grid, snapshot.start, snapshot.goal);
+  }
+  if (!path || path.length < 2) {
+    return { acceptedMoves: 0, solvedPathLength: 0 };
+  }
+  const acceptedMoves = await walkPathViaRealMoves(page, path);
+  return { acceptedMoves, solvedPathLength: path.length - 1 };
 };
 
 const collectFrameSamples = async (page, frameCount, intervalMs) => {
@@ -281,11 +330,12 @@ const runOneConfig = async (browser, baseUrl, config) => {
   // loop is never stopped for either measurement.
   const baselineFullFrameDeltas = await collectFullFrameIntervals(page, FULL_FRAME_SAMPLE_DURATION_MS);
 
-  // Fresh, seeded per config -- every config walks the exact same
-  // deterministic route (same seed), isolating each config's own toggle
-  // (viewport, Trail Fade, Trail Shine) as the only variable.
-  const routeRandom = createDeterministicRandom(ROUTE_RANDOM_SEED);
-  const acceptedMoves = await walkLongRoute(page, LONG_ROUTE_TARGET_ACCEPTED_MOVES, routeRandom);
+  // Deterministic (a real BFS solve, not a seeded-but-still-fragile random
+  // walk) and, for any real generated maze, a genuinely long route --
+  // driven via real movePlayPlayer calls the same way for every config, so
+  // each config's own toggle (viewport, Trail Fade, Trail Shine) is
+  // isolated as the only variable.
+  const { acceptedMoves, solvedPathLength } = await walkDeterministicLongRoute(page);
   const samples = await collectFrameSamples(page, SAMPLE_FRAME_COUNT, SAMPLE_FRAME_INTERVAL_MS);
   const withTrailFullFrameDeltas = await collectFullFrameIntervals(page, FULL_FRAME_SAMPLE_DURATION_MS);
 
@@ -293,11 +343,31 @@ const runOneConfig = async (browser, baseUrl, config) => {
 
   const fullFrameBaseline = summarizeFullFrameIntervals(baselineFullFrameDeltas);
   const fullFrameWithTrail = summarizeFullFrameIntervals(withTrailFullFrameDeltas);
+  const trailCpuCost = summarizeTrailCpuCost(samples);
+
+  // Assert the workload actually exercised what this config claims to
+  // measure, instead of reporting whatever rendered length happened to
+  // result. Trail Fade ON structurally bounds the retained/rendered path
+  // to its truncation window (TRAIL_FADE_TAIL, 16 points) regardless of how
+  // long the walk was, so its bar is "the window is actually full," not an
+  // absolute segment count; Trail Fade OFF retains full history, so a real
+  // long-route workload is expected and asserted directly.
+  const workload = config.toggleTrailFade
+    ? {
+      expectation: `Trail Fade ON: at least 16 accepted moves (fills the retained-tail window) and a non-trivial rendered path`,
+      met: acceptedMoves >= 16 && (trailCpuCost?.strokeSegmentCount ?? 0) >= 3
+    }
+    : {
+      expectation: `Trail Fade OFF: at least ${MIN_REQUIRED_STROKE_SEGMENTS} rendered stroke segments (a real long-route stress case, not a short net-displacement path)`,
+      met: (trailCpuCost?.strokeSegmentCount ?? 0) >= MIN_REQUIRED_STROKE_SEGMENTS
+    };
 
   return {
     name: config.name,
     acceptedMoves,
-    trailCpuCost: summarizeTrailCpuCost(samples),
+    solvedPathLength,
+    workload,
+    trailCpuCost,
     fullFrame: {
       baseline: fullFrameBaseline,
       withTrail: fullFrameWithTrail,
@@ -348,12 +418,16 @@ const main = async () => {
       const result = await runOneConfig(browser, resolvedBaseUrl, config);
       results.push(result);
       process.stderr.write(
-        `${config.name}: ${result.acceptedMoves} accepted moves, `
-        + `${result.trailCpuCost?.sampleCount ?? 0} trail-CPU samples, `
+        `${config.name}: ${result.acceptedMoves} accepted moves (solved path ${result.solvedPathLength} steps), `
+        + `${result.trailCpuCost?.strokeSegmentCount ?? 0} rendered segments (${result.trailCpuCost?.totalLengthPx?.toFixed(1) ?? '?'}px), `
+        + `workload ${result.workload.met ? 'OK' : 'FAILED'}, `
         + `fullFrame p95 baseline=${result.fullFrame.baseline?.intervalMs.p95?.toFixed(2) ?? 'n/a'}ms `
         + `withTrail=${result.fullFrame.withTrail?.intervalMs.p95?.toFixed(2) ?? 'n/a'}ms `
         + `delta=${result.fullFrame.p95DeltaMs?.toFixed(2) ?? 'n/a'}ms\n`
       );
+      if (!result.workload.met) {
+        process.stderr.write(`  WORKLOAD ASSERTION FAILED: ${result.workload.expectation}\n`);
+      }
     }
   } finally {
     await browser.close();
@@ -384,7 +458,8 @@ const main = async () => {
 
   const anyErrors = results.some((r) => r.consoleErrors.length > 0);
   const anyMissingSummary = results.some((r) => r.trailCpuCost === null || r.fullFrame.baseline === null || r.fullFrame.withTrail === null);
-  process.exitCode = anyErrors || anyMissingSummary ? 1 : 0;
+  const anyWorkloadNotMet = results.some((r) => !r.workload.met);
+  process.exitCode = anyErrors || anyMissingSummary || anyWorkloadNotMet ? 1 : 0;
 };
 
 main().catch((error) => {

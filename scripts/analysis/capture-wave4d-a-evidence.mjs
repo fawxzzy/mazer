@@ -221,6 +221,30 @@ const CORNER_SCENARIOS = [
   ['cornerSW', 'Corner: left -> down']
 ];
 
+// Builds the trail in real CONNECTED, start-to-goal order for a maze that's
+// a simple L-shape (horizontal leg along start.y, then vertical leg along
+// goal.x) -- every one of the four corner scenarios above. A prior version
+// built "trail" by scanning every floor cell row-major instead of following
+// the actual route; since resolveLegacyPlayPerfectPathTrail (the real
+// production method) treats trail[0] as the route's origin, a row-major
+// scan's first cell often wasn't the start at all (for some orientations it
+// was the goal, or otherwise disconnected from a sensible walk order),
+// which silently produced a missing or one-legged trail for 3 of the 4
+// corners. This constructs the path the player actually would have walked.
+const orderedCornerPath = (spec) => {
+  const path = [];
+  const stepX = Math.sign(spec.goal.x - spec.start.x);
+  for (let x = spec.start.x; x !== spec.goal.x; x += stepX) {
+    path.push({ x, y: spec.start.y });
+  }
+  const stepY = Math.sign(spec.goal.y - spec.start.y);
+  for (let y = spec.start.y; y !== spec.goal.y; y += stepY) {
+    path.push({ x: spec.goal.x, y });
+  }
+  path.push({ x: spec.goal.x, y: spec.goal.y });
+  return path;
+};
+
 const main = async () => {
   const args = parseCliArgs();
   const baseUrl = normalizeBaseUrl(typeof args.baseUrl === 'string' ? args.baseUrl : DEFAULT_BASE_URL);
@@ -318,11 +342,17 @@ const main = async () => {
       for (const [key, label] of CORNER_SCENARIOS) {
         const spec = MAZES[key];
         const maze = buildMazeSnapshot(spec);
-        const trailPoints = [];
-        for (let y = maze.height - 1; y >= 0; y -= 1) {
-          for (let x = 0; x < maze.width; x += 1) {
-            if (maze.grid[y][x]) trailPoints.push({ x, y });
-          }
+        const trailPoints = orderedCornerPath(spec);
+        // Assert both legs are actually present -- a real turn, not a
+        // straight line or a degenerate single point -- before capturing,
+        // rather than silently composing a sheet that can't prove the turn.
+        const hasHorizontalLeg = trailPoints.some((p) => p.x !== spec.goal.x);
+        const hasVerticalLeg = trailPoints.some((p) => p.y !== spec.start.y);
+        if (trailPoints[0].x !== spec.start.x || trailPoints[0].y !== spec.start.y) {
+          throw new Error(`Corner fixture '${key}': trail must originate at start, got ${JSON.stringify(trailPoints[0])}`);
+        }
+        if (!hasHorizontalLeg || !hasVerticalLeg) {
+          throw new Error(`Corner fixture '${key}': missing a leg -- horizontal=${hasHorizontalLeg} vertical=${hasVerticalLeg}`);
         }
         await setSceneState(page, {
           maze,
@@ -667,16 +697,59 @@ const main = async () => {
       await page.goto(`${resolvedBaseUrl}/?runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749`, { waitUntil: 'load', timeout: 30000 });
       await page.waitForFunction(() => Boolean(window.__MAZER_QA__?.startPlayMode), { timeout: 15000 });
       await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-      await page.waitForTimeout(500);
+
+      // A real generated maze's own build/reveal animation can genuinely
+      // take longer than a fixed short wait -- a fixed 500ms wait froze the
+      // capture mid-build (the level-number announcement glyph and a
+      // still-assembling corridor, no visible player/goal/trail at all: a
+      // capture failure, not evidence the mobile game itself is broken).
+      // Make real accepted moves instead of just waiting an arbitrary
+      // duration: movePlayPlayer reports reason:'lifecycle-locked' while
+      // the reveal is still in progress, so retrying real moves is both the
+      // readiness signal AND what produces the visible trail this proof
+      // needs -- not a synthetic scene-state assignment.
+      const settledMoves = ['move_right', 'move_down', 'move_left', 'move_up'];
+      let acceptedCount = 0;
+      let directionIndex = 0;
+      for (let attempt = 0; attempt < 200 && acceptedCount < 3; attempt += 1) {
+        const move = settledMoves[directionIndex % settledMoves.length];
+        // eslint-disable-next-line no-await-in-loop
+        const result = await page.evaluate((m) => window.__MAZER_QA__.movePlayPlayer(m), move);
+        if (result?.accepted) {
+          acceptedCount += 1;
+        } else if (result?.reason !== 'lifecycle-locked') {
+          // Genuinely blocked in that direction (a real wall) -- try the
+          // next direction instead of spinning on this one.
+          directionIndex += 1;
+        }
+        // eslint-disable-next-line no-await-in-loop
+        await page.waitForTimeout(50);
+      }
+      if (acceptedCount === 0) {
+        throw new Error('Mobile proof: no real move was ever accepted -- capture would show frozen mid-build state, not settled gameplay.');
+      }
+
       // Stop Phaser's own live requestAnimationFrame loop so the ONLY
       // clock advancing scene state is our manual game.loop.step() calls
       // below -- otherwise the real rAF loop keeps ticking in true wall-
       // clock time in parallel with our synthetic steps, racing our
       // pause/resume and shine-position math against real elapsed time.
       await page.evaluate(() => window.__MAZER_GAME__.loop.stop());
+      await page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        window.__mazerSyntheticTimeMs = scene.time.now;
+      });
+      await page.evaluate(() => {
+        window.__mazerSyntheticTimeMs += 50;
+        window.__MAZER_GAME__.loop.step(window.__mazerSyntheticTimeMs);
+      });
 
       const fullShot = await page.screenshot();
-      const labeled = await labelPng(fullShot, `Real 390x844 DPR3 isMobile hasTouch (${new Date().toISOString()})`, 390 * 3);
+      const labeled = await labelPng(
+        fullShot,
+        `Real 390x844 DPR3 isMobile hasTouch, ${acceptedCount} real moves accepted (${new Date().toISOString()})`,
+        390 * 3
+      );
       writeFileSync(`${outDir}/mazer-wave4d-a-mobile-proof.png`, labeled);
       process.stderr.write('Wrote mazer-wave4d-a-mobile-proof.png\n');
       await context.close();
@@ -749,8 +822,14 @@ const main = async () => {
       // Drives ONE real accepted move via the actual QA entry point, then
       // samples every real tick until the glide fully settles (plus a
       // couple of settled frames after, so the exact commit moment is
-      // unambiguous), returning the full recorded sequence.
-      const driveOneRealMove = async (direction) => {
+      // unambiguous). Captures the region's PIXELS at the same instant as
+      // the diagnostics for every sampled step (not just the diagnostics,
+      // with a screenshot taken later against whatever the scene has
+      // since become) -- otherwise every picked "frame" is really just a
+      // real diagnostic reading mislabeling a single, later, fully-settled
+      // screenshot, which is not motion evidence at all. captureRegionFn is
+      // called once per step, synchronously with that step's diagnostics.
+      const driveOneRealMove = async (direction, captureRegionFn) => {
         const moveResult = await page.evaluate((m) => window.__MAZER_QA__.movePlayPlayer(m), direction);
         if (!moveResult?.accepted) {
           throw new Error(`Real movement evidence: move '${direction}' was not accepted -- ${JSON.stringify(moveResult)}`);
@@ -761,7 +840,9 @@ const main = async () => {
           await syntheticStep(4);
           // eslint-disable-next-line no-await-in-loop
           const diag = await readMotionDiagnostics();
-          frames.push(diag);
+          // eslint-disable-next-line no-await-in-loop
+          const image = await captureRegionFn();
+          frames.push({ ...diag, image });
           settledStreak = diag.visualMotionActive ? 0 : settledStreak + 1;
         }
         return frames;
@@ -813,7 +894,7 @@ const main = async () => {
         const before = await readMotionDiagnostics();
         panels.push(await labelPng(await screenshotStraightRegion(page), formatMotionLabel('Before move (settled)', before), 640));
 
-        const frames = await driveOneRealMove('move_right');
+        const frames = await driveOneRealMove('move_right', () => screenshotStraightRegion(page));
         const picked = pickMotionFrames(frames);
         for (const [title, diag] of [
           ['Leaving (~0-10% into the move)', picked.leaving],
@@ -823,7 +904,10 @@ const main = async () => {
           ['~90-100% into the move (about to commit)', picked.aboutToCommit],
           ['First frame after commit (no pop)', picked.firstSettled]
         ]) {
-          panels.push(await labelPng(await screenshotStraightRegion(page), formatMotionLabel(title, diag), 640));
+          // The image is the ACTUAL screenshot captured at this frame's own
+          // instant, stored alongside its diagnostics in driveOneRealMove --
+          // never a fresh screenshot taken now (the scene has moved on).
+          panels.push(await labelPng(diag.image, formatMotionLabel(title, diag), 640));
         }
       }
 
@@ -864,10 +948,12 @@ const main = async () => {
         const before = await readMotionDiagnostics();
         panels.push(await labelPng(await cornerRegion(), formatMotionLabel('Corner: before the turn (settled)', before), 480));
 
-        // One move onto the corner tile itself, then one more move that
-        // continues past it (downward) -- "through or immediately after".
-        await driveOneRealMove('move_right');
-        const afterTurnFrames = await driveOneRealMove('move_down');
+        // One move onto the corner tile itself (its own frames aren't part
+        // of the picked sheet -- only the move that continues past the
+        // turn is), then one more move that continues past it (downward)
+        // -- "through or immediately after".
+        await driveOneRealMove('move_right', cornerRegion);
+        const afterTurnFrames = await driveOneRealMove('move_down', cornerRegion);
         const picked = pickMotionFrames(afterTurnFrames);
         for (const [title, diag] of [
           ['Corner: leaving the turn tile (~0-10%)', picked.leaving],
@@ -875,7 +961,7 @@ const main = async () => {
           ['Corner: about to commit past the turn', picked.aboutToCommit],
           ['Corner: first frame after commit (no pop)', picked.firstSettled]
         ]) {
-          panels.push(await labelPng(await cornerRegion(), formatMotionLabel(title, diag), 480));
+          panels.push(await labelPng(diag.image, formatMotionLabel(title, diag), 480));
         }
       }
 
