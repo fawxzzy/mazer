@@ -683,6 +683,209 @@ const main = async () => {
     }
 
     // ============================================================
+    // Contact sheet #6: REAL player movement, driven by the actual QA
+    // movement command (window.__MAZER_QA__.movePlayPlayer) -- not a direct
+    // scene.player/scene.trail assignment. Every prior scenario in this
+    // script sets up a starting POSITION via direct scene-state assignment
+    // (the same real fields the renderer already reads every frame), but
+    // this sheet's actual MOVEMENT goes through the same authoritative
+    // commit boundary real keyboard/touch input uses, so it proves the
+    // trail extends smoothly behind an actually-moving player, the
+    // endpoint tracks the interpolated (not logical) player position, and
+    // arrival commits without a position or length pop -- none of which a
+    // static end-state screenshot can demonstrate.
+    // ============================================================
+    {
+      const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      const page = await context.newPage();
+      await page.goto(`${resolvedBaseUrl}/?runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749`, { waitUntil: 'load', timeout: 30000 });
+      await page.waitForFunction(() => Boolean(window.__MAZER_QA__?.startPlayMode), { timeout: 15000 });
+      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+      await page.waitForTimeout(300);
+      await page.evaluate(() => window.__MAZER_GAME__.loop.stop());
+
+      // stepFrames (used everywhere else in this script) computes its tick
+      // time as `performance.now() + n*16.6667` FRESH on every call -- fine
+      // for jump-cutting between static scenarios, but a real player move's
+      // glide is only 90-190ms long (resolveLegacyPlayerVisualMoveDurationMs
+      // clamps to that range), and real Playwright round-trip jitter
+      // between calls can easily make consecutive stepFrames(page,1) calls
+      // advance the game's clock by far more than 16.67ms each -- enough to
+      // blow through the ENTIRE glide in one or two ticks and never
+      // actually observe it in progress. A synthetic clock anchored once
+      // and advanced by an explicit, fixed, small delta every step (rather
+      // than re-derived from real wall-clock time each call) gives exact
+      // control over how much simulated time passes between samples,
+      // independent of real IPC latency.
+      await page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        window.__mazerSyntheticTimeMs = scene.time.now;
+      });
+      const syntheticStep = (deltaMs) => page.evaluate((delta) => {
+        window.__mazerSyntheticTimeMs += delta;
+        window.__MAZER_GAME__.loop.step(window.__mazerSyntheticTimeMs);
+      }, deltaMs);
+
+      // resolveLegacyRenderedPlayerPoint/hasLegacyPlayerVisualMotionPendingFrame
+      // are private MenuScene methods -- TypeScript privacy is compile-time
+      // only, and calling them directly here (like getBoardFrame does for
+      // resolveLegacyMazeRenderFrame) is what gives an unthrottled, exact
+      // read of the same interpolation the real draw call uses, matching
+      // this script's established pattern rather than reimplementing it.
+      const readMotionDiagnostics = () => page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        const time = scene.time.now;
+        const rendered = scene.resolveLegacyRenderedPlayerPoint(time);
+        const perf = window.__MAZER_QA__.getTrailPerfDiagnostics();
+        return {
+          logicalPlayer: { x: scene.player.x, y: scene.player.y },
+          renderedPlayer: { x: Math.round(rendered.x * 1000) / 1000, y: Math.round(rendered.y * 1000) / 1000 },
+          visualMotionActive: scene.hasLegacyPlayerVisualMotionPendingFrame(time),
+          trailTotalLengthPx: perf ? Math.round(perf.totalLengthPx * 10) / 10 : null,
+          animationElapsedMs: Math.round(scene.trailAnimationElapsedMs * 10) / 10
+        };
+      });
+
+      // Drives ONE real accepted move via the actual QA entry point, then
+      // samples every real tick until the glide fully settles (plus a
+      // couple of settled frames after, so the exact commit moment is
+      // unambiguous), returning the full recorded sequence.
+      const driveOneRealMove = async (direction) => {
+        const moveResult = await page.evaluate((m) => window.__MAZER_QA__.movePlayPlayer(m), direction);
+        if (!moveResult?.accepted) {
+          throw new Error(`Real movement evidence: move '${direction}' was not accepted -- ${JSON.stringify(moveResult)}`);
+        }
+        const frames = [];
+        let settledStreak = 0;
+        for (let i = 0; i < 400 && settledStreak < 4; i += 1) {
+          await syntheticStep(4);
+          // eslint-disable-next-line no-await-in-loop
+          const diag = await readMotionDiagnostics();
+          frames.push(diag);
+          settledStreak = diag.visualMotionActive ? 0 : settledStreak + 1;
+        }
+        return frames;
+      };
+
+      // Picks representative frames from a real recorded sequence: the
+      // requested fractions are positions within the ACTIVE (glide-in-
+      // progress) sub-sequence, plus the first settled frame is always
+      // included separately as the "just committed" proof point.
+      const pickMotionFrames = (frames) => {
+        const activeIndices = frames.map((f, i) => (f.visualMotionActive ? i : -1)).filter((i) => i >= 0);
+        const firstSettledIndex = frames.findIndex((f) => !f.visualMotionActive);
+        const at = (fraction) => {
+          if (activeIndices.length === 0) return frames[0];
+          const idx = activeIndices[Math.min(activeIndices.length - 1, Math.round(fraction * (activeIndices.length - 1)))];
+          return frames[idx];
+        };
+        return {
+          leaving: at(0),
+          quarter: at(0.25),
+          half: at(0.5),
+          threeQuarter: at(0.75),
+          aboutToCommit: at(1),
+          firstSettled: firstSettledIndex >= 0 ? frames[firstSettledIndex] : frames[frames.length - 1]
+        };
+      };
+
+      const formatMotionLabel = (title, diag) => (
+        `${title} | player=(${diag.logicalPlayer.x},${diag.logicalPlayer.y}) `
+        + `rendered=(${diag.renderedPlayer.x},${diag.renderedPlayer.y}) `
+        + `len=${diag.trailTotalLengthPx}px t=${diag.animationElapsedMs}ms `
+        + `motion=${diag.visualMotionActive}`
+      );
+
+      const panels = [];
+
+      // Scenario A: an ordinary straight-corridor move, well clear of both
+      // Start's own special-cased latch and any corner.
+      {
+        const straightSpec = MAZES.straight;
+        const maze = buildMazeSnapshot(straightSpec);
+        const midX = straightSpec.start.x + Math.floor((straightSpec.goal.x - straightSpec.start.x) / 2);
+        const player = { x: midX, y: straightSpec.start.y };
+        const trail = [];
+        for (let x = straightSpec.start.x; x <= midX; x += 1) trail.push({ x, y: straightSpec.start.y });
+        await setSceneState(page, { maze, player, trail, hasPlayerEverLeftStart: true, toggleTrailShine: true });
+        await syntheticStep(50);
+
+        const before = await readMotionDiagnostics();
+        panels.push(await labelPng(await screenshotStraightRegion(page), formatMotionLabel('Before move (settled)', before), 640));
+
+        const frames = await driveOneRealMove('move_right');
+        const picked = pickMotionFrames(frames);
+        for (const [title, diag] of [
+          ['Leaving (~0-10% into the move)', picked.leaving],
+          ['~25% into the move', picked.quarter],
+          ['~50% into the move', picked.half],
+          ['~75% into the move', picked.threeQuarter],
+          ['~90-100% into the move (about to commit)', picked.aboutToCommit],
+          ['First frame after commit (no pop)', picked.firstSettled]
+        ]) {
+          panels.push(await labelPng(await screenshotStraightRegion(page), formatMotionLabel(title, diag), 640));
+        }
+      }
+
+      async function screenshotStraightRegion(pageRef) {
+        const frame = await getBoardFrame(pageRef);
+        const straightSpec = MAZES.straight;
+        const width = straightSpec.goal.x - straightSpec.start.x + 1 + 2;
+        return captureCanvasRegionPng(pageRef, {
+          x: frame.left - 4,
+          y: frame.top + (straightSpec.start.y * frame.tileSize) - 4,
+          w: (width * frame.tileSize) + 8,
+          h: frame.tileSize + 8
+        });
+      }
+
+      // Scenario B: one real move through/immediately after a corner --
+      // set up one tile short of the turn, then make the real move that
+      // completes it.
+      {
+        const spec = MAZES.cornerSE; // right then down
+        const maze = buildMazeSnapshot(spec);
+        const corner = { x: spec.goal.x, y: spec.start.y }; // the turn tile
+        const player = { x: corner.x - 1, y: corner.y };
+        const trail = [];
+        for (let x = spec.start.x; x <= player.x; x += 1) trail.push({ x, y: spec.start.y });
+        await setSceneState(page, { maze, player, trail, hasPlayerEverLeftStart: true, toggleTrailShine: true });
+        await syntheticStep(50);
+
+        const cornerRegion = async () => {
+          const frame = await getBoardFrame(page);
+          return captureCanvasRegionPng(
+            page,
+            { x: frame.left - 4, y: frame.top - 4, w: (maze.width * frame.tileSize) + 8, h: (maze.height * frame.tileSize) + 8 },
+            6
+          );
+        };
+
+        const before = await readMotionDiagnostics();
+        panels.push(await labelPng(await cornerRegion(), formatMotionLabel('Corner: before the turn (settled)', before), 480));
+
+        // One move onto the corner tile itself, then one more move that
+        // continues past it (downward) -- "through or immediately after".
+        await driveOneRealMove('move_right');
+        const afterTurnFrames = await driveOneRealMove('move_down');
+        const picked = pickMotionFrames(afterTurnFrames);
+        for (const [title, diag] of [
+          ['Corner: leaving the turn tile (~0-10%)', picked.leaving],
+          ['Corner: ~50% past the turn', picked.half],
+          ['Corner: about to commit past the turn', picked.aboutToCommit],
+          ['Corner: first frame after commit (no pop)', picked.firstSettled]
+        ]) {
+          panels.push(await labelPng(await cornerRegion(), formatMotionLabel(title, diag), 480));
+        }
+      }
+
+      const sheet = await compositeGrid(panels, 3, 640);
+      writeFileSync(`${outDir}/mazer-wave4d-a-real-player-motion-frames.png`, sheet);
+      process.stderr.write('Wrote mazer-wave4d-a-real-player-motion-frames.png\n');
+      await context.close();
+    }
+
+    // ============================================================
     // Optional: trail motion as real video (shine crossing the corner,
     // fade-out, quiet gap, invisible restart), driven by the same manual
     // clock as contact sheet #3 but stepped smoothly instead of jump-cut.
