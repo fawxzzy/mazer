@@ -1,9 +1,10 @@
 /**
  * Wave 4D-A's Navigation Core v1 required regression coverage -- the
  * continuous trail's pure geometry/shine-state logic, its canvas
- * compositor, BootScene's floor-texture failure-safe fallback, the
- * Trail-Fade path-origin connectivity fix, and the decision-registry/
- * UI-state-model ownership contracts this work touches.
+ * compositor, the player-glow and goal-halo canvas compositors, BootScene's
+ * floor-texture failure-safe fallback, the Trail-Fade path-origin
+ * connectivity fix, and the decision-registry/UI-state-model ownership
+ * contracts this work touches.
  *
  * A real gap this list exists to close: neither `npm run verify`'s own
  * curated TEST_SPINE (scripts/verify/run-test-verify.mjs) NOR
@@ -12,12 +13,20 @@
  * across a long session and observing neither pipeline's own reported test
  * count ever change. This module is the single canonical list both the
  * local runner and CI import from, so they can't drift apart again.
+ *
+ * Every new tests/render/*.ts suite added for this wave must be added here
+ * too, in the same change that adds the suite -- a rendering module without
+ * its test wired into required verification is exactly the gap this list
+ * exists to close, not a one-time fix for the files it happened to name
+ * first.
  */
 
 /** The full required set -- what CI (whose own explicit test list has no directory globbing) needs to run in its entirety. */
 export const NAVIGATION_CORE_REQUIRED_TESTS = [
   'tests/render/navigationCoreTrail.test.ts',
   'tests/render/navigationCoreTrailCanvas.test.ts',
+  'tests/render/navigationCorePlayerGlowCanvas.test.ts',
+  'tests/render/navigationCoreGoalHaloCanvas.test.ts',
   'tests/reset/boot-floor-texture.test.ts',
   'tests/reset/legacy-playable-graph.test.ts',
   'tests/architecture/decision-registry-contract.test.ts',
