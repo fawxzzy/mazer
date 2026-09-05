@@ -55,6 +55,9 @@ jobs:
             tests/reset/legacy-unreal-source-fixture.test.ts \
             --maxWorkers=1
 
+      - name: Verify Wave 4D-A Navigation Core v1 required coverage
+        run: node ./scripts/verify/run-navigation-core-required-tests.mjs
+
       - name: Build production bundle and PWA assets
         run: npm run build
 

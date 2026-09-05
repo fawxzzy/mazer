@@ -65,6 +65,69 @@ export const MAZER_FLOOR_TILE_TEXTURE_KEY = 'mazerFloorTile';
 export const MAZER_BLEED_PATH_TEXTURE_KEY = 'mazerBleedPathStrip';
 export const MAZER_PLAYER_TRAIL_TEXTURE_KEY = 'mazerPlayerTrail';
 
+// mazer-floor-tile.png (1254x1254) is a standalone "tile" icon -- a bright
+// two-pixel corner-bracket border plus a soft outer glow halo, wrapped
+// around a pale interior with its own faint crosshair subdivision -- not an
+// edge-to-edge-tileable material swatch. The live corridor floor repeats
+// this whole image once per maze cell via a TileSprite (see
+// boardFloorTileSprite in MenuScene.ts), which duplicates that border/glow
+// at every single cell boundary: a Navigation Core v1 review (see
+// docs/assets/reference/navigation-core-v1/README.md) confirmed by pixel-
+// sampling this exact file that this per-cell border duplication -- not the
+// connectivity-aware color fill/rim-light, which already suppresses its own
+// stroke on shared interior edges -- is the root cause of the maze reading
+// as a "checkerboard of separate beveled chiclets" instead of one connected
+// corridor.
+//
+// [260,260]-[990,990] (730x730) was this constant's first cut at excluding
+// the border -- it does stay inside the raw asset's own bright-bezel band
+// (measured at x=230-238/1018-1022) and its outer glow (alpha<253 below
+// x=228/above x=1024). But a later live-renderer check (driving the real
+// running MenuScene via getImageData, not just sampling the static PNG)
+// found that crop still reads as a per-cell "breathe" once actually tiled
+// at real tile sizes. A getImageData scanline down a straight,
+// fully-connected corridor column, averaged per row, measured the
+// brightness swing per tile at each candidate crop (all under the same
+// live scanline, boardFloorTileSprite otherwise unchanged):
+//   - boardFloorTileSprite hidden entirely (procedural fill/rim alone): 175-176
+//   - raw 1254x1254 source, no crop at all:                             174-248
+//   - this constant's old value, [260,260]-[990,990] (730x730):         194-246
+//   - [427,427]-[827,827] (400x400), centered on the source's true
+//     center (627,627), pulling every kept pixel further from the
+//     border falloff:                                                  206-249
+// Shrinking further (tried 300x300, 200x200, 100x100 at the same center)
+// did not reduce the swing any more -- it plateaus around 205-249
+// regardless of crop size once the border/glow band itself is excluded,
+// which reads as a Canvas 2D TileSprite minification artifact (this
+// source art was never designed as a seamless swatch, so any crop of it
+// still carries a faint radial shade that naive per-repeat resampling
+// turns into a per-tile ripple at these heavily-downscaled tile sizes),
+// not something a differently-chosen crop rectangle can fix further.
+// 400x400 keeps the interior's own crosshair centered per tile (the
+// reference design explicitly wants "visible floor texture depth ... not
+// a bleached, featureless slab") while cutting the swing from the old
+// crop's 52 units down to 43 -- a real, measured reduction, not a
+// complete elimination. generateMazerFloorTileInteriorTexture() below
+// bakes this crop into its own texture once at boot; MenuScene's floor
+// overlay must repeat that derived texture, never the raw
+// MAZER_FLOOR_TILE_TEXTURE_KEY.
+export const MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY = 'mazerFloorTileInterior';
+export const MAZER_FLOOR_TILE_INTERIOR_CROP = Object.freeze({ x: 427, y: 427, width: 400, height: 400 });
+
+// Whether generateMazerFloorTileInteriorTexture() below actually succeeded
+// this boot -- MenuScene's floor overlay must check this (or the texture's
+// own existence) before ever activating MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY.
+// If Canvas 2D or the source texture is unavailable, the key never gets
+// registered with Phaser at all, and requesting a nonexistent texture key
+// from a TileSprite renders Phaser's own default "missing texture"
+// placeholder (a visible purple/black checkerboard) -- unacceptable, and
+// silently falling back to the RAW bordered mazer-floor-tile.png instead
+// would reintroduce the exact per-cell border-duplication defect this
+// texture was created to fix. The only safe fallback is: no floor-texture
+// accent at all, procedural corridor material only.
+let mazerFloorTileInteriorTextureAvailable = false;
+export const isMazerFloorTileInteriorTextureAvailable = (): boolean => mazerFloorTileInteriorTextureAvailable;
+
 // Real HUD icon source art (see docs/assets/mazer-vfx-source-provenance.md) --
 // the actual profile/leaderboard/settings icons, replacing the procedural
 // thin-line glyphs used until now.
@@ -120,6 +183,7 @@ export class BootScene extends Phaser.Scene {
   public create(): void {
     this.registerMazerTileFontFrames(MAZER_TILE_FONT_TEXTURE_KEY);
     this.generateMazerTileFontRainbowVariants();
+    this.generateMazerFloorTileInteriorTexture();
     this.scene.start('MenuScene');
   }
 
@@ -202,6 +266,71 @@ export class BootScene extends Phaser.Scene {
         // Canvas 2D unavailable/erroring on this step -- leave it
         // unregistered, see this method's own header comment.
       }
+    }
+  }
+
+  // Bakes MAZER_FLOOR_TILE_INTERIOR_CROP out of the raw floor-tile source
+  // once at boot -- see the border-duplication comment above
+  // MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY for why the raw asset can't be
+  // repeated directly. Same getSourceImage-into-canvas technique as
+  // generateMazerTileFontRainbowVariants above, minus the recolor pass.
+  // Never fatal to boot: on any failure this leaves
+  // mazerFloorTileInteriorTextureAvailable false and logs one diagnostic
+  // warning, rather than throwing or leaving a half-registered texture key
+  // that could resolve to Phaser's own missing-texture placeholder.
+  // MenuScene's floor overlay must check isMazerFloorTileInteriorTextureAvailable()
+  // (or the texture's own existence) before activating this key, and must
+  // render with no floor-texture accent at all when it's false -- never the
+  // raw bordered source, which would silently reintroduce the original
+  // per-cell border-duplication defect.
+  private generateMazerFloorTileInteriorTexture(): void {
+    // Reset first, not just default-initialized: a later regeneration
+    // attempt (scene restart, hot-reload) that fails must not leave the
+    // flag stuck true from an earlier, successful lifecycle -- the fallback
+    // check downstream (isMazerFloorTileInteriorTextureAvailable) has to
+    // reflect THIS attempt's real outcome.
+    mazerFloorTileInteriorTextureAvailable = false;
+    if (!this.textures.exists(MAZER_FLOOR_TILE_TEXTURE_KEY)) {
+      console.warn('[Mazer] Navigation Core v1: mazer-floor-tile.png source texture missing at boot -- floor-texture accent disabled, procedural corridor material only.');
+      return;
+    }
+    const sourceImage = this.textures.get(MAZER_FLOOR_TILE_TEXTURE_KEY).getSourceImage();
+    const crop = MAZER_FLOOR_TILE_INTERIOR_CROP;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = crop.width;
+      canvas.height = crop.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.warn('[Mazer] Navigation Core v1: Canvas 2D unavailable at boot -- floor-texture accent disabled, procedural corridor material only.');
+        return;
+      }
+      ctx.drawImage(
+        sourceImage as CanvasImageSource,
+        crop.x,
+        crop.y,
+        crop.width,
+        crop.height,
+        0,
+        0,
+        crop.width,
+        crop.height
+      );
+      if (this.textures.exists(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY)) {
+        this.textures.remove(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY);
+      }
+      this.textures.addCanvas(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY, canvas);
+      // Confirm the derived texture actually registered before trusting it --
+      // addCanvas has no documented failure return, but checking here (not
+      // just assuming the preceding call succeeded) is what makes this
+      // flag an honest reflection of the real texture's presence.
+      if (this.textures.exists(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY)) {
+        mazerFloorTileInteriorTextureAvailable = true;
+      } else {
+        console.warn('[Mazer] Navigation Core v1: floor-tile interior texture did not register after addCanvas -- floor-texture accent disabled, procedural corridor material only.');
+      }
+    } catch (error) {
+      console.warn('[Mazer] Navigation Core v1: floor-tile interior texture generation failed -- floor-texture accent disabled, procedural corridor material only.', error);
     }
   }
 }
