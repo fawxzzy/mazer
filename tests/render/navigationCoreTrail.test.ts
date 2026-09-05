@@ -363,67 +363,67 @@ describe('advanceTrailShineState', () => {
   };
 
   it('suppresses the shine on a very short trail', () => {
-    const result = advanceTrailShineState(5, 0, 0, options);
+    const result = advanceTrailShineState(5, 0, 0, 0, options);
     expect(result.visible).toBe(false);
   });
 
   it('is visible and near the origin right after a lap starts', () => {
-    const result = advanceTrailShineState(1000, 10, 0, options);
+    const result = advanceTrailShineState(1000, 10, 0, 0, options);
     expect(result.visible).toBe(true);
     expect(result.centerDistance).toBeCloseTo(10, 6);
   });
 
   it('advances at a constant physical speed regardless of total length changing between calls', () => {
-    const first = advanceTrailShineState(1000, 100, 0, options);
+    const first = advanceTrailShineState(1000, 100, 0, 0, options);
     // trail grows (player took another step) -- the shine's position at the
     // same elapsed time must be identical, not remapped.
-    const afterGrowth = advanceTrailShineState(2000, 100, first.lapStartedAtMs, options);
+    const afterGrowth = advanceTrailShineState(2000, 100, first.lapStartedAtMs, first.lapCycleLength, options);
     expect(afterGrowth.centerDistance).toBeCloseTo(first.centerDistance, 6);
   });
 
   it('goes invisible once past the total length (quiet interval) and reports a stable lap start', () => {
-    const result = advanceTrailShineState(1000, 1010, 0, options);
+    const result = advanceTrailShineState(1000, 1010, 0, 0, options);
     expect(result.visible).toBe(false);
     expect(result.centerDistance).toBeGreaterThanOrEqual(1000);
   });
 
   it('restarts at the origin after a full lap + quiet gap, carrying over exact overshoot', () => {
     // cycleLength = 1000 * 1.5 = 1500 at speed 1px/ms -> completes at t=1500.
-    const justAfterWrap = advanceTrailShineState(1000, 1510, 0, options);
+    const justAfterWrap = advanceTrailShineState(1000, 1510, 0, 0, options);
     expect(justAfterWrap.visible).toBe(true);
     expect(justAfterWrap.centerDistance).toBeCloseTo(10, 6);
   });
 
   it('never produces a visible shine during the quiet interval', () => {
     for (let t = 1001; t < 1500; t += 50) {
-      const result = advanceTrailShineState(1000, t, 0, options);
+      const result = advanceTrailShineState(1000, t, 0, 0, options);
       expect(result.visible).toBe(false);
     }
   });
 
   it('fades in near the origin and out near the player end (envelope alpha)', () => {
-    const nearOrigin = advanceTrailShineState(1000, 1, 0, options);
-    const middle = advanceTrailShineState(1000, 500, 0, options);
-    const nearEnd = advanceTrailShineState(1000, 999, 0, options);
+    const nearOrigin = advanceTrailShineState(1000, 1, 0, 0, options);
+    const middle = advanceTrailShineState(1000, 500, 0, 0, options);
+    const nearEnd = advanceTrailShineState(1000, 999, 0, 0, options);
     expect(nearOrigin.envelopeAlpha).toBeLessThan(middle.envelopeAlpha);
     expect(nearEnd.envelopeAlpha).toBeLessThan(middle.envelopeAlpha);
   });
 
   it('scales shine length with the current total length', () => {
-    const shortTrail = advanceTrailShineState(500, 10, 0, options);
-    const longTrail = advanceTrailShineState(5000, 10, 0, options);
+    const shortTrail = advanceTrailShineState(500, 10, 0, 0, options);
+    const longTrail = advanceTrailShineState(5000, 10, 0, 0, options);
     expect(longTrail.halfLength).toBeGreaterThan(shortTrail.halfLength);
   });
 
   it('is a no-op speed guard against zero/negative speed', () => {
-    const result = advanceTrailShineState(1000, 500, 0, { ...options, speedPxPerMs: 0 });
+    const result = advanceTrailShineState(1000, 500, 0, 0, { ...options, speedPxPerMs: 0 });
     expect(result.visible).toBe(false);
   });
 
   it('computes the travel envelope as 4% of TOTAL path length, not 4% of the shine body', () => {
     // totalLength=1000 -> travelEnvelopeLength must be 40 (4% of 1000), not
     // 0.095*1000*0.04=3.8 (4% of the ~9.5%-length shine body).
-    const result = advanceTrailShineState(1000, 10, 0, options);
+    const result = advanceTrailShineState(1000, 10, 0, 0, options);
     expect(result.travelEnvelopeLength).toBeCloseTo(40, 6);
   });
 
@@ -431,26 +431,26 @@ describe('advanceTrailShineState', () => {
     // At t=0 the shine sits at distance 0 -- envelopeAlpha must start at 0
     // (a real fade-IN, not an instant pop to full brightness) and reach 1.0
     // once it has traveled the full 40px (4% of 1000) envelope window.
-    const atOrigin = advanceTrailShineState(1000, 0, 0, options);
+    const atOrigin = advanceTrailShineState(1000, 0, 0, 0, options);
     expect(atOrigin.envelopeAlpha).toBeCloseTo(0, 6);
-    const quarterIntoEnvelope = advanceTrailShineState(1000, 10, 0, options); // distance 10 of 40
+    const quarterIntoEnvelope = advanceTrailShineState(1000, 10, 0, 0, options); // distance 10 of 40
     expect(quarterIntoEnvelope.envelopeAlpha).toBeCloseTo(0.25, 6);
-    const halfwayIntoEnvelope = advanceTrailShineState(1000, 20, 0, options); // distance 20 of 40
+    const halfwayIntoEnvelope = advanceTrailShineState(1000, 20, 0, 0, options); // distance 20 of 40
     expect(halfwayIntoEnvelope.envelopeAlpha).toBeCloseTo(0.5, 6);
-    const fullyFadedIn = advanceTrailShineState(1000, 40, 0, options); // distance 40 of 40
+    const fullyFadedIn = advanceTrailShineState(1000, 40, 0, 0, options); // distance 40 of 40
     expect(fullyFadedIn.envelopeAlpha).toBeCloseTo(1, 6);
   });
 
   it('ramps down smoothly across the final 4% of path length before reaching the player, not a hard cut', () => {
     // totalLength=1000, envelope window=40 -- fade-out starts at distance
     // 960 and reaches exactly 0 at distance 1000.
-    const beforeFadeOutWindow = advanceTrailShineState(1000, 950, 0, options);
+    const beforeFadeOutWindow = advanceTrailShineState(1000, 950, 0, 0, options);
     expect(beforeFadeOutWindow.envelopeAlpha).toBeCloseTo(1, 6);
-    const tenIntoFadeOut = advanceTrailShineState(1000, 970, 0, options); // 30 of 40 remaining
+    const tenIntoFadeOut = advanceTrailShineState(1000, 970, 0, 0, options); // 30 of 40 remaining
     expect(tenIntoFadeOut.envelopeAlpha).toBeCloseTo(0.75, 6);
-    const nearEnd = advanceTrailShineState(1000, 990, 0, options); // 10 of 40 remaining
+    const nearEnd = advanceTrailShineState(1000, 990, 0, 0, options); // 10 of 40 remaining
     expect(nearEnd.envelopeAlpha).toBeCloseTo(0.25, 6);
-    const atPlayerEnd = advanceTrailShineState(1000, 1000, 0, options);
+    const atPlayerEnd = advanceTrailShineState(1000, 1000, 0, 0, options);
     expect(atPlayerEnd.envelopeAlpha).toBeCloseTo(0, 6);
   });
 
@@ -458,13 +458,13 @@ describe('advanceTrailShineState', () => {
     // totalLength=1000, envelope window=40 -- full brightness expected
     // anywhere in [40, 960].
     for (const distance of [40, 100, 300, 500, 700, 900, 960]) {
-      const result = advanceTrailShineState(1000, distance, 0, options);
+      const result = advanceTrailShineState(1000, distance, 0, 0, options);
       expect(result.envelopeAlpha).toBeCloseTo(1, 6);
     }
   });
 
   it('is fully invisible (envelopeAlpha 0) during the quiet reset interval, not merely dim', () => {
-    const result = advanceTrailShineState(1000, 1250, 0, options); // mid-quiet-gap (interval is [1000,1500])
+    const result = advanceTrailShineState(1000, 1250, 0, 0, options); // mid-quiet-gap (interval is [1000,1500])
     expect(result.visible).toBe(false);
     expect(result.envelopeAlpha).toBe(0);
   });
@@ -472,10 +472,118 @@ describe('advanceTrailShineState', () => {
   it('does not hard-cut at either the origin or the player end -- envelope alpha is continuous, not a step function', () => {
     // Sample densely across the fade-in window and assert monotonic, gapless increase.
     const samples = [0, 5, 10, 15, 20, 25, 30, 35, 40].map(
-      (d) => advanceTrailShineState(1000, d, 0, options).envelopeAlpha
+      (d) => advanceTrailShineState(1000, d, 0, 0, options).envelopeAlpha
     );
     for (let i = 1; i < samples.length; i += 1) {
       expect(samples[i]).toBeGreaterThan(samples[i - 1]!);
     }
+  });
+
+  // A shrinking path (backtracking makes the perfect-path shortest-path
+  // search shorter, or a Trail Fade origin advance) must never remap an
+  // in-flight shine to an unrelated earlier position via
+  // `traveled % newShorterCycleLength` -- it must instead just fade/suppress
+  // the shine (via `visible`, which reads the CURRENT totalLength) until
+  // either the path grows back past it or the ORIGINAL, longer cycle
+  // genuinely elapses. See advanceTrailShineState's own header.
+  describe('path shrink continuity (no modulo teleport)', () => {
+    it('goes invisible instead of remapping when a 100->40 shrink happens while the shine is at distance 80', () => {
+      const atLapStart = advanceTrailShineState(100, 0, 0, 0, options);
+      // Advance to distance 80 while the path is still length 100.
+      const at80 = advanceTrailShineState(100, 80, atLapStart.lapStartedAtMs, atLapStart.lapCycleLength, options);
+      expect(at80.visible).toBe(true);
+      expect(at80.centerDistance).toBeCloseTo(80, 6);
+
+      // The path shrinks to 40 at the same elapsed time (same lapStartedAtMs
+      // / lapCycleLength carried forward, as a real caller would).
+      const afterShrink = advanceTrailShineState(40, 80, at80.lapStartedAtMs, at80.lapCycleLength, options);
+      // Naive `80 % (40*1.5=60) = 20` would put the shine back near the
+      // origin -- a visible teleport. The fix must not do that: the shine
+      // is simply past the (now shorter) path, so it goes invisible.
+      expect(afterShrink.visible).toBe(false);
+      expect(afterShrink.envelopeAlpha).toBe(0);
+    });
+
+    it('keeps a stable, non-jumping center when a shrink still leaves the shine within the new (shorter) path', () => {
+      const atLapStart = advanceTrailShineState(100, 0, 0, 0, options);
+      const at50 = advanceTrailShineState(100, 50, atLapStart.lapStartedAtMs, atLapStart.lapCycleLength, options);
+      expect(at50.centerDistance).toBeCloseTo(50, 6);
+
+      // Shrink to 70 -- the shine (at 50) is still within the new path.
+      const afterShrink = advanceTrailShineState(70, 50, at50.lapStartedAtMs, at50.lapCycleLength, options);
+      expect(afterShrink.visible).toBe(true);
+      // Same physical center as before the shrink -- no jump.
+      expect(afterShrink.centerDistance).toBeCloseTo(50, 6);
+    });
+
+    it('resumes at the same physical position (no jump) once the path grows back past a shine hidden by a shrink', () => {
+      const atLapStart = advanceTrailShineState(100, 0, 0, 0, options);
+      const at80 = advanceTrailShineState(100, 80, atLapStart.lapStartedAtMs, atLapStart.lapCycleLength, options);
+      const hidden = advanceTrailShineState(40, 80, at80.lapStartedAtMs, at80.lapCycleLength, options);
+      expect(hidden.visible).toBe(false);
+
+      // Path grows back to 100 at the same elapsed time -- the shine must
+      // reappear at exactly distance 80, not some remapped position.
+      const regrown = advanceTrailShineState(100, 80, hidden.lapStartedAtMs, hidden.lapCycleLength, options);
+      expect(regrown.visible).toBe(true);
+      expect(regrown.centerDistance).toBeCloseTo(80, 6);
+    });
+
+    it('survives repeated shrink/grow cycles without ever teleporting the visible center', () => {
+      let state = advanceTrailShineState(100, 0, 0, 0, options);
+      const lengths = [100, 60, 100, 30, 100, 80, 40, 100];
+      let previousT = 0;
+
+      for (let i = 0; i < lengths.length; i += 1) {
+        const t = i * 10;
+        const previous = state;
+        state = advanceTrailShineState(lengths[i]!, t, state.lapStartedAtMs, state.lapCycleLength, options);
+        const noWrapHappened = state.lapStartedAtMs === previous.lapStartedAtMs;
+
+        // As long as no wrap happened and BOTH samples were visible (so
+        // neither centerDistance was clamped by an invisible totalLength),
+        // the shine's position must have advanced by EXACTLY the real
+        // elapsed time since the immediately preceding call, at the
+        // constant speed -- never anything else. A modulo-teleport (the
+        // bug) would instead land it at some unrelated position, violating
+        // this exact equality.
+        if (noWrapHappened && previous.visible && state.visible) {
+          const expectedDistance = previous.centerDistance + ((t - previousT) * options.speedPxPerMs);
+          expect(state.centerDistance).toBeCloseTo(expectedDistance, 6);
+        }
+
+        previousT = t;
+      }
+    });
+
+    it('stays invisible if a shrink happens during the already-invisible quiet interval', () => {
+      const atLapStart = advanceTrailShineState(100, 0, 0, 0, options);
+      // 1250 is mid-quiet-gap for a length-1000 path per the earlier test
+      // above; scale down: length 100, quietGapRatio 0.5 -> quiet interval
+      // is [100, 150].
+      const duringQuiet = advanceTrailShineState(100, 125, atLapStart.lapStartedAtMs, atLapStart.lapCycleLength, options);
+      expect(duringQuiet.visible).toBe(false);
+
+      const shrunkDuringQuiet = advanceTrailShineState(40, 125, duringQuiet.lapStartedAtMs, duringQuiet.lapCycleLength, options);
+      expect(shrunkDuringQuiet.visible).toBe(false);
+    });
+
+    it('eventually starts a fresh lap from the current path length once the original (longer) cycle elapses despite an intervening shrink', () => {
+      const atLapStart = advanceTrailShineState(100, 0, 0, 0, options);
+      // Original cycle length = 100 * 1.5 = 150, so it wraps at t=150.
+      const shrunkMidLap = advanceTrailShineState(40, 80, atLapStart.lapStartedAtMs, atLapStart.lapCycleLength, options);
+      expect(shrunkMidLap.visible).toBe(false);
+
+      const afterOriginalCycleElapses = advanceTrailShineState(
+        40,
+        151,
+        shrunkMidLap.lapStartedAtMs,
+        shrunkMidLap.lapCycleLength,
+        options
+      );
+      expect(afterOriginalCycleElapses.visible).toBe(true);
+      // A fresh lap just started -- near the origin.
+      expect(afterOriginalCycleElapses.centerDistance).toBeCloseTo(1, 0);
+    });
   });
 });

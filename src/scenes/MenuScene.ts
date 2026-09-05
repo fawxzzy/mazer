@@ -55,6 +55,7 @@ import { resolveLegacyAdvancedOptionsVisible } from '../legacy-runtime/legacyAdv
 import {
   isLegacyWrappedStepTransition,
   resolveLegacyPlayableShortestPath,
+  resolveLegacyShortestPath,
   type LegacyMazeGenerationProfile,
   type LegacyMazeSnapshot,
   type LegacyPoint
@@ -2004,6 +2005,33 @@ export class MenuScene extends Phaser.Scene {
   // Reset to 0 wherever this.trail itself resets to a fresh run, so a new
   // maze/run never inherits the previous run's shine phase.
   private trailShineLapStartedAtMs = 0;
+  // The lap-in-progress's own wrap threshold, locked in at lap start -- see
+  // advanceTrailShineState's own header for why this must survive a mid-lap
+  // path-length shrink (backtracking, or a Trail Fade origin advance)
+  // untouched instead of being recomputed from the live length every call.
+  // 0 is the "no lap established yet" sentinel, matching lapStartedAtMs's
+  // own use of 0 -- the function computes a fresh cycle length on the first
+  // real call. Reset alongside trailShineLapStartedAtMs at the same
+  // fresh-run sites.
+  private trailShineLapCycleLength = 0;
+  // Trail Fade bounds this.trail to its most recent TRAIL_FADE_TAIL points,
+  // so the visible path's own origin (resolveLegacyPlayPerfectPathTrail's
+  // first point) slides forward over time instead of staying pinned at
+  // maze.start. Without correction, every cell's color would re-derive from
+  // "distance since the CURRENT origin," so the whole gradient would visibly
+  // rebase every time the origin advances. trailOriginAdvanceDistancePx
+  // accumulates how far that origin has physically moved (in path-length
+  // px, measured via the real floor grid, not assumed to be exactly one
+  // tile) since the run started, and is added to the color-phase distance
+  // (see drawLegacyContinuousPlayTrail) so a given physical trail cell keeps
+  // its own apparent color as the window slides -- color is periodic over
+  // distance, so this is a phase realignment, not a length change. Shine
+  // timing is untouched: it only ever cares about position along the
+  // CURRENTLY visible path. lastTrailOriginPoint is the checkpoint used to
+  // detect an origin change frame-to-frame. Both reset alongside
+  // trailShineLapStartedAtMs at the same fresh-run sites.
+  private trailOriginAdvanceDistancePx = 0;
+  private lastTrailOriginPoint: LegacyPoint | null = null;
   // See LegacyTrailPerfDiagnostics's own header comment. Overwritten every
   // drawLegacyContinuousPlayTrail call in play mode; null until the first
   // one runs (or if the trail is empty/off-screen that frame).
@@ -5133,6 +5161,9 @@ export class MenuScene extends Phaser.Scene {
       this.trailAnimationElapsedMs = 0;
       this.trailAnimationLastRealMs = null;
       this.trailShineLapStartedAtMs = 0;
+      this.trailShineLapCycleLength = 0;
+      this.trailOriginAdvanceDistancePx = 0;
+      this.lastTrailOriginPoint = null;
       this.hasPlayerEverLeftStart = false;
       this.playCyclePath = generationState.initialTrail.map(copyPoint);
       this.playCycleResetUsed = false;
@@ -8561,16 +8592,29 @@ export class MenuScene extends Phaser.Scene {
   }
 
   // Play mode's trail/pulse should only ever show the perfect route from the
-  // start tile to wherever the player currently stands -- not the player's
-  // raw, append-only move history (which grows to cover dead ends and
-  // backtracks and was the source of both the "colored in weird" look and
-  // the messy ping-pong pulse the player actually walked).
+  // route's own origin to wherever the player currently stands -- not the
+  // player's raw, append-only move history (which grows to cover dead ends
+  // and backtracks and was the source of both the "colored in weird" look
+  // and the messy ping-pong pulse the player actually walked).
   // Restricted to tiles the player has actually stepped on -- searching the
   // full maze grid (as this originally did) can route the "perfect path"
   // through a shortcut the player never walked, which reads as the trail
   // jumping onto tiles they didn't visit. Building a visited-only grid and
   // running the same shortest-path search against that instead guarantees
   // every tile in the result is one the player's own trail already covers.
+  //
+  // The route's origin is this.trail's own first point, not always
+  // maze.start: Trail Fade bounds this.trail to its most recent
+  // TRAIL_FADE_TAIL points (see advanceLegacyPlayStep), so once the player
+  // has moved further than that from start, maze.start is no longer even in
+  // the visited set. Searching from maze.start regardless (the original bug)
+  // made the shortest-path search fail entirely once that gap opened, which
+  // collapsed the whole visible trail to a single point at the player -- not
+  // merely a shorter trail, an invisible one. Using this.trail's own first
+  // (oldest still-retained) point as the origin instead is always reachable
+  // by construction, since every consecutive pair in this.trail is a real
+  // accepted move (grid-adjacent), so a path through the visited set from
+  // that origin to the player always exists.
   private resolveLegacyPlayPerfectPathTrail(): LegacyPoint[] {
     const visitedGrid = this.maze.grid.map((row) => row.map(() => false));
     const markVisited = (point: LegacyPoint): void => {
@@ -8584,7 +8628,8 @@ export class MenuScene extends Phaser.Scene {
     markVisited(this.maze.start);
     markVisited(this.player);
 
-    const result = resolveLegacyPlayableShortestPath(visitedGrid, this.maze.start, this.player);
+    const origin = this.trail.length > 0 ? this.trail[0]! : this.maze.start;
+    const result = resolveLegacyPlayableShortestPath(visitedGrid, origin, this.player);
     if (result.found && result.path.length > 0) {
       return result.path;
     }
@@ -9779,8 +9824,18 @@ export class MenuScene extends Phaser.Scene {
   // uninterrupted clock would now say it should be. Deliberately keyed only
   // to mode/overlay/reduced-motion -- viewport resize, board zoom, Trail
   // Fade changes, and ordinary path extension never touch it.
+  // mode/overlay alone aren't enough to mean "settled, visible, interactive
+  // gameplay" -- they're also true during portions of maze build/deconstruct,
+  // a pending reset/generation request, and a staged reveal, all of which
+  // isLegacyPlayLifecycleInputLocked() already tracks (the same lock that
+  // gates real input) for exactly this reason. Without it, a trail that
+  // materializes mid-transition could start its color/shine phase already
+  // advanced by whatever time passed while the player couldn't see or
+  // control it.
   private advanceLegacyTrailAnimationClock(time: number): number {
-    const isActivePlayVisible = this.mode === 'play' && this.overlay === 'none';
+    const isActivePlayVisible = this.mode === 'play'
+      && this.overlay === 'none'
+      && !this.isLegacyPlayLifecycleInputLocked();
     if (isActivePlayVisible && !this.prefersLegacyReducedMotion()) {
       if (this.trailAnimationLastRealMs !== null) {
         this.trailAnimationElapsedMs += Math.max(0, time - this.trailAnimationLastRealMs);
@@ -9822,6 +9877,22 @@ export class MenuScene extends Phaser.Scene {
     if (perfectPath.length === 0) {
       return;
     }
+    // Trail Fade slides the route's origin forward over time (see
+    // resolveLegacyPlayPerfectPathTrail); track how far it's actually moved,
+    // in real path-length px over the true floor grid, so the color phase
+    // below can stay stable on a given physical cell instead of visibly
+    // rebasing every time the origin advances.
+    const currentOrigin = perfectPath[0]!;
+    if (
+      this.lastTrailOriginPoint
+      && (this.lastTrailOriginPoint.x !== currentOrigin.x || this.lastTrailOriginPoint.y !== currentOrigin.y)
+    ) {
+      const originAdvance = resolveLegacyShortestPath(this.maze.grid, this.lastTrailOriginPoint, currentOrigin, 'direct-floor');
+      if (originAdvance.found && originAdvance.stepCount !== null) {
+        this.trailOriginAdvanceDistancePx += originAdvance.stepCount * tileSize;
+      }
+    }
+    this.lastTrailOriginPoint = copyPoint(currentOrigin);
     // The perfect-path's own final point is always this.player (the
     // logical, already-arrived tile) -- replaced here with the caller's
     // rendered/interpolated player point so the trail visibly extends
@@ -9861,14 +9932,21 @@ export class MenuScene extends Phaser.Scene {
     const shineEnabled = this.isLegacyTrailShineVisible();
     let shineState: ReturnType<typeof advanceTrailShineState> | null = null;
     if (shineEnabled) {
-      shineState = advanceTrailShineState(geometry.totalLength, animationTime, this.trailShineLapStartedAtMs, {
-        speedPxPerMs: (tileSize * LEGACY_PLAY_TRAIL_SHINE_SPEED_TILES_PER_SEC) / 1000,
-        lengthRatio: LEGACY_PLAY_TRAIL_SHINE_LENGTH_RATIO,
-        travelEnvelopeRatio: LEGACY_PLAY_TRAIL_SHINE_TRAVEL_ENVELOPE_RATIO,
-        quietGapRatio: LEGACY_PLAY_TRAIL_SHINE_QUIET_GAP_RATIO,
-        minTotalLengthForShine: tileSize * LEGACY_PLAY_TRAIL_SHINE_MIN_TILES
-      });
+      shineState = advanceTrailShineState(
+        geometry.totalLength,
+        animationTime,
+        this.trailShineLapStartedAtMs,
+        this.trailShineLapCycleLength,
+        {
+          speedPxPerMs: (tileSize * LEGACY_PLAY_TRAIL_SHINE_SPEED_TILES_PER_SEC) / 1000,
+          lengthRatio: LEGACY_PLAY_TRAIL_SHINE_LENGTH_RATIO,
+          travelEnvelopeRatio: LEGACY_PLAY_TRAIL_SHINE_TRAVEL_ENVELOPE_RATIO,
+          quietGapRatio: LEGACY_PLAY_TRAIL_SHINE_QUIET_GAP_RATIO,
+          minTotalLengthForShine: tileSize * LEGACY_PLAY_TRAIL_SHINE_MIN_TILES
+        }
+      );
       this.trailShineLapStartedAtMs = shineState.lapStartedAtMs;
+      this.trailShineLapCycleLength = shineState.lapCycleLength;
     }
 
     const colorOptions = {
@@ -9908,7 +9986,14 @@ export class MenuScene extends Phaser.Scene {
         )
         : LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX;
 
-      const baseColor = sampleTrailEnergyColor(midDistance, animationTime, colorOptions);
+      // Color phase uses the physically-stable distance (mid-distance along
+      // the CURRENT window plus how far the window's own origin has already
+      // advanced), not the raw window-relative midDistance ageAlpha above
+      // uses -- otherwise a Trail-Fade-truncated cell's color would jump
+      // every time the origin slides forward. Color is periodic over
+      // distance, so this is a phase realignment, not a length change.
+      const colorPhaseDistance = midDistance + this.trailOriginAdvanceDistancePx;
+      const baseColor = sampleTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions);
       let coreColor = baseColor;
       let coreAlpha = ageAlpha * alphaMultiplier;
       let highlightStrength = 0;
@@ -15718,6 +15803,9 @@ export class MenuScene extends Phaser.Scene {
       this.trailAnimationElapsedMs = 0;
       this.trailAnimationLastRealMs = null;
       this.trailShineLapStartedAtMs = 0;
+      this.trailShineLapCycleLength = 0;
+      this.trailOriginAdvanceDistancePx = 0;
+      this.lastTrailOriginPoint = null;
       this.hasPlayerEverLeftStart = false;
       this.playCyclePath = [copyPoint(result.nextPlayer)];
       this.playCycleResetUsed = true;

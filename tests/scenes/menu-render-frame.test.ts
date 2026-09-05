@@ -2384,3 +2384,62 @@ describe('Navigation Core v1 end-star: canonical energy palette, no orbiting dot
     expect(menuSceneSource).toContain("graphics.lineBetween(\n          from.x + ((to.x - from.x) * t0),");
   });
 });
+
+describe('Navigation Core v1 final correctness pass: Trail Fade origin, shine shrink continuity, lifecycle-gated clock', () => {
+  const menuSceneSource = normalizeSourceLineEndings(
+    readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
+  );
+
+  test('the perfect-path search originates from the trail\'s own oldest retained point, not unconditionally maze.start', () => {
+    // The fix for the Trail-Fade-truncation disconnection bug: maze.start is
+    // no longer in the visited set once Trail Fade has truncated this.trail
+    // past it, so searching from maze.start regardless (the original bug)
+    // could fail entirely and collapse the trail to a single point. See
+    // legacy-playable-graph.test.ts for the behavioral reproduction against
+    // real advanceLegacyPlayStep movement.
+    expect(menuSceneSource).toContain('const origin = this.trail.length > 0 ? this.trail[0]! : this.maze.start;');
+    expect(menuSceneSource).toContain('resolveLegacyPlayableShortestPath(visitedGrid, origin, this.player)');
+  });
+
+  test('the trail animation clock only advances during settled, unlocked play -- not merely mode/overlay', () => {
+    // mode==='play' && overlay==='none' alone is also true during portions
+    // of maze build/deconstruct, a pending reset/generation request, and a
+    // staged reveal -- isLegacyPlayLifecycleInputLocked() is the same real
+    // lifecycle lock that already gates input, reused here instead of an
+    // invented boolean.
+    expect(menuSceneSource).toContain(
+      "const isActivePlayVisible = this.mode === 'play'\n      && this.overlay === 'none'\n      && !this.isLegacyPlayLifecycleInputLocked();"
+    );
+  });
+
+  test('the shine\'s lap-completion threshold is persisted and passed explicitly, not recomputed from the live path length', () => {
+    // See advanceTrailShineState's own header: recomputing the wrap
+    // threshold from a path length that can shrink mid-lap (backtracking,
+    // or a Trail Fade origin advance) turns a harmless shrink into a
+    // modulo-teleport of an in-flight shine.
+    expect(menuSceneSource).toContain('private trailShineLapCycleLength = 0;');
+    expect(menuSceneSource).toContain('this.trailShineLapCycleLength,');
+    expect(menuSceneSource).toContain('this.trailShineLapCycleLength = shineState.lapCycleLength;');
+  });
+
+  test('color phase is sampled with the accumulated origin-advance offset, not the raw window-relative distance', () => {
+    // Trail Fade slides the visible route's own origin forward over time;
+    // without this offset, a surviving trail cell's color would visibly
+    // rebase every time the origin advances, since color is periodic over
+    // distance from the CURRENT window's zero point.
+    expect(menuSceneSource).toContain('private trailOriginAdvanceDistancePx = 0;');
+    expect(menuSceneSource).toContain('const colorPhaseDistance = midDistance + this.trailOriginAdvanceDistancePx;');
+    expect(menuSceneSource).toContain('sampleTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions)');
+    // ageAlpha (the Trail Fade opacity gradient) must stay on the raw
+    // window-relative midDistance -- only color gets the stable-phase
+    // offset, since age-alpha is deliberately about position within the
+    // CURRENTLY visible path, not "true" absolute distance since run start.
+    expect(menuSceneSource).toContain('(midDistance / geometry.totalLength)');
+  });
+
+  test('every reset site that clears the shine/clock state also clears the new origin-advance and lap-cycle-length state', () => {
+    const resetBlockPattern = /this\.trailAnimationElapsedMs = 0;\s*this\.trailAnimationLastRealMs = null;\s*this\.trailShineLapStartedAtMs = 0;\s*this\.trailShineLapCycleLength = 0;\s*this\.trailOriginAdvanceDistancePx = 0;\s*this\.lastTrailOriginPoint = null;\s*this\.hasPlayerEverLeftStart = false;/g;
+    const matches = menuSceneSource.match(resetBlockPattern) ?? [];
+    expect(matches.length).toBe(2);
+  });
+});

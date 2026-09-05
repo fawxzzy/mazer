@@ -406,6 +406,8 @@ export interface TrailShineState {
   envelopeAlpha: number;
   /** Caller must persist this and pass it back in as previousLapStartedAtMs next frame. */
   lapStartedAtMs: number;
+  /** Caller must persist this and pass it back in as previousLapCycleLength next frame -- see this function's own header for why the wrap threshold must survive a mid-lap length change untouched. */
+  lapCycleLength: number;
 }
 
 /**
@@ -417,14 +419,31 @@ export interface TrailShineState {
  * growing the trail mid-lap (the ordinary case: the player takes another
  * step while the shine is already partway along) only changes how much
  * farther the current lap has to travel before it completes; it can never
- * retroactively move or teleport a shine that's already in flight. Only the
- * lap-completion check (and thus the render's origin position for the *next*
- * lap) reads the current totalLength.
+ * retroactively move or teleport a shine that's already in flight.
+ *
+ * The lap-completion (wrap) threshold is likewise locked in at
+ * previousLapCycleLength and only refreshed once a wrap genuinely happens --
+ * NOT recomputed from totalLength on every call. totalLength can shrink
+ * mid-lap (the path's own perfect-path recompute is a shortest-path search,
+ * so backtracking or a Trail-Fade origin advance can make it shorter than it
+ * was a moment ago) even though `traveled` itself never jumps -- if the wrap
+ * threshold were recomputed from that shrunk length every call, a `traveled`
+ * value that was always a valid, continuous position under the OLD, longer
+ * cycle could suddenly appear to be "past" the NEW, shorter cycle, and
+ * `traveled % cycleLength` would then remap it to an unrelated earlier
+ * position: a visible teleport, not a wrap. Locking the threshold at
+ * lap-start means a shrink instead just lets `visible` (computed against the
+ * CURRENT totalLength) fade the in-flight shine toward invisible until
+ * either the path grows back past its position (no jump -- its physical
+ * center was never touched) or the lap's original, larger cycle genuinely
+ * elapses and a fresh lap begins from whatever the path measures at that
+ * moment.
  */
 export function advanceTrailShineState(
   totalLength: number,
   timeMs: number,
   previousLapStartedAtMs: number,
+  previousLapCycleLength: number,
   options: TrailShineOptions
 ): TrailShineState {
   const shineLength = totalLength * options.lengthRatio;
@@ -437,19 +456,23 @@ export function advanceTrailShineState(
       halfLength: shineLength / 2,
       travelEnvelopeLength,
       envelopeAlpha: 0,
-      lapStartedAtMs: previousLapStartedAtMs
+      lapStartedAtMs: previousLapStartedAtMs,
+      lapCycleLength: previousLapCycleLength
     };
   }
 
   const quietGap = totalLength * options.quietGapRatio;
-  const cycleLength = totalLength + quietGap;
+  let lapCycleLength = previousLapCycleLength > EPSILON ? previousLapCycleLength : (totalLength + quietGap);
   let lapStartedAtMs = previousLapStartedAtMs;
   let traveled = Math.max(0, (timeMs - lapStartedAtMs) * options.speedPxPerMs);
 
-  if (traveled >= cycleLength) {
-    const overshoot = cycleLength > EPSILON ? traveled % cycleLength : 0;
+  if (traveled >= lapCycleLength) {
+    const overshoot = lapCycleLength > EPSILON ? traveled % lapCycleLength : 0;
     lapStartedAtMs = timeMs - (overshoot / options.speedPxPerMs);
     traveled = overshoot;
+    // A fresh lap starts now -- its own wrap threshold is whatever the path
+    // measures at THIS moment, locked in until the next genuine wrap.
+    lapCycleLength = totalLength + quietGap;
   }
 
   const visible = traveled <= totalLength;
@@ -465,6 +488,7 @@ export function advanceTrailShineState(
     halfLength: shineLength / 2,
     travelEnvelopeLength,
     envelopeAlpha,
-    lapStartedAtMs
+    lapStartedAtMs,
+    lapCycleLength
   };
 }

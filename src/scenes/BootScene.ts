@@ -263,6 +263,12 @@ export class BootScene extends Phaser.Scene {
   // raw bordered source, which would silently reintroduce the original
   // per-cell border-duplication defect.
   private generateMazerFloorTileInteriorTexture(): void {
+    // Reset first, not just default-initialized: a later regeneration
+    // attempt (scene restart, hot-reload) that fails must not leave the
+    // flag stuck true from an earlier, successful lifecycle -- the fallback
+    // check downstream (isMazerFloorTileInteriorTextureAvailable) has to
+    // reflect THIS attempt's real outcome.
+    mazerFloorTileInteriorTextureAvailable = false;
     if (!this.textures.exists(MAZER_FLOOR_TILE_TEXTURE_KEY)) {
       console.warn('[Mazer] Navigation Core v1: mazer-floor-tile.png source texture missing at boot -- floor-texture accent disabled, procedural corridor material only.');
       return;
@@ -293,7 +299,15 @@ export class BootScene extends Phaser.Scene {
         this.textures.remove(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY);
       }
       this.textures.addCanvas(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY, canvas);
-      mazerFloorTileInteriorTextureAvailable = true;
+      // Confirm the derived texture actually registered before trusting it --
+      // addCanvas has no documented failure return, but checking here (not
+      // just assuming the preceding call succeeded) is what makes this
+      // flag an honest reflection of the real texture's presence.
+      if (this.textures.exists(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY)) {
+        mazerFloorTileInteriorTextureAvailable = true;
+      } else {
+        console.warn('[Mazer] Navigation Core v1: floor-tile interior texture did not register after addCanvas -- floor-texture accent disabled, procedural corridor material only.');
+      }
     } catch (error) {
       console.warn('[Mazer] Navigation Core v1: floor-tile interior texture generation failed -- floor-texture accent disabled, procedural corridor material only.', error);
     }

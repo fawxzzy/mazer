@@ -74,12 +74,41 @@ describe('BootScene floor-tile texture generation failure safety (source-level i
   );
 
   test('never marks the texture available except on the real success path', () => {
-    // Exactly one assignment to true, and it must be the line immediately
-    // after the real addCanvas() call inside the try block -- not before
-    // the crop/context work, and not in a catch/early-return branch.
+    // Exactly one assignment to true, and it must be gated behind an actual
+    // post-addCanvas existence check inside the try block -- not before the
+    // crop/context work, and not in a catch/early-return branch. addCanvas
+    // has no documented failure return, so trusting it unconditionally
+    // would make the flag a hope rather than a fact.
     const trueAssignments = bootSceneSource.match(/mazerFloorTileInteriorTextureAvailable = true;/g) ?? [];
     expect(trueAssignments).toHaveLength(1);
-    expect(bootSceneSource).toContain('this.textures.addCanvas(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY, canvas);\n      mazerFloorTileInteriorTextureAvailable = true;');
+    expect(bootSceneSource).toContain(
+      'this.textures.addCanvas(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY, canvas);'
+      + '\n      // Confirm the derived texture actually registered before trusting it --'
+      + '\n      // addCanvas has no documented failure return, but checking here (not'
+      + '\n      // just assuming the preceding call succeeded) is what makes this'
+      + '\n      // flag an honest reflection of the real texture\'s presence.'
+      + '\n      if (this.textures.exists(MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY)) {'
+      + '\n        mazerFloorTileInteriorTextureAvailable = true;'
+    );
+  });
+
+  test('resets the availability flag to false at the start of every generation attempt, not just at module load', () => {
+    // A later regeneration attempt (scene restart, hot-reload) that fails
+    // must not leave the flag stuck true from an earlier, successful
+    // lifecycle -- so the function itself must reset it first, not rely
+    // solely on the module-level field's own initial value. Exactly two
+    // occurrences of the bare assignment text expected: the field's own
+    // `let ... = false;` declaration, and this in-function reset.
+    const allFalseAssignments = bootSceneSource.match(/mazerFloorTileInteriorTextureAvailable = false;/g) ?? [];
+    expect(allFalseAssignments).toHaveLength(2);
+    expect(bootSceneSource).toContain('let mazerFloorTileInteriorTextureAvailable = false;');
+
+    const fnStart = bootSceneSource.indexOf('private generateMazerFloorTileInteriorTexture(): void {');
+    const resetIndex = bootSceneSource.indexOf('mazerFloorTileInteriorTextureAvailable = false;', fnStart);
+    const firstGuardIndex = bootSceneSource.indexOf('if (!this.textures.exists(MAZER_FLOOR_TILE_TEXTURE_KEY))', fnStart);
+    expect(fnStart).toBeGreaterThan(-1);
+    expect(resetIndex).toBeGreaterThan(fnStart);
+    expect(resetIndex).toBeLessThan(firstGuardIndex);
   });
 
   test('logs a diagnostic instead of throwing when the source texture is missing', () => {
