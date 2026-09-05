@@ -1,15 +1,17 @@
 /**
- * Wave 4D-A: real-browser integration checks for the trail's canvas
- * compositor (src/render/navigationCoreTrailCanvas.ts + MenuScene's
- * trailCanvasImage/trailCanvasTexture). The trail now lives in a
- * persistent Image/CanvasTexture pair OUTSIDE boardDynamicGraphics (the
- * Graphics object the old vector-stroke trail lived in, cleared and
- * redrawn every dirty frame) -- the old "Graphics.clear() every frame"
+ * Wave 4D-A: real-browser integration checks for all three of Navigation
+ * Core v1's real-2D-canvas compositors -- the play trail
+ * (src/render/navigationCoreTrailCanvas.ts), the player marker's glow
+ * (src/render/navigationCorePlayerGlowCanvas.ts), and the goal star's halo
+ * (src/render/navigationCoreGoalHaloCanvas.ts). Each lives in a persistent
+ * Image/CanvasTexture pair OUTSIDE boardDynamicGraphics (the Graphics
+ * object the old vector-stroke/flat-shape approximations lived in, cleared
+ * and redrawn every dirty frame) -- the old "Graphics.clear() every frame"
  * cleanup behavior this game has always relied on elsewhere cannot be
- * assumed to also clean up this new persistent Image. This script drives
- * the real running game (not a mock) through the specific transitions
- * that could leave a stale/ghost trail showing, and exits non-zero with a
- * clear message on the first check that fails.
+ * assumed to also clean up these persistent Images. This script drives the
+ * real running game (not a mock) through the specific transitions that
+ * could leave a stale/ghost layer showing, and exits non-zero with a clear
+ * message on the first check that fails.
  *
  * Usage: node scripts/analysis/verify-trail-canvas-lifecycle.mjs
  * (builds and launches its own preview server unless --no-preview is
@@ -41,12 +43,18 @@ const check = (label, passed, detail) => {
   process.stderr.write(`${passed ? 'PASS' : 'FAIL'}: ${label}${detail ? ` -- ${detail}` : ''}\n`);
 };
 
-const readTrailImageState = (page) => page.evaluate(() => {
+// Reads all three canvas layers' state at once -- every check below cares
+// about whether a stale image from a prior scenario is still showing.
+const readLayerState = (page) => page.evaluate(() => {
   const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-  const image = scene.trailCanvasImage;
+  const layer = (image) => ({
+    exists: image !== null && image !== undefined,
+    visible: image ? image.visible : null
+  });
   return {
-    exists: image !== null,
-    visible: image ? image.visible : null,
+    trail: layer(scene.trailCanvasImage),
+    playerGlow: layer(scene.playerGlowCanvasImage),
+    goalHalo: layer(scene.goalHaloCanvasImage),
     mode: scene.mode,
     overlay: scene.overlay,
     trailLength: scene.trail.length
@@ -80,7 +88,11 @@ const main = async () => {
 
     // Drive real accepted moves (not a direct scene.trail assignment) until
     // the trail is genuinely visible, retrying past the real build/reveal
-    // lifecycle lock the same way the performance script does.
+    // lifecycle lock the same way the performance script does. The player
+    // glow follows the same real-play draw path, so it comes up alongside
+    // the trail; the goal halo needs no player motion at all (drawn
+    // whenever the goal tile itself is on-screen), so it's expected to
+    // already be visible once play mode settles.
     const moveUntilVisible = async () => {
       const directions = ['move_right', 'move_down', 'move_left', 'move_up'];
       let directionIndex = 0;
@@ -92,80 +104,166 @@ const main = async () => {
           directionIndex += 1;
         }
         // eslint-disable-next-line no-await-in-loop
-        const state = await readTrailImageState(page);
-        if (state.visible) {
+        const state = await readLayerState(page);
+        if (state.trail.visible) {
           return state;
         }
         // eslint-disable-next-line no-await-in-loop
         await page.waitForTimeout(30);
       }
-      return readTrailImageState(page);
+      return readLayerState(page);
     };
 
     // ============================================================
-    // Check 1: a visible play trail, then Play -> Main Menu.
+    // Check 1: visible trail/player-glow/goal-halo, then Play -> Main Menu.
     // ============================================================
     const beforeReturnHome = await moveUntilVisible();
-    check('trail canvas image exists after entering play mode', beforeReturnHome.exists);
-    check('trail canvas image is visible once a real move produces a trail', beforeReturnHome.visible === true);
+    check('trail canvas image exists after entering play mode', beforeReturnHome.trail.exists);
+    check('trail canvas image is visible once a real move produces a trail', beforeReturnHome.trail.visible === true);
+    check('player glow canvas image is visible once a real move produces a trail', beforeReturnHome.playerGlow.visible === true);
+    check('goal halo canvas image exists and is visible in real play mode', beforeReturnHome.goalHalo.visible === true);
 
     await page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RETURN_HOME' }));
     await page.waitForTimeout(100);
-    const afterReturnHome = await readTrailImageState(page);
+    const afterReturnHome = await readLayerState(page);
     check(
       'trail canvas image is hidden immediately after Play -> Main Menu (no ghost trail behind the menu)',
-      afterReturnHome.visible === false,
-      `mode=${afterReturnHome.mode} visible=${afterReturnHome.visible}`
+      afterReturnHome.trail.visible === false,
+      `mode=${afterReturnHome.mode} visible=${afterReturnHome.trail.visible}`
+    );
+    check(
+      'player glow canvas image is hidden immediately after Play -> Main Menu (no ghost glow behind the menu)',
+      afterReturnHome.playerGlow.visible === false
+    );
+    check(
+      'goal halo canvas image is hidden immediately after Play -> Main Menu (no ghost halo behind the menu)',
+      afterReturnHome.goalHalo.visible === false
     );
 
     // ============================================================
-    // Check 2: back into play, visible trail, then a real reset ->
-    // the trail must not stay stuck showing the pre-reset route.
+    // Check 2: back into play, visible layers, then a real reset -> the
+    // trail must not stay stuck showing the pre-reset route, and a fresh
+    // maze generation must not leave the OLD goal tile's halo behind.
     // ============================================================
     await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
     await page.waitForTimeout(300);
     const beforeReset = await moveUntilVisible();
-    check('trail visible again after re-entering play mode', beforeReset.visible === true);
+    check('trail visible again after re-entering play mode', beforeReset.trail.visible === true);
 
     // Real reset path via the same UI command bridge the real Pause-overlay
     // reset action would dispatch -- internally
     // applyLegacyPauseCommand('reset-player').
     const resetAccepted = await page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RESET_RUN' }));
     await page.waitForTimeout(100);
-    const afterReset = await readTrailImageState(page);
+    const afterReset = await readLayerState(page);
     check(
       'trail length collapses back down after a real reset (not stuck at the pre-reset route)',
       afterReset.trailLength <= 1,
       `trailLength=${afterReset.trailLength} resetAccepted=${resetAccepted}`
     );
 
+    // A real next-maze generation (returning home, then starting a fresh
+    // run) regenerates the goal at a new tile -- the halo canvas must
+    // reposition to it, not linger at the old goal's screen position.
+    await page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RETURN_HOME' }));
+    await page.waitForTimeout(100);
+    const goalBeforeNewMaze = await page.evaluate(() => {
+      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+      return { ...scene.maze.goal };
+    });
+    await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+    await page.waitForTimeout(300);
+    const afterNewMaze = await moveUntilVisible();
+    const goalAfterNewMaze = await page.evaluate(() => {
+      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+      return { ...scene.maze.goal };
+    });
+    check(
+      'goal halo canvas image is visible again after a fresh maze generation',
+      afterNewMaze.goalHalo.visible === true,
+      `goalBefore=${JSON.stringify(goalBeforeNewMaze)} goalAfter=${JSON.stringify(goalAfterNewMaze)}`
+    );
+
     // ============================================================
     // Check 3: pause/resume must not hide or corrupt an already-visible
-    // trail -- only its animation clock freezes, not its visibility.
+    // layer -- only its animation clock freezes, not its visibility.
     // ============================================================
     await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
     await page.waitForTimeout(300);
     const beforePause = await moveUntilVisible();
-    check('trail visible before opening Pause', beforePause.visible === true);
+    check('trail visible before opening Pause', beforePause.trail.visible === true);
+    check('player glow visible before opening Pause', beforePause.playerGlow.visible === true);
+    check('goal halo visible before opening Pause', beforePause.goalHalo.visible === true);
     await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
     await page.waitForTimeout(100);
-    const duringPause = await readTrailImageState(page);
+    const duringPause = await readLayerState(page);
     check(
       'trail stays visible while Pause is open (only its clock freezes, not its visibility)',
-      duringPause.visible === true,
+      duringPause.trail.visible === true,
       `overlay=${duringPause.overlay}`
     );
+    check('player glow stays visible while Pause is open', duringPause.playerGlow.visible === true);
+    check('goal halo stays visible while Pause is open', duringPause.goalHalo.visible === true);
     await page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RESUME_RUN' }));
     await page.waitForTimeout(100);
-    const afterResume = await readTrailImageState(page);
-    check('trail stays visible after closing Pause', afterResume.visible === true);
+    const afterResume = await readLayerState(page);
+    check('trail stays visible after closing Pause', afterResume.trail.visible === true);
+    check('player glow stays visible after closing Pause', afterResume.playerGlow.visible === true);
+    check('goal halo stays visible after closing Pause', afterResume.goalHalo.visible === true);
+
+    // ============================================================
+    // Check 4: reduced motion must not remove any layer -- only freeze the
+    // animated parts (halo pulse, glow breathing, shine sweep).
+    // ============================================================
+    const underReducedMotion = await page.evaluate(() => {
+      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+      scene.applyLegacyReducedMotionPreference(true);
+      scene.boardDynamicDirty = true;
+      return true;
+    });
+    await page.waitForTimeout(100);
+    const reducedMotionState = await readLayerState(page);
+    check(
+      'reduced motion keeps the trail/player-glow/goal-halo visible (freezes animation, does not remove the layer)',
+      reducedMotionState.trail.visible === true
+        && reducedMotionState.playerGlow.visible === true
+        && reducedMotionState.goalHalo.visible === true,
+      `reducedMotionApplied=${underReducedMotion}`
+    );
+    await page.evaluate(() => {
+      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+      scene.applyLegacyReducedMotionPreference(false);
+    });
+
+    // ============================================================
+    // Check 5: a viewport resize (simulating device rotation / a board-zoom
+    // change) must not leave any layer mispositioned/invisible -- all three
+    // canvases are DPR/zoom-resolution-aware and must redraw at the new size.
+    // ============================================================
+    await page.setViewportSize({ width: 800, height: 1280 });
+    await page.waitForTimeout(200);
+    await page.evaluate(() => {
+      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+      scene.boardDynamicDirty = true;
+      scene.boardPathDirty = true;
+      scene.boardStaticDirty = true;
+    });
+    await page.waitForTimeout(200);
+    const afterResize = await readLayerState(page);
+    check(
+      'trail/player-glow/goal-halo all stay visible across a viewport resize',
+      afterResize.trail.visible === true && afterResize.playerGlow.visible === true && afterResize.goalHalo.visible === true,
+      `trailLength=${afterResize.trailLength}`
+    );
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.waitForTimeout(200);
 
     await context.close();
 
     // ============================================================
-    // Check 4: scene shutdown/recreate (a full page reload) must not
-    // crash or collide on the texture key, and must produce a fresh,
-    // working trail canvas image again.
+    // Check 6: scene shutdown/recreate (a full page reload) must not
+    // crash or collide on any texture key, and must produce fresh,
+    // working canvas images again for all three layers.
     // ============================================================
     const context2 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const page2 = await context2.newPage();
@@ -175,8 +273,10 @@ const main = async () => {
     await page2.waitForFunction(() => Boolean(window.__MAZER_QA__?.startPlayMode), { timeout: 15000 });
     await page2.evaluate(() => window.__MAZER_QA__.startPlayMode());
     await page2.waitForTimeout(300);
-    const afterReload = await readTrailImageState(page2);
-    check('trail canvas image exists after a full reload (scene recreate)', afterReload.exists);
+    const afterReload = await readLayerState(page2);
+    check('trail canvas image exists after a full reload (scene recreate)', afterReload.trail.exists);
+    check('player glow canvas image exists after a full reload (scene recreate)', afterReload.playerGlow.exists);
+    check('goal halo canvas image exists after a full reload (scene recreate)', afterReload.goalHalo.exists);
     check('no page errors (e.g. a duplicate texture-key exception) across the reload', pageErrors.length === 0, pageErrors.join('; '));
     await context2.close();
   } finally {
