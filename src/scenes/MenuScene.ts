@@ -14,7 +14,9 @@ import {
 } from './BootScene';
 import {
   applyMazerCanvasBackingResolution,
+  MAZER_CANVAS_RESOLUTION_MAX,
   resolveMazerCanvasBackingResolution,
+  resolveMazerCanvasResolution,
   summarizeMazerRenderResolution,
   type MazerRenderResolutionDiagnostics,
   type MazerRenderResolutionStatus
@@ -1935,8 +1937,11 @@ export class MenuScene extends Phaser.Scene {
   private trailCanvasTextureKey: string | null = null;
   private trailCanvasTexture: Phaser.Textures.CanvasTexture | null = null;
   private trailCanvasImage: Phaser.GameObjects.Image | null = null;
+  // Backing PIXEL dimensions (logical size * resolution), not the Image's
+  // own logical display size -- see drawTrailCanvasSegments's own comment.
   private trailCanvasWidth = 0;
   private trailCanvasHeight = 0;
+  private trailCanvasResolution = 0;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
   private overlayGuideGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -10104,12 +10109,25 @@ export class MenuScene extends Phaser.Scene {
   }
 
   // Resizes/repositions the trail's own canvas (only when its bounding box
-  // actually changed -- not unconditionally every frame), clears it, draws
-  // into it via the pure Canvas-2D compositor, and shows the backing image
-  // at the right spot in boardZoomContainer. A no-op (leaves the image
-  // hidden, per drawLegacyContinuousPlayTrail's own default-hidden
-  // behavior at the top of that method) if there's nothing to draw or the
-  // canvas texture failed to initialize.
+  // or the required backing resolution actually changed -- not
+  // unconditionally every frame), clears it, draws into it via the pure
+  // Canvas-2D compositor, and shows the backing image at the right spot in
+  // boardZoomContainer. A no-op (leaves the image hidden, per
+  // drawLegacyContinuousPlayTrail's own default-hidden behavior at the top
+  // of that method) if there's nothing to draw or the canvas texture
+  // failed to initialize.
+  //
+  // Backing resolution: the texture's own pixel buffer is sized at
+  // logical-size * resolution (the same devicePixelRatio-derived policy
+  // src/boot/canvasResolution.ts already applies to the game's main
+  // canvas, times the board container's own current zoom scale, so a
+  // future zoom feature doesn't undersample this layer either), then the
+  // Image's DISPLAY size is set back to the logical size -- exactly the
+  // "render at N x display resolution, then downscale" supersampling
+  // pattern, so the trail stays crisp at DPR3 and compact/fractional tile
+  // sizes instead of the canvas's pixel buffer being 1:1 with logical
+  // board-space units and reading as soft/blurry next to the rest of the
+  // (resolution-aware) scene.
   private drawTrailCanvasSegments(
     segments: readonly TrailCanvasSegment[],
     coreWidth: number,
@@ -10125,13 +10143,32 @@ export class MenuScene extends Phaser.Scene {
     }
     const width = Math.max(1, Math.ceil(bounds.width));
     const height = Math.max(1, Math.ceil(bounds.height));
-    if (width !== this.trailCanvasWidth || height !== this.trailCanvasHeight) {
-      this.trailCanvasTexture.setSize(width, height);
-      this.trailCanvasWidth = width;
-      this.trailCanvasHeight = height;
+    const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
+    const resolution = Math.min(
+      MAZER_CANVAS_RESOLUTION_MAX * 2,
+      resolveMazerCanvasResolution() * zoomScale
+    );
+    const backingWidth = Math.max(1, Math.ceil(width * resolution));
+    const backingHeight = Math.max(1, Math.ceil(height * resolution));
+    if (
+      backingWidth !== this.trailCanvasWidth
+      || backingHeight !== this.trailCanvasHeight
+      || resolution !== this.trailCanvasResolution
+    ) {
+      this.trailCanvasTexture.setSize(backingWidth, backingHeight);
+      this.trailCanvasWidth = backingWidth;
+      this.trailCanvasHeight = backingHeight;
+      this.trailCanvasResolution = resolution;
     } else {
-      this.trailCanvasTexture.clear(0, 0, width, height, false);
+      this.trailCanvasTexture.clear(0, 0, backingWidth, backingHeight, false);
     }
+    // Idempotent (setTransform, not scale/save/restore) -- context state
+    // otherwise persists across frames and would compound every call. Every
+    // drawing value below (coordinates, lineWidth, shadowBlur) stays in
+    // LOGICAL board-space units -- the transform matrix is what actually
+    // scales them up to the higher-resolution backing buffer; multiplying
+    // any of them by `resolution` again here would double-scale it.
+    this.trailCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
     drawTrailToCanvasContext(this.trailCanvasTexture.context, segments, {
       originX: bounds.left,
       originY: bounds.top,
@@ -10142,6 +10179,7 @@ export class MenuScene extends Phaser.Scene {
     });
     this.trailCanvasTexture.refresh();
     this.trailCanvasImage.setPosition(bounds.left, bounds.top);
+    this.trailCanvasImage.setDisplaySize(width, height);
     this.trailCanvasImage.setVisible(true);
   }
 

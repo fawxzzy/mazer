@@ -270,6 +270,7 @@ describe('Mazer UI rework decision registry contract', () => {
         'src/scenes/menuRuntimeDiagnostics.ts': '1C',
         'src/scenes/MenuScene.ts': '4D-A',
         'src/render/navigationCoreTrail.ts': '4D-A',
+        'src/render/navigationCoreTrailCanvas.ts': '4D-A',
         'src/scenes/BootScene.ts': '4D-A',
         'src/legacy-runtime/legacyAuth.ts': '3B',
         'src/legacy-runtime/legacyPlayerMessage.ts': '3B',
