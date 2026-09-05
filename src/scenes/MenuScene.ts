@@ -28,6 +28,11 @@ import {
   sampleTrailEnergyColor
 } from '../render/navigationCoreTrail';
 import {
+  computeTrailCanvasBounds,
+  drawTrailToCanvasContext,
+  type TrailCanvasSegment
+} from '../render/navigationCoreTrailCanvas';
+import {
   collectDemoWalkerRouteDiagnostics,
   type DemoRunnerTelemetry,
   type DemoWalkerConfig,
@@ -1638,76 +1643,6 @@ const buildPathTrail = (
   return points.slice(Math.max(0, points.length - limit)).map((point) => ({ x: point.x, y: point.y }));
 };
 
-interface LegacyTrailStrokeSegment {
-  previous: { x: number; y: number };
-  current: { x: number; y: number };
-  color: number;
-  alpha: number;
-}
-
-const LEGACY_TRAIL_STROKE_CHUNK_COLOR_TOLERANCE = 4;
-const LEGACY_TRAIL_STROKE_CHUNK_ALPHA_TOLERANCE = 0.02;
-
-const legacyTrailColorChannelsClose = (a: number, b: number, tolerance: number): boolean => {
-  const ar = (a >> 16) & 0xff;
-  const ag = (a >> 8) & 0xff;
-  const ab = a & 0xff;
-  const br = (b >> 16) & 0xff;
-  const bg = (b >> 8) & 0xff;
-  const bb = b & 0xff;
-  return Math.abs(ar - br) <= tolerance && Math.abs(ag - bg) <= tolerance && Math.abs(ab - bb) <= tolerance;
-};
-
-// Draws the trail as ONE continuous multi-point stroke per run of visually
-// indistinguishable segments (within a small color/alpha tolerance), not one
-// independent stroke call per ~4px resampled segment. The per-segment
-// version stroked each tiny segment as its own moveTo/lineTo/strokePath --
-// with round line caps applied AT EVERY SEGMENT'S OWN ENDPOINTS (not a
-// shared join with its neighbor), consecutive short segments meeting at a
-// bend fan out into a "toothed"/radiating look instead of one smooth
-// rounded corner, and along straight runs the repeated overlapping caps
-// read as a faint banding texture. Chaining many lineTo calls into ONE
-// beginPath/strokePath instead lets the renderer's own line-join logic
-// (which handles bends between consecutive points of the SAME path) draw
-// the bend once, smoothly -- not many small independent caps piling up.
-// The color/alpha tolerance is small enough that batching doesn't visibly
-// change the gradient: a chunk boundary only starts where consecutive
-// segments already differ enough to need their own draw call anyway (e.g.
-// where the shine highlight is actively sweeping through).
-const drawLegacyTrailStrokeChunks = (
-  graphics: Phaser.GameObjects.Graphics,
-  segments: readonly LegacyTrailStrokeSegment[],
-  width: number
-): void => {
-  let i = 0;
-  while (i < segments.length) {
-    const chunkStart = segments[i]!;
-    let j = i;
-    while (
-      j + 1 < segments.length
-      // Segments can be non-adjacent in world space (a subpath break --
-      // e.g. a wraparound crossing -- skips drawing the connecting
-      // segment entirely, see the caller). Chunking must never bridge that
-      // gap with a stray line just because the colors either side happen
-      // to be close.
-      && segments[j]!.current.x === segments[j + 1]!.previous.x
-      && segments[j]!.current.y === segments[j + 1]!.previous.y
-      && legacyTrailColorChannelsClose(segments[j + 1]!.color, chunkStart.color, LEGACY_TRAIL_STROKE_CHUNK_COLOR_TOLERANCE)
-      && Math.abs(segments[j + 1]!.alpha - chunkStart.alpha) <= LEGACY_TRAIL_STROKE_CHUNK_ALPHA_TOLERANCE
-    ) {
-      j += 1;
-    }
-    graphics.lineStyle(width, chunkStart.color, chunkStart.alpha);
-    graphics.beginPath();
-    graphics.moveTo(chunkStart.previous.x, chunkStart.previous.y);
-    for (let k = i; k <= j; k += 1) {
-      graphics.lineTo(segments[k]!.current.x, segments[k]!.current.y);
-    }
-    graphics.strokePath();
-    i = j + 1;
-  }
-};
-
 export class MenuScene extends Phaser.Scene {
   private settings: LegacySettings = copyLegacySettings(LEGACY_DEFAULTS);
   private optionFieldDrafts: LegacyOptionFieldDrafts = createLegacyOptionFieldDrafts(LEGACY_DEFAULTS);
@@ -1981,6 +1916,27 @@ export class MenuScene extends Phaser.Scene {
   // boardZoomContainer, matching hudGraphics' own coordinate space.
   private touchSettingsCogIconImage!: Phaser.GameObjects.Image;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
+  // Navigation Core v1's continuous play trail is composited on a real 2D
+  // canvas (src/render/navigationCoreTrailCanvas.ts), not stroked as
+  // Phaser Graphics vector paths -- the game runs Phaser.CANVAS
+  // (postFX/preFX blur is WebGL-only), and a raw CanvasRenderingContext2D
+  // gives real round line joins on a single continuous path plus a genuine
+  // shadowBlur halo, neither of which a Graphics stroke call exposes.
+  // Sized to this one trail's own bounding box (plus glow padding), not a
+  // full-board canvas -- resized/repositioned only when that box actually
+  // changes. Lives in boardZoomContainer, positioned just before
+  // boardDynamicGraphics so the player/goal markers drawn into that
+  // Graphics object still render on top of it. Hidden (not destroyed) by
+  // drawLegacyContinuousPlayTrail on every early-return path, so a
+  // menu-mode frame or an empty/degenerate trail never leaves stale pixels
+  // showing. The texture key is unique per scene instance (see create())
+  // so a scene restart doesn't collide with a still-registered previous
+  // instance's texture.
+  private trailCanvasTextureKey: string | null = null;
+  private trailCanvasTexture: Phaser.Textures.CanvasTexture | null = null;
+  private trailCanvasImage: Phaser.GameObjects.Image | null = null;
+  private trailCanvasWidth = 0;
+  private trailCanvasHeight = 0;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
   private overlayGuideGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -2262,6 +2218,13 @@ export class MenuScene extends Phaser.Scene {
     this.boardBleedPathImages = Array.from({ length: LEGACY_BLEED_PATH_IMAGE_POOL_SIZE }, () => (
       this.add.image(0, 0, MAZER_BLEED_PATH_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
     ));
+    // Navigation Core v1's continuous play trail -- a real 2D canvas, not a
+    // Graphics object (see the field's own comment for why). 1x1 initially;
+    // drawLegacyContinuousPlayTrail resizes/repositions/redraws it every
+    // frame it actually has a trail to show, and hides it otherwise.
+    this.trailCanvasTextureKey = `legacy-nav-core-trail-${nextMenuSceneInstanceId()}`;
+    this.trailCanvasTexture = this.textures.createCanvas(this.trailCanvasTextureKey, 1, 1);
+    this.trailCanvasImage = this.add.image(0, 0, this.trailCanvasTextureKey).setOrigin(0, 0).setVisible(false);
     this.boardDynamicGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
     this.playerTrailImages = Array.from({ length: LEGACY_PLAYER_TRAIL_IMAGE_POOL_SIZE }, () => (
@@ -2275,6 +2238,10 @@ export class MenuScene extends Phaser.Scene {
       this.boardFloorTileSprite,
       this.boardFloorMaskGraphics,
       ...this.boardBleedPathImages,
+      // Before boardDynamicGraphics: the play trail's canvas-composited
+      // core/glow render here, underneath the start/goal/player markers
+      // drawn into boardDynamicGraphics right after it.
+      this.trailCanvasImage,
       this.boardDynamicGraphics,
       // After boardDynamicGraphics (the trail's own colored fill, and the
       // start/goal/player markers, are all drawn into that one Graphics
@@ -2425,6 +2392,17 @@ export class MenuScene extends Phaser.Scene {
       window.addEventListener(MAZER_VIEWPORT_CHANGE_EVENT, this.viewportGeometryListener);
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      // The CanvasTexture is registered in the game-level TextureManager,
+      // which outlives this scene instance -- unlike a plain Graphics
+      // object or Image (which Phaser destroys along with the scene), a
+      // leftover canvas texture would both leak and collide with a future
+      // scene instance's own key if left registered.
+      if (this.trailCanvasTextureKey !== null && this.textures.exists(this.trailCanvasTextureKey)) {
+        this.textures.remove(this.trailCanvasTextureKey);
+      }
+      this.trailCanvasTexture = null;
+      this.trailCanvasImage = null;
+      this.trailCanvasTextureKey = null;
       if (this.remoteSettingsSyncTimer !== null) {
         clearTimeout(this.remoteSettingsSyncTimer);
         this.remoteSettingsSyncTimer = null;
@@ -9940,6 +9918,11 @@ export class MenuScene extends Phaser.Scene {
     alphaMultiplier: number
   ): void {
     const animationTime = this.advanceLegacyTrailAnimationClock(time);
+    // Hidden by default -- every early return below (nothing to draw this
+    // frame) must leave the canvas image hidden, not showing stale pixels
+    // from the last frame that actually had a trail. Only re-shown once a
+    // real geometry is about to be drawn into it, further down.
+    this.trailCanvasImage?.setVisible(false);
     if (alphaMultiplier <= 0 || tileSize <= 0) {
       return;
     }
@@ -10025,7 +10008,6 @@ export class MenuScene extends Phaser.Scene {
     };
     const coreWidth = Math.max(1, tileSize * LEGACY_PLAY_TRAIL_WIDTH_RATIO);
     const glowWidth = Math.max(coreWidth, tileSize * LEGACY_PLAY_TRAIL_GLOW_WIDTH_RATIO);
-    const graphics = this.boardDynamicGraphics;
     // Trail Fade OFF: the full retained trail stays at one stable, uniform
     // base alpha (still subject to lifecycle/deconstruction alpha via
     // alphaMultiplier) -- no age gradient. Trail Fade ON: the existing
@@ -10091,36 +10073,20 @@ export class MenuScene extends Phaser.Scene {
       segments.push({ previous, current, baseColor, coreColor, coreAlpha });
     }
 
-    // Pass 1: soft outer spectral glow -- the same base energy color, wide
-    // and dim, bounded well under the player/goal markers' own glow
-    // intensity (LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO). Scales with tileSize
-    // like everything else here, so it stays a crisp accent rather than a
-    // blurred bar at compact/mobile tile sizes. Chunked (see
-    // drawLegacyTrailStrokeChunks) so consecutive segments share real line
-    // joins instead of each getting its own independent end caps.
-    drawLegacyTrailStrokeChunks(
-      graphics,
-      segments.map((segment) => ({
-        previous: segment.previous,
-        current: segment.current,
-        color: segment.baseColor,
-        alpha: segment.coreAlpha * LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO
-      })),
-      glowWidth
-    );
-
-    // Pass 2: the crisp 16%-tile core (shine-blended where applicable),
-    // entirely on top of every glow stroke from pass 1.
-    drawLegacyTrailStrokeChunks(
-      graphics,
-      segments.map((segment) => ({
-        previous: segment.previous,
-        current: segment.current,
-        color: segment.coreColor,
-        alpha: segment.coreAlpha
-      })),
-      coreWidth
-    );
+    // Composited on the real 2D canvas (src/render/navigationCoreTrailCanvas.ts),
+    // not stroked as Phaser Graphics vector paths -- see trailCanvasImage's
+    // own field comment for why (Phaser.CANVAS has no WebGL-only postFX
+    // blur to reach for, and a raw CanvasRenderingContext2D gives real round
+    // joins on one continuous path plus a genuine shadowBlur halo, neither
+    // of which a Graphics stroke call exposes).
+    const canvasSegments: TrailCanvasSegment[] = segments.map((segment) => ({
+      previous: segment.previous,
+      current: segment.current,
+      glowColor: segment.baseColor,
+      coreColor: segment.coreColor,
+      alpha: segment.coreAlpha
+    }));
+    this.drawTrailCanvasSegments(canvasSegments, coreWidth, glowWidth);
 
     const perfDrawEndedAtMs = performance.now();
     this.lastTrailPerfDiagnostics = {
@@ -10135,6 +10101,48 @@ export class MenuScene extends Phaser.Scene {
       shineEnabled,
       trailFadeEnabled
     };
+  }
+
+  // Resizes/repositions the trail's own canvas (only when its bounding box
+  // actually changed -- not unconditionally every frame), clears it, draws
+  // into it via the pure Canvas-2D compositor, and shows the backing image
+  // at the right spot in boardZoomContainer. A no-op (leaves the image
+  // hidden, per drawLegacyContinuousPlayTrail's own default-hidden
+  // behavior at the top of that method) if there's nothing to draw or the
+  // canvas texture failed to initialize.
+  private drawTrailCanvasSegments(
+    segments: readonly TrailCanvasSegment[],
+    coreWidth: number,
+    glowWidth: number
+  ): void {
+    if (!this.trailCanvasTexture || !this.trailCanvasImage || segments.length === 0) {
+      return;
+    }
+    const padding = Math.ceil(glowWidth);
+    const bounds = computeTrailCanvasBounds(segments, padding);
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return;
+    }
+    const width = Math.max(1, Math.ceil(bounds.width));
+    const height = Math.max(1, Math.ceil(bounds.height));
+    if (width !== this.trailCanvasWidth || height !== this.trailCanvasHeight) {
+      this.trailCanvasTexture.setSize(width, height);
+      this.trailCanvasWidth = width;
+      this.trailCanvasHeight = height;
+    } else {
+      this.trailCanvasTexture.clear(0, 0, width, height, false);
+    }
+    drawTrailToCanvasContext(this.trailCanvasTexture.context, segments, {
+      originX: bounds.left,
+      originY: bounds.top,
+      coreWidth,
+      glowWidth,
+      glowAlphaRatio: LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO,
+      glowBlurPx: Math.max(2, glowWidth * 0.5)
+    });
+    this.trailCanvasTexture.refresh();
+    this.trailCanvasImage.setPosition(bounds.left, bounds.top);
+    this.trailCanvasImage.setVisible(true);
   }
 
   private drawLegacyPlayDynamicTrailPulse(
