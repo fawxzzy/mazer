@@ -10172,11 +10172,26 @@ export class MenuScene extends Phaser.Scene {
       this.trailCanvasTexture.clear(0, 0, backingWidth, backingHeight, false);
     }
     // Idempotent (setTransform, not scale/save/restore) -- context state
-    // otherwise persists across frames and would compound every call. Every
-    // drawing value below (coordinates, lineWidth, shadowBlur) stays in
-    // LOGICAL board-space units -- the transform matrix is what actually
-    // scales them up to the higher-resolution backing buffer; multiplying
-    // any of them by `resolution` again here would double-scale it.
+    // otherwise persists across frames and would compound every call. Path
+    // geometry (coordinates, lineWidth) stays in LOGICAL board-space units --
+    // the transform matrix scales those up to the higher-resolution backing
+    // buffer, so multiplying them by `resolution` again here would double-
+    // scale them.
+    //
+    // shadowBlur is the one exception, verified empirically (not assumed):
+    // held a shape's own DEVICE-pixel footprint constant while sweeping
+    // setTransform's scale from 1 to 4 with shadowBlur set to a fixed value
+    // each time -- the rendered halo's device-pixel width was bit-for-bit
+    // identical (31px) at every scale. shadowBlur is a raw device-pixel
+    // radius that the CTM does not touch, unlike every other value here. So
+    // it needs the opposite treatment: passing the logical glow radius
+    // through unscaled would make the glow read `resolution` times TIGHTER
+    // than intended once the backing buffer is downscaled back to the
+    // Image's logical display size (exactly the bug a reviewer flagged after
+    // this comment previously claimed shadowBlur followed the transform like
+    // everything else) -- multiply it by `resolution` explicitly so the
+    // device-pixel blur, once downscaled for display, reads as the same
+    // logical radius regardless of backing resolution.
     this.trailCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
     drawTrailToCanvasContext(this.trailCanvasTexture.context, segments, {
       originX: bounds.left,
@@ -10184,7 +10199,7 @@ export class MenuScene extends Phaser.Scene {
       coreWidth,
       glowWidth,
       glowAlphaRatio: LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO,
-      glowBlurPx: Math.max(2, glowWidth * 0.5)
+      glowBlurPx: Math.max(2, glowWidth * 0.5) * resolution
     });
     this.trailCanvasTexture.refresh();
     this.trailCanvasImage.setPosition(bounds.left, bounds.top);

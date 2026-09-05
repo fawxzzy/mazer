@@ -2475,4 +2475,11 @@ describe('Navigation Core v1 trail canvas: lifecycle and resolution integration'
     expect(menuSceneSource).toContain('`legacy-nav-core-trail-${nextMenuSceneInstanceId()}`');
     expect(menuSceneSource).toContain('this.textures.remove(this.trailCanvasTextureKey);');
   });
+
+  test('scales shadowBlur by the backing resolution -- unlike path geometry, Canvas 2D shadowBlur is a raw device-pixel radius the context transform does not touch, verified empirically (identical device-pixel halo width across setTransform scales 1-4 with a fixed-device-footprint shape)', () => {
+    const fnStart = menuSceneSource.indexOf('private drawTrailCanvasSegments(');
+    expect(fnStart).toBeGreaterThan(-1);
+    const glowBlurIndex = menuSceneSource.indexOf('glowBlurPx: Math.max(2, glowWidth * 0.5) * resolution', fnStart);
+    expect(glowBlurIndex).toBeGreaterThan(fnStart);
+  });
 });
