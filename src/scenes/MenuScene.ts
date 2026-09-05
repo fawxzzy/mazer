@@ -6049,6 +6049,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private enterMenuMode(): void {
+    // drawLegacyContinuousPlayTrail (which hides this image on every one of
+    // its own early-return paths) only ever runs from drawDynamicBoard's
+    // play-mode branch -- once mode flips to 'menu' here, that branch (and
+    // so that hide-on-nothing-to-draw guard) stops running entirely, and
+    // drawDynamicBoard itself is dirty-flag-gated, not called every frame
+    // regardless. Without this, a trail still visible the instant play mode
+    // ends would stay stuck on screen, frozen, showing through/behind the
+    // menu that regenerates underneath it.
+    this.trailCanvasImage?.setVisible(false);
     this.resetLegacyPlayInputBuffer();
     this.clearPlayHudImmediately();
     this.resetLegacyPlayerTransferEnergy();
