@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NAVIGATION_CORE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './navigation-core-required-tests.mjs';
+import { TELEPORT_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './teleport-required-tests.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPO_ROOT = resolve(SCRIPT_PATH, '..', '..', '..');
@@ -44,6 +45,10 @@ runVitest([
   // exists and is shared with CI. Filtered to skip tests/reset/* entries,
   // which TEST_SPINE's own 'tests/reset' glob above already runs.
   ...NAVIGATION_CORE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
+  // Wave 4D-B's Teleport System v1 required coverage -- same silent-gap
+  // class as the Navigation Core list just above; see
+  // teleport-required-tests.mjs's own header.
+  ...TELEPORT_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
   '--exclude', CWD_MUTATING_FIXTURE,
   '--maxWorkers', '1',
   '--pool=threads',
