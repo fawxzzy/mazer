@@ -182,16 +182,53 @@ const getBoardFrame = async (page) => (
   })
 );
 
+// Word-wraps a caption to fit `width` px at the fixed 14px monospace font
+// used below, instead of emitting it as one <text> line. A single-line box
+// silently CROPS anything past its raster width (librsvg rasterizes to the
+// SVG's declared width/height in pixels; text past that edge is simply not
+// part of the output bitmap, "overflow: visible" or not) -- confirmed as a
+// real defect here: formatMotionLabel's dynamic captions (title plus
+// player/rendered coordinates, trail length, elapsed ms, and motion flag)
+// routinely run past 480-640px at this font size and were being silently
+// truncated rather than wrapped.
+const FONT_SIZE = 14;
+const CHAR_WIDTH_PX = FONT_SIZE * 0.6;
+const LINE_HEIGHT_PX = 18;
+const CAPTION_SIDE_MARGIN_PX = 6;
+
+const wrapCaptionLines = (label, width) => {
+  const maxChars = Math.max(8, Math.floor((width - (CAPTION_SIDE_MARGIN_PX * 2)) / CHAR_WIDTH_PX));
+  const words = label.split(' ');
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current.length === 0 ? word : `${current} ${word}`;
+    if (candidate.length > maxChars && current.length > 0) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current.length > 0) lines.push(current);
+  return lines.length > 0 ? lines : [''];
+};
+
 const labelPng = async (buffer, label, width) => {
+  const lines = wrapCaptionLines(label, width);
+  const captionHeight = (lines.length * LINE_HEIGHT_PX) + 8;
+  const textEls = lines
+    .map((line, i) => `<text x="${CAPTION_SIDE_MARGIN_PX}" y="${19 + (i * LINE_HEIGHT_PX)}" font-family="monospace" font-size="${FONT_SIZE}" fill="#e6fff5">${line}</text>`)
+    .join('');
   const svg = Buffer.from(
-    `<svg width="${width}" height="28"><rect width="100%" height="100%" fill="#0b0f14"/><text x="6" y="19" font-family="monospace" font-size="14" fill="#e6fff5">${label}</text></svg>`
+    `<svg width="${width}" height="${captionHeight}"><rect width="100%" height="100%" fill="#0b0f14"/>${textEls}</svg>`
   );
   const base = await sharp(buffer).resize({ width, fit: 'inside' }).toBuffer();
   const baseMeta = await sharp(base).metadata();
   const canvas = sharp({
-    create: { width: baseMeta.width, height: baseMeta.height + 28, channels: 4, background: '#0b0f14' }
+    create: { width: baseMeta.width, height: baseMeta.height + captionHeight, channels: 4, background: '#0b0f14' }
   });
-  return canvas.composite([{ input: svg, top: 0, left: 0 }, { input: base, top: 28, left: 0 }]).png().toBuffer();
+  return canvas.composite([{ input: svg, top: 0, left: 0 }, { input: base, top: captionHeight, left: 0 }]).png().toBuffer();
 };
 
 const compositeGrid = async (labeledBuffers, columns, tileWidth) => {
@@ -443,8 +480,15 @@ const main = async () => {
         await setSceneState(page, { maze, player: adjacent, trail: straightPath(straightSpec.start.x, adjacent.x) });
         await stepFrames(page);
         const frame = await getBoardFrame(page);
-        const buf = await captureCanvasRegionPng(page, { x: frame.left + ((adjacent.x - 2) * frame.tileSize) - 6, y: frame.top + (straightSpec.start.y * frame.tileSize) - 6, w: (3 * frame.tileSize) + 12, h: frame.tileSize + 12 }, 10);
-        panels.push(await labelPng(buf, 'Goal adjacent to player', 480));
+        // Region must cover BOTH tiles: player's tile (adjacent.x) through the
+        // goal's tile (adjacent.x + 1 === straightSpec.goal.x), with the same
+        // 6px-per-side margin the single-tile captures above use. A prior
+        // version started this region a full tile too far left (adjacent.x -
+        // 2, width 3 * tileSize) -- its right edge landed only 6px into the
+        // goal's own tile column, so the composited panel showed the player
+        // and a bare sliver of the goal rather than proving adjacency at all.
+        const buf = await captureCanvasRegionPng(page, { x: frame.left + (adjacent.x * frame.tileSize) - 6, y: frame.top + (straightSpec.start.y * frame.tileSize) - 6, w: (2 * frame.tileSize) + 12, h: frame.tileSize + 12 }, 10);
+        panels.push(await labelPng(buf, 'Goal adjacent to player (both tiles shown)', 480));
       }
 
       // Trail Fade off / on
@@ -972,9 +1016,18 @@ const main = async () => {
     }
 
     // ============================================================
-    // Optional: trail motion as real video (shine crossing the corner,
+    // Controlled shine demo as real video (shine crossing the corner,
     // fade-out, quiet gap, invisible restart), driven by the same manual
     // clock as contact sheet #3 but stepped smoothly instead of jump-cut.
+    //
+    // NOT player-movement evidence: the player is installed directly at
+    // spec.goal, the trail is installed already-complete, and the real
+    // game loop is stopped (loop.stop()) -- only setTrailClock() advances
+    // anything here. Named/labelled accordingly (a reviewer correctly
+    // flagged an earlier version of this file's own manifest for
+    // describing this specific clip as "real-command-driven player
+    // movement", which it never was). See the REAL movement recording
+    // immediately below for that.
     // ============================================================
     {
       const context = await browser.newContext({
@@ -1016,9 +1069,107 @@ const main = async () => {
       await context.close();
       if (video) {
         const videoPath = await video.path();
-        const dest = `${outDir}/mazer-wave4d-a-trail-motion.webm`;
+        const dest = `${outDir}/mazer-wave4d-a-trail-shine-demo.webm`;
         copyFileSync(videoPath, dest);
-        process.stderr.write('Wrote mazer-wave4d-a-trail-motion.webm\n');
+        process.stderr.write('Wrote mazer-wave4d-a-trail-shine-demo.webm (controlled shine demo, not movement)\n');
+      }
+    }
+
+    // ============================================================
+    // REAL player-movement video: the actual QA accepted-movement command
+    // (window.__MAZER_QA__.movePlayPlayer), the real game loop left
+    // running throughout (never loop.stop()), several ordinary moves plus
+    // one turn, each glide actually visible across real recorded time, and
+    // a subsequent shine traversal once the route is long enough to show
+    // one. A fixture maze sets up the geometry (labelled as such) so the
+    // route deterministically includes a turn without depending on a
+    // specific random seed's layout -- but every step of movement itself
+    // is the real accepted-movement command, never direct scene.player/
+    // scene.trail reassignment.
+    // ============================================================
+    {
+      const context = await browser.newContext({
+        viewport: { width: 1280, height: 800 },
+        recordVideo: { dir: outDir, size: { width: 1280, height: 800 } }
+      });
+      const page = await context.newPage();
+      await page.goto(`${resolvedBaseUrl}/?runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749`, { waitUntil: 'load', timeout: 30000 });
+      await page.waitForFunction(() => Boolean(window.__MAZER_QA__?.startPlayMode), { timeout: 15000 });
+      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+      await page.waitForTimeout(300);
+
+      // Fixture geometry only (a longer corridor-then-corner than the 3x3
+      // corner mazes above, so the route gives the shine something real to
+      // sweep across afterward) -- installed once, before any movement is
+      // recorded. The real loop is never stopped after this point.
+      // Pre-padding interior (row0: a 5-cell horizontal run; rows1-2: a
+      // 2-cell vertical continuation off its far end) -- same '#'=floor
+      // convention as RAW_MAZES above. Start at the near end of the
+      // horizontal run, goal at the far end of the vertical run: 4 real
+      // "move_right" commands reach the turn tile, then 2 real
+      // "move_down" commands reach the goal.
+      const movementRows = ['#####', '....#', '....#'];
+      const movementSpec = { rows: padWithWallBorder(movementRows), start: { x: 1, y: 1 }, goal: { x: 5, y: 3 } };
+      const movementMaze = buildMazeSnapshot(movementSpec);
+      await setSceneState(page, {
+        maze: movementMaze,
+        player: movementSpec.start,
+        trail: [movementSpec.start],
+        hasPlayerEverLeftStart: false,
+        toggleTrailShine: true
+      });
+      await stepFrames(page, 3);
+      await page.waitForTimeout(200);
+
+      // Synthetic-clock stepping (same technique as driveOneRealMove above)
+      // is what actually forces new canvas paints in this headless
+      // context -- real requestAnimationFrame timing is not reliably
+      // driven by Playwright's own clock here. Real wall-clock waits
+      // between steps are what give the video recorder's own sampler
+      // (which captures the page's real composited output, not a
+      // synthetic frame count) enough distinct real moments to record --
+      // without them, many synthetic steps could land inside a single
+      // recorded video frame.
+      let syntheticTimeMs = await page.evaluate(() => window.__MAZER_GAME__.scene.getScene('MenuScene').time.now);
+      const advance = async (ms, realWaitMs) => {
+        syntheticTimeMs += ms;
+        await page.evaluate((t) => window.__MAZER_GAME__.loop.step(t), syntheticTimeMs);
+        await page.waitForTimeout(realWaitMs);
+      };
+
+      const driveRealMoveForVideo = async (direction) => {
+        const result = await page.evaluate((m) => window.__MAZER_QA__.movePlayPlayer(m), direction);
+        if (!result?.accepted) {
+          throw new Error(`Real movement video: move '${direction}' was not accepted -- ${JSON.stringify(result)}`);
+        }
+        for (let i = 0; i < 16; i += 1) {
+          await advance(16, 30);
+        }
+      };
+
+      // Right, right, right, right (straight run) -> down, down (the
+      // turn + one tile past it): several ordinary moves, one turn, and
+      // real trail extension throughout, matching movementRows above.
+      for (const direction of ['move_right', 'move_right', 'move_right', 'move_right', 'move_down', 'move_down']) {
+        await driveRealMoveForVideo(direction);
+      }
+
+      // Let the shine sweep the now-real, actually-walked route for a
+      // couple of seconds of real recorded time, still via the same
+      // synthetic-clock stepping (the shine's own animation clock,
+      // trailAnimationElapsedMs, advances from real accepted moves the
+      // same way it does in normal play -- no setTrailClock override here).
+      for (let i = 0; i < 60; i += 1) {
+        await advance(16, 30);
+      }
+
+      const video = page.video();
+      await context.close();
+      if (video) {
+        const videoPath = await video.path();
+        const dest = `${outDir}/mazer-wave4d-a-real-player-movement.webm`;
+        copyFileSync(videoPath, dest);
+        process.stderr.write('Wrote mazer-wave4d-a-real-player-movement.webm (real movePlayPlayer commands, loop never stopped)\n');
       }
     }
   } finally {
