@@ -42,6 +42,13 @@ import {
   computeGoalHaloCanvasBounds,
   drawGoalHaloToCanvasContext
 } from '../render/navigationCoreGoalHaloCanvas';
+import { resolveTeleportAnchorCandidates, type TeleportRect } from '../render/teleportAnchorPose';
+import {
+  selectTeleportPrimaryAnchor,
+  type TeleportAnchorId,
+  type TeleportAnchorRejection,
+  type TeleportAnchorSelectionOutcome
+} from '../render/teleportPrimaryAnchor';
 import {
   collectDemoWalkerRouteDiagnostics,
   type DemoRunnerTelemetry,
@@ -988,6 +995,25 @@ interface LegacyQaOverlayResult {
   reason: string | null;
 }
 
+// Wave 4D-B QA-only diagnostic surface: exercises the REAL Teleport System
+// v1 primary-anchor selector (src/render/teleportPrimaryAnchor.ts) and pose/
+// clearance adapter (src/render/teleportAnchorPose.ts) against this scene's
+// own real layout and safe-area geometry, and repositions one of the
+// existing title-orbit diamond image pool slots to the result -- not a
+// duplicate mock diamond, and not a second selection implementation. See
+// resolveLegacyTeleportAnchorPreviewResult/applyLegacyTeleportAnchorPreviewOverride.
+// This is staging for real Teleport integration, not the conduit/spawn/
+// extraction choreography itself, and does not replace or pause the
+// existing player-transfer beam rendering.
+interface LegacyTeleportAnchorPreviewResult {
+  outcome: TeleportAnchorSelectionOutcome;
+  selectedId: TeleportAnchorId | null;
+  reason: string;
+  rejected: ReadonlyArray<TeleportAnchorRejection>;
+  /** Real-space pose of the selected anchor, or null when outcome is 'unavailable'/'invalid-input'. */
+  pose: { anchorX: number; anchorY: number; rotation: number; portX: number; portY: number } | null;
+}
+
 // Real, measured frame-time evidence for Navigation Core v1's continuous
 // trail (Wave 4D-A's own frame-time measurement requirement) -- populated
 // at the end of every drawLegacyContinuousPlayTrail call, not estimated.
@@ -1024,6 +1050,10 @@ interface LegacyQaDiagnosticsApi {
   getUiViewModels(): UiViewModels | null;
   dispatchUiCommand(command: unknown): UiLegacyBridgeDispatchResult;
   getUiBridgeDiagnostics(): UiLegacyBridgeDiagnostics | null;
+  // Wave 4D-B QA-only Teleport anchor-pose preview -- see
+  // LegacyTeleportAnchorPreviewResult's own comment above.
+  previewTeleportPrimaryAnchor(targetX: number, targetY: number): LegacyTeleportAnchorPreviewResult;
+  endTeleportPrimaryAnchorPreview(): void;
 }
 
 declare global {
@@ -1486,6 +1516,25 @@ const MAZER_HUD_SETTINGS_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight
 // y). Subtracted out wherever the diamond needs to face a specific absolute
 // direction (see drawLegacyMenuPathTitleOrbitSigils's inward-pointing math).
 const MAZER_VFX_DIAMOND_INTRINSIC_TIP_ANGLE = -Math.PI / 4;
+// Wave 4D-B QA-only Teleport anchor-pose preview: which of the 8 existing
+// titleOrbitDiamondImages pool slots this diagnostic temporarily commandeers
+// (the last slot, to minimize collision odds with whichever slots the
+// ambient orbit choreography happens to be animating), and the shell's
+// rendered diagonal, matching the SAME idle (non-spinning) sizing formula
+// drawLegacyMenuPathTitleOrbitSigils already computes for itself
+// (wave = 0.62 when not spinning -> radius = round(6 + 0.62*3) = 8 ->
+// targetDiagonal = radius*4 = 32) -- not an arbitrary new number.
+const TELEPORT_ANCHOR_PREVIEW_SLOT_INDEX = LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS - 1;
+const TELEPORT_ANCHOR_PREVIEW_SHELL_DIAGONAL_PX = 32;
+// resolveTeleportAnchorPoses's own inset default (2px) mirrors
+// MenuScene.ts's decorative orbit-sigil geometry, which is fine for that
+// tiny sparkle but lets a real ~32px shell's own rendered footprint bleed
+// off-canvas at a corner (confirmed directly: a target near the top-left
+// corner placed the anchor's CENTER only 2px from each edge, so more than
+// half the shell's footprint fell outside the viewport). Half the shell's
+// own diagonal is the minimum inset that keeps its full footprint within
+// the viewport at every one of the 4 corners/4 edge midpoints.
+const TELEPORT_ANCHOR_PREVIEW_VIEWPORT_INSET_PX = TELEPORT_ANCHOR_PREVIEW_SHELL_DIAGONAL_PX / 2;
 // Native pixel size of the teleport-beam source art (see
 // docs/assets/mazer-vfx-source-provenance.md) -- a horizontal strip, a
 // diamond emitter/receiver cap baked into each end, with the full rainbow
@@ -1833,6 +1882,15 @@ export class MenuScene extends Phaser.Scene {
   // replaces the procedural drawLegacyMenuPathTitleDiamond shape entirely
   // when the texture loaded successfully.
   private titleOrbitDiamondImages: Phaser.GameObjects.Image[] = [];
+  // Wave 4D-B QA-only Teleport anchor-pose preview state -- see
+  // resolveLegacyTeleportAnchorPreviewResult/applyLegacyTeleportAnchorPreviewOverride.
+  // null means no preview is active; the real per-frame title-orbit draw
+  // (drawLegacyMenuPathTitleOrbitSigils) then keeps full, unmodified control
+  // of every titleOrbitDiamondImages slot, exactly as it did before this
+  // wave existed -- no explicit "restore" step is needed on preview end
+  // because that unconditional per-frame draw already reasserts control of
+  // every slot every frame regardless of this field's value.
+  private teleportAnchorPreviewTarget: { x: number; y: number } | null = null;
   // Pool rendering the literal "MAZER" wordmark from the real tile-font
   // raster asset (see LEGACY_TITLE_WORD / drawLegacyMenuPathTitle) -- falls
   // back to the original maze-path dot-cell glyph only if the asset never
@@ -2708,16 +2766,114 @@ export class MenuScene extends Phaser.Scene {
         this.uiBridge?.dispatch(command) ?? { ok: false, reason: 'bridge-not-installed' }
       ),
       getUiBridgeDiagnostics: (): UiLegacyBridgeDiagnostics | null => this.uiBridge?.getDiagnostics() ?? null,
-      getTrailPerfDiagnostics: (): LegacyTrailPerfDiagnostics | null => this.lastTrailPerfDiagnostics
+      getTrailPerfDiagnostics: (): LegacyTrailPerfDiagnostics | null => this.lastTrailPerfDiagnostics,
+      previewTeleportPrimaryAnchor: (targetX: number, targetY: number): LegacyTeleportAnchorPreviewResult => (
+        this.handleLegacyQaPreviewTeleportPrimaryAnchor(targetX, targetY)
+      ),
+      endTeleportPrimaryAnchorPreview: (): void => {
+        this.teleportAnchorPreviewTarget = null;
+      }
     };
   }
 
   private detachLegacyQaDiagnosticsSurface(): void {
+    this.teleportAnchorPreviewTarget = null;
     if (typeof window === 'undefined') {
       return;
     }
 
     delete window.__MAZER_QA__;
+  }
+
+  // Wave 4D-B QA-only Teleport anchor-pose preview. Resolves REAL candidate
+  // poses/eligibility (src/render/teleportAnchorPose.ts) from this scene's
+  // own real viewport bounds and real device safe-area insets
+  // (readMazerViewportGeometry) -- never the reference sheet's illustrative
+  // 390x844 layout -- then feeds them into the REAL selector
+  // (src/render/teleportPrimaryAnchor.ts). Each call is treated as its own
+  // fresh selection (heldAnchorId: null): this is a diagnostic "what would
+  // selection choose for this target right now" preview, not a simulated
+  // multi-phase transfer, so cross-call retention semantics (already
+  // thoroughly covered at the pure-function level) do not apply here.
+  private resolveLegacyTeleportAnchorPreviewResult(
+    target: { x: number; y: number }
+  ): { result: ReturnType<typeof selectTeleportPrimaryAnchor>; poseById: Map<TeleportAnchorId, { anchorX: number; anchorY: number; rotation: number; portX: number; portY: number }> } {
+    const viewport = { width: this.layout.width, height: this.layout.height };
+    const safeArea = readMazerViewportGeometry().safeArea;
+    // Real HUD/safe-area exclusion rectangles derived from the actual
+    // device insets -- a zero-width/height inset contributes no rectangle
+    // rather than a degenerate zero-area one.
+    const exclusions: TeleportRect[] = [
+      { x: 0, y: 0, width: viewport.width, height: safeArea.top },
+      { x: 0, y: viewport.height - safeArea.bottom, width: viewport.width, height: safeArea.bottom },
+      { x: 0, y: 0, width: safeArea.left, height: viewport.height },
+      { x: viewport.width - safeArea.right, y: 0, width: safeArea.right, height: viewport.height }
+    ].filter((rect) => rect.width > 0 && rect.height > 0);
+
+    const candidates = resolveTeleportAnchorCandidates(
+      viewport,
+      target,
+      TELEPORT_ANCHOR_PREVIEW_SHELL_DIAGONAL_PX,
+      exclusions,
+      TELEPORT_ANCHOR_PREVIEW_VIEWPORT_INSET_PX
+    );
+    const result = selectTeleportPrimaryAnchor({ candidates, target, heldAnchorId: null });
+    const poseById = new Map(candidates.map((candidate) => [candidate.id, {
+      anchorX: candidate.pose.anchorX,
+      anchorY: candidate.pose.anchorY,
+      rotation: candidate.pose.rotation,
+      portX: candidate.pose.portX,
+      portY: candidate.pose.portY
+    }]));
+    return { result, poseById };
+  }
+
+  private handleLegacyQaPreviewTeleportPrimaryAnchor(targetX: number, targetY: number): LegacyTeleportAnchorPreviewResult {
+    this.teleportAnchorPreviewTarget = { x: targetX, y: targetY };
+    const { result, poseById } = this.resolveLegacyTeleportAnchorPreviewResult(this.teleportAnchorPreviewTarget);
+    const pose = result.selectedId === null ? null : (poseById.get(result.selectedId) ?? null);
+    return {
+      outcome: result.outcome,
+      selectedId: result.selectedId,
+      reason: result.reason,
+      rejected: result.rejected,
+      pose
+    };
+  }
+
+  // Called every frame from within the real per-frame title-orbit draw
+  // path (drawLegacyMenuPathTitleOrbitSigils's own call site), immediately
+  // after that function has already set every titleOrbitDiamondImages
+  // slot's transform for this frame's ambient choreography. When a preview
+  // is active, this overrides ONE slot's transform to the real selected
+  // anchor's real pose for this frame -- a continuous per-frame override,
+  // not a one-shot set that the next frame's ambient draw would silently
+  // clobber. An 'unavailable'/'invalid-input' outcome deliberately leaves
+  // the slot exactly as the ambient draw already left it: the pure
+  // selector's own contract explicitly forbids inventing a fallback
+  // placement (never place a shell in the HUD, never fall back to the
+  // prohibited eight-beam volley) -- this override honors that by simply
+  // not acting, rather than picking a "close enough" slot itself.
+  private applyLegacyTeleportAnchorPreviewOverride(): void {
+    if (!this.teleportAnchorPreviewTarget) {
+      return;
+    }
+    const { result, poseById } = this.resolveLegacyTeleportAnchorPreviewResult(this.teleportAnchorPreviewTarget);
+    if (result.selectedId === null) {
+      return;
+    }
+    const pose = poseById.get(result.selectedId);
+    const image = this.titleOrbitDiamondImages[TELEPORT_ANCHOR_PREVIEW_SLOT_INDEX];
+    if (!pose || !image) {
+      return;
+    }
+    const scale = TELEPORT_ANCHOR_PREVIEW_SHELL_DIAGONAL_PX / MAZER_VFX_DIAMOND_SOURCE_SIZE;
+    image
+      .setPosition(pose.anchorX, pose.anchorY)
+      .setRotation(pose.rotation)
+      .setScale(scale)
+      .setAlpha(1)
+      .setVisible(true);
   }
 
   private handleLegacyQaPlayMove(move: string): LegacyQaMoveResult {
@@ -8465,6 +8621,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);
+    this.applyLegacyTeleportAnchorPreviewOverride();
 
     if (!renderedTitleWithTileFont) {
       const cursorCell = visibleCells.at(-1);
