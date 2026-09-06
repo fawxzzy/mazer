@@ -73,10 +73,32 @@ export const stopPreviewServer = async (child) => {
     return;
   }
 
-  child.kill('SIGTERM');
+  // `npm run preview:health` (child.pid) execs/forks its own child (the
+  // actual `vite preview` server, and vite's own esbuild service process
+  // below that) -- signalling only child.pid here left those descendants
+  // running as orphans on a real Linux CI runner (confirmed directly: this
+  // step's own logic finished and printed its result in ~2 seconds, but the
+  // whole CI job then hung for the remaining ~19 minutes until GitHub's own
+  // job timeout force-killed two orphaned node processes itself -- the
+  // runner's log pipe stays open, and so the step never completes, for as
+  // long as any process still holds that inherited stdout/stderr fd, which
+  // an orphaned grandchild does). launchPreviewServer spawns this child
+  // `detached: true` specifically so it becomes its own process-group
+  // leader -- signalling the negative pid here targets that whole group
+  // (this process and everything it forked), the standard Node idiom for
+  // reaping a process tree, not just its immediate child.
+  try {
+    process.kill(-child.pid, 'SIGTERM');
+  } catch {
+    // Group may already be gone (e.g. the process exited on its own).
+  }
   await new Promise((resolvePromise) => {
     const timer = setTimeout(() => {
-      child.kill('SIGKILL');
+      try {
+        process.kill(-child.pid, 'SIGKILL');
+      } catch {
+        // Already gone.
+      }
       resolvePromise();
     }, 5_000);
     child.once('exit', () => {
@@ -150,7 +172,14 @@ export const launchPreviewServer = async ({
   const previewChild = spawn(previewCommand.command, previewCommand.args, {
     cwd: REPO_ROOT,
     shell: false,
-    stdio: ['ignore', 'pipe', 'pipe']
+    stdio: ['ignore', 'pipe', 'pipe'],
+    // POSIX only: makes this child its own process-group leader, so
+    // stopPreviewServer's negative-pid kill can reap the whole tree (npm ->
+    // vite -> vite's own esbuild service process) instead of leaving
+    // descendants orphaned -- see stopPreviewServer's own comment for the
+    // real CI hang this fixes. Meaningless on win32 (taskkill /t already
+    // walks the process tree there via a different mechanism).
+    detached: process.platform !== 'win32'
   });
 
   previewChild.stdout?.on('data', (chunk) => {
