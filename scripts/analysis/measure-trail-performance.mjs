@@ -63,6 +63,25 @@ const runBuild = () => {
 const SAMPLE_FRAME_COUNT = 90;
 const SAMPLE_FRAME_INTERVAL_MS = 16;
 const FULL_FRAME_SAMPLE_DURATION_MS = 800;
+// A reviewer correctly found that ~800ms (47-48 frame samples) is too
+// short to claim sustained smoothness or a complete shine-cycle result --
+// it supports "brief sampled runs showed similar p95 cadence," nothing
+// stronger. For the two configs this matters most for (desktop-normal and
+// the real mobile-390x844-DPR3 case), extend the full-frame sample to at
+// least this floor, or one complete real shine cycle for the actual walked
+// route -- whichever is longer -- computed from the SAME production
+// constants the renderer itself uses:
+// LEGACY_PLAY_TRAIL_SHINE_SPEED_TILES_PER_SEC (4.2 tiles/sec) and
+// LEGACY_PLAY_TRAIL_SHINE_QUIET_GAP_RATIO (0.35), both in
+// src/scenes/MenuScene.ts, feeding advanceTrailShineState's own
+// `liveCycleLength = totalLength * (1 + quietGapRatio)` in
+// src/render/navigationCoreTrail.ts -- not a re-guessed number. The other
+// six configs stay at the original
+// 800ms -- this is a targeted extension for the two demanding cases a
+// reviewer named, not a general slowdown of every config.
+const MIN_DEMANDING_FULL_FRAME_SAMPLE_MS = 10_000;
+const REAL_SHINE_SPEED_TILES_PER_SEC = 4.2;
+const REAL_SHINE_QUIET_GAP_RATIO = 0.35;
 // The rendered trail is resolveLegacyPlayPerfectPathTrail's shortest path
 // through VISITED tiles, not raw accepted-move count -- a review correctly
 // found that a preferred-direction random walk could still net-collapse to
@@ -223,13 +242,18 @@ const collectFullFrameIntervals = (page, durationMs) => page.evaluate((duration)
   })
 ), durationMs);
 
-const summarizeFullFrameIntervals = (deltas) => {
+const summarizeFullFrameIntervals = (deltas, sampleDurationMs) => {
   if (deltas.length === 0) {
     return null;
   }
   const sorted = [...deltas].sort((a, b) => a - b);
   return {
     sampleCount: deltas.length,
+    // The window this sample was actually collected over -- a reviewer
+    // correctly asked that a longer/extended sample not be silently
+    // reported the same way as the original 800ms one; this makes it
+    // explicit per-result rather than only in a comment.
+    sampleDurationMs,
     intervalMs: {
       p50: percentile(sorted, 0.5),
       p95: percentile(sorted, 0.95),
@@ -238,7 +262,10 @@ const summarizeFullFrameIntervals = (deltas) => {
     // Genuine full-frame budget misses -- scene update, draw, AND browser
     // composite/paint all included, unlike trailCpuCost's framesOverBudget.
     framesOver16_67ms: deltas.filter((d) => d > 16.67).length,
-    framesOver33_33ms: deltas.filter((d) => d > 33.33).length
+    framesOver33_33ms: deltas.filter((d) => d > 33.33).length,
+    // Raw per-frame intervals, so the summary above can be audited rather
+    // than taken on faith.
+    rawIntervalsMs: deltas
   };
 };
 
@@ -327,8 +354,13 @@ const runOneConfig = async (browser, baseUrl, config) => {
   // Baseline full-frame cost with an empty trail, BEFORE walking -- so the
   // report can show the actual delta the trail adds, rather than
   // attributing all full-frame cost to Navigation Core. The live render
-  // loop is never stopped for either measurement.
-  const baselineFullFrameDeltas = await collectFullFrameIntervals(page, FULL_FRAME_SAMPLE_DURATION_MS);
+  // loop is never stopped for either measurement. Demanding configs get
+  // the same extended floor as their withTrail measurement below, so the
+  // two sides of the p95 comparison have comparable statistical power --
+  // there is no shine cycle to wait out with an empty trail, so this side
+  // only needs the flat 10s floor, not the route-dependent cycle length.
+  const baselineFullFrameMs = config.demanding ? MIN_DEMANDING_FULL_FRAME_SAMPLE_MS : FULL_FRAME_SAMPLE_DURATION_MS;
+  const baselineFullFrameDeltas = await collectFullFrameIntervals(page, baselineFullFrameMs);
 
   // Deterministic (a real BFS solve, not a seeded-but-still-fragile random
   // walk) and, for any real generated maze, a genuinely long route --
@@ -337,13 +369,46 @@ const runOneConfig = async (browser, baseUrl, config) => {
   // isolated as the only variable.
   const { acceptedMoves, solvedPathLength } = await walkDeterministicLongRoute(page);
   const samples = await collectFrameSamples(page, SAMPLE_FRAME_COUNT, SAMPLE_FRAME_INTERVAL_MS);
-  const withTrailFullFrameDeltas = await collectFullFrameIntervals(page, FULL_FRAME_SAMPLE_DURATION_MS);
+  const trailCpuCost = summarizeTrailCpuCost(samples);
+
+  // For the two demanding configs, sample at least 10s or one full real
+  // shine cycle for the ACTUAL walked route (whichever is longer) --
+  // computed from this run's own measured tileSize/totalLengthPx, not a
+  // guessed number. A short warm-up pause first lets any first-frame
+  // JIT/GC cost (observed once: a 28ms outlier on an otherwise sub-3ms
+  // config) settle before the window being reported starts.
+  let withTrailFullFrameMs = FULL_FRAME_SAMPLE_DURATION_MS;
+  if (config.demanding && trailCpuCost) {
+    const speedPxPerMs = (trailCpuCost.tileSize * REAL_SHINE_SPEED_TILES_PER_SEC) / 1000;
+    const shineCycleMs = speedPxPerMs > 0
+      ? (trailCpuCost.totalLengthPx * (1 + REAL_SHINE_QUIET_GAP_RATIO)) / speedPxPerMs
+      : 0;
+    withTrailFullFrameMs = Math.max(MIN_DEMANDING_FULL_FRAME_SAMPLE_MS, shineCycleMs);
+    await page.waitForTimeout(500);
+  }
+  const withTrailFullFrameDeltas = await collectFullFrameIntervals(page, withTrailFullFrameMs);
+
+  // Confirm the trail workload was still actually present/rendering at the
+  // END of the (possibly 10s+) sampling window, not silently cleared or
+  // reset partway through by some other bug -- "the workload remains
+  // present throughout" is asserted, not assumed from the setup step alone.
+  const perfAfterSampling = await page.evaluate(() => window.__MAZER_QA__.getTrailPerfDiagnostics());
+  const sustainedWorkload = {
+    expectation: 'the trail\'s rendered segment count/length at the end of full-frame sampling matches what it was when sampling started',
+    met: Boolean(
+      perfAfterSampling
+      && trailCpuCost
+      && perfAfterSampling.strokeSegmentCount === trailCpuCost.strokeSegmentCount
+      && Math.abs(perfAfterSampling.totalLengthPx - trailCpuCost.totalLengthPx) < 1
+    ),
+    strokeSegmentCountAtStart: trailCpuCost?.strokeSegmentCount ?? null,
+    strokeSegmentCountAtEnd: perfAfterSampling?.strokeSegmentCount ?? null
+  };
 
   await context.close();
 
-  const fullFrameBaseline = summarizeFullFrameIntervals(baselineFullFrameDeltas);
-  const fullFrameWithTrail = summarizeFullFrameIntervals(withTrailFullFrameDeltas);
-  const trailCpuCost = summarizeTrailCpuCost(samples);
+  const fullFrameBaseline = summarizeFullFrameIntervals(baselineFullFrameDeltas, baselineFullFrameMs);
+  const fullFrameWithTrail = summarizeFullFrameIntervals(withTrailFullFrameDeltas, withTrailFullFrameMs);
 
   // Assert the workload actually exercised what this config claims to
   // measure, instead of reporting whatever rendered length happened to
@@ -367,6 +432,7 @@ const runOneConfig = async (browser, baseUrl, config) => {
     acceptedMoves,
     solvedPathLength,
     workload,
+    sustainedWorkload,
     trailCpuCost,
     fullFrame: {
       baseline: fullFrameBaseline,
@@ -383,8 +449,8 @@ const runOneConfig = async (browser, baseUrl, config) => {
 };
 
 const CONFIGS = [
-  { name: 'desktop-normal', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 },
-  { name: 'mobile-390x844-dpr3', viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
+  { name: 'desktop-normal', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, demanding: true },
+  { name: 'mobile-390x844-dpr3', viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, demanding: true },
   { name: 'compact-viewport-small-tiles', viewport: { width: 480, height: 360 }, deviceScaleFactor: 1 },
   { name: 'fractional-viewport-odd-dims', viewport: { width: 977, height: 653 }, deviceScaleFactor: 1 },
   { name: 'trail-fade-off', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, toggleTrailFade: false, toggleTrailShine: true },
@@ -421,12 +487,17 @@ const main = async () => {
         `${config.name}: ${result.acceptedMoves} accepted moves (solved path ${result.solvedPathLength} steps), `
         + `${result.trailCpuCost?.strokeSegmentCount ?? 0} rendered segments (${result.trailCpuCost?.totalLengthPx?.toFixed(1) ?? '?'}px), `
         + `workload ${result.workload.met ? 'OK' : 'FAILED'}, `
-        + `fullFrame p95 baseline=${result.fullFrame.baseline?.intervalMs.p95?.toFixed(2) ?? 'n/a'}ms `
+        + `fullFrame(${result.fullFrame.withTrail?.sampleDurationMs ?? '?'}ms sample) p95 baseline=${result.fullFrame.baseline?.intervalMs.p95?.toFixed(2) ?? 'n/a'}ms `
         + `withTrail=${result.fullFrame.withTrail?.intervalMs.p95?.toFixed(2) ?? 'n/a'}ms `
-        + `delta=${result.fullFrame.p95DeltaMs?.toFixed(2) ?? 'n/a'}ms\n`
+        + `delta=${result.fullFrame.p95DeltaMs?.toFixed(2) ?? 'n/a'}ms `
+        + `maxWithTrail=${result.fullFrame.withTrail?.intervalMs.max?.toFixed(2) ?? 'n/a'}ms `
+        + `framesOver33.33ms=${result.fullFrame.withTrail?.framesOver33_33ms ?? 'n/a'}\n`
       );
       if (!result.workload.met) {
         process.stderr.write(`  WORKLOAD ASSERTION FAILED: ${result.workload.expectation}\n`);
+      }
+      if (!result.sustainedWorkload.met) {
+        process.stderr.write(`  SUSTAINED-WORKLOAD ASSERTION FAILED: ${result.sustainedWorkload.expectation} (start=${result.sustainedWorkload.strokeSegmentCountAtStart} end=${result.sustainedWorkload.strokeSegmentCountAtEnd})\n`);
       }
     }
   } finally {
@@ -459,7 +530,8 @@ const main = async () => {
   const anyErrors = results.some((r) => r.consoleErrors.length > 0);
   const anyMissingSummary = results.some((r) => r.trailCpuCost === null || r.fullFrame.baseline === null || r.fullFrame.withTrail === null);
   const anyWorkloadNotMet = results.some((r) => !r.workload.met);
-  process.exitCode = anyErrors || anyMissingSummary || anyWorkloadNotMet ? 1 : 0;
+  const anySustainedWorkloadNotMet = results.some((r) => !r.sustainedWorkload.met);
+  process.exitCode = anyErrors || anyMissingSummary || anyWorkloadNotMet || anySustainedWorkloadNotMet ? 1 : 0;
 };
 
 main().catch((error) => {
