@@ -550,6 +550,104 @@ const main = async () => {
     }
 
     // ============================================================
+    // Title/board tile-by-tile construction proof. A single settled Main
+    // Menu screenshot proves nothing about HOW the board got there -- this
+    // captures the real, natural reveal a fresh page load drives
+    // (armLegacyMenuStaticDrawStage arms 'building' on scene boot, and the
+    // real per-frame draw path only shows tiles up to
+    // menuStaticDrawTilesVisible of menuStaticDrawTileOrder). The live rAF
+    // loop is stopped immediately after boot and game.loop.step() is
+    // stepped forward in small increments, reading those same two scene
+    // fields (not a reimplementation) to pick frames at roughly
+    // 0/25/50/75/100% of tiles revealed.
+    // ============================================================
+    {
+      const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      const page = await context.newPage();
+      await page.goto(`${resolvedBaseUrl}/?runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749`, { waitUntil: 'load', timeout: 30000 });
+      await page.waitForFunction(() => Boolean(window.__MAZER_GAME__?.scene?.getScene?.('MenuScene')), { timeout: 15000 });
+      await page.evaluate(() => window.__MAZER_GAME__.loop.stop());
+
+      const readProgress = () => page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        const total = scene.menuStaticDrawTileOrder?.length ?? 0;
+        const visible = scene.menuStaticDrawTilesVisible ?? 0;
+        return { total, visible, phase: scene.menuStaticDrawLifecyclePhase };
+      });
+
+      let syntheticTimeMs = await page.evaluate(() => window.__MAZER_GAME__.scene.getScene('MenuScene').time.now);
+      const stepMs = async (ms) => {
+        syntheticTimeMs += ms;
+        await page.evaluate((t) => window.__MAZER_GAME__.loop.step(t), syntheticTimeMs);
+      };
+
+      const panels = [];
+      const targets = [0, 0.25, 0.5, 0.75, 1];
+      let targetIndex = 0;
+      let lastProgress = await readProgress();
+      panels.push(await labelPng(
+        await page.screenshot(),
+        `Title/board construction: 0% revealed (phase=${lastProgress.phase})`,
+        900
+      ));
+      targetIndex = 1;
+
+      // Step forward in small increments (bounded) until every fractional
+      // target has been captured or the build has fully settled.
+      for (let guard = 0; guard < 400 && targetIndex < targets.length; guard += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await stepMs(16);
+        // eslint-disable-next-line no-await-in-loop
+        const progress = await readProgress();
+        // Once the scene leaves 'building' for 'settled', it clears its own
+        // visible/total tile-tracking fields (both read back as 0) -- that's
+        // the real completion signal, not a fraction to compute from those
+        // now-reset fields. Treat 'settled' as 100% outright rather than
+        // deriving a fraction that can never reach 1 once the fields are
+        // gone, which previously made the loop run out its step budget and
+        // fall through to a fallback panel mislabeled "0/46 tiles" for what
+        // was actually the fully-settled board.
+        const settled = progress.phase === 'settled';
+        const fraction = settled ? 1 : (progress.total > 0 ? progress.visible / progress.total : 0);
+        if (fraction >= targets[targetIndex] || (settled && targets[targetIndex] === 1)) {
+          const isLast = targets[targetIndex] === 1 || settled;
+          // eslint-disable-next-line no-await-in-loop
+          const shot = await page.screenshot();
+          // eslint-disable-next-line no-await-in-loop
+          panels.push(await labelPng(
+            shot,
+            settled
+              ? 'Title/board construction: 100% revealed, settled'
+              : `Title/board construction: ~${Math.round(fraction * 100)}% revealed (${progress.visible}/${progress.total} tiles, phase=${progress.phase})`,
+            900
+          ));
+          targetIndex += 1;
+          if (isLast) break;
+        }
+        lastProgress = progress;
+      }
+      if (targetIndex < targets.length) {
+        // Never reached every target within the step budget -- capture
+        // whatever the final observed state actually was rather than
+        // silently omitting it, so a real stall shows up in the evidence
+        // instead of being hidden.
+        const shot = await page.screenshot();
+        panels.push(await labelPng(
+          shot,
+          lastProgress.phase === 'settled'
+            ? 'Title/board construction: final observed state (100% revealed, settled)'
+            : `Title/board construction: final observed state (${lastProgress.visible}/${lastProgress.total} tiles, phase=${lastProgress.phase})`,
+          900
+        ));
+      }
+
+      const sheet = await compositeGrid(panels, 1, 900);
+      writeFileSync(`${outDir}/mazer-wave4d-a-title-construction.png`, sheet);
+      process.stderr.write(`Wrote mazer-wave4d-a-title-construction.png (${panels.length} panels)\n`);
+      await context.close();
+    }
+
+    // ============================================================
     // Contact sheet #2: goal proof (normal/compact/adjacent/reduced-motion)
     // ============================================================
     {
