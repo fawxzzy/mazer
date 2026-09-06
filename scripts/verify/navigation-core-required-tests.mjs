@@ -27,6 +27,11 @@ export const NAVIGATION_CORE_REQUIRED_TESTS = [
   'tests/render/navigationCoreTrailCanvas.test.ts',
   'tests/render/navigationCorePlayerGlowCanvas.test.ts',
   'tests/render/navigationCoreGoalHaloCanvas.test.ts',
+  // tests/analysis/ is a specific-file list in TEST_SPINE, not a glob (see
+  // scripts/verify/run-test-verify.mjs) -- a new file there is exactly the
+  // same silent-gap class this whole module exists to close, so it's
+  // listed here rather than assumed to be picked up automatically.
+  'tests/analysis/rasterCompare.test.ts',
   'tests/reset/boot-floor-texture.test.ts',
   'tests/reset/legacy-playable-graph.test.ts',
   'tests/architecture/decision-registry-contract.test.ts',

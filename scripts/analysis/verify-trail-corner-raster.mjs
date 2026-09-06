@@ -33,7 +33,6 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { chromium } from 'playwright';
-import sharp from 'sharp';
 import {
   DEFAULT_BASE_URL,
   DEFAULT_PREVIEW_TIMEOUT_MS,
@@ -42,6 +41,7 @@ import {
   parseCliArgs
 } from '../visual/common.mjs';
 import { launchPreviewServer, stopPreviewServer } from '../visual/preview-server.mjs';
+import { comparePngBuffers } from './lib/rasterCompare.mjs';
 
 const BASELINE_DIR = resolve(REPO_ROOT, 'tests/fixtures/trail-corner-raster');
 
@@ -182,16 +182,10 @@ const captureCanvasRegionPng = async (page, region, scale = 1) => {
   return Buffer.from(dataUrl.split(',')[1], 'base64');
 };
 
-// Per-channel absolute-difference tolerance and the fraction of pixels
-// allowed to exceed it before the check fails. Loose enough to absorb
-// ordinary cross-environment antialiasing/font-hinting jitter (the corner
-// fix's own live verification found sub-pixel differences of a few units
-// on re-render), tight enough that a real structural regression -- the
-// teeth artifact was a large, multi-pixel-wide fan at the corner, not a
-// stray pixel -- fails it by a wide margin, not a coin flip.
-const CHANNEL_TOLERANCE = 24;
-const MAX_DIFFERING_PIXEL_FRACTION = 0.02;
-
+// See scripts/analysis/lib/rasterCompare.mjs for the actual comparison
+// logic (whole-image diff fraction + largest-connected-differing-region
+// cap) and tests/analysis/rasterCompare.test.ts for the negative-control
+// proof that the region cap catches what a fraction budget alone cannot.
 const compareToBaseline = async (label, candidatePng, baselinePath, updateBaseline) => {
   if (updateBaseline) {
     mkdirSync(dirname(baselinePath), { recursive: true });
@@ -201,33 +195,7 @@ const compareToBaseline = async (label, candidatePng, baselinePath, updateBaseli
   if (!existsSync(baselinePath)) {
     return { passed: false, detail: `no committed baseline at ${baselinePath} -- run with --update-baseline after visually confirming the render` };
   }
-  const [candidate, baseline] = await Promise.all([
-    sharp(candidatePng).ensureAlpha().raw().toBuffer({ resolveWithObject: true }),
-    sharp(readFileSync(baselinePath)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-  ]);
-  if (candidate.info.width !== baseline.info.width || candidate.info.height !== baseline.info.height) {
-    return {
-      passed: false,
-      detail: `size mismatch: candidate ${candidate.info.width}x${candidate.info.height} vs baseline ${baseline.info.width}x${baseline.info.height}`
-    };
-  }
-  const { width, height } = candidate.info;
-  const totalPixels = width * height;
-  let differingPixels = 0;
-  for (let i = 0; i < candidate.data.length; i += 4) {
-    const dr = Math.abs(candidate.data[i] - baseline.data[i]);
-    const dg = Math.abs(candidate.data[i + 1] - baseline.data[i + 1]);
-    const db = Math.abs(candidate.data[i + 2] - baseline.data[i + 2]);
-    const da = Math.abs(candidate.data[i + 3] - baseline.data[i + 3]);
-    if (dr > CHANNEL_TOLERANCE || dg > CHANNEL_TOLERANCE || db > CHANNEL_TOLERANCE || da > CHANNEL_TOLERANCE) {
-      differingPixels += 1;
-    }
-  }
-  const fraction = differingPixels / totalPixels;
-  return {
-    passed: fraction <= MAX_DIFFERING_PIXEL_FRACTION,
-    detail: `${differingPixels}/${totalPixels} pixels (${(fraction * 100).toFixed(2)}%) exceeded tolerance ${CHANNEL_TOLERANCE}/255, allowed up to ${(MAX_DIFFERING_PIXEL_FRACTION * 100).toFixed(0)}%`
-  };
+  return comparePngBuffers(candidatePng, readFileSync(baselinePath));
 };
 
 const runBuild = () => {
