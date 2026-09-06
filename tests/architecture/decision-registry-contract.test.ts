@@ -274,6 +274,7 @@ describe('Mazer UI rework decision registry contract', () => {
         'src/render/navigationCorePlayerGlowCanvas.ts': '4D-A',
         'src/render/navigationCoreGoalHaloCanvas.ts': '4D-A',
         'src/scenes/BootScene.ts': '4D-A',
+        'src/render/teleportPrimaryAnchor.ts': '4D-B',
         'src/legacy-runtime/legacyAuth.ts': '3B',
         'src/legacy-runtime/legacyPlayerMessage.ts': '3B',
         'vite.config.ts': '5B',
@@ -309,6 +310,60 @@ describe('Mazer UI rework decision registry contract', () => {
       // (and must not need) a 3B<->4D-A edge for either to be a legitimate active assignment.
       expect(waveThreeB.dependsOn).not.toContain('4D-A');
       expect(waveFourDA.dependsOn).not.toContain('3B');
+    });
+
+    it('Wave 4D-B actively owns its new Teleport primary-anchor module and depends only on Wave 4D-A', async () => {
+      const { readDecisionRegistry } = await loadChecker();
+      const registry: any = await readDecisionRegistry();
+      const waveFourDB = registry.integratorWaveOwnership.assignments.find((entry: any) => entry.wave === '4D-B');
+
+      expect(waveFourDB.status).toBe('active');
+      expect(waveFourDB.paths).toEqual(['src/render/teleportPrimaryAnchor.ts']);
+      expect(waveFourDB.dependsOn).toEqual(['4D-A']);
+      // No dependency on the unrelated auth-migration wave.
+      expect(waveFourDB.dependsOn).not.toContain('3B');
+    });
+
+    it('Wave 4D-B claims none of Wave 4D-A\'s paths -- existing Navigation Core protections are untouched', async () => {
+      const { readDecisionRegistry, resolveActiveIntegratorPathOwners } = await loadChecker();
+      const registry: any = await readDecisionRegistry();
+      const owners = resolveActiveIntegratorPathOwners(registry);
+
+      for (const path of [
+        'src/scenes/MenuScene.ts',
+        'src/scenes/BootScene.ts',
+        'src/render/navigationCoreTrail.ts',
+        'src/render/navigationCoreTrailCanvas.ts',
+        'src/render/navigationCorePlayerGlowCanvas.ts',
+        'src/render/navigationCoreGoalHaloCanvas.ts'
+      ]) {
+        expect(owners.get(path)).toBe('4D-A');
+      }
+      expect(owners.get('src/render/teleportPrimaryAnchor.ts')).toBe('4D-B');
+    });
+
+    it('a Wave 4D-B branch may change its own new module but not Wave 4D-A\'s paths', async () => {
+      const { readDecisionRegistry, collectIntegratorWaveOwnershipViolations } = await loadChecker();
+      const registry = await readDecisionRegistry();
+
+      expect(collectIntegratorWaveOwnershipViolations(['src/render/teleportPrimaryAnchor.ts'], registry, '4D-B')).toEqual([]);
+
+      const violations = collectIntegratorWaveOwnershipViolations(['src/scenes/MenuScene.ts'], registry, '4D-B');
+      expect(violations.some((entry) => entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
+    });
+
+    it('rejects the real registry if Wave 4D-B were made to also actively claim a Wave 4D-A path (duplicate active ownership)', async () => {
+      const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
+      const registry: any = cloneRegistry(await readDecisionRegistry());
+      const waveFourDB = registry.integratorWaveOwnership.assignments.find((entry: any) => entry.wave === '4D-B');
+      // 4D-B does not really own MenuScene.ts -- this is a synthetic conflict, matching the
+      // existing 3B/MenuScene.ts case above, to prove the guard also catches it for 4D-B.
+      waveFourDB.paths.push('src/scenes/MenuScene.ts');
+
+      const violations = collectDecisionRegistryViolations(registry);
+      expect(violations.some((entry: any) => (
+        entry.rule === 'duplicate-active-integrator-path-owner' && entry.message.includes('src/scenes/MenuScene.ts')
+      ))).toBe(true);
     });
 
     it('flags a path touched by a wave that is not its current active owner', async () => {
