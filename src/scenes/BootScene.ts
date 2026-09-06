@@ -97,12 +97,16 @@ export const MAZER_PLAYER_TRAIL_TEXTURE_KEY = 'mazerPlayerTrail';
 //     border falloff:                                                  206-249
 // Shrinking further (tried 300x300, 200x200, 100x100 at the same center)
 // did not reduce the swing any more -- it plateaus around 205-249
-// regardless of crop size once the border/glow band itself is excluded,
-// which reads as a Canvas 2D TileSprite minification artifact (this
-// source art was never designed as a seamless swatch, so any crop of it
-// still carries a faint radial shade that naive per-repeat resampling
-// turns into a per-tile ripple at these heavily-downscaled tile sizes),
-// not something a differently-chosen crop rectangle can fix further.
+// regardless of crop size once the border/glow band itself is excluded.
+// Why it plateaus there is not established (a TileSprite-minification
+// explanation was suggested but never actually isolated against, say, a
+// filter-mode or supersampling change -- that stays an open, untested
+// hypothesis, not a documented cause); what IS established is the direct
+// measurement: no smaller crop tried produced a further reduction, and the
+// resulting corridor was visually accepted against the frozen reference at
+// three tile scales (64px, 26px, and a fractional ~34px) plus a direct
+// before/after screenshot pair at matched scale -- see
+// docs/assets/reference/navigation-core-v1/ and PR #345's evidence.
 // 400x400 keeps the interior's own crosshair centered per tile (the
 // reference design explicitly wants "visible floor texture depth ... not
 // a bleached, featureless slab") while cutting the swing from the old
