@@ -104,6 +104,29 @@ describe('resolveTeleportAnchorPoses', () => {
     expect(largePortDistance).toBeCloseTo(smallPortDistance * 2, 6);
   });
 
+  test('an inset of half the shell diagonal keeps every anchor\'s full footprint within the viewport (found live: the default 2px inset does not)', () => {
+    const shellDiagonal = 32;
+    const inset = shellDiagonal / 2;
+    const poses = resolveTeleportAnchorPoses(VIEWPORT, { x: 9999, y: 9999 }, shellDiagonal, inset);
+    for (const pose of poses) {
+      expect(pose.footprint.x).toBeGreaterThanOrEqual(0);
+      expect(pose.footprint.y).toBeGreaterThanOrEqual(0);
+      expect(pose.footprint.x + pose.footprint.width).toBeLessThanOrEqual(VIEWPORT.width);
+      expect(pose.footprint.y + pose.footprint.height).toBeLessThanOrEqual(VIEWPORT.height);
+    }
+
+    // Confirms the default inset genuinely does NOT provide this guarantee
+    // on its own -- proving this test is exercising a real distinction, not
+    // asserting something trivially true regardless of inset.
+    const defaultPoses = resolveTeleportAnchorPoses(VIEWPORT, { x: 9999, y: 9999 }, shellDiagonal);
+    const anyOffCanvas = defaultPoses.some((pose) => (
+      pose.footprint.x < 0 || pose.footprint.y < 0
+      || pose.footprint.x + pose.footprint.width > VIEWPORT.width
+      || pose.footprint.y + pose.footprint.height > VIEWPORT.height
+    ));
+    expect(anyOffCanvas).toBe(true);
+  });
+
   test('inputs are never mutated', () => {
     const viewport = { ...VIEWPORT };
     const target = { x: 5, y: 5 };
