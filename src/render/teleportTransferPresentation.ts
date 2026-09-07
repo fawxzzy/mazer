@@ -17,6 +17,14 @@
  *   Phase, outboundProgress, deliveryProgress, and energyAlpha are read
  *   verbatim from the existing resolver; this module never invents a
  *   second clock, a second phase enum, or duplicated player-energy state.
+ *   Preserving that timing source does NOT mean copying every old visual
+ *   envelope unchanged, though: legacyPlayerTransfer.ts documents itself
+ *   as a visual-only resolver that does not own gameplay timing, so this
+ *   module is free to derive a richer visual envelope from the SAME raw
+ *   elapsed-ms inputs the scene already supplies, even across a coarse
+ *   phase boundary the resolver itself draws (see "Extraction closure"
+ *   below) -- it never changes what those raw inputs mean or when they
+ *   advance.
  * - "A stable transfer identity outlives changes to target pose." The
  *   selected primary's pose is a plain input, not something this module
  *   selects or remaps -- that remains teleportPrimaryAnchor.ts's job via
@@ -26,14 +34,15 @@
  *
  * Direction semantics (frozen contract, "Beam" and "Extraction"/"Spawn"
  * sections):
- * - Extraction (existing 'outbound' phase): the packet originates at the
- *   real extraction target (the goal) and travels TOWARD the primary,
- *   which then absorbs it. This exactly reproduces the growing-tip
- *   direction MenuScene.ts's own drawLegacyPlayerTransferEnergy already
- *   uses for the ambient eight-origin volley (`tipX = targetX + (origin.x
- *   - targetX) * localProgress`) -- same direction convention, just
- *   projected onto the one held primary's real measured port instead of
- *   all eight ambient origins.
+ * - Extraction (existing 'outbound' phase, plus this module's own closure
+ *   tail described below): the packet originates at the real extraction
+ *   target (the goal) and travels TOWARD the primary, which then absorbs
+ *   it. This exactly reproduces the growing-tip direction MenuScene.ts's
+ *   own drawLegacyPlayerTransferEnergy already uses for the ambient
+ *   eight-origin volley (`tipX = targetX + (origin.x - targetX) *
+ *   localProgress`) -- same direction convention, just projected onto the
+ *   one held primary's real measured port instead of all eight ambient
+ *   origins.
  * - Delivery (existing 'delivering' phase): the packet originates at the
  *   primary and travels TOWARD the real delivery target (the next start
  *   tile). MenuScene.ts's current runtime draws NO beam at all for this
@@ -41,29 +50,45 @@
  *   "continuous conduit" this projection exists to make possible; the
  *   renderer commit that consumes this module supplies the pixels.
  *
- * openFraction reuses the extraction beam's existing per-origin growth
- * fraction exactly (`clamp((outboundProgress - stagger) / 0.88, 0, 1)`
- * with stagger = 0 for a single primary, not eight staggered origins) --
- * MenuScene.ts:~8970-8971. Delivery has no existing equivalent to reuse,
- * so this module defines one from the SAME raw elapsed/duration inputs
- * the existing resolver already takes (deliveryElapsedMs/deliveryTravelMs/
- * deliveryFlashMs): the conduit opens across the travel window, then
- * (a genuinely new-to-delivery behavior the contract requires and the
- * current runtime does not implement) collapses across the flash window,
- * rather than cutting instantly to 'complete' the instant travel ends.
+ * openFraction (extraction, while phase is still 'outbound') reuses the
+ * existing beam's per-origin growth fraction exactly (`clamp((outboundProgress
+ * - stagger) / 0.88, 0, 1)` with stagger = 0 for a single primary, not
+ * eight staggered origins) -- MenuScene.ts:~8970-8971.
+ *
+ * Extraction closure (the actual fix for a real gap found reading this
+ * module together with the existing resolver): outboundProgress saturates
+ * at 1 well before the resolver's own phase flips from 'outbound' to
+ * 'stored' at exactly LEGACY_PLAYER_TRANSFER_OUTBOUND_MS elapsed, so the
+ * un-adjusted projection above stayed pinned fully OPEN right up to that
+ * instant, then cut to fully CLOSED the moment 'stored' began -- a hard
+ * cut, not a collapse ("conduit collapses -> primary enters stored state"
+ * per the frozen contract). Because the scene keeps incrementing the same
+ * outboundElapsedMs clock well past that phase boundary (it is only reset
+ * once a full transfer genuinely completes), this module can read past
+ * the boundary and continue presenting a short closing extraction window
+ * during the FIRST EXTRACTION_ABSORPTION_MS of 'stored' -- a real visual
+ * envelope this presentation layer owns, without changing when the
+ * resolver's own phase flips or what triggers it.
  *
  * Reduced motion ("short state crossfades; a stable conduit; no
- * traveling packet") is applied entirely at this presentation layer, not
- * by changing the underlying clocks: this module forces openFraction to a
- * stable 1 for the whole active window and packetVisible to false. The
- * existing resolver already independently forces outboundProgress to 1
- * immediately under reduced motion (no ramp); it does NOT currently do
- * the same for deliveryProgress (a real, pre-existing gap this module
- * does not silently paper over for the underlying clock -- only this
- * projection's own openFraction/packetVisible fields are held stable).
- * The renderer commit is expected to fade openFraction with a short
- * (~150ms) crossfade rather than a hard cut; that easing is a rendering
- * concern and deliberately not owned by this pure module.
+ * traveling packet"): the existing resolver already independently forces
+ * outboundProgress to 1 immediately under reduced motion, so its own
+ * `if (outboundProgress < 1)` guard means phase jumps straight to
+ * 'stored' -- there is no reduced-motion 'outbound' tick to project a
+ * conduit for at all. Rather than silently treating that as "nothing to
+ * show" (which would fail the frozen "short crossfade" requirement), this
+ * module presents a brief, STABLE (non-ramping) open conduit during the
+ * first EXTRACTION_REDUCED_MOTION_CROSSFADE_MS of 'stored' under reduced
+ * motion specifically -- no traveling packet, matching the contract
+ * exactly, and shorter than the normal-motion absorption tail since there
+ * was no travel animation to close out. Delivery's reduced-motion
+ * handling is unchanged from the original implementation (a stable, fully
+ * open conduit with no packet for the whole real travel+flash window) --
+ * a real, narrower pre-existing gap than extraction's (it does not
+ * shorten the underlying deliveryProgress ramp under reduced motion,
+ * since that ramp is real gameplay-adjacent timing this module does not
+ * own), left as-is since it already satisfies "stable conduit, no
+ * traveling packet" and was not the specific defect being corrected here.
  *
  * When no legal primary pose is currently available (poseAvailable:
  * false), this module never fabricates a conduit: active is forced
@@ -76,6 +101,7 @@
  */
 import {
   resolveLegacyPlayerTransferVisualState,
+  LEGACY_PLAYER_TRANSFER_OUTBOUND_MS,
   type LegacyPlayerTransferPhase,
   type LegacyPlayerTransferVisualInput
 } from '../legacy-runtime/legacyPlayerTransfer';
@@ -91,6 +117,18 @@ export interface TeleportTransferPoint {
 // Matches drawLegacyPlayerTransferEnergy's own per-origin growth fraction
 // for the single-primary (stagger = 0) case -- see module doc above.
 export const TELEPORT_TRANSFER_EXTRACTION_OPEN_DIVISOR = 0.88;
+
+// This presentation layer's own closure envelope, not a legacy value:
+// how long, after the resolver's outbound clock crosses
+// LEGACY_PLAYER_TRANSFER_OUTBOUND_MS, the conduit keeps visibly
+// collapsing rather than cutting to zero pixels instantly.
+export const TELEPORT_TRANSFER_EXTRACTION_ABSORPTION_MS = 160;
+
+// This presentation layer's own reduced-motion crossfade envelope: how
+// long, from the start of the (effectively instant, under reduced
+// motion) outbound clock, a stable open conduit is shown before settling
+// into the ordinary closed 'stored' presentation.
+export const TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS = 140;
 
 export interface TeleportTransferPresentationInput extends LegacyPlayerTransferVisualInput {
   /**
@@ -152,6 +190,83 @@ const INACTIVE_PRESENTATION_BASE = {
   targetFlareIntensity: 0
 } as const;
 
+/**
+ * The 'stored' phase's extraction closure/crossfade tail, checked before
+ * falling back to ordinary settled-stored presentation. Returns null when
+ * neither window applies (ordinary stored, or no outbound clock at all).
+ */
+const resolveExtractionClosurePresentation = (
+  input: TeleportTransferPresentationInput,
+  storedEnergyAlpha: number,
+  poseAvailable: boolean,
+  reducedMotion: boolean
+): TeleportTransferPresentation | null => {
+  const outboundElapsedMs = normalizeElapsedMs(input.outboundElapsedMs);
+  if (outboundElapsedMs === null) {
+    return null;
+  }
+
+  if (reducedMotion) {
+    if (outboundElapsedMs >= TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS) {
+      return null;
+    }
+    if (!poseAvailable || input.extractionTarget === null) {
+      // Explicit degradation still applies inside the crossfade window --
+      // never fabricate a conduit without a real pose/target.
+      return {
+        ...INACTIVE_PRESENTATION_BASE,
+        phase: 'stored',
+        direction: 'extraction',
+        poseAvailable
+      };
+    }
+    return {
+      active: true,
+      phase: 'stored',
+      direction: 'extraction',
+      poseAvailable,
+      openFraction: 1,
+      sourcePoint: { x: input.primaryPose!.portX, y: input.primaryPose!.portY },
+      targetPoint: input.extractionTarget,
+      packetPoint: null,
+      packetVisible: false,
+      sourceFlareIntensity: Math.max(storedEnergyAlpha, 1),
+      targetFlareIntensity: 0
+    };
+  }
+
+  const overshootMs = outboundElapsedMs - LEGACY_PLAYER_TRANSFER_OUTBOUND_MS;
+  if (overshootMs < 0 || overshootMs >= TELEPORT_TRANSFER_EXTRACTION_ABSORPTION_MS) {
+    return null;
+  }
+  if (!poseAvailable || input.extractionTarget === null) {
+    return {
+      ...INACTIVE_PRESENTATION_BASE,
+      phase: 'stored',
+      direction: 'extraction',
+      poseAvailable
+    };
+  }
+  const openFraction = clamp01(1 - (overshootMs / TELEPORT_TRANSFER_EXTRACTION_ABSORPTION_MS));
+  return {
+    active: true,
+    phase: 'stored',
+    direction: 'extraction',
+    poseAvailable,
+    openFraction,
+    sourcePoint: { x: input.primaryPose!.portX, y: input.primaryPose!.portY },
+    targetPoint: input.extractionTarget,
+    // The packet has already been absorbed by the time this tail begins
+    // (the contract's "same shell absorbs it" happens at the outbound/
+    // stored boundary) -- only the conduit itself retracts, no separate
+    // traveling payload.
+    packetPoint: null,
+    packetVisible: false,
+    sourceFlareIntensity: Math.max(storedEnergyAlpha, openFraction),
+    targetFlareIntensity: 0
+  };
+};
+
 export const resolveTeleportTransferPresentation = (
   input: TeleportTransferPresentationInput
 ): TeleportTransferPresentation => {
@@ -159,12 +274,20 @@ export const resolveTeleportTransferPresentation = (
   const poseAvailable = input.primaryPose !== null;
   const reducedMotion = input.reducedMotion === true;
 
+  if (transfer.phase === 'stored') {
+    const closure = resolveExtractionClosurePresentation(input, transfer.energyAlpha, poseAvailable, reducedMotion);
+    if (closure !== null) {
+      return closure;
+    }
+  }
+
   if (!transfer.active || (transfer.phase !== 'outbound' && transfer.phase !== 'delivering')) {
-    // 'idle' / 'pending' / 'stored' / 'complete': no conduit. 'stored'
-    // still has a real settled glow (transfer.energyAlpha), which belongs
-    // to the shell itself, not a conduit -- surfaced via
-    // sourceFlareIntensity so a renderer can keep the primary glowing
-    // without drawing any conduit/packet pixels.
+    // 'idle' / 'pending' / 'stored' (outside its own closure/crossfade
+    // tail, handled above) / 'complete': no conduit. 'stored' still has a
+    // real settled glow (transfer.energyAlpha), which belongs to the
+    // shell itself, not a conduit -- surfaced via sourceFlareIntensity so
+    // a renderer can keep the primary glowing without drawing any
+    // conduit/packet pixels.
     return {
       ...INACTIVE_PRESENTATION_BASE,
       phase: transfer.phase,
