@@ -70,6 +70,9 @@ jobs:
       - name: Verify Wave 4D-A trail corner raster (bounded, all four orientations)
         run: node ./scripts/analysis/verify-trail-corner-raster.mjs --skip-build
 
+      - name: Verify Wave 4D-B Teleport anchor-pose QA preview lifecycle
+        run: node ./scripts/analysis/verify-teleport-anchor-preview-lifecycle.mjs --skip-build
+
   ai-navigation-acceptance:
     name: AI navigation acceptance shard ${{ matrix.shard }}
     runs-on: ubuntu-latest

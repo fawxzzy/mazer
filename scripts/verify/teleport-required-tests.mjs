@@ -16,7 +16,8 @@
 
 /** The full required set -- what CI needs to run in its entirety. */
 export const TELEPORT_REQUIRED_TESTS = [
-  'tests/render/teleportPrimaryAnchor.test.ts'
+  'tests/render/teleportPrimaryAnchor.test.ts',
+  'tests/render/teleportAnchorPose.test.ts'
 ];
 
 /**
