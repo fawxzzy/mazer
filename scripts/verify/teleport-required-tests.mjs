@@ -18,7 +18,8 @@
 export const TELEPORT_REQUIRED_TESTS = [
   'tests/render/teleportPrimaryAnchor.test.ts',
   'tests/render/teleportAnchorPose.test.ts',
-  'tests/render/teleportTransferPresentation.test.ts'
+  'tests/render/teleportTransferPresentation.test.ts',
+  'tests/render/teleportTransferConduitCanvas.test.ts'
 ];
 
 /**
