@@ -1019,7 +1019,14 @@ interface LegacyTeleportAnchorPreviewResult {
   reason: string;
   rejected: ReadonlyArray<TeleportAnchorRejection>;
   /** Real-space pose of the selected anchor, or null when outcome is 'unavailable'/'invalid-input'. */
-  pose: { anchorX: number; anchorY: number; rotation: number; portX: number; portY: number } | null;
+  pose: {
+    anchorX: number;
+    anchorY: number;
+    rotation: number;
+    portX: number;
+    portY: number;
+    footprint: TeleportRect;
+  } | null;
 }
 
 // Real, measured frame-time evidence for Navigation Core v1's continuous
@@ -2788,13 +2795,17 @@ export class MenuScene extends Phaser.Scene {
       previewTeleportPrimaryAnchor: (targetX: number, targetY: number, newSession?: boolean): LegacyTeleportAnchorPreviewResult => (
         this.handleLegacyQaPreviewTeleportPrimaryAnchor(targetX, targetY, newSession === true)
       ),
-      endTeleportPrimaryAnchorPreview: (): void => {
-        this.teleportAnchorPreviewSession = null;
-      }
+      endTeleportPrimaryAnchorPreview: (): void => this.handleLegacyQaEndTeleportPrimaryAnchorPreview()
     };
   }
 
   private detachLegacyQaDiagnosticsSurface(): void {
+    // Scene teardown/shutdown, not a live end-of-preview call -- clears the
+    // session so a later scene recreate starts fresh (matching this field's
+    // own initializer), but deliberately does NOT also force a presentation
+    // update here: the scene's own game objects may already be mid-
+    // destruction at this point, and there is nothing left to "restore"
+    // visually once the scene itself is going away.
     this.teleportAnchorPreviewSession = null;
     if (typeof window === 'undefined') {
       return;
@@ -2815,10 +2826,18 @@ export class MenuScene extends Phaser.Scene {
   // strips (readMazerViewportGeometry) are included too, unioned with the
   // above rather than replaced by it.
   //
-  // Not yet included, a real disclosed limitation: play mode's touch
-  // movement control has no discrete rectangular hit-zone in this codebase
-  // to extract (it is a whole-surface drag gesture, not a fixed-bounds
-  // button like the ones above) -- see docs/current-truth.md.
+  // Reviewer-caught defect fixed: play mode's touch controls DO have real
+  // discrete bounds in this codebase -- resolveLegacyPlayTouchControlLayout's
+  // own `controls.pause` (the fixed pause-button hit region, real whenever
+  // shouldRenderLegacyPlayTouchControls is true) and, only while a drag is
+  // genuinely active, resolveLegacyPlayFloatingStickGeometry's own `outer`
+  // rect for the floating stick actually mounted at playFloatingStickOrigin.
+  // Neither of these is "the whole gesture-capture surface" (which spans
+  // the entire canvas and correctly stays OUT of this exclusion set --
+  // excluding it would make every anchor ineligible during play for no
+  // real reason): a fixed button and a transient stick both have real,
+  // bounded footprints; the surface that merely detects where a drag
+  // started does not.
   private resolveLegacyTeleportAnchorPreviewExclusions(viewport: TeleportViewportBounds): TeleportRect[] {
     const safeArea = readMazerViewportGeometry().safeArea;
     const exclusions: TeleportRect[] = [
@@ -2846,6 +2865,16 @@ export class MenuScene extends Phaser.Scene {
       exclusions.push({ x: titleLayout.left, y: titleLayout.top, width: titleLayout.width, height: titleLayout.height });
     }
 
+    if (this.shouldRenderLegacyPlayTouchControls()) {
+      const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
+      const pause = touchControlLayout.controls.pause;
+      exclusions.push({ x: pause.left, y: pause.top, width: pause.width, height: pause.height });
+      if (this.playFloatingStickOrigin !== null) {
+        const stick = this.resolveLegacyPlayFloatingStickGeometry(this.playFloatingStickOrigin);
+        exclusions.push({ x: stick.outer.left, y: stick.outer.top, width: stick.outer.width, height: stick.outer.height });
+      }
+    }
+
     // A zero-width/height rectangle (e.g. a fully-collapsed safe-area
     // inset) contributes no real exclusion rather than a degenerate
     // zero-area one that could never intersect anything anyway but is
@@ -2865,7 +2894,7 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyTeleportAnchorPreviewResult(
     target: { x: number; y: number },
     heldAnchorId: TeleportAnchorId | null
-  ): { result: ReturnType<typeof selectTeleportPrimaryAnchor>; poseById: Map<TeleportAnchorId, { anchorX: number; anchorY: number; rotation: number; portX: number; portY: number }> } {
+  ): { result: ReturnType<typeof selectTeleportPrimaryAnchor>; poseById: Map<TeleportAnchorId, { anchorX: number; anchorY: number; rotation: number; portX: number; portY: number; footprint: TeleportRect }> } {
     const viewport = { width: this.layout.width, height: this.layout.height };
     const exclusions = this.resolveLegacyTeleportAnchorPreviewExclusions(viewport);
 
@@ -2882,9 +2911,33 @@ export class MenuScene extends Phaser.Scene {
       anchorY: candidate.pose.anchorY,
       rotation: candidate.pose.rotation,
       portX: candidate.pose.portX,
-      portY: candidate.pose.portY
+      portY: candidate.pose.portY,
+      footprint: candidate.pose.footprint
     }]));
     return { result, poseById };
+  }
+
+  // Reviewer-caught defect fixed: begin/update used to only mutate session
+  // state and rely on some future ambient frame to actually apply it --
+  // but the ambient title-orbit draw this preview rides on is dirty-gated
+  // and its own "pending frame" check (hasLegacyMenuTitleAnimationPendingFrame)
+  // explicitly returns false under reduced motion, so a settled,
+  // reduced-motion scene could have no guaranteed next frame at all. Rather
+  // than re-enabling continuous animation (which the review explicitly
+  // does not want) or fighting the dirty-flag system's own reset timing
+  // (boardPathDirty gets set back to false at the end of the very draw
+  // call that would need to see it), this calls the real
+  // drawLegacyMenuPathTitle draw function directly and synchronously --
+  // the same real function the normal per-frame path calls, not a
+  // duplicate. That function has its own real early-exit (mode/overlay
+  // guard) and internally calls drawLegacyMenuPathTitleOrbitSigils then
+  // applyLegacyTeleportAnchorPreviewOverride, so this guarantees the
+  // preview's effect (or, in an unsupported mode/overlay, the correct
+  // hidden state) is applied THIS call, independent of animation/dirty
+  // state, while the existing per-frame call site still keeps it applied
+  // across whatever real ambient frames run afterward.
+  private applyLegacyTeleportAnchorPreviewPresentationUpdate(): void {
+    this.drawLegacyMenuPathTitle(this.time.now);
   }
 
   private handleLegacyQaPreviewTeleportPrimaryAnchor(targetX: number, targetY: number, newSession: boolean): LegacyTeleportAnchorPreviewResult {
@@ -2892,6 +2945,7 @@ export class MenuScene extends Phaser.Scene {
     const heldAnchorId = (newSession || !this.teleportAnchorPreviewSession) ? null : this.teleportAnchorPreviewSession.heldAnchorId;
     const { result, poseById } = this.resolveLegacyTeleportAnchorPreviewResult(target, heldAnchorId);
     this.teleportAnchorPreviewSession = { target, heldAnchorId: result.selectedId };
+    this.applyLegacyTeleportAnchorPreviewPresentationUpdate();
     const pose = result.selectedId === null ? null : (poseById.get(result.selectedId) ?? null);
     return {
       outcome: result.outcome,
@@ -2900,6 +2954,18 @@ export class MenuScene extends Phaser.Scene {
       rejected: result.rejected,
       pose
     };
+  }
+
+  // Mirrors handleLegacyQaPreviewTeleportPrimaryAnchor's own explicit-update
+  // fix: ending the session and then merely waiting for some future ambient
+  // frame to restore the commandeered slot has the identical settled/
+  // reduced-motion gap begin/update had. Clearing the session BEFORE the
+  // explicit draw call means that draw call runs the real ambient path
+  // for every slot with no override active, immediately restoring the
+  // previously-commandeered slot to normal control.
+  private handleLegacyQaEndTeleportPrimaryAnchorPreview(): void {
+    this.teleportAnchorPreviewSession = null;
+    this.applyLegacyTeleportAnchorPreviewPresentationUpdate();
   }
 
   // Called every frame from within the real per-frame title-orbit draw
@@ -2963,11 +3029,25 @@ export class MenuScene extends Phaser.Scene {
     // own name/stated purpose ("Board Zoom") is a uniform zoom, so this is
     // a documented scope boundary, not an unexamined gap.
     const localRotation = pose.rotation - this.boardZoomContainer.rotation;
-    const scale = TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX / MAZER_VFX_DIAMOND_SOURCE_SIZE;
+    // Reviewer-caught defect fixed: this LOCAL scale used to be a fixed
+    // value regardless of the parent's own scale. Phaser composes
+    // WORLD scale = LOCAL scale * PARENT scale, so under a real non-1
+    // container scale (e.g. this codebase's own future "Board Zoom" use, or
+    // any other real transform) the previous fixed local scale rendered a
+    // shell whose WORLD size -- and so its measured tip's real-space
+    // offset from center, i.e. the beam port -- disagreed with what the
+    // pose resolver computed for TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX.
+    // Dividing by the container's own scale here keeps the rendered WORLD
+    // size (and so the real displayed port/footprint) equal to the
+    // resolver's own intended size regardless of the container's current
+    // scale -- correct under any UNIFORM parent scale (see the rotation
+    // comment above for why non-uniform scale is a documented non-goal).
+    const worldScale = TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX / MAZER_VFX_DIAMOND_SOURCE_SIZE;
+    const localScale = worldScale / this.boardZoomContainer.scaleX;
     image
       .setPosition(local.x, local.y)
       .setRotation(localRotation)
-      .setScale(scale)
+      .setScale(localScale)
       .setAlpha(1)
       .setVisible(true);
   }
