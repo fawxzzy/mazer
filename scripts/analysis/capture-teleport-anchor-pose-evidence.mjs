@@ -120,7 +120,7 @@ const main = async () => {
     // top-left corner, real selection (no forced ID).
     {
       const target = { x: 20, y: 20 };
-      const result = await page.evaluate((t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y), target);
+      const result = await page.evaluate((t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y, true), target);
       await stepOnce();
       const center = result.pose ?? { anchorX: target.x, anchorY: target.y };
       panels.push(await captureAroundAnchor(`Policy-selected: target=(${target.x},${target.y}) -> anchor ${result.selectedId} (${result.outcome})`, center.anchorX, center.anchorY));
@@ -131,7 +131,7 @@ const main = async () => {
     // the rotation actually differs (still real selection, not forced).
     {
       const target = { x: 5, y: 250 };
-      const result = await page.evaluate((t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y), target);
+      const result = await page.evaluate((t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y, true), target);
       await stepOnce();
       const center = result.pose ?? { anchorX: target.x, anchorY: target.y };
       panels.push(await captureAroundAnchor(`Policy-selected: target=(${target.x},${target.y}) -> anchor ${result.selectedId} (${result.outcome})`, center.anchorX, center.anchorY));
@@ -144,7 +144,7 @@ const main = async () => {
     // see the PR description).
     {
       const target = { x: 700, y: 5 };
-      const result = await page.evaluate((t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y), target);
+      const result = await page.evaluate((t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y, true), target);
       await stepOnce();
       const center = result.pose ?? { anchorX: target.x, anchorY: target.y };
       panels.push(await captureAroundAnchor(`Policy-selected: target=(${target.x},${target.y}) -> anchor ${result.selectedId} (${result.outcome})`, center.anchorX, center.anchorY));
