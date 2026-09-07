@@ -282,6 +282,209 @@ const main = async () => {
       `duringSlot=${JSON.stringify(resetSlot)} afterSlot=${JSON.stringify(afterSlot)}`
     );
 
+    // === Rendered port/footprint agreement (the review's finding 1) ===
+    // Independently transforms the canonical shell's own MEASURED tip
+    // (edge-diamond-energized.png: 1254x1254 canvas, center (627,627), tip
+    // at (920,131) -- see teleportAnchorPose.ts's own module doc) through
+    // the Image's ACTUAL world transform matrix (Phaser's own
+    // TransformMatrix.transformPoint, which composes position, rotation,
+    // AND scale -- position/rotation alone, which the previous round's
+    // checks used, cannot catch a scale-compensation bug). Compares that
+    // independently-measured point against the resolver's own reported
+    // portX/portY, and transforms the shell's 4 source-canvas corners the
+    // same way to confirm they fit the reported footprint -- not merely
+    // that the footprint is self-consistent with its own inputs.
+    const NATIVE_TIP_DX = 920 - 627;
+    const NATIVE_TIP_DY = 131 - 627;
+    const HALF_SOURCE = 627;
+    const verifyRenderedPortAndFootprint = (page2, label, parentScale) => page2.evaluate(({ dx, dy, half, scale, lbl }) => {
+      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+      const original = { x: scene.boardZoomContainer.x, y: scene.boardZoomContainer.y, sx: scene.boardZoomContainer.scaleX, sy: scene.boardZoomContainer.scaleY };
+      scene.boardZoomContainer.setPosition(11, -7).setScale(scale, scale);
+      const result = window.__MAZER_QA__.previewTeleportPrimaryAnchor(1260, 20, true);
+      const image = scene.titleOrbitDiamondImages[result.selectedId];
+      const world = image.getWorldTransformMatrix();
+      const measuredPort = world.transformPoint(dx, dy);
+      const corners = [[-half, -half], [half, -half], [half, half], [-half, half]].map(([cx, cy]) => world.transformPoint(cx, cy));
+      window.__MAZER_QA__.endTeleportPrimaryAnchorPreview();
+      scene.boardZoomContainer.setPosition(original.x, original.y).setScale(original.sx, original.sy);
+      return { label: lbl, result, measuredPort, corners };
+    }, { dx: NATIVE_TIP_DX, dy: NATIVE_TIP_DY, half: HALF_SOURCE, scale: parentScale, lbl: label });
+
+    const footprintContains = (footprint, point, epsilon = 0.5) => (
+      point.x >= footprint.x - epsilon && point.y >= footprint.y - epsilon
+      && point.x <= footprint.x + footprint.width + epsilon && point.y <= footprint.y + footprint.height + epsilon
+    );
+
+    for (const parentScale of [1, 1.6, 0.5]) {
+      // eslint-disable-next-line no-await-in-loop
+      const probe = await verifyRenderedPortAndFootprint(page, `parent scale ${parentScale}`, parentScale);
+      // eslint-disable-next-line no-await-in-loop
+      await stepOnce(page);
+      const portMatches = probe.result.pose !== null
+        && Math.abs(probe.measuredPort.x - probe.result.pose.portX) < 0.5
+        && Math.abs(probe.measuredPort.y - probe.result.pose.portY) < 0.5;
+      check(
+        `the rendered port (measured by transforming the real source tip through the Image's actual world matrix) matches the resolver's portX/portY at ${probe.label}`,
+        portMatches,
+        `measuredPort=${JSON.stringify(probe.measuredPort)} pose=${JSON.stringify(probe.result.pose)}`
+      );
+      const cornersContained = probe.result.pose !== null && probe.corners.every((corner) => footprintContains(probe.result.pose.footprint, corner));
+      check(
+        `all 4 transformed source-canvas corners fit the reported footprint at ${probe.label}`,
+        cornersContained,
+        `corners=${JSON.stringify(probe.corners)} footprint=${JSON.stringify(probe.result.pose?.footprint)}`
+      );
+    }
+
+    // Negative control: reproduces the ORIGINAL uncompensated-scale bug
+    // directly (bypassing the real fix) and proves the SAME port comparison
+    // above would have failed it -- confirming this test suite actually
+    // catches the defect it claims to, not just that the current code
+    // happens to pass.
+    const negativeControl = await page.evaluate(({ dx, dy }) => {
+      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+      const original = { x: scene.boardZoomContainer.x, y: scene.boardZoomContainer.y, sx: scene.boardZoomContainer.scaleX, sy: scene.boardZoomContainer.scaleY };
+      scene.boardZoomContainer.setPosition(11, -7).setScale(1.6, 1.6);
+      const result = window.__MAZER_QA__.previewTeleportPrimaryAnchor(1260, 20, true);
+      const image = scene.titleOrbitDiamondImages[result.selectedId];
+      // Reproduce the ORIGINAL bug: a fixed local scale not divided by the
+      // parent's own scale (this is exactly what applyLegacyTeleportAnchorPreviewOverride
+      // used to do before this correction round).
+      const uncompensatedScale = 32 / 1254;
+      image.setScale(uncompensatedScale);
+      const world = image.getWorldTransformMatrix();
+      const measuredPort = world.transformPoint(dx, dy);
+      window.__MAZER_QA__.endTeleportPrimaryAnchorPreview();
+      scene.boardZoomContainer.setPosition(original.x, original.y).setScale(original.sx, original.sy);
+      return { result, measuredPort };
+    }, { dx: NATIVE_TIP_DX, dy: NATIVE_TIP_DY });
+    await stepOnce(page);
+    const negativeControlPortMatches = negativeControl.result.pose !== null
+      && Math.abs(negativeControl.measuredPort.x - negativeControl.result.pose.portX) < 0.5
+      && Math.abs(negativeControl.measuredPort.y - negativeControl.result.pose.portY) < 0.5;
+    check(
+      'negative control: the ORIGINAL uncompensated-scale bug genuinely fails this same port comparison (proving the test has teeth)',
+      negativeControlPortMatches === false,
+      `measuredPort=${JSON.stringify(negativeControl.measuredPort)} pose=${JSON.stringify(negativeControl.result.pose)}`
+    );
+
+    // === Reduced-motion, settled-scene preview updates (the review's finding 2) ===
+    // The whole point of this block is that NO stepOnce() (manual frame
+    // advance) is called between any of these calls and reading their
+    // effect -- the previous round's fix relied on the real per-frame
+    // ambient draw to apply/restore the preview, which this scene's own
+    // hasLegacyMenuTitleAnimationPendingFrame explicitly disables under
+    // reduced motion, and boardPathDirty is only forced every frame when
+    // reduced motion is OFF. A settled, reduced-motion scene therefore has
+    // no guaranteed next frame at all -- this proves begin/update/end all
+    // apply their effect SYNCHRONOUSLY, independent of any frame running.
+    const reducedMotionProbe = await page.evaluate((t) => {
+      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+      const originalReducedMotion = scene.prefersLegacyReducedMotion;
+      scene.prefersLegacyReducedMotion = () => true;
+
+      const begin = window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.beginX, t.beginY, true);
+      const afterBeginWorld = begin.selectedId === null ? null : scene.titleOrbitDiamondImages[begin.selectedId].getWorldTransformMatrix();
+      const afterBeginPos = afterBeginWorld ? { x: afterBeginWorld.tx, y: afterBeginWorld.ty } : null;
+
+      const update = window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.updateX, t.updateY);
+      const afterUpdateWorld = update.selectedId === null ? null : scene.titleOrbitDiamondImages[update.selectedId].getWorldTransformMatrix();
+      const afterUpdatePos = afterUpdateWorld ? { x: afterUpdateWorld.tx, y: afterUpdateWorld.ty } : null;
+
+      const beforeEndWorld = scene.titleOrbitDiamondImages[update.selectedId].getWorldTransformMatrix();
+      const beforeEndPos = { x: beforeEndWorld.tx, y: beforeEndWorld.ty };
+      window.__MAZER_QA__.endTeleportPrimaryAnchorPreview();
+      const afterEndWorld = scene.titleOrbitDiamondImages[update.selectedId].getWorldTransformMatrix();
+      const afterEndPos = { x: afterEndWorld.tx, y: afterEndWorld.ty };
+
+      scene.prefersLegacyReducedMotion = originalReducedMotion;
+      return { begin, afterBeginPos, update, afterUpdatePos, beforeEndPos, afterEndPos };
+    }, { beginX: 20, beginY: 20, updateX: 1260, updateY: 20 });
+    check(
+      'reduced motion, settled scene, NO frame step: begin displays the chosen slot immediately',
+      reducedMotionProbe.begin.selectedId !== null && reducedMotionProbe.afterBeginPos !== null
+        && Math.abs(reducedMotionProbe.afterBeginPos.x - reducedMotionProbe.begin.pose.anchorX) < 0.5
+        && Math.abs(reducedMotionProbe.afterBeginPos.y - reducedMotionProbe.begin.pose.anchorY) < 0.5,
+      JSON.stringify(reducedMotionProbe)
+    );
+    check(
+      'reduced motion, settled scene, NO frame step: a held-target update is applied immediately',
+      reducedMotionProbe.update.selectedId !== null && reducedMotionProbe.afterUpdatePos !== null
+        && Math.abs(reducedMotionProbe.afterUpdatePos.x - reducedMotionProbe.update.pose.anchorX) < 0.5
+        && Math.abs(reducedMotionProbe.afterUpdatePos.y - reducedMotionProbe.update.pose.anchorY) < 0.5,
+      JSON.stringify(reducedMotionProbe)
+    );
+    check(
+      'reduced motion, settled scene, NO frame step: end restores ambient presentation immediately',
+      Math.abs(reducedMotionProbe.beforeEndPos.x - reducedMotionProbe.afterEndPos.x) > 0.5 || Math.abs(reducedMotionProbe.beforeEndPos.y - reducedMotionProbe.afterEndPos.y) > 0.5,
+      JSON.stringify(reducedMotionProbe)
+    );
+    await stepOnce(page);
+
+    // === Real play-control clearance (the review's finding 3) ===
+    // Distinguishes the fixed pause-button hit region (always real when
+    // touch controls should render) from an ACTIVE floating stick's own
+    // transient footprint (real only while a drag is genuinely in
+    // progress) -- and confirms the much larger whole-canvas gesture
+    // surface is NOT itself an exclusion (selection must still succeed).
+    await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+    await stepOnce(page);
+    const touchControlProbe = await page.evaluate(() => {
+      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+      const touchControlLayout = scene.resolveLegacyPlayTouchControlLayout();
+      const pause = touchControlLayout.controls.pause;
+      // A target placed exactly on the real, fixed pause-button bounds.
+      const pauseResult = window.__MAZER_QA__.previewTeleportPrimaryAnchor(
+        pause.left + (pause.width / 2),
+        pause.top + (pause.height / 2),
+        true
+      );
+      window.__MAZER_QA__.endTeleportPrimaryAnchorPreview();
+
+      // An active floating stick mounted right where anchor 1 (top-mid)
+      // sits, so its real footprint genuinely overlaps that anchor.
+      scene.playFloatingStickOrigin = { x: 640, y: 16 };
+      const stickResult = window.__MAZER_QA__.previewTeleportPrimaryAnchor(640, 16, true);
+      const stickRejectedAnchor1 = stickResult.rejected.some((r) => r.reason.includes('excluded region'));
+      window.__MAZER_QA__.endTeleportPrimaryAnchorPreview();
+      scene.playFloatingStickOrigin = null;
+
+      // The same target with NO active stick -- anchor 1 must be selectable
+      // once the transient footprint is gone.
+      const noStickResult = window.__MAZER_QA__.previewTeleportPrimaryAnchor(640, 16, true);
+      window.__MAZER_QA__.endTeleportPrimaryAnchorPreview();
+
+      // The gesture-capture surface itself (the whole canvas, no active
+      // stick) must NOT make every anchor ineligible -- an ordinary
+      // in-canvas target still resolves normally.
+      const ordinaryResult = window.__MAZER_QA__.previewTeleportPrimaryAnchor(scene.layout.width / 2, scene.layout.height / 2, true);
+      window.__MAZER_QA__.endTeleportPrimaryAnchorPreview();
+
+      return { pause, pauseResult, stickRejectedAnchor1, noStickResult, ordinaryResult };
+    });
+    await stepOnce(page);
+    check(
+      'a target on the real, fixed pause-button bounds is genuinely excluded',
+      touchControlProbe.pauseResult.rejected.some((r) => r.reason.includes('excluded region')),
+      JSON.stringify(touchControlProbe.pauseResult)
+    );
+    check(
+      'an active floating stick\'s real footprint genuinely excludes the anchor it overlaps',
+      touchControlProbe.stickRejectedAnchor1,
+      JSON.stringify(touchControlProbe)
+    );
+    check(
+      'once the stick is no longer active, the same anchor becomes selectable again -- a transient control, not a permanent exclusion',
+      touchControlProbe.noStickResult.selectedId === 1,
+      JSON.stringify(touchControlProbe.noStickResult)
+    );
+    check(
+      'the whole-canvas gesture-capture surface is NOT itself an exclusion -- an ordinary target still resolves to a real anchor',
+      touchControlProbe.ordinaryResult.selectedId !== null,
+      JSON.stringify(touchControlProbe.ordinaryResult)
+    );
+
     // === Navigation Core unaffected, including in settled Active Play ===
     await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
     await stepOnce(page);
