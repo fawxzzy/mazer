@@ -85,7 +85,8 @@ import {
   resolveLegacyShortestPath,
   type LegacyMazeGenerationProfile,
   type LegacyMazeSnapshot,
-  type LegacyPoint
+  type LegacyPoint,
+  type LegacyShortestPathResult
 } from '../legacy-runtime/legacyMaze';
 import { resolveInitialRuntimeMode } from '../legacy-runtime/legacyLaunchMode';
 import {
@@ -1074,6 +1075,26 @@ interface LegacyQaDiagnosticsApi {
   // LegacyTeleportAnchorPreviewResult's own comment above.
   previewTeleportPrimaryAnchor(targetX: number, targetY: number, newSession?: boolean): LegacyTeleportAnchorPreviewResult;
   endTeleportPrimaryAnchorPreview(): void;
+  // Exposes the REAL production wrap-aware solver (resolveLegacyPlayableShortestPath,
+  // the same one this scene's own AI/telemetry code already calls) to
+  // external real-browser test/evidence scripts, so they drive a genuine
+  // shortest route rather than maintaining their own separate (and, until
+  // this method existed, non-wrap-aware) BFS -- review 5146800659's own
+  // request, continuing 5144999445. From is the real current player
+  // position by default; to is always the real current goal.
+  resolveShortestPathToGoal(from?: LegacyPoint): LegacyShortestPathResult;
+  // Exposes renderGameplayTransferPresentation's own last cached real
+  // presentation snapshot (source/target/conduit points, all real
+  // WORLD-space) so real-browser tests can assert on the actual
+  // displayed geometry, not just visibility. Review 5146800659's own
+  // request. Returns null whenever no gameplay transfer presentation has
+  // rendered since the last reset (mirrors the field's own null state).
+  getGameplayTransferPresentationDiagnostics(): {
+    target: { x: number; y: number };
+    primaryPoseId: number | null;
+    capturedAtMs: number;
+    presentation: TeleportTransferPresentation;
+  } | null;
 }
 
 declare global {
@@ -1942,6 +1963,10 @@ export class MenuScene extends Phaser.Scene {
   private titleTileFontImagePool: Phaser.GameObjects.Image[] = [];
   private levelAnnouncerLabelText!: Phaser.GameObjects.Text;
   private levelAnnouncerWasVisible = false;
+  // One-more-redraw falling-edge tracker for the real initial-arrival
+  // conduit hide (see this field's own use in drawDynamicBoard for the
+  // confirmed real defect it fixes).
+  private playerSpawnBurstWasActiveForRedraw = false;
   private levelAnnouncerBuildFadeOutArmed = false;
   private playerSpawnBurstStartedAtMs: number | null = null;
   private playerTransferEnergyArmed = false;
@@ -2157,6 +2182,20 @@ export class MenuScene extends Phaser.Scene {
   // should resolve selection immediately rather than paying the same
   // one-frame delay a real resume needed.
   private gameplayTransferLastObservedOverlay: OverlayKind = 'none';
+  // The most recent real gameplay-transfer presentation this frame
+  // actually rendered from (renderGameplayTransferPresentation's own
+  // cache of its own resolveTeleportTransferPresentation output) --
+  // exposed read-only via window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics()
+  // so real-browser tests can assert on the actual displayed geometry
+  // (source tip, conduit endpoint, target point) rather than only
+  // visibility/positive-dimensions. Cleared alongside the other sticky
+  // gameplay-transfer fields.
+  private gameplayTransferLastPresentationSnapshot: {
+    presentation: TeleportTransferPresentation;
+    target: { x: number; y: number };
+    primaryPoseId: TeleportAnchorId | null;
+    capturedAtMs: number;
+  } | null = null;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
   private overlayGuideGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -2918,7 +2957,11 @@ export class MenuScene extends Phaser.Scene {
       previewTeleportPrimaryAnchor: (targetX: number, targetY: number, newSession?: boolean): LegacyTeleportAnchorPreviewResult => (
         this.handleLegacyQaPreviewTeleportPrimaryAnchor(targetX, targetY, newSession === true)
       ),
-      endTeleportPrimaryAnchorPreview: (): void => this.handleLegacyQaEndTeleportPrimaryAnchorPreview()
+      endTeleportPrimaryAnchorPreview: (): void => this.handleLegacyQaEndTeleportPrimaryAnchorPreview(),
+      resolveShortestPathToGoal: (from?: LegacyPoint): LegacyShortestPathResult => (
+        resolveLegacyPlayableShortestPath(this.maze.grid, from ?? this.player, this.maze.goal)
+      ),
+      getGameplayTransferPresentationDiagnostics: () => this.gameplayTransferLastPresentationSnapshot
     };
   }
 
@@ -3232,6 +3275,15 @@ export class MenuScene extends Phaser.Scene {
       extractionTarget: target,
       deliveryTarget: target
     });
+    // Cached for a real diagnostics QA surface (getGameplayTransferPresentationDiagnostics)
+    // -- review 5146800659's own request for geometry assertions that
+    // compare the displayed source tip, conduit endpoint, and target-cell
+    // bounds directly, not just visibility/positive-dimensions/non-null
+    // world positions. Every point here is already real WORLD-space
+    // (the same space primaryPose.portX/Y and target are both in) --
+    // no reconstruction, this is the exact input the renderer itself
+    // used this frame.
+    this.gameplayTransferLastPresentationSnapshot = { presentation, target, primaryPoseId: primaryPose?.id ?? null, capturedAtMs: time };
 
     // Position/rotate/scale the SELECTED IDENTITY's own real shell slot --
     // same coordinate-space conversion as applyLegacyTeleportAnchorPreviewOverride
@@ -3864,12 +3916,29 @@ export class MenuScene extends Phaser.Scene {
     // visibly holding energy, then self-clears when that same travel+flash
     // window completes -- no new lifecycle pause is introduced.
     this.settleLegacyPlayerTransferEnergy(time);
+    // Confirmed real defect (found strengthening the permanent gameplay
+    // test's own case 7 per review 5146800659): a real Play-mode initial
+    // arrival with no OTHER confounding system also forcing a redraw
+    // around the same instant (a real transfer's own completion happens
+    // to coincide with other maze-settling redraws that mask this) left
+    // gameplayTransferConduitCanvasImage stuck visible forever once
+    // playerSpawnBurst.active's own falling edge stopped forcing
+    // boardDynamicDirty -- the hide branch in applyLegacyGameplay*
+    // Presentation's own caller only runs from inside drawDynamicBoard,
+    // which is itself dirty-flag-gated, so a scene that stops requesting
+    // redraws never runs that hide branch at all. Fixed the same way this
+    // file's own settings-cog defect (levelAnnouncerWasVisible-style,
+    // see comment just below) was: force exactly one more redraw on the
+    // real falling edge (was active last frame, isn't now).
+    const spawnBurstActiveNow = this.resolveLegacyPlayerSpawnBurstState(time).active;
     if (
-      this.resolveLegacyPlayerSpawnBurstState(time).active
+      spawnBurstActiveNow
       || this.resolveLegacyPlayerTransferState(time).active
+      || this.playerSpawnBurstWasActiveForRedraw
     ) {
       this.boardDynamicDirty = true;
     }
+    this.playerSpawnBurstWasActiveForRedraw = spawnBurstActiveNow;
     // Menu mode's settings cog (drawLegacyMenuSettingsCog) has the exact
     // same time-driven blink as play mode's, but it's drawn inside
     // drawBoardPaths, gated by boardPathDirty -- a flag neither of the two
@@ -6944,6 +7013,7 @@ export class MenuScene extends Phaser.Scene {
       this.gameplayTransferPrimaryId = null;
       this.gameplayTransferLastPrimaryPose = null;
       this.gameplayTransferLastObservedOverlay = 'none';
+      this.gameplayTransferLastPresentationSnapshot = null;
     }
     const alignedStartedAtMs = time - Math.max(
       0,
@@ -9433,6 +9503,7 @@ export class MenuScene extends Phaser.Scene {
     this.gameplayTransferPrimaryId = null;
     this.gameplayTransferLastPrimaryPose = null;
     this.gameplayTransferLastObservedOverlay = 'none';
+    this.gameplayTransferLastPresentationSnapshot = null;
     this.gameplayTransferConduitCanvasImage?.setVisible(false);
   }
 

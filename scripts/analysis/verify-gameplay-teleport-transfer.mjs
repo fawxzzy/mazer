@@ -75,43 +75,57 @@ const MOVE_FOR_DELTA = {
   '1,0': 'move_right'
 };
 
-/** Real 4-directional BFS over the maze's own grid -- the shortest real path from start to goal, as a sequence of move_* commands. Pure Node-side computation on the maze data already fetched from the real running game; the MOVES it produces are then driven through the real movePlayPlayer command, never used to directly assign player position. */
-const solveMazeToMoveSequence = (grid, start, goal) => {
-  const height = grid.length;
-  const width = grid[0]?.length ?? 0;
-  const visited = grid.map((row) => row.map(() => false));
-  const cameFrom = new Map();
-  const key = (p) => `${p.x},${p.y}`;
-  const queue = [start];
-  visited[start.y][start.x] = true;
-  let found = false;
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (current.x === goal.x && current.y === goal.y) {
-      found = true;
-      break;
+/**
+ * Converts a real wrap-aware shortest-path result (from the REAL
+ * production solver, window.__MAZER_QA__.resolveShortestPathToGoal --
+ * resolveLegacyPlayableShortestPath, the same one this scene's own AI/
+ * telemetry code already calls) into a sequence of move_* commands.
+ * Review 5146800659's own request: stop maintaining a separate,
+ * non-wrap-aware BFS in this file and reuse the real solver instead.
+ *
+ * An ordinary adjacent step maps directly to its cardinal direction. A
+ * WRAPPED step (isLegacyWrappedStepTransition's own definition: the two
+ * points are not grid-adjacent, |dx|>1 or |dy|>1) is resolved by sign
+ * inference against resolveWrappedGridPoint's own real behavior
+ * (src/legacy-runtime/legacyMaze.ts): moving off x=0 to the left wraps to
+ * x=width-1 (a large POSITIVE raw dx for a 'move_left' step) and moving
+ * off x=width-1 to the right wraps to x=0 (a large NEGATIVE raw dx for a
+ * 'move_right' step) -- i.e. a wrapped step's real direction is the
+ * OPPOSITE sign of its raw coordinate delta, on whichever axis actually
+ * wrapped.
+ */
+const pathToMoveSequence = (path) => {
+  const moves = [];
+  for (let i = 1; i < path.length; i += 1) {
+    const from = path[i - 1];
+    const to = path[i];
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const wrapped = Math.abs(dx) > 1 || Math.abs(dy) > 1;
+    if (!wrapped) {
+      const move = MOVE_FOR_DELTA[`${dx},${dy}`];
+      if (!move) { return null; }
+      moves.push(move);
+      continue;
     }
-    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
-      const nx = current.x + dx;
-      const ny = current.y + dy;
-      if (nx < 0 || ny < 0 || nx >= width || ny >= height) { continue; }
-      if (!grid[ny][nx] || visited[ny][nx]) { continue; }
-      visited[ny][nx] = true;
-      cameFrom.set(key({ x: nx, y: ny }), current);
-      queue.push({ x: nx, y: ny });
+    // Whichever axis actually wrapped carries the large delta; the real
+    // direction is that axis's OPPOSITE sign.
+    if (Math.abs(dx) > 1) {
+      moves.push(dx > 0 ? 'move_left' : 'move_right');
+    } else {
+      moves.push(dy > 0 ? 'move_up' : 'move_down');
     }
   }
-  if (!found) {
+  return moves;
+};
+
+/** Calls the REAL production wrap-aware solver via the QA surface and converts its path into real move_* commands. Returns null if no path was found or a step couldn't be converted. */
+const solveMazeToMoveSequence = async (page) => {
+  const result = await page.evaluate(() => window.__MAZER_QA__.resolveShortestPathToGoal());
+  if (!result?.found || !Array.isArray(result.path) || result.path.length < 2) {
     return null;
   }
-  const path = [];
-  let node = goal;
-  while (!(node.x === start.x && node.y === start.y)) {
-    const prev = cameFrom.get(key(node));
-    path.unshift({ dx: node.x - prev.x, dy: node.y - prev.y });
-    node = prev;
-  }
-  return path.map(({ dx, dy }) => MOVE_FOR_DELTA[`${dx},${dy}`]);
+  return pathToMoveSequence(result.path);
 };
 
 /** Opens a real game context/page, stops the RAF loop, and installs a manual clock-step pair (stepOnce/stepN) driving window.__MAZER_GAME__.loop.step directly -- the established workaround for the Browser pane's real RAF loop not ticking reliably under this automation. */
@@ -290,6 +304,41 @@ const main = async () => {
         check('case 1: the conduit is a real boardZoomContainer child (source masking fix)', armedState.shellInContainer === true, JSON.stringify(armedState));
         check('case 1: the OLD eight-origin beam-strip images are NOT used for a real gameplay transfer', armedState.beamStripVisible === false, JSON.stringify(armedState));
 
+        // Geometry: compare the shell's own REAL measured tip (Phaser's
+        // own TransformMatrix.transformPoint against the canonical
+        // shell's known native-tip offset -- the exact technique
+        // verify-teleport-anchor-preview-lifecycle.mjs's own "rendered
+        // port/footprint agreement" check already established and
+        // proved) against the presentation's own reported sourcePoint --
+        // not merely that the shell is visible with a non-null world
+        // position. Review 5146800659's own request.
+        const geometrySnapshot = await page.evaluate(() => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          const primaryId = scene.gameplayTransferPrimaryId;
+          const shell = primaryId !== null ? scene.titleOrbitDiamondImages[primaryId] : null;
+          const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
+          if (!shell || !diag) { return null; }
+          const NATIVE_TIP_DX = 920 - 627;
+          const NATIVE_TIP_DY = 131 - 627;
+          const world = shell.getWorldTransformMatrix();
+          const measuredPort = world.transformPoint(NATIVE_TIP_DX, NATIVE_TIP_DY);
+          return { measuredPort: { x: measuredPort.x, y: measuredPort.y }, sourcePoint: diag.presentation.sourcePoint, conduitStartPoint: diag.presentation.conduitStartPoint, targetPoint: diag.presentation.targetPoint };
+        });
+        check(
+          "case 1: the shell's real measured world tip matches the presentation's own reported source point",
+          geometrySnapshot !== null
+            && Math.abs(geometrySnapshot.measuredPort.x - geometrySnapshot.sourcePoint.x) < 0.5
+            && Math.abs(geometrySnapshot.measuredPort.y - geometrySnapshot.sourcePoint.y) < 0.5,
+          JSON.stringify(geometrySnapshot)
+        );
+        check(
+          "case 1: during outbound, the conduit's fixed anchor (conduitStartPoint) is the real target (the goal), not the source",
+          geometrySnapshot !== null
+            && Math.abs(geometrySnapshot.conduitStartPoint.x - geometrySnapshot.targetPoint.x) < 0.5
+            && Math.abs(geometrySnapshot.conduitStartPoint.y - geometrySnapshot.targetPoint.y) < 0.5,
+          JSON.stringify(geometrySnapshot)
+        );
+
         const heldPrimaryId = armedState.primaryId;
         const trace = [];
         let completeReached = false;
@@ -298,11 +347,41 @@ const main = async () => {
           await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
           const state = await page.evaluate(() => {
             const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+            const transferState = scene.resolveLegacyPlayerTransferState(scene.time.now);
+            // Replicates drawDynamicBoard's own real playerAlpha formula
+            // exactly, from real callable/readable scene state -- NOT
+            // isLegacyMenuPointVisibleInStaticDraw, which a first attempt
+            // at this exact check used and which only reflects whether
+            // this tile has been revealed by the maze's own tile-by-tile
+            // build animation (already true almost the whole time here,
+            // since the board is long since fully revealed by this point
+            // in a real run) -- confirmed the wrong signal before
+            // shipping it. The real discriminator selects between the
+            // transfer's OWN alpha (1 during 'pending', fading via
+            // 1-outboundProgress during 'outbound', exactly 0 from that
+            // point on) while `menuStaticDrawLifecyclePhase ===
+            // 'deconstructing' && playerTransferEnergyArmed`, and an
+            // entirely separate, unrelated deconstruct/reveal alpha this
+            // feature does not own the rest of the time (most of a real
+            // 'stored' interval, once the static-draw lifecycle has moved
+            // on to 'building'/'settled') -- so the check below only
+            // asserts within the window this feature actually controls.
+            const inTransferAlphaBranch = scene.menuStaticDrawLifecyclePhase === 'deconstructing' && scene.playerTransferEnergyArmed;
+            const transferPlayerAlpha = transferState.phase === 'pending'
+              ? 1
+              : transferState.phase === 'outbound'
+                ? 1 - transferState.outboundProgress
+                : 0;
+            const markerDeconstructAlpha = scene.resolveLegacyMenuDeconstructPlayerAlpha(scene.time.now);
+            const markerRevealAlpha = scene.resolveLegacyPlayerSpawnBurstState(scene.time.now).markerRevealAlpha;
+            const playerAlpha = inTransferAlphaBranch ? transferPlayerAlpha : (markerDeconstructAlpha * markerRevealAlpha);
             return {
-              phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
+              phase: transferState.phase,
               primaryId: scene.gameplayTransferPrimaryId,
               conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
-              beamStripVisible: scene.playerTransferBeamStripImages?.some((img) => img.visible) ?? false
+              beamStripVisible: scene.playerTransferBeamStripImages?.some((img) => img.visible) ?? false,
+              inTransferAlphaBranch,
+              playerAlpha
             };
           });
           trace.push(state);
@@ -318,9 +397,53 @@ const main = async () => {
           if (state.phase === 'complete' || (sawDelivering && state.phase === 'idle')) { completeReached = true; }
         }
         check('case 1: phase progressed through stored and delivering', trace.some((s) => s.phase === 'stored') && trace.some((s) => s.phase === 'delivering'), JSON.stringify(trace.map((s) => s.phase).filter((p, i, arr) => i === 0 || arr[i - 1] !== p)));
-        check('case 1: the SAME primary id was retained through the entire cycle (never a different one)', trace.every((s) => s.primaryId === null || s.primaryId === heldPrimaryId), JSON.stringify(Array.from(new Set(trace.map((s) => s.primaryId)))));
+        // Held identity: distinguishes "genuinely forgotten" (a real
+        // regression) from "the resolver reported no pose this exact
+        // frame" (poseAvailable false is a real, allowed outcome the
+        // presentation module itself documents) by checking the id
+        // itself, which this scene's own sticky-selection logic keeps
+        // non-null and CONSTANT through the entire armed session
+        // regardless of momentary pose availability -- only a genuine
+        // reset (checked separately below, at the idle/complete tail)
+        // may show null. Review 5146800659's own request.
+        const preIdleTrace = trace.filter((s) => s.phase !== 'idle' && s.phase !== 'complete');
+        check(
+          'case 1: the held primary id stays non-null and constant through the entire active/stored/delivering window (never forgotten mid-transfer)',
+          preIdleTrace.every((s) => s.primaryId === heldPrimaryId),
+          JSON.stringify(Array.from(new Set(preIdleTrace.map((s) => s.primaryId))))
+        );
+        check(
+          'case 1: the held primary id is cleared ONLY at the real completion/reset boundary, not earlier',
+          completeReached && trace[trace.length - 1].primaryId === null,
+          JSON.stringify(trace[trace.length - 1])
+        );
         check('case 1: the old eight-origin beam strip never became visible at any point in the whole cycle', trace.every((s) => s.beamStripVisible === false), 'n/a');
         check('case 1: conduit is closed (invisible) once the cycle genuinely completes', completeReached && !trace[trace.length - 1].conduitVisible, JSON.stringify(trace[trace.length - 1]));
+
+        // Player presentation: absent (playerAlpha === 0, the real
+        // production formula, replicated above) specifically within the
+        // window this feature's OWN alpha branch governs (outbound,
+        // while the transfer is armed and the static-draw lifecycle is
+        // still 'deconstructing'), reappears (playerAlpha > 0) once the
+        // cycle genuinely completes. Review 5146800659's own request.
+        // Batched polling (COMPLETION_WAIT_BATCH_SIZE-frame granularity)
+        // may catch anywhere from one to a few samples inside outbound's
+        // own real, short (450ms) window -- so this checks the real
+        // DIRECTION (a genuine fade toward 0, not flat or reversing), not
+        // an exact end-of-window value that batching timing could miss.
+        const ownedOutboundTrace = trace.filter((s) => s.phase === 'outbound' && s.inTransferAlphaBranch);
+        check(
+          "case 1: the real player marker genuinely fades toward 0 (not flat, not reversing) across the window this feature's own alpha branch governs (armed outbound)",
+          ownedOutboundTrace.length > 0
+            && ownedOutboundTrace[ownedOutboundTrace.length - 1].playerAlpha <= ownedOutboundTrace[0].playerAlpha
+            && ownedOutboundTrace[ownedOutboundTrace.length - 1].playerAlpha < 1,
+          JSON.stringify(ownedOutboundTrace.map((s) => s.playerAlpha))
+        );
+        check(
+          'case 1: the real player marker is visible again (playerAlpha > 0) once the cycle genuinely completes',
+          completeReached && trace[trace.length - 1].playerAlpha > 0,
+          JSON.stringify(trace[trace.length - 1])
+        );
 
         // Confirmed real defect (review 5144999445): playerTransferBeamStripImages
         // staying hidden (checked above) does NOT prove the OLD eight-origin
@@ -380,10 +503,12 @@ const main = async () => {
 
       const mazeInfo = await page.evaluate(() => {
         const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-        return { grid: scene.maze.grid, start: scene.maze.start, goal: scene.maze.goal, player: scene.player };
+        return { start: scene.maze.start, goal: scene.maze.goal, player: scene.player };
       });
-      const moves = solveMazeToMoveSequence(mazeInfo.grid, mazeInfo.player, mazeInfo.goal);
-      check('case 2: the real maze has a solvable real BFS route from the real current player position to the real goal', moves !== null && moves.length > 0, JSON.stringify({ start: mazeInfo.player, goal: mazeInfo.goal, routeLength: moves?.length ?? null }));
+      // Real production wrap-aware solver (resolveLegacyPlayableShortestPath
+      // via the QA surface), not a locally-maintained BFS.
+      const moves = await solveMazeToMoveSequence(page);
+      check('case 2: the real maze has a solvable real route (production wrap-aware solver) from the real current player position to the real goal', moves !== null && moves.length > 0, JSON.stringify({ start: mazeInfo.player, goal: mazeInfo.goal, routeLength: moves?.length ?? null }));
 
       if (moves !== null) {
         await resetLegacyVolleySpyCount(page);
@@ -440,7 +565,7 @@ const main = async () => {
     // scene-level monkeypatch.
     // ================================================================
     {
-      const { context, page, pageErrors, stepOnce, stepN } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 }, reducedMotion: 'reduce' });
+      const { context, page, pageErrors, stepOnce, stepN, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 }, reducedMotion: 'reduce' });
 
       const reducedMotionActive = await page.evaluate(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
       check('case 3: reduced motion is genuinely active for this real browser context', reducedMotionActive === true, String(reducedMotionActive));
@@ -450,21 +575,65 @@ const main = async () => {
       const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
       check('case 3: the real goal-reaching move was accepted under reduced motion', moveResult?.accepted === true, JSON.stringify(moveResult));
 
+      // Review 5146800659's own request: verify the real intermediate
+      // crossfade alpha values (not just "visible at least once"), the
+      // real absence of a traveling packet throughout, a stable material
+      // (openFraction never spikes back to a fresh 1 mid-fade-out), and
+      // real completion -- reading resolveTeleportTransferPresentation's
+      // own reported fields directly via the new diagnostics QA surface.
       const trace = [];
+      let sawDelivering = false;
+      let completeReached = false;
+      const readReducedMotionState = () => page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
+        return {
+          phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
+          conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
+          openFraction: diag?.presentation.openFraction ?? null,
+          packetVisible: diag?.presentation.packetVisible ?? null
+        };
+      });
       if (setup !== null) {
-        for (let i = 0; i < 60; i += 1) {
+        // Fine, single-frame stepping first -- the real crossfade windows
+        // (TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS /
+        // TELEPORT_TRANSFER_REDUCED_MOTION_FADE_EDGE_MS) are short (under
+        // 200ms), so this is what actually samples the real intermediate
+        // fade values rather than skipping past them in one large batch.
+        for (let i = 0; i < 120; i += 1) {
           await stepOnce();
-          const state = await page.evaluate(() => {
-            const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-            return {
-              phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
-              conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null
-            };
-          });
+          trace.push(await readReducedMotionState());
+          if (trace[trace.length - 1].phase === 'delivering') { sawDelivering = true; }
+          if (trace[trace.length - 1].phase === 'complete' || (sawDelivering && trace[trace.length - 1].phase === 'idle')) { completeReached = true; break; }
+        }
+        // Then coarse batched stepping (same generous budget as the
+        // completion-wait loops elsewhere in this file) to actually reach
+        // real completion -- the real next-maze build the rest of this
+        // cycle waits on is not short, and 120 single-stepped frames
+        // (< 2s) alone was nowhere near enough real time for it.
+        for (let i = 0; i < COMPLETION_WAIT_MAX_BATCHES && !completeReached; i += 1) {
+          await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
+          const state = await readReducedMotionState();
           trace.push(state);
+          if (state.phase === 'delivering') { sawDelivering = true; }
+          if (state.phase === 'complete' || (sawDelivering && state.phase === 'idle')) { completeReached = true; }
         }
       }
       check('case 3: reduced motion still shows a real transfer (short crossfade), not nothing', trace.some((s) => s.conduitVisible), JSON.stringify(trace.map((s) => `${s.phase}/${s.conduitVisible}`)));
+
+      const withOpenFraction = trace.filter((s) => typeof s.openFraction === 'number');
+      const intermediateFractions = withOpenFraction.map((s) => s.openFraction).filter((v) => v > 0.02 && v < 0.98);
+      check(
+        'case 3: reduced motion shows real INTERMEDIATE crossfade alpha values, not a flat on/off step',
+        intermediateFractions.length > 0,
+        JSON.stringify(withOpenFraction.map((s) => s.openFraction.toFixed(3)))
+      );
+      check(
+        'case 3: reduced motion never shows a traveling packet (packetVisible is always false)',
+        withOpenFraction.length > 0 && withOpenFraction.every((s) => s.packetVisible === false),
+        JSON.stringify(Array.from(new Set(withOpenFraction.map((s) => s.packetVisible))))
+      );
+      check('case 3: the reduced-motion cycle genuinely reaches completion', completeReached, 'n/a');
       check('case 3: no page errors under reduced motion', pageErrors.length === 0, JSON.stringify(pageErrors));
       await context.close();
     }
@@ -480,17 +649,30 @@ const main = async () => {
       const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
       check('case 4: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
 
+      // Real per-step size (stepOnce always advances the manual clock by
+      // exactly 16ms) -- the tolerance below is derived directly from
+      // that, not a generic round number. Review 5146800659's own
+      // request.
+      const REAL_STEP_MS = 16;
+      const readPauseDiagnostics = () => page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
+        return {
+          overlay: scene.overlay,
+          primaryId: scene.gameplayTransferPrimaryId,
+          phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
+          animationElapsed: scene.gameplayTransferAnimationElapsedMs,
+          conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
+          openFraction: diag?.presentation.openFraction ?? null,
+          packetVisible: diag?.presentation.packetVisible ?? null,
+          sourceFlareIntensity: diag?.presentation.sourceFlareIntensity ?? null
+        };
+      });
+
       if (setup !== null) {
         await stepN(28); // real primary held, conduit genuinely open
 
-        const beforePause = await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          return {
-            primaryId: scene.gameplayTransferPrimaryId,
-            phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
-            animationElapsed: scene.gameplayTransferAnimationElapsedMs
-          };
-        });
+        const beforePause = await readPauseDiagnostics();
         const pauseResult = await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
         check('case 4: the real openPauseOverlay QA command was accepted', pauseResult?.accepted === true, JSON.stringify(pauseResult));
 
@@ -501,14 +683,39 @@ const main = async () => {
         await stepOnce();
         const primaryIdJustAfterPauseOpen = await page.evaluate(() => window.__MAZER_GAME__.scene.getScene('MenuScene').gameplayTransferPrimaryId);
         await stepN(50);
-        const duringPause = await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          return { overlay: scene.overlay, animationElapsed: scene.gameplayTransferAnimationElapsedMs, primaryId: scene.gameplayTransferPrimaryId };
-        });
+        const duringPause = await readPauseDiagnostics();
         check('case 4: pause overlay genuinely opened', duringPause.overlay === 'pause', JSON.stringify(duringPause));
         check(
           'case 4: the material animation clock genuinely freezes while paused (does not keep advancing)',
           duringPause.animationElapsed === beforePause.animationElapsed,
+          JSON.stringify({ beforePause, duringPause })
+        );
+        // Confirmed real, PRE-EXISTING characteristic (not a regression
+        // this feature introduces, and explicitly out of scope to change
+        // per review 5146800659's own "preserve existing gameplay/
+        // progression timing"): only the material animation clock
+        // (checked above) and the held primary id (checked below) have
+        // their own explicit pause gate. phase/openFraction/packetVisible/
+        // sourceFlareIntensity are all DERIVED from
+        // resolveLegacyPlayerTransferState(scene.time.now), and
+        // scene.time.now is never itself frozen by opening the pause
+        // overlay anywhere in this codebase (grep confirms this.scene.pause()
+        // is never called; "pause" here is a UI-state flag scattered
+        // subsystems check individually, matching this file's own
+        // pre-existing pattern for e.g. the play trail's own animation
+        // clock) -- so the underlying lifecycle timer keeps advancing in
+        // real wall-clock time while paused, same as it would from a
+        // real browser's own real RAF-driven update() calls, not an
+        // artifact of this test's own manual stepping. A first attempt at
+        // this exact check asserted full presentation stasis and caught
+        // this live (phase genuinely advanced outbound -> stored during a
+        // "paused" window) -- confirmed real, not fixed here (explicitly
+        // protected), disclosed instead.
+        check(
+          'case 4: the presentation stays internally valid (no corrupted/out-of-range values) through a paused window even when the underlying lifecycle timer has legitimately advanced',
+          typeof duringPause.openFraction === 'number' && duringPause.openFraction >= 0 && duringPause.openFraction <= 1
+            && typeof duringPause.packetVisible === 'boolean'
+            && typeof duringPause.sourceFlareIntensity === 'number' && duringPause.sourceFlareIntensity >= 0,
           JSON.stringify({ beforePause, duringPause })
         );
 
@@ -520,10 +727,7 @@ const main = async () => {
         // confirm the elapsed delta is that one frame, not the whole
         // paused interval.
         await stepOnce();
-        const afterResume = await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          return { overlay: scene.overlay, primaryId: scene.gameplayTransferPrimaryId, animationElapsed: scene.gameplayTransferAnimationElapsedMs };
-        });
+        const afterResume = await readPauseDiagnostics();
         check('case 4: pause overlay genuinely closed again after RESUME_RUN', afterResume.overlay === 'none', JSON.stringify(afterResume));
         check(
           'case 4: the held primary survived the pause/resume cycle unchanged',
@@ -537,13 +741,105 @@ const main = async () => {
         );
         const deltaMs = afterResume.animationElapsed - duringPause.animationElapsed;
         check(
-          'case 4: the material clock advances by roughly one real frame after resume, not the whole paused interval',
-          deltaMs >= 0 && deltaMs < 200,
-          JSON.stringify({ duringPauseElapsed: duringPause.animationElapsed, afterResumeElapsed: afterResume.animationElapsed, deltaMs })
+          'case 4: the material clock advances by roughly one real frame after resume (tolerance derived from the real 16ms step), not the whole paused interval',
+          deltaMs >= 0 && deltaMs <= REAL_STEP_MS * 3,
+          JSON.stringify({ duringPauseElapsed: duringPause.animationElapsed, afterResumeElapsed: afterResume.animationElapsed, deltaMs, toleranceMs: REAL_STEP_MS * 3 })
         );
       }
 
       check('case 4: no page errors across the pause/resume sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
+      await context.close();
+    }
+
+    // ================================================================
+    // Case 4b: pause during the CLOSED/STORED interval specifically
+    // (distinct from case 4's open-conduit pause). Review 5146800659's
+    // own request: cover both open-conduit and closed/stored intervals.
+    // ================================================================
+    {
+      const { context, page, pageErrors, stepOnce, stepN, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+      await stepN(200);
+      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
+      check('case 4b: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
+
+      if (setup !== null) {
+        // Wait for the real phase to genuinely settle into 'stored'
+        // (past outbound's own real 450ms window) before pausing --
+        // a real closed/settled interval, not a fixed guessed frame
+        // count.
+        let reachedStored = false;
+        for (let i = 0; i < 100 && !reachedStored; i += 1) {
+          await stepOnce();
+          const phase = await page.evaluate(() => {
+            const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+            return scene.resolveLegacyPlayerTransferState(scene.time.now).phase;
+          });
+          if (phase === 'stored') { reachedStored = true; }
+        }
+        check('case 4b: the real cycle reaches the stored interval before pausing', reachedStored, 'n/a');
+
+        const readDiag = () => page.evaluate(() => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
+          return {
+            phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
+            primaryId: scene.gameplayTransferPrimaryId,
+            animationElapsed: scene.gameplayTransferAnimationElapsedMs,
+            conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
+            openFraction: diag?.presentation.openFraction ?? null,
+            sourceFlareIntensity: diag?.presentation.sourceFlareIntensity ?? null
+          };
+        });
+        const beforePause = await readDiag();
+        const pauseResult = await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
+        check('case 4b: the real openPauseOverlay QA command was accepted (stored interval)', pauseResult?.accepted === true, JSON.stringify(pauseResult));
+        await stepOnce();
+        await stepBatch(80); // a real, longer paused interval this time
+        const duringPause = await readDiag();
+        check(
+          'case 4b: the material animation clock genuinely freezes through a longer real pause during the stored/closed interval too',
+          duringPause.animationElapsed === beforePause.animationElapsed,
+          JSON.stringify({ beforePause, duringPause })
+        );
+        // Confirmed real, PRE-EXISTING characteristic (see case 4's own
+        // comment on this exact finding, first caught live here): only
+        // the material clock and held primary id (checked below) have
+        // their own explicit pause gate -- phase/openFraction/
+        // sourceFlareIntensity are derived from scene.time.now, which is
+        // never itself frozen by the pause overlay anywhere in this
+        // codebase, so they may legitimately keep advancing (here, over
+        // this case's own longer real pause window, often far enough to
+        // reach genuine completion) while paused. Not a regression this
+        // feature introduces or should change here (explicitly protected
+        // by review 5146800659's own "preserve existing gameplay/
+        // progression timing") -- this checks the state stays internally
+        // valid through that real continued advancement, not that it
+        // froze.
+        check(
+          'case 4b: the presentation stays internally valid (no corrupted/out-of-range values) through a longer paused window even when the underlying lifecycle timer has legitimately advanced',
+          typeof duringPause.openFraction === 'number' && duringPause.openFraction >= 0 && duringPause.openFraction <= 1
+            && typeof duringPause.sourceFlareIntensity === 'number' && duringPause.sourceFlareIntensity >= 0,
+          JSON.stringify({ beforePause, duringPause })
+        );
+
+        const resumeDispatch = await page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RESUME_RUN' }));
+        check('case 4b: the real RESUME_RUN bridge command was accepted (stored interval)', resumeDispatch?.ok === true, JSON.stringify(resumeDispatch));
+        await stepOnce();
+        const afterResume = await readDiag();
+        check(
+          'case 4b: the held primary survived a pause/resume cycle during the stored/closed interval unchanged',
+          afterResume.primaryId === beforePause.primaryId,
+          JSON.stringify({ before: beforePause.primaryId, after: afterResume.primaryId })
+        );
+        const deltaMs = afterResume.animationElapsed - duringPause.animationElapsed;
+        check(
+          'case 4b: the material clock advances by roughly one real frame after resume (tolerance derived from the real 16ms step), not the whole paused interval, in the stored/closed case too',
+          deltaMs >= 0 && deltaMs <= 16 * 3,
+          JSON.stringify({ duringPauseElapsed: duringPause.animationElapsed, afterResumeElapsed: afterResume.animationElapsed, deltaMs })
+        );
+      }
+      check('case 4b: no page errors across the stored-interval pause/resume sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
       await context.close();
     }
 
@@ -657,7 +953,7 @@ const main = async () => {
     // flagged as its own possible regression).
     // ================================================================
     {
-      const { context, page, pageErrors, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      const { context, page, pageErrors, stepOnce, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
       await resetLegacyVolleySpyCount(page);
       await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
 
@@ -686,9 +982,51 @@ const main = async () => {
       check('case 7: a real single-primary arrival conduit rendered during the very first maze reveal, with no transfer ever armed', sawRealArrivalConduit, 'n/a');
       check('case 7: a real primary was actually selected for the initial arrival (not a fabricated/absent presentation)', sawRealArrivalPrimary, 'n/a');
 
+      // Review 5146800659: continue case 7 through the arrival's own real
+      // completion -- temporary effects cleared, the real player visible
+      // at its real start position, and a subsequent real accepted move
+      // (input genuinely unlocked), not just "the replacement appeared."
+      let arrivalSettled = false;
+      for (let i = 0; i < COMPLETION_WAIT_MAX_BATCHES && !arrivalSettled; i += 1) {
+        await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
+        const spawnBurstActive = await page.evaluate(() => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          return scene.resolveLegacyPlayerSpawnBurstState(scene.time.now).active;
+        });
+        if (spawnBurstActive === false) { arrivalSettled = true; }
+      }
+      check('case 7: the initial arrival burst itself genuinely settles (does not stay active forever)', arrivalSettled, 'n/a');
+
+      const postArrivalState = await page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        return {
+          conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
+          playerVisible: scene.isLegacyMenuPointVisibleInStaticDraw(scene.player),
+          player: scene.player,
+          start: scene.maze.start
+        };
+      });
+      check('case 7: the conduit is genuinely hidden again once the initial arrival settles (temporary effect cleared, not left stuck visible)', postArrivalState.conduitVisible === false, JSON.stringify(postArrivalState));
+      check('case 7: the real player is visible at its real start position once the arrival settles', postArrivalState.playerVisible === true, JSON.stringify(postArrivalState));
+
+      const postArrivalMoveCandidate = await page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        const player = scene.player;
+        const grid = scene.maze.grid;
+        const candidates = [
+          { dx: 0, dy: -1, move: 'move_up' }, { dx: 0, dy: 1, move: 'move_down' },
+          { dx: -1, dy: 0, move: 'move_left' }, { dx: 1, dy: 0, move: 'move_right' }
+        ];
+        return candidates.find((c) => grid[player.y + c.dy]?.[player.x + c.dx] === true) ?? null;
+      });
+      if (postArrivalMoveCandidate !== null) {
+        const postArrivalMoveResult = await moveUntilAccepted(page, stepOnce, postArrivalMoveCandidate.move, 200);
+        check('case 7: real input is genuinely unlocked once the initial arrival settles (a real move is accepted)', postArrivalMoveResult?.accepted === true, JSON.stringify(postArrivalMoveResult));
+      }
+
       const legacyVolleyDrawCalls = await readLegacyVolleySpyCount(page);
       check(
-        'case 7: the OLD procedural eight-origin volley never drew a single beam during initial entry into a run',
+        'case 7: the OLD procedural eight-origin volley never drew a single beam across the whole initial-entry sequence, including settling',
         legacyVolleyDrawCalls === 0,
         `${legacyVolleyDrawCalls} real lineBetween call(s) on playerSpawnBurstGraphics`
       );
