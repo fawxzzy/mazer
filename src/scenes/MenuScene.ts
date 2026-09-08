@@ -42,7 +42,7 @@ import {
   computeGoalHaloCanvasBounds,
   drawGoalHaloToCanvasContext
 } from '../render/navigationCoreGoalHaloCanvas';
-import { resolveTeleportAnchorCandidates, type TeleportRect, type TeleportViewportBounds } from '../render/teleportAnchorPose';
+import { resolveTeleportAnchorCandidates, type TeleportAnchorPose, type TeleportRect, type TeleportViewportBounds } from '../render/teleportAnchorPose';
 import {
   selectTeleportPrimaryAnchor,
   type TeleportAnchorId,
@@ -2121,6 +2121,42 @@ export class MenuScene extends Phaser.Scene {
   // always starts fresh, matching the frozen contract's "same primary
   // persists through outbound -> stored -> delivering" requirement.
   private gameplayTransferPrimaryId: TeleportAnchorId | null = null;
+  // Confirmed real defect: applyLegacyGameplayTransferPresentation used to
+  // re-run anchor selection every frame regardless of overlay state.
+  // Opening an overlay (in practice, only the pause overlay can be open
+  // while a transfer is active) populates this.uiButtons with that
+  // overlay's own buttons, which resolveLegacyTeleportAnchorPreviewExclusions
+  // folds into the real exclusion set the very next frame -- if one of
+  // those buttons happens to cover the held anchor's real footprint, the
+  // selector legitimately (and silently) reselects a different anchor
+  // while paused, even though nothing about the transfer itself changed.
+  // Resuming would then snap the shell/conduit to the new anchor with no
+  // crossfade, a real visible jump the "same primary persists through the
+  // whole cycle" contract does not allow. This field caches the last
+  // resolved pose so the presentation can be redrawn from it, unchanged,
+  // on any frame the overlay is open -- mirroring exactly how
+  // advanceLegacyGameplayTransferAnimationClock already freezes the
+  // material clock for the same reason. Cleared alongside primaryId.
+  private gameplayTransferLastPrimaryPose: TeleportAnchorPose | null = null;
+  // Confirmed real defect, found via the gameplayTransferLastPrimaryPose
+  // fix above: this.overlay flips back to 'none' SYNCHRONOUSLY the
+  // instant a RESUME_RUN command is dispatched (outside the normal
+  // per-frame update sequence entirely), but this.uiButtons -- which
+  // resolveLegacyTeleportAnchorPreviewExclusions reads directly -- is
+  // only rebuilt from the uiDirty flag LATER in that same update(),
+  // strictly after drawDynamicBoard's own call into this method. So the
+  // very first frame after resume still sees the STALE, pause-era
+  // uiButtons (the pause menu's own wide button rects) even though
+  // overlay already reads 'none' -- gating on overlay alone reselects
+  // away from the held anchor on exactly that one transitional frame.
+  // Tracking the overlay value observed on the PREVIOUS call and
+  // requiring it to ALSO have been 'none' before trusting uiButtons
+  // again gives that rebuild exactly one extra frame to catch up.
+  // Defaults (and resets) to 'none', not null -- a brand-new transfer's
+  // very first frame has no stale pause-era uiButtons to wait out, so it
+  // should resolve selection immediately rather than paying the same
+  // one-frame delay a real resume needed.
+  private gameplayTransferLastObservedOverlay: OverlayKind = 'none';
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
   private overlayGuideGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -3053,29 +3089,57 @@ export class MenuScene extends Phaser.Scene {
     // open/closed state at all.
     const gameplayTransferAnimationTime = this.advanceLegacyGameplayTransferAnimationClock(time);
     const target = { x: targetX, y: targetY };
-    const { result, poseById } = this.resolveLegacyTeleportAnchorPreviewResult(target, this.gameplayTransferPrimaryId);
-    // Sticky held identity: only overwrite when the selector actually
-    // found a legal anchor this frame. A transient 'unavailable' result
-    // (e.g. a HUD control momentarily overlapping every candidate) must
-    // NOT forget which primary this transfer is using -- the selector's
-    // own retention rule already resumes the SAME held id automatically
-    // once it becomes eligible again, as long as this field keeps
-    // passing that id back in rather than clearing it to null. Only
-    // resetLegacyPlayerTransferEnergy (a genuine completion/reset) clears
-    // this field.
-    if (result.selectedId !== null) {
-      this.gameplayTransferPrimaryId = result.selectedId;
+    // Confirmed real defect: re-resolving anchor selection on every frame
+    // regardless of overlay state let the pause overlay's own buttons
+    // (folded into this.uiButtons the instant it opens) silently
+    // reselect the held anchor away from a footprint they newly cover --
+    // a real snap on resume, not merely a frozen frame. While an overlay
+    // is open (in practice, only pause, since this method only runs
+    // during an active 'play' transfer), selection is skipped entirely
+    // and the last real resolved pose is reused unchanged -- the exact
+    // same "freeze while overlay is open" rule already applied to the
+    // material animation clock just above, now applied to geometry too.
+    //
+    // Confirmed real defect (found verifying the fix above): overlay
+    // itself flips back to 'none' synchronously on RESUME_RUN, one full
+    // frame before this.uiButtons is rebuilt free of the pause menu's
+    // own rects (see gameplayTransferLastObservedOverlay's own field
+    // comment) -- gating on overlay alone still reselected away from the
+    // held anchor on that one transitional frame. Requiring the
+    // PREVIOUS frame to have also been unpaused closes that window.
+    const shouldResolveSelection = this.overlay === 'none' && this.gameplayTransferLastObservedOverlay === 'none';
+    this.gameplayTransferLastObservedOverlay = this.overlay;
+    let primaryPose: TeleportAnchorPose | null;
+    if (shouldResolveSelection) {
+      const { result, poseById } = this.resolveLegacyTeleportAnchorPreviewResult(target, this.gameplayTransferPrimaryId);
+      // Sticky held identity: only overwrite when the selector actually
+      // found a legal anchor this frame. A transient 'unavailable' result
+      // (e.g. a HUD control momentarily overlapping every candidate) must
+      // NOT forget which primary this transfer is using -- the selector's
+      // own retention rule already resumes the SAME held id automatically
+      // once it becomes eligible again, as long as this field keeps
+      // passing that id back in rather than clearing it to null. Only
+      // resetLegacyPlayerTransferEnergy (a genuine completion/reset) clears
+      // this field.
+      if (result.selectedId !== null) {
+        this.gameplayTransferPrimaryId = result.selectedId;
+      }
+      const poseFields = result.selectedId === null ? null : (poseById.get(result.selectedId) ?? null);
+      primaryPose = poseFields === null || result.selectedId === null ? null : {
+        id: result.selectedId,
+        anchorX: poseFields.anchorX,
+        anchorY: poseFields.anchorY,
+        rotation: poseFields.rotation,
+        portX: poseFields.portX,
+        portY: poseFields.portY,
+        footprint: poseFields.footprint
+      };
+      if (primaryPose !== null) {
+        this.gameplayTransferLastPrimaryPose = primaryPose;
+      }
+    } else {
+      primaryPose = this.gameplayTransferLastPrimaryPose;
     }
-    const poseFields = result.selectedId === null ? null : (poseById.get(result.selectedId) ?? null);
-    const primaryPose = poseFields === null || result.selectedId === null ? null : {
-      id: result.selectedId,
-      anchorX: poseFields.anchorX,
-      anchorY: poseFields.anchorY,
-      rotation: poseFields.rotation,
-      portX: poseFields.portX,
-      portY: poseFields.portY,
-      footprint: poseFields.footprint
-    };
 
     // Computed once and reused for both the shell's own intensity below
     // and the conduit render call further down -- sourceFlareIntensity
@@ -3104,14 +3168,17 @@ export class MenuScene extends Phaser.Scene {
     // container's own, correct under identity rotation + any uniform
     // parent scale; local scale divided by the container's own scale so
     // world size -- and so the real port -- stays correct regardless of
-    // that scale). An 'unavailable'/'invalid-input' outcome (poseFields
+    // that scale). An 'unavailable'/'invalid-input' outcome (primaryPose
     // null) deliberately leaves every slot exactly as the ambient draw
-    // already left it -- never a fabricated placement.
-    if (result.selectedId !== null && poseFields !== null) {
-      const image = this.titleOrbitDiamondImages[result.selectedId];
+    // already left it -- never a fabricated placement. While paused,
+    // primaryPose is the cached pose from before the overlay opened, so
+    // this redraws the shell at the exact same position every frame --
+    // a harmless no-op, not a jump.
+    if (primaryPose !== null) {
+      const image = this.titleOrbitDiamondImages[primaryPose.id];
       if (image) {
-        const local = this.boardZoomContainer.pointToContainer({ x: poseFields.anchorX, y: poseFields.anchorY });
-        const localRotation = poseFields.rotation - this.boardZoomContainer.rotation;
+        const local = this.boardZoomContainer.pointToContainer({ x: primaryPose.anchorX, y: primaryPose.anchorY });
+        const localRotation = primaryPose.rotation - this.boardZoomContainer.rotation;
         const worldScale = TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX / MAZER_VFX_DIAMOND_SOURCE_SIZE;
         const localScale = worldScale / this.boardZoomContainer.scaleX;
         // Consumes the projected shell intensity (charging/absorption
@@ -9274,6 +9341,8 @@ export class MenuScene extends Phaser.Scene {
     // place gameplayTransferPrimaryId is cleared; it is retained across
     // outbound/stored/delivering by every other call site.
     this.gameplayTransferPrimaryId = null;
+    this.gameplayTransferLastPrimaryPose = null;
+    this.gameplayTransferLastObservedOverlay = 'none';
     this.gameplayTransferConduitCanvasImage?.setVisible(false);
   }
 
