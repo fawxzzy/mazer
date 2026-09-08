@@ -19,6 +19,19 @@
  * input unlocked again) end to end from an ordinary gameplay sequence,
  * not a shortcut into the middle of it.
  *
+ * Every case also spies on the real scene.playerSpawnBurstGraphics
+ * instance's own lineBetween method and asserts zero real calls during
+ * Play mode. This is not redundant with the playerTransferBeamStripImages
+ * checks elsewhere in this file: drawLegacyPlayerSpawnBurst is a
+ * completely separate old rendering path (one procedural beam per orbit
+ * sigil, drawn straight into playerSpawnBurstGraphics) that a review
+ * confirmed had no mode branch and was rendering in Play mode too --
+ * exactly the kind of regression an Image-pool-visibility check alone
+ * cannot see (review 5144999445; verified independently before fixing).
+ * Case 7 covers the specific scenario that check would have missed
+ * outright: the very first maze of a run, where no transfer is ever
+ * armed at all, so the old volley was the ONLY arrival visual firing.
+ *
  * Usage: node scripts/analysis/verify-gameplay-teleport-transfer.mjs
  */
 import { execFileSync } from 'node:child_process';
@@ -112,6 +125,29 @@ const openGameContext = async (browser, baseUrl, contextOptions) => {
   await page.waitForFunction(() => Boolean(window.__MAZER_QA__?.startPlayMode), { timeout: 15000 });
   await page.evaluate(() => window.__MAZER_GAME__.loop.stop());
 
+  // Confirmed real defect (review 5144999445): drawLegacyPlayerSpawnBurst
+  // -- a SEPARATE old effect from playerTransferBeamStripImages, drawing
+  // one procedural beam per orbit sigil directly into
+  // playerSpawnBurstGraphics -- had no mode branch and rendered in Play
+  // mode too. Checking playerTransferBeamStripImages visibility (the
+  // check every earlier round of this suite used) could never have
+  // caught it -- that Image pool is a different rendering path this one
+  // never touches. This spy wraps the real playerSpawnBurstGraphics
+  // instance's own lineBetween method (the primitive every one of that
+  // volley's beams is drawn with) and counts real invocations, so a
+  // regression can assert on the actual old rendering path executing,
+  // not merely on the unrelated Image pool staying hidden.
+  await page.evaluate(() => {
+    const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+    const graphics = scene.playerSpawnBurstGraphics;
+    window.__mazerLegacyVolleySpyCount = 0;
+    const originalLineBetween = graphics.lineBetween.bind(graphics);
+    graphics.lineBetween = (...args) => {
+      window.__mazerLegacyVolleySpyCount += 1;
+      return originalLineBetween(...args);
+    };
+  });
+
   let clockMs = await page.evaluate(() => window.__MAZER_GAME__.scene.getScene('MenuScene').time.now);
   const stepOnce = async () => { clockMs += 16; await page.evaluate((t) => window.__MAZER_GAME__.loop.step(t), clockMs); };
   // Runs n real frame-steps inside a SINGLE page.evaluate round trip
@@ -136,6 +172,12 @@ const openGameContext = async (browser, baseUrl, contextOptions) => {
 
   return { context, page, pageErrors, stepOnce, stepN, stepBatch };
 };
+
+/** Reads the real count of playerSpawnBurstGraphics.lineBetween calls since the spy was installed (or since the last reset) -- the forbidden old volley's own real draw primitive. */
+const readLegacyVolleySpyCount = (page) => page.evaluate(() => window.__mazerLegacyVolleySpyCount ?? 0);
+
+/** Zeroes the spy count so a case can assert on only the draw calls that happened during its own window, not everything since page load. */
+const resetLegacyVolleySpyCount = (page) => page.evaluate(() => { window.__mazerLegacyVolleySpyCount = 0; });
 
 /** Finds a real walkable neighbor of the real current goal, sets scene.player/scene.trail to it (a controlled but real fixture on GAMEPLAY POSITION -- explicitly allowed by this project's own established convention for fast boundary tests), then reaches the goal itself only via a real accepted movePlayPlayer command. Never assigns phase/primary/elapsed-time directly. */
 const setupControlledNearGoalMove = async (page, stepOnce) => {
@@ -230,6 +272,7 @@ const main = async () => {
       check('case 1: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
 
       if (setup !== null) {
+        await resetLegacyVolleySpyCount(page);
         await stepN(30); // reach the real deconstruct-arm instant
         const armedState = await page.evaluate(() => {
           const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
@@ -278,6 +321,21 @@ const main = async () => {
         check('case 1: the SAME primary id was retained through the entire cycle (never a different one)', trace.every((s) => s.primaryId === null || s.primaryId === heldPrimaryId), JSON.stringify(Array.from(new Set(trace.map((s) => s.primaryId)))));
         check('case 1: the old eight-origin beam strip never became visible at any point in the whole cycle', trace.every((s) => s.beamStripVisible === false), 'n/a');
         check('case 1: conduit is closed (invisible) once the cycle genuinely completes', completeReached && !trace[trace.length - 1].conduitVisible, JSON.stringify(trace[trace.length - 1]));
+
+        // Confirmed real defect (review 5144999445): playerTransferBeamStripImages
+        // staying hidden (checked above) does NOT prove the OLD eight-origin
+        // volley never rendered -- drawLegacyPlayerSpawnBurst draws a
+        // completely separate set of beams directly into
+        // playerSpawnBurstGraphics with no mode branch of its own. This
+        // checks the real draw-call count on that graphics object's own
+        // lineBetween method across the ENTIRE outbound->stored->delivering->
+        // complete window, not just the moment it happens to be visible.
+        const legacyVolleyDrawCalls = await readLegacyVolleySpyCount(page);
+        check(
+          'case 1: the OLD procedural eight-origin volley (playerSpawnBurstGraphics) never drew a single beam across the whole cycle',
+          legacyVolleyDrawCalls === 0,
+          `${legacyVolleyDrawCalls} real lineBetween call(s) on playerSpawnBurstGraphics`
+        );
 
         // After completion, real input must be genuinely unlocked again --
         // prove it with one more REAL accepted move, not a state check
@@ -328,6 +386,7 @@ const main = async () => {
       check('case 2: the real maze has a solvable real BFS route from the real current player position to the real goal', moves !== null && moves.length > 0, JSON.stringify({ start: mazeInfo.player, goal: mazeInfo.goal, routeLength: moves?.length ?? null }));
 
       if (moves !== null) {
+        await resetLegacyVolleySpyCount(page);
         let acceptedCount = 0;
         for (const move of moves) {
           // eslint-disable-next-line no-await-in-loop
@@ -362,6 +421,13 @@ const main = async () => {
         }
         check('case 2: a real primary was selected somewhere in the real solver-driven cycle', sawPrimary, 'n/a');
         check('case 2: the real solver-driven cycle reached completion', completeReached, 'n/a');
+
+        const legacyVolleyDrawCalls = await readLegacyVolleySpyCount(page);
+        check(
+          'case 2: the OLD procedural eight-origin volley never drew a single beam across the whole solver-driven cycle',
+          legacyVolleyDrawCalls === 0,
+          `${legacyVolleyDrawCalls} real lineBetween call(s) on playerSpawnBurstGraphics`
+        );
       }
 
       check('case 2: no page errors across the whole real solver-driven sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
@@ -574,6 +640,59 @@ const main = async () => {
         check('case 6: the real held shell slot is visible with a real world position under the non-identity transform', worldCheck.shellVisible === true && worldCheck.shellWorld !== null, JSON.stringify(worldCheck));
       }
       check('case 6: no page errors under the non-identity container transform', pageErrors.length === 0, JSON.stringify(pageErrors));
+      await context.close();
+    }
+
+    // ================================================================
+    // Case 7: initial entry into a run -- the very first maze reveal,
+    // with NO goal ever reached and so no teleport transfer ever armed.
+    // Confirmed real defect (review 5144999445): the old eight-origin
+    // volley (drawLegacyPlayerSpawnBurst) had no mode branch and fired
+    // for this exact case too, since armLegacyPlayerArrivalForFinalBuildStep
+    // arms playerSpawnBurstStartedAtMs on every settled maze build, not
+    // only when a transfer was armed. Proves BOTH halves of the fix: the
+    // old volley never draws here either, AND a real single-primary
+    // arrival presentation genuinely renders something (not silence --
+    // hiding the old burst without a real replacement was explicitly
+    // flagged as its own possible regression).
+    // ================================================================
+    {
+      const { context, page, pageErrors, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      await resetLegacyVolleySpyCount(page);
+      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+
+      // Same generous batched-polling budget as the completion-wait
+      // loops elsewhere in this file -- the initial reveal's own real
+      // deconstruct/build/reveal timing is not assumed to be short.
+      let sawRealArrivalConduit = false;
+      let sawRealArrivalPrimary = false;
+      let sawArmedTransfer = false;
+      for (let i = 0; i < COMPLETION_WAIT_MAX_BATCHES && !(sawRealArrivalConduit && sawRealArrivalPrimary); i += 1) {
+        await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
+        const state = await page.evaluate(() => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          return {
+            transferActive: scene.playerTransferEnergyArmed,
+            primaryId: scene.gameplayTransferPrimaryId,
+            conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null
+          };
+        });
+        if (state.transferActive === true) { sawArmedTransfer = true; }
+        if (state.conduitVisible === true) { sawRealArrivalConduit = true; }
+        if (state.primaryId !== null) { sawRealArrivalPrimary = true; }
+      }
+
+      check('case 7: no real transfer was ever armed (this case never reaches a goal)', sawArmedTransfer === false, 'n/a');
+      check('case 7: a real single-primary arrival conduit rendered during the very first maze reveal, with no transfer ever armed', sawRealArrivalConduit, 'n/a');
+      check('case 7: a real primary was actually selected for the initial arrival (not a fabricated/absent presentation)', sawRealArrivalPrimary, 'n/a');
+
+      const legacyVolleyDrawCalls = await readLegacyVolleySpyCount(page);
+      check(
+        'case 7: the OLD procedural eight-origin volley never drew a single beam during initial entry into a run',
+        legacyVolleyDrawCalls === 0,
+        `${legacyVolleyDrawCalls} real lineBetween call(s) on playerSpawnBurstGraphics`
+      );
+      check('case 7: no page errors during initial entry', pageErrors.length === 0, JSON.stringify(pageErrors));
       await context.close();
     }
   } finally {

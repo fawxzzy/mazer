@@ -3072,33 +3072,108 @@ export class MenuScene extends Phaser.Scene {
     targetCellSizePx: number,
     time: number
   ): void {
-    // Confirmed real defect (review 5142904159): this clock used to be
-    // advanced from inside drawGameplayTransferConduitCanvas, AFTER that
-    // method's own closed-state early returns -- so on any frame the
-    // conduit was genuinely closed (openFraction <= 0, e.g. settled
-    // 'stored'), the clock was never called at all, leaving
-    // gameplayTransferAnimationLastRealMs stale rather than reset. The
-    // instant the conduit reopened (e.g. delivery begins), the next call
-    // would add the ENTIRE elapsed real-time gap since it was last
-    // called as one lump sum -- a real, visible color jump, not merely a
-    // freeze. Called here instead, unconditionally, every single frame
-    // this method runs (which itself only runs while a real transfer is
-    // armed) -- the clock's own isActivePlayVisible gate (mode/overlay/
-    // armed, not conduit visibility) is what decides whether it
-    // advances or freezes; it no longer depends on the conduit's own
-    // open/closed state at all.
     const gameplayTransferAnimationTime = this.advanceLegacyGameplayTransferAnimationClock(time);
-    const target = { x: targetX, y: targetY };
+    this.renderGameplayTransferPresentation(
+      { x: targetX, y: targetY },
+      targetCellSizePx,
+      time,
+      gameplayTransferAnimationTime,
+      {
+        armed: this.playerTransferEnergyArmed,
+        outboundElapsedMs: this.playerTransferEnergyOutboundStartedAtMs === null
+          ? null
+          : time - this.playerTransferEnergyOutboundStartedAtMs,
+        deliveryElapsedMs: this.playerTransferEnergyDeliveryStartedAtMs === null
+          ? null
+          : time - this.playerTransferEnergyDeliveryStartedAtMs,
+        deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
+        deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS
+      }
+    );
+  }
+
+  // Confirmed real defect (ChatGPT-assisted review 5144999445, verified
+  // independently by reading drawDynamicBoard's own call sites before
+  // fixing): drawLegacyPlayerSpawnBurst -- a SEPARATE old effect from
+  // drawLegacyPlayerTransferEnergy/playerTransferBeamStripImages, drawing
+  // one procedural beam per orbit sigil (the exact same eight origins the
+  // ambient volley uses) into playerSpawnBurstGraphics -- had no mode
+  // branch at all and fired in Play mode too, including on the very
+  // first maze of a run and every ordinary play reset with no preceding
+  // goal completion (armLegacyPlayerArrivalForFinalBuildStep arms
+  // playerSpawnBurstStartedAtMs on every settled maze build, not only
+  // when a real transfer was armed). The permanent test's own
+  // playerTransferBeamStripImages check could never have caught this --
+  // that field is a different pool this separate Graphics-based effect
+  // never touches.
+  //
+  // This method is Play mode's real replacement for exactly that gap:
+  // the ordinary arrival case with no preceding armed transfer (a real
+  // armed transfer's own delivering phase is already fully covered by
+  // applyLegacyGameplayTransferPresentation above -- this method is never
+  // called for that case; see the call site's own mode/active gating).
+  // Reuses the SAME single-primary conduit/shell renderer, driven by
+  // playerSpawnBurst's own elapsed/travel/flash clock (identical
+  // LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS/FLASH_MS constants the old burst
+  // itself used) instead of a real transfer's own clock, so Play mode
+  // never shows two different arrival visual languages. Menu mode keeps
+  // calling drawLegacyPlayerSpawnBurst unchanged -- the frozen contract
+  // reserves that choreography for menu/title.
+  private applyLegacyGameplayInitialArrivalPresentation(
+    targetX: number,
+    targetY: number,
+    targetCellSizePx: number,
+    time: number
+  ): void {
+    const gameplayTransferAnimationTime = this.advanceLegacyGameplayTransferAnimationClock(time);
+    this.renderGameplayTransferPresentation(
+      { x: targetX, y: targetY },
+      targetCellSizePx,
+      time,
+      gameplayTransferAnimationTime,
+      {
+        armed: this.playerSpawnBurstStartedAtMs !== null,
+        outboundElapsedMs: null,
+        deliveryElapsedMs: this.playerSpawnBurstStartedAtMs === null
+          ? null
+          : time - this.playerSpawnBurstStartedAtMs,
+        deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
+        deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS
+      }
+    );
+  }
+
+  // Shared by applyLegacyGameplayTransferPresentation (a real armed
+  // transfer's own delivering phase) and
+  // applyLegacyGameplayInitialArrivalPresentation (Play mode's ordinary
+  // arrival with no preceding armed transfer) -- the two differ only in
+  // which clock/phase input drives resolveTeleportTransferPresentation;
+  // selection, shell positioning, and the conduit draw call are identical
+  // and were previously duplicated once already (the exact kind of drift
+  // that produced the z-order/masking bug a prior round fixed), so this
+  // extraction keeps there being exactly one copy of that logic.
+  private renderGameplayTransferPresentation(
+    target: { x: number; y: number },
+    targetCellSizePx: number,
+    time: number,
+    gameplayTransferAnimationTime: number,
+    lifecycleInput: {
+      armed: boolean;
+      outboundElapsedMs: number | null;
+      deliveryElapsedMs: number | null;
+      deliveryFlashMs: number;
+      deliveryTravelMs: number;
+    }
+  ): void {
     // Confirmed real defect: re-resolving anchor selection on every frame
     // regardless of overlay state let the pause overlay's own buttons
     // (folded into this.uiButtons the instant it opens) silently
     // reselect the held anchor away from a footprint they newly cover --
     // a real snap on resume, not merely a frozen frame. While an overlay
-    // is open (in practice, only pause, since this method only runs
-    // during an active 'play' transfer), selection is skipped entirely
-    // and the last real resolved pose is reused unchanged -- the exact
-    // same "freeze while overlay is open" rule already applied to the
-    // material animation clock just above, now applied to geometry too.
+    // is open, selection is skipped entirely and the last real resolved
+    // pose is reused unchanged -- the exact same "freeze while overlay is
+    // open" rule already applied to the material animation clock, now
+    // applied to geometry too.
     //
     // Confirmed real defect (found verifying the fix above): overlay
     // itself flips back to 'none' synchronously on RESUME_RUN, one full
@@ -3146,15 +3221,11 @@ export class MenuScene extends Phaser.Scene {
     // does not depend on primaryPose/targets in any branch, but sharing
     // one call avoids resolving the same projection twice per frame.
     const presentation = resolveTeleportTransferPresentation({
-      armed: this.playerTransferEnergyArmed,
-      outboundElapsedMs: this.playerTransferEnergyOutboundStartedAtMs === null
-        ? null
-        : time - this.playerTransferEnergyOutboundStartedAtMs,
-      deliveryElapsedMs: this.playerTransferEnergyDeliveryStartedAtMs === null
-        ? null
-        : time - this.playerTransferEnergyDeliveryStartedAtMs,
-      deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
-      deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS,
+      armed: lifecycleInput.armed,
+      outboundElapsedMs: lifecycleInput.outboundElapsedMs,
+      deliveryElapsedMs: lifecycleInput.deliveryElapsedMs,
+      deliveryFlashMs: lifecycleInput.deliveryFlashMs,
+      deliveryTravelMs: lifecycleInput.deliveryTravelMs,
       nowMs: time,
       reducedMotion: this.prefersLegacyReducedMotion(),
       primaryPose,
@@ -6855,6 +6926,25 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private armLegacyPlayerArrivalForFinalBuildStep(time: number, buildRemainingMs: number): void {
+    // A genuinely new arrival burst (this.playerSpawnBurstStartedAtMs was
+    // null, about to be armed below) that is NOT part of a real armed
+    // transfer is applyLegacyGameplayInitialArrivalPresentation's own
+    // session boundary -- reset its shared sticky selection fields here so
+    // a stale primary/pose from a PRIOR, unrelated arrival or transfer
+    // never carries into this new one (the resolver's own retention rule
+    // is for continuity WITHIN one live session, not across separate
+    // ones). A real transfer manages the exact same fields' own lifetime
+    // itself (armed at its own outbound start, cleared only by
+    // resetLegacyPlayerTransferEnergy at genuine completion), so this
+    // reset is skipped whenever one is armed -- this call already runs
+    // in lockstep with a real transfer's own delivery arm below when one
+    // is armed, and must not clear the primary it selected back at
+    // outbound.
+    if (this.playerSpawnBurstStartedAtMs === null && !this.playerTransferEnergyArmed) {
+      this.gameplayTransferPrimaryId = null;
+      this.gameplayTransferLastPrimaryPose = null;
+      this.gameplayTransferLastObservedOverlay = 'none';
+    }
     const alignedStartedAtMs = time - Math.max(
       0,
       LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS - Math.max(0, buildRemainingMs)
@@ -9830,7 +9920,26 @@ export class MenuScene extends Phaser.Scene {
       const boardRelativeY = mazeTop + ((renderedPlayerPoint.y + 0.5) * mazeTileSize);
       const targetX = this.boardZoomContainer.x + (boardRelativeX * this.boardZoomContainer.scaleX);
       const targetY = this.boardZoomContainer.y + (boardRelativeY * this.boardZoomContainer.scaleY);
-      this.drawLegacyPlayerSpawnBurst(targetX, targetY, playerSpawnBurst, time);
+      // Confirmed real defect (review 5144999445): this call used to be
+      // unconditional -- the old eight-origin-per-orbit-sigil beam volley
+      // (drawLegacyPlayerSpawnBurst) has no mode branch of its own and
+      // was rendering in Play mode too, including the very first maze of
+      // a run and every ordinary play reset, not only real teleport
+      // transfers. Play mode now NEVER calls it: a real armed transfer's
+      // own delivering phase is already fully rendered by
+      // applyLegacyGameplayTransferPresentation above (this block would
+      // otherwise double the arrival effect), and every other Play-mode
+      // arrival routes through applyLegacyGameplayInitialArrivalPresentation,
+      // the real single-primary replacement, instead. Menu/title
+      // choreography is unchanged -- the frozen contract reserves the old
+      // volley for exactly that.
+      if (this.mode === 'play') {
+        if (!playerTransferEnergy.active) {
+          this.applyLegacyGameplayInitialArrivalPresentation(targetX, targetY, mazeTileSize * this.boardZoomContainer.scaleX, time);
+        }
+      } else {
+        this.drawLegacyPlayerSpawnBurst(targetX, targetY, playerSpawnBurst, time);
+      }
     }
 
     // Drawn last, after the trail/board content above -- the bleed-off dock
