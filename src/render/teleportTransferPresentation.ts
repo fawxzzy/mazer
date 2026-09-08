@@ -98,6 +98,42 @@
  * now" -- explicit visual degradation, never a silently-invented
  * fallback pose, and never a reason to touch the underlying gameplay
  * clocks (see legacyPlayerTransfer.ts, unchanged by this module).
+ *
+ * Conduit coverage vs. packet position (real defect found in the first
+ * scene-integration round and fixed here): `sourcePoint`/`targetPoint`
+ * name the transfer's two fixed geometric endpoints (the primary's port
+ * and the real extraction/delivery target), but a renderer must NOT
+ * derive the conduit's currently-ILLUMINATED extent by branching on
+ * `packetVisible` and picking between `packetPoint` and one of those two
+ * endpoints -- doing so drew a correct, growing segment while the packet
+ * traveled, then, the instant the packet arrived and packetVisible
+ * flipped to false, jumped to redrawing the FULL fixed-endpoint-to-
+ * fixed-endpoint segment, which is only pixel-identical to where the
+ * growing segment already was for delivery (grows from source, so the
+ * full line is source->target, matching where the tip ended up) but
+ * NOT for extraction (grows from target TOWARD source, so at full
+ * openFraction the tip has reached source and the actually-drawn extent
+ * was target->source already -- correct -- yet re-deriving "target
+ * ->source" from scratch using target/source directly, rather than
+ * continuing from the tip's own last position, is where the two
+ * conventions silently diverged: the FIRST integration round's renderer
+ * always anchored the fixed end at `sourcePoint` regardless of
+ * direction, which is only correct for delivery; for extraction the
+ * fixed end must be `targetPoint`, matching the existing eight-origin
+ * volley's own convention exactly (`lineBetween(targetX, targetY, tipX,
+ * tipY)` -- fixed at the target, growing tip toward the origin).
+ *
+ * `conduitStartPoint`/`conduitEndPoint` below are this module's fix:
+ * the two points a renderer should ALWAYS stroke between, unconditional
+ * on packetVisible. `conduitStartPoint` is the direction's fixed anchor
+ * (target for extraction, source for delivery). `conduitEndPoint` is the
+ * growing tip while a packet travels (`packetPoint`, by construction),
+ * and is DELIBERATELY the SAME point the tip already reached the instant
+ * it stops traveling -- source for extraction, target for delivery --
+ * so the segment never jumps or is reconstructed when packetVisible
+ * changes; only the separately-drawn packet marker disappears, and only
+ * the segment's overall alpha (`openFraction`) continues its own
+ * already-continuous fade from wherever it was.
  */
 import {
   resolveLegacyPlayerTransferVisualState,
@@ -153,6 +189,16 @@ export interface TeleportTransferPresentation {
   /** Always the primary's measured beam port -- never its anchor center. */
   readonly sourcePoint: TeleportTransferPoint | null;
   readonly targetPoint: TeleportTransferPoint | null;
+  /**
+   * The segment a renderer should ALWAYS stroke between when openFraction
+   * > 0 -- unconditional on packetVisible. See the module doc's "Conduit
+   * coverage vs. packet position" section: conduitStartPoint is the
+   * direction's fixed anchor (target for extraction, source for
+   * delivery); conduitEndPoint is the growing tip while a packet
+   * travels, and stays exactly where that tip arrived once it stops.
+   */
+  readonly conduitStartPoint: TeleportTransferPoint | null;
+  readonly conduitEndPoint: TeleportTransferPoint | null;
   readonly packetPoint: TeleportTransferPoint | null;
   readonly packetVisible: boolean;
   readonly sourceFlareIntensity: number;
@@ -184,6 +230,8 @@ const INACTIVE_PRESENTATION_BASE = {
   openFraction: 0,
   sourcePoint: null,
   targetPoint: null,
+  conduitStartPoint: null,
+  conduitEndPoint: null,
   packetPoint: null,
   packetVisible: false,
   sourceFlareIntensity: 0,
@@ -220,14 +268,19 @@ const resolveExtractionClosurePresentation = (
         poseAvailable
       };
     }
+    const reducedMotionSourcePoint = { x: input.primaryPose!.portX, y: input.primaryPose!.portY };
     return {
       active: true,
       phase: 'stored',
       direction: 'extraction',
       poseAvailable,
       openFraction: 1,
-      sourcePoint: { x: input.primaryPose!.portX, y: input.primaryPose!.portY },
+      sourcePoint: reducedMotionSourcePoint,
       targetPoint: input.extractionTarget,
+      // Fully extended and stable -- extraction's fixed anchor is the
+      // target, with the tip already at the source (see module doc).
+      conduitStartPoint: input.extractionTarget,
+      conduitEndPoint: reducedMotionSourcePoint,
       packetPoint: null,
       packetVisible: false,
       sourceFlareIntensity: Math.max(storedEnergyAlpha, 1),
@@ -248,14 +301,20 @@ const resolveExtractionClosurePresentation = (
     };
   }
   const openFraction = clamp01(1 - (overshootMs / TELEPORT_TRANSFER_EXTRACTION_ABSORPTION_MS));
+  const closureSourcePoint = { x: input.primaryPose!.portX, y: input.primaryPose!.portY };
   return {
     active: true,
     phase: 'stored',
     direction: 'extraction',
     poseAvailable,
     openFraction,
-    sourcePoint: { x: input.primaryPose!.portX, y: input.primaryPose!.portY },
+    sourcePoint: closureSourcePoint,
     targetPoint: input.extractionTarget,
+    // Fully extended (fixed anchor = target, tip already at source --
+    // see module doc); only the overall alpha (openFraction) continues
+    // fading from wherever it already was, never a reconstructed line.
+    conduitStartPoint: input.extractionTarget,
+    conduitEndPoint: closureSourcePoint,
     // The packet has already been absorbed by the time this tail begins
     // (the contract's "same shell absorbs it" happens at the outbound/
     // stored boundary) -- only the conduit itself retracts, no separate
@@ -320,6 +379,12 @@ export const resolveTeleportTransferPresentation = (
       ? 1
       : clamp01(transfer.outboundProgress / TELEPORT_TRANSFER_EXTRACTION_OPEN_DIVISOR);
     const packetVisible = !reducedMotion && openFraction > 0;
+    // Extraction's fixed anchor is the TARGET (matches the existing
+    // eight-origin volley's own convention); the tip grows from target
+    // toward source as openFraction rises, reaching exactly sourcePoint
+    // at openFraction 1 -- the same point the closure tail above starts
+    // from, so there is no jump when packetVisible later turns false.
+    const conduitEndPoint = packetVisible ? lerpPoint(targetPoint, sourcePoint, openFraction) : sourcePoint;
     return {
       active: true,
       phase: transfer.phase,
@@ -328,7 +393,9 @@ export const resolveTeleportTransferPresentation = (
       openFraction,
       sourcePoint,
       targetPoint,
-      packetPoint: packetVisible ? lerpPoint(targetPoint, sourcePoint, openFraction) : null,
+      conduitStartPoint: targetPoint,
+      conduitEndPoint,
+      packetPoint: packetVisible ? conduitEndPoint : null,
       packetVisible,
       sourceFlareIntensity: transfer.energyAlpha,
       targetFlareIntensity: 0
@@ -358,6 +425,12 @@ export const resolveTeleportTransferPresentation = (
     ? 1
     : (traveling ? travelFraction : clamp01(1 - flashFraction));
   const packetVisible = !reducedMotion && traveling && openFraction > 0;
+  // Delivery's fixed anchor is the SOURCE (the primary); the tip grows
+  // from source toward target as it travels, reaching exactly
+  // targetPoint on arrival -- the same point the flash/closure window
+  // below continues from, so there is no jump when packetVisible turns
+  // false.
+  const conduitEndPoint = packetVisible ? lerpPoint(sourcePoint, targetPoint, travelFraction) : targetPoint;
 
   return {
     active: true,
@@ -367,7 +440,9 @@ export const resolveTeleportTransferPresentation = (
     openFraction,
     sourcePoint,
     targetPoint,
-    packetPoint: packetVisible ? lerpPoint(sourcePoint, targetPoint, travelFraction) : null,
+    conduitStartPoint: sourcePoint,
+    conduitEndPoint,
+    packetPoint: packetVisible ? conduitEndPoint : null,
     packetVisible,
     sourceFlareIntensity: transfer.energyAlpha,
     targetFlareIntensity: traveling ? travelFraction : 1

@@ -248,6 +248,112 @@ describe('resolveTeleportTransferPresentation: extraction closure (the normal-mo
   });
 });
 
+describe('resolveTeleportTransferPresentation: conduit coverage continuity (real defect fixed after scene integration)', () => {
+  // A confirmed real bug from the first scene-integration round: a
+  // renderer deriving the illuminated segment as `packetVisible ?
+  // sourcePoint->packetPoint : sourcePoint->targetPoint` drew a segment
+  // that (for extraction specifically) SHRANK toward zero length as the
+  // packet approached the primary, then JUMPED back to the full-length
+  // line the instant packetVisible turned false at the outbound->stored
+  // boundary. conduitStartPoint/conduitEndPoint exist specifically to
+  // make that impossible: they must already equal the fully-extended
+  // segment's own endpoints at the exact moment packetVisible flips.
+  test('extraction: conduitEndPoint reaches exactly sourcePoint as openFraction approaches 1, with no separate reconstruction needed', () => {
+    const justBeforeFull = resolveTeleportTransferPresentation(baseInput({ outboundElapsedMs: 449 }));
+    expect(justBeforeFull.packetVisible).toBe(true);
+    expect(justBeforeFull.conduitStartPoint).toEqual(EXTRACTION_TARGET);
+    // Very close to fully open -- the tip should read as very close to
+    // the source, not still near the target.
+    const distToSource = Math.hypot(
+      justBeforeFull.conduitEndPoint!.x - POSE.portX,
+      justBeforeFull.conduitEndPoint!.y - POSE.portY
+    );
+    expect(distToSource).toBeLessThan(5);
+  });
+
+  test('extraction: conduitEndPoint at the outbound->stored boundary EXACTLY equals the closure tail\'s own conduitEndPoint one instant later -- no jump', () => {
+    // 450ms = LEGACY_PLAYER_TRANSFER_OUTBOUND_MS -- the exact instant
+    // phase flips from 'outbound' to 'stored' (and this module's own
+    // closure tail takes over). Compare the segment reported one
+    // instant before (449ms, still 'outbound') against one instant
+    // after (450ms, now in the closure tail): the endpoints must already
+    // agree -- continuity, not a reconstruction.
+    const justBefore = resolveTeleportTransferPresentation(baseInput({ outboundElapsedMs: LEGACY_PLAYER_TRANSFER_OUTBOUND_MS - 1 }));
+    const justAfter = resolveTeleportTransferPresentation(baseInput({ outboundElapsedMs: LEGACY_PLAYER_TRANSFER_OUTBOUND_MS }));
+    expect(justBefore.phase).toBe('outbound');
+    expect(justAfter.phase).toBe('stored');
+    expect(justAfter.conduitStartPoint).toEqual(justBefore.conduitStartPoint);
+    // Both should already be extremely close to the source -- within a
+    // tight tolerance of each other, not a full-length jump apart.
+    const gap = Math.hypot(
+      justAfter.conduitEndPoint!.x - justBefore.conduitEndPoint!.x,
+      justAfter.conduitEndPoint!.y - justBefore.conduitEndPoint!.y
+    );
+    expect(gap).toBeLessThan(2);
+  });
+
+  test('extraction: the illuminated segment length is monotonically non-decreasing across the whole outbound ramp -- never shrinks', () => {
+    // Starts at 1ms, not 0ms: at exactly openFraction === 0 (nothing has
+    // travelled yet), packetVisible is false and conduitEndPoint reports
+    // the fully-arrived position rather than "not yet started" -- a
+    // harmless artifact only because the renderer's own openFraction <= 0
+    // check means that value is never actually drawn. This test only
+    // asserts monotonicity across the range where openFraction > 0 and
+    // the segment is genuinely visible.
+    const samples = [1, 50, 100, 150, 200, 250, 300, 350, 400, 449].map((ms) => {
+      const result = resolveTeleportTransferPresentation(baseInput({ outboundElapsedMs: ms }));
+      expect(result.openFraction).toBeGreaterThan(0);
+      return Math.hypot(
+        result.conduitEndPoint!.x - result.conduitStartPoint!.x,
+        result.conduitEndPoint!.y - result.conduitStartPoint!.y
+      );
+    });
+    for (let i = 1; i < samples.length; i += 1) {
+      expect(samples[i]).toBeGreaterThanOrEqual(samples[i - 1] - 1e-6);
+    }
+  });
+
+  test('delivery: conduitEndPoint at arrival EXACTLY equals the flash window\'s own conduitEndPoint one instant later -- no jump', () => {
+    const justBefore = resolveTeleportTransferPresentation(baseInput({ deliveryElapsedMs: 499 }));
+    const justAfter = resolveTeleportTransferPresentation(baseInput({ deliveryElapsedMs: 500 }));
+    expect(justBefore.packetVisible).toBe(true);
+    expect(justAfter.packetVisible).toBe(false);
+    expect(justAfter.conduitStartPoint).toEqual(justBefore.conduitStartPoint);
+    const gap = Math.hypot(
+      justAfter.conduitEndPoint!.x - justBefore.conduitEndPoint!.x,
+      justAfter.conduitEndPoint!.y - justBefore.conduitEndPoint!.y
+    );
+    // A tight tolerance, not zero: 499ms vs the exact 500ms boundary
+    // still differ by a fraction of a percent of the full source-target
+    // distance. The point is distinguishing this (a few px) from a full
+    // reconstruction (the ~940px full segment length), not asserting
+    // floating-point-exact equality.
+    expect(gap).toBeLessThan(5);
+  });
+
+  test('delivery: the illuminated segment length is monotonically non-decreasing across the whole travel window -- never shrinks', () => {
+    // Starts at 1ms, not 0ms -- see the matching extraction test's own
+    // comment on why openFraction === 0 is excluded.
+    const samples = [1, 50, 100, 200, 300, 400, 499].map((ms) => {
+      const result = resolveTeleportTransferPresentation(baseInput({ deliveryElapsedMs: ms }));
+      expect(result.openFraction).toBeGreaterThan(0);
+      return Math.hypot(
+        result.conduitEndPoint!.x - result.conduitStartPoint!.x,
+        result.conduitEndPoint!.y - result.conduitStartPoint!.y
+      );
+    });
+    for (let i = 1; i < samples.length; i += 1) {
+      expect(samples[i]).toBeGreaterThanOrEqual(samples[i - 1] - 1e-6);
+    }
+  });
+
+  test('reduced-motion extraction crossfade already reports the fully-extended segment (target -> source), matching the closure tail\'s own convention', () => {
+    const result = resolveTeleportTransferPresentation(baseInput({ outboundElapsedMs: 5, reducedMotion: true }));
+    expect(result.conduitStartPoint).toEqual(EXTRACTION_TARGET);
+    expect(result.conduitEndPoint).toEqual({ x: POSE.portX, y: POSE.portY });
+  });
+});
+
 describe('resolveTeleportTransferPresentation: delivery (delivering)', () => {
   test('packet direction: originates at the primary\'s measured port and travels TOWARD the real delivery target', () => {
     const early = resolveTeleportTransferPresentation(baseInput({ deliveryElapsedMs: 1 }));

@@ -35,21 +35,29 @@
  *
  * Conduit extent (frozen contract: "the conduit begins at that measured,
  * transformed tip and is drawn beneath the shell, so the shell's own art
- * masks the first few conduit pixels"): while a packet is traveling
- * (`packetVisible: true`), the visible conduit runs from the source port
- * only as far as the packet's current position -- a GROWING/SHRINKING
- * beam, exactly matching the existing single-primary eight-origin-volley
- * beam's own growing-tip behavior (MenuScene.ts's drawLegacyPlayerTransferEnergy),
- * just projected onto the one held primary. Once the packet is no longer
- * traveling (the delivery flash window, or extraction's own closure
- * tail), the conduit is drawn at its FULL source-to-target extent and
- * `openFraction` instead governs its overall alpha -- a fading complete
- * line, not a shortening one, since there is no packet position left to
- * define a partial length by. Masking the first few pixels at the source
- * so the beam never appears to originate from transparent canvas space
- * is a DRAW-ORDER concern (the real shell Image must be composited on
- * top of this canvas), not something this module clips internally --
- * documented on drawTeleportTransferConduitToCanvasContext below.
+ * masks the first few conduit pixels"): this module ALWAYS strokes
+ * between `conduitStartPoint` and `conduitEndPoint` -- it never derives
+ * the illuminated extent itself by branching on `packetVisible` (an
+ * earlier version of this module did exactly that, which drew a
+ * correctly-growing segment while a packet traveled but then jumped to
+ * redrawing a full fixed-endpoint-to-fixed-endpoint line the instant
+ * `packetVisible` turned false, since the two conventions -- "grow from
+ * source" for delivery, "grow toward source" for extraction -- silently
+ * disagreed about which endpoint was fixed; see
+ * teleportTransferPresentation.ts's own module doc, "Conduit coverage vs.
+ * packet position", for the full account). `conduitStartPoint`/
+ * `conduitEndPoint` are that presentation module's fix: `conduitEndPoint`
+ * is already guaranteed to equal the fully-extended tip's position the
+ * instant a packet stops traveling, so this module drawing that segment
+ * unconditionally is what makes the line continuous across that
+ * boundary -- it is not itself responsible for the continuity, only for
+ * not re-introducing a seam by second-guessing the presentation layer.
+ * The packet marker is drawn separately, only when `packetVisible`.
+ * Masking the first few pixels at the source so the beam never appears
+ * to originate from transparent canvas space is a DRAW-ORDER concern
+ * (the real shell Image must be composited on top of this canvas), not
+ * something this module clips internally -- documented on
+ * drawTeleportTransferConduitToCanvasContext below.
  */
 import { drawGoalHaloToCanvasContext } from './navigationCoreGoalHaloCanvas';
 import type { TeleportTransferPoint } from './teleportTransferPresentation';
@@ -67,13 +75,15 @@ export interface TeleportTransferConduitDrawOptions {
   /** Subtracted from every point's x/y before drawing -- the canvas's own local origin, in the same coordinate space every point below is given in. */
   originX: number;
   originY: number;
-  /** Always the primary's measured beam port -- see teleportTransferPresentation.ts. */
-  sourcePoint: TeleportTransferPoint;
+  /** The target-flare's own center -- see teleportTransferPresentation.ts's targetPoint. */
   targetPoint: TeleportTransferPoint;
+  /** The segment to stroke, unconditional on packetVisible -- see teleportTransferPresentation.ts's own conduitStartPoint/conduitEndPoint doc. */
+  conduitStartPoint: TeleportTransferPoint;
+  conduitEndPoint: TeleportTransferPoint;
   /** Null while no packet is traveling (delivery flash, extraction closure tail, or the reduced-motion stable window). */
   packetPoint: TeleportTransferPoint | null;
   packetVisible: boolean;
-  /** 0 => this function draws nothing at all (enforced as an early return, not merely a visual near-zero). */
+  /** 0 => this function draws nothing at all (enforced as an early return, not merely a visual near-zero). Also the conduit segment's overall alpha. */
   openFraction: number;
   targetFlareIntensity: number;
   /** 24-bit RGB, already resolved by the caller from the SAME shared energy-material call for this frame -- see module doc above. */
@@ -113,19 +123,18 @@ export const drawTeleportTransferConduitToCanvasContext = (
 
   const originX = options.originX;
   const originY = options.originY;
-  const source = { x: options.sourcePoint.x - originX, y: options.sourcePoint.y - originY };
-  const leadingEdge = options.packetVisible && options.packetPoint !== null
-    ? { x: options.packetPoint.x - originX, y: options.packetPoint.y - originY }
-    : { x: options.targetPoint.x - originX, y: options.targetPoint.y - originY };
+  const segmentStart = { x: options.conduitStartPoint.x - originX, y: options.conduitStartPoint.y - originY };
+  const segmentEnd = { x: options.conduitEndPoint.x - originX, y: options.conduitEndPoint.y - originY };
 
-  // While a packet travels, the conduit itself is fully present up to the
-  // leading edge (its own alpha does not fade with openFraction, since
-  // openFraction IS the packet's own travel/closure fraction in that
-  // case -- see teleportTransferPresentation.ts). Once no packet is
-  // traveling, the full-length conduit's alpha is openFraction itself
-  // (a fading complete line during the delivery flash / extraction
-  // closure tail / reduced-motion stable window).
-  const conduitAlpha = options.packetVisible ? 1 : clamp01(options.openFraction);
+  // While a packet travels, the conduit stays near-full brightness (matching
+  // the existing eight-origin volley's own growth alpha, which stays close
+  // to 1 throughout its travel rather than fading in from 0) -- only its
+  // LENGTH grows, via conduitEndPoint, not its opacity. Once no packet is
+  // traveling, openFraction is the segment's own fade (the delivery flash /
+  // extraction closure tail / reduced-motion stable-then-closing window).
+  const conduitAlpha = options.packetVisible
+    ? Math.max(0.85, clamp01(options.openFraction))
+    : clamp01(options.openFraction);
 
   if (conduitAlpha > 0) {
     ctx.save();
@@ -136,16 +145,16 @@ export const drawTeleportTransferConduitToCanvasContext = (
     ctx.strokeStyle = colorToRgba(options.energyColor, conduitAlpha * 0.45);
     ctx.lineWidth = options.conduitGlowWidth;
     ctx.beginPath();
-    ctx.moveTo(source.x, source.y);
-    ctx.lineTo(leadingEdge.x, leadingEdge.y);
+    ctx.moveTo(segmentStart.x, segmentStart.y);
+    ctx.lineTo(segmentEnd.x, segmentEnd.y);
     ctx.stroke();
 
     ctx.shadowBlur = 0;
     ctx.strokeStyle = colorToRgba(options.energyColor, conduitAlpha);
     ctx.lineWidth = options.conduitCoreWidth;
     ctx.beginPath();
-    ctx.moveTo(source.x, source.y);
-    ctx.lineTo(leadingEdge.x, leadingEdge.y);
+    ctx.moveTo(segmentStart.x, segmentStart.y);
+    ctx.lineTo(segmentEnd.x, segmentEnd.y);
     ctx.stroke();
     ctx.restore();
   }

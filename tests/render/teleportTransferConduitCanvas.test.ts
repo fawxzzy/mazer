@@ -54,11 +54,17 @@ const SOURCE = { x: 100, y: 100 };
 const TARGET = { x: 300, y: 100 };
 const PACKET = { x: 180, y: 100 };
 
+// Matches an EXTRACTION-shaped presentation: conduitStartPoint is the
+// fixed target, conduitEndPoint is the growing tip (the packet while it
+// travels). This is the shape that most directly exercises the real
+// defect this module was corrected for -- see teleportTransferPresentation.ts's
+// own "Conduit coverage vs. packet position" doc.
 const baseOptions = (overrides: Partial<TeleportTransferConduitDrawOptions> = {}): TeleportTransferConduitDrawOptions => ({
   originX: 0,
   originY: 0,
-  sourcePoint: SOURCE,
   targetPoint: TARGET,
+  conduitStartPoint: TARGET,
+  conduitEndPoint: PACKET,
   packetPoint: PACKET,
   packetVisible: true,
   openFraction: 0.5,
@@ -86,13 +92,12 @@ describe('drawTeleportTransferConduitToCanvasContext: closed-state guarantee', (
   });
 });
 
-describe('drawTeleportTransferConduitToCanvasContext: traveling packet (growing beam)', () => {
-  it('strokes from the source to the PACKET position, not all the way to the target, while a packet travels', () => {
+describe('drawTeleportTransferConduitToCanvasContext: strokes exactly conduitStartPoint -> conduitEndPoint, unconditionally', () => {
+  it('strokes from conduitStartPoint to conduitEndPoint while a packet travels (conduitEndPoint == packetPoint here)', () => {
     const ctx = new FakeContext2D();
     drawTeleportTransferConduitToCanvasContext(ctx as unknown as CanvasRenderingContext2D, baseOptions());
-    expect(ctx.calls).toContain(`moveTo(${SOURCE.x},${SOURCE.y})`);
+    expect(ctx.calls).toContain(`moveTo(${TARGET.x},${TARGET.y})`);
     expect(ctx.calls).toContain(`lineTo(${PACKET.x},${PACKET.y})`);
-    expect(ctx.calls).not.toContain(`lineTo(${TARGET.x},${TARGET.y})`);
   });
 
   it('draws the traveling packet as a filled circle at its own position', () => {
@@ -110,28 +115,39 @@ describe('drawTeleportTransferConduitToCanvasContext: traveling packet (growing 
     expect(ctx.lineWidthHistory).toContain(8); // conduitGlowWidth
     expect(ctx.lineWidthHistory).toContain(2); // conduitCoreWidth
   });
-});
 
-describe('drawTeleportTransferConduitToCanvasContext: no packet (full-length, fading conduit)', () => {
-  it('strokes the FULL source-to-target extent when no packet is traveling', () => {
-    const ctx = new FakeContext2D();
-    drawTeleportTransferConduitToCanvasContext(ctx as unknown as CanvasRenderingContext2D, baseOptions({ packetVisible: false, packetPoint: null }));
-    expect(ctx.calls).toContain(`moveTo(${SOURCE.x},${SOURCE.y})`);
-    expect(ctx.calls).toContain(`lineTo(${TARGET.x},${TARGET.y})`);
+  it('does NOT reconstruct a longer/different line once the packet stops traveling, when conduitEndPoint already equals the fully-extended tip -- the real defect this module was fixed for', () => {
+    // Simulates the exact moment packetVisible flips from true to false:
+    // the presentation module guarantees conduitEndPoint is ALREADY at
+    // the source by then (see teleportTransferPresentation.ts). This
+    // module must draw the SAME segment either way -- it must never
+    // derive a different, longer line from targetPoint/sourcePoint on
+    // its own once packetVisible is false.
+    const stillTraveling = new FakeContext2D();
+    drawTeleportTransferConduitToCanvasContext(stillTraveling as unknown as CanvasRenderingContext2D, baseOptions({
+      packetVisible: true, packetPoint: SOURCE, conduitEndPoint: SOURCE, openFraction: 1
+    }));
+    const justArrived = new FakeContext2D();
+    drawTeleportTransferConduitToCanvasContext(justArrived as unknown as CanvasRenderingContext2D, baseOptions({
+      packetVisible: false, packetPoint: null, conduitEndPoint: SOURCE, openFraction: 1
+    }));
+    const lineCallsA = stillTraveling.calls.filter((c) => c.startsWith('moveTo') || c.startsWith('lineTo'));
+    const lineCallsB = justArrived.calls.filter((c) => c.startsWith('moveTo') || c.startsWith('lineTo'));
+    expect(lineCallsB).toEqual(lineCallsA);
   });
 
   it('draws no packet circle when no packet is traveling', () => {
     const ctx = new FakeContext2D();
-    drawTeleportTransferConduitToCanvasContext(ctx as unknown as CanvasRenderingContext2D, baseOptions({ packetVisible: false, packetPoint: null }));
+    drawTeleportTransferConduitToCanvasContext(ctx as unknown as CanvasRenderingContext2D, baseOptions({ packetVisible: false, packetPoint: null, conduitEndPoint: SOURCE }));
     expect(ctx.calls.some((call) => call.startsWith('arc(') && call.includes(`${PACKET.x}`))).toBe(false);
   });
 
-  it('fades the full-length conduit\'s alpha with openFraction rather than shortening it', () => {
+  it('fades the conduit\'s alpha with openFraction', () => {
     const brighter = new FakeContext2D();
-    drawTeleportTransferConduitToCanvasContext(brighter as unknown as CanvasRenderingContext2D, baseOptions({ packetVisible: false, packetPoint: null, openFraction: 0.9 }));
+    drawTeleportTransferConduitToCanvasContext(brighter as unknown as CanvasRenderingContext2D, baseOptions({ packetVisible: false, packetPoint: null, conduitEndPoint: SOURCE, openFraction: 0.9 }));
     const dimmer = new FakeContext2D();
-    drawTeleportTransferConduitToCanvasContext(dimmer as unknown as CanvasRenderingContext2D, baseOptions({ packetVisible: false, packetPoint: null, openFraction: 0.1 }));
-    // Both draw the same full-length line...
+    drawTeleportTransferConduitToCanvasContext(dimmer as unknown as CanvasRenderingContext2D, baseOptions({ packetVisible: false, packetPoint: null, conduitEndPoint: SOURCE, openFraction: 0.1 }));
+    // Both draw the same line...
     expect(brighter.calls.filter((c) => c.startsWith('lineTo'))).toEqual(dimmer.calls.filter((c) => c.startsWith('lineTo')));
     // ...but at a different resolved alpha in the stroke color string.
     const brighterCoreStroke = brighter.strokeStyleHistory[brighter.strokeStyleHistory.length - 1] as string;
@@ -167,7 +183,7 @@ describe('drawTeleportTransferConduitToCanvasContext: target flare (reuses the t
 
   it('draws a real radial-gradient flare centered on the target when targetFlareIntensity > 0', () => {
     const ctx = new FakeContext2D();
-    drawTeleportTransferConduitToCanvasContext(ctx as unknown as CanvasRenderingContext2D, baseOptions({ targetFlareIntensity: 1, packetVisible: false, packetPoint: null }));
+    drawTeleportTransferConduitToCanvasContext(ctx as unknown as CanvasRenderingContext2D, baseOptions({ targetFlareIntensity: 1, packetVisible: false, packetPoint: null, conduitEndPoint: SOURCE }));
     expect(ctx.calls.some((call) => call.startsWith(`createRadialGradient(${TARGET.x},${TARGET.y}`))).toBe(true);
   });
 });
@@ -176,7 +192,7 @@ describe('drawTeleportTransferConduitToCanvasContext: origin offset', () => {
   it('subtracts originX/originY from every drawn point (canvas-local coordinates)', () => {
     const ctx = new FakeContext2D();
     drawTeleportTransferConduitToCanvasContext(ctx as unknown as CanvasRenderingContext2D, baseOptions({ originX: 20, originY: 10 }));
-    expect(ctx.calls).toContain(`moveTo(${SOURCE.x - 20},${SOURCE.y - 10})`);
+    expect(ctx.calls).toContain(`moveTo(${TARGET.x - 20},${TARGET.y - 10})`);
     expect(ctx.calls).toContain(`lineTo(${PACKET.x - 20},${PACKET.y - 10})`);
     expect(ctx.calls.some((call) => call.startsWith(`arc(${PACKET.x - 20},${PACKET.y - 10}`))).toBe(true);
   });
