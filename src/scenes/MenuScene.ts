@@ -2090,18 +2090,20 @@ export class MenuScene extends Phaser.Scene {
   private goalHaloCanvasResolution = 0;
   // Same real-2D-canvas pattern as goalHaloCanvasImage above, for the real
   // single-primary gameplay Teleport transfer conduit (Wave 4D-B --
-  // teleportTransferConduitCanvas.ts). Added directly to the scene, NOT
-  // to boardZoomContainer: its two endpoints (the held primary's real
-  // measured beam port, and the real goal/start target) are both already
-  // in the same scene/world space drawLegacyPlayerTransferEnergy's own
-  // playerSpawnBurstGraphics uses for the menu/title eight-origin volley
-  // -- confirmed by reading that function's own targetX/targetY
-  // computation, which multiplies board-local coordinates through
-  // boardZoomContainer's transform explicitly rather than relying on
-  // container-child positioning. No pointToContainer conversion needed
-  // here; the SHELL image (titleOrbitDiamondImages) is the one still
-  // positioned via that conversion, exactly as the QA preview already
-  // does (applyLegacyTeleportAnchorPreviewOverride).
+  // teleportTransferConduitCanvas.ts). A boardZoomContainer CHILD, added
+  // immediately before titleOrbitDiamondImages (see that add-call's own
+  // comment) so the real shell renders ON TOP of this conduit at the
+  // source end -- the frozen contract's own masking requirement.
+  // (Originally added directly to the scene instead; review 5142235386
+  // caught that this rendered the conduit ABOVE the shell, backwards
+  // from the masking requirement -- fixed by moving it here.) Its own
+  // draw call (drawGameplayTransferConduitCanvas) converts every WORLD-
+  // space point the presentation module returns into this container's
+  // own local space via pointToContainer, exactly the same conversion
+  // the shell's own positioning already uses (applyLegacyTeleportAnchorPreviewOverride),
+  // applied consistently to every point this draw needs, plus dividing
+  // every pixel-size constant by the container's own scale for the same
+  // reason the shell's own local scale is.
   private gameplayTransferConduitCanvasTextureKey: string | null = null;
   private gameplayTransferConduitCanvasTexture: Phaser.Textures.CanvasTexture | null = null;
   private gameplayTransferConduitCanvasImage: Phaser.GameObjects.Image | null = null;
@@ -2206,6 +2208,16 @@ export class MenuScene extends Phaser.Scene {
   // real delta instead of the whole paused/reduced-motion gap.
   private trailAnimationElapsedMs = 0;
   private trailAnimationLastRealMs: number | null = null;
+  // Same pausable-clock pattern as trailAnimationElapsedMs/trailAnimationLastRealMs
+  // above, a SEPARATE pair (not reused directly -- advanceLegacyTrailAnimationClock
+  // has its own side effects and is only safe to call once per frame) for
+  // the real gameplay Teleport transfer conduit's own spatial energy
+  // material (Wave 4D-B). Freezes under reduced motion, Pause, or any
+  // overlay/lifecycle-lock exactly like the trail's own clock does, so the
+  // conduit's color never visibly drifts while the game is paused or
+  // reduced motion is active.
+  private gameplayTransferAnimationElapsedMs = 0;
+  private gameplayTransferAnimationLastRealMs: number | null = null;
   // The continuous play trail's shared shine lap-start timestamp, expressed
   // in trailAnimationElapsedMs units (not raw scene time) -- see
   // advanceTrailShineState's own header for why this must be explicit,
@@ -2463,13 +2475,15 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics = this.add.graphics();
     this.touchSettingsCogIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.playerSpawnBurstGraphics = this.add.graphics();
-    // Real single-primary gameplay transfer conduit (Wave 4D-B). Same
-    // top-level (non-boardZoomContainer) coordinate space
-    // playerSpawnBurstGraphics itself draws in -- see this field's own
-    // comment above.
+    // Real single-primary gameplay transfer conduit (Wave 4D-B). The
+    // TEXTURE is created here; the Image itself is created and added to
+    // boardZoomContainer further below, immediately before
+    // titleOrbitDiamondImages, specifically so the real shell renders
+    // ON TOP of (masks) this conduit at the source end -- see that
+    // field's own comment for the full reasoning. NOT the same
+    // top-level coordinate space playerSpawnBurstGraphics uses.
     this.gameplayTransferConduitCanvasTextureKey = `legacy-teleport-transfer-conduit-${nextMenuSceneInstanceId()}`;
     this.gameplayTransferConduitCanvasTexture = this.textures.createCanvas(this.gameplayTransferConduitCanvasTextureKey, 1, 1);
-    this.gameplayTransferConduitCanvasImage = this.add.image(0, 0, this.gameplayTransferConduitCanvasTextureKey).setOrigin(0, 0).setVisible(false);
     // Same top-level (non-boardZoomContainer) coordinate space
     // playerSpawnBurstGraphics itself already draws the beam origins/target
     // in -- see drawLegacyPlayerTransferEnergyBeam.
@@ -2523,6 +2537,16 @@ export class MenuScene extends Phaser.Scene {
       { length: LEGACY_TILE_FONT_GLYPH_POOL_SIZE * LEGACY_TILE_FONT_TILES_PER_GLYPH },
       () => this.add.image(0, 0, MAZER_TILE_FONT_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
     );
+    // Added to boardZoomContainer BEFORE titleOrbitDiamondImages, so the
+    // real shell slots render ON TOP of (mask) this conduit at the
+    // source end -- the frozen contract's own masking requirement, and
+    // the actual fix for review 5142235386's real z-order finding
+    // (a prior top-level placement rendered the conduit ABOVE the
+    // shell). Its own draw call converts every point into this same
+    // container-local space via pointToContainer -- see
+    // drawGameplayTransferConduitCanvas's own comment.
+    this.gameplayTransferConduitCanvasImage = this.add.image(0, 0, this.gameplayTransferConduitCanvasTextureKey).setOrigin(0, 0).setVisible(false);
+    this.boardZoomContainer.add(this.gameplayTransferConduitCanvasImage);
     // Added to boardZoomContainer (not the top-level scene) so these sit in
     // the exact same local coordinate space and z-order titleGraphics itself
     // uses (last child = renders above the board layers, and the container
@@ -3095,6 +3119,28 @@ export class MenuScene extends Phaser.Scene {
   // shadowBlur is a raw device-pixel radius the transform does NOT
   // scale, so only conduitGlowBlurPx is multiplied by `resolution`
   // explicitly here, matching this file's own established correction.
+  //
+  // LAYERING FIX (review 5142235386): this canvas Image is now a
+  // boardZoomContainer CHILD, positioned in the container's own child
+  // list immediately before titleOrbitDiamondImages (see the
+  // gameplayTransferConduitCanvasImage field's own comment for the
+  // exact reasoning) -- so it genuinely renders BENEATH the real shell
+  // at the source end, the frozen contract's own masking requirement,
+  // rather than on top of it (the real defect the previous top-level
+  // placement had). Every point `presentation` carries is in WORLD/
+  // scene space (the same space the real target/port math already
+  // uses); Container.pointToContainer converts each one into this
+  // container's own local space here -- the SAME conversion the shell's
+  // own positioning already uses just above, applied consistently to
+  // every point this draw needs, not just the shell's anchor. Every
+  // pixel SIZE constant (widths, radii, blur) is divided by the
+  // container's own scale for the same reason the shell's own local
+  // scale is (`worldScale / boardZoomContainer.scaleX`): a size meant to
+  // be a fixed WORLD pixel count must shrink/grow in LOCAL units so the
+  // container's own scale multiplies it back to the intended world size
+  // -- correct under any UNIFORM parent scale (boardZoomContainer's own
+  // stated purpose), not meaningful under a non-uniform one, exactly the
+  // same documented boundary the shell's own conversion already carries.
   private drawGameplayTransferConduitCanvas(
     presentation: TeleportTransferPresentation,
     targetCellSizePx: number,
@@ -3114,13 +3160,39 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    // A "contained one-cell" flare sized from the REAL target cell,
-    // rather than a fixed pixel count that could dwarf a compact tile or
-    // undershoot a large one -- clamped to a sane range for extreme
-    // scales.
-    const targetFlareRadius = Math.max(8, Math.min(40, targetCellSizePx * 0.42));
-    const padding = Math.ceil(targetFlareRadius + (TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX * 2.5));
-    const bounds = computeTeleportTransferConduitCanvasBounds(presentation.sourcePoint, presentation.targetPoint, padding);
+    const containerScale = this.boardZoomContainer.scaleX;
+    const toContainerLocal = (point: { x: number; y: number }): { x: number; y: number } => (
+      this.boardZoomContainer.pointToContainer(point)
+    );
+    const localSourcePoint = toContainerLocal(presentation.sourcePoint);
+    const localTargetPoint = toContainerLocal(presentation.targetPoint);
+    const localConduitStartPoint = toContainerLocal(presentation.conduitStartPoint);
+    const localConduitEndPoint = toContainerLocal(presentation.conduitEndPoint);
+    const localPacketPoint = presentation.packetPoint === null ? null : toContainerLocal(presentation.packetPoint);
+
+    // A "contained one-cell" flare sized from the REAL target cell (a
+    // real WORLD pixel size, per the caller). Confirmed real defect
+    // (review 5142235386): a fixed 8px floor could exceed a compact
+    // cell's own half-size (e.g. a 10px cell only has 5px of half-width
+    // to work with), overflowing containment instead of respecting it.
+    // The containment cap (half the real cell, never more than 40px) is
+    // computed FIRST, and any readability floor is itself clamped to
+    // never exceed that cap. Converted to LOCAL units (divided by the
+    // container's own scale) only once the WORLD-space containment math
+    // is already settled.
+    const targetFlareContainmentCapWorld = Math.min(40, targetCellSizePx * 0.5);
+    const targetFlareReadabilityFloorWorld = Math.min(8, targetFlareContainmentCapWorld);
+    const targetFlareRadiusWorld = Math.max(
+      targetFlareReadabilityFloorWorld,
+      Math.min(targetFlareContainmentCapWorld, targetCellSizePx * 0.42)
+    );
+    const localTargetFlareRadius = targetFlareRadiusWorld / containerScale;
+    const localConduitCoreWidth = TELEPORT_TRANSFER_CONDUIT_CORE_WIDTH_PX / containerScale;
+    const localConduitGlowWidth = TELEPORT_TRANSFER_CONDUIT_GLOW_WIDTH_PX / containerScale;
+    const localConduitGlowBlurPx = TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX / containerScale;
+    const localPacketRadius = TELEPORT_TRANSFER_PACKET_RADIUS_PX / containerScale;
+    const localPadding = Math.ceil((targetFlareRadiusWorld + (TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX * 2.5)) / containerScale);
+    const bounds = computeTeleportTransferConduitCanvasBounds(localSourcePoint, localTargetPoint, localPadding);
     const width = Math.max(1, Math.ceil(bounds.width));
     const height = Math.max(1, Math.ceil(bounds.height));
     const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
@@ -3148,30 +3220,38 @@ export class MenuScene extends Phaser.Scene {
     // transition tone) -- NOT resolveLegacyIridescentMidnightColor's own
     // default stops, which navigationCoreTrail.ts's own module doc
     // explicitly documents as the wrong palette for this exact contract.
-    // Reuses the play trail's own real color-sampling call and time
-    // period (sampleTrailEnergyColor / LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS)
-    // so the conduit shares the SAME material and phase the trail already
-    // carries, not an independently-cycling approximation of it.
-    const energyColor = sampleTrailEnergyColor(0, time, {
-      distancePeriodPx: Math.max(1, targetCellSizePx) * LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE,
+    // Reuses the play trail's own real color-sampling call
+    // (sampleTrailEnergyColor) so the conduit shares the SAME material
+    // the trail already carries, not an independently-cycling
+    // approximation of it -- sampled at a REAL distance along the
+    // conduit (varying spatially, not one flat color per frame) and at
+    // this transfer's own pausable animation time (frozen under reduced
+    // motion, Pause, or any overlay -- see
+    // advanceLegacyGameplayTransferAnimationClock's own comment).
+    const gameplayTransferAnimationTime = this.advanceLegacyGameplayTransferAnimationClock(time);
+    const conduitColorOptions = {
+      distancePeriodPx: Math.max(1, targetCellSizePx / containerScale) * LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE,
       timePeriodMs: LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS
-    });
+    };
+    const energyColorAtDistance = (distancePx: number): number => (
+      sampleTrailEnergyColor(distancePx, gameplayTransferAnimationTime, conduitColorOptions)
+    );
     drawTeleportTransferConduitToCanvasContext(this.gameplayTransferConduitCanvasTexture.context, {
       originX: bounds.left,
       originY: bounds.top,
-      targetPoint: presentation.targetPoint,
-      conduitStartPoint: presentation.conduitStartPoint,
-      conduitEndPoint: presentation.conduitEndPoint,
-      packetPoint: presentation.packetPoint,
+      targetPoint: localTargetPoint,
+      conduitStartPoint: localConduitStartPoint,
+      conduitEndPoint: localConduitEndPoint,
+      packetPoint: localPacketPoint,
       packetVisible: presentation.packetVisible,
       openFraction: presentation.openFraction,
       targetFlareIntensity: presentation.targetFlareIntensity,
-      energyColor,
-      conduitCoreWidth: TELEPORT_TRANSFER_CONDUIT_CORE_WIDTH_PX,
-      conduitGlowWidth: TELEPORT_TRANSFER_CONDUIT_GLOW_WIDTH_PX,
-      conduitGlowBlurPx: TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX * resolution,
-      packetRadius: TELEPORT_TRANSFER_PACKET_RADIUS_PX,
-      targetFlareRadius
+      energyColorAtDistance,
+      conduitCoreWidth: localConduitCoreWidth,
+      conduitGlowWidth: localConduitGlowWidth,
+      conduitGlowBlurPx: localConduitGlowBlurPx * resolution,
+      packetRadius: localPacketRadius,
+      targetFlareRadius: localTargetFlareRadius
     });
     this.gameplayTransferConduitCanvasTexture.refresh();
     this.gameplayTransferConduitCanvasImage.setPosition(bounds.left, bounds.top);
@@ -10605,6 +10685,36 @@ export class MenuScene extends Phaser.Scene {
       this.trailAnimationLastRealMs = null;
     }
     return this.trailAnimationElapsedMs;
+  }
+
+  // Same pattern as advanceLegacyTrailAnimationClock above, a separate
+  // accumulator for the real gameplay transfer conduit's own energy
+  // material (see the field pair's own comment). Reduced motion is
+  // handled by this clock freezing entirely, NOT by the presentation
+  // module -- the conduit's own openFraction/geometry stay whatever
+  // teleportTransferPresentation.ts already computed for reduced motion;
+  // this only stops the color from visibly drifting while frozen.
+  //
+  // Deliberately does NOT gate on !isLegacyPlayLifecycleInputLocked() the
+  // way the trail's own clock does: the conduit's entire real active
+  // window (outbound/stored/delivering) falls WITHIN the locked
+  // transition period between moves, so that gate would freeze this
+  // clock for essentially its whole useful lifetime. Gates on the
+  // transfer actually being armed instead, plus Pause/overlay, which is
+  // the transfer-specific equivalent of "genuinely visible right now".
+  private advanceLegacyGameplayTransferAnimationClock(time: number): number {
+    const isActivePlayVisible = this.mode === 'play'
+      && this.overlay === 'none'
+      && this.playerTransferEnergyArmed;
+    if (isActivePlayVisible && !this.prefersLegacyReducedMotion()) {
+      if (this.gameplayTransferAnimationLastRealMs !== null) {
+        this.gameplayTransferAnimationElapsedMs += Math.max(0, time - this.gameplayTransferAnimationLastRealMs);
+      }
+      this.gameplayTransferAnimationLastRealMs = time;
+    } else {
+      this.gameplayTransferAnimationLastRealMs = null;
+    }
+    return this.gameplayTransferAnimationElapsedMs;
   }
 
   // Navigation Core v1's continuous play trail -- one logically continuous

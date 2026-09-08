@@ -22,16 +22,26 @@
  *
  * Shared energy material (frozen contract: "one continuous distance/time
  * phase across conduit, packet, and target flare together, not
- * independent unrelated colors per element"): the conduit stroke, the
- * traveling packet's core, and the target flare's inner color are always
- * resolved from the SAME resolveLegacyIridescentMidnightColor(timeMs /
- * LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS) call the caller makes once
- * per frame and passes in as `energyColor` -- the same canonical
- * Navigation-Core-locked palette the play trail already uses, per the
- * frozen Teleport contract's own "Energy material is the same
- * palette-stops contract Navigation Core Revision 6.1 locked for its
- * trail" clause. This module never samples the palette itself and never
- * gives any of its three draws an independent color.
+ * independent unrelated colors per element"): the caller supplies
+ * `energyColorAtDistance(distancePx)`, a pure function sampling the SAME
+ * canonical Navigation-Core-locked palette the play trail already uses
+ * (sampleTrailEnergyColor / NAVIGATION_CORE_TRAIL_ENERGY_STOPS), at a
+ * real distance along the conduit measured from `conduitStartPoint`.
+ * This module never samples the palette itself, but it DOES vary the
+ * conduit's own color spatially by calling that function at several
+ * points along the stroked segment (real distance-based variation, not
+ * one flat color per frame) -- reusing navigationCoreTrailCanvas.ts's
+ * own chunked multi-segment stroker (`drawTrailToCanvasContext`)
+ * directly for this, the same tested technique that already avoids
+ * banding/corner artifacts for the play trail, not a re-derivation. The
+ * traveling packet's glow and the target flare's outer color each sample
+ * the SAME function at their own real position along that axis (the
+ * packet's current distance from conduitStartPoint; the flare at the
+ * conduit's full source-to-target distance) -- one continuous material,
+ * not independently-colored parts. The packet's compact core stays
+ * white-hot regardless (the frozen contract's one explicit exception to
+ * "every decorative glint is a four-point sparkle" -- a payload, not
+ * decoration).
  *
  * Conduit extent (frozen contract: "the conduit begins at that measured,
  * transformed tip and is drawn beneath the shell, so the shell's own art
@@ -60,6 +70,7 @@
  * drawTeleportTransferConduitToCanvasContext below.
  */
 import { drawGoalHaloToCanvasContext } from './navigationCoreGoalHaloCanvas';
+import { drawTrailToCanvasContext, type TrailCanvasSegment } from './navigationCoreTrailCanvas';
 import type { TeleportTransferPoint } from './teleportTransferPresentation';
 
 const colorToRgba = (color: number, alpha: number): string => {
@@ -70,6 +81,12 @@ const colorToRgba = (color: number, alpha: number): string => {
 };
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+
+// Granularity for spatial color sampling along the conduit -- short
+// enough that a full-length conduit shows real, visible color drift
+// (matching the play trail's own per-position variation), long enough
+// not to spam tiny stroke segments for a routine short conduit.
+const CONDUIT_COLOR_SAMPLE_SPACING_PX = 14;
 
 export interface TeleportTransferConduitDrawOptions {
   /** Subtracted from every point's x/y before drawing -- the canvas's own local origin, in the same coordinate space every point below is given in. */
@@ -86,14 +103,60 @@ export interface TeleportTransferConduitDrawOptions {
   /** 0 => this function draws nothing at all (enforced as an early return, not merely a visual near-zero). Also the conduit segment's overall alpha. */
   openFraction: number;
   targetFlareIntensity: number;
-  /** 24-bit RGB, already resolved by the caller from the SAME shared energy-material call for this frame -- see module doc above. */
-  energyColor: number;
+  /**
+   * Samples the SAME shared energy material at a real distance (px)
+   * along the conduit, measured from conduitStartPoint -- see module doc
+   * above. Called once per color sample along the stroked segment, plus
+   * once for the packet (at its own current distance) and once for the
+   * target flare (at the conduit's full length).
+   */
+  energyColorAtDistance: (distancePx: number) => number;
   conduitCoreWidth: number;
   conduitGlowWidth: number;
   conduitGlowBlurPx: number;
   packetRadius: number;
   targetFlareRadius: number;
 }
+
+const distanceBetween = (a: TeleportTransferPoint, b: TeleportTransferPoint): number => (
+  Math.hypot(b.x - a.x, b.y - a.y)
+);
+
+/**
+ * Builds real TrailCanvasSegment[] for the straight conduitStartPoint ->
+ * conduitEndPoint run, sampling energyColorAtDistance at each sub-segment
+ * boundary so the stroke shows genuine spatial color variation instead
+ * of one flat color -- exported so the sampling itself is directly
+ * unit-testable without a canvas.
+ */
+export const buildTeleportTransferConduitSegments = (
+  start: TeleportTransferPoint,
+  end: TeleportTransferPoint,
+  alpha: number,
+  energyColorAtDistance: (distancePx: number) => number
+): TrailCanvasSegment[] => {
+  const totalLength = distanceBetween(start, end);
+  if (totalLength <= 0 || alpha <= 0) {
+    return [];
+  }
+  const steps = Math.max(1, Math.ceil(totalLength / CONDUIT_COLOR_SAMPLE_SPACING_PX));
+  const segments: TrailCanvasSegment[] = [];
+  let previous = start;
+  for (let step = 1; step <= steps; step += 1) {
+    const t = step / steps;
+    const current = {
+      x: start.x + ((end.x - start.x) * t),
+      y: start.y + ((end.y - start.y) * t)
+    };
+    // Sample at the sub-segment's midpoint distance -- a representative
+    // color for that stretch, not just its trailing edge.
+    const sampleDistance = totalLength * (t - (0.5 / steps));
+    const color = energyColorAtDistance(sampleDistance);
+    segments.push({ previous, current, glowColor: color, coreColor: color, alpha });
+    previous = current;
+  }
+  return segments;
+};
 
 /**
  * Draws the conduit's glow pass, core stroke, traveling packet, and target
@@ -123,8 +186,6 @@ export const drawTeleportTransferConduitToCanvasContext = (
 
   const originX = options.originX;
   const originY = options.originY;
-  const segmentStart = { x: options.conduitStartPoint.x - originX, y: options.conduitStartPoint.y - originY };
-  const segmentEnd = { x: options.conduitEndPoint.x - originX, y: options.conduitEndPoint.y - originY };
 
   // While a packet travels, the conduit stays near-full brightness (matching
   // the existing eight-origin volley's own growth alpha, which stays close
@@ -137,32 +198,28 @@ export const drawTeleportTransferConduitToCanvasContext = (
     : clamp01(options.openFraction);
 
   if (conduitAlpha > 0) {
-    ctx.save();
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.shadowColor = colorToRgba(options.energyColor, conduitAlpha);
-    ctx.shadowBlur = options.conduitGlowBlurPx;
-    ctx.strokeStyle = colorToRgba(options.energyColor, conduitAlpha * 0.45);
-    ctx.lineWidth = options.conduitGlowWidth;
-    ctx.beginPath();
-    ctx.moveTo(segmentStart.x, segmentStart.y);
-    ctx.lineTo(segmentEnd.x, segmentEnd.y);
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = colorToRgba(options.energyColor, conduitAlpha);
-    ctx.lineWidth = options.conduitCoreWidth;
-    ctx.beginPath();
-    ctx.moveTo(segmentStart.x, segmentStart.y);
-    ctx.lineTo(segmentEnd.x, segmentEnd.y);
-    ctx.stroke();
-    ctx.restore();
+    const segments = buildTeleportTransferConduitSegments(
+      options.conduitStartPoint,
+      options.conduitEndPoint,
+      conduitAlpha,
+      options.energyColorAtDistance
+    );
+    drawTrailToCanvasContext(ctx, segments, {
+      originX,
+      originY,
+      coreWidth: options.conduitCoreWidth,
+      glowWidth: options.conduitGlowWidth,
+      glowAlphaRatio: 0.45,
+      glowBlurPx: options.conduitGlowBlurPx
+    });
   }
 
   if (options.packetVisible && options.packetPoint !== null && options.packetRadius > 0) {
     const packet = { x: options.packetPoint.x - originX, y: options.packetPoint.y - originY };
+    const packetDistance = distanceBetween(options.conduitStartPoint, options.packetPoint);
+    const packetGlowColor = options.energyColorAtDistance(packetDistance);
     ctx.save();
-    ctx.shadowColor = colorToRgba(options.energyColor, 0.9);
+    ctx.shadowColor = colorToRgba(packetGlowColor, 0.9);
     ctx.shadowBlur = options.conduitGlowBlurPx;
     // A compact white-hot center is the one frozen-contract exception to
     // "every decorative glint is a four-point sparkle" -- the packet is a
@@ -175,6 +232,8 @@ export const drawTeleportTransferConduitToCanvasContext = (
   }
 
   if (options.targetFlareIntensity > 0 && options.targetFlareRadius > 0) {
+    const flareDistance = distanceBetween(options.conduitStartPoint, options.targetPoint);
+    const flareColor = options.energyColorAtDistance(flareDistance);
     drawGoalHaloToCanvasContext(ctx, {
       originX,
       originY,
@@ -183,7 +242,7 @@ export const drawTeleportTransferConduitToCanvasContext = (
       radius: options.targetFlareRadius,
       innerColor: 0xffffff,
       innerAlpha: clamp01(options.targetFlareIntensity),
-      outerColor: options.energyColor,
+      outerColor: flareColor,
       outerAlpha: clamp01(options.targetFlareIntensity) * 0.6
     });
   }

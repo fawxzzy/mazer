@@ -166,6 +166,15 @@ export const TELEPORT_TRANSFER_EXTRACTION_ABSORPTION_MS = 160;
 // into the ordinary closed 'stored' presentation.
 export const TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS = 140;
 
+// The fade-in/fade-out edges within a reduced-motion window (the
+// extraction crossfade above, and delivery's own reduced-motion window
+// below): "short state crossfades; a stable (non-animating) conduit" per
+// the frozen contract -- interpreted as a brief fade AT EACH EDGE of the
+// window with a genuinely stable (flat, non-ramping) hold in between,
+// not an instant on/off step. Kept short relative to the windows above
+// so the hold in the middle stays the dominant, "stable" impression.
+export const TELEPORT_TRANSFER_REDUCED_MOTION_FADE_EDGE_MS = 45;
+
 export interface TeleportTransferPresentationInput extends LegacyPlayerTransferVisualInput {
   /**
    * The currently-held primary's real measured pose, or null when no
@@ -224,6 +233,24 @@ const lerpPoint = (
   y: from.y + ((to.y - from.y) * fraction)
 });
 
+/**
+ * A genuine continuous fade at each edge of a bounded window
+ * [0, windowMs], with a flat, stable 1 in between -- "short state
+ * crossfades; a stable (non-animating) conduit" (frozen contract). Not
+ * an on/off step: ramps 0->1 over the first edgeMs, holds at 1, then
+ * ramps 1->0 over the last edgeMs. Used for both the extraction
+ * reduced-motion crossfade and delivery's own reduced-motion window.
+ */
+const edgeFade = (elapsedMs: number, windowMs: number, edgeMs: number): number => {
+  const clampedEdgeMs = Math.min(edgeMs, windowMs / 2);
+  if (clampedEdgeMs <= 0) {
+    return 1;
+  }
+  const fadeIn = clamp01(elapsedMs / clampedEdgeMs);
+  const fadeOut = clamp01((windowMs - elapsedMs) / clampedEdgeMs);
+  return Math.min(fadeIn, fadeOut);
+};
+
 const INACTIVE_PRESENTATION_BASE = {
   active: false,
   direction: null,
@@ -269,12 +296,19 @@ const resolveExtractionClosurePresentation = (
       };
     }
     const reducedMotionSourcePoint = { x: input.primaryPose!.portX, y: input.primaryPose!.portY };
+    // A genuine fade at each edge of the crossfade window, flat/stable
+    // in between -- not an instant on/off step (see edgeFade's own doc).
+    const reducedMotionOpenFraction = edgeFade(
+      outboundElapsedMs,
+      TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS,
+      TELEPORT_TRANSFER_REDUCED_MOTION_FADE_EDGE_MS
+    );
     return {
       active: true,
       phase: 'stored',
       direction: 'extraction',
       poseAvailable,
-      openFraction: 1,
+      openFraction: reducedMotionOpenFraction,
       sourcePoint: reducedMotionSourcePoint,
       targetPoint: input.extractionTarget,
       // Fully extended and stable -- extraction's fixed anchor is the
@@ -283,7 +317,7 @@ const resolveExtractionClosurePresentation = (
       conduitEndPoint: reducedMotionSourcePoint,
       packetPoint: null,
       packetVisible: false,
-      sourceFlareIntensity: Math.max(storedEnergyAlpha, 1),
+      sourceFlareIntensity: Math.max(storedEnergyAlpha, reducedMotionOpenFraction),
       targetFlareIntensity: 0
     };
   }
@@ -421,8 +455,15 @@ export const resolveTeleportTransferPresentation = (
   const flashFraction = arrived ? clamp01((deliveryElapsedMs - travelMs) / flashMs) : 0;
   const traveling = !arrived;
 
+  // Under reduced motion, delivery still runs its own REAL raw
+  // travel+flash duration (a genuine, narrower pre-existing gap this
+  // module does not shorten -- see the module doc's own note on this).
+  // What changes here is only the presentation: a genuine fade at each
+  // edge of that real window, flat/stable in between, instead of a flat
+  // 1 for the whole duration followed by an instant cut to 0 (see
+  // edgeFade's own doc, same treatment as the extraction crossfade).
   const openFraction = reducedMotion
-    ? 1
+    ? edgeFade(deliveryElapsedMs, travelMs + flashMs, TELEPORT_TRANSFER_REDUCED_MOTION_FADE_EDGE_MS)
     : (traveling ? travelFraction : clamp01(1 - flashFraction));
   const packetVisible = !reducedMotion && traveling && openFraction > 0;
   // Delivery's fixed anchor is the SOURCE (the primary); the tip grows

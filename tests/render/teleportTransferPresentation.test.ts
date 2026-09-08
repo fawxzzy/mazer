@@ -129,33 +129,48 @@ describe('resolveTeleportTransferPresentation: extraction (outbound)', () => {
     expect(result.targetPoint).toBeNull();
   });
 
-  test('reduced motion: the underlying resolver itself skips the outbound ramp entirely -- phase reads as \'stored\' immediately, but this module still presents a short stable crossfade there (the actual reduced-motion extraction fix)', () => {
+  test('reduced motion: the underlying resolver itself skips the outbound ramp entirely -- phase reads as \'stored\' immediately, but this module still presents a short crossfade there (the actual reduced-motion extraction fix), fading IN rather than snapping open', () => {
     // legacyPlayerTransfer.ts forces outboundProgress = 1 immediately under
     // reduced motion, and its own `if (outboundProgress < 1)` guard means
     // phase becomes 'stored' on the very first tick -- there is no
     // reduced-motion 'outbound' state to project a conduit for at all.
     // Rather than reporting nothing (failing the frozen "short crossfade"
-    // requirement), this module presents a brief STABLE (non-ramping,
-    // packet-free) open conduit during the very start of 'stored' under
-    // reduced motion specifically.
+    // requirement), this module presents a brief crossfaded (fade in,
+    // stable hold, fade out), packet-free open conduit during the very
+    // start of 'stored' under reduced motion specifically.
     const result = resolveTeleportTransferPresentation(baseInput({ outboundElapsedMs: 5, reducedMotion: true }));
     expect(result.phase).toBe('stored');
     expect(result.active).toBe(true);
     expect(result.direction).toBe('extraction');
-    expect(result.openFraction).toBe(1);
+    // 5ms into the fade-in edge -- open, but not yet fully.
+    expect(result.openFraction).toBeGreaterThan(0);
+    expect(result.openFraction).toBeLessThan(1);
     expect(result.packetVisible).toBe(false);
     expect(result.packetPoint).toBeNull();
     expect(result.sourcePoint).toEqual({ x: POSE.portX, y: POSE.portY });
     expect(result.targetPoint).toEqual(EXTRACTION_TARGET);
   });
 
-  test('reduced-motion crossfade window: stable and short, not indefinite -- settles into ordinary closed stored presentation once it elapses', () => {
+  test('reduced-motion crossfade: a genuinely stable (non-ramping) hold in the middle of the window', () => {
+    // Well past the fade-in edge (45ms) and well before the fade-out edge
+    // starts (140-45=95ms) -- two samples in that middle stretch should
+    // both read as fully, stably open.
+    const midA = resolveTeleportTransferPresentation(baseInput({ outboundElapsedMs: 60, reducedMotion: true }));
+    const midB = resolveTeleportTransferPresentation(baseInput({ outboundElapsedMs: 80, reducedMotion: true }));
+    expect(midA.openFraction).toBeCloseTo(1, 5);
+    expect(midB.openFraction).toBeCloseTo(1, 5);
+  });
+
+  test('reduced-motion crossfade window: fades OUT (not an instant cut) approaching its end, then settles into ordinary closed stored presentation once it elapses', () => {
     const justBeforeEnd = resolveTeleportTransferPresentation(baseInput({
       outboundElapsedMs: TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS - 1,
       reducedMotion: true
     }));
     expect(justBeforeEnd.active).toBe(true);
-    expect(justBeforeEnd.openFraction).toBe(1);
+    // 1ms before the window closes -- deep into the fade-out edge, not
+    // still fully open.
+    expect(justBeforeEnd.openFraction).toBeGreaterThan(0);
+    expect(justBeforeEnd.openFraction).toBeLessThan(0.1);
 
     const justAfterEnd = resolveTeleportTransferPresentation(baseInput({
       outboundElapsedMs: TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS,
@@ -419,11 +434,27 @@ describe('resolveTeleportTransferPresentation: delivery (delivering)', () => {
     expect(result.direction).toBe('delivery');
   });
 
-  test('reduced motion: stable open conduit, no traveling packet, still reports a full target flare once the travel window elapses', () => {
+  test('reduced motion: stable open conduit (well past the fade-in edge), no traveling packet, still reports a full target flare once the travel window elapses', () => {
     const traveling = resolveTeleportTransferPresentation(baseInput({ deliveryElapsedMs: 100, reducedMotion: true }));
     expect(traveling.openFraction).toBe(1);
     expect(traveling.packetVisible).toBe(false);
     expect(traveling.packetPoint).toBeNull();
+  });
+
+  test('reduced motion: fades IN at the very start of delivery rather than snapping open', () => {
+    const justStarted = resolveTeleportTransferPresentation(baseInput({ deliveryElapsedMs: 5, reducedMotion: true }));
+    expect(justStarted.openFraction).toBeGreaterThan(0);
+    expect(justStarted.openFraction).toBeLessThan(1);
+  });
+
+  test('reduced motion: fades OUT approaching the real end of the travel+flash window, rather than an instant cut to \'complete\'', () => {
+    // travelMs=500, flashMs=120 -> totalMs=620; 1ms before that boundary
+    // is deep into the 45ms fade-out edge.
+    const justBeforeComplete = resolveTeleportTransferPresentation(baseInput({ deliveryElapsedMs: 619, reducedMotion: true }));
+    expect(justBeforeComplete.phase).toBe('delivering');
+    expect(justBeforeComplete.active).toBe(true);
+    expect(justBeforeComplete.openFraction).toBeGreaterThan(0);
+    expect(justBeforeComplete.openFraction).toBeLessThan(0.1);
   });
 });
 

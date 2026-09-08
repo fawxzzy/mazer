@@ -59,6 +59,14 @@ const PACKET = { x: 180, y: 100 };
 // travels). This is the shape that most directly exercises the real
 // defect this module was corrected for -- see teleportTransferPresentation.ts's
 // own "Conduit coverage vs. packet position" doc.
+// A constant-color function -- used by most tests below, which care about
+// geometry/structure, not spatial variation (that gets its own dedicated
+// describe block). A constant color lets chunkTrailSegments merge every
+// sub-segment into one continuous path, keeping the old moveTo/lineTo
+// assertions meaningful.
+const CONSTANT_COLOR = 0x4a2fe0;
+const constantEnergyColorAtDistance = (): number => CONSTANT_COLOR;
+
 const baseOptions = (overrides: Partial<TeleportTransferConduitDrawOptions> = {}): TeleportTransferConduitDrawOptions => ({
   originX: 0,
   originY: 0,
@@ -69,7 +77,7 @@ const baseOptions = (overrides: Partial<TeleportTransferConduitDrawOptions> = {}
   packetVisible: true,
   openFraction: 0.5,
   targetFlareIntensity: 0,
-  energyColor: 0x4a2fe0,
+  energyColorAtDistance: constantEnergyColorAtDistance,
   conduitCoreWidth: 2,
   conduitGlowWidth: 8,
   conduitGlowBlurPx: 6,
@@ -159,11 +167,11 @@ describe('drawTeleportTransferConduitToCanvasContext: strokes exactly conduitSta
 });
 
 describe('drawTeleportTransferConduitToCanvasContext: shared energy color', () => {
-  it('uses the SAME caller-supplied energyColor for the conduit stroke and the packet is drawn white-hot (the one frozen exception), while the target flare reuses it as its outer color', () => {
+  it('uses the caller-supplied energyColorAtDistance for the conduit stroke, and the target flare samples the SAME function at the conduit\'s full length', () => {
     const ctx = new FakeContext2D();
     const color = 0x2fe0c0;
     drawTeleportTransferConduitToCanvasContext(ctx as unknown as CanvasRenderingContext2D, baseOptions({
-      energyColor: color,
+      energyColorAtDistance: () => color,
       targetFlareIntensity: 0.8
     }));
     const r = (color >> 16) & 0xff;
@@ -171,6 +179,67 @@ describe('drawTeleportTransferConduitToCanvasContext: shared energy color', () =
     const b = color & 0xff;
     expect(ctx.strokeStyleHistory.some((style) => typeof style === 'string' && style.includes(`${r},${g},${b}`))).toBe(true);
     expect(ctx.calls.some((call) => call.startsWith('createRadialGradient'))).toBe(true);
+  });
+
+  it('the packet\'s glow samples energyColorAtDistance at the packet\'s OWN real distance from conduitStartPoint, not a fixed value', () => {
+    const ctx = new FakeContext2D();
+    const distancesQueried: number[] = [];
+    drawTeleportTransferConduitToCanvasContext(ctx as unknown as CanvasRenderingContext2D, baseOptions({
+      energyColorAtDistance: (d) => { distancesQueried.push(d); return 0x112233; }
+    }));
+    // PACKET is 120px from TARGET (conduitStartPoint here) -- some query
+    // must have been made at (or very near) that real distance for the
+    // packet's own glow, not just at 0 or the conduit's own sample points.
+    const packetDistance = Math.hypot(PACKET.x - TARGET.x, PACKET.y - TARGET.y);
+    expect(distancesQueried.some((d) => Math.abs(d - packetDistance) < 1)).toBe(true);
+  });
+
+  it('the target flare samples energyColorAtDistance at the conduit\'s full source-to-target length', () => {
+    const ctx = new FakeContext2D();
+    const distancesQueried: number[] = [];
+    drawTeleportTransferConduitToCanvasContext(ctx as unknown as CanvasRenderingContext2D, baseOptions({
+      packetVisible: false, packetPoint: null, conduitEndPoint: SOURCE,
+      targetFlareIntensity: 1,
+      energyColorAtDistance: (d) => { distancesQueried.push(d); return 0x445566; }
+    }));
+    // conduitStartPoint === TARGET in this fixture, so the flare's own
+    // "full conduit length from conduitStartPoint" distance is exactly 0.
+    expect(distancesQueried.some((d) => Math.abs(d) < 1)).toBe(true);
+  });
+});
+
+describe('drawTeleportTransferConduitToCanvasContext: real spatial color variation (not one flat color per frame)', () => {
+  it('samples energyColorAtDistance at MULTIPLE distinct distances along a sufficiently long conduit', () => {
+    const ctx = new FakeContext2D();
+    const distancesQueried: number[] = [];
+    // A long conduit (SOURCE to TARGET, 200px) so it spans several of the
+    // module's own color-sample spacing steps.
+    drawTeleportTransferConduitToCanvasContext(ctx as unknown as CanvasRenderingContext2D, baseOptions({
+      conduitStartPoint: SOURCE,
+      conduitEndPoint: TARGET,
+      packetVisible: false,
+      packetPoint: null,
+      energyColorAtDistance: (d) => { distancesQueried.push(d); return Math.round(d) % 2 === 0 ? 0x00ff00 : 0x0000ff; }
+    }));
+    const distinctDistances = new Set(distancesQueried.map((d) => Math.round(d)));
+    expect(distinctDistances.size).toBeGreaterThan(1);
+  });
+
+  it('produces more than one distinct stroke color when the sampled material genuinely varies with distance -- proving real per-position rendering, not a single flat pass', () => {
+    const varyingColor = new FakeContext2D();
+    drawTeleportTransferConduitToCanvasContext(varyingColor as unknown as CanvasRenderingContext2D, baseOptions({
+      conduitStartPoint: SOURCE,
+      conduitEndPoint: TARGET,
+      packetVisible: false,
+      packetPoint: null,
+      energyColorAtDistance: (d) => (d < 100 ? 0xff0000 : 0x0000ff)
+    }));
+    // At least two distinct core-pass stroke colors were used (red-ish and
+    // blue-ish), not one flat color for the whole line.
+    const hasRed = varyingColor.strokeStyleHistory.some((s) => typeof s === 'string' && s.includes('255,0,0'));
+    const hasBlue = varyingColor.strokeStyleHistory.some((s) => typeof s === 'string' && s.includes('0,0,255'));
+    expect(hasRed).toBe(true);
+    expect(hasBlue).toBe(true);
   });
 });
 
