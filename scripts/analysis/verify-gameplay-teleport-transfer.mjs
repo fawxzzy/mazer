@@ -690,32 +690,26 @@ const main = async () => {
           duringPause.animationElapsed === beforePause.animationElapsed,
           JSON.stringify({ beforePause, duringPause })
         );
-        // Confirmed real, PRE-EXISTING characteristic (not a regression
-        // this feature introduces, and explicitly out of scope to change
-        // per review 5146800659's own "preserve existing gameplay/
-        // progression timing"): only the material animation clock
-        // (checked above) and the held primary id (checked below) have
-        // their own explicit pause gate. phase/openFraction/packetVisible/
-        // sourceFlareIntensity are all DERIVED from
-        // resolveLegacyPlayerTransferState(scene.time.now), and
-        // scene.time.now is never itself frozen by opening the pause
-        // overlay anywhere in this codebase (grep confirms this.scene.pause()
-        // is never called; "pause" here is a UI-state flag scattered
-        // subsystems check individually, matching this file's own
-        // pre-existing pattern for e.g. the play trail's own animation
-        // clock) -- so the underlying lifecycle timer keeps advancing in
-        // real wall-clock time while paused, same as it would from a
-        // real browser's own real RAF-driven update() calls, not an
-        // artifact of this test's own manual stepping. A first attempt at
-        // this exact check asserted full presentation stasis and caught
-        // this live (phase genuinely advanced outbound -> stored during a
-        // "paused" window) -- confirmed real, not fixed here (explicitly
-        // protected), disclosed instead.
+        // Confirmed real defect (review 5147427468, continuing 5144999445 /
+        // 5146800659), fixed at the source: a first attempt at this exact
+        // check asserted full presentation stasis and caught the
+        // underlying lifecycle timer legitimately advancing during a
+        // "paused" window (phase genuinely progressing outbound ->
+        // stored) -- scene.time.now is never itself frozen by opening the
+        // pause overlay (this.scene.pause() is never called anywhere in
+        // this codebase). Fixed with a narrowly scoped pause-aware
+        // elapsed-time correction at the scene's own transfer/arrival
+        // boundary (gameplayTransferPausedDurationMs/PauseStartedAtMs) --
+        // NOT a second gameplay state machine or a second clock; the one
+        // authoritative lifecycle (resolveLegacyPlayerTransferVisualState)
+        // is untouched, only the elapsed-ms INPUTS this scene feeds it are
+        // now pause-compensated. This check now asserts genuine freeze.
         check(
-          'case 4: the presentation stays internally valid (no corrupted/out-of-range values) through a paused window even when the underlying lifecycle timer has legitimately advanced',
-          typeof duringPause.openFraction === 'number' && duringPause.openFraction >= 0 && duringPause.openFraction <= 1
-            && typeof duringPause.packetVisible === 'boolean'
-            && typeof duringPause.sourceFlareIntensity === 'number' && duringPause.sourceFlareIntensity >= 0,
+          'case 4: the real presentation (phase/openFraction/packetVisible/sourceFlareIntensity) is genuinely frozen identically while paused, open-conduit interval',
+          duringPause.phase === beforePause.phase
+            && duringPause.openFraction === beforePause.openFraction
+            && duringPause.packetVisible === beforePause.packetVisible
+            && duringPause.sourceFlareIntensity === beforePause.sourceFlareIntensity,
           JSON.stringify({ beforePause, duringPause })
         );
 
@@ -744,6 +738,11 @@ const main = async () => {
           'case 4: the material clock advances by roughly one real frame after resume (tolerance derived from the real 16ms step), not the whole paused interval',
           deltaMs >= 0 && deltaMs <= REAL_STEP_MS * 3,
           JSON.stringify({ duringPauseElapsed: duringPause.animationElapsed, afterResumeElapsed: afterResume.animationElapsed, deltaMs, toleranceMs: REAL_STEP_MS * 3 })
+        );
+        check(
+          'case 4: the real lifecycle phase does not jump on resume (still the same phase one real frame later, not raced ahead)',
+          afterResume.phase === duringPause.phase,
+          JSON.stringify({ duringPausePhase: duringPause.phase, afterResumePhase: afterResume.phase })
         );
       }
 
@@ -802,24 +801,15 @@ const main = async () => {
           duringPause.animationElapsed === beforePause.animationElapsed,
           JSON.stringify({ beforePause, duringPause })
         );
-        // Confirmed real, PRE-EXISTING characteristic (see case 4's own
-        // comment on this exact finding, first caught live here): only
-        // the material clock and held primary id (checked below) have
-        // their own explicit pause gate -- phase/openFraction/
-        // sourceFlareIntensity are derived from scene.time.now, which is
-        // never itself frozen by the pause overlay anywhere in this
-        // codebase, so they may legitimately keep advancing (here, over
-        // this case's own longer real pause window, often far enough to
-        // reach genuine completion) while paused. Not a regression this
-        // feature introduces or should change here (explicitly protected
-        // by review 5146800659's own "preserve existing gameplay/
-        // progression timing") -- this checks the state stays internally
-        // valid through that real continued advancement, not that it
-        // froze.
+        // Fixed at the source (see case 4's own comment on this exact
+        // defect and its fix) -- the pause-aware elapsed-time correction
+        // applies just as much to a longer pause as a short one.
         check(
-          'case 4b: the presentation stays internally valid (no corrupted/out-of-range values) through a longer paused window even when the underlying lifecycle timer has legitimately advanced',
-          typeof duringPause.openFraction === 'number' && duringPause.openFraction >= 0 && duringPause.openFraction <= 1
-            && typeof duringPause.sourceFlareIntensity === 'number' && duringPause.sourceFlareIntensity >= 0,
+          'case 4b: the real presentation is genuinely frozen identically through a longer real pause during the stored/closed interval too',
+          duringPause.phase === beforePause.phase
+            && duringPause.conduitVisible === beforePause.conduitVisible
+            && duringPause.openFraction === beforePause.openFraction
+            && duringPause.sourceFlareIntensity === beforePause.sourceFlareIntensity,
           JSON.stringify({ beforePause, duringPause })
         );
 
@@ -838,8 +828,81 @@ const main = async () => {
           deltaMs >= 0 && deltaMs <= 16 * 3,
           JSON.stringify({ duringPauseElapsed: duringPause.animationElapsed, afterResumeElapsed: afterResume.animationElapsed, deltaMs })
         );
+        check(
+          'case 4b: the real lifecycle phase does not jump on resume in the stored/closed case either',
+          afterResume.phase === duringPause.phase,
+          JSON.stringify({ duringPausePhase: duringPause.phase, afterResumePhase: afterResume.phase })
+        );
       }
       check('case 4b: no page errors across the stored-interval pause/resume sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
+      await context.close();
+    }
+
+    // ================================================================
+    // Case 4c: pause during the INITIAL ARRIVAL (no goal ever reached,
+    // no transfer ever armed) -- review 5147427468's own explicit
+    // request, distinct from cases 4/4b which both pause a REAL armed
+    // transfer. Exercises the shared pause-aware elapsed-time correction
+    // via resolveLegacyPlayerSpawnBurstState specifically.
+    // ================================================================
+    {
+      const { context, page, pageErrors, stepOnce, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+
+      // Confirmed real defect (found live this round): a tight 60-iteration
+      // stepOnce() budget assumed the initial reveal/arrival conduit shows
+      // up almost immediately. Case 7 already established the real timing
+      // is not that short and uses the same generous batched-polling
+      // budget as the completion-wait loops elsewhere in this file --
+      // matching that pattern here instead of guessing a smaller one.
+      let sawArrivalConduit = false;
+      for (let i = 0; i < COMPLETION_WAIT_MAX_BATCHES && !sawArrivalConduit; i += 1) {
+        await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
+        const visible = await page.evaluate(() => window.__MAZER_GAME__.scene.getScene('MenuScene').gameplayTransferConduitCanvasImage?.visible ?? false);
+        if (visible) { sawArrivalConduit = true; }
+      }
+      check('case 4c: the real initial-arrival conduit became visible before pausing', sawArrivalConduit, 'n/a');
+
+      if (sawArrivalConduit) {
+        const readArrivalDiag = () => page.evaluate(() => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
+          return {
+            spawnBurstActive: scene.resolveLegacyPlayerSpawnBurstState(scene.time.now).active,
+            primaryId: scene.gameplayTransferPrimaryId,
+            conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
+            openFraction: diag?.presentation.openFraction ?? null
+          };
+        });
+        const beforePause = await readArrivalDiag();
+        const pauseResult = await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
+        check('case 4c: the real openPauseOverlay QA command was accepted during initial arrival', pauseResult?.accepted === true, JSON.stringify(pauseResult));
+        await stepOnce();
+        await stepBatch(50);
+        const duringPause = await readArrivalDiag();
+        check(
+          'case 4c: the real initial-arrival presentation is genuinely frozen identically while paused',
+          duringPause.spawnBurstActive === beforePause.spawnBurstActive
+            && duringPause.conduitVisible === beforePause.conduitVisible
+            && duringPause.openFraction === beforePause.openFraction,
+          JSON.stringify({ beforePause, duringPause })
+        );
+        const resumeDispatch = await page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RESUME_RUN' }));
+        check('case 4c: the real RESUME_RUN bridge command was accepted during initial arrival', resumeDispatch?.ok === true, JSON.stringify(resumeDispatch));
+        await stepOnce();
+        const afterResume = await readArrivalDiag();
+        check(
+          'case 4c: the held primary survived a pause/resume cycle during initial arrival unchanged',
+          afterResume.primaryId === beforePause.primaryId,
+          JSON.stringify({ before: beforePause.primaryId, after: afterResume.primaryId })
+        );
+        check(
+          'case 4c: the initial-arrival presentation does not jump on the first resumed frame',
+          afterResume.spawnBurstActive === duringPause.spawnBurstActive,
+          JSON.stringify({ duringPause, afterResume })
+        );
+      }
+      check('case 4c: no page errors during the initial-arrival pause/resume sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
       await context.close();
     }
 

@@ -2196,6 +2196,51 @@ export class MenuScene extends Phaser.Scene {
     primaryPoseId: TeleportAnchorId | null;
     capturedAtMs: number;
   } | null = null;
+  // Confirmed real defect (review 5147427468, continuing 5144999445 /
+  // 5146800659): the gameplay transfer's own outbound/delivery elapsed
+  // computation (time - startedAtMs) is not itself pause-aware --
+  // scene.time.now keeps advancing in real wall-clock terms regardless
+  // of the pause overlay (this.scene.pause() is never called anywhere in
+  // this codebase), so a real pause let phase genuinely advance
+  // (confirmed live: outbound -> stored while "paused"), and a real
+  // resume could reveal a jump or even a fully completed/reset transfer
+  // the player never saw run. These two fields implement a narrowly
+  // scoped pause-aware elapsed-time correction at this exact boundary --
+  // NOT a second gameplay state machine or a second clock:
+  // resolveLegacyPlayerTransferVisualState (the one authoritative
+  // lifecycle) is untouched; only the ELAPSED-MS INPUTS this scene feeds
+  // it are compensated for real time spent paused, the same
+  // accumulate-while-unpaused/freeze-while-paused shape already
+  // established for the material animation clock
+  // (advanceLegacyGameplayTransferAnimationClock), applied here to the
+  // lifecycle's own elapsed inputs instead of a presentation-only value.
+  // Updated exactly once per frame (updateGameplayTransferPauseTracking,
+  // called alongside settleLegacyPlayerTransferEnergy, itself already
+  // unconditional every frame) and consumed by every real elapsed-ms
+  // computation this scene derives for the transfer AND the initial
+  // arrival (resolveLegacyPlayerSpawnBurstState) alike, since pause is
+  // one real, global UI state affecting both identically. Reset to zero
+  // at every genuine new session boundary (the same three sites the
+  // other sticky gameplay-transfer fields already reset at) so a pause
+  // from an unrelated, already-finished session never bleeds into a
+  // later one.
+  private gameplayTransferPausedDurationMs = 0;
+  private gameplayTransferPauseStartedAtMs: number | null = null;
+  // The most recent `time` value observed while NOT paused. Confirmed
+  // real one-frame boundary defect (ChatGPT-assisted review 5147427468):
+  // overlay flips to 'pause' synchronously (a QA/UI command, not itself a
+  // frame tick), so the first real frame where updateGameplayTransferPauseTracking
+  // observes `paused === true` already has a NEW, larger `time` than the
+  // last frame rendered while unpaused. Anchoring gameplayTransferPauseStartedAtMs
+  // at THAT frame's own `time` (the original implementation) let exactly
+  // one real frame's worth of elapsed-ms slip through unfrozen before the
+  // freeze took hold on the frame after -- pause looked "frozen" from the
+  // second paused frame onward, but the very first paused sample still
+  // differed from the last pre-pause sample. Anchoring at this field's
+  // last pre-pause value instead means the pause boundary itself
+  // contributes zero elapsed-ms, matching "frozen identically" from the
+  // first paused frame, not the second.
+  private gameplayTransferLastUnpausedTimeMs: number | null = null;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
   private overlayGuideGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -3123,12 +3168,26 @@ export class MenuScene extends Phaser.Scene {
       gameplayTransferAnimationTime,
       {
         armed: this.playerTransferEnergyArmed,
+        // Confirmed real defect (ChatGPT-assisted review 5147427468):
+        // these two elapsed-ms inputs feed the presentation module's own
+        // closure/crossfade windows (resolveExtractionClosurePresentation,
+        // and the delivering-phase travel/flash math) directly -- they
+        // are a SEPARATE read of the same startedAtMs fields already
+        // compensated for pause in resolveLegacyPlayerTransferState /
+        // resolveLegacyPlayerSpawnBurstState (see
+        // resolveGameplayTransferPausedOffsetMs). Subtracting the same
+        // paused offset here too keeps the presentation layer frozen in
+        // lockstep with the lifecycle phase/progress it derives from --
+        // without this, phase/progress correctly froze while paused but
+        // openFraction/conduitVisible/sourceFlareIntensity kept changing
+        // underneath, because this closure math kept advancing on real
+        // elapsed ms alone.
         outboundElapsedMs: this.playerTransferEnergyOutboundStartedAtMs === null
           ? null
-          : time - this.playerTransferEnergyOutboundStartedAtMs,
+          : time - this.playerTransferEnergyOutboundStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time),
         deliveryElapsedMs: this.playerTransferEnergyDeliveryStartedAtMs === null
           ? null
-          : time - this.playerTransferEnergyDeliveryStartedAtMs,
+          : time - this.playerTransferEnergyDeliveryStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time),
         deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
         deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS
       }
@@ -3177,9 +3236,12 @@ export class MenuScene extends Phaser.Scene {
       {
         armed: this.playerSpawnBurstStartedAtMs !== null,
         outboundElapsedMs: null,
+        // Same pause-offset correction as applyLegacyGameplayTransferPresentation
+        // above, for the initial-arrival clock (playerSpawnBurstStartedAtMs)
+        // instead of the armed-transfer clock -- see that method's comment.
         deliveryElapsedMs: this.playerSpawnBurstStartedAtMs === null
           ? null
-          : time - this.playerSpawnBurstStartedAtMs,
+          : time - this.playerSpawnBurstStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time),
         deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
         deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS
       }
@@ -6794,6 +6856,13 @@ export class MenuScene extends Phaser.Scene {
     // no gap -- if a transfer is armed for this deconstruct at all.
     if (this.playerTransferEnergyArmed && this.playerTransferEnergyOutboundStartedAtMs === null) {
       this.playerTransferEnergyOutboundStartedAtMs = time;
+      // Fresh session boundary for the real transfer's own pause-offset
+      // accumulator (see gameplayTransferPausedDurationMs's own field
+      // comment) -- a pause from some earlier, already-finished session
+      // must never bleed into this new one.
+      this.gameplayTransferPausedDurationMs = 0;
+      this.gameplayTransferPauseStartedAtMs = null;
+      this.gameplayTransferLastUnpausedTimeMs = null;
     }
     this.menuStaticDeconstructZeroHoldStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
@@ -7014,6 +7083,14 @@ export class MenuScene extends Phaser.Scene {
       this.gameplayTransferLastPrimaryPose = null;
       this.gameplayTransferLastObservedOverlay = 'none';
       this.gameplayTransferLastPresentationSnapshot = null;
+      // Fresh session boundary for the initial arrival's own pause-offset
+      // accumulator too (see gameplayTransferPausedDurationMs's own field
+      // comment). A real transfer's own outbound-arm site resets this
+      // same pair for its own case; this covers the pure-arrival case
+      // (no transfer armed) this branch is specifically guarded to.
+      this.gameplayTransferPausedDurationMs = 0;
+      this.gameplayTransferPauseStartedAtMs = null;
+      this.gameplayTransferLastUnpausedTimeMs = null;
     }
     const alignedStartedAtMs = time - Math.max(
       0,
@@ -9504,26 +9581,67 @@ export class MenuScene extends Phaser.Scene {
     this.gameplayTransferLastPrimaryPose = null;
     this.gameplayTransferLastObservedOverlay = 'none';
     this.gameplayTransferLastPresentationSnapshot = null;
+    this.gameplayTransferPausedDurationMs = 0;
+    this.gameplayTransferPauseStartedAtMs = null;
+    this.gameplayTransferLastUnpausedTimeMs = null;
     this.gameplayTransferConduitCanvasImage?.setVisible(false);
   }
 
+  // Updates the shared pause-tracking accumulator exactly once per real
+  // frame -- called from the same place settleLegacyPlayerTransferEnergy
+  // already runs unconditionally every frame, so this is guaranteed
+  // single-fire regardless of how many places read the resulting offset
+  // afterward this same frame. See gameplayTransferPausedDurationMs's own
+  // field comment for the real defect this fixes.
+  private updateGameplayTransferPauseTracking(time: number): void {
+    const paused = this.overlay === 'pause';
+    if (paused && this.gameplayTransferPauseStartedAtMs === null) {
+      // Anchor at the last real pre-pause time, not this frame's own
+      // `time` -- see gameplayTransferLastUnpausedTimeMs's own field
+      // comment for the one-frame boundary defect this avoids. Falls
+      // back to `time` only if somehow no prior unpaused frame was ever
+      // observed (cannot happen in practice: this tracker itself always
+      // records an unpaused time before any pause can begin).
+      this.gameplayTransferPauseStartedAtMs = this.gameplayTransferLastUnpausedTimeMs ?? time;
+    } else if (!paused && this.gameplayTransferPauseStartedAtMs !== null) {
+      this.gameplayTransferPausedDurationMs += time - this.gameplayTransferPauseStartedAtMs;
+      this.gameplayTransferPauseStartedAtMs = null;
+    }
+    if (!paused) {
+      this.gameplayTransferLastUnpausedTimeMs = time;
+    }
+  }
+
+  // Real ms of wall-clock time this transfer/arrival session has spent
+  // paused so far, INCLUDING any pause still ongoing right now -- the
+  // amount every real elapsed-ms input this scene derives for the
+  // transfer and the initial arrival subtracts, so a paused interval
+  // costs the lifecycle nothing and resuming continues exactly where it
+  // left off rather than jumping ahead or racing to catch up.
+  private resolveGameplayTransferPausedOffsetMs(time: number): number {
+    return this.gameplayTransferPausedDurationMs
+      + (this.gameplayTransferPauseStartedAtMs !== null ? time - this.gameplayTransferPauseStartedAtMs : 0);
+  }
+
   private resolveLegacyPlayerTransferState(time: number): LegacyPlayerTransferVisualState {
+    const pausedOffsetMs = this.resolveGameplayTransferPausedOffsetMs(time);
     return resolveLegacyPlayerTransferVisualState({
       armed: this.playerTransferEnergyArmed,
       deliveryElapsedMs: this.playerTransferEnergyDeliveryStartedAtMs === null
         ? null
-        : time - this.playerTransferEnergyDeliveryStartedAtMs,
+        : time - this.playerTransferEnergyDeliveryStartedAtMs - pausedOffsetMs,
       deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
       deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS,
       nowMs: time,
       outboundElapsedMs: this.playerTransferEnergyOutboundStartedAtMs === null
         ? null
-        : time - this.playerTransferEnergyOutboundStartedAtMs,
+        : time - this.playerTransferEnergyOutboundStartedAtMs - pausedOffsetMs,
       reducedMotion: this.prefersLegacyReducedMotion()
     });
   }
 
   private settleLegacyPlayerTransferEnergy(time: number): void {
+    this.updateGameplayTransferPauseTracking(time);
     if (this.resolveLegacyPlayerTransferState(time).phase === 'complete') {
       this.resetLegacyPlayerTransferEnergy();
     }
@@ -10480,7 +10598,14 @@ export class MenuScene extends Phaser.Scene {
       return { active: false, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
     }
 
-    const elapsedMs = time - this.playerSpawnBurstStartedAtMs;
+    // Same pause-aware correction resolveLegacyPlayerTransferState applies
+    // (see gameplayTransferPausedDurationMs's own field comment) -- safe
+    // to apply unconditionally here too: the pause overlay can only ever
+    // be opened from real Play mode (handleLegacyQaOpenPauseOverlay's own
+    // 'not-play-mode' guard), so this offset is always exactly 0 for
+    // Menu mode's own ambient choreography, which this same resolver also
+    // serves.
+    const elapsedMs = time - this.playerSpawnBurstStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time);
     const totalMs = LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS + LEGACY_PLAYER_SPAWN_FLASH_MS;
     if (elapsedMs < 0 || elapsedMs >= totalMs) {
       return { active: false, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
