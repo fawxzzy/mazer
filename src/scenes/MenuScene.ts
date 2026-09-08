@@ -49,6 +49,11 @@ import {
   type TeleportAnchorRejection,
   type TeleportAnchorSelectionOutcome
 } from '../render/teleportPrimaryAnchor';
+import { resolveTeleportTransferPresentation, type TeleportTransferPresentation } from '../render/teleportTransferPresentation';
+import {
+  computeTeleportTransferConduitCanvasBounds,
+  drawTeleportTransferConduitToCanvasContext
+} from '../render/teleportTransferConduitCanvas';
 import {
   collectDemoWalkerRouteDiagnostics,
   type DemoRunnerTelemetry,
@@ -1553,6 +1558,19 @@ const TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX = 32;
 // keeps the full footprint within the viewport at every possible
 // target-facing angle, not just the axis-aligned ones.
 const TELEPORT_ANCHOR_PREVIEW_VIEWPORT_INSET_PX = (TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX * Math.SQRT2) / 2;
+
+// Real gameplay transfer conduit tuning (Wave 4D-B, single held primary --
+// see teleportTransferPresentation.ts / teleportTransferConduitCanvas.ts).
+// Values are a deliberately modest first pass matched to the shell's own
+// TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX (32px): thin core, a wider
+// soft glow pass, a compact packet, and a target flare sized similarly to
+// the existing goal halo's own radius so it reads as "one cell of
+// contained energy" rather than dwarfing the tile it lands on.
+const TELEPORT_TRANSFER_CONDUIT_CORE_WIDTH_PX = 3;
+const TELEPORT_TRANSFER_CONDUIT_GLOW_WIDTH_PX = 10;
+const TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX = 8;
+const TELEPORT_TRANSFER_PACKET_RADIUS_PX = 4;
+const TELEPORT_TRANSFER_TARGET_FLARE_RADIUS_PX = 22;
 // Native pixel size of the teleport-beam source art (see
 // docs/assets/mazer-vfx-source-provenance.md) -- a horizontal strip, a
 // diamond emitter/receiver cap baked into each end, with the full rainbow
@@ -2069,6 +2087,37 @@ export class MenuScene extends Phaser.Scene {
   private goalHaloCanvasWidth = 0;
   private goalHaloCanvasHeight = 0;
   private goalHaloCanvasResolution = 0;
+  // Same real-2D-canvas pattern as goalHaloCanvasImage above, for the real
+  // single-primary gameplay Teleport transfer conduit (Wave 4D-B --
+  // teleportTransferConduitCanvas.ts). Added directly to the scene, NOT
+  // to boardZoomContainer: its two endpoints (the held primary's real
+  // measured beam port, and the real goal/start target) are both already
+  // in the same scene/world space drawLegacyPlayerTransferEnergy's own
+  // playerSpawnBurstGraphics uses for the menu/title eight-origin volley
+  // -- confirmed by reading that function's own targetX/targetY
+  // computation, which multiplies board-local coordinates through
+  // boardZoomContainer's transform explicitly rather than relying on
+  // container-child positioning. No pointToContainer conversion needed
+  // here; the SHELL image (titleOrbitDiamondImages) is the one still
+  // positioned via that conversion, exactly as the QA preview already
+  // does (applyLegacyTeleportAnchorPreviewOverride).
+  private gameplayTransferConduitCanvasTextureKey: string | null = null;
+  private gameplayTransferConduitCanvasTexture: Phaser.Textures.CanvasTexture | null = null;
+  private gameplayTransferConduitCanvasImage: Phaser.GameObjects.Image | null = null;
+  private gameplayTransferConduitCanvasWidth = 0;
+  private gameplayTransferConduitCanvasHeight = 0;
+  private gameplayTransferConduitCanvasResolution = 0;
+  // The real single held primary for the actual (not QA-preview) gameplay
+  // transfer -- an entirely separate session from teleportAnchorPreviewSession
+  // ("the QA preview is not gameplay session ownership"). Selected at the
+  // real goal-reached instant (see the play-mode call site right after
+  // armLegacyPlayerTransferEnergy), retained through outbound/stored/
+  // delivering via the real selector's own retention rule (passed as
+  // heldAnchorId on every call), and cleared only when
+  // resetLegacyPlayerTransferEnergy runs -- so a genuinely new transfer
+  // always starts fresh, matching the frozen contract's "same primary
+  // persists through outbound -> stored -> delivering" requirement.
+  private gameplayTransferPrimaryId: TeleportAnchorId | null = null;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
   private overlayGuideGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -2413,6 +2462,13 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics = this.add.graphics();
     this.touchSettingsCogIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.playerSpawnBurstGraphics = this.add.graphics();
+    // Real single-primary gameplay transfer conduit (Wave 4D-B). Same
+    // top-level (non-boardZoomContainer) coordinate space
+    // playerSpawnBurstGraphics itself draws in -- see this field's own
+    // comment above.
+    this.gameplayTransferConduitCanvasTextureKey = `legacy-teleport-transfer-conduit-${nextMenuSceneInstanceId()}`;
+    this.gameplayTransferConduitCanvasTexture = this.textures.createCanvas(this.gameplayTransferConduitCanvasTextureKey, 1, 1);
+    this.gameplayTransferConduitCanvasImage = this.add.image(0, 0, this.gameplayTransferConduitCanvasTextureKey).setOrigin(0, 0).setVisible(false);
     // Same top-level (non-boardZoomContainer) coordinate space
     // playerSpawnBurstGraphics itself already draws the beam origins/target
     // in -- see drawLegacyPlayerTransferEnergyBeam.
@@ -2562,6 +2618,12 @@ export class MenuScene extends Phaser.Scene {
       this.goalHaloCanvasTexture = null;
       this.goalHaloCanvasImage = null;
       this.goalHaloCanvasTextureKey = null;
+      if (this.gameplayTransferConduitCanvasTextureKey !== null && this.textures.exists(this.gameplayTransferConduitCanvasTextureKey)) {
+        this.textures.remove(this.gameplayTransferConduitCanvasTextureKey);
+      }
+      this.gameplayTransferConduitCanvasTexture = null;
+      this.gameplayTransferConduitCanvasImage = null;
+      this.gameplayTransferConduitCanvasTextureKey = null;
       if (this.remoteSettingsSyncTimer !== null) {
         clearTimeout(this.remoteSettingsSyncTimer);
         this.remoteSettingsSyncTimer = null;
@@ -2915,6 +2977,154 @@ export class MenuScene extends Phaser.Scene {
       footprint: candidate.pose.footprint
     }]));
     return { result, poseById };
+  }
+
+  // Real single-primary gameplay transfer (Wave 4D-B) -- an entirely
+  // separate session from the QA preview above ("the QA preview is not
+  // gameplay session ownership"). Called from drawDynamicBoard, which is
+  // guaranteed to run every frame a transfer is active regardless of mode
+  // or reduced motion (see the update() loop's own
+  // `resolveLegacyPlayerTransferState(time).active` -> boardDynamicDirty
+  // re-arm), so this needs no separate dirty-flag/presentation-update
+  // plumbing of its own the way the QA preview did.
+  //
+  // Reuses resolveLegacyTeleportAnchorPreviewResult (real viewport, real
+  // HUD/safe-area/play-control exclusions, the real selector) rather than
+  // re-deriving candidate resolution -- the same real geometry PR #347
+  // already established and reviewed, just fed a real gameplay target/
+  // held-id instead of the QA session's.
+  //
+  // targetX/targetY (scene/world space, already computed by the caller
+  // exactly as drawLegacyPlayerTransferEnergy's own call site does) serve
+  // as BOTH the selector's own `target` (nearest-eligible-anchor
+  // candidate, only consulted on a genuinely new selection) and, passed
+  // through to the presentation module as both extractionTarget and
+  // deliveryTarget: teleportTransferPresentation.ts only ever reads
+  // whichever one is relevant to the CURRENT phase, and targetX/targetY
+  // already resolves to the correct point for that phase (the goal during
+  // 'outbound'/'stored', the real next-start point during 'delivering') --
+  // exactly mirroring drawLegacyPlayerTransferEnergy's own single-targetX/Y
+  // reuse for its two direction cases.
+  private applyLegacyGameplayTransferPresentation(
+    targetX: number,
+    targetY: number,
+    time: number
+  ): void {
+    const target = { x: targetX, y: targetY };
+    const { result, poseById } = this.resolveLegacyTeleportAnchorPreviewResult(target, this.gameplayTransferPrimaryId);
+    this.gameplayTransferPrimaryId = result.selectedId;
+    const poseFields = result.selectedId === null ? null : (poseById.get(result.selectedId) ?? null);
+
+    // Position/rotate/scale the SELECTED IDENTITY's own real shell slot --
+    // same coordinate-space conversion as applyLegacyTeleportAnchorPreviewOverride
+    // (Container.pointToContainer for position; rotation minus the
+    // container's own, correct under identity rotation + any uniform
+    // parent scale; local scale divided by the container's own scale so
+    // world size -- and so the real port -- stays correct regardless of
+    // that scale). An 'unavailable'/'invalid-input' outcome (poseFields
+    // null) deliberately leaves every slot exactly as the ambient draw
+    // already left it -- never a fabricated placement.
+    if (result.selectedId !== null && poseFields !== null) {
+      const image = this.titleOrbitDiamondImages[result.selectedId];
+      if (image) {
+        const local = this.boardZoomContainer.pointToContainer({ x: poseFields.anchorX, y: poseFields.anchorY });
+        const localRotation = poseFields.rotation - this.boardZoomContainer.rotation;
+        const worldScale = TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX / MAZER_VFX_DIAMOND_SOURCE_SIZE;
+        const localScale = worldScale / this.boardZoomContainer.scaleX;
+        image.setPosition(local.x, local.y).setRotation(localRotation).setScale(localScale).setAlpha(1).setVisible(true);
+      }
+    }
+
+    const primaryPose = poseFields === null || result.selectedId === null ? null : {
+      id: result.selectedId,
+      anchorX: poseFields.anchorX,
+      anchorY: poseFields.anchorY,
+      rotation: poseFields.rotation,
+      portX: poseFields.portX,
+      portY: poseFields.portY,
+      footprint: poseFields.footprint
+    };
+
+    const presentation = resolveTeleportTransferPresentation({
+      armed: this.playerTransferEnergyArmed,
+      outboundElapsedMs: this.playerTransferEnergyOutboundStartedAtMs === null
+        ? null
+        : time - this.playerTransferEnergyOutboundStartedAtMs,
+      deliveryElapsedMs: this.playerTransferEnergyDeliveryStartedAtMs === null
+        ? null
+        : time - this.playerTransferEnergyDeliveryStartedAtMs,
+      deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
+      deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS,
+      nowMs: time,
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      primaryPose,
+      extractionTarget: target,
+      deliveryTarget: target
+    });
+    this.drawGameplayTransferConduitCanvas(presentation, time);
+  }
+
+  // Real 2D-canvas draw for the gameplay conduit -- same DPR/zoom-aware
+  // backing-resolution pattern drawGoalHaloCanvas/drawPlayerGlowCanvas
+  // already use (see either's own comment): a canvas gradient/path's own
+  // coordinates ARE scaled correctly by ctx.setTransform, but
+  // shadowBlur is a raw device-pixel radius the transform does NOT
+  // scale, so only conduitGlowBlurPx is multiplied by `resolution`
+  // explicitly here, matching this file's own established correction.
+  private drawGameplayTransferConduitCanvas(presentation: TeleportTransferPresentation, time: number): void {
+    if (!this.gameplayTransferConduitCanvasTexture || !this.gameplayTransferConduitCanvasImage) {
+      return;
+    }
+    if (presentation.openFraction <= 0 || presentation.sourcePoint === null || presentation.targetPoint === null) {
+      this.gameplayTransferConduitCanvasImage.setVisible(false);
+      return;
+    }
+
+    const padding = Math.ceil(TELEPORT_TRANSFER_TARGET_FLARE_RADIUS_PX + (TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX * 2.5));
+    const bounds = computeTeleportTransferConduitCanvasBounds(presentation.sourcePoint, presentation.targetPoint, padding);
+    const width = Math.max(1, Math.ceil(bounds.width));
+    const height = Math.max(1, Math.ceil(bounds.height));
+    const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
+    const resolution = Math.min(
+      MAZER_CANVAS_RESOLUTION_MAX * 2,
+      resolveMazerCanvasResolution() * zoomScale
+    );
+    const backingWidth = Math.max(1, Math.ceil(width * resolution));
+    const backingHeight = Math.max(1, Math.ceil(height * resolution));
+    if (
+      backingWidth !== this.gameplayTransferConduitCanvasWidth
+      || backingHeight !== this.gameplayTransferConduitCanvasHeight
+      || resolution !== this.gameplayTransferConduitCanvasResolution
+    ) {
+      this.gameplayTransferConduitCanvasTexture.setSize(backingWidth, backingHeight);
+      this.gameplayTransferConduitCanvasWidth = backingWidth;
+      this.gameplayTransferConduitCanvasHeight = backingHeight;
+      this.gameplayTransferConduitCanvasResolution = resolution;
+    } else {
+      this.gameplayTransferConduitCanvasTexture.clear(0, 0, backingWidth, backingHeight, false);
+    }
+    this.gameplayTransferConduitCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
+    const energyColor = resolveLegacyIridescentMidnightColor(time / LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS);
+    drawTeleportTransferConduitToCanvasContext(this.gameplayTransferConduitCanvasTexture.context, {
+      originX: bounds.left,
+      originY: bounds.top,
+      sourcePoint: presentation.sourcePoint,
+      targetPoint: presentation.targetPoint,
+      packetPoint: presentation.packetPoint,
+      packetVisible: presentation.packetVisible,
+      openFraction: presentation.openFraction,
+      targetFlareIntensity: presentation.targetFlareIntensity,
+      energyColor,
+      conduitCoreWidth: TELEPORT_TRANSFER_CONDUIT_CORE_WIDTH_PX,
+      conduitGlowWidth: TELEPORT_TRANSFER_CONDUIT_GLOW_WIDTH_PX,
+      conduitGlowBlurPx: TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX * resolution,
+      packetRadius: TELEPORT_TRANSFER_PACKET_RADIUS_PX,
+      targetFlareRadius: TELEPORT_TRANSFER_TARGET_FLARE_RADIUS_PX
+    });
+    this.gameplayTransferConduitCanvasTexture.refresh();
+    this.gameplayTransferConduitCanvasImage.setPosition(bounds.left, bounds.top);
+    this.gameplayTransferConduitCanvasImage.setDisplaySize(width, height);
+    this.gameplayTransferConduitCanvasImage.setVisible(true);
   }
 
   // Reviewer-caught defect fixed: begin/update used to only mutate session
@@ -8909,6 +9119,13 @@ export class MenuScene extends Phaser.Scene {
     this.playerTransferEnergyArmed = false;
     this.playerTransferEnergyOutboundStartedAtMs = null;
     this.playerTransferEnergyDeliveryStartedAtMs = null;
+    // "Completion/reset clears the session" -- a genuinely new transfer
+    // always starts fresh (Playbook: a stable transfer identity outlives
+    // changes to target pose, but not a full reset). This is the ONLY
+    // place gameplayTransferPrimaryId is cleared; it is retained across
+    // outbound/stored/delivering by every other call site.
+    this.gameplayTransferPrimaryId = null;
+    this.gameplayTransferConduitCanvasImage?.setVisible(false);
   }
 
   private resolveLegacyPlayerTransferState(time: number): LegacyPlayerTransferVisualState {
@@ -9368,7 +9585,17 @@ export class MenuScene extends Phaser.Scene {
       const boardRelativeY = mazeTop + ((transferPoint.y + 0.5) * mazeTileSize);
       const targetX = this.boardZoomContainer.x + (boardRelativeX * this.boardZoomContainer.scaleX);
       const targetY = this.boardZoomContainer.y + (boardRelativeY * this.boardZoomContainer.scaleY);
-      this.drawLegacyPlayerTransferEnergy(targetX, targetY, playerTransferEnergy, time);
+      // Real gameplay (Wave 4D-B): one held primary and one continuous
+      // conduit, replacing the ambient eight-origin volley -- reserved for
+      // menu/title choreography per the frozen contract, so 'menu' keeps
+      // the original call unchanged.
+      if (this.mode === 'play') {
+        this.applyLegacyGameplayTransferPresentation(targetX, targetY, time);
+      } else {
+        this.drawLegacyPlayerTransferEnergy(targetX, targetY, playerTransferEnergy, time);
+      }
+    } else if (this.mode === 'play') {
+      this.gameplayTransferConduitCanvasImage?.setVisible(false);
     }
 
     if (playerSpawnBurst.active && this.isLegacyMenuPointVisibleInStaticDraw(this.player)) {
