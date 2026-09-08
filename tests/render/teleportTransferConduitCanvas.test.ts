@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildTeleportTransferConduitSegments,
   computeTeleportTransferConduitCanvasBounds,
   drawTeleportTransferConduitToCanvasContext,
   type TeleportTransferConduitDrawOptions
@@ -240,6 +241,91 @@ describe('drawTeleportTransferConduitToCanvasContext: real spatial color variati
     const hasBlue = varyingColor.strokeStyleHistory.some((s) => typeof s === 'string' && s.includes('0,0,255'));
     expect(hasRed).toBe(true);
     expect(hasBlue).toBe(true);
+  });
+});
+
+describe('buildTeleportTransferConduitSegments: stable chunk boundaries as the conduit grows (real defect fixed after review 5142904159)', () => {
+  // A confirmed real bug: the original implementation divided the whole
+  // conduit into `ceil(totalLength / SPACING)` EQUAL pieces, so every
+  // chunk's own boundary -- and so its own sampled color -- shifted on
+  // every frame the conduit's length changed, including chunks well
+  // behind the growing tip that had already been drawn and should stay
+  // visually stable. These tests hold a fixed origin and query at a
+  // fixed, already-covered ABSOLUTE distance from it across a growth
+  // step that changes the total chunk count, and require that fixed
+  // distance's own sampled color to be identical either way.
+  const start = { x: 0, y: 0 };
+  const colorAtDistance = (d: number): number => Math.round(d) * 7; // any pure, deterministic function of distance
+
+  // Floating-point tolerance, not a visual one: computing the same
+  // nominal chunk-end distance (e.g. exactly 14px) through `t =
+  // chunkEndDistance / totalLength` for two DIFFERENT totalLength values
+  // can differ by ~1e-15 due to ordinary floating-point rounding --
+  // imperceptible on screen, but not exactly `===`. These tests assert
+  // real chunk-boundary STABILITY (the thing that actually matters
+  // visually), not bit-exact floats.
+  const pointsClose = (a: { x: number; y: number }, b: { x: number; y: number }): boolean => (
+    Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6
+  );
+  const segmentsClose = (
+    a: { previous: { x: number; y: number }; current: { x: number; y: number }; glowColor: number; coreColor: number; alpha: number },
+    b: { previous: { x: number; y: number }; current: { x: number; y: number }; glowColor: number; coreColor: number; alpha: number }
+  ): boolean => (
+    pointsClose(a.previous, b.previous)
+    && pointsClose(a.current, b.current)
+    && a.glowColor === b.glowColor
+    && a.coreColor === b.coreColor
+    && a.alpha === b.alpha
+  );
+
+  it('an already-covered interior distance samples the SAME color before and after growth changes the total chunk count', () => {
+    // SPACING is 14px. A length of 70px = exactly 5 chunks; growing to
+    // 71px changes the chunk count's own rounding (ceil(71/14) = 6) --
+    // exactly the kind of step that reshuffled every chunk boundary in
+    // the original equal-division implementation.
+    const shorter = buildTeleportTransferConduitSegments(start, { x: 70, y: 0 }, 1, colorAtDistance);
+    const longer = buildTeleportTransferConduitSegments(start, { x: 71, y: 0 }, 1, colorAtDistance);
+
+    // The first chunk (covering absolute distance [0, 14)) must be
+    // stable in both -- same endpoints (within floating-point
+    // tolerance), same color -- since growth only ever extends the FAR
+    // end, never the near one.
+    expect(pointsClose(longer[0]!.previous, shorter[0]!.previous)).toBe(true);
+    expect(pointsClose(longer[0]!.current, shorter[0]!.current)).toBe(true);
+    expect(longer[0]!.glowColor).toBe(shorter[0]!.glowColor);
+  });
+
+  it('every FULLY-COVERED early chunk (not just the first) stays pixel-stable across a growth step that adds a new chunk', () => {
+    const shorter = buildTeleportTransferConduitSegments(start, { x: 70, y: 0 }, 1, colorAtDistance);
+    const longer = buildTeleportTransferConduitSegments(start, { x: 71, y: 0 }, 1, colorAtDistance);
+    // All 5 of the shorter run's chunks are still fully covered by the
+    // longer run (0-70 is a strict prefix of 0-71) -- every one of them
+    // must match; only the longer run's own extra 6th (partial) chunk is
+    // new.
+    expect(shorter.length).toBe(5);
+    expect(longer.length).toBe(6);
+    for (let i = 0; i < shorter.length; i += 1) {
+      expect(segmentsClose(longer[i]!, shorter[i]!)).toBe(true);
+    }
+  });
+
+  it('growth only ever APPENDS new chunks -- it never changes how many chunks already existed for a shorter length', () => {
+    // Simulates several successive real growth steps (as outboundProgress
+    // rises) and confirms each new step's segments are a strict
+    // prefix-preserving extension of the previous step's, never a full
+    // reshuffle.
+    let previousSegments = buildTeleportTransferConduitSegments(start, { x: 10, y: 0 }, 1, colorAtDistance);
+    for (const length of [24, 38, 52, 66, 80, 94, 100]) {
+      const nextSegments = buildTeleportTransferConduitSegments(start, { x: length, y: 0 }, 1, colorAtDistance);
+      expect(nextSegments.length).toBeGreaterThanOrEqual(previousSegments.length);
+      for (let i = 0; i < previousSegments.length - 1; i += 1) {
+        // Every chunk except possibly the last of the previous step
+        // (which may have been the partial/growing tip and can now be
+        // fully covered) must still be stable.
+        expect(segmentsClose(nextSegments[i]!, previousSegments[i]!)).toBe(true);
+      }
+      previousSegments = nextSegments;
+    }
   });
 });
 

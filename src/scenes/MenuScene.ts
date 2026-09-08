@@ -3036,6 +3036,22 @@ export class MenuScene extends Phaser.Scene {
     targetCellSizePx: number,
     time: number
   ): void {
+    // Confirmed real defect (review 5142904159): this clock used to be
+    // advanced from inside drawGameplayTransferConduitCanvas, AFTER that
+    // method's own closed-state early returns -- so on any frame the
+    // conduit was genuinely closed (openFraction <= 0, e.g. settled
+    // 'stored'), the clock was never called at all, leaving
+    // gameplayTransferAnimationLastRealMs stale rather than reset. The
+    // instant the conduit reopened (e.g. delivery begins), the next call
+    // would add the ENTIRE elapsed real-time gap since it was last
+    // called as one lump sum -- a real, visible color jump, not merely a
+    // freeze. Called here instead, unconditionally, every single frame
+    // this method runs (which itself only runs while a real transfer is
+    // armed) -- the clock's own isActivePlayVisible gate (mode/overlay/
+    // armed, not conduit visibility) is what decides whether it
+    // advances or freezes; it no longer depends on the conduit's own
+    // open/closed state at all.
+    const gameplayTransferAnimationTime = this.advanceLegacyGameplayTransferAnimationClock(time);
     const target = { x: targetX, y: targetY };
     const { result, poseById } = this.resolveLegacyTeleportAnchorPreviewResult(target, this.gameplayTransferPrimaryId);
     // Sticky held identity: only overwrite when the selector actually
@@ -3109,7 +3125,7 @@ export class MenuScene extends Phaser.Scene {
         image.setPosition(local.x, local.y).setRotation(localRotation).setScale(localScale).setAlpha(shellAlpha).setVisible(true);
       }
     }
-    this.drawGameplayTransferConduitCanvas(presentation, targetCellSizePx, time);
+    this.drawGameplayTransferConduitCanvas(presentation, targetCellSizePx, gameplayTransferAnimationTime);
   }
 
   // Real 2D-canvas draw for the gameplay conduit -- same DPR/zoom-aware
@@ -3144,7 +3160,7 @@ export class MenuScene extends Phaser.Scene {
   private drawGameplayTransferConduitCanvas(
     presentation: TeleportTransferPresentation,
     targetCellSizePx: number,
-    time: number
+    gameplayTransferAnimationTime: number
   ): void {
     if (!this.gameplayTransferConduitCanvasTexture || !this.gameplayTransferConduitCanvasImage) {
       return;
@@ -3226,9 +3242,10 @@ export class MenuScene extends Phaser.Scene {
     // approximation of it -- sampled at a REAL distance along the
     // conduit (varying spatially, not one flat color per frame) and at
     // this transfer's own pausable animation time (frozen under reduced
-    // motion, Pause, or any overlay -- see
-    // advanceLegacyGameplayTransferAnimationClock's own comment).
-    const gameplayTransferAnimationTime = this.advanceLegacyGameplayTransferAnimationClock(time);
+    // motion, Pause, or any overlay). gameplayTransferAnimationTime is
+    // computed by the CALLER, unconditionally, every frame -- see
+    // applyLegacyGameplayTransferPresentation's own comment on why this
+    // must not be computed only when the conduit happens to be open.
     const conduitColorOptions = {
       distancePeriodPx: Math.max(1, targetCellSizePx / containerScale) * LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE,
       timePeriodMs: LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS

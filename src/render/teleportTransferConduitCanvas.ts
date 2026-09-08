@@ -128,6 +128,20 @@ const distanceBetween = (a: TeleportTransferPoint, b: TeleportTransferPoint): nu
  * boundary so the stroke shows genuine spatial color variation instead
  * of one flat color -- exported so the sampling itself is directly
  * unit-testable without a canvas.
+ *
+ * Chunk boundaries are FIXED, absolute distances from `start`
+ * (0, SPACING, 2*SPACING, ...), not `totalLength` divided into N equal
+ * pieces. Confirmed real defect (review 5142904159): dividing into
+ * `ceil(totalLength / SPACING)` EQUAL pieces means every chunk's own
+ * boundary -- and so its own sampled distance -- shifts on every frame
+ * the conduit's length changes (i.e. every frame it is actively
+ * growing), including chunks well behind the growing tip that have
+ * already been drawn and should stay visually stable. Fixed-size
+ * chunking from a fixed origin means every FULLY-COVERED early chunk's
+ * own boundaries and sample point are identical from one frame to the
+ * next regardless of how much the conduit has grown since -- only the
+ * newest (partial) chunk at the growing tip changes size and re-samples,
+ * which is the only region actually supposed to be visibly changing.
  */
 export const buildTeleportTransferConduitSegments = (
   start: TeleportTransferPoint,
@@ -139,21 +153,23 @@ export const buildTeleportTransferConduitSegments = (
   if (totalLength <= 0 || alpha <= 0) {
     return [];
   }
-  const steps = Math.max(1, Math.ceil(totalLength / CONDUIT_COLOR_SAMPLE_SPACING_PX));
   const segments: TrailCanvasSegment[] = [];
   let previous = start;
-  for (let step = 1; step <= steps; step += 1) {
-    const t = step / steps;
+  let coveredDistance = 0;
+  while (coveredDistance < totalLength) {
+    const chunkEndDistance = Math.min(coveredDistance + CONDUIT_COLOR_SAMPLE_SPACING_PX, totalLength);
+    const t = chunkEndDistance / totalLength;
     const current = {
       x: start.x + ((end.x - start.x) * t),
       y: start.y + ((end.y - start.y) * t)
     };
-    // Sample at the sub-segment's midpoint distance -- a representative
-    // color for that stretch, not just its trailing edge.
-    const sampleDistance = totalLength * (t - (0.5 / steps));
+    // Sample at this chunk's own midpoint distance -- a representative
+    // color for that fixed stretch, not just its trailing edge.
+    const sampleDistance = (coveredDistance + chunkEndDistance) / 2;
     const color = energyColorAtDistance(sampleDistance);
     segments.push({ previous, current, glowColor: color, coreColor: color, alpha });
     previous = current;
+    coveredDistance = chunkEndDistance;
   }
   return segments;
 };
