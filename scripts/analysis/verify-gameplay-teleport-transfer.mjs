@@ -119,6 +119,44 @@ const pathToMoveSequence = (path) => {
   return moves;
 };
 
+/**
+ * The coupled Play-mode maze reveal/deconstruct lifecycle state -- what a
+ * pause must hold still ALONGSIDE the transfer's own frozen clocks
+ * (ChatGPT-assisted review 5173052153: the submitted pause recording
+ * showed corridor tiles disappearing while the pause menu stayed open).
+ * `revealedTileCount` is the actually-visible walkable-tile count, the
+ * exact thing that visibly changed between the reviewer's two paused
+ * frames.
+ */
+const readBoardProgress = (page) => page.evaluate(() => {
+  const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+  let revealed = 0;
+  for (let y = 0; y < scene.maze.height; y += 1) {
+    for (let x = 0; x < scene.maze.width; x += 1) {
+      if (scene.maze.grid[y][x] && scene.isLegacyMenuPointVisibleInStaticDraw({ x, y })) { revealed += 1; }
+    }
+  }
+  return {
+    drawPhase: scene.menuStaticDrawLifecyclePhase,
+    rowsVisible: scene.menuStaticDrawRowsVisible,
+    tilesVisible: scene.menuStaticDrawTilesVisible,
+    revealedTileCount: revealed,
+    mazeStartKey: `${scene.maze.start.x},${scene.maze.start.y}`,
+    generationPending: scene.pendingGenerationRequest !== null,
+    resetPending: scene.pendingResetRequest !== null
+  };
+});
+
+const boardProgressFrozen = (a, b) => (
+  a.drawPhase === b.drawPhase
+  && a.rowsVisible === b.rowsVisible
+  && a.tilesVisible === b.tilesVisible
+  && a.revealedTileCount === b.revealedTileCount
+  && a.mazeStartKey === b.mazeStartKey
+  && a.generationPending === b.generationPending
+  && a.resetPending === b.resetPending
+);
+
 /** Calls the REAL production wrap-aware solver via the QA surface and converts its path into real move_* commands. Returns null if no path was found or a step couldn't be converted. */
 const solveMazeToMoveSequence = async (page) => {
   const result = await page.evaluate(() => window.__MAZER_QA__.resolveShortestPathToGoal());
@@ -673,6 +711,7 @@ const main = async () => {
         await stepN(28); // real primary held, conduit genuinely open
 
         const beforePause = await readPauseDiagnostics();
+        const boardBeforePause = await readBoardProgress(page);
         const pauseResult = await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
         check('case 4: the real openPauseOverlay QA command was accepted', pauseResult?.accepted === true, JSON.stringify(pauseResult));
 
@@ -684,7 +723,13 @@ const main = async () => {
         const primaryIdJustAfterPauseOpen = await page.evaluate(() => window.__MAZER_GAME__.scene.getScene('MenuScene').gameplayTransferPrimaryId);
         await stepN(50);
         const duringPause = await readPauseDiagnostics();
+        const boardDuringPause = await readBoardProgress(page);
         check('case 4: pause overlay genuinely opened', duringPause.overlay === 'pause', JSON.stringify(duringPause));
+        check(
+          'case 4: the coupled maze reveal/deconstruct lifecycle is genuinely frozen while paused (draw phase, row/tile counters, visible-tile count, pending generation/reset -- the corridor does not keep disappearing behind the pause menu)',
+          boardProgressFrozen(boardBeforePause, boardDuringPause),
+          JSON.stringify({ boardBeforePause, boardDuringPause })
+        );
         check(
           'case 4: the material animation clock genuinely freezes while paused (does not keep advancing)',
           duringPause.animationElapsed === beforePause.animationElapsed,
@@ -722,7 +767,16 @@ const main = async () => {
         // paused interval.
         await stepOnce();
         const afterResume = await readPauseDiagnostics();
+        const boardAfterResume = await readBoardProgress(page);
         check('case 4: pause overlay genuinely closed again after RESUME_RUN', afterResume.overlay === 'none', JSON.stringify(afterResume));
+        check(
+          'case 4: the maze reveal/deconstruct lifecycle does not race ahead on the first resumed frame (no next-maze handoff or completion jumped forward behind the frozen effect)',
+          boardAfterResume.drawPhase === boardDuringPause.drawPhase
+            && Math.abs(boardAfterResume.revealedTileCount - boardDuringPause.revealedTileCount) <= 4
+            && boardAfterResume.mazeStartKey === boardDuringPause.mazeStartKey
+            && boardAfterResume.generationPending === boardDuringPause.generationPending,
+          JSON.stringify({ boardDuringPause, boardAfterResume })
+        );
         check(
           'case 4: the held primary survived the pause/resume cycle unchanged',
           afterResume.primaryId === beforePause.primaryId,
@@ -791,11 +845,20 @@ const main = async () => {
           };
         });
         const beforePause = await readDiag();
+        // The 'stored' interval IS the maze deconstruct/rebuild window --
+        // the exact scenario the reviewer's pause recording captured.
+        const boardBeforePause = await readBoardProgress(page);
         const pauseResult = await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
         check('case 4b: the real openPauseOverlay QA command was accepted (stored interval)', pauseResult?.accepted === true, JSON.stringify(pauseResult));
         await stepOnce();
         await stepBatch(80); // a real, longer paused interval this time
         const duringPause = await readDiag();
+        const boardDuringPause = await readBoardProgress(page);
+        check(
+          'case 4b: the coupled maze reveal/deconstruct lifecycle is frozen through the whole longer pause during the stored interval (draw phase, row/tile counters, visible-tile count, pending generation/reset all identical -- no tiles disappear behind the pause menu)',
+          boardProgressFrozen(boardBeforePause, boardDuringPause),
+          JSON.stringify({ boardBeforePause, boardDuringPause })
+        );
         check(
           'case 4b: the material animation clock genuinely freezes through a longer real pause during the stored/closed interval too',
           duringPause.animationElapsed === beforePause.animationElapsed,
@@ -817,6 +880,15 @@ const main = async () => {
         check('case 4b: the real RESUME_RUN bridge command was accepted (stored interval)', resumeDispatch?.ok === true, JSON.stringify(resumeDispatch));
         await stepOnce();
         const afterResume = await readDiag();
+        const boardAfterResume = await readBoardProgress(page);
+        check(
+          'case 4b: the maze deconstruct/rebuild does not race ahead on the first resumed frame after the longer stored-interval pause (no completion or next-maze handoff jumped forward)',
+          boardAfterResume.drawPhase === boardDuringPause.drawPhase
+            && Math.abs(boardAfterResume.revealedTileCount - boardDuringPause.revealedTileCount) <= 6
+            && boardAfterResume.mazeStartKey === boardDuringPause.mazeStartKey
+            && boardAfterResume.generationPending === boardDuringPause.generationPending,
+          JSON.stringify({ boardDuringPause, boardAfterResume })
+        );
         check(
           'case 4b: the held primary survived a pause/resume cycle during the stored/closed interval unchanged',
           afterResume.primaryId === beforePause.primaryId,
@@ -875,17 +947,26 @@ const main = async () => {
           };
         });
         const beforePause = await readArrivalDiag();
+        // The initial arrival overlaps the very first maze BUILD -- pausing
+        // here must hold that reveal still too.
+        const boardBeforePause = await readBoardProgress(page);
         const pauseResult = await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
         check('case 4c: the real openPauseOverlay QA command was accepted during initial arrival', pauseResult?.accepted === true, JSON.stringify(pauseResult));
         await stepOnce();
         await stepBatch(50);
         const duringPause = await readArrivalDiag();
+        const boardDuringPause = await readBoardProgress(page);
         check(
           'case 4c: the real initial-arrival presentation is genuinely frozen identically while paused',
           duringPause.spawnBurstActive === beforePause.spawnBurstActive
             && duringPause.conduitVisible === beforePause.conduitVisible
             && duringPause.openFraction === beforePause.openFraction,
           JSON.stringify({ beforePause, duringPause })
+        );
+        check(
+          'case 4c: the first maze reveal that overlaps the initial arrival is frozen while paused too (draw phase, row/tile counters, visible-tile count all identical)',
+          boardProgressFrozen(boardBeforePause, boardDuringPause),
+          JSON.stringify({ boardBeforePause, boardDuringPause })
         );
         const resumeDispatch = await page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RESUME_RUN' }));
         check('case 4c: the real RESUME_RUN bridge command was accepted during initial arrival', resumeDispatch?.ok === true, JSON.stringify(resumeDispatch));
@@ -903,6 +984,57 @@ const main = async () => {
         );
       }
       check('case 4c: no page errors during the initial-arrival pause/resume sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
+      await context.close();
+    }
+
+    // ================================================================
+    // Case 4d negative control (ChatGPT-assisted review 5173052153): with
+    // holdLegacyPlayMazeLifecycleDuringPause patched to a no-op in its own
+    // isolated context, the coupled maze reveal/deconstruct lifecycle DOES
+    // keep advancing while paused (tiles disappear behind the pause menu)
+    // -- exactly the defect the reviewer's recording showed, and exactly
+    // what cases 4/4b's board-frozen assertions now catch. Proves those
+    // assertions depend on the fix, not on the maze happening to be idle.
+    // The patch never leaves this context.
+    // ================================================================
+    {
+      const { context, page, pageErrors, stepOnce, stepN } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      await page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        scene.holdLegacyPlayMazeLifecycleDuringPause = () => {};
+      });
+      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+      await stepN(200);
+      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
+      check('case 4d negative control: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
+
+      if (setup !== null) {
+        // Reach the deconstruct/rebuild ('stored') interval -- the reviewer's scenario.
+        let reachedStored = false;
+        for (let i = 0; i < 120 && !reachedStored; i += 1) {
+          await stepOnce();
+          const s = await page.evaluate(() => {
+            const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+            return {
+              phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
+              drawPhase: scene.menuStaticDrawLifecyclePhase
+            };
+          });
+          if (s.phase === 'stored' && (s.drawPhase === 'deconstructing' || s.drawPhase === 'building')) { reachedStored = true; }
+        }
+        check('case 4d negative control: reached the stored/deconstruct interval', reachedStored, 'n/a');
+
+        const boardBeforePause = await readBoardProgress(page);
+        await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
+        await stepN(60);
+        const boardDuringPause = await readBoardProgress(page);
+        check(
+          'case 4d negative control: with the pause-hold disabled, the maze reveal/deconstruct genuinely KEEPS advancing while paused (the fix in cases 4/4b is load-bearing)',
+          !boardProgressFrozen(boardBeforePause, boardDuringPause),
+          JSON.stringify({ boardBeforePause, boardDuringPause })
+        );
+      }
+      check('case 4d negative control: no page errors', pageErrors.length === 0, JSON.stringify(pageErrors));
       await context.close();
     }
 
@@ -1164,22 +1296,133 @@ const main = async () => {
     }
 
     // ================================================================
-    // Case 9: ordinary player movement is genuinely LOCKED through the
-    // entire visible maze build, on BOTH first entry AND the next-maze
-    // transition after a goal. Owner-reported (2026-09-09): "the player
-    // is moving before the maze creation animation is done". Investigated
-    // live: ordinary movement is in fact locked the whole time (the only
-    // motion is the arrival materialization presentation, which the owner
-    // accepted as part of arrival). This case is the regression guard for
-    // that -- it hammers a real move command every frame across the whole
-    // reveal and asserts ZERO are accepted while any maze tile is still
-    // unrevealed, on both build paths.
+    // Case 8b: the sticky "last good pose" fallback must NOT keep
+    // rendering a cached pose whose footprint no longer clears the current
+    // layout (ChatGPT-assisted review 5173052153). Drives a real transfer
+    // to a held-primary state, then patches resolveLegacyTeleportAnchorPreviewExclusions
+    // to return one viewport-covering exclusion: the selector now finds NO
+    // legal anchor (fallback path), AND the cached pose validated against
+    // that same real snapshot is ineligible -> the presentation must
+    // degrade (poseAvailable false, conduit hidden), keeping the held id
+    // and all domain/lifecycle state. Unpatching restores the same held
+    // primary and re-attaches the conduit -- identity retained throughout,
+    // never an offscreen/overlapping shell drawn to avoid the blink.
     // ================================================================
     {
       const { context, page, pageErrors, stepOnce, stepN } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
       await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+      await stepN(200);
+      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
+      check('case 8b: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
 
-      const probeBuild = () => page.evaluate(() => {
+      if (setup !== null) {
+        await stepN(30);
+        const readCache = () => page.evaluate(() => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
+          return {
+            phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
+            armed: scene.playerTransferEnergyArmed,
+            heldId: scene.gameplayTransferPrimaryId,
+            cachedPoseId: scene.gameplayTransferLastPrimaryPose?.id ?? null,
+            conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
+            poseAvailable: diag?.presentation.poseAvailable ?? null,
+            player: { x: scene.player.x, y: scene.player.y }
+          };
+        });
+        const beforePatch = await readCache();
+        check('case 8b: a real held primary + cached pose exist before patching', beforePatch.heldId !== null && beforePatch.cachedPoseId !== null && beforePatch.conduitVisible === true, JSON.stringify(beforePatch));
+
+        // Patch: every exclusion query now returns one rectangle covering
+        // the whole viewport -> no anchor footprint can clear it.
+        await page.evaluate(() => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          scene.__realExclusions = scene.resolveLegacyTeleportAnchorPreviewExclusions.bind(scene);
+          scene.resolveLegacyTeleportAnchorPreviewExclusions = (viewport) => ([
+            { x: 0, y: 0, width: viewport.width, height: viewport.height }
+          ]);
+        });
+        await stepN(8);
+        const duringPatch = await readCache();
+        check(
+          'case 8b: with the cached pose no longer clearing the layout, the presentation degrades (poseAvailable false, conduit hidden) instead of rendering the stale pose',
+          duringPatch.poseAvailable === false && duringPatch.conduitVisible === false,
+          JSON.stringify({ beforePatch, duringPatch })
+        );
+        check(
+          'case 8b: the held primary id and the domain player position are retained through the degradation (identity/gameplay state not discarded)',
+          duringPatch.heldId === beforePatch.heldId
+            && duringPatch.player.x === beforePatch.player.x
+            && duringPatch.player.y === beforePatch.player.y,
+          JSON.stringify({ beforePatch, duringPatch })
+        );
+
+        // Unpatch: the layout is legal again -> same held primary, conduit
+        // re-attaches, no reselection to a different anchor.
+        await page.evaluate(() => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          scene.resolveLegacyTeleportAnchorPreviewExclusions = scene.__realExclusions;
+        });
+        await stepN(10);
+        const afterUnpatch = await readCache();
+        check(
+          'case 8b: once the layout clears again the SAME held primary is used and the conduit re-attaches (no blink-to-a-different-anchor)',
+          afterUnpatch.heldId === beforePatch.heldId
+            && (afterUnpatch.conduitVisible === true || afterUnpatch.phase === 'idle'),
+          JSON.stringify({ beforePatch, afterUnpatch })
+        );
+      }
+      check('case 8b: no page errors across the cached-pose invalidation sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
+      await context.close();
+    }
+
+    // ================================================================
+    // Case 9: ordinary player movement is genuinely LOCKED through the
+    // entire visible maze build, on BOTH first entry AND the next-maze
+    // transition after a goal. Owner-reported (2026-09-09): "the player
+    // is moving before the maze creation animation is done".
+    //
+    // Strengthened per ChatGPT-assisted review 5173052153: the earlier
+    // version always probed with 'move_up' (a wall-blocked rejection would
+    // read the same as a lifecycle lock), ignored the rejection REASON,
+    // and could pass without ever observing an incomplete reveal or the
+    // build reaching ready. This version:
+    //  - probes with a REAL legal move direction (a walkable neighbour of
+    //    the player), so any rejection during the reveal can ONLY be
+    //    'lifecycle-locked';
+    //  - requires a genuine incomplete-reveal window to be observed;
+    //  - requires every rejection in that window to be reason
+    //    'lifecycle-locked' specifically;
+    //  - tracks the DOMAIN player position, so arrival materialization
+    //    (presentation) is distinguished from ordinary traversal (which
+    //    moves scene.player);
+    //  - requires the build to genuinely reach settled + input-unlocked
+    //    within the bound;
+    //  - proves a legal move is then accepted AND actually moves the
+    //    player once ready;
+    //  - asserts the accepted goal move before claiming the next-maze
+    //    path was exercised;
+    //  - includes a controlled negative control (the lock guard patched
+    //    off in its own isolated context) proving the pass depends on the
+    //    guard, not on a wall or an unobserved build.
+    // ================================================================
+    {
+      const { context, page, pageErrors, stepOnce } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+
+      const resolveLegalMove = () => page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        const p = scene.player;
+        const grid = scene.maze.grid;
+        const opts = [
+          { m: 'move_up', x: p.x, y: p.y - 1 }, { m: 'move_down', x: p.x, y: p.y + 1 },
+          { m: 'move_left', x: p.x - 1, y: p.y }, { m: 'move_right', x: p.x + 1, y: p.y }
+        ];
+        const legal = opts.find((o) => grid[o.y]?.[o.x] === true);
+        return legal ? legal.m : null;
+      });
+
+      const probeBuild = (legalMove) => page.evaluate((mv) => {
         const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
         let total = 0;
         let revealed = 0;

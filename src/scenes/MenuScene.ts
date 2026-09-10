@@ -40,7 +40,7 @@ import {
   computeGoalHaloCanvasBounds,
   drawGoalHaloToCanvasContext
 } from '../render/navigationCoreGoalHaloCanvas';
-import { resolveTeleportAnchorCandidates, type TeleportAnchorPose, type TeleportRect, type TeleportViewportBounds } from '../render/teleportAnchorPose';
+import { resolveTeleportAnchorCandidates, resolveTeleportAnchorEligibility, type TeleportAnchorPose, type TeleportRect, type TeleportViewportBounds } from '../render/teleportAnchorPose';
 import {
   selectTeleportPrimaryAnchor,
   type TeleportAnchorId,
@@ -2459,6 +2459,16 @@ export class MenuScene extends Phaser.Scene {
   // fade-out, the bleed-off dock regrowth) needs its own timestamp that
   // persists for the full phase instead of reusing that one.
   private menuStaticBuildPhaseStartedAtMs: number | null = null;
+  // Owner-reported (ChatGPT-assisted review 5173052153): a Play-mode pause
+  // froze the transfer's own clocks but NOT the coupled maze
+  // reveal/deconstruct/handoff lifecycle -- the submitted pause recording
+  // showed corridor tiles disappearing while the pause menu stayed open.
+  // holdLegacyPlayMazeLifecycleDuringPause uses this to shift every one of
+  // that lifecycle's absolute-time deadlines/anchors forward by exactly
+  // the real frame elapsed while paused, so it holds still without
+  // touching `time` or pausing the whole scene. Null until the first
+  // real frame.
+  private legacyPlayMazeLifecyclePrevFrameMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
   private legacyMenuTitleAnimationNextFrameAtMs = 0;
   // Orbit sigils ease into their frozen resting positions instead of
@@ -3155,7 +3165,16 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyTeleportAnchorPreviewResult(
     target: { x: number; y: number },
     heldAnchorId: TeleportAnchorId | null
-  ): { result: ReturnType<typeof selectTeleportPrimaryAnchor>; poseById: Map<TeleportAnchorId, { anchorX: number; anchorY: number; rotation: number; portX: number; portY: number; footprint: TeleportRect }> } {
+  ): {
+    result: ReturnType<typeof selectTeleportPrimaryAnchor>;
+    poseById: Map<TeleportAnchorId, { anchorX: number; anchorY: number; rotation: number; portX: number; portY: number; footprint: TeleportRect }>;
+    // The exact viewport + exclusion snapshot this selection was resolved
+    // against, so a caller (renderGameplayTransferPresentation's sticky-pose
+    // fallback) can re-validate a cached pose against the SAME frame's
+    // layout inputs -- never a second, independently-recomputed snapshot
+    // that could disagree with the one the selector actually used.
+    layoutSnapshot: { viewport: TeleportViewportBounds; exclusions: TeleportRect[] };
+  } {
     const viewport = { width: this.layout.width, height: this.layout.height };
     const exclusions = this.resolveLegacyTeleportAnchorPreviewExclusions(viewport);
 
@@ -3175,7 +3194,7 @@ export class MenuScene extends Phaser.Scene {
       portY: candidate.pose.portY,
       footprint: candidate.pose.footprint
     }]));
-    return { result, poseById };
+    return { result, poseById, layoutSnapshot: { viewport, exclusions } };
   }
 
   // Real single-primary gameplay transfer (Wave 4D-B) -- an entirely
@@ -3341,7 +3360,7 @@ export class MenuScene extends Phaser.Scene {
     this.gameplayTransferLastObservedOverlay = this.overlay;
     let primaryPose: TeleportAnchorPose | null;
     if (shouldResolveSelection) {
-      const { result, poseById } = this.resolveLegacyTeleportAnchorPreviewResult(target, this.gameplayTransferPrimaryId);
+      const { result, poseById, layoutSnapshot } = this.resolveLegacyTeleportAnchorPreviewResult(target, this.gameplayTransferPrimaryId);
       // Sticky held identity: only overwrite when the selector actually
       // found a legal anchor this frame. A transient 'unavailable' result
       // (e.g. a HUD control momentarily overlapping every candidate) must
@@ -3369,19 +3388,32 @@ export class MenuScene extends Phaser.Scene {
       } else if (
         this.gameplayTransferLastPrimaryPose !== null
         && (lifecycleInput.armed || this.resolveLegacyPlayerSpawnBurstState(time).active)
+        && resolveTeleportAnchorEligibility(
+          this.gameplayTransferLastPrimaryPose,
+          layoutSnapshot.exclusions,
+          layoutSnapshot.viewport
+        ).eligible
       ) {
-        // Owner-reported (direct product-owner instruction, 2026-09-09):
-        // the conduit blinked out partway through a real transfer.
-        // Confirmed live: during the maze rebuild inside a transfer's own
-        // 'stored' phase, the selector transiently returns NO legal pose
-        // for the held anchor -- a temporarily-larger exclusion (a HUD
-        // control, the title region) overlapping its footprint for a few
-        // frames, not a genuine viewport change -- and the presentation
-        // degraded to inactive mid-transfer. Reusing the last good pose
-        // through that transient window keeps the conduit attached, the
-        // exact same "don't forget mid-transfer" rule already applied to
-        // the held id just above (a genuine completion/reset still clears
-        // this field via resetLegacyPlayerTransferEnergy).
+        // Sticky held POSE, not just id -- owner-reported (2026-09-09): the
+        // conduit blinked out partway through a real transfer, confirmed
+        // live as the selector transiently returning NO legal pose for the
+        // held anchor during the maze rebuild inside 'stored'. Reusing the
+        // last good pose through that transient window keeps the conduit
+        // attached (the same "don't forget mid-transfer" rule already
+        // applied to the held id just above; a genuine completion/reset
+        // still clears this field via resetLegacyPlayerTransferEnergy).
+        //
+        // BUT: only when the cached pose's own footprint STILL clears the
+        // current layout (ChatGPT-assisted review 5173052153) -- validated
+        // here against `layoutSnapshot`, the EXACT viewport + exclusion set
+        // this same frame's selection was resolved against (not a second,
+        // independently-recomputed snapshot). A genuine clearance failure
+        // (a real resize, or an exclusion that actually now covers the
+        // cached footprint) falls through to primaryPose === null and the
+        // presentation module's existing explicit degradation
+        // (poseAvailable: false -- no fabricated shell/conduit, held id and
+        // all domain/lifecycle state retained), never an offscreen or
+        // HUD-overlapping shell drawn just to avoid a blink.
         primaryPose = this.gameplayTransferLastPrimaryPose;
       }
     } else {
@@ -3952,6 +3984,8 @@ export class MenuScene extends Phaser.Scene {
     for (const button of this.uiButtons) {
       button.updateFrame?.(time);
     }
+
+    this.holdLegacyPlayMazeLifecycleDuringPause(time);
 
     const pendingReset = this.pendingResetRequest;
     if (pendingReset !== null && shouldConsumeLegacyResetRequest(pendingReset, time)) {
@@ -7024,6 +7058,72 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticBuildPhaseStartedAtMs = null;
     this.refreshLegacyMenuStaticDrawVisibleTileKeys();
     this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);
+  }
+
+  // Owner-reported (ChatGPT-assisted review 5173052153, anchored to head
+  // 1092acc8): the round-7 pause fix froze the transfer's own outbound/
+  // delivery clocks (resolveGameplayTransferPausedOffsetMs) but the
+  // coupled Play-mode maze reveal/deconstruct/handoff lifecycle kept
+  // advancing -- the submitted pause recording shows corridor tiles
+  // visibly disappearing between two frames while the pause menu stays
+  // open, and a next-maze generation request could be consumed behind the
+  // frozen screenshot. This holds that whole lifecycle still for the
+  // duration of a Play-mode pause WITHOUT touching `time`, calling
+  // this.scene.pause(), or otherwise freezing the scene (Resume UI keeps
+  // working): every pending absolute-time deadline and every phase anchor
+  // the lifecycle derives progress from is shifted forward by exactly the
+  // real frame that elapsed while paused, so every `time >= deadline` /
+  // `time - anchor` comparison in advanceLegacyMenuStaticDrawStage, the
+  // bleed-dock/handoff/preroll resolvers, and the pending-request
+  // consumers yields the same result it did on the last unpaused frame,
+  // and on resume each deadline is still exactly as far in the future as
+  // when the pause began -- unpaused durations and ordering are unchanged.
+  // Menu mode never reaches overlay === 'pause', so the demo AI's own
+  // goal-reset choreography is completely untouched. The transfer's OWN
+  // anchors (playerTransferEnergyOutboundStartedAtMs etc.) are
+  // deliberately NOT shifted here -- they are already compensated by
+  // resolveGameplayTransferPausedOffsetMs at read time, and shifting them
+  // too would double-count.
+  private holdLegacyPlayMazeLifecycleDuringPause(time: number): void {
+    const previousFrameMs = this.legacyPlayMazeLifecyclePrevFrameMs;
+    this.legacyPlayMazeLifecyclePrevFrameMs = time;
+    if (this.mode !== 'play' || this.overlay !== 'pause' || previousFrameMs === null) {
+      return;
+    }
+    const frameDeltaMs = Math.max(0, time - previousFrameMs);
+    if (frameDeltaMs <= 0) {
+      return;
+    }
+    if (Number.isFinite(this.menuStaticDrawNextRowAtMs) && this.menuStaticDrawNextRowAtMs > 0) {
+      this.menuStaticDrawNextRowAtMs += frameDeltaMs;
+    }
+    if (Number.isFinite(this.menuStaticDrawNextTileAtMs) && this.menuStaticDrawNextTileAtMs > 0) {
+      this.menuStaticDrawNextTileAtMs += frameDeltaMs;
+    }
+    if (this.menuStaticDeconstructStartedAtMs !== null) {
+      this.menuStaticDeconstructStartedAtMs += frameDeltaMs;
+    }
+    if (this.menuStaticDeconstructZeroHoldStartedAtMs !== null) {
+      this.menuStaticDeconstructZeroHoldStartedAtMs += frameDeltaMs;
+    }
+    if (this.menuStaticBuildPrerollStartedAtMs !== null) {
+      this.menuStaticBuildPrerollStartedAtMs += frameDeltaMs;
+    }
+    if (this.menuStaticBuildPhaseStartedAtMs !== null) {
+      this.menuStaticBuildPhaseStartedAtMs += frameDeltaMs;
+    }
+    if (this.pendingGenerationRequest !== null) {
+      this.pendingGenerationRequest = {
+        ...this.pendingGenerationRequest,
+        dueAtMs: this.pendingGenerationRequest.dueAtMs + frameDeltaMs
+      };
+    }
+    if (this.pendingResetRequest !== null) {
+      this.pendingResetRequest = {
+        ...this.pendingResetRequest,
+        dueAtMs: this.pendingResetRequest.dueAtMs + frameDeltaMs
+      };
+    }
   }
 
   private advanceLegacyMenuStaticDrawStage(time: number): void {
