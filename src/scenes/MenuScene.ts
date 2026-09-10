@@ -3316,6 +3316,23 @@ export class MenuScene extends Phaser.Scene {
       };
       if (primaryPose !== null) {
         this.gameplayTransferLastPrimaryPose = primaryPose;
+      } else if (
+        this.gameplayTransferLastPrimaryPose !== null
+        && (lifecycleInput.armed || this.resolveLegacyPlayerSpawnBurstState(time).active)
+      ) {
+        // Owner-reported (direct product-owner instruction, 2026-09-09):
+        // the conduit blinked out partway through a real transfer.
+        // Confirmed live: during the maze rebuild inside a transfer's own
+        // 'stored' phase, the selector transiently returns NO legal pose
+        // for the held anchor -- a temporarily-larger exclusion (a HUD
+        // control, the title region) overlapping its footprint for a few
+        // frames, not a genuine viewport change -- and the presentation
+        // degraded to inactive mid-transfer. Reusing the last good pose
+        // through that transient window keeps the conduit attached, the
+        // exact same "don't forget mid-transfer" rule already applied to
+        // the held id just above (a genuine completion/reset still clears
+        // this field via resetLegacyPlayerTransferEnergy).
+        primaryPose = this.gameplayTransferLastPrimaryPose;
       }
     } else {
       primaryPose = this.gameplayTransferLastPrimaryPose;
@@ -9099,8 +9116,26 @@ export class MenuScene extends Phaser.Scene {
     orbitPhase: number;
     travelReversed: boolean;
   } {
-    const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'
-      || this.menuStaticDrawLifecyclePhase === 'deconstructing';
+    // Owner-reported (direct product-owner instruction, 2026-09-09): "the
+    // laser is shooting to a diamond that isn't even one of the ones on
+    // the edge". Root cause found live: a real gameplay transfer (and the
+    // Play-mode initial arrival) always coincides with the maze
+    // deconstruct/rebuild, which drives isLifecycleSpinActive true -- so
+    // the seven NON-engaged perimeter diamonds swirl chaotically around
+    // the whole viewport edge while the ONE engaged diamond sits pinned
+    // at its fixed anchor with the conduit attached, reading as an
+    // unrelated ninth object rather than one of the ring. In Play mode,
+    // while a transfer is armed or the arrival burst is presenting, hold
+    // the whole ring still at its resting stations (4 corners + 4 edge
+    // midpoints, via the existing settle-phase ease) so the perimeter
+    // reads as a calm ring with one member lit and engaged. Menu mode
+    // (the demo AI's own goal-reset choreography) is completely
+    // unaffected -- no gameplay transfer is ever armed there.
+    const suppressSpinForGameplayTransfer = this.mode === 'play'
+      && (this.playerTransferEnergyArmed || this.resolveLegacyPlayerSpawnBurstState(time).active);
+    const isLifecycleSpinActive = !suppressSpinForGameplayTransfer
+      && (this.menuStaticDrawLifecyclePhase === 'building'
+        || this.menuStaticDrawLifecyclePhase === 'deconstructing');
     const orbitPhase = isLifecycleSpinActive
       ? this.resolveLegacyMenuPathTitleOrbitLifecyclePhase()
       : this.resolveLegacyMenuPathTitleOrbitSettlePhase(time);

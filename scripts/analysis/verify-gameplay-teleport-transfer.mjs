@@ -1096,6 +1096,135 @@ const main = async () => {
       check('case 7: no page errors during initial entry', pageErrors.length === 0, JSON.stringify(pageErrors));
       await context.close();
     }
+
+    // ================================================================
+    // Case 8: the ambient perimeter-diamond ring stays CALM during a
+    // real gameplay transfer. Owner-reported (direct product-owner
+    // instruction, 2026-09-09): "the laser is shooting to a diamond that
+    // isn't even one of the ones on the edge". Root cause found live: a
+    // real transfer always coincides with the maze deconstruct/rebuild,
+    // which drove the title-orbit spin -- so the seven non-engaged
+    // diamonds swirled all over the viewport edge while the one engaged
+    // diamond sat pinned, reading as an unrelated object. The fix freezes
+    // the orbit spin (holds every sigil at its resting corner/edge-mid
+    // station) for the whole transfer in Play mode. This case drives a
+    // real transfer and asserts the non-engaged diamonds do NOT move.
+    // ================================================================
+    {
+      const { context, page, pageErrors, stepOnce, stepN } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+      await stepN(200);
+
+      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
+      check('case 8: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
+
+      if (setup !== null) {
+        const readRing = () => page.evaluate(() => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          const primaryId = scene.gameplayTransferPrimaryId;
+          const positions = scene.titleOrbitDiamondImages.map((img, i) => {
+            const p = img.getWorldTransformMatrix().transformPoint(0, 0);
+            return { i, x: Math.round(p.x), y: Math.round(p.y) };
+          });
+          return {
+            phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
+            spinActive: scene.resolveLegacyMenuPathTitleOrbitFrame(scene.time.now).isLifecycleSpinActive,
+            drawPhase: scene.menuStaticDrawLifecyclePhase,
+            primaryId,
+            nonPrimary: positions.filter((d) => d.i !== primaryId)
+          };
+        });
+
+        await stepN(30); // reach the real deconstruct-arm / outbound instant
+        const first = await readRing();
+        check('case 8: a real transfer is genuinely armed for this case', first.primaryId !== null && ['outbound', 'stored', 'delivering'].includes(first.phase), JSON.stringify(first));
+
+        // Sample the non-engaged ring across the whole rest of the real
+        // transfer. The ambient spin must read as inactive and every
+        // non-engaged diamond must stay within a couple of px of where it
+        // started (no swirl), all the way through delivery.
+        let maxDrift = 0;
+        let sawSpinActive = first.spinActive === true;
+        const baseline = new Map(first.nonPrimary.map((d) => [d.i, d]));
+        for (let i = 0; i < 260; i += 1) {
+          await stepOnce();
+          const s = await readRing();
+          if (s.spinActive === true) { sawSpinActive = true; }
+          for (const d of s.nonPrimary) {
+            const b = baseline.get(d.i);
+            if (b) { maxDrift = Math.max(maxDrift, Math.hypot(d.x - b.x, d.y - b.y)); }
+          }
+          if (s.phase === 'idle' && i > 40) { break; }
+        }
+        check('case 8: the ambient title-orbit spin reads as inactive for the whole real transfer (not swirling)', sawSpinActive === false, `sawSpinActive=${sawSpinActive}`);
+        check('case 8: every NON-engaged perimeter diamond holds its resting station through the whole transfer (max drift <= 3px)', maxDrift <= 3, `maxDrift=${maxDrift.toFixed(2)}px`);
+      }
+      check('case 8: no page errors across the calm-ring transfer', pageErrors.length === 0, JSON.stringify(pageErrors));
+      await context.close();
+    }
+
+    // ================================================================
+    // Case 9: ordinary player movement is genuinely LOCKED through the
+    // entire visible maze build, on BOTH first entry AND the next-maze
+    // transition after a goal. Owner-reported (2026-09-09): "the player
+    // is moving before the maze creation animation is done". Investigated
+    // live: ordinary movement is in fact locked the whole time (the only
+    // motion is the arrival materialization presentation, which the owner
+    // accepted as part of arrival). This case is the regression guard for
+    // that -- it hammers a real move command every frame across the whole
+    // reveal and asserts ZERO are accepted while any maze tile is still
+    // unrevealed, on both build paths.
+    // ================================================================
+    {
+      const { context, page, pageErrors, stepOnce, stepN } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+
+      const probeBuild = () => page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        let total = 0;
+        let revealed = 0;
+        for (let y = 0; y < scene.maze.height; y += 1) {
+          for (let x = 0; x < scene.maze.width; x += 1) {
+            if (scene.maze.grid[y][x]) {
+              total += 1;
+              if (scene.isLegacyMenuPointVisibleInStaticDraw({ x, y })) { revealed += 1; }
+            }
+          }
+        }
+        const move = window.__MAZER_QA__.movePlayPlayer('move_up');
+        return {
+          drawPhase: scene.menuStaticDrawLifecyclePhase,
+          revealComplete: total > 0 && revealed >= total,
+          settledAndUnlocked: scene.menuStaticDrawLifecyclePhase === 'settled' && !scene.isLegacyPlayLifecycleInputLocked(),
+          moveAccepted: move?.accepted === true
+        };
+      });
+
+      const runBuildPath = async (label) => {
+        let acceptedWhileRevealIncomplete = 0;
+        let framesObserved = 0;
+        for (let i = 0; i < 700; i += 1) {
+          await stepOnce();
+          const p = await probeBuild();
+          framesObserved += 1;
+          if (!p.revealComplete && p.moveAccepted) { acceptedWhileRevealIncomplete += 1; }
+          if (p.settledAndUnlocked && i > 30) { break; }
+        }
+        check(`case 9 (${label}): ordinary movement is never accepted while a maze tile is still unrevealed`, acceptedWhileRevealIncomplete === 0, `${acceptedWhileRevealIncomplete} accepted move(s) over ${framesObserved} frames`);
+      };
+
+      await runBuildPath('first entry');
+
+      // Now drive a real goal reach and repeat across the next-maze rebuild.
+      const { setup } = await setupControlledNearGoalMove(page, stepOnce);
+      if (setup !== null) {
+        await runBuildPath('next-maze transition');
+      } else {
+        check('case 9 (next-maze transition): found a walkable goal neighbour to trigger a transition', false, 'n/a');
+      }
+      check('case 9: no page errors across the build-lock checks', pageErrors.length === 0, JSON.stringify(pageErrors));
+      await context.close();
+    }
   } finally {
     await browser.close();
     if (preview) {
