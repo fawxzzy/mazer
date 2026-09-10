@@ -1434,38 +1434,131 @@ const main = async () => {
             }
           }
         }
-        const move = window.__MAZER_QA__.movePlayPlayer('move_up');
+        const domainBefore = { x: scene.player.x, y: scene.player.y };
+        const move = window.__MAZER_QA__.movePlayPlayer(mv);
+        const domainAfter = { x: scene.player.x, y: scene.player.y };
         return {
           drawPhase: scene.menuStaticDrawLifecyclePhase,
-          revealComplete: total > 0 && revealed >= total,
+          lifecycleLocked: scene.isLegacyPlayLifecycleInputLocked(),
+          revealIncomplete: total > 0 && revealed < total,
           settledAndUnlocked: scene.menuStaticDrawLifecyclePhase === 'settled' && !scene.isLegacyPlayLifecycleInputLocked(),
-          moveAccepted: move?.accepted === true
+          moveAccepted: move?.accepted === true,
+          moveReason: move?.reason ?? null,
+          domainMoved: domainBefore.x !== domainAfter.x || domainBefore.y !== domainAfter.y
         };
-      });
+      }, legalMove);
 
       const runBuildPath = async (label) => {
-        let acceptedWhileRevealIncomplete = 0;
-        let framesObserved = 0;
-        for (let i = 0; i < 700; i += 1) {
+        const legalMove = await resolveLegalMove();
+        check(`case 9 (${label}): resolved a real legal move direction to probe with (rejections can only be lifecycle-locked, not a wall)`, legalMove !== null, 'n/a');
+        if (legalMove === null) { return; }
+
+        let incompleteRevealFrames = 0;
+        let rejectedWhileIncomplete = 0;
+        let nonLockRejectWhileIncomplete = 0;
+        let acceptedWhileIncomplete = 0;
+        let domainMovedWhileIncomplete = 0;
+        let reachedReady = false;
+        for (let i = 0; i < 800; i += 1) {
           await stepOnce();
-          const p = await probeBuild();
-          framesObserved += 1;
-          if (!p.revealComplete && p.moveAccepted) { acceptedWhileRevealIncomplete += 1; }
-          if (p.settledAndUnlocked && i > 30) { break; }
+          const p = await probeBuild(legalMove);
+          if (p.revealIncomplete) {
+            incompleteRevealFrames += 1;
+            if (p.moveAccepted) { acceptedWhileIncomplete += 1; }
+            if (p.domainMoved) { domainMovedWhileIncomplete += 1; }
+            if (!p.moveAccepted) {
+              rejectedWhileIncomplete += 1;
+              if (p.moveReason !== 'lifecycle-locked') { nonLockRejectWhileIncomplete += 1; }
+            }
+          }
+          if (p.settledAndUnlocked && i > 30) { reachedReady = true; break; }
         }
-        check(`case 9 (${label}): ordinary movement is never accepted while a maze tile is still unrevealed`, acceptedWhileRevealIncomplete === 0, `${acceptedWhileRevealIncomplete} accepted move(s) over ${framesObserved} frames`);
+
+        check(`case 9 (${label}): a genuine incomplete-reveal window was observed (not skipped)`, incompleteRevealFrames >= 3, `${incompleteRevealFrames} frame(s)`);
+        check(`case 9 (${label}): the build genuinely reached settled + input-unlocked within the bound (not a timeout)`, reachedReady, 'n/a');
+        check(`case 9 (${label}): every legal-move rejection during the incomplete reveal was reason 'lifecycle-locked' (not 'blocked'/other)`, rejectedWhileIncomplete > 0 && nonLockRejectWhileIncomplete === 0, `rejected=${rejectedWhileIncomplete}, non-lifecycle-locked=${nonLockRejectWhileIncomplete}`);
+        check(`case 9 (${label}): the legal move was never accepted while any maze tile was still unrevealed`, acceptedWhileIncomplete === 0, `${acceptedWhileIncomplete} accepted`);
+        check(`case 9 (${label}): the DOMAIN player never traversed the maze while any tile was unrevealed (arrival materialization is not ordinary movement)`, domainMovedWhileIncomplete === 0, `${domainMovedWhileIncomplete} domain move(s)`);
+
+        const readyMove = await resolveLegalMove();
+        const after = await page.evaluate((mv) => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          const before = { x: scene.player.x, y: scene.player.y };
+          const r = window.__MAZER_QA__.movePlayPlayer(mv);
+          const now = { x: scene.player.x, y: scene.player.y };
+          return { accepted: r?.accepted === true, moved: before.x !== now.x || before.y !== now.y };
+        }, readyMove);
+        check(`case 9 (${label}): once the build is ready, a legal move is accepted AND actually moves the domain player`, after.accepted === true && after.moved === true, JSON.stringify(after));
       };
 
       await runBuildPath('first entry');
 
-      // Now drive a real goal reach and repeat across the next-maze rebuild.
-      const { setup } = await setupControlledNearGoalMove(page, stepOnce);
-      if (setup !== null) {
+      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
+      check('case 9: the real goal-reaching move that triggers the next-maze transition was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
+      if (moveResult?.accepted === true) {
         await runBuildPath('next-maze transition');
-      } else {
-        check('case 9 (next-maze transition): found a walkable goal neighbour to trigger a transition', false, 'n/a');
       }
       check('case 9: no page errors across the build-lock checks', pageErrors.length === 0, JSON.stringify(pageErrors));
+      await context.close();
+    }
+
+    // ================================================================
+    // Case 9 negative control (ChatGPT-assisted review 5173052153): with
+    // isLegacyPlayLifecycleInputLocked patched to always return false in
+    // its OWN isolated context, a real legal move IS accepted (and moves
+    // the domain player) while maze tiles are still unrevealed -- proving
+    // case 9's pass depends on that guard, not on a wall rejection or an
+    // unobserved build. The patch never leaves this context.
+    // ================================================================
+    {
+      const { context, page, pageErrors, stepOnce } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      await page.evaluate(() => {
+        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+        scene.__realLifecycleLock = scene.isLegacyPlayLifecycleInputLocked.bind(scene);
+        scene.isLegacyPlayLifecycleInputLocked = () => false;
+      });
+      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+
+      let sawAcceptedOrMovedWhileIncomplete = false;
+      let sawIncompleteReveal = false;
+      for (let i = 0; i < 800; i += 1) {
+        await stepOnce();
+        const p = await page.evaluate(() => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          const pl = scene.player;
+          const grid = scene.maze.grid;
+          const legal = [
+            { m: 'move_up', x: pl.x, y: pl.y - 1 }, { m: 'move_down', x: pl.x, y: pl.y + 1 },
+            { m: 'move_left', x: pl.x - 1, y: pl.y }, { m: 'move_right', x: pl.x + 1, y: pl.y }
+          ].find((o) => grid[o.y]?.[o.x] === true);
+          let total = 0;
+          let revealed = 0;
+          for (let y = 0; y < scene.maze.height; y += 1) {
+            for (let x = 0; x < scene.maze.width; x += 1) {
+              if (scene.maze.grid[y][x]) { total += 1; if (scene.isLegacyMenuPointVisibleInStaticDraw({ x, y })) { revealed += 1; } }
+            }
+          }
+          const revealIncomplete = total > 0 && revealed < total;
+          if (!legal) { return { revealIncomplete, accepted: false, moved: false, realLocked: scene.__realLifecycleLock() }; }
+          const before = { x: pl.x, y: pl.y };
+          const r = window.__MAZER_QA__.movePlayPlayer(legal.m);
+          const now = { x: scene.player.x, y: scene.player.y };
+          return { revealIncomplete, accepted: r?.accepted === true, moved: before.x !== now.x || before.y !== now.y, realLocked: scene.__realLifecycleLock() };
+        });
+        if (p.revealIncomplete) {
+          sawIncompleteReveal = true;
+          if (p.realLocked && (p.accepted || p.moved)) { sawAcceptedOrMovedWhileIncomplete = true; }
+        }
+        const done = await page.evaluate(() => {
+          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+          return scene.menuStaticDrawLifecyclePhase === 'settled';
+        });
+        if (done && i > 30 && sawAcceptedOrMovedWhileIncomplete) { break; }
+        if (done && i > 200) { break; }
+      }
+      check('case 9 negative control: a genuine incomplete-reveal window was observed', sawIncompleteReveal, 'n/a');
+      check('case 9 negative control: with the lifecycle lock disabled, a real legal move IS accepted/moves the player while the reveal is incomplete (the guard is load-bearing)', sawAcceptedOrMovedWhileIncomplete, 'n/a');
+      check('case 9 negative control: no page errors', pageErrors.length === 0, JSON.stringify(pageErrors));
       await context.close();
     }
   } finally {
