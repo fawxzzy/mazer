@@ -25,9 +25,7 @@ import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameTo
 import {
   advanceTrailShineState,
   buildContinuousTrailPath,
-  NAVIGATION_CORE_TRAIL_ENERGY_STOPS,
-  resampleTrailVertices,
-  sampleTrailEnergyColor
+  resampleTrailVertices
 } from '../render/navigationCoreTrail';
 import {
   computeTrailCanvasBounds,
@@ -1243,9 +1241,61 @@ const LEGACY_PLAY_TRAIL_WIDTH_RATIO = 0.16;
 // ratios scale with tileSize like everything else here, so the glow stays
 // a crisp accent rather than a blurred bar at compact/mobile tile sizes.
 const LEGACY_PLAY_TRAIL_GLOW_WIDTH_RATIO = 0.3;
-const LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO = 0.22;
+// OWNER-AUTHORIZED VISUAL AMENDMENT (2026-09-09, with the calmer
+// NAVIGATION_CORE_TRAIL_ENERGY_STOPS palette): dropped from 0.22 -> 0.15
+// so the glow reads as a soft halo supporting the crisp core rather than
+// a wide translucent wash bleeding across the corridor floor. Still
+// scales with tileSize like everything else here.
+const LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO = 0.15;
 const LEGACY_PLAY_TRAIL_CORNER_RADIUS_RATIO = 0.16;
 const LEGACY_PLAY_TRAIL_PLAYER_TRIM_RATIO = 0.3;
+// OWNER-AUTHORIZED VISUAL AMENDMENT (direct product-owner instruction,
+// 2026-09-09): the original Navigation Core ENERGY palette
+// (NAVIGATION_CORE_TRAIL_ENERGY_STOPS, from the frozen reference's own
+// generator) puts every stop at full saturation and runs THREE
+// consecutive fully-saturated warm stops (red/orange/yellow) -- ~37% of
+// the cycle. On the real in-game trail and the gameplay-transfer conduit
+// that reads as an abrasive full-spectrum rainbow ribbon filling the
+// corridor, which the owner explicitly asked to calm. This calmer set
+// keeps the recognizable cool "energy" identity and the exact 8-stop
+// cyclic structure, but: every stop pulled to medium luminance / moderate
+// saturation (no neon); the three-stop warm band collapsed to ONE dusty
+// mauve accent, bracketed by violet on both sides so it can never form a
+// broad warm band as the phase drifts; adjacent stops kept close in hue
+// so the RGB lerp between them stays a smooth blend rather than a muddy
+// jump between distant hues.
+//
+// Scoped deliberately to Wave 4D-B's own rendering: the shared 4D-A
+// module src/render/navigationCoreTrail.ts (NAVIGATION_CORE_TRAIL_ENERGY_STOPS,
+// sampleTrailEnergyColor) and the frozen reference file are BOTH left
+// untouched -- only this scene's own three consumers of that material
+// (the continuous play trail, the gameplay-transfer conduit, and the
+// on-board goal-star ring) sample this calmer set instead, via
+// sampleCalmTrailEnergyColor below. Recorded in docs/current-truth.md as
+// an owner-authorized amendment; the new palette is a candidate for the
+// owner's review, not automatically accepted.
+const LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS = [
+  0x45a4c0,
+  0x4d8ac0,
+  0x6576bb,
+  0x7f68b2,
+  0x9c60a4,
+  0x7a66b6,
+  0x5183c0,
+  0x48ab98
+] as const;
+// The exact math of navigationCoreTrail.ts's own sampleTrailEnergyColor
+// (a pure function of distance/time phase), but sampling the calmer
+// amendment palette above instead of the frozen module's own stops.
+const sampleCalmTrailEnergyColor = (
+  distance: number,
+  timeMs: number,
+  options: { distancePeriodPx: number; timePeriodMs: number }
+): number => {
+  const distancePhase = options.distancePeriodPx > 0 ? distance / options.distancePeriodPx : 0;
+  const timePhase = options.timePeriodMs > 0 ? timeMs / options.timePeriodMs : 0;
+  return resolveLegacyIridescentMidnightColor(distancePhase + timePhase, LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS);
+};
 // Fine resampling interval for color/alpha continuity -- see
 // resampleTrailVertices's own header for why Canvas-mode Phaser Graphics
 // needs this at all (no per-vertex gradient stroke).
@@ -3500,27 +3550,25 @@ export class MenuScene extends Phaser.Scene {
       this.gameplayTransferConduitCanvasTexture.clear(0, 0, backingWidth, backingHeight, false);
     }
     this.gameplayTransferConduitCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
-    // The real Navigation-Core-locked energy palette (cyan/blue/violet/
-    // magenta dominant, brief red/orange/yellow accents, green a
-    // transition tone) -- NOT resolveLegacyIridescentMidnightColor's own
-    // default stops, which navigationCoreTrail.ts's own module doc
-    // explicitly documents as the wrong palette for this exact contract.
-    // Reuses the play trail's own real color-sampling call
-    // (sampleTrailEnergyColor) so the conduit shares the SAME material
-    // the trail already carries, not an independently-cycling
-    // approximation of it -- sampled at a REAL distance along the
-    // conduit (varying spatially, not one flat color per frame) and at
-    // this transfer's own pausable animation time (frozen under reduced
-    // motion, Pause, or any overlay). gameplayTransferAnimationTime is
-    // computed by the CALLER, unconditionally, every frame -- see
-    // applyLegacyGameplayTransferPresentation's own comment on why this
-    // must not be computed only when the conduit happens to be open.
+    // The Navigation-Core energy material -- the SAME one the play trail
+    // carries, so the conduit and the trail read as one energy language,
+    // not an independently-cycling approximation. Sampled at a REAL
+    // distance along the conduit (varying spatially, not one flat color
+    // per frame) and at this transfer's own pausable animation time
+    // (frozen under reduced motion, Pause, or any overlay).
+    // gameplayTransferAnimationTime is computed by the CALLER,
+    // unconditionally, every frame -- see applyLegacyGameplayTransferPresentation's
+    // own comment on why this must not be computed only when the conduit
+    // happens to be open. Uses sampleCalmTrailEnergyColor (the
+    // owner-authorized calmer palette, see LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS)
+    // for the same reason the trail does -- the owner reported this exact
+    // conduit beam as an abrasive rainbow.
     const conduitColorOptions = {
       distancePeriodPx: Math.max(1, targetCellSizePx / containerScale) * LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE,
       timePeriodMs: LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS
     };
     const energyColorAtDistance = (distancePx: number): number => (
-      sampleTrailEnergyColor(distancePx, gameplayTransferAnimationTime, conduitColorOptions)
+      sampleCalmTrailEnergyColor(distancePx, gameplayTransferAnimationTime, conduitColorOptions)
     );
     drawTeleportTransferConduitToCanvasContext(this.gameplayTransferConduitCanvasTexture.context, {
       originX: bounds.left,
@@ -11304,7 +11352,10 @@ export class MenuScene extends Phaser.Scene {
       // every time the origin slides forward. Color is periodic over
       // distance, so this is a phase realignment, not a length change.
       const colorPhaseDistance = midDistance + this.trailOriginAdvanceDistancePx;
-      const baseColor = sampleTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions);
+      // sampleCalmTrailEnergyColor: owner-authorized calmer palette (see
+      // LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS) -- the frozen 4D-A module
+      // and its own sampleTrailEnergyColor are left untouched.
+      const baseColor = sampleCalmTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions);
       let coreColor = baseColor;
       let coreAlpha = ageAlpha * alphaMultiplier;
 
@@ -11313,8 +11364,17 @@ export class MenuScene extends Phaser.Scene {
         if (distanceFromShineCenter <= shineState.halfLength) {
           const taper = 1 - clamp(distanceFromShineCenter / shineState.halfLength, 0, 1);
           const highlightStrength = taper * shineState.envelopeAlpha;
-          coreColor = mixLegacyIridescentColor(baseColor, LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR, highlightStrength * 0.85);
-          coreAlpha = Math.min(1, coreAlpha + (highlightStrength * 0.5));
+          // OWNER-AUTHORIZED VISUAL AMENDMENT (2026-09-09): the shine was
+          // reported as not visibly reading as a traveling highlight. Its
+          // own math was correct (verified live: clock advances, envelope
+          // fades, position travels the whole path), but an 0.85 white
+          // mix riding a FULLY-SATURATED rainbow base barely registered.
+          // Now that the base palette is calm (see
+          // NAVIGATION_CORE_TRAIL_ENERGY_STOPS) a soft highlight reads
+          // clearly; nudged the mix/alpha up slightly so it still lands
+          // as a definite travelling light without becoming a hard flash.
+          coreColor = mixLegacyIridescentColor(baseColor, LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR, highlightStrength * 0.92);
+          coreAlpha = Math.min(1, coreAlpha + (highlightStrength * 0.58));
         }
       }
 
@@ -11753,8 +11813,11 @@ export class MenuScene extends Phaser.Scene {
     const spinPhase = time !== undefined && !this.prefersLegacyReducedMotion()
       ? time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS
       : 0;
+    // Owner-authorized calmer palette (LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS)
+    // -- the goal-star ring's stated design intent is to read as visually
+    // related to the trail leading to it, so it tracks the same amendment.
     const energyColorAt = (position: number): number => (
-      resolveLegacyIridescentMidnightColor(position, NAVIGATION_CORE_TRAIL_ENERGY_STOPS)
+      resolveLegacyIridescentMidnightColor(position, LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS)
     );
 
     // Soft pulsing glow halo, drawn first (behind everything else). The

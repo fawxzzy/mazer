@@ -2347,7 +2347,15 @@ describe('Navigation Core v1 end-star: canonical energy palette, no orbiting dot
   );
 
   test('samples the canonical cool-dominant ENERGY stops (shared with the trail), never a raw equal-weight HSV rainbow, for the ring and star', () => {
-    expect(menuSceneSource).toContain('resolveLegacyIridescentMidnightColor(position, NAVIGATION_CORE_TRAIL_ENERGY_STOPS)');
+    // Owner-authorized visual amendment (2026-09-09): the goal-star ring
+    // tracks the same calmer trail palette the owner directed -- still the
+    // cyclic resolveLegacyIridescentMidnightColor sampler over a
+    // cool-dominant stop array, just LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS
+    // (the 4D-B-scoped amendment set) rather than the frozen module's own
+    // NAVIGATION_CORE_TRAIL_ENERGY_STOPS. The intent this test pins is
+    // unchanged: one shared cool-dominant energy material, never a raw
+    // equal-weight HSV rainbow.
+    expect(menuSceneSource).toContain('resolveLegacyIridescentMidnightColor(position, LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS)');
     expect(menuSceneSource).toContain('const segmentColor = energyColorAt((i / ringSegmentCount) + spinPhase);');
     expect(menuSceneSource).toContain('const segmentColor = energyColorAt(((i + t0) / starPoints.length) + spinPhase);');
     // The ring/star must not call Phaser's HSV helper directly any more --
@@ -2429,7 +2437,12 @@ describe('Navigation Core v1 final correctness pass: Trail Fade origin, shine sh
     // distance from the CURRENT window's zero point.
     expect(menuSceneSource).toContain('private trailOriginAdvanceDistancePx = 0;');
     expect(menuSceneSource).toContain('const colorPhaseDistance = midDistance + this.trailOriginAdvanceDistancePx;');
-    expect(menuSceneSource).toContain('sampleTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions)');
+    // Owner-authorized visual amendment (2026-09-09): the calmer trail
+    // palette is 4D-B-scoped, so the trail samples sampleCalmTrailEnergyColor
+    // (same distance/time phase math as the frozen module's
+    // sampleTrailEnergyColor, different stops) -- the stable-phase
+    // colorPhaseDistance argument this test pins is unchanged.
+    expect(menuSceneSource).toContain('sampleCalmTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions)');
     // ageAlpha (the Trail Fade opacity gradient) must stay on the raw
     // window-relative midDistance -- only color gets the stable-phase
     // offset, since age-alpha is deliberately about position within the
