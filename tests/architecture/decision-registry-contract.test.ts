@@ -275,6 +275,8 @@ describe('Mazer UI rework decision registry contract', () => {
         'src/scenes/BootScene.ts': '4D-A',
         'src/render/teleportPrimaryAnchor.ts': '4D-B',
         'src/render/teleportAnchorPose.ts': '4D-B',
+        'src/render/teleportTransferPresentation.ts': '4D-B',
+        'src/render/teleportTransferConduitCanvas.ts': '4D-B',
         'src/scenes/MenuScene.ts': '4D-B',
         'src/legacy-runtime/legacyAuth.ts': '3B',
         'src/legacy-runtime/legacyPlayerMessage.ts': '3B',
@@ -322,6 +324,8 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(waveFourDB.paths).toEqual([
         'src/render/teleportPrimaryAnchor.ts',
         'src/render/teleportAnchorPose.ts',
+        'src/render/teleportTransferPresentation.ts',
+        'src/render/teleportTransferConduitCanvas.ts',
         'src/scenes/MenuScene.ts'
       ]);
       expect(waveFourDB.dependsOn).toEqual(['4D-A']);
@@ -345,6 +349,8 @@ describe('Mazer UI rework decision registry contract', () => {
       }
       expect(owners.get('src/render/teleportPrimaryAnchor.ts')).toBe('4D-B');
       expect(owners.get('src/render/teleportAnchorPose.ts')).toBe('4D-B');
+      expect(owners.get('src/render/teleportTransferPresentation.ts')).toBe('4D-B');
+      expect(owners.get('src/render/teleportTransferConduitCanvas.ts')).toBe('4D-B');
       expect(owners.get('src/scenes/MenuScene.ts')).toBe('4D-B');
     });
 
@@ -354,6 +360,8 @@ describe('Mazer UI rework decision registry contract', () => {
 
       expect(collectIntegratorWaveOwnershipViolations(['src/render/teleportPrimaryAnchor.ts'], registry, '4D-B')).toEqual([]);
       expect(collectIntegratorWaveOwnershipViolations(['src/render/teleportAnchorPose.ts'], registry, '4D-B')).toEqual([]);
+      expect(collectIntegratorWaveOwnershipViolations(['src/render/teleportTransferPresentation.ts'], registry, '4D-B')).toEqual([]);
+      expect(collectIntegratorWaveOwnershipViolations(['src/render/teleportTransferConduitCanvas.ts'], registry, '4D-B')).toEqual([]);
       expect(collectIntegratorWaveOwnershipViolations(['src/scenes/MenuScene.ts'], registry, '4D-B')).toEqual([]);
 
       const violations = collectIntegratorWaveOwnershipViolations(['src/scenes/BootScene.ts'], registry, '4D-B');

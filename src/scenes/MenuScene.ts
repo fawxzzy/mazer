@@ -25,9 +25,7 @@ import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameTo
 import {
   advanceTrailShineState,
   buildContinuousTrailPath,
-  NAVIGATION_CORE_TRAIL_ENERGY_STOPS,
-  resampleTrailVertices,
-  sampleTrailEnergyColor
+  resampleTrailVertices
 } from '../render/navigationCoreTrail';
 import {
   computeTrailCanvasBounds,
@@ -42,13 +40,18 @@ import {
   computeGoalHaloCanvasBounds,
   drawGoalHaloToCanvasContext
 } from '../render/navigationCoreGoalHaloCanvas';
-import { resolveTeleportAnchorCandidates, type TeleportRect, type TeleportViewportBounds } from '../render/teleportAnchorPose';
+import { resolveTeleportAnchorCandidates, resolveTeleportAnchorEligibility, type TeleportAnchorPose, type TeleportRect, type TeleportViewportBounds } from '../render/teleportAnchorPose';
 import {
   selectTeleportPrimaryAnchor,
   type TeleportAnchorId,
   type TeleportAnchorRejection,
   type TeleportAnchorSelectionOutcome
 } from '../render/teleportPrimaryAnchor';
+import { resolveTeleportTransferPresentation, type TeleportTransferPresentation } from '../render/teleportTransferPresentation';
+import {
+  computeTeleportTransferConduitCanvasBounds,
+  drawTeleportTransferConduitToCanvasContext
+} from '../render/teleportTransferConduitCanvas';
 import {
   collectDemoWalkerRouteDiagnostics,
   type DemoRunnerTelemetry,
@@ -80,7 +83,8 @@ import {
   resolveLegacyShortestPath,
   type LegacyMazeGenerationProfile,
   type LegacyMazeSnapshot,
-  type LegacyPoint
+  type LegacyPoint,
+  type LegacyShortestPathResult
 } from '../legacy-runtime/legacyMaze';
 import { resolveInitialRuntimeMode } from '../legacy-runtime/legacyLaunchMode';
 import {
@@ -1069,6 +1073,26 @@ interface LegacyQaDiagnosticsApi {
   // LegacyTeleportAnchorPreviewResult's own comment above.
   previewTeleportPrimaryAnchor(targetX: number, targetY: number, newSession?: boolean): LegacyTeleportAnchorPreviewResult;
   endTeleportPrimaryAnchorPreview(): void;
+  // Exposes the REAL production wrap-aware solver (resolveLegacyPlayableShortestPath,
+  // the same one this scene's own AI/telemetry code already calls) to
+  // external real-browser test/evidence scripts, so they drive a genuine
+  // shortest route rather than maintaining their own separate (and, until
+  // this method existed, non-wrap-aware) BFS -- review 5146800659's own
+  // request, continuing 5144999445. From is the real current player
+  // position by default; to is always the real current goal.
+  resolveShortestPathToGoal(from?: LegacyPoint): LegacyShortestPathResult;
+  // Exposes renderGameplayTransferPresentation's own last cached real
+  // presentation snapshot (source/target/conduit points, all real
+  // WORLD-space) so real-browser tests can assert on the actual
+  // displayed geometry, not just visibility. Review 5146800659's own
+  // request. Returns null whenever no gameplay transfer presentation has
+  // rendered since the last reset (mirrors the field's own null state).
+  getGameplayTransferPresentationDiagnostics(): {
+    target: { x: number; y: number };
+    primaryPoseId: number | null;
+    capturedAtMs: number;
+    presentation: TeleportTransferPresentation;
+  } | null;
 }
 
 declare global {
@@ -1217,9 +1241,61 @@ const LEGACY_PLAY_TRAIL_WIDTH_RATIO = 0.16;
 // ratios scale with tileSize like everything else here, so the glow stays
 // a crisp accent rather than a blurred bar at compact/mobile tile sizes.
 const LEGACY_PLAY_TRAIL_GLOW_WIDTH_RATIO = 0.3;
-const LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO = 0.22;
+// OWNER-AUTHORIZED VISUAL AMENDMENT (2026-09-09, with the calmer
+// NAVIGATION_CORE_TRAIL_ENERGY_STOPS palette): dropped from 0.22 -> 0.15
+// so the glow reads as a soft halo supporting the crisp core rather than
+// a wide translucent wash bleeding across the corridor floor. Still
+// scales with tileSize like everything else here.
+const LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO = 0.15;
 const LEGACY_PLAY_TRAIL_CORNER_RADIUS_RATIO = 0.16;
 const LEGACY_PLAY_TRAIL_PLAYER_TRIM_RATIO = 0.3;
+// OWNER-AUTHORIZED VISUAL AMENDMENT (direct product-owner instruction,
+// 2026-09-09): the original Navigation Core ENERGY palette
+// (NAVIGATION_CORE_TRAIL_ENERGY_STOPS, from the frozen reference's own
+// generator) puts every stop at full saturation and runs THREE
+// consecutive fully-saturated warm stops (red/orange/yellow) -- ~37% of
+// the cycle. On the real in-game trail and the gameplay-transfer conduit
+// that reads as an abrasive full-spectrum rainbow ribbon filling the
+// corridor, which the owner explicitly asked to calm. This calmer set
+// keeps the recognizable cool "energy" identity and the exact 8-stop
+// cyclic structure, but: every stop pulled to medium luminance / moderate
+// saturation (no neon); the three-stop warm band collapsed to ONE dusty
+// mauve accent, bracketed by violet on both sides so it can never form a
+// broad warm band as the phase drifts; adjacent stops kept close in hue
+// so the RGB lerp between them stays a smooth blend rather than a muddy
+// jump between distant hues.
+//
+// Scoped deliberately to Wave 4D-B's own rendering: the shared 4D-A
+// module src/render/navigationCoreTrail.ts (NAVIGATION_CORE_TRAIL_ENERGY_STOPS,
+// sampleTrailEnergyColor) and the frozen reference file are BOTH left
+// untouched -- only this scene's own three consumers of that material
+// (the continuous play trail, the gameplay-transfer conduit, and the
+// on-board goal-star ring) sample this calmer set instead, via
+// sampleCalmTrailEnergyColor below. Recorded in docs/current-truth.md as
+// an owner-authorized amendment; the new palette is a candidate for the
+// owner's review, not automatically accepted.
+const LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS = [
+  0x45a4c0,
+  0x4d8ac0,
+  0x6576bb,
+  0x7f68b2,
+  0x9c60a4,
+  0x7a66b6,
+  0x5183c0,
+  0x48ab98
+] as const;
+// The exact math of navigationCoreTrail.ts's own sampleTrailEnergyColor
+// (a pure function of distance/time phase), but sampling the calmer
+// amendment palette above instead of the frozen module's own stops.
+const sampleCalmTrailEnergyColor = (
+  distance: number,
+  timeMs: number,
+  options: { distancePeriodPx: number; timePeriodMs: number }
+): number => {
+  const distancePhase = options.distancePeriodPx > 0 ? distance / options.distancePeriodPx : 0;
+  const timePhase = options.timePeriodMs > 0 ? timeMs / options.timePeriodMs : 0;
+  return resolveLegacyIridescentMidnightColor(distancePhase + timePhase, LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS);
+};
 // Fine resampling interval for color/alpha continuity -- see
 // resampleTrailVertices's own header for why Canvas-mode Phaser Graphics
 // needs this at all (no per-vertex gradient stroke).
@@ -1553,6 +1629,20 @@ const TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX = 32;
 // keeps the full footprint within the viewport at every possible
 // target-facing angle, not just the axis-aligned ones.
 const TELEPORT_ANCHOR_PREVIEW_VIEWPORT_INSET_PX = (TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX * Math.SQRT2) / 2;
+
+// Real gameplay transfer conduit tuning (Wave 4D-B, single held primary --
+// see teleportTransferPresentation.ts / teleportTransferConduitCanvas.ts).
+// Values are a deliberately modest first pass matched to the shell's own
+// TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX (32px): thin core, a wider
+// soft glow pass, and a compact packet. The target flare's own radius is
+// NOT a fixed constant -- it is derived from the real target cell's own
+// world-space size at the call site (drawGameplayTransferConduitCanvas),
+// so it stays "one cell of contained energy" rather than a fixed pixel
+// count that could dwarf a compact tile or undershoot a large one.
+const TELEPORT_TRANSFER_CONDUIT_CORE_WIDTH_PX = 3;
+const TELEPORT_TRANSFER_CONDUIT_GLOW_WIDTH_PX = 10;
+const TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX = 8;
+const TELEPORT_TRANSFER_PACKET_RADIUS_PX = 4;
 // Native pixel size of the teleport-beam source art (see
 // docs/assets/mazer-vfx-source-provenance.md) -- a horizontal strip, a
 // diamond emitter/receiver cap baked into each end, with the full rainbow
@@ -1923,6 +2013,10 @@ export class MenuScene extends Phaser.Scene {
   private titleTileFontImagePool: Phaser.GameObjects.Image[] = [];
   private levelAnnouncerLabelText!: Phaser.GameObjects.Text;
   private levelAnnouncerWasVisible = false;
+  // One-more-redraw falling-edge tracker for the real initial-arrival
+  // conduit hide (see this field's own use in drawDynamicBoard for the
+  // confirmed real defect it fixes).
+  private playerSpawnBurstWasActiveForRedraw = false;
   private levelAnnouncerBuildFadeOutArmed = false;
   private playerSpawnBurstStartedAtMs: number | null = null;
   private playerTransferEnergyArmed = false;
@@ -2069,6 +2163,134 @@ export class MenuScene extends Phaser.Scene {
   private goalHaloCanvasWidth = 0;
   private goalHaloCanvasHeight = 0;
   private goalHaloCanvasResolution = 0;
+  // Same real-2D-canvas pattern as goalHaloCanvasImage above, for the real
+  // single-primary gameplay Teleport transfer conduit (Wave 4D-B --
+  // teleportTransferConduitCanvas.ts). A boardZoomContainer CHILD, added
+  // immediately before titleOrbitDiamondImages (see that add-call's own
+  // comment) so the real shell renders ON TOP of this conduit at the
+  // source end -- the frozen contract's own masking requirement.
+  // (Originally added directly to the scene instead; review 5142235386
+  // caught that this rendered the conduit ABOVE the shell, backwards
+  // from the masking requirement -- fixed by moving it here.) Its own
+  // draw call (drawGameplayTransferConduitCanvas) converts every WORLD-
+  // space point the presentation module returns into this container's
+  // own local space via pointToContainer, exactly the same conversion
+  // the shell's own positioning already uses (applyLegacyTeleportAnchorPreviewOverride),
+  // applied consistently to every point this draw needs, plus dividing
+  // every pixel-size constant by the container's own scale for the same
+  // reason the shell's own local scale is.
+  private gameplayTransferConduitCanvasTextureKey: string | null = null;
+  private gameplayTransferConduitCanvasTexture: Phaser.Textures.CanvasTexture | null = null;
+  private gameplayTransferConduitCanvasImage: Phaser.GameObjects.Image | null = null;
+  private gameplayTransferConduitCanvasWidth = 0;
+  private gameplayTransferConduitCanvasHeight = 0;
+  private gameplayTransferConduitCanvasResolution = 0;
+  // The real single held primary for the actual (not QA-preview) gameplay
+  // transfer -- an entirely separate session from teleportAnchorPreviewSession
+  // ("the QA preview is not gameplay session ownership"). Selected at the
+  // real goal-reached instant (see the play-mode call site right after
+  // armLegacyPlayerTransferEnergy), retained through outbound/stored/
+  // delivering via the real selector's own retention rule (passed as
+  // heldAnchorId on every call), and cleared only when
+  // resetLegacyPlayerTransferEnergy runs -- so a genuinely new transfer
+  // always starts fresh, matching the frozen contract's "same primary
+  // persists through outbound -> stored -> delivering" requirement.
+  private gameplayTransferPrimaryId: TeleportAnchorId | null = null;
+  // Confirmed real defect: applyLegacyGameplayTransferPresentation used to
+  // re-run anchor selection every frame regardless of overlay state.
+  // Opening an overlay (in practice, only the pause overlay can be open
+  // while a transfer is active) populates this.uiButtons with that
+  // overlay's own buttons, which resolveLegacyTeleportAnchorPreviewExclusions
+  // folds into the real exclusion set the very next frame -- if one of
+  // those buttons happens to cover the held anchor's real footprint, the
+  // selector legitimately (and silently) reselects a different anchor
+  // while paused, even though nothing about the transfer itself changed.
+  // Resuming would then snap the shell/conduit to the new anchor with no
+  // crossfade, a real visible jump the "same primary persists through the
+  // whole cycle" contract does not allow. This field caches the last
+  // resolved pose so the presentation can be redrawn from it, unchanged,
+  // on any frame the overlay is open -- mirroring exactly how
+  // advanceLegacyGameplayTransferAnimationClock already freezes the
+  // material clock for the same reason. Cleared alongside primaryId.
+  private gameplayTransferLastPrimaryPose: TeleportAnchorPose | null = null;
+  // Confirmed real defect, found via the gameplayTransferLastPrimaryPose
+  // fix above: this.overlay flips back to 'none' SYNCHRONOUSLY the
+  // instant a RESUME_RUN command is dispatched (outside the normal
+  // per-frame update sequence entirely), but this.uiButtons -- which
+  // resolveLegacyTeleportAnchorPreviewExclusions reads directly -- is
+  // only rebuilt from the uiDirty flag LATER in that same update(),
+  // strictly after drawDynamicBoard's own call into this method. So the
+  // very first frame after resume still sees the STALE, pause-era
+  // uiButtons (the pause menu's own wide button rects) even though
+  // overlay already reads 'none' -- gating on overlay alone reselects
+  // away from the held anchor on exactly that one transitional frame.
+  // Tracking the overlay value observed on the PREVIOUS call and
+  // requiring it to ALSO have been 'none' before trusting uiButtons
+  // again gives that rebuild exactly one extra frame to catch up.
+  // Defaults (and resets) to 'none', not null -- a brand-new transfer's
+  // very first frame has no stale pause-era uiButtons to wait out, so it
+  // should resolve selection immediately rather than paying the same
+  // one-frame delay a real resume needed.
+  private gameplayTransferLastObservedOverlay: OverlayKind = 'none';
+  // The most recent real gameplay-transfer presentation this frame
+  // actually rendered from (renderGameplayTransferPresentation's own
+  // cache of its own resolveTeleportTransferPresentation output) --
+  // exposed read-only via window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics()
+  // so real-browser tests can assert on the actual displayed geometry
+  // (source tip, conduit endpoint, target point) rather than only
+  // visibility/positive-dimensions. Cleared alongside the other sticky
+  // gameplay-transfer fields.
+  private gameplayTransferLastPresentationSnapshot: {
+    presentation: TeleportTransferPresentation;
+    target: { x: number; y: number };
+    primaryPoseId: TeleportAnchorId | null;
+    capturedAtMs: number;
+  } | null = null;
+  // Confirmed real defect (review 5147427468, continuing 5144999445 /
+  // 5146800659): the gameplay transfer's own outbound/delivery elapsed
+  // computation (time - startedAtMs) is not itself pause-aware --
+  // scene.time.now keeps advancing in real wall-clock terms regardless
+  // of the pause overlay (this.scene.pause() is never called anywhere in
+  // this codebase), so a real pause let phase genuinely advance
+  // (confirmed live: outbound -> stored while "paused"), and a real
+  // resume could reveal a jump or even a fully completed/reset transfer
+  // the player never saw run. These two fields implement a narrowly
+  // scoped pause-aware elapsed-time correction at this exact boundary --
+  // NOT a second gameplay state machine or a second clock:
+  // resolveLegacyPlayerTransferVisualState (the one authoritative
+  // lifecycle) is untouched; only the ELAPSED-MS INPUTS this scene feeds
+  // it are compensated for real time spent paused, the same
+  // accumulate-while-unpaused/freeze-while-paused shape already
+  // established for the material animation clock
+  // (advanceLegacyGameplayTransferAnimationClock), applied here to the
+  // lifecycle's own elapsed inputs instead of a presentation-only value.
+  // Updated exactly once per frame (updateGameplayTransferPauseTracking,
+  // called alongside settleLegacyPlayerTransferEnergy, itself already
+  // unconditional every frame) and consumed by every real elapsed-ms
+  // computation this scene derives for the transfer AND the initial
+  // arrival (resolveLegacyPlayerSpawnBurstState) alike, since pause is
+  // one real, global UI state affecting both identically. Reset to zero
+  // at every genuine new session boundary (the same three sites the
+  // other sticky gameplay-transfer fields already reset at) so a pause
+  // from an unrelated, already-finished session never bleeds into a
+  // later one.
+  private gameplayTransferPausedDurationMs = 0;
+  private gameplayTransferPauseStartedAtMs: number | null = null;
+  // The most recent `time` value observed while NOT paused. Confirmed
+  // real one-frame boundary defect (ChatGPT-assisted review 5147427468):
+  // overlay flips to 'pause' synchronously (a QA/UI command, not itself a
+  // frame tick), so the first real frame where updateGameplayTransferPauseTracking
+  // observes `paused === true` already has a NEW, larger `time` than the
+  // last frame rendered while unpaused. Anchoring gameplayTransferPauseStartedAtMs
+  // at THAT frame's own `time` (the original implementation) let exactly
+  // one real frame's worth of elapsed-ms slip through unfrozen before the
+  // freeze took hold on the frame after -- pause looked "frozen" from the
+  // second paused frame onward, but the very first paused sample still
+  // differed from the last pre-pause sample. Anchoring at this field's
+  // last pre-pause value instead means the pause boundary itself
+  // contributes zero elapsed-ms, matching "frozen identically" from the
+  // first paused frame, not the second.
+  private gameplayTransferLastUnpausedTimeMs: number | null = null;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
   private overlayGuideGraphics: Phaser.GameObjects.Graphics | null = null;
@@ -2156,6 +2378,16 @@ export class MenuScene extends Phaser.Scene {
   // real delta instead of the whole paused/reduced-motion gap.
   private trailAnimationElapsedMs = 0;
   private trailAnimationLastRealMs: number | null = null;
+  // Same pausable-clock pattern as trailAnimationElapsedMs/trailAnimationLastRealMs
+  // above, a SEPARATE pair (not reused directly -- advanceLegacyTrailAnimationClock
+  // has its own side effects and is only safe to call once per frame) for
+  // the real gameplay Teleport transfer conduit's own spatial energy
+  // material (Wave 4D-B). Freezes under reduced motion, Pause, or any
+  // overlay/lifecycle-lock exactly like the trail's own clock does, so the
+  // conduit's color never visibly drifts while the game is paused or
+  // reduced motion is active.
+  private gameplayTransferAnimationElapsedMs = 0;
+  private gameplayTransferAnimationLastRealMs: number | null = null;
   // The continuous play trail's shared shine lap-start timestamp, expressed
   // in trailAnimationElapsedMs units (not raw scene time) -- see
   // advanceTrailShineState's own header for why this must be explicit,
@@ -2227,6 +2459,16 @@ export class MenuScene extends Phaser.Scene {
   // fade-out, the bleed-off dock regrowth) needs its own timestamp that
   // persists for the full phase instead of reusing that one.
   private menuStaticBuildPhaseStartedAtMs: number | null = null;
+  // Owner-reported (ChatGPT-assisted review 5173052153): a Play-mode pause
+  // froze the transfer's own clocks but NOT the coupled maze
+  // reveal/deconstruct/handoff lifecycle -- the submitted pause recording
+  // showed corridor tiles disappearing while the pause menu stayed open.
+  // holdLegacyPlayMazeLifecycleDuringPause uses this to shift every one of
+  // that lifecycle's absolute-time deadlines/anchors forward by exactly
+  // the real frame elapsed while paused, so it holds still without
+  // touching `time` or pausing the whole scene. Null until the first
+  // real frame.
+  private legacyPlayMazeLifecyclePrevFrameMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
   private legacyMenuTitleAnimationNextFrameAtMs = 0;
   // Orbit sigils ease into their frozen resting positions instead of
@@ -2413,6 +2655,15 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics = this.add.graphics();
     this.touchSettingsCogIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.playerSpawnBurstGraphics = this.add.graphics();
+    // Real single-primary gameplay transfer conduit (Wave 4D-B). The
+    // TEXTURE is created here; the Image itself is created and added to
+    // boardZoomContainer further below, immediately before
+    // titleOrbitDiamondImages, specifically so the real shell renders
+    // ON TOP of (masks) this conduit at the source end -- see that
+    // field's own comment for the full reasoning. NOT the same
+    // top-level coordinate space playerSpawnBurstGraphics uses.
+    this.gameplayTransferConduitCanvasTextureKey = `legacy-teleport-transfer-conduit-${nextMenuSceneInstanceId()}`;
+    this.gameplayTransferConduitCanvasTexture = this.textures.createCanvas(this.gameplayTransferConduitCanvasTextureKey, 1, 1);
     // Same top-level (non-boardZoomContainer) coordinate space
     // playerSpawnBurstGraphics itself already draws the beam origins/target
     // in -- see drawLegacyPlayerTransferEnergyBeam.
@@ -2466,6 +2717,16 @@ export class MenuScene extends Phaser.Scene {
       { length: LEGACY_TILE_FONT_GLYPH_POOL_SIZE * LEGACY_TILE_FONT_TILES_PER_GLYPH },
       () => this.add.image(0, 0, MAZER_TILE_FONT_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
     );
+    // Added to boardZoomContainer BEFORE titleOrbitDiamondImages, so the
+    // real shell slots render ON TOP of (mask) this conduit at the
+    // source end -- the frozen contract's own masking requirement, and
+    // the actual fix for review 5142235386's real z-order finding
+    // (a prior top-level placement rendered the conduit ABOVE the
+    // shell). Its own draw call converts every point into this same
+    // container-local space via pointToContainer -- see
+    // drawGameplayTransferConduitCanvas's own comment.
+    this.gameplayTransferConduitCanvasImage = this.add.image(0, 0, this.gameplayTransferConduitCanvasTextureKey).setOrigin(0, 0).setVisible(false);
+    this.boardZoomContainer.add(this.gameplayTransferConduitCanvasImage);
     // Added to boardZoomContainer (not the top-level scene) so these sit in
     // the exact same local coordinate space and z-order titleGraphics itself
     // uses (last child = renders above the board layers, and the container
@@ -2562,6 +2823,12 @@ export class MenuScene extends Phaser.Scene {
       this.goalHaloCanvasTexture = null;
       this.goalHaloCanvasImage = null;
       this.goalHaloCanvasTextureKey = null;
+      if (this.gameplayTransferConduitCanvasTextureKey !== null && this.textures.exists(this.gameplayTransferConduitCanvasTextureKey)) {
+        this.textures.remove(this.gameplayTransferConduitCanvasTextureKey);
+      }
+      this.gameplayTransferConduitCanvasTexture = null;
+      this.gameplayTransferConduitCanvasImage = null;
+      this.gameplayTransferConduitCanvasTextureKey = null;
       if (this.remoteSettingsSyncTimer !== null) {
         clearTimeout(this.remoteSettingsSyncTimer);
         this.remoteSettingsSyncTimer = null;
@@ -2795,7 +3062,11 @@ export class MenuScene extends Phaser.Scene {
       previewTeleportPrimaryAnchor: (targetX: number, targetY: number, newSession?: boolean): LegacyTeleportAnchorPreviewResult => (
         this.handleLegacyQaPreviewTeleportPrimaryAnchor(targetX, targetY, newSession === true)
       ),
-      endTeleportPrimaryAnchorPreview: (): void => this.handleLegacyQaEndTeleportPrimaryAnchorPreview()
+      endTeleportPrimaryAnchorPreview: (): void => this.handleLegacyQaEndTeleportPrimaryAnchorPreview(),
+      resolveShortestPathToGoal: (from?: LegacyPoint): LegacyShortestPathResult => (
+        resolveLegacyPlayableShortestPath(this.maze.grid, from ?? this.player, this.maze.goal)
+      ),
+      getGameplayTransferPresentationDiagnostics: () => this.gameplayTransferLastPresentationSnapshot
     };
   }
 
@@ -2894,7 +3165,16 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyTeleportAnchorPreviewResult(
     target: { x: number; y: number },
     heldAnchorId: TeleportAnchorId | null
-  ): { result: ReturnType<typeof selectTeleportPrimaryAnchor>; poseById: Map<TeleportAnchorId, { anchorX: number; anchorY: number; rotation: number; portX: number; portY: number; footprint: TeleportRect }> } {
+  ): {
+    result: ReturnType<typeof selectTeleportPrimaryAnchor>;
+    poseById: Map<TeleportAnchorId, { anchorX: number; anchorY: number; rotation: number; portX: number; portY: number; footprint: TeleportRect }>;
+    // The exact viewport + exclusion snapshot this selection was resolved
+    // against, so a caller (renderGameplayTransferPresentation's sticky-pose
+    // fallback) can re-validate a cached pose against the SAME frame's
+    // layout inputs -- never a second, independently-recomputed snapshot
+    // that could disagree with the one the selector actually used.
+    layoutSnapshot: { viewport: TeleportViewportBounds; exclusions: TeleportRect[] };
+  } {
     const viewport = { width: this.layout.width, height: this.layout.height };
     const exclusions = this.resolveLegacyTeleportAnchorPreviewExclusions(viewport);
 
@@ -2914,7 +3194,435 @@ export class MenuScene extends Phaser.Scene {
       portY: candidate.pose.portY,
       footprint: candidate.pose.footprint
     }]));
-    return { result, poseById };
+    return { result, poseById, layoutSnapshot: { viewport, exclusions } };
+  }
+
+  // Real single-primary gameplay transfer (Wave 4D-B) -- an entirely
+  // separate session from the QA preview above ("the QA preview is not
+  // gameplay session ownership"). Called from drawDynamicBoard, which is
+  // guaranteed to run every frame a transfer is active regardless of mode
+  // or reduced motion (see the update() loop's own
+  // `resolveLegacyPlayerTransferState(time).active` -> boardDynamicDirty
+  // re-arm), so this needs no separate dirty-flag/presentation-update
+  // plumbing of its own the way the QA preview did.
+  //
+  // Reuses resolveLegacyTeleportAnchorPreviewResult (real viewport, real
+  // HUD/safe-area/play-control exclusions, the real selector) rather than
+  // re-deriving candidate resolution -- the same real geometry PR #347
+  // already established and reviewed, just fed a real gameplay target/
+  // held-id instead of the QA session's.
+  //
+  // targetX/targetY (scene/world space, already computed by the caller
+  // exactly as drawLegacyPlayerTransferEnergy's own call site does) serve
+  // as BOTH the selector's own `target` (nearest-eligible-anchor
+  // candidate, only consulted on a genuinely new selection) and, passed
+  // through to the presentation module as both extractionTarget and
+  // deliveryTarget: teleportTransferPresentation.ts only ever reads
+  // whichever one is relevant to the CURRENT phase, and targetX/targetY
+  // already resolves to the correct point for that phase (the goal during
+  // 'outbound'/'stored', the real next-start point during 'delivering') --
+  // exactly mirroring drawLegacyPlayerTransferEnergy's own single-targetX/Y
+  // reuse for its two direction cases.
+  private applyLegacyGameplayTransferPresentation(
+    targetX: number,
+    targetY: number,
+    targetCellSizePx: number,
+    time: number
+  ): void {
+    const gameplayTransferAnimationTime = this.advanceLegacyGameplayTransferAnimationClock(time);
+    this.renderGameplayTransferPresentation(
+      { x: targetX, y: targetY },
+      targetCellSizePx,
+      time,
+      gameplayTransferAnimationTime,
+      {
+        armed: this.playerTransferEnergyArmed,
+        // Confirmed real defect (ChatGPT-assisted review 5147427468):
+        // these two elapsed-ms inputs feed the presentation module's own
+        // closure/crossfade windows (resolveExtractionClosurePresentation,
+        // and the delivering-phase travel/flash math) directly -- they
+        // are a SEPARATE read of the same startedAtMs fields already
+        // compensated for pause in resolveLegacyPlayerTransferState /
+        // resolveLegacyPlayerSpawnBurstState (see
+        // resolveGameplayTransferPausedOffsetMs). Subtracting the same
+        // paused offset here too keeps the presentation layer frozen in
+        // lockstep with the lifecycle phase/progress it derives from --
+        // without this, phase/progress correctly froze while paused but
+        // openFraction/conduitVisible/sourceFlareIntensity kept changing
+        // underneath, because this closure math kept advancing on real
+        // elapsed ms alone.
+        outboundElapsedMs: this.playerTransferEnergyOutboundStartedAtMs === null
+          ? null
+          : time - this.playerTransferEnergyOutboundStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time),
+        deliveryElapsedMs: this.playerTransferEnergyDeliveryStartedAtMs === null
+          ? null
+          : time - this.playerTransferEnergyDeliveryStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time),
+        deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
+        deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS
+      }
+    );
+  }
+
+  // Confirmed real defect (ChatGPT-assisted review 5144999445, verified
+  // independently by reading drawDynamicBoard's own call sites before
+  // fixing): drawLegacyPlayerSpawnBurst -- a SEPARATE old effect from
+  // drawLegacyPlayerTransferEnergy/playerTransferBeamStripImages, drawing
+  // one procedural beam per orbit sigil (the exact same eight origins the
+  // ambient volley uses) into playerSpawnBurstGraphics -- had no mode
+  // branch at all and fired in Play mode too, including on the very
+  // first maze of a run and every ordinary play reset with no preceding
+  // goal completion (armLegacyPlayerArrivalForFinalBuildStep arms
+  // playerSpawnBurstStartedAtMs on every settled maze build, not only
+  // when a real transfer was armed). The permanent test's own
+  // playerTransferBeamStripImages check could never have caught this --
+  // that field is a different pool this separate Graphics-based effect
+  // never touches.
+  //
+  // This method is Play mode's real replacement for exactly that gap:
+  // the ordinary arrival case with no preceding armed transfer (a real
+  // armed transfer's own delivering phase is already fully covered by
+  // applyLegacyGameplayTransferPresentation above -- this method is never
+  // called for that case; see the call site's own mode/active gating).
+  // Reuses the SAME single-primary conduit/shell renderer, driven by
+  // playerSpawnBurst's own elapsed/travel/flash clock (identical
+  // LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS/FLASH_MS constants the old burst
+  // itself used) instead of a real transfer's own clock, so Play mode
+  // never shows two different arrival visual languages. Menu mode keeps
+  // calling drawLegacyPlayerSpawnBurst unchanged -- the frozen contract
+  // reserves that choreography for menu/title.
+  private applyLegacyGameplayInitialArrivalPresentation(
+    targetX: number,
+    targetY: number,
+    targetCellSizePx: number,
+    time: number
+  ): void {
+    const gameplayTransferAnimationTime = this.advanceLegacyGameplayTransferAnimationClock(time);
+    this.renderGameplayTransferPresentation(
+      { x: targetX, y: targetY },
+      targetCellSizePx,
+      time,
+      gameplayTransferAnimationTime,
+      {
+        armed: this.playerSpawnBurstStartedAtMs !== null,
+        outboundElapsedMs: null,
+        // Same pause-offset correction as applyLegacyGameplayTransferPresentation
+        // above, for the initial-arrival clock (playerSpawnBurstStartedAtMs)
+        // instead of the armed-transfer clock -- see that method's comment.
+        deliveryElapsedMs: this.playerSpawnBurstStartedAtMs === null
+          ? null
+          : time - this.playerSpawnBurstStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time),
+        deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
+        deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS
+      }
+    );
+  }
+
+  // Shared by applyLegacyGameplayTransferPresentation (a real armed
+  // transfer's own delivering phase) and
+  // applyLegacyGameplayInitialArrivalPresentation (Play mode's ordinary
+  // arrival with no preceding armed transfer) -- the two differ only in
+  // which clock/phase input drives resolveTeleportTransferPresentation;
+  // selection, shell positioning, and the conduit draw call are identical
+  // and were previously duplicated once already (the exact kind of drift
+  // that produced the z-order/masking bug a prior round fixed), so this
+  // extraction keeps there being exactly one copy of that logic.
+  private renderGameplayTransferPresentation(
+    target: { x: number; y: number },
+    targetCellSizePx: number,
+    time: number,
+    gameplayTransferAnimationTime: number,
+    lifecycleInput: {
+      armed: boolean;
+      outboundElapsedMs: number | null;
+      deliveryElapsedMs: number | null;
+      deliveryFlashMs: number;
+      deliveryTravelMs: number;
+    }
+  ): void {
+    // Confirmed real defect: re-resolving anchor selection on every frame
+    // regardless of overlay state let the pause overlay's own buttons
+    // (folded into this.uiButtons the instant it opens) silently
+    // reselect the held anchor away from a footprint they newly cover --
+    // a real snap on resume, not merely a frozen frame. While an overlay
+    // is open, selection is skipped entirely and the last real resolved
+    // pose is reused unchanged -- the exact same "freeze while overlay is
+    // open" rule already applied to the material animation clock, now
+    // applied to geometry too.
+    //
+    // Confirmed real defect (found verifying the fix above): overlay
+    // itself flips back to 'none' synchronously on RESUME_RUN, one full
+    // frame before this.uiButtons is rebuilt free of the pause menu's
+    // own rects (see gameplayTransferLastObservedOverlay's own field
+    // comment) -- gating on overlay alone still reselected away from the
+    // held anchor on that one transitional frame. Requiring the
+    // PREVIOUS frame to have also been unpaused closes that window.
+    const shouldResolveSelection = this.overlay === 'none' && this.gameplayTransferLastObservedOverlay === 'none';
+    this.gameplayTransferLastObservedOverlay = this.overlay;
+    let primaryPose: TeleportAnchorPose | null;
+    if (shouldResolveSelection) {
+      const { result, poseById, layoutSnapshot } = this.resolveLegacyTeleportAnchorPreviewResult(target, this.gameplayTransferPrimaryId);
+      // Sticky held identity: only overwrite when the selector actually
+      // found a legal anchor this frame. A transient 'unavailable' result
+      // (e.g. a HUD control momentarily overlapping every candidate) must
+      // NOT forget which primary this transfer is using -- the selector's
+      // own retention rule already resumes the SAME held id automatically
+      // once it becomes eligible again, as long as this field keeps
+      // passing that id back in rather than clearing it to null. Only
+      // resetLegacyPlayerTransferEnergy (a genuine completion/reset) clears
+      // this field.
+      if (result.selectedId !== null) {
+        this.gameplayTransferPrimaryId = result.selectedId;
+      }
+      const poseFields = result.selectedId === null ? null : (poseById.get(result.selectedId) ?? null);
+      primaryPose = poseFields === null || result.selectedId === null ? null : {
+        id: result.selectedId,
+        anchorX: poseFields.anchorX,
+        anchorY: poseFields.anchorY,
+        rotation: poseFields.rotation,
+        portX: poseFields.portX,
+        portY: poseFields.portY,
+        footprint: poseFields.footprint
+      };
+      if (primaryPose !== null) {
+        this.gameplayTransferLastPrimaryPose = primaryPose;
+      } else if (
+        this.gameplayTransferLastPrimaryPose !== null
+        && (lifecycleInput.armed || this.resolveLegacyPlayerSpawnBurstState(time).active)
+        && resolveTeleportAnchorEligibility(
+          this.gameplayTransferLastPrimaryPose,
+          layoutSnapshot.exclusions,
+          layoutSnapshot.viewport
+        ).eligible
+      ) {
+        // Sticky held POSE, not just id -- owner-reported (2026-09-09): the
+        // conduit blinked out partway through a real transfer, confirmed
+        // live as the selector transiently returning NO legal pose for the
+        // held anchor during the maze rebuild inside 'stored'. Reusing the
+        // last good pose through that transient window keeps the conduit
+        // attached (the same "don't forget mid-transfer" rule already
+        // applied to the held id just above; a genuine completion/reset
+        // still clears this field via resetLegacyPlayerTransferEnergy).
+        //
+        // BUT: only when the cached pose's own footprint STILL clears the
+        // current layout (ChatGPT-assisted review 5173052153) -- validated
+        // here against `layoutSnapshot`, the EXACT viewport + exclusion set
+        // this same frame's selection was resolved against (not a second,
+        // independently-recomputed snapshot). A genuine clearance failure
+        // (a real resize, or an exclusion that actually now covers the
+        // cached footprint) falls through to primaryPose === null and the
+        // presentation module's existing explicit degradation
+        // (poseAvailable: false -- no fabricated shell/conduit, held id and
+        // all domain/lifecycle state retained), never an offscreen or
+        // HUD-overlapping shell drawn just to avoid a blink.
+        primaryPose = this.gameplayTransferLastPrimaryPose;
+      }
+    } else {
+      primaryPose = this.gameplayTransferLastPrimaryPose;
+    }
+
+    // Computed once and reused for both the shell's own intensity below
+    // and the conduit render call further down -- sourceFlareIntensity
+    // does not depend on primaryPose/targets in any branch, but sharing
+    // one call avoids resolving the same projection twice per frame.
+    const presentation = resolveTeleportTransferPresentation({
+      armed: lifecycleInput.armed,
+      outboundElapsedMs: lifecycleInput.outboundElapsedMs,
+      deliveryElapsedMs: lifecycleInput.deliveryElapsedMs,
+      deliveryFlashMs: lifecycleInput.deliveryFlashMs,
+      deliveryTravelMs: lifecycleInput.deliveryTravelMs,
+      nowMs: time,
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      primaryPose,
+      extractionTarget: target,
+      deliveryTarget: target
+    });
+    // Cached for a real diagnostics QA surface (getGameplayTransferPresentationDiagnostics)
+    // -- review 5146800659's own request for geometry assertions that
+    // compare the displayed source tip, conduit endpoint, and target-cell
+    // bounds directly, not just visibility/positive-dimensions/non-null
+    // world positions. Every point here is already real WORLD-space
+    // (the same space primaryPose.portX/Y and target are both in) --
+    // no reconstruction, this is the exact input the renderer itself
+    // used this frame.
+    this.gameplayTransferLastPresentationSnapshot = { presentation, target, primaryPoseId: primaryPose?.id ?? null, capturedAtMs: time };
+
+    // Position/rotate/scale the SELECTED IDENTITY's own real shell slot --
+    // same coordinate-space conversion as applyLegacyTeleportAnchorPreviewOverride
+    // (Container.pointToContainer for position; rotation minus the
+    // container's own, correct under identity rotation + any uniform
+    // parent scale; local scale divided by the container's own scale so
+    // world size -- and so the real port -- stays correct regardless of
+    // that scale). An 'unavailable'/'invalid-input' outcome (primaryPose
+    // null) deliberately leaves every slot exactly as the ambient draw
+    // already left it -- never a fabricated placement. While paused,
+    // primaryPose is the cached pose from before the overlay opened, so
+    // this redraws the shell at the exact same position every frame --
+    // a harmless no-op, not a jump.
+    if (primaryPose !== null) {
+      const image = this.titleOrbitDiamondImages[primaryPose.id];
+      if (image) {
+        const local = this.boardZoomContainer.pointToContainer({ x: primaryPose.anchorX, y: primaryPose.anchorY });
+        const localRotation = primaryPose.rotation - this.boardZoomContainer.rotation;
+        const worldScale = TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX / MAZER_VFX_DIAMOND_SOURCE_SIZE;
+        const localScale = worldScale / this.boardZoomContainer.scaleX;
+        // Consumes the projected shell intensity (charging/absorption
+        // during outbound, the settled pulse during stored, the release
+        // glow during delivering) rather than a fixed full brightness --
+        // a real, previously-unused field. Floored, not left to reach 0,
+        // so the shell stays a legible, present object even at its
+        // dimmest moment (never fully invisible while it is the thing
+        // holding the transfer).
+        const shellAlpha = Math.max(0.55, presentation.sourceFlareIntensity);
+        image.setPosition(local.x, local.y).setRotation(localRotation).setScale(localScale).setAlpha(shellAlpha).setVisible(true);
+      }
+    }
+    this.drawGameplayTransferConduitCanvas(presentation, targetCellSizePx, gameplayTransferAnimationTime);
+  }
+
+  // Real 2D-canvas draw for the gameplay conduit -- same DPR/zoom-aware
+  // backing-resolution pattern drawGoalHaloCanvas/drawPlayerGlowCanvas
+  // already use (see either's own comment): a canvas gradient/path's own
+  // coordinates ARE scaled correctly by ctx.setTransform, but
+  // shadowBlur is a raw device-pixel radius the transform does NOT
+  // scale, so only conduitGlowBlurPx is multiplied by `resolution`
+  // explicitly here, matching this file's own established correction.
+  //
+  // LAYERING FIX (review 5142235386): this canvas Image is now a
+  // boardZoomContainer CHILD, positioned in the container's own child
+  // list immediately before titleOrbitDiamondImages (see the
+  // gameplayTransferConduitCanvasImage field's own comment for the
+  // exact reasoning) -- so it genuinely renders BENEATH the real shell
+  // at the source end, the frozen contract's own masking requirement,
+  // rather than on top of it (the real defect the previous top-level
+  // placement had). Every point `presentation` carries is in WORLD/
+  // scene space (the same space the real target/port math already
+  // uses); Container.pointToContainer converts each one into this
+  // container's own local space here -- the SAME conversion the shell's
+  // own positioning already uses just above, applied consistently to
+  // every point this draw needs, not just the shell's anchor. Every
+  // pixel SIZE constant (widths, radii, blur) is divided by the
+  // container's own scale for the same reason the shell's own local
+  // scale is (`worldScale / boardZoomContainer.scaleX`): a size meant to
+  // be a fixed WORLD pixel count must shrink/grow in LOCAL units so the
+  // container's own scale multiplies it back to the intended world size
+  // -- correct under any UNIFORM parent scale (boardZoomContainer's own
+  // stated purpose), not meaningful under a non-uniform one, exactly the
+  // same documented boundary the shell's own conversion already carries.
+  private drawGameplayTransferConduitCanvas(
+    presentation: TeleportTransferPresentation,
+    targetCellSizePx: number,
+    gameplayTransferAnimationTime: number
+  ): void {
+    if (!this.gameplayTransferConduitCanvasTexture || !this.gameplayTransferConduitCanvasImage) {
+      return;
+    }
+    if (
+      presentation.openFraction <= 0
+      || presentation.sourcePoint === null
+      || presentation.targetPoint === null
+      || presentation.conduitStartPoint === null
+      || presentation.conduitEndPoint === null
+    ) {
+      this.gameplayTransferConduitCanvasImage.setVisible(false);
+      return;
+    }
+
+    const containerScale = this.boardZoomContainer.scaleX;
+    const toContainerLocal = (point: { x: number; y: number }): { x: number; y: number } => (
+      this.boardZoomContainer.pointToContainer(point)
+    );
+    const localSourcePoint = toContainerLocal(presentation.sourcePoint);
+    const localTargetPoint = toContainerLocal(presentation.targetPoint);
+    const localConduitStartPoint = toContainerLocal(presentation.conduitStartPoint);
+    const localConduitEndPoint = toContainerLocal(presentation.conduitEndPoint);
+    const localPacketPoint = presentation.packetPoint === null ? null : toContainerLocal(presentation.packetPoint);
+
+    // A "contained one-cell" flare sized from the REAL target cell (a
+    // real WORLD pixel size, per the caller). Confirmed real defect
+    // (review 5142235386): a fixed 8px floor could exceed a compact
+    // cell's own half-size (e.g. a 10px cell only has 5px of half-width
+    // to work with), overflowing containment instead of respecting it.
+    // The containment cap (half the real cell, never more than 40px) is
+    // computed FIRST, and any readability floor is itself clamped to
+    // never exceed that cap. Converted to LOCAL units (divided by the
+    // container's own scale) only once the WORLD-space containment math
+    // is already settled.
+    const targetFlareContainmentCapWorld = Math.min(40, targetCellSizePx * 0.5);
+    const targetFlareReadabilityFloorWorld = Math.min(8, targetFlareContainmentCapWorld);
+    const targetFlareRadiusWorld = Math.max(
+      targetFlareReadabilityFloorWorld,
+      Math.min(targetFlareContainmentCapWorld, targetCellSizePx * 0.42)
+    );
+    const localTargetFlareRadius = targetFlareRadiusWorld / containerScale;
+    const localConduitCoreWidth = TELEPORT_TRANSFER_CONDUIT_CORE_WIDTH_PX / containerScale;
+    const localConduitGlowWidth = TELEPORT_TRANSFER_CONDUIT_GLOW_WIDTH_PX / containerScale;
+    const localConduitGlowBlurPx = TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX / containerScale;
+    const localPacketRadius = TELEPORT_TRANSFER_PACKET_RADIUS_PX / containerScale;
+    const localPadding = Math.ceil((targetFlareRadiusWorld + (TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX * 2.5)) / containerScale);
+    const bounds = computeTeleportTransferConduitCanvasBounds(localSourcePoint, localTargetPoint, localPadding);
+    const width = Math.max(1, Math.ceil(bounds.width));
+    const height = Math.max(1, Math.ceil(bounds.height));
+    const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
+    const resolution = Math.min(
+      MAZER_CANVAS_RESOLUTION_MAX * 2,
+      resolveMazerCanvasResolution() * zoomScale
+    );
+    const backingWidth = Math.max(1, Math.ceil(width * resolution));
+    const backingHeight = Math.max(1, Math.ceil(height * resolution));
+    if (
+      backingWidth !== this.gameplayTransferConduitCanvasWidth
+      || backingHeight !== this.gameplayTransferConduitCanvasHeight
+      || resolution !== this.gameplayTransferConduitCanvasResolution
+    ) {
+      this.gameplayTransferConduitCanvasTexture.setSize(backingWidth, backingHeight);
+      this.gameplayTransferConduitCanvasWidth = backingWidth;
+      this.gameplayTransferConduitCanvasHeight = backingHeight;
+      this.gameplayTransferConduitCanvasResolution = resolution;
+    } else {
+      this.gameplayTransferConduitCanvasTexture.clear(0, 0, backingWidth, backingHeight, false);
+    }
+    this.gameplayTransferConduitCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
+    // The Navigation-Core energy material -- the SAME one the play trail
+    // carries, so the conduit and the trail read as one energy language,
+    // not an independently-cycling approximation. Sampled at a REAL
+    // distance along the conduit (varying spatially, not one flat color
+    // per frame) and at this transfer's own pausable animation time
+    // (frozen under reduced motion, Pause, or any overlay).
+    // gameplayTransferAnimationTime is computed by the CALLER,
+    // unconditionally, every frame -- see applyLegacyGameplayTransferPresentation's
+    // own comment on why this must not be computed only when the conduit
+    // happens to be open. Uses sampleCalmTrailEnergyColor (the
+    // owner-authorized calmer palette, see LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS)
+    // for the same reason the trail does -- the owner reported this exact
+    // conduit beam as an abrasive rainbow.
+    const conduitColorOptions = {
+      distancePeriodPx: Math.max(1, targetCellSizePx / containerScale) * LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE,
+      timePeriodMs: LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS
+    };
+    const energyColorAtDistance = (distancePx: number): number => (
+      sampleCalmTrailEnergyColor(distancePx, gameplayTransferAnimationTime, conduitColorOptions)
+    );
+    drawTeleportTransferConduitToCanvasContext(this.gameplayTransferConduitCanvasTexture.context, {
+      originX: bounds.left,
+      originY: bounds.top,
+      targetPoint: localTargetPoint,
+      conduitStartPoint: localConduitStartPoint,
+      conduitEndPoint: localConduitEndPoint,
+      packetPoint: localPacketPoint,
+      packetVisible: presentation.packetVisible,
+      openFraction: presentation.openFraction,
+      targetFlareIntensity: presentation.targetFlareIntensity,
+      energyColorAtDistance,
+      conduitCoreWidth: localConduitCoreWidth,
+      conduitGlowWidth: localConduitGlowWidth,
+      conduitGlowBlurPx: localConduitGlowBlurPx * resolution,
+      packetRadius: localPacketRadius,
+      targetFlareRadius: localTargetFlareRadius
+    });
+    this.gameplayTransferConduitCanvasTexture.refresh();
+    this.gameplayTransferConduitCanvasImage.setPosition(bounds.left, bounds.top);
+    this.gameplayTransferConduitCanvasImage.setDisplaySize(width, height);
+    this.gameplayTransferConduitCanvasImage.setVisible(true);
   }
 
   // Reviewer-caught defect fixed: begin/update used to only mutate session
@@ -3277,6 +3985,8 @@ export class MenuScene extends Phaser.Scene {
       button.updateFrame?.(time);
     }
 
+    this.holdLegacyPlayMazeLifecycleDuringPause(time);
+
     const pendingReset = this.pendingResetRequest;
     if (pendingReset !== null && shouldConsumeLegacyResetRequest(pendingReset, time)) {
       this.pendingResetRequest = null;
@@ -3367,12 +4077,29 @@ export class MenuScene extends Phaser.Scene {
     // visibly holding energy, then self-clears when that same travel+flash
     // window completes -- no new lifecycle pause is introduced.
     this.settleLegacyPlayerTransferEnergy(time);
+    // Confirmed real defect (found strengthening the permanent gameplay
+    // test's own case 7 per review 5146800659): a real Play-mode initial
+    // arrival with no OTHER confounding system also forcing a redraw
+    // around the same instant (a real transfer's own completion happens
+    // to coincide with other maze-settling redraws that mask this) left
+    // gameplayTransferConduitCanvasImage stuck visible forever once
+    // playerSpawnBurst.active's own falling edge stopped forcing
+    // boardDynamicDirty -- the hide branch in applyLegacyGameplay*
+    // Presentation's own caller only runs from inside drawDynamicBoard,
+    // which is itself dirty-flag-gated, so a scene that stops requesting
+    // redraws never runs that hide branch at all. Fixed the same way this
+    // file's own settings-cog defect (levelAnnouncerWasVisible-style,
+    // see comment just below) was: force exactly one more redraw on the
+    // real falling edge (was active last frame, isn't now).
+    const spawnBurstActiveNow = this.resolveLegacyPlayerSpawnBurstState(time).active;
     if (
-      this.resolveLegacyPlayerSpawnBurstState(time).active
+      spawnBurstActiveNow
       || this.resolveLegacyPlayerTransferState(time).active
+      || this.playerSpawnBurstWasActiveForRedraw
     ) {
       this.boardDynamicDirty = true;
     }
+    this.playerSpawnBurstWasActiveForRedraw = spawnBurstActiveNow;
     // Menu mode's settings cog (drawLegacyMenuSettingsCog) has the exact
     // same time-driven blink as play mode's, but it's drawn inside
     // drawBoardPaths, gated by boardPathDirty -- a flag neither of the two
@@ -6228,6 +6955,13 @@ export class MenuScene extends Phaser.Scene {
     // no gap -- if a transfer is armed for this deconstruct at all.
     if (this.playerTransferEnergyArmed && this.playerTransferEnergyOutboundStartedAtMs === null) {
       this.playerTransferEnergyOutboundStartedAtMs = time;
+      // Fresh session boundary for the real transfer's own pause-offset
+      // accumulator (see gameplayTransferPausedDurationMs's own field
+      // comment) -- a pause from some earlier, already-finished session
+      // must never bleed into this new one.
+      this.gameplayTransferPausedDurationMs = 0;
+      this.gameplayTransferPauseStartedAtMs = null;
+      this.gameplayTransferLastUnpausedTimeMs = null;
     }
     this.menuStaticDeconstructZeroHoldStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
@@ -6324,6 +7058,72 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticBuildPhaseStartedAtMs = null;
     this.refreshLegacyMenuStaticDrawVisibleTileKeys();
     this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);
+  }
+
+  // Owner-reported (ChatGPT-assisted review 5173052153, anchored to head
+  // 1092acc8): the round-7 pause fix froze the transfer's own outbound/
+  // delivery clocks (resolveGameplayTransferPausedOffsetMs) but the
+  // coupled Play-mode maze reveal/deconstruct/handoff lifecycle kept
+  // advancing -- the submitted pause recording shows corridor tiles
+  // visibly disappearing between two frames while the pause menu stays
+  // open, and a next-maze generation request could be consumed behind the
+  // frozen screenshot. This holds that whole lifecycle still for the
+  // duration of a Play-mode pause WITHOUT touching `time`, calling
+  // this.scene.pause(), or otherwise freezing the scene (Resume UI keeps
+  // working): every pending absolute-time deadline and every phase anchor
+  // the lifecycle derives progress from is shifted forward by exactly the
+  // real frame that elapsed while paused, so every `time >= deadline` /
+  // `time - anchor` comparison in advanceLegacyMenuStaticDrawStage, the
+  // bleed-dock/handoff/preroll resolvers, and the pending-request
+  // consumers yields the same result it did on the last unpaused frame,
+  // and on resume each deadline is still exactly as far in the future as
+  // when the pause began -- unpaused durations and ordering are unchanged.
+  // Menu mode never reaches overlay === 'pause', so the demo AI's own
+  // goal-reset choreography is completely untouched. The transfer's OWN
+  // anchors (playerTransferEnergyOutboundStartedAtMs etc.) are
+  // deliberately NOT shifted here -- they are already compensated by
+  // resolveGameplayTransferPausedOffsetMs at read time, and shifting them
+  // too would double-count.
+  private holdLegacyPlayMazeLifecycleDuringPause(time: number): void {
+    const previousFrameMs = this.legacyPlayMazeLifecyclePrevFrameMs;
+    this.legacyPlayMazeLifecyclePrevFrameMs = time;
+    if (this.mode !== 'play' || this.overlay !== 'pause' || previousFrameMs === null) {
+      return;
+    }
+    const frameDeltaMs = Math.max(0, time - previousFrameMs);
+    if (frameDeltaMs <= 0) {
+      return;
+    }
+    if (Number.isFinite(this.menuStaticDrawNextRowAtMs) && this.menuStaticDrawNextRowAtMs > 0) {
+      this.menuStaticDrawNextRowAtMs += frameDeltaMs;
+    }
+    if (Number.isFinite(this.menuStaticDrawNextTileAtMs) && this.menuStaticDrawNextTileAtMs > 0) {
+      this.menuStaticDrawNextTileAtMs += frameDeltaMs;
+    }
+    if (this.menuStaticDeconstructStartedAtMs !== null) {
+      this.menuStaticDeconstructStartedAtMs += frameDeltaMs;
+    }
+    if (this.menuStaticDeconstructZeroHoldStartedAtMs !== null) {
+      this.menuStaticDeconstructZeroHoldStartedAtMs += frameDeltaMs;
+    }
+    if (this.menuStaticBuildPrerollStartedAtMs !== null) {
+      this.menuStaticBuildPrerollStartedAtMs += frameDeltaMs;
+    }
+    if (this.menuStaticBuildPhaseStartedAtMs !== null) {
+      this.menuStaticBuildPhaseStartedAtMs += frameDeltaMs;
+    }
+    if (this.pendingGenerationRequest !== null) {
+      this.pendingGenerationRequest = {
+        ...this.pendingGenerationRequest,
+        dueAtMs: this.pendingGenerationRequest.dueAtMs + frameDeltaMs
+      };
+    }
+    if (this.pendingResetRequest !== null) {
+      this.pendingResetRequest = {
+        ...this.pendingResetRequest,
+        dueAtMs: this.pendingResetRequest.dueAtMs + frameDeltaMs
+      };
+    }
   }
 
   private advanceLegacyMenuStaticDrawStage(time: number): void {
@@ -6429,6 +7229,34 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private armLegacyPlayerArrivalForFinalBuildStep(time: number, buildRemainingMs: number): void {
+    // A genuinely new arrival burst (this.playerSpawnBurstStartedAtMs was
+    // null, about to be armed below) that is NOT part of a real armed
+    // transfer is applyLegacyGameplayInitialArrivalPresentation's own
+    // session boundary -- reset its shared sticky selection fields here so
+    // a stale primary/pose from a PRIOR, unrelated arrival or transfer
+    // never carries into this new one (the resolver's own retention rule
+    // is for continuity WITHIN one live session, not across separate
+    // ones). A real transfer manages the exact same fields' own lifetime
+    // itself (armed at its own outbound start, cleared only by
+    // resetLegacyPlayerTransferEnergy at genuine completion), so this
+    // reset is skipped whenever one is armed -- this call already runs
+    // in lockstep with a real transfer's own delivery arm below when one
+    // is armed, and must not clear the primary it selected back at
+    // outbound.
+    if (this.playerSpawnBurstStartedAtMs === null && !this.playerTransferEnergyArmed) {
+      this.gameplayTransferPrimaryId = null;
+      this.gameplayTransferLastPrimaryPose = null;
+      this.gameplayTransferLastObservedOverlay = 'none';
+      this.gameplayTransferLastPresentationSnapshot = null;
+      // Fresh session boundary for the initial arrival's own pause-offset
+      // accumulator too (see gameplayTransferPausedDurationMs's own field
+      // comment). A real transfer's own outbound-arm site resets this
+      // same pair for its own case; this covers the pure-arrival case
+      // (no transfer armed) this branch is specifically guarded to.
+      this.gameplayTransferPausedDurationMs = 0;
+      this.gameplayTransferPauseStartedAtMs = null;
+      this.gameplayTransferLastUnpausedTimeMs = null;
+    }
     const alignedStartedAtMs = time - Math.max(
       0,
       LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS - Math.max(0, buildRemainingMs)
@@ -8436,8 +9264,26 @@ export class MenuScene extends Phaser.Scene {
     orbitPhase: number;
     travelReversed: boolean;
   } {
-    const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'
-      || this.menuStaticDrawLifecyclePhase === 'deconstructing';
+    // Owner-reported (direct product-owner instruction, 2026-09-09): "the
+    // laser is shooting to a diamond that isn't even one of the ones on
+    // the edge". Root cause found live: a real gameplay transfer (and the
+    // Play-mode initial arrival) always coincides with the maze
+    // deconstruct/rebuild, which drives isLifecycleSpinActive true -- so
+    // the seven NON-engaged perimeter diamonds swirl chaotically around
+    // the whole viewport edge while the ONE engaged diamond sits pinned
+    // at its fixed anchor with the conduit attached, reading as an
+    // unrelated ninth object rather than one of the ring. In Play mode,
+    // while a transfer is armed or the arrival burst is presenting, hold
+    // the whole ring still at its resting stations (4 corners + 4 edge
+    // midpoints, via the existing settle-phase ease) so the perimeter
+    // reads as a calm ring with one member lit and engaged. Menu mode
+    // (the demo AI's own goal-reset choreography) is completely
+    // unaffected -- no gameplay transfer is ever armed there.
+    const suppressSpinForGameplayTransfer = this.mode === 'play'
+      && (this.playerTransferEnergyArmed || this.resolveLegacyPlayerSpawnBurstState(time).active);
+    const isLifecycleSpinActive = !suppressSpinForGameplayTransfer
+      && (this.menuStaticDrawLifecyclePhase === 'building'
+        || this.menuStaticDrawLifecyclePhase === 'deconstructing');
     const orbitPhase = isLifecycleSpinActive
       ? this.resolveLegacyMenuPathTitleOrbitLifecyclePhase()
       : this.resolveLegacyMenuPathTitleOrbitSettlePhase(time);
@@ -8909,25 +9755,76 @@ export class MenuScene extends Phaser.Scene {
     this.playerTransferEnergyArmed = false;
     this.playerTransferEnergyOutboundStartedAtMs = null;
     this.playerTransferEnergyDeliveryStartedAtMs = null;
+    // "Completion/reset clears the session" -- a genuinely new transfer
+    // always starts fresh (Playbook: a stable transfer identity outlives
+    // changes to target pose, but not a full reset). This is the ONLY
+    // place gameplayTransferPrimaryId is cleared; it is retained across
+    // outbound/stored/delivering by every other call site.
+    this.gameplayTransferPrimaryId = null;
+    this.gameplayTransferLastPrimaryPose = null;
+    this.gameplayTransferLastObservedOverlay = 'none';
+    this.gameplayTransferLastPresentationSnapshot = null;
+    this.gameplayTransferPausedDurationMs = 0;
+    this.gameplayTransferPauseStartedAtMs = null;
+    this.gameplayTransferLastUnpausedTimeMs = null;
+    this.gameplayTransferConduitCanvasImage?.setVisible(false);
+  }
+
+  // Updates the shared pause-tracking accumulator exactly once per real
+  // frame -- called from the same place settleLegacyPlayerTransferEnergy
+  // already runs unconditionally every frame, so this is guaranteed
+  // single-fire regardless of how many places read the resulting offset
+  // afterward this same frame. See gameplayTransferPausedDurationMs's own
+  // field comment for the real defect this fixes.
+  private updateGameplayTransferPauseTracking(time: number): void {
+    const paused = this.overlay === 'pause';
+    if (paused && this.gameplayTransferPauseStartedAtMs === null) {
+      // Anchor at the last real pre-pause time, not this frame's own
+      // `time` -- see gameplayTransferLastUnpausedTimeMs's own field
+      // comment for the one-frame boundary defect this avoids. Falls
+      // back to `time` only if somehow no prior unpaused frame was ever
+      // observed (cannot happen in practice: this tracker itself always
+      // records an unpaused time before any pause can begin).
+      this.gameplayTransferPauseStartedAtMs = this.gameplayTransferLastUnpausedTimeMs ?? time;
+    } else if (!paused && this.gameplayTransferPauseStartedAtMs !== null) {
+      this.gameplayTransferPausedDurationMs += time - this.gameplayTransferPauseStartedAtMs;
+      this.gameplayTransferPauseStartedAtMs = null;
+    }
+    if (!paused) {
+      this.gameplayTransferLastUnpausedTimeMs = time;
+    }
+  }
+
+  // Real ms of wall-clock time this transfer/arrival session has spent
+  // paused so far, INCLUDING any pause still ongoing right now -- the
+  // amount every real elapsed-ms input this scene derives for the
+  // transfer and the initial arrival subtracts, so a paused interval
+  // costs the lifecycle nothing and resuming continues exactly where it
+  // left off rather than jumping ahead or racing to catch up.
+  private resolveGameplayTransferPausedOffsetMs(time: number): number {
+    return this.gameplayTransferPausedDurationMs
+      + (this.gameplayTransferPauseStartedAtMs !== null ? time - this.gameplayTransferPauseStartedAtMs : 0);
   }
 
   private resolveLegacyPlayerTransferState(time: number): LegacyPlayerTransferVisualState {
+    const pausedOffsetMs = this.resolveGameplayTransferPausedOffsetMs(time);
     return resolveLegacyPlayerTransferVisualState({
       armed: this.playerTransferEnergyArmed,
       deliveryElapsedMs: this.playerTransferEnergyDeliveryStartedAtMs === null
         ? null
-        : time - this.playerTransferEnergyDeliveryStartedAtMs,
+        : time - this.playerTransferEnergyDeliveryStartedAtMs - pausedOffsetMs,
       deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
       deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS,
       nowMs: time,
       outboundElapsedMs: this.playerTransferEnergyOutboundStartedAtMs === null
         ? null
-        : time - this.playerTransferEnergyOutboundStartedAtMs,
+        : time - this.playerTransferEnergyOutboundStartedAtMs - pausedOffsetMs,
       reducedMotion: this.prefersLegacyReducedMotion()
     });
   }
 
   private settleLegacyPlayerTransferEnergy(time: number): void {
+    this.updateGameplayTransferPauseTracking(time);
     if (this.resolveLegacyPlayerTransferState(time).phase === 'complete') {
       this.resetLegacyPlayerTransferEnergy();
     }
@@ -9368,7 +10265,17 @@ export class MenuScene extends Phaser.Scene {
       const boardRelativeY = mazeTop + ((transferPoint.y + 0.5) * mazeTileSize);
       const targetX = this.boardZoomContainer.x + (boardRelativeX * this.boardZoomContainer.scaleX);
       const targetY = this.boardZoomContainer.y + (boardRelativeY * this.boardZoomContainer.scaleY);
-      this.drawLegacyPlayerTransferEnergy(targetX, targetY, playerTransferEnergy, time);
+      // Real gameplay (Wave 4D-B): one held primary and one continuous
+      // conduit, replacing the ambient eight-origin volley -- reserved for
+      // menu/title choreography per the frozen contract, so 'menu' keeps
+      // the original call unchanged.
+      if (this.mode === 'play') {
+        this.applyLegacyGameplayTransferPresentation(targetX, targetY, mazeTileSize * this.boardZoomContainer.scaleX, time);
+      } else {
+        this.drawLegacyPlayerTransferEnergy(targetX, targetY, playerTransferEnergy, time);
+      }
+    } else if (this.mode === 'play') {
+      this.gameplayTransferConduitCanvasImage?.setVisible(false);
     }
 
     if (playerSpawnBurst.active && this.isLegacyMenuPointVisibleInStaticDraw(this.player)) {
@@ -9385,7 +10292,26 @@ export class MenuScene extends Phaser.Scene {
       const boardRelativeY = mazeTop + ((renderedPlayerPoint.y + 0.5) * mazeTileSize);
       const targetX = this.boardZoomContainer.x + (boardRelativeX * this.boardZoomContainer.scaleX);
       const targetY = this.boardZoomContainer.y + (boardRelativeY * this.boardZoomContainer.scaleY);
-      this.drawLegacyPlayerSpawnBurst(targetX, targetY, playerSpawnBurst, time);
+      // Confirmed real defect (review 5144999445): this call used to be
+      // unconditional -- the old eight-origin-per-orbit-sigil beam volley
+      // (drawLegacyPlayerSpawnBurst) has no mode branch of its own and
+      // was rendering in Play mode too, including the very first maze of
+      // a run and every ordinary play reset, not only real teleport
+      // transfers. Play mode now NEVER calls it: a real armed transfer's
+      // own delivering phase is already fully rendered by
+      // applyLegacyGameplayTransferPresentation above (this block would
+      // otherwise double the arrival effect), and every other Play-mode
+      // arrival routes through applyLegacyGameplayInitialArrivalPresentation,
+      // the real single-primary replacement, instead. Menu/title
+      // choreography is unchanged -- the frozen contract reserves the old
+      // volley for exactly that.
+      if (this.mode === 'play') {
+        if (!playerTransferEnergy.active) {
+          this.applyLegacyGameplayInitialArrivalPresentation(targetX, targetY, mazeTileSize * this.boardZoomContainer.scaleX, time);
+        }
+      } else {
+        this.drawLegacyPlayerSpawnBurst(targetX, targetY, playerSpawnBurst, time);
+      }
     }
 
     // Drawn last, after the trail/board content above -- the bleed-off dock
@@ -9855,7 +10781,14 @@ export class MenuScene extends Phaser.Scene {
       return { active: false, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
     }
 
-    const elapsedMs = time - this.playerSpawnBurstStartedAtMs;
+    // Same pause-aware correction resolveLegacyPlayerTransferState applies
+    // (see gameplayTransferPausedDurationMs's own field comment) -- safe
+    // to apply unconditionally here too: the pause overlay can only ever
+    // be opened from real Play mode (handleLegacyQaOpenPauseOverlay's own
+    // 'not-play-mode' guard), so this offset is always exactly 0 for
+    // Menu mode's own ambient choreography, which this same resolver also
+    // serves.
+    const elapsedMs = time - this.playerSpawnBurstStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time);
     const totalMs = LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS + LEGACY_PLAYER_SPAWN_FLASH_MS;
     if (elapsedMs < 0 || elapsedMs >= totalMs) {
       return { active: false, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
@@ -10328,6 +11261,36 @@ export class MenuScene extends Phaser.Scene {
     return this.trailAnimationElapsedMs;
   }
 
+  // Same pattern as advanceLegacyTrailAnimationClock above, a separate
+  // accumulator for the real gameplay transfer conduit's own energy
+  // material (see the field pair's own comment). Reduced motion is
+  // handled by this clock freezing entirely, NOT by the presentation
+  // module -- the conduit's own openFraction/geometry stay whatever
+  // teleportTransferPresentation.ts already computed for reduced motion;
+  // this only stops the color from visibly drifting while frozen.
+  //
+  // Deliberately does NOT gate on !isLegacyPlayLifecycleInputLocked() the
+  // way the trail's own clock does: the conduit's entire real active
+  // window (outbound/stored/delivering) falls WITHIN the locked
+  // transition period between moves, so that gate would freeze this
+  // clock for essentially its whole useful lifetime. Gates on the
+  // transfer actually being armed instead, plus Pause/overlay, which is
+  // the transfer-specific equivalent of "genuinely visible right now".
+  private advanceLegacyGameplayTransferAnimationClock(time: number): number {
+    const isActivePlayVisible = this.mode === 'play'
+      && this.overlay === 'none'
+      && this.playerTransferEnergyArmed;
+    if (isActivePlayVisible && !this.prefersLegacyReducedMotion()) {
+      if (this.gameplayTransferAnimationLastRealMs !== null) {
+        this.gameplayTransferAnimationElapsedMs += Math.max(0, time - this.gameplayTransferAnimationLastRealMs);
+      }
+      this.gameplayTransferAnimationLastRealMs = time;
+    } else {
+      this.gameplayTransferAnimationLastRealMs = null;
+    }
+    return this.gameplayTransferAnimationElapsedMs;
+  }
+
   // Navigation Core v1's continuous play trail -- one logically continuous
   // path instead of the old per-cell hollow-frame/texture-overlay/pulse-
   // window trio (still used by the menu's own ambient demo above,
@@ -10489,7 +11452,10 @@ export class MenuScene extends Phaser.Scene {
       // every time the origin slides forward. Color is periodic over
       // distance, so this is a phase realignment, not a length change.
       const colorPhaseDistance = midDistance + this.trailOriginAdvanceDistancePx;
-      const baseColor = sampleTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions);
+      // sampleCalmTrailEnergyColor: owner-authorized calmer palette (see
+      // LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS) -- the frozen 4D-A module
+      // and its own sampleTrailEnergyColor are left untouched.
+      const baseColor = sampleCalmTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions);
       let coreColor = baseColor;
       let coreAlpha = ageAlpha * alphaMultiplier;
 
@@ -10498,8 +11464,17 @@ export class MenuScene extends Phaser.Scene {
         if (distanceFromShineCenter <= shineState.halfLength) {
           const taper = 1 - clamp(distanceFromShineCenter / shineState.halfLength, 0, 1);
           const highlightStrength = taper * shineState.envelopeAlpha;
-          coreColor = mixLegacyIridescentColor(baseColor, LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR, highlightStrength * 0.85);
-          coreAlpha = Math.min(1, coreAlpha + (highlightStrength * 0.5));
+          // OWNER-AUTHORIZED VISUAL AMENDMENT (2026-09-09): the shine was
+          // reported as not visibly reading as a traveling highlight. Its
+          // own math was correct (verified live: clock advances, envelope
+          // fades, position travels the whole path), but an 0.85 white
+          // mix riding a FULLY-SATURATED rainbow base barely registered.
+          // Now that the base palette is calm (see
+          // NAVIGATION_CORE_TRAIL_ENERGY_STOPS) a soft highlight reads
+          // clearly; nudged the mix/alpha up slightly so it still lands
+          // as a definite travelling light without becoming a hard flash.
+          coreColor = mixLegacyIridescentColor(baseColor, LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR, highlightStrength * 0.92);
+          coreAlpha = Math.min(1, coreAlpha + (highlightStrength * 0.58));
         }
       }
 
@@ -10938,8 +11913,11 @@ export class MenuScene extends Phaser.Scene {
     const spinPhase = time !== undefined && !this.prefersLegacyReducedMotion()
       ? time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS
       : 0;
+    // Owner-authorized calmer palette (LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS)
+    // -- the goal-star ring's stated design intent is to read as visually
+    // related to the trail leading to it, so it tracks the same amendment.
     const energyColorAt = (position: number): number => (
-      resolveLegacyIridescentMidnightColor(position, NAVIGATION_CORE_TRAIL_ENERGY_STOPS)
+      resolveLegacyIridescentMidnightColor(position, LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS)
     );
 
     // Soft pulsing glow halo, drawn first (behind everything else). The

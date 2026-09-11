@@ -73,6 +73,9 @@ jobs:
       - name: Verify Wave 4D-B Teleport anchor-pose QA preview lifecycle
         run: node ./scripts/analysis/verify-teleport-anchor-preview-lifecycle.mjs --skip-build
 
+      - name: Verify Wave 4D-B gameplay transfer (real solver-driven cycle, pause/resume, reduced motion, layouts)
+        run: node ./scripts/analysis/verify-gameplay-teleport-transfer.mjs --skip-build
+
   ai-navigation-acceptance:
     name: AI navigation acceptance shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
