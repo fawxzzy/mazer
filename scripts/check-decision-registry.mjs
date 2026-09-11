@@ -262,7 +262,7 @@ const REQUIRED_INTEGRATOR_WAVE_BY_PATH = Object.freeze({
   'src/scenes/diagnostics/menuCaptureMetadataDiagnostics.ts': '1C',
   'src/scenes/diagnostics/menuRuntimeDiagnosticsCompatibility.ts': '1C',
   'src/scenes/menuRuntimeDiagnostics.ts': '1C',
-  'src/scenes/MenuScene.ts': '4D-B',
+  'src/scenes/MenuScene.ts': '4E',
   'src/legacy-runtime/legacyAuth.ts': '3B',
   'src/legacy-runtime/legacyPlayerMessage.ts': '3B',
   'vite.config.ts': '5B',
