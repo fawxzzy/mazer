@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NAVIGATION_CORE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './navigation-core-required-tests.mjs';
 import { TELEPORT_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './teleport-required-tests.mjs';
+import { WORLD_IDENTITY_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './world-identity-required-tests.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPO_ROOT = resolve(SCRIPT_PATH, '..', '..', '..');
@@ -49,6 +50,9 @@ runVitest([
   // class as the Navigation Core list just above; see
   // teleport-required-tests.mjs's own header.
   ...TELEPORT_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
+  // Wave 4E's World Identity required coverage -- same silent-gap class;
+  // see world-identity-required-tests.mjs's own header.
+  ...WORLD_IDENTITY_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
   '--exclude', CWD_MUTATING_FIXTURE,
   '--maxWorkers', '1',
   '--pool=threads',
