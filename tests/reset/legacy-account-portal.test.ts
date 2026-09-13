@@ -25,6 +25,8 @@ import {
   resolveMazerOAuthAuthStorage,
   resolveMazerOAuthSessionStorage,
   resolveMazerLegalRoute,
+  runMazerExclusiveAuthMutation,
+  type MazerAuthMutationLockManager,
   type MazerOAuthClient,
   type MazerOAuthLocation,
   type MazerOAuthRuntime,
@@ -36,6 +38,26 @@ class MemoryStorage implements MazerOAuthStorage {
   getItem(key: string): string | null { return this.values.get(key) ?? null; }
   removeItem(key: string): void { this.values.delete(key); }
   setItem(key: string, value: string): void { this.values.set(key, value); }
+}
+
+class ExclusiveLockHarness implements MazerAuthMutationLockManager {
+  private held = false;
+
+  async request<T>(
+    _name: string,
+    _options: { ifAvailable: true; mode: 'exclusive' },
+    callback: (lock: Lock | null) => T | PromiseLike<T>
+  ): Promise<T> {
+    if (this.held) {
+      return callback(null);
+    }
+    this.held = true;
+    try {
+      return await callback({ mode: 'exclusive', name: 'mazer.auth.oauth-session-transaction.v1' } as Lock);
+    } finally {
+      this.held = false;
+    }
+  }
 }
 
 const createLocation = (href = 'https://mazer.fawxzzy.com/'): MazerOAuthLocation & { assigned: string[] } => {
@@ -102,6 +124,41 @@ const createClient = (claims: Record<string, unknown>): MazerOAuthClient => ({
 });
 
 describe('Mazer shared account contract', () => {
+  test('makes every shared auth mutation mutually exclusive and fail closed on lock contention', async () => {
+    const lock = new ExclusiveLockHarness();
+    let releaseFirst: (() => void) | null = null;
+    const first = runMazerExclusiveAuthMutation(async () => {
+      await new Promise<void>((resolve) => { releaseFirst = resolve; });
+      return 'first-complete';
+    }, lock);
+    await vi.waitFor(() => expect(releaseFirst).not.toBeNull());
+
+    let secondRan = false;
+    await expect(runMazerExclusiveAuthMutation(() => {
+      secondRan = true;
+      return 'second-complete';
+    }, lock)).resolves.toEqual({ status: 'unavailable' });
+    expect(secondRan).toBe(false);
+
+    releaseFirst?.();
+    await expect(first).resolves.toEqual({ status: 'completed', value: 'first-complete' });
+    await expect(runMazerExclusiveAuthMutation(
+      () => 'after-release',
+      lock
+    )).resolves.toEqual({ status: 'completed', value: 'after-release' });
+  });
+
+  test('releases the shared auth lock and reports unavailable when a mutation throws', async () => {
+    const lock = new ExclusiveLockHarness();
+    await expect(runMazerExclusiveAuthMutation(() => {
+      throw new Error('mutation failed');
+    }, lock)).resolves.toEqual({ status: 'unavailable' });
+    await expect(runMazerExclusiveAuthMutation(
+      () => 'recovered',
+      lock
+    )).resolves.toEqual({ status: 'completed', value: 'recovered' });
+  });
+
   test('contains denied browser storage and recovers OAuth submission only after a persisted page restore', async () => {
     const deniedStorage = {} as Pick<Window, 'sessionStorage'>;
     Object.defineProperty(deniedStorage, 'sessionStorage', {

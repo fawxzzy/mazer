@@ -100,6 +100,18 @@ export interface MazerOAuthPageLifecycle {
   removeEventListener(type: 'pageshow', listener: (event: PageTransitionEvent) => void): void;
 }
 
+export interface MazerAuthMutationLockManager {
+  request<T>(
+    name: string,
+    options: { ifAvailable: true; mode: 'exclusive' },
+    callback: (lock: Lock | null) => T | PromiseLike<T>
+  ): Promise<T>;
+}
+
+export type MazerExclusiveAuthMutationResult<T> =
+  | { status: 'completed'; value: T }
+  | { status: 'unavailable' };
+
 export interface MazerOAuthClient {
   auth: {
     getClaims(jwt?: string): Promise<{ data: { claims?: Record<string, unknown> } | null; error: unknown }>;
@@ -114,6 +126,30 @@ export interface MazerOAuthClient {
 }
 
 let mazerOAuthBootResult: MazerOAuthBootResult = { status: 'none' };
+
+export const runMazerExclusiveAuthMutation = async <T>(
+  operation: () => T | Promise<T>,
+  lockManager: MazerAuthMutationLockManager | null = (
+    typeof navigator === 'undefined' || navigator.locks === undefined
+      ? null
+      : navigator.locks
+  )
+): Promise<MazerExclusiveAuthMutationResult<T>> => {
+  if (lockManager === null) {
+    return { status: 'unavailable' };
+  }
+  try {
+    return await lockManager.request(
+      MAZER_OAUTH_SESSION_LOCK_NAME,
+      { ifAvailable: true, mode: 'exclusive' },
+      async (lock) => lock === null
+        ? { status: 'unavailable' }
+        : { status: 'completed', value: await operation() }
+    );
+  } catch {
+    return { status: 'unavailable' };
+  }
+};
 
 const base64UrlEncode = (bytes: Uint8Array): string => {
   let binary = '';
@@ -206,18 +242,8 @@ const resolveBrowserRuntime = (): MazerOAuthRuntimeResolution => {
         },
         now: () => Date.now(),
         runExclusiveSessionTransaction: async (operation) => {
-          try {
-            if (navigator.locks === undefined) {
-              return null;
-            }
-            return await navigator.locks.request(
-              MAZER_OAUTH_SESSION_LOCK_NAME,
-              { ifAvailable: true, mode: 'exclusive' },
-              (lock) => lock === null ? null : operation()
-            );
-          } catch {
-            return null;
-          }
+          const result = await runMazerExclusiveAuthMutation(operation);
+          return result.status === 'completed' ? result.value : null;
         },
         sessionStorage,
         setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)

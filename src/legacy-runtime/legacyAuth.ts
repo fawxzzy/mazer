@@ -10,7 +10,8 @@ import {
   advanceMazerAuthMutationEpoch,
   advanceMazerSharedAuthMutationEpoch,
   isMazerOAuthSessionQuarantined,
-  readMazerOAuthBootResult
+  readMazerOAuthBootResult,
+  runMazerExclusiveAuthMutation
 } from './legacyAccountPortal';
 import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';
 
@@ -547,12 +548,36 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
   return snapshot;
 };
 
+const createLegacyAuthMutationUnavailableResult = (): LegacyAuthActionResult => ({
+  snapshot: createGuestSnapshot(false, {
+    error: LEGACY_AUTH_MESSAGE_COPY.authUnavailable
+  })
+});
+
+const runLegacyAuthMutation = async (
+  operation: () => Promise<LegacyAuthActionResult>
+): Promise<LegacyAuthActionResult> => {
+  const result = await runMazerExclusiveAuthMutation(async () => {
+    // Both epochs advance inside the same cross-tab lock that protects OAuth
+    // commit and rollback. A failed write aborts before Supabase can mutate the
+    // shared persisted session.
+    if (advanceMazerSharedAuthMutationEpoch() === null) {
+      return createLegacyAuthMutationUnavailableResult();
+    }
+    if (advanceMazerAuthMutationEpoch() === null) {
+      return createLegacyAuthMutationUnavailableResult();
+    }
+    return operation();
+  });
+  return result.status === 'completed'
+    ? result.value
+    : createLegacyAuthMutationUnavailableResult();
+};
+
 export const signInLegacyAuth = async (
   email: string,
   password: string
-): Promise<LegacyAuthActionResult> => {
-  advanceMazerAuthMutationEpoch();
-  advanceMazerSharedAuthMutationEpoch();
+): Promise<LegacyAuthActionResult> => runLegacyAuthMutation(async () => {
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -581,15 +606,13 @@ export const signInLegacyAuth = async (
   return {
     snapshot
   };
-};
+});
 
 export const signUpLegacyAuth = async (
   email: string,
   password: string,
   username: string
-): Promise<LegacyAuthActionResult> => {
-  advanceMazerAuthMutationEpoch();
-  advanceMazerSharedAuthMutationEpoch();
+): Promise<LegacyAuthActionResult> => runLegacyAuthMutation(async () => {
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -629,7 +652,7 @@ export const signUpLegacyAuth = async (
   return {
     snapshot
   };
-};
+});
 
 export const requestLegacyPasswordReset = async (email: string): Promise<LegacyAuthActionResult> => {
   const client = await getLegacyAuthClient();
@@ -860,9 +883,7 @@ export const updateLegacyPassword = async (
   return updateLegacyPasswordWithClient(client, password);
 };
 
-export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
-  advanceMazerAuthMutationEpoch();
-  advanceMazerSharedAuthMutationEpoch();
+export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => runLegacyAuthMutation(async () => {
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -882,7 +903,7 @@ export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
       info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedOut
     })
   };
-};
+});
 
 export const subscribeLegacyAuthState = (
   listener: LegacyAuthStateListener
