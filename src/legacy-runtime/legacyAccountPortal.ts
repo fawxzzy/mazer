@@ -880,6 +880,29 @@ const restoreMazerOAuthSessionTransaction = (
   }
 };
 
+const recoverMazerOAuthSessionQuarantineWithinLock = (
+  storage: MazerOAuthStorage,
+  now: number
+): boolean => {
+  try {
+    const raw = storage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY);
+    if (raw === null) {
+      return true;
+    }
+    const transaction = parseMazerOAuthSessionTransaction(raw);
+    if (transaction === null) {
+      return false;
+    }
+    const age = now - transaction.createdAtEpochMs;
+    if (age < 0 || age <= MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS) {
+      return false;
+    }
+    return restoreMazerOAuthSessionTransaction(storage, raw, transaction);
+  } catch {
+    return false;
+  }
+};
+
 const acquireMazerOAuthSessionTransaction = (
   runtime: MazerOAuthRuntime,
   owner: string
@@ -889,7 +912,7 @@ const acquireMazerOAuthSessionTransaction = (
     return null;
   }
   try {
-    if (isMazerOAuthSessionQuarantined(authStorage, runtime.now())) {
+    if (!recoverMazerOAuthSessionQuarantineWithinLock(authStorage, runtime.now())) {
       return null;
     }
     const transaction: MazerOAuthSessionTransaction = {
@@ -985,28 +1008,30 @@ const completeMazerOAuthSessionTransaction = (
 
 export const isMazerOAuthSessionQuarantined = (
   storage: MazerOAuthStorage | null = resolveMazerOAuthAuthStorage(),
-  now = Date.now()
+  _now = Date.now()
 ): boolean => {
   try {
-    if (storage === null) {
-      return false;
-    }
-    const raw = storage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY);
-    if (raw === null) {
-      return false;
-    }
-    const transaction = parseMazerOAuthSessionTransaction(raw);
-    if (transaction === null) {
-      return true;
-    }
-    const age = now - transaction.createdAtEpochMs;
-    if (age < 0 || age <= MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS) {
-      return true;
-    }
-    return !restoreMazerOAuthSessionTransaction(storage, raw, transaction);
+    return storage !== null && storage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== null;
   } catch {
     return true;
   }
+};
+
+export const recoverMazerOAuthSessionQuarantine = async (
+  storage: MazerOAuthStorage | null = resolveMazerOAuthAuthStorage(),
+  now = Date.now(),
+  lockManager?: MazerAuthMutationLockManager | null
+): Promise<boolean> => {
+  if (storage === null) {
+    return false;
+  }
+  const result = await runMazerExclusiveAuthMutation(
+    () => recoverMazerOAuthSessionQuarantineWithinLock(storage, now),
+    lockManager === undefined
+      ? (typeof navigator === 'undefined' || navigator.locks === undefined ? null : navigator.locks)
+      : lockManager
+  );
+  return result.status === 'completed' && result.value;
 };
 
 const consumeMazerOAuthCallbackInner = async (

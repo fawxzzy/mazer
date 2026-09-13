@@ -22,6 +22,7 @@ import {
   isMazerOAuthCallbackRequest,
   installMazerOAuthPageShowRecovery,
   isMazerOAuthSessionQuarantined,
+  recoverMazerOAuthSessionQuarantine,
   resolveMazerOAuthAuthStorage,
   resolveMazerOAuthSessionStorage,
   resolveMazerLegalRoute,
@@ -817,7 +818,8 @@ describe('Mazer shared account contract', () => {
     expect(authStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(firstSession);
   });
 
-  test('recovers an orphaned transaction after its bounded lifetime', () => {
+  test('recovers an orphaned transaction after its bounded lifetime only inside the shared lock', async () => {
+    const lock = new ExclusiveLockHarness();
     const authStorage = new MemoryStorage();
     const previousSession = JSON.stringify({ access_token: 'previous-token', refresh_token: 'previous-refresh' });
     const provisionalSession = JSON.stringify({ access_token: 'provisional-token', refresh_token: 'provisional-refresh' });
@@ -830,11 +832,22 @@ describe('Mazer shared account contract', () => {
       version: 2
     }));
 
+    expect(isMazerOAuthSessionQuarantined(authStorage, 2_000_001)).toBe(true);
+    await expect(recoverMazerOAuthSessionQuarantine(
+      authStorage,
+      2_000_001,
+      lock
+    )).resolves.toBe(true);
     expect(isMazerOAuthSessionQuarantined(authStorage, 2_000_001)).toBe(false);
     expect(authStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(previousSession);
     expect(authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
     authStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, '{malformed');
     expect(isMazerOAuthSessionQuarantined(authStorage, 2_000_001)).toBe(true);
+    await expect(recoverMazerOAuthSessionQuarantine(
+      authStorage,
+      2_000_001,
+      lock
+    )).resolves.toBe(false);
 
     const ambiguousStorage = new MemoryStorage();
     ambiguousStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', provisionalSession);
@@ -846,6 +859,11 @@ describe('Mazer shared account contract', () => {
       version: 2
     });
     ambiguousStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, ambiguousTransaction);
+    await expect(recoverMazerOAuthSessionQuarantine(
+      ambiguousStorage,
+      2_000_001,
+      lock
+    )).resolves.toBe(true);
     expect(isMazerOAuthSessionQuarantined(ambiguousStorage, 2_000_001)).toBe(false);
     expect(ambiguousStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(provisionalSession);
     expect(ambiguousStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
@@ -859,6 +877,11 @@ describe('Mazer shared account contract', () => {
       preimageRaw: null,
       version: 2
     }));
+    await expect(recoverMazerOAuthSessionQuarantine(
+      emptyPreimageStorage,
+      2_000_001,
+      lock
+    )).resolves.toBe(true);
     expect(isMazerOAuthSessionQuarantined(emptyPreimageStorage, 2_000_001)).toBe(false);
     expect(emptyPreimageStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(provisionalSession);
     expect(emptyPreimageStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
@@ -871,9 +894,54 @@ describe('Mazer shared account contract', () => {
       preimageRaw: previousSession,
       version: 2
     }));
+    await expect(recoverMazerOAuthSessionQuarantine(
+      signedOutStorage,
+      2_000_001,
+      lock
+    )).resolves.toBe(true);
     expect(isMazerOAuthSessionQuarantined(signedOutStorage, 2_000_001)).toBe(false);
     expect(signedOutStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBeNull();
     expect(signedOutStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
+  });
+
+  test('does not let stale rollback interleave a newer shared auth mutation', async () => {
+    const lock = new ExclusiveLockHarness();
+    const authStorage = new MemoryStorage();
+    const previousSession = JSON.stringify({ access_token: 'previous-token' });
+    const provisionalSession = JSON.stringify({ access_token: 'provisional-token' });
+    const newerSession = JSON.stringify({ access_token: 'newer-token' });
+    authStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', provisionalSession);
+    authStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, JSON.stringify({
+      committedAccessToken: 'provisional-token',
+      createdAtEpochMs: 1_900_000,
+      owner: 'e'.repeat(43),
+      preimageRaw: previousSession,
+      version: 2
+    }));
+
+    let finishNewerMutation: (() => void) | null = null;
+    const newerMutation = runMazerExclusiveAuthMutation(async () => {
+      authStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', newerSession);
+      await new Promise<void>((resolve) => { finishNewerMutation = resolve; });
+    }, lock);
+    await vi.waitFor(() => expect(finishNewerMutation).not.toBeNull());
+
+    await expect(recoverMazerOAuthSessionQuarantine(
+      authStorage,
+      2_000_001,
+      lock
+    )).resolves.toBe(false);
+    expect(authStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(newerSession);
+
+    finishNewerMutation?.();
+    await expect(newerMutation).resolves.toEqual({ status: 'completed', value: undefined });
+    await expect(recoverMazerOAuthSessionQuarantine(
+      authStorage,
+      2_000_001,
+      lock
+    )).resolves.toBe(true);
+    expect(authStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(newerSession);
+    expect(authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
   });
 
   test('keeps the accepted session when optional broadcast notification is unavailable', async () => {
