@@ -130,6 +130,15 @@ describe('Mazer shared account contract', () => {
     expect(writeDeniedRuntime.location.assigned).toEqual([]);
     expect(writeDeniedRuntime.sessionStorage.getItem(MAZER_OAUTH_PENDING_KEY)).toBeNull();
 
+    const noLockRuntime = createRuntime(new MemoryStorage());
+    noLockRuntime.runExclusiveSessionTransaction = vi.fn(async () => null);
+    await expect(beginMazerOAuthAuthorization(noLockRuntime)).resolves.toEqual({
+      category: 'authorization_unavailable',
+      status: 'failed'
+    });
+    expect(noLockRuntime.location.assigned).toEqual([]);
+    expect(noLockRuntime.sessionStorage.getItem(MAZER_OAUTH_PENDING_KEY)).toBeNull();
+
     const sizedProbeStorage = new MemoryStorage();
     let observedProbeBytes = 0;
     sizedProbeStorage.setItem = (key, value) => {

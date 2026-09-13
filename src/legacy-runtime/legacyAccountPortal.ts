@@ -85,7 +85,7 @@ export interface MazerOAuthRuntime {
   location: MazerOAuthLocation;
   notifyAcceptedSession?(session: Record<string, unknown>): boolean;
   now(): number;
-  runExclusiveSessionTransaction?<T>(operation: () => T): Promise<T | null>;
+  runExclusiveSessionTransaction<T>(operation: () => T): Promise<T | null>;
   sessionStorage: MazerOAuthStorage;
   setTimer(handler: () => void, timeoutMs: number): ReturnType<typeof setTimeout>;
 }
@@ -201,14 +201,18 @@ const resolveBrowserRuntime = (): MazerOAuthRuntimeResolution => {
         },
         now: () => Date.now(),
         runExclusiveSessionTransaction: async (operation) => {
-          if (navigator.locks === undefined) {
-            return operation();
+          try {
+            if (navigator.locks === undefined) {
+              return null;
+            }
+            return await navigator.locks.request(
+              MAZER_OAUTH_SESSION_LOCK_NAME,
+              { ifAvailable: true, mode: 'exclusive' },
+              (lock) => lock === null ? null : operation()
+            );
+          } catch {
+            return null;
           }
-          return navigator.locks.request(
-            MAZER_OAUTH_SESSION_LOCK_NAME,
-            { ifAvailable: true, mode: 'exclusive' },
-            (lock) => lock === null ? null : operation()
-          );
         },
         sessionStorage,
         setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
@@ -324,6 +328,9 @@ export const beginMazerOAuthAuthorization = async (
     return resolution.result;
   }
   const resolvedRuntime = resolution.runtime;
+  if (await resolvedRuntime.runExclusiveSessionTransaction(() => true) !== true) {
+    return failed('authorization_unavailable');
+  }
   if (!verifyMazerOAuthAuthStorageWritable(resolvedRuntime)) {
     return failed('storage_unavailable');
   }
@@ -1058,11 +1065,8 @@ const consumeMazerOAuthCallbackInner = async (
     }
     return { status: 'connected' };
   };
-  if (runtime.runExclusiveSessionTransaction !== undefined) {
-    const result = await runtime.runExclusiveSessionTransaction(commitSessionTransaction);
-    return result ?? failed('storage_unavailable');
-  }
-  return commitSessionTransaction();
+  const result = await runtime.runExclusiveSessionTransaction(commitSessionTransaction);
+  return result ?? failed('storage_unavailable');
 };
 
 export const consumeMazerOAuthCallback = async (
