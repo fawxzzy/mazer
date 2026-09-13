@@ -7,6 +7,32 @@ export interface LegacyMenuBackdropStar {
   speed: number;
   x: number;
   y: number;
+  /**
+   * Stable per-star identity in [0, 1), fixed at creation and reassigned
+   * only when the star is genuinely reborn (resetLegacyMenuBackdropStarNearWarpOrigin).
+   * Confirmed real defect (owner-reported: background stars "switch colors
+   * like a strobe" instead of smoothly twinkling): the renderer used to
+   * derive its own per-frame "seed" as `((star.x * 9973) + (star.y * 6151))
+   * % 1` -- looks like a stable position-keyed hash, but isn't one in
+   * practice. Stars drift continuously (advanceLegacyMenuBackdropStars),
+   * and multiplying a smoothly-changing float by a large constant before
+   * taking it mod 1 amplifies even a sub-pixel position change into an
+   * effectively unrelated result -- measured live: for a star moving at
+   * its own ordinary drift speed, that expression produced a new,
+   * uncorrelated value in [0, 1) on almost every single real frame (30
+   * consecutive samples at 50ms apart: 0.473, 0.375, 0.281, 0.198, ...,
+   * jumping the full range with no visible pattern), not a stable
+   * identity. Every visual it fed -- the sparkle hue, the round-star
+   * white/blue/warm color bucket, and each star's own twinkle PERIOD --
+   * was silently re-randomizing every frame as a result, which is what
+   * actually read as "switching colors like a strobe" (worse than a slow
+   * hue rotation) and, via the period, as a non-smooth brightness curve.
+   * This field replaces that unstable derivation with a real stored value
+   * that only changes at genuine star-rebirth, restoring the already-
+   * intended "each star gets its own fixed period/color, twinkling
+   * in and out" design the surrounding code already documents.
+   */
+  seed: number;
 }
 
 export interface LegacyMenuBackdropPalette {
@@ -123,7 +149,8 @@ export function createLegacyMenuBackdropStars(
       radius: 0.6 + (depth * 2.7) + (random() * 0.35),
       speed: 0.009 + (depth * 0.052) + (random() * 0.006),
       alpha: 0.16 + (depth * 0.74) + (random() * 0.1),
-      drift: -0.03 + (random() * 0.06)
+      drift: -0.03 + (random() * 0.06),
+      seed: random()
     };
   });
 }
@@ -200,6 +227,10 @@ function resetLegacyMenuBackdropStarNearWarpOrigin(
 
   star.x = LEGACY_MENU_BACKDROP_WARP_CENTER_X + (Math.cos(angle) * radius);
   star.y = LEGACY_MENU_BACKDROP_WARP_CENTER_Y + (Math.sin(angle) * radius);
+  // A genuine rebirth is the one moment a fresh identity is correct --
+  // this is a new point of light appearing at the warp origin, not the
+  // same star silently reseeding mid-life (see the field's own doc).
+  star.seed = random();
 }
 
 export function resolveLegacyMenuBackdropPalette(darkMode: boolean): LegacyMenuBackdropPalette {

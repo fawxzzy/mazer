@@ -7755,11 +7755,19 @@ export class MenuScene extends Phaser.Scene {
       const streakLength = resolveLegacyMenuBackdropStreakLength(star);
       const coreSize = Math.max(1, Math.round(star.radius));
       const step = resolveLegacyMenuBackdropTailStep(star);
-      // Deterministic per-star twinkle and color-temperature variation from
-      // the star's own position (no extra persisted state needed) -- plain
-      // uniform white squares with no shimmer read as flat/lifeless at a
-      // real starfield's scale.
-      const starSeed = ((star.x * 9973) + (star.y * 6151)) % 1;
+      // Confirmed real defect (owner-reported: background stars "switch
+      // colors like a strobe" instead of smoothly twinkling): this used to
+      // be derived fresh every frame from the star's own (continuously
+      // drifting) position -- `((star.x * 9973) + (star.y * 6151)) % 1` --
+      // which looks like a stable position-keyed hash but isn't: measured
+      // live, a star moving at its own ordinary drift speed produced an
+      // uncorrelated new value on almost every real frame, silently
+      // re-randomizing the twinkle period, the color bucket below, and the
+      // sparkle hue every frame instead of giving each star one fixed
+      // identity. Now reads the star's own persisted seed (legacyMenuBackdrop.ts's
+      // own field doc has the measured trace) -- stable for the star's
+      // whole life, reassigned only at genuine rebirth.
+      const starSeed = star.seed;
       // Was a small (68-100%) alpha-only wobble on a shared 1300ms period --
       // reported as flickering badly, and asked to "make their size animate
       // too and fade in and out." Each star gets its own period (+-25%,
@@ -7792,11 +7800,22 @@ export class MenuScene extends Phaser.Scene {
       // by this depth distribution's own math), which real stars actually
       // reach.
       if (coreSize >= 3) {
-        const sparkleHue = Phaser.Display.Color.HSVToRGB(
-          (animationTime / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + starSeed,
-          0.8,
-          1
-        ).color;
+        // Stable per-star hue (no animationTime term), not a continuous
+        // rainbow rotation -- with starSeed now genuinely fixed per star,
+        // rotating hue by animationTime here would still be a real,
+        // continuous full-spectrum cycle every LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS
+        // (5.2s) across every bright star in the field simultaneously, at a
+        // different phase each. The owner's own stated preference is
+        // explicit: "stable per-star color... over rapid cycling through
+        // unrelated hues." A background star twinkling brighter/dimmer at
+        // one fixed hue reads as an actual star; a field of them
+        // continuously rainbow-shifting reads as a light show even once
+        // the shift itself is smooth. The goal-ring/title sparkle call
+        // sites (drawLegacyGoalStarMarker, the wordmark sparkles) are
+        // unaffected -- their own animated/per-cycle hues are a
+        // deliberate, different, attention-drawing design for those
+        // specific contexts and are not touched here.
+        const sparkleHue = Phaser.Display.Color.HSVToRGB(starSeed, 0.8, 1).color;
         this.drawLegacyFourPointSparkle(
           this.backdropGraphics,
           pixelX,

@@ -277,7 +277,8 @@ describe('Mazer UI rework decision registry contract', () => {
         'src/render/teleportAnchorPose.ts': '4D-B',
         'src/render/teleportTransferPresentation.ts': '4D-B',
         'src/render/teleportTransferConduitCanvas.ts': '4D-B',
-        'src/scenes/MenuScene.ts': '4D-B',
+        'src/scenes/MenuScene.ts': '4E',
+        'src/legacy-runtime/legacyMenuBackdrop.ts': '4E',
         'src/legacy-runtime/legacyAuth.ts': '3B',
         'src/legacy-runtime/legacyPlayerMessage.ts': '3B',
         'vite.config.ts': '5B',
@@ -315,7 +316,7 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(waveFourDA.dependsOn).not.toContain('3B');
     });
 
-    it('Wave 4D-B actively owns its new Teleport primary-anchor module and depends only on Wave 4D-A', async () => {
+    it('Wave 4D-B actively owns its Teleport modules and depends only on Wave 4D-A -- MenuScene.ts has since moved on to Wave 4E', async () => {
       const { readDecisionRegistry } = await loadChecker();
       const registry: any = await readDecisionRegistry();
       const waveFourDB = registry.integratorWaveOwnership.assignments.find((entry: any) => entry.wave === '4D-B');
@@ -325,15 +326,14 @@ describe('Mazer UI rework decision registry contract', () => {
         'src/render/teleportPrimaryAnchor.ts',
         'src/render/teleportAnchorPose.ts',
         'src/render/teleportTransferPresentation.ts',
-        'src/render/teleportTransferConduitCanvas.ts',
-        'src/scenes/MenuScene.ts'
+        'src/render/teleportTransferConduitCanvas.ts'
       ]);
       expect(waveFourDB.dependsOn).toEqual(['4D-A']);
       // No dependency on the unrelated auth-migration wave.
       expect(waveFourDB.dependsOn).not.toContain('3B');
     });
 
-    it('Wave 4D-B claims MenuScene.ts (handed off from 4D-A) plus its own new modules -- 4D-A\'s remaining Navigation Core paths are untouched', async () => {
+    it('Wave 4E claims MenuScene.ts (handed off from 4D-B) plus the new backdrop module -- 4D-B\'s own remaining Teleport paths are untouched', async () => {
       const { readDecisionRegistry, resolveActiveIntegratorPathOwners } = await loadChecker();
       const registry: any = await readDecisionRegistry();
       const owners = resolveActiveIntegratorPathOwners(registry);
@@ -351,10 +351,22 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(owners.get('src/render/teleportAnchorPose.ts')).toBe('4D-B');
       expect(owners.get('src/render/teleportTransferPresentation.ts')).toBe('4D-B');
       expect(owners.get('src/render/teleportTransferConduitCanvas.ts')).toBe('4D-B');
-      expect(owners.get('src/scenes/MenuScene.ts')).toBe('4D-B');
+      expect(owners.get('src/scenes/MenuScene.ts')).toBe('4E');
+      expect(owners.get('src/legacy-runtime/legacyMenuBackdrop.ts')).toBe('4E');
     });
 
-    it('a Wave 4D-B branch may change its own modules and the handed-off MenuScene.ts, but not Wave 4D-A\'s remaining paths', async () => {
+    it('a Wave 4E branch may change its own backdrop module and the handed-off MenuScene.ts, but not Wave 4D-B\'s remaining Teleport paths', async () => {
+      const { readDecisionRegistry, collectIntegratorWaveOwnershipViolations } = await loadChecker();
+      const registry = await readDecisionRegistry();
+
+      expect(collectIntegratorWaveOwnershipViolations(['src/scenes/MenuScene.ts'], registry, '4E')).toEqual([]);
+      expect(collectIntegratorWaveOwnershipViolations(['src/legacy-runtime/legacyMenuBackdrop.ts'], registry, '4E')).toEqual([]);
+
+      const violations = collectIntegratorWaveOwnershipViolations(['src/render/teleportPrimaryAnchor.ts'], registry, '4E');
+      expect(violations.some((entry) => entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/render/teleportPrimaryAnchor.ts')).toBe(true);
+    });
+
+    it('a Wave 4D-B branch may still change its own remaining Teleport paths but no longer MenuScene.ts after the 4E handoff', async () => {
       const { readDecisionRegistry, collectIntegratorWaveOwnershipViolations } = await loadChecker();
       const registry = await readDecisionRegistry();
 
@@ -362,18 +374,17 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(collectIntegratorWaveOwnershipViolations(['src/render/teleportAnchorPose.ts'], registry, '4D-B')).toEqual([]);
       expect(collectIntegratorWaveOwnershipViolations(['src/render/teleportTransferPresentation.ts'], registry, '4D-B')).toEqual([]);
       expect(collectIntegratorWaveOwnershipViolations(['src/render/teleportTransferConduitCanvas.ts'], registry, '4D-B')).toEqual([]);
-      expect(collectIntegratorWaveOwnershipViolations(['src/scenes/MenuScene.ts'], registry, '4D-B')).toEqual([]);
 
-      const violations = collectIntegratorWaveOwnershipViolations(['src/scenes/BootScene.ts'], registry, '4D-B');
-      expect(violations.some((entry) => entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/scenes/BootScene.ts')).toBe(true);
+      const violations = collectIntegratorWaveOwnershipViolations(['src/scenes/MenuScene.ts'], registry, '4D-B');
+      expect(violations.some((entry) => entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
     });
 
-    it('rejects the real registry if Wave 4D-B were made to also actively claim a Wave 4D-A path (duplicate active ownership)', async () => {
+    it('rejects the real registry if Wave 4D-B were made to also actively claim MenuScene.ts again (duplicate active ownership with Wave 4E)', async () => {
       const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
       const registry: any = cloneRegistry(await readDecisionRegistry());
       const waveFourDB = registry.integratorWaveOwnership.assignments.find((entry: any) => entry.wave === '4D-B');
-      // 4D-B does not really own MenuScene.ts -- this is a synthetic conflict, matching the
-      // existing 3B/MenuScene.ts case above, to prove the guard also catches it for 4D-B.
+      // 4D-B does not really own MenuScene.ts any more -- this is a synthetic conflict, matching
+      // the existing 3B/MenuScene.ts case above, to prove the guard also catches it for 4D-B/4E.
       waveFourDB.paths.push('src/scenes/MenuScene.ts');
 
       const violations = collectDecisionRegistryViolations(registry);

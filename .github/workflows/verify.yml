@@ -61,6 +61,9 @@ jobs:
       - name: Verify Wave 4D-B Teleport System v1 required coverage
         run: node ./scripts/verify/run-teleport-required-tests.mjs
 
+      - name: Verify Wave 4E World Identity required coverage
+        run: node ./scripts/verify/run-world-identity-required-tests.mjs
+
       - name: Build production bundle and PWA assets
         run: npm run build
 
