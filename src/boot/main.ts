@@ -11,6 +11,7 @@ import {
   consumeMazerOAuthCallback,
   isMazerOAuthCallbackReadyForBoot,
   isMazerOAuthCallbackRequest,
+  resolveMazerOAuthSessionStorage,
   resolveMazerLegalRoute,
   type MazerOAuthClient
 } from '../legacy-runtime/legacyAccountPortal';
@@ -89,8 +90,10 @@ const boot = async (): Promise<void> => {
   const passwordRecoveryRouteRequested = isLegacyPasswordRecoveryRuntimeLocation(window.location);
   const oauthCallbackRequested = !passwordRecoveryRouteRequested
     && isMazerOAuthCallbackRequest(window.location);
+  const oauthSessionStorage = resolveMazerOAuthSessionStorage(window);
   const oauthCallbackReadyForBoot = oauthCallbackRequested
-    && isMazerOAuthCallbackReadyForBoot(window.location, window.sessionStorage);
+    && oauthSessionStorage !== null
+    && isMazerOAuthCallbackReadyForBoot(window.location, oauthSessionStorage);
   const oauthCallback = oauthCallbackRequested
     ? captureAndScrubMazerOAuthCallback(window.location, window.history)
     : null;

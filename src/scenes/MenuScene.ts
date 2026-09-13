@@ -307,6 +307,7 @@ import {
 import {
   MAZER_OAUTH_SAFE_ERROR_MESSAGE,
   beginMazerOAuthAuthorization,
+  installMazerOAuthPageShowRecovery,
   navigateToMazerAccountPortal,
   navigateToMazerLegalPortal
 } from '../legacy-runtime/legacyAccountPortal';
@@ -2348,6 +2349,7 @@ export class MenuScene extends Phaser.Scene {
   private overlayBoardZoomSliderBounds: VisualRect | null = null;
   private overlayMovementSpeedSliderBounds: VisualRect | null = null;
   private viewportGeometryListener: (() => void) | null = null;
+  private oauthPageShowCleanup: (() => void) | null = null;
   /** Cached OS accessibility preference; never read from the render loop. */
   private legacyReducedMotionEnabled = false;
   private legacyReducedMotionMediaQuery: MediaQueryList | null = null;
@@ -2797,6 +2799,10 @@ export class MenuScene extends Phaser.Scene {
     if (typeof window !== 'undefined') {
       this.viewportGeometryListener = () => this.refreshLayout();
       window.addEventListener(MAZER_VIEWPORT_CHANGE_EVENT, this.viewportGeometryListener);
+      this.oauthPageShowCleanup = installMazerOAuthPageShowRecovery(window, () => {
+        this.authSubmitting = false;
+        this.uiDirty = true;
+      });
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       // The CanvasTexture is registered in the game-level TextureManager,
@@ -2852,6 +2858,8 @@ export class MenuScene extends Phaser.Scene {
         window.removeEventListener(MAZER_VIEWPORT_CHANGE_EVENT, this.viewportGeometryListener);
         this.viewportGeometryListener = null;
       }
+      this.oauthPageShowCleanup?.();
+      this.oauthPageShowCleanup = null;
       this.clearVisualDiagnostics();
       clearMenuSceneRuntimeDiagnostics();
     });
@@ -12862,6 +12870,7 @@ export class MenuScene extends Phaser.Scene {
               { fullScreenHitArea: true }
             )
           );
+          this.createLegacySignedOutOAuthFailure();
         } else {
           this.uiButtons.push(
             this.createButton(
@@ -16943,6 +16952,30 @@ export class MenuScene extends Phaser.Scene {
       11
     ).setOrigin(0.5);
     this.uiTexts.push(welcome, usernameLabel);
+  }
+
+  private createLegacySignedOutOAuthFailure(): void {
+    if (
+      this.authSnapshot.status === 'authenticated'
+      || this.authSnapshot.error !== MAZER_OAUTH_SAFE_ERROR_MESSAGE
+    ) {
+      return;
+    }
+
+    const compact = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT;
+    const feedback = this.padLegacyCompactUiText(this.add.text(
+      this.layout.centerButtonX,
+      this.layout.centerButtonY - this.layout.buttonHeight - (compact ? 24 : 28),
+      MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+      {
+        align: 'center',
+        color: '#ff9d9d',
+        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+        fontSize: `${compact ? 10 : 11}px`,
+        wordWrap: { width: Math.min(this.layout.width - 48, 320), useAdvancedWrap: true }
+      }
+    )).setOrigin(0.5);
+    this.uiTexts.push(feedback);
   }
 
   private openSharedAccountSurface(): void {

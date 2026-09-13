@@ -16,6 +16,8 @@ import {
   consumeMazerOAuthCallback,
   isMazerOAuthCallbackReadyForBoot,
   isMazerOAuthCallbackRequest,
+  installMazerOAuthPageShowRecovery,
+  resolveMazerOAuthSessionStorage,
   resolveMazerLegalRoute,
   type MazerOAuthClient,
   type MazerOAuthLocation,
@@ -92,6 +94,28 @@ const createClient = (claims: Record<string, unknown>): MazerOAuthClient => ({
 });
 
 describe('Mazer shared account contract', () => {
+  test('contains denied browser storage and recovers OAuth submission only after a persisted page restore', () => {
+    const deniedStorage = {} as Pick<Window, 'sessionStorage'>;
+    Object.defineProperty(deniedStorage, 'sessionStorage', {
+      get: () => { throw new DOMException('denied', 'SecurityError'); }
+    });
+    expect(resolveMazerOAuthSessionStorage(deniedStorage)).toBeNull();
+
+    const listeners = new Set<(event: PageTransitionEvent) => void>();
+    const lifecycle = {
+      addEventListener: (_type: 'pageshow', listener: (event: PageTransitionEvent) => void) => listeners.add(listener),
+      removeEventListener: (_type: 'pageshow', listener: (event: PageTransitionEvent) => void) => listeners.delete(listener)
+    };
+    const recover = vi.fn();
+    const cleanup = installMazerOAuthPageShowRecovery(lifecycle, recover);
+    for (const listener of listeners) listener({ persisted: false } as PageTransitionEvent);
+    expect(recover).not.toHaveBeenCalled();
+    for (const listener of listeners) listener({ persisted: true } as PageTransitionEvent);
+    expect(recover).toHaveBeenCalledTimes(1);
+    cleanup();
+    expect(listeners.size).toBe(0);
+  });
+
   test('uses exact closed portal and legal URLs without accepting caller return targets', () => {
     expect(buildMazerAccountPortalUrl('account')).toBe(
       `${MAZER_ACCOUNT_PORTAL_ORIGIN}/account?app=mazer&returnTo=${encodeURIComponent(MAZER_CANONICAL_RETURN_URL)}`

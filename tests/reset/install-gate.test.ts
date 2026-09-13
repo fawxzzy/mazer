@@ -99,7 +99,9 @@ describe('Mazer install gate', () => {
     expect(mainSource).toContain('initializeInstallSurface(window);');
     expect(mainSource).toContain('!passwordRecoveryRouteRequested');
     expect(mainSource).toContain('captureAndScrubMazerOAuthCallback(window.location, window.history)');
-    expect(mainSource).toContain('isMazerOAuthCallbackReadyForBoot(window.location, window.sessionStorage)');
+    expect(mainSource).toContain('const oauthSessionStorage = resolveMazerOAuthSessionStorage(window);');
+    expect(mainSource).toContain('oauthSessionStorage !== null');
+    expect(mainSource).toContain('isMazerOAuthCallbackReadyForBoot(window.location, oauthSessionStorage)');
     expect(mainSource).toContain('oauthCallbackRequested: oauthCallbackReadyForBoot');
     expect(mainSource).toContain("window.location.replace(buildMazerAccountPortalUrl('reset-password'))");
     expect(mainSource).toContain('window.location.replace(buildMazerLegalUrl(legalRoute))');

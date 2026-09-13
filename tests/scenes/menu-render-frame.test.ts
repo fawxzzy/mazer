@@ -1741,6 +1741,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private async handleSharedAccountAuthorization(): Promise<void>');
     expect(menuSceneSource).toContain('const result = await beginMazerOAuthAuthorization();');
     expect(menuSceneSource).toContain('void this.handleSharedAccountAuthorization();');
+    expect(menuSceneSource).toContain('private createLegacySignedOutOAuthFailure(): void');
+    expect(menuSceneSource).toContain("this.authSnapshot.error !== MAZER_OAUTH_SAFE_ERROR_MESSAGE");
+    expect(menuSceneSource).toContain('this.createLegacySignedOutOAuthFailure();');
+    expect(menuSceneSource).toContain('this.oauthPageShowCleanup = installMazerOAuthPageShowRecovery(window, () => {');
+    expect(menuSceneSource).toContain('this.oauthPageShowCleanup?.();');
     expect(menuSceneSource).toContain("if (this.overlay === 'auth') {");
     expect(menuSceneSource.indexOf("if (this.overlay === 'auth') {")).toBeLessThan(menuSceneSource.indexOf('this.updateStars(time, delta);'));
     expect(menuSceneSource).toContain('private createAuthFooterLink(');

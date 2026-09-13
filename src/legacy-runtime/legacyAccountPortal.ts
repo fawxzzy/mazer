@@ -81,6 +81,11 @@ export interface MazerOAuthRuntime {
   setTimer(handler: () => void, timeoutMs: number): ReturnType<typeof setTimeout>;
 }
 
+export interface MazerOAuthPageLifecycle {
+  addEventListener(type: 'pageshow', listener: (event: PageTransitionEvent) => void): void;
+  removeEventListener(type: 'pageshow', listener: (event: PageTransitionEvent) => void): void;
+}
+
 export interface MazerOAuthClient {
   auth: {
     getClaims(jwt?: string): Promise<{ data: { claims?: Record<string, unknown> } | null; error: unknown }>;
@@ -119,21 +124,50 @@ const decodeJwtPayload = (jwt: string): Record<string, unknown> | null => {
   }
 };
 
-const resolveBrowserRuntime = (): MazerOAuthRuntime | null => {
-  if (typeof window === 'undefined' || typeof crypto === 'undefined') {
+type MazerOAuthRuntimeResolution =
+  | { result: MazerOAuthBootResult; runtime: null }
+  | { result: null; runtime: MazerOAuthRuntime };
+
+export const resolveMazerOAuthSessionStorage = (
+  browserWindow: Pick<Window, 'sessionStorage'> | null = typeof window === 'undefined' ? null : window
+): MazerOAuthStorage | null => {
+  if (browserWindow === null) {
     return null;
   }
+  try {
+    return browserWindow.sessionStorage;
+  } catch {
+    return null;
+  }
+};
 
-  return {
-    clearTimer: (handle) => clearTimeout(handle),
-    crypto,
-    fetch: window.fetch.bind(window),
-    history: window.history,
-    location: window.location,
-    now: () => Date.now(),
-    sessionStorage: window.sessionStorage,
-    setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
-  };
+const resolveBrowserRuntime = (): MazerOAuthRuntimeResolution => {
+  if (typeof window === 'undefined' || typeof crypto === 'undefined') {
+    return { result: { category: 'authorization_unavailable', status: 'failed' }, runtime: null };
+  }
+
+  const sessionStorage = resolveMazerOAuthSessionStorage(window);
+  if (sessionStorage === null) {
+    return { result: { category: 'storage_unavailable', status: 'failed' }, runtime: null };
+  }
+
+  try {
+    return {
+      result: null,
+      runtime: {
+        clearTimer: (handle) => clearTimeout(handle),
+        crypto,
+        fetch: window.fetch.bind(window),
+        history: window.history,
+        location: window.location,
+        now: () => Date.now(),
+        sessionStorage,
+        setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
+      }
+    };
+  } catch {
+    return { result: { category: 'authorization_unavailable', status: 'failed' }, runtime: null };
+  }
 };
 
 const readAuthMutationEpoch = (storage: MazerOAuthStorage): number => {
@@ -146,15 +180,16 @@ const readAuthMutationEpoch = (storage: MazerOAuthStorage): number => {
 };
 
 export const advanceMazerAuthMutationEpoch = (
-  storage: MazerOAuthStorage | null = typeof window === 'undefined' ? null : window.sessionStorage
+  storage?: MazerOAuthStorage | null
 ): number | null => {
-  if (storage === null) {
+  const resolvedStorage = storage === undefined ? resolveMazerOAuthSessionStorage() : storage;
+  if (resolvedStorage === null) {
     return null;
   }
   try {
-    const next = readAuthMutationEpoch(storage) + 1;
-    storage.setItem(MAZER_AUTH_MUTATION_EPOCH_KEY, String(next));
-    storage.removeItem(MAZER_OAUTH_PENDING_KEY);
+    const next = readAuthMutationEpoch(resolvedStorage) + 1;
+    resolvedStorage.setItem(MAZER_AUTH_MUTATION_EPOCH_KEY, String(next));
+    resolvedStorage.removeItem(MAZER_OAUTH_PENDING_KEY);
     return next;
   } catch {
     return null;
@@ -208,20 +243,26 @@ const createRandomBase64Url = (runtime: MazerOAuthRuntime): string => {
 };
 
 export const beginMazerOAuthAuthorization = async (
-  runtime: MazerOAuthRuntime | null = resolveBrowserRuntime()
+  runtime?: MazerOAuthRuntime | null
 ): Promise<MazerOAuthBootResult> => {
-  if (runtime === null) {
-    return { category: 'authorization_unavailable', status: 'failed' };
+  const resolution: MazerOAuthRuntimeResolution = runtime === undefined
+    ? resolveBrowserRuntime()
+    : runtime === null
+      ? { result: failed('authorization_unavailable'), runtime: null }
+      : { result: null, runtime };
+  if (resolution.runtime === null) {
+    return resolution.result;
   }
+  const resolvedRuntime = resolution.runtime;
 
   let pendingWritten = false;
   try {
-    const authMutationEpoch = readAuthMutationEpoch(runtime.sessionStorage) + 1;
-    runtime.sessionStorage.setItem(MAZER_AUTH_MUTATION_EPOCH_KEY, String(authMutationEpoch));
-    runtime.sessionStorage.removeItem(MAZER_OAUTH_PENDING_KEY);
-    const codeVerifier = createRandomBase64Url(runtime);
-    const state = createRandomBase64Url(runtime);
-    const challengeBytes = new Uint8Array(await runtime.crypto.subtle.digest(
+    const authMutationEpoch = readAuthMutationEpoch(resolvedRuntime.sessionStorage) + 1;
+    resolvedRuntime.sessionStorage.setItem(MAZER_AUTH_MUTATION_EPOCH_KEY, String(authMutationEpoch));
+    resolvedRuntime.sessionStorage.removeItem(MAZER_OAUTH_PENDING_KEY);
+    const codeVerifier = createRandomBase64Url(resolvedRuntime);
+    const state = createRandomBase64Url(resolvedRuntime);
+    const challengeBytes = new Uint8Array(await resolvedRuntime.crypto.subtle.digest(
       'SHA-256',
       new TextEncoder().encode(codeVerifier)
     ));
@@ -229,19 +270,19 @@ export const beginMazerOAuthAuthorization = async (
     const pending: MazerOAuthPendingRecord = {
       authMutationEpoch,
       codeVerifier,
-      createdAtEpochMs: runtime.now(),
+      createdAtEpochMs: resolvedRuntime.now(),
       returnPath: '/',
       state,
       version: 1
     };
-    runtime.sessionStorage.setItem(MAZER_OAUTH_PENDING_KEY, JSON.stringify(pending));
+    resolvedRuntime.sessionStorage.setItem(MAZER_OAUTH_PENDING_KEY, JSON.stringify(pending));
     pendingWritten = true;
-    runtime.location.assign(buildMazerOAuthAuthorizationUrl(codeChallenge, state));
+    resolvedRuntime.location.assign(buildMazerOAuthAuthorizationUrl(codeChallenge, state));
     return { status: 'none' };
   } catch {
     if (pendingWritten) {
       try {
-        runtime.sessionStorage.removeItem(MAZER_OAUTH_PENDING_KEY);
+        resolvedRuntime.sessionStorage.removeItem(MAZER_OAUTH_PENDING_KEY);
       } catch {
         return { category: 'storage_unavailable', status: 'failed' };
       }
@@ -716,15 +757,21 @@ const consumeMazerOAuthCallbackInner = async (
 export const consumeMazerOAuthCallback = async (
   callback: MazerOAuthCapturedCallback,
   getClient: () => Promise<MazerOAuthClient | null>,
-  runtime: MazerOAuthRuntime | null = resolveBrowserRuntime()
+  runtime?: MazerOAuthRuntime | null
 ): Promise<MazerOAuthBootResult> => {
-  if (runtime === null) {
-    return failed('authorization_unavailable');
+  const resolution: MazerOAuthRuntimeResolution = runtime === undefined
+    ? resolveBrowserRuntime()
+    : runtime === null
+      ? { result: failed('authorization_unavailable'), runtime: null }
+      : { result: null, runtime };
+  if (resolution.runtime === null) {
+    mazerOAuthBootResult = resolution.result;
+    return resolution.result;
   }
 
   let result: MazerOAuthBootResult;
   try {
-    result = await consumeMazerOAuthCallbackInner(callback, runtime, getClient);
+    result = await consumeMazerOAuthCallbackInner(callback, resolution.runtime, getClient);
   } catch {
     result = failed('session_invalid');
   }
@@ -733,6 +780,19 @@ export const consumeMazerOAuthCallback = async (
 };
 
 export const readMazerOAuthBootResult = (): MazerOAuthBootResult => mazerOAuthBootResult;
+
+export const installMazerOAuthPageShowRecovery = (
+  lifecycle: MazerOAuthPageLifecycle,
+  recover: () => void
+): (() => void) => {
+  const listener = (event: PageTransitionEvent): void => {
+    if (event.persisted) {
+      recover();
+    }
+  };
+  lifecycle.addEventListener('pageshow', listener);
+  return () => lifecycle.removeEventListener('pageshow', listener);
+};
 
 export const navigateToMazerAccountPortal = (
   route: MazerAccountPortalRoute,
