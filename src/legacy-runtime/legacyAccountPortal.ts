@@ -92,21 +92,16 @@ export interface MazerOAuthClient {
   auth: {
     getClaims(jwt?: string): Promise<{ data: { claims?: Record<string, unknown> } | null; error: unknown }>;
     getSession(): Promise<{ data: { session: { user?: { id?: string } } | null }; error: unknown }>;
-    getUser(jwt?: string): Promise<{ data: { user: { id?: string } | null }; error: unknown }>;
+    getUser(jwt?: string): Promise<{
+      data: { user: ({ id?: string } & Record<string, unknown>) | null };
+      error: unknown;
+    }>;
     setSession(tokens: { access_token: string; refresh_token: string }): Promise<{ error: unknown }>;
     signOut(options: { scope: 'local' }): Promise<{ error: unknown }>;
   };
 }
 
 let mazerOAuthBootResult: MazerOAuthBootResult = { status: 'none' };
-const quarantinedMazerOAuthAccessTokens = new Set<string>();
-
-interface MazerOAuthAcceptedSessionSnapshot {
-  authMutationEpoch: number;
-  values: ReadonlyMap<string, string | null>;
-}
-
-let acceptedMazerOAuthSessionSnapshot: MazerOAuthAcceptedSessionSnapshot | null = null;
 
 const base64UrlEncode = (bytes: Uint8Array): string => {
   let binary = '';
@@ -151,6 +146,19 @@ export const resolveMazerOAuthSessionStorage = (
   }
 };
 
+export const resolveMazerOAuthAuthStorage = (
+  browserWindow: Pick<Window, 'localStorage'> | null = typeof window === 'undefined' ? null : window
+): MazerOAuthStorage | null => {
+  if (browserWindow === null) {
+    return null;
+  }
+  try {
+    return browserWindow.localStorage;
+  } catch {
+    return null;
+  }
+};
+
 const resolveBrowserRuntime = (): MazerOAuthRuntimeResolution => {
   if (typeof window === 'undefined' || typeof crypto === 'undefined') {
     return { result: { category: 'authorization_unavailable', status: 'failed' }, runtime: null };
@@ -162,12 +170,7 @@ const resolveBrowserRuntime = (): MazerOAuthRuntimeResolution => {
   }
 
   try {
-    let authStorage: MazerOAuthStorage | null = null;
-    try {
-      authStorage = window.localStorage;
-    } catch {
-      // A denied local store is handled by the callback quarantine below.
-    }
+    const authStorage = resolveMazerOAuthAuthStorage(window);
     return {
       result: null,
       runtime: {
@@ -644,40 +647,26 @@ const awaitMazerOAuthRemoteOperation = async <T>(
   );
 });
 
-const bestEffortMazerOAuthLocalSignOut = async (
-  client: MazerOAuthClient,
-  runtime: MazerOAuthRuntime,
-  expectedAccessToken: string
-): Promise<boolean> => {
-  const storageCleared = clearMazerOAuthPersistedSession(runtime, expectedAccessToken);
-  const signOutResult = await awaitMazerOAuthRemoteOperation(
-    () => client.auth.signOut({ scope: 'local' }),
-    runtime
-  );
-  return storageCleared
-    && signOutResult.status === 'resolved'
-    && !signOutResult.value.error
-    && clearMazerOAuthPersistedSession(runtime, expectedAccessToken);
-};
-
 const MAZER_OAUTH_AUTH_STORAGE_KEYS = [
   'sb-bxtcuhkotumitoqtrcej-auth-token',
   'sb-bxtcuhkotumitoqtrcej-auth-token-code-verifier',
   'sb-bxtcuhkotumitoqtrcej-auth-token-user'
 ] as const;
 
+const resolveRuntimeAuthStorage = (runtime: MazerOAuthRuntime): MazerOAuthStorage | null => (
+  runtime.authStorage === undefined ? runtime.sessionStorage : runtime.authStorage
+);
+
 const clearMazerOAuthPersistedSession = (
   runtime: MazerOAuthRuntime,
   expectedAccessToken: string
 ): boolean => {
-  if (runtime.authStorage === undefined) {
-    return true;
-  }
-  if (runtime.authStorage === null) {
+  const authStorage = resolveRuntimeAuthStorage(runtime);
+  if (authStorage === null) {
     return false;
   }
   try {
-    const raw = runtime.authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]);
+    const raw = authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]);
     if (raw === null) {
       return true;
     }
@@ -695,93 +684,81 @@ const clearMazerOAuthPersistedSession = (
       return true;
     }
     for (const key of MAZER_OAUTH_AUTH_STORAGE_KEYS) {
-      runtime.authStorage.removeItem(key);
+      authStorage.removeItem(key);
     }
-    return MAZER_OAUTH_AUTH_STORAGE_KEYS.every((key) => runtime.authStorage?.getItem(key) === null);
+    return MAZER_OAUTH_AUTH_STORAGE_KEYS.every((key) => authStorage.getItem(key) === null);
   } catch {
     return false;
   }
 };
 
-const captureMazerOAuthAcceptedSession = (
+const writeMazerOAuthSessionQuarantine = (
   runtime: MazerOAuthRuntime,
-  authMutationEpoch: number
+  owner: string,
+  active: boolean
 ): boolean => {
-  if (runtime.authStorage === undefined) {
-    acceptedMazerOAuthSessionSnapshot = null;
-    return true;
-  }
-  if (runtime.authStorage === null) {
+  const authStorage = resolveRuntimeAuthStorage(runtime);
+  if (authStorage === null) {
     return false;
   }
-  try {
-    acceptedMazerOAuthSessionSnapshot = {
-      authMutationEpoch,
-      values: new Map(MAZER_OAUTH_AUTH_STORAGE_KEYS.map((key) => [key, runtime.authStorage?.getItem(key) ?? null]))
-    };
-    return acceptedMazerOAuthSessionSnapshot.values.get(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]) !== null;
-  } catch {
-    acceptedMazerOAuthSessionSnapshot = null;
-    return false;
-  }
-};
-
-const restoreMazerOAuthAcceptedSessionAfterStaleSettle = (
-  runtime: MazerOAuthRuntime,
-  staleAccessToken: string
-): boolean => {
-  const accepted = acceptedMazerOAuthSessionSnapshot;
-  if (!runtime.authStorage || accepted === null) {
-    return clearMazerOAuthPersistedSession(runtime, staleAccessToken);
-  }
-  try {
-    if (readAuthMutationEpoch(runtime.sessionStorage) !== accepted.authMutationEpoch) {
-      return clearMazerOAuthPersistedSession(runtime, staleAccessToken);
-    }
-    const currentRaw = runtime.authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]);
-    if (currentRaw === null) {
-      return true;
-    }
-    const current = JSON.parse(currentRaw) as Record<string, unknown>;
-    if (current.access_token !== staleAccessToken) {
-      return true;
-    }
-    for (const key of MAZER_OAUTH_AUTH_STORAGE_KEYS) {
-      const value = accepted.values.get(key) ?? null;
-      if (value === null) {
-        runtime.authStorage.removeItem(key);
-      } else {
-        runtime.authStorage.setItem(key, value);
-      }
-    }
-    return MAZER_OAUTH_AUTH_STORAGE_KEYS.every(
-      (key) => runtime.authStorage?.getItem(key) === (accepted.values.get(key) ?? null)
-    );
-  } catch {
-    return false;
-  }
-};
-
-const writeMazerOAuthSessionQuarantine = (runtime: MazerOAuthRuntime, active: boolean): boolean => {
   try {
     if (active) {
-      runtime.sessionStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, '1');
+      authStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, owner);
+    } else if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === owner) {
+      authStorage.removeItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY);
     } else {
-      runtime.sessionStorage.removeItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY);
+      return false;
     }
-    return runtime.sessionStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === (active ? '1' : null);
+    return authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === (active ? owner : null);
+  } catch {
+    return false;
+  }
+};
+
+const persistMazerOAuthSession = (
+  runtime: MazerOAuthRuntime,
+  owner: string,
+  accessToken: string,
+  refreshToken: string,
+  expiresAt: number,
+  user: { id?: string } & Record<string, unknown>
+): boolean => {
+  const authStorage = resolveRuntimeAuthStorage(runtime);
+  if (authStorage === null) {
+    return false;
+  }
+  try {
+    if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== owner) {
+      return false;
+    }
+    authStorage.setItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0], JSON.stringify({
+      access_token: accessToken,
+      expires_at: expiresAt,
+      expires_in: Math.max(1, expiresAt - Math.floor(runtime.now() / 1_000)),
+      refresh_token: refreshToken,
+      token_type: 'bearer',
+      user
+    }));
+    if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== owner) {
+      clearMazerOAuthPersistedSession(runtime, accessToken);
+      return false;
+    }
+    const raw = authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]);
+    const stored: unknown = raw === null ? null : JSON.parse(raw);
+    return stored !== null && typeof stored === 'object' && !Array.isArray(stored)
+      && (stored as Record<string, unknown>).access_token === accessToken
+      && (stored as Record<string, unknown>).refresh_token === refreshToken
+      && ((stored as Record<string, unknown>).user as Record<string, unknown> | undefined)?.id === user.id;
   } catch {
     return false;
   }
 };
 
 export const isMazerOAuthSessionQuarantined = (
-  storage: MazerOAuthStorage | null = resolveMazerOAuthSessionStorage(),
-  accessToken: string | null = null
+  storage: MazerOAuthStorage | null = resolveMazerOAuthAuthStorage()
 ): boolean => {
   try {
-    return (accessToken !== null && quarantinedMazerOAuthAccessTokens.has(accessToken))
-      || storage?.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === '1';
+    return storage?.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== null;
   } catch {
     return true;
   }
@@ -896,49 +873,24 @@ const consumeMazerOAuthCallbackInner = async (
   if (!stillCurrent()) {
     return failed('expired_or_missing_state');
   }
-  if (!writeMazerOAuthSessionQuarantine(runtime, true)) {
+  if (!writeMazerOAuthSessionQuarantine(runtime, pending.state, true)) {
     return failed('storage_unavailable');
   }
-  quarantinedMazerOAuthAccessTokens.add(tokens.accessToken);
-  let setSessionPromise: ReturnType<MazerOAuthClient['auth']['setSession']>;
-  try {
-    setSessionPromise = client.auth.setSession({
-      access_token: tokens.accessToken,
-      refresh_token: tokens.refreshToken
-    });
-  } catch {
-    await bestEffortMazerOAuthLocalSignOut(client, runtime, tokens.accessToken);
-    return failed('storage_unavailable');
-  }
-  const setOperation = await awaitMazerOAuthRemoteOperation(() => setSessionPromise, runtime);
-  if (setOperation.status !== 'resolved') {
-    void setSessionPromise.then(
-      async () => {
-        if (stillCurrent()) {
-          await bestEffortMazerOAuthLocalSignOut(client, runtime, tokens.accessToken);
-        } else {
-          restoreMazerOAuthAcceptedSessionAfterStaleSettle(runtime, tokens.accessToken);
-        }
-        quarantinedMazerOAuthAccessTokens.delete(tokens.accessToken);
-      },
-      async () => {
-        if (stillCurrent()) {
-          await bestEffortMazerOAuthLocalSignOut(client, runtime, tokens.accessToken);
-        }
-        quarantinedMazerOAuthAccessTokens.delete(tokens.accessToken);
-      }
-    );
-    await bestEffortMazerOAuthLocalSignOut(client, runtime, tokens.accessToken);
-    return failed('storage_unavailable');
-  }
-  if (setOperation.value.error) {
-    await bestEffortMazerOAuthLocalSignOut(client, runtime, tokens.accessToken);
-    quarantinedMazerOAuthAccessTokens.delete(tokens.accessToken);
+  if (!persistMazerOAuthSession(
+    runtime,
+    pending.state,
+    tokens.accessToken,
+    tokens.refreshToken,
+    Number(claims.exp),
+    remoteUser.data.user
+  )) {
+    clearMazerOAuthPersistedSession(runtime, tokens.accessToken);
+    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
     return failed('storage_unavailable');
   }
   if (!stillCurrent()) {
-    await bestEffortMazerOAuthLocalSignOut(client, runtime, tokens.accessToken);
-    quarantinedMazerOAuthAccessTokens.delete(tokens.accessToken);
+    clearMazerOAuthPersistedSession(runtime, tokens.accessToken);
+    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
     return failed('expired_or_missing_state');
   }
   const postCommitOperation = await awaitMazerOAuthRemoteOperation(
@@ -949,8 +901,8 @@ const consumeMazerOAuthCallbackInner = async (
     runtime
   );
   if (postCommitOperation.status !== 'resolved') {
-    await bestEffortMazerOAuthLocalSignOut(client, runtime, tokens.accessToken);
-    quarantinedMazerOAuthAccessTokens.delete(tokens.accessToken);
+    clearMazerOAuthPersistedSession(runtime, tokens.accessToken);
+    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
     return failed('session_invalid');
   }
   const [sessionResult, sessionUser] = postCommitOperation.value;
@@ -961,21 +913,14 @@ const consumeMazerOAuthCallbackInner = async (
     || sessionUser.data.user?.id !== subject
     || !stillCurrent()
   ) {
-    await bestEffortMazerOAuthLocalSignOut(client, runtime, tokens.accessToken);
-    quarantinedMazerOAuthAccessTokens.delete(tokens.accessToken);
+    clearMazerOAuthPersistedSession(runtime, tokens.accessToken);
+    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
     return failed('session_invalid');
   }
-  if (!captureMazerOAuthAcceptedSession(runtime, pending.authMutationEpoch)) {
-    await bestEffortMazerOAuthLocalSignOut(client, runtime, tokens.accessToken);
-    quarantinedMazerOAuthAccessTokens.delete(tokens.accessToken);
+  if (!writeMazerOAuthSessionQuarantine(runtime, pending.state, false)) {
+    clearMazerOAuthPersistedSession(runtime, tokens.accessToken);
     return failed('storage_unavailable');
   }
-  if (!writeMazerOAuthSessionQuarantine(runtime, false)) {
-    await bestEffortMazerOAuthLocalSignOut(client, runtime, tokens.accessToken);
-    quarantinedMazerOAuthAccessTokens.delete(tokens.accessToken);
-    return failed('storage_unavailable');
-  }
-  quarantinedMazerOAuthAccessTokens.delete(tokens.accessToken);
   return { status: 'connected' };
 };
 
