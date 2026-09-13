@@ -19,6 +19,7 @@ import {
   readLegacyRememberedIdentity,
   readLegacyAuthSessionSnapshot,
   readLegacyPasswordRecoveryBootUrlState,
+  reconcileLegacyAuthStorageSession,
   resolveLegacyPasswordRecoveryCleanUrl,
   resolveLegacyPasswordRecoveryEnterAction,
   resolveLegacyPasswordRecoveryRedirectUrl,
@@ -463,7 +464,8 @@ describe('legacy auth runtime', () => {
     expect(authSource).toContain('legacyAuthPersistenceListenerInstalled');
     expect(authSource).toContain('legacyAuthStorageListenerInstalled');
     expect(authSource).toContain("window.addEventListener('storage'");
-    expect(authSource).toContain("syncLegacyAuthPersistenceFromSession(data.session, 'CROSS_TAB_SESSION')");
+    expect(authSource).toContain('reconcileLegacyAuthStorageSession(');
+    expect(authSource).toContain('legacyAuthLiveListeners');
     expect(authSource.match(/isMazerOAuthSessionQuarantined\(/g)?.length).toBeGreaterThanOrEqual(5);
     expect(authSource).toContain('syncLegacyAuthPersistenceFromSession(data.session,');
     expect(authSource).toContain('export const readLegacyAuthSessionSnapshot = async');
@@ -480,6 +482,49 @@ describe('legacy auth runtime', () => {
     expect(authSource).not.toContain("|| event === 'BOOTSTRAP_SESSION'");
     expect(authSource).not.toContain("|| event === 'INITIAL_SESSION'");
     expect(authSource).toContain("event === 'SIGNED_OUT'");
+  });
+
+  test('fans storage-event reconciliation out to every live auth subscriber', async () => {
+    const firstListener = vi.fn();
+    const secondListener = vi.fn();
+    const session = {
+      access_token: 'access-token',
+      expires_at: 2_100,
+      expires_in: 100,
+      refresh_token: 'refresh-token',
+      token_type: 'bearer',
+      user: {
+        app_metadata: {},
+        aud: 'authenticated',
+        created_at: '2026-09-13T00:00:00.000Z',
+        email: 'player@example.test',
+        id: '11111111-1111-4111-8111-111111111111',
+        user_metadata: { username: 'Maze Player' }
+      }
+    };
+    await expect(reconcileLegacyAuthStorageSession(
+      async () => session as never,
+      new Set([firstListener, secondListener]),
+      () => false,
+      { VITE_SUPABASE_ANON_KEY: 'anon-key', VITE_SUPABASE_URL: 'https://example.supabase.co' }
+    )).resolves.toBe(true);
+    for (const listener of [firstListener, secondListener]) {
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+        email: 'player@example.test',
+        status: 'authenticated',
+        userId: '11111111-1111-4111-8111-111111111111'
+      }), 'SIGNED_IN');
+    }
+
+    firstListener.mockClear();
+    secondListener.mockClear();
+    await expect(reconcileLegacyAuthStorageSession(
+      async () => session as never,
+      new Set([firstListener, secondListener]),
+      () => true
+    )).resolves.toBe(false);
+    expect(firstListener).not.toHaveBeenCalled();
+    expect(secondListener).not.toHaveBeenCalled();
   });
 
   test('preserves fixed-safe callback failure feedback when no auth client can be constructed', async () => {

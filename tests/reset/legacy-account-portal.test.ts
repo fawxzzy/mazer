@@ -61,6 +61,7 @@ const createRuntime = (
   location,
   notifyAcceptedSession: vi.fn(() => true),
   now: () => 2_000_000,
+  runExclusiveSessionTransaction: async (operation) => operation(),
   sessionStorage: storage,
   setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
 });
@@ -570,6 +571,34 @@ describe('Mazer shared account contract', () => {
     expect(client.auth.signOut).not.toHaveBeenCalled();
   });
 
+  test('fails without mutating shared storage when the exclusive session lock is busy', async () => {
+    const storage = new MemoryStorage();
+    const authStorage = new MemoryStorage();
+    const previousSession = JSON.stringify({ access_token: 'previous-token', refresh_token: 'previous-refresh' });
+    authStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', previousSession);
+    await beginMazerOAuthAuthorization(createRuntime(storage));
+    const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+    const { claims, token } = createAccessToken();
+    const runtime = createRuntime(storage, createLocation(), vi.fn(async () => new Response(JSON.stringify({
+      access_token: token,
+      expires_in: 100,
+      refresh_token: 'refresh-token',
+      token_type: 'bearer'
+    }), { headers: { 'content-type': 'application/json' }, status: 200 })) as typeof fetch);
+    runtime.authStorage = authStorage;
+    runtime.runExclusiveSessionTransaction = vi.fn(async () => null);
+
+    await expect(consumeMazerOAuthCallback({
+      code: 'one-time-code', malformed: false, providerError: false, requested: true, state: pending.state
+    }, async () => createClient(claims), runtime)).resolves.toEqual({
+      category: 'storage_unavailable',
+      status: 'failed'
+    });
+    expect(runtime.runExclusiveSessionTransaction).toHaveBeenCalledTimes(1);
+    expect(authStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(previousSession);
+    expect(authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
+  });
+
   test('rejects ownership acquired while the candidate is capturing its preimage', async () => {
     const storage = new MemoryStorage();
     const authStorage = new MemoryStorage();
@@ -632,6 +661,20 @@ describe('Mazer shared account contract', () => {
     expect(authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
     authStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, '{malformed');
     expect(isMazerOAuthSessionQuarantined(authStorage, 2_000_001)).toBe(true);
+
+    const ambiguousStorage = new MemoryStorage();
+    ambiguousStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', provisionalSession);
+    const ambiguousTransaction = JSON.stringify({
+      committedAccessToken: null,
+      createdAtEpochMs: 1_900_000,
+      owner: 'b'.repeat(43),
+      preimageRaw: previousSession,
+      version: 2
+    });
+    ambiguousStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, ambiguousTransaction);
+    expect(isMazerOAuthSessionQuarantined(ambiguousStorage, 2_000_001)).toBe(true);
+    expect(ambiguousStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(provisionalSession);
+    expect(ambiguousStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBe(ambiguousTransaction);
   });
 
   test('keeps the accepted session when optional broadcast notification is unavailable', async () => {

@@ -11,6 +11,7 @@ export const MAZER_AUTH_MUTATION_EPOCH_KEY = 'mazer.auth.mutation-epoch.v1';
 export const MAZER_OAUTH_SESSION_QUARANTINE_KEY = 'mazer.auth.oauth-session-quarantine.v2';
 export const MAZER_OAUTH_AUTH_SESSION_KEY = 'sb-bxtcuhkotumitoqtrcej-auth-token';
 export const MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY = 'mazer.auth.oauth-storage-probe.v1';
+export const MAZER_OAUTH_SESSION_LOCK_NAME = 'mazer.auth.oauth-session-transaction.v1';
 export const MAZER_OAUTH_PENDING_TTL_MS = 300_000;
 export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
 export const MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS = 60_000;
@@ -83,6 +84,7 @@ export interface MazerOAuthRuntime {
   location: MazerOAuthLocation;
   notifyAcceptedSession?(session: Record<string, unknown>): boolean;
   now(): number;
+  runExclusiveSessionTransaction?<T>(operation: () => T): Promise<T | null>;
   sessionStorage: MazerOAuthStorage;
   setTimer(handler: () => void, timeoutMs: number): ReturnType<typeof setTimeout>;
 }
@@ -197,6 +199,16 @@ const resolveBrowserRuntime = (): MazerOAuthRuntimeResolution => {
           }
         },
         now: () => Date.now(),
+        runExclusiveSessionTransaction: async (operation) => {
+          if (navigator.locks === undefined) {
+            return operation();
+          }
+          return navigator.locks.request(
+            MAZER_OAUTH_SESSION_LOCK_NAME,
+            { ifAvailable: true, mode: 'exclusive' },
+            (lock) => lock === null ? null : operation()
+          );
+        },
         sessionStorage,
         setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
       }
@@ -747,6 +759,9 @@ const restoreMazerOAuthSessionTransaction = (
       return true;
     }
     const currentRaw = storage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY);
+    if (transaction.committedAccessToken === null && currentRaw !== transaction.preimageRaw) {
+      return false;
+    }
     if (
       transaction.committedAccessToken !== null
       && readStoredAccessToken(currentRaw) === transaction.committedAccessToken
@@ -999,48 +1014,56 @@ const consumeMazerOAuthCallbackInner = async (
     return failed('session_invalid');
   }
   const remoteUser = remoteUserOperation.value;
-  if (remoteUser.error || remoteUser.data.user?.id !== subject || !stillCurrent()) {
+  const verifiedUser = remoteUser.data.user;
+  if (remoteUser.error || verifiedUser?.id !== subject || !stillCurrent()) {
     return failed('session_invalid');
   }
   if (!stillCurrent()) {
     return failed('expired_or_missing_state');
   }
-  const transactionState = acquireMazerOAuthSessionTransaction(runtime, pending.state);
-  if (transactionState === null) {
-    return failed('storage_unavailable');
-  }
-  const rollbackSession = (): void => {
-    const authStorage = resolveRuntimeAuthStorage(runtime);
-    if (authStorage !== null) {
-      restoreMazerOAuthSessionTransaction(authStorage, transactionState.raw, transactionState.transaction);
+  const commitSessionTransaction = (): MazerOAuthBootResult => {
+    const transactionState = acquireMazerOAuthSessionTransaction(runtime, pending.state);
+    if (transactionState === null) {
+      return failed('storage_unavailable');
     }
+    const rollbackSession = (): void => {
+      const authStorage = resolveRuntimeAuthStorage(runtime);
+      if (authStorage !== null) {
+        restoreMazerOAuthSessionTransaction(authStorage, transactionState.raw, transactionState.transaction);
+      }
+    };
+    const session = persistMazerOAuthSession(
+      runtime,
+      transactionState,
+      tokens.accessToken,
+      tokens.refreshToken,
+      Number(claims.exp),
+      verifiedUser
+    );
+    if (session === null) {
+      rollbackSession();
+      return failed('storage_unavailable');
+    }
+    if (!stillCurrent()) {
+      rollbackSession();
+      return failed('expired_or_missing_state');
+    }
+    if (!completeMazerOAuthSessionTransaction(runtime, transactionState.raw)) {
+      rollbackSession();
+      return failed('storage_unavailable');
+    }
+    try {
+      runtime.notifyAcceptedSession?.(session);
+    } catch {
+      // The shared-storage listener remains the fallback reconciliation path.
+    }
+    return { status: 'connected' };
   };
-  const session = persistMazerOAuthSession(
-    runtime,
-    transactionState,
-    tokens.accessToken,
-    tokens.refreshToken,
-    Number(claims.exp),
-    remoteUser.data.user
-  );
-  if (session === null) {
-    rollbackSession();
-    return failed('storage_unavailable');
+  if (runtime.runExclusiveSessionTransaction !== undefined) {
+    const result = await runtime.runExclusiveSessionTransaction(commitSessionTransaction);
+    return result ?? failed('storage_unavailable');
   }
-  if (!stillCurrent()) {
-    rollbackSession();
-    return failed('expired_or_missing_state');
-  }
-  if (!completeMazerOAuthSessionTransaction(runtime, transactionState.raw)) {
-    rollbackSession();
-    return failed('storage_unavailable');
-  }
-  try {
-    runtime.notifyAcceptedSession?.(session);
-  } catch {
-    // The shared-storage listener remains the fallback reconciliation path.
-  }
-  return { status: 'connected' };
+  return commitSessionTransaction();
 };
 
 export const consumeMazerOAuthCallback = async (

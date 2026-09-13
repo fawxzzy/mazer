@@ -228,6 +228,7 @@ let legacyAuthClient: LegacyAuthClient | null = null;
 let legacyAuthPersistenceListenerInstalled = false;
 let legacyAuthStorageListenerInstalled = false;
 let legacyAuthLastSessionSignature: string | null = null;
+const legacyAuthLiveListeners = new Set<LegacyAuthStateListener>();
 
 export const deriveLegacyRememberedIdentityDisplayName = (email: string): string => {
   const localPart = normalizeLegacyAuthEmail(email).split('@')[0] ?? '';
@@ -362,9 +363,10 @@ const resolveLegacyAuthSessionSignature = (session: Session | null): string | nu
 
 const syncLegacyAuthPersistenceFromSession = (
   session: Session | null,
-  event: AuthChangeEvent | 'BOOTSTRAP_SESSION' | 'CROSS_TAB_SESSION'
+  event: AuthChangeEvent | 'BOOTSTRAP_SESSION' | 'CROSS_TAB_SESSION',
+  env: Record<string, string | undefined> = readRuntimeEnv()
 ): LegacyAuthSessionSnapshot => {
-  const snapshot = createLegacyAuthSessionSnapshot(session);
+  const snapshot = createLegacyAuthSessionSnapshot(session, env);
   const storage = typeof window === 'undefined' ? undefined : window.localStorage;
   const signature = resolveLegacyAuthSessionSignature(session);
 
@@ -384,6 +386,31 @@ const syncLegacyAuthPersistenceFromSession = (
   }
 
   return snapshot;
+};
+
+export const reconcileLegacyAuthStorageSession = async (
+  loadSession: () => Promise<Session | null>,
+  listeners: Iterable<LegacyAuthStateListener>,
+  isQuarantined: () => boolean = isMazerOAuthSessionQuarantined,
+  env: Record<string, string | undefined> = readRuntimeEnv()
+): Promise<boolean> => {
+  if (isQuarantined()) {
+    return false;
+  }
+  const session = await loadSession();
+  if (isQuarantined()) {
+    return false;
+  }
+  const snapshot = syncLegacyAuthPersistenceFromSession(session, 'CROSS_TAB_SESSION', env);
+  const event: AuthChangeEvent = session === null ? 'SIGNED_OUT' : 'SIGNED_IN';
+  for (const listener of listeners) {
+    try {
+      listener(snapshot, event);
+    } catch {
+      // One consumer cannot block the remaining open tabs from reconciling.
+    }
+  }
+  return true;
 };
 
 const installLegacyAuthPersistenceListener = (client: LegacyAuthClient): void => {
@@ -417,12 +444,10 @@ const installLegacyAuthPersistenceListener = (client: LegacyAuthClient): void =>
       ) {
         return;
       }
-      void client.auth.getSession()
-        .then(({ data }) => {
-          if (!isMazerOAuthSessionQuarantined()) {
-            syncLegacyAuthPersistenceFromSession(data.session, 'CROSS_TAB_SESSION');
-          }
-        })
+      void reconcileLegacyAuthStorageSession(
+        async () => (await client.auth.getSession()).data.session,
+        legacyAuthLiveListeners
+      )
         .catch(() => {
           // The next explicit auth read retries reconciliation.
         });
@@ -862,6 +887,7 @@ export const subscribeLegacyAuthState = (
     return null;
   }
 
+  legacyAuthLiveListeners.add(listener);
   const { data } = client.auth.onAuthStateChange((event, session) => {
     if (isMazerOAuthSessionQuarantined()) {
       listener({ ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE }, event);
@@ -878,6 +904,7 @@ export const subscribeLegacyAuthState = (
   });
 
   return () => {
+    legacyAuthLiveListeners.delete(listener);
     data.subscription.unsubscribe();
   };
 });
