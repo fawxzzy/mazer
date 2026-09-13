@@ -2001,6 +2001,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(leaderboardSource).toContain('this.loadAccountUsernameIfNeeded();');
     expect(leaderboardSource).toContain('if (this.accountUsernameHydrationPending) {');
     expect(leaderboardSource).toContain("'Loading username...'");
+    expect(leaderboardSource).toContain('if (this.accountUsernameHydrationError) {');
+    expect(leaderboardSource).toContain("'Username unavailable. Try again.'");
+    expect(leaderboardSource).toContain("'Retry'");
     expect(leaderboardSource.indexOf('this.loadAccountUsernameIfNeeded();')).toBeLessThan(
       leaderboardSource.indexOf('if (this.accountUsernameSavedValue.length <= 0)')
     );

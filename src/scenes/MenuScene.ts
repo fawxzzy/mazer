@@ -1894,6 +1894,7 @@ export class MenuScene extends Phaser.Scene {
   private accountUsernameSavedValue = '';
   private accountUsernameLoadedForUserId: string | null = null;
   private accountUsernameHydrationPending = false;
+  private accountUsernameHydrationError = false;
   private accountUsernameActive = false;
   private accountUsernameSequence = 0;
   private accountUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -13720,6 +13721,24 @@ export class MenuScene extends Phaser.Scene {
         );
         return;
       }
+      if (this.accountUsernameHydrationError) {
+        const gateY = panel.top + (compact ? 140 : 160);
+        this.createAuthInfoText('Username unavailable. Try again.', gateY, panel, '#ff9d9d', compact ? 14 : 15);
+        this.uiButtons.push(this.createLegacyAuthActionButton(
+          centerX,
+          gateY + (compact ? 52 : 60),
+          Math.min(panel.width - 48, compact ? 220 : 260),
+          compact ? 46 : 52,
+          'Retry',
+          () => {
+            this.accountUsernameLoadedForUserId = null;
+            this.accountUsernameHydrationError = false;
+            this.uiDirty = true;
+          },
+          'primary'
+        ));
+        return;
+      }
     }
 
     // A named username is the only thing that puts a row on the public
@@ -14095,6 +14114,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.accountUsernameLoadedForUserId = userId;
     this.accountUsernameHydrationPending = true;
+    this.accountUsernameHydrationError = false;
     // The QA fixture (?runtimeDiagnostics=1&authFixture=authenticated) is a
     // synthetic, front-end-only identity with no real row behind it -- a
     // real readLegacyAccountUsername call always fails for it (there's
@@ -14125,6 +14145,7 @@ export class MenuScene extends Phaser.Scene {
 
       this.accountUsernameHydrationPending = false;
       if (result.error) {
+        this.accountUsernameHydrationError = true;
         this.uiDirty = true;
         return;
       }
@@ -14140,6 +14161,7 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
       this.accountUsernameHydrationPending = false;
+      this.accountUsernameHydrationError = true;
       this.uiDirty = true;
     });
   }
@@ -17470,6 +17492,7 @@ export class MenuScene extends Phaser.Scene {
       // for a single frame before loadAccountUsernameIfNeeded re-fetches.
       this.accountUsernameLoadedForUserId = null;
       this.accountUsernameHydrationPending = false;
+      this.accountUsernameHydrationError = false;
       this.accountUsernameDraft = '';
       this.accountUsernameSavedValue = '';
       this.accountUsernameActive = false;

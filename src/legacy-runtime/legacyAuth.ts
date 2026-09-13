@@ -6,6 +6,7 @@ import {
 import {
   MAZER_OAUTH_SAFE_ERROR_MESSAGE,
   advanceMazerAuthMutationEpoch,
+  isMazerOAuthSessionQuarantined,
   readMazerOAuthBootResult
 } from './legacyAccountPortal';
 import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';
@@ -457,6 +458,9 @@ export const isLegacyPasswordRecoveryRuntimeLocation = (
 
 export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSessionSnapshot> => {
   const oauthBootResult = readMazerOAuthBootResult();
+  if (isMazerOAuthSessionQuarantined()) {
+    return { ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE };
+  }
   const client = await getLegacyAuthClient();
   if (!client) {
     const guestSnapshot = createLegacyGuestAuthSnapshot();
@@ -827,6 +831,10 @@ export const subscribeLegacyAuthState = (
   }
 
   const { data } = client.auth.onAuthStateChange((event, session) => {
+    if (isMazerOAuthSessionQuarantined()) {
+      listener({ ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE }, event);
+      return;
+    }
     const snapshot = createLegacyAuthSessionSnapshot(session);
     if (snapshot.status === 'authenticated') {
       syncLegacyRememberedIdentityFromAuthenticatedSession(

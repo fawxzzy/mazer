@@ -8,6 +8,7 @@ export const MAZER_OAUTH_CLIENT_ID = 'da286bbf-2a57-43b1-a5ea-364f72cf461d';
 export const MAZER_OAUTH_SCOPE = 'email';
 export const MAZER_OAUTH_PENDING_KEY = 'mazer.auth.oauth-pending.v1';
 export const MAZER_AUTH_MUTATION_EPOCH_KEY = 'mazer.auth.mutation-epoch.v1';
+export const MAZER_OAUTH_SESSION_QUARANTINE_KEY = 'mazer.auth.oauth-session-quarantine.v1';
 export const MAZER_OAUTH_PENDING_TTL_MS = 300_000;
 export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
 export const MAZER_OAUTH_SAFE_ERROR_MESSAGE = 'Account connection unavailable. Return to Mazer and try again.';
@@ -71,6 +72,7 @@ export interface MazerOAuthHistory {
 }
 
 export interface MazerOAuthRuntime {
+  authStorage?: MazerOAuthStorage | null;
   clearTimer(handle: ReturnType<typeof setTimeout>): void;
   crypto: Pick<Crypto, 'getRandomValues' | 'subtle'>;
   fetch: typeof fetch;
@@ -152,9 +154,16 @@ const resolveBrowserRuntime = (): MazerOAuthRuntimeResolution => {
   }
 
   try {
+    let authStorage: MazerOAuthStorage | null = null;
+    try {
+      authStorage = window.localStorage;
+    } catch {
+      // A denied local store is handled by the callback quarantine below.
+    }
     return {
       result: null,
       runtime: {
+        authStorage,
         clearTimer: (handle) => clearTimeout(handle),
         crypto,
         fetch: window.fetch.bind(window),
@@ -630,11 +639,59 @@ const awaitMazerOAuthRemoteOperation = async <T>(
 const bestEffortMazerOAuthLocalSignOut = async (
   client: MazerOAuthClient,
   runtime: MazerOAuthRuntime
-): Promise<void> => {
-  await awaitMazerOAuthRemoteOperation(
+): Promise<boolean> => {
+  const storageCleared = clearMazerOAuthPersistedSession(runtime);
+  const signOutResult = await awaitMazerOAuthRemoteOperation(
     () => client.auth.signOut({ scope: 'local' }),
     runtime
   );
+  return storageCleared
+    && signOutResult.status === 'resolved'
+    && !signOutResult.value.error
+    && clearMazerOAuthPersistedSession(runtime);
+};
+
+const MAZER_OAUTH_AUTH_STORAGE_KEYS = [
+  'sb-bxtcuhkotumitoqtrcej-auth-token',
+  'sb-bxtcuhkotumitoqtrcej-auth-token-code-verifier',
+  'sb-bxtcuhkotumitoqtrcej-auth-token-user'
+] as const;
+
+const clearMazerOAuthPersistedSession = (runtime: MazerOAuthRuntime): boolean => {
+  if (!runtime.authStorage) {
+    return false;
+  }
+  try {
+    for (const key of MAZER_OAUTH_AUTH_STORAGE_KEYS) {
+      runtime.authStorage.removeItem(key);
+    }
+    return MAZER_OAUTH_AUTH_STORAGE_KEYS.every((key) => runtime.authStorage?.getItem(key) === null);
+  } catch {
+    return false;
+  }
+};
+
+const writeMazerOAuthSessionQuarantine = (runtime: MazerOAuthRuntime, active: boolean): boolean => {
+  try {
+    if (active) {
+      runtime.sessionStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, '1');
+    } else {
+      runtime.sessionStorage.removeItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY);
+    }
+    return runtime.sessionStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === (active ? '1' : null);
+  } catch {
+    return false;
+  }
+};
+
+export const isMazerOAuthSessionQuarantined = (
+  storage: MazerOAuthStorage | null = resolveMazerOAuthSessionStorage()
+): boolean => {
+  try {
+    return storage?.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === '1';
+  } catch {
+    return true;
+  }
 };
 
 const consumeMazerOAuthCallbackInner = async (
@@ -746,9 +803,12 @@ const consumeMazerOAuthCallbackInner = async (
   if (!stillCurrent()) {
     return failed('expired_or_missing_state');
   }
-  let setResult: Awaited<ReturnType<MazerOAuthClient['auth']['setSession']>>;
+  if (!writeMazerOAuthSessionQuarantine(runtime, true)) {
+    return failed('storage_unavailable');
+  }
+  let setSessionPromise: ReturnType<MazerOAuthClient['auth']['setSession']>;
   try {
-    setResult = await client.auth.setSession({
+    setSessionPromise = client.auth.setSession({
       access_token: tokens.accessToken,
       refresh_token: tokens.refreshToken
     });
@@ -756,7 +816,17 @@ const consumeMazerOAuthCallbackInner = async (
     await bestEffortMazerOAuthLocalSignOut(client, runtime);
     return failed('storage_unavailable');
   }
-  if (setResult.error) {
+  const setOperation = await awaitMazerOAuthRemoteOperation(() => setSessionPromise, runtime);
+  if (setOperation.status !== 'resolved') {
+    void setSessionPromise.then(
+      () => bestEffortMazerOAuthLocalSignOut(client, runtime),
+      () => bestEffortMazerOAuthLocalSignOut(client, runtime)
+    );
+    await bestEffortMazerOAuthLocalSignOut(client, runtime);
+    return failed('storage_unavailable');
+  }
+  if (setOperation.value.error) {
+    await bestEffortMazerOAuthLocalSignOut(client, runtime);
     return failed('storage_unavailable');
   }
   if (!stillCurrent()) {
@@ -784,6 +854,10 @@ const consumeMazerOAuthCallbackInner = async (
   ) {
     await bestEffortMazerOAuthLocalSignOut(client, runtime);
     return failed('session_invalid');
+  }
+  if (!writeMazerOAuthSessionQuarantine(runtime, false)) {
+    await bestEffortMazerOAuthLocalSignOut(client, runtime);
+    return failed('storage_unavailable');
   }
   return { status: 'connected' };
 };

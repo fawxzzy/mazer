@@ -7,6 +7,7 @@ import {
   MAZER_OAUTH_AUTHORIZATION_URL,
   MAZER_OAUTH_CLIENT_ID,
   MAZER_OAUTH_PENDING_KEY,
+  MAZER_OAUTH_SESSION_QUARANTINE_KEY,
   MAZER_OAUTH_TOKEN_URL,
   advanceMazerAuthMutationEpoch,
   beginMazerOAuthAuthorization,
@@ -17,6 +18,7 @@ import {
   isMazerOAuthCallbackReadyForBoot,
   isMazerOAuthCallbackRequest,
   installMazerOAuthPageShowRecovery,
+  isMazerOAuthSessionQuarantined,
   resolveMazerOAuthSessionStorage,
   resolveMazerLegalRoute,
   type MazerOAuthClient,
@@ -490,6 +492,41 @@ describe('Mazer shared account contract', () => {
     }, async () => client, runtime)).resolves.toEqual({ category: 'session_invalid', status: 'failed' });
     expect(client.auth.getUser).toHaveBeenCalledTimes(1);
     expect(client.auth.setSession).not.toHaveBeenCalled();
+  });
+
+  test('quarantines a timed-out session commit and finishes even when local sign-out also stalls', async () => {
+    const storage = new MemoryStorage();
+    const authStorage = new MemoryStorage();
+    await beginMazerOAuthAuthorization(createRuntime(storage));
+    const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+    const { claims, token } = createAccessToken();
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+      access_token: token,
+      expires_in: 3600,
+      refresh_token: 'refresh-token',
+      token_type: 'bearer'
+    }), { headers: { 'content-type': 'application/json' }, status: 200 })) as typeof fetch;
+    const client = createClient(claims);
+    vi.mocked(client.auth.setSession).mockImplementation(() => new Promise(() => undefined));
+    vi.mocked(client.auth.signOut).mockImplementation(() => new Promise(() => undefined));
+    const runtime = createRuntime(storage, createLocation(), fetchImpl);
+    runtime.authStorage = authStorage;
+    let timerCount = 0;
+    runtime.setTimer = (handler) => {
+      timerCount += 1;
+      if (timerCount >= 5) {
+        handler();
+      }
+      return setTimeout(() => undefined, 60_000);
+    };
+
+    await expect(consumeMazerOAuthCallback({
+      code: 'one-time-code', malformed: false, providerError: false, requested: true, state: pending.state
+    }, async () => client, runtime)).resolves.toEqual({ category: 'storage_unavailable', status: 'failed' });
+    expect(client.auth.setSession).toHaveBeenCalledTimes(1);
+    expect(client.auth.signOut).toHaveBeenCalledTimes(1);
+    expect(storage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBe('1');
+    expect(isMazerOAuthSessionQuarantined(storage)).toBe(true);
   });
 
   test('signs out locally when post-commit subject verification fails', async () => {
