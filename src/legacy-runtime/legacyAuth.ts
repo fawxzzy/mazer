@@ -390,10 +390,16 @@ const installLegacyAuthPersistenceListener = (client: LegacyAuthClient): void =>
 
   legacyAuthPersistenceListenerInstalled = true;
   client.auth.onAuthStateChange((event, session) => {
+    if (isMazerOAuthSessionQuarantined()) {
+      return;
+    }
     syncLegacyAuthPersistenceFromSession(session, event);
   });
   void client.auth.getSession()
     .then(({ data }) => {
+      if (isMazerOAuthSessionQuarantined()) {
+        return;
+      }
       syncLegacyAuthPersistenceFromSession(data.session, 'BOOTSTRAP_SESSION');
     })
     .catch(() => {
