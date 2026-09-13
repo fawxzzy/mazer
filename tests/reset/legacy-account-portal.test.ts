@@ -5,6 +5,8 @@ import {
   MAZER_AUTH_MUTATION_EPOCH_KEY,
   MAZER_CANONICAL_RETURN_URL,
   MAZER_OAUTH_AUTHORIZATION_URL,
+  MAZER_OAUTH_AUTH_STORAGE_PROBE_BYTES,
+  MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY,
   MAZER_OAUTH_CLIENT_ID,
   MAZER_OAUTH_PENDING_KEY,
   MAZER_OAUTH_SESSION_QUARANTINE_KEY,
@@ -127,6 +129,20 @@ describe('Mazer shared account contract', () => {
     });
     expect(writeDeniedRuntime.location.assigned).toEqual([]);
     expect(writeDeniedRuntime.sessionStorage.getItem(MAZER_OAUTH_PENDING_KEY)).toBeNull();
+
+    const sizedProbeStorage = new MemoryStorage();
+    let observedProbeBytes = 0;
+    sizedProbeStorage.setItem = (key, value) => {
+      if (key === MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY) {
+        observedProbeBytes = value.length;
+      }
+      sizedProbeStorage.values.set(key, value);
+    };
+    const sizedProbeRuntime = createRuntime(new MemoryStorage());
+    sizedProbeRuntime.authStorage = sizedProbeStorage;
+    await expect(beginMazerOAuthAuthorization(sizedProbeRuntime)).resolves.toEqual({ status: 'none' });
+    expect(observedProbeBytes).toBe(MAZER_OAUTH_AUTH_STORAGE_PROBE_BYTES);
+    expect(sizedProbeStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY)).toBeNull();
 
     const listeners = new Set<(event: PageTransitionEvent) => void>();
     const lifecycle = {

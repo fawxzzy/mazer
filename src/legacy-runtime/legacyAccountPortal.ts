@@ -11,6 +11,7 @@ export const MAZER_AUTH_MUTATION_EPOCH_KEY = 'mazer.auth.mutation-epoch.v1';
 export const MAZER_OAUTH_SESSION_QUARANTINE_KEY = 'mazer.auth.oauth-session-quarantine.v2';
 export const MAZER_OAUTH_AUTH_SESSION_KEY = 'sb-bxtcuhkotumitoqtrcej-auth-token';
 export const MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY = 'mazer.auth.oauth-storage-probe.v1';
+export const MAZER_OAUTH_AUTH_STORAGE_PROBE_BYTES = 65_536;
 export const MAZER_OAUTH_SESSION_LOCK_NAME = 'mazer.auth.oauth-session-transaction.v1';
 export const MAZER_OAUTH_PENDING_TTL_MS = 300_000;
 export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
@@ -299,8 +300,9 @@ const verifyMazerOAuthAuthStorageWritable = (runtime: MazerOAuthRuntime): boolea
     if (storage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY) !== null) {
       return false;
     }
-    storage.setItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY, '1');
-    if (storage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY) !== '1') {
+    const probe = '0'.repeat(MAZER_OAUTH_AUTH_STORAGE_PROBE_BYTES);
+    storage.setItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY, probe);
+    if (storage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY) !== probe) {
       return false;
     }
     storage.removeItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY);
