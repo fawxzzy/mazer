@@ -11,7 +11,7 @@ export type MazerBootStage =
   | 'boot-start'
   | 'reload-requested'
   | 'install-gate-checking'
-  | 'legal-surface-created'
+  | 'shared-account-redirect'
   | 'game-creating'
   | 'game-created'
   | 'service-worker-error'

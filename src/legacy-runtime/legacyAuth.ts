@@ -25,6 +25,7 @@ export interface LegacyAuthConfig {
 }
 
 export interface LegacyAuthSessionSnapshot {
+  canonicalUsername?: string | null;
   configured: boolean;
   displayName: string | null;
   email: string | null;
@@ -127,6 +128,7 @@ const createGuestSnapshot = (
   configured: boolean,
   overrides: Partial<Omit<LegacyAuthSessionSnapshot, 'configured' | 'status' | 'userId'>> = {}
 ): LegacyAuthSessionSnapshot => ({
+  canonicalUsername: null,
   configured,
   displayName: null,
   email: null,
@@ -172,12 +174,20 @@ export const createLegacyGuestAuthSnapshot = (
 const resolveDisplayName = (user: User): string | null => {
   const metadata = user.user_metadata;
   const candidates = [
+    typeof metadata.username === 'string' ? metadata.username : null,
     typeof metadata.display_name === 'string' ? metadata.display_name : null,
     typeof metadata.full_name === 'string' ? metadata.full_name : null,
     user.email?.split('@')[0] ?? null
   ];
 
   return candidates.find((candidate) => candidate !== null && candidate.trim().length > 0)?.trim() ?? null;
+};
+
+const resolveCanonicalUsername = (user: User): string | null => {
+  const username = user.user_metadata.username;
+  return typeof username === 'string' && username.trim().length > 0
+    ? username.trim()
+    : null;
 };
 
 export const createLegacyAuthSessionSnapshot = (
@@ -200,6 +210,7 @@ export const createLegacyAuthSessionSnapshot = (
   }
 
   return {
+    canonicalUsername: resolveCanonicalUsername(user),
     configured,
     displayName: resolveDisplayName(user),
     email: user.email ?? null,

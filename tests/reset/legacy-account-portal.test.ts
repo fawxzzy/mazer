@@ -14,6 +14,7 @@ import {
   buildMazerLegalUrl,
   captureAndScrubMazerOAuthCallback,
   consumeMazerOAuthCallback,
+  isMazerOAuthCallbackReadyForBoot,
   isMazerOAuthCallbackRequest,
   resolveMazerLegalRoute,
   type MazerOAuthClient,
@@ -96,10 +97,14 @@ describe('Mazer shared account contract', () => {
       `${MAZER_ACCOUNT_PORTAL_ORIGIN}/account?app=mazer&returnTo=${encodeURIComponent(MAZER_CANONICAL_RETURN_URL)}`
     );
     expect(buildMazerAccountPortalUrl('reset-password')).toBe(
-      `${MAZER_ACCOUNT_PORTAL_ORIGIN}/reset-password?recovery=1&app=mazer`
+      `${MAZER_ACCOUNT_PORTAL_ORIGIN}/reset-password?recovery=1&app=mazer&returnTo=${encodeURIComponent(MAZER_CANONICAL_RETURN_URL)}`
     );
-    expect(buildMazerLegalUrl('privacy')).toBe('https://fawxzzy.com/legal/mazer/privacy');
-    expect(buildMazerLegalUrl('terms')).toBe('https://fawxzzy.com/legal/mazer/terms');
+    expect(buildMazerLegalUrl('privacy')).toBe(
+      `${MAZER_ACCOUNT_PORTAL_ORIGIN}/privacy?app=mazer&returnTo=${encodeURIComponent(MAZER_CANONICAL_RETURN_URL)}`
+    );
+    expect(buildMazerLegalUrl('terms')).toBe(
+      `${MAZER_ACCOUNT_PORTAL_ORIGIN}/terms?app=mazer&returnTo=${encodeURIComponent(MAZER_CANONICAL_RETURN_URL)}`
+    );
     expect(resolveMazerLegalRoute('/privacy/')).toBe('privacy');
     expect(resolveMazerLegalRoute('/terms')).toBe('terms');
     expect(resolveMazerLegalRoute('/privacy.evil')).toBeNull();
@@ -121,6 +126,33 @@ describe('Mazer shared account contract', () => {
     expect(pending.state).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(pending.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(storage.getItem(MAZER_AUTH_MUTATION_EPOCH_KEY)).toBe('1');
+  });
+
+  test('allows install-gate bypass only for a canonical callback matching the live pending attempt', async () => {
+    const storage = new MemoryStorage();
+    await beginMazerOAuthAuthorization(createRuntime(storage));
+    const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+    expect(isMazerOAuthCallbackReadyForBoot(createLocation(
+      `https://mazer.fawxzzy.com/?code=one-time-code&state=${pending.state}`
+    ), storage, 2_000_000)).toBe(true);
+    expect(isMazerOAuthCallbackReadyForBoot(createLocation(
+      `https://mazer.fawxzzy.com/?error=access_denied&state=${pending.state}`
+    ), storage, 2_000_000)).toBe(true);
+
+    expect(isMazerOAuthCallbackReadyForBoot(
+      createLocation('https://mazer.fawxzzy.com/?state=arbitrary'),
+      storage,
+      2_000_000
+    )).toBe(false);
+    expect(isMazerOAuthCallbackReadyForBoot(createLocation(
+      'https://mazer.fawxzzy.com/?error=arbitrary&state=abcdefghijklmnopqrstuvwxyzABCDEFGH123456789'
+    ), storage, 2_000_000)).toBe(false);
+    expect(isMazerOAuthCallbackReadyForBoot(createLocation(
+      `https://preview.example.test/?code=one-time-code&state=${pending.state}`
+    ), storage, 2_000_000)).toBe(false);
+    expect(isMazerOAuthCallbackReadyForBoot(createLocation(
+      `https://mazer.fawxzzy.com/?code=one-time-code&state=${pending.state}`
+    ), storage, 2_400_001)).toBe(false);
   });
 
   test('scrubs callback material before returning the captured in-memory result', () => {

@@ -9,6 +9,7 @@ import {
   captureLegacyPasswordRecoveryBootUrlState,
   clearLegacyPasswordRecoveryUrl,
   createEmptyLegacyAuthFormState,
+  createLegacyAuthSessionSnapshot,
   createLegacyAuthScopedStorage,
   deriveLegacyRememberedIdentityDisplayName,
   isLegacyPasswordRecoveryRuntimeLocation,
@@ -74,6 +75,65 @@ describe('legacy auth runtime', () => {
     })).toEqual({
       anonKey: 'anon-key',
       url: 'https://example.supabase.co'
+    });
+  });
+
+  test('uses the canonical master username before profile display metadata', () => {
+    const snapshot = createLegacyAuthSessionSnapshot({
+      user: {
+        email: 'shared-owner@example.test',
+        id: 'master-user-without-mazer-profile',
+        user_metadata: {
+          display_name: 'Shared Display Name',
+          full_name: 'Shared Full Name',
+          username: 'canonical-owner'
+        }
+      }
+    } as Parameters<typeof createLegacyAuthSessionSnapshot>[0], {
+      VITE_SUPABASE_ANON_KEY: 'anon-key',
+      VITE_SUPABASE_URL: 'https://example.supabase.co'
+    });
+
+    expect(snapshot).toMatchObject({
+      canonicalUsername: 'canonical-owner',
+      displayName: 'canonical-owner',
+      status: 'authenticated',
+      userId: 'master-user-without-mazer-profile'
+    });
+  });
+
+  test('keeps a profile-backed user on the same Auth principal and fallback order', () => {
+    const env = {
+      VITE_SUPABASE_ANON_KEY: 'anon-key',
+      VITE_SUPABASE_URL: 'https://example.supabase.co'
+    };
+    const createSnapshotForMetadata = (userMetadata: Record<string, unknown>) => (
+      createLegacyAuthSessionSnapshot({
+        user: {
+          email: 'profile-owner@example.test',
+          id: 'master-user-with-mazer-profile',
+          user_metadata: userMetadata
+        }
+      } as Parameters<typeof createLegacyAuthSessionSnapshot>[0], env)
+    );
+
+    expect(createSnapshotForMetadata({
+      display_name: 'Mazer Profile Name',
+      full_name: 'Shared Full Name',
+      username: 'profile-owner'
+    })).toMatchObject({
+      canonicalUsername: 'profile-owner',
+      displayName: 'profile-owner',
+      userId: 'master-user-with-mazer-profile'
+    });
+    expect(createSnapshotForMetadata({
+      display_name: 'Mazer Profile Name',
+      full_name: 'Shared Full Name',
+      username: '   '
+    })).toMatchObject({
+      canonicalUsername: null,
+      displayName: 'Mazer Profile Name',
+      userId: 'master-user-with-mazer-profile'
     });
   });
 

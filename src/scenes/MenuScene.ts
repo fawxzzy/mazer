@@ -307,7 +307,8 @@ import {
 import {
   MAZER_OAUTH_SAFE_ERROR_MESSAGE,
   beginMazerOAuthAuthorization,
-  navigateToMazerAccountPortal
+  navigateToMazerAccountPortal,
+  navigateToMazerLegalPortal
 } from '../legacy-runtime/legacyAccountPortal';
 import {
   createLegacyPasswordRecoveryState,
@@ -3918,10 +3919,6 @@ export class MenuScene extends Phaser.Scene {
     if (this.pendingAuthGateTransition) {
       this.pendingAuthGateTransition = false;
       if (this.isLegacyPasswordRecoveryActive() && this.overlay !== 'auth') {
-        this.enterForcedLegacyAuthOverlay();
-        this.uiDirty = true;
-        this.rebuildUi();
-      } else if (this.authGateLocked && this.overlay !== 'auth') {
         this.enterForcedLegacyAuthOverlay();
         this.uiDirty = true;
         this.rebuildUi();
@@ -12887,6 +12884,7 @@ export class MenuScene extends Phaser.Scene {
         this.uiButtons.push(this.createLegacyMenuProfileButton(
           () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
         ));
+        this.createLegacyAuthenticatedWelcomeIdentity();
       }
 
       this.uiDirty = false;
@@ -13940,8 +13938,8 @@ export class MenuScene extends Phaser.Scene {
       'Reset password',
       () => this.navigateToSharedAccountRoute('reset-password')
     );
-    this.createAuthFooterLink(centerX - 48, footerY, 'Privacy', () => this.navigateToLocalLegalRoute('privacy'));
-    this.createAuthFooterLink(centerX + 48, footerY, 'Terms', () => this.navigateToLocalLegalRoute('terms'));
+    this.createAuthFooterLink(centerX - 48, footerY, 'Privacy', () => navigateToMazerLegalPortal('privacy'));
+    this.createAuthFooterLink(centerX + 48, footerY, 'Terms', () => navigateToMazerLegalPortal('terms'));
     this.createLegacyBottomActionBar(
       panel,
       stacked,
@@ -16918,12 +16916,41 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
+  private createLegacyAuthenticatedWelcomeIdentity(): void {
+    const username = this.authSnapshot.status === 'authenticated'
+      ? this.authSnapshot.canonicalUsername?.trim() ?? ''
+      : '';
+    if (username.length === 0) {
+      return;
+    }
+
+    const compact = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT;
+    const centerX = this.layout.centerButtonX;
+    const welcomeY = this.layout.centerButtonY - this.layout.buttonHeight - (compact ? 26 : 30);
+    const welcome = this.padLegacyCompactUiText(this.add.text(centerX, welcomeY, 'Welcome', {
+      color: '#7894a0',
+      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+      fontSize: `${compact ? 11 : 12}px`
+    })).setOrigin(0.5);
+    const usernameLabel = this.fitLegacyUiTextToWidth(
+      this.padLegacyUiText(this.add.text(centerX, welcomeY + (compact ? 17 : 19), username, {
+        color: '#d7f7ee',
+        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+        fontSize: `${compact ? 14 : 16}px`
+      })),
+      Math.min(this.layout.width - 48, 320),
+      compact ? 14 : 16,
+      11
+    ).setOrigin(0.5);
+    this.uiTexts.push(welcome, usernameLabel);
+  }
+
   private openSharedAccountSurface(): void {
     if (this.authSnapshot.status === 'authenticated') {
       this.navigateToSharedAccountRoute('account');
       return;
     }
-    this.openOverlay('auth');
+    void this.handleSharedAccountAuthorization();
   }
 
   private navigateToSharedAccountRoute(route: 'account' | 'reset-password'): void {
@@ -16940,13 +16967,6 @@ export class MenuScene extends Phaser.Scene {
       };
       this.uiDirty = true;
     }
-  }
-
-  private navigateToLocalLegalRoute(route: 'privacy' | 'terms'): void {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    window.location.assign(`/${route}`);
   }
 
   private async handleSharedAccountAuthorization(): Promise<void> {
@@ -17333,6 +17353,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     return {
+      canonicalUsername: 'qa-player',
       configured: true,
       displayName: 'QA Player',
       email: 'qa@mazer.local',

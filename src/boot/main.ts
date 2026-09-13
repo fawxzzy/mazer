@@ -1,9 +1,15 @@
 import Phaser from 'phaser';
 import '../styles/base.css';
-import { captureLegacyPasswordRecoveryBootUrlState, getLegacyAuthClient } from '../legacy-runtime/legacyAuth';
 import {
+  getLegacyAuthClient,
+  isLegacyPasswordRecoveryRuntimeLocation
+} from '../legacy-runtime/legacyAuth';
+import {
+  buildMazerAccountPortalUrl,
+  buildMazerLegalUrl,
   captureAndScrubMazerOAuthCallback,
   consumeMazerOAuthCallback,
+  isMazerOAuthCallbackReadyForBoot,
   isMazerOAuthCallbackRequest,
   resolveMazerLegalRoute,
   type MazerOAuthClient
@@ -13,7 +19,6 @@ import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
 import { initializeInstallSurface } from './installSurface';
-import { installMazerLegalSurface } from './legalSurface';
 import { createMazerPhaserConfig } from './phaserConfig';
 import { installMazerProductionServiceWorker, installMazerServiceWorkerControllerReload } from './serviceWorkerLifecycle';
 import { installMazerViewportGeometry, syncMazerGameToViewport } from './viewportGeometry';
@@ -81,9 +86,11 @@ const registerProductionServiceWorker = (): void => {
 };
 
 const boot = async (): Promise<void> => {
-  const passwordRecoveryBootUrlState = captureLegacyPasswordRecoveryBootUrlState(window.location);
-  const oauthCallbackRequested = !passwordRecoveryBootUrlState.requested
+  const passwordRecoveryRouteRequested = isLegacyPasswordRecoveryRuntimeLocation(window.location);
+  const oauthCallbackRequested = !passwordRecoveryRouteRequested
     && isMazerOAuthCallbackRequest(window.location);
+  const oauthCallbackReadyForBoot = oauthCallbackRequested
+    && isMazerOAuthCallbackReadyForBoot(window.location, window.sessionStorage);
   const oauthCallback = oauthCallbackRequested
     ? captureAndScrubMazerOAuthCallback(window.location, window.history)
     : null;
@@ -92,9 +99,14 @@ const boot = async (): Promise<void> => {
   let game: Phaser.Game | null = null;
 
   if (legalRoute !== null) {
-    installMazerLegalSurface(document, legalRoute);
-    registerProductionServiceWorker();
-    markMazerBootStatus('legal-surface-created');
+    window.location.replace(buildMazerLegalUrl(legalRoute));
+    markMazerBootStatus('shared-account-redirect');
+    return;
+  }
+
+  if (passwordRecoveryRouteRequested) {
+    window.location.replace(buildMazerAccountPortalUrl('reset-password'));
+    markMazerBootStatus('shared-account-redirect');
     return;
   }
 
@@ -125,8 +137,8 @@ const boot = async (): Promise<void> => {
     forceInstallGate,
     isLocalhostRuntime: isLocalhostRuntime(),
     legalRouteRequested: legalRoute !== null,
-    oauthCallbackRequested,
-    passwordRecoveryRequested: passwordRecoveryBootUrlState.requested
+    oauthCallbackRequested: oauthCallbackReadyForBoot,
+    passwordRecoveryRequested: passwordRecoveryRouteRequested
   })) {
     markMazerBootStatus('install-gate-checking');
     await runMazerInstallGate(document);

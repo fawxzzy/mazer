@@ -167,15 +167,16 @@ export const buildMazerAccountPortalUrl = (route: MazerAccountPortalRoute): stri
     url.searchParams.set('recovery', '1');
   }
   url.searchParams.set('app', MAZER_ACCOUNT_APP);
-  if (route === 'account') {
-    url.searchParams.set('returnTo', MAZER_CANONICAL_RETURN_URL);
-  }
+  url.searchParams.set('returnTo', MAZER_CANONICAL_RETURN_URL);
   return url.toString();
 };
 
-export const buildMazerLegalUrl = (route: MazerLegalRoute): string => (
-  `https://fawxzzy.com/legal/mazer/${route}`
-);
+export const buildMazerLegalUrl = (route: MazerLegalRoute): string => {
+  const url = new URL(`/${route}`, MAZER_ACCOUNT_PORTAL_ORIGIN);
+  url.searchParams.set('app', MAZER_ACCOUNT_APP);
+  url.searchParams.set('returnTo', MAZER_CANONICAL_RETURN_URL);
+  return url.toString();
+};
 
 export const resolveMazerLegalRoute = (pathname: string): MazerLegalRoute | null => {
   const normalized = pathname.replace(/\/+$/, '') || '/';
@@ -329,6 +330,47 @@ const parsePendingRecord = (raw: string | null): MazerOAuthPendingRecord | null 
     return record as MazerOAuthPendingRecord;
   } catch {
     return null;
+  }
+};
+
+export const isMazerOAuthCallbackReadyForBoot = (
+  location: Pick<MazerOAuthLocation, 'hash' | 'origin' | 'pathname' | 'search'>,
+  storage: MazerOAuthStorage,
+  nowEpochMs = Date.now()
+): boolean => {
+  const query = new URLSearchParams(location.search);
+  const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const queryCode = query.getAll('code');
+  const queryState = query.getAll('state');
+  const queryError = query.getAll('error');
+  const queryErrorDescription = query.getAll('error_description');
+  const requested = collectCallbackValues(query).length > 0 || collectCallbackValues(fragment).length > 0;
+  const structurallyValid = requested
+    && location.origin === new URL(MAZER_CANONICAL_RETURN_URL).origin
+    && location.pathname === '/'
+    && collectCallbackValues(fragment).length === 0
+    && queryCode.length <= 1
+    && queryState.length === 1
+    && queryError.length <= 1
+    && queryErrorDescription.length <= 1
+    && ((queryCode.length === 1) !== (queryError.length === 1));
+  if (!structurallyValid) {
+    return false;
+  }
+
+  try {
+    const pending = parsePendingRecord(storage.getItem(MAZER_OAUTH_PENDING_KEY));
+    if (
+      pending === null
+      || queryState[0] !== pending.state
+      || pending.authMutationEpoch !== readAuthMutationEpoch(storage)
+    ) {
+      return false;
+    }
+    const ageMs = nowEpochMs - pending.createdAtEpochMs;
+    return ageMs >= 0 && ageMs <= MAZER_OAUTH_PENDING_TTL_MS;
+  } catch {
+    return false;
   }
 };
 
@@ -697,4 +739,11 @@ export const navigateToMazerAccountPortal = (
   location: Pick<MazerOAuthLocation, 'assign'> = window.location
 ): void => {
   location.assign(buildMazerAccountPortalUrl(route));
+};
+
+export const navigateToMazerLegalPortal = (
+  route: MazerLegalRoute,
+  location: Pick<MazerOAuthLocation, 'assign'> = window.location
+): void => {
+  location.assign(buildMazerLegalUrl(route));
 };

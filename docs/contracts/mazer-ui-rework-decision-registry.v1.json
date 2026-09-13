@@ -426,7 +426,7 @@
           "src/scenes/MenuScene.ts",
           "src/styles/base.css"
         ],
-        "note": "Owns the Mazer consumer side of the production-verified shared account portal: OAuth 2.1 authorization-code-with-PKCE initiation and callback/session validation, fixed account/reset/legal routes, callback cache exclusion, install-gate bypass, and diagnostics-only persistence acceptance. The prior active waves retain their unrelated remaining paths."
+        "note": "Owns the Mazer consumer side of the production-verified shared account portal: OAuth 2.1 authorization-code-with-PKCE initiation and callback/session validation, direct shared login/account/reset/legal routing, canonical master username display, callback cache exclusion, install-gate bypass only for a structurally valid callback matching the live pending attempt, and diagnostics-only persistence acceptance. The prior active waves retain their unrelated remaining paths."
       }
     ],
     "note": "Assignments preserve the handoff packet's single-owner guardrails while replacing the obsolete pull-request hold with current dependency-graph wave ownership. The Wave 1B token exports are concrete and assigned. Wave 2A's base DOM primitives and Wave 2A.1's settings extensions remain stateless and unwired; no branch name or stale pull-request state grants an exception.",
