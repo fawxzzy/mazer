@@ -116,6 +116,16 @@ describe('Mazer shared account contract', () => {
       status: 'failed'
     });
     expect(deniedRuntime.location.assigned).toEqual([]);
+    const writeDeniedRuntime = createRuntime(new MemoryStorage());
+    const writeDeniedStorage = new MemoryStorage();
+    writeDeniedStorage.setItem = () => { throw new DOMException('denied', 'SecurityError'); };
+    writeDeniedRuntime.authStorage = writeDeniedStorage;
+    await expect(beginMazerOAuthAuthorization(writeDeniedRuntime)).resolves.toEqual({
+      category: 'storage_unavailable',
+      status: 'failed'
+    });
+    expect(writeDeniedRuntime.location.assigned).toEqual([]);
+    expect(writeDeniedRuntime.sessionStorage.getItem(MAZER_OAUTH_PENDING_KEY)).toBeNull();
 
     const listeners = new Set<(event: PageTransitionEvent) => void>();
     const lifecycle = {

@@ -10,6 +10,7 @@ export const MAZER_OAUTH_PENDING_KEY = 'mazer.auth.oauth-pending.v1';
 export const MAZER_AUTH_MUTATION_EPOCH_KEY = 'mazer.auth.mutation-epoch.v1';
 export const MAZER_OAUTH_SESSION_QUARANTINE_KEY = 'mazer.auth.oauth-session-quarantine.v2';
 export const MAZER_OAUTH_AUTH_SESSION_KEY = 'sb-bxtcuhkotumitoqtrcej-auth-token';
+export const MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY = 'mazer.auth.oauth-storage-probe.v1';
 export const MAZER_OAUTH_PENDING_TTL_MS = 300_000;
 export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
 export const MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS = 60_000;
@@ -277,6 +278,26 @@ const createRandomBase64Url = (runtime: MazerOAuthRuntime): string => {
   return base64UrlEncode(bytes);
 };
 
+const verifyMazerOAuthAuthStorageWritable = (runtime: MazerOAuthRuntime): boolean => {
+  const storage = runtime.authStorage === undefined ? runtime.sessionStorage : runtime.authStorage;
+  if (storage === null) {
+    return false;
+  }
+  try {
+    if (storage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY) !== null) {
+      return false;
+    }
+    storage.setItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY, '1');
+    if (storage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY) !== '1') {
+      return false;
+    }
+    storage.removeItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY);
+    return storage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY) === null;
+  } catch {
+    return false;
+  }
+};
+
 export const beginMazerOAuthAuthorization = async (
   runtime?: MazerOAuthRuntime | null
 ): Promise<MazerOAuthBootResult> => {
@@ -289,7 +310,7 @@ export const beginMazerOAuthAuthorization = async (
     return resolution.result;
   }
   const resolvedRuntime = resolution.runtime;
-  if (resolvedRuntime.authStorage === null) {
+  if (!verifyMazerOAuthAuthStorageWritable(resolvedRuntime)) {
     return failed('storage_unavailable');
   }
 
