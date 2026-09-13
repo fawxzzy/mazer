@@ -97,7 +97,7 @@ const createClient = (claims: Record<string, unknown>): MazerOAuthClient => ({
 });
 
 describe('Mazer shared account contract', () => {
-  test('contains denied browser storage and recovers OAuth submission only after a persisted page restore', () => {
+  test('contains denied browser storage and recovers OAuth submission only after a persisted page restore', async () => {
     const deniedStorage = {} as Pick<Window, 'sessionStorage'>;
     Object.defineProperty(deniedStorage, 'sessionStorage', {
       get: () => { throw new DOMException('denied', 'SecurityError'); }
@@ -108,6 +108,13 @@ describe('Mazer shared account contract', () => {
       get: () => { throw new DOMException('denied', 'SecurityError'); }
     });
     expect(resolveMazerOAuthAuthStorage(deniedAuthStorage)).toBeNull();
+    const deniedRuntime = createRuntime(new MemoryStorage());
+    deniedRuntime.authStorage = null;
+    await expect(beginMazerOAuthAuthorization(deniedRuntime)).resolves.toEqual({
+      category: 'storage_unavailable',
+      status: 'failed'
+    });
+    expect(deniedRuntime.location.assigned).toEqual([]);
 
     const listeners = new Set<(event: PageTransitionEvent) => void>();
     const lifecycle = {

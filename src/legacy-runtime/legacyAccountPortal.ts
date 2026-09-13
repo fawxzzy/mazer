@@ -274,6 +274,9 @@ export const beginMazerOAuthAuthorization = async (
     return resolution.result;
   }
   const resolvedRuntime = resolution.runtime;
+  if (resolvedRuntime.authStorage === null) {
+    return failed('storage_unavailable');
+  }
 
   let pendingWritten = false;
   try {
