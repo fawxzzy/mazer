@@ -463,6 +463,9 @@ describe('legacy auth runtime', () => {
     expect(authSource).toContain('legacyAuthPersistenceListenerInstalled');
     expect(authSource).toContain('syncLegacyAuthPersistenceFromSession(data.session,');
     expect(authSource).toContain('export const readLegacyAuthSessionSnapshot = async');
+    expect(authSource).toContain("error: oauthBootResult.status === 'failed'");
+    expect(authSource).toContain('? MAZER_OAUTH_SAFE_ERROR_MESSAGE');
+    expect(authSource).toContain(': error?.message ?? null');
     expect(authSource).toContain('export const subscribeLegacyAuthState = (');
     expect(authSource).toContain("if (snapshot.status === 'authenticated')");
     expect(authSource).toContain('return `${session.user.id}:${session.expires_at ?? 0}`;');

@@ -1751,6 +1751,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createAuthFooterLink(');
     expect(menuSceneSource).toContain('private navigateToSharedAccountRoute(');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSignOut(): Promise<void>');
+    expect(menuSceneSource).toContain('private createLegacyOptionsSessionActionBar(');
+    expect(menuSceneSource).toContain("if (this.authSnapshot.status !== 'authenticated') {");
+    expect(menuSceneSource).toContain("{ onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }");
     expect(menuSceneSource).toContain('interface LegacyAuthActionDiagnostics');
     expect(menuSceneSource).toContain('private latestAuthActionDiagnostics: LegacyAuthActionDiagnostics | null = null;');
     expect(menuSceneSource).toContain('private recordLegacyAuthActionDiagnostics(');

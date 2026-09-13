@@ -13116,6 +13116,7 @@ export class MenuScene extends Phaser.Scene {
         viewport: renderViewport
       });
       this.drawLegacyOverlayScrollFacade(scrollMetrics);
+      this.createLegacyOptionsSessionActionBar(panel, compact);
       return;
     }
 
@@ -13132,6 +13133,18 @@ export class MenuScene extends Phaser.Scene {
       rowY = this.createColorInputRow('Path RGB 0-255', ['pathR', 'pathG', 'pathB'], rowY, panel, this.settings.pathColor);
       rowY = this.createColorInputRow('Wall RGB 0-255', ['wallR', 'wallG', 'wallB'], rowY, panel, this.settings.wallColor);
     }
+    this.createLegacyOptionsSessionActionBar(panel, compact);
+  }
+
+  private createLegacyOptionsSessionActionBar(panel: OverlayPanelFrame, compact: boolean): void {
+    if (this.authSnapshot.status !== 'authenticated') {
+      return;
+    }
+    this.createLegacyBottomActionBar(
+      panel,
+      compact,
+      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }
+    );
   }
 
   // The Guide card's actual on-screen height depends on overlayGuideExpanded

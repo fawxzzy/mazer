@@ -467,7 +467,9 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
 
   const { data, error } = await client.auth.getSession();
   const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-    error: error?.message ?? (oauthBootResult.status === 'failed' ? MAZER_OAUTH_SAFE_ERROR_MESSAGE : null),
+    error: oauthBootResult.status === 'failed'
+      ? MAZER_OAUTH_SAFE_ERROR_MESSAGE
+      : error?.message ?? null,
     info: oauthBootResult.status === 'connected' ? 'Account connected.' : null
   });
   if (snapshot.status === 'authenticated') {
