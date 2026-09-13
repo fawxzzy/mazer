@@ -413,7 +413,7 @@ export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> =>
     legacyAuthClient = createClient(config.url, config.anonKey, {
       auth: {
         autoRefreshToken: true,
-        detectSessionInUrl: false,
+        detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation(),
         persistSession: true,
         storage: typeof window === 'undefined' ? undefined : window.localStorage,
         // auth-js defaults to a navigator.locks-backed mutex in any browser
@@ -437,6 +437,12 @@ export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> =>
 
   return legacyAuthClient;
 };
+
+export const isLegacyPasswordRecoveryRuntimeLocation = (
+  location: Pick<Location, 'pathname'> | undefined = typeof window === 'undefined' ? undefined : window.location
+): boolean => (
+  location?.pathname.replace(/\/+$/, '') === LEGACY_PASSWORD_RECOVERY_PATH
+);
 
 export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSessionSnapshot> => {
   const client = await getLegacyAuthClient();

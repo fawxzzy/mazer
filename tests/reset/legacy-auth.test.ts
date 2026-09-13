@@ -11,6 +11,7 @@ import {
   createEmptyLegacyAuthFormState,
   createLegacyAuthScopedStorage,
   deriveLegacyRememberedIdentityDisplayName,
+  isLegacyPasswordRecoveryRuntimeLocation,
   markLegacyRememberedIdentityReauthRequired,
   normalizeLegacyAuthEmail,
   readLegacyRememberedIdentityState,
@@ -139,6 +140,14 @@ describe('legacy auth runtime', () => {
     expect(resolveLegacyPasswordRecoveryCleanUrl('https://mazer.fawxzzy.com', 'continue')).toBe(
       'https://mazer.fawxzzy.com/'
     );
+  });
+
+  test('enables Supabase URL-session detection only on the legacy recovery route', () => {
+    expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/update-password' })).toBe(true);
+    expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/update-password/' })).toBe(true);
+    expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/' })).toBe(false);
+    expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/privacy' })).toBe(false);
+    expect(isLegacyPasswordRecoveryRuntimeLocation(undefined)).toBe(false);
   });
 
   test('recognizes direct recovery paths and categorical provider failures without exposing details', () => {

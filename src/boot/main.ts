@@ -81,12 +81,13 @@ const registerProductionServiceWorker = (): void => {
 };
 
 const boot = async (): Promise<void> => {
-  const oauthCallbackRequested = isMazerOAuthCallbackRequest(window.location);
+  const passwordRecoveryBootUrlState = captureLegacyPasswordRecoveryBootUrlState(window.location);
+  const oauthCallbackRequested = !passwordRecoveryBootUrlState.requested
+    && isMazerOAuthCallbackRequest(window.location);
   const oauthCallback = oauthCallbackRequested
     ? captureAndScrubMazerOAuthCallback(window.location, window.history)
     : null;
   markMazerBootStatus('boot-start');
-  const passwordRecoveryBootUrlState = captureLegacyPasswordRecoveryBootUrlState(window.location);
   const legalRoute = resolveMazerLegalRoute(window.location.pathname);
   let game: Phaser.Game | null = null;
 

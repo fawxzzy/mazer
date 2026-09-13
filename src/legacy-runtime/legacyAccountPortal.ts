@@ -377,6 +377,56 @@ interface ParsedTokenResponse {
   refreshToken: string;
 }
 
+const readBoundedResponseText = async (response: Response): Promise<string | null> => {
+  const declaredLength = response.headers.get('content-length');
+  if (declaredLength !== null) {
+    const parsedLength = Number.parseInt(declaredLength, 10);
+    if (
+      !Number.isSafeInteger(parsedLength)
+      || parsedLength < 0
+      || parsedLength > MAZER_OAUTH_TOKEN_RESPONSE_MAX_BYTES
+    ) {
+      try {
+        await response.body?.cancel();
+      } catch {
+        // The response is rejected regardless; cancellation is best-effort cleanup.
+      }
+      return null;
+    }
+  }
+  if (response.body === null) {
+    return null;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      byteLength += value.byteLength;
+      if (byteLength > MAZER_OAUTH_TOKEN_RESPONSE_MAX_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+};
+
 const exchangeAuthorizationCode = async (
   code: string,
   verifier: string,
@@ -407,8 +457,8 @@ const exchangeAuthorizationCode = async (
     if (!response.ok || !contentType.includes('application/json')) {
       return null;
     }
-    const raw = await response.text();
-    if (new TextEncoder().encode(raw).byteLength > MAZER_OAUTH_TOKEN_RESPONSE_MAX_BYTES) {
+    const raw = await readBoundedResponseText(response);
+    if (raw === null) {
       return null;
     }
     const value: unknown = JSON.parse(raw);
@@ -448,9 +498,11 @@ const consumeMazerOAuthCallbackInner = async (
   }
 
   let pending: MazerOAuthPendingRecord | null;
+  let pendingRaw: string | null;
   let currentEpoch: number;
   try {
-    pending = parsePendingRecord(runtime.sessionStorage.getItem(MAZER_OAUTH_PENDING_KEY));
+    pendingRaw = runtime.sessionStorage.getItem(MAZER_OAUTH_PENDING_KEY);
+    pending = parsePendingRecord(pendingRaw);
     currentEpoch = readAuthMutationEpoch(runtime.sessionStorage);
   } catch {
     return failed('storage_unavailable');
@@ -463,7 +515,23 @@ const consumeMazerOAuthCallbackInner = async (
   ) {
     return failed('expired_or_missing_state');
   }
-  if (callback.malformed || callback.state !== pending.state) {
+  if (callback.state !== pending.state) {
+    return failed('invalid_state');
+  }
+
+  try {
+    if (runtime.sessionStorage.getItem(MAZER_OAUTH_PENDING_KEY) !== pendingRaw) {
+      return failed('expired_or_missing_state');
+    }
+    runtime.sessionStorage.removeItem(MAZER_OAUTH_PENDING_KEY);
+    if (runtime.sessionStorage.getItem(MAZER_OAUTH_PENDING_KEY) !== null) {
+      return failed('storage_unavailable');
+    }
+  } catch {
+    return failed('storage_unavailable');
+  }
+
+  if (callback.malformed) {
     return failed('invalid_state');
   }
   if (callback.providerError) {
@@ -588,21 +656,6 @@ export const consumeMazerOAuthCallback = async (
     result = await consumeMazerOAuthCallbackInner(callback, runtime, getClient);
   } catch {
     result = failed('session_invalid');
-  }
-  if (callback.requested) {
-    try {
-      runtime.sessionStorage.removeItem(MAZER_OAUTH_PENDING_KEY);
-    } catch {
-      if (result.status === 'connected') {
-        try {
-          const client = await getClient();
-          await client?.auth.signOut({ scope: 'local' });
-        } catch {
-          // The fixed storage failure remains the only surfaced detail.
-        }
-      }
-      result = failed('storage_unavailable');
-    }
   }
   mazerOAuthBootResult = result;
   return result;

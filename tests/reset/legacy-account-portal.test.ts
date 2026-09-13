@@ -184,6 +184,102 @@ describe('Mazer shared account contract', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  test('claims pending PKCE state before awaiting exchange so concurrent consumption cannot race', async () => {
+    const storage = new MemoryStorage();
+    await beginMazerOAuthAuthorization(createRuntime(storage));
+    const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+    const { claims, token } = createAccessToken();
+    let releaseResponse: ((response: Response) => void) | null = null;
+    const fetchImpl = vi.fn(() => new Promise<Response>((resolve) => {
+      releaseResponse = resolve;
+    })) as unknown as typeof fetch;
+    const runtime = createRuntime(storage, createLocation(), fetchImpl);
+    const client = createClient(claims);
+    const callback = {
+      code: 'one-time-code', malformed: false, providerError: false, requested: true, state: pending.state
+    };
+
+    const first = consumeMazerOAuthCallback(callback, async () => client, runtime);
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    expect(storage.getItem(MAZER_OAUTH_PENDING_KEY)).toBeNull();
+    await expect(consumeMazerOAuthCallback(callback, async () => client, runtime)).resolves.toEqual({
+      category: 'expired_or_missing_state', status: 'failed'
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    releaseResponse?.(new Response(JSON.stringify({
+      access_token: token,
+      expires_in: 3600,
+      refresh_token: 'refresh-token',
+      token_type: 'bearer'
+    }), { headers: { 'content-type': 'application/json' }, status: 200 }));
+    await expect(first).resolves.toEqual({ status: 'connected' });
+    expect(client.auth.setSession).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not let an older in-flight callback delete or commit across a newer authorization attempt', async () => {
+    const storage = new MemoryStorage();
+    await beginMazerOAuthAuthorization(createRuntime(storage));
+    const firstPending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+    const { claims, token } = createAccessToken();
+    let releaseResponse: ((response: Response) => void) | null = null;
+    const fetchImpl = vi.fn(() => new Promise<Response>((resolve) => {
+      releaseResponse = resolve;
+    })) as unknown as typeof fetch;
+    const runtime = createRuntime(storage, createLocation(), fetchImpl);
+    const client = createClient(claims);
+    const first = consumeMazerOAuthCallback({
+      code: 'old-code', malformed: false, providerError: false, requested: true, state: firstPending.state
+    }, async () => client, runtime);
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+
+    await beginMazerOAuthAuthorization(runtime);
+    const newerPendingRaw = storage.getItem(MAZER_OAUTH_PENDING_KEY);
+    expect(newerPendingRaw).not.toBeNull();
+    expect(JSON.parse(newerPendingRaw ?? '{}').state).not.toBe(firstPending.state);
+    releaseResponse?.(new Response(JSON.stringify({
+      access_token: token,
+      expires_in: 3600,
+      refresh_token: 'refresh-token',
+      token_type: 'bearer'
+    }), { headers: { 'content-type': 'application/json' }, status: 200 }));
+
+    await expect(first).resolves.toEqual({ category: 'expired_or_missing_state', status: 'failed' });
+    expect(client.auth.setSession).not.toHaveBeenCalled();
+    expect(storage.getItem(MAZER_OAUTH_PENDING_KEY)).toBe(newerPendingRaw);
+  });
+
+  test('rejects declared and streamed oversized token responses before unbounded buffering', async () => {
+    const runCase = async (response: Response): Promise<void> => {
+      const storage = new MemoryStorage();
+      await beginMazerOAuthAuthorization(createRuntime(storage));
+      const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+      const fetchImpl = vi.fn(async () => response) as typeof fetch;
+      const client = createClient(createAccessToken().claims);
+      await expect(consumeMazerOAuthCallback({
+        code: 'one-time-code', malformed: false, providerError: false, requested: true, state: pending.state
+      }, async () => client, createRuntime(storage, createLocation(), fetchImpl))).resolves.toEqual({
+        category: 'exchange_unavailable', status: 'failed'
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(client.auth.setSession).not.toHaveBeenCalled();
+    };
+
+    await runCase(new Response('{}', {
+      headers: { 'content-length': '16385', 'content-type': 'application/json' },
+      status: 200
+    }));
+
+    let streamCancelled = false;
+    await runCase(new Response(new ReadableStream<Uint8Array>({
+      cancel: () => { streamCancelled = true; },
+      start: (controller) => {
+        controller.enqueue(new Uint8Array(10_000));
+        controller.enqueue(new Uint8Array(10_000));
+      }
+    }), { headers: { 'content-type': 'application/json' }, status: 200 }));
+    expect(streamCancelled).toBe(true);
+  });
+
   test('rejects wrong state and auth-epoch drift before session mutation', async () => {
     const storage = new MemoryStorage();
     const runtime = createRuntime(storage);

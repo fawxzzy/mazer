@@ -98,7 +98,11 @@ describe('Mazer install gate', () => {
     expect(installGateCallIndex).toBeLessThan(gameCreateIndex);
     expect(mainSource).toContain('initializeInstallSurface(window);');
     expect(mainSource).toContain('captureLegacyPasswordRecoveryBootUrlState(window.location)');
+    expect(mainSource).toContain('!passwordRecoveryBootUrlState.requested');
     expect(mainSource).toContain('captureAndScrubMazerOAuthCallback(window.location, window.history)');
+    expect(mainSource.indexOf('captureLegacyPasswordRecoveryBootUrlState(window.location)')).toBeLessThan(
+      mainSource.indexOf('captureAndScrubMazerOAuthCallback(window.location, window.history)')
+    );
     expect(mainSource.indexOf('captureAndScrubMazerOAuthCallback(window.location, window.history)')).toBeLessThan(
       mainSource.indexOf("markMazerBootStatus('boot-start')")
     );

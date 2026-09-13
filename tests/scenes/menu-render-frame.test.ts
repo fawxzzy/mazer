@@ -1716,7 +1716,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain('createClient(config.url, config.anonKey');
     expect(authSource).toContain('autoRefreshToken: true');
     expect(authSource).toContain('persistSession: true');
-    expect(authSource).toContain('detectSessionInUrl: false');
+    expect(authSource).toContain('detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation()');
+    expect(authSource).not.toContain('detectSessionInUrl: true');
     expect(authSource).toContain('createLegacyAuthScopedStorage');
     expect(menuSceneSource).toContain('LEGACY_GAME_TOGGLE_STORAGE_KEY');
     expect(menuSceneSource).toContain('this.loadPersistedLegacyGameToggleSettings();');
@@ -1890,7 +1891,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const accentColor = unifiedAuthDanger ? cyberArcadeMaterial.signal.goal : LEGACY_PLAY_TOUCH_ACCENT;');
     expect(menuSceneSource).not.toContain("text: 'Log out'");
     expect(menuSceneSource).not.toContain("return 'Username saved.';");
-    expect(authSource).toContain('detectSessionInUrl: false');
+    expect(authSource).toContain('detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation()');
+    expect(authSource).not.toContain('detectSessionInUrl: true');
     expect(authSource).toContain('advanceMazerAuthMutationEpoch();');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");
   });
