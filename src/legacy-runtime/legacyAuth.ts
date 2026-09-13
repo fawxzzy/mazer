@@ -4,7 +4,9 @@ import {
   LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL
 } from './legacyPlayerMessage';
 import {
+  MAZER_OAUTH_AUTH_SESSION_KEY,
   MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+  MAZER_OAUTH_SESSION_QUARANTINE_KEY,
   advanceMazerAuthMutationEpoch,
   isMazerOAuthSessionQuarantined,
   readMazerOAuthBootResult
@@ -224,6 +226,7 @@ export const createLegacyAuthSessionSnapshot = (
 
 let legacyAuthClient: LegacyAuthClient | null = null;
 let legacyAuthPersistenceListenerInstalled = false;
+let legacyAuthStorageListenerInstalled = false;
 let legacyAuthLastSessionSignature: string | null = null;
 
 export const deriveLegacyRememberedIdentityDisplayName = (email: string): string => {
@@ -359,7 +362,7 @@ const resolveLegacyAuthSessionSignature = (session: Session | null): string | nu
 
 const syncLegacyAuthPersistenceFromSession = (
   session: Session | null,
-  event: AuthChangeEvent | 'BOOTSTRAP_SESSION'
+  event: AuthChangeEvent | 'BOOTSTRAP_SESSION' | 'CROSS_TAB_SESSION'
 ): LegacyAuthSessionSnapshot => {
   const snapshot = createLegacyAuthSessionSnapshot(session);
   const storage = typeof window === 'undefined' ? undefined : window.localStorage;
@@ -405,6 +408,26 @@ const installLegacyAuthPersistenceListener = (client: LegacyAuthClient): void =>
     .catch(() => {
       // Bootstrap session sync is best-effort; explicit auth reads still drive UI state.
     });
+  if (typeof window !== 'undefined' && !legacyAuthStorageListenerInstalled) {
+    legacyAuthStorageListenerInstalled = true;
+    window.addEventListener('storage', (event) => {
+      if (
+        (event.key !== MAZER_OAUTH_AUTH_SESSION_KEY && event.key !== MAZER_OAUTH_SESSION_QUARANTINE_KEY)
+        || isMazerOAuthSessionQuarantined()
+      ) {
+        return;
+      }
+      void client.auth.getSession()
+        .then(({ data }) => {
+          if (!isMazerOAuthSessionQuarantined()) {
+            syncLegacyAuthPersistenceFromSession(data.session, 'CROSS_TAB_SESSION');
+          }
+        })
+        .catch(() => {
+          // The next explicit auth read retries reconciliation.
+        });
+    });
+  }
 };
 
 export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> => {

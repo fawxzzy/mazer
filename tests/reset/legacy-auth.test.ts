@@ -461,6 +461,9 @@ describe('legacy auth runtime', () => {
 
     expect(authSource).toContain("client.auth.signOut({ scope: 'local' })");
     expect(authSource).toContain('legacyAuthPersistenceListenerInstalled');
+    expect(authSource).toContain('legacyAuthStorageListenerInstalled');
+    expect(authSource).toContain("window.addEventListener('storage'");
+    expect(authSource).toContain("syncLegacyAuthPersistenceFromSession(data.session, 'CROSS_TAB_SESSION')");
     expect(authSource.match(/isMazerOAuthSessionQuarantined\(/g)?.length).toBeGreaterThanOrEqual(5);
     expect(authSource).toContain('syncLegacyAuthPersistenceFromSession(data.session,');
     expect(authSource).toContain('export const readLegacyAuthSessionSnapshot = async');

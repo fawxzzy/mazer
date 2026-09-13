@@ -8,9 +8,11 @@ export const MAZER_OAUTH_CLIENT_ID = 'da286bbf-2a57-43b1-a5ea-364f72cf461d';
 export const MAZER_OAUTH_SCOPE = 'email';
 export const MAZER_OAUTH_PENDING_KEY = 'mazer.auth.oauth-pending.v1';
 export const MAZER_AUTH_MUTATION_EPOCH_KEY = 'mazer.auth.mutation-epoch.v1';
-export const MAZER_OAUTH_SESSION_QUARANTINE_KEY = 'mazer.auth.oauth-session-quarantine.v1';
+export const MAZER_OAUTH_SESSION_QUARANTINE_KEY = 'mazer.auth.oauth-session-quarantine.v2';
+export const MAZER_OAUTH_AUTH_SESSION_KEY = 'sb-bxtcuhkotumitoqtrcej-auth-token';
 export const MAZER_OAUTH_PENDING_TTL_MS = 300_000;
 export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
+export const MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS = 60_000;
 export const MAZER_OAUTH_SAFE_ERROR_MESSAGE = 'Account connection unavailable. Return to Mazer and try again.';
 
 const MAZER_OAUTH_CALLBACK_KEYS = ['code', 'state', 'error', 'error_description'] as const;
@@ -78,6 +80,7 @@ export interface MazerOAuthRuntime {
   fetch: typeof fetch;
   history: MazerOAuthHistory;
   location: MazerOAuthLocation;
+  notifyAcceptedSession?(session: Record<string, unknown>): boolean;
   now(): number;
   sessionStorage: MazerOAuthStorage;
   setTimer(handler: () => void, timeoutMs: number): ReturnType<typeof setTimeout>;
@@ -180,6 +183,18 @@ const resolveBrowserRuntime = (): MazerOAuthRuntimeResolution => {
         fetch: window.fetch.bind(window),
         history: window.history,
         location: window.location,
+        notifyAcceptedSession: (session) => {
+          if (typeof BroadcastChannel === 'undefined') {
+            return true;
+          }
+          const channel = new BroadcastChannel(MAZER_OAUTH_AUTH_SESSION_KEY);
+          try {
+            channel.postMessage({ event: 'SIGNED_IN', session });
+            return true;
+          } finally {
+            channel.close();
+          }
+        },
         now: () => Date.now(),
         sessionStorage,
         setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
@@ -650,141 +665,211 @@ const awaitMazerOAuthRemoteOperation = async <T>(
   );
 });
 
-const MAZER_OAUTH_AUTH_STORAGE_KEYS = [
-  'sb-bxtcuhkotumitoqtrcej-auth-token',
-  'sb-bxtcuhkotumitoqtrcej-auth-token-code-verifier',
-  'sb-bxtcuhkotumitoqtrcej-auth-token-user'
-] as const;
-
 const resolveRuntimeAuthStorage = (runtime: MazerOAuthRuntime): MazerOAuthStorage | null => (
   runtime.authStorage === undefined ? runtime.sessionStorage : runtime.authStorage
 );
 
-interface MazerOAuthSessionPreimage {
-  raw: string | null;
+interface MazerOAuthSessionTransaction {
+  committedAccessToken: string | null;
+  createdAtEpochMs: number;
+  owner: string;
+  preimageRaw: string | null;
+  version: 2;
 }
 
-const captureMazerOAuthSessionPreimage = (
-  runtime: MazerOAuthRuntime,
-  owner: string
-): MazerOAuthSessionPreimage | null => {
-  const authStorage = resolveRuntimeAuthStorage(runtime);
-  if (authStorage === null) {
+const parseMazerOAuthSessionTransaction = (raw: string | null): MazerOAuthSessionTransaction | null => {
+  if (raw === null) {
     return null;
   }
   try {
-    return authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === owner
-      ? { raw: authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]) }
+    const value: unknown = JSON.parse(raw);
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+    const record = value as Record<string, unknown>;
+    return record.version === 2
+      && typeof record.owner === 'string'
+      && /^[A-Za-z0-9_-]{43}$/.test(record.owner)
+      && typeof record.createdAtEpochMs === 'number'
+      && Number.isSafeInteger(record.createdAtEpochMs)
+      && (record.preimageRaw === null || typeof record.preimageRaw === 'string')
+      && (record.committedAccessToken === null || typeof record.committedAccessToken === 'string')
+      ? value as MazerOAuthSessionTransaction
       : null;
   } catch {
     return null;
   }
 };
 
-const restoreMazerOAuthSessionPreimage = (
-  runtime: MazerOAuthRuntime,
-  owner: string,
-  expectedAccessToken: string,
-  preimage: MazerOAuthSessionPreimage
-): boolean => {
-  const authStorage = resolveRuntimeAuthStorage(runtime);
-  if (authStorage === null) {
-    return false;
+const readStoredAccessToken = (raw: string | null): string | null => {
+  if (raw === null) {
+    return null;
   }
   try {
-    if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== owner) {
+    const value: unknown = JSON.parse(raw);
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+      && typeof (value as Record<string, unknown>).access_token === 'string'
+      ? (value as Record<string, unknown>).access_token as string
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const restoreMazerOAuthSessionTransaction = (
+  storage: MazerOAuthStorage,
+  transactionRaw: string,
+  transaction: MazerOAuthSessionTransaction
+): boolean => {
+  try {
+    if (storage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== transactionRaw) {
       return true;
     }
-    const raw = authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]);
-    if (raw === null) {
-      return true;
-    }
-    const stored: unknown = JSON.parse(raw);
+    const currentRaw = storage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY);
     if (
-      stored === null
-      || typeof stored !== 'object'
-      || Array.isArray(stored)
-      || (stored as Record<string, unknown>).access_token !== expectedAccessToken
+      transaction.committedAccessToken !== null
+      && readStoredAccessToken(currentRaw) === transaction.committedAccessToken
     ) {
-      return true;
+      if (transaction.preimageRaw === null) {
+        storage.removeItem(MAZER_OAUTH_AUTH_SESSION_KEY);
+      } else {
+        storage.setItem(MAZER_OAUTH_AUTH_SESSION_KEY, transaction.preimageRaw);
+      }
+      if (storage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY) !== transaction.preimageRaw) {
+        return false;
+      }
     }
-    if (preimage.raw === null) {
-      authStorage.removeItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]);
-    } else {
-      authStorage.setItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0], preimage.raw);
-    }
-    return authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]) === preimage.raw;
+    storage.removeItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY);
+    return storage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === null;
   } catch {
     return false;
   }
 };
 
-const writeMazerOAuthSessionQuarantine = (
+const acquireMazerOAuthSessionTransaction = (
   runtime: MazerOAuthRuntime,
-  owner: string,
-  active: boolean
-): boolean => {
+  owner: string
+): { raw: string; transaction: MazerOAuthSessionTransaction } | null => {
   const authStorage = resolveRuntimeAuthStorage(runtime);
   if (authStorage === null) {
-    return false;
+    return null;
   }
   try {
-    if (active) {
-      authStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, owner);
-    } else if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === owner) {
-      authStorage.removeItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY);
-    } else {
-      return false;
+    if (isMazerOAuthSessionQuarantined(authStorage, runtime.now())) {
+      return null;
     }
-    return authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === (active ? owner : null);
+    const transaction: MazerOAuthSessionTransaction = {
+      committedAccessToken: null,
+      createdAtEpochMs: runtime.now(),
+      owner,
+      preimageRaw: authStorage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY),
+      version: 2
+    };
+    if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== null) {
+      return null;
+    }
+    const raw = JSON.stringify(transaction);
+    authStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, raw);
+    return authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === raw
+      ? { raw, transaction }
+      : null;
   } catch {
-    return false;
+    return null;
   }
 };
 
 const persistMazerOAuthSession = (
   runtime: MazerOAuthRuntime,
-  owner: string,
+  transactionState: { raw: string; transaction: MazerOAuthSessionTransaction },
   accessToken: string,
   refreshToken: string,
   expiresAt: number,
   user: { id?: string } & Record<string, unknown>
-): boolean => {
+): Record<string, unknown> | null => {
   const authStorage = resolveRuntimeAuthStorage(runtime);
   if (authStorage === null) {
-    return false;
+    return null;
   }
   try {
-    if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== owner) {
-      return false;
+    if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== transactionState.raw) {
+      return null;
     }
-    authStorage.setItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0], JSON.stringify({
+    const committedTransaction: MazerOAuthSessionTransaction = {
+      ...transactionState.transaction,
+      committedAccessToken: accessToken
+    };
+    const committedTransactionRaw = JSON.stringify(committedTransaction);
+    authStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, committedTransactionRaw);
+    if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== committedTransactionRaw) {
+      return null;
+    }
+    transactionState.raw = committedTransactionRaw;
+    transactionState.transaction = committedTransaction;
+    const session: Record<string, unknown> = {
       access_token: accessToken,
       expires_at: expiresAt,
       expires_in: Math.max(1, expiresAt - Math.floor(runtime.now() / 1_000)),
       refresh_token: refreshToken,
       token_type: 'bearer',
       user
-    }));
-    if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== owner) {
-      return false;
+    };
+    authStorage.setItem(MAZER_OAUTH_AUTH_SESSION_KEY, JSON.stringify(session));
+    if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== committedTransactionRaw) {
+      return null;
     }
-    const raw = authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]);
+    const raw = authStorage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY);
     const stored: unknown = raw === null ? null : JSON.parse(raw);
     return stored !== null && typeof stored === 'object' && !Array.isArray(stored)
       && (stored as Record<string, unknown>).access_token === accessToken
       && (stored as Record<string, unknown>).refresh_token === refreshToken
-      && ((stored as Record<string, unknown>).user as Record<string, unknown> | undefined)?.id === user.id;
+      && ((stored as Record<string, unknown>).user as Record<string, unknown> | undefined)?.id === user.id
+      ? session
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const completeMazerOAuthSessionTransaction = (
+  runtime: MazerOAuthRuntime,
+  transactionRaw: string
+): boolean => {
+  const authStorage = resolveRuntimeAuthStorage(runtime);
+  if (authStorage === null) {
+    return false;
+  }
+  try {
+    if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== transactionRaw) {
+      return false;
+    }
+    authStorage.removeItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY);
+    return authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === null;
   } catch {
     return false;
   }
 };
 
 export const isMazerOAuthSessionQuarantined = (
-  storage: MazerOAuthStorage | null = resolveMazerOAuthAuthStorage()
+  storage: MazerOAuthStorage | null = resolveMazerOAuthAuthStorage(),
+  now = Date.now()
 ): boolean => {
   try {
-    return storage?.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== null;
+    if (storage === null) {
+      return false;
+    }
+    const raw = storage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY);
+    if (raw === null) {
+      return false;
+    }
+    const transaction = parseMazerOAuthSessionTransaction(raw);
+    if (transaction === null) {
+      return true;
+    }
+    const age = now - transaction.createdAtEpochMs;
+    if (age < 0 || age <= MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS) {
+      return true;
+    }
+    return !restoreMazerOAuthSessionTransaction(storage, raw, transaction);
   } catch {
     return true;
   }
@@ -899,26 +984,25 @@ const consumeMazerOAuthCallbackInner = async (
   if (!stillCurrent()) {
     return failed('expired_or_missing_state');
   }
-  if (!writeMazerOAuthSessionQuarantine(runtime, pending.state, true)) {
-    return failed('storage_unavailable');
-  }
-  const sessionPreimage = captureMazerOAuthSessionPreimage(runtime, pending.state);
-  if (sessionPreimage === null) {
-    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
+  const transactionState = acquireMazerOAuthSessionTransaction(runtime, pending.state);
+  if (transactionState === null) {
     return failed('storage_unavailable');
   }
   const rollbackSession = (): void => {
-    restoreMazerOAuthSessionPreimage(runtime, pending.state, tokens.accessToken, sessionPreimage);
-    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
+    const authStorage = resolveRuntimeAuthStorage(runtime);
+    if (authStorage !== null) {
+      restoreMazerOAuthSessionTransaction(authStorage, transactionState.raw, transactionState.transaction);
+    }
   };
-  if (!persistMazerOAuthSession(
+  const session = persistMazerOAuthSession(
     runtime,
-    pending.state,
+    transactionState,
     tokens.accessToken,
     tokens.refreshToken,
     Number(claims.exp),
     remoteUser.data.user
-  )) {
+  );
+  if (session === null) {
     rollbackSession();
     return failed('storage_unavailable');
   }
@@ -926,31 +1010,14 @@ const consumeMazerOAuthCallbackInner = async (
     rollbackSession();
     return failed('expired_or_missing_state');
   }
-  const postCommitOperation = await awaitMazerOAuthRemoteOperation(
-    () => Promise.all([
-      client.auth.getSession(),
-      client.auth.getUser()
-    ]),
-    runtime
-  );
-  if (postCommitOperation.status !== 'resolved') {
+  if (!completeMazerOAuthSessionTransaction(runtime, transactionState.raw)) {
     rollbackSession();
-    return failed('session_invalid');
-  }
-  const [sessionResult, sessionUser] = postCommitOperation.value;
-  if (
-    sessionResult.error
-    || sessionUser.error
-    || sessionResult.data.session?.user?.id !== subject
-    || sessionUser.data.user?.id !== subject
-    || !stillCurrent()
-  ) {
-    rollbackSession();
-    return failed('session_invalid');
-  }
-  if (!writeMazerOAuthSessionQuarantine(runtime, pending.state, false)) {
-    restoreMazerOAuthSessionPreimage(runtime, pending.state, tokens.accessToken, sessionPreimage);
     return failed('storage_unavailable');
+  }
+  try {
+    runtime.notifyAcceptedSession?.(session);
+  } catch {
+    // The shared-storage listener remains the fallback reconciliation path.
   }
   return { status: 'connected' };
 };
