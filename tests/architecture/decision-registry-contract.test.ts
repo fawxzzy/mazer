@@ -257,7 +257,7 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(Object.fromEntries(owners)).toEqual({
         'scripts/analysis/capture-auth-capability-surfaces.mjs': '0C',
         'scripts/analysis/capture-ui-surfaces.mjs': '0C',
-        'scripts/analysis/live-auth-persistence-soak.mjs': '0C',
+        'scripts/analysis/live-auth-persistence-soak.mjs': '5C',
         'src/theme/tokens.ts': '1B',
         'src/theme/tokens.css': '1B',
         'src/scenes/diagnostics/menuSurfaceStateDiagnostics.ts': '1C',
@@ -277,11 +277,19 @@ describe('Mazer UI rework decision registry contract', () => {
         'src/render/teleportAnchorPose.ts': '4D-B',
         'src/render/teleportTransferPresentation.ts': '4D-B',
         'src/render/teleportTransferConduitCanvas.ts': '4D-B',
-        'src/scenes/MenuScene.ts': '4E',
+        'src/scenes/MenuScene.ts': '5C',
         'src/legacy-runtime/legacyMenuBackdrop.ts': '4E',
-        'src/legacy-runtime/legacyAuth.ts': '3B',
+        'src/legacy-runtime/legacyAuth.ts': '5C',
         'src/legacy-runtime/legacyPlayerMessage.ts': '3B',
-        'vite.config.ts': '5B',
+        'src/legacy-runtime/legacyAccountPortal.ts': '5C',
+        'src/boot/bootStatus.ts': '5C',
+        'src/boot/main.ts': '5C',
+        'src/boot/installGate.ts': '5C',
+        'src/boot/legalSurface.ts': '5C',
+        'src/styles/base.css': '5C',
+        'index.html': '5C',
+        'vercel.json': '5C',
+        'vite.config.ts': '5C',
         'package.json': '5B'
       });
       // Completed waves' own paths are real history, not active ownership -- src/state/uiLegacyBridge.ts
@@ -333,7 +341,7 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(waveFourDB.dependsOn).not.toContain('3B');
     });
 
-    it('Wave 4E claims MenuScene.ts (handed off from 4D-B) plus the new backdrop module -- 4D-B\'s own remaining Teleport paths are untouched', async () => {
+    it('Wave 5C claims the shared-account consumer paths while earlier waves retain their unrelated paths', async () => {
       const { readDecisionRegistry, resolveActiveIntegratorPathOwners } = await loadChecker();
       const registry: any = await readDecisionRegistry();
       const owners = resolveActiveIntegratorPathOwners(registry);
@@ -351,19 +359,22 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(owners.get('src/render/teleportAnchorPose.ts')).toBe('4D-B');
       expect(owners.get('src/render/teleportTransferPresentation.ts')).toBe('4D-B');
       expect(owners.get('src/render/teleportTransferConduitCanvas.ts')).toBe('4D-B');
-      expect(owners.get('src/scenes/MenuScene.ts')).toBe('4E');
+      expect(owners.get('src/scenes/MenuScene.ts')).toBe('5C');
       expect(owners.get('src/legacy-runtime/legacyMenuBackdrop.ts')).toBe('4E');
+      expect(owners.get('src/legacy-runtime/legacyAuth.ts')).toBe('5C');
+      expect(owners.get('src/legacy-runtime/legacyPlayerMessage.ts')).toBe('3B');
+      expect(owners.get('vite.config.ts')).toBe('5C');
+      expect(owners.get('package.json')).toBe('5B');
     });
 
-    it('a Wave 4E branch may change its own backdrop module and the handed-off MenuScene.ts, but not Wave 4D-B\'s remaining Teleport paths', async () => {
+    it('Wave 4E retains its backdrop module but no longer MenuScene.ts after the Wave 5C handoff', async () => {
       const { readDecisionRegistry, collectIntegratorWaveOwnershipViolations } = await loadChecker();
       const registry = await readDecisionRegistry();
 
-      expect(collectIntegratorWaveOwnershipViolations(['src/scenes/MenuScene.ts'], registry, '4E')).toEqual([]);
       expect(collectIntegratorWaveOwnershipViolations(['src/legacy-runtime/legacyMenuBackdrop.ts'], registry, '4E')).toEqual([]);
 
-      const violations = collectIntegratorWaveOwnershipViolations(['src/render/teleportPrimaryAnchor.ts'], registry, '4E');
-      expect(violations.some((entry) => entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/render/teleportPrimaryAnchor.ts')).toBe(true);
+      const violations = collectIntegratorWaveOwnershipViolations(['src/scenes/MenuScene.ts'], registry, '4E');
+      expect(violations.some((entry) => entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
     });
 
     it('a Wave 4D-B branch may still change its own remaining Teleport paths but no longer MenuScene.ts after the 4E handoff', async () => {
@@ -379,12 +390,12 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(violations.some((entry) => entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
     });
 
-    it('rejects the real registry if Wave 4D-B were made to also actively claim MenuScene.ts again (duplicate active ownership with Wave 4E)', async () => {
+    it('rejects the real registry if Wave 4D-B were made to also actively claim MenuScene.ts again (duplicate active ownership with Wave 5C)', async () => {
       const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
       const registry: any = cloneRegistry(await readDecisionRegistry());
       const waveFourDB = registry.integratorWaveOwnership.assignments.find((entry: any) => entry.wave === '4D-B');
       // 4D-B does not really own MenuScene.ts any more -- this is a synthetic conflict, matching
-      // the existing 3B/MenuScene.ts case above, to prove the guard also catches it for 4D-B/4E.
+      // the existing 3B/MenuScene.ts case above, to prove the guard also catches it for 4D-B/5C.
       waveFourDB.paths.push('src/scenes/MenuScene.ts');
 
       const violations = collectDecisionRegistryViolations(registry);
@@ -430,7 +441,7 @@ describe('Mazer UI rework decision registry contract', () => {
       ))).toBe(true);
     });
 
-    it('fails closed when one change set spans two different currently-ACTIVE integrator waves', async () => {
+    it('keeps the coherent shared-account change set inside Wave 5C', async () => {
       const { readDecisionRegistry, collectIntegratorWaveMixViolations } = await loadChecker();
       const registry = await readDecisionRegistry();
 
@@ -439,8 +450,7 @@ describe('Mazer UI rework decision registry contract', () => {
         'src/scenes/MenuScene.ts'
       ], registry);
 
-      expect(violations.some((entry) => entry.rule === 'integrator-wave-mix' && entry.path === 'src/legacy-runtime/legacyAuth.ts')).toBe(true);
-      expect(violations.some((entry) => entry.rule === 'integrator-wave-mix' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
+      expect(violations).toEqual([]);
     });
 
     it('does not mix a completed wave\'s historical path with a currently-active wave\'s path', async () => {

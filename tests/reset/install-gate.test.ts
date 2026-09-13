@@ -24,20 +24,40 @@ describe('Mazer install gate', () => {
     expect(shouldShowMazerInstallGate({ ...hiddenState, mode: 'manual', instruction: 'Use Share > Add to Home Screen' })).toBe(true);
   });
 
-  test('bypasses the install gate only for a captured recovery callback', () => {
+  test('bypasses the install gate for recovery, OAuth callbacks, and legal routes', () => {
     expect(shouldRunMazerInstallGateForBoot({
       forceInstallGate: false,
       isLocalhostRuntime: false,
+      legalRouteRequested: false,
+      oauthCallbackRequested: false,
       passwordRecoveryRequested: true
     })).toBe(false);
     expect(shouldRunMazerInstallGateForBoot({
       forceInstallGate: false,
       isLocalhostRuntime: false,
+      legalRouteRequested: false,
+      oauthCallbackRequested: true,
+      passwordRecoveryRequested: false
+    })).toBe(false);
+    expect(shouldRunMazerInstallGateForBoot({
+      forceInstallGate: false,
+      isLocalhostRuntime: false,
+      legalRouteRequested: true,
+      oauthCallbackRequested: false,
+      passwordRecoveryRequested: false
+    })).toBe(false);
+    expect(shouldRunMazerInstallGateForBoot({
+      forceInstallGate: false,
+      isLocalhostRuntime: false,
+      legalRouteRequested: false,
+      oauthCallbackRequested: false,
       passwordRecoveryRequested: false
     })).toBe(true);
     expect(shouldRunMazerInstallGateForBoot({
       forceInstallGate: true,
       isLocalhostRuntime: true,
+      legalRouteRequested: false,
+      oauthCallbackRequested: false,
       passwordRecoveryRequested: false
     })).toBe(true);
   });
@@ -78,6 +98,10 @@ describe('Mazer install gate', () => {
     expect(installGateCallIndex).toBeLessThan(gameCreateIndex);
     expect(mainSource).toContain('initializeInstallSurface(window);');
     expect(mainSource).toContain('captureLegacyPasswordRecoveryBootUrlState(window.location)');
+    expect(mainSource).toContain('captureAndScrubMazerOAuthCallback(window.location, window.history)');
+    expect(mainSource.indexOf('captureAndScrubMazerOAuthCallback(window.location, window.history)')).toBeLessThan(
+      mainSource.indexOf("markMazerBootStatus('boot-start')")
+    );
     expect(mainSource).toContain('shouldRunMazerInstallGateForBoot({');
     expect(cssSource).toContain(`#${MAZER_INSTALL_GATE_OVERLAY_ID}`);
     expect(cssSource).toContain('"Space Grotesk", ui-sans-serif, system-ui');

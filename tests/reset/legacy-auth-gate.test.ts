@@ -26,18 +26,22 @@ describe('legacy full auth gate', () => {
     expect(menuSceneSource).toContain('private handleLegacyQaStartGuestPlayMode(): LegacyQaOverlayResult {');
   });
 
-  test('uses one full-width submit action and no guest action in the auth bottom bar', () => {
+  test('uses shared sign-in and create-account actions with no guest action in the auth bottom bar', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
       .replace(/\r\n/g, '\n');
-    const formStart = menuSceneSource.indexOf('  private buildAuthCredentialsForm(');
-    const formEnd = menuSceneSource.indexOf('  private createAuthFooterLink(', formStart);
+    const formStart = menuSceneSource.indexOf('  private buildSharedAccountEntrySection(');
+    const formEnd = menuSceneSource.indexOf('  private isLegacyPasswordRecoveryActive(', formStart);
     const formSource = menuSceneSource.slice(formStart, formEnd);
 
     expect(formSource).toContain('this.createLegacyBottomActionBar(');
     expect(formSource).toContain("tone: 'primary'");
-    expect(formSource).toContain('      null\n    );');
+    expect(formSource).toContain("tone: 'secondary'");
+    expect(formSource).toContain("text: this.authSubmitting ? 'Opening' : 'Sign in'");
+    expect(formSource).toContain("text: 'Create account'");
+    expect(formSource).toContain('this.handleSharedAccountAuthorization()');
     expect(formSource).not.toContain('Play as guest');
     expect(formSource).not.toContain('handleLegacyGuestPlay');
+    expect(formSource).not.toContain('handleLegacyAuthSubmit');
   });
 
   test('halts gameplay and ambient updates while the forced auth screen is open', () => {

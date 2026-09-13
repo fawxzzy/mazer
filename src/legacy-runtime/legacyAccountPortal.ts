@@ -1,0 +1,618 @@
+export const MAZER_ACCOUNT_APP = 'mazer';
+export const MAZER_ACCOUNT_PORTAL_ORIGIN = 'https://account.fawxzzy.com';
+export const MAZER_CANONICAL_RETURN_URL = 'https://mazer.fawxzzy.com/';
+export const MAZER_OAUTH_AUTHORIZATION_URL = 'https://bxtcuhkotumitoqtrcej.supabase.co/auth/v1/oauth/authorize';
+export const MAZER_OAUTH_TOKEN_URL = 'https://bxtcuhkotumitoqtrcej.supabase.co/auth/v1/oauth/token';
+export const MAZER_OAUTH_ISSUER = 'https://bxtcuhkotumitoqtrcej.supabase.co/auth/v1';
+export const MAZER_OAUTH_CLIENT_ID = 'da286bbf-2a57-43b1-a5ea-364f72cf461d';
+export const MAZER_OAUTH_SCOPE = 'email';
+export const MAZER_OAUTH_PENDING_KEY = 'mazer.auth.oauth-pending.v1';
+export const MAZER_AUTH_MUTATION_EPOCH_KEY = 'mazer.auth.mutation-epoch.v1';
+export const MAZER_OAUTH_PENDING_TTL_MS = 300_000;
+export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
+export const MAZER_OAUTH_SAFE_ERROR_MESSAGE = 'Account connection unavailable. Return to Mazer and try again.';
+
+const MAZER_OAUTH_CALLBACK_KEYS = ['code', 'state', 'error', 'error_description'] as const;
+const MAZER_OAUTH_TOKEN_RESPONSE_MAX_BYTES = 16_384;
+const MAZER_OAUTH_TOKEN_VALUE_MAX_LENGTH = 4_096;
+const MAZER_OAUTH_STATE_LENGTH = 43;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export type MazerAccountPortalRoute = 'account' | 'reset-password';
+export type MazerLegalRoute = 'privacy' | 'terms';
+export type MazerOAuthFailureCategory =
+  | 'cancelled'
+  | 'expired_or_missing_state'
+  | 'invalid_state'
+  | 'authorization_unavailable'
+  | 'exchange_unavailable'
+  | 'session_invalid'
+  | 'storage_unavailable';
+
+export type MazerOAuthBootResult =
+  | { status: 'none' }
+  | { status: 'connected' }
+  | { category: MazerOAuthFailureCategory; status: 'failed' };
+
+export interface MazerOAuthCapturedCallback {
+  code: string | null;
+  malformed: boolean;
+  providerError: boolean;
+  requested: boolean;
+  state: string | null;
+}
+
+interface MazerOAuthPendingRecord {
+  authMutationEpoch: number;
+  codeVerifier: string;
+  createdAtEpochMs: number;
+  returnPath: '/';
+  state: string;
+  version: 1;
+}
+
+export interface MazerOAuthStorage {
+  getItem(key: string): string | null;
+  removeItem(key: string): void;
+  setItem(key: string, value: string): void;
+}
+
+export interface MazerOAuthLocation {
+  assign(url: string): void;
+  hash: string;
+  href: string;
+  origin: string;
+  pathname: string;
+  search: string;
+}
+
+export interface MazerOAuthHistory {
+  replaceState(data: unknown, unused: string, url?: string | URL | null): void;
+}
+
+export interface MazerOAuthRuntime {
+  clearTimer(handle: ReturnType<typeof setTimeout>): void;
+  crypto: Pick<Crypto, 'getRandomValues' | 'subtle'>;
+  fetch: typeof fetch;
+  history: MazerOAuthHistory;
+  location: MazerOAuthLocation;
+  now(): number;
+  sessionStorage: MazerOAuthStorage;
+  setTimer(handler: () => void, timeoutMs: number): ReturnType<typeof setTimeout>;
+}
+
+export interface MazerOAuthClient {
+  auth: {
+    getClaims(jwt?: string): Promise<{ data: { claims?: Record<string, unknown> } | null; error: unknown }>;
+    getSession(): Promise<{ data: { session: { user?: { id?: string } } | null }; error: unknown }>;
+    getUser(jwt?: string): Promise<{ data: { user: { id?: string } | null }; error: unknown }>;
+    setSession(tokens: { access_token: string; refresh_token: string }): Promise<{ error: unknown }>;
+    signOut(options: { scope: 'local' }): Promise<{ error: unknown }>;
+  };
+}
+
+let mazerOAuthBootResult: MazerOAuthBootResult = { status: 'none' };
+
+const base64UrlEncode = (bytes: Uint8Array): string => {
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+};
+
+const decodeJwtPayload = (jwt: string): Record<string, unknown> | null => {
+  const parts = jwt.split('.');
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const value: unknown = JSON.parse(atob(padded));
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const resolveBrowserRuntime = (): MazerOAuthRuntime | null => {
+  if (typeof window === 'undefined' || typeof crypto === 'undefined') {
+    return null;
+  }
+
+  return {
+    clearTimer: (handle) => clearTimeout(handle),
+    crypto,
+    fetch: window.fetch.bind(window),
+    history: window.history,
+    location: window.location,
+    now: () => Date.now(),
+    sessionStorage: window.sessionStorage,
+    setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
+  };
+};
+
+const readAuthMutationEpoch = (storage: MazerOAuthStorage): number => {
+  const raw = storage.getItem(MAZER_AUTH_MUTATION_EPOCH_KEY);
+  if (raw === null) {
+    return 0;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+};
+
+export const advanceMazerAuthMutationEpoch = (
+  storage: MazerOAuthStorage | null = typeof window === 'undefined' ? null : window.sessionStorage
+): number | null => {
+  if (storage === null) {
+    return null;
+  }
+  try {
+    const next = readAuthMutationEpoch(storage) + 1;
+    storage.setItem(MAZER_AUTH_MUTATION_EPOCH_KEY, String(next));
+    storage.removeItem(MAZER_OAUTH_PENDING_KEY);
+    return next;
+  } catch {
+    return null;
+  }
+};
+
+export const buildMazerAccountPortalUrl = (route: MazerAccountPortalRoute): string => {
+  const url = new URL(`/${route}`, MAZER_ACCOUNT_PORTAL_ORIGIN);
+  if (route === 'reset-password') {
+    url.searchParams.set('recovery', '1');
+  }
+  url.searchParams.set('app', MAZER_ACCOUNT_APP);
+  if (route === 'account') {
+    url.searchParams.set('returnTo', MAZER_CANONICAL_RETURN_URL);
+  }
+  return url.toString();
+};
+
+export const buildMazerLegalUrl = (route: MazerLegalRoute): string => (
+  `https://fawxzzy.com/legal/mazer/${route}`
+);
+
+export const resolveMazerLegalRoute = (pathname: string): MazerLegalRoute | null => {
+  const normalized = pathname.replace(/\/+$/, '') || '/';
+  if (normalized === '/privacy') {
+    return 'privacy';
+  }
+  if (normalized === '/terms') {
+    return 'terms';
+  }
+  return null;
+};
+
+export const buildMazerOAuthAuthorizationUrl = (codeChallenge: string, state: string): string => {
+  const url = new URL(MAZER_OAUTH_AUTHORIZATION_URL);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('client_id', MAZER_OAUTH_CLIENT_ID);
+  url.searchParams.set('redirect_uri', MAZER_CANONICAL_RETURN_URL);
+  url.searchParams.set('scope', MAZER_OAUTH_SCOPE);
+  url.searchParams.set('code_challenge', codeChallenge);
+  url.searchParams.set('code_challenge_method', 'S256');
+  url.searchParams.set('state', state);
+  return url.toString();
+};
+
+const createRandomBase64Url = (runtime: MazerOAuthRuntime): string => {
+  const bytes = new Uint8Array(32);
+  runtime.crypto.getRandomValues(bytes);
+  return base64UrlEncode(bytes);
+};
+
+export const beginMazerOAuthAuthorization = async (
+  runtime: MazerOAuthRuntime | null = resolveBrowserRuntime()
+): Promise<MazerOAuthBootResult> => {
+  if (runtime === null) {
+    return { category: 'authorization_unavailable', status: 'failed' };
+  }
+
+  let pendingWritten = false;
+  try {
+    const authMutationEpoch = readAuthMutationEpoch(runtime.sessionStorage) + 1;
+    runtime.sessionStorage.setItem(MAZER_AUTH_MUTATION_EPOCH_KEY, String(authMutationEpoch));
+    runtime.sessionStorage.removeItem(MAZER_OAUTH_PENDING_KEY);
+    const codeVerifier = createRandomBase64Url(runtime);
+    const state = createRandomBase64Url(runtime);
+    const challengeBytes = new Uint8Array(await runtime.crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(codeVerifier)
+    ));
+    const codeChallenge = base64UrlEncode(challengeBytes);
+    const pending: MazerOAuthPendingRecord = {
+      authMutationEpoch,
+      codeVerifier,
+      createdAtEpochMs: runtime.now(),
+      returnPath: '/',
+      state,
+      version: 1
+    };
+    runtime.sessionStorage.setItem(MAZER_OAUTH_PENDING_KEY, JSON.stringify(pending));
+    pendingWritten = true;
+    runtime.location.assign(buildMazerOAuthAuthorizationUrl(codeChallenge, state));
+    return { status: 'none' };
+  } catch {
+    if (pendingWritten) {
+      try {
+        runtime.sessionStorage.removeItem(MAZER_OAUTH_PENDING_KEY);
+      } catch {
+        return { category: 'storage_unavailable', status: 'failed' };
+      }
+    }
+    return { category: 'authorization_unavailable', status: 'failed' };
+  }
+};
+
+const collectCallbackValues = (params: URLSearchParams): string[] => (
+  MAZER_OAUTH_CALLBACK_KEYS.flatMap((key) => params.getAll(key))
+);
+
+export const isMazerOAuthCallbackRequest = (
+  location: Pick<MazerOAuthLocation, 'hash' | 'search'>
+): boolean => {
+  const query = new URLSearchParams(location.search);
+  const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+  return collectCallbackValues(query).length > 0 || collectCallbackValues(fragment).length > 0;
+};
+
+export const captureAndScrubMazerOAuthCallback = (
+  location: Pick<MazerOAuthLocation, 'hash' | 'origin' | 'pathname' | 'search'>,
+  history: MazerOAuthHistory
+): MazerOAuthCapturedCallback => {
+  const query = new URLSearchParams(location.search);
+  const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const requested = isMazerOAuthCallbackRequest(location);
+  const queryCode = query.getAll('code');
+  const queryState = query.getAll('state');
+  const queryError = query.getAll('error');
+  const queryErrorDescription = query.getAll('error_description');
+  const fragmentSensitiveValues = collectCallbackValues(fragment);
+  const malformed = requested && (
+    location.origin !== new URL(MAZER_CANONICAL_RETURN_URL).origin
+    || location.pathname !== '/'
+    || fragmentSensitiveValues.length > 0
+    || queryCode.length > 1
+    || queryState.length !== 1
+    || queryError.length > 1
+    || queryErrorDescription.length > 1
+    || (queryCode.length === 1 && queryError.length === 1)
+    || (queryCode.length === 0 && queryError.length === 0)
+  );
+
+  if (requested) {
+    for (const key of MAZER_OAUTH_CALLBACK_KEYS) {
+      query.delete(key);
+      fragment.delete(key);
+    }
+    const search = query.toString();
+    history.replaceState(null, '', `${location.pathname}${search ? `?${search}` : ''}`);
+  }
+
+  return {
+    code: queryCode.length === 1 ? queryCode[0] : null,
+    malformed,
+    providerError: queryError.length === 1,
+    requested,
+    state: queryState.length === 1 ? queryState[0] : null
+  };
+};
+
+const parsePendingRecord = (raw: string | null): MazerOAuthPendingRecord | null => {
+  if (raw === null) {
+    return null;
+  }
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+    const record = value as Partial<MazerOAuthPendingRecord>;
+    if (
+      record.version !== 1
+      || record.returnPath !== '/'
+      || !Number.isSafeInteger(record.createdAtEpochMs)
+      || !Number.isSafeInteger(record.authMutationEpoch)
+      || typeof record.codeVerifier !== 'string'
+      || record.codeVerifier.length < 43
+      || record.codeVerifier.length > 128
+      || typeof record.state !== 'string'
+      || record.state.length !== MAZER_OAUTH_STATE_LENGTH
+    ) {
+      return null;
+    }
+    return record as MazerOAuthPendingRecord;
+  } catch {
+    return null;
+  }
+};
+
+const failed = (category: MazerOAuthFailureCategory): MazerOAuthBootResult => ({ category, status: 'failed' });
+
+const isExpectedAudience = (value: unknown): boolean => (
+  value === 'authenticated'
+  || (Array.isArray(value) && value.includes('authenticated'))
+);
+
+const validateClaims = (
+  accessToken: string,
+  claims: Record<string, unknown>,
+  nowEpochMs: number
+): string | null => {
+  const decoded = decodeJwtPayload(accessToken);
+  const sub = claims.sub;
+  const sessionId = claims.session_id;
+  const exp = claims.exp;
+  const iat = claims.iat;
+  if (
+    decoded === null
+    || typeof sub !== 'string'
+    || decoded.sub !== sub
+    || !UUID_PATTERN.test(sub)
+    || typeof sessionId !== 'string'
+    || !UUID_PATTERN.test(sessionId)
+    || claims.iss !== MAZER_OAUTH_ISSUER
+    || !isExpectedAudience(claims.aud)
+    || claims.role !== 'authenticated'
+    || claims.client_id !== MAZER_OAUTH_CLIENT_ID
+    || typeof exp !== 'number'
+    || !Number.isFinite(exp)
+    || exp <= Math.floor(nowEpochMs / 1000)
+    || typeof iat !== 'number'
+    || !Number.isFinite(iat)
+    || iat > Math.floor(nowEpochMs / 1000) + 60
+  ) {
+    return null;
+  }
+  return sub;
+};
+
+interface ParsedTokenResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
+const exchangeAuthorizationCode = async (
+  code: string,
+  verifier: string,
+  runtime: MazerOAuthRuntime
+): Promise<ParsedTokenResponse | null> => {
+  const controller = new AbortController();
+  const timeout = runtime.setTimer(() => controller.abort(), MAZER_OAUTH_TOKEN_TIMEOUT_MS);
+  try {
+    const body = new URLSearchParams({
+      client_id: MAZER_OAUTH_CLIENT_ID,
+      code,
+      code_verifier: verifier,
+      grant_type: 'authorization_code',
+      redirect_uri: MAZER_CANONICAL_RETURN_URL
+    });
+    const response = await runtime.fetch(MAZER_OAUTH_TOKEN_URL, {
+      body,
+      cache: 'no-store',
+      credentials: 'omit',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      method: 'POST',
+      mode: 'cors',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
+      signal: controller.signal
+    });
+    const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+    if (!response.ok || !contentType.includes('application/json')) {
+      return null;
+    }
+    const raw = await response.text();
+    if (new TextEncoder().encode(raw).byteLength > MAZER_OAUTH_TOKEN_RESPONSE_MAX_BYTES) {
+      return null;
+    }
+    const value: unknown = JSON.parse(raw);
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+    const token = value as Record<string, unknown>;
+    if (
+      typeof token.access_token !== 'string'
+      || token.access_token.length === 0
+      || token.access_token.length > MAZER_OAUTH_TOKEN_VALUE_MAX_LENGTH
+      || typeof token.refresh_token !== 'string'
+      || token.refresh_token.length === 0
+      || token.refresh_token.length > MAZER_OAUTH_TOKEN_VALUE_MAX_LENGTH
+      || typeof token.token_type !== 'string'
+      || token.token_type.toLowerCase() !== 'bearer'
+      || !Number.isSafeInteger(token.expires_in)
+      || Number(token.expires_in) <= 0
+    ) {
+      return null;
+    }
+    return { accessToken: token.access_token, refreshToken: token.refresh_token };
+  } catch {
+    return null;
+  } finally {
+    runtime.clearTimer(timeout);
+  }
+};
+
+const consumeMazerOAuthCallbackInner = async (
+  callback: MazerOAuthCapturedCallback,
+  runtime: MazerOAuthRuntime,
+  getClient: () => Promise<MazerOAuthClient | null>
+): Promise<MazerOAuthBootResult> => {
+  if (!callback.requested) {
+    return { status: 'none' };
+  }
+
+  let pending: MazerOAuthPendingRecord | null;
+  let currentEpoch: number;
+  try {
+    pending = parsePendingRecord(runtime.sessionStorage.getItem(MAZER_OAUTH_PENDING_KEY));
+    currentEpoch = readAuthMutationEpoch(runtime.sessionStorage);
+  } catch {
+    return failed('storage_unavailable');
+  }
+  if (
+    pending === null
+    || runtime.now() - pending.createdAtEpochMs < 0
+    || runtime.now() - pending.createdAtEpochMs > MAZER_OAUTH_PENDING_TTL_MS
+    || pending.authMutationEpoch !== currentEpoch
+  ) {
+    return failed('expired_or_missing_state');
+  }
+  if (callback.malformed || callback.state !== pending.state) {
+    return failed('invalid_state');
+  }
+  if (callback.providerError) {
+    return failed('cancelled');
+  }
+  if (callback.code === null || callback.code.length === 0 || callback.code.length > 2_048) {
+    return failed('authorization_unavailable');
+  }
+
+  const stillCurrent = (): boolean => {
+    try {
+      return readAuthMutationEpoch(runtime.sessionStorage) === pending?.authMutationEpoch;
+    } catch {
+      return false;
+    }
+  };
+  if (!stillCurrent()) {
+    return failed('expired_or_missing_state');
+  }
+  const tokens = await exchangeAuthorizationCode(callback.code, pending.codeVerifier, runtime);
+  if (tokens === null || !stillCurrent()) {
+    return failed(tokens === null ? 'exchange_unavailable' : 'expired_or_missing_state');
+  }
+  const client = await getClient();
+  if (client === null || !stillCurrent()) {
+    return failed(client === null ? 'session_invalid' : 'expired_or_missing_state');
+  }
+  let claimsResult: Awaited<ReturnType<MazerOAuthClient['auth']['getClaims']>>;
+  try {
+    claimsResult = await client.auth.getClaims(tokens.accessToken);
+  } catch {
+    return failed('session_invalid');
+  }
+  const claims = claimsResult.data?.claims;
+  if (claimsResult.error || claims === undefined || !stillCurrent()) {
+    return failed('session_invalid');
+  }
+  const subject = validateClaims(tokens.accessToken, claims, runtime.now());
+  if (subject === null) {
+    return failed('session_invalid');
+  }
+  let remoteUser: Awaited<ReturnType<MazerOAuthClient['auth']['getUser']>>;
+  try {
+    remoteUser = await client.auth.getUser(tokens.accessToken);
+  } catch {
+    return failed('session_invalid');
+  }
+  if (remoteUser.error || remoteUser.data.user?.id !== subject || !stillCurrent()) {
+    return failed('session_invalid');
+  }
+  if (!stillCurrent()) {
+    return failed('expired_or_missing_state');
+  }
+  let setResult: Awaited<ReturnType<MazerOAuthClient['auth']['setSession']>>;
+  try {
+    setResult = await client.auth.setSession({
+      access_token: tokens.accessToken,
+      refresh_token: tokens.refreshToken
+    });
+  } catch {
+    try {
+      await client.auth.signOut({ scope: 'local' });
+    } catch {
+      // The fixed failure result remains safe even if local cleanup is unavailable.
+    }
+    return failed('storage_unavailable');
+  }
+  if (setResult.error) {
+    return failed('storage_unavailable');
+  }
+  if (!stillCurrent()) {
+    try {
+      await client.auth.signOut({ scope: 'local' });
+    } catch {
+      // Continue with the fixed failure result; never surface provider detail.
+    }
+    return failed('expired_or_missing_state');
+  }
+  let sessionResult: Awaited<ReturnType<MazerOAuthClient['auth']['getSession']>>;
+  let sessionUser: Awaited<ReturnType<MazerOAuthClient['auth']['getUser']>>;
+  try {
+    [sessionResult, sessionUser] = await Promise.all([
+      client.auth.getSession(),
+      client.auth.getUser()
+    ]);
+  } catch {
+    try {
+      await client.auth.signOut({ scope: 'local' });
+    } catch {
+      // Continue with the fixed failure result; never surface provider detail.
+    }
+    return failed('session_invalid');
+  }
+  if (
+    sessionResult.error
+    || sessionUser.error
+    || sessionResult.data.session?.user?.id !== subject
+    || sessionUser.data.user?.id !== subject
+    || !stillCurrent()
+  ) {
+    try {
+      await client.auth.signOut({ scope: 'local' });
+    } catch {
+      // Continue with the fixed failure result; never surface provider detail.
+    }
+    return failed('session_invalid');
+  }
+  return { status: 'connected' };
+};
+
+export const consumeMazerOAuthCallback = async (
+  callback: MazerOAuthCapturedCallback,
+  getClient: () => Promise<MazerOAuthClient | null>,
+  runtime: MazerOAuthRuntime | null = resolveBrowserRuntime()
+): Promise<MazerOAuthBootResult> => {
+  if (runtime === null) {
+    return failed('authorization_unavailable');
+  }
+
+  let result: MazerOAuthBootResult;
+  try {
+    result = await consumeMazerOAuthCallbackInner(callback, runtime, getClient);
+  } catch {
+    result = failed('session_invalid');
+  }
+  if (callback.requested) {
+    try {
+      runtime.sessionStorage.removeItem(MAZER_OAUTH_PENDING_KEY);
+    } catch {
+      if (result.status === 'connected') {
+        try {
+          const client = await getClient();
+          await client?.auth.signOut({ scope: 'local' });
+        } catch {
+          // The fixed storage failure remains the only surfaced detail.
+        }
+      }
+      result = failed('storage_unavailable');
+    }
+  }
+  mazerOAuthBootResult = result;
+  return result;
+};
+
+export const readMazerOAuthBootResult = (): MazerOAuthBootResult => mazerOAuthBootResult;
+
+export const navigateToMazerAccountPortal = (
+  route: MazerAccountPortalRoute,
+  location: Pick<MazerOAuthLocation, 'assign'> = window.location
+): void => {
+  location.assign(buildMazerAccountPortalUrl(route));
+};

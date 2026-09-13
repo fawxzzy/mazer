@@ -29,7 +29,7 @@ import {
 
 const passingSteps = [
   'signed-out-account-gate',
-  'signed-out-empty-submit-stays-gated',
+  'signed-out-shared-account-contract',
   'diagnostics-fixture-entry',
   'diagnostics-fixture-options',
   'diagnostics-fixture-trail-shine-changed',
@@ -94,8 +94,12 @@ describe('live auth persistence soak contract', () => {
 
     const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/live-auth-persistence-soak.mjs'), 'utf8');
     expect(source).toContain("id: 'diagnostics-fixture-play'");
+    expect(source).toContain("id: 'signed-out-shared-account-contract'");
+    expect(source).not.toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Sign in'");
     expect(source).toContain("buttons: ['Back', 'Guide', 'Trail Shine', 'Main Menu']");
     expect(source).toContain("id: 'diagnostics-fixture-account'");
+    expect(source).toContain("buttons: ['Account'], mode: 'menu', overlay: 'options'");
+    expect(source).not.toContain("buttons: ['username', 'Reset progress', 'Sign out']");
     expect(source).toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Trail Shine'");
     expect(source).toContain('evaluateTrailShineChangedStatePersistence({');
     expect(source).toContain('fixture_settings_restore');

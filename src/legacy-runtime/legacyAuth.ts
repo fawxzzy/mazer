@@ -3,6 +3,11 @@ import {
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL
 } from './legacyPlayerMessage';
+import {
+  MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+  advanceMazerAuthMutationEpoch,
+  readMazerOAuthBootResult
+} from './legacyAccountPortal';
 import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
@@ -408,7 +413,7 @@ export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> =>
     legacyAuthClient = createClient(config.url, config.anonKey, {
       auth: {
         autoRefreshToken: true,
-        detectSessionInUrl: true,
+        detectSessionInUrl: false,
         persistSession: true,
         storage: typeof window === 'undefined' ? undefined : window.localStorage,
         // auth-js defaults to a navigator.locks-backed mutex in any browser
@@ -440,8 +445,10 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
   }
 
   const { data, error } = await client.auth.getSession();
+  const oauthBootResult = readMazerOAuthBootResult();
   const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-    error: error?.message ?? null
+    error: error?.message ?? (oauthBootResult.status === 'failed' ? MAZER_OAUTH_SAFE_ERROR_MESSAGE : null),
+    info: oauthBootResult.status === 'connected' ? 'Account connected.' : null
   });
   if (snapshot.status === 'authenticated') {
     syncLegacyRememberedIdentityFromAuthenticatedSession(
@@ -460,6 +467,7 @@ export const signInLegacyAuth = async (
   email: string,
   password: string
 ): Promise<LegacyAuthActionResult> => {
+  advanceMazerAuthMutationEpoch();
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -495,6 +503,7 @@ export const signUpLegacyAuth = async (
   password: string,
   username: string
 ): Promise<LegacyAuthActionResult> => {
+  advanceMazerAuthMutationEpoch();
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -766,6 +775,7 @@ export const updateLegacyPassword = async (
 };
 
 export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
+  advanceMazerAuthMutationEpoch();
   const client = await getLegacyAuthClient();
   if (!client) {
     return {

@@ -33,10 +33,17 @@ describe('production service worker lifecycle', () => {
     const vercelConfig = readFileSync(resolve(process.cwd(), 'vercel.json'), 'utf8');
 
     expect(viteConfig).toContain("filename: 'app-sw.js'");
-    expect(viteConfig).toContain('navigateFallbackDenylist: [/^\\/__/, /^\\/@vite\\//]');
+    expect(viteConfig).toContain('navigateFallbackDenylist: [/^\\/__/, /^\\/@vite\\//, /[?&](?:code|state|error|error_description)=/]');
     expect(viteConfig).not.toMatch(/navigateFallbackDenylist:[^\n]*update-password/);
     expect(vercelConfig).toContain('"source": "/update-password"');
     expect(vercelConfig).toContain('"destination": "/index.html"');
+  });
+
+  test('keeps OAuth callback navigations and token exchange network-only', () => {
+    const viteConfig = readFileSync(resolve(process.cwd(), 'vite.config.ts'), 'utf8');
+    expect(viteConfig).toContain("['code', 'state', 'error', 'error_description'].some((key) => url.searchParams.has(key))");
+    expect(viteConfig).toContain("url.pathname === '/auth/v1/oauth/token'");
+    expect(viteConfig.match(/handler: 'NetworkOnly'/g)).toHaveLength(2);
   });
 
   test.each(['localhost', '127.0.0.1', '::1'])(

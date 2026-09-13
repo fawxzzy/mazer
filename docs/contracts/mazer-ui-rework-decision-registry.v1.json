@@ -308,9 +308,9 @@
         "owner": "measured-baseline-integrator",
         "paths": [
           "scripts/analysis/capture-auth-capability-surfaces.mjs",
-          "scripts/analysis/capture-ui-surfaces.mjs",
-          "scripts/analysis/live-auth-persistence-soak.mjs"
-        ]
+          "scripts/analysis/capture-ui-surfaces.mjs"
+        ],
+        "note": "The live authenticated-persistence soak moved to Wave 5C when its account-entry contract became part of the shared OAuth consumer. This wave remains active for the two capture surfaces."
       },
       {
         "wave": "1B",
@@ -356,9 +356,9 @@
         "dependsOn": ["3A"],
         "owner": "auth-migration-integrator",
         "paths": [
-          "src/legacy-runtime/legacyAuth.ts",
           "src/legacy-runtime/legacyPlayerMessage.ts"
-        ]
+        ],
+        "note": "legacyAuth.ts moved to Wave 5C for the exact shared-account OAuth callback/session handoff. This wave remains active for legacyPlayerMessage.ts."
       },
       {
         "wave": "4D-A",
@@ -393,10 +393,9 @@
         "dependsOn": ["4D-B"],
         "owner": "world-identity-integrator",
         "paths": [
-          "src/scenes/MenuScene.ts",
           "src/legacy-runtime/legacyMenuBackdrop.ts"
         ],
-        "note": "World Identity: the menu/backdrop starfield and related ambient world presentation, starting with a bounded correctness slice for the background star twinkle (owner-reported: stars 'switch colors like a strobe' instead of smoothly brightening/dimming and growing/shrinking). Confirmed real defect, not a tuning issue: MenuScene.ts's per-frame star-draw loop derived its own 'seed' fresh every frame from the star's own (continuously drifting) position -- `((star.x * 9973) + (star.y * 6151)) % 1` -- which looks like a stable position-keyed hash but isn't: multiplying a smoothly-changing float by a large constant before taking it mod 1 amplifies even sub-pixel motion into an effectively unrelated result every frame. Measured live: a star moving at its own ordinary drift speed produced an uncorrelated new value in [0, 1) on almost every real frame (a 30-sample real-time trace jumped the full range with no pattern). Every visual that value fed -- the sparkle hue for the brightest ~5% of stars, the round-star white/blue/warm color bucket, and each star's own twinkle PERIOD -- was silently re-randomizing every frame instead of the single fixed-per-star identity the surrounding code's own comments already describe wanting ('each star gets its own period... so they don't all pulse in lockstep'). Fixed by adding a real persisted `seed` field to `LegacyMenuBackdropStar` (src/legacy-runtime/legacyMenuBackdrop.ts), assigned once at creation and reassigned only at genuine rebirth (resetLegacyMenuBackdropStarNearWarpOrigin) -- never mid-life -- and reading that stable field everywhere MenuScene.ts's star-draw loop previously recomputed the unstable hash. The brightest-tier sparkle stars also switched to a fully time-stable hue (no animationTime-driven rotation) rather than a continuous rainbow cycle, matching the owner's own explicit preference ('stable per-star color... over rapid cycling through unrelated hues') -- the goal-star ring and title/wordmark sparkle call sites, which share the same drawLegacyFourPointSparkle primitive but serve a deliberately different, attention-drawing design intent, are untouched. Does not touch Wave 4D-B's Teleport modules, Wave 4D-A's Navigation Core modules, star placement/count/motion (advanceLegacyMenuBackdropStars' radial-warp physics unchanged), or the tile-by-tile title/level-number construction."
+        "note": "World Identity: the menu/backdrop starfield and related ambient world presentation, starting with a bounded correctness slice for the background star twinkle (owner-reported: stars 'switch colors like a strobe' instead of smoothly brightening/dimming and growing/shrinking). Confirmed real defect, not a tuning issue: MenuScene.ts's per-frame star-draw loop derived its own 'seed' fresh every frame from the star's own (continuously drifting) position -- `((star.x * 9973) + (star.y * 6151)) % 1` -- which looks like a stable position-keyed hash but isn't: multiplying a smoothly-changing float by a large constant before taking it mod 1 amplifies even sub-pixel motion into an effectively unrelated result every frame. Measured live: a star moving at its own ordinary drift speed produced an uncorrelated new value in [0, 1) on almost every real frame (a 30-sample real-time trace jumped the full range with no pattern). Every visual that value fed -- the sparkle hue for the brightest ~5% of stars, the round-star white/blue/warm color bucket, and each star's own twinkle PERIOD -- was silently re-randomizing every frame instead of the single fixed-per-star identity the surrounding code's own comments already describe wanting ('each star gets its own period... so they don't all pulse in lockstep'). Fixed by adding a real persisted `seed` field to `LegacyMenuBackdropStar` (src/legacy-runtime/legacyMenuBackdrop.ts), assigned once at creation and reassigned only at genuine rebirth (resetLegacyMenuBackdropStarNearWarpOrigin) -- never mid-life -- and reading that stable field everywhere MenuScene.ts's star-draw loop previously recomputed the unstable hash. The brightest-tier sparkle stars also switched to a fully time-stable hue (no animationTime-driven rotation) rather than a continuous rainbow cycle, matching the owner's own explicit preference ('stable per-star color... over rapid cycling through unrelated hues') -- the goal-star ring and title/wordmark sparkle call sites, which share the same drawLegacyFourPointSparkle primitive but serve a deliberately different, attention-drawing design intent, are untouched. Does not touch Wave 4D-B's Teleport modules, Wave 4D-A's Navigation Core modules, star placement/count/motion (advanceLegacyMenuBackdropStars' radial-warp physics unchanged), or the tile-by-tile title/level-number construction. MenuScene.ts moved to Wave 5C when account-entry controls and OAuth navigation became its active integration responsibility; this wave remains active for legacyMenuBackdrop.ts."
       },
       {
         "wave": "5B",
@@ -404,9 +403,30 @@
         "dependsOn": [],
         "owner": "system-pwa-integrator",
         "paths": [
-          "vite.config.ts",
           "package.json"
-        ]
+        ],
+        "note": "vite.config.ts moved to Wave 5C for callback/token network-only and sensitive-navigation cache controls. This wave remains active for package.json."
+      },
+      {
+        "wave": "5C",
+        "status": "active",
+        "dependsOn": ["0C", "3B", "4E", "5B"],
+        "owner": "shared-account-oauth-integrator",
+        "paths": [
+          "index.html",
+          "vercel.json",
+          "vite.config.ts",
+          "scripts/analysis/live-auth-persistence-soak.mjs",
+          "src/boot/bootStatus.ts",
+          "src/boot/main.ts",
+          "src/boot/installGate.ts",
+          "src/boot/legalSurface.ts",
+          "src/legacy-runtime/legacyAccountPortal.ts",
+          "src/legacy-runtime/legacyAuth.ts",
+          "src/scenes/MenuScene.ts",
+          "src/styles/base.css"
+        ],
+        "note": "Owns the Mazer consumer side of the production-verified shared account portal: OAuth 2.1 authorization-code-with-PKCE initiation and callback/session validation, fixed account/reset/legal routes, callback cache exclusion, install-gate bypass, and diagnostics-only persistence acceptance. The prior active waves retain their unrelated remaining paths."
       }
     ],
     "note": "Assignments preserve the handoff packet's single-owner guardrails while replacing the obsolete pull-request hold with current dependency-graph wave ownership. The Wave 1B token exports are concrete and assigned. Wave 2A's base DOM primitives and Wave 2A.1's settings extensions remain stateless and unwired; no branch name or stale pull-request state grants an exception.",

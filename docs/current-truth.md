@@ -54,6 +54,15 @@ If the current web app disagrees with restored gameplay/mechanics truth, restore
 - The generated master migration sequence is schema parity, runtime RPC/leaderboard contracts, then shared-project signup username authority. The Before User Created hook is activated only after those database contracts and rollback proof pass.
 - Existing sessions are project-specific. Any future migration must still prove existing-user re-authentication and must never lower proven player or AI ordinals, discard receipts, expose usernames through anonymous availability probing, or derive a username from email.
 
+### Shared account consumer contract — 2026-09-13
+
+- Mazer uses the master Supabase OAuth 2.1 authorization-code flow with PKCE S256, public client `da286bbf-2a57-43b1-a5ea-364f72cf461d`, exact redirect `https://mazer.fawxzzy.com/`, and scope `email`. The game never embeds a client secret or broker credential.
+- Sign in and Create account share one authorization entry. Account management uses `https://account.fawxzzy.com/account?app=mazer&returnTo=https%3A%2F%2Fmazer.fawxzzy.com%2F`; reset initiation uses `https://account.fawxzzy.com/reset-password?recovery=1&app=mazer`. Caller-supplied return targets are not accepted.
+- Callback material is captured and removed from the URL before boot status, rendering, service-worker registration, or diagnostics. State/PKCE pending data is one-time session storage with a five-minute lifetime and an auth-mutation epoch fence.
+- Token exchange is one bounded, no-retry, no-store request. The returned session is accepted only after signed-claim, issuer, audience, role, client, subject, session, expiry, and remote-user checks agree; failed post-commit readback clears the local session.
+- Local `/privacy` and `/terms` routes bypass the install gate and link to the authoritative shared Mazer policies at `https://fawxzzy.com/legal/mazer/privacy` and `https://fawxzzy.com/legal/mazer/terms`.
+- The legacy direct credential helpers and old `/update-password` completion route remain compatibility/recovery internals, but no current sign-in, create-account, reset-initiation, Account, or profile control routes into the local credential form.
+
 ## Current implementation truth
 
 ### Final app-icon authority — 2026-08-28

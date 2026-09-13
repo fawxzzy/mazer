@@ -1,11 +1,19 @@
 import Phaser from 'phaser';
 import '../styles/base.css';
-import { captureLegacyPasswordRecoveryBootUrlState } from '../legacy-runtime/legacyAuth';
+import { captureLegacyPasswordRecoveryBootUrlState, getLegacyAuthClient } from '../legacy-runtime/legacyAuth';
+import {
+  captureAndScrubMazerOAuthCallback,
+  consumeMazerOAuthCallback,
+  isMazerOAuthCallbackRequest,
+  resolveMazerLegalRoute,
+  type MazerOAuthClient
+} from '../legacy-runtime/legacyAccountPortal';
 import { bootstrapLegacyRemoteAccountState } from '../legacy-runtime/legacyRemoteProgression';
 import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
 import { initializeInstallSurface } from './installSurface';
+import { installMazerLegalSurface } from './legalSurface';
 import { createMazerPhaserConfig } from './phaserConfig';
 import { installMazerProductionServiceWorker, installMazerServiceWorkerControllerReload } from './serviceWorkerLifecycle';
 import { installMazerViewportGeometry, syncMazerGameToViewport } from './viewportGeometry';
@@ -73,9 +81,22 @@ const registerProductionServiceWorker = (): void => {
 };
 
 const boot = async (): Promise<void> => {
+  const oauthCallbackRequested = isMazerOAuthCallbackRequest(window.location);
+  const oauthCallback = oauthCallbackRequested
+    ? captureAndScrubMazerOAuthCallback(window.location, window.history)
+    : null;
   markMazerBootStatus('boot-start');
   const passwordRecoveryBootUrlState = captureLegacyPasswordRecoveryBootUrlState(window.location);
+  const legalRoute = resolveMazerLegalRoute(window.location.pathname);
   let game: Phaser.Game | null = null;
+
+  if (legalRoute !== null) {
+    installMazerLegalSurface(document, legalRoute);
+    registerProductionServiceWorker();
+    markMazerBootStatus('legal-surface-created');
+    return;
+  }
+
   const viewportGeometry = installMazerViewportGeometry();
 
   if (isLocalhostRuntime()) {
@@ -102,10 +123,18 @@ const boot = async (): Promise<void> => {
   if (shouldRunMazerInstallGateForBoot({
     forceInstallGate,
     isLocalhostRuntime: isLocalhostRuntime(),
+    legalRouteRequested: legalRoute !== null,
+    oauthCallbackRequested,
     passwordRecoveryRequested: passwordRecoveryBootUrlState.requested
   })) {
     markMazerBootStatus('install-gate-checking');
     await runMazerInstallGate(document);
+  }
+
+  if (oauthCallback !== null) {
+    await consumeMazerOAuthCallback(oauthCallback, async () => (
+      await getLegacyAuthClient() as unknown as MazerOAuthClient | null
+    ));
   }
 
   await bootstrapLegacyRemoteAccountState();

@@ -70,6 +70,7 @@ describe('Mazer installable PWA contract', () => {
     expect(html).toContain('name="theme-color"');
     expect(html).toContain('name="apple-mobile-web-app-capable"');
     expect(html).toContain('rel="manifest"');
+    expect(html).toContain('<meta name="referrer" content="no-referrer" />');
     expect(html).toContain('rel="apple-touch-icon"');
     expect(html).toContain('rel="canonical" href="https://mazer.fawxzzy.com/"');
     expect(html).toContain('property="og:url" content="https://mazer.fawxzzy.com/"');
