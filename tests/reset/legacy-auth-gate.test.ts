@@ -57,6 +57,24 @@ describe('legacy full auth gate', () => {
     expect(updateSource.slice(freezeAt, updateSource.indexOf('this.updateStars(time, delta);'))).toContain('return;');
   });
 
+  test('ends an active run before a cross-tab sign-out can expose guest-scoped persistence', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const updateStart = menuSceneSource.indexOf('  public update(time: number, delta: number): void {');
+    const updateEnd = menuSceneSource.indexOf('  private initializeRuntimeDiagnostics(): void {', updateStart);
+    const updateSource = menuSceneSource.slice(updateStart, updateEnd);
+    const forcedSignOutTransition = updateSource.slice(
+      updateSource.indexOf("if (this.authGateLocked && this.mode === 'play') {"),
+      updateSource.indexOf("} else if (this.isLegacyPasswordRecoveryActive()", updateSource.indexOf("if (this.authGateLocked && this.mode === 'play') {"))
+    );
+
+    expect(forcedSignOutTransition).toContain('this.enterMenuMode();');
+    expect(forcedSignOutTransition).toContain('this.enterForcedLegacyAuthOverlay();');
+    expect(forcedSignOutTransition).toContain("this.overlayReturn = 'none';");
+    expect(forcedSignOutTransition.indexOf('this.enterMenuMode();')).toBeLessThan(
+      forcedSignOutTransition.indexOf('this.enterForcedLegacyAuthOverlay();')
+    );
+  });
+
   test('revokes a prior guest grant before returning to menu, account entry, or credential submission', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const submitStart = menuSceneSource.indexOf('  private async handleLegacyAuthSubmit(): Promise<void> {');
