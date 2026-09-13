@@ -688,9 +688,22 @@ describe('Mazer shared account contract', () => {
       version: 2
     });
     ambiguousStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, ambiguousTransaction);
-    expect(isMazerOAuthSessionQuarantined(ambiguousStorage, 2_000_001)).toBe(true);
-    expect(ambiguousStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(provisionalSession);
-    expect(ambiguousStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBe(ambiguousTransaction);
+    expect(isMazerOAuthSessionQuarantined(ambiguousStorage, 2_000_001)).toBe(false);
+    expect(ambiguousStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(previousSession);
+    expect(ambiguousStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
+
+    const emptyPreimageStorage = new MemoryStorage();
+    emptyPreimageStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', provisionalSession);
+    emptyPreimageStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, JSON.stringify({
+      committedAccessToken: null,
+      createdAtEpochMs: 1_900_000,
+      owner: 'c'.repeat(43),
+      preimageRaw: null,
+      version: 2
+    }));
+    expect(isMazerOAuthSessionQuarantined(emptyPreimageStorage, 2_000_001)).toBe(false);
+    expect(emptyPreimageStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBeNull();
+    expect(emptyPreimageStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
   });
 
   test('keeps the accepted session when optional broadcast notification is unavailable', async () => {

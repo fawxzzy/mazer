@@ -761,13 +761,10 @@ const restoreMazerOAuthSessionTransaction = (
       return true;
     }
     const currentRaw = storage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY);
-    if (transaction.committedAccessToken === null && currentRaw !== transaction.preimageRaw) {
-      return false;
-    }
-    if (
-      transaction.committedAccessToken !== null
-      && readStoredAccessToken(currentRaw) === transaction.committedAccessToken
-    ) {
+    const shouldRestorePreimage = transaction.committedAccessToken === null
+      ? currentRaw !== transaction.preimageRaw
+      : readStoredAccessToken(currentRaw) === transaction.committedAccessToken;
+    if (shouldRestorePreimage) {
       if (transaction.preimageRaw === null) {
         storage.removeItem(MAZER_OAUTH_AUTH_SESSION_KEY);
       } else {
