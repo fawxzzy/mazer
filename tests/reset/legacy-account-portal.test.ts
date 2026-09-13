@@ -595,9 +595,15 @@ describe('Mazer shared account contract', () => {
     expect(client.auth.signOut).not.toHaveBeenCalled();
   });
 
-  test('clears only its exact committed session when post-commit subject verification fails', async () => {
+  test('restores the exact prior session when post-commit subject verification fails', async () => {
     const storage = new MemoryStorage();
     const authStorage = new MemoryStorage();
+    const previousSession = JSON.stringify({
+      access_token: 'previous-access-token',
+      refresh_token: 'previous-refresh-token',
+      user: { id: '44444444-4444-4444-8444-444444444444' }
+    });
+    authStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', previousSession);
     const startRuntime = createRuntime(storage);
     await beginMazerOAuthAuthorization(startRuntime);
     const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
@@ -620,7 +626,7 @@ describe('Mazer shared account contract', () => {
     }, async () => client, runtime)).toEqual({
       category: 'session_invalid', status: 'failed'
     });
-    expect(authStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBeNull();
+    expect(authStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(previousSession);
     expect(authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
     expect(client.auth.setSession).not.toHaveBeenCalled();
     expect(client.auth.signOut).not.toHaveBeenCalled();

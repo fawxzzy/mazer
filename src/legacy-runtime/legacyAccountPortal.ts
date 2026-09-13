@@ -657,36 +657,60 @@ const resolveRuntimeAuthStorage = (runtime: MazerOAuthRuntime): MazerOAuthStorag
   runtime.authStorage === undefined ? runtime.sessionStorage : runtime.authStorage
 );
 
-const clearMazerOAuthPersistedSession = (
+interface MazerOAuthSessionPreimage {
+  raw: string | null;
+}
+
+const captureMazerOAuthSessionPreimage = (
   runtime: MazerOAuthRuntime,
-  expectedAccessToken: string
+  owner: string
+): MazerOAuthSessionPreimage | null => {
+  const authStorage = resolveRuntimeAuthStorage(runtime);
+  if (authStorage === null) {
+    return null;
+  }
+  try {
+    return authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) === owner
+      ? { raw: authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]) }
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const restoreMazerOAuthSessionPreimage = (
+  runtime: MazerOAuthRuntime,
+  owner: string,
+  expectedAccessToken: string,
+  preimage: MazerOAuthSessionPreimage
 ): boolean => {
   const authStorage = resolveRuntimeAuthStorage(runtime);
   if (authStorage === null) {
     return false;
   }
   try {
+    if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== owner) {
+      return true;
+    }
     const raw = authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]);
     if (raw === null) {
       return true;
     }
-    let storedAccessToken: string | null = null;
-    try {
-      const stored: unknown = JSON.parse(raw);
-      storedAccessToken = stored !== null && typeof stored === 'object' && !Array.isArray(stored)
-        && typeof (stored as Record<string, unknown>).access_token === 'string'
-        ? (stored as Record<string, unknown>).access_token as string
-        : null;
-    } catch {
-      return false;
-    }
-    if (storedAccessToken !== expectedAccessToken) {
+    const stored: unknown = JSON.parse(raw);
+    if (
+      stored === null
+      || typeof stored !== 'object'
+      || Array.isArray(stored)
+      || (stored as Record<string, unknown>).access_token !== expectedAccessToken
+    ) {
       return true;
     }
-    for (const key of MAZER_OAUTH_AUTH_STORAGE_KEYS) {
-      authStorage.removeItem(key);
+    if (preimage.raw === null) {
+      authStorage.removeItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]);
+    } else {
+      authStorage.setItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0], preimage.raw);
     }
-    return MAZER_OAUTH_AUTH_STORAGE_KEYS.every((key) => authStorage.getItem(key) === null);
+    return authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]) === preimage.raw;
   } catch {
     return false;
   }
@@ -740,7 +764,6 @@ const persistMazerOAuthSession = (
       user
     }));
     if (authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY) !== owner) {
-      clearMazerOAuthPersistedSession(runtime, accessToken);
       return false;
     }
     const raw = authStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_KEYS[0]);
@@ -876,6 +899,15 @@ const consumeMazerOAuthCallbackInner = async (
   if (!writeMazerOAuthSessionQuarantine(runtime, pending.state, true)) {
     return failed('storage_unavailable');
   }
+  const sessionPreimage = captureMazerOAuthSessionPreimage(runtime, pending.state);
+  if (sessionPreimage === null) {
+    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
+    return failed('storage_unavailable');
+  }
+  const rollbackSession = (): void => {
+    restoreMazerOAuthSessionPreimage(runtime, pending.state, tokens.accessToken, sessionPreimage);
+    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
+  };
   if (!persistMazerOAuthSession(
     runtime,
     pending.state,
@@ -884,13 +916,11 @@ const consumeMazerOAuthCallbackInner = async (
     Number(claims.exp),
     remoteUser.data.user
   )) {
-    clearMazerOAuthPersistedSession(runtime, tokens.accessToken);
-    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
+    rollbackSession();
     return failed('storage_unavailable');
   }
   if (!stillCurrent()) {
-    clearMazerOAuthPersistedSession(runtime, tokens.accessToken);
-    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
+    rollbackSession();
     return failed('expired_or_missing_state');
   }
   const postCommitOperation = await awaitMazerOAuthRemoteOperation(
@@ -901,8 +931,7 @@ const consumeMazerOAuthCallbackInner = async (
     runtime
   );
   if (postCommitOperation.status !== 'resolved') {
-    clearMazerOAuthPersistedSession(runtime, tokens.accessToken);
-    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
+    rollbackSession();
     return failed('session_invalid');
   }
   const [sessionResult, sessionUser] = postCommitOperation.value;
@@ -913,12 +942,11 @@ const consumeMazerOAuthCallbackInner = async (
     || sessionUser.data.user?.id !== subject
     || !stillCurrent()
   ) {
-    clearMazerOAuthPersistedSession(runtime, tokens.accessToken);
-    writeMazerOAuthSessionQuarantine(runtime, pending.state, false);
+    rollbackSession();
     return failed('session_invalid');
   }
   if (!writeMazerOAuthSessionQuarantine(runtime, pending.state, false)) {
-    clearMazerOAuthPersistedSession(runtime, tokens.accessToken);
+    restoreMazerOAuthSessionPreimage(runtime, pending.state, tokens.accessToken, sessionPreimage);
     return failed('storage_unavailable');
   }
   return { status: 'connected' };
