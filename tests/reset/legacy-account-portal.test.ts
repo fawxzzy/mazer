@@ -462,6 +462,36 @@ describe('Mazer shared account contract', () => {
     expect(client.auth.setSession).not.toHaveBeenCalled();
   });
 
+  test('bounds a stalled remote identity verification and never commits a client session', async () => {
+    const storage = new MemoryStorage();
+    await beginMazerOAuthAuthorization(createRuntime(storage));
+    const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+    const { claims, token } = createAccessToken();
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+      access_token: token,
+      expires_in: 3600,
+      refresh_token: 'refresh-token',
+      token_type: 'bearer'
+    }), { headers: { 'content-type': 'application/json' }, status: 200 })) as typeof fetch;
+    const client = createClient(claims);
+    vi.mocked(client.auth.getUser).mockImplementation(() => new Promise(() => undefined));
+    const runtime = createRuntime(storage, createLocation(), fetchImpl);
+    let timerCount = 0;
+    runtime.setTimer = (handler) => {
+      timerCount += 1;
+      if (timerCount === 4) {
+        handler();
+      }
+      return setTimeout(() => undefined, 60_000);
+    };
+
+    await expect(consumeMazerOAuthCallback({
+      code: 'one-time-code', malformed: false, providerError: false, requested: true, state: pending.state
+    }, async () => client, runtime)).resolves.toEqual({ category: 'session_invalid', status: 'failed' });
+    expect(client.auth.getUser).toHaveBeenCalledTimes(1);
+    expect(client.auth.setSession).not.toHaveBeenCalled();
+  });
+
   test('signs out locally when post-commit subject verification fails', async () => {
     const storage = new MemoryStorage();
     const startRuntime = createRuntime(storage);

@@ -595,6 +595,48 @@ const exchangeAuthorizationCode = async (
   }
 };
 
+type MazerOAuthDeadlineResult<T> =
+  | { status: 'resolved'; value: T }
+  | { status: 'rejected' | 'timed_out' };
+
+const awaitMazerOAuthRemoteOperation = async <T>(
+  operation: () => Promise<T>,
+  runtime: MazerOAuthRuntime
+): Promise<MazerOAuthDeadlineResult<T>> => new Promise((resolve) => {
+  let settled = false;
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  const finish = (result: MazerOAuthDeadlineResult<T>): void => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    if (timeout !== null) {
+      runtime.clearTimer(timeout);
+    }
+    resolve(result);
+  };
+
+  const pending = Promise.resolve().then(operation);
+  timeout = runtime.setTimer(() => finish({ status: 'timed_out' }), MAZER_OAUTH_TOKEN_TIMEOUT_MS);
+  if (settled && timeout !== null) {
+    runtime.clearTimer(timeout);
+  }
+  void pending.then(
+    (value) => finish({ status: 'resolved', value }),
+    () => finish({ status: 'rejected' })
+  );
+});
+
+const bestEffortMazerOAuthLocalSignOut = async (
+  client: MazerOAuthClient,
+  runtime: MazerOAuthRuntime
+): Promise<void> => {
+  await awaitMazerOAuthRemoteOperation(
+    () => client.auth.signOut({ scope: 'local' }),
+    runtime
+  );
+};
+
 const consumeMazerOAuthCallbackInner = async (
   callback: MazerOAuthCapturedCallback,
   runtime: MazerOAuthRuntime,
@@ -667,16 +709,21 @@ const consumeMazerOAuthCallbackInner = async (
   if (tokens === null || !stillCurrent()) {
     return failed(tokens === null ? 'exchange_unavailable' : 'expired_or_missing_state');
   }
-  const client = await getClient();
-  if (client === null || !stillCurrent()) {
-    return failed(client === null ? 'session_invalid' : 'expired_or_missing_state');
+  const clientResult = await awaitMazerOAuthRemoteOperation(getClient, runtime);
+  if (clientResult.status !== 'resolved' || clientResult.value === null || !stillCurrent()) {
+    return failed(clientResult.status === 'resolved' && !stillCurrent()
+      ? 'expired_or_missing_state'
+      : 'session_invalid');
   }
-  let claimsResult: Awaited<ReturnType<MazerOAuthClient['auth']['getClaims']>>;
-  try {
-    claimsResult = await client.auth.getClaims(tokens.accessToken);
-  } catch {
+  const client = clientResult.value;
+  const claimsOperation = await awaitMazerOAuthRemoteOperation(
+    () => client.auth.getClaims(tokens.accessToken),
+    runtime
+  );
+  if (claimsOperation.status !== 'resolved') {
     return failed('session_invalid');
   }
+  const claimsResult = claimsOperation.value;
   const claims = claimsResult.data?.claims;
   if (claimsResult.error || claims === undefined || !stillCurrent()) {
     return failed('session_invalid');
@@ -685,12 +732,14 @@ const consumeMazerOAuthCallbackInner = async (
   if (subject === null) {
     return failed('session_invalid');
   }
-  let remoteUser: Awaited<ReturnType<MazerOAuthClient['auth']['getUser']>>;
-  try {
-    remoteUser = await client.auth.getUser(tokens.accessToken);
-  } catch {
+  const remoteUserOperation = await awaitMazerOAuthRemoteOperation(
+    () => client.auth.getUser(tokens.accessToken),
+    runtime
+  );
+  if (remoteUserOperation.status !== 'resolved') {
     return failed('session_invalid');
   }
+  const remoteUser = remoteUserOperation.value;
   if (remoteUser.error || remoteUser.data.user?.id !== subject || !stillCurrent()) {
     return failed('session_invalid');
   }
@@ -704,39 +753,28 @@ const consumeMazerOAuthCallbackInner = async (
       refresh_token: tokens.refreshToken
     });
   } catch {
-    try {
-      await client.auth.signOut({ scope: 'local' });
-    } catch {
-      // The fixed failure result remains safe even if local cleanup is unavailable.
-    }
+    await bestEffortMazerOAuthLocalSignOut(client, runtime);
     return failed('storage_unavailable');
   }
   if (setResult.error) {
     return failed('storage_unavailable');
   }
   if (!stillCurrent()) {
-    try {
-      await client.auth.signOut({ scope: 'local' });
-    } catch {
-      // Continue with the fixed failure result; never surface provider detail.
-    }
+    await bestEffortMazerOAuthLocalSignOut(client, runtime);
     return failed('expired_or_missing_state');
   }
-  let sessionResult: Awaited<ReturnType<MazerOAuthClient['auth']['getSession']>>;
-  let sessionUser: Awaited<ReturnType<MazerOAuthClient['auth']['getUser']>>;
-  try {
-    [sessionResult, sessionUser] = await Promise.all([
+  const postCommitOperation = await awaitMazerOAuthRemoteOperation(
+    () => Promise.all([
       client.auth.getSession(),
       client.auth.getUser()
-    ]);
-  } catch {
-    try {
-      await client.auth.signOut({ scope: 'local' });
-    } catch {
-      // Continue with the fixed failure result; never surface provider detail.
-    }
+    ]),
+    runtime
+  );
+  if (postCommitOperation.status !== 'resolved') {
+    await bestEffortMazerOAuthLocalSignOut(client, runtime);
     return failed('session_invalid');
   }
+  const [sessionResult, sessionUser] = postCommitOperation.value;
   if (
     sessionResult.error
     || sessionUser.error
@@ -744,11 +782,7 @@ const consumeMazerOAuthCallbackInner = async (
     || sessionUser.data.user?.id !== subject
     || !stillCurrent()
   ) {
-    try {
-      await client.auth.signOut({ scope: 'local' });
-    } catch {
-      // Continue with the fixed failure result; never surface provider detail.
-    }
+    await bestEffortMazerOAuthLocalSignOut(client, runtime);
     return failed('session_invalid');
   }
   return { status: 'connected' };

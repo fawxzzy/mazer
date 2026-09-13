@@ -1893,6 +1893,7 @@ export class MenuScene extends Phaser.Scene {
   private accountUsernameDraft = '';
   private accountUsernameSavedValue = '';
   private accountUsernameLoadedForUserId: string | null = null;
+  private accountUsernameHydrationPending = false;
   private accountUsernameActive = false;
   private accountUsernameSequence = 0;
   private accountUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -13707,6 +13708,20 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyLeaderboardTitleGlyph(centerX, titleY - (compact ? 30 : 34), compact ? 11 : 12);
     this.createOverlayTitle('Leaderboard', titleY);
 
+    if (this.authSnapshot.status === 'authenticated') {
+      this.loadAccountUsernameIfNeeded();
+      if (this.accountUsernameHydrationPending) {
+        this.createAuthInfoText(
+          'Loading username...',
+          panel.top + (compact ? 140 : 160),
+          panel,
+          '#b7f2ff',
+          compact ? 14 : 15
+        );
+        return;
+      }
+    }
+
     // A named username is the only thing that puts a row on the public
     // page (mazer_leaderboard_page filters to it) -- a guest or an
     // authenticated player without one can never appear no matter how they
@@ -14079,6 +14094,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.accountUsernameLoadedForUserId = userId;
+    this.accountUsernameHydrationPending = true;
     // The QA fixture (?runtimeDiagnostics=1&authFixture=authenticated) is a
     // synthetic, front-end-only identity with no real row behind it -- a
     // real readLegacyAccountUsername call always fails for it (there's
@@ -14091,6 +14107,7 @@ export class MenuScene extends Phaser.Scene {
     if (userId === 'runtime-diagnostics-auth-fixture') {
       this.accountUsernameDraft = 'qa-player';
       this.accountUsernameSavedValue = 'qa-player';
+      this.accountUsernameHydrationPending = false;
       this.uiDirty = true;
       return;
     }
@@ -14106,6 +14123,7 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
+      this.accountUsernameHydrationPending = false;
       if (result.error) {
         this.uiDirty = true;
         return;
@@ -14116,6 +14134,12 @@ export class MenuScene extends Phaser.Scene {
       if (this.accountUsernameNativeInput) {
         this.accountUsernameNativeInput.value = this.accountUsernameDraft;
       }
+      this.uiDirty = true;
+    }).catch(() => {
+      if (sequence !== this.accountUsernameSequence || this.authSnapshot.userId !== userId) {
+        return;
+      }
+      this.accountUsernameHydrationPending = false;
       this.uiDirty = true;
     });
   }
@@ -17445,6 +17469,7 @@ export class MenuScene extends Phaser.Scene {
       // account and must not leak into the next one's account screen, even
       // for a single frame before loadAccountUsernameIfNeeded re-fetches.
       this.accountUsernameLoadedForUserId = null;
+      this.accountUsernameHydrationPending = false;
       this.accountUsernameDraft = '';
       this.accountUsernameSavedValue = '';
       this.accountUsernameActive = false;

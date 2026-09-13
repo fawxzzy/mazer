@@ -1990,6 +1990,22 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.playerSpawnBurstStartedAtMs ??= alignedStartedAtMs;');
   });
 
+  test('hydrates the signed-in username before deciding whether leaderboard access is gated', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const leaderboardSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private buildLeaderboardOverlay(): void'),
+      menuSceneSource.indexOf('private async loadLeaderboardPage(')
+    );
+
+    expect(leaderboardSource).toContain("if (this.authSnapshot.status === 'authenticated') {");
+    expect(leaderboardSource).toContain('this.loadAccountUsernameIfNeeded();');
+    expect(leaderboardSource).toContain('if (this.accountUsernameHydrationPending) {');
+    expect(leaderboardSource).toContain("'Loading username...'");
+    expect(leaderboardSource.indexOf('this.loadAccountUsernameIfNeeded();')).toBeLessThan(
+      leaderboardSource.indexOf('if (this.accountUsernameSavedValue.length <= 0)')
+    );
+  });
+
   test('consumes shared UI standards for buttons, titles, guides, and toggles', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
