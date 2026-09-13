@@ -8,6 +8,7 @@ export const MAZER_OAUTH_CLIENT_ID = 'da286bbf-2a57-43b1-a5ea-364f72cf461d';
 export const MAZER_OAUTH_SCOPE = 'email';
 export const MAZER_OAUTH_PENDING_KEY = 'mazer.auth.oauth-pending.v1';
 export const MAZER_AUTH_MUTATION_EPOCH_KEY = 'mazer.auth.mutation-epoch.v1';
+export const MAZER_SHARED_AUTH_MUTATION_EPOCH_KEY = 'mazer.auth.shared-mutation-epoch.v1';
 export const MAZER_OAUTH_SESSION_QUARANTINE_KEY = 'mazer.auth.oauth-session-quarantine.v2';
 export const MAZER_OAUTH_AUTH_SESSION_KEY = 'sb-bxtcuhkotumitoqtrcej-auth-token';
 export const MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY = 'mazer.auth.oauth-storage-probe.v1';
@@ -51,12 +52,14 @@ export interface MazerOAuthCapturedCallback {
 type MazerOAuthReturnPath = '/' | '/?mode=play';
 
 interface MazerOAuthPendingRecord {
+  authSessionPreimageRaw: string | null;
   authMutationEpoch: number;
   codeVerifier: string;
   createdAtEpochMs: number;
   returnPath: MazerOAuthReturnPath;
+  sharedAuthMutationEpoch: number;
   state: string;
-  version: 1;
+  version: 2;
 }
 
 export interface MazerOAuthStorage {
@@ -251,6 +254,33 @@ export const advanceMazerAuthMutationEpoch = (
   }
 };
 
+const readSharedAuthMutationEpoch = (storage: MazerOAuthStorage): number => {
+  const raw = storage.getItem(MAZER_SHARED_AUTH_MUTATION_EPOCH_KEY);
+  if (raw === null) {
+    return 0;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+};
+
+export const advanceMazerSharedAuthMutationEpoch = (
+  storage?: MazerOAuthStorage | null
+): number | null => {
+  const resolvedStorage = storage === undefined ? resolveMazerOAuthAuthStorage() : storage;
+  if (resolvedStorage === null) {
+    return null;
+  }
+  try {
+    const next = readSharedAuthMutationEpoch(resolvedStorage) + 1;
+    resolvedStorage.setItem(MAZER_SHARED_AUTH_MUTATION_EPOCH_KEY, String(next));
+    return resolvedStorage.getItem(MAZER_SHARED_AUTH_MUTATION_EPOCH_KEY) === String(next)
+      ? next
+      : null;
+  } catch {
+    return null;
+  }
+};
+
 export const buildMazerAccountPortalUrl = (route: MazerAccountPortalRoute): string => {
   const url = new URL(`/${route}`, MAZER_ACCOUNT_PORTAL_ORIGIN);
   if (route === 'reset-password') {
@@ -334,10 +364,37 @@ export const beginMazerOAuthAuthorization = async (
     return resolution.result;
   }
   const resolvedRuntime = resolution.runtime;
-  if (await resolvedRuntime.runExclusiveSessionTransaction(() => true) !== true) {
+  if (!verifyMazerOAuthAuthStorageWritable(resolvedRuntime)) {
+    return failed('storage_unavailable');
+  }
+  const authStorage = resolveRuntimeAuthStorage(resolvedRuntime);
+  if (authStorage === null) {
+    return failed('storage_unavailable');
+  }
+  let sharedMutationState: {
+    authSessionPreimageRaw: string | null;
+    ok: true;
+    sharedAuthMutationEpoch: number;
+  } | { ok: false } | null;
+  try {
+    sharedMutationState = await resolvedRuntime.runExclusiveSessionTransaction(() => {
+      const sharedAuthMutationEpoch = advanceMazerSharedAuthMutationEpoch(authStorage);
+      if (sharedAuthMutationEpoch === null) {
+        return { ok: false as const };
+      }
+      return {
+        authSessionPreimageRaw: authStorage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY),
+        ok: true as const,
+        sharedAuthMutationEpoch
+      };
+    });
+  } catch {
     return failed('authorization_unavailable');
   }
-  if (!verifyMazerOAuthAuthStorageWritable(resolvedRuntime)) {
+  if (sharedMutationState === null) {
+    return failed('authorization_unavailable');
+  }
+  if (!sharedMutationState.ok) {
     return failed('storage_unavailable');
   }
 
@@ -354,12 +411,14 @@ export const beginMazerOAuthAuthorization = async (
     ));
     const codeChallenge = base64UrlEncode(challengeBytes);
     const pending: MazerOAuthPendingRecord = {
+      authSessionPreimageRaw: sharedMutationState.authSessionPreimageRaw,
       authMutationEpoch,
       codeVerifier,
       createdAtEpochMs: resolvedRuntime.now(),
       returnPath: resolveMazerOAuthReturnPath(resolvedRuntime.location.search),
+      sharedAuthMutationEpoch: sharedMutationState.sharedAuthMutationEpoch,
       state,
-      version: 1
+      version: 2
     };
     resolvedRuntime.sessionStorage.setItem(MAZER_OAUTH_PENDING_KEY, JSON.stringify(pending));
     pendingWritten = true;
@@ -442,10 +501,12 @@ const parsePendingRecord = (raw: string | null): MazerOAuthPendingRecord | null 
     }
     const record = value as Partial<MazerOAuthPendingRecord>;
     if (
-      record.version !== 1
+      record.version !== 2
       || (record.returnPath !== '/' && record.returnPath !== '/?mode=play')
+      || (record.authSessionPreimageRaw !== null && typeof record.authSessionPreimageRaw !== 'string')
       || !Number.isSafeInteger(record.createdAtEpochMs)
       || !Number.isSafeInteger(record.authMutationEpoch)
+      || !Number.isSafeInteger(record.sharedAuthMutationEpoch)
       || typeof record.codeVerifier !== 'string'
       || record.codeVerifier.length < 43
       || record.codeVerifier.length > 128
@@ -982,7 +1043,11 @@ const consumeMazerOAuthCallbackInner = async (
 
   const stillCurrent = (): boolean => {
     try {
-      return readAuthMutationEpoch(runtime.sessionStorage) === pending?.authMutationEpoch;
+      const authStorage = resolveRuntimeAuthStorage(runtime);
+      return authStorage !== null
+        && readAuthMutationEpoch(runtime.sessionStorage) === pending?.authMutationEpoch
+        && readSharedAuthMutationEpoch(authStorage) === pending?.sharedAuthMutationEpoch
+        && authStorage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY) === pending?.authSessionPreimageRaw;
     } catch {
       return false;
     }
@@ -1033,6 +1098,9 @@ const consumeMazerOAuthCallbackInner = async (
     return failed('expired_or_missing_state');
   }
   const commitSessionTransaction = (): MazerOAuthBootResult => {
+    if (!stillCurrent()) {
+      return failed('expired_or_missing_state');
+    }
     const transactionState = acquireMazerOAuthSessionTransaction(runtime, pending.state);
     if (transactionState === null) {
       return failed('storage_unavailable');
@@ -1055,7 +1123,16 @@ const consumeMazerOAuthCallbackInner = async (
       rollbackSession();
       return failed('storage_unavailable');
     }
-    if (!stillCurrent()) {
+    const authStorage = resolveRuntimeAuthStorage(runtime);
+    let sharedMutationStillCurrent = false;
+    try {
+      sharedMutationStillCurrent = authStorage !== null
+        && readAuthMutationEpoch(runtime.sessionStorage) === pending.authMutationEpoch
+        && readSharedAuthMutationEpoch(authStorage) === pending.sharedAuthMutationEpoch;
+    } catch {
+      sharedMutationStillCurrent = false;
+    }
+    if (!sharedMutationStillCurrent) {
       rollbackSession();
       return failed('expired_or_missing_state');
     }

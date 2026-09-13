@@ -8,6 +8,7 @@ import {
   MAZER_OAUTH_SAFE_ERROR_MESSAGE,
   MAZER_OAUTH_SESSION_QUARANTINE_KEY,
   advanceMazerAuthMutationEpoch,
+  advanceMazerSharedAuthMutationEpoch,
   isMazerOAuthSessionQuarantined,
   readMazerOAuthBootResult
 } from './legacyAccountPortal';
@@ -551,6 +552,7 @@ export const signInLegacyAuth = async (
   password: string
 ): Promise<LegacyAuthActionResult> => {
   advanceMazerAuthMutationEpoch();
+  advanceMazerSharedAuthMutationEpoch();
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -587,6 +589,7 @@ export const signUpLegacyAuth = async (
   username: string
 ): Promise<LegacyAuthActionResult> => {
   advanceMazerAuthMutationEpoch();
+  advanceMazerSharedAuthMutationEpoch();
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -859,6 +862,7 @@ export const updateLegacyPassword = async (
 
 export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
   advanceMazerAuthMutationEpoch();
+  advanceMazerSharedAuthMutationEpoch();
   const client = await getLegacyAuthClient();
   if (!client) {
     return {

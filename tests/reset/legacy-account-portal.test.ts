@@ -12,6 +12,7 @@ import {
   MAZER_OAUTH_SESSION_QUARANTINE_KEY,
   MAZER_OAUTH_TOKEN_URL,
   advanceMazerAuthMutationEpoch,
+  advanceMazerSharedAuthMutationEpoch,
   beginMazerOAuthAuthorization,
   buildMazerAccountPortalUrl,
   buildMazerLegalUrl,
@@ -400,6 +401,62 @@ describe('Mazer shared account contract', () => {
     expect(storage.getItem(MAZER_OAUTH_PENDING_KEY)).toBe(newerPendingRaw);
   });
 
+  test('rejects an older tab callback after a newer tab signs in or signs out', async () => {
+    const runCase = async (newerAction: (sharedStorage: MemoryStorage) => Promise<void> | void): Promise<void> => {
+      const tabAStorage = new MemoryStorage();
+      const sharedStorage = new MemoryStorage();
+      const tabAStartRuntime = createRuntime(tabAStorage);
+      tabAStartRuntime.authStorage = sharedStorage;
+      await beginMazerOAuthAuthorization(tabAStartRuntime);
+      const tabAPending = JSON.parse(tabAStorage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+      let releaseTabA: ((response: Response) => void) | null = null;
+      const tabAFetch = vi.fn(() => new Promise<Response>((resolve) => {
+        releaseTabA = resolve;
+      })) as unknown as typeof fetch;
+      const tabARuntime = createRuntime(tabAStorage, createLocation(), tabAFetch);
+      tabARuntime.authStorage = sharedStorage;
+      const tabAClient = createClient(createAccessToken().claims);
+      const tabAResult = consumeMazerOAuthCallback({
+        code: 'older-code', malformed: false, providerError: false, requested: true, state: tabAPending.state
+      }, async () => tabAClient, tabARuntime);
+      await vi.waitFor(() => expect(tabAFetch).toHaveBeenCalledTimes(1));
+
+      await newerAction(sharedStorage);
+      const sharedSessionPostimage = sharedStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token');
+      releaseTabA?.(new Response(JSON.stringify({
+        access_token: createAccessToken().token,
+        expires_in: 3600,
+        refresh_token: 'older-refresh-token',
+        token_type: 'bearer'
+      }), { headers: { 'content-type': 'application/json' }, status: 200 }));
+
+      await expect(tabAResult).resolves.toEqual({ category: 'expired_or_missing_state', status: 'failed' });
+      expect(tabAClient.auth.setSession).not.toHaveBeenCalled();
+      expect(sharedStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(sharedSessionPostimage);
+    };
+
+    await runCase(async (sharedStorage) => {
+      const tabBStorage = new MemoryStorage();
+      const tabBRuntime = createRuntime(tabBStorage, createLocation(), vi.fn(async () => new Response(JSON.stringify({
+        access_token: createAccessToken().token,
+        expires_in: 3600,
+        refresh_token: 'newer-refresh-token',
+        token_type: 'bearer'
+      }), { headers: { 'content-type': 'application/json' }, status: 200 })) as typeof fetch);
+      tabBRuntime.authStorage = sharedStorage;
+      await beginMazerOAuthAuthorization(tabBRuntime);
+      const tabBPending = JSON.parse(tabBStorage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+      await expect(consumeMazerOAuthCallback({
+        code: 'newer-code', malformed: false, providerError: false, requested: true, state: tabBPending.state
+      }, async () => createClient(createAccessToken().claims), tabBRuntime)).resolves.toEqual({ status: 'connected' });
+    });
+
+    await runCase((sharedStorage) => {
+      expect(advanceMazerSharedAuthMutationEpoch(sharedStorage)).not.toBeNull();
+      sharedStorage.removeItem('sb-bxtcuhkotumitoqtrcej-auth-token');
+    });
+  });
+
   test('rejects declared and streamed oversized token responses before unbounded buffering', async () => {
     const runCase = async (response: Response): Promise<void> => {
       const storage = new MemoryStorage();
@@ -603,7 +660,9 @@ describe('Mazer shared account contract', () => {
     });
     authStorage.setItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY, transaction);
     authStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', firstSession);
-    await beginMazerOAuthAuthorization(createRuntime(storage));
+    const startRuntime = createRuntime(storage);
+    startRuntime.authStorage = authStorage;
+    await beginMazerOAuthAuthorization(startRuntime);
     const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
     const secondToken = `${token.slice(0, token.lastIndexOf('.') + 1)}second-signature`;
     const runtime = createRuntime(storage, createLocation(), vi.fn(async () => new Response(JSON.stringify({
@@ -630,7 +689,9 @@ describe('Mazer shared account contract', () => {
     const authStorage = new MemoryStorage();
     const previousSession = JSON.stringify({ access_token: 'previous-token', refresh_token: 'previous-refresh' });
     authStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', previousSession);
-    await beginMazerOAuthAuthorization(createRuntime(storage));
+    const startRuntime = createRuntime(storage);
+    startRuntime.authStorage = authStorage;
+    await beginMazerOAuthAuthorization(startRuntime);
     const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
     const { claims, token } = createAccessToken();
     const runtime = createRuntime(storage, createLocation(), vi.fn(async () => new Response(JSON.stringify({
@@ -653,7 +714,7 @@ describe('Mazer shared account contract', () => {
     expect(authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
   });
 
-  test('rejects ownership acquired while the candidate is capturing its preimage', async () => {
+  test('rejects external ownership acquired during its final shared-session preimage check', async () => {
     const storage = new MemoryStorage();
     const authStorage = new MemoryStorage();
     const { claims, token } = createAccessToken();
@@ -665,6 +726,10 @@ describe('Mazer shared account contract', () => {
       preimageRaw: null,
       version: 2
     });
+    const startRuntime = createRuntime(storage);
+    startRuntime.authStorage = authStorage;
+    await beginMazerOAuthAuthorization(startRuntime);
+    const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
     const readAuthStorage = authStorage.getItem.bind(authStorage);
     let injected = false;
     authStorage.getItem = (key) => {
@@ -676,8 +741,6 @@ describe('Mazer shared account contract', () => {
       }
       return value;
     };
-    await beginMazerOAuthAuthorization(createRuntime(storage));
-    const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
     const secondToken = `${token.slice(0, token.lastIndexOf('.') + 1)}second-signature`;
     const runtime = createRuntime(storage, createLocation(), vi.fn(async () => new Response(JSON.stringify({
       access_token: secondToken,
@@ -690,7 +753,7 @@ describe('Mazer shared account contract', () => {
     await expect(consumeMazerOAuthCallback({
       code: 'one-time-code', malformed: false, providerError: false, requested: true, state: pending.state
     }, async () => createClient(claims), runtime)).resolves.toEqual({
-      category: 'storage_unavailable',
+      category: 'expired_or_missing_state',
       status: 'failed'
     });
     expect(authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBe(firstTransaction);
@@ -761,7 +824,9 @@ describe('Mazer shared account contract', () => {
     const authStorage = new MemoryStorage();
     const previousSession = JSON.stringify({ access_token: 'previous-token', refresh_token: 'previous-refresh' });
     authStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', previousSession);
-    await beginMazerOAuthAuthorization(createRuntime(storage));
+    const startRuntime = createRuntime(storage);
+    startRuntime.authStorage = authStorage;
+    await beginMazerOAuthAuthorization(startRuntime);
     const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
     const { claims, token } = createAccessToken();
     const runtime = createRuntime(storage, createLocation(), vi.fn(async () => new Response(JSON.stringify({
@@ -786,7 +851,9 @@ describe('Mazer shared account contract', () => {
 
   test('fails closed when shared auth storage rejects the session write', async () => {
     const storage = new MemoryStorage();
+    const authStorage = new MemoryStorage();
     const startRuntime = createRuntime(storage);
+    startRuntime.authStorage = authStorage;
     await beginMazerOAuthAuthorization(startRuntime);
     const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
     const { claims, token } = createAccessToken();
@@ -797,7 +864,6 @@ describe('Mazer shared account contract', () => {
       token_type: 'bearer'
     }), { headers: { 'content-type': 'application/json' }, status: 200 })) as typeof fetch;
     const client = createClient(claims);
-    const authStorage = new MemoryStorage();
     authStorage.setItem = () => { throw new DOMException('denied', 'SecurityError'); };
     const runtime = createRuntime(storage, createLocation(), fetchImpl);
     runtime.authStorage = authStorage;
