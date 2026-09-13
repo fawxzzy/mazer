@@ -48,11 +48,13 @@ export interface MazerOAuthCapturedCallback {
   state: string | null;
 }
 
+type MazerOAuthReturnPath = '/' | '/?mode=play';
+
 interface MazerOAuthPendingRecord {
   authMutationEpoch: number;
   codeVerifier: string;
   createdAtEpochMs: number;
-  returnPath: '/';
+  returnPath: MazerOAuthReturnPath;
   state: string;
   version: 1;
 }
@@ -295,6 +297,10 @@ const createRandomBase64Url = (runtime: MazerOAuthRuntime): string => {
   return base64UrlEncode(bytes);
 };
 
+const resolveMazerOAuthReturnPath = (search: string): MazerOAuthReturnPath => (
+  new URLSearchParams(search).get('mode') === 'play' ? '/?mode=play' : '/'
+);
+
 const verifyMazerOAuthAuthStorageWritable = (runtime: MazerOAuthRuntime): boolean => {
   const storage = runtime.authStorage === undefined ? runtime.sessionStorage : runtime.authStorage;
   if (storage === null) {
@@ -351,7 +357,7 @@ export const beginMazerOAuthAuthorization = async (
       authMutationEpoch,
       codeVerifier,
       createdAtEpochMs: resolvedRuntime.now(),
-      returnPath: '/',
+      returnPath: resolveMazerOAuthReturnPath(resolvedRuntime.location.search),
       state,
       version: 1
     };
@@ -437,7 +443,7 @@ const parsePendingRecord = (raw: string | null): MazerOAuthPendingRecord | null 
     const record = value as Partial<MazerOAuthPendingRecord>;
     if (
       record.version !== 1
-      || record.returnPath !== '/'
+      || (record.returnPath !== '/' && record.returnPath !== '/?mode=play')
       || !Number.isSafeInteger(record.createdAtEpochMs)
       || !Number.isSafeInteger(record.authMutationEpoch)
       || typeof record.codeVerifier !== 'string'
@@ -768,9 +774,8 @@ const restoreMazerOAuthSessionTransaction = (
       return true;
     }
     const currentRaw = storage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY);
-    const shouldRestorePreimage = transaction.committedAccessToken === null
-      ? currentRaw !== transaction.preimageRaw
-      : readStoredAccessToken(currentRaw) === transaction.committedAccessToken;
+    const shouldRestorePreimage = transaction.committedAccessToken !== null
+      && readStoredAccessToken(currentRaw) === transaction.committedAccessToken;
     if (shouldRestorePreimage) {
       if (transaction.preimageRaw === null) {
         storage.removeItem(MAZER_OAUTH_AUTH_SESSION_KEY);
@@ -1054,8 +1059,25 @@ const consumeMazerOAuthCallbackInner = async (
       rollbackSession();
       return failed('expired_or_missing_state');
     }
+    let launchPathRestored = false;
+    if (pending.returnPath !== '/') {
+      try {
+        runtime.history.replaceState(null, '', pending.returnPath);
+        launchPathRestored = true;
+      } catch {
+        rollbackSession();
+        return failed('authorization_unavailable');
+      }
+    }
     if (!completeMazerOAuthSessionTransaction(runtime, transactionState.raw)) {
       rollbackSession();
+      if (launchPathRestored) {
+        try {
+          runtime.history.replaceState(null, '', '/');
+        } catch {
+          // Session rollback remains authoritative even if URL cleanup is denied.
+        }
+      }
       return failed('storage_unavailable');
     }
     try {
