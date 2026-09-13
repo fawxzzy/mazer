@@ -1713,6 +1713,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(overlayRoutingSource).toContain("export type LegacyOverlayKind = 'none' | 'options' | 'pause' | 'auth' | 'confirm-progression-reset' | 'leaderboard';");
     expect(authSource).toContain('createClient(config.url, config.anonKey');
     expect(authSource).toContain('autoRefreshToken: true');
+    expect(authSource).toContain('const result = await runMazerExclusiveAuthMutation(fn);');
+    expect(authSource).not.toContain('lock: async (_name, _acquireTimeout, fn) => fn()');
     expect(authSource).toContain('persistSession: true');
     expect(authSource).toContain('detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation()');
     expect(authSource).not.toContain('detectSessionInUrl: true');
@@ -1915,7 +1917,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain("return 'Username saved.';");
     expect(authSource).toContain('detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation()');
     expect(authSource).not.toContain('detectSessionInUrl: true');
-    expect(authSource).toContain('runMazerExclusiveAuthMutation(async () => {');
+    expect(authSource).toContain('const invalidation = await runMazerExclusiveAuthMutation(() => {');
     expect(authSource).toContain('if (advanceMazerSharedAuthMutationEpoch() === null)');
     expect(authSource).toContain('if (advanceMazerAuthMutationEpoch() === null)');
     expect(authSource.match(/=> runLegacyAuthMutation\(async \(\) => \{/g)).toHaveLength(3);

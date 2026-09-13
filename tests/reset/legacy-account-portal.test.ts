@@ -4,6 +4,7 @@ import {
   MAZER_ACCOUNT_PORTAL_ORIGIN,
   MAZER_AUTH_MUTATION_EPOCH_KEY,
   MAZER_CANONICAL_RETURN_URL,
+  MAZER_OAUTH_AUTH_SESSION_KEY,
   MAZER_OAUTH_AUTHORIZATION_URL,
   MAZER_OAUTH_AUTH_STORAGE_PROBE_BYTES,
   MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY,
@@ -158,6 +159,29 @@ describe('Mazer shared account contract', () => {
       () => 'recovered',
       lock
     )).resolves.toEqual({ status: 'completed', value: 'recovered' });
+  });
+
+  test('prevents a late refresh or password update from overwriting an accepted OAuth session', async () => {
+    const lock = new ExclusiveLockHarness();
+    const authStorage = new MemoryStorage();
+    let finishOAuthCommit: (() => void) | null = null;
+    const oauthCommit = runMazerExclusiveAuthMutation(async () => {
+      authStorage.setItem(MAZER_OAUTH_AUTH_SESSION_KEY, 'accepted-account-b');
+      await new Promise<void>((resolve) => { finishOAuthCommit = resolve; });
+    }, lock);
+    await vi.waitFor(() => expect(finishOAuthCommit).not.toBeNull());
+
+    let staleWriterRan = false;
+    await expect(runMazerExclusiveAuthMutation(() => {
+      staleWriterRan = true;
+      authStorage.setItem(MAZER_OAUTH_AUTH_SESSION_KEY, 'stale-account-a');
+    }, lock)).resolves.toEqual({ status: 'unavailable' });
+    expect(staleWriterRan).toBe(false);
+    expect(authStorage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY)).toBe('accepted-account-b');
+
+    finishOAuthCommit?.();
+    await expect(oauthCommit).resolves.toEqual({ status: 'completed', value: undefined });
+    expect(authStorage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY)).toBe('accepted-account-b');
   });
 
   test('contains denied browser storage and recovers OAuth submission only after a persisted page restore', async () => {

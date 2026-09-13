@@ -485,17 +485,18 @@ export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> =>
         detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation(),
         persistSession: true,
         storage: typeof window === 'undefined' ? undefined : window.localStorage,
-        // auth-js defaults to a navigator.locks-backed mutex in any browser
-        // that has the Web Locks API, coordinating session refresh across
-        // tabs -- and every internal call site acquires it with an
-        // unbounded (-1) timeout, so a lock left held by a crashed tab,
-        // killed service worker, or a stale session from before a backend
-        // migration blocks every future auth call (sign-in included)
-        // forever, with no error ever thrown. Mazer doesn't need cross-tab
-        // refresh coordination badly enough to risk an unrecoverable hang
-        // for it -- this is the library's own no-op fallback (used
-        // automatically outside a browser), forced on unconditionally.
-        lock: async (_name, _acquireTimeout, fn) => fn()
+        // Auth-js routes every refresh/update-capable session operation through
+        // this hook. Use the same bounded, fail-closed lock as OAuth commit,
+        // rollback, and crash recovery so a late refresh from account A cannot
+        // overwrite an accepted account B session. Never accept auth-js's
+        // unbounded default wait or its no-op non-browser fallback here.
+        lock: async (_name, _acquireTimeout, fn) => {
+          const result = await runMazerExclusiveAuthMutation(fn);
+          if (result.status !== 'completed') {
+            throw new Error('Shared authentication transaction unavailable.');
+          }
+          return result.value;
+        }
       },
       db: {
         schema
@@ -561,21 +562,25 @@ const createLegacyAuthMutationUnavailableResult = (): LegacyAuthActionResult => 
 const runLegacyAuthMutation = async (
   operation: () => Promise<LegacyAuthActionResult>
 ): Promise<LegacyAuthActionResult> => {
-  const result = await runMazerExclusiveAuthMutation(async () => {
-    // Both epochs advance inside the same cross-tab lock that protects OAuth
-    // commit and rollback. A failed write aborts before Supabase can mutate the
-    // shared persisted session.
+  const invalidation = await runMazerExclusiveAuthMutation(() => {
+    // Invalidate older OAuth work atomically before auth-js obtains the same
+    // lock for its complete refresh/update-capable session operation.
     if (advanceMazerSharedAuthMutationEpoch() === null) {
-      return createLegacyAuthMutationUnavailableResult();
+      return false;
     }
     if (advanceMazerAuthMutationEpoch() === null) {
-      return createLegacyAuthMutationUnavailableResult();
+      return false;
     }
-    return operation();
+    return true;
   });
-  return result.status === 'completed'
-    ? result.value
-    : createLegacyAuthMutationUnavailableResult();
+  if (invalidation.status !== 'completed' || !invalidation.value) {
+    return createLegacyAuthMutationUnavailableResult();
+  }
+  try {
+    return await operation();
+  } catch {
+    return createLegacyAuthMutationUnavailableResult();
+  }
 };
 
 export const signInLegacyAuth = async (
