@@ -390,14 +390,14 @@ const installLegacyAuthPersistenceListener = (client: LegacyAuthClient): void =>
 
   legacyAuthPersistenceListenerInstalled = true;
   client.auth.onAuthStateChange((event, session) => {
-    if (isMazerOAuthSessionQuarantined()) {
+    if (isMazerOAuthSessionQuarantined(undefined, session?.access_token ?? null)) {
       return;
     }
     syncLegacyAuthPersistenceFromSession(session, event);
   });
   void client.auth.getSession()
     .then(({ data }) => {
-      if (isMazerOAuthSessionQuarantined()) {
+      if (isMazerOAuthSessionQuarantined(undefined, data.session?.access_token ?? null)) {
         return;
       }
       syncLegacyAuthPersistenceFromSession(data.session, 'BOOTSTRAP_SESSION');
@@ -476,6 +476,9 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
   }
 
   const { data, error } = await client.auth.getSession();
+  if (isMazerOAuthSessionQuarantined(undefined, data.session?.access_token ?? null)) {
+    return { ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE };
+  }
   const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
     error: oauthBootResult.status === 'failed'
       ? MAZER_OAUTH_SAFE_ERROR_MESSAGE
@@ -837,7 +840,7 @@ export const subscribeLegacyAuthState = (
   }
 
   const { data } = client.auth.onAuthStateChange((event, session) => {
-    if (isMazerOAuthSessionQuarantined()) {
+    if (isMazerOAuthSessionQuarantined(undefined, session?.access_token ?? null)) {
       listener({ ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE }, event);
       return;
     }

@@ -529,6 +529,69 @@ describe('Mazer shared account contract', () => {
     expect(isMazerOAuthSessionQuarantined(storage)).toBe(true);
   });
 
+  test('late cleanup restores a newer successful attempt without signing it out', async () => {
+    const storage = new MemoryStorage();
+    const authStorage = new MemoryStorage();
+    const firstToken = createAccessToken();
+    await beginMazerOAuthAuthorization(createRuntime(storage));
+    const firstPending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+    let resolveFirstCommit: ((value: { error: unknown }) => void) | null = null;
+    const firstClient = createClient(firstToken.claims);
+    vi.mocked(firstClient.auth.setSession).mockImplementation(() => new Promise((resolve) => {
+      resolveFirstCommit = resolve;
+    }));
+    const firstRuntime = createRuntime(storage, createLocation(), vi.fn(async () => new Response(JSON.stringify({
+      access_token: firstToken.token,
+      expires_in: 3600,
+      refresh_token: 'first-refresh-token',
+      token_type: 'bearer'
+    }), { headers: { 'content-type': 'application/json' }, status: 200 })) as typeof fetch);
+    firstRuntime.authStorage = authStorage;
+    let firstTimerCount = 0;
+    firstRuntime.setTimer = (handler) => {
+      firstTimerCount += 1;
+      if (firstTimerCount >= 5) handler();
+      return setTimeout(() => undefined, 60_000);
+    };
+    await expect(consumeMazerOAuthCallback({
+      code: 'first-code', malformed: false, providerError: false, requested: true, state: firstPending.state
+    }, async () => firstClient, firstRuntime)).resolves.toEqual({ category: 'storage_unavailable', status: 'failed' });
+
+    await beginMazerOAuthAuthorization(createRuntime(storage));
+    const secondPending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+    const secondToken = `${firstToken.token.slice(0, firstToken.token.lastIndexOf('.') + 1)}retry-signature`;
+    const secondClient = createClient(firstToken.claims);
+    vi.mocked(secondClient.auth.setSession).mockImplementation(async ({ access_token, refresh_token }) => {
+      authStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', JSON.stringify({
+        access_token,
+        refresh_token
+      }));
+      return { error: null };
+    });
+    const secondRuntime = createRuntime(storage, createLocation(), vi.fn(async () => new Response(JSON.stringify({
+      access_token: secondToken,
+      expires_in: 3600,
+      refresh_token: 'second-refresh-token',
+      token_type: 'bearer'
+    }), { headers: { 'content-type': 'application/json' }, status: 200 })) as typeof fetch);
+    secondRuntime.authStorage = authStorage;
+    await expect(consumeMazerOAuthCallback({
+      code: 'second-code', malformed: false, providerError: false, requested: true, state: secondPending.state
+    }, async () => secondClient, secondRuntime)).resolves.toEqual({ status: 'connected' });
+    const secondSessionRaw = authStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token');
+
+    authStorage.setItem('sb-bxtcuhkotumitoqtrcej-auth-token', JSON.stringify({
+      access_token: firstToken.token,
+      refresh_token: 'first-refresh-token'
+    }));
+    resolveFirstCommit?.({ error: null });
+    await vi.waitFor(() => {
+      expect(authStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(secondSessionRaw);
+    });
+    expect(firstClient.auth.signOut).toHaveBeenCalledTimes(1);
+    expect(isMazerOAuthSessionQuarantined(storage)).toBe(false);
+  });
+
   test('signs out locally when post-commit subject verification fails', async () => {
     const storage = new MemoryStorage();
     const startRuntime = createRuntime(storage);
