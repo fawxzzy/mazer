@@ -299,6 +299,45 @@ describe('Mazer shared account contract', () => {
     expect(client.auth.setSession).not.toHaveBeenCalled();
   });
 
+  test('clears only the exact malformed or expired pending attempt on terminal failure', async () => {
+    const malformedStorage = new MemoryStorage();
+    malformedStorage.setItem(MAZER_OAUTH_PENDING_KEY, '{malformed');
+    const malformedFetch = vi.fn() as typeof fetch;
+    await expect(consumeMazerOAuthCallback({
+      code: 'code', malformed: false, providerError: false, requested: true, state: 'x'.repeat(43)
+    }, async () => createClient(createAccessToken().claims), createRuntime(
+      malformedStorage,
+      createLocation(),
+      malformedFetch
+    ))).resolves.toEqual({ category: 'expired_or_missing_state', status: 'failed' });
+    expect(malformedStorage.getItem(MAZER_OAUTH_PENDING_KEY)).toBeNull();
+    expect(malformedFetch).not.toHaveBeenCalled();
+
+    const expiredStorage = new MemoryStorage();
+    await beginMazerOAuthAuthorization(createRuntime(expiredStorage));
+    const expiredRaw = expiredStorage.getItem(MAZER_OAUTH_PENDING_KEY);
+    const expired = JSON.parse(expiredRaw ?? '{}');
+    const expiredRuntime = createRuntime(expiredStorage);
+    expiredRuntime.now = () => 2_300_001;
+    await expect(consumeMazerOAuthCallback({
+      code: 'code', malformed: false, providerError: false, requested: true, state: expired.state
+    }, async () => createClient(createAccessToken().claims), expiredRuntime)).resolves.toEqual({
+      category: 'expired_or_missing_state', status: 'failed'
+    });
+    expect(expiredStorage.getItem(MAZER_OAUTH_PENDING_KEY)).toBeNull();
+
+    const newerStorage = new MemoryStorage();
+    newerStorage.setItem(MAZER_OAUTH_PENDING_KEY, expiredRaw ?? '');
+    const mismatchedRuntime = createRuntime(newerStorage);
+    mismatchedRuntime.now = () => 2_300_001;
+    await expect(consumeMazerOAuthCallback({
+      code: 'code', malformed: false, providerError: false, requested: true, state: 'y'.repeat(43)
+    }, async () => createClient(createAccessToken().claims), mismatchedRuntime)).resolves.toEqual({
+      category: 'expired_or_missing_state', status: 'failed'
+    });
+    expect(newerStorage.getItem(MAZER_OAUTH_PENDING_KEY)).toBe(expiredRaw);
+  });
+
   test('treats provider cancellation as terminal, consumes pending state, and never exchanges', async () => {
     const storage = new MemoryStorage();
     const fetchImpl = vi.fn() as typeof fetch;

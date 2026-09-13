@@ -332,6 +332,30 @@ const parsePendingRecord = (raw: string | null): MazerOAuthPendingRecord | null 
   }
 };
 
+type ExactPendingRemovalResult = 'absent' | 'changed' | 'failed' | 'removed';
+
+const removeExactPendingRecord = (
+  storage: MazerOAuthStorage,
+  expectedRaw: string | null
+): ExactPendingRemovalResult => {
+  if (expectedRaw === null) {
+    return 'absent';
+  }
+  try {
+    if (storage.getItem(MAZER_OAUTH_PENDING_KEY) !== expectedRaw) {
+      return 'changed';
+    }
+    storage.removeItem(MAZER_OAUTH_PENDING_KEY);
+    const postimage = storage.getItem(MAZER_OAUTH_PENDING_KEY);
+    if (postimage === null) {
+      return 'removed';
+    }
+    return postimage === expectedRaw ? 'failed' : 'changed';
+  } catch {
+    return 'failed';
+  }
+};
+
 const failed = (category: MazerOAuthFailureCategory): MazerOAuthBootResult => ({ category, status: 'failed' });
 
 const isExpectedAudience = (value: unknown): boolean => (
@@ -507,27 +531,32 @@ const consumeMazerOAuthCallbackInner = async (
   } catch {
     return failed('storage_unavailable');
   }
+  if (pending === null) {
+    const removal = removeExactPendingRecord(runtime.sessionStorage, pendingRaw);
+    return failed(removal === 'failed' ? 'storage_unavailable' : 'expired_or_missing_state');
+  }
   if (
-    pending === null
-    || runtime.now() - pending.createdAtEpochMs < 0
+    runtime.now() - pending.createdAtEpochMs < 0
     || runtime.now() - pending.createdAtEpochMs > MAZER_OAUTH_PENDING_TTL_MS
     || pending.authMutationEpoch !== currentEpoch
   ) {
+    if (callback.state === pending.state) {
+      const removal = removeExactPendingRecord(runtime.sessionStorage, pendingRaw);
+      if (removal === 'failed') {
+        return failed('storage_unavailable');
+      }
+    }
     return failed('expired_or_missing_state');
   }
   if (callback.state !== pending.state) {
     return failed('invalid_state');
   }
 
-  try {
-    if (runtime.sessionStorage.getItem(MAZER_OAUTH_PENDING_KEY) !== pendingRaw) {
-      return failed('expired_or_missing_state');
-    }
-    runtime.sessionStorage.removeItem(MAZER_OAUTH_PENDING_KEY);
-    if (runtime.sessionStorage.getItem(MAZER_OAUTH_PENDING_KEY) !== null) {
-      return failed('storage_unavailable');
-    }
-  } catch {
+  const claimResult = removeExactPendingRecord(runtime.sessionStorage, pendingRaw);
+  if (claimResult === 'changed' || claimResult === 'absent') {
+    return failed('expired_or_missing_state');
+  }
+  if (claimResult === 'failed') {
     return failed('storage_unavailable');
   }
 
