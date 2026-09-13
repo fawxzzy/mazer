@@ -17,6 +17,7 @@ import {
   normalizeLegacyAuthEmail,
   readLegacyRememberedIdentityState,
   readLegacyRememberedIdentity,
+  readLegacyAuthSessionSnapshot,
   readLegacyPasswordRecoveryBootUrlState,
   resolveLegacyPasswordRecoveryCleanUrl,
   resolveLegacyPasswordRecoveryEnterAction,
@@ -36,6 +37,10 @@ import {
   writeLegacyRememberedIdentity,
   type LegacyAuthSessionSnapshot
 } from '../../src/legacy-runtime/legacyAuth';
+import {
+  MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+  consumeMazerOAuthCallback
+} from '../../src/legacy-runtime/legacyAccountPortal';
 
 class MemoryStorage {
   public values = new Map<string, string>();
@@ -466,6 +471,21 @@ describe('legacy auth runtime', () => {
     expect(authSource).not.toContain("|| event === 'BOOTSTRAP_SESSION'");
     expect(authSource).not.toContain("|| event === 'INITIAL_SESSION'");
     expect(authSource).toContain("event === 'SIGNED_OUT'");
+  });
+
+  test('preserves fixed-safe callback failure feedback when no auth client can be constructed', async () => {
+    await consumeMazerOAuthCallback({
+      code: null,
+      malformed: false,
+      providerError: false,
+      requested: true,
+      state: null
+    }, async () => null, null);
+
+    await expect(readLegacyAuthSessionSnapshot()).resolves.toMatchObject({
+      error: MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+      status: 'unavailable'
+    });
   });
 
   test('binds browser data queries to a schema resolved per-project, not a hardcoded constant', () => {

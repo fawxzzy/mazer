@@ -456,13 +456,16 @@ export const isLegacyPasswordRecoveryRuntimeLocation = (
 );
 
 export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSessionSnapshot> => {
+  const oauthBootResult = readMazerOAuthBootResult();
   const client = await getLegacyAuthClient();
   if (!client) {
-    return createLegacyGuestAuthSnapshot();
+    const guestSnapshot = createLegacyGuestAuthSnapshot();
+    return oauthBootResult.status === 'failed'
+      ? { ...guestSnapshot, error: MAZER_OAUTH_SAFE_ERROR_MESSAGE }
+      : guestSnapshot;
   }
 
   const { data, error } = await client.auth.getSession();
-  const oauthBootResult = readMazerOAuthBootResult();
   const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
     error: error?.message ?? (oauthBootResult.status === 'failed' ? MAZER_OAUTH_SAFE_ERROR_MESSAGE : null),
     info: oauthBootResult.status === 'connected' ? 'Account connected.' : null
