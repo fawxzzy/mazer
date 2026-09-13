@@ -57,22 +57,26 @@ describe('legacy full auth gate', () => {
     expect(updateSource.slice(freezeAt, updateSource.indexOf('this.updateStars(time, delta);'))).toContain('return;');
   });
 
-  test('ends an active run before a cross-tab sign-out can expose guest-scoped persistence', () => {
+  test('ends an active run synchronously before an auth owner transition can switch persistence scope', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
-    const updateStart = menuSceneSource.indexOf('  public update(time: number, delta: number): void {');
-    const updateEnd = menuSceneSource.indexOf('  private initializeRuntimeDiagnostics(): void {', updateStart);
-    const updateSource = menuSceneSource.slice(updateStart, updateEnd);
-    const forcedSignOutTransition = updateSource.slice(
-      updateSource.indexOf("if (this.authGateLocked && this.mode === 'play') {"),
-      updateSource.indexOf("} else if (this.isLegacyPasswordRecoveryActive()", updateSource.indexOf("if (this.authGateLocked && this.mode === 'play') {"))
+    const applySnapshotStart = menuSceneSource.indexOf('  private applyLegacyAuthSnapshot(snapshot: LegacyAuthSessionSnapshot): void {');
+    const applySnapshotEnd = menuSceneSource.indexOf('  private hasLegacyPlayAccess(): boolean {', applySnapshotStart);
+    const applySnapshotSource = menuSceneSource.slice(applySnapshotStart, applySnapshotEnd);
+    const ownerTransitionSource = applySnapshotSource.slice(
+      applySnapshotSource.indexOf("const accountOwnerChangedDuringPlay = this.mode === 'play'"),
+      applySnapshotSource.indexOf('this.authSnapshot = snapshot;')
     );
 
-    expect(forcedSignOutTransition).toContain('this.enterMenuMode();');
-    expect(forcedSignOutTransition).toContain('this.enterForcedLegacyAuthOverlay();');
-    expect(forcedSignOutTransition).toContain("this.overlayReturn = 'none';");
-    expect(forcedSignOutTransition.indexOf('this.enterMenuMode();')).toBeLessThan(
-      forcedSignOutTransition.indexOf('this.enterForcedLegacyAuthOverlay();')
+    expect(ownerTransitionSource).toContain('previousUserId !== snapshot.userId');
+    expect(ownerTransitionSource).toContain('this.enterMenuMode();');
+    expect(applySnapshotSource.indexOf('this.enterMenuMode();')).toBeLessThan(
+      applySnapshotSource.indexOf('this.authSnapshot = snapshot;')
     );
+    expect(applySnapshotSource.indexOf('this.authSnapshot = snapshot;')).toBeLessThan(
+      applySnapshotSource.indexOf('this.loadPersistedLegacyProgressionState();')
+    );
+    expect(applySnapshotSource).toContain("if (accountOwnerChangedDuringPlay && snapshot.status !== 'authenticated') {");
+    expect(applySnapshotSource).toContain('this.enterForcedLegacyAuthOverlay();');
   });
 
   test('revokes a prior guest grant before returning to menu, account entry, or credential submission', () => {

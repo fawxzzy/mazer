@@ -3928,19 +3928,7 @@ export class MenuScene extends Phaser.Scene {
   public update(time: number, delta: number): void {
     if (this.pendingAuthGateTransition) {
       this.pendingAuthGateTransition = false;
-      if (this.authGateLocked && this.mode === 'play') {
-        // A cross-tab sign-out can arrive while a run is active. End that
-        // account-owned run before the guest-scoped persistence lane becomes
-        // reachable, then present the same non-dismissible account boundary
-        // used at boot. This also clears play-only HUD and pending generation
-        // work through enterMenuMode rather than leaving a half-active run
-        // behind the full-screen auth surface.
-        this.enterMenuMode();
-        this.enterForcedLegacyAuthOverlay();
-        this.overlayReturn = 'none';
-        this.uiDirty = true;
-        this.rebuildUi();
-      } else if (this.isLegacyPasswordRecoveryActive() && this.overlay !== 'auth') {
+      if (this.isLegacyPasswordRecoveryActive() && this.overlay !== 'auth') {
         this.enterForcedLegacyAuthOverlay();
         this.uiDirty = true;
         this.rebuildUi();
@@ -17471,6 +17459,15 @@ export class MenuScene extends Phaser.Scene {
   private applyLegacyAuthSnapshot(snapshot: LegacyAuthSessionSnapshot): void {
     const previousMenuActionMode = this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest';
     const previousUserId = this.authSnapshot.userId;
+    const accountOwnerChangedDuringPlay = this.mode === 'play' && previousUserId !== snapshot.userId;
+
+    if (accountOwnerChangedDuringPlay) {
+      // Auth subscribers can fire between Phaser frames. Stop an account-owned
+      // run synchronously, while the OLD account scope is still active, so no
+      // pointer/QA input can finish it after progression storage switches to a
+      // signed-out or different-user scope.
+      this.enterMenuMode();
+    }
 
     this.authSnapshot = snapshot;
     this.authGateAwaitingResolution = false;
@@ -17524,6 +17521,10 @@ export class MenuScene extends Phaser.Scene {
       this.uiDirty = true;
       this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
       this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+    }
+    if (accountOwnerChangedDuringPlay && snapshot.status !== 'authenticated') {
+      this.enterForcedLegacyAuthOverlay();
+      this.overlayReturn = 'none';
     }
     if (
       previousMenuActionMode !== menuActionMode

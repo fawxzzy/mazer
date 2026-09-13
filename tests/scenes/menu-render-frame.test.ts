@@ -1650,8 +1650,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       menuSceneSource.indexOf('private resolveLegacyRuntimeAuthFixtureSnapshot()')
     );
 
-    expect(updateSource.match(/this\.enterForcedLegacyAuthOverlay\(\);/g)).toHaveLength(2);
-    expect(updateSource).toContain("if (this.authGateLocked && this.mode === 'play') {");
+    expect(updateSource.match(/this\.enterForcedLegacyAuthOverlay\(\);/g)).toHaveLength(1);
     expect(updateSource).not.toContain("this.overlay = 'auth';");
     expect(recoverySource).toContain('this.enterForcedLegacyAuthOverlay();');
     expect(forcedAuthSource).toContain("if (this.mode === 'play') {\n      this.clearPlayHudImmediately();\n    }");
