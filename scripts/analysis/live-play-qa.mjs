@@ -477,11 +477,15 @@ const getCommitSha = () => {
   }
 };
 
-const isWorktreeDirty = () => {
+export const isWorktreeDirty = (readStatus = () => execFileSync(
+  'git',
+  ['status', '--porcelain'],
+  { cwd: REPO_ROOT, encoding: 'utf8' }
+)) => {
   try {
-    return execFileSync('git', ['status', '--porcelain'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim().length > 0;
+    return readStatus().trim().length > 0;
   } catch {
-    return false;
+    return null;
   }
 };
 

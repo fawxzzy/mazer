@@ -9,6 +9,7 @@ import {
   appendLivePlayQaCleanupEvidence,
   assertLivePlayProductionVerifierIdentityUnchanged,
   assertLivePlayProductionNavigationBinding,
+  isWorktreeDirty,
   assertLivePlayQaNavigationStable,
   captureRedactedLivePlayQaScreenshot,
   captureLivePlayQaFailureEvidence,
@@ -298,10 +299,15 @@ describe('live play QA script helpers', () => {
       targetRelationship: 'independently-verified-deployment'
     });
     expect(verifierIdentity.commit).not.toBe(deploymentIdentity.sourceCommit);
-    expect(() => resolveLivePlayProductionVerifierIdentity({
-      commit: verifierIdentity.commit,
-      dirty: true
-    })).toThrow('live_play_production_verifier_worktree_dirty');
+    for (const dirty of [true, null, undefined]) {
+      expect(() => resolveLivePlayProductionVerifierIdentity({
+        commit: verifierIdentity.commit,
+        dirty
+      })).toThrow('live_play_production_verifier_worktree_dirty');
+    }
+    expect(isWorktreeDirty(() => {
+      throw new Error('git status unavailable');
+    })).toBeNull();
     expect(() => resolveLivePlayProductionVerifierIdentity({
       commit: 'not-a-commit',
       dirty: false
