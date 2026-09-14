@@ -3,11 +3,15 @@ import { getInstallSurfaceState, promptInstallSurface, subscribeInstallSurface, 
 export interface MazerInstallGateBootContext {
   forceInstallGate: boolean;
   isLocalhostRuntime: boolean;
+  legalRouteRequested: boolean;
+  oauthCallbackAccepted: boolean;
   passwordRecoveryRequested: boolean;
 }
 
 export const shouldRunMazerInstallGateForBoot = (context: MazerInstallGateBootContext): boolean => (
   (!context.isLocalhostRuntime || context.forceInstallGate)
+  && !context.legalRouteRequested
+  && !context.oauthCallbackAccepted
   && !context.passwordRecoveryRequested
 );
 

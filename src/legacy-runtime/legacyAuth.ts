@@ -3,11 +3,23 @@ import {
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL
 } from './legacyPlayerMessage';
+import {
+  MAZER_OAUTH_AUTH_SESSION_KEY,
+  MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+  MAZER_OAUTH_SESSION_QUARANTINE_KEY,
+  advanceMazerAuthMutationEpoch,
+  advanceMazerSharedAuthMutationEpoch,
+  isMazerOAuthSessionQuarantined,
+  readMazerOAuthBootResult,
+  recoverMazerOAuthSessionQuarantine,
+  runMazerExclusiveAuthMutation
+} from './legacyAccountPortal';
 import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
 export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
 export const LEGACY_PASSWORD_RECOVERY_PATH = '/update-password';
+export const LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS = 10_000;
 
 export type LegacyAuthStatus = 'guest' | 'authenticated' | 'unavailable';
 export type LegacyAuthFormMode = 'login' | 'signup';
@@ -20,6 +32,7 @@ export interface LegacyAuthConfig {
 }
 
 export interface LegacyAuthSessionSnapshot {
+  canonicalUsername?: string | null;
   configured: boolean;
   displayName: string | null;
   email: string | null;
@@ -117,11 +130,120 @@ export type LegacyAuthStateListener = (
 
 type LegacyAuthStorage = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>;
 type LegacyAuthClient = SupabaseClient<any, any, any>;
+interface LegacyAuthDirectSignOutClient {
+  admin: LegacyAuthAbortableTransport;
+  storage: Storage;
+  storageKey: string;
+  _signOut: (options: { scope: 'local' }) => Promise<{
+    error: { message?: string | null } | null;
+  }>;
+}
+export interface LegacyAuthAbortableTransport {
+  fetch: typeof fetch;
+}
+
+export const runLegacyAbortableCredentialRequest = async <T>(
+  transport: LegacyAuthAbortableTransport,
+  operation: () => Promise<T>,
+  timeoutMs = LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS
+): Promise<T> => {
+  const originalFetch = transport.fetch;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  transport.fetch = (input, init) => originalFetch(input, {
+    ...init,
+    signal: controller.signal
+  });
+  try {
+    return await operation();
+  } finally {
+    clearTimeout(timeout);
+    transport.fetch = originalFetch;
+  }
+};
+
+export const invokeLegacyLocalSignOutWithTimeout = async (
+  auth: Partial<LegacyAuthDirectSignOutClient>,
+  timeoutMs = LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS
+): Promise<{ error: { message?: string | null } | null } | null> => {
+  if (
+    typeof auth._signOut !== 'function'
+    || typeof auth.admin?.fetch !== 'function'
+    || typeof auth.storage?.getItem !== 'function'
+    || typeof auth.storage?.removeItem !== 'function'
+    || typeof auth.storage?.setItem !== 'function'
+    || typeof auth.storageKey !== 'string'
+    || auth.storageKey.length === 0
+  ) {
+    return null;
+  }
+  const originalStorage = auth.storage;
+  const verifyingStorage = {
+    getItem: (key: string) => originalStorage.getItem(key),
+    removeItem: (key: string) => {
+      originalStorage.removeItem(key);
+      if (key === auth.storageKey && originalStorage.getItem(key) !== null) {
+        throw new Error('Authentication session removal could not be verified.');
+      }
+    },
+    setItem: (key: string, value: string) => originalStorage.setItem(key, value)
+  } as Storage;
+  auth.storage = verifyingStorage;
+  try {
+    return await runLegacyAbortableCredentialRequest(
+      auth.admin,
+      () => auth._signOut!({ scope: 'local' }),
+      timeoutMs
+    );
+  } finally {
+    auth.storage = originalStorage;
+  }
+};
+
+export const readLegacyPersistedAuthSessionSnapshot = (
+  storage: Pick<Storage, 'getItem'> | null | undefined,
+  env: Record<string, string | undefined> = readRuntimeEnv(),
+  storageKey = MAZER_OAUTH_AUTH_SESSION_KEY
+): LegacyAuthSessionSnapshot | null => {
+  if (!storage) {
+    return null;
+  }
+  try {
+    const raw = storage.getItem(storageKey);
+    const parsed: unknown = raw === null ? null : JSON.parse(raw);
+    if (
+      parsed === null
+      || typeof parsed !== 'object'
+      || Array.isArray(parsed)
+      || typeof (parsed as Partial<Session>).user?.id !== 'string'
+    ) {
+      return null;
+    }
+    return createLegacyAuthSessionSnapshot(parsed as Session, env);
+  } catch {
+    return null;
+  }
+};
+
+export const isLegacyPersistedAuthSessionRemoved = (
+  storage: Pick<Storage, 'getItem'> | null | undefined,
+  storageKey = MAZER_OAUTH_AUTH_SESSION_KEY
+): boolean => {
+  if (!storage) {
+    return false;
+  }
+  try {
+    return storage.getItem(storageKey) === null;
+  } catch {
+    return false;
+  }
+};
 
 const createGuestSnapshot = (
   configured: boolean,
   overrides: Partial<Omit<LegacyAuthSessionSnapshot, 'configured' | 'status' | 'userId'>> = {}
 ): LegacyAuthSessionSnapshot => ({
+  canonicalUsername: null,
   configured,
   displayName: null,
   email: null,
@@ -167,12 +289,20 @@ export const createLegacyGuestAuthSnapshot = (
 const resolveDisplayName = (user: User): string | null => {
   const metadata = user.user_metadata;
   const candidates = [
+    typeof metadata.username === 'string' ? metadata.username : null,
     typeof metadata.display_name === 'string' ? metadata.display_name : null,
     typeof metadata.full_name === 'string' ? metadata.full_name : null,
     user.email?.split('@')[0] ?? null
   ];
 
   return candidates.find((candidate) => candidate !== null && candidate.trim().length > 0)?.trim() ?? null;
+};
+
+const resolveCanonicalUsername = (user: User): string | null => {
+  const username = user.user_metadata.username;
+  return typeof username === 'string' && username.trim().length > 0
+    ? username.trim()
+    : null;
 };
 
 export const createLegacyAuthSessionSnapshot = (
@@ -195,6 +325,7 @@ export const createLegacyAuthSessionSnapshot = (
   }
 
   return {
+    canonicalUsername: resolveCanonicalUsername(user),
     configured,
     displayName: resolveDisplayName(user),
     email: user.email ?? null,
@@ -207,7 +338,9 @@ export const createLegacyAuthSessionSnapshot = (
 
 let legacyAuthClient: LegacyAuthClient | null = null;
 let legacyAuthPersistenceListenerInstalled = false;
+let legacyAuthStorageListenerInstalled = false;
 let legacyAuthLastSessionSignature: string | null = null;
+const legacyAuthLiveListeners = new Set<LegacyAuthStateListener>();
 
 export const deriveLegacyRememberedIdentityDisplayName = (email: string): string => {
   const localPart = normalizeLegacyAuthEmail(email).split('@')[0] ?? '';
@@ -342,9 +475,10 @@ const resolveLegacyAuthSessionSignature = (session: Session | null): string | nu
 
 const syncLegacyAuthPersistenceFromSession = (
   session: Session | null,
-  event: AuthChangeEvent | 'BOOTSTRAP_SESSION'
+  event: AuthChangeEvent | 'BOOTSTRAP_SESSION' | 'CROSS_TAB_SESSION',
+  env: Record<string, string | undefined> = readRuntimeEnv()
 ): LegacyAuthSessionSnapshot => {
-  const snapshot = createLegacyAuthSessionSnapshot(session);
+  const snapshot = createLegacyAuthSessionSnapshot(session, env);
   const storage = typeof window === 'undefined' ? undefined : window.localStorage;
   const signature = resolveLegacyAuthSessionSignature(session);
 
@@ -366,6 +500,43 @@ const syncLegacyAuthPersistenceFromSession = (
   return snapshot;
 };
 
+export const reconcileLegacyAuthStorageSession = async (
+  loadSession: () => Promise<Session | null>,
+  listeners: Iterable<LegacyAuthStateListener>,
+  isQuarantined: () => boolean = isMazerOAuthSessionQuarantined,
+  env: Record<string, string | undefined> = readRuntimeEnv()
+): Promise<boolean> => {
+  if (isQuarantined()) {
+    return false;
+  }
+  const session = await loadSession();
+  if (isQuarantined()) {
+    return false;
+  }
+  const snapshot = syncLegacyAuthPersistenceFromSession(session, 'CROSS_TAB_SESSION', env);
+  const event: AuthChangeEvent = session === null ? 'SIGNED_OUT' : 'SIGNED_IN';
+  for (const listener of listeners) {
+    try {
+      listener(snapshot, event);
+    } catch {
+      // One consumer cannot block the remaining open tabs from reconciling.
+    }
+  }
+  return true;
+};
+
+export const isLegacyAuthStorageEventKey = (
+  eventKey: string | null,
+  authStorageKey: unknown
+): boolean => (
+  (
+    typeof authStorageKey === 'string'
+    && authStorageKey.length > 0
+    && eventKey === authStorageKey
+  )
+  || eventKey === MAZER_OAUTH_SESSION_QUARANTINE_KEY
+);
+
 const installLegacyAuthPersistenceListener = (client: LegacyAuthClient): void => {
   if (legacyAuthPersistenceListenerInstalled) {
     return;
@@ -373,15 +544,40 @@ const installLegacyAuthPersistenceListener = (client: LegacyAuthClient): void =>
 
   legacyAuthPersistenceListenerInstalled = true;
   client.auth.onAuthStateChange((event, session) => {
+    if (isMazerOAuthSessionQuarantined()) {
+      return;
+    }
     syncLegacyAuthPersistenceFromSession(session, event);
   });
   void client.auth.getSession()
     .then(({ data }) => {
+      if (isMazerOAuthSessionQuarantined()) {
+        return;
+      }
       syncLegacyAuthPersistenceFromSession(data.session, 'BOOTSTRAP_SESSION');
     })
     .catch(() => {
       // Bootstrap session sync is best-effort; explicit auth reads still drive UI state.
     });
+  if (typeof window !== 'undefined' && !legacyAuthStorageListenerInstalled) {
+    legacyAuthStorageListenerInstalled = true;
+    const authStorageKey = (client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>).storageKey;
+    window.addEventListener('storage', (event) => {
+      if (
+        !isLegacyAuthStorageEventKey(event.key, authStorageKey)
+        || isMazerOAuthSessionQuarantined()
+      ) {
+        return;
+      }
+      void reconcileLegacyAuthStorageSession(
+        async () => (await client.auth.getSession()).data.session,
+        legacyAuthLiveListeners
+      )
+        .catch(() => {
+          // The next explicit auth read retries reconciliation.
+        });
+    });
+  }
 };
 
 export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> => {
@@ -408,20 +604,21 @@ export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> =>
     legacyAuthClient = createClient(config.url, config.anonKey, {
       auth: {
         autoRefreshToken: true,
-        detectSessionInUrl: true,
+        detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation(),
         persistSession: true,
         storage: typeof window === 'undefined' ? undefined : window.localStorage,
-        // auth-js defaults to a navigator.locks-backed mutex in any browser
-        // that has the Web Locks API, coordinating session refresh across
-        // tabs -- and every internal call site acquires it with an
-        // unbounded (-1) timeout, so a lock left held by a crashed tab,
-        // killed service worker, or a stale session from before a backend
-        // migration blocks every future auth call (sign-in included)
-        // forever, with no error ever thrown. Mazer doesn't need cross-tab
-        // refresh coordination badly enough to risk an unrecoverable hang
-        // for it -- this is the library's own no-op fallback (used
-        // automatically outside a browser), forced on unconditionally.
-        lock: async (_name, _acquireTimeout, fn) => fn()
+        // Auth-js routes every refresh/update-capable session operation through
+        // this hook. Use the same bounded, fail-closed lock as OAuth commit,
+        // rollback, and crash recovery so a late refresh from account A cannot
+        // overwrite an accepted account B session. Never accept auth-js's
+        // unbounded default wait or its no-op non-browser fallback here.
+        lock: async (_name, _acquireTimeout, fn) => {
+          const result = await runMazerExclusiveAuthMutation(fn);
+          if (result.status !== 'completed') {
+            throw new Error('Shared authentication transaction unavailable.');
+          }
+          return result.value;
+        }
       },
       db: {
         schema
@@ -433,15 +630,43 @@ export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> =>
   return legacyAuthClient;
 };
 
+export const isLegacyPasswordRecoveryRuntimeLocation = (
+  location: Pick<Location, 'pathname'> | undefined = typeof window === 'undefined' ? undefined : window.location
+): boolean => (
+  location?.pathname.replace(/\/+$/, '') === LEGACY_PASSWORD_RECOVERY_PATH
+);
+
 export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSessionSnapshot> => {
+  const oauthBootResult = readMazerOAuthBootResult();
+  if (isMazerOAuthSessionQuarantined()) {
+    await recoverMazerOAuthSessionQuarantine();
+    if (isMazerOAuthSessionQuarantined()) {
+      return { ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE };
+    }
+  }
   const client = await getLegacyAuthClient();
   if (!client) {
-    return createLegacyGuestAuthSnapshot();
+    const guestSnapshot = createLegacyGuestAuthSnapshot();
+    return oauthBootResult.status === 'failed'
+      ? { ...guestSnapshot, error: MAZER_OAUTH_SAFE_ERROR_MESSAGE }
+      : guestSnapshot;
   }
 
-  const { data, error } = await client.auth.getSession();
+  let sessionResult: Awaited<ReturnType<LegacyAuthClient['auth']['getSession']>>;
+  try {
+    sessionResult = await client.auth.getSession();
+  } catch {
+    return { ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE };
+  }
+  const { data, error } = sessionResult;
+  if (isMazerOAuthSessionQuarantined()) {
+    return { ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE };
+  }
   const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-    error: error?.message ?? null
+    error: oauthBootResult.status === 'failed'
+      ? MAZER_OAUTH_SAFE_ERROR_MESSAGE
+      : error?.message ?? null,
+    info: oauthBootResult.status === 'connected' ? 'Account connected.' : null
   });
   if (snapshot.status === 'authenticated') {
     syncLegacyRememberedIdentityFromAuthenticatedSession(
@@ -454,6 +679,35 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
     );
   }
   return snapshot;
+};
+
+const createLegacyAuthMutationUnavailableResult = (): LegacyAuthActionResult => ({
+  snapshot: createGuestSnapshot(false, {
+    error: LEGACY_AUTH_MESSAGE_COPY.authUnavailable
+  })
+});
+
+const runLegacyAuthDirectSessionMutation = async (
+  operation: () => Promise<LegacyAuthActionResult>
+): Promise<LegacyAuthActionResult> => {
+  const result = await runMazerExclusiveAuthMutation(async () => {
+    // Keep generation invalidation, the auth-js request, persistence, and
+    // notification in one outer common lock.
+    try {
+      if (advanceMazerSharedAuthMutationEpoch() === null) {
+        return createLegacyAuthMutationUnavailableResult();
+      }
+      if (advanceMazerAuthMutationEpoch() === null) {
+        return createLegacyAuthMutationUnavailableResult();
+      }
+      return await operation();
+    } catch {
+      return createLegacyAuthMutationUnavailableResult();
+    }
+  });
+  return result.status === 'completed'
+    ? result.value
+    : createLegacyAuthMutationUnavailableResult();
 };
 
 export const signInLegacyAuth = async (
@@ -469,25 +723,32 @@ export const signInLegacyAuth = async (
     };
   }
 
-  const { data, error } = await client.auth.signInWithPassword({
-    email: normalizeLegacyAuthEmail(email),
-    password
-  });
-
-  const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-    error: error?.message ?? null,
-    info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedIn
-  });
-  if (snapshot.status === 'authenticated') {
-    syncLegacyRememberedIdentityFromAuthenticatedSession(
-      typeof window === 'undefined' ? undefined : window.localStorage,
-      snapshot
+  return runLegacyAuthDirectSessionMutation(async () => {
+    const transport = client.auth as unknown as Partial<LegacyAuthAbortableTransport>;
+    if (typeof transport.fetch !== 'function') {
+      return createLegacyAuthMutationUnavailableResult();
+    }
+    const { data, error } = await runLegacyAbortableCredentialRequest(
+      transport as LegacyAuthAbortableTransport,
+      () => client.auth.signInWithPassword({
+        email: normalizeLegacyAuthEmail(email),
+        password
+      })
     );
-  }
 
-  return {
-    snapshot
-  };
+    const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
+      error: error?.message ?? null,
+      info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedIn
+    });
+    if (snapshot.status === 'authenticated') {
+      syncLegacyRememberedIdentityFromAuthenticatedSession(
+        typeof window === 'undefined' ? undefined : window.localStorage,
+        snapshot
+      );
+    }
+
+    return { snapshot };
+  });
 };
 
 export const signUpLegacyAuth = async (
@@ -513,27 +774,34 @@ export const signUpLegacyAuth = async (
     };
   }
 
-  const { data, error } = await client.auth.signUp({
-    email: normalizeLegacyAuthEmail(email),
-    password,
-    options: { data: metadata }
-  });
-
-  const info = resolveLegacySignUpInfo(Boolean(error), Boolean(data.session));
-  const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-    error: error?.message ?? null,
-    info
-  });
-  if (snapshot.status === 'authenticated') {
-    syncLegacyRememberedIdentityFromAuthenticatedSession(
-      typeof window === 'undefined' ? undefined : window.localStorage,
-      snapshot
+  return runLegacyAuthDirectSessionMutation(async () => {
+    const transport = client.auth as unknown as Partial<LegacyAuthAbortableTransport>;
+    if (typeof transport.fetch !== 'function') {
+      return createLegacyAuthMutationUnavailableResult();
+    }
+    const { data, error } = await runLegacyAbortableCredentialRequest(
+      transport as LegacyAuthAbortableTransport,
+      () => client.auth.signUp({
+        email: normalizeLegacyAuthEmail(email),
+        password,
+        options: { data: metadata }
+      })
     );
-  }
 
-  return {
-    snapshot
-  };
+    const info = resolveLegacySignUpInfo(Boolean(error), Boolean(data.session));
+    const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
+      error: error?.message ?? null,
+      info
+    });
+    if (snapshot.status === 'authenticated') {
+      syncLegacyRememberedIdentityFromAuthenticatedSession(
+        typeof window === 'undefined' ? undefined : window.localStorage,
+        snapshot
+      );
+    }
+
+    return { snapshot };
+  });
 };
 
 export const requestLegacyPasswordReset = async (email: string): Promise<LegacyAuthActionResult> => {
@@ -765,7 +1033,9 @@ export const updateLegacyPassword = async (
   return updateLegacyPasswordWithClient(client, password);
 };
 
-export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
+export const signOutLegacyAuth = async (
+  authenticatedFallback?: LegacyAuthSessionSnapshot
+): Promise<LegacyAuthActionResult> => {
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -773,18 +1043,51 @@ export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
     };
   }
 
-  const { error } = await client.auth.signOut({ scope: 'local' });
-  if (!error) {
-    legacyAuthLastSessionSignature = null;
-    markLegacyRememberedIdentityReauthRequired(typeof window === 'undefined' ? undefined : window.localStorage);
-  }
+  return runLegacyAuthDirectSessionMutation(async () => {
+    // Supabase auth-js's public signOut() reacquires its configured lock. That
+    // would force this transaction to release between generation invalidation
+    // and session removal. The pinned client exposes the same protected
+    // implementation used by signOut(); invoke it only while our exact common
+    // lock is already held, and fail closed if the pinned seam ever changes.
+    const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
+    const authStorage = directSignOut.storage ?? null;
+    const authStorageKey = directSignOut.storageKey;
+    const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(authStorage, undefined, authStorageKey)
+      ?? (authenticatedFallback?.status === 'authenticated' ? authenticatedFallback : null);
+    const preserveAuthenticatedPreimage = (message?: string | null): LegacyAuthActionResult => ({
+      snapshot: authenticatedPreimage === null
+        ? createLegacyAuthMutationUnavailableResult().snapshot
+        : { ...authenticatedPreimage, error: message ?? LEGACY_AUTH_MESSAGE_COPY.authUnavailable, info: null }
+    });
+    let result: Awaited<ReturnType<typeof invokeLegacyLocalSignOutWithTimeout>>;
+    try {
+      result = await invokeLegacyLocalSignOutWithTimeout(directSignOut);
+    } catch {
+      if (!isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey)) {
+        return preserveAuthenticatedPreimage();
+      }
+      result = { error: null };
+    }
+    if (result === null) {
+      return preserveAuthenticatedPreimage();
+    }
+    const { error } = result;
+    if (error) {
+      return preserveAuthenticatedPreimage(error.message);
+    }
+    if (!isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey)) {
+      return preserveAuthenticatedPreimage();
+    }
 
-  return {
-    snapshot: createGuestSnapshot(true, {
-      error: error?.message ?? null,
-      info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedOut
-    })
-  };
+    legacyAuthLastSessionSignature = null;
+    markLegacyRememberedIdentityReauthRequired(authStorage ?? undefined);
+
+    return {
+      snapshot: createGuestSnapshot(true, {
+        info: LEGACY_AUTH_MESSAGE_COPY.signedOut
+      })
+    };
+  });
 };
 
 export const subscribeLegacyAuthState = (
@@ -794,7 +1097,12 @@ export const subscribeLegacyAuthState = (
     return null;
   }
 
+  legacyAuthLiveListeners.add(listener);
   const { data } = client.auth.onAuthStateChange((event, session) => {
+    if (isMazerOAuthSessionQuarantined()) {
+      listener({ ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE }, event);
+      return;
+    }
     const snapshot = createLegacyAuthSessionSnapshot(session);
     if (snapshot.status === 'authenticated') {
       syncLegacyRememberedIdentityFromAuthenticatedSession(
@@ -806,6 +1114,7 @@ export const subscribeLegacyAuthState = (
   });
 
   return () => {
+    legacyAuthLiveListeners.delete(listener);
     data.subscription.unsubscribe();
   };
 });

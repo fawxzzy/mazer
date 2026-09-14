@@ -6,8 +6,8 @@ import { describe, expect, test } from 'vitest';
 import {
   AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
   FIXTURE_SETTINGS_STORAGE_KEYS,
-  RETIRED_GUEST_ENTRY_BUTTON,
-  SIGNED_OUT_AUTH_GATE_BUTTONS,
+  RETIRED_LOCAL_AUTH_CONTROLS,
+  SIGNED_OUT_SHARED_ACCOUNT_BUTTONS,
   buildAuthPersistenceRoute,
   createFixtureSettingsRestorePlan,
   evaluateFixtureSettingsCleanup,
@@ -28,8 +28,8 @@ import {
 } from '../../scripts/analysis/live-auth-persistence-soak.mjs';
 
 const passingSteps = [
-  'signed-out-account-gate',
-  'signed-out-empty-submit-stays-gated',
+  'signed-out-shared-account-entry',
+  'signed-out-shared-account-contract',
   'diagnostics-fixture-entry',
   'diagnostics-fixture-options',
   'diagnostics-fixture-trail-shine-changed',
@@ -43,18 +43,18 @@ const passingSteps = [
 
 const signedOutExpectation = {
   authenticated: false,
-  buttons: SIGNED_OUT_AUTH_GATE_BUTTONS,
+  buttons: SIGNED_OUT_SHARED_ACCOUNT_BUTTONS,
   exactButtons: true,
-  forbiddenButtons: [RETIRED_GUEST_ENTRY_BUTTON],
+  forbiddenButtons: RETIRED_LOCAL_AUTH_CONTROLS,
   mode: 'menu',
-  overlay: 'auth'
+  overlay: 'none'
 };
 
 const currentSignedOutSurface = {
   authStatus: 'anonymous',
-  buttons: [...SIGNED_OUT_AUTH_GATE_BUTTONS],
+  buttons: [...SIGNED_OUT_SHARED_ACCOUNT_BUTTONS],
   mode: 'menu',
-  overlay: 'auth',
+  overlay: 'none',
   userIdPresent: false
 };
 
@@ -69,21 +69,21 @@ const fixtureSettingsChanged = Object.freeze({
 });
 
 describe('live auth persistence soak contract', () => {
-  test('recognizes the current signed-out account gate and rejects the retired guest expectation', () => {
+  test('recognizes shared account entry on the main menu and rejects every retired local-auth control', () => {
     expect(surfaceMatchesAuthPersistenceExpectation(currentSignedOutSurface, signedOutExpectation)).toBe(true);
     expect(surfaceMatchesAuthPersistenceExpectation(currentSignedOutSurface, {
       authenticated: false,
-      buttons: [RETIRED_GUEST_ENTRY_BUTTON, 'Sign In'],
+      buttons: ['Play as guest', 'Sign In'],
       mode: 'menu',
       overlay: 'auth'
     })).toBe(false);
     expect(surfaceMatchesAuthPersistenceExpectation({
       ...currentSignedOutSurface,
-      buttons: [...SIGNED_OUT_AUTH_GATE_BUTTONS, RETIRED_GUEST_ENTRY_BUTTON]
+      buttons: [...SIGNED_OUT_SHARED_ACCOUNT_BUTTONS, 'Play as guest']
     }, signedOutExpectation)).toBe(false);
     expect(surfaceMatchesAuthPersistenceExpectation({
       ...currentSignedOutSurface,
-      buttons: [...SIGNED_OUT_AUTH_GATE_BUTTONS, 'Continue offline']
+      buttons: [...SIGNED_OUT_SHARED_ACCOUNT_BUTTONS, 'Continue offline']
     }, signedOutExpectation)).toBe(false);
   });
 
@@ -94,14 +94,18 @@ describe('live auth persistence soak contract', () => {
 
     const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/live-auth-persistence-soak.mjs'), 'utf8');
     expect(source).toContain("id: 'diagnostics-fixture-play'");
+    expect(source).toContain("id: 'signed-out-shared-account-contract'");
+    expect(source).not.toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Sign in'");
     expect(source).toContain("buttons: ['Back', 'Guide', 'Trail Shine', 'Main Menu']");
     expect(source).toContain("id: 'diagnostics-fixture-account'");
+    expect(source).toContain("buttons: ['Account'], mode: 'menu', overlay: 'options'");
+    expect(source).not.toContain("buttons: ['username', 'Reset progress', 'Sign out']");
     expect(source).toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Trail Shine'");
     expect(source).toContain('evaluateTrailShineChangedStatePersistence({');
     expect(source).toContain('fixture_settings_restore');
     expect(source).not.toContain('const logoutPoint =');
     expect(source.match(/Play as guest/gu)).toHaveLength(1);
-    expect(source).toContain('forbiddenButtons: [RETIRED_GUEST_ENTRY_BUTTON]');
+    expect(source).toContain('forbiddenButtons: RETIRED_LOCAL_AUTH_CONTROLS');
   });
 
   test('requires an opposite Trail Shine state in runtime and visible UI before and after reload', () => {
@@ -324,14 +328,14 @@ describe('live auth persistence soak contract', () => {
     try {
       const evidence = {
         capturedAt: '2026-09-02T00:00:00.000Z',
-        currentPhase: 'signed-out-account-gate',
+        currentPhase: 'signed-out-shared-account-entry',
         elapsedMs: 30_000,
-        phaseTimings: [{ phase: 'signed-out-account-gate', elapsedMs: 0 }],
+        phaseTimings: [{ phase: 'signed-out-shared-account-entry', elapsedMs: 0 }],
         error: 'surface_timeout',
         url: sanitizeAuthPersistenceDiagnosticUrl('https://example.test/?token=private&runtimeDiagnostics=1#secret'),
         title: 'Mazer',
         document: { readyState: 'complete', visibilityState: 'visible' },
-        controls: [{ tag: 'input', type: 'email', name: 'email', text: null }],
+        controls: [{ tag: 'button', type: 'button', name: null, text: 'Login' }],
         canvas: { width: 810, height: 1916, clientWidth: 405, clientHeight: 958, visible: true },
         surface: currentSignedOutSurface,
         failedRequests: [{ method: 'GET', url: 'https://example.test/api?token=<redacted>' }],
@@ -352,12 +356,12 @@ describe('live auth persistence soak contract', () => {
 
       expect(persisted).toMatchObject({
         schema: 'mazer.live-auth-persistence-failure.v1',
-        currentPhase: 'signed-out-account-gate',
+        currentPhase: 'signed-out-shared-account-entry',
         elapsedMs: 30_000,
         error: 'surface_timeout',
         document: { readyState: 'complete', visibilityState: 'visible' },
         canvas: { visible: true },
-        surface: { overlay: 'auth' },
+        surface: { overlay: 'none' },
         serviceWorker: { controlled: true },
         artifacts: { screenshotError: null }
       });

@@ -56,7 +56,22 @@ export default defineConfig({
         // Versioned icon URLs map to Workbox's content-revisioned precache
         // entries instead of bypassing the offline install assets.
         ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^v$/],
-        navigateFallbackDenylist: [/^\/__/, /^\/@vite\//],
+        navigateFallbackDenylist: [/^\/__/, /^\/@vite\//, /[?&](?:code|state|error|error_description)=/],
+        runtimeCaching: [
+          {
+            // OAuth callbacks carry one-time authorization material. Keep
+            // them out of the precache/navigation fallback and every queue.
+            urlPattern: ({ request, url }) => request.mode === 'navigate'
+              && url.origin === self.location.origin
+              && ['code', 'state', 'error', 'error_description'].some((key) => url.searchParams.has(key)),
+            handler: 'NetworkOnly'
+          },
+          {
+            urlPattern: ({ url }) => url.origin === 'https://bxtcuhkotumitoqtrcej.supabase.co'
+              && url.pathname === '/auth/v1/oauth/token',
+            handler: 'NetworkOnly'
+          }
+        ],
         skipWaiting: true,
         clientsClaim: true
       }

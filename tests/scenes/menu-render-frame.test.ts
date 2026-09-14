@@ -1650,7 +1650,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       menuSceneSource.indexOf('private resolveLegacyRuntimeAuthFixtureSnapshot()')
     );
 
-    expect(updateSource.match(/this\.enterForcedLegacyAuthOverlay\(\);/g)).toHaveLength(2);
+    expect(updateSource.match(/this\.enterForcedLegacyAuthOverlay\(\);/g)).toHaveLength(1);
     expect(updateSource).not.toContain("this.overlay = 'auth';");
     expect(recoverySource).toContain('this.enterForcedLegacyAuthOverlay();');
     expect(forcedAuthSource).toContain("if (this.mode === 'play') {\n      this.clearPlayHudImmediately();\n    }");
@@ -1685,12 +1685,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       menuSceneSource.indexOf('private drawLegacyProfileIcon(')
     );
 
-    // Now routes through the Wave 3A bridge first (bridge.dispatch(NAVIGATE
-    // account)), falling back to the same real openOverlay('auth') call only
-    // if the bridge rejects or is unavailable.
+    // Route through the Wave 3A bridge first, then the shared account flow.
     expect(menuSceneSource).toContain(
       'this.uiButtons.push(this.createLegacyMenuProfileButton(\n'
-      + '          () => this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openOverlay(\'auth\'))\n'
+      + '          () => this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
       + '        ));'
     );
     expect(menuSceneSource).not.toContain('createLegacyMenuUsernameButton');
@@ -1706,7 +1704,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const color = cyberArcadeMaterial.signal.player;');
   });
 
-  test('keeps account login/logout inside the shared player-facing overlay system', () => {
+  test('routes signed-out account entry directly through shared OAuth without a local login surface', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
     const playerMessageSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayerMessage.ts'), 'utf8');
@@ -1715,8 +1713,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(overlayRoutingSource).toContain("export type LegacyOverlayKind = 'none' | 'options' | 'pause' | 'auth' | 'confirm-progression-reset' | 'leaderboard';");
     expect(authSource).toContain('createClient(config.url, config.anonKey');
     expect(authSource).toContain('autoRefreshToken: true');
+    expect(authSource).toContain('const result = await runMazerExclusiveAuthMutation(fn);');
+    expect(authSource).not.toContain('lock: async (_name, _acquireTimeout, fn) => fn()');
     expect(authSource).toContain('persistSession: true');
-    expect(authSource).toContain('detectSessionInUrl: true');
+    expect(authSource).toContain('detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation()');
+    expect(authSource).not.toContain('detectSessionInUrl: true');
     expect(authSource).toContain('createLegacyAuthScopedStorage');
     expect(menuSceneSource).toContain('LEGACY_GAME_TOGGLE_STORAGE_KEY');
     expect(menuSceneSource).toContain('this.loadPersistedLegacyGameToggleSettings();');
@@ -1727,26 +1728,34 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("userId: 'runtime-diagnostics-auth-fixture'");
     expect(menuSceneSource).toContain('const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();');
     expect(menuSceneSource).toContain('if (runtimeAuthFixtureSnapshot) {');
-    expect(menuSceneSource).toContain("this.openOverlay('auth')");
+    expect(menuSceneSource).not.toContain("this.openOverlay('auth')");
     expect(menuSceneSource).toContain('private buildAuthOverlay(): void');
-    expect(menuSceneSource).toContain('resolveLegacyAuthPresentation({');
-    expect(menuSceneSource).toContain("fieldId === 'password'");
-    expect(menuSceneSource).toContain('private createLegacyAuthPasswordVisibilityButton(');
-    expect(menuSceneSource).toContain("this.authPasswordVisible ? 'text' : 'password'");
+    expect(menuSceneSource).toContain('private buildSharedAccountEntrySection(');
+    expect(menuSceneSource).toContain("'Reset password'");
+    expect(menuSceneSource).toContain("'Privacy'");
+    expect(menuSceneSource).toContain("'Terms'");
+    expect(menuSceneSource).toContain("text: this.authSubmitting ? 'Opening' : 'Sign in'");
+    expect(menuSceneSource).toContain("text: 'Create account'");
     expect(menuSceneSource).toContain('this.createLegacyAuthActionButton(');
-    expect(menuSceneSource).toContain('presentation.primaryActionLabel');
-    expect(menuSceneSource).toContain('presentation.recoveryActionLabel');
     expect(menuSceneSource).toContain('this.createLegacyBottomActionBar(\n      panel,\n      stacked,');
     expect(menuSceneSource).not.toContain("text: 'Play as guest',");
     expect(menuSceneSource).not.toContain('onClick: () => this.handleLegacyGuestPlay()');
-    expect(menuSceneSource).toContain("? ['username', 'email', 'password']");
-    expect(menuSceneSource).not.toContain("'displayName',\n        this.authForm.displayName");
-    expect(menuSceneSource).toContain('? signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.username)');
+    expect(menuSceneSource).toContain('private async handleSharedAccountAuthorization(): Promise<void>');
+    expect(menuSceneSource).toContain('const result = await beginMazerOAuthAuthorization();');
+    expect(menuSceneSource).toContain('void this.handleSharedAccountAuthorization();');
+    expect(menuSceneSource).toContain('private createLegacySignedOutOAuthFailure(): void');
+    expect(menuSceneSource).toContain("this.authSnapshot.error !== MAZER_OAUTH_SAFE_ERROR_MESSAGE");
+    expect(menuSceneSource).toContain('this.createLegacySignedOutOAuthFailure();');
+    expect(menuSceneSource).toContain('this.oauthPageShowCleanup = installMazerOAuthPageShowRecovery(window, () => {');
+    expect(menuSceneSource).toContain('this.oauthPageShowCleanup?.();');
     expect(menuSceneSource).toContain("if (this.overlay === 'auth') {");
     expect(menuSceneSource.indexOf("if (this.overlay === 'auth') {")).toBeLessThan(menuSceneSource.indexOf('this.updateStars(time, delta);'));
     expect(menuSceneSource).toContain('private createAuthFooterLink(');
-    expect(menuSceneSource).toContain('private async handleLegacyAuthSubmit(): Promise<void>');
+    expect(menuSceneSource).toContain('private navigateToSharedAccountRoute(');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSignOut(): Promise<void>');
+    expect(menuSceneSource).toContain('private createLegacyOptionsSessionActionBar(');
+    expect(menuSceneSource).toContain("if (this.authSnapshot.status !== 'authenticated') {");
+    expect(menuSceneSource).toContain("{ onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }");
     expect(menuSceneSource).toContain('interface LegacyAuthActionDiagnostics');
     expect(menuSceneSource).toContain('private latestAuthActionDiagnostics: LegacyAuthActionDiagnostics | null = null;');
     expect(menuSceneSource).toContain('private recordLegacyAuthActionDiagnostics(');
@@ -1771,11 +1780,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("const menuActionMode = snapshot.status === 'authenticated' ? 'authenticated' : 'guest';");
     expect(menuSceneSource).toContain('previousMenuActionMode !== menuActionMode');
     expect(menuSceneSource).toContain('this.refreshLayout();');
-    // Now routes through the Wave 3A bridge first (bridge.dispatch(NAVIGATE
-    // account)), falling back to the same real openOverlay('auth') call only
-    // if the bridge rejects or is unavailable.
+    // Route through the shared bridge, then the canonical account surface.
     expect(menuSceneSource).toContain(
-      "'Login',\n              () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth')),"
+      "'Login',\n              () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface()),"
     );
     expect(menuSceneSource).toContain('this.layout.centerButtonX,');
     expect(menuSceneSource).toContain('this.layout.centerButtonY,');
@@ -1785,13 +1792,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // button -- there's no "go to main menu" equivalent here since you're
     // already at the main menu, so the bottom of the panel is simply empty.
     expect(menuSceneSource).not.toContain('private createLegacyOptionsAccountActionRow(');
-    // Now routes through the Wave 3A bridge first (bridge.dispatch(NAVIGATE
-    // account)), falling back to the same real openOverlay('auth') call only
-    // if the bridge rejects or is unavailable.
+    // The header account action uses that same shared surface.
     expect(menuSceneSource).toContain(
       'this.uiButtons.push(this.createLegacyOverlayUsernameButton(\n'
       + '      panel,\n'
-      + '      () => this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openOverlay(\'auth\')),\n'
+      + '      () => this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface()),\n'
       + '      panel.centerX\n'
       + '    ));'
     );
@@ -1840,6 +1845,21 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.resolveLegacyProgressionStorageKey()');
   });
 
+  test('shows the verified master username beneath Welcome without consulting the Mazer profile row', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const welcomeSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private createLegacyAuthenticatedWelcomeIdentity(): void'),
+      menuSceneSource.indexOf('private openSharedAccountSurface(): void')
+    );
+
+    expect(menuSceneSource).toContain('this.createLegacyAuthenticatedWelcomeIdentity();');
+    expect(welcomeSource).toContain("this.authSnapshot.canonicalUsername?.trim() ?? ''");
+    expect(welcomeSource).toContain("'Welcome'");
+    expect(welcomeSource).not.toContain('accountUsernameSavedValue');
+    expect(welcomeSource).not.toContain('authSnapshot.email');
+    expect(welcomeSource).not.toContain('readLegacyAccountUsername');
+  });
+
   test('records the Fitness account-surface reuse contract without coupling Phaser to Fitness React components', () => {
     const authReuseContract = readFileSync(
       resolve(process.cwd(), 'docs/ops/MAZER-FITNESS-AUTH-SURFACE-REUSE-2026-08-16.md'),
@@ -1856,7 +1876,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authReuseContract).toContain('No shared React component import into Phaser.');
   });
 
-  test('adopts the opaque Fitness-derived auth visual family without changing Mazer auth semantics', () => {
+  test('keeps the opaque auth visual family while routing account entry through the shared portal', () => {
     const menuSceneSource = normalizeSourceLineEndings(
       readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
     );
@@ -1875,24 +1895,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('EMAIL OR USERNAME');
     expect(menuSceneSource).toContain('this.levelAnnouncerNumberGraphics.setVisible(false);');
     expect(menuSceneSource).toContain("this.authSnapshot.status !== 'authenticated'");
-    expect(menuSceneSource).toContain("&& rememberedIdentity?.displayName");
-    expect(menuSceneSource).toContain('private authInvalidFields: ReadonlySet<LegacyAuthFieldId> = new Set();');
-    expect(menuSceneSource).toContain('this.authInvalidFields = new Set(resolveLegacyAuthInvalidFields(this.authForm));');
-    expect(menuSceneSource).toContain("? 0xff7d7d");
-    expect(menuSceneSource).toContain('resolveLegacyAuthBottomFeedbackLabel(this.authSnapshot.error, this.authSnapshot.info)');
-    expect(menuSceneSource).toContain('const LEGACY_AUTH_BOTTOM_FEEDBACK_DURATION_MS = 5000;');
-    expect(menuSceneSource).toContain('const separatorCenterY = footerY + 2;');
+    expect(menuSceneSource).toContain('private buildSharedAccountEntrySection(');
+    expect(menuSceneSource).toContain('Use your shared Fawxzzy account to keep progression, settings, and leaderboard identity connected.');
+    expect(menuSceneSource).toContain('const result = await beginMazerOAuthAuthorization();');
+    expect(menuSceneSource).toContain("this.navigateToSharedAccountRoute('reset-password')");
     expect(menuSceneSource).not.toContain('this.createAuthAccountSummaryCard(`Signed in as ${accountLabel}`');
-    expect(menuSceneSource).toContain("this.createAccountReadOnlyField(");
-    const readOnlyFieldSource = menuSceneSource.slice(
-      menuSceneSource.indexOf('private createAccountReadOnlyField('),
-      menuSceneSource.indexOf('private createAccountUsernameNativeInput(')
-    );
     const clearUiSource = menuSceneSource.slice(
       menuSceneSource.indexOf('private clearUi(): void'),
       menuSceneSource.indexOf('private async loadLeaderboardPage(')
     );
-    expect(readOnlyFieldSource).toContain('this.uiGraphics.push(border);');
     expect(clearUiSource).toContain('for (const graphic of this.uiGraphics) {');
     expect(clearUiSource).toContain('graphic.destroy();');
     expect(clearUiSource).toContain('this.uiGraphics = [];');
@@ -1904,7 +1915,27 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const accentColor = unifiedAuthDanger ? cyberArcadeMaterial.signal.goal : LEGACY_PLAY_TOUCH_ACCENT;');
     expect(menuSceneSource).not.toContain("text: 'Log out'");
     expect(menuSceneSource).not.toContain("return 'Username saved.';");
-    expect(authSource).toContain('signInWithPassword({');
+    expect(authSource).toContain('detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation()');
+    expect(authSource).not.toContain('detectSessionInUrl: true');
+    expect(authSource).toContain('const result = await runMazerExclusiveAuthMutation(async () => {');
+    expect(authSource).toContain('if (advanceMazerSharedAuthMutationEpoch() === null)');
+    expect(authSource).toContain('if (advanceMazerAuthMutationEpoch() === null)');
+    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\(async \(\) => \{/g)).toHaveLength(3);
+    expect(authSource).not.toContain('runLegacyAuthInternallyLockedMutation');
+    expect(authSource).toContain("const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;");
+    expect(authSource).toContain('if (key === auth.storageKey && originalStorage.getItem(key) !== null) {');
+    expect(authSource).toContain('const authStorageKey = directSignOut.storageKey;');
+    expect(authSource).toContain('auth.storage = verifyingStorage;');
+    expect(authSource).toContain('auth.storage = originalStorage;');
+    expect(authSource).toContain('await invokeLegacyLocalSignOutWithTimeout(directSignOut)');
+    expect(authSource).toContain('const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(');
+    expect(authSource).toContain('const preserveAuthenticatedPreimage = (message?: string | null): LegacyAuthActionResult => ({');
+    expect(authSource).toContain('if (!isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey)) {');
+    expect(menuSceneSource).toContain('await signOutLegacyAuth(this.authSnapshot)');
+    expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
+    expect(authSource.match(/runLegacyAbortableCredentialRequest\(/g)).toHaveLength(3);
+    expect(authSource).toContain('LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS = 10_000');
+    expect(authSource).toContain('sessionResult = await client.auth.getSession();');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");
   });
 
@@ -1977,6 +2008,25 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (this.playerTransferEnergyArmed && this.playerTransferEnergyOutboundStartedAtMs === null) {');
     expect(menuSceneSource).toContain('resolveLegacyStaticDrawBuildRemainingMs({');
     expect(menuSceneSource).toContain('this.playerSpawnBurstStartedAtMs ??= alignedStartedAtMs;');
+  });
+
+  test('hydrates the signed-in username before deciding whether leaderboard access is gated', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const leaderboardSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private buildLeaderboardOverlay(): void'),
+      menuSceneSource.indexOf('private async loadLeaderboardPage(')
+    );
+
+    expect(leaderboardSource).toContain("if (this.authSnapshot.status === 'authenticated') {");
+    expect(leaderboardSource).toContain('this.loadAccountUsernameIfNeeded();');
+    expect(leaderboardSource).toContain('if (this.accountUsernameHydrationPending) {');
+    expect(leaderboardSource).toContain("'Loading username...'");
+    expect(leaderboardSource).toContain('if (this.accountUsernameHydrationError) {');
+    expect(leaderboardSource).toContain("'Username unavailable. Try again.'");
+    expect(leaderboardSource).toContain("'Retry'");
+    expect(leaderboardSource.indexOf('this.loadAccountUsernameIfNeeded();')).toBeLessThan(
+      leaderboardSource.indexOf('if (this.accountUsernameSavedValue.length <= 0)')
+    );
   });
 
   test('consumes shared UI standards for buttons, titles, guides, and toggles', () => {
@@ -2141,7 +2191,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(diagnosticsSource).toContain('thoughtState: string;');
   });
 
-  test('keeps account form entry backed by native browser inputs for mobile and automation', () => {
+  test('keeps only password-recovery entry backed by native browser inputs for mobile and automation', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('private authNativeInput: HTMLInputElement | null = null;');
@@ -2158,7 +2208,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("ease: 'Sine.easeInOut'");
     expect(menuSceneSource).toContain('this.syncLegacyAuthNativeInputValue();');
     expect(menuSceneSource).toContain('this.destroyLegacyAuthNativeInput();');
-    expect(menuSceneSource).toContain('presentation.alternateActionLabel,');
+    expect(menuSceneSource).toContain('private buildPasswordRecoveryOverlay(');
+    expect(menuSceneSource).toContain("'confirmPassword'");
     expect(menuSceneSource).not.toContain('Guest mode is active. Sign in to keep account progress separate.');
   });
 

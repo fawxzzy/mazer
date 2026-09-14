@@ -286,7 +286,6 @@ import {
   readLegacyRememberedIdentityState,
   readLegacyPasswordRecoveryBootUrlState,
   normalizeLegacyAuthEmail,
-  requestLegacyPasswordReset,
   resolveLegacyPasswordRecoveryEnterAction,
   resolveLegacyPasswordUpdateSubmitState,
   resolveLegacyAuthInvalidFields,
@@ -306,12 +305,16 @@ import {
   type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
 import {
+  MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+  beginMazerOAuthAuthorization,
+  installMazerOAuthPageShowRecovery,
+  navigateToMazerAccountPortal,
+  navigateToMazerLegalPortal
+} from '../legacy-runtime/legacyAccountPortal';
+import {
   createLegacyPasswordRecoveryState,
-  resolveLegacyAuthBottomFeedbackLabel,
-  resolveLegacyAuthPresentation,
   resolveLegacyPasswordRecoveryEntry,
   resolveLegacyPasswordRecoveryPresentation,
-  type LegacyAuthPresentation,
   type LegacyPasswordRecoveryState
 } from '../legacy-runtime/legacyAuthPresentation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
@@ -1868,7 +1871,6 @@ export class MenuScene extends Phaser.Scene {
   // invalid) is silently skipped and can be set later from the account
   // screen instead.
   private authUsernameStatus: 'available' | 'checking' | 'error' | 'idle' | 'taken' = 'idle';
-  private authUsernameStatusMessage: string | null = null;
   private authUsernameSequence = 0;
   private authUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private menuLeaderboardActive = false;
@@ -1891,9 +1893,9 @@ export class MenuScene extends Phaser.Scene {
   private accountUsernameDraft = '';
   private accountUsernameSavedValue = '';
   private accountUsernameLoadedForUserId: string | null = null;
+  private accountUsernameHydrationPending = false;
+  private accountUsernameHydrationError = false;
   private accountUsernameActive = false;
-  private accountUsernameStatus: 'available' | 'checking' | 'error' | 'idle' | 'loading' | 'saved' | 'saving' | 'taken' = 'idle';
-  private accountUsernameStatusMessage: string | null = null;
   private accountUsernameSequence = 0;
   private accountUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private accountUsernameNativeInput: HTMLInputElement | null = null;
@@ -2349,6 +2351,7 @@ export class MenuScene extends Phaser.Scene {
   private overlayBoardZoomSliderBounds: VisualRect | null = null;
   private overlayMovementSpeedSliderBounds: VisualRect | null = null;
   private viewportGeometryListener: (() => void) | null = null;
+  private oauthPageShowCleanup: (() => void) | null = null;
   /** Cached OS accessibility preference; never read from the render loop. */
   private legacyReducedMotionEnabled = false;
   private legacyReducedMotionMediaQuery: MediaQueryList | null = null;
@@ -2798,6 +2801,10 @@ export class MenuScene extends Phaser.Scene {
     if (typeof window !== 'undefined') {
       this.viewportGeometryListener = () => this.refreshLayout();
       window.addEventListener(MAZER_VIEWPORT_CHANGE_EVENT, this.viewportGeometryListener);
+      this.oauthPageShowCleanup = installMazerOAuthPageShowRecovery(window, () => {
+        this.authSubmitting = false;
+        this.uiDirty = true;
+      });
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       // The CanvasTexture is registered in the game-level TextureManager,
@@ -2853,6 +2860,8 @@ export class MenuScene extends Phaser.Scene {
         window.removeEventListener(MAZER_VIEWPORT_CHANGE_EVENT, this.viewportGeometryListener);
         this.viewportGeometryListener = null;
       }
+      this.oauthPageShowCleanup?.();
+      this.oauthPageShowCleanup = null;
       this.clearVisualDiagnostics();
       clearMenuSceneRuntimeDiagnostics();
     });
@@ -2955,7 +2964,7 @@ export class MenuScene extends Phaser.Scene {
     return {
       getFacts: (): LegacyRuntimeFacts => this.resolveUiBridgeFacts(),
       openSettings: (): boolean => { this.openOverlay('options'); return true; },
-      openAccount: (): boolean => { this.openOverlay('auth'); return true; },
+      openAccount: (): boolean => { this.openSharedAccountSurface(); return true; },
       openLeaderboard: (): boolean => { this.openOverlay('leaderboard'); return true; },
       openResetProgressConfirmation: (): boolean => { this.openOverlay('confirm-progression-reset'); return true; },
       closeTopOverlay: (): boolean => { this.handleBackAction(); return true; },
@@ -3920,10 +3929,6 @@ export class MenuScene extends Phaser.Scene {
     if (this.pendingAuthGateTransition) {
       this.pendingAuthGateTransition = false;
       if (this.isLegacyPasswordRecoveryActive() && this.overlay !== 'auth') {
-        this.enterForcedLegacyAuthOverlay();
-        this.uiDirty = true;
-        this.rebuildUi();
-      } else if (this.authGateLocked && this.overlay !== 'auth') {
         this.enterForcedLegacyAuthOverlay();
         this.uiDirty = true;
         this.rebuildUi();
@@ -12863,10 +12868,11 @@ export class MenuScene extends Phaser.Scene {
               primaryButtonWidth,
               this.layout.buttonHeight,
               'Login',
-              () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth')),
+              () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface()),
               { fullScreenHitArea: true }
             )
           );
+          this.createLegacySignedOutOAuthFailure();
         } else {
           this.uiButtons.push(
             this.createButton(
@@ -12887,8 +12893,9 @@ export class MenuScene extends Phaser.Scene {
           () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'leaderboard' }, () => this.openOverlay('leaderboard'))
         ));
         this.uiButtons.push(this.createLegacyMenuProfileButton(
-          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth'))
+          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
         ));
+        this.createLegacyAuthenticatedWelcomeIdentity();
       }
 
       this.uiDirty = false;
@@ -13068,7 +13075,7 @@ export class MenuScene extends Phaser.Scene {
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
     this.uiButtons.push(this.createLegacyOverlayUsernameButton(
       panel,
-      () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth')),
+      () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface()),
       panel.centerX
     ));
 
@@ -13111,6 +13118,7 @@ export class MenuScene extends Phaser.Scene {
         viewport: renderViewport
       });
       this.drawLegacyOverlayScrollFacade(scrollMetrics);
+      this.createLegacyOptionsSessionActionBar(panel, compact);
       return;
     }
 
@@ -13127,6 +13135,18 @@ export class MenuScene extends Phaser.Scene {
       rowY = this.createColorInputRow('Path RGB 0-255', ['pathR', 'pathG', 'pathB'], rowY, panel, this.settings.pathColor);
       rowY = this.createColorInputRow('Wall RGB 0-255', ['wallR', 'wallG', 'wallB'], rowY, panel, this.settings.wallColor);
     }
+    this.createLegacyOptionsSessionActionBar(panel, compact);
+  }
+
+  private createLegacyOptionsSessionActionBar(panel: OverlayPanelFrame, compact: boolean): void {
+    if (this.authSnapshot.status !== 'authenticated') {
+      return;
+    }
+    this.createLegacyBottomActionBar(
+      panel,
+      compact,
+      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }
+    );
   }
 
   // The Guide card's actual on-screen height depends on overlayGuideExpanded
@@ -13689,6 +13709,38 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyLeaderboardTitleGlyph(centerX, titleY - (compact ? 30 : 34), compact ? 11 : 12);
     this.createOverlayTitle('Leaderboard', titleY);
 
+    if (this.authSnapshot.status === 'authenticated') {
+      this.loadAccountUsernameIfNeeded();
+      if (this.accountUsernameHydrationPending) {
+        this.createAuthInfoText(
+          'Loading username...',
+          panel.top + (compact ? 140 : 160),
+          panel,
+          '#b7f2ff',
+          compact ? 14 : 15
+        );
+        return;
+      }
+      if (this.accountUsernameHydrationError) {
+        const gateY = panel.top + (compact ? 140 : 160);
+        this.createAuthInfoText('Username unavailable. Try again.', gateY, panel, '#ff9d9d', compact ? 14 : 15);
+        this.uiButtons.push(this.createLegacyAuthActionButton(
+          centerX,
+          gateY + (compact ? 52 : 60),
+          Math.min(panel.width - 48, compact ? 220 : 260),
+          compact ? 46 : 52,
+          'Retry',
+          () => {
+            this.accountUsernameLoadedForUserId = null;
+            this.accountUsernameHydrationError = false;
+            this.uiDirty = true;
+          },
+          'primary'
+        ));
+        return;
+      }
+    }
+
     // A named username is the only thing that puts a row on the public
     // page (mazer_leaderboard_page filters to it) -- a guest or an
     // authenticated player without one can never appear no matter how they
@@ -13714,7 +13766,7 @@ export class MenuScene extends Phaser.Scene {
         buttonWidth,
         buttonHeight,
         'Go to Account',
-        () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openOverlay('auth')),
+        () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface()),
         'primary'
       ));
       return;
@@ -13900,12 +13952,6 @@ export class MenuScene extends Phaser.Scene {
       this.buildPasswordRecoveryOverlay(panel, stacked);
       return;
     }
-    const rememberedIdentity = readLegacyRememberedIdentityState(this.resolveBrowserLocalStorage());
-    const presentation = resolveLegacyAuthPresentation({
-      mode: this.authForm.mode,
-      rememberedIdentity,
-      snapshot: this.authSnapshot
-    });
     const rowY = panel.top + (panel.height * 0.42);
 
     // No way out while the full auth gate has this locked -- handleBackAction
@@ -13915,31 +13961,55 @@ export class MenuScene extends Phaser.Scene {
       this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
     }
     this.createAuthWordmark(panel.top + (stacked ? 42 : 48));
-    this.createOverlayTitle(
-      this.authForm.mode === 'signup' ? 'Create account' : presentation.title,
-      panel.top + (stacked ? 103 : 110)
-    );
-    if (
-      this.authSnapshot.status !== 'authenticated'
-      && this.authForm.mode === 'login'
-      && rememberedIdentity?.displayName
-    ) {
-      this.createAuthInfoText(
-        rememberedIdentity.displayName,
-        panel.top + (stacked ? 164 : 176),
-        panel,
-        '#d7f7ee',
-        stacked ? 15 : 17
-      );
-    }
+    this.createOverlayTitle('Account', panel.top + (stacked ? 103 : 110));
 
     if (this.authSnapshot.status === 'authenticated') {
       this.buildAuthenticatedAccountSection(panel, stacked, rowY);
       return;
     }
 
-    this.buildAuthCredentialsForm(panel, stacked, centerX, rowY, presentation);
+    this.buildSharedAccountEntrySection(panel, stacked, centerX, rowY);
     this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
+  }
+
+  private buildSharedAccountEntrySection(
+    panel: OverlayPanelFrame,
+    stacked: boolean,
+    centerX: number,
+    rowY: number
+  ): void {
+    const feedback = this.authSnapshot.error ?? this.authSnapshot.info;
+    this.createAuthInfoText(
+      feedback ?? 'Use your shared Fawxzzy account to keep progression, settings, and leaderboard identity connected.',
+      rowY,
+      panel,
+      this.authSnapshot.error ? '#ff9d9d' : '#d7f7ee',
+      stacked ? 14 : 16
+    );
+
+    const footerY = panel.top + panel.height - 104;
+    this.createAuthFooterLink(
+      centerX,
+      footerY - 34,
+      'Reset password',
+      () => this.navigateToSharedAccountRoute('reset-password')
+    );
+    this.createAuthFooterLink(centerX - 48, footerY, 'Privacy', () => navigateToMazerLegalPortal('privacy'));
+    this.createAuthFooterLink(centerX + 48, footerY, 'Terms', () => navigateToMazerLegalPortal('terms'));
+    this.createLegacyBottomActionBar(
+      panel,
+      stacked,
+      {
+        onClick: () => { void this.handleSharedAccountAuthorization(); },
+        text: this.authSubmitting ? 'Opening' : 'Sign in',
+        tone: 'primary'
+      },
+      {
+        onClick: () => { void this.handleSharedAccountAuthorization(); },
+        text: 'Create account',
+        tone: 'secondary'
+      }
+    );
   }
 
   private isLegacyPasswordRecoveryActive(): boolean {
@@ -14007,25 +14077,14 @@ export class MenuScene extends Phaser.Scene {
     stacked: boolean,
     startY: number
   ): void {
-    let rowY = startY;
-
-    this.loadAccountUsernameIfNeeded();
-    const usernameFieldWidth = Math.min(panel.width - 32, 280);
-    const usernameFieldHeight = 54;
-    this.createAccountUsernameField(panel.centerX, rowY + (usernameFieldHeight / 2), usernameFieldWidth, usernameFieldHeight);
-    rowY += 74;
-
-    const accountEmail = this.authSnapshot.email ?? '';
-    if (accountEmail.length > 0) {
-      this.createAccountReadOnlyField(
-        panel.centerX,
-        rowY + (usernameFieldHeight / 2),
-        usernameFieldWidth,
-        usernameFieldHeight,
-        'EMAIL',
-        accountEmail
-      );
-    }
+    const accountLabel = this.authSnapshot.displayName ?? this.authSnapshot.email ?? 'Connected account';
+    this.createAuthInfoText(
+      `${accountLabel}\nManage your profile and account from the shared Fawxzzy account portal.`,
+      startY,
+      panel,
+      '#d7f7ee',
+      stacked ? 14 : 16
+    );
 
     // Match the auth-screen hierarchy: the lower-frequency destructive action
     // is a compact text control above one full-width primary dock action.
@@ -14042,6 +14101,7 @@ export class MenuScene extends Phaser.Scene {
     this.createLegacyBottomActionBar(
       panel,
       stacked,
+      { onClick: () => this.navigateToSharedAccountRoute('account'), text: 'Account', tone: 'primary' },
       { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }
     );
   }
@@ -14053,6 +14113,8 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.accountUsernameLoadedForUserId = userId;
+    this.accountUsernameHydrationPending = true;
+    this.accountUsernameHydrationError = false;
     // The QA fixture (?runtimeDiagnostics=1&authFixture=authenticated) is a
     // synthetic, front-end-only identity with no real row behind it -- a
     // real readLegacyAccountUsername call always fails for it (there's
@@ -14065,14 +14127,11 @@ export class MenuScene extends Phaser.Scene {
     if (userId === 'runtime-diagnostics-auth-fixture') {
       this.accountUsernameDraft = 'qa-player';
       this.accountUsernameSavedValue = 'qa-player';
-      this.accountUsernameStatus = 'saved';
-      this.accountUsernameStatusMessage = null;
+      this.accountUsernameHydrationPending = false;
       this.uiDirty = true;
       return;
     }
 
-    this.accountUsernameStatus = 'loading';
-    this.accountUsernameStatusMessage = null;
     this.accountUsernameSequence += 1;
     const sequence = this.accountUsernameSequence;
 
@@ -14084,20 +14143,25 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
+      this.accountUsernameHydrationPending = false;
       if (result.error) {
-        this.accountUsernameStatus = 'error';
-        this.accountUsernameStatusMessage = 'Could not load your username.';
+        this.accountUsernameHydrationError = true;
         this.uiDirty = true;
         return;
       }
 
       this.accountUsernameDraft = result.username ?? '';
       this.accountUsernameSavedValue = result.username ?? '';
-      this.accountUsernameStatus = 'idle';
-      this.accountUsernameStatusMessage = null;
       if (this.accountUsernameNativeInput) {
         this.accountUsernameNativeInput.value = this.accountUsernameDraft;
       }
+      this.uiDirty = true;
+    }).catch(() => {
+      if (sequence !== this.accountUsernameSequence || this.authSnapshot.userId !== userId) {
+        return;
+      }
+      this.accountUsernameHydrationPending = false;
+      this.accountUsernameHydrationError = true;
       this.uiDirty = true;
     });
   }
@@ -14122,21 +14186,15 @@ export class MenuScene extends Phaser.Scene {
 
     const candidate = this.accountUsernameDraft.trim();
     if (candidate.length === 0 || candidate === this.accountUsernameSavedValue) {
-      this.accountUsernameStatus = 'idle';
-      this.accountUsernameStatusMessage = null;
       this.uiDirty = true;
       return;
     }
 
     if (!LEGACY_USERNAME_PATTERN.test(candidate)) {
-      this.accountUsernameStatus = 'error';
-      this.accountUsernameStatusMessage = '2-15 characters: letters, numbers, periods, underscores, or hyphens.';
       this.uiDirty = true;
       return;
     }
 
-    this.accountUsernameStatus = 'checking';
-    this.accountUsernameStatusMessage = null;
     this.uiDirty = true;
 
     this.accountUsernameDebounceTimer = setTimeout(() => {
@@ -14169,20 +14227,15 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (availability.error) {
-      this.accountUsernameStatus = 'error';
-      this.accountUsernameStatusMessage = this.resolveAccountUsernameFriendlyError(availability.error);
       this.uiDirty = true;
       return;
     }
 
     if (availability.available === false) {
-      this.accountUsernameStatus = 'taken';
-      this.accountUsernameStatusMessage = 'That username is already taken.';
       this.uiDirty = true;
       return;
     }
 
-    this.accountUsernameStatus = 'saving';
     this.uiDirty = true;
     const saveResult = await saveLegacyAccountUsername(userId, candidate);
     if (sequence !== this.accountUsernameSequence) {
@@ -14190,265 +14243,12 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (!saveResult.ok) {
-      this.accountUsernameStatus = saveResult.error === 'That username is already taken.' ? 'taken' : 'error';
-      this.accountUsernameStatusMessage = saveResult.error === null
-        ? 'Could not save your username.'
-        : saveResult.error === 'That username is already taken.'
-          ? saveResult.error
-          : this.resolveAccountUsernameFriendlyError(saveResult.error);
       this.uiDirty = true;
       return;
     }
 
     this.accountUsernameSavedValue = candidate;
-    this.accountUsernameStatus = 'saved';
-    this.accountUsernameStatusMessage = null;
     this.uiDirty = true;
-  }
-
-  private resolveAccountUsernameFriendlyError(rawError: string): string {
-    const normalized = rawError.toLowerCase();
-    if (normalized.includes('fetch') || normalized.includes('network')) {
-      return 'Could not reach the account service. Check your connection and try again.';
-    }
-    return 'Could not check that username right now. Try again shortly.';
-  }
-
-  private resolveAccountUsernameStatusText(): string | null {
-    switch (this.accountUsernameStatus) {
-      case 'loading':
-        return 'Loading...';
-      case 'checking':
-        return 'Checking availability...';
-      case 'saving':
-        return 'Saving...';
-      case 'saved':
-        return null;
-      case 'taken':
-        return this.accountUsernameStatusMessage ?? 'That username is already taken.';
-      case 'error':
-        return this.accountUsernameStatusMessage ?? 'Something went wrong.';
-      default:
-        return null;
-    }
-  }
-
-  private createAccountUsernameField(x: number, y: number, width: number, height: number): void {
-    const isActive = this.accountUsernameActive;
-    const contentLeft = x - (width / 2) + 18;
-    const valueWidth = width - 36;
-    const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    background.on('pointerdown', () => {
-      this.accountUsernameActive = true;
-      this.positionAccountUsernameNativeInput({ height, width, x, y });
-      this.uiDirty = true;
-    });
-    if (isActive) {
-      this.positionAccountUsernameNativeInput({ height, width, x, y });
-    }
-
-    const borderColor = isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
-    const borderAlpha = isActive ? 0.95 : 0.68;
-    const border = this.add.graphics();
-    const left = x - (width / 2);
-    const right = x + (width / 2);
-    const top = y - (height / 2);
-    const bottom = y + (height / 2);
-    const radius = Math.min(18, height * 0.36);
-    const labelWidth = 84;
-    const labelRight = right - radius - 8;
-    const gapStart = labelRight - labelWidth - 7;
-    const gapEnd = labelRight + 7;
-    border.lineStyle(1, borderColor, borderAlpha);
-    border.beginPath();
-    border.moveTo(left + radius, top);
-    border.lineTo(gapStart, top);
-    border.moveTo(gapEnd, top);
-    border.lineTo(right - radius, top);
-    border.arc(right - radius, top + radius, radius, -Math.PI / 2, 0);
-    border.lineTo(right, bottom - radius);
-    border.arc(right - radius, bottom - radius, radius, 0, Math.PI / 2);
-    border.lineTo(left + radius, bottom);
-    border.arc(left + radius, bottom - radius, radius, Math.PI / 2, Math.PI);
-    border.lineTo(left, top + radius);
-    border.arc(left + radius, top + radius, radius, Math.PI, (Math.PI * 3) / 2);
-    border.strokePath();
-
-    const eyebrow = this.padLegacyCompactUiText(this.add.text(labelRight - (labelWidth / 2), top, 'USERNAME', {
-      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-      fontSize: '11px',
-      color: isActive ? '#72e0bf' : '#9bcdbd'
-    })).setOrigin(0.5);
-    this.uiTexts.push(eyebrow);
-
-    const hasValue = this.accountUsernameDraft.length > 0;
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(
-      contentLeft,
-      y + (height * 0.14),
-      hasValue ? this.accountUsernameDraft : 'Set a username',
-      {
-          fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-          fontSize: '14px',
-        color: hasValue ? (isActive ? '#72e0bf' : '#ecfff5') : '#7894a0'
-      }
-    )), valueWidth, 14, 14).setOrigin(0, 0.5);
-    this.uiTexts.push(label);
-
-    this.uiButtons.push({
-      background,
-      bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height),
-      label,
-      setActive: () => undefined,
-      text: 'username',
-      destroy: () => {
-        border.destroy();
-        background.destroy();
-        label.destroy();
-      }
-    });
-
-    const statusText = this.resolveAccountUsernameStatusText();
-    if (statusText !== null) {
-      const statusColor = this.accountUsernameStatus === 'saved'
-        ? '#72e0bf'
-        : this.accountUsernameStatus === 'taken' || this.accountUsernameStatus === 'error'
-          ? '#ff9d9d'
-          : '#7894a0';
-      const status = this.padLegacyCompactUiText(this.add.text(contentLeft, y + (height / 2) + 14, statusText, {
-        fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: '11px',
-        color: statusColor
-      })).setOrigin(0, 0.5);
-      this.uiTexts.push(status);
-    }
-  }
-
-  private createAccountReadOnlyField(
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    fieldLabel: string,
-    value: string
-  ): void {
-    const left = x - (width / 2);
-    const right = x + (width / 2);
-    const top = y - (height / 2);
-    const bottom = y + (height / 2);
-    const radius = Math.min(18, height * 0.36);
-    const labelWidth = Math.max(58, (fieldLabel.length * 7) + 18);
-    const labelRight = right - radius - 8;
-    const gapStart = labelRight - labelWidth - 7;
-    const gapEnd = labelRight + 7;
-    const border = this.add.graphics();
-    border.lineStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.68);
-    border.beginPath();
-    border.moveTo(left + radius, top);
-    border.lineTo(gapStart, top);
-    border.moveTo(gapEnd, top);
-    border.lineTo(right - radius, top);
-    border.arc(right - radius, top + radius, radius, -Math.PI / 2, 0);
-    border.lineTo(right, bottom - radius);
-    border.arc(right - radius, bottom - radius, radius, 0, Math.PI / 2);
-    border.lineTo(left + radius, bottom);
-    border.arc(left + radius, bottom - radius, radius, Math.PI / 2, Math.PI);
-    border.lineTo(left, top + radius);
-    border.arc(left + radius, top + radius, radius, Math.PI, (Math.PI * 3) / 2);
-    border.strokePath();
-    this.uiGraphics.push(border);
-
-    const eyebrow = this.padLegacyCompactUiText(this.add.text(
-      labelRight - (labelWidth / 2),
-      top,
-      fieldLabel,
-      {
-        color: '#9bcdbd',
-        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-        fontSize: '11px'
-      }
-    )).setOrigin(0.5);
-    const valueText = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(
-      left + 18,
-      y + (height * 0.14),
-      value,
-      {
-        color: '#ecfff5',
-        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-        fontSize: '14px'
-      }
-    )), width - 36, 14, 12).setOrigin(0, 0.5);
-    this.uiTexts.push(eyebrow, valueText);
-  }
-
-  private createAccountUsernameNativeInput(): HTMLInputElement | null {
-    if (typeof document === 'undefined' || typeof window === 'undefined') {
-      return null;
-    }
-
-    if (this.accountUsernameNativeInput) {
-      return this.accountUsernameNativeInput;
-    }
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.autocomplete = 'username';
-    input.inputMode = 'text';
-    input.enterKeyHint = 'done';
-    input.autocapitalize = 'none';
-    input.spellcheck = false;
-    input.maxLength = 15;
-    input.setAttribute('aria-label', 'username');
-    input.setAttribute('data-mazer-account-username-input', 'true');
-    input.value = this.accountUsernameDraft;
-    Object.assign(input.style, {
-      position: 'fixed',
-      zIndex: '2147483647',
-      opacity: '0.01',
-      background: 'transparent',
-      color: 'transparent',
-      caretColor: 'transparent',
-      border: '0',
-      outline: '0',
-      padding: '0',
-      margin: '0'
-    });
-
-    this.accountUsernameNativeInputHandler = () => {
-      this.handleAccountUsernameChange(input.value);
-    };
-    this.accountUsernameNativeKeyDownHandler = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' || event.key === 'Escape') {
-        event.preventDefault();
-        this.accountUsernameActive = false;
-        this.destroyAccountUsernameNativeInput();
-        this.uiDirty = true;
-      }
-    };
-    input.addEventListener('input', this.accountUsernameNativeInputHandler);
-    input.addEventListener('keydown', this.accountUsernameNativeKeyDownHandler);
-    document.body.appendChild(input);
-    this.accountUsernameNativeInput = input;
-    return input;
-  }
-
-  private positionAccountUsernameNativeInput(
-    bounds: { height: number; width: number; x: number; y: number }
-  ): void {
-    const input = this.createAccountUsernameNativeInput();
-    const canvas = this.game.canvas;
-    if (!input || !canvas) {
-      return;
-    }
-
-    input.value = this.accountUsernameDraft;
-    const rect = canvas.getBoundingClientRect();
-    const cssRect = resolveLegacyAuthInputCssRect(bounds, rect, this.layout);
-    input.style.left = `${cssRect.left}px`;
-    input.style.top = `${cssRect.top}px`;
-    input.style.width = `${Math.max(1, cssRect.width)}px`;
-    input.style.height = `${cssRect.height}px`;
-    window.setTimeout(() => input.focus({ preventScroll: true }), 0);
   }
 
   private destroyAccountUsernameNativeInput(): void {
@@ -14496,133 +14296,6 @@ export class MenuScene extends Phaser.Scene {
 
     this.handleAccountUsernameChange(`${this.accountUsernameDraft}${event.key}`);
     return true;
-  }
-
-  private buildAuthCredentialsForm(
-    panel: OverlayPanelFrame,
-    stacked: boolean,
-    centerX: number,
-    startY: number,
-    presentation: LegacyAuthPresentation
-  ): void {
-    const fieldWidth = Math.min(panel.width - 32, 280);
-    const fieldHeight = 54;
-    let rowY = startY;
-
-    if (this.authForm.mode === 'signup') {
-      this.createAuthFieldBox(
-        centerX,
-        rowY,
-        fieldWidth,
-        fieldHeight,
-        'username',
-        this.authForm.username,
-        this.authForm.username.length === 0
-      );
-      const usernameStatusText = this.resolveAuthUsernameStatusText();
-      if (usernameStatusText) {
-        const statusColor = this.authUsernameStatus === 'available'
-          ? '#72e0bf'
-          : this.authUsernameStatus === 'taken' || this.authUsernameStatus === 'error'
-            ? '#ff9d9d'
-            : '#7894a0';
-        this.createAuthInfoText(
-          usernameStatusText,
-          rowY + (fieldHeight / 2) + 14,
-          panel,
-          statusColor,
-          stacked ? 11 : 12
-        );
-      }
-      rowY += 64;
-    }
-
-    this.createAuthFieldBox(
-      centerX,
-      rowY,
-      fieldWidth,
-      fieldHeight,
-      'email',
-      this.authForm.email,
-      this.authForm.email.length === 0
-    );
-    rowY += 64;
-    this.createAuthFieldBox(
-      centerX,
-      rowY,
-      fieldWidth,
-      fieldHeight,
-      'password',
-      this.authForm.password.length === 0 ? '' : this.maskLegacyAuthPassword(),
-      this.authForm.password.length === 0
-    );
-
-    // Footer links (mode switch, password reset) sit inline below the
-    // fields as small text -- not full-width buttons -- mirroring
-    // Fitness's AuthFooter. The one actual action (submit) lives in the
-    // bottom-pinned action bar below, matching Fitness's AuthDock instead
-    // of stacking three same-sized buttons in the form flow.
-    const footerY = panel.top + panel.height - 104;
-    const modeLinkWidth = this.measureAuthFooterLinkWidth(presentation.alternateActionLabel);
-    const recoveryLinkWidth = this.authForm.mode === 'signup'
-      ? 0
-      : this.measureAuthFooterLinkWidth(presentation.recoveryActionLabel);
-    const separatorWidth = 0.465 * 16;
-    const separatorHeight = 0.94 * 14;
-    const footerGap = 8;
-    const footerGroupWidth = this.authForm.mode === 'signup'
-      ? modeLinkWidth
-      : modeLinkWidth + footerGap + separatorWidth + footerGap + recoveryLinkWidth;
-    let footerCursorX = centerX - (footerGroupWidth / 2);
-    this.createAuthFooterLink(
-      footerCursorX + (modeLinkWidth / 2),
-      footerY,
-      presentation.alternateActionLabel,
-      () => this.setLegacyAuthFormMode(this.authForm.mode === 'signup' ? 'login' : 'signup')
-    );
-    if (this.authForm.mode !== 'signup') {
-      footerCursorX += modeLinkWidth + footerGap;
-      const separatorX = footerCursorX + (separatorWidth / 2);
-      const separatorCenterY = footerY + 2;
-      footerCursorX += separatorWidth + footerGap;
-      this.createAuthFooterLink(
-        footerCursorX + (recoveryLinkWidth / 2),
-        footerY,
-        presentation.recoveryActionLabel,
-        () => { void this.handleLegacyAuthPasswordReset(); }
-      );
-      this.overlayGraphics.lineStyle(7, LEGACY_PLAY_TOUCH_ACCENT, 0.12);
-      this.overlayGraphics.lineBetween(separatorX, separatorCenterY - (separatorHeight / 2), separatorX, separatorCenterY + (separatorHeight / 2));
-      this.overlayGraphics.lineStyle(3, LEGACY_PLAY_TOUCH_ACCENT, 0.96);
-      this.overlayGraphics.lineBetween(separatorX, separatorCenterY - (separatorHeight / 2), separatorX, separatorCenterY + (separatorHeight / 2));
-    }
-
-    const feedbackLabel = this.time.now < this.latestAuthFeedbackMessageExpiresAtMs
-      ? resolveLegacyAuthBottomFeedbackLabel(this.authSnapshot.error, this.authSnapshot.info)
-      : null;
-    const primaryLabel = this.authSubmitting
-      ? 'Working'
-      : feedbackLabel ?? presentation.primaryActionLabel;
-    this.createLegacyBottomActionBar(
-      panel,
-      stacked,
-      {
-        onClick: () => { void this.handleLegacyAuthSubmit(); },
-        text: primaryLabel,
-        tone: 'primary'
-      },
-      null
-    );
-  }
-
-  private measureAuthFooterLinkWidth(text: string): number {
-    const label = this.padLegacyCompactUiText(this.add.text(0, 0, text, {
-      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-      fontSize: '14px'
-    }));
-    const width = label.displayWidth;
-    label.destroy();
-    return width;
   }
 
   private createAuthFooterLink(
@@ -16054,20 +15727,17 @@ export class MenuScene extends Phaser.Scene {
     const candidate = this.authForm.username.trim();
     if (candidate.length === 0) {
       this.authUsernameStatus = 'idle';
-      this.authUsernameStatusMessage = null;
       this.uiDirty = true;
       return;
     }
 
     if (!LEGACY_USERNAME_PATTERN.test(candidate)) {
       this.authUsernameStatus = 'error';
-      this.authUsernameStatusMessage = '2-15 characters: letters, numbers, periods, underscores, or hyphens.';
       this.uiDirty = true;
       return;
     }
 
     this.authUsernameStatus = 'checking';
-    this.authUsernameStatusMessage = null;
     this.uiDirty = true;
 
     this.authUsernameDebounceTimer = setTimeout(() => {
@@ -16084,29 +15754,12 @@ export class MenuScene extends Phaser.Scene {
 
     if (availability.error) {
       this.authUsernameStatus = 'error';
-      this.authUsernameStatusMessage = 'Could not check that username right now.';
       this.uiDirty = true;
       return;
     }
 
     this.authUsernameStatus = availability.available === false ? 'taken' : 'available';
-    this.authUsernameStatusMessage = availability.available === false ? 'That username is already taken.' : null;
     this.uiDirty = true;
-  }
-
-  private resolveAuthUsernameStatusText(): string | null {
-    switch (this.authUsernameStatus) {
-      case 'checking':
-        return 'Checking availability...';
-      case 'available':
-        return 'Username available.';
-      case 'taken':
-        return this.authUsernameStatusMessage ?? 'That username is already taken.';
-      case 'error':
-        return this.authUsernameStatusMessage ?? 'Something went wrong.';
-      default:
-        return null;
-    }
   }
 
   private resetAuthUsernameEvaluation(): void {
@@ -16116,29 +15769,6 @@ export class MenuScene extends Phaser.Scene {
     }
     this.authUsernameSequence += 1;
     this.authUsernameStatus = 'idle';
-    this.authUsernameStatusMessage = null;
-  }
-
-  private setLegacyAuthFormMode(mode: LegacyAuthFormState['mode']): void {
-    this.authForm = {
-      ...this.authForm,
-      mode,
-      confirmPassword: '',
-      username: ''
-    };
-    this.authPasswordVisible = false;
-    this.authInvalidFields = new Set();
-    this.activeAuthField = this.authForm.email.length > 0 ? 'password' : 'email';
-    this.destroyLegacyAuthNativeInput();
-    this.resetAuthUsernameEvaluation();
-    this.authSnapshot = {
-      ...this.authSnapshot,
-      error: null,
-      info: null
-    };
-    this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
-    this.clearQueuedLegacyPlayerMessagesBySource('auth');
-    this.uiDirty = true;
   }
 
   private maskLegacyAuthPassword(fieldId: 'confirmPassword' | 'password' = 'password'): string {
@@ -16448,46 +16078,6 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
-  private async handleLegacyAuthPasswordReset(): Promise<void> {
-    if (this.authSubmitting) {
-      return;
-    }
-
-    this.syncLegacyAuthNativeInputValue();
-    if (!this.authForm.email.includes('@')) {
-      this.authInvalidFields = new Set(['email']);
-      this.authSnapshot = {
-        ...this.authSnapshot,
-        error: null,
-        info: null
-      };
-      this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
-      this.clearQueuedLegacyPlayerMessagesBySource('auth');
-      this.activeAuthField = 'email';
-      this.uiDirty = true;
-      return;
-    }
-
-    if (!this.authSnapshot.configured) {
-      this.authSnapshot = {
-        ...this.authSnapshot,
-        error: LEGACY_AUTH_MESSAGE_COPY.passwordResetNotConfigured,
-        info: null
-      };
-      this.armLegacyAuthFeedbackMessage();
-      this.uiDirty = true;
-      return;
-    }
-
-    this.authInvalidFields = new Set();
-    this.authSubmitting = true;
-    this.uiDirty = true;
-    const result = await requestLegacyPasswordReset(this.authForm.email);
-    this.authSubmitting = false;
-    this.applyLegacyAuthSnapshot(result.snapshot);
-    this.uiDirty = true;
-  }
-
   private async handleLegacyAuthSignOut(): Promise<void> {
     if (this.authSubmitting) {
       return;
@@ -16496,7 +16086,7 @@ export class MenuScene extends Phaser.Scene {
     this.syncLegacyAuthNativeInputValue();
     this.authSubmitting = true;
     this.uiDirty = true;
-    const result = await signOutLegacyAuth();
+    const result = await signOutLegacyAuth(this.authSnapshot);
     this.authSubmitting = false;
     this.authForm = createEmptyLegacyAuthFormState(
       'login',
@@ -17394,6 +16984,102 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
+  private createLegacyAuthenticatedWelcomeIdentity(): void {
+    const username = this.authSnapshot.status === 'authenticated'
+      ? this.authSnapshot.canonicalUsername?.trim() ?? ''
+      : '';
+    if (username.length === 0) {
+      return;
+    }
+
+    const compact = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT;
+    const centerX = this.layout.centerButtonX;
+    const welcomeY = this.layout.centerButtonY - this.layout.buttonHeight - (compact ? 26 : 30);
+    const welcome = this.padLegacyCompactUiText(this.add.text(centerX, welcomeY, 'Welcome', {
+      color: '#7894a0',
+      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+      fontSize: `${compact ? 11 : 12}px`
+    })).setOrigin(0.5);
+    const usernameLabel = this.fitLegacyUiTextToWidth(
+      this.padLegacyUiText(this.add.text(centerX, welcomeY + (compact ? 17 : 19), username, {
+        color: '#d7f7ee',
+        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+        fontSize: `${compact ? 14 : 16}px`
+      })),
+      Math.min(this.layout.width - 48, 320),
+      compact ? 14 : 16,
+      11
+    ).setOrigin(0.5);
+    this.uiTexts.push(welcome, usernameLabel);
+  }
+
+  private createLegacySignedOutOAuthFailure(): void {
+    if (
+      this.authSnapshot.status === 'authenticated'
+      || this.authSnapshot.error !== MAZER_OAUTH_SAFE_ERROR_MESSAGE
+    ) {
+      return;
+    }
+
+    const compact = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT;
+    const feedback = this.padLegacyCompactUiText(this.add.text(
+      this.layout.centerButtonX,
+      this.layout.centerButtonY - this.layout.buttonHeight - (compact ? 24 : 28),
+      MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+      {
+        align: 'center',
+        color: '#ff9d9d',
+        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+        fontSize: `${compact ? 10 : 11}px`,
+        wordWrap: { width: Math.min(this.layout.width - 48, 320), useAdvancedWrap: true }
+      }
+    )).setOrigin(0.5);
+    this.uiTexts.push(feedback);
+  }
+
+  private openSharedAccountSurface(): void {
+    if (this.authSnapshot.status === 'authenticated') {
+      this.navigateToSharedAccountRoute('account');
+      return;
+    }
+    void this.handleSharedAccountAuthorization();
+  }
+
+  private navigateToSharedAccountRoute(route: 'account' | 'reset-password'): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    try {
+      navigateToMazerAccountPortal(route, window.location);
+    } catch {
+      this.authSnapshot = {
+        ...this.authSnapshot,
+        error: MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+        info: null
+      };
+      this.uiDirty = true;
+    }
+  }
+
+  private async handleSharedAccountAuthorization(): Promise<void> {
+    if (this.authSubmitting) {
+      return;
+    }
+    this.authSubmitting = true;
+    this.authSnapshot = { ...this.authSnapshot, error: null, info: null };
+    this.uiDirty = true;
+    const result = await beginMazerOAuthAuthorization();
+    if (result.status === 'failed') {
+      this.authSubmitting = false;
+      this.authSnapshot = {
+        ...this.authSnapshot,
+        error: MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+        info: null
+      };
+      this.uiDirty = true;
+    }
+  }
+
   private openOverlay(kind: OverlayKind): void {
     const previousOverlay = this.overlay;
     if (previousOverlay === 'auth' && kind !== 'auth') {
@@ -17759,6 +17445,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     return {
+      canonicalUsername: 'qa-player',
       configured: true,
       displayName: 'QA Player',
       email: 'qa@mazer.local',
@@ -17772,6 +17459,15 @@ export class MenuScene extends Phaser.Scene {
   private applyLegacyAuthSnapshot(snapshot: LegacyAuthSessionSnapshot): void {
     const previousMenuActionMode = this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest';
     const previousUserId = this.authSnapshot.userId;
+    const accountOwnerChangedDuringPlay = this.mode === 'play' && previousUserId !== snapshot.userId;
+
+    if (accountOwnerChangedDuringPlay) {
+      // Auth subscribers can fire between Phaser frames. Stop an account-owned
+      // run synchronously, while the OLD account scope is still active, so no
+      // pointer/QA input can finish it after progression storage switches to a
+      // signed-out or different-user scope.
+      this.enterMenuMode();
+    }
 
     this.authSnapshot = snapshot;
     this.authGateAwaitingResolution = false;
@@ -17804,10 +17500,10 @@ export class MenuScene extends Phaser.Scene {
       // account and must not leak into the next one's account screen, even
       // for a single frame before loadAccountUsernameIfNeeded re-fetches.
       this.accountUsernameLoadedForUserId = null;
+      this.accountUsernameHydrationPending = false;
+      this.accountUsernameHydrationError = false;
       this.accountUsernameDraft = '';
       this.accountUsernameSavedValue = '';
-      this.accountUsernameStatus = 'idle';
-      this.accountUsernameStatusMessage = null;
       this.accountUsernameActive = false;
       this.destroyAccountUsernameNativeInput();
       if (this.accountUsernameDebounceTimer !== null) {
@@ -17825,6 +17521,10 @@ export class MenuScene extends Phaser.Scene {
       this.uiDirty = true;
       this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
       this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+    }
+    if (accountOwnerChangedDuringPlay && snapshot.status !== 'authenticated') {
+      this.enterForcedLegacyAuthOverlay();
+      this.overlayReturn = 'none';
     }
     if (
       previousMenuActionMode !== menuActionMode

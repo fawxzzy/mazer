@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
 import {
+  LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS,
   LEGACY_AUTH_GUEST_SCOPE,
   LEGACY_AUTH_REMEMBERED_IDENTITY_KEY,
   buildLegacySignUpMetadata,
@@ -9,13 +10,21 @@ import {
   captureLegacyPasswordRecoveryBootUrlState,
   clearLegacyPasswordRecoveryUrl,
   createEmptyLegacyAuthFormState,
+  createLegacyAuthSessionSnapshot,
   createLegacyAuthScopedStorage,
   deriveLegacyRememberedIdentityDisplayName,
+  isLegacyAuthStorageEventKey,
+  isLegacyPasswordRecoveryRuntimeLocation,
+  isLegacyPersistedAuthSessionRemoved,
+  invokeLegacyLocalSignOutWithTimeout,
   markLegacyRememberedIdentityReauthRequired,
   normalizeLegacyAuthEmail,
   readLegacyRememberedIdentityState,
   readLegacyRememberedIdentity,
+  readLegacyPersistedAuthSessionSnapshot,
+  readLegacyAuthSessionSnapshot,
   readLegacyPasswordRecoveryBootUrlState,
+  reconcileLegacyAuthStorageSession,
   resolveLegacyPasswordRecoveryCleanUrl,
   resolveLegacyPasswordRecoveryEnterAction,
   resolveLegacyPasswordRecoveryRedirectUrl,
@@ -28,12 +37,18 @@ import {
   resolveLegacyAuthStorageScope,
   resolveLegacyAuthSubmitState,
   resolveLegacySignUpInfo,
+  runLegacyAbortableCredentialRequest,
   syncLegacyRememberedIdentityFromAuthenticatedSession,
   updateLegacyPasswordWithClient,
   writeLegacyRememberedIdentityState,
   writeLegacyRememberedIdentity,
   type LegacyAuthSessionSnapshot
 } from '../../src/legacy-runtime/legacyAuth';
+import {
+  MAZER_OAUTH_AUTH_SESSION_KEY,
+  MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+  consumeMazerOAuthCallback
+} from '../../src/legacy-runtime/legacyAccountPortal';
 
 class MemoryStorage {
   public values = new Map<string, string>();
@@ -65,6 +80,172 @@ const createSnapshot = (
 });
 
 describe('legacy auth runtime', () => {
+  test('aborts the underlying credential request before restoring its auth transport', async () => {
+    let observedSignal: AbortSignal | undefined;
+    const originalFetch = vi.fn((_: RequestInfo | URL, init?: RequestInit) => {
+      observedSignal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        observedSignal?.addEventListener('abort', () => {
+          reject(new DOMException('aborted', 'AbortError'));
+        }, { once: true });
+      });
+    }) as unknown as typeof fetch;
+    const transport = { fetch: originalFetch };
+
+    await expect(runLegacyAbortableCredentialRequest(
+      transport,
+      () => transport.fetch('https://bxtcuhkotumitoqtrcej.supabase.co/auth/v1/token'),
+      5
+    )).rejects.toMatchObject({ name: 'AbortError' });
+    expect(observedSignal?.aborted).toBe(true);
+    expect(transport.fetch).toBe(originalFetch);
+    expect(LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS).toBeLessThan(12_000);
+  });
+
+  test('bounds local sign-out remote revocation and restores its auth transport', async () => {
+    let observedSignal: AbortSignal | undefined;
+    const originalFetch = vi.fn((_: RequestInfo | URL, init?: RequestInit) => {
+      observedSignal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        observedSignal?.addEventListener('abort', () => {
+          reject(new DOMException('aborted', 'AbortError'));
+        }, { once: true });
+      });
+    }) as unknown as typeof fetch;
+    const clientFetch = vi.fn(() => {
+      throw new Error('logout must not use the client transport');
+    }) as unknown as typeof fetch;
+    const auth = {
+      fetch: clientFetch,
+      admin: { fetch: originalFetch },
+      storage: new MemoryStorage() as unknown as Storage,
+      storageKey: MAZER_OAUTH_AUTH_SESSION_KEY,
+      _signOut: async () => {
+        await auth.admin.fetch('https://bxtcuhkotumitoqtrcej.supabase.co/auth/v1/logout');
+        return { error: null };
+      }
+    };
+
+    await expect(invokeLegacyLocalSignOutWithTimeout(auth, 5)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(observedSignal?.aborted).toBe(true);
+    expect(auth.admin.fetch).toBe(originalFetch);
+    expect(auth.fetch).toBe(clientFetch);
+  });
+
+  test('suppresses provisional sign-out events when persisted session removal is a no-op', async () => {
+    const values = new Map([[MAZER_OAUTH_AUTH_SESSION_KEY, '{"retained":true}']]);
+    const noOpStorage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      removeItem: vi.fn(),
+      setItem: (key: string, value: string) => values.set(key, value)
+    } as unknown as Storage;
+    const events: string[] = [];
+    const auth = {
+      admin: { fetch: vi.fn() as unknown as typeof fetch },
+      storage: noOpStorage,
+      storageKey: MAZER_OAUTH_AUTH_SESSION_KEY,
+      _signOut: async () => {
+        auth.storage.removeItem(MAZER_OAUTH_AUTH_SESSION_KEY);
+        events.push('SIGNED_OUT');
+        return { error: null };
+      }
+    };
+
+    await expect(invokeLegacyLocalSignOutWithTimeout(auth, 50)).rejects.toThrow(
+      'Authentication session removal could not be verified.'
+    );
+    expect(events).toEqual([]);
+    expect(auth.storage).toBe(noOpStorage);
+  });
+
+  test('suppresses provisional sign-out events when persisted session removal throws', async () => {
+    const throwingStorage = {
+      getItem: () => '{"retained":true}',
+      removeItem: () => {
+        throw new DOMException('denied', 'SecurityError');
+      },
+      setItem: vi.fn()
+    } as unknown as Storage;
+    const events: string[] = [];
+    const auth = {
+      admin: { fetch: vi.fn() as unknown as typeof fetch },
+      storage: throwingStorage,
+      storageKey: MAZER_OAUTH_AUTH_SESSION_KEY,
+      _signOut: async () => {
+        auth.storage.removeItem(MAZER_OAUTH_AUTH_SESSION_KEY);
+        events.push('SIGNED_OUT');
+        return { error: null };
+      }
+    };
+
+    await expect(invokeLegacyLocalSignOutWithTimeout(auth, 50)).rejects.toMatchObject({ name: 'SecurityError' });
+    expect(events).toEqual([]);
+    expect(auth.storage).toBe(throwingStorage);
+  });
+
+  test('restores the exact authenticated snapshot when local sign-out fails', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(MAZER_OAUTH_AUTH_SESSION_KEY, JSON.stringify({
+      access_token: 'not-exposed',
+      refresh_token: 'not-exposed',
+      user: {
+        email: 'runner@example.test',
+        id: 'runner-id',
+        user_metadata: { username: 'MazeRunner' }
+      }
+    }));
+
+    expect(readLegacyPersistedAuthSessionSnapshot(storage, {
+      VITE_SUPABASE_ANON_KEY: 'anon-key',
+      VITE_SUPABASE_URL: 'https://example.supabase.co'
+    })).toMatchObject({
+      canonicalUsername: 'MazeRunner',
+      email: 'runner@example.test',
+      status: 'authenticated',
+      userId: 'runner-id'
+    });
+  });
+
+  test('rejects no-op and throwing local session removal postimages', () => {
+    const noOpRemoval = new MemoryStorage();
+    noOpRemoval.setItem(MAZER_OAUTH_AUTH_SESSION_KEY, '{"retained":true}');
+    expect(isLegacyPersistedAuthSessionRemoved(noOpRemoval)).toBe(false);
+
+    expect(isLegacyPersistedAuthSessionRemoved({
+      getItem: () => {
+        throw new DOMException('denied', 'SecurityError');
+      }
+    })).toBe(false);
+    expect(isLegacyPersistedAuthSessionRemoved(new MemoryStorage())).toBe(true);
+  });
+
+  test('verifies the session key derived from the configured auth client', async () => {
+    const rollbackStorageKey = 'sb-geknvnrmktchljnyddwp-auth-token';
+    const values = new Map([[rollbackStorageKey, '{"retained":true}']]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      removeItem: vi.fn(),
+      setItem: (key: string, value: string) => values.set(key, value)
+    } as unknown as Storage;
+    const events: string[] = [];
+    const auth = {
+      admin: { fetch: vi.fn() as unknown as typeof fetch },
+      storage,
+      storageKey: rollbackStorageKey,
+      _signOut: async () => {
+        auth.storage.removeItem(rollbackStorageKey);
+        events.push('SIGNED_OUT');
+        return { error: null };
+      }
+    };
+
+    await expect(invokeLegacyLocalSignOutWithTimeout(auth, 50)).rejects.toThrow(
+      'Authentication session removal could not be verified.'
+    );
+    expect(events).toEqual([]);
+    expect(isLegacyPersistedAuthSessionRemoved(storage, rollbackStorageKey)).toBe(false);
+  });
+
   test('detects whether Supabase browser auth is configured', () => {
     expect(resolveLegacyAuthConfig({})).toBeNull();
     expect(resolveLegacyAuthConfig({
@@ -73,6 +254,65 @@ describe('legacy auth runtime', () => {
     })).toEqual({
       anonKey: 'anon-key',
       url: 'https://example.supabase.co'
+    });
+  });
+
+  test('uses the canonical master username before profile display metadata', () => {
+    const snapshot = createLegacyAuthSessionSnapshot({
+      user: {
+        email: 'shared-owner@example.test',
+        id: 'master-user-without-mazer-profile',
+        user_metadata: {
+          display_name: 'Shared Display Name',
+          full_name: 'Shared Full Name',
+          username: 'canonical-owner'
+        }
+      }
+    } as Parameters<typeof createLegacyAuthSessionSnapshot>[0], {
+      VITE_SUPABASE_ANON_KEY: 'anon-key',
+      VITE_SUPABASE_URL: 'https://example.supabase.co'
+    });
+
+    expect(snapshot).toMatchObject({
+      canonicalUsername: 'canonical-owner',
+      displayName: 'canonical-owner',
+      status: 'authenticated',
+      userId: 'master-user-without-mazer-profile'
+    });
+  });
+
+  test('keeps a profile-backed user on the same Auth principal and fallback order', () => {
+    const env = {
+      VITE_SUPABASE_ANON_KEY: 'anon-key',
+      VITE_SUPABASE_URL: 'https://example.supabase.co'
+    };
+    const createSnapshotForMetadata = (userMetadata: Record<string, unknown>) => (
+      createLegacyAuthSessionSnapshot({
+        user: {
+          email: 'profile-owner@example.test',
+          id: 'master-user-with-mazer-profile',
+          user_metadata: userMetadata
+        }
+      } as Parameters<typeof createLegacyAuthSessionSnapshot>[0], env)
+    );
+
+    expect(createSnapshotForMetadata({
+      display_name: 'Mazer Profile Name',
+      full_name: 'Shared Full Name',
+      username: 'profile-owner'
+    })).toMatchObject({
+      canonicalUsername: 'profile-owner',
+      displayName: 'profile-owner',
+      userId: 'master-user-with-mazer-profile'
+    });
+    expect(createSnapshotForMetadata({
+      display_name: 'Mazer Profile Name',
+      full_name: 'Shared Full Name',
+      username: '   '
+    })).toMatchObject({
+      canonicalUsername: null,
+      displayName: 'Mazer Profile Name',
+      userId: 'master-user-with-mazer-profile'
     });
   });
 
@@ -139,6 +379,14 @@ describe('legacy auth runtime', () => {
     expect(resolveLegacyPasswordRecoveryCleanUrl('https://mazer.fawxzzy.com', 'continue')).toBe(
       'https://mazer.fawxzzy.com/'
     );
+  });
+
+  test('enables Supabase URL-session detection only on the legacy recovery route', () => {
+    expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/update-password' })).toBe(true);
+    expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/update-password/' })).toBe(true);
+    expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/' })).toBe(false);
+    expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/privacy' })).toBe(false);
+    expect(isLegacyPasswordRecoveryRuntimeLocation(undefined)).toBe(false);
   });
 
   test('recognizes direct recovery paths and categorical provider failures without exposing details', () => {
@@ -385,10 +633,25 @@ describe('legacy auth runtime', () => {
   test('guards auth persistence against global sign-out and duplicate listeners', () => {
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
 
-    expect(authSource).toContain("client.auth.signOut({ scope: 'local' })");
+    expect(authSource).toContain('await invokeLegacyLocalSignOutWithTimeout(directSignOut)');
+    expect(authSource).toContain('const authStorage = directSignOut.storage ?? null;');
+    expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
+    expect(authSource).toContain('return runLegacyAuthDirectSessionMutation(async () => {');
+    expect(authSource).toContain('fail closed if the pinned seam ever changes');
     expect(authSource).toContain('legacyAuthPersistenceListenerInstalled');
+    expect(authSource).toContain('legacyAuthStorageListenerInstalled');
+    expect(authSource).toContain("window.addEventListener('storage'");
+    expect(authSource).toContain('!isLegacyAuthStorageEventKey(event.key, authStorageKey)');
+    expect(authSource).toContain('reconcileLegacyAuthStorageSession(');
+    expect(authSource).toContain('legacyAuthLiveListeners');
+    expect(authSource.match(/isMazerOAuthSessionQuarantined\(/g)?.length).toBeGreaterThanOrEqual(5);
     expect(authSource).toContain('syncLegacyAuthPersistenceFromSession(data.session,');
     expect(authSource).toContain('export const readLegacyAuthSessionSnapshot = async');
+    expect(authSource).toContain('if (isMazerOAuthSessionQuarantined()) {');
+    expect(authSource).toContain("listener({ ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE }, event);");
+    expect(authSource).toContain("error: oauthBootResult.status === 'failed'");
+    expect(authSource).toContain('? MAZER_OAUTH_SAFE_ERROR_MESSAGE');
+    expect(authSource).toContain(': error?.message ?? null');
     expect(authSource).toContain('export const subscribeLegacyAuthState = (');
     expect(authSource).toContain("if (snapshot.status === 'authenticated')");
     expect(authSource).toContain('return `${session.user.id}:${session.expires_at ?? 0}`;');
@@ -397,6 +660,75 @@ describe('legacy auth runtime', () => {
     expect(authSource).not.toContain("|| event === 'BOOTSTRAP_SESSION'");
     expect(authSource).not.toContain("|| event === 'INITIAL_SESSION'");
     expect(authSource).toContain("event === 'SIGNED_OUT'");
+  });
+
+  test('fans storage-event reconciliation out to every live auth subscriber', async () => {
+    const firstListener = vi.fn();
+    const secondListener = vi.fn();
+    const session = {
+      access_token: 'access-token',
+      expires_at: 2_100,
+      expires_in: 100,
+      refresh_token: 'refresh-token',
+      token_type: 'bearer',
+      user: {
+        app_metadata: {},
+        aud: 'authenticated',
+        created_at: '2026-09-13T00:00:00.000Z',
+        email: 'player@example.test',
+        id: '11111111-1111-4111-8111-111111111111',
+        user_metadata: { username: 'Maze Player' }
+      }
+    };
+    await expect(reconcileLegacyAuthStorageSession(
+      async () => session as never,
+      new Set([firstListener, secondListener]),
+      () => false,
+      { VITE_SUPABASE_ANON_KEY: 'anon-key', VITE_SUPABASE_URL: 'https://example.supabase.co' }
+    )).resolves.toBe(true);
+    for (const listener of [firstListener, secondListener]) {
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+        email: 'player@example.test',
+        status: 'authenticated',
+        userId: '11111111-1111-4111-8111-111111111111'
+      }), 'SIGNED_IN');
+    }
+
+    firstListener.mockClear();
+    secondListener.mockClear();
+    await expect(reconcileLegacyAuthStorageSession(
+      async () => session as never,
+      new Set([firstListener, secondListener]),
+      () => true
+    )).resolves.toBe(false);
+    expect(firstListener).not.toHaveBeenCalled();
+    expect(secondListener).not.toHaveBeenCalled();
+  });
+
+  test('accepts storage events for either configured project key without accepting unrelated keys', () => {
+    const rollbackStorageKey = 'sb-geknvnrmktchljnyddwp-auth-token';
+
+    expect(isLegacyAuthStorageEventKey(MAZER_OAUTH_AUTH_SESSION_KEY, MAZER_OAUTH_AUTH_SESSION_KEY)).toBe(true);
+    expect(isLegacyAuthStorageEventKey(rollbackStorageKey, rollbackStorageKey)).toBe(true);
+    expect(isLegacyAuthStorageEventKey(MAZER_OAUTH_AUTH_SESSION_KEY, rollbackStorageKey)).toBe(false);
+    expect(isLegacyAuthStorageEventKey(rollbackStorageKey, MAZER_OAUTH_AUTH_SESSION_KEY)).toBe(false);
+    expect(isLegacyAuthStorageEventKey('unrelated', rollbackStorageKey)).toBe(false);
+    expect(isLegacyAuthStorageEventKey(null, rollbackStorageKey)).toBe(false);
+  });
+
+  test('preserves fixed-safe callback failure feedback when no auth client can be constructed', async () => {
+    await consumeMazerOAuthCallback({
+      code: null,
+      malformed: false,
+      providerError: false,
+      requested: true,
+      state: null
+    }, async () => null, null);
+
+    await expect(readLegacyAuthSessionSnapshot()).resolves.toMatchObject({
+      error: MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+      status: 'unavailable'
+    });
   });
 
   test('binds browser data queries to a schema resolved per-project, not a hardcoded constant', () => {

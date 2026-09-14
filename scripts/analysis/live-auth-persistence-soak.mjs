@@ -22,15 +22,20 @@ const MOBILE_VIEWPORT = Object.freeze({ width: 405, height: 958 });
 const MOBILE_DPR = 2;
 const TIMEOUT_MS = 30_000;
 
-export const SIGNED_OUT_AUTH_GATE_BUTTONS = Object.freeze([
-  'email',
-  'password',
-  'Show password',
+export const SIGNED_OUT_SHARED_ACCOUNT_BUTTONS = Object.freeze([
+  'Login',
+  'Settings',
+  'Leaderboard',
+  'Account'
+]);
+export const RETIRED_LOCAL_AUTH_CONTROLS = Object.freeze([
   'Create account',
   'Reset password',
-  'Sign in'
+  'Privacy',
+  'Terms',
+  'Sign in',
+  'Play as guest'
 ]);
-export const RETIRED_GUEST_ENTRY_BUTTON = 'Play as guest';
 export const AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY = 'mazer.game-toggles.v1:user:runtime-diagnostics-auth-fixture';
 export const GUEST_FIXTURE_SETTINGS_STORAGE_KEY = 'mazer.game-toggles.v1:guest';
 export const UNSCOPED_SETTINGS_STORAGE_KEY = 'mazer.game-toggles.v1';
@@ -545,8 +550,8 @@ export const buildAuthPersistenceRoute = (authenticated) => (
 
 export const summarizeAuthPersistenceSoak = (steps, consoleMessages, pageErrors) => {
   const required = [
-    'signed-out-account-gate',
-    'signed-out-empty-submit-stays-gated',
+    'signed-out-shared-account-entry',
+    'signed-out-shared-account-contract',
     'diagnostics-fixture-entry',
     'diagnostics-fixture-options',
     'diagnostics-fixture-trail-shine-changed',
@@ -705,49 +710,40 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       });
       pendingRequests.delete(request);
     });
-    enterPhase('signed-out-account-gate');
+    enterPhase('signed-out-shared-account-entry');
     await page.goto(`${preview.baseUrl}${buildAuthPersistenceRoute(false)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
-    const signedOutAccountGate = await waitForSurface(page, {
+    const signedOutAccountEntry = await waitForSurface(page, {
       authenticated: false,
-      buttons: SIGNED_OUT_AUTH_GATE_BUTTONS,
+      buttons: SIGNED_OUT_SHARED_ACCOUNT_BUTTONS,
       exactButtons: true,
-      forbiddenButtons: [RETIRED_GUEST_ENTRY_BUTTON],
+      forbiddenButtons: RETIRED_LOCAL_AUTH_CONTROLS,
       mode: 'menu',
-      overlay: 'auth'
+      overlay: 'none'
     });
     steps.push({
-      id: 'signed-out-account-gate',
-      pass: surfaceMatchesAuthPersistenceExpectation(signedOutAccountGate, {
+      id: 'signed-out-shared-account-entry',
+      pass: surfaceMatchesAuthPersistenceExpectation(signedOutAccountEntry, {
         authenticated: false,
-        buttons: SIGNED_OUT_AUTH_GATE_BUTTONS,
+        buttons: SIGNED_OUT_SHARED_ACCOUNT_BUTTONS,
         exactButtons: true,
-        forbiddenButtons: [RETIRED_GUEST_ENTRY_BUTTON],
+        forbiddenButtons: RETIRED_LOCAL_AUTH_CONTROLS,
         mode: 'menu',
-        overlay: 'auth'
+        overlay: 'none'
       }),
-      surface: signedOutAccountGate
+      surface: signedOutAccountEntry
     });
 
-    // Empty submission exercises only local validation. Authenticated gameplay
-    // below uses the maintained diagnostics fixture and never real credentials.
-    enterPhase('signed-out-empty-submit');
-    const emptySubmitPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Sign in');
-    await page.mouse.click(emptySubmitPoint.x, emptySubmitPoint.y);
-    const invalidSignedOutSubmit = await waitForSurface(page, {
-      authenticated: false,
-      buttons: SIGNED_OUT_AUTH_GATE_BUTTONS,
-      exactButtons: true,
-      forbiddenButtons: [RETIRED_GUEST_ENTRY_BUTTON],
-      mode: 'menu',
-      overlay: 'auth'
-    });
+    // Do not click the external OAuth controls in this fixture-only soak. The
+    // exact destination and PKCE contract are covered by source-level tests;
+    // authenticated gameplay below uses only the maintained diagnostics lane.
+    enterPhase('signed-out-shared-account-contract');
     steps.push({
-      id: 'signed-out-empty-submit-stays-gated',
-      pass: invalidSignedOutSubmit.mode === 'menu'
-        && invalidSignedOutSubmit.overlay === 'auth'
-        && !invalidSignedOutSubmit.userIdPresent
-        && !invalidSignedOutSubmit.buttons.includes(RETIRED_GUEST_ENTRY_BUTTON),
-      surface: invalidSignedOutSubmit
+      id: 'signed-out-shared-account-contract',
+      pass: signedOutAccountEntry.mode === 'menu'
+        && signedOutAccountEntry.overlay === 'none'
+        && !signedOutAccountEntry.userIdPresent
+        && RETIRED_LOCAL_AUTH_CONTROLS.every((label) => !signedOutAccountEntry.buttons.includes(label)),
+      surface: signedOutAccountEntry
     });
 
     enterPhase('diagnostics-fixture-entry');
@@ -883,20 +879,19 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
     await openOptionsViaQa(page);
-    await waitForSurface(page, {
-      authenticated: true, buttons: ['Account'], mode: 'menu', overlay: 'options'
-    });
-    const accountPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Account');
-    await page.mouse.click(accountPoint.x, accountPoint.y);
     const fixtureAccount = await waitForSurface(page, {
-      authenticated: true, buttons: ['username', 'Reset progress', 'Sign out'], mode: 'menu',
-      overlay: 'auth'
+      authenticated: true, buttons: ['Account'], mode: 'menu', overlay: 'options'
     });
     steps.push({
       id: 'diagnostics-fixture-account',
-      pass: fixtureAccount.userIdPresent && fixtureAccount.authStatus === 'authenticated',
+      pass: fixtureAccount.userIdPresent
+        && fixtureAccount.authStatus === 'authenticated'
+        && fixtureAccount.buttons.includes('Account')
+        && fixtureAccount.mode === 'menu'
+        && fixtureAccount.overlay === 'options',
       surface: fixtureAccount,
-      fixtureOnly: true
+      fixtureOnly: true,
+      note: 'The authenticated Account control is present; the fixture intentionally does not follow the external shared-account portal navigation.'
     });
 
     enterPhase('fixture-reentry');
@@ -933,7 +928,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       label,
       generatedAt: new Date().toISOString(),
       fixtureOnly: true,
-      note: 'This verifies the exact current signed-out account gate and an opposite fixture-local Trail Shine value through the real Settings control, reload, gameplay, Pause, Account, and re-entry without credentials, external settings/session writes, or retired guest-entry controls.',
+      note: 'This verifies the exact current signed-out shared-account entry surface and an opposite fixture-local Trail Shine value through the real Settings control, reload, gameplay, Pause, Account, and re-entry without credentials, external settings/session writes, or retired local-auth controls.',
       viewport: MOBILE_VIEWPORT,
       deviceScaleFactor: MOBILE_DPR,
       result,

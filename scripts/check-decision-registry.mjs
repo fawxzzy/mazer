@@ -251,7 +251,7 @@ const checkRedesignComplete = (registry) => {
 const REQUIRED_INTEGRATOR_WAVE_BY_PATH = Object.freeze({
   'scripts/analysis/capture-auth-capability-surfaces.mjs': '0C',
   'scripts/analysis/capture-ui-surfaces.mjs': '0C',
-  'scripts/analysis/live-auth-persistence-soak.mjs': '0C',
+  'scripts/analysis/live-auth-persistence-soak.mjs': '5C',
   'src/theme/tokens.ts': '1B',
   'src/theme/tokens.css': '1B',
   'src/scenes/diagnostics/menuSurfaceStateDiagnostics.ts': '1C',
@@ -262,10 +262,18 @@ const REQUIRED_INTEGRATOR_WAVE_BY_PATH = Object.freeze({
   'src/scenes/diagnostics/menuCaptureMetadataDiagnostics.ts': '1C',
   'src/scenes/diagnostics/menuRuntimeDiagnosticsCompatibility.ts': '1C',
   'src/scenes/menuRuntimeDiagnostics.ts': '1C',
-  'src/scenes/MenuScene.ts': '4E',
-  'src/legacy-runtime/legacyAuth.ts': '3B',
+  'src/scenes/MenuScene.ts': '5C',
+  'src/legacy-runtime/legacyAuth.ts': '5C',
   'src/legacy-runtime/legacyPlayerMessage.ts': '3B',
-  'vite.config.ts': '5B',
+  'src/legacy-runtime/legacyAccountPortal.ts': '5C',
+  'src/boot/bootStatus.ts': '5C',
+  'src/boot/main.ts': '5C',
+  'src/boot/installGate.ts': '5C',
+  'src/boot/legalSurface.ts': '5C',
+  'src/styles/base.css': '5C',
+  'index.html': '5C',
+  'vercel.json': '5C',
+  'vite.config.ts': '5C',
   'package.json': '5B'
 });
 
