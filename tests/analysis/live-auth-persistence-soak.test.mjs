@@ -190,6 +190,18 @@ describe('live auth persistence soak contract', () => {
       baseUrl: 'https://attacker.vercel.app/',
       protectionBypass: 'fixture-secret'
     })).toThrow('protection_bypass_target_forbidden');
+    expect(() => buildVercelProtectionBypassSeedUrl({
+      baseUrl: 'http://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+      protectionBypass: 'fixture-secret'
+    })).toThrow('protected_deployment_https_required');
+    await expect(seedVercelProtectionBypassCookie({
+      baseUrl: 'http://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+      context: {
+        cookies: async () => [],
+        request: { get: async () => { throw new Error('must not execute'); } }
+      },
+      protectionBypass: 'fixture-secret'
+    })).rejects.toThrow('protected_deployment_https_required');
     await expect(seedVercelProtectionBypassCookie({
       baseUrl: plan.baseUrl,
       context: {

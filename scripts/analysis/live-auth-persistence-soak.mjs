@@ -96,6 +96,9 @@ export const buildVercelProtectionBypassSeedUrl = ({ baseUrl, protectionBypass }
     throw new Error('protection_bypass_missing');
   }
   const url = new URL(baseUrl);
+  if (url.protocol !== 'https:') {
+    throw new Error('protected_deployment_https_required');
+  }
   if (url.hostname === PUBLIC_PRODUCTION_HOST || !PROTECTED_DEPLOYMENT_HOST_PATTERN.test(url.hostname)) {
     throw new Error('protection_bypass_target_forbidden');
   }
