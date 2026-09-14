@@ -85,9 +85,12 @@ describe('live play QA script helpers', () => {
     expect(tracker.snapshot()).toMatchObject({ stabilized: true, unexpectedNavigation: null });
   });
 
-  test('does not invent a service-worker reload on localhost', () => {
+  test('expects a service-worker reload only for non-loopback HTTPS targets', () => {
     expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://127.0.0.1:4173/')).toBe(0);
     expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://localhost:4173/')).toBe(0);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://192.168.1.20:4173/')).toBe(0);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://mazer.example.test/')).toBe(0);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://localhost:4173/')).toBe(0);
     expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://mazer.example.test/')).toBe(1);
   });
 
