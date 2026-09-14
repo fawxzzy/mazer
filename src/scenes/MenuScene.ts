@@ -342,7 +342,9 @@ import {
 } from '../legacy-runtime/legacyPlayerMessage';
 import {
   hydrateLegacyRemoteAccountState,
+  isLegacyRemoteAccountProviderEligible,
   isLegacyRemoteCompletionContextCurrent,
+  LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID,
   readLegacyBootstrappedAccountState,
   readLegacyBootstrappedAuthSnapshot,
   writeLegacyRemoteCompletion,
@@ -14124,7 +14126,7 @@ export class MenuScene extends Phaser.Scene {
     // of anything past it. Seed a fixed local value instead of hitting the
     // network at all -- purely cosmetic/local, never actually persisted or
     // validated anywhere real.
-    if (userId === 'runtime-diagnostics-auth-fixture') {
+    if (userId === LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID) {
       this.accountUsernameDraft = 'qa-player';
       this.accountUsernameSavedValue = 'qa-player';
       this.accountUsernameHydrationPending = false;
@@ -17452,7 +17454,7 @@ export class MenuScene extends Phaser.Scene {
       error: null,
       info: 'Runtime diagnostics authenticated fixture.',
       status: 'authenticated',
-      userId: 'runtime-diagnostics-auth-fixture'
+      userId: LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID
     };
   }
 
@@ -17514,7 +17516,7 @@ export class MenuScene extends Phaser.Scene {
       this.loadPersistedLegacyGameToggleSettings();
       this.loadPersistedMazeCycleTelemetryHistory();
       this.loadPersistedLegacyProgressionState();
-      if (snapshot.status === 'authenticated' && snapshot.userId) {
+      if (isLegacyRemoteAccountProviderEligible(snapshot)) {
         void this.hydrateLegacyAccountDataAfterAuth(snapshot, hydrationSequence);
       }
       this.boardDynamicDirty = true;

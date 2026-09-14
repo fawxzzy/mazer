@@ -20,6 +20,7 @@ export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identi
 export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
 export const LEGACY_PASSWORD_RECOVERY_PATH = '/update-password';
 export const LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS = 10_000;
+export const LEGACY_AUTH_JS_LOCK_MAX_WAIT_MS = LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS;
 
 export type LegacyAuthStatus = 'guest' | 'authenticated' | 'unavailable';
 export type LegacyAuthFormMode = 'login' | 'signup';
@@ -141,6 +142,94 @@ interface LegacyAuthDirectSignOutClient {
 export interface LegacyAuthAbortableTransport {
   fetch: typeof fetch;
 }
+
+export interface LegacyAuthJsLockManager {
+  request<T>(
+    name: string,
+    options: { ifAvailable?: true; mode: 'exclusive'; signal?: AbortSignal },
+    callback: (lock: Lock | null) => T | PromiseLike<T>
+  ): Promise<T>;
+}
+
+export class LegacyAuthJsLockAcquireTimeoutError extends Error {
+  public readonly isAcquireTimeout = true;
+
+  public constructor(lockName: string) {
+    super(`Timed out waiting for authentication lock "${lockName}".`);
+    this.name = 'LegacyAuthJsLockAcquireTimeoutError';
+  }
+}
+
+export class LegacyAuthJsLockUnavailableError extends Error {
+  public constructor() {
+    super('Browser authentication locking is unavailable.');
+    this.name = 'LegacyAuthJsLockUnavailableError';
+  }
+}
+
+const resolveLegacyAuthJsLockWaitMs = (acquireTimeout: number): number => {
+  if (acquireTimeout === 0) {
+    return 0;
+  }
+  return acquireTimeout < 0
+    ? LEGACY_AUTH_JS_LOCK_MAX_WAIT_MS
+    : Math.min(acquireTimeout, LEGACY_AUTH_JS_LOCK_MAX_WAIT_MS);
+};
+
+export const runLegacyAuthJsLock = async <T>(
+  name: string,
+  acquireTimeout: number,
+  operation: () => T | Promise<T>,
+  lockManager: LegacyAuthJsLockManager | null = (
+    typeof navigator === 'undefined' || navigator.locks === undefined
+      ? null
+      : navigator.locks as LegacyAuthJsLockManager
+  )
+): Promise<T> => {
+  if (lockManager === null) {
+    throw new LegacyAuthJsLockUnavailableError();
+  }
+
+  const waitMs = resolveLegacyAuthJsLockWaitMs(acquireTimeout);
+  if (waitMs === 0) {
+    return lockManager.request(name, { ifAvailable: true, mode: 'exclusive' }, async (lock) => {
+      if (lock === null) {
+        throw new LegacyAuthJsLockAcquireTimeoutError(name);
+      }
+      return operation();
+    });
+  }
+
+  const controller = new AbortController();
+  let acquired = false;
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, waitMs);
+
+  try {
+    return await lockManager.request(
+      name,
+      { mode: 'exclusive', signal: controller.signal },
+      async (lock) => {
+        acquired = true;
+        clearTimeout(timeout);
+        if (lock === null) {
+          throw new LegacyAuthJsLockUnavailableError();
+        }
+        return operation();
+      }
+    );
+  } catch (error) {
+    if (timedOut && !acquired && error instanceof Error && error.name === 'AbortError') {
+      throw new LegacyAuthJsLockAcquireTimeoutError(name);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 
 export const runLegacyAbortableCredentialRequest = async <T>(
   transport: LegacyAuthAbortableTransport,
@@ -607,18 +696,12 @@ export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> =>
         detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation(),
         persistSession: true,
         storage: typeof window === 'undefined' ? undefined : window.localStorage,
-        // Auth-js routes every refresh/update-capable session operation through
-        // this hook. Use the same bounded, fail-closed lock as OAuth commit,
-        // rollback, and crash recovery so a late refresh from account A cannot
-        // overwrite an accepted account B session. Never accept auth-js's
-        // unbounded default wait or its no-op non-browser fallback here.
-        lock: async (_name, _acquireTimeout, fn) => {
-          const result = await runMazerExclusiveAuthMutation(fn);
-          if (result.status !== 'completed') {
-            throw new Error('Shared authentication transaction unavailable.');
-          }
-          return result.value;
-        }
+        // Preserve auth-js's caller-supplied lock identity and queue normal
+        // same-session contention. Its negative "wait forever" request is
+        // capped so a stale browser holder cannot freeze account hydration;
+        // true acquisition timeouts retain auth-js's isAcquireTimeout contract.
+        // OAuth commit/rollback keeps its separate fail-fast transaction seam.
+        lock: runLegacyAuthJsLock
       },
       db: {
         schema

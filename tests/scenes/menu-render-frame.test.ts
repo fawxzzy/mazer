@@ -1713,7 +1713,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(overlayRoutingSource).toContain("export type LegacyOverlayKind = 'none' | 'options' | 'pause' | 'auth' | 'confirm-progression-reset' | 'leaderboard';");
     expect(authSource).toContain('createClient(config.url, config.anonKey');
     expect(authSource).toContain('autoRefreshToken: true');
-    expect(authSource).toContain('const result = await runMazerExclusiveAuthMutation(fn);');
+    expect(authSource).toContain('lock: runLegacyAuthJsLock');
     expect(authSource).not.toContain('lock: async (_name, _acquireTimeout, fn) => fn()');
     expect(authSource).toContain('persistSession: true');
     expect(authSource).toContain('detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation()');
@@ -1725,7 +1725,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null');
     expect(menuSceneSource).toContain("runtimeDiagnostics !== '1' && runtimeDiagnostics !== 'true'");
     expect(menuSceneSource).toContain("searchParams.get('authFixture')?.trim().toLowerCase() !== 'authenticated'");
-    expect(menuSceneSource).toContain("userId: 'runtime-diagnostics-auth-fixture'");
+    expect(menuSceneSource).toContain('userId: LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID');
+    expect(menuSceneSource).toContain('isLegacyRemoteAccountProviderEligible(snapshot)');
     expect(menuSceneSource).toContain('const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();');
     expect(menuSceneSource).toContain('if (runtimeAuthFixtureSnapshot) {');
     expect(menuSceneSource).not.toContain("this.openOverlay('auth')");

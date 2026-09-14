@@ -4,7 +4,10 @@ import { describe, expect, test, vi } from 'vitest';
 import {
   LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS,
   LEGACY_AUTH_GUEST_SCOPE,
+  LEGACY_AUTH_JS_LOCK_MAX_WAIT_MS,
   LEGACY_AUTH_REMEMBERED_IDENTITY_KEY,
+  LegacyAuthJsLockAcquireTimeoutError,
+  LegacyAuthJsLockUnavailableError,
   buildLegacySignUpMetadata,
   buildLegacyRememberedIdentityState,
   captureLegacyPasswordRecoveryBootUrlState,
@@ -38,6 +41,7 @@ import {
   resolveLegacyAuthSubmitState,
   resolveLegacySignUpInfo,
   runLegacyAbortableCredentialRequest,
+  runLegacyAuthJsLock,
   syncLegacyRememberedIdentityFromAuthenticatedSession,
   updateLegacyPasswordWithClient,
   writeLegacyRememberedIdentityState,
@@ -66,6 +70,52 @@ class MemoryStorage {
   }
 }
 
+class NamedLockHarness {
+  private readonly held = new Set<string>();
+  private readonly queues = new Map<string, Array<() => void>>();
+
+  async request<T>(
+    name: string,
+    options: { ifAvailable?: true; mode: 'exclusive'; signal?: AbortSignal },
+    callback: (lock: Lock | null) => T | PromiseLike<T>
+  ): Promise<T> {
+    if (this.held.has(name)) {
+      if (options.ifAvailable) {
+        return callback(null);
+      }
+      await new Promise<void>((resolve, reject) => {
+        const queued = this.queues.get(name) ?? [];
+        const resume = () => {
+          options.signal?.removeEventListener('abort', onAbort);
+          resolve();
+        };
+        const onAbort = () => {
+          const index = queued.indexOf(resume);
+          if (index >= 0) {
+            queued.splice(index, 1);
+          }
+          reject(new DOMException('The lock request was aborted.', 'AbortError'));
+        };
+        queued.push(resume);
+        this.queues.set(name, queued);
+        options.signal?.addEventListener('abort', onAbort, { once: true });
+      });
+    }
+
+    if (options.signal?.aborted) {
+      throw new DOMException('The lock request was aborted.', 'AbortError');
+    }
+
+    this.held.add(name);
+    try {
+      return await callback({ mode: 'exclusive', name } as Lock);
+    } finally {
+      this.held.delete(name);
+      this.queues.get(name)?.shift()?.();
+    }
+  }
+}
+
 const createSnapshot = (
   overrides: Partial<LegacyAuthSessionSnapshot> = {}
 ): LegacyAuthSessionSnapshot => ({
@@ -80,6 +130,142 @@ const createSnapshot = (
 });
 
 describe('legacy auth runtime', () => {
+  test('queues same-name auth-js lock contention without treating it as unavailable', async () => {
+    const lockManager = new NamedLockHarness();
+    const events: string[] = [];
+    let releaseFirst!: () => void;
+    const first = runLegacyAuthJsLock('supabase.auth.token', -1, async () => {
+      events.push('first-start');
+      await new Promise<void>((resolve) => { releaseFirst = resolve; });
+      events.push('first-end');
+      return 'first';
+    }, lockManager);
+    await vi.waitFor(() => expect(events).toEqual(['first-start']));
+
+    const second = runLegacyAuthJsLock('supabase.auth.token', -1, async () => {
+      events.push('second-start');
+      return 'second';
+    }, lockManager);
+    await Promise.resolve();
+    expect(events).toEqual(['first-start']);
+
+    releaseFirst();
+    await expect(Promise.all([first, second])).resolves.toEqual(['first', 'second']);
+    expect(events).toEqual(['first-start', 'first-end', 'second-start']);
+  });
+
+  test('does not serialize independent auth-js lock names', async () => {
+    const lockManager = new NamedLockHarness();
+    const active = new Set<string>();
+    let release!: () => void;
+    const first = runLegacyAuthJsLock('supabase.auth.account-a', -1, async () => {
+      active.add('a');
+      await new Promise<void>((resolve) => { release = resolve; });
+      return 'a';
+    }, lockManager);
+    await vi.waitFor(() => expect(active.has('a')).toBe(true));
+
+    const second = runLegacyAuthJsLock('supabase.auth.account-b', -1, async () => {
+      active.add('b');
+      return 'b';
+    }, lockManager);
+    await vi.waitFor(() => expect(active).toEqual(new Set(['a', 'b'])));
+
+    release();
+    await expect(Promise.all([first, second])).resolves.toEqual(['a', 'b']);
+  });
+
+  test('bounds queued auth-js acquisition and classifies the real timeout', async () => {
+    const lockManager = new NamedLockHarness();
+    let release!: () => void;
+    const holder = runLegacyAuthJsLock('supabase.auth.timeout', -1, async () => {
+      await new Promise<void>((resolve) => { release = resolve; });
+    }, lockManager);
+    await Promise.resolve();
+
+    await expect(runLegacyAuthJsLock(
+      'supabase.auth.timeout',
+      5,
+      async () => 'never',
+      lockManager
+    )).rejects.toMatchObject({
+      isAcquireTimeout: true,
+      name: 'LegacyAuthJsLockAcquireTimeoutError'
+    });
+    expect(LEGACY_AUTH_JS_LOCK_MAX_WAIT_MS).toBe(LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS);
+    release();
+    await holder;
+  });
+
+  test('caps auth-js negative waits and keeps zero-time acquisition immediate', async () => {
+    vi.useFakeTimers();
+    try {
+      const lockManager = new NamedLockHarness();
+      let release!: () => void;
+      const holder = runLegacyAuthJsLock('supabase.auth.bounded-default', -1, async () => {
+        await new Promise<void>((resolve) => { release = resolve; });
+      }, lockManager);
+
+      const boundedWait = runLegacyAuthJsLock(
+        'supabase.auth.bounded-default',
+        -1,
+        async () => 'never',
+        lockManager
+      );
+      const boundedExpectation = expect(boundedWait).rejects.toBeInstanceOf(
+        LegacyAuthJsLockAcquireTimeoutError
+      );
+      await vi.advanceTimersByTimeAsync(LEGACY_AUTH_JS_LOCK_MAX_WAIT_MS);
+      await boundedExpectation;
+
+      await expect(runLegacyAuthJsLock(
+        'supabase.auth.bounded-default',
+        0,
+        async () => 'never',
+        lockManager
+      )).rejects.toMatchObject({ isAcquireTimeout: true });
+
+      release();
+      await holder;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('preserves lock cancellation and callback failures without misclassifying them', async () => {
+    const cancellation = new DOMException('browser cancelled the request', 'AbortError');
+    const cancellingManager = {
+      request: vi.fn(async () => { throw cancellation; })
+    };
+    await expect(runLegacyAuthJsLock(
+      'supabase.auth.cancelled',
+      -1,
+      async () => 'never',
+      cancellingManager
+    )).rejects.toBe(cancellation);
+
+    const callbackFailure = new Error('session callback failed');
+    const lockManager = new NamedLockHarness();
+    await expect(runLegacyAuthJsLock(
+      'supabase.auth.callback',
+      -1,
+      async () => { throw callbackFailure; },
+      lockManager
+    )).rejects.toBe(callbackFailure);
+  });
+
+  test('classifies unsupported Web Locks without running the protected callback', async () => {
+    const callback = vi.fn(async () => 'unsafe');
+    await expect(runLegacyAuthJsLock(
+      'supabase.auth.unsupported',
+      -1,
+      callback,
+      null
+    )).rejects.toBeInstanceOf(LegacyAuthJsLockUnavailableError);
+    expect(callback).not.toHaveBeenCalled();
+    expect(new LegacyAuthJsLockAcquireTimeoutError('test').isAcquireTimeout).toBe(true);
+  });
+
   test('aborts the underlying credential request before restoring its auth transport', async () => {
     let observedSignal: AbortSignal | undefined;
     const originalFetch = vi.fn((_: RequestInfo | URL, init?: RequestInit) => {

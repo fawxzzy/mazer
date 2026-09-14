@@ -59,6 +59,24 @@ export const LEGACY_REMOTE_PROFILE_TABLE = 'mazer_profiles';
 export const LEGACY_REMOTE_AI_RUNNER_KEY = 'menu-runner';
 export const LEGACY_REMOTE_ACCOUNT_SYNC_STORAGE_KEY = 'mazer.remote-account-sync.v1';
 export const LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY = 'mazer.remote-completion-outbox.v1';
+export const LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID = 'runtime-diagnostics-auth-fixture';
+
+export const isLegacyRemoteAccountProviderEligible = (
+  snapshot: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>
+): snapshot is Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'> & {
+  status: 'authenticated';
+  userId: string;
+} => (
+  snapshot.status === 'authenticated'
+  && snapshot.userId !== null
+  && snapshot.userId !== LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID
+);
+
+const resolveLegacyRemoteIneligibleReason = (
+  snapshot: Pick<LegacyAuthSessionSnapshot, 'userId'>
+): 'disabled' | 'guest' => (
+  snapshot.userId === LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID ? 'disabled' : 'guest'
+);
 
 type LegacyRemoteProgressionWriteMode = 'advance' | 'replace';
 type LegacyRootStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -441,7 +459,7 @@ export const bootstrapLegacyRemoteAccountState = async (
   };
   legacyRemoteAccountBootstrap = emptyResult;
 
-  if (!isLegacyRemoteProgressionEnabled(env) || snapshot.status !== 'authenticated' || !snapshot.userId) {
+  if (!isLegacyRemoteProgressionEnabled(env) || !isLegacyRemoteAccountProviderEligible(snapshot)) {
     return emptyResult;
   }
 
@@ -607,7 +625,7 @@ export const hydrateLegacyRemoteAccountState = async (
     snapshot
   };
 
-  if (!isLegacyRemoteProgressionEnabled(env) || snapshot.status !== 'authenticated' || !snapshot.userId) {
+  if (!isLegacyRemoteProgressionEnabled(env) || !isLegacyRemoteAccountProviderEligible(snapshot)) {
     return emptyResult;
   }
 
@@ -1090,8 +1108,11 @@ export const writeLegacyRemoteCycleReceipt = async (
     return createLegacyRemoteProgressionDisabledResult('cycle-receipt', 'disabled');
   }
 
-  if (snapshot.status !== 'authenticated' || !snapshot.userId) {
-    return createLegacyRemoteProgressionDisabledResult('cycle-receipt', 'guest');
+  if (!isLegacyRemoteAccountProviderEligible(snapshot)) {
+    return createLegacyRemoteProgressionDisabledResult(
+      'cycle-receipt',
+      resolveLegacyRemoteIneligibleReason(snapshot)
+    );
   }
 
   return createLegacyRemoteProgressionSyncResult('cycle-receipt', {
@@ -1259,6 +1280,12 @@ const flushLegacyRemoteCompletionOutbox = async (
   recoveredCompletionCount = 0,
   clientOverride?: SupabaseClient
 ): Promise<LegacyRemoteProgressionSyncResult> => {
+  if (!isLegacyRemoteAccountProviderEligible(snapshot)) {
+    return createLegacyRemoteProgressionDisabledResult(
+      'progression',
+      resolveLegacyRemoteIneligibleReason(snapshot)
+    );
+  }
   const outboxStorage = createLegacyAuthScopedStorage(
     rootStorage,
     LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY,
@@ -1543,8 +1570,11 @@ export const replayLegacyRemoteCompletions = async (
   if (!isLegacyRemoteProgressionEnabled(env)) {
     return createLegacyRemoteProgressionDisabledResult('progression', 'disabled');
   }
-  if (snapshot.status !== 'authenticated' || !snapshot.userId) {
-    return createLegacyRemoteProgressionDisabledResult('progression', 'guest');
+  if (!isLegacyRemoteAccountProviderEligible(snapshot)) {
+    return createLegacyRemoteProgressionDisabledResult(
+      'progression',
+      resolveLegacyRemoteIneligibleReason(snapshot)
+    );
   }
   let liveLocal = normalizeLegacyProgressionState(state);
   const outboxStorage = createLegacyAuthScopedStorage(
@@ -1704,8 +1734,11 @@ export const writeLegacyRemoteCompletion = async (
   if (!isLegacyRemoteProgressionEnabled(env)) {
     return createLegacyRemoteProgressionDisabledResult('progression', 'disabled');
   }
-  if (snapshot.status !== 'authenticated' || !snapshot.userId) {
-    return createLegacyRemoteProgressionDisabledResult('progression', 'guest');
+  if (!isLegacyRemoteAccountProviderEligible(snapshot)) {
+    return createLegacyRemoteProgressionDisabledResult(
+      'progression',
+      resolveLegacyRemoteIneligibleReason(snapshot)
+    );
   }
   const trackId = receipt.surface === 'play' ? 'player' : 'ai-runner';
   const previous = normalizeLegacyProgressionState(previousState).tracks[trackId];
@@ -1760,8 +1793,11 @@ export const writeLegacyRemoteProgressionState = async (
     return createLegacyRemoteProgressionDisabledResult('progression', 'disabled');
   }
 
-  if (snapshot.status !== 'authenticated' || !snapshot.userId) {
-    return createLegacyRemoteProgressionDisabledResult('progression', 'guest');
+  if (!isLegacyRemoteAccountProviderEligible(snapshot)) {
+    return createLegacyRemoteProgressionDisabledResult(
+      'progression',
+      resolveLegacyRemoteIneligibleReason(snapshot)
+    );
   }
 
   if (mode === 'advance') {
@@ -1847,8 +1883,11 @@ export const writeLegacyRemoteSettings = async (
   if (!isLegacyRemoteProgressionEnabled(env)) {
     return createLegacyRemoteProgressionDisabledResult('settings', 'disabled');
   }
-  if (snapshot.status !== 'authenticated' || !snapshot.userId) {
-    return createLegacyRemoteProgressionDisabledResult('settings', 'guest');
+  if (!isLegacyRemoteAccountProviderEligible(snapshot)) {
+    return createLegacyRemoteProgressionDisabledResult(
+      'settings',
+      resolveLegacyRemoteIneligibleReason(snapshot)
+    );
   }
   const client = await getLegacyAuthClient();
   if (!client) {
