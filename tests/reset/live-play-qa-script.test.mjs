@@ -1301,8 +1301,19 @@ describe('live play QA script helpers', () => {
       elapsedMs: 8_420,
       frozen: true,
       pass: true,
+      resampleCompletedAtMs: 18_420,
       resampleElapsedMs: 0
     });
+    expect(summarizeGoalTimerFreeze(
+      { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true },
+      { completedAtMs: 18_420, elapsedMs: 0, frozen: false },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'deconstructing' }
+    ).pass).toBe(false);
+    expect(summarizeGoalTimerFreeze(
+      { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true },
+      { elapsedMs: 0, frozen: true },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'handoff' }
+    ).pass).toBe(false);
     expect(summarizeGoalTimerFreeze(
       { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true },
       { completedAtMs: 18_420, elapsedMs: 0, frozen: true },
@@ -1311,6 +1322,37 @@ describe('live play QA script helpers', () => {
       comparison: 'invalid-lifecycle-boundary',
       pass: false
     });
+  });
+
+  test('validates phase-appropriate retired timer shapes after goal-hold', () => {
+    const goalHoldTimer = { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true };
+
+    expect(summarizeGoalTimerFreeze(
+      goalHoldTimer,
+      { completedAtMs: 18_420, elapsedMs: 0, frozen: true },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'handoff' }
+    ).pass).toBe(true);
+    expect(summarizeGoalTimerFreeze(
+      goalHoldTimer,
+      { completedAtMs: null, elapsedMs: 0, frozen: false },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'building' }
+    )).toMatchObject({ frozen: false, pass: true, resampleFrozen: false });
+    expect(summarizeGoalTimerFreeze(
+      goalHoldTimer,
+      { completedAtMs: null, elapsedMs: 96, frozen: false },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'ready' }
+    )).toMatchObject({ frozen: false, pass: true, resampleElapsedMs: 96 });
+
+    expect(summarizeGoalTimerFreeze(
+      goalHoldTimer,
+      { completedAtMs: null, elapsedMs: 12, frozen: false },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'building' }
+    ).pass).toBe(false);
+    expect(summarizeGoalTimerFreeze(
+      goalHoldTimer,
+      { completedAtMs: null, elapsedMs: -1, frozen: false },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'ready' }
+    ).pass).toBe(false);
   });
 
   test('still requires a valid frozen goal-hold timer before a lifecycle advance', () => {

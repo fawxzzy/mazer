@@ -1867,6 +1867,25 @@ export const summarizeGoalTimerFreeze = (
     && firstSample.completedAtMs === secondSample.completedAtMs
     && firstSample.elapsedMs === secondSample.elapsedMs
   );
+  const advancedPostGoalTimerValid = Boolean(
+    advancedPostGoalLifecycle
+    && secondSample
+    && (
+      (['deconstructing', 'handoff'].includes(secondLifecyclePhase)
+        && secondSample.frozen === true
+        && secondSample.completedAtMs === firstSample?.completedAtMs
+        && secondSample.elapsedMs === 0)
+      || (secondLifecyclePhase === 'building'
+        && secondSample.frozen === false
+        && secondSample.completedAtMs === null
+        && secondSample.elapsedMs === 0)
+      || (secondLifecyclePhase === 'ready'
+        && secondSample.frozen === false
+        && secondSample.completedAtMs === null
+        && Number.isFinite(secondSample.elapsedMs)
+        && secondSample.elapsedMs >= 0)
+    )
+  );
 
   return {
     comparison: sameGoalHold
@@ -1877,13 +1896,15 @@ export const summarizeGoalTimerFreeze = (
     completedAtMs: firstSample?.completedAtMs ?? null,
     elapsedMs: firstSample?.elapsedMs ?? null,
     firstLifecyclePhase,
-    frozen: firstGoalHoldTimerValid && (sameGoalHold ? secondSample?.frozen === true : advancedPostGoalLifecycle),
+    frozen: firstGoalHoldTimerValid && secondSample?.frozen === true,
     pass: Boolean(
       firstGoalHoldTimerValid
       && secondSample
-      && (sameGoalHoldTimerStable || advancedPostGoalLifecycle)
+      && (sameGoalHoldTimerStable || advancedPostGoalTimerValid)
     ),
+    resampleCompletedAtMs: secondSample?.completedAtMs ?? null,
     resampleElapsedMs: secondSample?.elapsedMs ?? null,
+    resampleFrozen: secondSample?.frozen === true,
     secondLifecyclePhase
   };
 };
