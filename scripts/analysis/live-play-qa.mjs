@@ -147,7 +147,7 @@ export const settleLivePlayQaCleanup = async (actions) => {
 export const captureRedactedLivePlayQaScreenshot = async (page, screenshotPath) => {
   const redactionStyle = await page.addStyleTag({
     content: `
-      body *, body *::before, body *::after {
+      html, body, body *, body *::before, body *::after {
         color: transparent !important;
         caret-color: transparent !important;
         text-shadow: none !important;
