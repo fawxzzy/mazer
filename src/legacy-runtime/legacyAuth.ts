@@ -525,6 +525,18 @@ export const reconcileLegacyAuthStorageSession = async (
   return true;
 };
 
+export const isLegacyAuthStorageEventKey = (
+  eventKey: string | null,
+  authStorageKey: unknown
+): boolean => (
+  (
+    typeof authStorageKey === 'string'
+    && authStorageKey.length > 0
+    && eventKey === authStorageKey
+  )
+  || eventKey === MAZER_OAUTH_SESSION_QUARANTINE_KEY
+);
+
 const installLegacyAuthPersistenceListener = (client: LegacyAuthClient): void => {
   if (legacyAuthPersistenceListenerInstalled) {
     return;
@@ -549,9 +561,10 @@ const installLegacyAuthPersistenceListener = (client: LegacyAuthClient): void =>
     });
   if (typeof window !== 'undefined' && !legacyAuthStorageListenerInstalled) {
     legacyAuthStorageListenerInstalled = true;
+    const authStorageKey = (client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>).storageKey;
     window.addEventListener('storage', (event) => {
       if (
-        (event.key !== MAZER_OAUTH_AUTH_SESSION_KEY && event.key !== MAZER_OAUTH_SESSION_QUARANTINE_KEY)
+        !isLegacyAuthStorageEventKey(event.key, authStorageKey)
         || isMazerOAuthSessionQuarantined()
       ) {
         return;

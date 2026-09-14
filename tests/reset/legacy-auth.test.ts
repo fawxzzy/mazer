@@ -13,6 +13,7 @@ import {
   createLegacyAuthSessionSnapshot,
   createLegacyAuthScopedStorage,
   deriveLegacyRememberedIdentityDisplayName,
+  isLegacyAuthStorageEventKey,
   isLegacyPasswordRecoveryRuntimeLocation,
   isLegacyPersistedAuthSessionRemoved,
   invokeLegacyLocalSignOutWithTimeout,
@@ -640,6 +641,7 @@ describe('legacy auth runtime', () => {
     expect(authSource).toContain('legacyAuthPersistenceListenerInstalled');
     expect(authSource).toContain('legacyAuthStorageListenerInstalled');
     expect(authSource).toContain("window.addEventListener('storage'");
+    expect(authSource).toContain('!isLegacyAuthStorageEventKey(event.key, authStorageKey)');
     expect(authSource).toContain('reconcileLegacyAuthStorageSession(');
     expect(authSource).toContain('legacyAuthLiveListeners');
     expect(authSource.match(/isMazerOAuthSessionQuarantined\(/g)?.length).toBeGreaterThanOrEqual(5);
@@ -701,6 +703,17 @@ describe('legacy auth runtime', () => {
     )).resolves.toBe(false);
     expect(firstListener).not.toHaveBeenCalled();
     expect(secondListener).not.toHaveBeenCalled();
+  });
+
+  test('accepts storage events for either configured project key without accepting unrelated keys', () => {
+    const rollbackStorageKey = 'sb-geknvnrmktchljnyddwp-auth-token';
+
+    expect(isLegacyAuthStorageEventKey(MAZER_OAUTH_AUTH_SESSION_KEY, MAZER_OAUTH_AUTH_SESSION_KEY)).toBe(true);
+    expect(isLegacyAuthStorageEventKey(rollbackStorageKey, rollbackStorageKey)).toBe(true);
+    expect(isLegacyAuthStorageEventKey(MAZER_OAUTH_AUTH_SESSION_KEY, rollbackStorageKey)).toBe(false);
+    expect(isLegacyAuthStorageEventKey(rollbackStorageKey, MAZER_OAUTH_AUTH_SESSION_KEY)).toBe(false);
+    expect(isLegacyAuthStorageEventKey('unrelated', rollbackStorageKey)).toBe(false);
+    expect(isLegacyAuthStorageEventKey(null, rollbackStorageKey)).toBe(false);
   });
 
   test('preserves fixed-safe callback failure feedback when no auth client can be constructed', async () => {
