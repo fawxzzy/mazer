@@ -14,6 +14,7 @@ import {
   assertLivePlayQaNavigationStable,
   captureRedactedLivePlayQaScreenshot,
   captureLivePlayQaFailureEvidence,
+  collectPostGoalLifecycleProof,
   createLivePlayQaEvidencePersistenceError,
   createLivePlayQaFailureError,
   createLivePlayQaNavigationTracker,
@@ -824,6 +825,86 @@ describe('live play QA script helpers', () => {
     expect(scriptSource.indexOf('await installLivePlayQaServiceWorkerStabilizationProbe(page)')).toBeLessThan(
       scriptSource.indexOf('await page.goto(targetUrl')
     );
+  });
+
+  test('starts lifecycle proof from the immediate goal sample before the timer-freeze delay', async () => {
+    const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
+    const goalReachedIndex = scriptSource.indexOf('const goalReachedDiagnostics = await readLivePlayDiagnostics(page)');
+    const lifecycleIndex = scriptSource.indexOf('const lifecycleProofPromise =', goalReachedIndex);
+    const immediateSeedIndex = scriptSource.indexOf('initialDiagnostics: goalReachedDiagnostics', lifecycleIndex);
+    const timerDelayIndex = scriptSource.indexOf('await page.waitForTimeout(96)', goalReachedIndex);
+    const timerSecondIndex = scriptSource.indexOf('const goalTimerSecondDiagnostics = await readLivePlayDiagnostics(page)', timerDelayIndex);
+
+    expect(goalReachedIndex).toBeGreaterThan(-1);
+    expect(lifecycleIndex).toBeGreaterThan(goalReachedIndex);
+    expect(immediateSeedIndex).toBeGreaterThan(lifecycleIndex);
+    expect(timerDelayIndex).toBeGreaterThan(immediateSeedIndex);
+    expect(timerSecondIndex).toBeGreaterThan(timerDelayIndex);
+
+    const diagnostic = ({ complete, phase, seed }) => ({
+      runtime: {
+        generation: {
+          drawStage: {
+            complete,
+            handoffActive: phase === 'handoff',
+            lifecyclePhase: phase === 'deconstructing' || phase === 'handoff' ? 'deconstructing' : phase === 'building' ? 'building' : 'settled',
+            nextSeedQueued: phase === 'deconstructing' || phase === 'handoff'
+          },
+          maze: { seed, source: 'play-generated' }
+        },
+        play: {
+          lifecycle: {
+            inputLocked: phase !== 'ready',
+            phase
+          },
+          player: { x: seed === 101 ? 1 : 2, y: seed === 101 ? 1 : 2 }
+        },
+        surface: { mode: 'play', overlay: 'none' }
+      },
+      visual: {
+        hud: { compassSpinActive: phase !== 'goal-hold' && phase !== 'ready' }
+      }
+    });
+    const initialDiagnostics = diagnostic({ complete: false, phase: 'goal-hold', seed: 101 });
+    const remainingDiagnostics = [
+      diagnostic({ complete: false, phase: 'deconstructing', seed: 101 }),
+      diagnostic({ complete: false, phase: 'handoff', seed: 101 }),
+      diagnostic({ complete: false, phase: 'building', seed: 202 }),
+      diagnostic({ complete: true, phase: 'ready', seed: 202 })
+    ];
+    let currentPlayer = initialDiagnostics.runtime.play.player;
+    const page = {
+      evaluate: async (_callback, argument) => {
+        if (argument !== undefined) {
+          const next = remainingDiagnostics.shift() ?? diagnostic({ complete: true, phase: 'ready', seed: 202 });
+          currentPlayer = next.runtime.play.player;
+          return next;
+        }
+        return {
+          accepted: false,
+          lifecycleLocked: true,
+          player: currentPlayer,
+          reason: 'lifecycle-locked'
+        };
+      },
+      waitForTimeout: async () => {}
+    };
+
+    const proof = await collectPostGoalLifecycleProof({
+      initialDiagnostics,
+      initialSeed: 101,
+      page,
+      pollMs: 0,
+      timeoutMs: 1_000
+    });
+
+    expect(proof).toMatchObject({
+      explicitPhaseSequence: ['goal-hold', 'deconstructing', 'handoff', 'building', 'ready'],
+      inputLockProbePass: true,
+      pass: true,
+      settledFreshSeed: true,
+      timedOut: false
+    });
   });
 
   test('requires the exact QA move surface before diagnostics readiness can pass', () => {

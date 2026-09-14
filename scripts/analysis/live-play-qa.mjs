@@ -2117,6 +2117,14 @@ export const runLivePlayQa = async (options = {}) => {
     assertLivePlayQaNavigationStable(navigationTracker);
     const goalReachedDiagnostics = await readLivePlayDiagnostics(page);
     const goalTimerFirstSample = goalReachedDiagnostics.runtime?.play?.timer ?? null;
+    const lifecycleProofPromise = options.verifyPostGoalLifecycle === false || failedAt !== null
+      ? null
+      : collectPostGoalLifecycleProof({
+        initialDiagnostics: goalReachedDiagnostics,
+        initialSeed: initialRuntime?.generation?.maze?.seed ?? null,
+        page,
+        timeoutMs: options.postGoalTimeoutMs ?? DEFAULT_POST_GOAL_TIMEOUT_MS
+      });
     await page.waitForTimeout(96);
     assertLivePlayQaNavigationStable(navigationTracker);
     const goalTimerSecondDiagnostics = await readLivePlayDiagnostics(page);
@@ -2124,14 +2132,6 @@ export const runLivePlayQa = async (options = {}) => {
       goalTimerFirstSample,
       goalTimerSecondDiagnostics.runtime?.play?.timer ?? null
     );
-    const lifecycleProofPromise = options.verifyPostGoalLifecycle === false || failedAt !== null
-      ? null
-      : collectPostGoalLifecycleProof({
-        initialDiagnostics: goalTimerSecondDiagnostics,
-        initialSeed: initialRuntime?.generation?.maze?.seed ?? null,
-        page,
-        timeoutMs: options.postGoalTimeoutMs ?? DEFAULT_POST_GOAL_TIMEOUT_MS
-      });
     enterPhase('post-goal');
     const lifecycleProof = lifecycleProofPromise ? await lifecycleProofPromise : null;
     assertLivePlayQaNavigationStable(navigationTracker);
