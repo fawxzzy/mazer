@@ -76,11 +76,10 @@ export const normalizeAuthPersistenceBaseUrl = (value) => {
   return url.toString();
 };
 
-export const resolveProtectedDeploymentIdentity = ({
+const validateProtectedDeploymentClaims = ({
   baseUrl,
   deploymentId,
   deploymentUrl,
-  providerDeployment,
   sourceCommit
 }) => {
   if (!VERCEL_DEPLOYMENT_ID_PATTERN.test(String(deploymentId ?? ''))) {
@@ -99,12 +98,32 @@ export const resolveProtectedDeploymentIdentity = ({
   if (normalizedDeploymentUrl !== baseUrl) {
     throw new Error('protected_deployment_identity_mismatch');
   }
+  return {
+    deploymentId,
+    deploymentUrl: normalizedDeploymentUrl,
+    sourceCommit
+  };
+};
+
+export const resolveProtectedDeploymentIdentity = ({
+  baseUrl,
+  deploymentId,
+  deploymentUrl,
+  providerDeployment,
+  sourceCommit
+}) => {
+  const normalizedIdentity = validateProtectedDeploymentClaims({
+    baseUrl,
+    deploymentId,
+    deploymentUrl,
+    sourceCommit
+  });
   const providerUrl = typeof providerDeployment?.url === 'string'
     ? normalizeAuthPersistenceBaseUrl(`https://${providerDeployment.url}`)
     : null;
   const providerSourceCommit = providerDeployment?.gitSource?.sha ?? providerDeployment?.meta?.githubCommitSha;
   if (providerDeployment?.id !== deploymentId
-    || providerUrl !== normalizedDeploymentUrl
+    || providerUrl !== normalizedIdentity.deploymentUrl
     || providerSourceCommit !== sourceCommit
     || providerDeployment?.projectId !== EXPECTED_VERCEL_PROJECT_ID
     || (providerDeployment?.team?.id ?? providerDeployment?.ownerId) !== EXPECTED_VERCEL_TEAM_ID
@@ -113,15 +132,10 @@ export const resolveProtectedDeploymentIdentity = ({
     || providerDeployment?.readyState !== 'READY') {
     throw new Error('protected_deployment_provider_identity_mismatch');
   }
-  const normalizedIdentity = {
-    deploymentId,
-    deploymentUrl: normalizedDeploymentUrl,
-    sourceCommit
-  };
   return {
     ...normalizedIdentity,
     digest: createHash('sha256')
-      .update(`${deploymentId}\n${normalizedDeploymentUrl}\n${sourceCommit}\n`, 'utf8')
+      .update(`${deploymentId}\n${normalizedIdentity.deploymentUrl}\n${sourceCommit}\n`, 'utf8')
       .digest('hex')
   };
 };
@@ -175,17 +189,22 @@ export const resolveAuthPersistenceExecutionPlan = (options = {}) => {
   if (protectedDeployment && new URL(baseUrl).hostname === PUBLIC_PRODUCTION_HOST) {
     throw new Error('public_alias_protection_bypass_forbidden');
   }
-  const deploymentIdentity = protectedDeployment
-    ? resolveProtectedDeploymentIdentity({
-        baseUrl,
-        deploymentId: options.deploymentId,
-        deploymentUrl: options.deploymentUrl,
-        providerDeployment: process.env.NODE_ENV === 'test' && options.providerDeploymentIdentity
-          ? options.providerDeploymentIdentity
-          : readProtectedDeploymentProviderIdentity(options.deploymentId),
-        sourceCommit: options.sourceCommit
-      })
-    : null;
+  let deploymentIdentity = null;
+  if (protectedDeployment) {
+    const locallyValidatedIdentity = validateProtectedDeploymentClaims({
+      baseUrl,
+      deploymentId: options.deploymentId,
+      deploymentUrl: options.deploymentUrl,
+      sourceCommit: options.sourceCommit
+    });
+    deploymentIdentity = resolveProtectedDeploymentIdentity({
+      baseUrl,
+      ...locallyValidatedIdentity,
+      providerDeployment: process.env.NODE_ENV === 'test' && options.providerDeploymentIdentity
+        ? options.providerDeploymentIdentity
+        : readProtectedDeploymentProviderIdentity(locallyValidatedIdentity.deploymentId)
+    });
+  }
   return {
     baseUrl,
     ...(deploymentIdentity === null ? {} : { deploymentIdentity }),
@@ -287,6 +306,25 @@ export const assertAuthPersistenceNavigationOrigin = ({ actualUrl, baseUrl }) =>
     throw new Error('auth_persistence_navigation_origin_mismatch');
   }
   return sanitizeAuthPersistenceDiagnosticUrl(actual.toString());
+};
+
+export const assertAuthPersistenceClosedBrowserBoundary = ({
+  baseUrl,
+  blockedMutationRequests,
+  finalUrl,
+  navigationHistory
+}) => {
+  if (blockedMutationRequests.length > 0) {
+    throw new Error(`external_mutation_attempt_blocked:${JSON.stringify(blockedMutationRequests)}`);
+  }
+  for (const navigation of navigationHistory) {
+    assertAuthPersistenceNavigationOrigin({ actualUrl: navigation.url, baseUrl });
+  }
+  assertAuthPersistenceNavigationOrigin({ actualUrl: finalUrl, baseUrl });
+  return {
+    finalUrl: sanitizeAuthPersistenceDiagnosticUrl(finalUrl),
+    navigationCount: navigationHistory.length
+  };
 };
 
 const normalizeControlLabel = (value) => String(value).trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
@@ -896,6 +934,9 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   let browser = null;
   let context = null;
   let page = null;
+  let resolvedBaseUrl = null;
+  let finalBrowserUrl = null;
+  let closedBrowserBoundary = null;
   const consoleMessages = [];
   const pageErrors = [];
   const failedRequests = [];
@@ -975,7 +1016,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     preview = executionPlan.launchPreview
       ? await launchPreviewServer({ previewTimeoutMs: options.previewTimeoutMs })
       : null;
-    const resolvedBaseUrl = preview?.baseUrl ?? executionPlan.baseUrl;
+    resolvedBaseUrl = preview?.baseUrl ?? executionPlan.baseUrl;
     browser = await chromium.launch({ headless: options.headless !== false });
     context = await createGuardedAuthPersistenceContext({
       browser,
@@ -1355,8 +1396,27 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
           }, null, 2)}\n`, 'utf8')
       },
       {
+        name: 'final_browser_url_capture',
+        run: page === null ? null : () => {
+          finalBrowserUrl = page.url();
+        }
+      },
+      {
         name: 'context_close',
         run: context === null ? null : () => context.close()
+      },
+      {
+        name: 'closed_browser_boundary',
+        run: resolvedBaseUrl === null || finalBrowserUrl === null
+          ? null
+          : () => {
+            closedBrowserBoundary = assertAuthPersistenceClosedBrowserBoundary({
+              baseUrl: resolvedBaseUrl,
+              blockedMutationRequests,
+              finalUrl: finalBrowserUrl,
+              navigationHistory
+            });
+          }
       },
       {
         name: 'browser_close',
@@ -1406,8 +1466,12 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   if (pendingSummary === null) {
     throw new Error('auth_persistence_summary_unavailable');
   }
+  if (closedBrowserBoundary === null) {
+    throw new Error('auth_persistence_closed_browser_boundary_unavailable');
+  }
 
   pendingSummary.fixtureSettings.cleanup = fixtureSettingsCleanup;
+  pendingSummary.transport.closedBrowserBoundary = closedBrowserBoundary;
   await publishAuthPersistenceSuccessAfterCleanup({
     cleanupErrors,
     writeSummary: () => writeFile(summaryPath, `${JSON.stringify(pendingSummary, null, 2)}\n`, 'utf8'),

@@ -17,6 +17,7 @@ import {
   evaluateFixtureSettingsCleanup,
   evaluateFixtureSettingsIsolation,
   evaluateTrailShineChangedStatePersistence,
+  assertAuthPersistenceClosedBrowserBoundary,
   assertAuthPersistenceNavigationOrigin,
   isExternalMutationRequest,
   measureAuthPersistenceElapsedMs,
@@ -321,6 +322,13 @@ describe('live auth persistence soak contract', () => {
     expect(() => resolveAuthPersistenceExecutionPlan({
       baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
       ...PROTECTED_DEPLOYMENT_IDENTITY,
+      deploymentId: 'bad',
+      protectedDeployment: true,
+      useExistingServer: true
+    })).toThrow('protected_deployment_id_invalid');
+    expect(() => resolveAuthPersistenceExecutionPlan({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      ...PROTECTED_DEPLOYMENT_IDENTITY,
       deploymentId: 'preview-alias',
       providerDeploymentIdentity: PROTECTED_PROVIDER_DEPLOYMENT,
       protectedDeployment: true,
@@ -443,6 +451,40 @@ describe('live auth persistence soak contract', () => {
     expect(() => assertAuthPersistenceNavigationOrigin({
       actualUrl: 'https://fawxzzy-mazer-z9y8x7w6v-fawxzzy.vercel.app/',
       baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl
+    })).toThrow('auth_persistence_navigation_origin_mismatch');
+  });
+
+  test('revalidates late mutations and every navigation only after the browser boundary closes', () => {
+    const blockedMutationRequests = [];
+    const navigationHistory = [{
+      elapsedMs: 1,
+      url: `${PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl}?runtimeDiagnostics=<redacted>`
+    }];
+    expect(assertAuthPersistenceClosedBrowserBoundary({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      blockedMutationRequests,
+      finalUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      navigationHistory
+    })).toEqual({
+      finalUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      navigationCount: 1
+    });
+
+    blockedMutationRequests.push({ method: 'POST', url: `${PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl}late` });
+    expect(() => assertAuthPersistenceClosedBrowserBoundary({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      blockedMutationRequests,
+      finalUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      navigationHistory
+    })).toThrow('external_mutation_attempt_blocked');
+
+    blockedMutationRequests.length = 0;
+    navigationHistory.push({ elapsedMs: 2, url: 'https://mazer.fawxzzy.com/' });
+    expect(() => assertAuthPersistenceClosedBrowserBoundary({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      blockedMutationRequests,
+      finalUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      navigationHistory
     })).toThrow('auth_persistence_navigation_origin_mismatch');
   });
 
