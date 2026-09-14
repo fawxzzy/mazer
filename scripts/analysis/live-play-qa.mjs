@@ -195,7 +195,7 @@ export const resolveLivePlayProductionDeploymentIdentity = ({
     deploymentId,
     deploymentUrl: normalizedDeploymentUrl,
     digest: createHash('sha256')
-      .update(`${deploymentId}\n${normalizedDeploymentUrl}\n${sourceCommit}\n`, 'utf8')
+      .update(`${acceptanceTarget}\n${deploymentId}\n${normalizedDeploymentUrl}\n${sourceCommit}\n`, 'utf8')
       .digest('hex'),
     projectId: EXPECTED_VERCEL_PROJECT_ID,
     productionCertified,

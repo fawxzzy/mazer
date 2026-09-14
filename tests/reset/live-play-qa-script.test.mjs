@@ -211,11 +211,12 @@ describe('live play QA script helpers', () => {
   });
 
   test('distinguishes retained release candidates from current live production', () => {
-    expect(resolveLivePlayProductionDeploymentIdentity({
+    const candidateIdentity = resolveLivePlayProductionDeploymentIdentity({
       baseUrl: deploymentIdentity.deploymentUrl,
       ...deploymentIdentity,
       providerDeployment: providerDeploymentIdentity
-    })).toMatchObject({
+    });
+    expect(candidateIdentity).toMatchObject({
       acceptanceTarget: 'release-candidate',
       productionCertified: false
     });
@@ -225,7 +226,7 @@ describe('live play QA script helpers', () => {
       acceptanceTarget: 'live-production',
       providerDeployment: providerDeploymentIdentity
     })).toThrow('live_play_production_live_target_mismatch');
-    expect(resolveLivePlayProductionDeploymentIdentity({
+    const liveProductionIdentity = resolveLivePlayProductionDeploymentIdentity({
       baseUrl: deploymentIdentity.deploymentUrl,
       ...deploymentIdentity,
       acceptanceTarget: 'live-production',
@@ -234,10 +235,12 @@ describe('live play QA script helpers', () => {
         alias: ['mazer.fawxzzy.com'],
         target: 'production'
       }
-    })).toMatchObject({
+    });
+    expect(liveProductionIdentity).toMatchObject({
       acceptanceTarget: 'live-production',
       productionCertified: true
     });
+    expect(liveProductionIdentity.digest).not.toBe(candidateIdentity.digest);
     expect(() => resolveLivePlayProductionDeploymentIdentity({
       baseUrl: deploymentIdentity.deploymentUrl,
       ...deploymentIdentity,
