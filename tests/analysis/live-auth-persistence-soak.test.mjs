@@ -17,6 +17,7 @@ import {
   evaluateFixtureSettingsCleanup,
   evaluateFixtureSettingsIsolation,
   evaluateTrailShineChangedStatePersistence,
+  assertAuthPersistenceNavigationOrigin,
   isExternalMutationRequest,
   measureAuthPersistenceElapsedMs,
   persistAuthPersistenceFailureEvidence,
@@ -40,6 +41,17 @@ const PROTECTED_DEPLOYMENT_IDENTITY = Object.freeze({
   deploymentId: 'dpl_6zxHgAEKUbntK8Fw6NW253rZwx1z',
   deploymentUrl: 'https://fawxzzy-mazer-a1b2c3d4e-fawxzzy.vercel.app/',
   sourceCommit: 'a544150002794421f8ea339fffbfd9f71f5a9268'
+});
+const PROTECTED_PROVIDER_DEPLOYMENT = Object.freeze({
+  gitSource: {
+    repoId: 1212867711,
+    sha: PROTECTED_DEPLOYMENT_IDENTITY.sourceCommit
+  },
+  id: PROTECTED_DEPLOYMENT_IDENTITY.deploymentId,
+  ownerId: 'team_CMJn7MvzFZZBnhNnjVUZF2RD',
+  projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
+  readyState: 'READY',
+  url: new URL(PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl).hostname
 });
 
 const startSyntheticServiceWorkerMutationServer = async () => {
@@ -185,6 +197,7 @@ describe('live auth persistence soak contract', () => {
     const plan = resolveAuthPersistenceExecutionPlan({
       baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
       ...PROTECTED_DEPLOYMENT_IDENTITY,
+      providerDeploymentIdentity: PROTECTED_PROVIDER_DEPLOYMENT,
       protectedDeployment: true,
       useExistingServer: true
     });
@@ -292,7 +305,8 @@ describe('live auth persistence soak contract', () => {
   test('requires exact immutable deployment and source identity before protected success can exist', () => {
     const identity = resolveProtectedDeploymentIdentity({
       baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
-      ...PROTECTED_DEPLOYMENT_IDENTITY
+      ...PROTECTED_DEPLOYMENT_IDENTITY,
+      providerDeployment: PROTECTED_PROVIDER_DEPLOYMENT
     });
     expect(identity).toEqual({
       ...PROTECTED_DEPLOYMENT_IDENTITY,
@@ -300,6 +314,7 @@ describe('live auth persistence soak contract', () => {
     });
     expect(() => resolveAuthPersistenceExecutionPlan({
       baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      providerDeploymentIdentity: PROTECTED_PROVIDER_DEPLOYMENT,
       protectedDeployment: true,
       useExistingServer: true
     })).toThrow('protected_deployment_id_invalid');
@@ -307,12 +322,14 @@ describe('live auth persistence soak contract', () => {
       baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
       ...PROTECTED_DEPLOYMENT_IDENTITY,
       deploymentId: 'preview-alias',
+      providerDeploymentIdentity: PROTECTED_PROVIDER_DEPLOYMENT,
       protectedDeployment: true,
       useExistingServer: true
     })).toThrow('protected_deployment_id_invalid');
     expect(() => resolveAuthPersistenceExecutionPlan({
       baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
       ...PROTECTED_DEPLOYMENT_IDENTITY,
+      providerDeploymentIdentity: PROTECTED_PROVIDER_DEPLOYMENT,
       sourceCommit: 'not-a-commit',
       protectedDeployment: true,
       useExistingServer: true
@@ -321,15 +338,33 @@ describe('live auth persistence soak contract', () => {
       baseUrl: 'https://fawxzzy-mazer-git-main-fawxzzy.vercel.app/',
       ...PROTECTED_DEPLOYMENT_IDENTITY,
       deploymentUrl: 'https://fawxzzy-mazer-git-main-fawxzzy.vercel.app/',
+      providerDeploymentIdentity: PROTECTED_PROVIDER_DEPLOYMENT,
       protectedDeployment: true,
       useExistingServer: true
     })).toThrow('protected_deployment_immutable_url_required');
     expect(() => resolveAuthPersistenceExecutionPlan({
       baseUrl: 'https://fawxzzy-mazer-z9y8x7w6v-fawxzzy.vercel.app/',
       ...PROTECTED_DEPLOYMENT_IDENTITY,
+      providerDeploymentIdentity: PROTECTED_PROVIDER_DEPLOYMENT,
       protectedDeployment: true,
       useExistingServer: true
     })).toThrow('protected_deployment_identity_mismatch');
+    expect(() => resolveAuthPersistenceExecutionPlan({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      ...PROTECTED_DEPLOYMENT_IDENTITY,
+      providerDeploymentIdentity: PROTECTED_PROVIDER_DEPLOYMENT,
+      sourceCommit: '0'.repeat(40),
+      protectedDeployment: true,
+      useExistingServer: true
+    })).toThrow('protected_deployment_provider_identity_mismatch');
+    expect(() => resolveAuthPersistenceExecutionPlan({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      ...PROTECTED_DEPLOYMENT_IDENTITY,
+      deploymentId: 'dpl_0000000000000000000000000000',
+      providerDeploymentIdentity: PROTECTED_PROVIDER_DEPLOYMENT,
+      protectedDeployment: true,
+      useExistingServer: true
+    })).toThrow('protected_deployment_provider_identity_mismatch');
   });
 
   test('verifies service-worker assets through read-only request-context GETs', async () => {
@@ -341,8 +376,14 @@ describe('live auth persistence soak contract', () => {
           get: async (url) => {
             calls.push(url);
             return {
-              body: async () => Buffer.from(`asset:${new URL(url).pathname}`),
+              body: async () => Buffer.from(
+                new URL(url).pathname === '/app-sw.js'
+                  ? 'precacheAndRoute(); self.skipWaiting();'
+                  : "self.addEventListener('install', () => {}); const CANONICAL_ORIGIN = 'https://mazer.fawxzzy.com';"
+              ),
               dispose: async () => {},
+              headers: () => ({ 'content-type': 'application/javascript; charset=utf-8' }),
+              url: () => url,
               status: () => 200
             };
           }
@@ -354,6 +395,55 @@ describe('live auth persistence soak contract', () => {
       expect.objectContaining({ pathname: '/app-sw.js', status: 200, sha256: expect.stringMatching(/^[0-9a-f]{64}$/u) }),
       expect.objectContaining({ pathname: '/sw.js', status: 200, sha256: expect.stringMatching(/^[0-9a-f]{64}$/u) })
     ]);
+  });
+
+  test('rejects redirected or HTML worker asset responses', async () => {
+    const responseFor = ({ body, contentType, responseUrl }) => ({
+      body: async () => Buffer.from(body),
+      dispose: async () => {},
+      headers: () => ({ 'content-type': contentType }),
+      status: () => 200,
+      url: () => responseUrl
+    });
+    await expect(verifyReadOnlyServiceWorkerAssets({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      context: {
+        request: {
+          get: async (url) => responseFor({
+            body: '<!doctype html><title>Mazer</title>',
+            contentType: 'text/html',
+            responseUrl: url
+          })
+        }
+      }
+    })).rejects.toThrow('service_worker_asset_read_only_verification_failed');
+    await expect(verifyReadOnlyServiceWorkerAssets({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      context: {
+        request: {
+          get: async (url) => responseFor({
+            body: 'precacheAndRoute(); self.skipWaiting();',
+            contentType: 'application/javascript',
+            responseUrl: new URL(new URL(url).pathname, 'https://mazer.fawxzzy.com/').toString()
+          })
+        }
+      }
+    })).rejects.toThrow('service_worker_asset_read_only_verification_failed');
+  });
+
+  test('rejects every final navigation origin that drifts from the immutable target', () => {
+    expect(assertAuthPersistenceNavigationOrigin({
+      actualUrl: `${PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl}?runtimeDiagnostics=1`,
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl
+    })).toContain('runtimeDiagnostics=<redacted>');
+    expect(() => assertAuthPersistenceNavigationOrigin({
+      actualUrl: 'https://mazer.fawxzzy.com/?runtimeDiagnostics=1',
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl
+    })).toThrow('auth_persistence_navigation_origin_mismatch');
+    expect(() => assertAuthPersistenceNavigationOrigin({
+      actualUrl: 'https://fawxzzy-mazer-z9y8x7w6v-fawxzzy.vercel.app/',
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl
+    })).toThrow('auth_persistence_navigation_origin_mismatch');
   });
 
   test('recognizes shared account entry on the main menu and rejects every retired local-auth control', () => {

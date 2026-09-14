@@ -33,6 +33,14 @@ const IMMUTABLE_PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9]{8,3
 const VERCEL_DEPLOYMENT_ID_PATTERN = /^dpl_[A-Za-z0-9]{20,64}$/u;
 const SOURCE_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
 const READ_ONLY_SERVICE_WORKER_ASSETS = Object.freeze(['/app-sw.js', '/sw.js']);
+const EXPECTED_VERCEL_PROJECT_ID = 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ';
+const EXPECTED_VERCEL_TEAM_ID = 'team_CMJn7MvzFZZBnhNnjVUZF2RD';
+const EXPECTED_VERCEL_SCOPE = 'fawxzzy';
+const EXPECTED_GITHUB_REPOSITORY_ID = 1212867711;
+const SERVICE_WORKER_ASSET_MARKERS = Object.freeze({
+  '/app-sw.js': ['precacheAndRoute', 'self.skipWaiting'],
+  '/sw.js': ["self.addEventListener('install'", 'CANONICAL_ORIGIN']
+});
 
 export const SIGNED_OUT_SHARED_ACCOUNT_BUTTONS = Object.freeze([
   'Login',
@@ -72,6 +80,7 @@ export const resolveProtectedDeploymentIdentity = ({
   baseUrl,
   deploymentId,
   deploymentUrl,
+  providerDeployment,
   sourceCommit
 }) => {
   if (!VERCEL_DEPLOYMENT_ID_PATTERN.test(String(deploymentId ?? ''))) {
@@ -90,6 +99,20 @@ export const resolveProtectedDeploymentIdentity = ({
   if (normalizedDeploymentUrl !== baseUrl) {
     throw new Error('protected_deployment_identity_mismatch');
   }
+  const providerUrl = typeof providerDeployment?.url === 'string'
+    ? normalizeAuthPersistenceBaseUrl(`https://${providerDeployment.url}`)
+    : null;
+  const providerSourceCommit = providerDeployment?.gitSource?.sha ?? providerDeployment?.meta?.githubCommitSha;
+  if (providerDeployment?.id !== deploymentId
+    || providerUrl !== normalizedDeploymentUrl
+    || providerSourceCommit !== sourceCommit
+    || providerDeployment?.projectId !== EXPECTED_VERCEL_PROJECT_ID
+    || (providerDeployment?.team?.id ?? providerDeployment?.ownerId) !== EXPECTED_VERCEL_TEAM_ID
+    || Number(providerDeployment?.gitSource?.repoId ?? providerDeployment?.meta?.githubRepoId)
+      !== EXPECTED_GITHUB_REPOSITORY_ID
+    || providerDeployment?.readyState !== 'READY') {
+    throw new Error('protected_deployment_provider_identity_mismatch');
+  }
   const normalizedIdentity = {
     deploymentId,
     deploymentUrl: normalizedDeploymentUrl,
@@ -101,6 +124,37 @@ export const resolveProtectedDeploymentIdentity = ({
       .update(`${deploymentId}\n${normalizedDeploymentUrl}\n${sourceCommit}\n`, 'utf8')
       .digest('hex')
   };
+};
+
+const readProtectedDeploymentProviderIdentity = (deploymentId) => {
+  try {
+    const vercelWrapper = process.platform === 'win32'
+      ? execFileSync('where.exe', ['vercel.cmd'], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true
+        }).split(/\r?\n/u).find(Boolean)
+      : 'vercel';
+    if (!vercelWrapper) {
+      throw new Error('vercel_cli_missing');
+    }
+    const vercelCommand = process.platform === 'win32' ? process.execPath : vercelWrapper;
+    const vercelArgs = process.platform === 'win32'
+      ? [resolve(vercelWrapper, '..', 'node_modules', 'vercel', 'dist', 'vc.js')]
+      : [];
+    return JSON.parse(execFileSync(
+      vercelCommand,
+      [...vercelArgs, 'api', `/v13/deployments/${deploymentId}`, '--scope', EXPECTED_VERCEL_SCOPE],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+      }
+    ));
+  } catch {
+    throw new Error('protected_deployment_provider_readback_failed');
+  }
 };
 
 export const resolveAuthPersistenceExecutionPlan = (options = {}) => {
@@ -126,6 +180,9 @@ export const resolveAuthPersistenceExecutionPlan = (options = {}) => {
         baseUrl,
         deploymentId: options.deploymentId,
         deploymentUrl: options.deploymentUrl,
+        providerDeployment: process.env.NODE_ENV === 'test' && options.providerDeploymentIdentity
+          ? options.providerDeploymentIdentity
+          : readProtectedDeploymentProviderIdentity(options.deploymentId),
         sourceCommit: options.sourceCommit
       })
     : null;
@@ -190,12 +247,23 @@ export const verifyReadOnlyServiceWorkerAssets = async ({ context, baseUrl }) =>
     try {
       const status = response.status();
       const body = await response.body();
-      if (status !== 200 || body.byteLength === 0) {
+      const contentType = String(response.headers()['content-type'] ?? '').toLocaleLowerCase('en-US');
+      const responseUrl = new URL(response.url());
+      const requestedUrl = new URL(url);
+      const bodyText = body.toString('utf8');
+      const markers = SERVICE_WORKER_ASSET_MARKERS[pathname];
+      if (status !== 200
+        || body.byteLength === 0
+        || responseUrl.toString() !== requestedUrl.toString()
+        || !/(?:java|ecma)script/iu.test(contentType)
+        || !markers.every((marker) => bodyText.includes(marker))) {
         throw new Error('service_worker_asset_read_only_verification_failed');
       }
       assets.push({
         bytes: body.byteLength,
+        contentType,
         pathname,
+        responseUrl: responseUrl.toString(),
         sha256: createHash('sha256').update(body).digest('hex'),
         status
       });
@@ -204,6 +272,21 @@ export const verifyReadOnlyServiceWorkerAssets = async ({ context, baseUrl }) =>
     }
   }
   return assets;
+};
+
+export const assertAuthPersistenceNavigationOrigin = ({ actualUrl, baseUrl }) => {
+  let actual;
+  let expected;
+  try {
+    actual = new URL(actualUrl);
+    expected = new URL(baseUrl);
+  } catch {
+    throw new Error('auth_persistence_navigation_origin_invalid');
+  }
+  if (actual.origin !== expected.origin) {
+    throw new Error('auth_persistence_navigation_origin_mismatch');
+  }
+  return sanitizeAuthPersistenceDiagnosticUrl(actual.toString());
 };
 
 const normalizeControlLabel = (value) => String(value).trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
@@ -960,6 +1043,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       timeoutMs: TIMEOUT_MS,
       tracker: navigationTracker
     });
+    assertAuthPersistenceNavigationOrigin({ actualUrl: page.url(), baseUrl: resolvedBaseUrl });
     const signedOutAccountEntry = await waitForSurface(page, {
       authenticated: false,
       buttons: SIGNED_OUT_SHARED_ACCOUNT_BUTTONS,
@@ -996,6 +1080,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     enterPhase('diagnostics-fixture-entry');
     await page.goto(new URL(buildAuthPersistenceRoute(true), resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    assertAuthPersistenceNavigationOrigin({ actualUrl: page.url(), baseUrl: resolvedBaseUrl });
     const authenticatedEntry = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
@@ -1048,6 +1133,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     enterPhase('authenticated-reload');
     await page.reload({ waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    assertAuthPersistenceNavigationOrigin({ actualUrl: page.url(), baseUrl: resolvedBaseUrl });
     const authenticatedReload = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
@@ -1123,6 +1209,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     enterPhase('diagnostics-fixture-account');
     await page.goto(new URL(buildAuthPersistenceRoute(true), resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    assertAuthPersistenceNavigationOrigin({ actualUrl: page.url(), baseUrl: resolvedBaseUrl });
     await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
@@ -1144,6 +1231,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     enterPhase('fixture-reentry');
     await page.goto(new URL(buildAuthPersistenceRoute(true), resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    assertAuthPersistenceNavigationOrigin({ actualUrl: page.url(), baseUrl: resolvedBaseUrl });
     const reentry = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
