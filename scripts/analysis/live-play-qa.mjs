@@ -33,6 +33,9 @@ const DEFAULT_MOVE_CAP = 320;
 const DEFAULT_POST_GOAL_TIMEOUT_MS = 30_000;
 const DEFAULT_POST_GOAL_POLL_MS = 80;
 const DEFAULT_INPUT_METHOD = 'qa';
+const DEFAULT_SERVICE_WORKER_STABILIZATION_QUIET_MS = 250;
+const SERVICE_WORKER_STABILIZATION_PROBE_GLOBAL = '__MAZER_LIVE_PLAY_QA_SW_STABILIZATION__';
+const SERVICE_WORKER_STABILIZATION_PROBE_STORAGE_KEY = 'mazer.live-play-qa.sw-stabilization.v1';
 
 export const MOVE_DELTAS = Object.freeze({
   move_up: Object.freeze({ dx: 0, dy: -1 }),
@@ -120,6 +123,211 @@ export const sanitizeLivePlayQaDiagnosticValue = (value) => {
     ]));
   }
   return value;
+};
+
+export const resolveLivePlayQaExpectedServiceWorkerReloadCount = (targetUrl, serviceWorkerAvailable) => {
+  const url = new URL(targetUrl);
+  const isRuntimeLocalhost = ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+  return serviceWorkerAvailable === true && !isRuntimeLocalhost ? 1 : 0;
+};
+
+export const installLivePlayQaServiceWorkerStabilizationProbe = async (page) => page.addInitScript(({
+  globalName,
+  storageKey
+}) => {
+  const readState = () => {
+    try {
+      return JSON.parse(sessionStorage.getItem(storageKey) ?? '{}');
+    } catch {
+      return {};
+    }
+  };
+  const writeState = (state) => {
+    window[globalName] = state;
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(state));
+    } catch {
+      // A blocked session store leaves the probe incomplete and the harness fails closed.
+    }
+  };
+  const previous = readState();
+  const navigationType = performance.getEntriesByType('navigation')[0]?.type ?? 'unknown';
+  const sameUrl = previous.pendingControllerChange === true
+    && previous.controllerChangeUrl === location.href;
+  const correlatedReload = sameUrl && navigationType === 'reload';
+  const state = {
+    bootCount: (previous.bootCount ?? 0) + 1,
+    controllerChangeCount: previous.controllerChangeCount ?? 0,
+    correlatedReloadCount: (previous.correlatedReloadCount ?? 0) + (correlatedReload ? 1 : 0),
+    lastNavigationType: navigationType,
+    lastReloadMatchedControllerChange: correlatedReload,
+    pendingControllerChange: false,
+    controllerChangeUrl: null
+  };
+  writeState(state);
+
+  navigator.serviceWorker?.addEventListener('controllerchange', () => {
+    const current = readState();
+    writeState({
+      ...current,
+      controllerChangeCount: (current.controllerChangeCount ?? 0) + 1,
+      pendingControllerChange: true,
+      controllerChangeUrl: location.href
+    });
+  });
+}, {
+  globalName: SERVICE_WORKER_STABILIZATION_PROBE_GLOBAL,
+  storageKey: SERVICE_WORKER_STABILIZATION_PROBE_STORAGE_KEY
+});
+
+export const createLivePlayQaNavigationTracker = () => {
+  const mainFrameNavigations = [];
+  const mainFrameDestinationKeys = [];
+  let stabilized = false;
+  let movementStarted = false;
+  let unexpectedNavigation = null;
+
+  return {
+    record({ isMainFrame, url }) {
+      if (!isMainFrame) {
+        return null;
+      }
+      const navigation = {
+        index: mainFrameNavigations.length,
+        phase: movementStarted ? 'movement' : stabilized ? 'post-stabilization' : 'stabilization',
+        url: sanitizeLivePlayQaDiagnosticUrl(url)
+      };
+      mainFrameNavigations.push(navigation);
+      mainFrameDestinationKeys.push(String(url));
+      if (stabilized && unexpectedNavigation === null) {
+        unexpectedNavigation = navigation;
+      }
+      return navigation;
+    },
+    markStabilized() {
+      stabilized = true;
+    },
+    markMovementStarted() {
+      movementStarted = true;
+    },
+    destinationsMatch(leftIndex, rightIndex) {
+      return mainFrameDestinationKeys[leftIndex] === mainFrameDestinationKeys[rightIndex];
+    },
+    snapshot() {
+      return {
+        mainFrameNavigationCount: mainFrameNavigations.length,
+        mainFrameNavigations: [...mainFrameNavigations],
+        movementStarted,
+        stabilized,
+        unexpectedNavigation
+      };
+    }
+  };
+};
+
+export const createLivePlayQaUnexpectedNavigationError = (tracker, fallbackError = null) => {
+  const { unexpectedNavigation } = tracker.snapshot();
+  if (unexpectedNavigation === null) {
+    return fallbackError;
+  }
+  const phase = unexpectedNavigation.phase === 'movement' ? 'movement_started' : 'service_worker_stabilization';
+  return new Error(
+    `live_play_unexpected_navigation_after_${phase}: ${unexpectedNavigation.url}`
+  );
+};
+
+export const assertLivePlayQaNavigationStable = (tracker) => {
+  const failure = createLivePlayQaUnexpectedNavigationError(tracker);
+  if (failure) {
+    throw failure;
+  }
+};
+
+export const settleLivePlayQaServiceWorkerNavigation = async ({
+  initialNavigationCount,
+  page,
+  quietMs = DEFAULT_SERVICE_WORKER_STABILIZATION_QUIET_MS,
+  serviceWorkerAvailable,
+  targetUrl,
+  timeoutMs,
+  tracker,
+  wait = sleep
+}) => {
+  const browserExposesServiceWorker = typeof serviceWorkerAvailable === 'boolean'
+    ? serviceWorkerAvailable
+    : await page.evaluate(() => Boolean(navigator.serviceWorker));
+  const expectedReloadCount = resolveLivePlayQaExpectedServiceWorkerReloadCount(
+    targetUrl,
+    browserExposesServiceWorker
+  );
+  const expectedNavigationCount = initialNavigationCount + 1 + expectedReloadCount;
+  const startedAt = performance.now();
+  const remainingTimeoutMs = () => Math.max(1, timeoutMs - (performance.now() - startedAt));
+
+  while (tracker.snapshot().mainFrameNavigationCount < expectedNavigationCount) {
+    if (performance.now() - startedAt >= timeoutMs) {
+      throw new Error('live_play_expected_service_worker_reload_missing');
+    }
+    await wait(Math.min(25, remainingTimeoutMs()));
+  }
+
+  if (tracker.snapshot().mainFrameNavigationCount > expectedNavigationCount) {
+    throw new Error('live_play_unexpected_navigation_during_service_worker_stabilization');
+  }
+
+  await page.waitForLoadState('load', { timeout: remainingTimeoutMs() });
+  if (expectedReloadCount === 1) {
+    await page.waitForFunction(
+      () => Boolean(navigator.serviceWorker?.controller),
+      null,
+      { timeout: remainingTimeoutMs() }
+    );
+  }
+  await wait(quietMs);
+
+  const settledNavigationCount = tracker.snapshot().mainFrameNavigationCount;
+  if (settledNavigationCount !== expectedNavigationCount) {
+    throw new Error('live_play_unexpected_navigation_during_service_worker_stabilization');
+  }
+  if (
+    expectedReloadCount === 1
+    && !tracker.destinationsMatch(expectedNavigationCount - 2, expectedNavigationCount - 1)
+  ) {
+    throw new Error('live_play_service_worker_reload_destination_drift');
+  }
+
+  let serviceWorkerProbe = null;
+  if (expectedReloadCount === 1) {
+    serviceWorkerProbe = await page.evaluate((globalName) => {
+      const state = window[globalName];
+      return state
+        ? {
+            controllerChangeCount: state.controllerChangeCount ?? 0,
+            correlatedReloadCount: state.correlatedReloadCount ?? 0,
+            lastNavigationType: state.lastNavigationType ?? 'unknown',
+            lastReloadMatchedControllerChange: state.lastReloadMatchedControllerChange === true,
+            pendingControllerChange: state.pendingControllerChange === true
+          }
+        : null;
+    }, SERVICE_WORKER_STABILIZATION_PROBE_GLOBAL);
+    if (
+      serviceWorkerProbe?.controllerChangeCount !== 1
+      || serviceWorkerProbe.correlatedReloadCount !== 1
+      || serviceWorkerProbe.lastNavigationType !== 'reload'
+      || serviceWorkerProbe.lastReloadMatchedControllerChange !== true
+      || serviceWorkerProbe.pendingControllerChange !== false
+    ) {
+      throw new Error('live_play_service_worker_controller_reload_proof_failed');
+    }
+  }
+
+  tracker.markStabilized();
+  return {
+    expectedReloadCount,
+    mainFrameNavigationCount: settledNavigationCount,
+    pass: true,
+    serviceWorkerProbe
+  };
 };
 
 export const createLivePlayQaFailureError = ({ error, evidencePath }) => new Error(
@@ -1197,6 +1405,8 @@ export const runLivePlayQa = async (options = {}) => {
   let terminalFailure = null;
   let failureArtifact = null;
   let cleanupErrors = [];
+  let navigationTracker = null;
+  let serviceWorkerStabilization = null;
 
   await ensureDir(outputDir);
 
@@ -1221,6 +1431,12 @@ export const runLivePlayQa = async (options = {}) => {
     browser = await chromium.launch({ headless: options.headless !== false });
     context = await browser.newContext(browserContextOptions);
     page = await context.newPage();
+    await installLivePlayQaServiceWorkerStabilizationProbe(page);
+    navigationTracker = createLivePlayQaNavigationTracker();
+    page.on('framenavigated', (frame) => navigationTracker.record({
+      isMainFrame: frame === page.mainFrame(),
+      url: frame.url()
+    }));
     page.on('console', (message) => {
       if (message.type() === 'warning' || message.type() === 'error') {
         consoleMessages.push(message.text());
@@ -1248,7 +1464,16 @@ export const runLivePlayQa = async (options = {}) => {
     });
 
     enterPhase('navigation');
+    const initialNavigationCount = navigationTracker.snapshot().mainFrameNavigationCount;
     await page.goto(targetUrl, { waitUntil: 'load', timeout: options.captureTimeoutMs ?? 45_000 });
+    enterPhase('service-worker-stabilization');
+    serviceWorkerStabilization = await settleLivePlayQaServiceWorkerNavigation({
+      initialNavigationCount,
+      page,
+      targetUrl,
+      timeoutMs: options.captureTimeoutMs ?? 45_000,
+      tracker: navigationTracker
+    });
     enterPhase('readiness');
     const initialDiagnostics = await waitForDiagnosticsReady(page, options.captureTimeoutMs ?? 45_000);
     const initialRuntime = initialDiagnostics.runtime;
@@ -1266,6 +1491,8 @@ export const runLivePlayQa = async (options = {}) => {
       throw new Error('Could not solve route from live playtest diagnostics.');
     }
 
+    assertLivePlayQaNavigationStable(navigationTracker);
+    navigationTracker.markMovementStarted();
     enterPhase('movement');
     const moves = routePlan.moves.slice(0, moveCap);
     const stepRecords = [];
@@ -1273,6 +1500,7 @@ export const runLivePlayQa = async (options = {}) => {
 
     let routeIndex = 0;
     while (routeIndex < moves.length) {
+      assertLivePlayQaNavigationStable(navigationTracker);
       const before = await readLivePlayDiagnostics(page);
       const expected = routePlan.points[routeIndex + 1];
       const startedAt = performance.now();
@@ -1301,6 +1529,7 @@ export const runLivePlayQa = async (options = {}) => {
 
       while (!matched && performance.now() - startedAt < stepTimeoutMs) {
         await page.waitForTimeout(24);
+        assertLivePlayQaNavigationStable(navigationTracker);
         after = await readLivePlayDiagnostics(page);
         actual = readActualPlayer();
         matchedIndex = resolveLivePlayRouteProgressIndex({
@@ -1340,9 +1569,11 @@ export const runLivePlayQa = async (options = {}) => {
       routeIndex = matchedIndex;
     }
 
+    assertLivePlayQaNavigationStable(navigationTracker);
     const goalReachedDiagnostics = await readLivePlayDiagnostics(page);
     const goalTimerFirstSample = goalReachedDiagnostics.runtime?.play?.timer ?? null;
     await page.waitForTimeout(96);
+    assertLivePlayQaNavigationStable(navigationTracker);
     const goalTimerSecondDiagnostics = await readLivePlayDiagnostics(page);
     const goalTimerProof = summarizeGoalTimerFreeze(
       goalTimerFirstSample,
@@ -1358,6 +1589,7 @@ export const runLivePlayQa = async (options = {}) => {
       });
     enterPhase('post-goal');
     const lifecycleProof = lifecycleProofPromise ? await lifecycleProofPromise : null;
+    assertLivePlayQaNavigationStable(navigationTracker);
     const finalDiagnostics = lifecycleProof?.finalDiagnostics ?? goalReachedDiagnostics;
     const progressionCompletionProof = summarizePlayerProgressionCompletion({
       finalLevel: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null,
@@ -1368,6 +1600,7 @@ export const runLivePlayQa = async (options = {}) => {
     await page.screenshot({ path: progressionScreenshotPath, fullPage: false });
     const screenshotPath = resolve(outputDir, `${label}.png`);
     await page.screenshot({ path: screenshotPath, fullPage: false });
+    assertLivePlayQaNavigationStable(navigationTracker);
 
     const goalReachedPlayer = goalReachedDiagnostics.runtime?.play?.player ?? null;
     const goal = initialRuntime?.play?.goal ?? null;
@@ -1406,6 +1639,7 @@ export const runLivePlayQa = async (options = {}) => {
         hasTouch: browserContextOptions.hasTouch,
         isMobile: browserContextOptions.isMobile
       },
+      serviceWorkerStabilization,
       result: {
         pass: reached && failedAt === null && routePlan.moves.length <= moveCap && lifecyclePassed && worldTurnPassed && goalTimerProof.pass && progressionCompletionProof.pass,
         reached,
@@ -1491,16 +1725,21 @@ export const runLivePlayQa = async (options = {}) => {
     };
 
     enterPhase('artifact-publication');
+    assertLivePlayQaNavigationStable(navigationTracker);
     await writeFile(summary.artifacts.summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
     await writeFile(summary.artifacts.stepsPath, `${JSON.stringify(stepRecords, null, 2)}\n`, 'utf8');
+    assertLivePlayQaNavigationStable(navigationTracker);
   } catch (error) {
+    const capturedError = navigationTracker
+      ? createLivePlayQaUnexpectedNavigationError(navigationTracker, error)
+      : error;
     const failedPhase = currentPhase;
     let artifact;
     try {
       artifact = await captureLivePlayQaFailureEvidence({
         browserContextOptions,
         consoleMessages,
-        error,
+        error: capturedError,
         failedRequests,
         label,
         outputDir,
@@ -1515,14 +1754,22 @@ export const runLivePlayQa = async (options = {}) => {
       });
       failureArtifact = artifact;
     } catch (evidenceError) {
-      terminalFailure = createLivePlayQaEvidencePersistenceError({ error, evidenceError });
+      terminalFailure = createLivePlayQaEvidencePersistenceError({ error: capturedError, evidenceError });
     }
     if (artifact) {
-      terminalFailure = createLivePlayQaFailureError({ error, evidencePath: artifact.evidencePath });
+      terminalFailure = createLivePlayQaFailureError({ error: capturedError, evidencePath: artifact.evidencePath });
     }
   } finally {
     cleanupErrors = await settleLivePlayQaCleanup([
+      ...(navigationTracker ? [{
+        name: 'navigation.assert-before-browser-close',
+        run: async () => assertLivePlayQaNavigationStable(navigationTracker)
+      }] : []),
       ...(browser ? [{ name: 'browser.close', run: () => browser.close() }] : []),
+      ...(navigationTracker ? [{
+        name: 'navigation.assert-after-browser-close',
+        run: async () => assertLivePlayQaNavigationStable(navigationTracker)
+      }] : []),
       ...(preview ? [{ name: 'preview.stop', run: () => stopPreviewServer(preview.child) }] : [])
     ]);
   }
