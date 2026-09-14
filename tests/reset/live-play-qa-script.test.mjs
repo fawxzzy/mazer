@@ -916,6 +916,7 @@ describe('live play QA script helpers', () => {
     const promotionPhaseIndex = scriptSource.lastIndexOf("enterPhase('success-pointer-promotion')");
     const promotionTryIndex = scriptSource.indexOf('try {', promotionPhaseIndex);
     const productionRevalidationIndex = scriptSource.lastIndexOf('assertLivePlayProductionDeploymentIdentityUnchanged({');
+    const verifierRevalidationIndex = scriptSource.lastIndexOf('assertLivePlayProductionVerifierIdentityUnchanged({');
     const latestPromotionIndex = scriptSource.lastIndexOf("await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'))");
     expect(cleanupIndex).toBeGreaterThan(-1);
     expect(promotionPhaseIndex).toBeGreaterThan(cleanupIndex);
@@ -924,6 +925,8 @@ describe('live play QA script helpers', () => {
     expect(latestPromotionIndex).toBeGreaterThan(promotionTryIndex);
     expect(productionRevalidationIndex).toBeGreaterThan(promotionTryIndex);
     expect(productionRevalidationIndex).toBeLessThan(latestPromotionIndex);
+    expect(verifierRevalidationIndex).toBeGreaterThan(productionRevalidationIndex);
+    expect(verifierRevalidationIndex).toBeLessThan(latestPromotionIndex);
     expect(scriptSource.indexOf("phase: 'success-pointer-promotion'", latestPromotionIndex)).toBeGreaterThan(latestPromotionIndex);
   });
 

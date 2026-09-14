@@ -2333,6 +2333,10 @@ export const runLivePlayQa = async (options = {}) => {
         ? options.finalProviderDeploymentIdentity
         : undefined
     });
+    assertLivePlayProductionVerifierIdentityUnchanged({
+      contract: productionAcceptanceContract,
+      verifierIdentity: testOnlyVerifierIdentity
+    });
     await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'));
   } catch (error) {
     try {
