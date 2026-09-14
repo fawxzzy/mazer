@@ -748,6 +748,7 @@ describe('live auth persistence soak contract', () => {
       closedBrowserBoundary: { finalUrl: 'https://example.test/', navigationCount: 1, pendingRequestCount: 0 },
       failureEvidencePersisted: false,
       pendingSummary: {},
+      persistFailure: async () => { events.push('failure'); },
       writeSummary: async () => { events.push('summary'); },
       promoteLatest: async () => { events.push('latest'); }
     })).resolves.toEqual({ published: false, promoted: false });
@@ -758,6 +759,7 @@ describe('live auth persistence soak contract', () => {
       closedBrowserBoundary: { finalUrl: 'https://example.test/', navigationCount: 1, pendingRequestCount: 0 },
       failureEvidencePersisted: false,
       pendingSummary: {},
+      persistFailure: async () => { events.push('failure'); },
       writeSummary: async () => { events.push('summary'); },
       promoteLatest: async () => { events.push('latest'); }
     })).resolves.toEqual({ published: true, promoted: true });
@@ -774,10 +776,41 @@ describe('live auth persistence soak contract', () => {
       await expect(publishAuthPersistenceSuccessAfterCleanup({
         cleanupErrors: [],
         ...finalization,
+        persistFailure: async () => { events.push('failure'); },
         writeSummary: async () => { events.push('summary'); },
         promoteLatest: async () => { events.push('latest'); }
       })).resolves.toEqual({ published: false, promoted: false });
       expect(events).toEqual([]);
+    }
+  });
+
+  test('persists deterministic failure evidence when summary or latest publication throws', async () => {
+    for (const failingStep of ['summary', 'latest']) {
+      const events = [];
+      await expect(publishAuthPersistenceSuccessAfterCleanup({
+        cleanupErrors: [],
+        closedBrowserBoundary: { finalUrl: 'https://example.test/', navigationCount: 1, pendingRequestCount: 0 },
+        failureEvidencePersisted: false,
+        pendingSummary: {},
+        persistFailure: async (error) => {
+          events.push(`failure:${error.message}`);
+        },
+        writeSummary: async () => {
+          events.push('summary');
+          if (failingStep === 'summary') {
+            throw new Error('summary_write_failed');
+          }
+        },
+        promoteLatest: async () => {
+          events.push('latest');
+          if (failingStep === 'latest') {
+            throw new Error('latest_promotion_failed');
+          }
+        }
+      })).rejects.toThrow(`${failingStep === 'summary' ? 'summary_write' : 'latest_promotion'}_failed`);
+      expect(events).toEqual(failingStep === 'summary'
+        ? ['summary', 'failure:summary_write_failed']
+        : ['summary', 'latest', 'failure:latest_promotion_failed']);
     }
   });
 
@@ -827,6 +860,9 @@ describe('live auth persistence soak contract', () => {
     expect(source).toContain('createAuthPersistenceClosedBrowserBoundaryAction({');
     expect(source).toContain('getFinalUrl: () => finalBrowserUrl');
     expect(source).toContain("run: () => persistCurrentFailureEvidence('finalization')");
+    expect(source).toContain("schema: 'mazer.live-auth-persistence-cleanup-failure.v1'");
+    expect(source).toContain("currentPhase: 'finalization'");
+    expect(source).toContain("await persistCurrentFailureEvidence('success-publication')");
   });
 
   test('treats a closed page after preimage capture as cleanup failure', () => {

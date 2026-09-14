@@ -515,6 +515,7 @@ export const publishAuthPersistenceSuccessAfterCleanup = async ({
   closedBrowserBoundary,
   failureEvidencePersisted,
   pendingSummary,
+  persistFailure,
   writeSummary,
   promoteLatest
 }) => {
@@ -523,11 +524,17 @@ export const publishAuthPersistenceSuccessAfterCleanup = async ({
     || closedBrowserBoundary === null
     || failureEvidencePersisted
     || pendingSummary === null
+    || typeof persistFailure !== 'function'
   ) {
     return { published: false, promoted: false };
   }
-  await writeSummary();
-  await promoteLatest();
+  try {
+    await writeSummary();
+    await promoteLatest();
+  } catch (error) {
+    await persistFailure(error);
+    throw error;
+  }
   return { published: true, promoted: true };
 };
 
@@ -1527,7 +1534,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       const cleanupFailure = {
         schema: 'mazer.live-auth-persistence-cleanup-failure.v1',
         capturedAt: new Date().toISOString(),
-        currentPhase: failedPhase,
+        currentPhase: 'finalization',
         elapsedMs: measureAuthPersistenceElapsedMs(runStartedAt),
         cleanupErrors,
         fixtureSettingsCleanup
@@ -1561,14 +1568,30 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
   pendingSummary.fixtureSettings.cleanup = fixtureSettingsCleanup;
   pendingSummary.transport.closedBrowserBoundary = closedBrowserBoundary;
-  await publishAuthPersistenceSuccessAfterCleanup({
-    cleanupErrors,
-    closedBrowserBoundary,
-    failureEvidencePersisted,
-    pendingSummary,
-    writeSummary: () => writeFile(summaryPath, `${JSON.stringify(pendingSummary, null, 2)}\n`, 'utf8'),
-    promoteLatest: () => copyFile(summaryPath, latestSummaryPath)
-  });
+  enterPhase('success-publication');
+  try {
+    const publication = await publishAuthPersistenceSuccessAfterCleanup({
+      cleanupErrors,
+      closedBrowserBoundary,
+      failureEvidencePersisted,
+      pendingSummary,
+      persistFailure: async (error) => {
+        terminalError = error;
+        await persistCurrentFailureEvidence('success-publication');
+      },
+      writeSummary: () => writeFile(summaryPath, `${JSON.stringify(pendingSummary, null, 2)}\n`, 'utf8'),
+      promoteLatest: () => copyFile(summaryPath, latestSummaryPath)
+    });
+    if (!publication.published || !publication.promoted) {
+      throw new Error('auth_persistence_success_publication_not_admitted');
+    }
+  } catch (error) {
+    terminalError = error;
+    if (!failureEvidencePersisted) {
+      await persistCurrentFailureEvidence('success-publication');
+    }
+    throw terminalError;
+  }
   return { ...pendingSummary, summaryPath };
 };
 
