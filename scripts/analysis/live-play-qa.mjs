@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { copyFile, writeFile } from 'node:fs/promises';
+import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -79,6 +79,164 @@ const isWorktreeDirty = () => {
   } catch {
     return false;
   }
+};
+
+export const measureLivePlayQaElapsedMs = (
+  runStartedAt,
+  capturedAt = performance.now()
+) => Math.max(0, Math.round(capturedAt - runStartedAt));
+
+export const sanitizeLivePlayQaDiagnosticUrl = (rawUrl) => {
+  try {
+    const url = new URL(rawUrl);
+    const queryKeys = [...new Set([...url.searchParams.keys()])].sort();
+    const redactedQuery = queryKeys.length > 0
+      ? `?${queryKeys.map((key) => `${encodeURIComponent(key)}=<redacted>`).join('&')}`
+      : '';
+    return `${url.origin}${url.pathname}${redactedQuery}`;
+  } catch {
+    return String(rawUrl).replace(/[?#].*$/u, '');
+  }
+};
+
+export const sanitizeLivePlayQaDiagnosticText = (value) => String(value)
+  .replace(/https?:\/\/[^\s"'<>]+/giu, (url) => sanitizeLivePlayQaDiagnosticUrl(url))
+  .replace(/\bBearer\s+[A-Z0-9._~+/=-]+/giu, 'Bearer <redacted>')
+  .replace(/\beyJ[A-Z0-9_-]+\.[A-Z0-9_-]+\.[A-Z0-9_-]+\b/giu, '<redacted-jwt>')
+  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu, '<redacted-email>')
+  .replace(/((?:token|code|password|secret|key)=)[^\s&]+/giu, '$1<redacted>');
+
+export const sanitizeLivePlayQaDiagnosticValue = (value) => {
+  if (typeof value === 'string') {
+    return sanitizeLivePlayQaDiagnosticText(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(sanitizeLivePlayQaDiagnosticValue);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [
+      key,
+      sanitizeLivePlayQaDiagnosticValue(entry)
+    ]));
+  }
+  return value;
+};
+
+export const createLivePlayQaFailureError = ({ error, evidencePath }) => new Error(
+  `${sanitizeLivePlayQaDiagnosticText(error instanceof Error ? error.message : String(error))}\n` +
+  `Failure evidence: ${evidencePath}`
+);
+
+export const createLivePlayQaEvidencePersistenceError = ({ error, evidenceError }) => new AggregateError(
+  [error, evidenceError].map((failure) => new Error(sanitizeLivePlayQaDiagnosticText(
+    failure instanceof Error ? failure.message : String(failure)
+  ))),
+  'live_play_qa_failed_and_failure_evidence_could_not_be_persisted'
+);
+
+export const settleLivePlayQaCleanup = async (actions) => {
+  const errors = [];
+  for (const action of actions) {
+    try {
+      await action.run();
+    } catch (error) {
+      errors.push({
+        action: action.name,
+        message: sanitizeLivePlayQaDiagnosticText(
+          error instanceof Error ? error.message : String(error)
+        )
+      });
+    }
+  }
+  return errors;
+};
+
+export const captureRedactedLivePlayQaScreenshot = async (page, screenshotPath) => {
+  const redactionStyle = await page.addStyleTag({
+    content: `
+      html, body, body *, body *::before, body *::after {
+        color: transparent !important;
+        caret-color: transparent !important;
+        text-shadow: none !important;
+        background-image: none !important;
+      }
+      img, video, iframe { visibility: hidden !important; }
+    `
+  });
+  try {
+    await page.screenshot({
+      path: screenshotPath,
+      fullPage: true,
+      mask: [page.locator('canvas, svg')],
+      maskColor: '#111827'
+    });
+  } finally {
+    await redactionStyle.evaluate((element) => element.remove()).catch(() => {});
+  }
+};
+
+export const isLivePlayDiagnosticsReady = ({
+  qaMoveAvailable,
+  runtime,
+  visual
+}) => {
+  const drawStage = runtime?.generation?.drawStage ?? null;
+  const drawSettled = drawStage?.lifecyclePhase === 'settled'
+    && drawStage?.complete === true
+    && drawStage?.buildPrerollActive !== true;
+  return Boolean(
+    runtime?.surface?.mode === 'play'
+    && runtime?.play?.playtest?.encoding === 'walkable-rows-v1'
+    && drawSettled
+    && visual?.touchControls?.visible === true
+    && qaMoveAvailable === true
+  );
+};
+
+export const persistLivePlayQaFailureEvidence = async ({
+  evidence,
+  label,
+  outputDir,
+  screenshot
+}) => {
+  const screenshotPath = resolve(outputDir, `${label}.failure.png`);
+  let screenshotError = null;
+  try {
+    await screenshot(screenshotPath);
+  } catch (error) {
+    screenshotError = sanitizeLivePlayQaDiagnosticText(
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+
+  const evidencePath = resolve(outputDir, `${label}.failure.json`);
+  await writeFile(evidencePath, `${JSON.stringify({
+    schema: 'mazer.live-play-qa-failure.v1',
+    ...evidence,
+    artifacts: {
+      evidencePath,
+      screenshotPath: screenshotError === null ? screenshotPath : null,
+      screenshotError
+    }
+  }, null, 2)}\n`, 'utf8');
+  return {
+    evidencePath,
+    screenshotPath: screenshotError === null ? screenshotPath : null,
+    screenshotError
+  };
+};
+
+export const appendLivePlayQaCleanupEvidence = async ({
+  cleanupErrors,
+  evidencePath,
+  elapsedMs
+}) => {
+  const evidence = JSON.parse(await readFile(evidencePath, 'utf8'));
+  await writeFile(evidencePath, `${JSON.stringify({
+    ...evidence,
+    elapsedMs,
+    cleanupErrors: sanitizeLivePlayQaDiagnosticValue(cleanupErrors)
+  }, null, 2)}\n`, 'utf8');
 };
 
 const createPointKey = (point) => `${point.x},${point.y}`;
@@ -610,6 +768,7 @@ const waitForDiagnosticsReady = async (page, timeoutMs) => {
         && runtime?.play?.playtest?.encoding === 'walkable-rows-v1'
         && drawSettled
         && visual?.touchControls?.visible === true
+        && typeof window.__MAZER_QA__?.movePlayPlayer === 'function'
       );
     },
     {
@@ -618,7 +777,176 @@ const waitForDiagnosticsReady = async (page, timeoutMs) => {
     },
     { timeout: timeoutMs }
   );
-  return readLivePlayDiagnostics(page);
+  const diagnostics = await readLivePlayDiagnostics(page);
+  const qaMoveAvailable = await page.evaluate(() => (
+    typeof window.__MAZER_QA__?.movePlayPlayer === 'function'
+  ));
+  if (!isLivePlayDiagnosticsReady({ ...diagnostics, qaMoveAvailable })) {
+    throw new Error('live_play_diagnostics_readiness_drift');
+  }
+  return diagnostics;
+};
+
+export const captureLivePlayQaFailureEvidence = async ({
+  browserContextOptions,
+  cleanupErrors = [],
+  consoleMessages,
+  error,
+  failedRequests,
+  label,
+  outputDir,
+  page,
+  pageErrors,
+  pendingRequests,
+  phase,
+  phaseTimings,
+  runStartedAt,
+  targetUrl,
+  viewport
+}) => {
+  const pageAvailable = page !== null && !page.isClosed();
+  let pageState = null;
+  let pageStateError = null;
+  if (pageAvailable) {
+    try {
+      pageState = await page.evaluate(async ({ runtimeAttribute, visualAttribute }) => {
+        const readJson = (attribute) => {
+          const raw = document.documentElement.getAttribute(attribute);
+          if (!raw) {
+            return null;
+          }
+          try {
+            return JSON.parse(raw);
+          } catch {
+            return null;
+          }
+        };
+        const canvas = document.querySelector('canvas');
+        const runtime = readJson(runtimeAttribute);
+        const visual = readJson(visualAttribute);
+        return {
+          url: location.href,
+          title: document.title,
+          document: {
+            readyState: document.readyState,
+            visibilityState: document.visibilityState
+          },
+          canvas: canvas
+            ? {
+                height: canvas.height,
+                width: canvas.width,
+                visible: canvas.getBoundingClientRect().width > 0 && canvas.getBoundingClientRect().height > 0
+              }
+            : null,
+          controls: [...document.querySelectorAll('button, input, a')].map((element) => ({
+            ariaLabel: element.getAttribute('aria-label'),
+            tag: element.tagName.toLowerCase(),
+            text: element.tagName === 'INPUT' ? null : element.textContent?.trim() || null,
+            type: element.getAttribute('type')
+          })),
+          runtime: runtime
+            ? {
+                auth: {
+                  configured: runtime.auth?.configured ?? null,
+                  status: runtime.auth?.status ?? null,
+                  userIdPresent: runtime.auth?.userIdPresent ?? null
+                },
+                generation: {
+                  drawStage: runtime.generation?.drawStage ?? null,
+                  maze: runtime.generation?.maze
+                    ? {
+                        buildKind: runtime.generation.maze.buildKind ?? null,
+                        seed: runtime.generation.maze.seed ?? null,
+                        source: runtime.generation.maze.source ?? null
+                      }
+                    : null
+                },
+                play: {
+                  goal: runtime.play?.goal ?? null,
+                  lifecycle: runtime.play?.lifecycle ?? null,
+                  player: runtime.play?.player ?? null,
+                  playtest: {
+                    encoding: runtime.play?.playtest?.encoding ?? null
+                  }
+                },
+                surface: runtime.surface ?? null
+              }
+            : null,
+          visual: visual
+            ? {
+                board: { bounds: visual.board?.bounds ?? null },
+                runtime: visual.runtime ?? null,
+                touchControls: {
+                  controlMode: visual.touchControls?.controlMode ?? null,
+                  visible: visual.touchControls?.visible ?? null
+                }
+              }
+            : null,
+          qa: {
+            present: typeof window.__MAZER_QA__ === 'object' && window.__MAZER_QA__ !== null,
+            movePlayPlayerCallable: typeof window.__MAZER_QA__?.movePlayPlayer === 'function'
+          },
+          serviceWorker: {
+            cacheNames: typeof caches === 'undefined' ? [] : await caches.keys(),
+            controllerScriptUrl: navigator.serviceWorker?.controller?.scriptURL ?? null
+          }
+        };
+      }, {
+        runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
+        visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
+      });
+    } catch (stateError) {
+      pageStateError = sanitizeLivePlayQaDiagnosticText(
+        stateError instanceof Error ? stateError.message : String(stateError)
+      );
+    }
+  }
+
+  const sanitizedPageState = sanitizeLivePlayQaDiagnosticValue(pageState);
+  const evidence = {
+    generatedAt: new Date().toISOString(),
+    phase,
+    elapsedMs: measureLivePlayQaElapsedMs(runStartedAt),
+    phaseTimings,
+    error: sanitizeLivePlayQaDiagnosticText(error instanceof Error ? error.stack ?? error.message : String(error)),
+    targetUrl: sanitizeLivePlayQaDiagnosticUrl(targetUrl),
+    viewport,
+    browserContext: browserContextOptions,
+    cleanupErrors: sanitizeLivePlayQaDiagnosticValue(cleanupErrors),
+    page: sanitizedPageState === null
+      ? null
+      : {
+          ...sanitizedPageState,
+          url: sanitizeLivePlayQaDiagnosticUrl(pageState.url),
+          serviceWorker: {
+            ...sanitizedPageState.serviceWorker,
+            controllerScriptUrl: pageState.serviceWorker.controllerScriptUrl
+              ? sanitizeLivePlayQaDiagnosticUrl(pageState.serviceWorker.controllerScriptUrl)
+              : null
+          }
+        },
+    pageStateError,
+    failedRequests: failedRequests.map((request) => ({
+      ...request,
+      url: sanitizeLivePlayQaDiagnosticUrl(request.url),
+      failure: request.failure ? sanitizeLivePlayQaDiagnosticText(request.failure) : null
+    })),
+    pendingRequests: [...pendingRequests.values()].map((request) => ({
+      ...request,
+      url: sanitizeLivePlayQaDiagnosticUrl(request.url)
+    })),
+    consoleMessages: consoleMessages.map(sanitizeLivePlayQaDiagnosticText),
+    pageErrors: pageErrors.map(sanitizeLivePlayQaDiagnosticText)
+  };
+
+  return persistLivePlayQaFailureEvidence({
+    evidence,
+    label,
+    outputDir,
+    screenshot: pageAvailable
+      ? (screenshotPath) => captureRedactedLivePlayQaScreenshot(page, screenshotPath)
+      : async () => { throw new Error('page_unavailable'); }
+  });
 };
 
 const setQaPreferences = async (page, options) => {
@@ -834,6 +1162,7 @@ export const summarizePlayerProgressionCompletion = ({
 };
 
 export const runLivePlayQa = async (options = {}) => {
+  const runStartedAt = performance.now();
   const label = options.label ?? DEFAULT_LABEL;
   const sessionId = resolveSessionId(options.sessionId);
   const artifactRoot = resolve(options.artifactRoot ?? DEFAULT_ARTIFACT_ROOT);
@@ -850,33 +1179,77 @@ export const runLivePlayQa = async (options = {}) => {
     isMobile: options.isMobile,
     viewport
   });
+  const phaseTimings = [];
+  let currentPhase = 'initialization';
+  const enterPhase = (phase) => {
+    currentPhase = phase;
+    phaseTimings.push({ phase, elapsedMs: measureLivePlayQaElapsedMs(runStartedAt) });
+  };
+  const consoleMessages = [];
+  const pageErrors = [];
+  const failedRequests = [];
+  const pendingRequests = new Map();
+  let preview = null;
+  let browser = null;
+  let context = null;
+  let page = null;
+  let targetUrl = new URL(route, baseUrl).toString();
+  let terminalFailure = null;
+  let failureArtifact = null;
+  let cleanupErrors = [];
 
   await ensureDir(outputDir);
 
-  if (!options.skipBuild) {
-    runNpmCommand(['run', 'build']);
-  }
-
-  const preview = options.useExistingServer
-    ? null
-    : await launchPreviewServer({
-      requestedBaseUrl: baseUrl,
-      previewTimeoutMs: options.previewTimeoutMs ?? DEFAULT_PREVIEW_TIMEOUT_MS
-    });
-
-  const resolvedBaseUrl = preview?.baseUrl ?? baseUrl;
-  const targetUrl = new URL(route, resolvedBaseUrl).toString();
-  const browser = await chromium.launch({ headless: options.headless !== false });
-  const context = await browser.newContext(browserContextOptions);
-  const page = await context.newPage();
-  await setQaPreferences(page, {
-    inputMethod,
-    movementSpeed: options.movementSpeed ?? 0.42
-  });
-
   let summary;
   try {
+    enterPhase('build');
+    if (!options.skipBuild) {
+      runNpmCommand(['run', 'build']);
+    }
+
+    enterPhase('preview');
+    preview = options.useExistingServer
+      ? null
+      : await launchPreviewServer({
+        requestedBaseUrl: baseUrl,
+        previewTimeoutMs: options.previewTimeoutMs ?? DEFAULT_PREVIEW_TIMEOUT_MS
+      });
+
+    const resolvedBaseUrl = preview?.baseUrl ?? baseUrl;
+    targetUrl = new URL(route, resolvedBaseUrl).toString();
+    enterPhase('browser');
+    browser = await chromium.launch({ headless: options.headless !== false });
+    context = await browser.newContext(browserContextOptions);
+    page = await context.newPage();
+    page.on('console', (message) => {
+      if (message.type() === 'warning' || message.type() === 'error') {
+        consoleMessages.push(message.text());
+      }
+    });
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    page.on('request', (request) => pendingRequests.set(request, {
+      method: request.method(),
+      resourceType: request.resourceType(),
+      url: sanitizeLivePlayQaDiagnosticUrl(request.url())
+    }));
+    page.on('requestfinished', (request) => pendingRequests.delete(request));
+    page.on('requestfailed', (request) => {
+      failedRequests.push({
+        method: request.method(),
+        resourceType: request.resourceType(),
+        url: sanitizeLivePlayQaDiagnosticUrl(request.url()),
+        failure: sanitizeLivePlayQaDiagnosticText(request.failure()?.errorText ?? 'request_failed')
+      });
+      pendingRequests.delete(request);
+    });
+    await setQaPreferences(page, {
+      inputMethod,
+      movementSpeed: options.movementSpeed ?? 0.42
+    });
+
+    enterPhase('navigation');
     await page.goto(targetUrl, { waitUntil: 'load', timeout: options.captureTimeoutMs ?? 45_000 });
+    enterPhase('readiness');
     const initialDiagnostics = await waitForDiagnosticsReady(page, options.captureTimeoutMs ?? 45_000);
     const initialRuntime = initialDiagnostics.runtime;
     const initialProgressionLevel = initialRuntime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null;
@@ -893,6 +1266,7 @@ export const runLivePlayQa = async (options = {}) => {
       throw new Error('Could not solve route from live playtest diagnostics.');
     }
 
+    enterPhase('movement');
     const moves = routePlan.moves.slice(0, moveCap);
     const stepRecords = [];
     let failedAt = null;
@@ -982,6 +1356,7 @@ export const runLivePlayQa = async (options = {}) => {
         page,
         timeoutMs: options.postGoalTimeoutMs ?? DEFAULT_POST_GOAL_TIMEOUT_MS
       });
+    enterPhase('post-goal');
     const lifecycleProof = lifecycleProofPromise ? await lifecycleProofPromise : null;
     const finalDiagnostics = lifecycleProof?.finalDiagnostics ?? goalReachedDiagnostics;
     const progressionCompletionProof = summarizePlayerProgressionCompletion({
@@ -1115,16 +1490,133 @@ export const runLivePlayQa = async (options = {}) => {
       }
     };
 
+    enterPhase('artifact-publication');
     await writeFile(summary.artifacts.summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
     await writeFile(summary.artifacts.stepsPath, `${JSON.stringify(stepRecords, null, 2)}\n`, 'utf8');
-    await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'));
-    return summary;
+  } catch (error) {
+    const failedPhase = currentPhase;
+    let artifact;
+    try {
+      artifact = await captureLivePlayQaFailureEvidence({
+        browserContextOptions,
+        consoleMessages,
+        error,
+        failedRequests,
+        label,
+        outputDir,
+        page,
+        pageErrors,
+        pendingRequests,
+        phase: failedPhase,
+        phaseTimings,
+        runStartedAt,
+        targetUrl,
+        viewport
+      });
+      failureArtifact = artifact;
+    } catch (evidenceError) {
+      terminalFailure = createLivePlayQaEvidencePersistenceError({ error, evidenceError });
+    }
+    if (artifact) {
+      terminalFailure = createLivePlayQaFailureError({ error, evidencePath: artifact.evidencePath });
+    }
   } finally {
-    await browser.close();
-    if (preview) {
-      await stopPreviewServer(preview.child);
+    cleanupErrors = await settleLivePlayQaCleanup([
+      ...(browser ? [{ name: 'browser.close', run: () => browser.close() }] : []),
+      ...(preview ? [{ name: 'preview.stop', run: () => stopPreviewServer(preview.child) }] : [])
+    ]);
+  }
+
+  if (cleanupErrors.length > 0) {
+    const cleanupFailure = new AggregateError(
+      cleanupErrors.map(({ action, message }) => new Error(`${action}: ${message}`)),
+      'live_play_qa_cleanup_failed'
+    );
+    if (failureArtifact) {
+      try {
+        await appendLivePlayQaCleanupEvidence({
+          cleanupErrors,
+          evidencePath: failureArtifact.evidencePath,
+          elapsedMs: measureLivePlayQaElapsedMs(runStartedAt)
+        });
+      } catch (evidenceError) {
+        terminalFailure = createLivePlayQaEvidencePersistenceError({
+          error: terminalFailure ?? cleanupFailure,
+          evidenceError
+        });
+      }
+    } else {
+      try {
+        failureArtifact = await captureLivePlayQaFailureEvidence({
+          browserContextOptions,
+          cleanupErrors,
+          consoleMessages,
+          error: terminalFailure ?? cleanupFailure,
+          failedRequests,
+          label,
+          outputDir,
+          page,
+          pageErrors,
+          pendingRequests,
+          phase: 'cleanup',
+          phaseTimings,
+          runStartedAt,
+          targetUrl,
+          viewport
+        });
+        if (terminalFailure) {
+          terminalFailure.message += `\nCleanup evidence: ${failureArtifact.evidencePath}`;
+        } else {
+          terminalFailure = createLivePlayQaFailureError({
+            error: cleanupFailure,
+            evidencePath: failureArtifact.evidencePath
+          });
+        }
+      } catch (evidenceError) {
+        terminalFailure = createLivePlayQaEvidencePersistenceError({
+          error: terminalFailure ?? cleanupFailure,
+          evidenceError
+        });
+      }
+    }
+    if (terminalFailure) {
+      terminalFailure.message += `\nCleanup errors: ${JSON.stringify(cleanupErrors)}`;
     }
   }
+
+  if (terminalFailure) {
+    throw terminalFailure;
+  }
+  enterPhase('success-pointer-promotion');
+  try {
+    await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'));
+  } catch (error) {
+    try {
+      failureArtifact = await captureLivePlayQaFailureEvidence({
+        browserContextOptions,
+        consoleMessages,
+        error,
+        failedRequests,
+        label,
+        outputDir,
+        page,
+        pageErrors,
+        pendingRequests,
+        phase: 'success-pointer-promotion',
+        phaseTimings,
+        runStartedAt,
+        targetUrl,
+        viewport
+      });
+    } catch (evidenceError) {
+      throw createLivePlayQaEvidencePersistenceError({ error, evidenceError });
+    }
+    throw createLivePlayQaFailureError({
+      error,
+      evidencePath: failureArtifact.evidencePath
+    });
+  }
+  return summary;
 };
 
 const parseViewport = (value) => {

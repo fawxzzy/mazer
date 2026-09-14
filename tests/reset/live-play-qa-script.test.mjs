@@ -1,10 +1,23 @@
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import {
+  appendLivePlayQaCleanupEvidence,
+  captureRedactedLivePlayQaScreenshot,
+  captureLivePlayQaFailureEvidence,
+  createLivePlayQaEvidencePersistenceError,
+  createLivePlayQaFailureError,
+  isLivePlayDiagnosticsReady,
+  measureLivePlayQaElapsedMs,
   normalizeLivePlayInputMethod,
+  persistLivePlayQaFailureEvidence,
   resolveLivePlayBrowserContextOptions,
   resolveLivePlayLifecycleSnapshot,
   resolveArrowPointForMove,
+  sanitizeLivePlayQaDiagnosticValue,
+  settleLivePlayQaCleanup,
   resolveLivePlayRouteProgressIndex,
   resolveStickHoldMsForMove,
   resolveStickPointForMove,
@@ -19,6 +32,234 @@ import {
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
+  test('requires the exact QA move surface before diagnostics readiness can pass', () => {
+    const readyState = {
+      runtime: {
+        surface: { mode: 'play' },
+        generation: {
+          drawStage: {
+            buildPrerollActive: false,
+            complete: true,
+            lifecyclePhase: 'settled'
+          }
+        },
+        play: { playtest: { encoding: 'walkable-rows-v1' } }
+      },
+      visual: { touchControls: { visible: true } }
+    };
+
+    expect(isLivePlayDiagnosticsReady({ ...readyState, qaMoveAvailable: false })).toBe(false);
+    expect(isLivePlayDiagnosticsReady({ ...readyState, qaMoveAvailable: true })).toBe(true);
+    expect(isLivePlayDiagnosticsReady({
+      ...readyState,
+      qaMoveAvailable: true,
+      runtime: {
+        ...readyState.runtime,
+        generation: { drawStage: { complete: false, lifecyclePhase: 'building' } }
+      }
+    })).toBe(false);
+  });
+
+  test('measures failure time at evidence capture instead of phase entry', () => {
+    expect(measureLivePlayQaElapsedMs(100, 850)).toBe(750);
+    expect(measureLivePlayQaElapsedMs(850, 100)).toBe(0);
+  });
+
+  test('sanitizes nested page text, controls, cache names, and embedded URLs', () => {
+    expect(sanitizeLivePlayQaDiagnosticValue({
+      title: 'user@example.test',
+      controls: [{ text: 'token=secret' }],
+      cacheNames: ['profile-user@example.test'],
+      error: 'failed https://example.test/callback?state=raw&code=secret'
+    })).toEqual({
+      title: '<redacted-email>',
+      controls: [{ text: 'token=<redacted>' }],
+      cacheNames: ['<redacted-email>'],
+      error: 'failed https://example.test/callback?code=<redacted>&state=<redacted>'
+    });
+  });
+
+  test('builds a terminal error without retaining the raw URL or raw cause', () => {
+    const failure = createLivePlayQaFailureError({
+      error: new Error('failed https://example.test/callback?state=raw-secret'),
+      evidencePath: 'failure.json'
+    });
+    expect(failure.message).toContain('state=<redacted>');
+    expect(failure.message).not.toContain('raw-secret');
+    expect(failure.cause).toBeUndefined();
+  });
+
+  test('sanitizes both failures when evidence persistence itself fails', () => {
+    const failure = createLivePlayQaEvidencePersistenceError({
+      error: new Error('failed https://example.test/callback?state=raw-secret'),
+      evidenceError: new Error('write failed for user@example.test token=secret')
+    });
+    expect(failure).toBeInstanceOf(AggregateError);
+    expect(failure.message).toBe('live_play_qa_failed_and_failure_evidence_could_not_be_persisted');
+    expect(failure.errors.map((entry) => entry.message)).toEqual([
+      'failed https://example.test/callback?state=<redacted>',
+      'write failed for <redacted-email> token=<redacted>'
+    ]);
+    expect(JSON.stringify(failure.errors)).not.toContain('raw-secret');
+    expect(JSON.stringify(failure.errors)).not.toContain('user@example.test');
+  });
+
+  test('redacts rendered text and media while capturing a failure screenshot', async () => {
+    const calls = [];
+    const page = {
+      addStyleTag: async ({ content }) => {
+        calls.push(['style', content]);
+        return { evaluate: async () => calls.push(['remove']) };
+      },
+      locator: (selector) => ({ selector }),
+      screenshot: async (options) => calls.push(['screenshot', options])
+    };
+    await captureRedactedLivePlayQaScreenshot(page, 'failure.png');
+    expect(calls[0][0]).toBe('style');
+    expect(calls[0][1]).toContain('color: transparent');
+    expect(calls[1]).toEqual(['screenshot', {
+      path: 'failure.png',
+      fullPage: true,
+      mask: [{ selector: 'canvas, svg' }],
+      maskColor: '#111827'
+    }]);
+    expect(calls[2]).toEqual(['remove']);
+  });
+
+  test('settles every cleanup action and sanitizes each failure independently', async () => {
+    const calls = [];
+    const errors = await settleLivePlayQaCleanup([
+      { name: 'browser.close', run: async () => { calls.push('browser'); throw new Error('user@example.test'); } },
+      { name: 'preview.stop', run: async () => { calls.push('preview'); throw new Error('token=secret'); } }
+    ]);
+    expect(calls).toEqual(['browser', 'preview']);
+    expect(errors).toEqual([
+      { action: 'browser.close', message: '<redacted-email>' },
+      { action: 'preview.stop', message: 'token=<redacted>' }
+    ]);
+  });
+
+  test('persists finally-safe initial-timeout evidence with a sanitized page snapshot', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mazer-live-play-qa-'));
+    try {
+      const page = {
+        isClosed: () => false,
+        evaluate: async () => ({
+          url: 'https://mazer.example.test/?token=secret&runtimeDiagnostics=1',
+          title: 'Mazer',
+          document: { readyState: 'complete', visibilityState: 'visible' },
+          canvas: { height: 900, width: 1440, visible: true },
+          controls: [{ ariaLabel: 'Start', tag: 'button', text: 'Start', type: null }],
+          runtime: { surface: { mode: 'play' } },
+          visual: { runtime: { mode: 'play', overlay: 'none' } },
+          qa: { present: false, movePlayPlayerCallable: false },
+          serviceWorker: { cacheNames: ['workbox-precache-v2-test'], controllerScriptUrl: 'https://mazer.example.test/sw.js?token=secret' }
+        }),
+        addStyleTag: async () => ({ evaluate: async () => {} }),
+        locator: (selector) => ({ selector }),
+        screenshot: async ({ path }) => writeFile(path, 'png', 'utf8')
+      };
+
+      const artifact = await captureLivePlayQaFailureEvidence({
+        browserContextOptions: { hasTouch: false, isMobile: false, viewport: { width: 1440, height: 900 } },
+        consoleMessages: ['user@example.test failed token=secret'],
+        error: new Error('page.waitForFunction: Timeout 90000ms exceeded token=secret'),
+        failedRequests: [{ method: 'GET', url: 'https://mazer.example.test/api?token=<redacted>' }],
+        label: 'desktop-timeout',
+        outputDir: root,
+        page,
+        pageErrors: ['Bearer abc.def.ghi'],
+        pendingRequests: new Map([['request', { method: 'GET', url: 'https://mazer.example.test/pending?key=<redacted>' }]]),
+        phase: 'readiness',
+        phaseTimings: [{ phase: 'readiness', elapsedMs: 12 }],
+        runStartedAt: performance.now() - 100,
+        targetUrl: 'https://mazer.example.test/?runtimeDiagnostics=1&authFixture=authenticated',
+        viewport: { width: 1440, height: 900 }
+      });
+
+      const evidence = JSON.parse(await readFile(artifact.evidencePath, 'utf8'));
+      expect(evidence).toMatchObject({
+        schema: 'mazer.live-play-qa-failure.v1',
+        phase: 'readiness',
+        page: {
+          qa: { movePlayPlayerCallable: false, present: false },
+          url: 'https://mazer.example.test/?runtimeDiagnostics=<redacted>&token=<redacted>'
+        }
+      });
+      expect(evidence.elapsedMs).toBeGreaterThanOrEqual(100);
+      expect(evidence.error).not.toContain('token=secret');
+      expect(evidence.consoleMessages).toEqual(['<redacted-email> failed token=<redacted>']);
+      expect(evidence.artifacts.screenshotPath).toBe(artifact.screenshotPath);
+      expect(await readFile(artifact.screenshotPath, 'utf8')).toBe('png');
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test('retains failure JSON when screenshot capture itself fails', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mazer-live-play-qa-'));
+    try {
+      const artifact = await persistLivePlayQaFailureEvidence({
+        evidence: { phase: 'navigation' },
+        label: 'navigation-error',
+        outputDir: root,
+        screenshot: async () => { throw new Error('page closed'); }
+      });
+      const evidence = JSON.parse(await readFile(artifact.evidencePath, 'utf8'));
+      expect(artifact.screenshotPath).toBeNull();
+      expect(evidence.artifacts).toMatchObject({
+        screenshotError: 'page closed',
+        screenshotPath: null
+      });
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test('appends cleanup failures to the durable failure bundle', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mazer-live-play-qa-'));
+    try {
+      const evidencePath = join(root, 'cleanup.failure.json');
+      await writeFile(evidencePath, `${JSON.stringify({
+        schema: 'mazer.live-play-qa-failure.v1',
+        elapsedMs: 50,
+        phase: 'readiness'
+      })}\n`, 'utf8');
+      await appendLivePlayQaCleanupEvidence({
+        cleanupErrors: [
+          { action: 'browser.close', message: 'user@example.test token=secret' },
+          { action: 'preview.stop', message: 'preview failed' }
+        ],
+        evidencePath,
+        elapsedMs: 125
+      });
+      expect(JSON.parse(await readFile(evidencePath, 'utf8'))).toMatchObject({
+        elapsedMs: 125,
+        phase: 'readiness',
+        cleanupErrors: [
+          { action: 'browser.close', message: '<redacted-email> token=<redacted>' },
+          { action: 'preview.stop', message: 'preview failed' }
+        ]
+      });
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test('promotes the success pointer only after cleanup has settled', async () => {
+    const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
+    const cleanupIndex = scriptSource.lastIndexOf('cleanupErrors = await settleLivePlayQaCleanup');
+    const promotionPhaseIndex = scriptSource.lastIndexOf("enterPhase('success-pointer-promotion')");
+    const promotionTryIndex = scriptSource.indexOf('try {', promotionPhaseIndex);
+    const latestPromotionIndex = scriptSource.lastIndexOf("await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'))");
+    expect(cleanupIndex).toBeGreaterThan(-1);
+    expect(promotionPhaseIndex).toBeGreaterThan(cleanupIndex);
+    expect(promotionTryIndex).toBeGreaterThan(promotionPhaseIndex);
+    expect(latestPromotionIndex).toBeGreaterThan(cleanupIndex);
+    expect(latestPromotionIndex).toBeGreaterThan(promotionTryIndex);
+    expect(scriptSource.indexOf("phase: 'success-pointer-promotion'", latestPromotionIndex)).toBeGreaterThan(latestPromotionIndex);
+  });
+
   test('uses a touch-capable mobile context by default and permits explicit desktop proof', () => {
     expect(resolveLivePlayBrowserContextOptions({
       viewport: { width: 405, height: 958 }
