@@ -13,7 +13,9 @@ export const MAZER_OAUTH_SESSION_QUARANTINE_KEY = 'mazer.auth.oauth-session-quar
 export const MAZER_OAUTH_AUTH_SESSION_KEY = 'sb-bxtcuhkotumitoqtrcej-auth-token';
 export const MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY = 'mazer.auth.oauth-storage-probe.v1';
 export const MAZER_OAUTH_AUTH_STORAGE_PROBE_BYTES = 65_536;
-export const MAZER_OAUTH_SESSION_LOCK_NAME = 'mazer.auth.oauth-session-transaction.v1';
+// auth-js derives this exact name from the persisted session key. OAuth
+// commits and auth-js refreshes must share it because both replace that key.
+export const MAZER_OAUTH_SESSION_LOCK_NAME = `lock:${MAZER_OAUTH_AUTH_SESSION_KEY}`;
 export const MAZER_OAUTH_PENDING_TTL_MS = 300_000;
 export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
 export const MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS = 60_000;

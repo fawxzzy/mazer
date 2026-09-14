@@ -700,7 +700,8 @@ export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> =>
         // same-session contention. Its negative "wait forever" request is
         // capped so a stale browser holder cannot freeze account hydration;
         // true acquisition timeouts retain auth-js's isAcquireTimeout contract.
-        // OAuth commit/rollback keeps its separate fail-fast transaction seam.
+        // OAuth commit/rollback uses the same storage-derived lock name, but
+        // keeps its fail-fast acquisition policy while auth-js queues.
         lock: runLegacyAuthJsLock
       },
       db: {
@@ -770,18 +771,37 @@ const createLegacyAuthMutationUnavailableResult = (): LegacyAuthActionResult => 
   })
 });
 
+const prepareLegacyAuthDirectSessionMutation = (): LegacyAuthActionResult | null => {
+  if (advanceMazerSharedAuthMutationEpoch() === null) {
+    return createLegacyAuthMutationUnavailableResult();
+  }
+  if (advanceMazerAuthMutationEpoch() === null) {
+    return createLegacyAuthMutationUnavailableResult();
+  }
+  return null;
+};
+
+const runLegacyAuthJsSessionMutation = async (
+  operation: () => Promise<LegacyAuthActionResult>
+): Promise<LegacyAuthActionResult> => {
+  try {
+    const unavailable = prepareLegacyAuthDirectSessionMutation();
+    return unavailable ?? await operation();
+  } catch {
+    return createLegacyAuthMutationUnavailableResult();
+  }
+};
+
 const runLegacyAuthDirectSessionMutation = async (
   operation: () => Promise<LegacyAuthActionResult>
 ): Promise<LegacyAuthActionResult> => {
   const result = await runMazerExclusiveAuthMutation(async () => {
-    // Keep generation invalidation, the auth-js request, persistence, and
-    // notification in one outer common lock.
+    // Direct internal auth operations bypass auth-js's public lock hook, so
+    // they retain an explicit outer acquisition of the shared session lock.
     try {
-      if (advanceMazerSharedAuthMutationEpoch() === null) {
-        return createLegacyAuthMutationUnavailableResult();
-      }
-      if (advanceMazerAuthMutationEpoch() === null) {
-        return createLegacyAuthMutationUnavailableResult();
+      const unavailable = prepareLegacyAuthDirectSessionMutation();
+      if (unavailable !== null) {
+        return unavailable;
       }
       return await operation();
     } catch {
@@ -806,7 +826,7 @@ export const signInLegacyAuth = async (
     };
   }
 
-  return runLegacyAuthDirectSessionMutation(async () => {
+  return runLegacyAuthJsSessionMutation(async () => {
     const transport = client.auth as unknown as Partial<LegacyAuthAbortableTransport>;
     if (typeof transport.fetch !== 'function') {
       return createLegacyAuthMutationUnavailableResult();
@@ -857,7 +877,7 @@ export const signUpLegacyAuth = async (
     };
   }
 
-  return runLegacyAuthDirectSessionMutation(async () => {
+  return runLegacyAuthJsSessionMutation(async () => {
     const transport = client.auth as unknown as Partial<LegacyAuthAbortableTransport>;
     if (typeof transport.fetch !== 'function') {
       return createLegacyAuthMutationUnavailableResult();

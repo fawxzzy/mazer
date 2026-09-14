@@ -50,8 +50,10 @@ import {
 } from '../../src/legacy-runtime/legacyAuth';
 import {
   MAZER_OAUTH_AUTH_SESSION_KEY,
+  MAZER_OAUTH_SESSION_LOCK_NAME,
   MAZER_OAUTH_SAFE_ERROR_MESSAGE,
-  consumeMazerOAuthCallback
+  consumeMazerOAuthCallback,
+  runMazerExclusiveAuthMutation
 } from '../../src/legacy-runtime/legacyAccountPortal';
 
 class MemoryStorage {
@@ -173,6 +175,31 @@ describe('legacy auth runtime', () => {
 
     release();
     await expect(Promise.all([first, second])).resolves.toEqual(['a', 'b']);
+  });
+
+  test('queues auth-js session writes behind the shared OAuth session lock', async () => {
+    const lockManager = new NamedLockHarness();
+    const events: string[] = [];
+    let releaseOAuth!: () => void;
+    const oauth = runMazerExclusiveAuthMutation(async () => {
+      events.push('oauth-start');
+      await new Promise<void>((resolve) => { releaseOAuth = resolve; });
+      events.push('oauth-end');
+    }, lockManager);
+    await vi.waitFor(() => expect(events).toEqual(['oauth-start']));
+
+    expect(MAZER_OAUTH_SESSION_LOCK_NAME).toBe(`lock:${MAZER_OAUTH_AUTH_SESSION_KEY}`);
+    const refresh = runLegacyAuthJsLock(MAZER_OAUTH_SESSION_LOCK_NAME, -1, async () => {
+      events.push('refresh');
+      return 'refreshed';
+    }, lockManager);
+    await Promise.resolve();
+    expect(events).toEqual(['oauth-start']);
+
+    releaseOAuth();
+    await expect(oauth).resolves.toEqual({ status: 'completed', value: undefined });
+    await expect(refresh).resolves.toBe('refreshed');
+    expect(events).toEqual(['oauth-start', 'oauth-end', 'refresh']);
   });
 
   test('bounds queued auth-js acquisition and classifies the real timeout', async () => {
