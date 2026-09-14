@@ -127,8 +127,8 @@ export const sanitizeLivePlayQaDiagnosticValue = (value) => {
 
 export const resolveLivePlayQaExpectedServiceWorkerReloadCount = (targetUrl) => {
   const url = new URL(targetUrl);
-  const isLoopback = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname);
-  return url.protocol === 'https:' && !isLoopback ? 1 : 0;
+  const isRuntimeLocalhost = ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+  return url.protocol === 'https:' && !isRuntimeLocalhost ? 1 : 0;
 };
 
 export const installLivePlayQaServiceWorkerStabilizationProbe = async (page) => page.addInitScript(({

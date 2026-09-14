@@ -91,6 +91,7 @@ describe('live play QA script helpers', () => {
     expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://192.168.1.20:4173/')).toBe(0);
     expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://mazer.example.test/')).toBe(0);
     expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://localhost:4173/')).toBe(0);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://[::1]:4173/')).toBe(1);
     expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://mazer.example.test/')).toBe(1);
   });
 
