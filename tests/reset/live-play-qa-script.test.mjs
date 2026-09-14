@@ -28,6 +28,7 @@ import {
   resolveArrowPointForMove,
   resolveLivePlayQaExpectedServiceWorkerReloadCount,
   resolveLivePlayProductionAcceptanceContract,
+  resolveRoute,
   resolveLivePlayProductionDeploymentIdentity,
   resolveLivePlayProductionVerifierIdentity,
   sanitizeLivePlayQaDiagnosticValue,
@@ -353,6 +354,22 @@ describe('live play QA script helpers', () => {
       actualUrl: `https://attacker.example.test${productionRoute}`,
       contract
     })).toThrow('live_play_production_navigation_origin_or_path_drift');
+  });
+
+  test('keeps production routes exact while preserving non-production cache busting', () => {
+    expect(resolveRoute({
+      productionAcceptance: 'true',
+      route: productionRoute
+    }, 'production')).toBe(productionRoute);
+    const nonProductionRoute = new URL(resolveRoute({ route: productionRoute }, 'local'), 'http://local.test');
+    expect(nonProductionRoute.searchParams.get('v')).toMatch(/^local-\d+$/u);
+    expect([...nonProductionRoute.searchParams.keys()].sort()).toEqual([
+      'authFixture',
+      'mazeSeed',
+      'mode',
+      'runtimeDiagnostics',
+      'v'
+    ]);
   });
 
   test('accepts only exact authenticated deterministic play readiness and rejects the historical menu-reset race', () => {

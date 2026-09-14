@@ -1716,13 +1716,14 @@ const triggerMove = async ({ inputMethod, page, diagnostics, move, stepSettleMs 
   };
 };
 
-const resolveRoute = (args, label) => {
+export const resolveRoute = (args, label) => {
   const rawRoute = typeof args.route === 'string' ? args.route : DEFAULT_ROUTE;
   const url = new URL(rawRoute, 'http://local.test');
+  const productionAcceptance = isTruthy(args.productionAcceptance ?? args['production-acceptance']);
   if (!url.searchParams.has('runtimeDiagnostics')) {
     url.searchParams.set('runtimeDiagnostics', '1');
   }
-  if (!url.searchParams.has('v')) {
+  if (!productionAcceptance && !url.searchParams.has('v')) {
     url.searchParams.set('v', `${label}-${Date.now()}`);
   }
   if (typeof args.mazeSeed === 'string' || typeof args['maze-seed'] === 'string') {
