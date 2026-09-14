@@ -759,7 +759,12 @@ export const buildAuthPersistenceRoute = (authenticated) => (
   `/?content=core-only&theme=aurora&runtimeDiagnostics=1${authenticated ? '&authFixture=authenticated' : ''}&v=auth-persistence-soak`
 );
 
-export const summarizeAuthPersistenceSoak = (steps, consoleMessages, pageErrors) => {
+export const summarizeAuthPersistenceSoak = (
+  steps,
+  consoleMessages,
+  pageErrors,
+  { serviceWorkersBlocked = false } = {}
+) => {
   const required = [
     'signed-out-shared-account-entry',
     'signed-out-shared-account-contract',
@@ -777,6 +782,7 @@ export const summarizeAuthPersistenceSoak = (steps, consoleMessages, pageErrors)
   // Phaser may emit this teardown diagnostic while a page is navigating away.
   const actionableConsoleMessages = consoleMessages.filter(
     (message) => !message.startsWith('WebGL: CONTEXT_LOST_WEBGL:')
+      && !(serviceWorkersBlocked && message === 'Service Worker registration blocked by Playwright')
   );
   return {
     pass: missingSteps.length === 0 && actionableConsoleMessages.length === 0 && pageErrors.length === 0,
@@ -1157,7 +1163,9 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     screenshots.fixtureReentry = screenshotPath;
     const sanitizedConsoleMessages = consoleMessages.map(sanitizeAuthPersistenceDiagnosticText);
     const sanitizedPageErrors = pageErrors.map(sanitizeAuthPersistenceDiagnosticText);
-    const result = summarizeAuthPersistenceSoak(steps, sanitizedConsoleMessages, sanitizedPageErrors);
+    const result = summarizeAuthPersistenceSoak(steps, sanitizedConsoleMessages, sanitizedPageErrors, {
+      serviceWorkersBlocked: executionPlan.serviceWorkers === 'block'
+    });
     if (!result.pass) {
       throw new Error(`auth_persistence_soak_failed:${JSON.stringify({
         missingSteps: result.missingSteps,

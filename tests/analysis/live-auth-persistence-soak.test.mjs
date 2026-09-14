@@ -767,5 +767,23 @@ describe('live auth persistence soak contract', () => {
       pass: false,
       actionableConsoleMessages: ['unexpected runtime warning']
     });
+    expect(summarizeAuthPersistenceSoak(
+      passingSteps,
+      ['Service Worker registration blocked by Playwright'],
+      [],
+      { serviceWorkersBlocked: true }
+    )).toMatchObject({
+      pass: true,
+      actionableConsoleMessages: []
+    });
+    expect(summarizeAuthPersistenceSoak(
+      passingSteps,
+      ['Service Worker registration blocked by Playwright'],
+      [],
+      { serviceWorkersBlocked: false }
+    )).toMatchObject({
+      pass: false,
+      actionableConsoleMessages: ['Service Worker registration blocked by Playwright']
+    });
   });
 });
