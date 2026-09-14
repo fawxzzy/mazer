@@ -1923,10 +1923,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource.match(/return runLegacyAuthDirectSessionMutation\(async \(\) => \{/g)).toHaveLength(3);
     expect(authSource).not.toContain('runLegacyAuthInternallyLockedMutation');
     expect(authSource).toContain("const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;");
-    expect(authSource).toContain("if (typeof directSignOut._signOut !== 'function') {");
-    expect(authSource).toContain("await directSignOut._signOut({ scope: 'local' })");
+    expect(authSource).toContain("if (typeof auth._signOut !== 'function' || typeof auth.fetch !== 'function') {");
+    expect(authSource).toContain('await invokeLegacyLocalSignOutWithTimeout(directSignOut)');
     expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
-    expect(authSource.match(/runLegacyAbortableCredentialRequest\(/g)).toHaveLength(2);
+    expect(authSource.match(/runLegacyAbortableCredentialRequest\(/g)).toHaveLength(3);
     expect(authSource).toContain('LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS = 10_000');
     expect(authSource).toContain('sessionResult = await client.auth.getSession();');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");

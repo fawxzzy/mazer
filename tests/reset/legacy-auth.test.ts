@@ -14,6 +14,7 @@ import {
   createLegacyAuthScopedStorage,
   deriveLegacyRememberedIdentityDisplayName,
   isLegacyPasswordRecoveryRuntimeLocation,
+  invokeLegacyLocalSignOutWithTimeout,
   markLegacyRememberedIdentityReauthRequired,
   normalizeLegacyAuthEmail,
   readLegacyRememberedIdentityState,
@@ -95,6 +96,29 @@ describe('legacy auth runtime', () => {
     expect(observedSignal?.aborted).toBe(true);
     expect(transport.fetch).toBe(originalFetch);
     expect(LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS).toBeLessThan(12_000);
+  });
+
+  test('bounds local sign-out remote revocation and restores its auth transport', async () => {
+    let observedSignal: AbortSignal | undefined;
+    const originalFetch = vi.fn((_: RequestInfo | URL, init?: RequestInit) => {
+      observedSignal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        observedSignal?.addEventListener('abort', () => {
+          reject(new DOMException('aborted', 'AbortError'));
+        }, { once: true });
+      });
+    }) as unknown as typeof fetch;
+    const auth = {
+      fetch: originalFetch,
+      _signOut: async () => {
+        await auth.fetch('https://bxtcuhkotumitoqtrcej.supabase.co/auth/v1/logout');
+        return { error: null };
+      }
+    };
+
+    await expect(invokeLegacyLocalSignOutWithTimeout(auth, 5)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(observedSignal?.aborted).toBe(true);
+    expect(auth.fetch).toBe(originalFetch);
   });
 
   test('detects whether Supabase browser auth is configured', () => {
@@ -484,7 +508,7 @@ describe('legacy auth runtime', () => {
   test('guards auth persistence against global sign-out and duplicate listeners', () => {
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
 
-    expect(authSource).toContain("await directSignOut._signOut({ scope: 'local' })");
+    expect(authSource).toContain('await invokeLegacyLocalSignOutWithTimeout(directSignOut)');
     expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
     expect(authSource).toContain('return runLegacyAuthDirectSessionMutation(async () => {');
     expect(authSource).toContain('fail closed if the pinned seam ever changes');

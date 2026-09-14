@@ -24,40 +24,40 @@ describe('Mazer install gate', () => {
     expect(shouldShowMazerInstallGate({ ...hiddenState, mode: 'manual', instruction: 'Use Share > Add to Home Screen' })).toBe(true);
   });
 
-  test('bypasses the install gate for recovery, OAuth callbacks, and legal routes', () => {
+  test('bypasses the install gate for recovery, accepted OAuth callbacks, and legal routes', () => {
     expect(shouldRunMazerInstallGateForBoot({
       forceInstallGate: false,
       isLocalhostRuntime: false,
       legalRouteRequested: false,
-      oauthCallbackRequested: false,
+      oauthCallbackAccepted: false,
       passwordRecoveryRequested: true
     })).toBe(false);
     expect(shouldRunMazerInstallGateForBoot({
       forceInstallGate: false,
       isLocalhostRuntime: false,
       legalRouteRequested: false,
-      oauthCallbackRequested: true,
+      oauthCallbackAccepted: true,
       passwordRecoveryRequested: false
     })).toBe(false);
     expect(shouldRunMazerInstallGateForBoot({
       forceInstallGate: false,
       isLocalhostRuntime: false,
       legalRouteRequested: true,
-      oauthCallbackRequested: false,
+      oauthCallbackAccepted: false,
       passwordRecoveryRequested: false
     })).toBe(false);
     expect(shouldRunMazerInstallGateForBoot({
       forceInstallGate: false,
       isLocalhostRuntime: false,
       legalRouteRequested: false,
-      oauthCallbackRequested: false,
+      oauthCallbackAccepted: false,
       passwordRecoveryRequested: false
     })).toBe(true);
     expect(shouldRunMazerInstallGateForBoot({
       forceInstallGate: true,
       isLocalhostRuntime: true,
       legalRouteRequested: false,
-      oauthCallbackRequested: false,
+      oauthCallbackAccepted: false,
       passwordRecoveryRequested: false
     })).toBe(true);
   });
@@ -99,18 +99,17 @@ describe('Mazer install gate', () => {
     expect(mainSource).toContain('initializeInstallSurface(window);');
     expect(mainSource).toContain('!passwordRecoveryRouteRequested');
     expect(mainSource).toContain('captureAndScrubMazerOAuthCallback(window.location, window.history)');
-    expect(mainSource).toContain('const oauthSessionStorage = resolveMazerOAuthSessionStorage(window);');
-    expect(mainSource).toContain('const oauthAuthStorage = resolveMazerOAuthAuthStorage(window);');
-    expect(mainSource).toContain('oauthSessionStorage !== null');
-    expect(mainSource).toContain('oauthAuthStorage !== null');
-    expect(mainSource).toContain('isMazerOAuthCallbackReadyForBoot(');
-    expect(mainSource).toContain('oauthSessionStorage,\n      Date.now(),\n      oauthAuthStorage');
-    expect(mainSource).toContain('oauthCallbackRequested: oauthCallbackReadyForBoot');
+    expect(mainSource).toContain("oauthCallbackAccepted = result.status === 'connected';");
+    expect(mainSource).toContain('oauthCallbackAccepted,');
     expect(mainSource).toContain("window.location.replace(buildMazerAccountPortalUrl('reset-password'))");
     expect(mainSource).toContain('window.location.replace(buildMazerLegalUrl(legalRoute))');
     expect(mainSource.indexOf('captureAndScrubMazerOAuthCallback(window.location, window.history)')).toBeLessThan(
       mainSource.indexOf("markMazerBootStatus('boot-start')")
     );
+    expect(mainSource.indexOf('initializeInstallSurface(window);')).toBeLessThan(
+      mainSource.indexOf('await consumeMazerOAuthCallback(')
+    );
+    expect(mainSource.indexOf('await consumeMazerOAuthCallback(')).toBeLessThan(installGateCallIndex);
     expect(mainSource).toContain('shouldRunMazerInstallGateForBoot({');
     expect(cssSource).toContain(`#${MAZER_INSTALL_GATE_OVERLAY_ID}`);
     expect(cssSource).toContain('"Space Grotesk", ui-sans-serif, system-ui');

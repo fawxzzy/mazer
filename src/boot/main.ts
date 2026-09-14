@@ -9,10 +9,7 @@ import {
   buildMazerLegalUrl,
   captureAndScrubMazerOAuthCallback,
   consumeMazerOAuthCallback,
-  isMazerOAuthCallbackReadyForBoot,
   isMazerOAuthCallbackRequest,
-  resolveMazerOAuthAuthStorage,
-  resolveMazerOAuthSessionStorage,
   resolveMazerLegalRoute,
   type MazerOAuthClient
 } from '../legacy-runtime/legacyAccountPortal';
@@ -91,17 +88,6 @@ const boot = async (): Promise<void> => {
   const passwordRecoveryRouteRequested = isLegacyPasswordRecoveryRuntimeLocation(window.location);
   const oauthCallbackRequested = !passwordRecoveryRouteRequested
     && isMazerOAuthCallbackRequest(window.location);
-  const oauthSessionStorage = resolveMazerOAuthSessionStorage(window);
-  const oauthAuthStorage = resolveMazerOAuthAuthStorage(window);
-  const oauthCallbackReadyForBoot = oauthCallbackRequested
-    && oauthSessionStorage !== null
-    && oauthAuthStorage !== null
-    && isMazerOAuthCallbackReadyForBoot(
-      window.location,
-      oauthSessionStorage,
-      Date.now(),
-      oauthAuthStorage
-    );
   const oauthCallback = oauthCallbackRequested
     ? captureAndScrubMazerOAuthCallback(window.location, window.history)
     : null;
@@ -138,6 +124,14 @@ const boot = async (): Promise<void> => {
   }
 
   initializeInstallSurface(window);
+  let oauthCallbackAccepted = false;
+  if (oauthCallback !== null) {
+    const result = await consumeMazerOAuthCallback(oauthCallback, async () => (
+      await getLegacyAuthClient() as unknown as MazerOAuthClient | null
+    ));
+    oauthCallbackAccepted = result.status === 'connected';
+  }
+
   // The install gate is meaningless during local dev (no real production
   // URL to install, and localhost PWA installs behave strangely) -- it'd
   // otherwise block every single local test run behind a screen with
@@ -148,17 +142,11 @@ const boot = async (): Promise<void> => {
     forceInstallGate,
     isLocalhostRuntime: isLocalhostRuntime(),
     legalRouteRequested: legalRoute !== null,
-    oauthCallbackRequested: oauthCallbackReadyForBoot,
+    oauthCallbackAccepted,
     passwordRecoveryRequested: passwordRecoveryRouteRequested
   })) {
     markMazerBootStatus('install-gate-checking');
     await runMazerInstallGate(document);
-  }
-
-  if (oauthCallback !== null) {
-    await consumeMazerOAuthCallback(oauthCallback, async () => (
-      await getLegacyAuthClient() as unknown as MazerOAuthClient | null
-    ));
   }
 
   await bootstrapLegacyRemoteAccountState();

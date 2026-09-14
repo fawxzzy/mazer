@@ -130,7 +130,7 @@ export type LegacyAuthStateListener = (
 
 type LegacyAuthStorage = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>;
 type LegacyAuthClient = SupabaseClient<any, any, any>;
-interface LegacyAuthDirectSignOutClient {
+interface LegacyAuthDirectSignOutClient extends LegacyAuthAbortableTransport {
   _signOut: (options: { scope: 'local' }) => Promise<{
     error: { message?: string | null } | null;
   }>;
@@ -157,6 +157,20 @@ export const runLegacyAbortableCredentialRequest = async <T>(
     clearTimeout(timeout);
     transport.fetch = originalFetch;
   }
+};
+
+export const invokeLegacyLocalSignOutWithTimeout = async (
+  auth: Partial<LegacyAuthDirectSignOutClient>,
+  timeoutMs = LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS
+): Promise<{ error: { message?: string | null } | null } | null> => {
+  if (typeof auth._signOut !== 'function' || typeof auth.fetch !== 'function') {
+    return null;
+  }
+  return runLegacyAbortableCredentialRequest(
+    auth as LegacyAuthDirectSignOutClient,
+    () => auth._signOut!({ scope: 'local' }),
+    timeoutMs
+  );
 };
 
 const createGuestSnapshot = (
@@ -955,10 +969,11 @@ export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
     // implementation used by signOut(); invoke it only while our exact common
     // lock is already held, and fail closed if the pinned seam ever changes.
     const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
-    if (typeof directSignOut._signOut !== 'function') {
+    const result = await invokeLegacyLocalSignOutWithTimeout(directSignOut);
+    if (result === null) {
       return createLegacyAuthMutationUnavailableResult();
     }
-    const { error } = await directSignOut._signOut({ scope: 'local' });
+    const { error } = result;
     if (!error) {
       legacyAuthLastSessionSignature = null;
       markLegacyRememberedIdentityReauthRequired(typeof window === 'undefined' ? undefined : window.localStorage);
