@@ -130,7 +130,8 @@ export type LegacyAuthStateListener = (
 
 type LegacyAuthStorage = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>;
 type LegacyAuthClient = SupabaseClient<any, any, any>;
-interface LegacyAuthDirectSignOutClient extends LegacyAuthAbortableTransport {
+interface LegacyAuthDirectSignOutClient {
+  admin: LegacyAuthAbortableTransport;
   _signOut: (options: { scope: 'local' }) => Promise<{
     error: { message?: string | null } | null;
   }>;
@@ -163,14 +164,38 @@ export const invokeLegacyLocalSignOutWithTimeout = async (
   auth: Partial<LegacyAuthDirectSignOutClient>,
   timeoutMs = LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS
 ): Promise<{ error: { message?: string | null } | null } | null> => {
-  if (typeof auth._signOut !== 'function' || typeof auth.fetch !== 'function') {
+  if (typeof auth._signOut !== 'function' || typeof auth.admin?.fetch !== 'function') {
     return null;
   }
   return runLegacyAbortableCredentialRequest(
-    auth as LegacyAuthDirectSignOutClient,
+    auth.admin,
     () => auth._signOut!({ scope: 'local' }),
     timeoutMs
   );
+};
+
+export const readLegacyPersistedAuthSessionSnapshot = (
+  storage: Pick<Storage, 'getItem'> | undefined,
+  env: Record<string, string | undefined> = readRuntimeEnv()
+): LegacyAuthSessionSnapshot | null => {
+  if (!storage) {
+    return null;
+  }
+  try {
+    const raw = storage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY);
+    const parsed: unknown = raw === null ? null : JSON.parse(raw);
+    if (
+      parsed === null
+      || typeof parsed !== 'object'
+      || Array.isArray(parsed)
+      || typeof (parsed as Partial<Session>).user?.id !== 'string'
+    ) {
+      return null;
+    }
+    return createLegacyAuthSessionSnapshot(parsed as Session, env);
+  } catch {
+    return null;
+  }
 };
 
 const createGuestSnapshot = (
@@ -969,20 +994,28 @@ export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
     // implementation used by signOut(); invoke it only while our exact common
     // lock is already held, and fail closed if the pinned seam ever changes.
     const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
+    const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(
+      typeof window === 'undefined' ? undefined : window.localStorage
+    );
     const result = await invokeLegacyLocalSignOutWithTimeout(directSignOut);
     if (result === null) {
       return createLegacyAuthMutationUnavailableResult();
     }
     const { error } = result;
-    if (!error) {
-      legacyAuthLastSessionSignature = null;
-      markLegacyRememberedIdentityReauthRequired(typeof window === 'undefined' ? undefined : window.localStorage);
+    if (error) {
+      return {
+        snapshot: authenticatedPreimage === null
+          ? createLegacyAuthMutationUnavailableResult().snapshot
+          : { ...authenticatedPreimage, error: error.message ?? LEGACY_AUTH_MESSAGE_COPY.authUnavailable, info: null }
+      };
     }
+
+    legacyAuthLastSessionSignature = null;
+    markLegacyRememberedIdentityReauthRequired(typeof window === 'undefined' ? undefined : window.localStorage);
 
     return {
       snapshot: createGuestSnapshot(true, {
-        error: error?.message ?? null,
-        info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedOut
+        info: LEGACY_AUTH_MESSAGE_COPY.signedOut
       })
     };
   });

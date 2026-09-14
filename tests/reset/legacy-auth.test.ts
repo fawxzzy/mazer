@@ -19,6 +19,7 @@ import {
   normalizeLegacyAuthEmail,
   readLegacyRememberedIdentityState,
   readLegacyRememberedIdentity,
+  readLegacyPersistedAuthSessionSnapshot,
   readLegacyAuthSessionSnapshot,
   readLegacyPasswordRecoveryBootUrlState,
   reconcileLegacyAuthStorageSession,
@@ -42,6 +43,7 @@ import {
   type LegacyAuthSessionSnapshot
 } from '../../src/legacy-runtime/legacyAuth';
 import {
+  MAZER_OAUTH_AUTH_SESSION_KEY,
   MAZER_OAUTH_SAFE_ERROR_MESSAGE,
   consumeMazerOAuthCallback
 } from '../../src/legacy-runtime/legacyAccountPortal';
@@ -108,17 +110,45 @@ describe('legacy auth runtime', () => {
         }, { once: true });
       });
     }) as unknown as typeof fetch;
+    const clientFetch = vi.fn(() => {
+      throw new Error('logout must not use the client transport');
+    }) as unknown as typeof fetch;
     const auth = {
-      fetch: originalFetch,
+      fetch: clientFetch,
+      admin: { fetch: originalFetch },
       _signOut: async () => {
-        await auth.fetch('https://bxtcuhkotumitoqtrcej.supabase.co/auth/v1/logout');
+        await auth.admin.fetch('https://bxtcuhkotumitoqtrcej.supabase.co/auth/v1/logout');
         return { error: null };
       }
     };
 
     await expect(invokeLegacyLocalSignOutWithTimeout(auth, 5)).rejects.toMatchObject({ name: 'AbortError' });
     expect(observedSignal?.aborted).toBe(true);
-    expect(auth.fetch).toBe(originalFetch);
+    expect(auth.admin.fetch).toBe(originalFetch);
+    expect(auth.fetch).toBe(clientFetch);
+  });
+
+  test('restores the exact authenticated snapshot when local sign-out fails', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(MAZER_OAUTH_AUTH_SESSION_KEY, JSON.stringify({
+      access_token: 'not-exposed',
+      refresh_token: 'not-exposed',
+      user: {
+        email: 'runner@example.test',
+        id: 'runner-id',
+        user_metadata: { username: 'MazeRunner' }
+      }
+    }));
+
+    expect(readLegacyPersistedAuthSessionSnapshot(storage, {
+      VITE_SUPABASE_ANON_KEY: 'anon-key',
+      VITE_SUPABASE_URL: 'https://example.supabase.co'
+    })).toMatchObject({
+      canonicalUsername: 'MazeRunner',
+      email: 'runner@example.test',
+      status: 'authenticated',
+      userId: 'runner-id'
+    });
   });
 
   test('detects whether Supabase browser auth is configured', () => {
