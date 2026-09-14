@@ -1153,6 +1153,26 @@ const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 // Slowed way down from an initial 900ms -- per feedback that pace read as
 // too fast/flickery for a deliberate classic-menu blink.
 const LEGACY_MENU_BLINK_PULSE_MS = 2400;
+// Shared by the Options/Pause overlay's Account ring (drawLegacyProfileIcon)
+// and its own Home button's ring (createLegacyOverlayHomeButton's drawHome)
+// -- previously two independently hand-copied formulas that could silently
+// drift apart despite existing specifically to make those two icons read as
+// a matched pair. Restrained consistency pass (owner-directed refinement,
+// not a reversal of the original ring-vs-no-ring split): the menu header's
+// own bare-glyph treatment and the overlay's ringed treatment are both kept
+// -- the compact 3-icon menu row and the paired Account/Home overlay row
+// have different real layout needs -- but the ring itself was bold enough
+// (a wide, near-opaque stroke) to read as a genuinely different icon family
+// rather than a restrained accent on the same glyph, which is what drove
+// the "not the same... set up" report. Toned down (thinner stroke, softer
+// alpha) so the glyph/color/texture stay the visually dominant, consistent
+// element across Menu/Options/Pause, and the ring reads as a light halo
+// tying Account+Home together rather than a competing badge outline. The
+// ring carries no state of its own (confirmed: it's the same idle pulse
+// regardless of auth/session status) -- there is no meaning to preserve
+// beyond the pairing itself, which this keeps.
+const LEGACY_OVERLAY_ICON_RING_WIDTH_RATIO = 0.06;
+const LEGACY_OVERLAY_ICON_RING_ALPHA_FACTOR = 0.5;
 const LEGACY_MENU_PATH_TITLE_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_MENU_PATH_TITLE_ACCENT = cyberArcadeMaterial.signal.player;
 const LEGACY_MENU_PATH_TITLE_PRISM = cyberArcadeMaterial.rail.cyan;
@@ -16752,7 +16772,7 @@ export class MenuScene extends Phaser.Scene {
     if (showOuterRing) {
       const ringRadius = (iconSize * 0.62) + 8;
       const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
-      graphics.lineStyle(Math.max(1.6, iconSize * 0.1), ringColor, alpha * 0.82);
+      graphics.lineStyle(Math.max(1.2, iconSize * LEGACY_OVERLAY_ICON_RING_WIDTH_RATIO), ringColor, alpha * LEGACY_OVERLAY_ICON_RING_ALPHA_FACTOR);
       graphics.strokeCircle(centerX, centerY, ringRadius * scale);
     }
     this.applyLegacyHudIconFrame(image, MAZER_HUD_PROFILE_ICON_METRICS, centerX, centerY, iconSize * scale, alpha);
@@ -16863,7 +16883,7 @@ export class MenuScene extends Phaser.Scene {
       const pulseScale = 0.94 + (phase * 0.06) + (this.overlayHomeActive ? 0.02 : 0);
 
       const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
-      graphics.lineStyle(Math.max(1.6, iconSize * 0.1), ringColor, pulseAlpha * 0.82);
+      graphics.lineStyle(Math.max(1.2, iconSize * LEGACY_OVERLAY_ICON_RING_WIDTH_RATIO), ringColor, pulseAlpha * LEGACY_OVERLAY_ICON_RING_ALPHA_FACTOR);
       graphics.strokeCircle(centerX, rowY, ringRadius * pulseScale);
 
       const color = cyberArcadeMaterial.signal.player;
