@@ -25,6 +25,7 @@ import {
   resolveArrowPointForMove,
   resolveLivePlayQaExpectedServiceWorkerReloadCount,
   resolveLivePlayProductionAcceptanceContract,
+  resolveLivePlayProductionDeploymentIdentity,
   sanitizeLivePlayQaDiagnosticValue,
   seedLivePlayProtectionBypassCookie,
   settleLivePlayQaCleanup,
@@ -44,18 +45,41 @@ import {
 
 describe('live play QA script helpers', () => {
   const productionRoute = '/?content=core-only&mode=play&theme=aurora&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=1735707242';
+  const deploymentIdentity = {
+    deploymentId: 'dpl_0000000000000000000000000000',
+    deploymentUrl: 'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app/',
+    sourceCommit: 'a'.repeat(40)
+  };
+  const providerDeploymentIdentity = {
+    alias: [],
+    gitSource: { repoId: 1212867711, sha: deploymentIdentity.sourceCommit },
+    id: deploymentIdentity.deploymentId,
+    projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
+    readyState: 'READY',
+    team: { id: 'team_CMJn7MvzFZZBnhNnjVUZF2RD' },
+    url: 'fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app'
+  };
   const productionContract = (expectedObservedSeed = 1735707243) => resolveLivePlayProductionAcceptanceContract({
-    baseUrl: 'https://mazer.example.test/',
+    baseUrl: deploymentIdentity.deploymentUrl,
+    ...deploymentIdentity,
     enabled: true,
     expectedObservedSeed,
+    providerDeploymentIdentity,
     route: productionRoute,
     useExistingServer: true
   });
 
   test('requires a deterministic seed and exact authenticated diagnostics fixture before production browser work', async () => {
     expect(productionContract()).toEqual({
+      deploymentIdentity: {
+        ...deploymentIdentity,
+        digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
+        repositoryId: 1212867711,
+        teamId: 'team_CMJn7MvzFZZBnhNnjVUZF2RD'
+      },
       enabled: true,
-      expectedOrigin: 'https://mazer.example.test',
+      expectedOrigin: 'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app',
       expectedObservedSeed: 1735707243,
       expectedObservedSeedSource: 'runtime-random',
       expectedPathname: '/',
@@ -79,23 +103,29 @@ describe('live play QA script helpers', () => {
     ];
     for (const [route, error] of invalidRoutes) {
       expect(() => resolveLivePlayProductionAcceptanceContract({
-        baseUrl: 'https://mazer.example.test/',
+        baseUrl: deploymentIdentity.deploymentUrl,
+        ...deploymentIdentity,
         enabled: true,
         expectedObservedSeed: 7,
+        providerDeploymentIdentity,
         route,
         useExistingServer: true
       })).toThrow(error);
     }
     expect(() => resolveLivePlayProductionAcceptanceContract({
-      baseUrl: 'https://mazer.example.test/',
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
       enabled: true,
       expectedObservedSeed: 1735707243,
+      providerDeploymentIdentity,
       route: productionRoute,
       useExistingServer: false
     })).toThrow('live_play_production_existing_server_required');
     expect(() => resolveLivePlayProductionAcceptanceContract({
-      baseUrl: 'https://mazer.example.test/',
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
       enabled: true,
+      providerDeploymentIdentity,
       route: productionRoute,
       useExistingServer: true
     })).toThrow('live_play_production_expected_observed_seed_required');
@@ -112,14 +142,48 @@ describe('live play QA script helpers', () => {
     expect(contractIndex).toBeLessThan(scriptSource.indexOf('page.goto', contractIndex));
   });
 
+  test('fails closed unless production acceptance binds the exact ready deployment source', () => {
+    expect(resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      providerDeployment: providerDeploymentIdentity
+    })).toMatchObject({
+      ...deploymentIdentity,
+      projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
+      repositoryId: 1212867711,
+      teamId: 'team_CMJn7MvzFZZBnhNnjVUZF2RD'
+    });
+    expect(() => resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      providerDeployment: {
+        ...providerDeploymentIdentity,
+        gitSource: { ...providerDeploymentIdentity.gitSource, sha: 'b'.repeat(40) }
+      }
+    })).toThrow('live_play_production_provider_identity_mismatch');
+    expect(() => resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: 'https://staging.example.test/',
+      ...deploymentIdentity,
+      providerDeployment: providerDeploymentIdentity
+    })).toThrow('live_play_production_provider_identity_mismatch');
+    expect(() => resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: 'https://mazer.fawxzzy.com/',
+      ...deploymentIdentity,
+      providerDeployment: {
+        ...providerDeploymentIdentity,
+        alias: ['mazer.fawxzzy.com']
+      }
+    })).toThrow('live_play_production_provider_identity_mismatch');
+  });
+
   test('binds the stabilized navigation to the exact production route contract', () => {
     const contract = productionContract();
     expect(() => assertLivePlayProductionNavigationBinding({
-      actualUrl: `https://mazer.example.test${productionRoute}&v=one`,
+      actualUrl: `${deploymentIdentity.deploymentUrl.slice(0, -1)}${productionRoute}&v=one`,
       contract
     })).not.toThrow();
     expect(() => assertLivePlayProductionNavigationBinding({
-      actualUrl: 'https://mazer.example.test/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=9',
+      actualUrl: `${deploymentIdentity.deploymentUrl}?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=9`,
       contract
     })).toThrow('live_play_production_navigation_contract_drift');
     expect(() => assertLivePlayProductionNavigationBinding({
@@ -213,6 +277,13 @@ describe('live play QA script helpers', () => {
       }
     });
     expect(artifactContract).toEqual({
+      deploymentIdentity: {
+        ...deploymentIdentity,
+        digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
+        repositoryId: 1212867711,
+        teamId: 'team_CMJn7MvzFZZBnhNnjVUZF2RD'
+      },
       enabled: true,
       expectedObservedSeed: 1735707243,
       expectedObservedSeedSource: 'runtime-random',
@@ -223,7 +294,7 @@ describe('live play QA script helpers', () => {
       requestedSeed: 1735707242,
       seedInput: 'explicit-query',
       route: {
-        origin: 'https://mazer.example.test',
+        origin: 'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app',
         pathname: '/',
         queryKeys: ['authFixture', 'mazeSeed', 'mode', 'runtimeDiagnostics']
       }
@@ -238,9 +309,11 @@ describe('live play QA script helpers', () => {
       targetComplexity: 64
     });
     const contract = resolveLivePlayProductionAcceptanceContract({
-      baseUrl: 'https://mazer.example.test/',
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
       enabled: true,
       expectedObservedSeed: selected.seed,
+      providerDeploymentIdentity,
       route: `/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=${requestedSeed}`,
       useExistingServer: true
     });

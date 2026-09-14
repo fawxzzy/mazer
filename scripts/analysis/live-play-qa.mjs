@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +41,13 @@ const PRODUCTION_AUTH_FIXTURE = 'authenticated';
 const PRODUCTION_PLAY_SEED_SOURCE = 'runtime-random';
 const MAX_LEGACY_RUNTIME_SEED = 0xffffffff;
 const PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9-]+-fawxzzy\.vercel\.app$/u;
+const IMMUTABLE_PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9]{8,32}-fawxzzy\.vercel\.app$/u;
+const VERCEL_DEPLOYMENT_ID_PATTERN = /^dpl_[A-Za-z0-9]{20,64}$/u;
+const SOURCE_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
+const EXPECTED_VERCEL_PROJECT_ID = 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ';
+const EXPECTED_VERCEL_TEAM_ID = 'team_CMJn7MvzFZZBnhNnjVUZF2RD';
+const EXPECTED_VERCEL_SCOPE = 'fawxzzy';
+const EXPECTED_GITHUB_REPOSITORY_ID = 1212867711;
 
 export const MOVE_DELTAS = Object.freeze({
   move_up: Object.freeze({ dx: 0, dy: -1 }),
@@ -68,11 +76,112 @@ const readSingleQueryValue = (url, key, errorCode) => {
   return values[0];
 };
 
+const normalizeLivePlayDeploymentUrl = (value) => {
+  const url = new URL(value);
+  if (url.protocol !== 'https:' || url.username || url.password) {
+    throw new Error('live_play_production_deployment_url_invalid');
+  }
+  url.pathname = '/';
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+};
+
+const readLivePlayProductionProviderIdentity = (deploymentId) => {
+  try {
+    const vercelWrapper = process.platform === 'win32'
+      ? execFileSync('where.exe', ['vercel.cmd'], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true
+        }).split(/\r?\n/u).find(Boolean)
+      : 'vercel';
+    if (!vercelWrapper) {
+      throw new Error('vercel_cli_missing');
+    }
+    const vercelCommand = process.platform === 'win32' ? process.execPath : vercelWrapper;
+    const vercelArgs = process.platform === 'win32'
+      ? [resolve(vercelWrapper, '..', 'node_modules', 'vercel', 'dist', 'vc.js')]
+      : [];
+    return JSON.parse(execFileSync(
+      vercelCommand,
+      [...vercelArgs, 'api', `/v13/deployments/${deploymentId}`, '--scope', EXPECTED_VERCEL_SCOPE],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+      }
+    ));
+  } catch {
+    throw new Error('live_play_production_provider_readback_failed');
+  }
+};
+
+export const resolveLivePlayProductionDeploymentIdentity = ({
+  baseUrl,
+  deploymentId,
+  deploymentUrl,
+  providerDeployment,
+  sourceCommit
+}) => {
+  if (!VERCEL_DEPLOYMENT_ID_PATTERN.test(String(deploymentId ?? ''))) {
+    throw new Error('live_play_production_deployment_id_invalid');
+  }
+  if (!SOURCE_COMMIT_PATTERN.test(String(sourceCommit ?? ''))) {
+    throw new Error('live_play_production_source_commit_invalid');
+  }
+  if (typeof deploymentUrl !== 'string') {
+    throw new Error('live_play_production_deployment_url_required');
+  }
+  const normalizedDeploymentUrl = normalizeLivePlayDeploymentUrl(deploymentUrl);
+  const deploymentHost = new URL(normalizedDeploymentUrl).hostname;
+  if (!IMMUTABLE_PROTECTED_DEPLOYMENT_HOST_PATTERN.test(deploymentHost)) {
+    throw new Error('live_play_production_immutable_deployment_url_required');
+  }
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  const base = new URL(normalizedBaseUrl);
+  const providerUrl = typeof providerDeployment?.url === 'string'
+    ? normalizeLivePlayDeploymentUrl(`https://${providerDeployment.url}`)
+    : null;
+  const providerSourceCommit = providerDeployment?.gitSource?.sha
+    ?? providerDeployment?.meta?.githubCommitSha;
+  const baseTargetsDeployment = base.origin === new URL(normalizedDeploymentUrl).origin;
+  if (
+    providerDeployment?.id !== deploymentId
+    || providerUrl !== normalizedDeploymentUrl
+    || providerSourceCommit !== sourceCommit
+    || providerDeployment?.projectId !== EXPECTED_VERCEL_PROJECT_ID
+    || (providerDeployment?.team?.id ?? providerDeployment?.ownerId) !== EXPECTED_VERCEL_TEAM_ID
+    || Number(providerDeployment?.gitSource?.repoId ?? providerDeployment?.meta?.githubRepoId)
+      !== EXPECTED_GITHUB_REPOSITORY_ID
+    || providerDeployment?.readyState !== 'READY'
+    || !baseTargetsDeployment
+  ) {
+    throw new Error('live_play_production_provider_identity_mismatch');
+  }
+  return Object.freeze({
+    deploymentId,
+    deploymentUrl: normalizedDeploymentUrl,
+    digest: createHash('sha256')
+      .update(`${deploymentId}\n${normalizedDeploymentUrl}\n${sourceCommit}\n`, 'utf8')
+      .digest('hex'),
+    projectId: EXPECTED_VERCEL_PROJECT_ID,
+    repositoryId: EXPECTED_GITHUB_REPOSITORY_ID,
+    sourceCommit,
+    teamId: EXPECTED_VERCEL_TEAM_ID
+  });
+};
+
 export const resolveLivePlayProductionAcceptanceContract = ({
   baseUrl,
+  deploymentId,
+  deploymentUrl,
   enabled = false,
   expectedObservedSeed,
+  providerDeploymentIdentity,
   route,
+  sourceCommit,
   useExistingServer = false
 }) => {
   if (!enabled) {
@@ -83,6 +192,15 @@ export const resolveLivePlayProductionAcceptanceContract = ({
   }
 
   const base = new URL(normalizeBaseUrl(baseUrl));
+  const deploymentIdentity = resolveLivePlayProductionDeploymentIdentity({
+    baseUrl: base.toString(),
+    deploymentId,
+    deploymentUrl,
+    providerDeployment: process.env.NODE_ENV === 'test' && providerDeploymentIdentity
+      ? providerDeploymentIdentity
+      : readLivePlayProductionProviderIdentity(deploymentId),
+    sourceCommit
+  });
   const target = new URL(route, base);
   if (target.origin !== base.origin || target.pathname !== '/') {
     throw new Error('live_play_production_route_binding_invalid');
@@ -129,6 +247,7 @@ export const resolveLivePlayProductionAcceptanceContract = ({
   }
 
   return Object.freeze({
+    deploymentIdentity,
     enabled: true,
     expectedOrigin: base.origin,
     expectedObservedSeed: normalizedExpectedObservedSeed,
@@ -197,6 +316,7 @@ export const classifyLivePlayProductionReadiness = ({
 
 export const createLivePlayProductionArtifactContract = (contract, diagnostics = null) => contract
   ? {
+      deploymentIdentity: contract.deploymentIdentity,
       enabled: true,
       expectedObservedSeed: contract.expectedObservedSeed,
       expectedObservedSeedSource: contract.expectedObservedSeedSource,
@@ -1612,9 +1732,13 @@ export const runLivePlayQa = async (options = {}) => {
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
   const productionAcceptanceContract = resolveLivePlayProductionAcceptanceContract({
     baseUrl,
+    deploymentId: options.deploymentId,
+    deploymentUrl: options.deploymentUrl,
     enabled: options.productionAcceptance === true,
     expectedObservedSeed: options.expectedObservedSeed,
+    providerDeploymentIdentity: options.providerDeploymentIdentity,
     route,
+    sourceCommit: options.sourceCommit,
     useExistingServer: options.useExistingServer === true
   });
   const inputMethod = normalizeLivePlayInputMethod(options.inputMethod);
@@ -2167,6 +2291,12 @@ if (isDirectRun) {
       : 0.42,
     inputMethod: normalizeLivePlayInputMethod(rawInputMethod),
     isMobile: args.mobile === undefined ? true : isTruthy(args.mobile),
+    deploymentId: typeof args.deploymentId === 'string'
+      ? args.deploymentId
+      : args['deployment-id'],
+    deploymentUrl: typeof args.deploymentUrl === 'string'
+      ? args.deploymentUrl
+      : args['deployment-url'],
     expectedObservedSeed: args.expectedObservedSeed ?? args['expected-observed-seed'],
     productionAcceptance: isTruthy(args.productionAcceptance ?? args['production-acceptance']),
     protectedDeployment: isTruthy(args.protectedDeployment ?? args['protected-deployment']),
@@ -2176,6 +2306,9 @@ if (isDirectRun) {
     route: resolveRoute(args, label),
     sessionId: typeof args.session === 'string' ? args.session : undefined,
     skipBuild: isTruthy(args.skipBuild ?? args['skip-build']),
+    sourceCommit: typeof args.sourceCommit === 'string'
+      ? args.sourceCommit
+      : args['source-commit'],
     stepSettleMs: parseIntegerArg(args.stepSettleMs ?? args['step-settle-ms'], DEFAULT_SETTLE_MS),
     stepTimeoutMs: parseIntegerArg(args.stepTimeoutMs ?? args['step-timeout-ms'], DEFAULT_STEP_TIMEOUT_MS),
     useExistingServer: isTruthy(args.noPreview ?? args['no-preview']),
