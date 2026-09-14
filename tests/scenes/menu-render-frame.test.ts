@@ -1988,6 +1988,51 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('y: this.boardZoomContainer.scaleY');
   });
 
+  test('threads the level announcer\'s own computed revealProgress into the shared tile-block glyph renderer instead of discarding it', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    // Real, reported defect: resolveLegacyLevelAnnouncerVisualState already
+    // computes a real revealProgress for this banner's own fade-in/out
+    // timing, but drawLegacyLevelAnnouncerNumberGlyph hardcoded a full,
+    // instant reveal instead of using it -- the number always popped in as
+    // one flat block instead of building tile-by-tile the way the title/
+    // Start/Login words next to it do ("is the level tiles not building out
+    // the number like it does for title text tiles"). The caller must
+    // destructure the real value and pass it all the way through to the
+    // shared renderer, the same way the title's own call site already
+    // threads resolveLegacyMenuPathTitleProgress() into the identical
+    // parameter -- not recompute or approximate it.
+    expect(menuSceneSource).toContain(
+      'const { alpha, scale, revealProgress } = this.resolveLegacyLevelAnnouncerVisualState(time);'
+    );
+    expect(menuSceneSource).toContain(
+      'this.drawLegacyLevelAnnouncerNumberGlyph(this.levelAnnouncerNumberGraphics, glyphLayout, time, revealProgress);'
+    );
+    expect(menuSceneSource).toContain(
+      'this.drawLegacyGlyphWordTileBlock(graphics, layout, time, 1, revealProgress);'
+    );
+    // The exact rejected form: a bare destructure that drops revealProgress,
+    // and the hardcoded-reveal call it fed into.
+    expect(menuSceneSource).not.toContain(
+      'const { alpha, scale } = this.resolveLegacyLevelAnnouncerVisualState(time);'
+    );
+    expect(menuSceneSource).not.toContain(
+      'this.drawLegacyLevelAnnouncerNumberGlyph(this.levelAnnouncerNumberGraphics, glyphLayout, time);'
+    );
+    expect(menuSceneSource).not.toContain('this.drawLegacyGlyphWordTileBlock(graphics, layout, time, 1);');
+
+    // Boundary behavior: drawLegacyGlyphWordTileBlock's own reveal math
+    // (shared with the title, already proven there) must still default to a
+    // full reveal when no revealProgress is supplied at all -- callers that
+    // legitimately want an instant reveal (there are none for the level
+    // announcer any more, but the shared renderer itself must stay
+    // backward-compatible) are not broken by this fix.
+    expect(menuSceneSource).toContain('revealProgress: number = 1');
+    expect(menuSceneSource).toContain(
+      'const visibleCellCount = clamp(Math.ceil(layout.cells.length * clamp(revealProgress, 0, 1)), 0, layout.cells.length);'
+    );
+  });
+
   test('hydrates the scene from the already-fetched account bootstrap instead of leaving the local Level-1 placeholder active', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
