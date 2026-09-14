@@ -117,6 +117,7 @@ describe('legacy auth runtime', () => {
     const auth = {
       fetch: clientFetch,
       admin: { fetch: originalFetch },
+      storage: new MemoryStorage() as unknown as Storage,
       _signOut: async () => {
         await auth.admin.fetch('https://bxtcuhkotumitoqtrcej.supabase.co/auth/v1/logout');
         return { error: null };
@@ -127,6 +128,55 @@ describe('legacy auth runtime', () => {
     expect(observedSignal?.aborted).toBe(true);
     expect(auth.admin.fetch).toBe(originalFetch);
     expect(auth.fetch).toBe(clientFetch);
+  });
+
+  test('suppresses provisional sign-out events when persisted session removal is a no-op', async () => {
+    const values = new Map([[MAZER_OAUTH_AUTH_SESSION_KEY, '{"retained":true}']]);
+    const noOpStorage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      removeItem: vi.fn(),
+      setItem: (key: string, value: string) => values.set(key, value)
+    } as unknown as Storage;
+    const events: string[] = [];
+    const auth = {
+      admin: { fetch: vi.fn() as unknown as typeof fetch },
+      storage: noOpStorage,
+      _signOut: async () => {
+        auth.storage.removeItem(MAZER_OAUTH_AUTH_SESSION_KEY);
+        events.push('SIGNED_OUT');
+        return { error: null };
+      }
+    };
+
+    await expect(invokeLegacyLocalSignOutWithTimeout(auth, 50)).rejects.toThrow(
+      'Authentication session removal could not be verified.'
+    );
+    expect(events).toEqual([]);
+    expect(auth.storage).toBe(noOpStorage);
+  });
+
+  test('suppresses provisional sign-out events when persisted session removal throws', async () => {
+    const throwingStorage = {
+      getItem: () => '{"retained":true}',
+      removeItem: () => {
+        throw new DOMException('denied', 'SecurityError');
+      },
+      setItem: vi.fn()
+    } as unknown as Storage;
+    const events: string[] = [];
+    const auth = {
+      admin: { fetch: vi.fn() as unknown as typeof fetch },
+      storage: throwingStorage,
+      _signOut: async () => {
+        auth.storage.removeItem(MAZER_OAUTH_AUTH_SESSION_KEY);
+        events.push('SIGNED_OUT');
+        return { error: null };
+      }
+    };
+
+    await expect(invokeLegacyLocalSignOutWithTimeout(auth, 50)).rejects.toMatchObject({ name: 'SecurityError' });
+    expect(events).toEqual([]);
+    expect(auth.storage).toBe(throwingStorage);
   });
 
   test('restores the exact authenticated snapshot when local sign-out fails', () => {
@@ -553,6 +603,7 @@ describe('legacy auth runtime', () => {
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
 
     expect(authSource).toContain('await invokeLegacyLocalSignOutWithTimeout(directSignOut)');
+    expect(authSource).toContain('const authStorage = directSignOut.storage ?? null;');
     expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
     expect(authSource).toContain('return runLegacyAuthDirectSessionMutation(async () => {');
     expect(authSource).toContain('fail closed if the pinned seam ever changes');

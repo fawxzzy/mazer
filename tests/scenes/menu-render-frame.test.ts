@@ -1923,11 +1923,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource.match(/return runLegacyAuthDirectSessionMutation\(async \(\) => \{/g)).toHaveLength(3);
     expect(authSource).not.toContain('runLegacyAuthInternallyLockedMutation');
     expect(authSource).toContain("const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;");
-    expect(authSource).toContain("if (typeof auth._signOut !== 'function' || typeof auth.admin?.fetch !== 'function') {");
+    expect(authSource).toContain("if (key === MAZER_OAUTH_AUTH_SESSION_KEY && originalStorage.getItem(key) !== null) {");
+    expect(authSource).toContain('auth.storage = verifyingStorage;');
+    expect(authSource).toContain('auth.storage = originalStorage;');
     expect(authSource).toContain('await invokeLegacyLocalSignOutWithTimeout(directSignOut)');
     expect(authSource).toContain('const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(');
     expect(authSource).toContain('const preserveAuthenticatedPreimage = (message?: string | null): LegacyAuthActionResult => ({');
     expect(authSource).toContain('if (!isLegacyPersistedAuthSessionRemoved(authStorage)) {');
+    expect(menuSceneSource).toContain('await signOutLegacyAuth(this.authSnapshot)');
     expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
     expect(authSource.match(/runLegacyAbortableCredentialRequest\(/g)).toHaveLength(3);
     expect(authSource).toContain('LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS = 10_000');

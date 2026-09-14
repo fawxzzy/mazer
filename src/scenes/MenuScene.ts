@@ -16086,7 +16086,7 @@ export class MenuScene extends Phaser.Scene {
     this.syncLegacyAuthNativeInputValue();
     this.authSubmitting = true;
     this.uiDirty = true;
-    const result = await signOutLegacyAuth();
+    const result = await signOutLegacyAuth(this.authSnapshot);
     this.authSubmitting = false;
     this.authForm = createEmptyLegacyAuthFormState(
       'login',
