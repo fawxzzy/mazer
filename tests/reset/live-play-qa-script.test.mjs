@@ -26,6 +26,7 @@ import {
   resolveLivePlayQaExpectedServiceWorkerReloadCount,
   resolveLivePlayProductionAcceptanceContract,
   resolveLivePlayProductionDeploymentIdentity,
+  resolveLivePlayProductionVerifierIdentity,
   sanitizeLivePlayQaDiagnosticValue,
   seedLivePlayProtectionBypassCookie,
   settleLivePlayQaCleanup,
@@ -59,6 +60,10 @@ describe('live play QA script helpers', () => {
     team: { id: 'team_CMJn7MvzFZZBnhNnjVUZF2RD' },
     url: 'fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app'
   };
+  const verifierIdentity = {
+    commit: 'b'.repeat(40),
+    dirty: false
+  };
   const productionContract = (expectedObservedSeed = 1735707243) => resolveLivePlayProductionAcceptanceContract({
     baseUrl: deploymentIdentity.deploymentUrl,
     ...deploymentIdentity,
@@ -66,7 +71,8 @@ describe('live play QA script helpers', () => {
     expectedObservedSeed,
     providerDeploymentIdentity,
     route: productionRoute,
-    useExistingServer: true
+    useExistingServer: true,
+    verifierIdentity
   });
 
   test('requires a deterministic seed and exact authenticated diagnostics fixture before production browser work', async () => {
@@ -84,7 +90,12 @@ describe('live play QA script helpers', () => {
       expectedObservedSeedSource: 'runtime-random',
       expectedPathname: '/',
       fixtureMode: 'authenticated',
-      requestedSeed: 1735707242
+      requestedSeed: 1735707242,
+      verifierIdentity: {
+        commit: verifierIdentity.commit,
+        role: 'external-verifier',
+        targetRelationship: 'independently-verified-deployment'
+      }
     });
     expect(resolveLivePlayProductionAcceptanceContract({
       baseUrl: 'https://mazer.example.test/',
@@ -109,7 +120,8 @@ describe('live play QA script helpers', () => {
         expectedObservedSeed: 7,
         providerDeploymentIdentity,
         route,
-        useExistingServer: true
+        useExistingServer: true,
+        verifierIdentity
       })).toThrow(error);
     }
     expect(() => resolveLivePlayProductionAcceptanceContract({
@@ -119,7 +131,8 @@ describe('live play QA script helpers', () => {
       expectedObservedSeed: 1735707243,
       providerDeploymentIdentity,
       route: productionRoute,
-      useExistingServer: false
+      useExistingServer: false,
+      verifierIdentity
     })).toThrow('live_play_production_existing_server_required');
     expect(() => resolveLivePlayProductionAcceptanceContract({
       baseUrl: deploymentIdentity.deploymentUrl,
@@ -127,7 +140,8 @@ describe('live play QA script helpers', () => {
       enabled: true,
       providerDeploymentIdentity,
       route: productionRoute,
-      useExistingServer: true
+      useExistingServer: true,
+      verifierIdentity
     })).toThrow('live_play_production_expected_observed_seed_required');
     expect(() => productionContract('random')).toThrow(
       'live_play_production_expected_observed_seed_malformed'
@@ -186,6 +200,23 @@ describe('live play QA script helpers', () => {
         alias: ['mazer.fawxzzy.com']
       }
     })).toThrow('live_play_production_provider_identity_mismatch');
+  });
+
+  test('binds a clean external verifier identity separately from the deployed target source', () => {
+    expect(resolveLivePlayProductionVerifierIdentity(verifierIdentity)).toEqual({
+      commit: verifierIdentity.commit,
+      role: 'external-verifier',
+      targetRelationship: 'independently-verified-deployment'
+    });
+    expect(verifierIdentity.commit).not.toBe(deploymentIdentity.sourceCommit);
+    expect(() => resolveLivePlayProductionVerifierIdentity({
+      commit: verifierIdentity.commit,
+      dirty: true
+    })).toThrow('live_play_production_verifier_worktree_dirty');
+    expect(() => resolveLivePlayProductionVerifierIdentity({
+      commit: 'not-a-commit',
+      dirty: false
+    })).toThrow('live_play_production_verifier_commit_invalid');
   });
 
   test('binds the stabilized navigation to the exact production route contract', () => {
@@ -309,6 +340,11 @@ describe('live play QA script helpers', () => {
         origin: 'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app',
         pathname: '/',
         queryKeys: ['authFixture', 'mazeSeed', 'mode', 'runtimeDiagnostics']
+      },
+      verifierIdentity: {
+        commit: verifierIdentity.commit,
+        role: 'external-verifier',
+        targetRelationship: 'independently-verified-deployment'
       }
     });
     expect(JSON.stringify(artifactContract)).not.toContain('?');
@@ -327,7 +363,8 @@ describe('live play QA script helpers', () => {
       expectedObservedSeed: selected.seed,
       providerDeploymentIdentity,
       route: `/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=${requestedSeed}`,
-      useExistingServer: true
+      useExistingServer: true,
+      verifierIdentity
     });
     expect(classifyLivePlayProductionReadiness({
       contract,

@@ -183,6 +183,23 @@ export const resolveLivePlayProductionDeploymentIdentity = ({
   });
 };
 
+export const resolveLivePlayProductionVerifierIdentity = ({
+  commit = getCommitSha(),
+  dirty = isWorktreeDirty()
+} = {}) => {
+  if (!SOURCE_COMMIT_PATTERN.test(String(commit ?? ''))) {
+    throw new Error('live_play_production_verifier_commit_invalid');
+  }
+  if (dirty !== false) {
+    throw new Error('live_play_production_verifier_worktree_dirty');
+  }
+  return Object.freeze({
+    commit,
+    role: 'external-verifier',
+    targetRelationship: 'independently-verified-deployment'
+  });
+};
+
 export const resolveLivePlayProductionAcceptanceContract = ({
   baseUrl,
   deploymentId,
@@ -192,7 +209,8 @@ export const resolveLivePlayProductionAcceptanceContract = ({
   providerDeploymentIdentity,
   route,
   sourceCommit,
-  useExistingServer = false
+  useExistingServer = false,
+  verifierIdentity
 }) => {
   if (!enabled) {
     return null;
@@ -211,6 +229,7 @@ export const resolveLivePlayProductionAcceptanceContract = ({
       : readLivePlayProductionProviderIdentity(deploymentId),
     sourceCommit
   });
+  const resolvedVerifierIdentity = resolveLivePlayProductionVerifierIdentity(verifierIdentity);
   const target = new URL(route, base);
   if (target.origin !== base.origin || target.pathname !== '/') {
     throw new Error('live_play_production_route_binding_invalid');
@@ -264,7 +283,8 @@ export const resolveLivePlayProductionAcceptanceContract = ({
     expectedObservedSeedSource: PRODUCTION_PLAY_SEED_SOURCE,
     expectedPathname: '/',
     fixtureMode,
-    requestedSeed
+    requestedSeed,
+    verifierIdentity: resolvedVerifierIdentity
   });
 };
 
@@ -340,7 +360,8 @@ export const createLivePlayProductionArtifactContract = (contract, diagnostics =
         origin: contract.expectedOrigin,
         pathname: contract.expectedPathname,
         queryKeys: ['authFixture', 'mazeSeed', 'mode', 'runtimeDiagnostics']
-      }
+      },
+      verifierIdentity: contract.verifierIdentity
     }
   : { enabled: false };
 
@@ -1749,7 +1770,8 @@ export const runLivePlayQa = async (options = {}) => {
     providerDeploymentIdentity: options.providerDeploymentIdentity,
     route,
     sourceCommit: options.sourceCommit,
-    useExistingServer: options.useExistingServer === true
+    useExistingServer: options.useExistingServer === true,
+    verifierIdentity: options.verifierIdentity
   });
   const inputMethod = normalizeLivePlayInputMethod(options.inputMethod);
   const browserContextOptions = resolveLivePlayBrowserContextOptions({
