@@ -1334,8 +1334,28 @@ export const summarizePostGoalLifecycleSamples = (samples, initialSeed, inputLoc
   };
 };
 
+const collectLivePlayInputLockProbe = async (page, snapshot) => {
+  const result = await page.evaluate(() => window.__MAZER_QA__?.movePlayPlayer?.('move_up') ?? null);
+  const playerUnchanged = Boolean(
+    result?.player
+    && snapshot.player
+    && result.player.x === snapshot.player.x
+    && result.player.y === snapshot.player.y
+  );
+  return {
+    accepted: result?.accepted ?? null,
+    lifecycleLocked: result?.lifecycleLocked ?? null,
+    pass: result?.accepted === false && result?.lifecycleLocked === true && playerUnchanged,
+    phase: snapshot.explicitLifecyclePhase,
+    playerUnchanged,
+    reason: result?.reason ?? null,
+    seed: snapshot.seed ?? null
+  };
+};
+
 export const collectPostGoalLifecycleProof = async ({
   initialDiagnostics = null,
+  initialInputLockProbes = [],
   initialSeed,
   page,
   pollMs = DEFAULT_POST_GOAL_POLL_MS,
@@ -1343,7 +1363,7 @@ export const collectPostGoalLifecycleProof = async ({
 }) => {
   const startedAt = performance.now();
   const samples = [];
-  const inputLockProbes = [];
+  const inputLockProbes = [...initialInputLockProbes];
   let finalDiagnostics = initialDiagnostics;
 
   const collectDiagnosticsSample = async (diagnostics) => {
@@ -1354,22 +1374,7 @@ export const collectPostGoalLifecycleProof = async ({
       elapsedMs: round(performance.now() - startedAt)
     });
     if (shouldCollectInputLockProbe(snapshot, initialSeed, inputLockProbes)) {
-      const result = await page.evaluate(() => window.__MAZER_QA__?.movePlayPlayer?.('move_up') ?? null);
-      const playerUnchanged = Boolean(
-        result?.player
-        && snapshot.player
-        && result.player.x === snapshot.player.x
-        && result.player.y === snapshot.player.y
-      );
-      inputLockProbes.push({
-        accepted: result?.accepted ?? null,
-        lifecycleLocked: result?.lifecycleLocked ?? null,
-        pass: result?.accepted === false && result?.lifecycleLocked === true && playerUnchanged,
-        phase: snapshot.explicitLifecyclePhase,
-        playerUnchanged,
-        reason: result?.reason ?? null,
-        seed: snapshot.seed ?? null
-      });
+      inputLockProbes.push(await collectLivePlayInputLockProbe(page, snapshot));
     }
   };
 
@@ -2117,6 +2122,13 @@ export const runLivePlayQa = async (options = {}) => {
     assertLivePlayQaNavigationStable(navigationTracker);
     const goalReachedDiagnostics = await readLivePlayDiagnostics(page);
     const goalTimerFirstSample = goalReachedDiagnostics.runtime?.play?.timer ?? null;
+    const initialSeed = initialRuntime?.generation?.maze?.seed ?? null;
+    const goalReachedSnapshot = resolveLivePlayLifecycleSnapshot(goalReachedDiagnostics);
+    const shouldVerifyPostGoalLifecycle = options.verifyPostGoalLifecycle !== false && failedAt === null;
+    const initialInputLockProbes = shouldVerifyPostGoalLifecycle
+      && shouldCollectInputLockProbe(goalReachedSnapshot, initialSeed, [])
+      ? [await collectLivePlayInputLockProbe(page, goalReachedSnapshot)]
+      : [];
     await page.waitForTimeout(96);
     assertLivePlayQaNavigationStable(navigationTracker);
     const goalTimerSecondDiagnostics = await readLivePlayDiagnostics(page);
@@ -2124,14 +2136,15 @@ export const runLivePlayQa = async (options = {}) => {
       goalTimerFirstSample,
       goalTimerSecondDiagnostics.runtime?.play?.timer ?? null
     );
-    const lifecycleProofPromise = options.verifyPostGoalLifecycle === false || failedAt !== null
-      ? null
-      : collectPostGoalLifecycleProof({
-        initialDiagnostics: goalTimerSecondDiagnostics,
-        initialSeed: initialRuntime?.generation?.maze?.seed ?? null,
+    const lifecycleProofPromise = shouldVerifyPostGoalLifecycle
+      ? collectPostGoalLifecycleProof({
+        initialDiagnostics: goalReachedDiagnostics,
+        initialInputLockProbes,
+        initialSeed,
         page,
         timeoutMs: options.postGoalTimeoutMs ?? DEFAULT_POST_GOAL_TIMEOUT_MS
-      });
+      })
+      : null;
     enterPhase('post-goal');
     const lifecycleProof = lifecycleProofPromise ? await lifecycleProofPromise : null;
     assertLivePlayQaNavigationStable(navigationTracker);
