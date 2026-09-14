@@ -1756,6 +1756,14 @@ export const resolveRoute = (args, label) => {
   return `${url.pathname}${url.search}`;
 };
 
+export const resolveLivePlayQaRoute = (options = {}, label = DEFAULT_LABEL) => (
+  options.route ?? resolveRoute({
+    authFixture: options.authFixture,
+    mazeSeed: options.mazeSeed,
+    productionAcceptance: options.productionAcceptance
+  }, label)
+);
+
 const summarizeTimings = (durations) => {
   if (durations.length === 0) {
     return {
@@ -1851,11 +1859,7 @@ export const runLivePlayQa = async (options = {}) => {
   const sessionId = resolveSessionId(options.sessionId);
   const artifactRoot = resolve(options.artifactRoot ?? DEFAULT_ARTIFACT_ROOT);
   const outputDir = resolve(artifactRoot, sessionId);
-  const route = options.route ?? resolveRoute({
-    authFixture: options.authFixture,
-    mazeSeed: options.mazeSeed,
-    productionAcceptance: options.productionAcceptance
-  }, label);
+  const route = resolveLivePlayQaRoute(options, label);
   const viewport = options.viewport ?? DEFAULT_VIEWPORT;
   const stepTimeoutMs = options.stepTimeoutMs ?? DEFAULT_STEP_TIMEOUT_MS;
   const stepSettleMs = options.stepSettleMs ?? DEFAULT_SETTLE_MS;

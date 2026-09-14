@@ -28,6 +28,7 @@ import {
   resolveArrowPointForMove,
   resolveLivePlayQaExpectedServiceWorkerReloadCount,
   resolveLivePlayProductionAcceptanceContract,
+  resolveLivePlayQaRoute,
   resolveRoute,
   resolveLivePlayProductionDeploymentIdentity,
   resolveLivePlayProductionVerifierIdentity,
@@ -415,6 +416,28 @@ describe('live play QA script helpers', () => {
       'runtimeDiagnostics',
       'v'
     ]);
+
+    const programmaticProductionDefault = new URL(resolveLivePlayQaRoute({
+      authFixture: 'authenticated',
+      mazeSeed: '1735707242',
+      productionAcceptance: true
+    }, 'programmatic-production'), 'http://local.test');
+    expect([...programmaticProductionDefault.searchParams.keys()].sort()).toEqual([
+      'authFixture',
+      'mazeSeed',
+      'mode',
+      'runtimeDiagnostics'
+    ]);
+    expect(programmaticProductionDefault.searchParams.get('authFixture')).toBe('authenticated');
+    expect(programmaticProductionDefault.searchParams.get('mazeSeed')).toBe('1735707242');
+    expect(programmaticProductionDefault.searchParams.has('content')).toBe(false);
+    expect(programmaticProductionDefault.searchParams.has('theme')).toBe(false);
+    expect(programmaticProductionDefault.searchParams.has('v')).toBe(false);
+
+    const programmaticNonProductionDefault = new URL(resolveLivePlayQaRoute({}, 'programmatic-local'), 'http://local.test');
+    expect(programmaticNonProductionDefault.searchParams.get('content')).toBe('core-only');
+    expect(programmaticNonProductionDefault.searchParams.get('theme')).toBe('aurora');
+    expect(programmaticNonProductionDefault.searchParams.get('v')).toMatch(/^programmatic-local-\d+$/u);
   });
 
   test('accepts only exact authenticated deterministic play readiness and rejects the historical menu-reset race', () => {
