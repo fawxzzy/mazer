@@ -530,7 +530,13 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
       : guestSnapshot;
   }
 
-  const { data, error } = await client.auth.getSession();
+  let sessionResult: Awaited<ReturnType<LegacyAuthClient['auth']['getSession']>>;
+  try {
+    sessionResult = await client.auth.getSession();
+  } catch {
+    return { ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE };
+  }
+  const { data, error } = sessionResult;
   if (isMazerOAuthSessionQuarantined()) {
     return { ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE };
   }
@@ -559,12 +565,8 @@ const createLegacyAuthMutationUnavailableResult = (): LegacyAuthActionResult => 
   })
 });
 
-const runLegacyAuthMutation = async (
-  operation: () => Promise<LegacyAuthActionResult>
-): Promise<LegacyAuthActionResult> => {
+const invalidateLegacyAuthMutation = async (): Promise<boolean> => {
   const invalidation = await runMazerExclusiveAuthMutation(() => {
-    // Invalidate older OAuth work atomically before auth-js obtains the same
-    // lock for its complete refresh/update-capable session operation.
     if (advanceMazerSharedAuthMutationEpoch() === null) {
       return false;
     }
@@ -573,7 +575,13 @@ const runLegacyAuthMutation = async (
     }
     return true;
   });
-  if (invalidation.status !== 'completed' || !invalidation.value) {
+  return invalidation.status === 'completed' && invalidation.value;
+};
+
+const runLegacyAuthInternallyLockedMutation = async (
+  operation: () => Promise<LegacyAuthActionResult>
+): Promise<LegacyAuthActionResult> => {
+  if (!await invalidateLegacyAuthMutation()) {
     return createLegacyAuthMutationUnavailableResult();
   }
   try {
@@ -583,10 +591,34 @@ const runLegacyAuthMutation = async (
   }
 };
 
+const runLegacyAuthDirectSessionMutation = async (
+  operation: () => Promise<LegacyAuthActionResult>
+): Promise<LegacyAuthActionResult> => {
+  const result = await runMazerExclusiveAuthMutation(async () => {
+    // The pinned auth-js signInWithPassword/signUp implementations persist
+    // directly instead of entering their configured lock hook. Keep their
+    // request, persistence, and notification inside our outer common lock.
+    if (advanceMazerSharedAuthMutationEpoch() === null) {
+      return createLegacyAuthMutationUnavailableResult();
+    }
+    if (advanceMazerAuthMutationEpoch() === null) {
+      return createLegacyAuthMutationUnavailableResult();
+    }
+    try {
+      return await operation();
+    } catch {
+      return createLegacyAuthMutationUnavailableResult();
+    }
+  });
+  return result.status === 'completed'
+    ? result.value
+    : createLegacyAuthMutationUnavailableResult();
+};
+
 export const signInLegacyAuth = async (
   email: string,
   password: string
-): Promise<LegacyAuthActionResult> => runLegacyAuthMutation(async () => {
+): Promise<LegacyAuthActionResult> => {
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -596,32 +628,32 @@ export const signInLegacyAuth = async (
     };
   }
 
-  const { data, error } = await client.auth.signInWithPassword({
-    email: normalizeLegacyAuthEmail(email),
-    password
-  });
+  return runLegacyAuthDirectSessionMutation(async () => {
+    const { data, error } = await client.auth.signInWithPassword({
+      email: normalizeLegacyAuthEmail(email),
+      password
+    });
 
-  const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-    error: error?.message ?? null,
-    info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedIn
-  });
-  if (snapshot.status === 'authenticated') {
-    syncLegacyRememberedIdentityFromAuthenticatedSession(
-      typeof window === 'undefined' ? undefined : window.localStorage,
-      snapshot
-    );
-  }
+    const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
+      error: error?.message ?? null,
+      info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedIn
+    });
+    if (snapshot.status === 'authenticated') {
+      syncLegacyRememberedIdentityFromAuthenticatedSession(
+        typeof window === 'undefined' ? undefined : window.localStorage,
+        snapshot
+      );
+    }
 
-  return {
-    snapshot
-  };
-});
+    return { snapshot };
+  });
+};
 
 export const signUpLegacyAuth = async (
   email: string,
   password: string,
   username: string
-): Promise<LegacyAuthActionResult> => runLegacyAuthMutation(async () => {
+): Promise<LegacyAuthActionResult> => {
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -640,28 +672,28 @@ export const signUpLegacyAuth = async (
     };
   }
 
-  const { data, error } = await client.auth.signUp({
-    email: normalizeLegacyAuthEmail(email),
-    password,
-    options: { data: metadata }
-  });
+  return runLegacyAuthDirectSessionMutation(async () => {
+    const { data, error } = await client.auth.signUp({
+      email: normalizeLegacyAuthEmail(email),
+      password,
+      options: { data: metadata }
+    });
 
-  const info = resolveLegacySignUpInfo(Boolean(error), Boolean(data.session));
-  const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-    error: error?.message ?? null,
-    info
-  });
-  if (snapshot.status === 'authenticated') {
-    syncLegacyRememberedIdentityFromAuthenticatedSession(
-      typeof window === 'undefined' ? undefined : window.localStorage,
-      snapshot
-    );
-  }
+    const info = resolveLegacySignUpInfo(Boolean(error), Boolean(data.session));
+    const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
+      error: error?.message ?? null,
+      info
+    });
+    if (snapshot.status === 'authenticated') {
+      syncLegacyRememberedIdentityFromAuthenticatedSession(
+        typeof window === 'undefined' ? undefined : window.localStorage,
+        snapshot
+      );
+    }
 
-  return {
-    snapshot
-  };
-});
+    return { snapshot };
+  });
+};
 
 export const requestLegacyPasswordReset = async (email: string): Promise<LegacyAuthActionResult> => {
   const client = await getLegacyAuthClient();
@@ -892,7 +924,7 @@ export const updateLegacyPassword = async (
   return updateLegacyPasswordWithClient(client, password);
 };
 
-export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => runLegacyAuthMutation(async () => {
+export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => runLegacyAuthInternallyLockedMutation(async () => {
   const client = await getLegacyAuthClient();
   if (!client) {
     return {

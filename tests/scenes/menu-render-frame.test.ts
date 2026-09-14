@@ -1920,7 +1920,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain('const invalidation = await runMazerExclusiveAuthMutation(() => {');
     expect(authSource).toContain('if (advanceMazerSharedAuthMutationEpoch() === null)');
     expect(authSource).toContain('if (advanceMazerAuthMutationEpoch() === null)');
-    expect(authSource.match(/=> runLegacyAuthMutation\(async \(\) => \{/g)).toHaveLength(3);
+    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\(async \(\) => \{/g)).toHaveLength(2);
+    expect(authSource).toContain('=> runLegacyAuthInternallyLockedMutation(async () => {');
+    expect(authSource).toContain('sessionResult = await client.auth.getSession();');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");
   });
 
