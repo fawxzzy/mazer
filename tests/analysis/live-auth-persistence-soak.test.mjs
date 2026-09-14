@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { chromium } from 'playwright';
 import { describe, expect, test } from 'vitest';
 import {
   AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
@@ -10,6 +12,7 @@ import {
   SIGNED_OUT_SHARED_ACCOUNT_BUTTONS,
   buildAuthPersistenceRoute,
   buildVercelProtectionBypassSeedUrl,
+  createGuardedAuthPersistenceContext,
   createFixtureSettingsRestorePlan,
   evaluateFixtureSettingsCleanup,
   evaluateFixtureSettingsIsolation,
@@ -21,15 +24,64 @@ import {
   requireFixtureSettingsCleanupPage,
   resolveAuthPersistenceArtifactPath,
   resolveAuthPersistenceExecutionPlan,
+  resolveProtectedDeploymentIdentity,
   sanitizeAuthPersistenceDiagnosticText,
   sanitizeAuthPersistenceDiagnosticUrl,
   seedVercelProtectionBypassCookie,
   settleAuthPersistenceResources,
   summarizeAuthPersistenceSurface,
   summarizeAuthPersistenceSoak,
+  verifyReadOnlyServiceWorkerAssets,
   resolveTrailShineUiState,
   surfaceMatchesAuthPersistenceExpectation
 } from '../../scripts/analysis/live-auth-persistence-soak.mjs';
+
+const PROTECTED_DEPLOYMENT_IDENTITY = Object.freeze({
+  deploymentId: 'dpl_6zxHgAEKUbntK8Fw6NW253rZwx1z',
+  deploymentUrl: 'https://fawxzzy-mazer-a1b2c3d4e-fawxzzy.vercel.app/',
+  sourceCommit: 'a544150002794421f8ea339fffbfd9f71f5a9268'
+});
+
+const startSyntheticServiceWorkerMutationServer = async () => {
+  const state = { mutations: 0 };
+  const server = createServer((request, response) => {
+    const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
+    if (pathname === '/sw.js') {
+      response.writeHead(200, { 'Content-Type': 'text/javascript', 'Service-Worker-Allowed': '/' });
+      response.end(`
+        self.addEventListener('install', () => self.skipWaiting());
+        self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+        self.addEventListener('message', (event) => {
+          if (event.data === 'mutate') {
+            event.waitUntil(fetch('/mutation', { method: 'POST', body: 'synthetic' }));
+          }
+        });
+      `);
+      return;
+    }
+    if (pathname === '/mutation' && request.method === 'POST') {
+      state.mutations += 1;
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+    response.writeHead(200, { 'Content-Type': 'text/html' });
+    response.end('<!doctype html><title>service worker mutation boundary</title>');
+  });
+  await new Promise((resolvePromise, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolvePromise);
+  });
+  const address = server.address();
+  if (address === null || typeof address === 'string') {
+    throw new Error('synthetic_service_worker_server_address_missing');
+  }
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}/`,
+    close: () => new Promise((resolvePromise, reject) => server.close((error) => error ? reject(error) : resolvePromise())),
+    state
+  };
+};
 
 const passingSteps = [
   'signed-out-shared-account-entry',
@@ -131,7 +183,8 @@ describe('live auth persistence soak contract', () => {
 
   test('protected retained-deployment mode seeds an isolated bypass cookie before browser navigation without widening public aliases', async () => {
     const plan = resolveAuthPersistenceExecutionPlan({
-      baseUrl: 'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      ...PROTECTED_DEPLOYMENT_IDENTITY,
       protectedDeployment: true,
       useExistingServer: true
     });
@@ -139,16 +192,20 @@ describe('live auth persistence soak contract', () => {
       launchPreview: false,
       protectedDeployment: true,
       runBuild: false,
-      serviceWorkers: 'allow'
+      serviceWorkers: 'block',
+      deploymentIdentity: {
+        ...PROTECTED_DEPLOYMENT_IDENTITY,
+        digest: expect.stringMatching(/^[0-9a-f]{64}$/u)
+      }
     });
     const seedUrl = buildVercelProtectionBypassSeedUrl({
-      baseUrl: plan.baseUrl,
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
       protectionBypass: 'fixture-secret'
     });
     expect(new URL(seedUrl).searchParams.get('x-vercel-protection-bypass')).toBe('fixture-secret');
     expect(new URL(seedUrl).searchParams.get('x-vercel-set-bypass-cookie')).toBe('true');
     expect(sanitizeAuthPersistenceDiagnosticUrl(seedUrl)).toBe(
-      'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/?x-vercel-protection-bypass=<redacted>&x-vercel-set-bypass-cookie=<redacted>'
+      'https://fawxzzy-mazer-a1b2c3d4e-fawxzzy.vercel.app/?x-vercel-protection-bypass=<redacted>&x-vercel-set-bypass-cookie=<redacted>'
     );
     const calls = [];
     const seeded = await seedVercelProtectionBypassCookie({
@@ -179,6 +236,7 @@ describe('live auth persistence soak contract', () => {
     })).toThrow('public_alias_protection_bypass_forbidden');
     expect(() => resolveAuthPersistenceExecutionPlan({
       baseUrl: 'http://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+      ...PROTECTED_DEPLOYMENT_IDENTITY,
       protectedDeployment: true,
       useExistingServer: true
     })).toThrow('protected_deployment_https_required');
@@ -229,6 +287,73 @@ describe('live auth persistence soak contract', () => {
     )).toBe(
       'GET https://example.test/?x-vercel-protection-bypass=<redacted>&x-vercel-set-bypass-cookie=<redacted>'
     );
+  });
+
+  test('requires exact immutable deployment and source identity before protected success can exist', () => {
+    const identity = resolveProtectedDeploymentIdentity({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      ...PROTECTED_DEPLOYMENT_IDENTITY
+    });
+    expect(identity).toEqual({
+      ...PROTECTED_DEPLOYMENT_IDENTITY,
+      digest: expect.stringMatching(/^[0-9a-f]{64}$/u)
+    });
+    expect(() => resolveAuthPersistenceExecutionPlan({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      protectedDeployment: true,
+      useExistingServer: true
+    })).toThrow('protected_deployment_id_invalid');
+    expect(() => resolveAuthPersistenceExecutionPlan({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      ...PROTECTED_DEPLOYMENT_IDENTITY,
+      deploymentId: 'preview-alias',
+      protectedDeployment: true,
+      useExistingServer: true
+    })).toThrow('protected_deployment_id_invalid');
+    expect(() => resolveAuthPersistenceExecutionPlan({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      ...PROTECTED_DEPLOYMENT_IDENTITY,
+      sourceCommit: 'not-a-commit',
+      protectedDeployment: true,
+      useExistingServer: true
+    })).toThrow('protected_deployment_source_commit_invalid');
+    expect(() => resolveAuthPersistenceExecutionPlan({
+      baseUrl: 'https://fawxzzy-mazer-git-main-fawxzzy.vercel.app/',
+      ...PROTECTED_DEPLOYMENT_IDENTITY,
+      deploymentUrl: 'https://fawxzzy-mazer-git-main-fawxzzy.vercel.app/',
+      protectedDeployment: true,
+      useExistingServer: true
+    })).toThrow('protected_deployment_immutable_url_required');
+    expect(() => resolveAuthPersistenceExecutionPlan({
+      baseUrl: 'https://fawxzzy-mazer-z9y8x7w6v-fawxzzy.vercel.app/',
+      ...PROTECTED_DEPLOYMENT_IDENTITY,
+      protectedDeployment: true,
+      useExistingServer: true
+    })).toThrow('protected_deployment_identity_mismatch');
+  });
+
+  test('verifies service-worker assets through read-only request-context GETs', async () => {
+    const calls = [];
+    const assets = await verifyReadOnlyServiceWorkerAssets({
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      context: {
+        request: {
+          get: async (url) => {
+            calls.push(url);
+            return {
+              body: async () => Buffer.from(`asset:${new URL(url).pathname}`),
+              dispose: async () => {},
+              status: () => 200
+            };
+          }
+        }
+      }
+    });
+    expect(calls.map((url) => new URL(url).pathname)).toEqual(['/app-sw.js', '/sw.js']);
+    expect(assets).toEqual([
+      expect.objectContaining({ pathname: '/app-sw.js', status: 200, sha256: expect.stringMatching(/^[0-9a-f]{64}$/u) }),
+      expect.objectContaining({ pathname: '/sw.js', status: 200, sha256: expect.stringMatching(/^[0-9a-f]{64}$/u) })
+    ]);
   });
 
   test('recognizes shared account entry on the main menu and rejects every retired local-auth control', () => {
@@ -477,6 +602,66 @@ describe('live auth persistence soak contract', () => {
       { allowSameOriginMutations: false }
     )).toBe(false);
   });
+
+  test('blocks service-worker mutation reachability at the real browser boundary', async () => {
+    const synthetic = await startSyntheticServiceWorkerMutationServer();
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const vulnerableControl = await browser.newContext({ serviceWorkers: 'allow' });
+      const controlPage = await vulnerableControl.newPage();
+      await controlPage.goto(synthetic.baseUrl);
+      await controlPage.evaluate(async () => {
+        await navigator.serviceWorker.register('/sw.js');
+        await navigator.serviceWorker.ready;
+      });
+      await controlPage.reload();
+      await controlPage.waitForFunction(() => navigator.serviceWorker.controller !== null);
+      await controlPage.evaluate(() => navigator.serviceWorker.controller?.postMessage('mutate'));
+      await expect.poll(() => synthetic.state.mutations, { timeout: 5_000 }).toBe(1);
+      await vulnerableControl.close();
+
+      const blockedMutationRequests = [];
+      const executionPlan = resolveAuthPersistenceExecutionPlan({
+        baseUrl: synthetic.baseUrl,
+        useExistingServer: true
+      });
+      const guardedContext = await createGuardedAuthPersistenceContext({
+        browser,
+        executionPlan,
+        resolvedBaseUrl: synthetic.baseUrl,
+        blockedMutationRequests
+      });
+      const guardedPage = await guardedContext.newPage();
+      await guardedPage.goto(synthetic.baseUrl);
+      const guardedResult = await guardedPage.evaluate(async () => {
+        let registrationBlocked = false;
+        try {
+          await navigator.serviceWorker.register('/sw.js');
+        } catch {
+          registrationBlocked = true;
+        }
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+        const controlled = navigator.serviceWorker.controller !== null;
+        const mutationResult = await fetch('/mutation', { method: 'POST', body: 'synthetic' })
+          .then(() => 'unexpected-success')
+          .catch(() => 'blocked');
+        return { controlled, mutationResult, registrationBlocked };
+      });
+      expect(guardedResult).toMatchObject({
+        controlled: false,
+        mutationResult: 'blocked'
+      });
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+      expect(synthetic.state.mutations).toBe(1);
+      expect(blockedMutationRequests).toEqual([
+        expect.objectContaining({ method: 'POST', url: `${synthetic.baseUrl}mutation` })
+      ]);
+      await guardedContext.close();
+    } finally {
+      await browser.close();
+      await synthetic.close();
+    }
+  }, 20_000);
 
   test('constrains artifact labels to the session directory', () => {
     const root = resolve(tmpdir(), 'mazer-auth-soak-artifacts');

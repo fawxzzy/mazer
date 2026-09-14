@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { copyFile, writeFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -28,6 +29,10 @@ const MOBILE_DPR = 2;
 const TIMEOUT_MS = 30_000;
 const PUBLIC_PRODUCTION_HOST = 'mazer.fawxzzy.com';
 const PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9-]+-fawxzzy\.vercel\.app$/u;
+const IMMUTABLE_PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9]{8,32}-fawxzzy\.vercel\.app$/u;
+const VERCEL_DEPLOYMENT_ID_PATTERN = /^dpl_[A-Za-z0-9]{20,64}$/u;
+const SOURCE_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
+const READ_ONLY_SERVICE_WORKER_ASSETS = Object.freeze(['/app-sw.js', '/sw.js']);
 
 export const SIGNED_OUT_SHARED_ACCOUNT_BUTTONS = Object.freeze([
   'Login',
@@ -63,6 +68,41 @@ export const normalizeAuthPersistenceBaseUrl = (value) => {
   return url.toString();
 };
 
+export const resolveProtectedDeploymentIdentity = ({
+  baseUrl,
+  deploymentId,
+  deploymentUrl,
+  sourceCommit
+}) => {
+  if (!VERCEL_DEPLOYMENT_ID_PATTERN.test(String(deploymentId ?? ''))) {
+    throw new Error('protected_deployment_id_invalid');
+  }
+  if (!SOURCE_COMMIT_PATTERN.test(String(sourceCommit ?? ''))) {
+    throw new Error('protected_deployment_source_commit_invalid');
+  }
+  if (typeof deploymentUrl !== 'string') {
+    throw new Error('protected_deployment_url_required');
+  }
+  const normalizedDeploymentUrl = normalizeAuthPersistenceBaseUrl(deploymentUrl);
+  if (!IMMUTABLE_PROTECTED_DEPLOYMENT_HOST_PATTERN.test(new URL(normalizedDeploymentUrl).hostname)) {
+    throw new Error('protected_deployment_immutable_url_required');
+  }
+  if (normalizedDeploymentUrl !== baseUrl) {
+    throw new Error('protected_deployment_identity_mismatch');
+  }
+  const normalizedIdentity = {
+    deploymentId,
+    deploymentUrl: normalizedDeploymentUrl,
+    sourceCommit
+  };
+  return {
+    ...normalizedIdentity,
+    digest: createHash('sha256')
+      .update(`${deploymentId}\n${normalizedDeploymentUrl}\n${sourceCommit}\n`, 'utf8')
+      .digest('hex')
+  };
+};
+
 export const resolveAuthPersistenceExecutionPlan = (options = {}) => {
   const useExistingServer = options.useExistingServer === true;
   if (useExistingServer && typeof options.baseUrl !== 'string') {
@@ -81,12 +121,24 @@ export const resolveAuthPersistenceExecutionPlan = (options = {}) => {
   if (protectedDeployment && new URL(baseUrl).hostname === PUBLIC_PRODUCTION_HOST) {
     throw new Error('public_alias_protection_bypass_forbidden');
   }
+  const deploymentIdentity = protectedDeployment
+    ? resolveProtectedDeploymentIdentity({
+        baseUrl,
+        deploymentId: options.deploymentId,
+        deploymentUrl: options.deploymentUrl,
+        sourceCommit: options.sourceCommit
+      })
+    : null;
   return {
     baseUrl,
+    ...(deploymentIdentity === null ? {} : { deploymentIdentity }),
     launchPreview: !useExistingServer,
     protectedDeployment,
     runBuild: !useExistingServer && options.skipBuild !== true,
-    serviceWorkers: protectedDeployment ? 'allow' : 'block',
+    // Context routing cannot intercept requests handled by a service worker.
+    // Keep the guarded browser uncontrolled, then verify both worker assets
+    // separately through read-only request-context GETs.
+    serviceWorkers: 'block',
     useExistingServer
   };
 };
@@ -125,6 +177,33 @@ export const seedVercelProtectionBypassCookie = async ({ context, baseUrl, prote
     throw new Error('protection_bypass_cookie_seed_failed');
   }
   return { cookieSeeded: true, status };
+};
+
+export const verifyReadOnlyServiceWorkerAssets = async ({ context, baseUrl }) => {
+  const assets = [];
+  for (const pathname of READ_ONLY_SERVICE_WORKER_ASSETS) {
+    const url = new URL(pathname, baseUrl).toString();
+    const response = await context.request.get(url, {
+      failOnStatusCode: false,
+      timeout: TIMEOUT_MS
+    });
+    try {
+      const status = response.status();
+      const body = await response.body();
+      if (status !== 200 || body.byteLength === 0) {
+        throw new Error('service_worker_asset_read_only_verification_failed');
+      }
+      assets.push({
+        bytes: body.byteLength,
+        pathname,
+        sha256: createHash('sha256').update(body).digest('hex'),
+        status
+      });
+    } finally {
+      await response.dispose();
+    }
+  }
+  return assets;
 };
 
 const normalizeControlLabel = (value) => String(value).trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
@@ -353,6 +432,38 @@ export const isExternalMutationRequest = (
   } catch {
     return true;
   }
+};
+
+export const createGuardedAuthPersistenceContext = async ({
+  browser,
+  executionPlan,
+  resolvedBaseUrl,
+  blockedMutationRequests
+}) => {
+  const context = await browser.newContext({
+    deviceScaleFactor: MOBILE_DPR,
+    hasTouch: true,
+    isMobile: true,
+    serviceWorkers: executionPlan.serviceWorkers,
+    viewport: MOBILE_VIEWPORT
+  });
+  await context.route('**/*', async (route) => {
+    const request = route.request();
+    const requestSummary = {
+      method: request.method(),
+      resourceType: request.resourceType(),
+      url: sanitizeAuthPersistenceDiagnosticUrl(request.url())
+    };
+    if (isExternalMutationRequest(requestSummary, resolvedBaseUrl, {
+      allowSameOriginMutations: executionPlan.launchPreview
+    })) {
+      blockedMutationRequests.push(requestSummary);
+      await route.abort('blockedbyclient');
+      return;
+    }
+    await route.continue();
+  });
+  return context;
 };
 
 export const persistAuthPersistenceFailureEvidence = async ({
@@ -777,28 +888,11 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       : null;
     const resolvedBaseUrl = preview?.baseUrl ?? executionPlan.baseUrl;
     browser = await chromium.launch({ headless: options.headless !== false });
-    context = await browser.newContext({
-      deviceScaleFactor: MOBILE_DPR,
-      hasTouch: true,
-      isMobile: true,
-      serviceWorkers: executionPlan.serviceWorkers,
-      viewport: MOBILE_VIEWPORT
-    });
-    await context.route('**/*', async (route) => {
-      const request = route.request();
-      const requestSummary = {
-        method: request.method(),
-        resourceType: request.resourceType(),
-        url: sanitizeAuthPersistenceDiagnosticUrl(request.url())
-      };
-      if (isExternalMutationRequest(requestSummary, resolvedBaseUrl, {
-        allowSameOriginMutations: executionPlan.launchPreview
-      })) {
-        blockedMutationRequests.push(requestSummary);
-        await route.abort('blockedbyclient');
-        return;
-      }
-      await route.continue();
+    context = await createGuardedAuthPersistenceContext({
+      browser,
+      executionPlan,
+      resolvedBaseUrl,
+      blockedMutationRequests
     });
     page = await context.newPage();
     await installLivePlayQaServiceWorkerStabilizationProbe(page);
@@ -837,6 +931,15 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         context,
         baseUrl: resolvedBaseUrl,
         protectionBypass: options.protectionBypass
+      });
+      enterPhase('read-only-service-worker-assets');
+      steps.push({
+        id: 'read-only-service-worker-assets',
+        pass: true,
+        assets: await verifyReadOnlyServiceWorkerAssets({
+          context,
+          baseUrl: resolvedBaseUrl
+        })
       });
     }
     enterPhase('signed-out-shared-account-entry');
@@ -1075,6 +1178,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       pageErrors: sanitizedPageErrors,
       blockedMutationRequests,
       transport: {
+        deploymentIdentity: executionPlan.deploymentIdentity ?? null,
         existingServer: executionPlan.useExistingServer,
         protectedDeployment: executionPlan.protectedDeployment,
         serviceWorkers: executionPlan.serviceWorkers
@@ -1223,12 +1327,15 @@ if (isDirectRun) {
   runLiveAuthPersistenceSoak({
     artifactRoot: typeof args['output-root'] === 'string' ? args['output-root'] : DEFAULT_ARTIFACT_ROOT,
     baseUrl: typeof args['base-url'] === 'string' ? args['base-url'] : undefined,
+    deploymentId: typeof args['deployment-id'] === 'string' ? args['deployment-id'] : undefined,
+    deploymentUrl: typeof args['deployment-url'] === 'string' ? args['deployment-url'] : undefined,
     headless: args.headless !== 'false',
     label: typeof args.label === 'string' ? args.label : 'auth-persistence-soak',
     protectedDeployment,
     protectionBypass: protectedDeployment ? process.env.VERCEL_AUTOMATION_BYPASS_SECRET : undefined,
     sessionId: typeof args.session === 'string' ? args.session : undefined,
     skipBuild: optionEnabled(args['skip-build']),
+    sourceCommit: typeof args['source-commit'] === 'string' ? args['source-commit'] : undefined,
     useExistingServer: optionEnabled(args['existing-server']) || optionEnabled(args['no-preview'])
   }).then((summary) => {
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
