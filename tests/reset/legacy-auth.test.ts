@@ -202,83 +202,88 @@ describe('legacy auth runtime', () => {
     expect(events).toEqual(['oauth-start', 'oauth-end', 'refresh']);
   });
 
-  test('serializes public password sign-in and signup behind the shared OAuth session lock', async () => {
-    const lockManager = new NamedLockHarness();
-    const signInWithPassword = vi.fn(async () => ({
-      data: { session: null },
-      error: null
-    }));
-    const signUp = vi.fn(async () => ({
-      data: { session: null },
-      error: null
-    }));
-    const authClient = {
-      auth: {
-        fetch: vi.fn() as unknown as typeof fetch,
-        getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
-        onAuthStateChange: vi.fn(() => ({
-          data: { subscription: { unsubscribe: vi.fn() } }
-        })),
-        signInWithPassword,
-        signUp
-      }
-    };
+  test('serializes public password mutations on each configured client storage lock', async () => {
+    for (const projectRef of ['bxtcuhkotumitoqtrcej', 'geknvnrmktchljnyddwp']) {
+      const lockManager = new NamedLockHarness();
+      const storageKey = `sb-${projectRef}-auth-token`;
+      const signInWithPassword = vi.fn(async () => ({
+        data: { session: null },
+        error: null
+      }));
+      const signUp = vi.fn(async () => ({
+        data: { session: null },
+        error: null
+      }));
+      const authClient = {
+        auth: {
+          fetch: vi.fn() as unknown as typeof fetch,
+          getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
+          onAuthStateChange: vi.fn(() => ({
+            data: { subscription: { unsubscribe: vi.fn() } }
+          })),
+          signInWithPassword,
+          signUp,
+          storageKey
+        }
+      };
 
-    vi.resetModules();
-    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-key');
-    vi.stubEnv('VITE_SUPABASE_URL', 'https://bxtcuhkotumitoqtrcej.supabase.co');
-    vi.stubGlobal('navigator', { locks: lockManager });
-    vi.stubGlobal('window', {
-      addEventListener: vi.fn(),
-      localStorage: new MemoryStorage(),
-      location: { pathname: '/' },
-      sessionStorage: new MemoryStorage()
-    });
-    vi.doMock('@supabase/supabase-js', () => ({
-      createClient: vi.fn(() => authClient)
-    }));
-
-    try {
-      const freshAuth = await import('../../src/legacy-runtime/legacyAuth');
-      const freshPortal = await import('../../src/legacy-runtime/legacyAccountPortal');
-      expect(freshAuth.resolveLegacyAuthConfig()).toEqual({
-        anonKey: 'anon-key',
-        url: 'https://bxtcuhkotumitoqtrcej.supabase.co'
-      });
-      await expect(freshAuth.getLegacyAuthClient()).resolves.not.toBeNull();
-      let releaseOAuth!: () => void;
-      const oauth = freshPortal.runMazerExclusiveAuthMutation(async () => {
-        await new Promise<void>((resolve) => { releaseOAuth = resolve; });
-      }, lockManager);
-      await vi.waitFor(() => expect(releaseOAuth).toBeTypeOf('function'));
-
-      const signIn = freshAuth.signInLegacyAuth('player@example.test', 'secret1');
-      const signup = freshAuth.signUpLegacyAuth('new@example.test', 'secret1', 'MazeNew');
-      await expect(Promise.all([signIn, signup])).resolves.toEqual([
-        { snapshot: expect.objectContaining({ status: 'unavailable' }) },
-        { snapshot: expect.objectContaining({ status: 'unavailable' }) }
-      ]);
-      expect(signInWithPassword).not.toHaveBeenCalled();
-      expect(signUp).not.toHaveBeenCalled();
-
-      releaseOAuth();
-      await expect(oauth).resolves.toMatchObject({ status: 'completed' });
-      await expect(freshAuth.signInLegacyAuth(
-        'player@example.test',
-        'secret1'
-      )).resolves.toHaveProperty('snapshot');
-      await expect(freshAuth.signUpLegacyAuth(
-        'new@example.test',
-        'secret1',
-        'MazeNew'
-      )).resolves.toHaveProperty('snapshot');
-      expect(signInWithPassword).toHaveBeenCalledOnce();
-      expect(signUp).toHaveBeenCalledOnce();
-    } finally {
-      vi.doUnmock('@supabase/supabase-js');
-      vi.unstubAllEnvs();
-      vi.unstubAllGlobals();
       vi.resetModules();
+      vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-key');
+      vi.stubEnv('VITE_SUPABASE_URL', `https://${projectRef}.supabase.co`);
+      vi.stubGlobal('navigator', { locks: lockManager });
+      vi.stubGlobal('window', {
+        addEventListener: vi.fn(),
+        localStorage: new MemoryStorage(),
+        location: { pathname: '/' },
+        sessionStorage: new MemoryStorage()
+      });
+      vi.doMock('@supabase/supabase-js', () => ({
+        createClient: vi.fn(() => authClient)
+      }));
+
+      try {
+        const freshAuth = await import('../../src/legacy-runtime/legacyAuth');
+        const freshPortal = await import('../../src/legacy-runtime/legacyAccountPortal');
+        expect(freshAuth.resolveLegacyAuthConfig()).toEqual({
+          anonKey: 'anon-key',
+          url: `https://${projectRef}.supabase.co`
+        });
+        await expect(freshAuth.getLegacyAuthClient()).resolves.not.toBeNull();
+        let releaseCurrentWriter!: () => void;
+        const currentWriter = freshPortal.runMazerExclusiveAuthMutation(async () => {
+          await new Promise<void>((resolve) => { releaseCurrentWriter = resolve; });
+        }, lockManager, `lock:${storageKey}`);
+        await vi.waitFor(() => expect(releaseCurrentWriter).toBeTypeOf('function'));
+
+        await expect(Promise.all([
+          freshAuth.signInLegacyAuth('player@example.test', 'secret1'),
+          freshAuth.signUpLegacyAuth('new@example.test', 'secret1', 'MazeNew')
+        ])).resolves.toEqual([
+          { snapshot: expect.objectContaining({ status: 'unavailable' }) },
+          { snapshot: expect.objectContaining({ status: 'unavailable' }) }
+        ]);
+        expect(signInWithPassword).not.toHaveBeenCalled();
+        expect(signUp).not.toHaveBeenCalled();
+
+        releaseCurrentWriter();
+        await expect(currentWriter).resolves.toMatchObject({ status: 'completed' });
+        await expect(freshAuth.signInLegacyAuth(
+          'player@example.test',
+          'secret1'
+        )).resolves.toHaveProperty('snapshot');
+        await expect(freshAuth.signUpLegacyAuth(
+          'new@example.test',
+          'secret1',
+          'MazeNew'
+        )).resolves.toHaveProperty('snapshot');
+        expect(signInWithPassword).toHaveBeenCalledOnce();
+        expect(signUp).toHaveBeenCalledOnce();
+      } finally {
+        vi.doUnmock('@supabase/supabase-js');
+        vi.unstubAllEnvs();
+        vi.unstubAllGlobals();
+        vi.resetModules();
+      }
     }
   });
 
@@ -302,6 +307,26 @@ describe('legacy auth runtime', () => {
     expect(LEGACY_AUTH_JS_LOCK_MAX_WAIT_MS).toBe(LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS);
     release();
     await holder;
+  });
+
+  test('signs out the diagnostics fixture locally without constructing an auth client', async () => {
+    const createClient = vi.fn(() => {
+      throw new Error('fixture sign-out must not construct a provider client');
+    });
+    vi.resetModules();
+    vi.doMock('@supabase/supabase-js', () => ({ createClient }));
+    try {
+      const freshAuth = await import('../../src/legacy-runtime/legacyAuth');
+      await expect(freshAuth.signOutLegacyAuth(createSnapshot({
+        configured: true,
+        status: 'authenticated',
+        userId: freshAuth.LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID
+      }))).resolves.toMatchObject({ snapshot: { status: 'guest' } });
+      expect(createClient).not.toHaveBeenCalled();
+    } finally {
+      vi.doUnmock('@supabase/supabase-js');
+      vi.resetModules();
+    }
   });
 
   test('caps auth-js negative waits and keeps zero-time acquisition immediate', async () => {
@@ -929,7 +954,7 @@ describe('legacy auth runtime', () => {
     expect(authSource).toContain('await invokeLegacyLocalSignOutWithTimeout(directSignOut)');
     expect(authSource).toContain('const authStorage = directSignOut.storage ?? null;');
     expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
-    expect(authSource).toContain('return runLegacyAuthDirectSessionMutation(async () => {');
+    expect(authSource).toContain('return runLegacyAuthDirectSessionMutation(directSignOut.storageKey, async () => {');
     expect(authSource).toContain('fail closed if the pinned seam ever changes');
     expect(authSource).toContain('legacyAuthPersistenceListenerInstalled');
     expect(authSource).toContain('legacyAuthStorageListenerInstalled');

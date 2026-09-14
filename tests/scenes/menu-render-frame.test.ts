@@ -1924,7 +1924,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain('if (advanceMazerSharedAuthMutationEpoch() === null)');
     expect(authSource).toContain('if (advanceMazerAuthMutationEpoch() === null)');
     expect(authSource).not.toContain('runLegacyAuthJsSessionMutation');
-    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\(async \(\) => \{/g)).toHaveLength(3);
+    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\([^,]+, async \(\) => \{/g)).toHaveLength(3);
     expect(authSource).not.toContain('runLegacyAuthInternallyLockedMutation');
     expect(authSource).toContain("const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;");
     expect(authSource).toContain('if (key === auth.storageKey && originalStorage.getItem(key) !== null) {');
@@ -1932,6 +1932,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain('auth.storage = verifyingStorage;');
     expect(authSource).toContain('auth.storage = originalStorage;');
     expect(authSource).toContain('await invokeLegacyLocalSignOutWithTimeout(directSignOut)');
+    expect(authSource).toContain('isLegacyRuntimeDiagnosticsAuthFixtureSnapshot(authenticatedFallback)');
+    expect(menuSceneSource).toContain('fetchLegacyLeaderboardPage(offset, MenuScene.LEADERBOARD_VISIBLE_ROWS, this.authSnapshot)');
+    expect(menuSceneSource).toContain('fetchLegacyLeaderboardSelfRank(this.authSnapshot)');
     expect(authSource).toContain('const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(');
     expect(authSource).toContain('const preserveAuthenticatedPreimage = (message?: string | null): LegacyAuthActionResult => ({');
     expect(authSource).toContain('if (!isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey)) {');

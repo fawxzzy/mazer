@@ -16958,8 +16958,8 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
 
     const [pageResult, selfRankResult] = await Promise.all([
-      fetchLegacyLeaderboardPage(offset, MenuScene.LEADERBOARD_VISIBLE_ROWS),
-      offset === 0 ? fetchLegacyLeaderboardSelfRank() : Promise.resolve(null)
+      fetchLegacyLeaderboardPage(offset, MenuScene.LEADERBOARD_VISIBLE_ROWS, this.authSnapshot),
+      offset === 0 ? fetchLegacyLeaderboardSelfRank(this.authSnapshot) : Promise.resolve(null)
     ]);
     if (sequence !== this.leaderboardSequence) {
       // A newer page request (or the overlay closing and reopening) has

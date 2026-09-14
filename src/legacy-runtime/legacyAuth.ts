@@ -21,6 +21,7 @@ export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
 export const LEGACY_PASSWORD_RECOVERY_PATH = '/update-password';
 export const LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS = 10_000;
 export const LEGACY_AUTH_JS_LOCK_MAX_WAIT_MS = LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS;
+export const LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID = 'runtime-diagnostics-auth-fixture';
 
 export type LegacyAuthStatus = 'guest' | 'authenticated' | 'unavailable';
 export type LegacyAuthFormMode = 'login' | 'signup';
@@ -142,6 +143,13 @@ interface LegacyAuthDirectSignOutClient {
 export interface LegacyAuthAbortableTransport {
   fetch: typeof fetch;
 }
+
+export const isLegacyRuntimeDiagnosticsAuthFixtureSnapshot = (
+  snapshot: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>
+): boolean => (
+  snapshot.status === 'authenticated'
+  && snapshot.userId === LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID
+);
 
 export interface LegacyAuthJsLockManager {
   request<T>(
@@ -782,8 +790,12 @@ const prepareLegacyAuthDirectSessionMutation = (): LegacyAuthActionResult | null
 };
 
 const runLegacyAuthDirectSessionMutation = async (
+  authStorageKey: string | undefined,
   operation: () => Promise<LegacyAuthActionResult>
 ): Promise<LegacyAuthActionResult> => {
+  if (typeof authStorageKey !== 'string' || authStorageKey.length === 0) {
+    return createLegacyAuthMutationUnavailableResult();
+  }
   const result = await runMazerExclusiveAuthMutation(async () => {
     // Direct internal auth operations and the pinned auth-js password
     // sign-in/sign-up methods write session storage without invoking the
@@ -797,7 +809,7 @@ const runLegacyAuthDirectSessionMutation = async (
     } catch {
       return createLegacyAuthMutationUnavailableResult();
     }
-  });
+  }, undefined, `lock:${authStorageKey}`);
   return result.status === 'completed'
     ? result.value
     : createLegacyAuthMutationUnavailableResult();
@@ -816,8 +828,9 @@ export const signInLegacyAuth = async (
     };
   }
 
-  return runLegacyAuthDirectSessionMutation(async () => {
-    const transport = client.auth as unknown as Partial<LegacyAuthAbortableTransport>;
+  const auth = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
+  return runLegacyAuthDirectSessionMutation(auth.storageKey, async () => {
+    const transport = auth as Partial<LegacyAuthAbortableTransport>;
     if (typeof transport.fetch !== 'function') {
       return createLegacyAuthMutationUnavailableResult();
     }
@@ -867,8 +880,9 @@ export const signUpLegacyAuth = async (
     };
   }
 
-  return runLegacyAuthDirectSessionMutation(async () => {
-    const transport = client.auth as unknown as Partial<LegacyAuthAbortableTransport>;
+  const auth = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
+  return runLegacyAuthDirectSessionMutation(auth.storageKey, async () => {
+    const transport = auth as Partial<LegacyAuthAbortableTransport>;
     if (typeof transport.fetch !== 'function') {
       return createLegacyAuthMutationUnavailableResult();
     }
@@ -1129,6 +1143,12 @@ export const updateLegacyPassword = async (
 export const signOutLegacyAuth = async (
   authenticatedFallback?: LegacyAuthSessionSnapshot
 ): Promise<LegacyAuthActionResult> => {
+  if (
+    authenticatedFallback !== undefined
+    && isLegacyRuntimeDiagnosticsAuthFixtureSnapshot(authenticatedFallback)
+  ) {
+    return { snapshot: createGuestSnapshot(true, { info: LEGACY_AUTH_MESSAGE_COPY.signedOut }) };
+  }
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -1136,13 +1156,13 @@ export const signOutLegacyAuth = async (
     };
   }
 
-  return runLegacyAuthDirectSessionMutation(async () => {
+  const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
+  return runLegacyAuthDirectSessionMutation(directSignOut.storageKey, async () => {
     // Supabase auth-js's public signOut() reacquires its configured lock. That
     // would force this transaction to release between generation invalidation
     // and session removal. The pinned client exposes the same protected
     // implementation used by signOut(); invoke it only while our exact common
     // lock is already held, and fail closed if the pinned seam ever changes.
-    const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
     const authStorage = directSignOut.storage ?? null;
     const authStorageKey = directSignOut.storageKey;
     const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(authStorage, undefined, authStorageKey)

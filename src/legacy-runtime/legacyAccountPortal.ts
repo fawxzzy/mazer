@@ -137,14 +137,15 @@ export const runMazerExclusiveAuthMutation = async <T>(
     typeof navigator === 'undefined' || navigator.locks === undefined
       ? null
       : navigator.locks
-  )
+  ),
+  lockName = MAZER_OAUTH_SESSION_LOCK_NAME
 ): Promise<MazerExclusiveAuthMutationResult<T>> => {
   if (lockManager === null) {
     return { status: 'unavailable' };
   }
   try {
     return await lockManager.request(
-      MAZER_OAUTH_SESSION_LOCK_NAME,
+      lockName,
       { ifAvailable: true, mode: 'exclusive' },
       async (lock) => lock === null
         ? { status: 'unavailable' }

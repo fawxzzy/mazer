@@ -1,10 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { LegacyAuthSessionSnapshot } from './legacyAuth';
 import {
+  LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID,
   createLegacyAuthScopedStorage,
   getLegacyAuthClient,
+  isLegacyRuntimeDiagnosticsAuthFixtureSnapshot,
   readLegacyAuthSessionSnapshot
 } from './legacyAuth';
+import type { LegacyAuthSessionSnapshot } from './legacyAuth';
 import {
   LEGACY_DEFAULTS,
   type LegacySettings
@@ -59,7 +61,7 @@ export const LEGACY_REMOTE_PROFILE_TABLE = 'mazer_profiles';
 export const LEGACY_REMOTE_AI_RUNNER_KEY = 'menu-runner';
 export const LEGACY_REMOTE_ACCOUNT_SYNC_STORAGE_KEY = 'mazer.remote-account-sync.v1';
 export const LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY = 'mazer.remote-completion-outbox.v1';
-export const LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID = 'runtime-diagnostics-auth-fixture';
+export { LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID } from './legacyAuth';
 
 export const isLegacyRuntimeDiagnosticsAuthFixtureRoute = (search: string): boolean => {
   const searchParams = new URLSearchParams(search);
@@ -76,7 +78,7 @@ export const isLegacyRemoteAccountProviderEligible = (
 } => (
   snapshot.status === 'authenticated'
   && snapshot.userId !== null
-  && snapshot.userId !== LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID
+  && !isLegacyRuntimeDiagnosticsAuthFixtureSnapshot(snapshot)
 );
 
 const resolveLegacyRemoteIneligibleReason = (

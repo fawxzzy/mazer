@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { getLegacyAuthClient } from '../../src/legacy-runtime/legacyAuth';
+import {
+  LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID,
+  getLegacyAuthClient
+} from '../../src/legacy-runtime/legacyAuth';
 import {
   LEGACY_LEADERBOARD_MAX_PAGE_SIZE,
   fetchLegacyLeaderboardPage,
@@ -20,6 +23,23 @@ beforeEach(() => {
 });
 
 describe('fetchLegacyLeaderboardPage', () => {
+  test('keeps the authenticated diagnostics fixture provider-inert', async () => {
+    const fixture = {
+      status: 'authenticated' as const,
+      userId: LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID
+    };
+
+    await expect(fetchLegacyLeaderboardPage(0, 10, fixture)).resolves.toEqual({
+      entries: [],
+      error: null
+    });
+    await expect(fetchLegacyLeaderboardSelfRank(fixture)).resolves.toEqual({
+      error: null,
+      selfRank: null
+    });
+    expect(getLegacyAuthClient).not.toHaveBeenCalled();
+  });
+
   test('keeps database ordering numeric while transporting unbounded ranks and levels as text', () => {
     const leaderboardRpc = readFileSync(
       new URL('../../supabase/migrations/20260822000200_mazer_leaderboard_rpc.sql', import.meta.url),

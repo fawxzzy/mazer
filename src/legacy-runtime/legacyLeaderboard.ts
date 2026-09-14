@@ -1,4 +1,8 @@
-import { getLegacyAuthClient } from './legacyAuth';
+import {
+  getLegacyAuthClient,
+  isLegacyRuntimeDiagnosticsAuthFixtureSnapshot,
+  type LegacyAuthSessionSnapshot
+} from './legacyAuth';
 import {
   compareLegacyProgressionOrdinals,
   resolveLegacyProgressionOrdinal,
@@ -99,8 +103,12 @@ const parseLegacyLeaderboardRow = (row: unknown): LegacyLeaderboardEntry | null 
 
 export const fetchLegacyLeaderboardPage = async (
   offset: number,
-  limit: number = LEGACY_LEADERBOARD_PAGE_SIZE
+  limit: number = LEGACY_LEADERBOARD_PAGE_SIZE,
+  authSnapshot?: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>
 ): Promise<LegacyLeaderboardPageResult> => {
+  if (authSnapshot && isLegacyRuntimeDiagnosticsAuthFixtureSnapshot(authSnapshot)) {
+    return { entries: [], error: null };
+  }
   const client = await getLegacyAuthClient();
   if (!client) {
     return { entries: [], error: resolveLegacyLeaderboardUnavailableMessage() };
@@ -126,7 +134,12 @@ export const fetchLegacyLeaderboardPage = async (
   return { entries, error: null };
 };
 
-export const fetchLegacyLeaderboardSelfRank = async (): Promise<LegacyLeaderboardSelfRankResult> => {
+export const fetchLegacyLeaderboardSelfRank = async (
+  authSnapshot?: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>
+): Promise<LegacyLeaderboardSelfRankResult> => {
+  if (authSnapshot && isLegacyRuntimeDiagnosticsAuthFixtureSnapshot(authSnapshot)) {
+    return { error: null, selfRank: null };
+  }
   const client = await getLegacyAuthClient();
   if (!client) {
     return { error: resolveLegacyLeaderboardUnavailableMessage(), selfRank: null };
