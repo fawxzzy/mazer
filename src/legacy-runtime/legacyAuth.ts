@@ -198,6 +198,19 @@ export const readLegacyPersistedAuthSessionSnapshot = (
   }
 };
 
+export const isLegacyPersistedAuthSessionRemoved = (
+  storage: Pick<Storage, 'getItem'> | undefined
+): boolean => {
+  if (!storage) {
+    return false;
+  }
+  try {
+    return storage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY) === null;
+  } catch {
+    return false;
+  }
+};
+
 const createGuestSnapshot = (
   configured: boolean,
   overrides: Partial<Omit<LegacyAuthSessionSnapshot, 'configured' | 'status' | 'userId'>> = {}
@@ -993,25 +1006,33 @@ export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
     // and session removal. The pinned client exposes the same protected
     // implementation used by signOut(); invoke it only while our exact common
     // lock is already held, and fail closed if the pinned seam ever changes.
+    const authStorage = typeof window === 'undefined' ? undefined : window.localStorage;
     const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
-    const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(
-      typeof window === 'undefined' ? undefined : window.localStorage
-    );
-    const result = await invokeLegacyLocalSignOutWithTimeout(directSignOut);
+    const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(authStorage);
+    const preserveAuthenticatedPreimage = (message?: string | null): LegacyAuthActionResult => ({
+      snapshot: authenticatedPreimage === null
+        ? createLegacyAuthMutationUnavailableResult().snapshot
+        : { ...authenticatedPreimage, error: message ?? LEGACY_AUTH_MESSAGE_COPY.authUnavailable, info: null }
+    });
+    let result: Awaited<ReturnType<typeof invokeLegacyLocalSignOutWithTimeout>>;
+    try {
+      result = await invokeLegacyLocalSignOutWithTimeout(directSignOut);
+    } catch {
+      return preserveAuthenticatedPreimage();
+    }
     if (result === null) {
-      return createLegacyAuthMutationUnavailableResult();
+      return preserveAuthenticatedPreimage();
     }
     const { error } = result;
     if (error) {
-      return {
-        snapshot: authenticatedPreimage === null
-          ? createLegacyAuthMutationUnavailableResult().snapshot
-          : { ...authenticatedPreimage, error: error.message ?? LEGACY_AUTH_MESSAGE_COPY.authUnavailable, info: null }
-      };
+      return preserveAuthenticatedPreimage(error.message);
+    }
+    if (!isLegacyPersistedAuthSessionRemoved(authStorage)) {
+      return preserveAuthenticatedPreimage();
     }
 
     legacyAuthLastSessionSignature = null;
-    markLegacyRememberedIdentityReauthRequired(typeof window === 'undefined' ? undefined : window.localStorage);
+    markLegacyRememberedIdentityReauthRequired(authStorage);
 
     return {
       snapshot: createGuestSnapshot(true, {

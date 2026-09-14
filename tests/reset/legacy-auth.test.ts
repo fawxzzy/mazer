@@ -14,6 +14,7 @@ import {
   createLegacyAuthScopedStorage,
   deriveLegacyRememberedIdentityDisplayName,
   isLegacyPasswordRecoveryRuntimeLocation,
+  isLegacyPersistedAuthSessionRemoved,
   invokeLegacyLocalSignOutWithTimeout,
   markLegacyRememberedIdentityReauthRequired,
   normalizeLegacyAuthEmail,
@@ -149,6 +150,19 @@ describe('legacy auth runtime', () => {
       status: 'authenticated',
       userId: 'runner-id'
     });
+  });
+
+  test('rejects no-op and throwing local session removal postimages', () => {
+    const noOpRemoval = new MemoryStorage();
+    noOpRemoval.setItem(MAZER_OAUTH_AUTH_SESSION_KEY, '{"retained":true}');
+    expect(isLegacyPersistedAuthSessionRemoved(noOpRemoval)).toBe(false);
+
+    expect(isLegacyPersistedAuthSessionRemoved({
+      getItem: () => {
+        throw new DOMException('denied', 'SecurityError');
+      }
+    })).toBe(false);
+    expect(isLegacyPersistedAuthSessionRemoved(new MemoryStorage())).toBe(true);
   });
 
   test('detects whether Supabase browser auth is configured', () => {

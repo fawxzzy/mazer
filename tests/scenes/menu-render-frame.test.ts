@@ -1926,7 +1926,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain("if (typeof auth._signOut !== 'function' || typeof auth.admin?.fetch !== 'function') {");
     expect(authSource).toContain('await invokeLegacyLocalSignOutWithTimeout(directSignOut)');
     expect(authSource).toContain('const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(');
-    expect(authSource).toContain('{ ...authenticatedPreimage, error: error.message ?? LEGACY_AUTH_MESSAGE_COPY.authUnavailable, info: null }');
+    expect(authSource).toContain('const preserveAuthenticatedPreimage = (message?: string | null): LegacyAuthActionResult => ({');
+    expect(authSource).toContain('if (!isLegacyPersistedAuthSessionRemoved(authStorage)) {');
     expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
     expect(authSource.match(/runLegacyAbortableCredentialRequest\(/g)).toHaveLength(3);
     expect(authSource).toContain('LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS = 10_000');
