@@ -100,10 +100,73 @@ export const sanitizeLivePlayQaDiagnosticUrl = (rawUrl) => {
 };
 
 export const sanitizeLivePlayQaDiagnosticText = (value) => String(value)
+  .replace(/https?:\/\/[^\s"'<>]+/giu, (url) => sanitizeLivePlayQaDiagnosticUrl(url))
   .replace(/\bBearer\s+[A-Z0-9._~+/=-]+/giu, 'Bearer <redacted>')
   .replace(/\beyJ[A-Z0-9_-]+\.[A-Z0-9_-]+\.[A-Z0-9_-]+\b/giu, '<redacted-jwt>')
   .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu, '<redacted-email>')
   .replace(/((?:token|code|password|secret|key)=)[^\s&]+/giu, '$1<redacted>');
+
+export const sanitizeLivePlayQaDiagnosticValue = (value) => {
+  if (typeof value === 'string') {
+    return sanitizeLivePlayQaDiagnosticText(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(sanitizeLivePlayQaDiagnosticValue);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [
+      key,
+      sanitizeLivePlayQaDiagnosticValue(entry)
+    ]));
+  }
+  return value;
+};
+
+export const createLivePlayQaFailureError = ({ error, evidencePath }) => new Error(
+  `${sanitizeLivePlayQaDiagnosticText(error instanceof Error ? error.message : String(error))}\n` +
+  `Failure evidence: ${evidencePath}`
+);
+
+export const settleLivePlayQaCleanup = async (actions) => {
+  const errors = [];
+  for (const action of actions) {
+    try {
+      await action.run();
+    } catch (error) {
+      errors.push({
+        action: action.name,
+        message: sanitizeLivePlayQaDiagnosticText(
+          error instanceof Error ? error.message : String(error)
+        )
+      });
+    }
+  }
+  return errors;
+};
+
+export const captureRedactedLivePlayQaScreenshot = async (page, screenshotPath) => {
+  const redactionStyle = await page.addStyleTag({
+    content: `
+      body *, body *::before, body *::after {
+        color: transparent !important;
+        caret-color: transparent !important;
+        text-shadow: none !important;
+        background-image: none !important;
+      }
+      img, video, iframe { visibility: hidden !important; }
+    `
+  });
+  try {
+    await page.screenshot({
+      path: screenshotPath,
+      fullPage: true,
+      mask: [page.locator('canvas, svg')],
+      maskColor: '#111827'
+    });
+  } finally {
+    await redactionStyle.evaluate((element) => element.remove()).catch(() => {});
+  }
+};
 
 export const isLivePlayDiagnosticsReady = ({
   qaMoveAvailable,
@@ -818,6 +881,7 @@ export const captureLivePlayQaFailureEvidence = async ({
     }
   }
 
+  const sanitizedPageState = sanitizeLivePlayQaDiagnosticValue(pageState);
   const evidence = {
     generatedAt: new Date().toISOString(),
     phase,
@@ -827,13 +891,13 @@ export const captureLivePlayQaFailureEvidence = async ({
     targetUrl: sanitizeLivePlayQaDiagnosticUrl(targetUrl),
     viewport,
     browserContext: browserContextOptions,
-    page: pageState === null
+    page: sanitizedPageState === null
       ? null
       : {
-          ...pageState,
+          ...sanitizedPageState,
           url: sanitizeLivePlayQaDiagnosticUrl(pageState.url),
           serviceWorker: {
-            ...pageState.serviceWorker,
+            ...sanitizedPageState.serviceWorker,
             controllerScriptUrl: pageState.serviceWorker.controllerScriptUrl
               ? sanitizeLivePlayQaDiagnosticUrl(pageState.serviceWorker.controllerScriptUrl)
               : null
@@ -858,7 +922,7 @@ export const captureLivePlayQaFailureEvidence = async ({
     label,
     outputDir,
     screenshot: pageAvailable
-      ? (screenshotPath) => page.screenshot({ path: screenshotPath, fullPage: true })
+      ? (screenshotPath) => captureRedactedLivePlayQaScreenshot(page, screenshotPath)
       : async () => { throw new Error('page_unavailable'); }
   });
 };
@@ -1108,6 +1172,7 @@ export const runLivePlayQa = async (options = {}) => {
   let context = null;
   let page = null;
   let targetUrl = new URL(route, baseUrl).toString();
+  let terminalFailure = null;
 
   await ensureDir(outputDir);
 
@@ -1432,16 +1497,22 @@ export const runLivePlayQa = async (options = {}) => {
         'live_play_qa_failed_and_failure_evidence_could_not_be_persisted'
       );
     }
-    throw new Error(
-      `${error instanceof Error ? error.message : String(error)}\nFailure evidence: ${artifact.evidencePath}`,
-      { cause: error }
-    );
+    terminalFailure = createLivePlayQaFailureError({ error, evidencePath: artifact.evidencePath });
+    throw terminalFailure;
   } finally {
-    if (browser) {
-      await browser.close();
-    }
-    if (preview) {
-      await stopPreviewServer(preview.child);
+    const cleanupErrors = await settleLivePlayQaCleanup([
+      ...(browser ? [{ name: 'browser.close', run: () => browser.close() }] : []),
+      ...(preview ? [{ name: 'preview.stop', run: () => stopPreviewServer(preview.child) }] : [])
+    ]);
+    if (cleanupErrors.length > 0) {
+      if (terminalFailure) {
+        terminalFailure.message += `\nCleanup errors: ${JSON.stringify(cleanupErrors)}`;
+      } else {
+        throw new AggregateError(
+          cleanupErrors.map(({ action, message }) => new Error(`${action}: ${message}`)),
+          'live_play_qa_cleanup_failed'
+        );
+      }
     }
   }
 };

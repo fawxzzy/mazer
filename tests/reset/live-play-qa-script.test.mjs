@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import {
+  captureRedactedLivePlayQaScreenshot,
   captureLivePlayQaFailureEvidence,
+  createLivePlayQaFailureError,
   isLivePlayDiagnosticsReady,
   measureLivePlayQaElapsedMs,
   normalizeLivePlayInputMethod,
@@ -12,6 +14,8 @@ import {
   resolveLivePlayBrowserContextOptions,
   resolveLivePlayLifecycleSnapshot,
   resolveArrowPointForMove,
+  sanitizeLivePlayQaDiagnosticValue,
+  settleLivePlayQaCleanup,
   resolveLivePlayRouteProgressIndex,
   resolveStickHoldMsForMove,
   resolveStickPointForMove,
@@ -59,6 +63,65 @@ describe('live play QA script helpers', () => {
     expect(measureLivePlayQaElapsedMs(850, 100)).toBe(0);
   });
 
+  test('sanitizes nested page text, controls, cache names, and embedded URLs', () => {
+    expect(sanitizeLivePlayQaDiagnosticValue({
+      title: 'user@example.test',
+      controls: [{ text: 'token=secret' }],
+      cacheNames: ['profile-user@example.test'],
+      error: 'failed https://example.test/callback?state=raw&code=secret'
+    })).toEqual({
+      title: '<redacted-email>',
+      controls: [{ text: 'token=<redacted>' }],
+      cacheNames: ['<redacted-email>'],
+      error: 'failed https://example.test/callback?code=<redacted>&state=<redacted>'
+    });
+  });
+
+  test('builds a terminal error without retaining the raw URL or raw cause', () => {
+    const failure = createLivePlayQaFailureError({
+      error: new Error('failed https://example.test/callback?state=raw-secret'),
+      evidencePath: 'failure.json'
+    });
+    expect(failure.message).toContain('state=<redacted>');
+    expect(failure.message).not.toContain('raw-secret');
+    expect(failure.cause).toBeUndefined();
+  });
+
+  test('redacts rendered text and media while capturing a failure screenshot', async () => {
+    const calls = [];
+    const page = {
+      addStyleTag: async ({ content }) => {
+        calls.push(['style', content]);
+        return { evaluate: async () => calls.push(['remove']) };
+      },
+      locator: (selector) => ({ selector }),
+      screenshot: async (options) => calls.push(['screenshot', options])
+    };
+    await captureRedactedLivePlayQaScreenshot(page, 'failure.png');
+    expect(calls[0][0]).toBe('style');
+    expect(calls[0][1]).toContain('color: transparent');
+    expect(calls[1]).toEqual(['screenshot', {
+      path: 'failure.png',
+      fullPage: true,
+      mask: [{ selector: 'canvas, svg' }],
+      maskColor: '#111827'
+    }]);
+    expect(calls[2]).toEqual(['remove']);
+  });
+
+  test('settles every cleanup action and sanitizes each failure independently', async () => {
+    const calls = [];
+    const errors = await settleLivePlayQaCleanup([
+      { name: 'browser.close', run: async () => { calls.push('browser'); throw new Error('user@example.test'); } },
+      { name: 'preview.stop', run: async () => { calls.push('preview'); throw new Error('token=secret'); } }
+    ]);
+    expect(calls).toEqual(['browser', 'preview']);
+    expect(errors).toEqual([
+      { action: 'browser.close', message: '<redacted-email>' },
+      { action: 'preview.stop', message: 'token=<redacted>' }
+    ]);
+  });
+
   test('persists finally-safe initial-timeout evidence with a sanitized page snapshot', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mazer-live-play-qa-'));
     try {
@@ -75,6 +138,8 @@ describe('live play QA script helpers', () => {
           qa: { present: false, movePlayPlayerCallable: false },
           serviceWorker: { cacheNames: ['workbox-precache-v2-test'], controllerScriptUrl: 'https://mazer.example.test/sw.js?token=secret' }
         }),
+        addStyleTag: async () => ({ evaluate: async () => {} }),
+        locator: (selector) => ({ selector }),
         screenshot: async ({ path }) => writeFile(path, 'png', 'utf8')
       };
 
