@@ -311,9 +311,21 @@ export const assertAuthPersistenceNavigationOrigin = ({ actualUrl, baseUrl }) =>
 export const assertAuthPersistenceClosedBrowserBoundary = ({
   baseUrl,
   blockedMutationRequests,
+  contextClosed,
   finalUrl,
-  navigationHistory
+  navigationHistory,
+  pageClosed,
+  pendingRequestCount
 }) => {
+  if (contextClosed !== true || pageClosed !== true) {
+    throw new Error('auth_persistence_browser_boundary_not_closed');
+  }
+  if (!Number.isInteger(pendingRequestCount) || pendingRequestCount !== 0) {
+    throw new Error('auth_persistence_pending_requests_unsettled');
+  }
+  if (typeof finalUrl !== 'string' || finalUrl.trim() === '') {
+    throw new Error('auth_persistence_final_browser_url_unavailable');
+  }
   if (blockedMutationRequests.length > 0) {
     throw new Error(`external_mutation_attempt_blocked:${JSON.stringify(blockedMutationRequests)}`);
   }
@@ -323,9 +335,37 @@ export const assertAuthPersistenceClosedBrowserBoundary = ({
   assertAuthPersistenceNavigationOrigin({ actualUrl: finalUrl, baseUrl });
   return {
     finalUrl: sanitizeAuthPersistenceDiagnosticUrl(finalUrl),
-    navigationCount: navigationHistory.length
+    navigationCount: navigationHistory.length,
+    pendingRequestCount
   };
 };
+
+export const createAuthPersistenceClosedBrowserBoundaryAction = ({
+  baseUrl,
+  blockedMutationRequests,
+  getContextClosed,
+  getFinalUrl,
+  getPageClosed,
+  getPendingRequestCount,
+  navigationHistory,
+  onVerified
+}) => ({
+  name: 'closed_browser_boundary',
+  run: typeof baseUrl !== 'string'
+    ? null
+    : () => {
+      const boundary = assertAuthPersistenceClosedBrowserBoundary({
+        baseUrl,
+        blockedMutationRequests,
+        contextClosed: getContextClosed(),
+        finalUrl: getFinalUrl(),
+        navigationHistory,
+        pageClosed: getPageClosed(),
+        pendingRequestCount: getPendingRequestCount()
+      });
+      onVerified(boundary);
+    }
+});
 
 export const summarizeAuthPersistenceServiceWorkerCoverage = (executionPlan) => ({
   assetVerification: executionPlan.protectedDeployment
@@ -470,16 +510,35 @@ export const measureAuthPersistenceElapsedMs = (
   capturedAt = performance.now()
 ) => Math.max(0, Math.round(capturedAt - runStartedAt));
 
+export const shouldPersistAuthFinalizationFailureEvidence = (failureEvidencePersisted) => (
+  failureEvidencePersisted !== true
+);
+
 export const publishAuthPersistenceSuccessAfterCleanup = async ({
   cleanupErrors,
+  closedBrowserBoundary,
+  failureEvidencePersisted,
+  pendingSummary,
+  persistFailure,
   writeSummary,
   promoteLatest
 }) => {
-  if (cleanupErrors.length > 0) {
+  if (
+    cleanupErrors.length > 0
+    || closedBrowserBoundary === null
+    || failureEvidencePersisted
+    || pendingSummary === null
+    || typeof persistFailure !== 'function'
+  ) {
     return { published: false, promoted: false };
   }
-  await writeSummary();
-  await promoteLatest();
+  try {
+    await writeSummary();
+    await promoteLatest();
+  } catch (error) {
+    await persistFailure(error);
+    throw error;
+  }
   return { published: true, promoted: true };
 };
 
@@ -945,6 +1004,10 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   let resolvedBaseUrl = null;
   let finalBrowserUrl = null;
   let closedBrowserBoundary = null;
+  let contextClosed = false;
+  let browserClosed = false;
+  let previewStopped = false;
+  let failureEvidencePersisted = false;
   const consoleMessages = [];
   const pageErrors = [];
   const failedRequests = [];
@@ -990,6 +1053,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       })
       : {
         capturedAt: new Date().toISOString(),
+        cleanupErrors: [...cleanupErrors],
         currentPhase: failedPhase,
         elapsedMs: measureAuthPersistenceElapsedMs(runStartedAt),
         phaseTimings,
@@ -1013,11 +1077,15 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     await persistAuthPersistenceFailureEvidence({
       outputDir,
       label,
-      evidence,
+      evidence: {
+        cleanupErrors: [...cleanupErrors],
+        ...evidence
+      },
       screenshot: pageAvailable
         ? (path) => page.screenshot({ path, fullPage: true })
         : async () => { throw new Error('page_unavailable'); }
     });
+    failureEvidencePersisted = true;
   };
 
   try {
@@ -1341,12 +1409,13 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   } catch (error) {
     terminalError = error;
   } finally {
-    const failedPhase = currentPhase;
+    const applicationFailurePhase = currentPhase;
+    enterPhase('finalization');
     if (terminalError !== null) {
       cleanupErrors.push(...await settleAuthPersistenceResources([
         {
           name: 'failure_evidence',
-          run: () => persistCurrentFailureEvidence(failedPhase)
+          run: () => persistCurrentFailureEvidence(applicationFailurePhase)
         }
       ]));
     }
@@ -1407,40 +1476,69 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       {
         name: 'final_browser_url_capture',
         run: page === null ? null : () => {
+          if (page.isClosed()) {
+            throw new Error('auth_persistence_final_browser_url_unavailable');
+          }
           finalBrowserUrl = page.url();
         }
       },
       {
         name: 'context_close',
-        run: context === null ? null : () => context.close()
+        run: context === null ? null : async () => {
+          await context.close();
+          contextClosed = true;
+        }
       },
-      {
-        name: 'closed_browser_boundary',
-        run: resolvedBaseUrl === null || finalBrowserUrl === null
-          ? null
-          : () => {
-            closedBrowserBoundary = assertAuthPersistenceClosedBrowserBoundary({
-              baseUrl: resolvedBaseUrl,
-              blockedMutationRequests,
-              finalUrl: finalBrowserUrl,
-              navigationHistory
-            });
-          }
-      },
+      createAuthPersistenceClosedBrowserBoundaryAction({
+        baseUrl: resolvedBaseUrl,
+        blockedMutationRequests,
+        getContextClosed: () => contextClosed,
+        getFinalUrl: () => finalBrowserUrl,
+        getPageClosed: () => page?.isClosed() === true,
+        getPendingRequestCount: () => pendingRequests.size,
+        navigationHistory,
+        onVerified: (boundary) => {
+          closedBrowserBoundary = boundary;
+        }
+      }),
       {
         name: 'browser_close',
-        run: browser === null ? null : () => browser.close()
+        run: browser === null ? null : async () => {
+          await browser.close();
+          browserClosed = true;
+        }
       },
       {
         name: 'preview_stop',
-        run: preview?.child ? () => stopPreviewServer(preview.child) : null
+        run: preview?.child
+          ? async () => {
+            await stopPreviewServer(preview.child);
+            previewStopped = true;
+          }
+          : null
+      },
+      {
+        name: 'success_preconditions',
+        run: terminalError === null
+          ? () => {
+            if (pendingSummary === null) {
+              throw new Error('auth_persistence_summary_unavailable');
+            }
+            if (closedBrowserBoundary === null) {
+              throw new Error('auth_persistence_closed_browser_boundary_unavailable');
+            }
+            if (!contextClosed || !browserClosed || (preview?.child && !previewStopped)) {
+              throw new Error('auth_persistence_resource_shutdown_incomplete');
+            }
+          }
+          : null
       }
     ]));
     if (cleanupErrors.length > 0) {
       const cleanupFailure = {
         schema: 'mazer.live-auth-persistence-cleanup-failure.v1',
         capturedAt: new Date().toISOString(),
-        currentPhase: failedPhase,
+        currentPhase: 'finalization',
         elapsedMs: measureAuthPersistenceElapsedMs(runStartedAt),
         cleanupErrors,
         fixtureSettingsCleanup
@@ -1452,40 +1550,54 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
           error instanceof Error ? error.message : String(error)
         )}`);
       }
-      if (terminalError instanceof Error) {
-        terminalError.cleanupErrors = cleanupErrors;
-      } else {
+      if (!(terminalError instanceof Error)) {
         terminalError = new AggregateError(
           cleanupErrors.map((message) => new Error(message)),
-          'auth_persistence_cleanup_failed'
+          'auth_persistence_finalization_failed'
         );
-        cleanupErrors.push(...await settleAuthPersistenceResources([
-          {
-            name: 'failure_evidence',
-            run: () => persistCurrentFailureEvidence(failedPhase)
-          }
-        ]));
       }
+      terminalError.cleanupErrors = cleanupErrors;
+      cleanupErrors.push(...await settleAuthPersistenceResources([
+        {
+          name: 'failure_evidence',
+          run: shouldPersistAuthFinalizationFailureEvidence(failureEvidencePersisted)
+            ? () => persistCurrentFailureEvidence('finalization')
+            : null
+        }
+      ]));
     }
   }
 
   if (terminalError !== null) {
     throw terminalError;
   }
-  if (pendingSummary === null) {
-    throw new Error('auth_persistence_summary_unavailable');
-  }
-  if (closedBrowserBoundary === null) {
-    throw new Error('auth_persistence_closed_browser_boundary_unavailable');
-  }
 
   pendingSummary.fixtureSettings.cleanup = fixtureSettingsCleanup;
   pendingSummary.transport.closedBrowserBoundary = closedBrowserBoundary;
-  await publishAuthPersistenceSuccessAfterCleanup({
-    cleanupErrors,
-    writeSummary: () => writeFile(summaryPath, `${JSON.stringify(pendingSummary, null, 2)}\n`, 'utf8'),
-    promoteLatest: () => copyFile(summaryPath, latestSummaryPath)
-  });
+  enterPhase('success-publication');
+  try {
+    const publication = await publishAuthPersistenceSuccessAfterCleanup({
+      cleanupErrors,
+      closedBrowserBoundary,
+      failureEvidencePersisted,
+      pendingSummary,
+      persistFailure: async (error) => {
+        terminalError = error;
+        await persistCurrentFailureEvidence('success-publication');
+      },
+      writeSummary: () => writeFile(summaryPath, `${JSON.stringify(pendingSummary, null, 2)}\n`, 'utf8'),
+      promoteLatest: () => copyFile(summaryPath, latestSummaryPath)
+    });
+    if (!publication.published || !publication.promoted) {
+      throw new Error('auth_persistence_success_publication_not_admitted');
+    }
+  } catch (error) {
+    terminalError = error;
+    if (!failureEvidencePersisted) {
+      await persistCurrentFailureEvidence('success-publication');
+    }
+    throw terminalError;
+  }
   return { ...pendingSummary, summaryPath };
 };
 
