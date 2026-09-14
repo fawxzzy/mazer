@@ -1858,7 +1858,9 @@ export const summarizeGoalTimerFreeze = (
     firstSample
     && firstSample.frozen === true
     && Number.isFinite(firstSample.completedAtMs)
+    && firstSample.completedAtMs >= 0
     && Number.isFinite(firstSample.elapsedMs)
+    && firstSample.elapsedMs >= 0
   );
   const sameGoalHoldTimerStable = Boolean(
     sameGoalHold

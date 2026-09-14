@@ -1361,6 +1361,16 @@ describe('live play QA script helpers', () => {
       { completedAtMs: null, elapsedMs: 0, frozen: false },
       { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'deconstructing' }
     ).pass).toBe(false);
+    expect(summarizeGoalTimerFreeze(
+      { completedAtMs: -1, elapsedMs: 8_420, frozen: true },
+      { completedAtMs: -1, elapsedMs: 0, frozen: true },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'deconstructing' }
+    ).pass).toBe(false);
+    expect(summarizeGoalTimerFreeze(
+      { completedAtMs: 18_420, elapsedMs: -1, frozen: true },
+      { completedAtMs: 18_420, elapsedMs: 0, frozen: true },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'deconstructing' }
+    ).pass).toBe(false);
   });
 
 
