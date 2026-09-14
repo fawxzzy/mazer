@@ -10485,7 +10485,7 @@ export class MenuScene extends Phaser.Scene {
   // same menuStaticDrawLifecyclePhase transition, so this needs no mode
   // branch of its own beyond picking which track's level to show.
   private drawLegacyLevelAnnouncer(time: number): void {
-    const { alpha, scale } = this.resolveLegacyLevelAnnouncerVisualState(time);
+    const { alpha, scale, revealProgress } = this.resolveLegacyLevelAnnouncerVisualState(time);
     this.levelAnnouncerLabelText.setVisible(false);
     if (alpha <= 0) {
       this.levelAnnouncerNumberGraphics.setVisible(false);
@@ -10511,14 +10511,22 @@ export class MenuScene extends Phaser.Scene {
     // maze itself, the title, and Start/Login are all built from, not the
     // raster tile-font atlas (a pre-drawn glyph image merely cropped into
     // sub-tile chunks -- never actually made of discrete square tiles).
-    // revealProgress isn't threaded through here: this banner's own fade
-    // envelope (`alpha`, applied to the whole Graphics object below) already
-    // covers its in/out, and it's a short between-mazes flash rather than a
-    // tile-by-tile build.
+    // Bug fix: revealProgress was computed by resolveLegacyLevelAnnouncerVisualState
+    // (its own fade-in window) but never actually passed down to the glyph
+    // renderer -- drawLegacyLevelAnnouncerNumberGlyph hardcoded a full,
+    // instant reveal, so the number always just faded in as one flat block
+    // (via the whole-Graphics alpha below) instead of building tile-by-tile
+    // the way the title/Start/Login words next to it do. Reported directly:
+    // "is the level tiles not building out the number like it does for
+    // title text tiles". Threading the same revealProgress this banner
+    // already computes for its own fade timing through to the shared
+    // tile-block renderer is the same wiring the title's own call site
+    // already uses (this.resolveLegacyMenuPathTitleProgress()) -- no new
+    // reveal math, just no longer discarding the value already computed.
     this.levelAnnouncerNumberGlyphPool.forEach((image) => image.setVisible(false));
     const cellSize = Math.max(2, Math.round(numberFontSize / 9));
     const glyphLayout = resolveLegacyGlyphWordLayout(levelDigits, 0, 0, cellSize);
-    this.drawLegacyLevelAnnouncerNumberGlyph(this.levelAnnouncerNumberGraphics, glyphLayout, time);
+    this.drawLegacyLevelAnnouncerNumberGlyph(this.levelAnnouncerNumberGraphics, glyphLayout, time, revealProgress);
     this.levelAnnouncerNumberGraphics
       .setPosition(centerX, centerY)
       .setScale(scale)
@@ -10619,9 +10627,14 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyLevelAnnouncerNumberGlyph(
     graphics: Phaser.GameObjects.Graphics,
     layout: LegacyGlyphWordLayout,
-    time: number
+    time: number,
+    revealProgress: number = 1
   ): void {
-    this.drawLegacyGlyphWordTileBlock(graphics, layout, time, 1);
+    this.drawLegacyGlyphWordTileBlock(graphics, layout, time, 1, revealProgress);
+    // Matches the title's own call site (drawn unconditionally alongside its
+    // tile-block build, not gated on reveal completion) -- the sparkles are a
+    // constant ambient accent independent of how much of the word has
+    // dropped in yet.
     this.drawLegacyWordmarkAmbientSparkles(graphics, layout.left + (layout.width / 2), 0, layout.width / 2, layout.height / 2, time, 1);
   }
 
