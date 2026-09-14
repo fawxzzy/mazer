@@ -1,7 +1,14 @@
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import {
+  captureLivePlayQaFailureEvidence,
+  isLivePlayDiagnosticsReady,
+  measureLivePlayQaElapsedMs,
   normalizeLivePlayInputMethod,
+  persistLivePlayQaFailureEvidence,
   resolveLivePlayBrowserContextOptions,
   resolveLivePlayLifecycleSnapshot,
   resolveArrowPointForMove,
@@ -19,6 +26,114 @@ import {
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
+  test('requires the exact QA move surface before diagnostics readiness can pass', () => {
+    const readyState = {
+      runtime: {
+        surface: { mode: 'play' },
+        generation: {
+          drawStage: {
+            buildPrerollActive: false,
+            complete: true,
+            lifecyclePhase: 'settled'
+          }
+        },
+        play: { playtest: { encoding: 'walkable-rows-v1' } }
+      },
+      visual: { touchControls: { visible: true } }
+    };
+
+    expect(isLivePlayDiagnosticsReady({ ...readyState, qaMoveAvailable: false })).toBe(false);
+    expect(isLivePlayDiagnosticsReady({ ...readyState, qaMoveAvailable: true })).toBe(true);
+    expect(isLivePlayDiagnosticsReady({
+      ...readyState,
+      qaMoveAvailable: true,
+      runtime: {
+        ...readyState.runtime,
+        generation: { drawStage: { complete: false, lifecyclePhase: 'building' } }
+      }
+    })).toBe(false);
+  });
+
+  test('measures failure time at evidence capture instead of phase entry', () => {
+    expect(measureLivePlayQaElapsedMs(100, 850)).toBe(750);
+    expect(measureLivePlayQaElapsedMs(850, 100)).toBe(0);
+  });
+
+  test('persists finally-safe initial-timeout evidence with a sanitized page snapshot', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mazer-live-play-qa-'));
+    try {
+      const page = {
+        isClosed: () => false,
+        evaluate: async () => ({
+          url: 'https://mazer.example.test/?token=secret&runtimeDiagnostics=1',
+          title: 'Mazer',
+          document: { readyState: 'complete', visibilityState: 'visible' },
+          canvas: { height: 900, width: 1440, visible: true },
+          controls: [{ ariaLabel: 'Start', tag: 'button', text: 'Start', type: null }],
+          runtime: { surface: { mode: 'play' } },
+          visual: { runtime: { mode: 'play', overlay: 'none' } },
+          qa: { present: false, movePlayPlayerCallable: false },
+          serviceWorker: { cacheNames: ['workbox-precache-v2-test'], controllerScriptUrl: 'https://mazer.example.test/sw.js?token=secret' }
+        }),
+        screenshot: async ({ path }) => writeFile(path, 'png', 'utf8')
+      };
+
+      const artifact = await captureLivePlayQaFailureEvidence({
+        browserContextOptions: { hasTouch: false, isMobile: false, viewport: { width: 1440, height: 900 } },
+        consoleMessages: ['user@example.test failed token=secret'],
+        error: new Error('page.waitForFunction: Timeout 90000ms exceeded token=secret'),
+        failedRequests: [{ method: 'GET', url: 'https://mazer.example.test/api?token=<redacted>' }],
+        label: 'desktop-timeout',
+        outputDir: root,
+        page,
+        pageErrors: ['Bearer abc.def.ghi'],
+        pendingRequests: new Map([['request', { method: 'GET', url: 'https://mazer.example.test/pending?key=<redacted>' }]]),
+        phase: 'readiness',
+        phaseTimings: [{ phase: 'readiness', elapsedMs: 12 }],
+        runStartedAt: performance.now() - 100,
+        targetUrl: 'https://mazer.example.test/?runtimeDiagnostics=1&authFixture=authenticated',
+        viewport: { width: 1440, height: 900 }
+      });
+
+      const evidence = JSON.parse(await readFile(artifact.evidencePath, 'utf8'));
+      expect(evidence).toMatchObject({
+        schema: 'mazer.live-play-qa-failure.v1',
+        phase: 'readiness',
+        page: {
+          qa: { movePlayPlayerCallable: false, present: false },
+          url: 'https://mazer.example.test/?runtimeDiagnostics=<redacted>&token=<redacted>'
+        }
+      });
+      expect(evidence.elapsedMs).toBeGreaterThanOrEqual(100);
+      expect(evidence.error).not.toContain('token=secret');
+      expect(evidence.consoleMessages).toEqual(['<redacted-email> failed token=<redacted>']);
+      expect(evidence.artifacts.screenshotPath).toBe(artifact.screenshotPath);
+      expect(await readFile(artifact.screenshotPath, 'utf8')).toBe('png');
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test('retains failure JSON when screenshot capture itself fails', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mazer-live-play-qa-'));
+    try {
+      const artifact = await persistLivePlayQaFailureEvidence({
+        evidence: { phase: 'navigation' },
+        label: 'navigation-error',
+        outputDir: root,
+        screenshot: async () => { throw new Error('page closed'); }
+      });
+      const evidence = JSON.parse(await readFile(artifact.evidencePath, 'utf8'));
+      expect(artifact.screenshotPath).toBeNull();
+      expect(evidence.artifacts).toMatchObject({
+        screenshotError: 'page closed',
+        screenshotPath: null
+      });
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test('uses a touch-capable mobile context by default and permits explicit desktop proof', () => {
     expect(resolveLivePlayBrowserContextOptions({
       viewport: { width: 405, height: 958 }
