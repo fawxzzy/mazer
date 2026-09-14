@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 
 import {
   appendLivePlayQaCleanupEvidence,
@@ -43,9 +44,10 @@ import {
 
 describe('live play QA script helpers', () => {
   const productionRoute = '/?content=core-only&mode=play&theme=aurora&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=1735707242';
-  const productionContract = () => resolveLivePlayProductionAcceptanceContract({
+  const productionContract = (expectedObservedSeed = 1735707243) => resolveLivePlayProductionAcceptanceContract({
     baseUrl: 'https://mazer.example.test/',
     enabled: true,
+    expectedObservedSeed,
     route: productionRoute,
     useExistingServer: true
   });
@@ -55,6 +57,7 @@ describe('live play QA script helpers', () => {
       enabled: true,
       expectedOrigin: 'https://mazer.example.test',
       expectedObservedSeed: 1735707243,
+      expectedObservedSeedSource: 'runtime-random',
       expectedPathname: '/',
       fixtureMode: 'authenticated',
       requestedSeed: 1735707242
@@ -78,6 +81,7 @@ describe('live play QA script helpers', () => {
       expect(() => resolveLivePlayProductionAcceptanceContract({
         baseUrl: 'https://mazer.example.test/',
         enabled: true,
+        expectedObservedSeed: 7,
         route,
         useExistingServer: true
       })).toThrow(error);
@@ -85,9 +89,19 @@ describe('live play QA script helpers', () => {
     expect(() => resolveLivePlayProductionAcceptanceContract({
       baseUrl: 'https://mazer.example.test/',
       enabled: true,
+      expectedObservedSeed: 1735707243,
       route: productionRoute,
       useExistingServer: false
     })).toThrow('live_play_production_existing_server_required');
+    expect(() => resolveLivePlayProductionAcceptanceContract({
+      baseUrl: 'https://mazer.example.test/',
+      enabled: true,
+      route: productionRoute,
+      useExistingServer: true
+    })).toThrow('live_play_production_expected_observed_seed_required');
+    expect(() => productionContract('random')).toThrow(
+      'live_play_production_expected_observed_seed_malformed'
+    );
 
     const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
     const contractIndex = scriptSource.indexOf('const productionAcceptanceContract = resolveLivePlayProductionAcceptanceContract');
@@ -151,11 +165,28 @@ describe('live play QA script helpers', () => {
         ...readyDiagnostics,
         runtime: {
           ...readyDiagnostics.runtime,
-          generation: { ...readyDiagnostics.runtime.generation, maze: { seed: 99 } }
+          generation: {
+            ...readyDiagnostics.runtime.generation,
+            maze: { seed: 99, seedSource: 'runtime-random' }
+          }
         }
       },
       qaMoveAvailable: true
     })).toEqual({ state: 'rejected', reason: 'live_play_production_observed_seed_drift' });
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: {
+        ...readyDiagnostics,
+        runtime: {
+          ...readyDiagnostics.runtime,
+          generation: {
+            ...readyDiagnostics.runtime.generation,
+            maze: { seed: 1735707243, seedSource: 'query' }
+          }
+        }
+      },
+      qaMoveAvailable: true
+    })).toEqual({ state: 'rejected', reason: 'live_play_production_observed_seed_source_drift' });
     expect(classifyLivePlayProductionReadiness({
       contract,
       diagnostics: {
@@ -183,6 +214,8 @@ describe('live play QA script helpers', () => {
     });
     expect(artifactContract).toEqual({
       enabled: true,
+      expectedObservedSeed: 1735707243,
+      expectedObservedSeedSource: 'runtime-random',
       fixtureMode: 'authenticated',
       observedFixtureMode: 'authenticated',
       observedSeed: 1735707243,
@@ -196,6 +229,37 @@ describe('live play QA script helpers', () => {
       }
     });
     expect(JSON.stringify(artifactContract)).not.toContain('?');
+  });
+
+  test('accepts the selector-owned observed seed instead of assuming a fixed offset', () => {
+    const requestedSeed = 3749;
+    const selected = createLegacyRuntimeMazeForMode('play', 50, requestedSeed, null, {
+      candidateCount: 3,
+      targetComplexity: 64
+    });
+    const contract = resolveLivePlayProductionAcceptanceContract({
+      baseUrl: 'https://mazer.example.test/',
+      enabled: true,
+      expectedObservedSeed: selected.seed,
+      route: `/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=${requestedSeed}`,
+      useExistingServer: true
+    });
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: {
+        runtime: {
+          auth: { status: 'authenticated' },
+          surface: { mode: 'play' },
+          generation: {
+            drawStage: { buildPrerollActive: false, complete: true, lifecyclePhase: 'settled' },
+            maze: { seed: selected.seed, seedSource: 'runtime-random' }
+          },
+          play: { playtest: { encoding: 'walkable-rows-v1' } }
+        },
+        visual: { touchControls: { visible: true } }
+      },
+      qaMoveAvailable: true
+    })).toEqual({ state: 'ready', reason: null });
   });
 
   test('accepts only the exact protected-deployment bypass cookie and rejects login redirects', async () => {
@@ -550,6 +614,8 @@ describe('live play QA script helpers', () => {
         phase: 'readiness',
         productionAcceptance: {
           enabled: true,
+          expectedObservedSeed: 1735707243,
+          expectedObservedSeedSource: 'runtime-random',
           fixtureMode: 'authenticated',
           observedFixtureMode: null,
           observedSeed: null,

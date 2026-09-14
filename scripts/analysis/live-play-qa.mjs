@@ -37,6 +37,7 @@ const DEFAULT_SERVICE_WORKER_STABILIZATION_QUIET_MS = 250;
 const SERVICE_WORKER_STABILIZATION_PROBE_GLOBAL = '__MAZER_LIVE_PLAY_QA_SW_STABILIZATION__';
 const SERVICE_WORKER_STABILIZATION_PROBE_STORAGE_KEY = 'mazer.live-play-qa.sw-stabilization.v1';
 const PRODUCTION_AUTH_FIXTURE = 'authenticated';
+const PRODUCTION_PLAY_SEED_SOURCE = 'runtime-random';
 const MAX_LEGACY_RUNTIME_SEED = 0xffffffff;
 const PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9-]+-fawxzzy\.vercel\.app$/u;
 
@@ -70,6 +71,7 @@ const readSingleQueryValue = (url, key, errorCode) => {
 export const resolveLivePlayProductionAcceptanceContract = ({
   baseUrl,
   enabled = false,
+  expectedObservedSeed,
   route,
   useExistingServer = false
 }) => {
@@ -111,11 +113,26 @@ export const resolveLivePlayProductionAcceptanceContract = ({
   if (!Number.isSafeInteger(requestedSeed) || requestedSeed > MAX_LEGACY_RUNTIME_SEED) {
     throw new Error('live_play_production_seed_malformed');
   }
+  if (expectedObservedSeed === undefined || expectedObservedSeed === null || expectedObservedSeed === '') {
+    throw new Error('live_play_production_expected_observed_seed_required');
+  }
+  const rawExpectedObservedSeed = String(expectedObservedSeed);
+  if (!/^\d+$/u.test(rawExpectedObservedSeed)) {
+    throw new Error('live_play_production_expected_observed_seed_malformed');
+  }
+  const normalizedExpectedObservedSeed = Number(rawExpectedObservedSeed);
+  if (
+    !Number.isSafeInteger(normalizedExpectedObservedSeed)
+    || normalizedExpectedObservedSeed > MAX_LEGACY_RUNTIME_SEED
+  ) {
+    throw new Error('live_play_production_expected_observed_seed_malformed');
+  }
 
   return Object.freeze({
     enabled: true,
     expectedOrigin: base.origin,
-    expectedObservedSeed: (requestedSeed + 1) >>> 0,
+    expectedObservedSeed: normalizedExpectedObservedSeed,
+    expectedObservedSeedSource: PRODUCTION_PLAY_SEED_SOURCE,
     expectedPathname: '/',
     fixtureMode,
     requestedSeed
@@ -165,6 +182,10 @@ export const classifyLivePlayProductionReadiness = ({
     return { state: 'rejected', reason: 'live_play_production_auth_fixture_state_drift' };
   }
   const observedSeed = runtime?.generation?.maze?.seed ?? null;
+  const observedSeedSource = runtime?.generation?.maze?.seedSource ?? null;
+  if (surfaceMode === 'play' && observedSeedSource !== contract.expectedObservedSeedSource) {
+    return { state: 'rejected', reason: 'live_play_production_observed_seed_source_drift' };
+  }
   if (surfaceMode === 'play' && observedSeed !== contract.expectedObservedSeed) {
     return { state: 'rejected', reason: 'live_play_production_observed_seed_drift' };
   }
@@ -177,6 +198,8 @@ export const classifyLivePlayProductionReadiness = ({
 export const createLivePlayProductionArtifactContract = (contract, diagnostics = null) => contract
   ? {
       enabled: true,
+      expectedObservedSeed: contract.expectedObservedSeed,
+      expectedObservedSeedSource: contract.expectedObservedSeedSource,
       fixtureMode: contract.fixtureMode,
       observedFixtureMode: diagnostics?.runtime?.auth?.status ?? null,
       observedSeed: diagnostics?.runtime?.generation?.maze?.seed ?? null,
@@ -1590,6 +1613,7 @@ export const runLivePlayQa = async (options = {}) => {
   const productionAcceptanceContract = resolveLivePlayProductionAcceptanceContract({
     baseUrl,
     enabled: options.productionAcceptance === true,
+    expectedObservedSeed: options.expectedObservedSeed,
     route,
     useExistingServer: options.useExistingServer === true
   });
@@ -2143,6 +2167,7 @@ if (isDirectRun) {
       : 0.42,
     inputMethod: normalizeLivePlayInputMethod(rawInputMethod),
     isMobile: args.mobile === undefined ? true : isTruthy(args.mobile),
+    expectedObservedSeed: args.expectedObservedSeed ?? args['expected-observed-seed'],
     productionAcceptance: isTruthy(args.productionAcceptance ?? args['production-acceptance']),
     protectedDeployment: isTruthy(args.protectedDeployment ?? args['protected-deployment']),
     protectionBypass: process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
