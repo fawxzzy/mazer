@@ -76,14 +76,21 @@ const readSingleQueryValue = (url, key, errorCode) => {
   return values[0];
 };
 
-const normalizeLivePlayDeploymentUrl = (value) => {
+const normalizeLivePlayDeploymentUrl = (
+  value,
+  errorCode = 'live_play_production_deployment_url_invalid'
+) => {
   const url = new URL(value);
-  if (url.protocol !== 'https:' || url.username || url.password) {
-    throw new Error('live_play_production_deployment_url_invalid');
+  if (
+    url.protocol !== 'https:'
+    || url.username
+    || url.password
+    || url.pathname !== '/'
+    || url.search
+    || url.hash
+  ) {
+    throw new Error(errorCode);
   }
-  url.pathname = '/';
-  url.search = '';
-  url.hash = '';
   return url.toString();
 };
 
@@ -139,14 +146,17 @@ export const resolveLivePlayProductionDeploymentIdentity = ({
   if (!IMMUTABLE_PROTECTED_DEPLOYMENT_HOST_PATTERN.test(deploymentHost)) {
     throw new Error('live_play_production_immutable_deployment_url_required');
   }
-  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  const normalizedBaseUrl = normalizeLivePlayDeploymentUrl(
+    baseUrl,
+    'live_play_production_base_url_invalid'
+  );
   const base = new URL(normalizedBaseUrl);
   const providerUrl = typeof providerDeployment?.url === 'string'
     ? normalizeLivePlayDeploymentUrl(`https://${providerDeployment.url}`)
     : null;
   const providerSourceCommit = providerDeployment?.gitSource?.sha
     ?? providerDeployment?.meta?.githubCommitSha;
-  const baseTargetsDeployment = base.origin === new URL(normalizedDeploymentUrl).origin;
+  const baseTargetsDeployment = normalizedBaseUrl === normalizedDeploymentUrl;
   if (
     providerDeployment?.id !== deploymentId
     || providerUrl !== normalizedDeploymentUrl

@@ -166,6 +166,18 @@ describe('live play QA script helpers', () => {
       ...deploymentIdentity,
       providerDeployment: providerDeploymentIdentity
     })).toThrow('live_play_production_provider_identity_mismatch');
+    for (const unsafeBaseUrl of [
+      'https://user:password@fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app/',
+      'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app/wrong/path',
+      'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app/?token=secret',
+      'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app/#fragment'
+    ]) {
+      expect(() => resolveLivePlayProductionDeploymentIdentity({
+        baseUrl: unsafeBaseUrl,
+        ...deploymentIdentity,
+        providerDeployment: providerDeploymentIdentity
+      })).toThrow('live_play_production_base_url_invalid');
+    }
     expect(() => resolveLivePlayProductionDeploymentIdentity({
       baseUrl: 'https://mazer.fawxzzy.com/',
       ...deploymentIdentity,
