@@ -2327,6 +2327,12 @@ export const runLivePlayQa = async (options = {}) => {
   }
   enterPhase('success-pointer-promotion');
   try {
+    assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: productionAcceptanceContract,
+      providerDeployment: process.env.NODE_ENV === 'test'
+        ? options.finalProviderDeploymentIdentity
+        : undefined
+    });
     await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'));
   } catch (error) {
     try {
