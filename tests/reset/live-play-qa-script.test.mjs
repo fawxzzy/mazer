@@ -58,6 +58,7 @@ describe('live play QA script helpers', () => {
       initialNavigationCount: 0,
       page,
       quietMs: 0,
+      serviceWorkerAvailable: true,
       targetUrl: 'https://mazer.example.test/?runtimeDiagnostics=1',
       timeoutMs: 100,
       tracker,
@@ -85,14 +86,16 @@ describe('live play QA script helpers', () => {
     expect(tracker.snapshot()).toMatchObject({ stabilized: true, unexpectedNavigation: null });
   });
 
-  test('expects a service-worker reload only for non-loopback HTTPS targets', () => {
-    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://127.0.0.1:4173/')).toBe(0);
-    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://localhost:4173/')).toBe(0);
-    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://192.168.1.20:4173/')).toBe(0);
-    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://mazer.example.test/')).toBe(0);
-    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://localhost:4173/')).toBe(0);
-    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://[::1]:4173/')).toBe(1);
-    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://mazer.example.test/')).toBe(1);
+  test('matches actual service-worker exposure and the application localhost predicate', () => {
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://127.0.0.1:4173/', true)).toBe(0);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://localhost:4173/', true)).toBe(0);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://192.168.1.20:4173/', false)).toBe(0);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://mazer.example.test/', false)).toBe(0);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://localhost:4173/', true)).toBe(0);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://[::1]:4173/', true)).toBe(1);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://[::1]:4173/', true)).toBe(1);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://mazer.example.test/', true)).toBe(1);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://mazer.example.test/', false)).toBe(0);
   });
 
   test('fails closed when navigation occurs after movement begins', () => {
@@ -122,6 +125,7 @@ describe('live play QA script helpers', () => {
       initialNavigationCount: 0,
       page,
       quietMs: 0,
+      serviceWorkerAvailable: true,
       targetUrl: 'https://mazer.example.test/',
       timeoutMs: 100,
       tracker,
@@ -142,6 +146,7 @@ describe('live play QA script helpers', () => {
       initialNavigationCount: 0,
       page: {},
       quietMs: 0,
+      serviceWorkerAvailable: true,
       targetUrl: 'https://mazer.example.test/',
       timeoutMs: 1,
       tracker,
@@ -157,6 +162,7 @@ describe('live play QA script helpers', () => {
       initialNavigationCount: 0,
       page: {},
       quietMs: 0,
+      serviceWorkerAvailable: true,
       targetUrl: 'https://mazer.example.test/',
       timeoutMs: 100,
       tracker,

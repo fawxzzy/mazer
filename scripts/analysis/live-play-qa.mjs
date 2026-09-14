@@ -125,10 +125,10 @@ export const sanitizeLivePlayQaDiagnosticValue = (value) => {
   return value;
 };
 
-export const resolveLivePlayQaExpectedServiceWorkerReloadCount = (targetUrl) => {
+export const resolveLivePlayQaExpectedServiceWorkerReloadCount = (targetUrl, serviceWorkerAvailable) => {
   const url = new URL(targetUrl);
   const isRuntimeLocalhost = ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
-  return url.protocol === 'https:' && !isRuntimeLocalhost ? 1 : 0;
+  return serviceWorkerAvailable === true && !isRuntimeLocalhost ? 1 : 0;
 };
 
 export const installLivePlayQaServiceWorkerStabilizationProbe = async (page) => page.addInitScript(({
@@ -247,12 +247,19 @@ export const settleLivePlayQaServiceWorkerNavigation = async ({
   initialNavigationCount,
   page,
   quietMs = DEFAULT_SERVICE_WORKER_STABILIZATION_QUIET_MS,
+  serviceWorkerAvailable,
   targetUrl,
   timeoutMs,
   tracker,
   wait = sleep
 }) => {
-  const expectedReloadCount = resolveLivePlayQaExpectedServiceWorkerReloadCount(targetUrl);
+  const browserExposesServiceWorker = typeof serviceWorkerAvailable === 'boolean'
+    ? serviceWorkerAvailable
+    : await page.evaluate(() => Boolean(navigator.serviceWorker));
+  const expectedReloadCount = resolveLivePlayQaExpectedServiceWorkerReloadCount(
+    targetUrl,
+    browserExposesServiceWorker
+  );
   const expectedNavigationCount = initialNavigationCount + 1 + expectedReloadCount;
   const startedAt = performance.now();
   const remainingTimeoutMs = () => Math.max(1, timeoutMs - (performance.now() - startedAt));
