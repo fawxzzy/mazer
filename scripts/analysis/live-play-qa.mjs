@@ -34,6 +34,8 @@ const DEFAULT_POST_GOAL_TIMEOUT_MS = 30_000;
 const DEFAULT_POST_GOAL_POLL_MS = 80;
 const DEFAULT_INPUT_METHOD = 'qa';
 const DEFAULT_SERVICE_WORKER_STABILIZATION_QUIET_MS = 250;
+const SERVICE_WORKER_STABILIZATION_PROBE_GLOBAL = '__MAZER_LIVE_PLAY_QA_SW_STABILIZATION__';
+const SERVICE_WORKER_STABILIZATION_PROBE_STORAGE_KEY = 'mazer.live-play-qa.sw-stabilization.v1';
 
 export const MOVE_DELTAS = Object.freeze({
   move_up: Object.freeze({ dx: 0, dy: -1 }),
@@ -128,8 +130,58 @@ export const resolveLivePlayQaExpectedServiceWorkerReloadCount = (targetUrl) => 
   return ['localhost', '127.0.0.1', '::1'].includes(hostname) ? 0 : 1;
 };
 
+export const installLivePlayQaServiceWorkerStabilizationProbe = async (page) => page.addInitScript(({
+  globalName,
+  storageKey
+}) => {
+  const readState = () => {
+    try {
+      return JSON.parse(sessionStorage.getItem(storageKey) ?? '{}');
+    } catch {
+      return {};
+    }
+  };
+  const writeState = (state) => {
+    window[globalName] = state;
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(state));
+    } catch {
+      // A blocked session store leaves the probe incomplete and the harness fails closed.
+    }
+  };
+  const previous = readState();
+  const navigationType = performance.getEntriesByType('navigation')[0]?.type ?? 'unknown';
+  const sameUrl = previous.pendingControllerChange === true
+    && previous.controllerChangeUrl === location.href;
+  const correlatedReload = sameUrl && navigationType === 'reload';
+  const state = {
+    bootCount: (previous.bootCount ?? 0) + 1,
+    controllerChangeCount: previous.controllerChangeCount ?? 0,
+    correlatedReloadCount: (previous.correlatedReloadCount ?? 0) + (correlatedReload ? 1 : 0),
+    lastNavigationType: navigationType,
+    lastReloadMatchedControllerChange: correlatedReload,
+    pendingControllerChange: false,
+    controllerChangeUrl: null
+  };
+  writeState(state);
+
+  navigator.serviceWorker?.addEventListener('controllerchange', () => {
+    const current = readState();
+    writeState({
+      ...current,
+      controllerChangeCount: (current.controllerChangeCount ?? 0) + 1,
+      pendingControllerChange: true,
+      controllerChangeUrl: location.href
+    });
+  });
+}, {
+  globalName: SERVICE_WORKER_STABILIZATION_PROBE_GLOBAL,
+  storageKey: SERVICE_WORKER_STABILIZATION_PROBE_STORAGE_KEY
+});
+
 export const createLivePlayQaNavigationTracker = () => {
   const mainFrameNavigations = [];
+  const mainFrameDestinationKeys = [];
   let stabilized = false;
   let movementStarted = false;
   let unexpectedNavigation = null;
@@ -145,6 +197,7 @@ export const createLivePlayQaNavigationTracker = () => {
         url: sanitizeLivePlayQaDiagnosticUrl(url)
       };
       mainFrameNavigations.push(navigation);
+      mainFrameDestinationKeys.push(String(url));
       if (stabilized && unexpectedNavigation === null) {
         unexpectedNavigation = navigation;
       }
@@ -155,6 +208,9 @@ export const createLivePlayQaNavigationTracker = () => {
     },
     markMovementStarted() {
       movementStarted = true;
+    },
+    destinationsMatch(leftIndex, rightIndex) {
+      return mainFrameDestinationKeys[leftIndex] === mainFrameDestinationKeys[rightIndex];
     },
     snapshot() {
       return {
@@ -225,12 +281,44 @@ export const settleLivePlayQaServiceWorkerNavigation = async ({
   if (settledNavigationCount !== expectedNavigationCount) {
     throw new Error('live_play_unexpected_navigation_during_service_worker_stabilization');
   }
+  if (
+    expectedReloadCount === 1
+    && !tracker.destinationsMatch(expectedNavigationCount - 2, expectedNavigationCount - 1)
+  ) {
+    throw new Error('live_play_service_worker_reload_destination_drift');
+  }
+
+  let serviceWorkerProbe = null;
+  if (expectedReloadCount === 1) {
+    serviceWorkerProbe = await page.evaluate((globalName) => {
+      const state = window[globalName];
+      return state
+        ? {
+            controllerChangeCount: state.controllerChangeCount ?? 0,
+            correlatedReloadCount: state.correlatedReloadCount ?? 0,
+            lastNavigationType: state.lastNavigationType ?? 'unknown',
+            lastReloadMatchedControllerChange: state.lastReloadMatchedControllerChange === true,
+            pendingControllerChange: state.pendingControllerChange === true
+          }
+        : null;
+    }, SERVICE_WORKER_STABILIZATION_PROBE_GLOBAL);
+    if (
+      serviceWorkerProbe?.controllerChangeCount !== 1
+      || serviceWorkerProbe.correlatedReloadCount !== 1
+      || serviceWorkerProbe.lastNavigationType !== 'reload'
+      || serviceWorkerProbe.lastReloadMatchedControllerChange !== true
+      || serviceWorkerProbe.pendingControllerChange !== false
+    ) {
+      throw new Error('live_play_service_worker_controller_reload_proof_failed');
+    }
+  }
 
   tracker.markStabilized();
   return {
     expectedReloadCount,
     mainFrameNavigationCount: settledNavigationCount,
-    pass: true
+    pass: true,
+    serviceWorkerProbe
   };
 };
 
@@ -1335,6 +1423,7 @@ export const runLivePlayQa = async (options = {}) => {
     browser = await chromium.launch({ headless: options.headless !== false });
     context = await browser.newContext(browserContextOptions);
     page = await context.newPage();
+    await installLivePlayQaServiceWorkerStabilizationProbe(page);
     navigationTracker = createLivePlayQaNavigationTracker();
     page.on('framenavigated', (frame) => navigationTracker.record({
       isMainFrame: frame === page.mainFrame(),
@@ -1631,6 +1720,7 @@ export const runLivePlayQa = async (options = {}) => {
     assertLivePlayQaNavigationStable(navigationTracker);
     await writeFile(summary.artifacts.summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
     await writeFile(summary.artifacts.stepsPath, `${JSON.stringify(stepRecords, null, 2)}\n`, 'utf8');
+    assertLivePlayQaNavigationStable(navigationTracker);
   } catch (error) {
     const capturedError = navigationTracker
       ? createLivePlayQaUnexpectedNavigationError(navigationTracker, error)
@@ -1663,7 +1753,15 @@ export const runLivePlayQa = async (options = {}) => {
     }
   } finally {
     cleanupErrors = await settleLivePlayQaCleanup([
+      ...(navigationTracker ? [{
+        name: 'navigation.assert-before-browser-close',
+        run: async () => assertLivePlayQaNavigationStable(navigationTracker)
+      }] : []),
       ...(browser ? [{ name: 'browser.close', run: () => browser.close() }] : []),
+      ...(navigationTracker ? [{
+        name: 'navigation.assert-after-browser-close',
+        run: async () => assertLivePlayQaNavigationStable(navigationTracker)
+      }] : []),
       ...(preview ? [{ name: 'preview.stop', run: () => stopPreviewServer(preview.child) }] : [])
     ]);
   }

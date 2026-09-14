@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   appendLivePlayQaCleanupEvidence,
+  assertLivePlayQaNavigationStable,
   captureRedactedLivePlayQaScreenshot,
   captureLivePlayQaFailureEvidence,
   createLivePlayQaEvidencePersistenceError,
@@ -41,6 +42,13 @@ describe('live play QA script helpers', () => {
     tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/?runtimeDiagnostics=1' });
     const calls = [];
     const page = {
+      evaluate: async () => ({
+        controllerChangeCount: 1,
+        correlatedReloadCount: 1,
+        lastNavigationType: 'reload',
+        lastReloadMatchedControllerChange: true,
+        pendingControllerChange: false
+      }),
       waitForFunction: async () => calls.push('controller'),
       waitForLoadState: async () => calls.push('load')
     };
@@ -64,7 +72,14 @@ describe('live play QA script helpers', () => {
     expect(result).toEqual({
       expectedReloadCount: 1,
       mainFrameNavigationCount: 2,
-      pass: true
+      pass: true,
+      serviceWorkerProbe: {
+        controllerChangeCount: 1,
+        correlatedReloadCount: 1,
+        lastNavigationType: 'reload',
+        lastReloadMatchedControllerChange: true,
+        pendingControllerChange: false
+      }
     });
     expect(calls).toEqual(['load', 'controller']);
     expect(tracker.snapshot()).toMatchObject({ stabilized: true, unexpectedNavigation: null });
@@ -90,6 +105,86 @@ describe('live play QA script helpers', () => {
     );
   });
 
+  test('rejects an uncorrelated second navigation even when a controller exists', async () => {
+    const tracker = createLivePlayQaNavigationTracker();
+    tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/' });
+    const page = {
+      waitForFunction: async () => {},
+      waitForLoadState: async () => {}
+    };
+    let redirected = false;
+
+    await expect(settleLivePlayQaServiceWorkerNavigation({
+      initialNavigationCount: 0,
+      page,
+      quietMs: 0,
+      targetUrl: 'https://mazer.example.test/',
+      timeoutMs: 100,
+      tracker,
+      wait: async () => {
+        if (!redirected) {
+          redirected = true;
+          tracker.record({ isMainFrame: true, url: 'https://attacker.example.test/' });
+        }
+      }
+    })).rejects.toThrow('live_play_service_worker_reload_destination_drift');
+  });
+
+  test('rejects a missing production controller-change reload', async () => {
+    const tracker = createLivePlayQaNavigationTracker();
+    tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/' });
+
+    await expect(settleLivePlayQaServiceWorkerNavigation({
+      initialNavigationCount: 0,
+      page: {},
+      quietMs: 0,
+      targetUrl: 'https://mazer.example.test/',
+      timeoutMs: 1,
+      tracker,
+      wait: async () => {}
+    })).rejects.toThrow('live_play_expected_service_worker_reload_missing');
+  });
+
+  test('rejects extra navigation during service-worker stabilization', async () => {
+    const tracker = createLivePlayQaNavigationTracker();
+    tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/' });
+
+    await expect(settleLivePlayQaServiceWorkerNavigation({
+      initialNavigationCount: 0,
+      page: {},
+      quietMs: 0,
+      targetUrl: 'https://mazer.example.test/',
+      timeoutMs: 100,
+      tracker,
+      wait: async () => {
+        tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/' });
+        tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/' });
+      }
+    })).rejects.toThrow('live_play_unexpected_navigation_during_service_worker_stabilization');
+  });
+
+  test('settles a navigation that commits during browser shutdown as a terminal cleanup failure', async () => {
+    const tracker = createLivePlayQaNavigationTracker();
+    tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/' });
+    tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/' });
+    tracker.markStabilized();
+    tracker.markMovementStarted();
+
+    const errors = await settleLivePlayQaCleanup([
+      { name: 'navigation.before', run: async () => assertLivePlayQaNavigationStable(tracker) },
+      {
+        name: 'browser.close',
+        run: async () => tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/late' })
+      },
+      { name: 'navigation.after', run: async () => assertLivePlayQaNavigationStable(tracker) }
+    ]);
+
+    expect(errors).toEqual([{
+      action: 'navigation.after',
+      message: 'live_play_unexpected_navigation_after_movement_started: https://mazer.example.test/late'
+    }]);
+  });
+
   test('rebinds readiness after service-worker stabilization and before movement', async () => {
     const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
     const stabilizationIndex = scriptSource.indexOf('serviceWorkerStabilization = await settleLivePlayQaServiceWorkerNavigation');
@@ -98,6 +193,9 @@ describe('live play QA script helpers', () => {
     expect(stabilizationIndex).toBeGreaterThan(-1);
     expect(readinessIndex).toBeGreaterThan(stabilizationIndex);
     expect(movementIndex).toBeGreaterThan(readinessIndex);
+    expect(scriptSource.indexOf('await installLivePlayQaServiceWorkerStabilizationProbe(page)')).toBeLessThan(
+      scriptSource.indexOf('await page.goto(targetUrl')
+    );
   });
 
   test('requires the exact QA move surface before diagnostics readiness can pass', () => {
