@@ -48,7 +48,7 @@ import {
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
-  const productionRoute = '/?content=core-only&mode=play&theme=aurora&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=1735707242';
+  const productionRoute = '/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=1735707242';
   const deploymentIdentity = {
     acceptanceTarget: 'release-candidate',
     deploymentId: 'dpl_0000000000000000000000000000',
@@ -326,9 +326,25 @@ describe('live play QA script helpers', () => {
   test('binds the stabilized navigation to the exact production route contract', () => {
     const contract = productionContract();
     expect(() => assertLivePlayProductionNavigationBinding({
-      actualUrl: `${deploymentIdentity.deploymentUrl.slice(0, -1)}${productionRoute}&v=one`,
+      actualUrl: `${deploymentIdentity.deploymentUrl.slice(0, -1)}${productionRoute}`,
       contract
     })).not.toThrow();
+    for (const extraQuery of ['lowPower=1', 'v=one']) {
+      expect(() => assertLivePlayProductionNavigationBinding({
+        actualUrl: `${deploymentIdentity.deploymentUrl.slice(0, -1)}${productionRoute}&${extraQuery}`,
+        contract
+      })).toThrow('live_play_production_navigation_contract_drift');
+      expect(() => resolveLivePlayProductionAcceptanceContract({
+        baseUrl: deploymentIdentity.deploymentUrl,
+        ...deploymentIdentity,
+        enabled: true,
+        expectedObservedSeed: 1735707243,
+        providerDeploymentIdentity,
+        route: `${productionRoute}&${extraQuery}`,
+        useExistingServer: true,
+        verifierIdentity
+      })).toThrow('live_play_production_route_query_invalid');
+    }
     expect(() => assertLivePlayProductionNavigationBinding({
       actualUrl: `${deploymentIdentity.deploymentUrl}?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=9`,
       contract

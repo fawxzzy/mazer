@@ -47,6 +47,12 @@ const SOURCE_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
 const RELEASE_CANDIDATE_ACCEPTANCE_TARGET = 'release-candidate';
 const LIVE_PRODUCTION_ACCEPTANCE_TARGET = 'live-production';
 const PUBLIC_PRODUCTION_HOST = 'mazer.fawxzzy.com';
+const PRODUCTION_ROUTE_QUERY_KEYS = Object.freeze([
+  'authFixture',
+  'mazeSeed',
+  'mode',
+  'runtimeDiagnostics'
+]);
 const EXPECTED_VERCEL_PROJECT_ID = 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ';
 const EXPECTED_VERCEL_TEAM_ID = 'team_CMJn7MvzFZZBnhNnjVUZF2RD';
 const EXPECTED_VERCEL_SCOPE = 'fawxzzy';
@@ -311,6 +317,9 @@ export const resolveLivePlayProductionAcceptanceContract = ({
   ) {
     throw new Error('live_play_production_expected_observed_seed_malformed');
   }
+  if (JSON.stringify([...target.searchParams.keys()].sort()) !== JSON.stringify(PRODUCTION_ROUTE_QUERY_KEYS)) {
+    throw new Error('live_play_production_route_query_invalid');
+  }
 
   return Object.freeze({
     deploymentIdentity,
@@ -356,6 +365,8 @@ export const assertLivePlayProductionNavigationBinding = ({ actualUrl, contract 
     throw new Error('live_play_production_navigation_origin_or_path_drift');
   }
   if (
+    JSON.stringify([...actual.searchParams.keys()].sort()) !== JSON.stringify(PRODUCTION_ROUTE_QUERY_KEYS)
+    ||
     actual.searchParams.getAll('runtimeDiagnostics').length !== 1
     || actual.searchParams.get('runtimeDiagnostics') !== '1'
     || actual.searchParams.getAll('mode').length !== 1
@@ -418,7 +429,7 @@ export const createLivePlayProductionArtifactContract = (contract, diagnostics =
       route: {
         origin: contract.expectedOrigin,
         pathname: contract.expectedPathname,
-        queryKeys: ['authFixture', 'mazeSeed', 'mode', 'runtimeDiagnostics']
+        queryKeys: PRODUCTION_ROUTE_QUERY_KEYS
       },
       verifierIdentity: contract.verifierIdentity
     }
