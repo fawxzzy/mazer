@@ -1707,13 +1707,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('routes signed-out account entry directly through shared OAuth without a local login surface', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
+    const bootSource = readFileSync(resolve(process.cwd(), 'src/boot/main.ts'), 'utf8');
     const playerMessageSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayerMessage.ts'), 'utf8');
     const overlayRoutingSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayRouting.ts'), 'utf8');
 
     expect(overlayRoutingSource).toContain("export type LegacyOverlayKind = 'none' | 'options' | 'pause' | 'auth' | 'confirm-progression-reset' | 'leaderboard';");
     expect(authSource).toContain('createClient(config.url, config.anonKey');
     expect(authSource).toContain('autoRefreshToken: true');
-    expect(authSource).toContain('const result = await runMazerExclusiveAuthMutation(fn);');
+    expect(authSource).toContain('lock: runLegacyAuthJsLock');
     expect(authSource).not.toContain('lock: async (_name, _acquireTimeout, fn) => fn()');
     expect(authSource).toContain('persistSession: true');
     expect(authSource).toContain('detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation()');
@@ -1723,9 +1724,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.loadPersistedLegacyGameToggleSettings();');
     expect(menuSceneSource).toContain('this.authSnapshot');
     expect(menuSceneSource).toContain('private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null');
-    expect(menuSceneSource).toContain("runtimeDiagnostics !== '1' && runtimeDiagnostics !== 'true'");
-    expect(menuSceneSource).toContain("searchParams.get('authFixture')?.trim().toLowerCase() !== 'authenticated'");
-    expect(menuSceneSource).toContain("userId: 'runtime-diagnostics-auth-fixture'");
+    expect(menuSceneSource).toContain('isLegacyRuntimeDiagnosticsAuthFixtureRoute(window.location.search)');
+    expect(bootSource).toContain('await bootstrapLegacyRemoteAccountStateForRoute(window.location.search);');
+    expect(bootSource).not.toContain('await bootstrapLegacyRemoteAccountState();');
+    expect(menuSceneSource).toContain('userId: LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID');
+    expect(menuSceneSource).toContain('isLegacyRemoteAccountProviderEligible(snapshot)');
     expect(menuSceneSource).toContain('const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();');
     expect(menuSceneSource).toContain('if (runtimeAuthFixtureSnapshot) {');
     expect(menuSceneSource).not.toContain("this.openOverlay('auth')");
@@ -1920,7 +1923,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain('const result = await runMazerExclusiveAuthMutation(async () => {');
     expect(authSource).toContain('if (advanceMazerSharedAuthMutationEpoch() === null)');
     expect(authSource).toContain('if (advanceMazerAuthMutationEpoch() === null)');
-    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\(async \(\) => \{/g)).toHaveLength(3);
+    expect(authSource).not.toContain('runLegacyAuthJsSessionMutation');
+    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\([^,]+, async \(\) => \{/g)).toHaveLength(3);
     expect(authSource).not.toContain('runLegacyAuthInternallyLockedMutation');
     expect(authSource).toContain("const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;");
     expect(authSource).toContain('if (key === auth.storageKey && originalStorage.getItem(key) !== null) {');
@@ -1928,6 +1932,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain('auth.storage = verifyingStorage;');
     expect(authSource).toContain('auth.storage = originalStorage;');
     expect(authSource).toContain('await invokeLegacyLocalSignOutWithTimeout(directSignOut)');
+    expect(authSource).toContain('isLegacyRuntimeDiagnosticsAuthFixtureSnapshot(authenticatedFallback)');
+    expect(menuSceneSource).toContain('fetchLegacyLeaderboardPage(offset, MenuScene.LEADERBOARD_VISIBLE_ROWS, this.authSnapshot)');
+    expect(menuSceneSource).toContain('fetchLegacyLeaderboardSelfRank(this.authSnapshot)');
     expect(authSource).toContain('const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(');
     expect(authSource).toContain('const preserveAuthenticatedPreimage = (message?: string | null): LegacyAuthActionResult => ({');
     expect(authSource).toContain('if (!isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey)) {');

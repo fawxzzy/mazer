@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
+  createLegacyGuestAuthSnapshot,
   createLegacyAuthScopedStorage,
   getLegacyAuthClient,
   readLegacyAuthSessionSnapshot
 } from '../../src/legacy-runtime/legacyAuth';
 import {
   bootstrapLegacyRemoteAccountState,
+  bootstrapLegacyRemoteAccountStateForRoute,
   hydrateLegacyRemoteAccountState,
   isLegacyRemoteCompletionContextCurrent,
+  isLegacyRemoteAccountProviderEligible,
+  isLegacyRuntimeDiagnosticsAuthFixtureRoute,
+  LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID,
   LEGACY_REMOTE_ACCOUNT_SYNC_STORAGE_KEY,
   LEGACY_REMOTE_AI_PROGRESSION_TABLE,
   LEGACY_REMOTE_AI_RUNNER_KEY,
@@ -22,8 +27,10 @@ import {
   mergeLegacyProgressionStateAdvancements,
   writeLegacyRemoteCycleReceipt,
   writeLegacyRemoteCompletion,
-  writeLegacyRemoteProgressionState
+  writeLegacyRemoteProgressionState,
+  writeLegacyRemoteSettings
 } from '../../src/legacy-runtime/legacyRemoteProgression';
+import { LEGACY_DEFAULTS } from '../../src/legacy-runtime/legacyDefaults';
 import {
   createEmptyLegacyProgressionState,
   incrementLegacyProgressionOrdinal
@@ -139,6 +146,85 @@ beforeEach(() => {
 });
 
 describe('legacy remote progression', () => {
+  test('suppresses account bootstrap before the authenticated diagnostics fixture reaches the scene', async () => {
+    const bootstrapResult = {
+      error: null,
+      progressionState: null,
+      remoteSyncResult: null,
+      settings: null,
+      snapshot: createLegacyGuestAuthSnapshot()
+    };
+    const bootstrap = vi.fn(async () => bootstrapResult);
+
+    expect(isLegacyRuntimeDiagnosticsAuthFixtureRoute('?runtimeDiagnostics=1&authFixture=authenticated')).toBe(true);
+    expect(isLegacyRuntimeDiagnosticsAuthFixtureRoute('?runtimeDiagnostics=TRUE&authFixture=AUTHENTICATED')).toBe(true);
+    expect(isLegacyRuntimeDiagnosticsAuthFixtureRoute('?authFixture=authenticated')).toBe(false);
+    expect(isLegacyRuntimeDiagnosticsAuthFixtureRoute('?runtimeDiagnostics=1')).toBe(false);
+
+    await expect(bootstrapLegacyRemoteAccountStateForRoute(
+      '?runtimeDiagnostics=1&authFixture=authenticated',
+      bootstrap
+    )).resolves.toBeNull();
+    expect(bootstrap).not.toHaveBeenCalled();
+
+    await expect(bootstrapLegacyRemoteAccountStateForRoute(
+      '?runtimeDiagnostics=1',
+      bootstrap
+    )).resolves.toEqual(bootstrapResult);
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+  });
+
+  test('keeps the authenticated runtime diagnostics fixture entirely provider-inert', async () => {
+    const snapshot = {
+      configured: true,
+      displayName: 'QA Player',
+      email: 'qa@mazer.local',
+      error: null,
+      info: 'Runtime diagnostics authenticated fixture.',
+      status: 'authenticated' as const,
+      userId: LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID
+    };
+
+    expect(isLegacyRemoteAccountProviderEligible(snapshot)).toBe(false);
+    const providerCallCountBefore = vi.mocked(getLegacyAuthClient).mock.calls.length;
+    await expect(hydrateLegacyRemoteAccountState(
+      snapshot,
+      { getItem: vi.fn(() => null), setItem: vi.fn() },
+      { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' }
+    )).resolves.toMatchObject({
+      error: null,
+      progressionState: null,
+      remoteSyncResult: null,
+      settings: null,
+      snapshot
+    });
+    const localProgression = createEmptyLegacyProgressionState();
+    await expect(writeLegacyRemoteProgressionState(
+      snapshot,
+      localProgression,
+      { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' },
+      'replace'
+    )).resolves.toMatchObject({ skippedReason: 'disabled', synced: false });
+    await expect(writeLegacyRemoteSettings(
+      snapshot,
+      LEGACY_DEFAULTS,
+      { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' }
+    )).resolves.toMatchObject({ skippedReason: 'disabled', synced: false });
+    expect(getLegacyAuthClient).toHaveBeenCalledTimes(providerCallCountBefore);
+  });
+
+  test('keeps real authenticated accounts eligible for remote hydration', () => {
+    expect(isLegacyRemoteAccountProviderEligible({
+      configured: true,
+      displayName: 'Player',
+      email: 'player@example.test',
+      error: null,
+      info: null,
+      status: 'authenticated',
+      userId: '11111111-1111-4111-8111-111111111111'
+    })).toBe(true);
+  });
+
   test('is disabled by default and only enabled by explicit env opt-in', () => {
     expect(isLegacyRemoteProgressionEnabled({})).toBe(false);
     expect(isLegacyRemoteProgressionEnabled({ [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'false' })).toBe(false);

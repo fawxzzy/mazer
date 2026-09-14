@@ -342,7 +342,10 @@ import {
 } from '../legacy-runtime/legacyPlayerMessage';
 import {
   hydrateLegacyRemoteAccountState,
+  isLegacyRuntimeDiagnosticsAuthFixtureRoute,
+  isLegacyRemoteAccountProviderEligible,
   isLegacyRemoteCompletionContextCurrent,
+  LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID,
   readLegacyBootstrappedAccountState,
   readLegacyBootstrappedAuthSnapshot,
   writeLegacyRemoteCompletion,
@@ -14124,7 +14127,7 @@ export class MenuScene extends Phaser.Scene {
     // of anything past it. Seed a fixed local value instead of hitting the
     // network at all -- purely cosmetic/local, never actually persisted or
     // validated anywhere real.
-    if (userId === 'runtime-diagnostics-auth-fixture') {
+    if (userId === LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID) {
       this.accountUsernameDraft = 'qa-player';
       this.accountUsernameSavedValue = 'qa-player';
       this.accountUsernameHydrationPending = false;
@@ -16955,8 +16958,8 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
 
     const [pageResult, selfRankResult] = await Promise.all([
-      fetchLegacyLeaderboardPage(offset, MenuScene.LEADERBOARD_VISIBLE_ROWS),
-      offset === 0 ? fetchLegacyLeaderboardSelfRank() : Promise.resolve(null)
+      fetchLegacyLeaderboardPage(offset, MenuScene.LEADERBOARD_VISIBLE_ROWS, this.authSnapshot),
+      offset === 0 ? fetchLegacyLeaderboardSelfRank(this.authSnapshot) : Promise.resolve(null)
     ]);
     if (sequence !== this.leaderboardSequence) {
       // A newer page request (or the overlay closing and reopening) has
@@ -17434,13 +17437,7 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }
 
-    const searchParams = new URLSearchParams(window.location.search);
-    const runtimeDiagnostics = searchParams.get('runtimeDiagnostics')?.trim().toLowerCase();
-    if (runtimeDiagnostics !== '1' && runtimeDiagnostics !== 'true') {
-      return null;
-    }
-
-    if (searchParams.get('authFixture')?.trim().toLowerCase() !== 'authenticated') {
+    if (!isLegacyRuntimeDiagnosticsAuthFixtureRoute(window.location.search)) {
       return null;
     }
 
@@ -17452,7 +17449,7 @@ export class MenuScene extends Phaser.Scene {
       error: null,
       info: 'Runtime diagnostics authenticated fixture.',
       status: 'authenticated',
-      userId: 'runtime-diagnostics-auth-fixture'
+      userId: LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID
     };
   }
 
@@ -17514,7 +17511,7 @@ export class MenuScene extends Phaser.Scene {
       this.loadPersistedLegacyGameToggleSettings();
       this.loadPersistedMazeCycleTelemetryHistory();
       this.loadPersistedLegacyProgressionState();
-      if (snapshot.status === 'authenticated' && snapshot.userId) {
+      if (isLegacyRemoteAccountProviderEligible(snapshot)) {
         void this.hydrateLegacyAccountDataAfterAuth(snapshot, hydrationSequence);
       }
       this.boardDynamicDirty = true;
