@@ -242,6 +242,26 @@ export const assertLivePlayProductionVerifierIdentityUnchanged = ({
   }
 };
 
+export const assertLivePlayProductionTestDoublePolicy = ({
+  enabled = false,
+  finalProviderDeploymentIdentity,
+  providerDeploymentIdentity,
+  testEnvironment = process.env.NODE_ENV === 'test',
+  verifierIdentity
+} = {}) => {
+  if (
+    enabled === true
+    && testEnvironment === true
+    && (
+      finalProviderDeploymentIdentity !== undefined
+      || providerDeploymentIdentity !== undefined
+      || verifierIdentity !== undefined
+    )
+  ) {
+    throw new Error('live_play_production_test_double_forbidden');
+  }
+};
+
 export const resolveLivePlayProductionAcceptanceContract = ({
   acceptanceTarget,
   baseUrl,
@@ -1865,6 +1885,12 @@ export const runLivePlayQa = async (options = {}) => {
   const stepSettleMs = options.stepSettleMs ?? DEFAULT_SETTLE_MS;
   const moveCap = options.moveCap ?? DEFAULT_MOVE_CAP;
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+  assertLivePlayProductionTestDoublePolicy({
+    enabled: options.productionAcceptance === true,
+    finalProviderDeploymentIdentity: options.finalProviderDeploymentIdentity,
+    providerDeploymentIdentity: options.providerDeploymentIdentity,
+    verifierIdentity: options.verifierIdentity
+  });
   const testOnlyVerifierIdentity = process.env.NODE_ENV === 'test'
     ? options.verifierIdentity
     : undefined;

@@ -6,6 +6,7 @@ import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyG
 
 import {
   assertLivePlayProductionDeploymentIdentityUnchanged,
+  assertLivePlayProductionTestDoublePolicy,
   appendLivePlayQaCleanupEvidence,
   assertLivePlayProductionVerifierIdentityUnchanged,
   assertLivePlayProductionNavigationBinding,
@@ -169,10 +170,21 @@ describe('live play QA script helpers', () => {
     const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
     const contractIndex = scriptSource.indexOf('const productionAcceptanceContract = resolveLivePlayProductionAcceptanceContract');
     expect(contractIndex).toBeGreaterThan(-1);
+    const runnerIndex = scriptSource.indexOf('export const runLivePlayQa = async');
+    const testDoublePolicyIndex = scriptSource.indexOf(
+      'assertLivePlayProductionTestDoublePolicy({',
+      runnerIndex
+    );
+    expect(testDoublePolicyIndex).toBeGreaterThan(runnerIndex);
+    expect(testDoublePolicyIndex).toBeLessThan(contractIndex);
     const testOnlyVerifierIndex = scriptSource.indexOf("const testOnlyVerifierIdentity = process.env.NODE_ENV === 'test'");
     expect(testOnlyVerifierIndex).toBeGreaterThan(-1);
     expect(testOnlyVerifierIndex).toBeLessThan(contractIndex);
-    expect(scriptSource).not.toContain('verifierIdentity: options.verifierIdentity');
+    const contractSource = scriptSource.slice(
+      contractIndex,
+      scriptSource.indexOf('});', contractIndex) + 3
+    );
+    expect(contractSource).not.toContain('verifierIdentity: options.verifierIdentity');
     expect(contractIndex).toBeLessThan(scriptSource.indexOf('await ensureDir(outputDir)', contractIndex));
     expect(contractIndex).toBeLessThan(scriptSource.indexOf('chromium.launch', contractIndex));
     expect(contractIndex).toBeLessThan(scriptSource.indexOf('browser.newContext', contractIndex));
@@ -223,6 +235,30 @@ describe('live play QA script helpers', () => {
         alias: ['mazer.fawxzzy.com']
       }
     })).toThrow('live_play_production_provider_identity_mismatch');
+  });
+
+  test('forbids test doubles from publishing production acceptance artifacts', () => {
+    for (const testDouble of [
+      { providerDeploymentIdentity },
+      { finalProviderDeploymentIdentity: providerDeploymentIdentity },
+      { verifierIdentity }
+    ]) {
+      expect(() => assertLivePlayProductionTestDoublePolicy({
+        enabled: true,
+        testEnvironment: true,
+        ...testDouble
+      })).toThrow('live_play_production_test_double_forbidden');
+    }
+    expect(() => assertLivePlayProductionTestDoublePolicy({
+      enabled: false,
+      providerDeploymentIdentity,
+      testEnvironment: true
+    })).not.toThrow();
+    expect(() => assertLivePlayProductionTestDoublePolicy({
+      enabled: true,
+      providerDeploymentIdentity,
+      testEnvironment: false
+    })).not.toThrow();
   });
 
   test('distinguishes retained release candidates from current live production', () => {
