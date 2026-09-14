@@ -1923,8 +1923,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain('const result = await runMazerExclusiveAuthMutation(async () => {');
     expect(authSource).toContain('if (advanceMazerSharedAuthMutationEpoch() === null)');
     expect(authSource).toContain('if (advanceMazerAuthMutationEpoch() === null)');
-    expect(authSource.match(/return runLegacyAuthJsSessionMutation\(async \(\) => \{/g)).toHaveLength(2);
-    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\(async \(\) => \{/g)).toHaveLength(1);
+    expect(authSource).not.toContain('runLegacyAuthJsSessionMutation');
+    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\(async \(\) => \{/g)).toHaveLength(3);
     expect(authSource).not.toContain('runLegacyAuthInternallyLockedMutation');
     expect(authSource).toContain("const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;");
     expect(authSource).toContain('if (key === auth.storageKey && originalStorage.getItem(key) !== null) {');

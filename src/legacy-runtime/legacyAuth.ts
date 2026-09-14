@@ -781,23 +781,13 @@ const prepareLegacyAuthDirectSessionMutation = (): LegacyAuthActionResult | null
   return null;
 };
 
-const runLegacyAuthJsSessionMutation = async (
-  operation: () => Promise<LegacyAuthActionResult>
-): Promise<LegacyAuthActionResult> => {
-  try {
-    const unavailable = prepareLegacyAuthDirectSessionMutation();
-    return unavailable ?? await operation();
-  } catch {
-    return createLegacyAuthMutationUnavailableResult();
-  }
-};
-
 const runLegacyAuthDirectSessionMutation = async (
   operation: () => Promise<LegacyAuthActionResult>
 ): Promise<LegacyAuthActionResult> => {
   const result = await runMazerExclusiveAuthMutation(async () => {
-    // Direct internal auth operations bypass auth-js's public lock hook, so
-    // they retain an explicit outer acquisition of the shared session lock.
+    // Direct internal auth operations and the pinned auth-js password
+    // sign-in/sign-up methods write session storage without invoking the
+    // client lock hook. Keep one explicit outer acquisition for those paths.
     try {
       const unavailable = prepareLegacyAuthDirectSessionMutation();
       if (unavailable !== null) {
@@ -826,7 +816,7 @@ export const signInLegacyAuth = async (
     };
   }
 
-  return runLegacyAuthJsSessionMutation(async () => {
+  return runLegacyAuthDirectSessionMutation(async () => {
     const transport = client.auth as unknown as Partial<LegacyAuthAbortableTransport>;
     if (typeof transport.fetch !== 'function') {
       return createLegacyAuthMutationUnavailableResult();
@@ -877,7 +867,7 @@ export const signUpLegacyAuth = async (
     };
   }
 
-  return runLegacyAuthJsSessionMutation(async () => {
+  return runLegacyAuthDirectSessionMutation(async () => {
     const transport = client.auth as unknown as Partial<LegacyAuthAbortableTransport>;
     if (typeof transport.fetch !== 'function') {
       return createLegacyAuthMutationUnavailableResult();

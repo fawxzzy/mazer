@@ -202,6 +202,74 @@ describe('legacy auth runtime', () => {
     expect(events).toEqual(['oauth-start', 'oauth-end', 'refresh']);
   });
 
+  test('serializes public password sign-in and signup behind the shared OAuth session lock', async () => {
+    const lockManager = new NamedLockHarness();
+    const signInWithPassword = vi.fn(async () => ({
+      data: { session: null },
+      error: null
+    }));
+    const signUp = vi.fn(async () => ({
+      data: { session: null },
+      error: null
+    }));
+    const authClient = {
+      auth: {
+        fetch: vi.fn() as unknown as typeof fetch,
+        getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
+        onAuthStateChange: vi.fn(() => ({
+          data: { subscription: { unsubscribe: vi.fn() } }
+        })),
+        signInWithPassword,
+        signUp
+      }
+    };
+
+    vi.resetModules();
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-key');
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://bxtcuhkotumitoqtrcej.supabase.co');
+    vi.stubGlobal('navigator', { locks: lockManager });
+    vi.stubGlobal('window', {
+      addEventListener: vi.fn(),
+      localStorage: new MemoryStorage(),
+      location: { pathname: '/' },
+      sessionStorage: new MemoryStorage()
+    });
+    vi.doMock('@supabase/supabase-js', () => ({
+      createClient: vi.fn(() => authClient)
+    }));
+
+    try {
+      const freshAuth = await import('../../src/legacy-runtime/legacyAuth');
+      const freshPortal = await import('../../src/legacy-runtime/legacyAccountPortal');
+      expect(freshAuth.resolveLegacyAuthConfig()).toEqual({
+        anonKey: 'anon-key',
+        url: 'https://bxtcuhkotumitoqtrcej.supabase.co'
+      });
+      let releaseOAuth!: () => void;
+      const oauth = freshPortal.runMazerExclusiveAuthMutation(async () => {
+        await new Promise<void>((resolve) => { releaseOAuth = resolve; });
+      }, lockManager);
+      await vi.waitFor(() => expect(releaseOAuth).toBeTypeOf('function'));
+
+      const signIn = freshAuth.signInLegacyAuth('player@example.test', 'secret1');
+      const signup = freshAuth.signUpLegacyAuth('new@example.test', 'secret1', 'MazeNew');
+      await Promise.resolve();
+      expect(signInWithPassword).not.toHaveBeenCalled();
+      expect(signUp).not.toHaveBeenCalled();
+
+      releaseOAuth();
+      await expect(oauth).resolves.toMatchObject({ status: 'completed' });
+      await expect(Promise.all([signIn, signup])).resolves.toHaveLength(2);
+      expect(signInWithPassword).toHaveBeenCalledOnce();
+      expect(signUp).toHaveBeenCalledOnce();
+    } finally {
+      vi.doUnmock('@supabase/supabase-js');
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+      vi.resetModules();
+    }
+  });
+
   test('bounds queued auth-js acquisition and classifies the real timeout', async () => {
     const lockManager = new NamedLockHarness();
     let release!: () => void;
