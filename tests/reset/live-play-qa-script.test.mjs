@@ -404,6 +404,8 @@ describe('live play QA script helpers', () => {
     ]);
     expect(productionDefault.searchParams.get('mode')).toBe('play');
     expect(productionDefault.searchParams.get('runtimeDiagnostics')).toBe('1');
+    expect(productionDefault.searchParams.get('authFixture')).toBe('authenticated');
+    expect(productionDefault.searchParams.get('mazeSeed')).toBe('1735707242');
     const nonProductionRoute = new URL(resolveRoute({ route: productionRoute }, 'local'), 'http://local.test');
     expect(nonProductionRoute.searchParams.get('v')).toMatch(/^local-\d+$/u);
     expect([...nonProductionRoute.searchParams.keys()].sort()).toEqual([
