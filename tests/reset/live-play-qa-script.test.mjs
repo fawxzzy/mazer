@@ -830,6 +830,7 @@ describe('live play QA script helpers', () => {
   test('starts lifecycle proof from the immediate goal sample before the timer-freeze delay', async () => {
     const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
     const goalReachedIndex = scriptSource.indexOf('const goalReachedDiagnostics = await readLivePlayDiagnostics(page)');
+    const lifecycleEnabledIndex = scriptSource.indexOf('const shouldVerifyPostGoalLifecycle = options.verifyPostGoalLifecycle !== false && failedAt === null', goalReachedIndex);
     const initialProbeIndex = scriptSource.indexOf('const initialInputLockProbes =', goalReachedIndex);
     const timerDelayIndex = scriptSource.indexOf('await page.waitForTimeout(96)', goalReachedIndex);
     const timerSecondIndex = scriptSource.indexOf('const goalTimerSecondDiagnostics = await readLivePlayDiagnostics(page)', timerDelayIndex);
@@ -838,10 +839,17 @@ describe('live play QA script helpers', () => {
     const probeSeedIndex = scriptSource.indexOf('initialInputLockProbes,', lifecycleIndex);
 
     expect(goalReachedIndex).toBeGreaterThan(-1);
-    expect(initialProbeIndex).toBeGreaterThan(goalReachedIndex);
+    expect(lifecycleEnabledIndex).toBeGreaterThan(goalReachedIndex);
+    expect(initialProbeIndex).toBeGreaterThan(lifecycleEnabledIndex);
+    expect(scriptSource.slice(initialProbeIndex, timerDelayIndex)).toContain(
+      'const initialInputLockProbes = shouldVerifyPostGoalLifecycle'
+    );
     expect(timerDelayIndex).toBeGreaterThan(initialProbeIndex);
     expect(timerSecondIndex).toBeGreaterThan(timerDelayIndex);
     expect(lifecycleIndex).toBeGreaterThan(timerSecondIndex);
+    expect(scriptSource.slice(lifecycleIndex, immediateSeedIndex)).toContain(
+      'const lifecycleProofPromise = shouldVerifyPostGoalLifecycle'
+    );
     expect(immediateSeedIndex).toBeGreaterThan(lifecycleIndex);
     expect(probeSeedIndex).toBeGreaterThan(immediateSeedIndex);
 
