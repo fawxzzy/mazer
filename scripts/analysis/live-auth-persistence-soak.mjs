@@ -12,6 +12,11 @@ import {
   resolveSessionId
 } from '../visual/common.mjs';
 import { launchPreviewServer, stopPreviewServer } from '../visual/preview-server.mjs';
+import {
+  createLivePlayQaNavigationTracker,
+  installLivePlayQaServiceWorkerStabilizationProbe,
+  settleLivePlayQaServiceWorkerNavigation
+} from './live-play-qa.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
@@ -21,6 +26,8 @@ const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
 const MOBILE_VIEWPORT = Object.freeze({ width: 405, height: 958 });
 const MOBILE_DPR = 2;
 const TIMEOUT_MS = 30_000;
+const PUBLIC_PRODUCTION_HOST = 'mazer.fawxzzy.com';
+const PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9-]+-fawxzzy\.vercel\.app$/u;
 
 export const SIGNED_OUT_SHARED_ACCOUNT_BUTTONS = Object.freeze([
   'Login',
@@ -44,6 +51,70 @@ export const FIXTURE_SETTINGS_STORAGE_KEYS = Object.freeze({
   guest: GUEST_FIXTURE_SETTINGS_STORAGE_KEY,
   unscoped: UNSCOPED_SETTINGS_STORAGE_KEY
 });
+
+export const normalizeAuthPersistenceBaseUrl = (value) => {
+  const url = new URL(value);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+    throw new Error('unsafe_auth_persistence_base_url');
+  }
+  url.pathname = '/';
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+};
+
+export const resolveAuthPersistenceExecutionPlan = (options = {}) => {
+  const useExistingServer = options.useExistingServer === true;
+  if (useExistingServer && typeof options.baseUrl !== 'string') {
+    throw new Error('existing_server_base_url_required');
+  }
+  const baseUrl = normalizeAuthPersistenceBaseUrl(
+    useExistingServer ? options.baseUrl : (options.baseUrl ?? 'http://127.0.0.1:4173')
+  );
+  const protectedDeployment = options.protectedDeployment === true;
+  if (protectedDeployment && !useExistingServer) {
+    throw new Error('protected_deployment_requires_existing_server');
+  }
+  if (protectedDeployment && new URL(baseUrl).hostname === PUBLIC_PRODUCTION_HOST) {
+    throw new Error('public_alias_protection_bypass_forbidden');
+  }
+  return {
+    baseUrl,
+    launchPreview: !useExistingServer,
+    protectedDeployment,
+    runBuild: !useExistingServer && options.skipBuild !== true,
+    serviceWorkers: protectedDeployment ? 'allow' : 'block',
+    useExistingServer
+  };
+};
+
+export const buildVercelProtectionBypassSeedUrl = ({ baseUrl, protectionBypass }) => {
+  if (typeof protectionBypass !== 'string' || protectionBypass.length === 0) {
+    throw new Error('protection_bypass_missing');
+  }
+  const url = new URL(baseUrl);
+  if (url.hostname === PUBLIC_PRODUCTION_HOST || !PROTECTED_DEPLOYMENT_HOST_PATTERN.test(url.hostname)) {
+    throw new Error('protection_bypass_target_forbidden');
+  }
+  url.searchParams.set('x-vercel-protection-bypass', protectionBypass);
+  url.searchParams.set('x-vercel-set-bypass-cookie', 'true');
+  return url.toString();
+};
+
+export const seedVercelProtectionBypassCookie = async ({ context, baseUrl, protectionBypass }) => {
+  const seedUrl = buildVercelProtectionBypassSeedUrl({ baseUrl, protectionBypass });
+  const response = await context.request.get(seedUrl, {
+    failOnStatusCode: false,
+    timeout: TIMEOUT_MS
+  });
+  const status = response.status();
+  await response.dispose();
+  const cookies = await context.cookies(baseUrl);
+  if (status !== 200 || cookies.length === 0) {
+    throw new Error('protection_bypass_cookie_seed_failed');
+  }
+  return { cookieSeeded: true, status };
+};
 
 const normalizeControlLabel = (value) => String(value).trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
 const normalizedLabelsMatchExactly = (actual, expected) => {
@@ -302,7 +373,14 @@ const runBuild = () => {
 
 const readJsonAttribute = async (page, attribute) => page.evaluate((name) => {
   const raw = document.documentElement.getAttribute(name);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }, attribute);
 
 const readDiagnostics = async (page) => ({
@@ -316,7 +394,7 @@ const readFixtureSettingsStorageSnapshot = async (page) => page.evaluate((keys) 
   unscoped: window.localStorage.getItem(keys.unscoped)
 }), FIXTURE_SETTINGS_STORAGE_KEYS);
 
-const summarizeSurface = ({ runtime, visual }) => ({
+export const summarizeAuthPersistenceSurface = ({ runtime, visual }) => ({
   authStatus: runtime?.auth?.status ?? null,
   buttons: (visual?.buttons ?? []).map((button) => button.text),
   mode: visual?.runtime?.mode ?? null,
@@ -360,17 +438,17 @@ const waitForSurface = async (page, expected) => {
       expectedSurface: expected
     }, { timeout: TIMEOUT_MS });
   } catch (error) {
-    const observed = summarizeSurface(await readDiagnostics(page));
+    const observed = summarizeAuthPersistenceSurface(await readDiagnostics(page));
     throw new Error(`surface_timeout:${JSON.stringify({ expected, observed })}`, { cause: error });
   }
-  return summarizeSurface(await readDiagnostics(page));
+  return summarizeAuthPersistenceSurface(await readDiagnostics(page));
 };
 
 const waitForTrailShineState = async (page, enabled, expectedSurface) => {
   const deadline = Date.now() + TIMEOUT_MS;
   let observed = null;
   while (Date.now() < deadline) {
-    observed = summarizeSurface(await readDiagnostics(page));
+    observed = summarizeAuthPersistenceSurface(await readDiagnostics(page));
     if (
       surfaceMatchesAuthPersistenceExpectation(observed, expectedSurface)
       && observed.trailShineEnabled === enabled
@@ -392,7 +470,8 @@ const captureFailureState = async ({
   consoleMessages,
   pageErrors,
   failedRequests,
-  pendingRequests
+  pendingRequests,
+  navigationHistory
 }) => {
   const elapsedMs = measureAuthPersistenceElapsedMs(runStartedAt);
   if (page.isClosed()) {
@@ -401,6 +480,7 @@ const captureFailureState = async ({
       currentPhase,
       elapsedMs,
       phaseTimings,
+      navigationHistory,
       error: sanitizeAuthPersistenceDiagnosticText(terminalError?.message ?? terminalError ?? 'unknown_failure'),
       url: null,
       title: null,
@@ -488,6 +568,7 @@ const captureFailureState = async ({
     currentPhase,
     elapsedMs,
     phaseTimings,
+    navigationHistory,
     error: sanitizeAuthPersistenceDiagnosticText(terminalError?.message ?? terminalError ?? 'unknown_failure'),
     url: sanitizeAuthPersistenceDiagnosticUrl(page.url()),
     title: await page.title().catch(() => null),
@@ -586,8 +667,9 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   const cleanupFailureEvidencePath = resolveAuthPersistenceArtifactPath(outputDir, label, '.cleanup-failure.json');
   const latestSummaryPath = resolve(artifactRoot, 'latest.summary.json');
   await ensureDir(outputDir);
+  const executionPlan = resolveAuthPersistenceExecutionPlan(options);
 
-  if (options.skipBuild !== true) {
+  if (executionPlan.runBuild) {
     runBuild();
   }
 
@@ -600,6 +682,8 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   const failedRequests = [];
   const pendingRequests = new Map();
   const blockedMutationRequests = [];
+  const navigationHistory = [];
+  let navigationTracker = null;
   const steps = [];
   const screenshots = {};
   const phaseTimings = [];
@@ -633,7 +717,8 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         consoleMessages,
         pageErrors,
         failedRequests,
-        pendingRequests
+        pendingRequests,
+        navigationHistory
       })
       : {
         capturedAt: new Date().toISOString(),
@@ -653,6 +738,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         pendingRequests: [...pendingRequests.values()],
         consoleMessages: consoleMessages.map(sanitizeAuthPersistenceDiagnosticText),
         pageErrors: pageErrors.map(sanitizeAuthPersistenceDiagnosticText),
+        navigationHistory,
         serviceWorker: null,
         captureState: 'page_unavailable'
       };
@@ -667,13 +753,16 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   };
 
   try {
-    preview = await launchPreviewServer({ previewTimeoutMs: options.previewTimeoutMs });
+    preview = executionPlan.launchPreview
+      ? await launchPreviewServer({ previewTimeoutMs: options.previewTimeoutMs })
+      : null;
+    const resolvedBaseUrl = preview?.baseUrl ?? executionPlan.baseUrl;
     browser = await chromium.launch({ headless: options.headless !== false });
     context = await browser.newContext({
       deviceScaleFactor: MOBILE_DPR,
       hasTouch: true,
       isMobile: true,
-      serviceWorkers: 'block',
+      serviceWorkers: executionPlan.serviceWorkers,
       viewport: MOBILE_VIEWPORT
     });
     await context.route('**/*', async (route) => {
@@ -683,7 +772,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         resourceType: request.resourceType(),
         url: sanitizeAuthPersistenceDiagnosticUrl(request.url())
       };
-      if (isExternalMutationRequest(requestSummary, preview.baseUrl)) {
+      if (isExternalMutationRequest(requestSummary, resolvedBaseUrl)) {
         blockedMutationRequests.push(requestSummary);
         await route.abort('blockedbyclient');
         return;
@@ -691,6 +780,17 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       await route.continue();
     });
     page = await context.newPage();
+    await installLivePlayQaServiceWorkerStabilizationProbe(page);
+    navigationTracker = createLivePlayQaNavigationTracker();
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) {
+        navigationTracker.record({ isMainFrame: true, url: frame.url() });
+        navigationHistory.push({
+          elapsedMs: measureAuthPersistenceElapsedMs(runStartedAt),
+          url: sanitizeAuthPersistenceDiagnosticUrl(frame.url())
+        });
+      }
+    });
     page.on('console', (message) => {
       if (message.type() === 'warning' || message.type() === 'error') {
         consoleMessages.push(message.text());
@@ -710,8 +810,26 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       });
       pendingRequests.delete(request);
     });
+    if (executionPlan.protectedDeployment) {
+      enterPhase('protected-deployment-bypass-cookie');
+      await seedVercelProtectionBypassCookie({
+        context,
+        baseUrl: resolvedBaseUrl,
+        protectionBypass: options.protectionBypass
+      });
+    }
     enterPhase('signed-out-shared-account-entry');
-    await page.goto(`${preview.baseUrl}${buildAuthPersistenceRoute(false)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    const signedOutRoute = new URL(buildAuthPersistenceRoute(false), resolvedBaseUrl).toString();
+    const initialNavigationCount = navigationTracker.snapshot().mainFrameNavigationCount;
+    await page.goto(signedOutRoute, { waitUntil: 'load', timeout: TIMEOUT_MS });
+    await settleLivePlayQaServiceWorkerNavigation({
+      initialNavigationCount,
+      page,
+      serviceWorkerAvailable: executionPlan.serviceWorkers === 'allow',
+      targetUrl: signedOutRoute,
+      timeoutMs: TIMEOUT_MS,
+      tracker: navigationTracker
+    });
     const signedOutAccountEntry = await waitForSurface(page, {
       authenticated: false,
       buttons: SIGNED_OUT_SHARED_ACCOUNT_BUTTONS,
@@ -747,7 +865,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     });
 
     enterPhase('diagnostics-fixture-entry');
-    await page.goto(`${preview.baseUrl}${buildAuthPersistenceRoute(true)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    await page.goto(new URL(buildAuthPersistenceRoute(true), resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
     const authenticatedEntry = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
@@ -874,7 +992,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     await page.screenshot({ path: screenshots.authenticatedPause });
 
     enterPhase('diagnostics-fixture-account');
-    await page.goto(`${preview.baseUrl}${buildAuthPersistenceRoute(true)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    await page.goto(new URL(buildAuthPersistenceRoute(true), resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
     await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
@@ -895,7 +1013,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     });
 
     enterPhase('fixture-reentry');
-    await page.goto(`${preview.baseUrl}${buildAuthPersistenceRoute(true)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    await page.goto(new URL(buildAuthPersistenceRoute(true), resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
     const reentry = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
@@ -935,6 +1053,11 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       consoleMessages: sanitizedConsoleMessages,
       pageErrors: sanitizedPageErrors,
       blockedMutationRequests,
+      transport: {
+        existingServer: executionPlan.useExistingServer,
+        protectedDeployment: executionPlan.protectedDeployment,
+        serviceWorkers: executionPlan.serviceWorkers
+      },
       fixtureSettings: {
         changedFromDefault: changedTrailShine !== initialTrailShine,
         storageIsolation: fixtureSettingsIsolation,
@@ -1074,12 +1197,18 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
 if (isDirectRun) {
   const args = parseCliArgs();
+  const optionEnabled = (value) => value === true || value === 'true';
+  const protectedDeployment = optionEnabled(args['protected-deployment']);
   runLiveAuthPersistenceSoak({
     artifactRoot: typeof args['output-root'] === 'string' ? args['output-root'] : DEFAULT_ARTIFACT_ROOT,
+    baseUrl: typeof args['base-url'] === 'string' ? args['base-url'] : undefined,
     headless: args.headless !== 'false',
     label: typeof args.label === 'string' ? args.label : 'auth-persistence-soak',
+    protectedDeployment,
+    protectionBypass: protectedDeployment ? process.env.VERCEL_AUTOMATION_BYPASS_SECRET : undefined,
     sessionId: typeof args.session === 'string' ? args.session : undefined,
-    skipBuild: args['skip-build'] === true || args['skip-build'] === 'true'
+    skipBuild: optionEnabled(args['skip-build']),
+    useExistingServer: optionEnabled(args['existing-server']) || optionEnabled(args['no-preview'])
   }).then((summary) => {
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
     process.exitCode = summary.result.pass ? 0 : 1;
