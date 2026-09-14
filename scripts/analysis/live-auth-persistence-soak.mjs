@@ -510,6 +510,10 @@ export const measureAuthPersistenceElapsedMs = (
   capturedAt = performance.now()
 ) => Math.max(0, Math.round(capturedAt - runStartedAt));
 
+export const shouldPersistAuthFinalizationFailureEvidence = (failureEvidencePersisted) => (
+  failureEvidencePersisted !== true
+);
+
 export const publishAuthPersistenceSuccessAfterCleanup = async ({
   cleanupErrors,
   closedBrowserBoundary,
@@ -1556,7 +1560,9 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       cleanupErrors.push(...await settleAuthPersistenceResources([
         {
           name: 'failure_evidence',
-          run: () => persistCurrentFailureEvidence('finalization')
+          run: shouldPersistAuthFinalizationFailureEvidence(failureEvidencePersisted)
+            ? () => persistCurrentFailureEvidence('finalization')
+            : null
         }
       ]));
     }

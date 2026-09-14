@@ -32,6 +32,7 @@ import {
   sanitizeAuthPersistenceDiagnosticUrl,
   seedVercelProtectionBypassCookie,
   settleAuthPersistenceResources,
+  shouldPersistAuthFinalizationFailureEvidence,
   summarizeAuthPersistenceServiceWorkerCoverage,
   summarizeAuthPersistenceSurface,
   summarizeAuthPersistenceSoak,
@@ -814,6 +815,11 @@ describe('live auth persistence soak contract', () => {
     }
   });
 
+  test('preserves existing application failure evidence when finalization also fails', () => {
+    expect(shouldPersistAuthFinalizationFailureEvidence(true)).toBe(false);
+    expect(shouldPersistAuthFinalizationFailureEvidence(false)).toBe(true);
+  });
+
   test('routes a missing final URL through deterministic sanitized failure JSON', async () => {
     const outputDir = await mkdtemp(join(tmpdir(), 'mazer-auth-finalization-evidence-'));
     try {
@@ -859,9 +865,10 @@ describe('live auth persistence soak contract', () => {
     expect(source).not.toContain('resolvedBaseUrl === null || finalBrowserUrl === null');
     expect(source).toContain('createAuthPersistenceClosedBrowserBoundaryAction({');
     expect(source).toContain('getFinalUrl: () => finalBrowserUrl');
-    expect(source).toContain("run: () => persistCurrentFailureEvidence('finalization')");
+    expect(source).toContain("? () => persistCurrentFailureEvidence('finalization')");
     expect(source).toContain("schema: 'mazer.live-auth-persistence-cleanup-failure.v1'");
     expect(source).toContain("currentPhase: 'finalization'");
+    expect(source).toContain('shouldPersistAuthFinalizationFailureEvidence(failureEvidencePersisted)');
     expect(source).toContain("await persistCurrentFailureEvidence('success-publication')");
   });
 
