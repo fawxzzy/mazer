@@ -1587,7 +1587,35 @@ export const runLivePlayQa = async (options = {}) => {
   if (terminalFailure) {
     throw terminalFailure;
   }
-  await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'));
+  enterPhase('success-pointer-promotion');
+  try {
+    await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'));
+  } catch (error) {
+    try {
+      failureArtifact = await captureLivePlayQaFailureEvidence({
+        browserContextOptions,
+        consoleMessages,
+        error,
+        failedRequests,
+        label,
+        outputDir,
+        page,
+        pageErrors,
+        pendingRequests,
+        phase: 'success-pointer-promotion',
+        phaseTimings,
+        runStartedAt,
+        targetUrl,
+        viewport
+      });
+    } catch (evidenceError) {
+      throw createLivePlayQaEvidencePersistenceError({ error, evidenceError });
+    }
+    throw createLivePlayQaFailureError({
+      error,
+      evidencePath: failureArtifact.evidencePath
+    });
+  }
   return summary;
 };
 

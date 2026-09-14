@@ -249,9 +249,15 @@ describe('live play QA script helpers', () => {
   test('promotes the success pointer only after cleanup has settled', async () => {
     const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
     const cleanupIndex = scriptSource.lastIndexOf('cleanupErrors = await settleLivePlayQaCleanup');
+    const promotionPhaseIndex = scriptSource.lastIndexOf("enterPhase('success-pointer-promotion')");
+    const promotionTryIndex = scriptSource.indexOf('try {', promotionPhaseIndex);
     const latestPromotionIndex = scriptSource.lastIndexOf("await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'))");
     expect(cleanupIndex).toBeGreaterThan(-1);
+    expect(promotionPhaseIndex).toBeGreaterThan(cleanupIndex);
+    expect(promotionTryIndex).toBeGreaterThan(promotionPhaseIndex);
     expect(latestPromotionIndex).toBeGreaterThan(cleanupIndex);
+    expect(latestPromotionIndex).toBeGreaterThan(promotionTryIndex);
+    expect(scriptSource.indexOf("phase: 'success-pointer-promotion'", latestPromotionIndex)).toBeGreaterThan(latestPromotionIndex);
   });
 
   test('uses a touch-capable mobile context by default and permits explicit desktop proof', () => {
