@@ -830,16 +830,20 @@ describe('live play QA script helpers', () => {
   test('starts lifecycle proof from the immediate goal sample before the timer-freeze delay', async () => {
     const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
     const goalReachedIndex = scriptSource.indexOf('const goalReachedDiagnostics = await readLivePlayDiagnostics(page)');
-    const lifecycleIndex = scriptSource.indexOf('const lifecycleProofPromise =', goalReachedIndex);
-    const immediateSeedIndex = scriptSource.indexOf('initialDiagnostics: goalReachedDiagnostics', lifecycleIndex);
+    const initialProbeIndex = scriptSource.indexOf('const initialInputLockProbes =', goalReachedIndex);
     const timerDelayIndex = scriptSource.indexOf('await page.waitForTimeout(96)', goalReachedIndex);
     const timerSecondIndex = scriptSource.indexOf('const goalTimerSecondDiagnostics = await readLivePlayDiagnostics(page)', timerDelayIndex);
+    const lifecycleIndex = scriptSource.indexOf('const lifecycleProofPromise =', goalReachedIndex);
+    const immediateSeedIndex = scriptSource.indexOf('initialDiagnostics: goalReachedDiagnostics', lifecycleIndex);
+    const probeSeedIndex = scriptSource.indexOf('initialInputLockProbes,', lifecycleIndex);
 
     expect(goalReachedIndex).toBeGreaterThan(-1);
-    expect(lifecycleIndex).toBeGreaterThan(goalReachedIndex);
-    expect(immediateSeedIndex).toBeGreaterThan(lifecycleIndex);
-    expect(timerDelayIndex).toBeGreaterThan(immediateSeedIndex);
+    expect(initialProbeIndex).toBeGreaterThan(goalReachedIndex);
+    expect(timerDelayIndex).toBeGreaterThan(initialProbeIndex);
     expect(timerSecondIndex).toBeGreaterThan(timerDelayIndex);
+    expect(lifecycleIndex).toBeGreaterThan(timerSecondIndex);
+    expect(immediateSeedIndex).toBeGreaterThan(lifecycleIndex);
+    expect(probeSeedIndex).toBeGreaterThan(immediateSeedIndex);
 
     const diagnostic = ({ complete, phase, seed }) => ({
       runtime: {
@@ -892,6 +896,15 @@ describe('live play QA script helpers', () => {
 
     const proof = await collectPostGoalLifecycleProof({
       initialDiagnostics,
+      initialInputLockProbes: [{
+        accepted: false,
+        lifecycleLocked: true,
+        pass: true,
+        phase: 'goal-hold',
+        playerUnchanged: true,
+        reason: 'lifecycle-locked',
+        seed: 101
+      }],
       initialSeed: 101,
       page,
       pollMs: 0,
