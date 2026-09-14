@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   appendLivePlayQaCleanupEvidence,
+  assertLivePlayProductionNavigationBinding,
   assertLivePlayQaNavigationStable,
   captureRedactedLivePlayQaScreenshot,
   captureLivePlayQaFailureEvidence,
@@ -12,6 +13,8 @@ import {
   createLivePlayQaFailureError,
   createLivePlayQaNavigationTracker,
   createLivePlayQaUnexpectedNavigationError,
+  createLivePlayProductionArtifactContract,
+  classifyLivePlayProductionReadiness,
   isLivePlayDiagnosticsReady,
   measureLivePlayQaElapsedMs,
   normalizeLivePlayInputMethod,
@@ -20,7 +23,9 @@ import {
   resolveLivePlayLifecycleSnapshot,
   resolveArrowPointForMove,
   resolveLivePlayQaExpectedServiceWorkerReloadCount,
+  resolveLivePlayProductionAcceptanceContract,
   sanitizeLivePlayQaDiagnosticValue,
+  seedLivePlayProtectionBypassCookie,
   settleLivePlayQaCleanup,
   settleLivePlayQaServiceWorkerNavigation,
   resolveLivePlayRouteProgressIndex,
@@ -37,6 +42,191 @@ import {
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
+  const productionRoute = '/?content=core-only&mode=play&theme=aurora&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=1735707242';
+  const productionContract = () => resolveLivePlayProductionAcceptanceContract({
+    baseUrl: 'https://mazer.example.test/',
+    enabled: true,
+    route: productionRoute,
+    useExistingServer: true
+  });
+
+  test('requires a deterministic seed and exact authenticated diagnostics fixture before production browser work', async () => {
+    expect(productionContract()).toEqual({
+      enabled: true,
+      expectedOrigin: 'https://mazer.example.test',
+      expectedObservedSeed: 1735707243,
+      expectedPathname: '/',
+      fixtureMode: 'authenticated',
+      requestedSeed: 1735707242
+    });
+    expect(resolveLivePlayProductionAcceptanceContract({
+      baseUrl: 'https://mazer.example.test/',
+      enabled: false,
+      route: '/',
+      useExistingServer: false
+    })).toBeNull();
+
+    const invalidRoutes = [
+      ['/?mode=play&runtimeDiagnostics=1&authFixture=authenticated', 'live_play_production_seed_required'],
+      ['/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=runtime-random', 'live_play_production_runtime_random_seed_forbidden'],
+      ['/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=1.5', 'live_play_production_seed_malformed'],
+      ['/?mode=play&runtimeDiagnostics=1&authFixture=guest&mazeSeed=7', 'live_play_production_auth_fixture_invalid'],
+      ['/?mode=menu&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=7', 'live_play_production_play_mode_required'],
+      ['/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=7&mazeSeed=8', 'live_play_production_seed_required']
+    ];
+    for (const [route, error] of invalidRoutes) {
+      expect(() => resolveLivePlayProductionAcceptanceContract({
+        baseUrl: 'https://mazer.example.test/',
+        enabled: true,
+        route,
+        useExistingServer: true
+      })).toThrow(error);
+    }
+    expect(() => resolveLivePlayProductionAcceptanceContract({
+      baseUrl: 'https://mazer.example.test/',
+      enabled: true,
+      route: productionRoute,
+      useExistingServer: false
+    })).toThrow('live_play_production_existing_server_required');
+
+    const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
+    const contractIndex = scriptSource.indexOf('const productionAcceptanceContract = resolveLivePlayProductionAcceptanceContract');
+    expect(contractIndex).toBeGreaterThan(-1);
+    expect(contractIndex).toBeLessThan(scriptSource.indexOf('await ensureDir(outputDir)', contractIndex));
+    expect(contractIndex).toBeLessThan(scriptSource.indexOf('chromium.launch', contractIndex));
+    expect(contractIndex).toBeLessThan(scriptSource.indexOf('browser.newContext', contractIndex));
+    expect(contractIndex).toBeLessThan(scriptSource.indexOf('page.goto', contractIndex));
+  });
+
+  test('binds the stabilized navigation to the exact production route contract', () => {
+    const contract = productionContract();
+    expect(() => assertLivePlayProductionNavigationBinding({
+      actualUrl: `https://mazer.example.test${productionRoute}&v=one`,
+      contract
+    })).not.toThrow();
+    expect(() => assertLivePlayProductionNavigationBinding({
+      actualUrl: 'https://mazer.example.test/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=9',
+      contract
+    })).toThrow('live_play_production_navigation_contract_drift');
+    expect(() => assertLivePlayProductionNavigationBinding({
+      actualUrl: `https://attacker.example.test${productionRoute}`,
+      contract
+    })).toThrow('live_play_production_navigation_origin_or_path_drift');
+  });
+
+  test('accepts only exact authenticated deterministic play readiness and rejects the historical menu-reset race', () => {
+    const contract = productionContract();
+    const readyDiagnostics = {
+      runtime: {
+        auth: { status: 'authenticated' },
+        surface: { mode: 'play' },
+        generation: {
+          drawStage: {
+            buildPrerollActive: false,
+            complete: true,
+            lifecyclePhase: 'settled'
+          },
+          maze: { seed: 1735707243, seedSource: 'runtime-random' }
+        },
+        play: { playtest: { encoding: 'walkable-rows-v1' } }
+      },
+      visual: { touchControls: { visible: true } }
+    };
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: readyDiagnostics,
+      qaMoveAvailable: true
+    })).toEqual({ state: 'ready', reason: null });
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: {
+        ...readyDiagnostics,
+        runtime: { ...readyDiagnostics.runtime, auth: { status: 'guest' } }
+      },
+      qaMoveAvailable: true
+    })).toEqual({ state: 'rejected', reason: 'live_play_production_auth_fixture_state_drift' });
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: {
+        ...readyDiagnostics,
+        runtime: {
+          ...readyDiagnostics.runtime,
+          generation: { ...readyDiagnostics.runtime.generation, maze: { seed: 99 } }
+        }
+      },
+      qaMoveAvailable: true
+    })).toEqual({ state: 'rejected', reason: 'live_play_production_observed_seed_drift' });
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: {
+        runtime: {
+          auth: { status: 'authenticated' },
+          surface: { mode: 'menu' },
+          generation: {
+            maze: { buildKind: 'menu-generated', seed: 1735707242 },
+            pendingRequest: { reason: 'menu-demo-goal-reset' }
+          }
+        },
+        visual: { touchControls: { visible: false } }
+      },
+      qaMoveAvailable: false,
+      sawPlay: false
+    })).toEqual({ state: 'rejected', reason: 'live_play_production_play_returned_to_menu' });
+  });
+
+  test('records bounded requested and observed production identity without query-bearing URLs', () => {
+    const artifactContract = createLivePlayProductionArtifactContract(productionContract(), {
+      runtime: {
+        auth: { status: 'authenticated' },
+        generation: { maze: { seed: 1735707243, seedSource: 'runtime-random' } }
+      }
+    });
+    expect(artifactContract).toEqual({
+      enabled: true,
+      fixtureMode: 'authenticated',
+      observedFixtureMode: 'authenticated',
+      observedSeed: 1735707243,
+      observedSeedSource: 'runtime-random',
+      requestedSeed: 1735707242,
+      seedInput: 'explicit-query',
+      route: {
+        origin: 'https://mazer.example.test',
+        pathname: '/',
+        queryKeys: ['authFixture', 'mazeSeed', 'mode', 'runtimeDiagnostics']
+      }
+    });
+    expect(JSON.stringify(artifactContract)).not.toContain('?');
+  });
+
+  test('accepts only the exact protected-deployment bypass cookie and rejects login redirects', async () => {
+    const makeContext = ({ responseUrl, cookies }) => ({
+      cookies: async () => cookies,
+      request: {
+        get: async () => ({
+          dispose: async () => {},
+          status: () => 200,
+          url: () => responseUrl
+        })
+      }
+    });
+    await expect(seedLivePlayProtectionBypassCookie({
+      baseUrl: 'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+      context: makeContext({
+        responseUrl: 'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+        cookies: [{ name: '_vercel_jwt', value: 'opaque' }]
+      }),
+      protectionBypass: 'fixture-secret'
+    })).resolves.toBeUndefined();
+    await expect(seedLivePlayProtectionBypassCookie({
+      baseUrl: 'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+      context: makeContext({
+        responseUrl: 'https://vercel.com/login',
+        cookies: [{ name: 'unrelated', value: 'opaque' }]
+      }),
+      protectionBypass: 'fixture-secret'
+    })).rejects.toThrow('live_play_protection_bypass_cookie_seed_failed');
+  });
+
   test('absorbs exactly one production service-worker reload before readiness is authoritative', async () => {
     const tracker = createLivePlayQaNavigationTracker();
     tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/?runtimeDiagnostics=1' });
@@ -348,6 +538,7 @@ describe('live play QA script helpers', () => {
         pendingRequests: new Map([['request', { method: 'GET', url: 'https://mazer.example.test/pending?key=<redacted>' }]]),
         phase: 'readiness',
         phaseTimings: [{ phase: 'readiness', elapsedMs: 12 }],
+        productionAcceptanceContract: productionContract(),
         runStartedAt: performance.now() - 100,
         targetUrl: 'https://mazer.example.test/?runtimeDiagnostics=1&authFixture=authenticated',
         viewport: { width: 1440, height: 900 }
@@ -357,14 +548,25 @@ describe('live play QA script helpers', () => {
       expect(evidence).toMatchObject({
         schema: 'mazer.live-play-qa-failure.v1',
         phase: 'readiness',
+        productionAcceptance: {
+          enabled: true,
+          fixtureMode: 'authenticated',
+          observedFixtureMode: null,
+          observedSeed: null,
+          observedSeedSource: null,
+          requestedSeed: 1735707242
+        },
+        targetUrl: 'https://mazer.example.test/',
         page: {
           qa: { movePlayPlayerCallable: false, present: false },
-          url: 'https://mazer.example.test/?runtimeDiagnostics=<redacted>&token=<redacted>'
+          url: 'https://mazer.example.test/'
         }
       });
       expect(evidence.elapsedMs).toBeGreaterThanOrEqual(100);
       expect(evidence.error).not.toContain('token=secret');
       expect(evidence.consoleMessages).toEqual(['<redacted-email> failed token=<redacted>']);
+      expect(evidence.failedRequests[0].url).toBe('https://mazer.example.test/api');
+      expect(evidence.pendingRequests[0].url).toBe('https://mazer.example.test/pending');
       expect(evidence.artifacts.screenshotPath).toBe(artifact.screenshotPath);
       expect(await readFile(artifact.screenshotPath, 'utf8')).toBe('png');
     } finally {
