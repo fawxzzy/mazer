@@ -6,6 +6,7 @@ import { describe, expect, test } from 'vitest';
 import {
   captureRedactedLivePlayQaScreenshot,
   captureLivePlayQaFailureEvidence,
+  createLivePlayQaEvidencePersistenceError,
   createLivePlayQaFailureError,
   isLivePlayDiagnosticsReady,
   measureLivePlayQaElapsedMs,
@@ -85,6 +86,21 @@ describe('live play QA script helpers', () => {
     expect(failure.message).toContain('state=<redacted>');
     expect(failure.message).not.toContain('raw-secret');
     expect(failure.cause).toBeUndefined();
+  });
+
+  test('sanitizes both failures when evidence persistence itself fails', () => {
+    const failure = createLivePlayQaEvidencePersistenceError({
+      error: new Error('failed https://example.test/callback?state=raw-secret'),
+      evidenceError: new Error('write failed for user@example.test token=secret')
+    });
+    expect(failure).toBeInstanceOf(AggregateError);
+    expect(failure.message).toBe('live_play_qa_failed_and_failure_evidence_could_not_be_persisted');
+    expect(failure.errors.map((entry) => entry.message)).toEqual([
+      'failed https://example.test/callback?state=<redacted>',
+      'write failed for <redacted-email> token=<redacted>'
+    ]);
+    expect(JSON.stringify(failure.errors)).not.toContain('raw-secret');
+    expect(JSON.stringify(failure.errors)).not.toContain('user@example.test');
   });
 
   test('redacts rendered text and media while capturing a failure screenshot', async () => {

@@ -127,6 +127,13 @@ export const createLivePlayQaFailureError = ({ error, evidencePath }) => new Err
   `Failure evidence: ${evidencePath}`
 );
 
+export const createLivePlayQaEvidencePersistenceError = ({ error, evidenceError }) => new AggregateError(
+  [error, evidenceError].map((failure) => new Error(sanitizeLivePlayQaDiagnosticText(
+    failure instanceof Error ? failure.message : String(failure)
+  ))),
+  'live_play_qa_failed_and_failure_evidence_could_not_be_persisted'
+);
+
 export const settleLivePlayQaCleanup = async (actions) => {
   const errors = [];
   for (const action of actions) {
@@ -1492,10 +1499,8 @@ export const runLivePlayQa = async (options = {}) => {
         viewport
       });
     } catch (evidenceError) {
-      throw new AggregateError(
-        [error, evidenceError],
-        'live_play_qa_failed_and_failure_evidence_could_not_be_persisted'
-      );
+      terminalFailure = createLivePlayQaEvidencePersistenceError({ error, evidenceError });
+      throw terminalFailure;
     }
     terminalFailure = createLivePlayQaFailureError({ error, evidencePath: artifact.evidencePath });
     throw terminalFailure;
