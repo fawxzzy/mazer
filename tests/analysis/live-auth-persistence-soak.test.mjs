@@ -12,6 +12,7 @@ import {
   SIGNED_OUT_SHARED_ACCOUNT_BUTTONS,
   buildAuthPersistenceRoute,
   buildVercelProtectionBypassSeedUrl,
+  createAuthPersistenceClosedBrowserBoundaryAction,
   createGuardedAuthPersistenceContext,
   createFixtureSettingsRestorePlan,
   evaluateFixtureSettingsCleanup,
@@ -464,19 +465,26 @@ describe('live auth persistence soak contract', () => {
     expect(assertAuthPersistenceClosedBrowserBoundary({
       baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
       blockedMutationRequests,
+      contextClosed: true,
       finalUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
-      navigationHistory
+      navigationHistory,
+      pageClosed: true,
+      pendingRequestCount: 0
     })).toEqual({
       finalUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
-      navigationCount: 1
+      navigationCount: 1,
+      pendingRequestCount: 0
     });
 
     blockedMutationRequests.push({ method: 'POST', url: `${PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl}late` });
     expect(() => assertAuthPersistenceClosedBrowserBoundary({
       baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
       blockedMutationRequests,
+      contextClosed: true,
       finalUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
-      navigationHistory
+      navigationHistory,
+      pageClosed: true,
+      pendingRequestCount: 0
     })).toThrow('external_mutation_attempt_blocked');
 
     blockedMutationRequests.length = 0;
@@ -484,9 +492,61 @@ describe('live auth persistence soak contract', () => {
     expect(() => assertAuthPersistenceClosedBrowserBoundary({
       baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
       blockedMutationRequests,
+      contextClosed: true,
       finalUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
-      navigationHistory
+      navigationHistory,
+      pageClosed: true,
+      pendingRequestCount: 0
     })).toThrow('auth_persistence_navigation_origin_mismatch');
+  });
+
+  test('constructs the closed-browser action before URL capture and consumes the later captured URL', async () => {
+    let finalUrl = null;
+    let boundary = null;
+    const actions = [
+      {
+        name: 'final_browser_url_capture',
+        run: () => { finalUrl = PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl; }
+      },
+      createAuthPersistenceClosedBrowserBoundaryAction({
+        baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+        blockedMutationRequests: [],
+        getContextClosed: () => true,
+        getFinalUrl: () => finalUrl,
+        getPageClosed: () => true,
+        getPendingRequestCount: () => 0,
+        navigationHistory: [],
+        onVerified: (value) => { boundary = value; }
+      })
+    ];
+
+    expect(finalUrl).toBe(null);
+    await expect(settleAuthPersistenceResources(actions)).resolves.toEqual([]);
+    expect(boundary).toEqual({
+      finalUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      navigationCount: 0,
+      pendingRequestCount: 0
+    });
+  });
+
+  test('fails closed for missing final URL, unsettled requests, or incomplete page and context closure', async () => {
+    const base = {
+      baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      blockedMutationRequests: [],
+      contextClosed: true,
+      finalUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+      navigationHistory: [],
+      pageClosed: true,
+      pendingRequestCount: 0
+    };
+    expect(() => assertAuthPersistenceClosedBrowserBoundary({ ...base, finalUrl: null }))
+      .toThrow('auth_persistence_final_browser_url_unavailable');
+    expect(() => assertAuthPersistenceClosedBrowserBoundary({ ...base, pendingRequestCount: 1 }))
+      .toThrow('auth_persistence_pending_requests_unsettled');
+    expect(() => assertAuthPersistenceClosedBrowserBoundary({ ...base, pageClosed: false }))
+      .toThrow('auth_persistence_browser_boundary_not_closed');
+    expect(() => assertAuthPersistenceClosedBrowserBoundary({ ...base, contextClosed: false }))
+      .toThrow('auth_persistence_browser_boundary_not_closed');
   });
 
   test('recognizes shared account entry on the main menu and rejects every retired local-auth control', () => {
@@ -685,6 +745,9 @@ describe('live auth persistence soak contract', () => {
 
     await expect(publishAuthPersistenceSuccessAfterCleanup({
       cleanupErrors: ['fixture_settings_restore:fixture_settings_complete_postimage_mismatch'],
+      closedBrowserBoundary: { finalUrl: 'https://example.test/', navigationCount: 1, pendingRequestCount: 0 },
+      failureEvidencePersisted: false,
+      pendingSummary: {},
       writeSummary: async () => { events.push('summary'); },
       promoteLatest: async () => { events.push('latest'); }
     })).resolves.toEqual({ published: false, promoted: false });
@@ -692,10 +755,78 @@ describe('live auth persistence soak contract', () => {
 
     await expect(publishAuthPersistenceSuccessAfterCleanup({
       cleanupErrors: [],
+      closedBrowserBoundary: { finalUrl: 'https://example.test/', navigationCount: 1, pendingRequestCount: 0 },
+      failureEvidencePersisted: false,
+      pendingSummary: {},
       writeSummary: async () => { events.push('summary'); },
       promoteLatest: async () => { events.push('latest'); }
     })).resolves.toEqual({ published: true, promoted: true });
     expect(events).toEqual(['summary', 'latest']);
+  });
+
+  test('never publishes success or latest for any finalization failure state', async () => {
+    for (const finalization of [
+      { closedBrowserBoundary: null, failureEvidencePersisted: false, pendingSummary: {} },
+      { closedBrowserBoundary: {}, failureEvidencePersisted: true, pendingSummary: {} },
+      { closedBrowserBoundary: {}, failureEvidencePersisted: false, pendingSummary: null }
+    ]) {
+      const events = [];
+      await expect(publishAuthPersistenceSuccessAfterCleanup({
+        cleanupErrors: [],
+        ...finalization,
+        writeSummary: async () => { events.push('summary'); },
+        promoteLatest: async () => { events.push('latest'); }
+      })).resolves.toEqual({ published: false, promoted: false });
+      expect(events).toEqual([]);
+    }
+  });
+
+  test('routes a missing final URL through deterministic sanitized failure JSON', async () => {
+    const outputDir = await mkdtemp(join(tmpdir(), 'mazer-auth-finalization-evidence-'));
+    try {
+      const action = createAuthPersistenceClosedBrowserBoundaryAction({
+        baseUrl: PROTECTED_DEPLOYMENT_IDENTITY.deploymentUrl,
+        blockedMutationRequests: [],
+        getContextClosed: () => true,
+        getFinalUrl: () => null,
+        getPageClosed: () => true,
+        getPendingRequestCount: () => 0,
+        navigationHistory: [],
+        onVerified: () => { throw new Error('unreachable'); }
+      });
+      const errors = await settleAuthPersistenceResources([action]);
+      expect(errors).toEqual(['closed_browser_boundary:auth_persistence_final_browser_url_unavailable']);
+      const artifacts = await persistAuthPersistenceFailureEvidence({
+        outputDir,
+        label: 'finalization',
+        evidence: {
+          capturedAt: '2026-09-14T00:00:00.000Z',
+          cleanupErrors: [],
+          currentPhase: 'finalization',
+          elapsedMs: 1,
+          error: errors[0]
+        },
+        screenshot: async () => { throw new Error('page_unavailable'); }
+      });
+      const persisted = JSON.parse(await readFile(artifacts.evidencePath, 'utf8'));
+      expect(persisted).toMatchObject({
+        schema: 'mazer.live-auth-persistence-failure.v1',
+        cleanupErrors: [],
+        currentPhase: 'finalization',
+        error: 'closed_browser_boundary:auth_persistence_final_browser_url_unavailable',
+        artifacts: { screenshotPath: null, screenshotError: 'page_unavailable' }
+      });
+    } finally {
+      await rm(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  test('pins the original pre-capture null defect out of the finalization source', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/live-auth-persistence-soak.mjs'), 'utf8');
+    expect(source).not.toContain('resolvedBaseUrl === null || finalBrowserUrl === null');
+    expect(source).toContain('createAuthPersistenceClosedBrowserBoundaryAction({');
+    expect(source).toContain('getFinalUrl: () => finalBrowserUrl');
+    expect(source).toContain("run: () => persistCurrentFailureEvidence('finalization')");
   });
 
   test('treats a closed page after preimage capture as cleanup failure', () => {
