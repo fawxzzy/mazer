@@ -11,6 +11,8 @@ import {
   MAZER_OAUTH_CLIENT_ID,
   MAZER_OAUTH_PENDING_KEY,
   MAZER_OAUTH_SESSION_QUARANTINE_KEY,
+  MAZER_OAUTH_SESSION_LOCK_MAX_WAIT_MS,
+  MAZER_OAUTH_TOKEN_TIMEOUT_MS,
   MAZER_OAUTH_TOKEN_URL,
   advanceMazerAuthMutationEpoch,
   advanceMazerSharedAuthMutationEpoch,
@@ -28,6 +30,7 @@ import {
   resolveMazerOAuthSessionStorage,
   resolveMazerLegalRoute,
   runMazerExclusiveAuthMutation,
+  runMazerQueuedAuthMutation,
   type MazerAuthMutationLockManager,
   type MazerOAuthClient,
   type MazerOAuthLocation,
@@ -44,20 +47,39 @@ class MemoryStorage implements MazerOAuthStorage {
 
 class ExclusiveLockHarness implements MazerAuthMutationLockManager {
   private held = false;
+  private readonly queue: Array<() => void> = [];
 
   async request<T>(
     _name: string,
-    _options: { ifAvailable: true; mode: 'exclusive' },
+    options: { ifAvailable?: true; mode: 'exclusive'; signal?: AbortSignal },
     callback: (lock: Lock | null) => T | PromiseLike<T>
   ): Promise<T> {
     if (this.held) {
-      return callback(null);
+      if (options.ifAvailable) {
+        return callback(null);
+      }
+      await new Promise<void>((resolve, reject) => {
+        const resume = () => {
+          options.signal?.removeEventListener('abort', onAbort);
+          resolve();
+        };
+        const onAbort = () => {
+          const index = this.queue.indexOf(resume);
+          if (index >= 0) {
+            this.queue.splice(index, 1);
+          }
+          reject(new DOMException('The lock request was aborted.', 'AbortError'));
+        };
+        this.queue.push(resume);
+        options.signal?.addEventListener('abort', onAbort, { once: true });
+      });
     }
     this.held = true;
     try {
-      return await callback({ mode: 'exclusive', name: 'mazer.auth.oauth-session-transaction.v1' } as Lock);
+      return await callback({ mode: 'exclusive', name: MAZER_OAUTH_AUTH_SESSION_KEY } as Lock);
     } finally {
       this.held = false;
+      this.queue.shift()?.();
     }
   }
 }
@@ -89,6 +111,7 @@ const createRuntime = (
   notifyAcceptedSession: vi.fn(() => true),
   now: () => 2_000_000,
   runExclusiveSessionTransaction: async (operation) => operation(),
+  runQueuedSessionTransaction: async (operation) => operation(),
   sessionStorage: storage,
   setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
 });
@@ -159,6 +182,51 @@ describe('Mazer shared account contract', () => {
       () => 'recovered',
       lock
     )).resolves.toEqual({ status: 'completed', value: 'recovered' });
+  });
+
+  test('queues an OAuth callback commit behind a current shared auth lock holder', async () => {
+    const lock = new ExclusiveLockHarness();
+    let releaseRefresh!: () => void;
+    const refresh = runMazerExclusiveAuthMutation(async () => {
+      await new Promise<void>((resolve) => { releaseRefresh = resolve; });
+      return 'refresh-complete';
+    }, lock);
+    await vi.waitFor(() => expect(releaseRefresh).toBeTypeOf('function'));
+
+    const commit = vi.fn(() => 'oauth-committed');
+    const queuedCommit = runMazerQueuedAuthMutation(commit, lock);
+    await Promise.resolve();
+    expect(commit).not.toHaveBeenCalled();
+    expect(MAZER_OAUTH_SESSION_LOCK_MAX_WAIT_MS).toBe(MAZER_OAUTH_TOKEN_TIMEOUT_MS);
+
+    releaseRefresh();
+    await expect(refresh).resolves.toEqual({ status: 'completed', value: 'refresh-complete' });
+    await expect(queuedCommit).resolves.toEqual({ status: 'completed', value: 'oauth-committed' });
+    expect(commit).toHaveBeenCalledOnce();
+  });
+
+  test('bounds a queued OAuth callback commit when the shared auth lock stays busy', async () => {
+    vi.useFakeTimers();
+    try {
+      const lock = new ExclusiveLockHarness();
+      let releaseRefresh!: () => void;
+      const refresh = runMazerExclusiveAuthMutation(async () => {
+        await new Promise<void>((resolve) => { releaseRefresh = resolve; });
+      }, lock);
+      await vi.waitFor(() => expect(releaseRefresh).toBeTypeOf('function'));
+
+      const commit = vi.fn(() => 'must-not-run');
+      const queuedCommit = runMazerQueuedAuthMutation(commit, lock, 5);
+      const result = expect(queuedCommit).resolves.toEqual({ status: 'unavailable' });
+      await vi.advanceTimersByTimeAsync(5);
+      await result;
+      expect(commit).not.toHaveBeenCalled();
+
+      releaseRefresh();
+      await refresh;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test('prevents a late refresh or password update from overwriting an accepted OAuth session', async () => {
@@ -785,7 +853,7 @@ describe('Mazer shared account contract', () => {
     expect(client.auth.signOut).not.toHaveBeenCalled();
   });
 
-  test('fails without mutating shared storage when the exclusive session lock is busy', async () => {
+  test('fails without mutating shared storage when bounded queued lock acquisition is unavailable', async () => {
     const storage = new MemoryStorage();
     const authStorage = new MemoryStorage();
     const previousSession = JSON.stringify({ access_token: 'previous-token', refresh_token: 'previous-refresh' });
@@ -802,7 +870,7 @@ describe('Mazer shared account contract', () => {
       token_type: 'bearer'
     }), { headers: { 'content-type': 'application/json' }, status: 200 })) as typeof fetch);
     runtime.authStorage = authStorage;
-    runtime.runExclusiveSessionTransaction = vi.fn(async () => null);
+    runtime.runQueuedSessionTransaction = vi.fn(async () => null);
 
     await expect(consumeMazerOAuthCallback({
       code: 'one-time-code', malformed: false, providerError: false, requested: true, state: pending.state
@@ -810,7 +878,7 @@ describe('Mazer shared account contract', () => {
       category: 'storage_unavailable',
       status: 'failed'
     });
-    expect(runtime.runExclusiveSessionTransaction).toHaveBeenCalledTimes(1);
+    expect(runtime.runQueuedSessionTransaction).toHaveBeenCalledTimes(1);
     expect(authStorage.getItem('sb-bxtcuhkotumitoqtrcej-auth-token')).toBe(previousSession);
     expect(authStorage.getItem(MAZER_OAUTH_SESSION_QUARANTINE_KEY)).toBeNull();
   });

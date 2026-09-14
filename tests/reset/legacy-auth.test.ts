@@ -245,6 +245,7 @@ describe('legacy auth runtime', () => {
         anonKey: 'anon-key',
         url: 'https://bxtcuhkotumitoqtrcej.supabase.co'
       });
+      await expect(freshAuth.getLegacyAuthClient()).resolves.not.toBeNull();
       let releaseOAuth!: () => void;
       const oauth = freshPortal.runMazerExclusiveAuthMutation(async () => {
         await new Promise<void>((resolve) => { releaseOAuth = resolve; });
@@ -253,13 +254,24 @@ describe('legacy auth runtime', () => {
 
       const signIn = freshAuth.signInLegacyAuth('player@example.test', 'secret1');
       const signup = freshAuth.signUpLegacyAuth('new@example.test', 'secret1', 'MazeNew');
-      await Promise.resolve();
+      await expect(Promise.all([signIn, signup])).resolves.toEqual([
+        { snapshot: expect.objectContaining({ status: 'unavailable' }) },
+        { snapshot: expect.objectContaining({ status: 'unavailable' }) }
+      ]);
       expect(signInWithPassword).not.toHaveBeenCalled();
       expect(signUp).not.toHaveBeenCalled();
 
       releaseOAuth();
       await expect(oauth).resolves.toMatchObject({ status: 'completed' });
-      await expect(Promise.all([signIn, signup])).resolves.toHaveLength(2);
+      await expect(freshAuth.signInLegacyAuth(
+        'player@example.test',
+        'secret1'
+      )).resolves.toHaveProperty('snapshot');
+      await expect(freshAuth.signUpLegacyAuth(
+        'new@example.test',
+        'secret1',
+        'MazeNew'
+      )).resolves.toHaveProperty('snapshot');
       expect(signInWithPassword).toHaveBeenCalledOnce();
       expect(signUp).toHaveBeenCalledOnce();
     } finally {

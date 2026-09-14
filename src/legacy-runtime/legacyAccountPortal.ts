@@ -18,6 +18,7 @@ export const MAZER_OAUTH_AUTH_STORAGE_PROBE_BYTES = 65_536;
 export const MAZER_OAUTH_SESSION_LOCK_NAME = `lock:${MAZER_OAUTH_AUTH_SESSION_KEY}`;
 export const MAZER_OAUTH_PENDING_TTL_MS = 300_000;
 export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
+export const MAZER_OAUTH_SESSION_LOCK_MAX_WAIT_MS = MAZER_OAUTH_TOKEN_TIMEOUT_MS;
 export const MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS = 60_000;
 export const MAZER_OAUTH_SAFE_ERROR_MESSAGE = 'Account connection unavailable. Return to Mazer and try again.';
 
@@ -93,6 +94,7 @@ export interface MazerOAuthRuntime {
   notifyAcceptedSession?(session: Record<string, unknown>): boolean;
   now(): number;
   runExclusiveSessionTransaction<T>(operation: () => T): Promise<T | null>;
+  runQueuedSessionTransaction<T>(operation: () => T): Promise<T | null>;
   sessionStorage: MazerOAuthStorage;
   setTimer(handler: () => void, timeoutMs: number): ReturnType<typeof setTimeout>;
 }
@@ -105,7 +107,7 @@ export interface MazerOAuthPageLifecycle {
 export interface MazerAuthMutationLockManager {
   request<T>(
     name: string,
-    options: { ifAvailable: true; mode: 'exclusive' },
+    options: { ifAvailable?: true; mode: 'exclusive'; signal?: AbortSignal },
     callback: (lock: Lock | null) => T | PromiseLike<T>
   ): Promise<T>;
 }
@@ -150,6 +152,35 @@ export const runMazerExclusiveAuthMutation = async <T>(
     );
   } catch {
     return { status: 'unavailable' };
+  }
+};
+
+export const runMazerQueuedAuthMutation = async <T>(
+  operation: () => T | Promise<T>,
+  lockManager: MazerAuthMutationLockManager | null = (
+    typeof navigator === 'undefined' || navigator.locks === undefined
+      ? null
+      : navigator.locks
+  ),
+  maxWaitMs = MAZER_OAUTH_SESSION_LOCK_MAX_WAIT_MS
+): Promise<MazerExclusiveAuthMutationResult<T>> => {
+  if (lockManager === null) {
+    return { status: 'unavailable' };
+  }
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), maxWaitMs);
+  try {
+    return await lockManager.request(
+      MAZER_OAUTH_SESSION_LOCK_NAME,
+      { mode: 'exclusive', signal: abortController.signal },
+      async (lock) => lock === null
+        ? { status: 'unavailable' }
+        : { status: 'completed', value: await operation() }
+    );
+  } catch {
+    return { status: 'unavailable' };
+  } finally {
+    clearTimeout(timeout);
   }
 };
 
@@ -245,6 +276,10 @@ const resolveBrowserRuntime = (): MazerOAuthRuntimeResolution => {
         now: () => Date.now(),
         runExclusiveSessionTransaction: async (operation) => {
           const result = await runMazerExclusiveAuthMutation(operation);
+          return result.status === 'completed' ? result.value : null;
+        },
+        runQueuedSessionTransaction: async (operation) => {
+          const result = await runMazerQueuedAuthMutation(operation);
           return result.status === 'completed' ? result.value : null;
         },
         sessionStorage,
@@ -1234,7 +1269,9 @@ const consumeMazerOAuthCallbackInner = async (
     }
     return { status: 'connected' };
   };
-  const result = await runtime.runExclusiveSessionTransaction(commitSessionTransaction);
+  // Code exchange is one-time. Queue this final commit behind any in-flight
+  // auth-js refresh instead of failing after the provider code is consumed.
+  const result = await runtime.runQueuedSessionTransaction(commitSessionTransaction);
   return result ?? failed('storage_unavailable');
 };
 
