@@ -460,7 +460,10 @@ describe('legacy auth runtime', () => {
   test('guards auth persistence against global sign-out and duplicate listeners', () => {
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
 
-    expect(authSource).toContain("client.auth.signOut({ scope: 'local' })");
+    expect(authSource).toContain("await directSignOut._signOut({ scope: 'local' })");
+    expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
+    expect(authSource).toContain('return runLegacyAuthDirectSessionMutation(async () => {');
+    expect(authSource).toContain('fail closed if the pinned seam ever changes');
     expect(authSource).toContain('legacyAuthPersistenceListenerInstalled');
     expect(authSource).toContain('legacyAuthStorageListenerInstalled');
     expect(authSource).toContain("window.addEventListener('storage'");

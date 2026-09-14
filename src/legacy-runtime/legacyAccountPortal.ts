@@ -362,7 +362,11 @@ const verifyMazerOAuthAuthStorageWritable = (runtime: MazerOAuthRuntime): boolea
   if (storage === null) {
     return false;
   }
+  let verified = false;
   try {
+    // A terminated tab can leave this app-owned probe behind. Clear and verify
+    // that stale residue before testing current write capacity.
+    storage.removeItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY);
     if (storage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY) !== null) {
       return false;
     }
@@ -371,11 +375,20 @@ const verifyMazerOAuthAuthStorageWritable = (runtime: MazerOAuthRuntime): boolea
     if (storage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY) !== probe) {
       return false;
     }
-    storage.removeItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY);
-    return storage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY) === null;
+    verified = true;
   } catch {
-    return false;
+    verified = false;
+  } finally {
+    try {
+      storage.removeItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY);
+      if (storage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY) !== null) {
+        verified = false;
+      }
+    } catch {
+      verified = false;
+    }
   }
+  return verified;
 };
 
 export const beginMazerOAuthAuthorization = async (
@@ -550,7 +563,8 @@ const parsePendingRecord = (raw: string | null): MazerOAuthPendingRecord | null 
 export const isMazerOAuthCallbackReadyForBoot = (
   location: Pick<MazerOAuthLocation, 'hash' | 'origin' | 'pathname' | 'search'>,
   storage: MazerOAuthStorage,
-  nowEpochMs = Date.now()
+  nowEpochMs = Date.now(),
+  authStorage: MazerOAuthStorage | null = resolveMazerOAuthAuthStorage()
 ): boolean => {
   const query = new URLSearchParams(location.search);
   const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -576,8 +590,11 @@ export const isMazerOAuthCallbackReadyForBoot = (
     const pending = parsePendingRecord(storage.getItem(MAZER_OAUTH_PENDING_KEY));
     if (
       pending === null
+      || authStorage === null
       || queryState[0] !== pending.state
       || pending.authMutationEpoch !== readAuthMutationEpoch(storage)
+      || pending.sharedAuthMutationEpoch !== readSharedAuthMutationEpoch(authStorage)
+      || pending.authSessionPreimageRaw !== authStorage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY)
     ) {
       return false;
     }

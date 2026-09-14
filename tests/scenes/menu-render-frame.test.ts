@@ -1917,11 +1917,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain("return 'Username saved.';");
     expect(authSource).toContain('detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation()');
     expect(authSource).not.toContain('detectSessionInUrl: true');
-    expect(authSource).toContain('const invalidation = await runMazerExclusiveAuthMutation(() => {');
+    expect(authSource).toContain('const result = await runMazerExclusiveAuthMutation(async () => {');
     expect(authSource).toContain('if (advanceMazerSharedAuthMutationEpoch() === null)');
     expect(authSource).toContain('if (advanceMazerAuthMutationEpoch() === null)');
-    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\(async \(\) => \{/g)).toHaveLength(2);
-    expect(authSource).toContain('=> runLegacyAuthInternallyLockedMutation(async () => {');
+    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\(async \(\) => \{/g)).toHaveLength(3);
+    expect(authSource).not.toContain('runLegacyAuthInternallyLockedMutation');
+    expect(authSource).toContain("const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;");
+    expect(authSource).toContain("if (typeof directSignOut._signOut !== 'function') {");
+    expect(authSource).toContain("await directSignOut._signOut({ scope: 'local' })");
+    expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
     expect(authSource).toContain('sessionResult = await client.auth.getSession();');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");
   });

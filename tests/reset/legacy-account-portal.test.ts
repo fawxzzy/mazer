@@ -232,6 +232,7 @@ describe('Mazer shared account contract', () => {
     };
     const sizedProbeRuntime = createRuntime(new MemoryStorage());
     sizedProbeRuntime.authStorage = sizedProbeStorage;
+    sizedProbeStorage.setItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY, 'stale-probe');
     await expect(beginMazerOAuthAuthorization(sizedProbeRuntime)).resolves.toEqual({ status: 'none' });
     expect(observedProbeBytes).toBe(MAZER_OAUTH_AUTH_STORAGE_PROBE_BYTES);
     expect(sizedProbeStorage.getItem(MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY)).toBeNull();
@@ -322,25 +323,43 @@ describe('Mazer shared account contract', () => {
     const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
     expect(isMazerOAuthCallbackReadyForBoot(createLocation(
       `https://mazer.fawxzzy.com/?code=one-time-code&state=${pending.state}`
-    ), storage, 2_000_000)).toBe(true);
+    ), storage, 2_000_000, storage)).toBe(true);
     expect(isMazerOAuthCallbackReadyForBoot(createLocation(
       `https://mazer.fawxzzy.com/?error=access_denied&state=${pending.state}`
-    ), storage, 2_000_000)).toBe(true);
+    ), storage, 2_000_000, storage)).toBe(true);
 
     expect(isMazerOAuthCallbackReadyForBoot(
       createLocation('https://mazer.fawxzzy.com/?state=arbitrary'),
       storage,
-      2_000_000
+      2_000_000,
+      storage
     )).toBe(false);
     expect(isMazerOAuthCallbackReadyForBoot(createLocation(
       'https://mazer.fawxzzy.com/?error=arbitrary&state=abcdefghijklmnopqrstuvwxyzABCDEFGH123456789'
-    ), storage, 2_000_000)).toBe(false);
+    ), storage, 2_000_000, storage)).toBe(false);
     expect(isMazerOAuthCallbackReadyForBoot(createLocation(
       `https://preview.example.test/?code=one-time-code&state=${pending.state}`
-    ), storage, 2_000_000)).toBe(false);
+    ), storage, 2_000_000, storage)).toBe(false);
     expect(isMazerOAuthCallbackReadyForBoot(createLocation(
       `https://mazer.fawxzzy.com/?code=one-time-code&state=${pending.state}`
-    ), storage, 2_400_001)).toBe(false);
+    ), storage, 2_400_001, storage)).toBe(false);
+
+    const sharedEpochDriftStorage = new MemoryStorage();
+    await beginMazerOAuthAuthorization(createRuntime(sharedEpochDriftStorage));
+    const sharedEpochPending = JSON.parse(sharedEpochDriftStorage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+    advanceMazerSharedAuthMutationEpoch(sharedEpochDriftStorage);
+    expect(isMazerOAuthCallbackReadyForBoot(createLocation(
+      `https://mazer.fawxzzy.com/?code=one-time-code&state=${sharedEpochPending.state}`
+    ), sharedEpochDriftStorage, 2_000_000, sharedEpochDriftStorage)).toBe(false);
+
+    const sessionDriftStorage = new MemoryStorage();
+    sessionDriftStorage.setItem(MAZER_OAUTH_AUTH_SESSION_KEY, 'account-a');
+    await beginMazerOAuthAuthorization(createRuntime(sessionDriftStorage));
+    const sessionDriftPending = JSON.parse(sessionDriftStorage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+    sessionDriftStorage.setItem(MAZER_OAUTH_AUTH_SESSION_KEY, 'account-b');
+    expect(isMazerOAuthCallbackReadyForBoot(createLocation(
+      `https://mazer.fawxzzy.com/?code=one-time-code&state=${sessionDriftPending.state}`
+    ), sessionDriftStorage, 2_000_000, sessionDriftStorage)).toBe(false);
   });
 
   test('scrubs callback material before returning the captured in-memory result', () => {

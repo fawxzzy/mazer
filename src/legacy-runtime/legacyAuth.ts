@@ -129,6 +129,11 @@ export type LegacyAuthStateListener = (
 
 type LegacyAuthStorage = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>;
 type LegacyAuthClient = SupabaseClient<any, any, any>;
+interface LegacyAuthDirectSignOutClient {
+  _signOut: (options: { scope: 'local' }) => Promise<{
+    error: { message?: string | null } | null;
+  }>;
+}
 
 const createGuestSnapshot = (
   configured: boolean,
@@ -565,46 +570,19 @@ const createLegacyAuthMutationUnavailableResult = (): LegacyAuthActionResult => 
   })
 });
 
-const invalidateLegacyAuthMutation = async (): Promise<boolean> => {
-  const invalidation = await runMazerExclusiveAuthMutation(() => {
-    if (advanceMazerSharedAuthMutationEpoch() === null) {
-      return false;
-    }
-    if (advanceMazerAuthMutationEpoch() === null) {
-      return false;
-    }
-    return true;
-  });
-  return invalidation.status === 'completed' && invalidation.value;
-};
-
-const runLegacyAuthInternallyLockedMutation = async (
-  operation: () => Promise<LegacyAuthActionResult>
-): Promise<LegacyAuthActionResult> => {
-  if (!await invalidateLegacyAuthMutation()) {
-    return createLegacyAuthMutationUnavailableResult();
-  }
-  try {
-    return await operation();
-  } catch {
-    return createLegacyAuthMutationUnavailableResult();
-  }
-};
-
 const runLegacyAuthDirectSessionMutation = async (
   operation: () => Promise<LegacyAuthActionResult>
 ): Promise<LegacyAuthActionResult> => {
   const result = await runMazerExclusiveAuthMutation(async () => {
-    // The pinned auth-js signInWithPassword/signUp implementations persist
-    // directly instead of entering their configured lock hook. Keep their
-    // request, persistence, and notification inside our outer common lock.
-    if (advanceMazerSharedAuthMutationEpoch() === null) {
-      return createLegacyAuthMutationUnavailableResult();
-    }
-    if (advanceMazerAuthMutationEpoch() === null) {
-      return createLegacyAuthMutationUnavailableResult();
-    }
+    // Keep generation invalidation, the auth-js request, persistence, and
+    // notification in one outer common lock.
     try {
+      if (advanceMazerSharedAuthMutationEpoch() === null) {
+        return createLegacyAuthMutationUnavailableResult();
+      }
+      if (advanceMazerAuthMutationEpoch() === null) {
+        return createLegacyAuthMutationUnavailableResult();
+      }
       return await operation();
     } catch {
       return createLegacyAuthMutationUnavailableResult();
@@ -924,7 +902,7 @@ export const updateLegacyPassword = async (
   return updateLegacyPasswordWithClient(client, password);
 };
 
-export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => runLegacyAuthInternallyLockedMutation(async () => {
+export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
   const client = await getLegacyAuthClient();
   if (!client) {
     return {
@@ -932,19 +910,30 @@ export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => ru
     };
   }
 
-  const { error } = await client.auth.signOut({ scope: 'local' });
-  if (!error) {
-    legacyAuthLastSessionSignature = null;
-    markLegacyRememberedIdentityReauthRequired(typeof window === 'undefined' ? undefined : window.localStorage);
-  }
+  return runLegacyAuthDirectSessionMutation(async () => {
+    // Supabase auth-js's public signOut() reacquires its configured lock. That
+    // would force this transaction to release between generation invalidation
+    // and session removal. The pinned client exposes the same protected
+    // implementation used by signOut(); invoke it only while our exact common
+    // lock is already held, and fail closed if the pinned seam ever changes.
+    const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
+    if (typeof directSignOut._signOut !== 'function') {
+      return createLegacyAuthMutationUnavailableResult();
+    }
+    const { error } = await directSignOut._signOut({ scope: 'local' });
+    if (!error) {
+      legacyAuthLastSessionSignature = null;
+      markLegacyRememberedIdentityReauthRequired(typeof window === 'undefined' ? undefined : window.localStorage);
+    }
 
-  return {
-    snapshot: createGuestSnapshot(true, {
-      error: error?.message ?? null,
-      info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedOut
-    })
-  };
-});
+    return {
+      snapshot: createGuestSnapshot(true, {
+        error: error?.message ?? null,
+        info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedOut
+      })
+    };
+  });
+};
 
 export const subscribeLegacyAuthState = (
   listener: LegacyAuthStateListener

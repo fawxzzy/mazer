@@ -11,6 +11,7 @@ import {
   consumeMazerOAuthCallback,
   isMazerOAuthCallbackReadyForBoot,
   isMazerOAuthCallbackRequest,
+  resolveMazerOAuthAuthStorage,
   resolveMazerOAuthSessionStorage,
   resolveMazerLegalRoute,
   type MazerOAuthClient
@@ -91,9 +92,16 @@ const boot = async (): Promise<void> => {
   const oauthCallbackRequested = !passwordRecoveryRouteRequested
     && isMazerOAuthCallbackRequest(window.location);
   const oauthSessionStorage = resolveMazerOAuthSessionStorage(window);
+  const oauthAuthStorage = resolveMazerOAuthAuthStorage(window);
   const oauthCallbackReadyForBoot = oauthCallbackRequested
     && oauthSessionStorage !== null
-    && isMazerOAuthCallbackReadyForBoot(window.location, oauthSessionStorage);
+    && oauthAuthStorage !== null
+    && isMazerOAuthCallbackReadyForBoot(
+      window.location,
+      oauthSessionStorage,
+      Date.now(),
+      oauthAuthStorage
+    );
   const oauthCallback = oauthCallbackRequested
     ? captureAndScrubMazerOAuthCallback(window.location, window.history)
     : null;
