@@ -6,6 +6,7 @@ import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyG
 
 import {
   appendLivePlayQaCleanupEvidence,
+  assertLivePlayProductionVerifierIdentityUnchanged,
   assertLivePlayProductionNavigationBinding,
   assertLivePlayQaNavigationStable,
   captureRedactedLivePlayQaScreenshot,
@@ -217,6 +218,14 @@ describe('live play QA script helpers', () => {
       commit: 'not-a-commit',
       dirty: false
     })).toThrow('live_play_production_verifier_commit_invalid');
+    expect(() => assertLivePlayProductionVerifierIdentityUnchanged({
+      contract: productionContract(),
+      verifierIdentity: { commit: 'c'.repeat(40), dirty: false }
+    })).toThrow('live_play_production_verifier_identity_drift');
+    expect(() => assertLivePlayProductionVerifierIdentityUnchanged({
+      contract: productionContract(),
+      verifierIdentity
+    })).not.toThrow();
   });
 
   test('binds the stabilized navigation to the exact production route contract', () => {

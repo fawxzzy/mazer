@@ -200,6 +200,19 @@ export const resolveLivePlayProductionVerifierIdentity = ({
   });
 };
 
+export const assertLivePlayProductionVerifierIdentityUnchanged = ({
+  contract,
+  verifierIdentity
+}) => {
+  if (!contract) {
+    return;
+  }
+  const currentIdentity = resolveLivePlayProductionVerifierIdentity(verifierIdentity);
+  if (currentIdentity.commit !== contract.verifierIdentity.commit) {
+    throw new Error('live_play_production_verifier_identity_drift');
+  }
+};
+
 export const resolveLivePlayProductionAcceptanceContract = ({
   baseUrl,
   deploymentId,
@@ -2027,6 +2040,10 @@ export const runLivePlayQa = async (options = {}) => {
       : summarizeFreshReadyState(lifecycleProof.finalDiagnostics);
     const worldTurnPassed = worldTurnProof.pass && freshWorldTurnProof.pass && freshReadyProof.pass;
 
+    assertLivePlayProductionVerifierIdentityUnchanged({
+      contract: productionAcceptanceContract,
+      verifierIdentity: options.verifierIdentity
+    });
     summary = {
       schema: 'mazer.live-play-qa.v1',
       label,
