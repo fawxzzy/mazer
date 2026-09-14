@@ -133,6 +133,7 @@ type LegacyAuthClient = SupabaseClient<any, any, any>;
 interface LegacyAuthDirectSignOutClient {
   admin: LegacyAuthAbortableTransport;
   storage: Storage;
+  storageKey: string;
   _signOut: (options: { scope: 'local' }) => Promise<{
     error: { message?: string | null } | null;
   }>;
@@ -171,6 +172,8 @@ export const invokeLegacyLocalSignOutWithTimeout = async (
     || typeof auth.storage?.getItem !== 'function'
     || typeof auth.storage?.removeItem !== 'function'
     || typeof auth.storage?.setItem !== 'function'
+    || typeof auth.storageKey !== 'string'
+    || auth.storageKey.length === 0
   ) {
     return null;
   }
@@ -179,7 +182,7 @@ export const invokeLegacyLocalSignOutWithTimeout = async (
     getItem: (key: string) => originalStorage.getItem(key),
     removeItem: (key: string) => {
       originalStorage.removeItem(key);
-      if (key === MAZER_OAUTH_AUTH_SESSION_KEY && originalStorage.getItem(key) !== null) {
+      if (key === auth.storageKey && originalStorage.getItem(key) !== null) {
         throw new Error('Authentication session removal could not be verified.');
       }
     },
@@ -199,13 +202,14 @@ export const invokeLegacyLocalSignOutWithTimeout = async (
 
 export const readLegacyPersistedAuthSessionSnapshot = (
   storage: Pick<Storage, 'getItem'> | null | undefined,
-  env: Record<string, string | undefined> = readRuntimeEnv()
+  env: Record<string, string | undefined> = readRuntimeEnv(),
+  storageKey = MAZER_OAUTH_AUTH_SESSION_KEY
 ): LegacyAuthSessionSnapshot | null => {
   if (!storage) {
     return null;
   }
   try {
-    const raw = storage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY);
+    const raw = storage.getItem(storageKey);
     const parsed: unknown = raw === null ? null : JSON.parse(raw);
     if (
       parsed === null
@@ -222,13 +226,14 @@ export const readLegacyPersistedAuthSessionSnapshot = (
 };
 
 export const isLegacyPersistedAuthSessionRemoved = (
-  storage: Pick<Storage, 'getItem'> | null | undefined
+  storage: Pick<Storage, 'getItem'> | null | undefined,
+  storageKey = MAZER_OAUTH_AUTH_SESSION_KEY
 ): boolean => {
   if (!storage) {
     return false;
   }
   try {
-    return storage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY) === null;
+    return storage.getItem(storageKey) === null;
   } catch {
     return false;
   }
@@ -1033,7 +1038,8 @@ export const signOutLegacyAuth = async (
     // lock is already held, and fail closed if the pinned seam ever changes.
     const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
     const authStorage = directSignOut.storage ?? null;
-    const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(authStorage)
+    const authStorageKey = directSignOut.storageKey;
+    const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(authStorage, undefined, authStorageKey)
       ?? (authenticatedFallback?.status === 'authenticated' ? authenticatedFallback : null);
     const preserveAuthenticatedPreimage = (message?: string | null): LegacyAuthActionResult => ({
       snapshot: authenticatedPreimage === null
@@ -1044,7 +1050,7 @@ export const signOutLegacyAuth = async (
     try {
       result = await invokeLegacyLocalSignOutWithTimeout(directSignOut);
     } catch {
-      if (!isLegacyPersistedAuthSessionRemoved(authStorage)) {
+      if (!isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey)) {
         return preserveAuthenticatedPreimage();
       }
       result = { error: null };
@@ -1056,7 +1062,7 @@ export const signOutLegacyAuth = async (
     if (error) {
       return preserveAuthenticatedPreimage(error.message);
     }
-    if (!isLegacyPersistedAuthSessionRemoved(authStorage)) {
+    if (!isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey)) {
       return preserveAuthenticatedPreimage();
     }
 

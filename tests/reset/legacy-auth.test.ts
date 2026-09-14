@@ -118,6 +118,7 @@ describe('legacy auth runtime', () => {
       fetch: clientFetch,
       admin: { fetch: originalFetch },
       storage: new MemoryStorage() as unknown as Storage,
+      storageKey: MAZER_OAUTH_AUTH_SESSION_KEY,
       _signOut: async () => {
         await auth.admin.fetch('https://bxtcuhkotumitoqtrcej.supabase.co/auth/v1/logout');
         return { error: null };
@@ -141,6 +142,7 @@ describe('legacy auth runtime', () => {
     const auth = {
       admin: { fetch: vi.fn() as unknown as typeof fetch },
       storage: noOpStorage,
+      storageKey: MAZER_OAUTH_AUTH_SESSION_KEY,
       _signOut: async () => {
         auth.storage.removeItem(MAZER_OAUTH_AUTH_SESSION_KEY);
         events.push('SIGNED_OUT');
@@ -167,6 +169,7 @@ describe('legacy auth runtime', () => {
     const auth = {
       admin: { fetch: vi.fn() as unknown as typeof fetch },
       storage: throwingStorage,
+      storageKey: MAZER_OAUTH_AUTH_SESSION_KEY,
       _signOut: async () => {
         auth.storage.removeItem(MAZER_OAUTH_AUTH_SESSION_KEY);
         events.push('SIGNED_OUT');
@@ -213,6 +216,33 @@ describe('legacy auth runtime', () => {
       }
     })).toBe(false);
     expect(isLegacyPersistedAuthSessionRemoved(new MemoryStorage())).toBe(true);
+  });
+
+  test('verifies the session key derived from the configured auth client', async () => {
+    const rollbackStorageKey = 'sb-geknvnrmktchljnyddwp-auth-token';
+    const values = new Map([[rollbackStorageKey, '{"retained":true}']]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      removeItem: vi.fn(),
+      setItem: (key: string, value: string) => values.set(key, value)
+    } as unknown as Storage;
+    const events: string[] = [];
+    const auth = {
+      admin: { fetch: vi.fn() as unknown as typeof fetch },
+      storage,
+      storageKey: rollbackStorageKey,
+      _signOut: async () => {
+        auth.storage.removeItem(rollbackStorageKey);
+        events.push('SIGNED_OUT');
+        return { error: null };
+      }
+    };
+
+    await expect(invokeLegacyLocalSignOutWithTimeout(auth, 50)).rejects.toThrow(
+      'Authentication session removal could not be verified.'
+    );
+    expect(events).toEqual([]);
+    expect(isLegacyPersistedAuthSessionRemoved(storage, rollbackStorageKey)).toBe(false);
   });
 
   test('detects whether Supabase browser auth is configured', () => {
