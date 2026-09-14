@@ -327,6 +327,14 @@ export const assertAuthPersistenceClosedBrowserBoundary = ({
   };
 };
 
+export const summarizeAuthPersistenceServiceWorkerCoverage = (executionPlan) => ({
+  assetVerification: executionPlan.protectedDeployment
+    ? 'read-only-static-contract'
+    : 'not-run',
+  mutationBoundary: 'service-workers-blocked',
+  runtime: 'uncontrolled-browser-only'
+});
+
 const normalizeControlLabel = (value) => String(value).trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
 const normalizedLabelsMatchExactly = (actual, expected) => {
   const actualLabels = actual.map(normalizeControlLabel).sort();
@@ -1307,7 +1315,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       label,
       generatedAt: new Date().toISOString(),
       fixtureOnly: true,
-      note: 'This verifies the exact current signed-out shared-account entry surface and an opposite fixture-local Trail Shine value through the real Settings control, reload, gameplay, Pause, Account, and re-entry without credentials, external settings/session writes, or retired local-auth controls.',
+      note: 'This verifies the exact current signed-out shared-account entry surface and an opposite fixture-local Trail Shine value through the real Settings control, reload, gameplay, Pause, Account, and re-entry without credentials, external settings/session writes, or retired local-auth controls. The mutation-safe browser is intentionally uncontrolled: installed service-worker activation, controller-change reload, and cache-runtime behavior are outside this result; protected runs verify worker assets only through the separately recorded read-only static contract.',
       viewport: MOBILE_VIEWPORT,
       deviceScaleFactor: MOBILE_DPR,
       result,
@@ -1318,7 +1326,8 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         deploymentIdentity: executionPlan.deploymentIdentity ?? null,
         existingServer: executionPlan.useExistingServer,
         protectedDeployment: executionPlan.protectedDeployment,
-        serviceWorkers: executionPlan.serviceWorkers
+        serviceWorkers: executionPlan.serviceWorkers,
+        serviceWorkerCoverage: summarizeAuthPersistenceServiceWorkerCoverage(executionPlan)
       },
       fixtureSettings: {
         changedFromDefault: changedTrailShine !== initialTrailShine,

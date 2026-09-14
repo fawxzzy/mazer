@@ -31,6 +31,7 @@ import {
   sanitizeAuthPersistenceDiagnosticUrl,
   seedVercelProtectionBypassCookie,
   settleAuthPersistenceResources,
+  summarizeAuthPersistenceServiceWorkerCoverage,
   summarizeAuthPersistenceSurface,
   summarizeAuthPersistenceSoak,
   verifyReadOnlyServiceWorkerAssets,
@@ -794,6 +795,19 @@ describe('live auth persistence soak contract', () => {
       await synthetic.close();
     }
   }, 20_000);
+
+  test('scopes remote persistence evidence to the uncontrolled browser and read-only worker assets', () => {
+    expect(summarizeAuthPersistenceServiceWorkerCoverage({ protectedDeployment: true })).toEqual({
+      assetVerification: 'read-only-static-contract',
+      mutationBoundary: 'service-workers-blocked',
+      runtime: 'uncontrolled-browser-only'
+    });
+    expect(summarizeAuthPersistenceServiceWorkerCoverage({ protectedDeployment: false })).toEqual({
+      assetVerification: 'not-run',
+      mutationBoundary: 'service-workers-blocked',
+      runtime: 'uncontrolled-browser-only'
+    });
+  });
 
   test('constrains artifact labels to the session directory', () => {
     const root = resolve(tmpdir(), 'mazer-auth-soak-artifacts');
