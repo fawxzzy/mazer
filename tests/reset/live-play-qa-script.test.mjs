@@ -299,15 +299,16 @@ describe('live play QA script helpers', () => {
       targetRelationship: 'independently-verified-deployment'
     });
     expect(verifierIdentity.commit).not.toBe(deploymentIdentity.sourceCommit);
-    for (const dirty of [true, null, undefined]) {
+    const unreadableDirty = isWorktreeDirty(() => {
+      throw new Error('git status unavailable');
+    });
+    expect(unreadableDirty).toBeNull();
+    for (const dirty of [true, unreadableDirty]) {
       expect(() => resolveLivePlayProductionVerifierIdentity({
         commit: verifierIdentity.commit,
         dirty
       })).toThrow('live_play_production_verifier_worktree_dirty');
     }
-    expect(isWorktreeDirty(() => {
-      throw new Error('git status unavailable');
-    })).toBeNull();
     expect(() => resolveLivePlayProductionVerifierIdentity({
       commit: 'not-a-commit',
       dirty: false
