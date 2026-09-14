@@ -75,6 +75,9 @@ export const resolveAuthPersistenceExecutionPlan = (options = {}) => {
   if (protectedDeployment && !useExistingServer) {
     throw new Error('protected_deployment_requires_existing_server');
   }
+  if (protectedDeployment && new URL(baseUrl).protocol !== 'https:') {
+    throw new Error('protected_deployment_https_required');
+  }
   if (protectedDeployment && new URL(baseUrl).hostname === PUBLIC_PRODUCTION_HOST) {
     throw new Error('public_alias_protection_bypass_forbidden');
   }
@@ -103,12 +106,17 @@ export const buildVercelProtectionBypassSeedUrl = ({ baseUrl, protectionBypass }
 
 export const seedVercelProtectionBypassCookie = async ({ context, baseUrl, protectionBypass }) => {
   const seedUrl = buildVercelProtectionBypassSeedUrl({ baseUrl, protectionBypass });
-  const response = await context.request.get(seedUrl, {
-    failOnStatusCode: false,
-    timeout: TIMEOUT_MS
-  });
-  const status = response.status();
-  await response.dispose();
+  let status;
+  try {
+    const response = await context.request.get(seedUrl, {
+      failOnStatusCode: false,
+      timeout: TIMEOUT_MS
+    });
+    status = response.status();
+    await response.dispose();
+  } catch {
+    throw new Error('protection_bypass_cookie_seed_request_failed');
+  }
   const cookies = await context.cookies(baseUrl);
   if (status !== 200 || cookies.length === 0) {
     throw new Error('protection_bypass_cookie_seed_failed');
@@ -290,6 +298,7 @@ export const sanitizeAuthPersistenceDiagnosticText = (value) => String(value)
   .replace(/\bBearer\s+[A-Z0-9._~+/=-]+/giu, 'Bearer <redacted>')
   .replace(/\beyJ[A-Z0-9_-]+\.[A-Z0-9_-]+\.[A-Z0-9_-]+\b/giu, '<redacted-jwt>')
   .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu, '<redacted-email>')
+  .replace(/((?:x-vercel-protection-bypass|x-vercel-set-bypass-cookie)=)[^\s&]+/giu, '$1<redacted>')
   .replace(/((?:token|code|password|secret|key)=)[^\s&]+/giu, '$1<redacted>');
 
 export const settleAuthPersistenceResources = async (actions) => {
@@ -324,10 +333,17 @@ export const resolveAuthPersistenceArtifactPath = (outputDir, label, suffix) => 
   return artifactPath;
 };
 
-export const isExternalMutationRequest = ({ method, url }, allowedOrigin) => {
+export const isExternalMutationRequest = (
+  { method, url },
+  allowedOrigin,
+  { allowSameOriginMutations = true } = {}
+) => {
   const normalizedMethod = String(method).toUpperCase();
   if (normalizedMethod === 'GET' || normalizedMethod === 'HEAD' || normalizedMethod === 'OPTIONS') {
     return false;
+  }
+  if (!allowSameOriginMutations) {
+    return true;
   }
   try {
     return new URL(url).origin !== new URL(allowedOrigin).origin;
@@ -772,7 +788,9 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         resourceType: request.resourceType(),
         url: sanitizeAuthPersistenceDiagnosticUrl(request.url())
       };
-      if (isExternalMutationRequest(requestSummary, resolvedBaseUrl)) {
+      if (isExternalMutationRequest(requestSummary, resolvedBaseUrl, {
+        allowSameOriginMutations: executionPlan.launchPreview
+      })) {
         blockedMutationRequests.push(requestSummary);
         await route.abort('blockedbyclient');
         return;

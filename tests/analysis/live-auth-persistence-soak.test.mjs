@@ -177,6 +177,11 @@ describe('live auth persistence soak contract', () => {
       protectedDeployment: true,
       useExistingServer: true
     })).toThrow('public_alias_protection_bypass_forbidden');
+    expect(() => resolveAuthPersistenceExecutionPlan({
+      baseUrl: 'http://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+      protectedDeployment: true,
+      useExistingServer: true
+    })).toThrow('protected_deployment_https_required');
     expect(() => buildVercelProtectionBypassSeedUrl({
       baseUrl: 'https://example.com/',
       protectionBypass: 'fixture-secret'
@@ -193,6 +198,25 @@ describe('live auth persistence soak contract', () => {
       },
       protectionBypass: 'fixture-secret'
     })).rejects.toThrow('protection_bypass_cookie_seed_failed');
+    const requestFailure = await seedVercelProtectionBypassCookie({
+      baseUrl: plan.baseUrl,
+      context: {
+        cookies: async () => [],
+        request: {
+          get: async () => {
+            throw new Error('request failed for https://example.test/?x-vercel-protection-bypass=fixture-secret');
+          }
+        }
+      },
+      protectionBypass: 'fixture-secret'
+    }).catch((error) => error);
+    expect(requestFailure.message).toBe('protection_bypass_cookie_seed_request_failed');
+    expect(requestFailure.stack).not.toContain('fixture-secret');
+    expect(sanitizeAuthPersistenceDiagnosticText(
+      'GET https://example.test/?x-vercel-protection-bypass=fixture-secret&x-vercel-set-bypass-cookie=true'
+    )).toBe(
+      'GET https://example.test/?x-vercel-protection-bypass=<redacted>&x-vercel-set-bypass-cookie=<redacted>'
+    );
   });
 
   test('recognizes shared account entry on the main menu and rejects every retired local-auth control', () => {
@@ -425,7 +449,21 @@ describe('live auth persistence soak contract', () => {
     expect(isExternalMutationRequest({ method: 'POST', url: 'https://project.supabase.co/rest/v1/profiles' }, allowedOrigin)).toBe(true);
     expect(isExternalMutationRequest({ method: 'PATCH', url: 'https://project.supabase.co/rest/v1/profiles' }, allowedOrigin)).toBe(true);
     expect(isExternalMutationRequest({ method: 'GET', url: 'https://project.supabase.co/rest/v1/profiles' }, allowedOrigin)).toBe(false);
-    expect(isExternalMutationRequest({ method: 'POST', url: `${allowedOrigin}/fixture` }, allowedOrigin)).toBe(false);
+    expect(isExternalMutationRequest(
+      { method: 'POST', url: `${allowedOrigin}/fixture` },
+      allowedOrigin,
+      { allowSameOriginMutations: true }
+    )).toBe(false);
+    expect(isExternalMutationRequest(
+      { method: 'POST', url: 'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/api/settings' },
+      'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+      { allowSameOriginMutations: false }
+    )).toBe(true);
+    expect(isExternalMutationRequest(
+      { method: 'GET', url: 'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/api/settings' },
+      'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+      { allowSameOriginMutations: false }
+    )).toBe(false);
   });
 
   test('constrains artifact labels to the session directory', () => {
