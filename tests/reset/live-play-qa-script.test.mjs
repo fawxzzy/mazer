@@ -9,6 +9,8 @@ import {
   captureLivePlayQaFailureEvidence,
   createLivePlayQaEvidencePersistenceError,
   createLivePlayQaFailureError,
+  createLivePlayQaNavigationTracker,
+  createLivePlayQaUnexpectedNavigationError,
   isLivePlayDiagnosticsReady,
   measureLivePlayQaElapsedMs,
   normalizeLivePlayInputMethod,
@@ -16,8 +18,10 @@ import {
   resolveLivePlayBrowserContextOptions,
   resolveLivePlayLifecycleSnapshot,
   resolveArrowPointForMove,
+  resolveLivePlayQaExpectedServiceWorkerReloadCount,
   sanitizeLivePlayQaDiagnosticValue,
   settleLivePlayQaCleanup,
+  settleLivePlayQaServiceWorkerNavigation,
   resolveLivePlayRouteProgressIndex,
   resolveStickHoldMsForMove,
   resolveStickPointForMove,
@@ -32,6 +36,70 @@ import {
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
+  test('absorbs exactly one production service-worker reload before readiness is authoritative', async () => {
+    const tracker = createLivePlayQaNavigationTracker();
+    tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/?runtimeDiagnostics=1' });
+    const calls = [];
+    const page = {
+      waitForFunction: async () => calls.push('controller'),
+      waitForLoadState: async () => calls.push('load')
+    };
+    let reloadRecorded = false;
+
+    const result = await settleLivePlayQaServiceWorkerNavigation({
+      initialNavigationCount: 0,
+      page,
+      quietMs: 0,
+      targetUrl: 'https://mazer.example.test/?runtimeDiagnostics=1',
+      timeoutMs: 100,
+      tracker,
+      wait: async () => {
+        if (!reloadRecorded) {
+          reloadRecorded = true;
+          tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/?runtimeDiagnostics=1' });
+        }
+      }
+    });
+
+    expect(result).toEqual({
+      expectedReloadCount: 1,
+      mainFrameNavigationCount: 2,
+      pass: true
+    });
+    expect(calls).toEqual(['load', 'controller']);
+    expect(tracker.snapshot()).toMatchObject({ stabilized: true, unexpectedNavigation: null });
+  });
+
+  test('does not invent a service-worker reload on localhost', () => {
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://127.0.0.1:4173/')).toBe(0);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('http://localhost:4173/')).toBe(0);
+    expect(resolveLivePlayQaExpectedServiceWorkerReloadCount('https://mazer.example.test/')).toBe(1);
+  });
+
+  test('fails closed when navigation occurs after movement begins', () => {
+    const tracker = createLivePlayQaNavigationTracker();
+    tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/' });
+    tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/' });
+    tracker.markStabilized();
+    tracker.markMovementStarted();
+    tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/?token=secret' });
+
+    const failure = createLivePlayQaUnexpectedNavigationError(tracker, new Error('context destroyed'));
+    expect(failure.message).toBe(
+      'live_play_unexpected_navigation_after_movement_started: https://mazer.example.test/?token=<redacted>'
+    );
+  });
+
+  test('rebinds readiness after service-worker stabilization and before movement', async () => {
+    const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
+    const stabilizationIndex = scriptSource.indexOf('serviceWorkerStabilization = await settleLivePlayQaServiceWorkerNavigation');
+    const readinessIndex = scriptSource.indexOf('const initialDiagnostics = await waitForDiagnosticsReady', stabilizationIndex);
+    const movementIndex = scriptSource.indexOf('navigationTracker.markMovementStarted()', readinessIndex);
+    expect(stabilizationIndex).toBeGreaterThan(-1);
+    expect(readinessIndex).toBeGreaterThan(stabilizationIndex);
+    expect(movementIndex).toBeGreaterThan(readinessIndex);
+  });
+
   test('requires the exact QA move surface before diagnostics readiness can pass', () => {
     const readyState = {
       runtime: {
