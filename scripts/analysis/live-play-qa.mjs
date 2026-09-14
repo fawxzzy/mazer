@@ -1838,21 +1838,55 @@ export const summarizeFreshWorldTurn = (worldTurn) => {
   };
 };
 
-export const summarizeGoalTimerFreeze = (firstSample, secondSample) => ({
-  completedAtMs: firstSample?.completedAtMs ?? null,
-  elapsedMs: firstSample?.elapsedMs ?? null,
-  frozen: firstSample?.frozen === true && secondSample?.frozen === true,
-  pass: Boolean(
+const POST_GOAL_TIMER_RELEASE_PHASES = new Set([
+  'deconstructing',
+  'handoff',
+  'building',
+  'ready'
+]);
+
+export const summarizeGoalTimerFreeze = (
+  firstSample,
+  secondSample,
+  { firstLifecyclePhase = null, secondLifecyclePhase = null } = {}
+) => {
+  const sameGoalHold = firstLifecyclePhase === 'goal-hold'
+    && secondLifecyclePhase === 'goal-hold';
+  const advancedPostGoalLifecycle = firstLifecyclePhase === 'goal-hold'
+    && POST_GOAL_TIMER_RELEASE_PHASES.has(secondLifecyclePhase);
+  const firstGoalHoldTimerValid = Boolean(
     firstSample
-    && secondSample
     && firstSample.frozen === true
-    && secondSample.frozen === true
     && Number.isFinite(firstSample.completedAtMs)
+    && Number.isFinite(firstSample.elapsedMs)
+  );
+  const sameGoalHoldTimerStable = Boolean(
+    sameGoalHold
+    && secondSample
+    && secondSample.frozen === true
     && firstSample.completedAtMs === secondSample.completedAtMs
     && firstSample.elapsedMs === secondSample.elapsedMs
-  ),
-  resampleElapsedMs: secondSample?.elapsedMs ?? null
-});
+  );
+
+  return {
+    comparison: sameGoalHold
+      ? 'same-goal-hold'
+      : advancedPostGoalLifecycle
+        ? 'advanced-post-goal-lifecycle'
+        : 'invalid-lifecycle-boundary',
+    completedAtMs: firstSample?.completedAtMs ?? null,
+    elapsedMs: firstSample?.elapsedMs ?? null,
+    firstLifecyclePhase,
+    frozen: firstGoalHoldTimerValid && (sameGoalHold ? secondSample?.frozen === true : advancedPostGoalLifecycle),
+    pass: Boolean(
+      firstGoalHoldTimerValid
+      && secondSample
+      && (sameGoalHoldTimerStable || advancedPostGoalLifecycle)
+    ),
+    resampleElapsedMs: secondSample?.elapsedMs ?? null,
+    secondLifecyclePhase
+  };
+};
 
 export const summarizePlayerProgressionCompletion = ({
   initialLevel,
@@ -2132,9 +2166,14 @@ export const runLivePlayQa = async (options = {}) => {
     await page.waitForTimeout(96);
     assertLivePlayQaNavigationStable(navigationTracker);
     const goalTimerSecondDiagnostics = await readLivePlayDiagnostics(page);
+    const goalTimerSecondSnapshot = resolveLivePlayLifecycleSnapshot(goalTimerSecondDiagnostics);
     const goalTimerProof = summarizeGoalTimerFreeze(
       goalTimerFirstSample,
-      goalTimerSecondDiagnostics.runtime?.play?.timer ?? null
+      goalTimerSecondDiagnostics.runtime?.play?.timer ?? null,
+      {
+        firstLifecyclePhase: goalReachedSnapshot.explicitLifecyclePhase,
+        secondLifecyclePhase: goalTimerSecondSnapshot.explicitLifecyclePhase
+      }
     );
     const lifecycleProofPromise = shouldVerifyPostGoalLifecycle
       ? collectPostGoalLifecycleProof({

@@ -1272,19 +1272,52 @@ describe('live play QA script helpers', () => {
     }).pass).toBe(false);
   });
 
-  test('requires the goal timer to stay frozen across a real post-arrival resample', () => {
+  test('requires the goal timer to stay frozen while both samples remain in goal-hold', () => {
     expect(summarizeGoalTimerFreeze(
       { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true },
-      { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true }
+      { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'goal-hold' }
     )).toMatchObject({
+      comparison: 'same-goal-hold',
       elapsedMs: 8_420,
       frozen: true,
       pass: true,
       resampleElapsedMs: 8_420
     });
     expect(summarizeGoalTimerFreeze(
+      { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true },
+      { completedAtMs: 18_420, elapsedMs: 8_516, frozen: true },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'goal-hold' }
+    ).pass).toBe(false);
+  });
+
+  test('does not compare timer values after goal-hold advances into deconstruction', () => {
+    expect(summarizeGoalTimerFreeze(
+      { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true },
+      { completedAtMs: 18_420, elapsedMs: 0, frozen: true },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'deconstructing' }
+    )).toMatchObject({
+      comparison: 'advanced-post-goal-lifecycle',
+      elapsedMs: 8_420,
+      frozen: true,
+      pass: true,
+      resampleElapsedMs: 0
+    });
+    expect(summarizeGoalTimerFreeze(
+      { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true },
+      { completedAtMs: 18_420, elapsedMs: 0, frozen: true },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'settled' }
+    )).toMatchObject({
+      comparison: 'invalid-lifecycle-boundary',
+      pass: false
+    });
+  });
+
+  test('still requires a valid frozen goal-hold timer before a lifecycle advance', () => {
+    expect(summarizeGoalTimerFreeze(
       { completedAtMs: null, elapsedMs: 8_420, frozen: false },
-      { completedAtMs: null, elapsedMs: 8_516, frozen: false }
+      { completedAtMs: null, elapsedMs: 0, frozen: false },
+      { firstLifecyclePhase: 'goal-hold', secondLifecyclePhase: 'deconstructing' }
     ).pass).toBe(false);
   });
 
