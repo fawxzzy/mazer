@@ -44,6 +44,9 @@ const PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9-]+-fawxzzy\.ve
 const IMMUTABLE_PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9]{8,32}-fawxzzy\.vercel\.app$/u;
 const VERCEL_DEPLOYMENT_ID_PATTERN = /^dpl_[A-Za-z0-9]{20,64}$/u;
 const SOURCE_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
+const RELEASE_CANDIDATE_ACCEPTANCE_TARGET = 'release-candidate';
+const LIVE_PRODUCTION_ACCEPTANCE_TARGET = 'live-production';
+const PUBLIC_PRODUCTION_HOST = 'mazer.fawxzzy.com';
 const EXPECTED_VERCEL_PROJECT_ID = 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ';
 const EXPECTED_VERCEL_TEAM_ID = 'team_CMJn7MvzFZZBnhNnjVUZF2RD';
 const EXPECTED_VERCEL_SCOPE = 'fawxzzy';
@@ -126,12 +129,16 @@ const readLivePlayProductionProviderIdentity = (deploymentId) => {
 };
 
 export const resolveLivePlayProductionDeploymentIdentity = ({
+  acceptanceTarget,
   baseUrl,
   deploymentId,
   deploymentUrl,
   providerDeployment,
   sourceCommit
 }) => {
+  if (![RELEASE_CANDIDATE_ACCEPTANCE_TARGET, LIVE_PRODUCTION_ACCEPTANCE_TARGET].includes(acceptanceTarget)) {
+    throw new Error('live_play_production_acceptance_target_invalid');
+  }
   if (!VERCEL_DEPLOYMENT_ID_PATTERN.test(String(deploymentId ?? ''))) {
     throw new Error('live_play_production_deployment_id_invalid');
   }
@@ -156,7 +163,11 @@ export const resolveLivePlayProductionDeploymentIdentity = ({
     : null;
   const providerSourceCommit = providerDeployment?.gitSource?.sha
     ?? providerDeployment?.meta?.githubCommitSha;
+  const providerAliases = Array.isArray(providerDeployment?.alias)
+    ? providerDeployment.alias
+    : [];
   const baseTargetsDeployment = normalizedBaseUrl === normalizedDeploymentUrl;
+  const productionCertified = acceptanceTarget === LIVE_PRODUCTION_ACCEPTANCE_TARGET;
   if (
     providerDeployment?.id !== deploymentId
     || providerUrl !== normalizedDeploymentUrl
@@ -170,13 +181,24 @@ export const resolveLivePlayProductionDeploymentIdentity = ({
   ) {
     throw new Error('live_play_production_provider_identity_mismatch');
   }
+  if (
+    productionCertified
+    && (
+      providerDeployment?.target !== 'production'
+      || !providerAliases.includes(PUBLIC_PRODUCTION_HOST)
+    )
+  ) {
+    throw new Error('live_play_production_live_target_mismatch');
+  }
   return Object.freeze({
+    acceptanceTarget,
     deploymentId,
     deploymentUrl: normalizedDeploymentUrl,
     digest: createHash('sha256')
       .update(`${deploymentId}\n${normalizedDeploymentUrl}\n${sourceCommit}\n`, 'utf8')
       .digest('hex'),
     projectId: EXPECTED_VERCEL_PROJECT_ID,
+    productionCertified,
     repositoryId: EXPECTED_GITHUB_REPOSITORY_ID,
     sourceCommit,
     teamId: EXPECTED_VERCEL_TEAM_ID
@@ -214,6 +236,7 @@ export const assertLivePlayProductionVerifierIdentityUnchanged = ({
 };
 
 export const resolveLivePlayProductionAcceptanceContract = ({
+  acceptanceTarget,
   baseUrl,
   deploymentId,
   deploymentUrl,
@@ -234,6 +257,7 @@ export const resolveLivePlayProductionAcceptanceContract = ({
 
   const base = new URL(normalizeBaseUrl(baseUrl));
   const deploymentIdentity = resolveLivePlayProductionDeploymentIdentity({
+    acceptanceTarget,
     baseUrl: base.toString(),
     deploymentId,
     deploymentUrl,
@@ -1778,6 +1802,7 @@ export const runLivePlayQa = async (options = {}) => {
     ? options.verifierIdentity
     : undefined;
   const productionAcceptanceContract = resolveLivePlayProductionAcceptanceContract({
+    acceptanceTarget: options.acceptanceTarget,
     baseUrl,
     deploymentId: options.deploymentId,
     deploymentUrl: options.deploymentUrl,
@@ -2343,6 +2368,9 @@ if (isDirectRun) {
       : 0.42,
     inputMethod: normalizeLivePlayInputMethod(rawInputMethod),
     isMobile: args.mobile === undefined ? true : isTruthy(args.mobile),
+    acceptanceTarget: typeof args.acceptanceTarget === 'string'
+      ? args.acceptanceTarget
+      : args['acceptance-target'],
     deploymentId: typeof args.deploymentId === 'string'
       ? args.deploymentId
       : args['deployment-id'],

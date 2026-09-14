@@ -48,6 +48,7 @@ import {
 describe('live play QA script helpers', () => {
   const productionRoute = '/?content=core-only&mode=play&theme=aurora&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=1735707242';
   const deploymentIdentity = {
+    acceptanceTarget: 'release-candidate',
     deploymentId: 'dpl_0000000000000000000000000000',
     deploymentUrl: 'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app/',
     sourceCommit: 'a'.repeat(40)
@@ -58,6 +59,7 @@ describe('live play QA script helpers', () => {
     id: deploymentIdentity.deploymentId,
     projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
     readyState: 'READY',
+    target: 'preview',
     team: { id: 'team_CMJn7MvzFZZBnhNnjVUZF2RD' },
     url: 'fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app'
   };
@@ -80,6 +82,7 @@ describe('live play QA script helpers', () => {
     expect(productionContract()).toEqual({
       deploymentIdentity: {
         ...deploymentIdentity,
+        productionCertified: false,
         digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
         projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
         repositoryId: 1212867711,
@@ -205,6 +208,42 @@ describe('live play QA script helpers', () => {
         alias: ['mazer.fawxzzy.com']
       }
     })).toThrow('live_play_production_provider_identity_mismatch');
+  });
+
+  test('distinguishes retained release candidates from current live production', () => {
+    expect(resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      providerDeployment: providerDeploymentIdentity
+    })).toMatchObject({
+      acceptanceTarget: 'release-candidate',
+      productionCertified: false
+    });
+    expect(() => resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      acceptanceTarget: 'live-production',
+      providerDeployment: providerDeploymentIdentity
+    })).toThrow('live_play_production_live_target_mismatch');
+    expect(resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      acceptanceTarget: 'live-production',
+      providerDeployment: {
+        ...providerDeploymentIdentity,
+        alias: ['mazer.fawxzzy.com'],
+        target: 'production'
+      }
+    })).toMatchObject({
+      acceptanceTarget: 'live-production',
+      productionCertified: true
+    });
+    expect(() => resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      acceptanceTarget: 'preview',
+      providerDeployment: providerDeploymentIdentity
+    })).toThrow('live_play_production_acceptance_target_invalid');
   });
 
   test('binds a clean external verifier identity separately from the deployed target source', () => {
@@ -335,6 +374,7 @@ describe('live play QA script helpers', () => {
     expect(artifactContract).toEqual({
       deploymentIdentity: {
         ...deploymentIdentity,
+        productionCertified: false,
         digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
         projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
         repositoryId: 1212867711,
