@@ -325,6 +325,28 @@ export const resolveLivePlayProductionAcceptanceContract = ({
   });
 };
 
+export const assertLivePlayProductionDeploymentIdentityUnchanged = ({
+  contract,
+  providerDeployment
+}) => {
+  if (!contract || contract.deploymentIdentity.acceptanceTarget !== LIVE_PRODUCTION_ACCEPTANCE_TARGET) {
+    return contract?.deploymentIdentity ?? null;
+  }
+  const currentIdentity = resolveLivePlayProductionDeploymentIdentity({
+    acceptanceTarget: contract.deploymentIdentity.acceptanceTarget,
+    baseUrl: contract.deploymentIdentity.deploymentUrl,
+    deploymentId: contract.deploymentIdentity.deploymentId,
+    deploymentUrl: contract.deploymentIdentity.deploymentUrl,
+    providerDeployment: providerDeployment
+      ?? readLivePlayProductionProviderIdentity(contract.deploymentIdentity.deploymentId),
+    sourceCommit: contract.deploymentIdentity.sourceCommit
+  });
+  if (JSON.stringify(currentIdentity) !== JSON.stringify(contract.deploymentIdentity)) {
+    throw new Error('live_play_production_deployment_identity_drift');
+  }
+  return currentIdentity;
+};
+
 export const assertLivePlayProductionNavigationBinding = ({ actualUrl, contract }) => {
   if (!contract) {
     return;
@@ -2185,6 +2207,12 @@ export const runLivePlayQa = async (options = {}) => {
       }
     };
 
+    assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: productionAcceptanceContract,
+      providerDeployment: process.env.NODE_ENV === 'test'
+        ? options.finalProviderDeploymentIdentity
+        : undefined
+    });
     enterPhase('artifact-publication');
     assertLivePlayQaNavigationStable(navigationTracker);
     await writeFile(summary.artifacts.summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');

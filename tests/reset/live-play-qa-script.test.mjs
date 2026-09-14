@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 
 import {
+  assertLivePlayProductionDeploymentIdentityUnchanged,
   appendLivePlayQaCleanupEvidence,
   assertLivePlayProductionVerifierIdentityUnchanged,
   assertLivePlayProductionNavigationBinding,
@@ -247,6 +248,47 @@ describe('live play QA script helpers', () => {
       acceptanceTarget: 'preview',
       providerDeployment: providerDeploymentIdentity
     })).toThrow('live_play_production_acceptance_target_invalid');
+  });
+
+  test('revalidates the live production alias immediately before artifact publication', () => {
+    const liveProviderDeployment = {
+      ...providerDeploymentIdentity,
+      alias: ['mazer.fawxzzy.com'],
+      target: 'production'
+    };
+    const liveContract = resolveLivePlayProductionAcceptanceContract({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      acceptanceTarget: 'live-production',
+      enabled: true,
+      expectedObservedSeed: 1735707243,
+      providerDeploymentIdentity: liveProviderDeployment,
+      route: productionRoute,
+      useExistingServer: true,
+      verifierIdentity
+    });
+    expect(assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: liveContract,
+      providerDeployment: liveProviderDeployment
+    })).toEqual(liveContract.deploymentIdentity);
+    expect(() => assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: liveContract,
+      providerDeployment: {
+        ...liveProviderDeployment,
+        alias: []
+      }
+    })).toThrow('live_play_production_live_target_mismatch');
+    expect(() => assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: liveContract,
+      providerDeployment: {
+        ...liveProviderDeployment,
+        target: 'preview'
+      }
+    })).toThrow('live_play_production_live_target_mismatch');
+    expect(assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: productionContract(),
+      providerDeployment: providerDeploymentIdentity
+    })).toEqual(productionContract().deploymentIdentity);
   });
 
   test('binds a clean external verifier identity separately from the deployed target source', () => {
