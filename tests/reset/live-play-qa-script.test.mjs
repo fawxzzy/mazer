@@ -151,6 +151,10 @@ describe('live play QA script helpers', () => {
     const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
     const contractIndex = scriptSource.indexOf('const productionAcceptanceContract = resolveLivePlayProductionAcceptanceContract');
     expect(contractIndex).toBeGreaterThan(-1);
+    const testOnlyVerifierIndex = scriptSource.indexOf("const testOnlyVerifierIdentity = process.env.NODE_ENV === 'test'");
+    expect(testOnlyVerifierIndex).toBeGreaterThan(-1);
+    expect(testOnlyVerifierIndex).toBeLessThan(contractIndex);
+    expect(scriptSource).not.toContain('verifierIdentity: options.verifierIdentity');
     expect(contractIndex).toBeLessThan(scriptSource.indexOf('await ensureDir(outputDir)', contractIndex));
     expect(contractIndex).toBeLessThan(scriptSource.indexOf('chromium.launch', contractIndex));
     expect(contractIndex).toBeLessThan(scriptSource.indexOf('browser.newContext', contractIndex));

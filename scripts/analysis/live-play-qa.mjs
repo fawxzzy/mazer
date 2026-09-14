@@ -1774,6 +1774,9 @@ export const runLivePlayQa = async (options = {}) => {
   const stepSettleMs = options.stepSettleMs ?? DEFAULT_SETTLE_MS;
   const moveCap = options.moveCap ?? DEFAULT_MOVE_CAP;
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+  const testOnlyVerifierIdentity = process.env.NODE_ENV === 'test'
+    ? options.verifierIdentity
+    : undefined;
   const productionAcceptanceContract = resolveLivePlayProductionAcceptanceContract({
     baseUrl,
     deploymentId: options.deploymentId,
@@ -1784,7 +1787,7 @@ export const runLivePlayQa = async (options = {}) => {
     route,
     sourceCommit: options.sourceCommit,
     useExistingServer: options.useExistingServer === true,
-    verifierIdentity: options.verifierIdentity
+    verifierIdentity: testOnlyVerifierIdentity
   });
   const inputMethod = normalizeLivePlayInputMethod(options.inputMethod);
   const browserContextOptions = resolveLivePlayBrowserContextOptions({
@@ -2042,7 +2045,7 @@ export const runLivePlayQa = async (options = {}) => {
 
     assertLivePlayProductionVerifierIdentityUnchanged({
       contract: productionAcceptanceContract,
-      verifierIdentity: options.verifierIdentity
+      verifierIdentity: testOnlyVerifierIdentity
     });
     summary = {
       schema: 'mazer.live-play-qa.v1',
