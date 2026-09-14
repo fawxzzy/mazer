@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { copyFile, writeFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -12,6 +13,11 @@ import {
   resolveSessionId
 } from '../visual/common.mjs';
 import { launchPreviewServer, stopPreviewServer } from '../visual/preview-server.mjs';
+import {
+  createLivePlayQaNavigationTracker,
+  installLivePlayQaServiceWorkerStabilizationProbe,
+  settleLivePlayQaServiceWorkerNavigation
+} from './live-play-qa.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
@@ -21,6 +27,20 @@ const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
 const MOBILE_VIEWPORT = Object.freeze({ width: 405, height: 958 });
 const MOBILE_DPR = 2;
 const TIMEOUT_MS = 30_000;
+const PUBLIC_PRODUCTION_HOST = 'mazer.fawxzzy.com';
+const PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9-]+-fawxzzy\.vercel\.app$/u;
+const IMMUTABLE_PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9]{8,32}-fawxzzy\.vercel\.app$/u;
+const VERCEL_DEPLOYMENT_ID_PATTERN = /^dpl_[A-Za-z0-9]{20,64}$/u;
+const SOURCE_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
+const READ_ONLY_SERVICE_WORKER_ASSETS = Object.freeze(['/app-sw.js', '/sw.js']);
+const EXPECTED_VERCEL_PROJECT_ID = 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ';
+const EXPECTED_VERCEL_TEAM_ID = 'team_CMJn7MvzFZZBnhNnjVUZF2RD';
+const EXPECTED_VERCEL_SCOPE = 'fawxzzy';
+const EXPECTED_GITHUB_REPOSITORY_ID = 1212867711;
+const SERVICE_WORKER_ASSET_MARKERS = Object.freeze({
+  '/app-sw.js': ['precacheAndRoute', 'self.skipWaiting'],
+  '/sw.js': ["self.addEventListener('install'", 'CANONICAL_ORIGIN']
+});
 
 export const SIGNED_OUT_SHARED_ACCOUNT_BUTTONS = Object.freeze([
   'Login',
@@ -43,6 +63,276 @@ export const FIXTURE_SETTINGS_STORAGE_KEYS = Object.freeze({
   authenticated: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
   guest: GUEST_FIXTURE_SETTINGS_STORAGE_KEY,
   unscoped: UNSCOPED_SETTINGS_STORAGE_KEY
+});
+
+export const normalizeAuthPersistenceBaseUrl = (value) => {
+  const url = new URL(value);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+    throw new Error('unsafe_auth_persistence_base_url');
+  }
+  url.pathname = '/';
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+};
+
+const validateProtectedDeploymentClaims = ({
+  baseUrl,
+  deploymentId,
+  deploymentUrl,
+  sourceCommit
+}) => {
+  if (!VERCEL_DEPLOYMENT_ID_PATTERN.test(String(deploymentId ?? ''))) {
+    throw new Error('protected_deployment_id_invalid');
+  }
+  if (!SOURCE_COMMIT_PATTERN.test(String(sourceCommit ?? ''))) {
+    throw new Error('protected_deployment_source_commit_invalid');
+  }
+  if (typeof deploymentUrl !== 'string') {
+    throw new Error('protected_deployment_url_required');
+  }
+  const normalizedDeploymentUrl = normalizeAuthPersistenceBaseUrl(deploymentUrl);
+  if (!IMMUTABLE_PROTECTED_DEPLOYMENT_HOST_PATTERN.test(new URL(normalizedDeploymentUrl).hostname)) {
+    throw new Error('protected_deployment_immutable_url_required');
+  }
+  if (normalizedDeploymentUrl !== baseUrl) {
+    throw new Error('protected_deployment_identity_mismatch');
+  }
+  return {
+    deploymentId,
+    deploymentUrl: normalizedDeploymentUrl,
+    sourceCommit
+  };
+};
+
+export const resolveProtectedDeploymentIdentity = ({
+  baseUrl,
+  deploymentId,
+  deploymentUrl,
+  providerDeployment,
+  sourceCommit
+}) => {
+  const normalizedIdentity = validateProtectedDeploymentClaims({
+    baseUrl,
+    deploymentId,
+    deploymentUrl,
+    sourceCommit
+  });
+  const providerUrl = typeof providerDeployment?.url === 'string'
+    ? normalizeAuthPersistenceBaseUrl(`https://${providerDeployment.url}`)
+    : null;
+  const providerSourceCommit = providerDeployment?.gitSource?.sha ?? providerDeployment?.meta?.githubCommitSha;
+  if (providerDeployment?.id !== deploymentId
+    || providerUrl !== normalizedIdentity.deploymentUrl
+    || providerSourceCommit !== sourceCommit
+    || providerDeployment?.projectId !== EXPECTED_VERCEL_PROJECT_ID
+    || (providerDeployment?.team?.id ?? providerDeployment?.ownerId) !== EXPECTED_VERCEL_TEAM_ID
+    || Number(providerDeployment?.gitSource?.repoId ?? providerDeployment?.meta?.githubRepoId)
+      !== EXPECTED_GITHUB_REPOSITORY_ID
+    || providerDeployment?.readyState !== 'READY') {
+    throw new Error('protected_deployment_provider_identity_mismatch');
+  }
+  return {
+    ...normalizedIdentity,
+    digest: createHash('sha256')
+      .update(`${deploymentId}\n${normalizedIdentity.deploymentUrl}\n${sourceCommit}\n`, 'utf8')
+      .digest('hex')
+  };
+};
+
+const readProtectedDeploymentProviderIdentity = (deploymentId) => {
+  try {
+    const vercelWrapper = process.platform === 'win32'
+      ? execFileSync('where.exe', ['vercel.cmd'], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true
+        }).split(/\r?\n/u).find(Boolean)
+      : 'vercel';
+    if (!vercelWrapper) {
+      throw new Error('vercel_cli_missing');
+    }
+    const vercelCommand = process.platform === 'win32' ? process.execPath : vercelWrapper;
+    const vercelArgs = process.platform === 'win32'
+      ? [resolve(vercelWrapper, '..', 'node_modules', 'vercel', 'dist', 'vc.js')]
+      : [];
+    return JSON.parse(execFileSync(
+      vercelCommand,
+      [...vercelArgs, 'api', `/v13/deployments/${deploymentId}`, '--scope', EXPECTED_VERCEL_SCOPE],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+      }
+    ));
+  } catch {
+    throw new Error('protected_deployment_provider_readback_failed');
+  }
+};
+
+export const resolveAuthPersistenceExecutionPlan = (options = {}) => {
+  const useExistingServer = options.useExistingServer === true;
+  if (useExistingServer && typeof options.baseUrl !== 'string') {
+    throw new Error('existing_server_base_url_required');
+  }
+  const baseUrl = normalizeAuthPersistenceBaseUrl(
+    useExistingServer ? options.baseUrl : (options.baseUrl ?? 'http://127.0.0.1:4173')
+  );
+  const protectedDeployment = options.protectedDeployment === true;
+  if (protectedDeployment && !useExistingServer) {
+    throw new Error('protected_deployment_requires_existing_server');
+  }
+  if (protectedDeployment && new URL(baseUrl).protocol !== 'https:') {
+    throw new Error('protected_deployment_https_required');
+  }
+  if (protectedDeployment && new URL(baseUrl).hostname === PUBLIC_PRODUCTION_HOST) {
+    throw new Error('public_alias_protection_bypass_forbidden');
+  }
+  let deploymentIdentity = null;
+  if (protectedDeployment) {
+    const locallyValidatedIdentity = validateProtectedDeploymentClaims({
+      baseUrl,
+      deploymentId: options.deploymentId,
+      deploymentUrl: options.deploymentUrl,
+      sourceCommit: options.sourceCommit
+    });
+    deploymentIdentity = resolveProtectedDeploymentIdentity({
+      baseUrl,
+      ...locallyValidatedIdentity,
+      providerDeployment: process.env.NODE_ENV === 'test' && options.providerDeploymentIdentity
+        ? options.providerDeploymentIdentity
+        : readProtectedDeploymentProviderIdentity(locallyValidatedIdentity.deploymentId)
+    });
+  }
+  return {
+    baseUrl,
+    ...(deploymentIdentity === null ? {} : { deploymentIdentity }),
+    launchPreview: !useExistingServer,
+    protectedDeployment,
+    runBuild: !useExistingServer && options.skipBuild !== true,
+    // Context routing cannot intercept requests handled by a service worker.
+    // Keep the guarded browser uncontrolled, then verify both worker assets
+    // separately through read-only request-context GETs.
+    serviceWorkers: 'block',
+    useExistingServer
+  };
+};
+
+export const buildVercelProtectionBypassSeedUrl = ({ baseUrl, protectionBypass }) => {
+  if (typeof protectionBypass !== 'string' || protectionBypass.length === 0) {
+    throw new Error('protection_bypass_missing');
+  }
+  const url = new URL(baseUrl);
+  if (url.protocol !== 'https:') {
+    throw new Error('protected_deployment_https_required');
+  }
+  if (url.hostname === PUBLIC_PRODUCTION_HOST || !PROTECTED_DEPLOYMENT_HOST_PATTERN.test(url.hostname)) {
+    throw new Error('protection_bypass_target_forbidden');
+  }
+  url.searchParams.set('x-vercel-protection-bypass', protectionBypass);
+  url.searchParams.set('x-vercel-set-bypass-cookie', 'true');
+  return url.toString();
+};
+
+export const seedVercelProtectionBypassCookie = async ({ context, baseUrl, protectionBypass }) => {
+  const seedUrl = buildVercelProtectionBypassSeedUrl({ baseUrl, protectionBypass });
+  let status;
+  try {
+    const response = await context.request.get(seedUrl, {
+      failOnStatusCode: false,
+      timeout: TIMEOUT_MS
+    });
+    status = response.status();
+    await response.dispose();
+  } catch {
+    throw new Error('protection_bypass_cookie_seed_request_failed');
+  }
+  const cookies = await context.cookies(baseUrl);
+  if (status !== 200 || cookies.length === 0) {
+    throw new Error('protection_bypass_cookie_seed_failed');
+  }
+  return { cookieSeeded: true, status };
+};
+
+export const verifyReadOnlyServiceWorkerAssets = async ({ context, baseUrl }) => {
+  const assets = [];
+  for (const pathname of READ_ONLY_SERVICE_WORKER_ASSETS) {
+    const url = new URL(pathname, baseUrl).toString();
+    const response = await context.request.get(url, {
+      failOnStatusCode: false,
+      timeout: TIMEOUT_MS
+    });
+    try {
+      const status = response.status();
+      const body = await response.body();
+      const contentType = String(response.headers()['content-type'] ?? '').toLocaleLowerCase('en-US');
+      const responseUrl = new URL(response.url());
+      const requestedUrl = new URL(url);
+      const bodyText = body.toString('utf8');
+      const markers = SERVICE_WORKER_ASSET_MARKERS[pathname];
+      if (status !== 200
+        || body.byteLength === 0
+        || responseUrl.toString() !== requestedUrl.toString()
+        || !/(?:java|ecma)script/iu.test(contentType)
+        || !markers.every((marker) => bodyText.includes(marker))) {
+        throw new Error('service_worker_asset_read_only_verification_failed');
+      }
+      assets.push({
+        bytes: body.byteLength,
+        contentType,
+        pathname,
+        responseUrl: responseUrl.toString(),
+        sha256: createHash('sha256').update(body).digest('hex'),
+        status
+      });
+    } finally {
+      await response.dispose();
+    }
+  }
+  return assets;
+};
+
+export const assertAuthPersistenceNavigationOrigin = ({ actualUrl, baseUrl }) => {
+  let actual;
+  let expected;
+  try {
+    actual = new URL(actualUrl);
+    expected = new URL(baseUrl);
+  } catch {
+    throw new Error('auth_persistence_navigation_origin_invalid');
+  }
+  if (actual.origin !== expected.origin) {
+    throw new Error('auth_persistence_navigation_origin_mismatch');
+  }
+  return sanitizeAuthPersistenceDiagnosticUrl(actual.toString());
+};
+
+export const assertAuthPersistenceClosedBrowserBoundary = ({
+  baseUrl,
+  blockedMutationRequests,
+  finalUrl,
+  navigationHistory
+}) => {
+  if (blockedMutationRequests.length > 0) {
+    throw new Error(`external_mutation_attempt_blocked:${JSON.stringify(blockedMutationRequests)}`);
+  }
+  for (const navigation of navigationHistory) {
+    assertAuthPersistenceNavigationOrigin({ actualUrl: navigation.url, baseUrl });
+  }
+  assertAuthPersistenceNavigationOrigin({ actualUrl: finalUrl, baseUrl });
+  return {
+    finalUrl: sanitizeAuthPersistenceDiagnosticUrl(finalUrl),
+    navigationCount: navigationHistory.length
+  };
+};
+
+export const summarizeAuthPersistenceServiceWorkerCoverage = (executionPlan) => ({
+  assetVerification: executionPlan.protectedDeployment
+    ? 'read-only-static-contract'
+    : 'not-run',
+  mutationBoundary: 'service-workers-blocked',
+  runtime: 'uncontrolled-browser-only'
 });
 
 const normalizeControlLabel = (value) => String(value).trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
@@ -219,6 +509,7 @@ export const sanitizeAuthPersistenceDiagnosticText = (value) => String(value)
   .replace(/\bBearer\s+[A-Z0-9._~+/=-]+/giu, 'Bearer <redacted>')
   .replace(/\beyJ[A-Z0-9_-]+\.[A-Z0-9_-]+\.[A-Z0-9_-]+\b/giu, '<redacted-jwt>')
   .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu, '<redacted-email>')
+  .replace(/((?:x-vercel-protection-bypass|x-vercel-set-bypass-cookie)=)[^\s&]+/giu, '$1<redacted>')
   .replace(/((?:token|code|password|secret|key)=)[^\s&]+/giu, '$1<redacted>');
 
 export const settleAuthPersistenceResources = async (actions) => {
@@ -253,16 +544,55 @@ export const resolveAuthPersistenceArtifactPath = (outputDir, label, suffix) => 
   return artifactPath;
 };
 
-export const isExternalMutationRequest = ({ method, url }, allowedOrigin) => {
+export const isExternalMutationRequest = (
+  { method, url },
+  allowedOrigin,
+  { allowSameOriginMutations = true } = {}
+) => {
   const normalizedMethod = String(method).toUpperCase();
   if (normalizedMethod === 'GET' || normalizedMethod === 'HEAD' || normalizedMethod === 'OPTIONS') {
     return false;
+  }
+  if (!allowSameOriginMutations) {
+    return true;
   }
   try {
     return new URL(url).origin !== new URL(allowedOrigin).origin;
   } catch {
     return true;
   }
+};
+
+export const createGuardedAuthPersistenceContext = async ({
+  browser,
+  executionPlan,
+  resolvedBaseUrl,
+  blockedMutationRequests
+}) => {
+  const context = await browser.newContext({
+    deviceScaleFactor: MOBILE_DPR,
+    hasTouch: true,
+    isMobile: true,
+    serviceWorkers: executionPlan.serviceWorkers,
+    viewport: MOBILE_VIEWPORT
+  });
+  await context.route('**/*', async (route) => {
+    const request = route.request();
+    const requestSummary = {
+      method: request.method(),
+      resourceType: request.resourceType(),
+      url: sanitizeAuthPersistenceDiagnosticUrl(request.url())
+    };
+    if (isExternalMutationRequest(requestSummary, resolvedBaseUrl, {
+      allowSameOriginMutations: executionPlan.launchPreview
+    })) {
+      blockedMutationRequests.push(requestSummary);
+      await route.abort('blockedbyclient');
+      return;
+    }
+    await route.continue();
+  });
+  return context;
 };
 
 export const persistAuthPersistenceFailureEvidence = async ({
@@ -302,7 +632,14 @@ const runBuild = () => {
 
 const readJsonAttribute = async (page, attribute) => page.evaluate((name) => {
   const raw = document.documentElement.getAttribute(name);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }, attribute);
 
 const readDiagnostics = async (page) => ({
@@ -316,7 +653,7 @@ const readFixtureSettingsStorageSnapshot = async (page) => page.evaluate((keys) 
   unscoped: window.localStorage.getItem(keys.unscoped)
 }), FIXTURE_SETTINGS_STORAGE_KEYS);
 
-const summarizeSurface = ({ runtime, visual }) => ({
+export const summarizeAuthPersistenceSurface = ({ runtime, visual }) => ({
   authStatus: runtime?.auth?.status ?? null,
   buttons: (visual?.buttons ?? []).map((button) => button.text),
   mode: visual?.runtime?.mode ?? null,
@@ -360,17 +697,17 @@ const waitForSurface = async (page, expected) => {
       expectedSurface: expected
     }, { timeout: TIMEOUT_MS });
   } catch (error) {
-    const observed = summarizeSurface(await readDiagnostics(page));
+    const observed = summarizeAuthPersistenceSurface(await readDiagnostics(page));
     throw new Error(`surface_timeout:${JSON.stringify({ expected, observed })}`, { cause: error });
   }
-  return summarizeSurface(await readDiagnostics(page));
+  return summarizeAuthPersistenceSurface(await readDiagnostics(page));
 };
 
 const waitForTrailShineState = async (page, enabled, expectedSurface) => {
   const deadline = Date.now() + TIMEOUT_MS;
   let observed = null;
   while (Date.now() < deadline) {
-    observed = summarizeSurface(await readDiagnostics(page));
+    observed = summarizeAuthPersistenceSurface(await readDiagnostics(page));
     if (
       surfaceMatchesAuthPersistenceExpectation(observed, expectedSurface)
       && observed.trailShineEnabled === enabled
@@ -392,7 +729,8 @@ const captureFailureState = async ({
   consoleMessages,
   pageErrors,
   failedRequests,
-  pendingRequests
+  pendingRequests,
+  navigationHistory
 }) => {
   const elapsedMs = measureAuthPersistenceElapsedMs(runStartedAt);
   if (page.isClosed()) {
@@ -401,6 +739,7 @@ const captureFailureState = async ({
       currentPhase,
       elapsedMs,
       phaseTimings,
+      navigationHistory,
       error: sanitizeAuthPersistenceDiagnosticText(terminalError?.message ?? terminalError ?? 'unknown_failure'),
       url: null,
       title: null,
@@ -488,6 +827,7 @@ const captureFailureState = async ({
     currentPhase,
     elapsedMs,
     phaseTimings,
+    navigationHistory,
     error: sanitizeAuthPersistenceDiagnosticText(terminalError?.message ?? terminalError ?? 'unknown_failure'),
     url: sanitizeAuthPersistenceDiagnosticUrl(page.url()),
     title: await page.title().catch(() => null),
@@ -548,7 +888,12 @@ export const buildAuthPersistenceRoute = (authenticated) => (
   `/?content=core-only&theme=aurora&runtimeDiagnostics=1${authenticated ? '&authFixture=authenticated' : ''}&v=auth-persistence-soak`
 );
 
-export const summarizeAuthPersistenceSoak = (steps, consoleMessages, pageErrors) => {
+export const summarizeAuthPersistenceSoak = (
+  steps,
+  consoleMessages,
+  pageErrors,
+  { serviceWorkersBlocked = false } = {}
+) => {
   const required = [
     'signed-out-shared-account-entry',
     'signed-out-shared-account-contract',
@@ -566,6 +911,7 @@ export const summarizeAuthPersistenceSoak = (steps, consoleMessages, pageErrors)
   // Phaser may emit this teardown diagnostic while a page is navigating away.
   const actionableConsoleMessages = consoleMessages.filter(
     (message) => !message.startsWith('WebGL: CONTEXT_LOST_WEBGL:')
+      && !(serviceWorkersBlocked && message === 'Service Worker registration blocked by Playwright')
   );
   return {
     pass: missingSteps.length === 0 && actionableConsoleMessages.length === 0 && pageErrors.length === 0,
@@ -586,8 +932,9 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   const cleanupFailureEvidencePath = resolveAuthPersistenceArtifactPath(outputDir, label, '.cleanup-failure.json');
   const latestSummaryPath = resolve(artifactRoot, 'latest.summary.json');
   await ensureDir(outputDir);
+  const executionPlan = resolveAuthPersistenceExecutionPlan(options);
 
-  if (options.skipBuild !== true) {
+  if (executionPlan.runBuild) {
     runBuild();
   }
 
@@ -595,11 +942,16 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   let browser = null;
   let context = null;
   let page = null;
+  let resolvedBaseUrl = null;
+  let finalBrowserUrl = null;
+  let closedBrowserBoundary = null;
   const consoleMessages = [];
   const pageErrors = [];
   const failedRequests = [];
   const pendingRequests = new Map();
   const blockedMutationRequests = [];
+  const navigationHistory = [];
+  let navigationTracker = null;
   const steps = [];
   const screenshots = {};
   const phaseTimings = [];
@@ -633,7 +985,8 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         consoleMessages,
         pageErrors,
         failedRequests,
-        pendingRequests
+        pendingRequests,
+        navigationHistory
       })
       : {
         capturedAt: new Date().toISOString(),
@@ -653,6 +1006,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         pendingRequests: [...pendingRequests.values()],
         consoleMessages: consoleMessages.map(sanitizeAuthPersistenceDiagnosticText),
         pageErrors: pageErrors.map(sanitizeAuthPersistenceDiagnosticText),
+        navigationHistory,
         serviceWorker: null,
         captureState: 'page_unavailable'
       };
@@ -667,30 +1021,29 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   };
 
   try {
-    preview = await launchPreviewServer({ previewTimeoutMs: options.previewTimeoutMs });
+    preview = executionPlan.launchPreview
+      ? await launchPreviewServer({ previewTimeoutMs: options.previewTimeoutMs })
+      : null;
+    resolvedBaseUrl = preview?.baseUrl ?? executionPlan.baseUrl;
     browser = await chromium.launch({ headless: options.headless !== false });
-    context = await browser.newContext({
-      deviceScaleFactor: MOBILE_DPR,
-      hasTouch: true,
-      isMobile: true,
-      serviceWorkers: 'block',
-      viewport: MOBILE_VIEWPORT
-    });
-    await context.route('**/*', async (route) => {
-      const request = route.request();
-      const requestSummary = {
-        method: request.method(),
-        resourceType: request.resourceType(),
-        url: sanitizeAuthPersistenceDiagnosticUrl(request.url())
-      };
-      if (isExternalMutationRequest(requestSummary, preview.baseUrl)) {
-        blockedMutationRequests.push(requestSummary);
-        await route.abort('blockedbyclient');
-        return;
-      }
-      await route.continue();
+    context = await createGuardedAuthPersistenceContext({
+      browser,
+      executionPlan,
+      resolvedBaseUrl,
+      blockedMutationRequests
     });
     page = await context.newPage();
+    await installLivePlayQaServiceWorkerStabilizationProbe(page);
+    navigationTracker = createLivePlayQaNavigationTracker();
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) {
+        navigationTracker.record({ isMainFrame: true, url: frame.url() });
+        navigationHistory.push({
+          elapsedMs: measureAuthPersistenceElapsedMs(runStartedAt),
+          url: sanitizeAuthPersistenceDiagnosticUrl(frame.url())
+        });
+      }
+    });
     page.on('console', (message) => {
       if (message.type() === 'warning' || message.type() === 'error') {
         consoleMessages.push(message.text());
@@ -710,8 +1063,36 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       });
       pendingRequests.delete(request);
     });
+    if (executionPlan.protectedDeployment) {
+      enterPhase('protected-deployment-bypass-cookie');
+      await seedVercelProtectionBypassCookie({
+        context,
+        baseUrl: resolvedBaseUrl,
+        protectionBypass: options.protectionBypass
+      });
+      enterPhase('read-only-service-worker-assets');
+      steps.push({
+        id: 'read-only-service-worker-assets',
+        pass: true,
+        assets: await verifyReadOnlyServiceWorkerAssets({
+          context,
+          baseUrl: resolvedBaseUrl
+        })
+      });
+    }
     enterPhase('signed-out-shared-account-entry');
-    await page.goto(`${preview.baseUrl}${buildAuthPersistenceRoute(false)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    const signedOutRoute = new URL(buildAuthPersistenceRoute(false), resolvedBaseUrl).toString();
+    const initialNavigationCount = navigationTracker.snapshot().mainFrameNavigationCount;
+    await page.goto(signedOutRoute, { waitUntil: 'load', timeout: TIMEOUT_MS });
+    await settleLivePlayQaServiceWorkerNavigation({
+      initialNavigationCount,
+      page,
+      serviceWorkerAvailable: executionPlan.serviceWorkers === 'allow',
+      targetUrl: signedOutRoute,
+      timeoutMs: TIMEOUT_MS,
+      tracker: navigationTracker
+    });
+    assertAuthPersistenceNavigationOrigin({ actualUrl: page.url(), baseUrl: resolvedBaseUrl });
     const signedOutAccountEntry = await waitForSurface(page, {
       authenticated: false,
       buttons: SIGNED_OUT_SHARED_ACCOUNT_BUTTONS,
@@ -747,7 +1128,8 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     });
 
     enterPhase('diagnostics-fixture-entry');
-    await page.goto(`${preview.baseUrl}${buildAuthPersistenceRoute(true)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    await page.goto(new URL(buildAuthPersistenceRoute(true), resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    assertAuthPersistenceNavigationOrigin({ actualUrl: page.url(), baseUrl: resolvedBaseUrl });
     const authenticatedEntry = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
@@ -800,6 +1182,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     enterPhase('authenticated-reload');
     await page.reload({ waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    assertAuthPersistenceNavigationOrigin({ actualUrl: page.url(), baseUrl: resolvedBaseUrl });
     const authenticatedReload = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
@@ -874,7 +1257,8 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     await page.screenshot({ path: screenshots.authenticatedPause });
 
     enterPhase('diagnostics-fixture-account');
-    await page.goto(`${preview.baseUrl}${buildAuthPersistenceRoute(true)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    await page.goto(new URL(buildAuthPersistenceRoute(true), resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    assertAuthPersistenceNavigationOrigin({ actualUrl: page.url(), baseUrl: resolvedBaseUrl });
     await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
@@ -895,7 +1279,8 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     });
 
     enterPhase('fixture-reentry');
-    await page.goto(`${preview.baseUrl}${buildAuthPersistenceRoute(true)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    await page.goto(new URL(buildAuthPersistenceRoute(true), resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    assertAuthPersistenceNavigationOrigin({ actualUrl: page.url(), baseUrl: resolvedBaseUrl });
     const reentry = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
@@ -915,7 +1300,9 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     screenshots.fixtureReentry = screenshotPath;
     const sanitizedConsoleMessages = consoleMessages.map(sanitizeAuthPersistenceDiagnosticText);
     const sanitizedPageErrors = pageErrors.map(sanitizeAuthPersistenceDiagnosticText);
-    const result = summarizeAuthPersistenceSoak(steps, sanitizedConsoleMessages, sanitizedPageErrors);
+    const result = summarizeAuthPersistenceSoak(steps, sanitizedConsoleMessages, sanitizedPageErrors, {
+      serviceWorkersBlocked: executionPlan.serviceWorkers === 'block'
+    });
     if (!result.pass) {
       throw new Error(`auth_persistence_soak_failed:${JSON.stringify({
         missingSteps: result.missingSteps,
@@ -928,13 +1315,20 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       label,
       generatedAt: new Date().toISOString(),
       fixtureOnly: true,
-      note: 'This verifies the exact current signed-out shared-account entry surface and an opposite fixture-local Trail Shine value through the real Settings control, reload, gameplay, Pause, Account, and re-entry without credentials, external settings/session writes, or retired local-auth controls.',
+      note: 'This verifies the exact current signed-out shared-account entry surface and an opposite fixture-local Trail Shine value through the real Settings control, reload, gameplay, Pause, Account, and re-entry without credentials, external settings/session writes, or retired local-auth controls. The mutation-safe browser is intentionally uncontrolled: installed service-worker activation, controller-change reload, and cache-runtime behavior are outside this result; protected runs verify worker assets only through the separately recorded read-only static contract.',
       viewport: MOBILE_VIEWPORT,
       deviceScaleFactor: MOBILE_DPR,
       result,
       consoleMessages: sanitizedConsoleMessages,
       pageErrors: sanitizedPageErrors,
       blockedMutationRequests,
+      transport: {
+        deploymentIdentity: executionPlan.deploymentIdentity ?? null,
+        existingServer: executionPlan.useExistingServer,
+        protectedDeployment: executionPlan.protectedDeployment,
+        serviceWorkers: executionPlan.serviceWorkers,
+        serviceWorkerCoverage: summarizeAuthPersistenceServiceWorkerCoverage(executionPlan)
+      },
       fixtureSettings: {
         changedFromDefault: changedTrailShine !== initialTrailShine,
         storageIsolation: fixtureSettingsIsolation,
@@ -1011,8 +1405,27 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
           }, null, 2)}\n`, 'utf8')
       },
       {
+        name: 'final_browser_url_capture',
+        run: page === null ? null : () => {
+          finalBrowserUrl = page.url();
+        }
+      },
+      {
         name: 'context_close',
         run: context === null ? null : () => context.close()
+      },
+      {
+        name: 'closed_browser_boundary',
+        run: resolvedBaseUrl === null || finalBrowserUrl === null
+          ? null
+          : () => {
+            closedBrowserBoundary = assertAuthPersistenceClosedBrowserBoundary({
+              baseUrl: resolvedBaseUrl,
+              blockedMutationRequests,
+              finalUrl: finalBrowserUrl,
+              navigationHistory
+            });
+          }
       },
       {
         name: 'browser_close',
@@ -1062,8 +1475,12 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   if (pendingSummary === null) {
     throw new Error('auth_persistence_summary_unavailable');
   }
+  if (closedBrowserBoundary === null) {
+    throw new Error('auth_persistence_closed_browser_boundary_unavailable');
+  }
 
   pendingSummary.fixtureSettings.cleanup = fixtureSettingsCleanup;
+  pendingSummary.transport.closedBrowserBoundary = closedBrowserBoundary;
   await publishAuthPersistenceSuccessAfterCleanup({
     cleanupErrors,
     writeSummary: () => writeFile(summaryPath, `${JSON.stringify(pendingSummary, null, 2)}\n`, 'utf8'),
@@ -1074,12 +1491,21 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
 if (isDirectRun) {
   const args = parseCliArgs();
+  const optionEnabled = (value) => value === true || value === 'true';
+  const protectedDeployment = optionEnabled(args['protected-deployment']);
   runLiveAuthPersistenceSoak({
     artifactRoot: typeof args['output-root'] === 'string' ? args['output-root'] : DEFAULT_ARTIFACT_ROOT,
+    baseUrl: typeof args['base-url'] === 'string' ? args['base-url'] : undefined,
+    deploymentId: typeof args['deployment-id'] === 'string' ? args['deployment-id'] : undefined,
+    deploymentUrl: typeof args['deployment-url'] === 'string' ? args['deployment-url'] : undefined,
     headless: args.headless !== 'false',
     label: typeof args.label === 'string' ? args.label : 'auth-persistence-soak',
+    protectedDeployment,
+    protectionBypass: protectedDeployment ? process.env.VERCEL_AUTOMATION_BYPASS_SECRET : undefined,
     sessionId: typeof args.session === 'string' ? args.session : undefined,
-    skipBuild: args['skip-build'] === true || args['skip-build'] === 'true'
+    skipBuild: optionEnabled(args['skip-build']),
+    sourceCommit: typeof args['source-commit'] === 'string' ? args['source-commit'] : undefined,
+    useExistingServer: optionEnabled(args['existing-server']) || optionEnabled(args['no-preview'])
   }).then((summary) => {
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
     process.exitCode = summary.result.pass ? 0 : 1;
