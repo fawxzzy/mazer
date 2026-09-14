@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import {
+  appendLivePlayQaCleanupEvidence,
   captureRedactedLivePlayQaScreenshot,
   captureLivePlayQaFailureEvidence,
   createLivePlayQaEvidencePersistenceError,
@@ -213,6 +214,44 @@ describe('live play QA script helpers', () => {
     } finally {
       await rm(root, { force: true, recursive: true });
     }
+  });
+
+  test('appends cleanup failures to the durable failure bundle', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mazer-live-play-qa-'));
+    try {
+      const evidencePath = join(root, 'cleanup.failure.json');
+      await writeFile(evidencePath, `${JSON.stringify({
+        schema: 'mazer.live-play-qa-failure.v1',
+        elapsedMs: 50,
+        phase: 'readiness'
+      })}\n`, 'utf8');
+      await appendLivePlayQaCleanupEvidence({
+        cleanupErrors: [
+          { action: 'browser.close', message: 'user@example.test token=secret' },
+          { action: 'preview.stop', message: 'preview failed' }
+        ],
+        evidencePath,
+        elapsedMs: 125
+      });
+      expect(JSON.parse(await readFile(evidencePath, 'utf8'))).toMatchObject({
+        elapsedMs: 125,
+        phase: 'readiness',
+        cleanupErrors: [
+          { action: 'browser.close', message: '<redacted-email> token=<redacted>' },
+          { action: 'preview.stop', message: 'preview failed' }
+        ]
+      });
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test('promotes the success pointer only after cleanup has settled', async () => {
+    const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
+    const cleanupIndex = scriptSource.lastIndexOf('cleanupErrors = await settleLivePlayQaCleanup');
+    const latestPromotionIndex = scriptSource.lastIndexOf("await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'))");
+    expect(cleanupIndex).toBeGreaterThan(-1);
+    expect(latestPromotionIndex).toBeGreaterThan(cleanupIndex);
   });
 
   test('uses a touch-capable mobile context by default and permits explicit desktop proof', () => {

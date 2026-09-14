@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { copyFile, writeFile } from 'node:fs/promises';
+import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -224,6 +224,19 @@ export const persistLivePlayQaFailureEvidence = async ({
     screenshotPath: screenshotError === null ? screenshotPath : null,
     screenshotError
   };
+};
+
+export const appendLivePlayQaCleanupEvidence = async ({
+  cleanupErrors,
+  evidencePath,
+  elapsedMs
+}) => {
+  const evidence = JSON.parse(await readFile(evidencePath, 'utf8'));
+  await writeFile(evidencePath, `${JSON.stringify({
+    ...evidence,
+    elapsedMs,
+    cleanupErrors: sanitizeLivePlayQaDiagnosticValue(cleanupErrors)
+  }, null, 2)}\n`, 'utf8');
 };
 
 const createPointKey = (point) => `${point.x},${point.y}`;
@@ -776,6 +789,7 @@ const waitForDiagnosticsReady = async (page, timeoutMs) => {
 
 export const captureLivePlayQaFailureEvidence = async ({
   browserContextOptions,
+  cleanupErrors = [],
   consoleMessages,
   error,
   failedRequests,
@@ -898,6 +912,7 @@ export const captureLivePlayQaFailureEvidence = async ({
     targetUrl: sanitizeLivePlayQaDiagnosticUrl(targetUrl),
     viewport,
     browserContext: browserContextOptions,
+    cleanupErrors: sanitizeLivePlayQaDiagnosticValue(cleanupErrors),
     page: sanitizedPageState === null
       ? null
       : {
@@ -1180,6 +1195,8 @@ export const runLivePlayQa = async (options = {}) => {
   let page = null;
   let targetUrl = new URL(route, baseUrl).toString();
   let terminalFailure = null;
+  let failureArtifact = null;
+  let cleanupErrors = [];
 
   await ensureDir(outputDir);
 
@@ -1476,8 +1493,6 @@ export const runLivePlayQa = async (options = {}) => {
     enterPhase('artifact-publication');
     await writeFile(summary.artifacts.summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
     await writeFile(summary.artifacts.stepsPath, `${JSON.stringify(stepRecords, null, 2)}\n`, 'utf8');
-    await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'));
-    return summary;
   } catch (error) {
     const failedPhase = currentPhase;
     let artifact;
@@ -1498,28 +1513,82 @@ export const runLivePlayQa = async (options = {}) => {
         targetUrl,
         viewport
       });
+      failureArtifact = artifact;
     } catch (evidenceError) {
       terminalFailure = createLivePlayQaEvidencePersistenceError({ error, evidenceError });
-      throw terminalFailure;
     }
-    terminalFailure = createLivePlayQaFailureError({ error, evidencePath: artifact.evidencePath });
-    throw terminalFailure;
+    if (artifact) {
+      terminalFailure = createLivePlayQaFailureError({ error, evidencePath: artifact.evidencePath });
+    }
   } finally {
-    const cleanupErrors = await settleLivePlayQaCleanup([
+    cleanupErrors = await settleLivePlayQaCleanup([
       ...(browser ? [{ name: 'browser.close', run: () => browser.close() }] : []),
       ...(preview ? [{ name: 'preview.stop', run: () => stopPreviewServer(preview.child) }] : [])
     ]);
-    if (cleanupErrors.length > 0) {
-      if (terminalFailure) {
-        terminalFailure.message += `\nCleanup errors: ${JSON.stringify(cleanupErrors)}`;
-      } else {
-        throw new AggregateError(
-          cleanupErrors.map(({ action, message }) => new Error(`${action}: ${message}`)),
-          'live_play_qa_cleanup_failed'
-        );
+  }
+
+  if (cleanupErrors.length > 0) {
+    const cleanupFailure = new AggregateError(
+      cleanupErrors.map(({ action, message }) => new Error(`${action}: ${message}`)),
+      'live_play_qa_cleanup_failed'
+    );
+    if (failureArtifact) {
+      try {
+        await appendLivePlayQaCleanupEvidence({
+          cleanupErrors,
+          evidencePath: failureArtifact.evidencePath,
+          elapsedMs: measureLivePlayQaElapsedMs(runStartedAt)
+        });
+      } catch (evidenceError) {
+        terminalFailure = createLivePlayQaEvidencePersistenceError({
+          error: terminalFailure ?? cleanupFailure,
+          evidenceError
+        });
+      }
+    } else {
+      try {
+        failureArtifact = await captureLivePlayQaFailureEvidence({
+          browserContextOptions,
+          cleanupErrors,
+          consoleMessages,
+          error: terminalFailure ?? cleanupFailure,
+          failedRequests,
+          label,
+          outputDir,
+          page,
+          pageErrors,
+          pendingRequests,
+          phase: 'cleanup',
+          phaseTimings,
+          runStartedAt,
+          targetUrl,
+          viewport
+        });
+        if (terminalFailure) {
+          terminalFailure.message += `\nCleanup evidence: ${failureArtifact.evidencePath}`;
+        } else {
+          terminalFailure = createLivePlayQaFailureError({
+            error: cleanupFailure,
+            evidencePath: failureArtifact.evidencePath
+          });
+        }
+      } catch (evidenceError) {
+        terminalFailure = createLivePlayQaEvidencePersistenceError({
+          error: terminalFailure ?? cleanupFailure,
+          evidenceError
+        });
       }
     }
+    if (terminalFailure) {
+      terminalFailure.message += `\nCleanup errors: ${JSON.stringify(cleanupErrors)}`;
+    }
   }
+
+  if (terminalFailure) {
+    throw terminalFailure;
+  }
+  await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'));
+  return summary;
 };
 
 const parseViewport = (value) => {
