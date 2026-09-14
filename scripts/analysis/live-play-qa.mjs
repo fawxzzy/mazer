@@ -252,13 +252,17 @@ export const resolveLivePlayProductionAcceptanceContract = ({
   route,
   sourceCommit,
   useExistingServer = false,
-  verifierIdentity
+  verifierIdentity,
+  verifyPostGoalLifecycle = true
 }) => {
   if (!enabled) {
     return null;
   }
   if (!useExistingServer) {
     throw new Error('live_play_production_existing_server_required');
+  }
+  if (verifyPostGoalLifecycle !== true) {
+    throw new Error('live_play_production_post_goal_lifecycle_required');
   }
 
   const base = new URL(normalizeBaseUrl(baseUrl));
@@ -1862,7 +1866,8 @@ export const runLivePlayQa = async (options = {}) => {
     route,
     sourceCommit: options.sourceCommit,
     useExistingServer: options.useExistingServer === true,
-    verifierIdentity: testOnlyVerifierIdentity
+    verifierIdentity: testOnlyVerifierIdentity,
+    verifyPostGoalLifecycle: options.verifyPostGoalLifecycle !== false
   });
   const inputMethod = normalizeLivePlayInputMethod(options.inputMethod);
   const browserContextOptions = resolveLivePlayBrowserContextOptions({

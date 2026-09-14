@@ -153,6 +153,17 @@ describe('live play QA script helpers', () => {
     expect(() => productionContract('random')).toThrow(
       'live_play_production_expected_observed_seed_malformed'
     );
+    expect(() => resolveLivePlayProductionAcceptanceContract({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      enabled: true,
+      expectedObservedSeed: 1735707243,
+      providerDeploymentIdentity,
+      route: productionRoute,
+      useExistingServer: true,
+      verifierIdentity,
+      verifyPostGoalLifecycle: false
+    })).toThrow('live_play_production_post_goal_lifecycle_required');
 
     const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
     const contractIndex = scriptSource.indexOf('const productionAcceptanceContract = resolveLivePlayProductionAcceptanceContract');
