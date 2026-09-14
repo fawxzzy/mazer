@@ -26,6 +26,7 @@ const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
 const STORAGE_KEY = 'mazer.game-toggles.v1';
 const DEFAULT_ARTIFACT_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-live-play-qa');
 const DEFAULT_ROUTE = '/?content=core-only&mode=play&theme=aurora&runtimeDiagnostics=1';
+const PRODUCTION_DEFAULT_ROUTE = '/?mode=play&runtimeDiagnostics=1';
 const DEFAULT_LABEL = 'live-play-qa';
 const DEFAULT_VIEWPORT = Object.freeze({ width: 405, height: 958 });
 const DEFAULT_STEP_TIMEOUT_MS = 900;
@@ -1733,9 +1734,13 @@ const triggerMove = async ({ inputMethod, page, diagnostics, move, stepSettleMs 
 };
 
 export const resolveRoute = (args, label) => {
-  const rawRoute = typeof args.route === 'string' ? args.route : DEFAULT_ROUTE;
-  const url = new URL(rawRoute, 'http://local.test');
   const productionAcceptance = isTruthy(args.productionAcceptance ?? args['production-acceptance']);
+  const rawRoute = typeof args.route === 'string'
+    ? args.route
+    : productionAcceptance
+      ? PRODUCTION_DEFAULT_ROUTE
+      : DEFAULT_ROUTE;
+  const url = new URL(rawRoute, 'http://local.test');
   if (!url.searchParams.has('runtimeDiagnostics')) {
     url.searchParams.set('runtimeDiagnostics', '1');
   }
