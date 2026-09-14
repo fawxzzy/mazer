@@ -19,6 +19,7 @@ import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
 export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
 export const LEGACY_PASSWORD_RECOVERY_PATH = '/update-password';
+export const LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS = 10_000;
 
 export type LegacyAuthStatus = 'guest' | 'authenticated' | 'unavailable';
 export type LegacyAuthFormMode = 'login' | 'signup';
@@ -134,6 +135,29 @@ interface LegacyAuthDirectSignOutClient {
     error: { message?: string | null } | null;
   }>;
 }
+export interface LegacyAuthAbortableTransport {
+  fetch: typeof fetch;
+}
+
+export const runLegacyAbortableCredentialRequest = async <T>(
+  transport: LegacyAuthAbortableTransport,
+  operation: () => Promise<T>,
+  timeoutMs = LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS
+): Promise<T> => {
+  const originalFetch = transport.fetch;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  transport.fetch = (input, init) => originalFetch(input, {
+    ...init,
+    signal: controller.signal
+  });
+  try {
+    return await operation();
+  } finally {
+    clearTimeout(timeout);
+    transport.fetch = originalFetch;
+  }
+};
 
 const createGuestSnapshot = (
   configured: boolean,
@@ -607,10 +631,17 @@ export const signInLegacyAuth = async (
   }
 
   return runLegacyAuthDirectSessionMutation(async () => {
-    const { data, error } = await client.auth.signInWithPassword({
-      email: normalizeLegacyAuthEmail(email),
-      password
-    });
+    const transport = client.auth as unknown as Partial<LegacyAuthAbortableTransport>;
+    if (typeof transport.fetch !== 'function') {
+      return createLegacyAuthMutationUnavailableResult();
+    }
+    const { data, error } = await runLegacyAbortableCredentialRequest(
+      transport as LegacyAuthAbortableTransport,
+      () => client.auth.signInWithPassword({
+        email: normalizeLegacyAuthEmail(email),
+        password
+      })
+    );
 
     const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
       error: error?.message ?? null,
@@ -651,11 +682,18 @@ export const signUpLegacyAuth = async (
   }
 
   return runLegacyAuthDirectSessionMutation(async () => {
-    const { data, error } = await client.auth.signUp({
-      email: normalizeLegacyAuthEmail(email),
-      password,
-      options: { data: metadata }
-    });
+    const transport = client.auth as unknown as Partial<LegacyAuthAbortableTransport>;
+    if (typeof transport.fetch !== 'function') {
+      return createLegacyAuthMutationUnavailableResult();
+    }
+    const { data, error } = await runLegacyAbortableCredentialRequest(
+      transport as LegacyAuthAbortableTransport,
+      () => client.auth.signUp({
+        email: normalizeLegacyAuthEmail(email),
+        password,
+        options: { data: metadata }
+      })
+    );
 
     const info = resolveLegacySignUpInfo(Boolean(error), Boolean(data.session));
     const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {

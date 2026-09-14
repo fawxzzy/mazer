@@ -1926,6 +1926,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain("if (typeof directSignOut._signOut !== 'function') {");
     expect(authSource).toContain("await directSignOut._signOut({ scope: 'local' })");
     expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
+    expect(authSource.match(/runLegacyAbortableCredentialRequest\(/g)).toHaveLength(2);
+    expect(authSource).toContain('LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS = 10_000');
     expect(authSource).toContain('sessionResult = await client.auth.getSession();');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");
   });

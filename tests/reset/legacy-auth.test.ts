@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
 import {
+  LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS,
   LEGACY_AUTH_GUEST_SCOPE,
   LEGACY_AUTH_REMEMBERED_IDENTITY_KEY,
   buildLegacySignUpMetadata,
@@ -32,6 +33,7 @@ import {
   resolveLegacyAuthStorageScope,
   resolveLegacyAuthSubmitState,
   resolveLegacySignUpInfo,
+  runLegacyAbortableCredentialRequest,
   syncLegacyRememberedIdentityFromAuthenticatedSession,
   updateLegacyPasswordWithClient,
   writeLegacyRememberedIdentityState,
@@ -73,6 +75,28 @@ const createSnapshot = (
 });
 
 describe('legacy auth runtime', () => {
+  test('aborts the underlying credential request before restoring its auth transport', async () => {
+    let observedSignal: AbortSignal | undefined;
+    const originalFetch = vi.fn((_: RequestInfo | URL, init?: RequestInit) => {
+      observedSignal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        observedSignal?.addEventListener('abort', () => {
+          reject(new DOMException('aborted', 'AbortError'));
+        }, { once: true });
+      });
+    }) as unknown as typeof fetch;
+    const transport = { fetch: originalFetch };
+
+    await expect(runLegacyAbortableCredentialRequest(
+      transport,
+      () => transport.fetch('https://bxtcuhkotumitoqtrcej.supabase.co/auth/v1/token'),
+      5
+    )).rejects.toMatchObject({ name: 'AbortError' });
+    expect(observedSignal?.aborted).toBe(true);
+    expect(transport.fetch).toBe(originalFetch);
+    expect(LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS).toBeLessThan(12_000);
+  });
+
   test('detects whether Supabase browser auth is configured', () => {
     expect(resolveLegacyAuthConfig({})).toBeNull();
     expect(resolveLegacyAuthConfig({
