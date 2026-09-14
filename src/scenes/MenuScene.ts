@@ -342,6 +342,7 @@ import {
 } from '../legacy-runtime/legacyPlayerMessage';
 import {
   hydrateLegacyRemoteAccountState,
+  isLegacyRuntimeDiagnosticsAuthFixtureRoute,
   isLegacyRemoteAccountProviderEligible,
   isLegacyRemoteCompletionContextCurrent,
   LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID,
@@ -17436,13 +17437,7 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }
 
-    const searchParams = new URLSearchParams(window.location.search);
-    const runtimeDiagnostics = searchParams.get('runtimeDiagnostics')?.trim().toLowerCase();
-    if (runtimeDiagnostics !== '1' && runtimeDiagnostics !== 'true') {
-      return null;
-    }
-
-    if (searchParams.get('authFixture')?.trim().toLowerCase() !== 'authenticated') {
+    if (!isLegacyRuntimeDiagnosticsAuthFixtureRoute(window.location.search)) {
       return null;
     }
 

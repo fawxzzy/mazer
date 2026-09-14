@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
+  createLegacyGuestAuthSnapshot,
   createLegacyAuthScopedStorage,
   getLegacyAuthClient,
   readLegacyAuthSessionSnapshot
 } from '../../src/legacy-runtime/legacyAuth';
 import {
   bootstrapLegacyRemoteAccountState,
+  bootstrapLegacyRemoteAccountStateForRoute,
   hydrateLegacyRemoteAccountState,
   isLegacyRemoteCompletionContextCurrent,
   isLegacyRemoteAccountProviderEligible,
+  isLegacyRuntimeDiagnosticsAuthFixtureRoute,
   LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID,
   LEGACY_REMOTE_ACCOUNT_SYNC_STORAGE_KEY,
   LEGACY_REMOTE_AI_PROGRESSION_TABLE,
@@ -143,6 +146,34 @@ beforeEach(() => {
 });
 
 describe('legacy remote progression', () => {
+  test('suppresses account bootstrap before the authenticated diagnostics fixture reaches the scene', async () => {
+    const bootstrapResult = {
+      error: null,
+      progressionState: null,
+      remoteSyncResult: null,
+      settings: null,
+      snapshot: createLegacyGuestAuthSnapshot()
+    };
+    const bootstrap = vi.fn(async () => bootstrapResult);
+
+    expect(isLegacyRuntimeDiagnosticsAuthFixtureRoute('?runtimeDiagnostics=1&authFixture=authenticated')).toBe(true);
+    expect(isLegacyRuntimeDiagnosticsAuthFixtureRoute('?runtimeDiagnostics=TRUE&authFixture=AUTHENTICATED')).toBe(true);
+    expect(isLegacyRuntimeDiagnosticsAuthFixtureRoute('?authFixture=authenticated')).toBe(false);
+    expect(isLegacyRuntimeDiagnosticsAuthFixtureRoute('?runtimeDiagnostics=1')).toBe(false);
+
+    await expect(bootstrapLegacyRemoteAccountStateForRoute(
+      '?runtimeDiagnostics=1&authFixture=authenticated',
+      bootstrap
+    )).resolves.toBeNull();
+    expect(bootstrap).not.toHaveBeenCalled();
+
+    await expect(bootstrapLegacyRemoteAccountStateForRoute(
+      '?runtimeDiagnostics=1',
+      bootstrap
+    )).resolves.toEqual(bootstrapResult);
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+  });
+
   test('keeps the authenticated runtime diagnostics fixture entirely provider-inert', async () => {
     const snapshot = {
       configured: true,

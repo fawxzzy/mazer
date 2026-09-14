@@ -13,7 +13,7 @@ import {
   resolveMazerLegalRoute,
   type MazerOAuthClient
 } from '../legacy-runtime/legacyAccountPortal';
-import { bootstrapLegacyRemoteAccountState } from '../legacy-runtime/legacyRemoteProgression';
+import { bootstrapLegacyRemoteAccountStateForRoute } from '../legacy-runtime/legacyRemoteProgression';
 import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
@@ -149,7 +149,7 @@ const boot = async (): Promise<void> => {
     await runMazerInstallGate(document);
   }
 
-  await bootstrapLegacyRemoteAccountState();
+  await bootstrapLegacyRemoteAccountStateForRoute(window.location.search);
   markMazerBootStatus('game-creating');
   game = new Phaser.Game(createMazerPhaserConfig(viewportGeometry.getSnapshot().fullBleed));
   attachMazerGameToWindow(game);

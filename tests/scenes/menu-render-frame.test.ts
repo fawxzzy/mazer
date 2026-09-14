@@ -1707,6 +1707,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('routes signed-out account entry directly through shared OAuth without a local login surface', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
+    const bootSource = readFileSync(resolve(process.cwd(), 'src/boot/main.ts'), 'utf8');
     const playerMessageSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayerMessage.ts'), 'utf8');
     const overlayRoutingSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayRouting.ts'), 'utf8');
 
@@ -1723,8 +1724,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.loadPersistedLegacyGameToggleSettings();');
     expect(menuSceneSource).toContain('this.authSnapshot');
     expect(menuSceneSource).toContain('private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null');
-    expect(menuSceneSource).toContain("runtimeDiagnostics !== '1' && runtimeDiagnostics !== 'true'");
-    expect(menuSceneSource).toContain("searchParams.get('authFixture')?.trim().toLowerCase() !== 'authenticated'");
+    expect(menuSceneSource).toContain('isLegacyRuntimeDiagnosticsAuthFixtureRoute(window.location.search)');
+    expect(bootSource).toContain('await bootstrapLegacyRemoteAccountStateForRoute(window.location.search);');
+    expect(bootSource).not.toContain('await bootstrapLegacyRemoteAccountState();');
     expect(menuSceneSource).toContain('userId: LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID');
     expect(menuSceneSource).toContain('isLegacyRemoteAccountProviderEligible(snapshot)');
     expect(menuSceneSource).toContain('const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();');

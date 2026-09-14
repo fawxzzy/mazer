@@ -61,6 +61,13 @@ export const LEGACY_REMOTE_ACCOUNT_SYNC_STORAGE_KEY = 'mazer.remote-account-sync
 export const LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY = 'mazer.remote-completion-outbox.v1';
 export const LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID = 'runtime-diagnostics-auth-fixture';
 
+export const isLegacyRuntimeDiagnosticsAuthFixtureRoute = (search: string): boolean => {
+  const searchParams = new URLSearchParams(search);
+  const runtimeDiagnostics = searchParams.get('runtimeDiagnostics')?.trim().toLowerCase();
+  return (runtimeDiagnostics === '1' || runtimeDiagnostics === 'true')
+    && searchParams.get('authFixture')?.trim().toLowerCase() === 'authenticated';
+};
+
 export const isLegacyRemoteAccountProviderEligible = (
   snapshot: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>
 ): snapshot is Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'> & {
@@ -585,6 +592,17 @@ export const bootstrapLegacyRemoteAccountState = async (
     snapshot
   };
   return legacyRemoteAccountBootstrap;
+};
+
+export const bootstrapLegacyRemoteAccountStateForRoute = async (
+  search: string,
+  bootstrap: () => Promise<LegacyRemoteAccountBootstrapResult> = () => bootstrapLegacyRemoteAccountState()
+): Promise<LegacyRemoteAccountBootstrapResult | null> => {
+  if (isLegacyRuntimeDiagnosticsAuthFixtureRoute(search)) {
+    return null;
+  }
+
+  return bootstrap();
 };
 
 /**
