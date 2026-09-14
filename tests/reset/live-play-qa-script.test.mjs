@@ -354,6 +354,25 @@ describe('live play QA script helpers', () => {
       actualUrl: `https://attacker.example.test${productionRoute}`,
       contract
     })).toThrow('live_play_production_navigation_origin_or_path_drift');
+    for (const unsafeRoute of [
+      `${deploymentIdentity.deploymentUrl.slice(0, -1)}${productionRoute}#hidden`,
+      `https://user:password@${new URL(deploymentIdentity.deploymentUrl).host}${productionRoute}`
+    ]) {
+      expect(() => assertLivePlayProductionNavigationBinding({
+        actualUrl: unsafeRoute,
+        contract
+      })).toThrow('live_play_production_navigation_origin_or_path_drift');
+      expect(() => resolveLivePlayProductionAcceptanceContract({
+        baseUrl: deploymentIdentity.deploymentUrl,
+        ...deploymentIdentity,
+        enabled: true,
+        expectedObservedSeed: 1735707243,
+        providerDeploymentIdentity,
+        route: unsafeRoute,
+        useExistingServer: true,
+        verifierIdentity
+      })).toThrow('live_play_production_route_binding_invalid');
+    }
   });
 
   test('keeps production routes exact while preserving non-production cache busting', () => {

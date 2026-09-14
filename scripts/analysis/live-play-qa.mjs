@@ -274,7 +274,13 @@ export const resolveLivePlayProductionAcceptanceContract = ({
   });
   const resolvedVerifierIdentity = resolveLivePlayProductionVerifierIdentity(verifierIdentity);
   const target = new URL(route, base);
-  if (target.origin !== base.origin || target.pathname !== '/') {
+  if (
+    target.origin !== base.origin
+    || target.pathname !== '/'
+    || target.username !== ''
+    || target.password !== ''
+    || target.hash !== ''
+  ) {
     throw new Error('live_play_production_route_binding_invalid');
   }
   if (readSingleQueryValue(target, 'runtimeDiagnostics', 'live_play_production_diagnostics_required') !== '1') {
@@ -361,7 +367,13 @@ export const assertLivePlayProductionNavigationBinding = ({ actualUrl, contract 
     return;
   }
   const actual = new URL(actualUrl);
-  if (actual.origin !== contract.expectedOrigin || actual.pathname !== contract.expectedPathname) {
+  if (
+    actual.origin !== contract.expectedOrigin
+    || actual.pathname !== contract.expectedPathname
+    || actual.username !== ''
+    || actual.password !== ''
+    || actual.hash !== ''
+  ) {
     throw new Error('live_play_production_navigation_origin_or_path_drift');
   }
   if (
