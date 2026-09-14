@@ -2,9 +2,15 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 
 import {
+  assertLivePlayProductionDeploymentIdentityUnchanged,
+  assertLivePlayProductionTestDoublePolicy,
   appendLivePlayQaCleanupEvidence,
+  assertLivePlayProductionVerifierIdentityUnchanged,
+  assertLivePlayProductionNavigationBinding,
+  isWorktreeDirty,
   assertLivePlayQaNavigationStable,
   captureRedactedLivePlayQaScreenshot,
   captureLivePlayQaFailureEvidence,
@@ -12,6 +18,8 @@ import {
   createLivePlayQaFailureError,
   createLivePlayQaNavigationTracker,
   createLivePlayQaUnexpectedNavigationError,
+  createLivePlayProductionArtifactContract,
+  classifyLivePlayProductionReadiness,
   isLivePlayDiagnosticsReady,
   measureLivePlayQaElapsedMs,
   normalizeLivePlayInputMethod,
@@ -20,7 +28,13 @@ import {
   resolveLivePlayLifecycleSnapshot,
   resolveArrowPointForMove,
   resolveLivePlayQaExpectedServiceWorkerReloadCount,
+  resolveLivePlayProductionAcceptanceContract,
+  resolveLivePlayQaRoute,
+  resolveRoute,
+  resolveLivePlayProductionDeploymentIdentity,
+  resolveLivePlayProductionVerifierIdentity,
   sanitizeLivePlayQaDiagnosticValue,
+  seedLivePlayProtectionBypassCookie,
   settleLivePlayQaCleanup,
   settleLivePlayQaServiceWorkerNavigation,
   resolveLivePlayRouteProgressIndex,
@@ -37,6 +51,610 @@ import {
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
+  const productionRoute = '/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=1735707242';
+  const deploymentIdentity = {
+    acceptanceTarget: 'release-candidate',
+    deploymentId: 'dpl_0000000000000000000000000000',
+    deploymentUrl: 'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app/',
+    sourceCommit: 'a'.repeat(40)
+  };
+  const providerDeploymentIdentity = {
+    alias: [],
+    gitSource: { repoId: 1212867711, sha: deploymentIdentity.sourceCommit },
+    id: deploymentIdentity.deploymentId,
+    projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
+    readyState: 'READY',
+    target: 'preview',
+    team: { id: 'team_CMJn7MvzFZZBnhNnjVUZF2RD' },
+    url: 'fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app'
+  };
+  const verifierIdentity = {
+    commit: 'b'.repeat(40),
+    dirty: false
+  };
+  const productionContract = (expectedObservedSeed = 1735707243) => resolveLivePlayProductionAcceptanceContract({
+    baseUrl: deploymentIdentity.deploymentUrl,
+    ...deploymentIdentity,
+    enabled: true,
+    expectedObservedSeed,
+    providerDeploymentIdentity,
+    route: productionRoute,
+    useExistingServer: true,
+    verifierIdentity
+  });
+
+  test('requires a deterministic seed and exact authenticated diagnostics fixture before production browser work', async () => {
+    expect(productionContract()).toEqual({
+      deploymentIdentity: {
+        ...deploymentIdentity,
+        productionCertified: false,
+        digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
+        repositoryId: 1212867711,
+        teamId: 'team_CMJn7MvzFZZBnhNnjVUZF2RD'
+      },
+      enabled: true,
+      expectedOrigin: 'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app',
+      expectedObservedSeed: 1735707243,
+      expectedObservedSeedSource: 'runtime-random',
+      expectedPathname: '/',
+      fixtureMode: 'authenticated',
+      requestedSeed: 1735707242,
+      verifierIdentity: {
+        commit: verifierIdentity.commit,
+        role: 'external-verifier',
+        targetRelationship: 'independently-verified-deployment'
+      }
+    });
+    expect(resolveLivePlayProductionAcceptanceContract({
+      baseUrl: 'https://mazer.example.test/',
+      enabled: false,
+      route: '/',
+      useExistingServer: false
+    })).toBeNull();
+
+    const invalidRoutes = [
+      ['/?mode=play&runtimeDiagnostics=1&authFixture=authenticated', 'live_play_production_seed_required'],
+      ['/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=runtime-random', 'live_play_production_runtime_random_seed_forbidden'],
+      ['/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=1.5', 'live_play_production_seed_malformed'],
+      ['/?mode=play&runtimeDiagnostics=1&authFixture=guest&mazeSeed=7', 'live_play_production_auth_fixture_invalid'],
+      ['/?mode=menu&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=7', 'live_play_production_play_mode_required'],
+      ['/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=7&mazeSeed=8', 'live_play_production_seed_required']
+    ];
+    for (const [route, error] of invalidRoutes) {
+      expect(() => resolveLivePlayProductionAcceptanceContract({
+        baseUrl: deploymentIdentity.deploymentUrl,
+        ...deploymentIdentity,
+        enabled: true,
+        expectedObservedSeed: 7,
+        providerDeploymentIdentity,
+        route,
+        useExistingServer: true,
+        verifierIdentity
+      })).toThrow(error);
+    }
+    expect(() => resolveLivePlayProductionAcceptanceContract({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      enabled: true,
+      expectedObservedSeed: 1735707243,
+      providerDeploymentIdentity,
+      route: productionRoute,
+      useExistingServer: false,
+      verifierIdentity
+    })).toThrow('live_play_production_existing_server_required');
+    expect(() => resolveLivePlayProductionAcceptanceContract({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      enabled: true,
+      providerDeploymentIdentity,
+      route: productionRoute,
+      useExistingServer: true,
+      verifierIdentity
+    })).toThrow('live_play_production_expected_observed_seed_required');
+    expect(() => productionContract('random')).toThrow(
+      'live_play_production_expected_observed_seed_malformed'
+    );
+    expect(() => resolveLivePlayProductionAcceptanceContract({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      enabled: true,
+      expectedObservedSeed: 1735707243,
+      providerDeploymentIdentity,
+      route: productionRoute,
+      useExistingServer: true,
+      verifierIdentity,
+      verifyPostGoalLifecycle: false
+    })).toThrow('live_play_production_post_goal_lifecycle_required');
+
+    const scriptSource = await readFile(new URL('../../scripts/analysis/live-play-qa.mjs', import.meta.url), 'utf8');
+    const contractIndex = scriptSource.indexOf('const productionAcceptanceContract = resolveLivePlayProductionAcceptanceContract');
+    expect(contractIndex).toBeGreaterThan(-1);
+    const runnerIndex = scriptSource.indexOf('export const runLivePlayQa = async');
+    const testDoublePolicyIndex = scriptSource.indexOf(
+      'assertLivePlayProductionTestDoublePolicy({',
+      runnerIndex
+    );
+    expect(testDoublePolicyIndex).toBeGreaterThan(runnerIndex);
+    expect(testDoublePolicyIndex).toBeLessThan(contractIndex);
+    const testOnlyVerifierIndex = scriptSource.indexOf("const testOnlyVerifierIdentity = process.env.NODE_ENV === 'test'");
+    expect(testOnlyVerifierIndex).toBeGreaterThan(-1);
+    expect(testOnlyVerifierIndex).toBeLessThan(contractIndex);
+    const contractSource = scriptSource.slice(
+      contractIndex,
+      scriptSource.indexOf('});', contractIndex) + 3
+    );
+    expect(contractSource).not.toContain('verifierIdentity: options.verifierIdentity');
+    expect(contractIndex).toBeLessThan(scriptSource.indexOf('await ensureDir(outputDir)', contractIndex));
+    expect(contractIndex).toBeLessThan(scriptSource.indexOf('chromium.launch', contractIndex));
+    expect(contractIndex).toBeLessThan(scriptSource.indexOf('browser.newContext', contractIndex));
+    expect(contractIndex).toBeLessThan(scriptSource.indexOf('page.goto', contractIndex));
+  });
+
+  test('fails closed unless production acceptance binds the exact ready deployment source', () => {
+    expect(resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      providerDeployment: providerDeploymentIdentity
+    })).toMatchObject({
+      ...deploymentIdentity,
+      projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
+      repositoryId: 1212867711,
+      teamId: 'team_CMJn7MvzFZZBnhNnjVUZF2RD'
+    });
+    expect(() => resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      providerDeployment: {
+        ...providerDeploymentIdentity,
+        gitSource: { ...providerDeploymentIdentity.gitSource, sha: 'b'.repeat(40) }
+      }
+    })).toThrow('live_play_production_provider_identity_mismatch');
+    expect(() => resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: 'https://staging.example.test/',
+      ...deploymentIdentity,
+      providerDeployment: providerDeploymentIdentity
+    })).toThrow('live_play_production_provider_identity_mismatch');
+    for (const unsafeBaseUrl of [
+      'https://user:password@fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app/',
+      'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app/wrong/path',
+      'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app/?token=secret',
+      'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app/#fragment'
+    ]) {
+      expect(() => resolveLivePlayProductionDeploymentIdentity({
+        baseUrl: unsafeBaseUrl,
+        ...deploymentIdentity,
+        providerDeployment: providerDeploymentIdentity
+      })).toThrow('live_play_production_base_url_invalid');
+    }
+    expect(() => resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: 'https://mazer.fawxzzy.com/',
+      ...deploymentIdentity,
+      providerDeployment: {
+        ...providerDeploymentIdentity,
+        alias: ['mazer.fawxzzy.com']
+      }
+    })).toThrow('live_play_production_provider_identity_mismatch');
+  });
+
+  test('forbids test doubles from publishing production acceptance artifacts', () => {
+    for (const testDouble of [
+      { providerDeploymentIdentity },
+      { finalProviderDeploymentIdentity: providerDeploymentIdentity },
+      { verifierIdentity }
+    ]) {
+      expect(() => assertLivePlayProductionTestDoublePolicy({
+        enabled: true,
+        testEnvironment: true,
+        ...testDouble
+      })).toThrow('live_play_production_test_double_forbidden');
+    }
+    expect(() => assertLivePlayProductionTestDoublePolicy({
+      enabled: false,
+      providerDeploymentIdentity,
+      testEnvironment: true
+    })).not.toThrow();
+    expect(() => assertLivePlayProductionTestDoublePolicy({
+      enabled: true,
+      providerDeploymentIdentity,
+      testEnvironment: false
+    })).not.toThrow();
+  });
+
+  test('distinguishes retained release candidates from current live production', () => {
+    const candidateIdentity = resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      providerDeployment: providerDeploymentIdentity
+    });
+    expect(candidateIdentity).toMatchObject({
+      acceptanceTarget: 'release-candidate',
+      productionCertified: false
+    });
+    expect(() => resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      acceptanceTarget: 'live-production',
+      providerDeployment: providerDeploymentIdentity
+    })).toThrow('live_play_production_live_target_mismatch');
+    const liveProductionIdentity = resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      acceptanceTarget: 'live-production',
+      providerDeployment: {
+        ...providerDeploymentIdentity,
+        alias: ['mazer.fawxzzy.com'],
+        target: 'production'
+      }
+    });
+    expect(liveProductionIdentity).toMatchObject({
+      acceptanceTarget: 'live-production',
+      productionCertified: true
+    });
+    expect(liveProductionIdentity.digest).not.toBe(candidateIdentity.digest);
+    expect(() => resolveLivePlayProductionDeploymentIdentity({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      acceptanceTarget: 'preview',
+      providerDeployment: providerDeploymentIdentity
+    })).toThrow('live_play_production_acceptance_target_invalid');
+  });
+
+  test('revalidates the live production alias immediately before artifact publication', () => {
+    const liveProviderDeployment = {
+      ...providerDeploymentIdentity,
+      alias: ['mazer.fawxzzy.com'],
+      target: 'production'
+    };
+    const liveContract = resolveLivePlayProductionAcceptanceContract({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      acceptanceTarget: 'live-production',
+      enabled: true,
+      expectedObservedSeed: 1735707243,
+      providerDeploymentIdentity: liveProviderDeployment,
+      route: productionRoute,
+      useExistingServer: true,
+      verifierIdentity
+    });
+    expect(assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: liveContract,
+      providerDeployment: liveProviderDeployment
+    })).toEqual(liveContract.deploymentIdentity);
+    expect(() => assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: liveContract,
+      providerDeployment: {
+        ...liveProviderDeployment,
+        alias: []
+      }
+    })).toThrow('live_play_production_live_target_mismatch');
+    expect(() => assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: liveContract,
+      providerDeployment: {
+        ...liveProviderDeployment,
+        target: 'preview'
+      }
+    })).toThrow('live_play_production_live_target_mismatch');
+    expect(assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: productionContract(),
+      providerDeployment: providerDeploymentIdentity
+    })).toEqual(productionContract().deploymentIdentity);
+  });
+
+  test('binds a clean external verifier identity separately from the deployed target source', () => {
+    expect(resolveLivePlayProductionVerifierIdentity(verifierIdentity)).toEqual({
+      commit: verifierIdentity.commit,
+      role: 'external-verifier',
+      targetRelationship: 'independently-verified-deployment'
+    });
+    expect(verifierIdentity.commit).not.toBe(deploymentIdentity.sourceCommit);
+    const unreadableDirty = isWorktreeDirty(() => {
+      throw new Error('git status unavailable');
+    });
+    expect(unreadableDirty).toBeNull();
+    for (const dirty of [true, unreadableDirty]) {
+      expect(() => resolveLivePlayProductionVerifierIdentity({
+        commit: verifierIdentity.commit,
+        dirty
+      })).toThrow('live_play_production_verifier_worktree_dirty');
+    }
+    expect(() => resolveLivePlayProductionVerifierIdentity({
+      commit: 'not-a-commit',
+      dirty: false
+    })).toThrow('live_play_production_verifier_commit_invalid');
+    expect(() => assertLivePlayProductionVerifierIdentityUnchanged({
+      contract: productionContract(),
+      verifierIdentity: { commit: 'c'.repeat(40), dirty: false }
+    })).toThrow('live_play_production_verifier_identity_drift');
+    expect(() => assertLivePlayProductionVerifierIdentityUnchanged({
+      contract: productionContract(),
+      verifierIdentity
+    })).not.toThrow();
+  });
+
+  test('binds the stabilized navigation to the exact production route contract', () => {
+    const contract = productionContract();
+    expect(() => assertLivePlayProductionNavigationBinding({
+      actualUrl: `${deploymentIdentity.deploymentUrl.slice(0, -1)}${productionRoute}`,
+      contract
+    })).not.toThrow();
+    for (const extraQuery of ['lowPower=1', 'v=one']) {
+      expect(() => assertLivePlayProductionNavigationBinding({
+        actualUrl: `${deploymentIdentity.deploymentUrl.slice(0, -1)}${productionRoute}&${extraQuery}`,
+        contract
+      })).toThrow('live_play_production_navigation_contract_drift');
+      expect(() => resolveLivePlayProductionAcceptanceContract({
+        baseUrl: deploymentIdentity.deploymentUrl,
+        ...deploymentIdentity,
+        enabled: true,
+        expectedObservedSeed: 1735707243,
+        providerDeploymentIdentity,
+        route: `${productionRoute}&${extraQuery}`,
+        useExistingServer: true,
+        verifierIdentity
+      })).toThrow('live_play_production_route_query_invalid');
+    }
+    expect(() => assertLivePlayProductionNavigationBinding({
+      actualUrl: `${deploymentIdentity.deploymentUrl}?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=9`,
+      contract
+    })).toThrow('live_play_production_navigation_contract_drift');
+    expect(() => assertLivePlayProductionNavigationBinding({
+      actualUrl: `https://attacker.example.test${productionRoute}`,
+      contract
+    })).toThrow('live_play_production_navigation_origin_or_path_drift');
+    for (const unsafeRoute of [
+      `${deploymentIdentity.deploymentUrl.slice(0, -1)}${productionRoute}#hidden`,
+      `https://user:password@${new URL(deploymentIdentity.deploymentUrl).host}${productionRoute}`
+    ]) {
+      expect(() => assertLivePlayProductionNavigationBinding({
+        actualUrl: unsafeRoute,
+        contract
+      })).toThrow('live_play_production_navigation_origin_or_path_drift');
+      expect(() => resolveLivePlayProductionAcceptanceContract({
+        baseUrl: deploymentIdentity.deploymentUrl,
+        ...deploymentIdentity,
+        enabled: true,
+        expectedObservedSeed: 1735707243,
+        providerDeploymentIdentity,
+        route: unsafeRoute,
+        useExistingServer: true,
+        verifierIdentity
+      })).toThrow('live_play_production_route_binding_invalid');
+    }
+  });
+
+  test('keeps production routes exact while preserving non-production cache busting', () => {
+    expect(resolveRoute({
+      productionAcceptance: 'true',
+      route: productionRoute
+    }, 'production')).toBe(productionRoute);
+    const productionDefault = new URL(resolveRoute({
+      authFixture: 'authenticated',
+      mazeSeed: '1735707242',
+      productionAcceptance: 'true'
+    }, 'production'), 'http://local.test');
+    expect([...productionDefault.searchParams.keys()].sort()).toEqual([
+      'authFixture',
+      'mazeSeed',
+      'mode',
+      'runtimeDiagnostics'
+    ]);
+    expect(productionDefault.searchParams.get('mode')).toBe('play');
+    expect(productionDefault.searchParams.get('runtimeDiagnostics')).toBe('1');
+    expect(productionDefault.searchParams.get('authFixture')).toBe('authenticated');
+    expect(productionDefault.searchParams.get('mazeSeed')).toBe('1735707242');
+    const nonProductionRoute = new URL(resolveRoute({ route: productionRoute }, 'local'), 'http://local.test');
+    expect(nonProductionRoute.searchParams.get('v')).toMatch(/^local-\d+$/u);
+    expect([...nonProductionRoute.searchParams.keys()].sort()).toEqual([
+      'authFixture',
+      'mazeSeed',
+      'mode',
+      'runtimeDiagnostics',
+      'v'
+    ]);
+
+    const programmaticProductionDefault = new URL(resolveLivePlayQaRoute({
+      authFixture: 'authenticated',
+      mazeSeed: '1735707242',
+      productionAcceptance: true
+    }, 'programmatic-production'), 'http://local.test');
+    expect([...programmaticProductionDefault.searchParams.keys()].sort()).toEqual([
+      'authFixture',
+      'mazeSeed',
+      'mode',
+      'runtimeDiagnostics'
+    ]);
+    expect(programmaticProductionDefault.searchParams.get('authFixture')).toBe('authenticated');
+    expect(programmaticProductionDefault.searchParams.get('mazeSeed')).toBe('1735707242');
+    expect(programmaticProductionDefault.searchParams.has('content')).toBe(false);
+    expect(programmaticProductionDefault.searchParams.has('theme')).toBe(false);
+    expect(programmaticProductionDefault.searchParams.has('v')).toBe(false);
+
+    const programmaticNonProductionDefault = new URL(resolveLivePlayQaRoute({}, 'programmatic-local'), 'http://local.test');
+    expect(programmaticNonProductionDefault.searchParams.get('content')).toBe('core-only');
+    expect(programmaticNonProductionDefault.searchParams.get('theme')).toBe('aurora');
+    expect(programmaticNonProductionDefault.searchParams.get('v')).toMatch(/^programmatic-local-\d+$/u);
+  });
+
+  test('accepts only exact authenticated deterministic play readiness and rejects the historical menu-reset race', () => {
+    const contract = productionContract();
+    const readyDiagnostics = {
+      runtime: {
+        auth: { status: 'authenticated' },
+        surface: { mode: 'play' },
+        generation: {
+          drawStage: {
+            buildPrerollActive: false,
+            complete: true,
+            lifecyclePhase: 'settled'
+          },
+          maze: { seed: 1735707243, seedSource: 'runtime-random' }
+        },
+        play: { playtest: { encoding: 'walkable-rows-v1' } }
+      },
+      visual: { touchControls: { visible: true } }
+    };
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: readyDiagnostics,
+      qaMoveAvailable: true
+    })).toEqual({ state: 'ready', reason: null });
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: {
+        ...readyDiagnostics,
+        runtime: { ...readyDiagnostics.runtime, auth: { status: 'guest' } }
+      },
+      qaMoveAvailable: true
+    })).toEqual({ state: 'rejected', reason: 'live_play_production_auth_fixture_state_drift' });
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: {
+        ...readyDiagnostics,
+        runtime: {
+          ...readyDiagnostics.runtime,
+          generation: {
+            ...readyDiagnostics.runtime.generation,
+            maze: { seed: 99, seedSource: 'runtime-random' }
+          }
+        }
+      },
+      qaMoveAvailable: true
+    })).toEqual({ state: 'rejected', reason: 'live_play_production_observed_seed_drift' });
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: {
+        ...readyDiagnostics,
+        runtime: {
+          ...readyDiagnostics.runtime,
+          generation: {
+            ...readyDiagnostics.runtime.generation,
+            maze: { seed: 1735707243, seedSource: 'query' }
+          }
+        }
+      },
+      qaMoveAvailable: true
+    })).toEqual({ state: 'rejected', reason: 'live_play_production_observed_seed_source_drift' });
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: {
+        runtime: {
+          auth: { status: 'authenticated' },
+          surface: { mode: 'menu' },
+          generation: {
+            maze: { buildKind: 'menu-generated', seed: 1735707242 },
+            pendingRequest: { reason: 'menu-demo-goal-reset' }
+          }
+        },
+        visual: { touchControls: { visible: false } }
+      },
+      qaMoveAvailable: false,
+      sawPlay: false
+    })).toEqual({ state: 'rejected', reason: 'live_play_production_play_returned_to_menu' });
+  });
+
+  test('records bounded requested and observed production identity without query-bearing URLs', () => {
+    const artifactContract = createLivePlayProductionArtifactContract(productionContract(), {
+      runtime: {
+        auth: { status: 'authenticated' },
+        generation: { maze: { seed: 1735707243, seedSource: 'runtime-random' } }
+      }
+    });
+    expect(artifactContract).toEqual({
+      deploymentIdentity: {
+        ...deploymentIdentity,
+        productionCertified: false,
+        digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        projectId: 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ',
+        repositoryId: 1212867711,
+        teamId: 'team_CMJn7MvzFZZBnhNnjVUZF2RD'
+      },
+      enabled: true,
+      expectedObservedSeed: 1735707243,
+      expectedObservedSeedSource: 'runtime-random',
+      fixtureMode: 'authenticated',
+      observedFixtureMode: 'authenticated',
+      observedSeed: 1735707243,
+      observedSeedSource: 'runtime-random',
+      requestedSeed: 1735707242,
+      seedInput: 'explicit-query',
+      route: {
+        origin: 'https://fawxzzy-mazer-a1b2c3d4-fawxzzy.vercel.app',
+        pathname: '/',
+        queryKeys: ['authFixture', 'mazeSeed', 'mode', 'runtimeDiagnostics']
+      },
+      verifierIdentity: {
+        commit: verifierIdentity.commit,
+        role: 'external-verifier',
+        targetRelationship: 'independently-verified-deployment'
+      }
+    });
+    expect(JSON.stringify(artifactContract)).not.toContain('?');
+  });
+
+  test('accepts the selector-owned observed seed instead of assuming a fixed offset', () => {
+    const requestedSeed = 3749;
+    const selected = createLegacyRuntimeMazeForMode('play', 50, requestedSeed, null, {
+      candidateCount: 3,
+      targetComplexity: 64
+    });
+    const contract = resolveLivePlayProductionAcceptanceContract({
+      baseUrl: deploymentIdentity.deploymentUrl,
+      ...deploymentIdentity,
+      enabled: true,
+      expectedObservedSeed: selected.seed,
+      providerDeploymentIdentity,
+      route: `/?mode=play&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=${requestedSeed}`,
+      useExistingServer: true,
+      verifierIdentity
+    });
+    expect(classifyLivePlayProductionReadiness({
+      contract,
+      diagnostics: {
+        runtime: {
+          auth: { status: 'authenticated' },
+          surface: { mode: 'play' },
+          generation: {
+            drawStage: { buildPrerollActive: false, complete: true, lifecyclePhase: 'settled' },
+            maze: { seed: selected.seed, seedSource: 'runtime-random' }
+          },
+          play: { playtest: { encoding: 'walkable-rows-v1' } }
+        },
+        visual: { touchControls: { visible: true } }
+      },
+      qaMoveAvailable: true
+    })).toEqual({ state: 'ready', reason: null });
+  });
+
+  test('accepts only the exact protected-deployment bypass cookie and rejects login redirects', async () => {
+    const makeContext = ({ responseUrl, cookies }) => ({
+      cookies: async () => cookies,
+      request: {
+        get: async () => ({
+          dispose: async () => {},
+          status: () => 200,
+          url: () => responseUrl
+        })
+      }
+    });
+    await expect(seedLivePlayProtectionBypassCookie({
+      baseUrl: 'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+      context: makeContext({
+        responseUrl: 'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+        cookies: [{ name: '_vercel_jwt', value: 'opaque' }]
+      }),
+      protectionBypass: 'fixture-secret'
+    })).resolves.toBeUndefined();
+    await expect(seedLivePlayProtectionBypassCookie({
+      baseUrl: 'https://fawxzzy-mazer-fixture-fawxzzy.vercel.app/',
+      context: makeContext({
+        responseUrl: 'https://vercel.com/login',
+        cookies: [{ name: 'unrelated', value: 'opaque' }]
+      }),
+      protectionBypass: 'fixture-secret'
+    })).rejects.toThrow('live_play_protection_bypass_cookie_seed_failed');
+  });
+
   test('absorbs exactly one production service-worker reload before readiness is authoritative', async () => {
     const tracker = createLivePlayQaNavigationTracker();
     tracker.record({ isMainFrame: true, url: 'https://mazer.example.test/?runtimeDiagnostics=1' });
@@ -348,6 +966,7 @@ describe('live play QA script helpers', () => {
         pendingRequests: new Map([['request', { method: 'GET', url: 'https://mazer.example.test/pending?key=<redacted>' }]]),
         phase: 'readiness',
         phaseTimings: [{ phase: 'readiness', elapsedMs: 12 }],
+        productionAcceptanceContract: productionContract(),
         runStartedAt: performance.now() - 100,
         targetUrl: 'https://mazer.example.test/?runtimeDiagnostics=1&authFixture=authenticated',
         viewport: { width: 1440, height: 900 }
@@ -357,14 +976,27 @@ describe('live play QA script helpers', () => {
       expect(evidence).toMatchObject({
         schema: 'mazer.live-play-qa-failure.v1',
         phase: 'readiness',
+        productionAcceptance: {
+          enabled: true,
+          expectedObservedSeed: 1735707243,
+          expectedObservedSeedSource: 'runtime-random',
+          fixtureMode: 'authenticated',
+          observedFixtureMode: null,
+          observedSeed: null,
+          observedSeedSource: null,
+          requestedSeed: 1735707242
+        },
+        targetUrl: 'https://mazer.example.test/',
         page: {
           qa: { movePlayPlayerCallable: false, present: false },
-          url: 'https://mazer.example.test/?runtimeDiagnostics=<redacted>&token=<redacted>'
+          url: 'https://mazer.example.test/'
         }
       });
       expect(evidence.elapsedMs).toBeGreaterThanOrEqual(100);
       expect(evidence.error).not.toContain('token=secret');
       expect(evidence.consoleMessages).toEqual(['<redacted-email> failed token=<redacted>']);
+      expect(evidence.failedRequests[0].url).toBe('https://mazer.example.test/api');
+      expect(evidence.pendingRequests[0].url).toBe('https://mazer.example.test/pending');
       expect(evidence.artifacts.screenshotPath).toBe(artifact.screenshotPath);
       expect(await readFile(artifact.screenshotPath, 'utf8')).toBe('png');
     } finally {
@@ -427,12 +1059,18 @@ describe('live play QA script helpers', () => {
     const cleanupIndex = scriptSource.lastIndexOf('cleanupErrors = await settleLivePlayQaCleanup');
     const promotionPhaseIndex = scriptSource.lastIndexOf("enterPhase('success-pointer-promotion')");
     const promotionTryIndex = scriptSource.indexOf('try {', promotionPhaseIndex);
+    const productionRevalidationIndex = scriptSource.lastIndexOf('assertLivePlayProductionDeploymentIdentityUnchanged({');
+    const verifierRevalidationIndex = scriptSource.lastIndexOf('assertLivePlayProductionVerifierIdentityUnchanged({');
     const latestPromotionIndex = scriptSource.lastIndexOf("await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'))");
     expect(cleanupIndex).toBeGreaterThan(-1);
     expect(promotionPhaseIndex).toBeGreaterThan(cleanupIndex);
     expect(promotionTryIndex).toBeGreaterThan(promotionPhaseIndex);
     expect(latestPromotionIndex).toBeGreaterThan(cleanupIndex);
     expect(latestPromotionIndex).toBeGreaterThan(promotionTryIndex);
+    expect(productionRevalidationIndex).toBeGreaterThan(promotionTryIndex);
+    expect(productionRevalidationIndex).toBeLessThan(latestPromotionIndex);
+    expect(verifierRevalidationIndex).toBeGreaterThan(productionRevalidationIndex);
+    expect(verifierRevalidationIndex).toBeLessThan(latestPromotionIndex);
     expect(scriptSource.indexOf("phase: 'success-pointer-promotion'", latestPromotionIndex)).toBeGreaterThan(latestPromotionIndex);
   });
 

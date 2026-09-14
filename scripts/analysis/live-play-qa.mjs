@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +26,7 @@ const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
 const STORAGE_KEY = 'mazer.game-toggles.v1';
 const DEFAULT_ARTIFACT_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-live-play-qa');
 const DEFAULT_ROUTE = '/?content=core-only&mode=play&theme=aurora&runtimeDiagnostics=1';
+const PRODUCTION_DEFAULT_ROUTE = '/?mode=play&runtimeDiagnostics=1';
 const DEFAULT_LABEL = 'live-play-qa';
 const DEFAULT_VIEWPORT = Object.freeze({ width: 405, height: 958 });
 const DEFAULT_STEP_TIMEOUT_MS = 900;
@@ -36,6 +38,26 @@ const DEFAULT_INPUT_METHOD = 'qa';
 const DEFAULT_SERVICE_WORKER_STABILIZATION_QUIET_MS = 250;
 const SERVICE_WORKER_STABILIZATION_PROBE_GLOBAL = '__MAZER_LIVE_PLAY_QA_SW_STABILIZATION__';
 const SERVICE_WORKER_STABILIZATION_PROBE_STORAGE_KEY = 'mazer.live-play-qa.sw-stabilization.v1';
+const PRODUCTION_AUTH_FIXTURE = 'authenticated';
+const PRODUCTION_PLAY_SEED_SOURCE = 'runtime-random';
+const MAX_LEGACY_RUNTIME_SEED = 0xffffffff;
+const PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9-]+-fawxzzy\.vercel\.app$/u;
+const IMMUTABLE_PROTECTED_DEPLOYMENT_HOST_PATTERN = /^fawxzzy-mazer-[a-z0-9]{8,32}-fawxzzy\.vercel\.app$/u;
+const VERCEL_DEPLOYMENT_ID_PATTERN = /^dpl_[A-Za-z0-9]{20,64}$/u;
+const SOURCE_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
+const RELEASE_CANDIDATE_ACCEPTANCE_TARGET = 'release-candidate';
+const LIVE_PRODUCTION_ACCEPTANCE_TARGET = 'live-production';
+const PUBLIC_PRODUCTION_HOST = 'mazer.fawxzzy.com';
+const PRODUCTION_ROUTE_QUERY_KEYS = Object.freeze([
+  'authFixture',
+  'mazeSeed',
+  'mode',
+  'runtimeDiagnostics'
+]);
+const EXPECTED_VERCEL_PROJECT_ID = 'prj_t3zothbtj9DExrh3FjMsH98hwwSZ';
+const EXPECTED_VERCEL_TEAM_ID = 'team_CMJn7MvzFZZBnhNnjVUZF2RD';
+const EXPECTED_VERCEL_SCOPE = 'fawxzzy';
+const EXPECTED_GITHUB_REPOSITORY_ID = 1212867711;
 
 export const MOVE_DELTAS = Object.freeze({
   move_up: Object.freeze({ dx: 0, dy: -1 }),
@@ -55,6 +77,433 @@ const KEY_BY_MOVE = Object.freeze({
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 
 const isTruthy = (value) => value === true || value === 'true' || value === '1' || value === 'yes';
+
+const readSingleQueryValue = (url, key, errorCode) => {
+  const values = url.searchParams.getAll(key);
+  if (values.length !== 1) {
+    throw new Error(errorCode);
+  }
+  return values[0];
+};
+
+const normalizeLivePlayDeploymentUrl = (
+  value,
+  errorCode = 'live_play_production_deployment_url_invalid'
+) => {
+  const url = new URL(value);
+  if (
+    url.protocol !== 'https:'
+    || url.username
+    || url.password
+    || url.pathname !== '/'
+    || url.search
+    || url.hash
+  ) {
+    throw new Error(errorCode);
+  }
+  return url.toString();
+};
+
+const readLivePlayProductionProviderIdentity = (deploymentId) => {
+  try {
+    const vercelWrapper = process.platform === 'win32'
+      ? execFileSync('where.exe', ['vercel.cmd'], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true
+        }).split(/\r?\n/u).find(Boolean)
+      : 'vercel';
+    if (!vercelWrapper) {
+      throw new Error('vercel_cli_missing');
+    }
+    const vercelCommand = process.platform === 'win32' ? process.execPath : vercelWrapper;
+    const vercelArgs = process.platform === 'win32'
+      ? [resolve(vercelWrapper, '..', 'node_modules', 'vercel', 'dist', 'vc.js')]
+      : [];
+    return JSON.parse(execFileSync(
+      vercelCommand,
+      [...vercelArgs, 'api', `/v13/deployments/${deploymentId}`, '--scope', EXPECTED_VERCEL_SCOPE],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+      }
+    ));
+  } catch {
+    throw new Error('live_play_production_provider_readback_failed');
+  }
+};
+
+export const resolveLivePlayProductionDeploymentIdentity = ({
+  acceptanceTarget,
+  baseUrl,
+  deploymentId,
+  deploymentUrl,
+  providerDeployment,
+  sourceCommit
+}) => {
+  if (![RELEASE_CANDIDATE_ACCEPTANCE_TARGET, LIVE_PRODUCTION_ACCEPTANCE_TARGET].includes(acceptanceTarget)) {
+    throw new Error('live_play_production_acceptance_target_invalid');
+  }
+  if (!VERCEL_DEPLOYMENT_ID_PATTERN.test(String(deploymentId ?? ''))) {
+    throw new Error('live_play_production_deployment_id_invalid');
+  }
+  if (!SOURCE_COMMIT_PATTERN.test(String(sourceCommit ?? ''))) {
+    throw new Error('live_play_production_source_commit_invalid');
+  }
+  if (typeof deploymentUrl !== 'string') {
+    throw new Error('live_play_production_deployment_url_required');
+  }
+  const normalizedDeploymentUrl = normalizeLivePlayDeploymentUrl(deploymentUrl);
+  const deploymentHost = new URL(normalizedDeploymentUrl).hostname;
+  if (!IMMUTABLE_PROTECTED_DEPLOYMENT_HOST_PATTERN.test(deploymentHost)) {
+    throw new Error('live_play_production_immutable_deployment_url_required');
+  }
+  const normalizedBaseUrl = normalizeLivePlayDeploymentUrl(
+    baseUrl,
+    'live_play_production_base_url_invalid'
+  );
+  const base = new URL(normalizedBaseUrl);
+  const providerUrl = typeof providerDeployment?.url === 'string'
+    ? normalizeLivePlayDeploymentUrl(`https://${providerDeployment.url}`)
+    : null;
+  const providerSourceCommit = providerDeployment?.gitSource?.sha
+    ?? providerDeployment?.meta?.githubCommitSha;
+  const providerAliases = Array.isArray(providerDeployment?.alias)
+    ? providerDeployment.alias
+    : [];
+  const baseTargetsDeployment = normalizedBaseUrl === normalizedDeploymentUrl;
+  const productionCertified = acceptanceTarget === LIVE_PRODUCTION_ACCEPTANCE_TARGET;
+  if (
+    providerDeployment?.id !== deploymentId
+    || providerUrl !== normalizedDeploymentUrl
+    || providerSourceCommit !== sourceCommit
+    || providerDeployment?.projectId !== EXPECTED_VERCEL_PROJECT_ID
+    || (providerDeployment?.team?.id ?? providerDeployment?.ownerId) !== EXPECTED_VERCEL_TEAM_ID
+    || Number(providerDeployment?.gitSource?.repoId ?? providerDeployment?.meta?.githubRepoId)
+      !== EXPECTED_GITHUB_REPOSITORY_ID
+    || providerDeployment?.readyState !== 'READY'
+    || !baseTargetsDeployment
+  ) {
+    throw new Error('live_play_production_provider_identity_mismatch');
+  }
+  if (
+    productionCertified
+    && (
+      providerDeployment?.target !== 'production'
+      || !providerAliases.includes(PUBLIC_PRODUCTION_HOST)
+    )
+  ) {
+    throw new Error('live_play_production_live_target_mismatch');
+  }
+  return Object.freeze({
+    acceptanceTarget,
+    deploymentId,
+    deploymentUrl: normalizedDeploymentUrl,
+    digest: createHash('sha256')
+      .update(`${acceptanceTarget}\n${deploymentId}\n${normalizedDeploymentUrl}\n${sourceCommit}\n`, 'utf8')
+      .digest('hex'),
+    projectId: EXPECTED_VERCEL_PROJECT_ID,
+    productionCertified,
+    repositoryId: EXPECTED_GITHUB_REPOSITORY_ID,
+    sourceCommit,
+    teamId: EXPECTED_VERCEL_TEAM_ID
+  });
+};
+
+export const resolveLivePlayProductionVerifierIdentity = ({
+  commit = getCommitSha(),
+  dirty = isWorktreeDirty()
+} = {}) => {
+  if (!SOURCE_COMMIT_PATTERN.test(String(commit ?? ''))) {
+    throw new Error('live_play_production_verifier_commit_invalid');
+  }
+  if (dirty !== false) {
+    throw new Error('live_play_production_verifier_worktree_dirty');
+  }
+  return Object.freeze({
+    commit,
+    role: 'external-verifier',
+    targetRelationship: 'independently-verified-deployment'
+  });
+};
+
+export const assertLivePlayProductionVerifierIdentityUnchanged = ({
+  contract,
+  verifierIdentity
+}) => {
+  if (!contract) {
+    return;
+  }
+  const currentIdentity = resolveLivePlayProductionVerifierIdentity(verifierIdentity);
+  if (currentIdentity.commit !== contract.verifierIdentity.commit) {
+    throw new Error('live_play_production_verifier_identity_drift');
+  }
+};
+
+export const assertLivePlayProductionTestDoublePolicy = ({
+  enabled = false,
+  finalProviderDeploymentIdentity,
+  providerDeploymentIdentity,
+  testEnvironment = process.env.NODE_ENV === 'test',
+  verifierIdentity
+} = {}) => {
+  if (
+    enabled === true
+    && testEnvironment === true
+    && (
+      finalProviderDeploymentIdentity !== undefined
+      || providerDeploymentIdentity !== undefined
+      || verifierIdentity !== undefined
+    )
+  ) {
+    throw new Error('live_play_production_test_double_forbidden');
+  }
+};
+
+export const resolveLivePlayProductionAcceptanceContract = ({
+  acceptanceTarget,
+  baseUrl,
+  deploymentId,
+  deploymentUrl,
+  enabled = false,
+  expectedObservedSeed,
+  providerDeploymentIdentity,
+  route,
+  sourceCommit,
+  useExistingServer = false,
+  verifierIdentity,
+  verifyPostGoalLifecycle = true
+}) => {
+  if (!enabled) {
+    return null;
+  }
+  if (!useExistingServer) {
+    throw new Error('live_play_production_existing_server_required');
+  }
+  if (verifyPostGoalLifecycle !== true) {
+    throw new Error('live_play_production_post_goal_lifecycle_required');
+  }
+
+  const base = new URL(normalizeBaseUrl(baseUrl));
+  const deploymentIdentity = resolveLivePlayProductionDeploymentIdentity({
+    acceptanceTarget,
+    baseUrl: base.toString(),
+    deploymentId,
+    deploymentUrl,
+    providerDeployment: process.env.NODE_ENV === 'test' && providerDeploymentIdentity
+      ? providerDeploymentIdentity
+      : readLivePlayProductionProviderIdentity(deploymentId),
+    sourceCommit
+  });
+  const resolvedVerifierIdentity = resolveLivePlayProductionVerifierIdentity(verifierIdentity);
+  const target = new URL(route, base);
+  if (
+    target.origin !== base.origin
+    || target.pathname !== '/'
+    || target.username !== ''
+    || target.password !== ''
+    || target.hash !== ''
+  ) {
+    throw new Error('live_play_production_route_binding_invalid');
+  }
+  if (readSingleQueryValue(target, 'runtimeDiagnostics', 'live_play_production_diagnostics_required') !== '1') {
+    throw new Error('live_play_production_diagnostics_required');
+  }
+  if (readSingleQueryValue(target, 'mode', 'live_play_production_play_mode_required') !== 'play') {
+    throw new Error('live_play_production_play_mode_required');
+  }
+  const fixtureMode = readSingleQueryValue(
+    target,
+    'authFixture',
+    'live_play_production_auth_fixture_required'
+  );
+  if (fixtureMode !== PRODUCTION_AUTH_FIXTURE) {
+    throw new Error('live_play_production_auth_fixture_invalid');
+  }
+
+  const rawSeed = readSingleQueryValue(target, 'mazeSeed', 'live_play_production_seed_required');
+  if (rawSeed === 'runtime-random' || rawSeed === 'random' || rawSeed === 'auto') {
+    throw new Error('live_play_production_runtime_random_seed_forbidden');
+  }
+  if (!/^[1-9]\d*$/u.test(rawSeed)) {
+    throw new Error('live_play_production_seed_malformed');
+  }
+  const requestedSeed = Number(rawSeed);
+  if (!Number.isSafeInteger(requestedSeed) || requestedSeed > MAX_LEGACY_RUNTIME_SEED) {
+    throw new Error('live_play_production_seed_malformed');
+  }
+  if (expectedObservedSeed === undefined || expectedObservedSeed === null || expectedObservedSeed === '') {
+    throw new Error('live_play_production_expected_observed_seed_required');
+  }
+  const rawExpectedObservedSeed = String(expectedObservedSeed);
+  if (!/^\d+$/u.test(rawExpectedObservedSeed)) {
+    throw new Error('live_play_production_expected_observed_seed_malformed');
+  }
+  const normalizedExpectedObservedSeed = Number(rawExpectedObservedSeed);
+  if (
+    !Number.isSafeInteger(normalizedExpectedObservedSeed)
+    || normalizedExpectedObservedSeed > MAX_LEGACY_RUNTIME_SEED
+  ) {
+    throw new Error('live_play_production_expected_observed_seed_malformed');
+  }
+  if (JSON.stringify([...target.searchParams.keys()].sort()) !== JSON.stringify(PRODUCTION_ROUTE_QUERY_KEYS)) {
+    throw new Error('live_play_production_route_query_invalid');
+  }
+
+  return Object.freeze({
+    deploymentIdentity,
+    enabled: true,
+    expectedOrigin: base.origin,
+    expectedObservedSeed: normalizedExpectedObservedSeed,
+    expectedObservedSeedSource: PRODUCTION_PLAY_SEED_SOURCE,
+    expectedPathname: '/',
+    fixtureMode,
+    requestedSeed,
+    verifierIdentity: resolvedVerifierIdentity
+  });
+};
+
+export const assertLivePlayProductionDeploymentIdentityUnchanged = ({
+  contract,
+  providerDeployment
+}) => {
+  if (!contract || contract.deploymentIdentity.acceptanceTarget !== LIVE_PRODUCTION_ACCEPTANCE_TARGET) {
+    return contract?.deploymentIdentity ?? null;
+  }
+  const currentIdentity = resolveLivePlayProductionDeploymentIdentity({
+    acceptanceTarget: contract.deploymentIdentity.acceptanceTarget,
+    baseUrl: contract.deploymentIdentity.deploymentUrl,
+    deploymentId: contract.deploymentIdentity.deploymentId,
+    deploymentUrl: contract.deploymentIdentity.deploymentUrl,
+    providerDeployment: providerDeployment
+      ?? readLivePlayProductionProviderIdentity(contract.deploymentIdentity.deploymentId),
+    sourceCommit: contract.deploymentIdentity.sourceCommit
+  });
+  if (JSON.stringify(currentIdentity) !== JSON.stringify(contract.deploymentIdentity)) {
+    throw new Error('live_play_production_deployment_identity_drift');
+  }
+  return currentIdentity;
+};
+
+export const assertLivePlayProductionNavigationBinding = ({ actualUrl, contract }) => {
+  if (!contract) {
+    return;
+  }
+  const actual = new URL(actualUrl);
+  if (
+    actual.origin !== contract.expectedOrigin
+    || actual.pathname !== contract.expectedPathname
+    || actual.username !== ''
+    || actual.password !== ''
+    || actual.hash !== ''
+  ) {
+    throw new Error('live_play_production_navigation_origin_or_path_drift');
+  }
+  if (
+    JSON.stringify([...actual.searchParams.keys()].sort()) !== JSON.stringify(PRODUCTION_ROUTE_QUERY_KEYS)
+    ||
+    actual.searchParams.getAll('runtimeDiagnostics').length !== 1
+    || actual.searchParams.get('runtimeDiagnostics') !== '1'
+    || actual.searchParams.getAll('mode').length !== 1
+    || actual.searchParams.get('mode') !== 'play'
+    || actual.searchParams.getAll('authFixture').length !== 1
+    || actual.searchParams.get('authFixture') !== contract.fixtureMode
+    || actual.searchParams.getAll('mazeSeed').length !== 1
+    || actual.searchParams.get('mazeSeed') !== String(contract.requestedSeed)
+  ) {
+    throw new Error('live_play_production_navigation_contract_drift');
+  }
+};
+
+export const classifyLivePlayProductionReadiness = ({
+  contract,
+  diagnostics,
+  qaMoveAvailable,
+  sawPlay = false
+}) => {
+  const runtime = diagnostics?.runtime ?? null;
+  const surfaceMode = runtime?.surface?.mode ?? null;
+  const generationReason = runtime?.generation?.pendingRequest?.reason
+    ?? runtime?.generation?.reset?.reason
+    ?? null;
+  if (
+    surfaceMode === 'menu'
+    && (sawPlay || generationReason === 'menu-demo-goal-reset')
+  ) {
+    return { state: 'rejected', reason: 'live_play_production_play_returned_to_menu' };
+  }
+  if (surfaceMode === 'play' && runtime?.auth?.status !== contract.fixtureMode) {
+    return { state: 'rejected', reason: 'live_play_production_auth_fixture_state_drift' };
+  }
+  const observedSeed = runtime?.generation?.maze?.seed ?? null;
+  const observedSeedSource = runtime?.generation?.maze?.seedSource ?? null;
+  if (surfaceMode === 'play' && observedSeedSource !== contract.expectedObservedSeedSource) {
+    return { state: 'rejected', reason: 'live_play_production_observed_seed_source_drift' };
+  }
+  if (surfaceMode === 'play' && observedSeed !== contract.expectedObservedSeed) {
+    return { state: 'rejected', reason: 'live_play_production_observed_seed_drift' };
+  }
+  if (isLivePlayDiagnosticsReady({ ...diagnostics, qaMoveAvailable })) {
+    return { state: 'ready', reason: null };
+  }
+  return { state: 'pending', reason: null };
+};
+
+export const createLivePlayProductionArtifactContract = (contract, diagnostics = null) => contract
+  ? {
+      deploymentIdentity: contract.deploymentIdentity,
+      enabled: true,
+      expectedObservedSeed: contract.expectedObservedSeed,
+      expectedObservedSeedSource: contract.expectedObservedSeedSource,
+      fixtureMode: contract.fixtureMode,
+      observedFixtureMode: diagnostics?.runtime?.auth?.status ?? null,
+      observedSeed: diagnostics?.runtime?.generation?.maze?.seed ?? null,
+      observedSeedSource: diagnostics?.runtime?.generation?.maze?.seedSource ?? null,
+      requestedSeed: contract.requestedSeed,
+      seedInput: 'explicit-query',
+      route: {
+        origin: contract.expectedOrigin,
+        pathname: contract.expectedPathname,
+        queryKeys: PRODUCTION_ROUTE_QUERY_KEYS
+      },
+      verifierIdentity: contract.verifierIdentity
+    }
+  : { enabled: false };
+
+export const seedLivePlayProtectionBypassCookie = async ({ context, baseUrl, protectionBypass }) => {
+  if (typeof protectionBypass !== 'string' || protectionBypass.length === 0) {
+    throw new Error('live_play_protection_bypass_missing');
+  }
+  const url = new URL(baseUrl);
+  if (url.protocol !== 'https:' || !PROTECTED_DEPLOYMENT_HOST_PATTERN.test(url.hostname)) {
+    throw new Error('live_play_protection_bypass_target_forbidden');
+  }
+  url.searchParams.set('x-vercel-protection-bypass', protectionBypass);
+  url.searchParams.set('x-vercel-set-bypass-cookie', 'true');
+  let status;
+  let responseOrigin;
+  try {
+    const response = await context.request.get(url.toString(), {
+      failOnStatusCode: false,
+      timeout: 45_000
+    });
+    status = response.status();
+    responseOrigin = new URL(response.url()).origin;
+    await response.dispose();
+  } catch {
+    throw new Error('live_play_protection_bypass_cookie_seed_request_failed');
+  }
+  const cookies = await context.cookies(baseUrl);
+  if (
+    status !== 200
+    || responseOrigin !== url.origin
+    || !cookies.some((cookie) => cookie.name === '_vercel_jwt' && cookie.value.length > 0)
+  ) {
+    throw new Error('live_play_protection_bypass_cookie_seed_failed');
+  }
+};
 
 const runNpmCommand = (args) => {
   if (process.platform === 'win32') {
@@ -76,11 +525,15 @@ const getCommitSha = () => {
   }
 };
 
-const isWorktreeDirty = () => {
+export const isWorktreeDirty = (readStatus = () => execFileSync(
+  'git',
+  ['status', '--porcelain'],
+  { cwd: REPO_ROOT, encoding: 'utf8' }
+)) => {
   try {
-    return execFileSync('git', ['status', '--porcelain'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim().length > 0;
+    return readStatus().trim().length > 0;
   } catch {
-    return false;
+    return null;
   }
 };
 
@@ -951,7 +1404,33 @@ export const collectPostGoalLifecycleProof = async ({
   };
 };
 
-const waitForDiagnosticsReady = async (page, timeoutMs) => {
+const waitForDiagnosticsReady = async (page, timeoutMs, productionAcceptanceContract = null) => {
+  if (productionAcceptanceContract) {
+    const startedAt = performance.now();
+    let sawPlay = false;
+    while (performance.now() - startedAt < timeoutMs) {
+      const diagnostics = await readLivePlayDiagnostics(page);
+      const qaMoveAvailable = await page.evaluate(() => (
+        typeof window.__MAZER_QA__?.movePlayPlayer === 'function'
+      ));
+      const classification = classifyLivePlayProductionReadiness({
+        contract: productionAcceptanceContract,
+        diagnostics,
+        qaMoveAvailable,
+        sawPlay
+      });
+      sawPlay ||= diagnostics.runtime?.surface?.mode === 'play';
+      if (classification.state === 'ready') {
+        return diagnostics;
+      }
+      if (classification.state === 'rejected') {
+        throw new Error(classification.reason);
+      }
+      await page.waitForTimeout(50);
+    }
+    throw new Error('live_play_production_readiness_timeout');
+  }
+
   await page.waitForFunction(
     ({ runtimeAttribute, visualAttribute }) => {
       const read = (name) => {
@@ -1008,6 +1487,7 @@ export const captureLivePlayQaFailureEvidence = async ({
   pendingRequests,
   phase,
   phaseTimings,
+  productionAcceptanceContract = null,
   runStartedAt,
   targetUrl,
   viewport
@@ -1065,6 +1545,7 @@ export const captureLivePlayQaFailureEvidence = async ({
                     ? {
                         buildKind: runtime.generation.maze.buildKind ?? null,
                         seed: runtime.generation.maze.seed ?? null,
+                        seedSource: runtime.generation.maze.seedSource ?? null,
                         source: runtime.generation.maze.source ?? null
                       }
                     : null
@@ -1111,37 +1592,44 @@ export const captureLivePlayQaFailureEvidence = async ({
   }
 
   const sanitizedPageState = sanitizeLivePlayQaDiagnosticValue(pageState);
+  const artifactUrl = (value) => productionAcceptanceContract
+    ? String(value).replace(/[?#].*$/u, '')
+    : sanitizeLivePlayQaDiagnosticUrl(value);
   const evidence = {
     generatedAt: new Date().toISOString(),
     phase,
     elapsedMs: measureLivePlayQaElapsedMs(runStartedAt),
     phaseTimings,
     error: sanitizeLivePlayQaDiagnosticText(error instanceof Error ? error.stack ?? error.message : String(error)),
-    targetUrl: sanitizeLivePlayQaDiagnosticUrl(targetUrl),
+    targetUrl: artifactUrl(targetUrl),
     viewport,
     browserContext: browserContextOptions,
+    productionAcceptance: createLivePlayProductionArtifactContract(
+      productionAcceptanceContract,
+      pageState ? { runtime: pageState.runtime } : null
+    ),
     cleanupErrors: sanitizeLivePlayQaDiagnosticValue(cleanupErrors),
     page: sanitizedPageState === null
       ? null
       : {
           ...sanitizedPageState,
-          url: sanitizeLivePlayQaDiagnosticUrl(pageState.url),
+          url: artifactUrl(pageState.url),
           serviceWorker: {
             ...sanitizedPageState.serviceWorker,
             controllerScriptUrl: pageState.serviceWorker.controllerScriptUrl
-              ? sanitizeLivePlayQaDiagnosticUrl(pageState.serviceWorker.controllerScriptUrl)
+              ? artifactUrl(pageState.serviceWorker.controllerScriptUrl)
               : null
           }
         },
     pageStateError,
     failedRequests: failedRequests.map((request) => ({
       ...request,
-      url: sanitizeLivePlayQaDiagnosticUrl(request.url),
+      url: artifactUrl(request.url),
       failure: request.failure ? sanitizeLivePlayQaDiagnosticText(request.failure) : null
     })),
     pendingRequests: [...pendingRequests.values()].map((request) => ({
       ...request,
-      url: sanitizeLivePlayQaDiagnosticUrl(request.url)
+      url: artifactUrl(request.url)
     })),
     consoleMessages: consoleMessages.map(sanitizeLivePlayQaDiagnosticText),
     pageErrors: pageErrors.map(sanitizeLivePlayQaDiagnosticText)
@@ -1265,20 +1753,36 @@ const triggerMove = async ({ inputMethod, page, diagnostics, move, stepSettleMs 
   };
 };
 
-const resolveRoute = (args, label) => {
-  const rawRoute = typeof args.route === 'string' ? args.route : DEFAULT_ROUTE;
+export const resolveRoute = (args, label) => {
+  const productionAcceptance = isTruthy(args.productionAcceptance ?? args['production-acceptance']);
+  const rawRoute = typeof args.route === 'string'
+    ? args.route
+    : productionAcceptance
+      ? PRODUCTION_DEFAULT_ROUTE
+      : DEFAULT_ROUTE;
   const url = new URL(rawRoute, 'http://local.test');
   if (!url.searchParams.has('runtimeDiagnostics')) {
     url.searchParams.set('runtimeDiagnostics', '1');
   }
-  if (!url.searchParams.has('v')) {
+  if (!productionAcceptance && !url.searchParams.has('v')) {
     url.searchParams.set('v', `${label}-${Date.now()}`);
   }
   if (typeof args.mazeSeed === 'string' || typeof args['maze-seed'] === 'string') {
     url.searchParams.set('mazeSeed', String(args.mazeSeed ?? args['maze-seed']));
   }
+  if (typeof args.authFixture === 'string' || typeof args['auth-fixture'] === 'string') {
+    url.searchParams.set('authFixture', String(args.authFixture ?? args['auth-fixture']));
+  }
   return `${url.pathname}${url.search}`;
 };
+
+export const resolveLivePlayQaRoute = (options = {}, label = DEFAULT_LABEL) => (
+  options.route ?? resolveRoute({
+    authFixture: options.authFixture,
+    mazeSeed: options.mazeSeed,
+    productionAcceptance: options.productionAcceptance
+  }, label)
+);
 
 const summarizeTimings = (durations) => {
   if (durations.length === 0) {
@@ -1375,12 +1879,35 @@ export const runLivePlayQa = async (options = {}) => {
   const sessionId = resolveSessionId(options.sessionId);
   const artifactRoot = resolve(options.artifactRoot ?? DEFAULT_ARTIFACT_ROOT);
   const outputDir = resolve(artifactRoot, sessionId);
-  const route = options.route ?? resolveRoute({}, label);
+  const route = resolveLivePlayQaRoute(options, label);
   const viewport = options.viewport ?? DEFAULT_VIEWPORT;
   const stepTimeoutMs = options.stepTimeoutMs ?? DEFAULT_STEP_TIMEOUT_MS;
   const stepSettleMs = options.stepSettleMs ?? DEFAULT_SETTLE_MS;
   const moveCap = options.moveCap ?? DEFAULT_MOVE_CAP;
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+  assertLivePlayProductionTestDoublePolicy({
+    enabled: options.productionAcceptance === true,
+    finalProviderDeploymentIdentity: options.finalProviderDeploymentIdentity,
+    providerDeploymentIdentity: options.providerDeploymentIdentity,
+    verifierIdentity: options.verifierIdentity
+  });
+  const testOnlyVerifierIdentity = process.env.NODE_ENV === 'test'
+    ? options.verifierIdentity
+    : undefined;
+  const productionAcceptanceContract = resolveLivePlayProductionAcceptanceContract({
+    acceptanceTarget: options.acceptanceTarget,
+    baseUrl,
+    deploymentId: options.deploymentId,
+    deploymentUrl: options.deploymentUrl,
+    enabled: options.productionAcceptance === true,
+    expectedObservedSeed: options.expectedObservedSeed,
+    providerDeploymentIdentity: options.providerDeploymentIdentity,
+    route,
+    sourceCommit: options.sourceCommit,
+    useExistingServer: options.useExistingServer === true,
+    verifierIdentity: testOnlyVerifierIdentity,
+    verifyPostGoalLifecycle: options.verifyPostGoalLifecycle !== false
+  });
   const inputMethod = normalizeLivePlayInputMethod(options.inputMethod);
   const browserContextOptions = resolveLivePlayBrowserContextOptions({
     hasTouch: options.hasTouch,
@@ -1430,6 +1957,16 @@ export const runLivePlayQa = async (options = {}) => {
     enterPhase('browser');
     browser = await chromium.launch({ headless: options.headless !== false });
     context = await browser.newContext(browserContextOptions);
+    if (options.protectedDeployment === true) {
+      if (!productionAcceptanceContract) {
+        throw new Error('live_play_protected_deployment_requires_production_acceptance');
+      }
+      await seedLivePlayProtectionBypassCookie({
+        baseUrl: resolvedBaseUrl,
+        context,
+        protectionBypass: options.protectionBypass
+      });
+    }
     page = await context.newPage();
     await installLivePlayQaServiceWorkerStabilizationProbe(page);
     navigationTracker = createLivePlayQaNavigationTracker();
@@ -1474,8 +2011,16 @@ export const runLivePlayQa = async (options = {}) => {
       timeoutMs: options.captureTimeoutMs ?? 45_000,
       tracker: navigationTracker
     });
+    assertLivePlayProductionNavigationBinding({
+      actualUrl: page.url(),
+      contract: productionAcceptanceContract
+    });
     enterPhase('readiness');
-    const initialDiagnostics = await waitForDiagnosticsReady(page, options.captureTimeoutMs ?? 45_000);
+    const initialDiagnostics = await waitForDiagnosticsReady(
+      page,
+      options.captureTimeoutMs ?? 45_000,
+      productionAcceptanceContract
+    );
     const initialRuntime = initialDiagnostics.runtime;
     const initialProgressionLevel = initialRuntime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null;
     const playtest = initialRuntime?.play?.playtest ?? null;
@@ -1617,6 +2162,10 @@ export const runLivePlayQa = async (options = {}) => {
       : summarizeFreshReadyState(lifecycleProof.finalDiagnostics);
     const worldTurnPassed = worldTurnProof.pass && freshWorldTurnProof.pass && freshReadyProof.pass;
 
+    assertLivePlayProductionVerifierIdentityUnchanged({
+      contract: productionAcceptanceContract,
+      verifierIdentity: testOnlyVerifierIdentity
+    });
     summary = {
       schema: 'mazer.live-play-qa.v1',
       label,
@@ -1627,13 +2176,19 @@ export const runLivePlayQa = async (options = {}) => {
         dirty: isWorktreeDirty()
       },
       route: {
-        url: targetUrl,
-        requestedRoute: route,
+        url: productionAcceptanceContract ? `${new URL(targetUrl).origin}${new URL(targetUrl).pathname}` : targetUrl,
+        requestedRoute: productionAcceptanceContract
+          ? new URL(route, baseUrl).pathname
+          : route,
         seed: initialRuntime?.generation?.maze?.seed ?? null,
         seedSource: initialRuntime?.generation?.maze?.seedSource ?? null,
         buildKind: initialRuntime?.generation?.maze?.buildKind ?? null,
         source: initialRuntime?.generation?.maze?.source ?? null
       },
+      productionAcceptance: createLivePlayProductionArtifactContract(
+        productionAcceptanceContract,
+        initialDiagnostics
+      ),
       viewport,
       browserContext: {
         hasTouch: browserContextOptions.hasTouch,
@@ -1724,6 +2279,12 @@ export const runLivePlayQa = async (options = {}) => {
       }
     };
 
+    assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: productionAcceptanceContract,
+      providerDeployment: process.env.NODE_ENV === 'test'
+        ? options.finalProviderDeploymentIdentity
+        : undefined
+    });
     enterPhase('artifact-publication');
     assertLivePlayQaNavigationStable(navigationTracker);
     await writeFile(summary.artifacts.summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
@@ -1748,6 +2309,7 @@ export const runLivePlayQa = async (options = {}) => {
         pendingRequests,
         phase: failedPhase,
         phaseTimings,
+        productionAcceptanceContract,
         runStartedAt,
         targetUrl,
         viewport
@@ -1807,6 +2369,7 @@ export const runLivePlayQa = async (options = {}) => {
           pendingRequests,
           phase: 'cleanup',
           phaseTimings,
+          productionAcceptanceContract,
           runStartedAt,
           targetUrl,
           viewport
@@ -1836,6 +2399,16 @@ export const runLivePlayQa = async (options = {}) => {
   }
   enterPhase('success-pointer-promotion');
   try {
+    assertLivePlayProductionDeploymentIdentityUnchanged({
+      contract: productionAcceptanceContract,
+      providerDeployment: process.env.NODE_ENV === 'test'
+        ? options.finalProviderDeploymentIdentity
+        : undefined
+    });
+    assertLivePlayProductionVerifierIdentityUnchanged({
+      contract: productionAcceptanceContract,
+      verifierIdentity: testOnlyVerifierIdentity
+    });
     await copyFile(summary.artifacts.summaryPath, resolve(artifactRoot, 'latest.summary.json'));
   } catch (error) {
     try {
@@ -1851,6 +2424,7 @@ export const runLivePlayQa = async (options = {}) => {
         pendingRequests,
         phase: 'success-pointer-promotion',
         phaseTimings,
+        productionAcceptanceContract,
         runStartedAt,
         targetUrl,
         viewport
@@ -1904,11 +2478,27 @@ if (isDirectRun) {
       : 0.42,
     inputMethod: normalizeLivePlayInputMethod(rawInputMethod),
     isMobile: args.mobile === undefined ? true : isTruthy(args.mobile),
+    acceptanceTarget: typeof args.acceptanceTarget === 'string'
+      ? args.acceptanceTarget
+      : args['acceptance-target'],
+    deploymentId: typeof args.deploymentId === 'string'
+      ? args.deploymentId
+      : args['deployment-id'],
+    deploymentUrl: typeof args.deploymentUrl === 'string'
+      ? args.deploymentUrl
+      : args['deployment-url'],
+    expectedObservedSeed: args.expectedObservedSeed ?? args['expected-observed-seed'],
+    productionAcceptance: isTruthy(args.productionAcceptance ?? args['production-acceptance']),
+    protectedDeployment: isTruthy(args.protectedDeployment ?? args['protected-deployment']),
+    protectionBypass: process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
     postGoalTimeoutMs: parseIntegerArg(args.postGoalTimeoutMs ?? args['post-goal-timeout-ms'], DEFAULT_POST_GOAL_TIMEOUT_MS),
     previewTimeoutMs: parseIntegerArg(args.previewTimeoutMs ?? args['preview-timeout-ms'], DEFAULT_PREVIEW_TIMEOUT_MS),
     route: resolveRoute(args, label),
     sessionId: typeof args.session === 'string' ? args.session : undefined,
     skipBuild: isTruthy(args.skipBuild ?? args['skip-build']),
+    sourceCommit: typeof args.sourceCommit === 'string'
+      ? args.sourceCommit
+      : args['source-commit'],
     stepSettleMs: parseIntegerArg(args.stepSettleMs ?? args['step-settle-ms'], DEFAULT_SETTLE_MS),
     stepTimeoutMs: parseIntegerArg(args.stepTimeoutMs ?? args['step-timeout-ms'], DEFAULT_STEP_TIMEOUT_MS),
     useExistingServer: isTruthy(args.noPreview ?? args['no-preview']),
