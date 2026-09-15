@@ -540,7 +540,40 @@ describe('Mazer UI rework decision registry contract', () => {
         return;
       }
 
-      console.error('[DIAG-BASE-REF]', JSON.stringify({ GITHUB_BASE_REF: process.env.GITHUB_BASE_REF ?? null, changedFilesCount: changedFiles.length, sample: changedFiles.slice(0, 8) }));
+      {
+        const { execFileSync } = await import('node:child_process');
+        const tryResolve = (ref: string): string => {
+          try {
+            return execFileSync('git', ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { encoding: 'utf8' }).trim();
+          } catch (e) {
+            return `UNRESOLVED (${e instanceof Error ? e.message.split('\n')[0] : String(e)})`;
+          }
+        };
+        const remoteBranches = (() => {
+          try {
+            return execFileSync('git', ['branch', '-r'], { encoding: 'utf8' }).trim();
+          } catch (e) {
+            return `ERROR (${e instanceof Error ? e.message.split('\n')[0] : String(e)})`;
+          }
+        })();
+        const fetchDepth = (() => {
+          try {
+            return execFileSync('git', ['log', '--oneline', '-n', '5'], { encoding: 'utf8' }).trim();
+          } catch (e) {
+            return `ERROR (${e instanceof Error ? e.message.split('\n')[0] : String(e)})`;
+          }
+        })();
+        console.error('[DIAG-BASE-REF]', JSON.stringify({
+          GITHUB_BASE_REF: process.env.GITHUB_BASE_REF ?? null,
+          origin_prBase: tryResolve(`origin/${process.env.GITHUB_BASE_REF ?? ''}`),
+          origin_main: tryResolve('origin/main'),
+          plain_main: tryResolve('main'),
+          remoteBranches,
+          recentLog: fetchDepth,
+          changedFilesCount: changedFiles.length,
+          sample: changedFiles.slice(0, 8)
+        }));
+      }
       const violations = collectIntegratorWaveMixViolations(changedFiles, registry);
       expect(violations).toEqual([]);
     });
