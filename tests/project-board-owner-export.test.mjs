@@ -240,6 +240,30 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     );
   }
 
+  for (const [label, markdown] of [
+    ["unordered list paragraph exits before type 7", "- item\n  continuation\n<span>\n## Hidden Raw Heading\n"],
+    ["ordered list paragraph exits before type 7", "1. item\n   continuation\n<span>\n## Hidden Raw Heading\n"],
+    ["wide unordered item content indentation exits before type 7", "-   item\n    continuation\n<span>\n## Hidden Raw Heading\n"],
+    ["wide ordered marker content indentation exits before type 7", "10.  item\n     continuation\n<span>\n## Hidden Raw Heading\n"],
+    ["nested list paragraph exits to the document before type 7", "- outer\n  - inner\n    continuation\n<span>\n## Hidden Raw Heading\n"],
+    ["nested list paragraph exits to its parent before type 7", "- outer\n  - inner\n    continuation\n  <span>\n  ## Hidden Raw Heading\n"],
+    ["sibling list paragraph exits before type 7", "- first\n  continuation\n- second\n  continuation\n<span>\n## Hidden Raw Heading\n"],
+    ["lazy list continuation exits before type 7", "- item\nlazy continuation\n<span>\n## Hidden Raw Heading\n"],
+    ["blank line exits list paragraph before type 7", "- item\n  continuation\n\n<span>\n## Hidden Raw Heading\n"],
+  ]) {
+    const rawHeading = structuredClone(registry);
+    rawHeading.workItems[0].sourceRef = "docs/current-truth.md#hidden-raw-heading";
+    assert.throws(
+      () => buildProjectBoardOwnerExport(rawHeading, {
+        ...bytes,
+        "mazer-owner-work-registry": JSON.stringify(rawHeading),
+        "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}`,
+      }),
+      /sourceRef fragment does not exist/,
+      label,
+    );
+  }
+
   for (const [sourceRef, markdown] of [
     ["docs/current-truth.md#heading-before-raw", "## Heading Before Raw\n<pre>\n## Hidden Raw Heading\n</pre>"],
     ["docs/current-truth.md#heading-after-raw", "<SCRIPT type=\"application/json\">\n## Hidden Raw Heading\n</SCRIPT>\n## Heading After Raw"],
@@ -250,6 +274,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["docs/current-truth.md#heading-after-inline-tag", "paragraph\n<x-widget>\n## Heading After Inline Tag"],
     ["docs/current-truth.md#heading-after-indented-paragraph-line", "paragraph\n    continuation\n<x-widget>\n## Heading After Indented Paragraph Line"],
     ["docs/current-truth.md#heading-after-nonstarting-ordered-text", "paragraph\n2. item\n<x-widget>\n## Heading After Nonstarting Ordered Text"],
+    ["docs/current-truth.md#heading-after-list-inline-tag", "- paragraph\n  <span>\n  ## Heading After List Inline Tag"],
   ]) {
     const visibleHeading = structuredClone(registry);
     visibleHeading.workItems[0].sourceRef = sourceRef;

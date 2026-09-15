@@ -124,6 +124,10 @@ function maskMarkdownHtmlComments(line, inComment) {
   return { masked, inComment };
 }
 
+function isMarkdownType7Start(line) {
+  return COMMONMARK_COMPLETE_OPEN_TAG.test(line) || COMMONMARK_COMPLETE_CLOSING_TAG.test(line);
+}
+
 function detectMarkdownRawHtmlBlock(line, allowType7) {
   const rawTextOpening = line.match(/^ {0,3}<(pre|script|style|textarea)(?:[\t >]|$)/i);
   if (rawTextOpening) {
@@ -134,27 +138,75 @@ function detectMarkdownRawHtmlBlock(line, allowType7) {
   if (/^ {0,3}<![A-Za-z]/.test(line)) return { endPattern: />/, endOnBlank: false };
   if (/^ {0,3}<!\[CDATA\[/.test(line)) return { endPattern: /\]\]>/, endOnBlank: false };
   if (COMMONMARK_TYPE_6_START.test(line)) return { endPattern: null, endOnBlank: true };
-  if (allowType7 && (COMMONMARK_COMPLETE_OPEN_TAG.test(line) || COMMONMARK_COMPLETE_CLOSING_TAG.test(line))) {
+  if (allowType7 && isMarkdownType7Start(line)) {
     return { endPattern: null, endOnBlank: true };
   }
   return null;
 }
 
-function nextMarkdownParagraphState(line, paragraphOpen) {
-  if (/^\s*$/.test(line)) return false;
-  if (/^ {0,3}#{1,6}(?:[ \t]+|$)/.test(line)) return false;
-  if (paragraphOpen && /^ {0,3}(?:=+|-+)[ \t]*$/.test(line)) return false;
-  if (/^ {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})$/.test(line)) return false;
-  if (/^ {0,3}>/.test(line)) return false;
-  const listMarker = line.match(/^ {0,3}(?:([*+-])|(\d{1,9})[.)])(?:([ \t]+)(.*)|[ \t]*)$/);
-  if (listMarker) {
-    if (!paragraphOpen) return false;
-    const itemContent = listMarker[4] ?? "";
-    const canInterruptParagraph = itemContent.trim() !== "" && (listMarker[1] !== undefined || listMarker[2] === "1");
-    return !canInterruptParagraph;
+function markdownIndentColumns(text, startColumn = 0) {
+  let column = startColumn;
+  for (const character of text) {
+    column = character === "\t" ? column + (4 - (column % 4)) : column + 1;
   }
-  if (/^(?: {4}|\t)/.test(line)) return paragraphOpen;
-  return true;
+  return column - startColumn;
+}
+
+function parseMarkdownListItem(line, activeListContentIndent) {
+  const indentation = line.match(/^[ \t]*/)?.[0] ?? "";
+  const markerIndent = markdownIndentColumns(indentation);
+  const isRootMarker = markerIndent <= 3;
+  const isNestedMarker = activeListContentIndent !== null
+    && markerIndent >= activeListContentIndent
+    && markerIndent <= activeListContentIndent + 3;
+  if (!isRootMarker && !isNestedMarker) return null;
+
+  const markerMatch = line.slice(indentation.length)
+    .match(/^(([*+-])|(\d{1,9})[.)])(?:(?:([ \t]+)(.*))|[ \t]*)$/);
+  if (!markerMatch) return null;
+  const marker = markerMatch[1];
+  const followingWhitespace = markerMatch[4] ?? "";
+  const itemContent = markerMatch[5] ?? "";
+  const markerEndColumn = markerIndent + marker.length;
+  const measuredFollowingIndent = markdownIndentColumns(followingWhitespace, markerEndColumn);
+  const followingIndent = itemContent === "" ? 1 : measuredFollowingIndent > 4 ? 1 : measuredFollowingIndent;
+  return {
+    markerIndent,
+    contentIndent: markerEndColumn + followingIndent,
+    itemContent,
+    canInterruptParagraph: itemContent.trim() !== ""
+      && (markerMatch[2] !== undefined || markerMatch[3] === "1"),
+  };
+}
+
+function nextMarkdownParagraphState(line, state) {
+  if (/^\s*$/.test(line)) return { ...state, open: false };
+  if (/^ {0,3}#{1,6}(?:[ \t]+|$)/.test(line)) return { ...state, open: false };
+  if (state.open && /^ {0,3}(?:=+|-+)[ \t]*$/.test(line)) return { ...state, open: false };
+  if (/^ {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})$/.test(line)) {
+    return { ...state, open: false };
+  }
+  if (/^ {0,3}>/.test(line)) return { ...state, open: false };
+
+  const listItem = parseMarkdownListItem(line, state.listContentIndent);
+  if (listItem) {
+    const exitsActiveListParagraph = state.listContentIndent !== null
+      && listItem.markerIndent < state.listContentIndent;
+    if (state.open && !exitsActiveListParagraph && !listItem.canInterruptParagraph) return state;
+    if (state.open && state.listContentIndent === null && !listItem.canInterruptParagraph) return state;
+    return {
+      open: listItem.itemContent.trim() !== "",
+      listContentIndent: listItem.contentIndent,
+    };
+  }
+
+  const lineIndent = markdownIndentColumns(line.match(/^[ \t]*/)?.[0] ?? "");
+  if (state.listContentIndent !== null) {
+    if (state.open || lineIndent >= state.listContentIndent) return { ...state, open: true };
+    return { open: true, listContentIndent: null };
+  }
+  if (lineIndent >= 4) return state;
+  return { open: true, listContentIndent: null };
 }
 
 function maskMarkdownRawHtmlBlock(line, state, allowType7 = true) {
@@ -176,7 +228,7 @@ function markdownHeadingAnchors(markdown) {
   let fence = null;
   let htmlComment = false;
   let rawHtmlBlock = null;
-  let paragraphOpen = false;
+  let paragraphState = { open: false, listContentIndent: null };
   for (const rawLine of lines) {
     if (fence) {
       const fenceMatch = rawLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
@@ -189,35 +241,40 @@ function markdownHeadingAnchors(markdown) {
       const rawMasked = maskMarkdownRawHtmlBlock(rawLine, rawHtmlBlock);
       rawHtmlBlock = rawMasked.state;
       renderedLines.push(rawMasked.masked);
-      if (!rawHtmlBlock && /^\s*$/.test(rawLine)) paragraphOpen = false;
+      if (!rawHtmlBlock && /^\s*$/.test(rawLine)) paragraphState = { ...paragraphState, open: false };
       continue;
     }
     if (htmlComment) {
       const commentMasked = maskMarkdownHtmlComments(rawLine, htmlComment);
       htmlComment = commentMasked.inComment;
       renderedLines.push(commentMasked.masked);
-      if (!htmlComment && /^\s*$/.test(commentMasked.masked)) paragraphOpen = false;
+      if (!htmlComment && /^\s*$/.test(commentMasked.masked)) paragraphState = { ...paragraphState, open: false };
       continue;
     }
     const fenceMatch = rawLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     if (fenceMatch && (fenceMatch[1][0] === "~" || !fenceMatch[2].includes("`"))) {
       fence = { marker: fenceMatch[1][0], length: fenceMatch[1].length };
       renderedLines.push(null);
-      paragraphOpen = false;
+      paragraphState = { ...paragraphState, open: false };
       continue;
     }
-    const rawMasked = maskMarkdownRawHtmlBlock(rawLine, null, !paragraphOpen);
+    const rawIndent = markdownIndentColumns(rawLine.match(/^[ \t]*/)?.[0] ?? "");
+    if (paragraphState.open && paragraphState.listContentIndent !== null
+      && rawIndent < paragraphState.listContentIndent && isMarkdownType7Start(rawLine)) {
+      paragraphState = { open: false, listContentIndent: null };
+    }
+    const rawMasked = maskMarkdownRawHtmlBlock(rawLine, null, !paragraphState.open);
     if (rawMasked.isBlock) {
       rawHtmlBlock = rawMasked.state;
       renderedLines.push(rawMasked.masked);
-      paragraphOpen = false;
+      paragraphState = { ...paragraphState, open: false };
       continue;
     }
     const commentMasked = maskMarkdownHtmlComments(rawLine, htmlComment);
     htmlComment = commentMasked.inComment;
     const visibleLine = commentMasked.masked;
     renderedLines.push(visibleLine);
-    paragraphOpen = nextMarkdownParagraphState(visibleLine, paragraphOpen);
+    paragraphState = nextMarkdownParagraphState(visibleLine, paragraphState);
   }
   for (let index = 0; index < renderedLines.length; index += 1) {
     const line = renderedLines[index];
