@@ -67,6 +67,9 @@ jobs:
       - name: Verify Wave 5C shared-account OAuth consumer required coverage
         run: node ./scripts/verify/run-shared-account-oauth-required-tests.mjs
 
+      - name: Verify Wave 0C measured-baseline required coverage
+        run: node ./scripts/verify/run-measured-baseline-required-tests.mjs
+
       - name: Build production bundle and PWA assets
         run: npm run build
 

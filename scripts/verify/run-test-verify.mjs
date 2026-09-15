@@ -5,6 +5,7 @@ import { NAVIGATION_CORE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './nav
 import { TELEPORT_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './teleport-required-tests.mjs';
 import { WORLD_IDENTITY_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './world-identity-required-tests.mjs';
 import { SHARED_ACCOUNT_OAUTH_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './shared-account-oauth-required-tests.mjs';
+import { MEASURED_BASELINE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './measured-baseline-required-tests.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPO_ROOT = resolve(SCRIPT_PATH, '..', '..', '..');
@@ -61,6 +62,11 @@ runVitest([
   // future non-tests/reset/* addition to this wave's list is covered
   // automatically instead of silently missed again.
   ...SHARED_ACCOUNT_OAUTH_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
+  // Wave 0C's measured-baseline required coverage -- same silent-gap class;
+  // see measured-baseline-required-tests.mjs's own header. Also currently
+  // empty after the tests/reset/* filter, kept for the same future-proofing
+  // reason as the Wave 5C list above.
+  ...MEASURED_BASELINE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
   '--exclude', CWD_MUTATING_FIXTURE,
   '--maxWorkers', '1',
   '--pool=threads',
