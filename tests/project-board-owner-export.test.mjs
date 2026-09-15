@@ -212,6 +212,89 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     "mazer-current-truth": `${bytes["mazer-current-truth"]}\n\`\`\`md\n## Fenced Heading\n\`\`\`\n## Heading After Fence\n`,
   }));
 
+  for (const [label, fencedMarkdown] of [
+    ["unordered list-contained fence", "- ```md\n  ## Hidden List Fence\n  ```"],
+    ["ordered list-contained tilde fence", "1. ~~~md\n   ## Hidden List Fence\n   ~~~"],
+    ["nested list-contained fence with blank lines", "- outer\n  - ```md\n\n    ## Hidden List Fence\n\n    ```"],
+    [
+      "nested parent fence retains the actual parent indentation",
+      "- outer\n  - ~~~md\n    code\n   ~~~\n  ## Hidden List Fence\n  ~~~\n## Visible After Parent Fence",
+    ],
+    [
+      "ordered nested parent fence retains the actual parent indentation",
+      "1. outer\n   1. ~~~md\n      code\n    ~~~\n   ## Hidden List Fence\n   ~~~\n## Visible After Parent Fence",
+    ],
+    [
+      "deep nested parent fence retains the actual ancestor indentation",
+      "- outer\n  - middle\n    - ~~~md\n      code\n     ~~~\n    ## Hidden List Fence\n    ~~~\n## Visible After Parent Fence",
+    ],
+    ["list-contained indented code takes precedence", "-     ```md\n      ## Hidden List Fence\n      ```"],
+    ["lazy list continuation followed by a top-level fence", "- paragraph\nlazy continuation\n```md\n## Hidden List Fence\n```"],
+    [
+      "shorter marker does not close a nested fence",
+      "- outer\n  - ````md\n    ## Hidden List Fence\n    ```\n    ## Hidden After Short Fence\n    `````",
+    ],
+  ]) {
+    const listFencedHeading = structuredClone(registry);
+    listFencedHeading.workItems[0].sourceRef = "docs/current-truth.md#hidden-list-fence";
+    assert.throws(
+      () => buildProjectBoardOwnerExport(listFencedHeading, {
+        ...bytes,
+        "mazer-owner-work-registry": JSON.stringify(listFencedHeading),
+        "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${fencedMarkdown}\n`,
+      }),
+      /sourceRef fragment does not exist/,
+      label,
+    );
+  }
+
+  for (const [sourceRef, fencedMarkdown] of [
+    [
+      "docs/current-truth.md#first-real-heading-after-list-fence",
+      "- ````md\n  ## Hidden List Fence\n  ```\n  ## Hidden After Short Fence\n  `````\n## First Real Heading After List Fence",
+    ],
+    [
+      "docs/current-truth.md#visible-sibling-list-heading",
+      "- ~~~md\n  ## Hidden List Fence\n  ~~~~\n- sibling\n  ## Visible Sibling List Heading",
+    ],
+    [
+      "docs/current-truth.md#heading-after-invalid-list-fence-info",
+      "- ```info`tick\n  ## Heading After Invalid List Fence Info",
+    ],
+    [
+      "docs/current-truth.md#real-heading-after-unclosed-list-fence",
+      "- ~~~md\n  code\n## Real Heading After Unclosed List Fence",
+    ],
+    [
+      "docs/current-truth.md#real-heading-in-sibling-list-item",
+      "- ~~~md\n  code\n- sibling\n  ## Real Heading In Sibling List Item",
+    ],
+    [
+      "docs/current-truth.md#real-heading-in-parent-list-item",
+      "- outer\n  - ~~~md\n    code\n  ## Real Heading In Parent List Item",
+    ],
+    [
+      "docs/current-truth.md#real-heading-after-reopened-top-level-fence",
+      "- ~~~md\n  code\n~~~\n## Hidden In Reopened Top Level Fence\n~~~\n## Real Heading After Reopened Top Level Fence",
+    ],
+    [
+      "docs/current-truth.md#real-heading-after-noninterrupting-ordered-marker",
+      "paragraph\n2. ~~~md\n## Real Heading After Noninterrupting Ordered Marker",
+    ],
+    [
+      "docs/current-truth.md#real-heading-after-ordered-list-fence",
+      "1. item\n2. ~~~md\n   ## Hidden List Fence\n   ~~~\n3. sibling\n   ## Real Heading After Ordered List Fence",
+    ],
+  ]) {
+    const headingAfterListFence = structuredClone(registry);
+    headingAfterListFence.workItems[0].sourceRef = sourceRef;
+    assert.doesNotThrow(() => buildProjectBoardOwnerExport(headingAfterListFence, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(headingAfterListFence),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${fencedMarkdown}\n`,
+    }));
+  }
+
   for (const [label, commentedMarkdown] of [
     ["same-line comment", "<!-- ## Commented Heading -->"],
     ["multiline comment", "<!--\n## Commented Heading\n-->"],

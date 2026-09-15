@@ -314,19 +314,24 @@ function nextMarkdownParagraphState(line, state) {
       && listItem.markerIndent < state.listContentIndent;
     if (state.open && !exitsActiveListParagraph && !listItem.canInterruptParagraph) return state;
     if (state.open && state.listContentIndent === null && !listItem.canInterruptParagraph) return state;
+    const listContentIndents = (state.listContentIndents ?? [])
+      .filter((indent) => indent <= listItem.markerIndent && indent < listItem.contentIndent);
+    listContentIndents.push(listItem.contentIndent);
     return {
       open: listItem.itemContent.trim() !== "" && !listItem.startsWithIndentedCode,
       listContentIndent: listItem.contentIndent,
+      listContentIndents,
     };
   }
 
   const lineIndent = markdownIndentColumns(line.match(/^[ \t]*/)?.[0] ?? "");
   if (state.listContentIndent !== null) {
     if (state.open || lineIndent >= state.listContentIndent) return { ...state, open: true };
-    return { open: true, listContentIndent: null };
+    const listContentIndents = (state.listContentIndents ?? []).filter((indent) => indent <= lineIndent);
+    return { open: true, listContentIndent: listContentIndents.at(-1) ?? null, listContentIndents };
   }
   if (lineIndent >= 4) return state;
-  return { open: true, listContentIndent: null };
+  return { open: true, listContentIndent: null, listContentIndents: [] };
 }
 
 function splitGfmTableRow(line) {
@@ -380,25 +385,53 @@ function stripMarkdownIndent(line, columns) {
   return `${" ".repeat(Math.max(0, consumedColumns - columns))}${line.slice(index)}`;
 }
 
-function markdownListContainerView(line, activeListContentIndent) {
+function markdownListContainerView(line, activeListContentIndent, activeListContentIndents = []) {
   let candidate = line;
   let startsNewListItem = false;
   let canInterruptParagraph = false;
+  let projectedBaseIndent = 0;
   const lineIndent = markdownIndentColumns(line.match(/^[ \t]*/)?.[0] ?? "");
+  let listContentIndents = activeListContentIndents.filter((indent) => indent <= lineIndent);
   if (activeListContentIndent !== null && lineIndent >= activeListContentIndent) {
     candidate = stripMarkdownIndent(line, activeListContentIndent);
+    projectedBaseIndent = activeListContentIndent;
+    listContentIndents = [...activeListContentIndents];
   }
   for (let depth = 0; depth < 16; depth += 1) {
     const listItem = parseMarkdownListItem(candidate, null);
     if (!listItem) break;
     startsNewListItem = true;
     canInterruptParagraph ||= listItem.canInterruptParagraph;
+    const listContentIndent = projectedBaseIndent + listItem.contentIndent;
+    listContentIndents = listContentIndents.filter((indent) => indent < listContentIndent);
+    listContentIndents.push(listContentIndent);
+    projectedBaseIndent = listContentIndent;
     if (listItem.startsWithIndentedCode) {
-      return { line: candidate, startsNewListItem, canInterruptParagraph, startsWithIndentedCode: true };
+      return {
+        line: candidate,
+        listContentIndent,
+        listContentIndents,
+        startsNewListItem,
+        canInterruptParagraph,
+        startsWithIndentedCode: true,
+      };
     }
     candidate = listItem.itemContent;
   }
-  return { line: candidate, startsNewListItem, canInterruptParagraph, startsWithIndentedCode: false };
+  return {
+    line: candidate,
+    listContentIndent: listContentIndents.at(-1) ?? null,
+    listContentIndents,
+    startsNewListItem,
+    canInterruptParagraph,
+    startsWithIndentedCode: false,
+  };
+}
+
+function markdownFenceContainerView(line, listContentIndent) {
+  if (listContentIndent === null) return line;
+  const lineIndent = markdownIndentColumns(line.match(/^[ \t]*/)?.[0] ?? "");
+  return lineIndent >= listContentIndent ? stripMarkdownIndent(line, listContentIndent) : line;
 }
 
 function startsMarkdownBlockOutsideTable(line) {
@@ -432,14 +465,30 @@ function markdownHeadingAnchors(markdown) {
   let htmlComment = false;
   let rawHtmlBlock = null;
   let gfmTableColumns = null;
-  let paragraphState = { open: false, listContentIndent: null };
+  let paragraphState = { open: false, listContentIndent: null, listContentIndents: [] };
   for (const rawLine of lines) {
     if (fence) {
-      const fenceMatch = rawLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
-      if (fenceMatch && fenceMatch[1][0] === fence.marker && fenceMatch[1].length >= fence.length
-        && fenceMatch[2].trim() === "") fence = null;
-      renderedLines.push(null);
-      continue;
+      const rawIndent = markdownIndentColumns(rawLine.match(/^[ \t]*/)?.[0] ?? "");
+      const exitsListFence = fence.listContentIndent !== null
+        && !/^\s*$/.test(rawLine)
+        && rawIndent < fence.listContentIndent;
+      if (!exitsListFence) {
+        const fenceLine = markdownFenceContainerView(rawLine, fence.listContentIndent);
+        const fenceMatch = fenceLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+        if (fenceMatch && fenceMatch[1][0] === fence.marker && fenceMatch[1].length >= fence.length
+          && fenceMatch[2].trim() === "") fence = null;
+        renderedLines.push(null);
+        continue;
+      }
+      const exitedFence = fence;
+      fence = null;
+      const listContentIndents = exitedFence.listContentIndents
+        .filter((indent) => indent < exitedFence.listContentIndent && indent <= rawIndent);
+      paragraphState = {
+        open: false,
+        listContentIndent: listContentIndents.at(-1) ?? null,
+        listContentIndents,
+      };
     }
     if (gfmTableColumns !== null) {
       const cells = splitGfmTableRow(rawLine);
@@ -463,19 +512,42 @@ function markdownHeadingAnchors(markdown) {
       if (!htmlComment && /^\s*$/.test(commentMasked.masked)) paragraphState = { ...paragraphState, open: false };
       continue;
     }
-    const fenceMatch = rawLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    const containerView = markdownListContainerView(
+      rawLine,
+      paragraphState.listContentIndent,
+      paragraphState.listContentIndents,
+    );
+    const rawListItem = parseMarkdownListItem(rawLine, paragraphState.listContentIndent);
+    const exitsActiveListParagraph = paragraphState.listContentIndent !== null
+      && rawListItem !== null
+      && rawListItem.markerIndent < paragraphState.listContentIndent;
+    const listContainerCanOpenFence = !paragraphState.open
+      || !containerView.startsNewListItem
+      || containerView.canInterruptParagraph
+      || exitsActiveListParagraph;
+    const fenceMatch = containerView.startsWithIndentedCode || !listContainerCanOpenFence
+      ? null
+      : containerView.line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     if (fenceMatch && (fenceMatch[1][0] === "~" || !fenceMatch[2].includes("`"))) {
-      fence = { marker: fenceMatch[1][0], length: fenceMatch[1].length };
+      fence = {
+        marker: fenceMatch[1][0],
+        length: fenceMatch[1].length,
+        listContentIndent: containerView.listContentIndent,
+        listContentIndents: containerView.listContentIndents,
+      };
       renderedLines.push(null);
-      paragraphState = { ...paragraphState, open: false };
+      paragraphState = {
+        open: false,
+        listContentIndent: containerView.listContentIndent,
+        listContentIndents: containerView.listContentIndents,
+      };
       continue;
     }
     const rawIndent = markdownIndentColumns(rawLine.match(/^[ \t]*/)?.[0] ?? "");
-    const containerView = markdownListContainerView(rawLine, paragraphState.listContentIndent);
     if (paragraphState.open && paragraphState.listContentIndent !== null
       && (rawIndent < paragraphState.listContentIndent || containerView.canInterruptParagraph)
       && isMarkdownType7Start(containerView.line)) {
-      paragraphState = { open: false, listContentIndent: null };
+      paragraphState = { open: false, listContentIndent: null, listContentIndents: [] };
     }
     const rawMasked = containerView.startsWithIndentedCode
       ? { masked: rawLine, state: null, isBlock: false }
