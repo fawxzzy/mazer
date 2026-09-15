@@ -142,6 +142,29 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     "mazer-current-truth": `${bytes["mazer-current-truth"]}\n## Heading_with_underscore: punctuation!\n`,
   }));
 
+  for (const [sourceRef, heading] of [
+    ["docs/current-truth.md#this-is-emphasis", "## This _is_ emphasis"],
+    ["docs/current-truth.md#outer-inner-and-adjacentmarks-punctuation", "## _Outer **inner**_ and __adjacent__*marks* punctuation!"],
+    ["docs/current-truth.md#keep-_literal_-underscores", "## Keep \\_literal\\_ underscores"],
+    ["docs/current-truth.md#use-_literal_", "## Use `_literal_`"],
+  ]) {
+    const emphasizedHeading = structuredClone(registry);
+    emphasizedHeading.workItems[0].sourceRef = sourceRef;
+    assert.doesNotThrow(() => buildProjectBoardOwnerExport(emphasizedHeading, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(emphasizedHeading),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${heading}\n`,
+    }));
+  }
+
+  const markupSlug = structuredClone(registry);
+  markupSlug.workItems[0].sourceRef = "docs/current-truth.md#this-_is_-emphasis";
+  assert.throws(() => buildProjectBoardOwnerExport(markupSlug, {
+    ...bytes,
+    "mazer-owner-work-registry": JSON.stringify(markupSlug),
+    "mazer-current-truth": `${bytes["mazer-current-truth"]}\n## This _is_ emphasis\n`,
+  }), /sourceRef fragment does not exist/);
+
   for (const [label, fencedMarkdown] of [
     ["backtick fence with info string", "````markdown\n## Fenced Heading\n````"],
     ["tilde fence with a longer closer", "~~~md\nFenced Heading\n---\n~~~~"],
@@ -250,6 +273,12 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["sibling list paragraph exits before type 7", "- first\n  continuation\n- second\n  continuation\n<span>\n## Hidden Raw Heading\n"],
     ["lazy list continuation exits before type 7", "- item\nlazy continuation\n<span>\n## Hidden Raw Heading\n"],
     ["blank line exits list paragraph before type 7", "- item\n  continuation\n\n<span>\n## Hidden Raw Heading\n"],
+    ["five-space dash item starts with code before type 7", "-     code\n  <span>\n  ## Hidden Raw Heading\n"],
+    ["five-space plus item starts with code before type 7", "+     code\n  <span>\n  ## Hidden Raw Heading\n"],
+    ["five-space star item starts with code before type 7", "*     code\n  <span>\n  ## Hidden Raw Heading\n"],
+    ["five-space ordered item starts with code before type 7", "1.     code\n   <span>\n   ## Hidden Raw Heading\n"],
+    ["type 7 after a GFM table header and delimiter", "| Column |\n| --- |\n<span>\n## Hidden Raw Heading\n"],
+    ["type 7 after aligned multi-column GFM table body", "| Left | Right |\n| :--- | ---: |\n| value | value |\n<span>\n## Hidden Raw Heading\n"],
   ]) {
     const rawHeading = structuredClone(registry);
     rawHeading.workItems[0].sourceRef = "docs/current-truth.md#hidden-raw-heading";
@@ -275,6 +304,8 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["docs/current-truth.md#heading-after-indented-paragraph-line", "paragraph\n    continuation\n<x-widget>\n## Heading After Indented Paragraph Line"],
     ["docs/current-truth.md#heading-after-nonstarting-ordered-text", "paragraph\n2. item\n<x-widget>\n## Heading After Nonstarting Ordered Text"],
     ["docs/current-truth.md#heading-after-list-inline-tag", "- paragraph\n  <span>\n  ## Heading After List Inline Tag"],
+    ["docs/current-truth.md#heading-after-short-table-delimiter", "| Column |\n| -- |\n<span>\n## Heading After Short Table Delimiter"],
+    ["docs/current-truth.md#heading-after-mismatched-table-delimiter", "| Left | Right |\n| --- |\n<span>\n## Heading After Mismatched Table Delimiter"],
   ]) {
     const visibleHeading = structuredClone(registry);
     visibleHeading.workItems[0].sourceRef = sourceRef;
@@ -335,6 +366,26 @@ test("requires every emitted priority to match the nullable atlas.card-record.v2
   assert.equal(output.cards.find((card) => card.record.card_id === nullable.workItems[0].id).record.priority, null);
 });
 
+test("requires typed acceptance criteria before lifecycle filtering", () => {
+  for (const status of ["active", "completed", "deferred_candidate"]) {
+    const malformed = structuredClone(registry);
+    const item = malformed.workItems.find((candidate) => candidate.status === status);
+    item.acceptanceCriteria = ["valid", {}, null];
+    assert.throws(
+      () => buildProjectBoardOwnerExport(malformed, { ...bytes, "mazer-owner-work-registry": JSON.stringify(malformed) }),
+      /acceptanceCriteria must be a non-empty string/,
+      `${status} criteria are validated before lifecycle filtering`,
+    );
+  }
+
+  const emptyCriterion = structuredClone(registry);
+  emptyCriterion.workItems.find((item) => item.status === "completed").acceptanceCriteria[0] = "   ";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(emptyCriterion, { ...bytes, "mazer-owner-work-registry": JSON.stringify(emptyCriterion) }),
+    /acceptanceCriteria must be a non-empty string/,
+  );
+});
+
 test("requires canonical calendar-valid UTC timestamps without coercion", () => {
   for (const [label, timestamp] of [
     ["boolean coercion", true],
@@ -383,6 +434,16 @@ test("requires canonical calendar-valid UTC timestamps without coercion", () => 
     }),
     /registry\.updatedAt must be a canonical UTC timestamp/,
   );
+
+  for (const status of ["active", "completed", "deferred_candidate"]) {
+    const futureDated = structuredClone(registry);
+    futureDated.workItems.find((item) => item.status === status).updatedAt = "2026-09-14T22:54:28.001Z";
+    assert.throws(
+      () => buildProjectBoardOwnerExport(futureDated, { ...bytes, "mazer-owner-work-registry": JSON.stringify(futureDated) }),
+      /updatedAt must not be later than registry\.updatedAt/,
+      `${status} future timestamp is rejected`,
+    );
+  }
   assert.doesNotThrow(() => buildProjectBoardOwnerExport(registry, bytes));
 });
 
@@ -418,13 +479,17 @@ test("scans the complete public envelope and rejects sensitive values without ec
     ["RSA private key with case and spacing drift", (value) => { value.cards[0].record.description = "-----begin  rsa   private key -----"; }, /sensitive PEM private key/],
     ["OpenSSH private key", (value) => { value.cards[0].content.acceptance_criteria[0] = "-----BEGIN OPENSSH PRIVATE KEY-----"; }, /sensitive PEM private key/],
     ["PGP private key block", (value) => { value.cards[0].content.summary = "-----BEGIN PGP PRIVATE KEY BLOCK-----"; }, /sensitive PEM private key/],
+    ["wrapped Slack service credential", (value) => { value.cards[0].record.title = `wrapped (${["xoxb", "123456789012", "syntheticvalue"].join("-")})`; }, /sensitive known secret format/],
+    ["AWS access-key prefix", (value) => { value.cards[0].record.description = `cloud ${`AKIA${"0".repeat(16)}`}`; }, /sensitive known secret format/],
+    ["wrapped Stripe service credential", (value) => { value.cards[0].content.acceptance_criteria[0] = `(${`sk_live_${"A".repeat(20)}`})`; }, /sensitive known secret format/],
+    ["Google API-key prefix", (value) => { value.cards[0].content.summary = `key ${`AIza${"A".repeat(35)}`}`; }, /sensitive known secret format/],
   ];
   for (const [label, mutate, expected] of hostileCases) {
     const hostile = structuredClone(output);
     mutate(hostile);
     assert.throws(() => assertPublicSafety(hostile), (error) => {
       assert.match(error.message, expected, label);
-      assert.doesNotMatch(error.message, /owner@example\.com|private-value|not-public|BEGIN.*PRIVATE KEY/i, `${label} echoed a sensitive value`);
+      assert.doesNotMatch(error.message, /owner@example\.com|private-value|not-public|BEGIN.*PRIVATE KEY|xoxb-|AKIA0|sk_live_|AIzaA/i, `${label} echoed a sensitive value`);
       return true;
     });
   }

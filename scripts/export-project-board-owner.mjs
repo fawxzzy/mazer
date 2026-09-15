@@ -84,12 +84,112 @@ function normalizeTimestamp(value, label) {
   return value;
 }
 
-function githubHeadingBaseSlug(value) {
-  return value
+function isMarkdownWhitespace(character) {
+  return character === undefined || /\s/u.test(character);
+}
+
+function isMarkdownPunctuation(character) {
+  return character !== undefined && /[\p{P}\p{S}]/u.test(character);
+}
+
+function stripMarkdownEmphasis(value) {
+  const runs = [];
+  for (let index = 0; index < value.length;) {
+    const marker = value[index];
+    if ((marker !== "*" && marker !== "_") || value[index - 1] === "\\") {
+      index += 1;
+      continue;
+    }
+    let end = index + 1;
+    while (value[end] === marker) end += 1;
+    const previous = value[index - 1];
+    const next = value[end];
+    const leftFlanking = !isMarkdownWhitespace(next)
+      && (!isMarkdownPunctuation(next) || isMarkdownWhitespace(previous) || isMarkdownPunctuation(previous));
+    const rightFlanking = !isMarkdownWhitespace(previous)
+      && (!isMarkdownPunctuation(previous) || isMarkdownWhitespace(next) || isMarkdownPunctuation(next));
+    runs.push({
+      marker,
+      start: index,
+      end,
+      length: end - index,
+      remaining: end - index,
+      canOpen: marker === "*" ? leftFlanking : leftFlanking && (!rightFlanking || isMarkdownPunctuation(previous)),
+      canClose: marker === "*" ? rightFlanking : rightFlanking && (!leftFlanking || isMarkdownPunctuation(next)),
+    });
+    index = end;
+  }
+
+  const removed = new Set();
+  for (let closerIndex = 0; closerIndex < runs.length; closerIndex += 1) {
+    const closer = runs[closerIndex];
+    if (!closer.canClose) continue;
+    for (let openerIndex = closerIndex - 1; openerIndex >= 0 && closer.remaining > 0; openerIndex -= 1) {
+      const opener = runs[openerIndex];
+      if (!opener.canOpen || opener.marker !== closer.marker || opener.remaining === 0) continue;
+      const oneCanBoth = (opener.canClose || closer.canOpen);
+      const blockedByRuleOfThree = oneCanBoth
+        && (opener.remaining + closer.remaining) % 3 === 0
+        && (opener.remaining % 3 !== 0 || closer.remaining % 3 !== 0);
+      if (blockedByRuleOfThree) continue;
+      const used = opener.remaining >= 2 && closer.remaining >= 2 ? 2 : 1;
+      for (let offset = 0; offset < used; offset += 1) {
+        removed.add(opener.end - opener.length + opener.remaining - 1 - offset);
+        removed.add(closer.start + closer.length - closer.remaining + offset);
+      }
+      opener.remaining -= used;
+      closer.remaining -= used;
+    }
+  }
+  return [...value].filter((_, index) => !removed.has(index)).join("");
+}
+
+function protectMarkdownCodeSpans(value, protect) {
+  let rendered = "";
+  let index = 0;
+  while (index < value.length) {
+    if (value[index] !== "`") {
+      rendered += value[index];
+      index += 1;
+      continue;
+    }
+    let openerEnd = index + 1;
+    while (value[openerEnd] === "`") openerEnd += 1;
+    const marker = value.slice(index, openerEnd);
+    let closing = value.indexOf(marker, openerEnd);
+    while (closing >= 0 && (value[closing - 1] === "`" || value[closing + marker.length] === "`")) {
+      closing = value.indexOf(marker, closing + marker.length);
+    }
+    if (closing < 0) {
+      rendered += marker;
+      index = openerEnd;
+      continue;
+    }
+    rendered += protect(value.slice(openerEnd, closing));
+    index = closing + marker.length;
+  }
+  return rendered;
+}
+
+function renderedMarkdownHeadingText(value) {
+  const protectedText = [];
+  const protect = (text) => {
+    const token = `\uE000${protectedText.length}\uE001`;
+    protectedText.push(text);
+    return token;
+  };
+  let rendered = value
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/<[^>]*>/g, "")
-    .replace(/[`*~]/g, "")
+    .replace(/<[^>]*>/g, "");
+  rendered = protectMarkdownCodeSpans(rendered, protect)
+    .replace(/\\([\\`*_[\]{}()#+.!|~-])/g, (_match, escaped) => protect(escaped));
+  rendered = stripMarkdownEmphasis(rendered).replace(/~/g, "");
+  return rendered.replace(/\uE000(\d+)\uE001/g, (_match, index) => protectedText[Number(index)]);
+}
+
+function githubHeadingBaseSlug(value) {
+  return renderedMarkdownHeadingText(value)
     .trim()
     .toLowerCase()
     .replace(/[\t\r\n]/g, " ")
@@ -174,6 +274,7 @@ function parseMarkdownListItem(line, activeListContentIndent) {
     markerIndent,
     contentIndent: markerEndColumn + followingIndent,
     itemContent,
+    startsWithIndentedCode: itemContent !== "" && measuredFollowingIndent > 4,
     canInterruptParagraph: itemContent.trim() !== ""
       && (markerMatch[2] !== undefined || markerMatch[3] === "1"),
   };
@@ -195,7 +296,7 @@ function nextMarkdownParagraphState(line, state) {
     if (state.open && !exitsActiveListParagraph && !listItem.canInterruptParagraph) return state;
     if (state.open && state.listContentIndent === null && !listItem.canInterruptParagraph) return state;
     return {
-      open: listItem.itemContent.trim() !== "",
+      open: listItem.itemContent.trim() !== "" && !listItem.startsWithIndentedCode,
       listContentIndent: listItem.contentIndent,
     };
   }
@@ -207,6 +308,46 @@ function nextMarkdownParagraphState(line, state) {
   }
   if (lineIndent >= 4) return state;
   return { open: true, listContentIndent: null };
+}
+
+function splitGfmTableRow(line) {
+  if (!/^ {0,3}\S/.test(line)) return null;
+  const trimmed = line.trim();
+  let escaped = false;
+  let hasSeparator = false;
+  let cell = "";
+  const cells = [];
+  for (const character of trimmed) {
+    if (escaped) {
+      cell += character;
+      escaped = false;
+      continue;
+    }
+    if (character === "\\") {
+      cell += character;
+      escaped = true;
+      continue;
+    }
+    if (character === "|") {
+      cells.push(cell.trim());
+      cell = "";
+      hasSeparator = true;
+      continue;
+    }
+    cell += character;
+  }
+  cells.push(cell.trim());
+  if (!hasSeparator) return null;
+  if (cells[0] === "") cells.shift();
+  if (cells.at(-1) === "") cells.pop();
+  return cells.length > 0 ? cells : null;
+}
+
+function gfmTableColumnCount(headerLine, delimiterLine) {
+  const header = splitGfmTableRow(headerLine);
+  const delimiter = splitGfmTableRow(delimiterLine);
+  if (!header || !delimiter || header.length !== delimiter.length) return null;
+  return delimiter.every((cell) => /^:?-{3,}:?$/.test(cell)) ? delimiter.length : null;
 }
 
 function maskMarkdownRawHtmlBlock(line, state, allowType7 = true) {
@@ -228,6 +369,7 @@ function markdownHeadingAnchors(markdown) {
   let fence = null;
   let htmlComment = false;
   let rawHtmlBlock = null;
+  let gfmTableColumns = null;
   let paragraphState = { open: false, listContentIndent: null };
   for (const rawLine of lines) {
     if (fence) {
@@ -236,6 +378,14 @@ function markdownHeadingAnchors(markdown) {
         && fenceMatch[2].trim() === "") fence = null;
       renderedLines.push(null);
       continue;
+    }
+    if (gfmTableColumns !== null) {
+      const cells = splitGfmTableRow(rawLine);
+      if (cells) {
+        renderedLines.push(rawLine);
+        continue;
+      }
+      gfmTableColumns = null;
     }
     if (rawHtmlBlock) {
       const rawMasked = maskMarkdownRawHtmlBlock(rawLine, rawHtmlBlock);
@@ -274,6 +424,15 @@ function markdownHeadingAnchors(markdown) {
     htmlComment = commentMasked.inComment;
     const visibleLine = commentMasked.masked;
     renderedLines.push(visibleLine);
+    const previousLine = renderedLines.at(-2);
+    const tableColumnCount = previousLine === null || previousLine === undefined
+      ? null
+      : gfmTableColumnCount(previousLine, visibleLine);
+    if (tableColumnCount !== null) {
+      gfmTableColumns = tableColumnCount;
+      paragraphState = { ...paragraphState, open: false };
+      continue;
+    }
     paragraphState = nextMarkdownParagraphState(visibleLine, paragraphState);
   }
   for (let index = 0; index < renderedLines.length; index += 1) {
@@ -308,6 +467,7 @@ function validateRegistry(registry, sourceBytes) {
   if (!Array.isArray(registry.workItems) || registry.workItems.length !== registry.provenance?.stableIdentityCount) {
     throw new Error("Mazer stable identity denominator is incomplete");
   }
+  const registryUpdatedAt = normalizeTimestamp(registry.updatedAt, "registry.updatedAt");
   const ids = registry.workItems.map((item) => item.id);
   if (new Set(ids).size !== ids.length || ids.some((id) => !/^MAZER-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$/.test(id))) {
     throw new Error("Mazer registry ids must be unique stable MAZER ids");
@@ -318,7 +478,8 @@ function validateRegistry(registry, sourceBytes) {
     requireString(item.id, "work item id");
     requireString(item.title, `${item.id}.title`);
     requireString(item.description, `${item.id}.description`);
-    normalizeTimestamp(item.updatedAt, `${item.id}.updatedAt`);
+    const itemUpdatedAt = normalizeTimestamp(item.updatedAt, `${item.id}.updatedAt`);
+    if (itemUpdatedAt > registryUpdatedAt) throw new Error(`${item.id}.updatedAt must not be later than registry.updatedAt`);
     if (!ADMITTED_STATUSES.has(item.status)) throw new Error(`${item.id} has an unsupported lifecycle status`);
     if (typeof item.cardType !== "string" || !SUPPORTED_CARD_TYPES.has(item.cardType)) {
       throw new Error(`${item.id}.cardType must be a supported atlas.card-record.v2 card type`);
@@ -342,7 +503,10 @@ function validateRegistry(registry, sourceBytes) {
         throw new Error(`${item.id} sourceRef fragment does not exist in its source document`);
       }
     }
-    if (!Array.isArray(item.acceptanceCriteria) || item.acceptanceCriteria.length < 3) throw new Error(`${item.id} requires at least three acceptance criteria`);
+    if (!Array.isArray(item.acceptanceCriteria) || item.acceptanceCriteria.length < 3) {
+      throw new Error(`${item.id} requires at least three acceptance criteria`);
+    }
+    item.acceptanceCriteria.forEach((criterion) => requireString(criterion, `${item.id}.acceptanceCriteria`));
   }
   const dependencyGraph = new Map(registry.workItems.map((item) => [item.id, uniqueSorted(item.dependencies)]));
   const visiting = new Set();
@@ -421,7 +585,7 @@ export function assertPublicSafety(exported) {
     ["authorization value", /\bbearer\s+[A-Z0-9._~+/=-]{8,}/i],
     ["sensitive query value", /https?:\/\/[^\s"']+\?[^\s"']*(?:token|key|secret|code|password|credential|session|cookie|email|phone|user_id)=/i],
     ["credential-like assignment", /\b(?:secret|credential|password|token|cookie|session(?:_data)?|supabase_key|service_role)\b\s*(?:=|:)\s*["']?[^\s"',;]{4,}/i],
-    ["known secret format", /\b(?:gh[pousr]_[A-Z0-9]{20,}|github_pat_[A-Z0-9_]{20,}|sk-[A-Z0-9_-]{20,}|sb_secret_[A-Z0-9_-]{10,}|eyJ[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,})\b/i],
+    ["known secret format", /\b(?:gh[pousr]_[A-Z0-9]{20,}|github_pat_[A-Z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Z0-9-]{10,}|sk_(?:live|test)_[A-Z0-9]{16,}|AIza[A-Z0-9_-]{30,}|sk-[A-Z0-9_-]{20,}|sb_secret_[A-Z0-9_-]{10,}|eyJ[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,})\b/i],
     ["PEM private key", /-{5}[ \t]*BEGIN[ \t]+(?:[A-Z0-9]+[ \t]+)*PRIVATE[ \t]+KEY(?:[ \t]+BLOCK)?[ \t]*-{5}/i],
   ];
   const visit = (value, location = "export") => {
