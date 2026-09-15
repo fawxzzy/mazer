@@ -176,12 +176,20 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["overlong hexadecimal references remain literal", "docs/current-truth.md#xabcdef0", "## &#xabcdef0;"],
     ["code spans stay literal beside decoded emphasis", "docs/current-truth.md#aelig-æ", "## `&AElig;` **&AElig;**"],
     ["code spans preserve literal tags and references", "docs/current-truth.md#span-titleaeligaeligspan", "## `<span title=\"&AElig;\">&AElig;</span>`"],
+    ["escaped backticks do not open code spans", "docs/current-truth.md#æ", "## \\`&AElig;`"],
     ["escaped ampersands stay literal beside decoded references", "docs/current-truth.md#aelig-æ", "## \\&AElig; &AElig;"],
     ["quoted tag delimiters cannot leak references", "docs/current-truth.md#visible", "## <span title=\"> &AElig;\">Visible</span>"],
     ["single-quoted tag delimiters cannot leak references", "docs/current-truth.md#visible-æ", "## <span title='> &AElig;'>Visible</span> &AElig;"],
     ["inline comments cannot leak references", "docs/current-truth.md#visible", "## <!-- > &AElig; -->Visible"],
+    ["CommonMark short comment opener leaves following text visible", "docs/current-truth.md#foo---", "## <!--> foo -->"],
+    ["CommonMark short hyphen comment opener leaves following text visible", "docs/current-truth.md#foo---", "## <!---> foo -->"],
     ["processing instructions cannot leak references", "docs/current-truth.md#visible", "## <?target > &AElig;?>Visible"],
     ["CDATA sections cannot leak references", "docs/current-truth.md#visible", "## <![CDATA[> &AElig;]]>Visible"],
+    ["GFM declarations do not contribute visible slug text", "docs/current-truth.md#visible", "## <!ELEMENT br EMPTY>Visible"],
+    ["declaration-like question text remains visible", "docs/current-truth.md#a", "## <!A?>"],
+    ["declaration-like numeric text remains visible", "docs/current-truth.md#a1", "## <!A1>"],
+    ["declaration-like hyphen text remains visible", "docs/current-truth.md#a-x", "## <!A-x>"],
+    ["ordinary angle-bracket text is not inline HTML", "docs/current-truth.md#a--b--c", "## A < B > C"],
   ]) {
     const referenceHeading = structuredClone(registry);
     referenceHeading.workItems[0].sourceRef = sourceRef;
@@ -190,6 +198,35 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "mazer-owner-work-registry": JSON.stringify(referenceHeading),
       "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
     }), label);
+  }
+
+  for (const [label, sourceRef, markdown] of [
+    ["full reference links use rendered label text", "docs/current-truth.md#foo", "## [Foo][docs]\n\n[docs]: /target"],
+    ["multiline reference definitions preserve continuation indentation", "docs/current-truth.md#foo", "## [Foo][docs]\n\n   [docs]:\n      /target\n           'the title'"],
+    ["collapsed reference links use rendered label text", "docs/current-truth.md#foo", "## [Foo][]\n\n[foo]: /target"],
+    ["shortcut reference links use rendered label text", "docs/current-truth.md#foo", "## [Foo]\n\n[FOO]: /target"],
+    ["reference images use rendered alt text", "docs/current-truth.md#foo", "## ![Foo][docs]\n\n[docs]: /target"],
+  ]) {
+    const referenceLinkHeading = structuredClone(registry);
+    referenceLinkHeading.workItems[0].sourceRef = sourceRef;
+    assert.doesNotThrow(() => buildProjectBoardOwnerExport(referenceLinkHeading, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(referenceLinkHeading),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+    }), label);
+  }
+
+  for (const [label, sourceRef, markdown] of [
+    ["unresolved references remain literal", "docs/current-truth.md#foo", "## [Foo][missing]"],
+    ["escaped reference openers remain literal", "docs/current-truth.md#foo", "## \\[Foo][docs]\n\n[docs]: /target"],
+  ]) {
+    const danglingReferenceLink = structuredClone(registry);
+    danglingReferenceLink.workItems[0].sourceRef = sourceRef;
+    assert.throws(() => buildProjectBoardOwnerExport(danglingReferenceLink, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(danglingReferenceLink),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+    }), /sourceRef fragment does not exist/, label);
   }
 
   const duplicateReferenceHeading = structuredClone(registry);
@@ -475,6 +512,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["type 7 inside a nested list item", "- outer\n  - <x-widget>\n    ## Hidden Raw Heading\n"],
     ["type 7 in an ancestor sibling after nested content", "1.  outer\n    - child\n      continuation\n    - <x-widget>\n      ## Hidden Raw Heading\n"],
     ["noninterrupting wide ordered ancestor sibling starts type 7", "1.  outer\n    - child\n      continuation\n    2.    <x-widget>\n          ## Hidden Raw Heading\n"],
+    ["type 7 after seventeen compact nested list markers", `${"- ".repeat(17)}<x-widget>\n${"  ".repeat(17)}## Hidden Raw Heading\n`],
     ["type 7 after a one-hyphen GFM delimiter", "| Column |\n| - |\n<span>\n## Hidden Raw Heading\n"],
     ["type 7 after a two-hyphen GFM delimiter", "| Column |\n| -- |\n<span>\n## Hidden Raw Heading\n"],
     ["type 7 after a GFM table header and delimiter", "| Column |\n| --- |\n<span>\n## Hidden Raw Heading\n"],

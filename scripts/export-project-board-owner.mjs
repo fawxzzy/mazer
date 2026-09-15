@@ -287,11 +287,17 @@ function normalizeMarkdownCodeSpanContent(value) {
     : normalized;
 }
 
+function isEscapedMarkdownDelimiter(value, index) {
+  let backslashes = 0;
+  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor -= 1) backslashes += 1;
+  return backslashes % 2 === 1;
+}
+
 function protectMarkdownCodeSpans(value, protect) {
   let rendered = "";
   let index = 0;
   while (index < value.length) {
-    if (value[index] !== "`") {
+    if (value[index] !== "`" || isEscapedMarkdownDelimiter(value, index)) {
       rendered += value[index];
       index += 1;
       continue;
@@ -337,6 +343,70 @@ function decodeCommonMarkCharacterReferences(value) {
   );
 }
 
+function normalizeMarkdownReferenceLabel(value) {
+  return decodeCommonMarkCharacterReferences(value)
+    .replace(/\\([!-/:-@[-`{-~])/g, "$1")
+    .replace(/[ \t\r\n]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function markdownReferenceLabels(lines) {
+  const labels = new Set();
+  const definitionStart = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(.*)$/;
+  const destination = /^(?:<[^>\n]*>|\S+)(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^\)\n]*\)))?[ \t]*$/;
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index]?.match(definitionStart);
+    if (!match) continue;
+    const sameLineDestination = match[2].trim();
+    const nextLineDestination = sameLineDestination === "" ? lines[index + 1]?.trim() : null;
+    if (!destination.test(sameLineDestination || nextLineDestination || "")) continue;
+    const label = normalizeMarkdownReferenceLabel(match[1]);
+    if (label) labels.add(label);
+  }
+  return labels;
+}
+
+function renderMarkdownReferenceLinks(value, referenceLabels, protect) {
+  const fullOrCollapsed = /(!?)\[([^\]\n]+)\]\[([^\]\n]*)\]/g;
+  let rendered = value.replace(fullOrCollapsed, (match, imageMarker, label, explicitLabel, offset, source) => {
+    const openingBracket = offset + imageMarker.length;
+    if (isEscapedMarkdownDelimiter(source, openingBracket)) return protect(match);
+    const referenceLabel = explicitLabel === "" ? label : explicitLabel;
+    return referenceLabels.has(normalizeMarkdownReferenceLabel(referenceLabel)) ? label : protect(match);
+  });
+  rendered = rendered.replace(/(!?)\[([^\]\n]+)\]/g, (match, imageMarker, label, offset, source) => {
+    const openingBracket = offset + imageMarker.length;
+    if (isEscapedMarkdownDelimiter(source, openingBracket)) return match;
+    return referenceLabels.has(normalizeMarkdownReferenceLabel(label)) ? label : match;
+  });
+  return rendered;
+}
+
+const COMMONMARK_INLINE_OPEN_TAG = new RegExp(
+  `^<[A-Za-z][A-Za-z0-9-]*(?:[ \\t]+${HTML_ATTRIBUTE_NAME}(?:[ \\t]*=[ \\t]*${HTML_ATTRIBUTE_VALUE})?)*[ \\t]*/?>`,
+);
+const COMMONMARK_INLINE_CLOSING_TAG = /^<\/[A-Za-z][A-Za-z0-9-]*[ \t]*>/;
+
+function markdownInlineHtmlEnd(value, opening) {
+  const suffix = value.slice(opening);
+  if (suffix.startsWith("<!-->")) return opening + 5;
+  if (suffix.startsWith("<!--->")) return opening + 6;
+  if (suffix.startsWith("<!--")) {
+    const closing = value.indexOf("-->", opening + 4);
+    return closing < 0 ? null : closing + 3;
+  }
+  for (const [prefix, terminator] of [["<![CDATA[", "]]>"], ["<?", "?>"]]) {
+    if (!suffix.startsWith(prefix)) continue;
+    const closing = value.indexOf(terminator, opening + prefix.length);
+    return closing < 0 ? null : closing + terminator.length;
+  }
+  const declaration = suffix.match(/^<![A-Z]+[ \t]+[^>]*>/);
+  if (declaration) return opening + declaration[0].length;
+  const tag = suffix.match(COMMONMARK_INLINE_OPEN_TAG) ?? suffix.match(COMMONMARK_INLINE_CLOSING_TAG);
+  return tag ? opening + tag[0].length : null;
+}
+
 function stripMarkdownInlineHtml(value) {
   let rendered = "";
   let cursor = 0;
@@ -344,34 +414,18 @@ function stripMarkdownInlineHtml(value) {
     const opening = value.indexOf("<", cursor);
     if (opening < 0) return rendered + value.slice(cursor);
     rendered += value.slice(cursor, opening);
-    let delimitedTerminator = null;
-    if (value.startsWith("<!--", opening)) delimitedTerminator = "-->";
-    else if (value.startsWith("<![CDATA[", opening)) delimitedTerminator = "]]>";
-    else if (value.startsWith("<?", opening)) delimitedTerminator = "?>";
-    if (delimitedTerminator !== null) {
-      const closing = value.indexOf(delimitedTerminator, opening + 2);
-      if (closing < 0) return rendered + value.slice(opening);
-      cursor = closing + delimitedTerminator.length;
+    const closing = markdownInlineHtmlEnd(value, opening);
+    if (closing === null) {
+      rendered += "<";
+      cursor = opening + 1;
       continue;
     }
-    let quote = null;
-    let closing = opening + 1;
-    for (; closing < value.length; closing += 1) {
-      const character = value[closing];
-      if (quote !== null) {
-        if (character === quote) quote = null;
-        continue;
-      }
-      if (character === "\"" || character === "'") quote = character;
-      else if (character === ">") break;
-    }
-    if (closing >= value.length) return rendered + value.slice(opening);
-    cursor = closing + 1;
+    cursor = closing;
   }
   return rendered;
 }
 
-function renderedMarkdownHeadingText(value) {
+function renderedMarkdownHeadingText(value, referenceLabels) {
   const protectedText = [];
   const protect = (text) => {
     const token = `\uE000${protectedText.length}\uE001`;
@@ -381,14 +435,15 @@ function renderedMarkdownHeadingText(value) {
   let rendered = protectMarkdownCodeSpans(value, protect)
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  rendered = renderMarkdownReferenceLinks(rendered, referenceLabels, protect);
   rendered = stripMarkdownInlineHtml(rendered)
     .replace(/\\([!-/:-@[-`{-~])/g, (_match, escaped) => protect(escaped));
   rendered = decodeCommonMarkCharacterReferences(stripMarkdownEmphasis(rendered).replace(/~/g, ""));
   return rendered.replace(/\uE000(\d+)\uE001/g, (_match, index) => protectedText[Number(index)]);
 }
 
-function githubHeadingBaseSlug(value) {
-  return renderedMarkdownHeadingText(value)
+function githubHeadingBaseSlug(value, referenceLabels) {
+  return renderedMarkdownHeadingText(value, referenceLabels)
     .trim()
     .toLowerCase()
     .replace(/[\t\r\n]/g, " ")
@@ -598,7 +653,7 @@ function markdownListContainerView(line, activeListContentIndent, activeListCont
     candidate = stripMarkdownIndent(line, survivingListContentIndent);
     projectedBaseIndent = survivingListContentIndent;
   }
-  for (let depth = 0; depth < 16; depth += 1) {
+  while (true) {
     const listItem = parseMarkdownListItem(candidate, null);
     if (!listItem) break;
     startsNewListItem = true;
@@ -619,7 +674,9 @@ function markdownListContainerView(line, activeListContentIndent, activeListCont
         startsWithIndentedCode: true,
       };
     }
-    candidate = listItem.itemContent;
+    const nextCandidate = listItem.itemContent;
+    if (nextCandidate.length >= candidate.length) throw new Error("list-container projection made no progress");
+    candidate = nextCandidate;
   }
   return {
     line: candidate,
@@ -666,6 +723,7 @@ function markdownHeadingAnchors(markdown) {
   const lines = normalize(markdown).split("\n");
   const renderedLines = [];
   const renderedHeadingLines = [];
+  const referenceDefinitionLines = [];
   let fence = null;
   let htmlComment = false;
   let rawHtmlBlock = null;
@@ -684,6 +742,7 @@ function markdownHeadingAnchors(markdown) {
           && fenceMatch[2].trim() === "") fence = null;
         renderedLines.push(null);
         renderedHeadingLines.push(null);
+        referenceDefinitionLines.push(null);
         continue;
       }
       const exitedFence = fence;
@@ -701,6 +760,7 @@ function markdownHeadingAnchors(markdown) {
       if (cells && !startsMarkdownBlockOutsideTable(rawLine)) {
         renderedLines.push(rawLine);
         renderedHeadingLines.push(null);
+        referenceDefinitionLines.push(null);
         continue;
       }
       gfmTableColumns = null;
@@ -715,6 +775,7 @@ function markdownHeadingAnchors(markdown) {
         rawHtmlBlock = rawMasked.state;
         renderedLines.push(rawMasked.masked);
         renderedHeadingLines.push(null);
+        referenceDefinitionLines.push(null);
         if (!rawHtmlBlock && /^\s*$/.test(rawLine)) paragraphState = { ...paragraphState, open: false };
         continue;
       }
@@ -733,6 +794,7 @@ function markdownHeadingAnchors(markdown) {
       htmlComment = commentMasked.inComment;
       renderedLines.push(commentMasked.masked);
       renderedHeadingLines.push(null);
+      referenceDefinitionLines.push(null);
       if (!htmlComment && /^\s*$/.test(commentMasked.masked)) paragraphState = { ...paragraphState, open: false };
       continue;
     }
@@ -760,6 +822,7 @@ function markdownHeadingAnchors(markdown) {
       };
       renderedLines.push(null);
       renderedHeadingLines.push(null);
+      referenceDefinitionLines.push(null);
       paragraphState = {
         open: false,
         listContentIndent: containerView.listContentIndent,
@@ -790,6 +853,7 @@ function markdownHeadingAnchors(markdown) {
         };
       renderedLines.push(" ".repeat(rawLine.length));
       renderedHeadingLines.push(null);
+      referenceDefinitionLines.push(null);
       paragraphState = { ...paragraphState, open: false };
       continue;
     }
@@ -799,6 +863,7 @@ function markdownHeadingAnchors(markdown) {
     renderedLines.push(visibleLine);
     const headingCommentMasked = maskMarkdownHtmlComments(containerView.line, false);
     renderedHeadingLines.push(markdownHeadingLine(headingCommentMasked.masked));
+    referenceDefinitionLines.push(headingCommentMasked.masked);
     const previousLine = renderedLines.at(-2);
     const tableColumnCount = previousLine === null || previousLine === undefined
       ? null
@@ -824,9 +889,10 @@ function markdownHeadingAnchors(markdown) {
       index += 1;
     }
   }
+  const referenceLabels = markdownReferenceLabels(referenceDefinitionLines);
   const anchors = new Set();
   for (const heading of headings) {
-    const base = githubHeadingBaseSlug(heading);
+    const base = githubHeadingBaseSlug(heading, referenceLabels);
     if (!base) continue;
     let anchor = base;
     let suffix = 0;
