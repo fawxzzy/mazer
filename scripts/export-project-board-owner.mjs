@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 
 const REGISTRY_PATH = "config/mazer-owner-work-registry.json";
 const CURRENT_TRUTH_PATH = "docs/current-truth.md";
@@ -55,6 +56,138 @@ const COMMONMARK_COMPLETE_OPEN_TAG = new RegExp(
   `^ {0,3}<[A-Za-z][A-Za-z0-9-]*(?:[ \\t]+${HTML_ATTRIBUTE_NAME}(?:[ \\t]*=[ \\t]*${HTML_ATTRIBUTE_VALUE})?)*[ \\t]*/?>[ \\t]*$`,
 );
 const COMMONMARK_COMPLETE_CLOSING_TAG = /^ {0,3}<\/[A-Za-z][A-Za-z0-9-]*[ \t]*>[ \t]*$/;
+// Complete semicolon-terminated WHATWG named-character-reference table used by
+// CommonMark 0.31.2 (2,125 names; decoded JSON SHA-256
+// 71c1137e74b6cf94dbc75855e4cb7eb69db1b378663efb6b02107af80c976bcd).
+const COMMONMARK_NAMED_CHARACTER_REFERENCES = Object.freeze(JSON.parse(gunzipSync(Buffer.from(`
+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
+`.replace(/\s/g, ""), "base64")).toString("utf8")));
 const SOURCE_PATHS = Object.freeze({
   "mazer-owner-work-registry": { kind: "manual-registry", path: REGISTRY_PATH },
   "mazer-current-truth": { kind: "markdown", path: CURRENT_TRUTH_PATH },
@@ -190,6 +323,54 @@ function protectMarkdownCodeSpans(value, protect) {
   return rendered;
 }
 
+function decodeCommonMarkCharacterReferences(value) {
+  return value.replace(
+    /&(?:#([0-9]{1,7})|#[xX]([0-9A-Fa-f]{1,6})|([A-Za-z][A-Za-z0-9]{0,30}));/g,
+    (match, decimal, hexadecimal, named) => {
+      if (named !== undefined) return COMMONMARK_NAMED_CHARACTER_REFERENCES[named] ?? match;
+      const codePoint = Number.parseInt(decimal ?? hexadecimal, decimal === undefined ? 16 : 10);
+      if (codePoint === 0 || codePoint > 0x10FFFF || (codePoint >= 0xD800 && codePoint <= 0xDFFF)) {
+        return "\uFFFD";
+      }
+      return String.fromCodePoint(codePoint);
+    },
+  );
+}
+
+function stripMarkdownInlineHtml(value) {
+  let rendered = "";
+  let cursor = 0;
+  while (cursor < value.length) {
+    const opening = value.indexOf("<", cursor);
+    if (opening < 0) return rendered + value.slice(cursor);
+    rendered += value.slice(cursor, opening);
+    let delimitedTerminator = null;
+    if (value.startsWith("<!--", opening)) delimitedTerminator = "-->";
+    else if (value.startsWith("<![CDATA[", opening)) delimitedTerminator = "]]>";
+    else if (value.startsWith("<?", opening)) delimitedTerminator = "?>";
+    if (delimitedTerminator !== null) {
+      const closing = value.indexOf(delimitedTerminator, opening + 2);
+      if (closing < 0) return rendered + value.slice(opening);
+      cursor = closing + delimitedTerminator.length;
+      continue;
+    }
+    let quote = null;
+    let closing = opening + 1;
+    for (; closing < value.length; closing += 1) {
+      const character = value[closing];
+      if (quote !== null) {
+        if (character === quote) quote = null;
+        continue;
+      }
+      if (character === "\"" || character === "'") quote = character;
+      else if (character === ">") break;
+    }
+    if (closing >= value.length) return rendered + value.slice(opening);
+    cursor = closing + 1;
+  }
+  return rendered;
+}
+
 function renderedMarkdownHeadingText(value) {
   const protectedText = [];
   const protect = (text) => {
@@ -197,13 +378,12 @@ function renderedMarkdownHeadingText(value) {
     protectedText.push(text);
     return token;
   };
-  let rendered = value
+  let rendered = protectMarkdownCodeSpans(value, protect)
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/<[^>]*>/g, "");
-  rendered = protectMarkdownCodeSpans(rendered, protect)
-    .replace(/\\([\\`*_[\]{}()#+.!|~-])/g, (_match, escaped) => protect(escaped));
-  rendered = stripMarkdownEmphasis(rendered).replace(/~/g, "");
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  rendered = stripMarkdownInlineHtml(rendered)
+    .replace(/\\([!-/:-@[-`{-~])/g, (_match, escaped) => protect(escaped));
+  rendered = decodeCommonMarkCharacterReferences(stripMarkdownEmphasis(rendered).replace(/~/g, ""));
   return rendered.replace(/\uE000(\d+)\uE001/g, (_match, index) => protectedText[Number(index)]);
 }
 
@@ -304,7 +484,7 @@ function parseMarkdownListItem(line, activeListContentIndent) {
   };
 }
 
-function nextMarkdownParagraphState(line, state) {
+function nextMarkdownParagraphState(line, state, containerView = null) {
   if (/^\s*$/.test(line)) return { ...state, open: false };
   if (/^ {0,3}#{1,6}(?:[ \t]+|$)/.test(line)) return { ...state, open: false };
   if (state.open && /^ {0,3}(?:=+|-+)[ \t]*$/.test(line)) return { ...state, open: false };
@@ -314,6 +494,17 @@ function nextMarkdownParagraphState(line, state) {
   if (/^ {0,3}>/.test(line)) return { ...state, open: false };
 
   const listItem = parseMarkdownListItem(line, state.listContentIndent);
+  if (containerView?.startsNewListItem) {
+    const exitsActiveListParagraph = state.listContentIndent !== null
+      && containerView.firstListMarkerIndent < state.listContentIndent;
+    if (state.open && !exitsActiveListParagraph && !containerView.canInterruptParagraph) return state;
+    if (state.open && state.listContentIndent === null && !containerView.canInterruptParagraph) return state;
+    return {
+      open: containerView.line.trim() !== "" && !containerView.startsWithIndentedCode,
+      listContentIndent: containerView.listContentIndent,
+      listContentIndents: containerView.listContentIndents,
+    };
+  }
   if (listItem) {
     const exitsActiveListParagraph = state.listContentIndent !== null
       && listItem.markerIndent < state.listContentIndent;
@@ -397,18 +588,21 @@ function markdownListContainerView(line, activeListContentIndent, activeListCont
   let candidate = line;
   let startsNewListItem = false;
   let canInterruptParagraph = false;
+  let firstListMarkerIndent = null;
   let projectedBaseIndent = 0;
   const lineIndent = markdownIndentColumns(line.match(/^[ \t]*/)?.[0] ?? "");
   let listContentIndents = activeListContentIndents.filter((indent) => indent <= lineIndent);
-  if (activeListContentIndent !== null && lineIndent >= activeListContentIndent) {
-    candidate = stripMarkdownIndent(line, activeListContentIndent);
-    projectedBaseIndent = activeListContentIndent;
-    listContentIndents = [...activeListContentIndents];
+  const survivingListContentIndent = listContentIndents.at(-1)
+    ?? (activeListContentIndent !== null && activeListContentIndent <= lineIndent ? activeListContentIndent : null);
+  if (survivingListContentIndent !== null) {
+    candidate = stripMarkdownIndent(line, survivingListContentIndent);
+    projectedBaseIndent = survivingListContentIndent;
   }
   for (let depth = 0; depth < 16; depth += 1) {
     const listItem = parseMarkdownListItem(candidate, null);
     if (!listItem) break;
     startsNewListItem = true;
+    firstListMarkerIndent ??= projectedBaseIndent + listItem.markerIndent;
     canInterruptParagraph ||= listItem.canInterruptParagraph;
     const listContentIndent = projectedBaseIndent + listItem.contentIndent;
     listContentIndents = listContentIndents.filter((indent) => indent < listContentIndent);
@@ -420,6 +614,7 @@ function markdownListContainerView(line, activeListContentIndent, activeListCont
         listContentIndent,
         listContentIndents,
         startsNewListItem,
+        firstListMarkerIndent,
         canInterruptParagraph,
         startsWithIndentedCode: true,
       };
@@ -431,6 +626,7 @@ function markdownListContainerView(line, activeListContentIndent, activeListCont
     listContentIndent: listContentIndents.at(-1) ?? null,
     listContentIndents,
     startsNewListItem,
+    firstListMarkerIndent,
     canInterruptParagraph,
     startsWithIndentedCode: false,
   };
@@ -510,12 +706,27 @@ function markdownHeadingAnchors(markdown) {
       gfmTableColumns = null;
     }
     if (rawHtmlBlock) {
-      const rawMasked = maskMarkdownRawHtmlBlock(rawLine, rawHtmlBlock);
-      rawHtmlBlock = rawMasked.state;
-      renderedLines.push(rawMasked.masked);
-      renderedHeadingLines.push(null);
-      if (!rawHtmlBlock && /^\s*$/.test(rawLine)) paragraphState = { ...paragraphState, open: false };
-      continue;
+      const rawIndent = markdownIndentColumns(rawLine.match(/^[ \t]*/)?.[0] ?? "");
+      const exitsListRawHtml = rawHtmlBlock.listContentIndent !== null
+        && !/^\s*$/.test(rawLine)
+        && rawIndent < rawHtmlBlock.listContentIndent;
+      if (!exitsListRawHtml) {
+        const rawMasked = maskMarkdownRawHtmlBlock(rawLine, rawHtmlBlock);
+        rawHtmlBlock = rawMasked.state;
+        renderedLines.push(rawMasked.masked);
+        renderedHeadingLines.push(null);
+        if (!rawHtmlBlock && /^\s*$/.test(rawLine)) paragraphState = { ...paragraphState, open: false };
+        continue;
+      }
+      const exitedRawHtml = rawHtmlBlock;
+      rawHtmlBlock = null;
+      const listContentIndents = exitedRawHtml.listContentIndents
+        .filter((indent) => indent < exitedRawHtml.listContentIndent && indent <= rawIndent);
+      paragraphState = {
+        open: false,
+        listContentIndent: listContentIndents.at(-1) ?? null,
+        listContentIndents,
+      };
     }
     if (htmlComment) {
       const commentMasked = maskMarkdownHtmlComments(rawLine, htmlComment);
@@ -530,10 +741,9 @@ function markdownHeadingAnchors(markdown) {
       paragraphState.listContentIndent,
       paragraphState.listContentIndents,
     );
-    const rawListItem = parseMarkdownListItem(rawLine, paragraphState.listContentIndent);
     const exitsActiveListParagraph = paragraphState.listContentIndent !== null
-      && rawListItem !== null
-      && rawListItem.markerIndent < paragraphState.listContentIndent;
+      && containerView.startsNewListItem
+      && containerView.firstListMarkerIndent < paragraphState.listContentIndent;
     const listContainerCanOpenFence = !paragraphState.open
       || !containerView.startsNewListItem
       || containerView.canInterruptParagraph
@@ -571,7 +781,13 @@ function markdownHeadingAnchors(markdown) {
         !paragraphState.open || (containerView.startsNewListItem && containerView.canInterruptParagraph),
       );
     if (rawMasked.isBlock) {
-      rawHtmlBlock = rawMasked.state;
+      rawHtmlBlock = rawMasked.state === null
+        ? null
+        : {
+          ...rawMasked.state,
+          listContentIndent: containerView.listContentIndent,
+          listContentIndents: containerView.listContentIndents,
+        };
       renderedLines.push(" ".repeat(rawLine.length));
       renderedHeadingLines.push(null);
       paragraphState = { ...paragraphState, open: false };
@@ -592,7 +808,7 @@ function markdownHeadingAnchors(markdown) {
       paragraphState = { ...paragraphState, open: false };
       continue;
     }
-    paragraphState = nextMarkdownParagraphState(visibleLine, paragraphState);
+    paragraphState = nextMarkdownParagraphState(visibleLine, paragraphState, containerView);
   }
   for (let index = 0; index < renderedHeadingLines.length; index += 1) {
     const line = renderedHeadingLines[index];

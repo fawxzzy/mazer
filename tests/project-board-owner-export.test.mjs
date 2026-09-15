@@ -162,6 +162,44 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     }));
   }
 
+  for (const [label, sourceRef, markdown] of [
+    ["named references use the complete case-sensitive table", "docs/current-truth.md#æther-", "## &AElig;ther &copy;"],
+    ["lowercase named references remain valid", "docs/current-truth.md#æther", "## &aelig;ther"],
+    ["decimal and hexadecimal references decode before slugging", "docs/current-truth.md#astral-", "## &#65;stral &#x1F680;"],
+    ["astral letters survive Unicode-aware slugging", "docs/current-truth.md#𐐨", "## &#x10400;"],
+    ["invalid code points become the replacement character", "docs/current-truth.md#-replacement", "## &#0; replacement"],
+    ["surrogate code points become the replacement character", "docs/current-truth.md#surrogate-", "## Surrogate &#xD800;"],
+    ["missing semicolons remain literal", "docs/current-truth.md#aelig", "## &AElig"],
+    ["unknown names remain literal", "docs/current-truth.md#notdefined", "## &NotDefined;"],
+    ["named references remain case sensitive", "docs/current-truth.md#aelig", "## &AELIG;"],
+    ["overlong decimal references remain literal", "docs/current-truth.md#87654321", "## &#87654321;"],
+    ["overlong hexadecimal references remain literal", "docs/current-truth.md#xabcdef0", "## &#xabcdef0;"],
+    ["code spans stay literal beside decoded emphasis", "docs/current-truth.md#aelig-æ", "## `&AElig;` **&AElig;**"],
+    ["code spans preserve literal tags and references", "docs/current-truth.md#span-titleaeligaeligspan", "## `<span title=\"&AElig;\">&AElig;</span>`"],
+    ["escaped ampersands stay literal beside decoded references", "docs/current-truth.md#aelig-æ", "## \\&AElig; &AElig;"],
+    ["quoted tag delimiters cannot leak references", "docs/current-truth.md#visible", "## <span title=\"> &AElig;\">Visible</span>"],
+    ["single-quoted tag delimiters cannot leak references", "docs/current-truth.md#visible-æ", "## <span title='> &AElig;'>Visible</span> &AElig;"],
+    ["inline comments cannot leak references", "docs/current-truth.md#visible", "## <!-- > &AElig; -->Visible"],
+    ["processing instructions cannot leak references", "docs/current-truth.md#visible", "## <?target > &AElig;?>Visible"],
+    ["CDATA sections cannot leak references", "docs/current-truth.md#visible", "## <![CDATA[> &AElig;]]>Visible"],
+  ]) {
+    const referenceHeading = structuredClone(registry);
+    referenceHeading.workItems[0].sourceRef = sourceRef;
+    assert.doesNotThrow(() => buildProjectBoardOwnerExport(referenceHeading, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(referenceHeading),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+    }), label);
+  }
+
+  const duplicateReferenceHeading = structuredClone(registry);
+  duplicateReferenceHeading.workItems[0].sourceRef = "docs/current-truth.md#æ-1";
+  assert.doesNotThrow(() => buildProjectBoardOwnerExport(duplicateReferenceHeading, {
+    ...bytes,
+    "mazer-owner-work-registry": JSON.stringify(duplicateReferenceHeading),
+    "mazer-current-truth": `${bytes["mazer-current-truth"]}\n## &AElig;\n## Æ\n`,
+  }), "decoded and literal headings share the duplicate suffix sequence");
+
   const markupSlug = structuredClone(registry);
   markupSlug.workItems[0].sourceRef = "docs/current-truth.md#this-_is_-emphasis";
   assert.throws(() => buildProjectBoardOwnerExport(markupSlug, {
@@ -247,6 +285,11 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["ordered-list projected tab heading", "1. item\n   \t## Visible Heading"],
     ["nested-list projected heading", "- outer\n  - item\n    ### Visible Heading"],
     ["nested ordered-list projected tab heading", "- outer\n  1. item\n     \t### Visible Heading"],
+    ["ancestor sibling after nested unordered item", "1.  outer\n    - child\n      continuation\n    - sibling\n      ## Visible Heading"],
+    ["ancestor sibling after a blank separator", "1.  outer\n    - child\n\n    - sibling\n      ## Visible Heading"],
+    ["ordered ancestor sibling after nested ordered item", "10. outer\n    1) child\n       continuation\n    2) sibling\n       ## Visible Heading"],
+    ["wide ancestor sibling refreshes the active leaf indent", "1.  outer\n    - child\n      continuation\n    1.    sibling\n          ## Visible Heading"],
+    ["full top-level exit after a nested list", "1. outer\n   - child\n     continuation\n- top\n  ## Visible Heading"],
     ["heading resumes after four-column code", "    ## Hidden Indented Heading\n## Visible Heading"],
     ["heading resumes after mixed-tab code", "  \t## Hidden Tab Indented\n## Visible Heading"],
   ]) {
@@ -430,6 +473,8 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["type 7 inside an unordered list item", "- <x-widget>\n  ## Hidden Raw Heading\n"],
     ["type 7 inside an ordered list item", "1. <x-widget>\n   ## Hidden Raw Heading\n"],
     ["type 7 inside a nested list item", "- outer\n  - <x-widget>\n    ## Hidden Raw Heading\n"],
+    ["type 7 in an ancestor sibling after nested content", "1.  outer\n    - child\n      continuation\n    - <x-widget>\n      ## Hidden Raw Heading\n"],
+    ["noninterrupting wide ordered ancestor sibling starts type 7", "1.  outer\n    - child\n      continuation\n    2.    <x-widget>\n          ## Hidden Raw Heading\n"],
     ["type 7 after a one-hyphen GFM delimiter", "| Column |\n| - |\n<span>\n## Hidden Raw Heading\n"],
     ["type 7 after a two-hyphen GFM delimiter", "| Column |\n| -- |\n<span>\n## Hidden Raw Heading\n"],
     ["type 7 after a GFM table header and delimiter", "| Column |\n| --- |\n<span>\n## Hidden Raw Heading\n"],
@@ -456,6 +501,9 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["docs/current-truth.md#heading-after-pi", "<?target\n## Hidden Raw Heading\n?>\n## Heading After PI"],
     ["docs/current-truth.md#heading-after-table", "<table>\n## Hidden Raw Heading\n</table>\n\n## Heading After Table"],
     ["docs/current-truth.md#heading-after-custom", "<x-widget>\n## Hidden Raw Heading\n\n## Heading After Custom"],
+    ["docs/current-truth.md#visible-heading", "1. outer\n   - <x-widget>\n## Visible Heading"],
+    ["docs/current-truth.md#visible-heading", "1. outer\n   - <table>\n   ## Visible Heading"],
+    ["docs/current-truth.md#visible-heading", "1. outer\n   - <pre>\n## Visible Heading"],
     ["docs/current-truth.md#heading-after-inline-tag", "paragraph\n<x-widget>\n## Heading After Inline Tag"],
     ["docs/current-truth.md#heading-after-indented-paragraph-line", "paragraph\n    continuation\n<x-widget>\n## Heading After Indented Paragraph Line"],
     ["docs/current-truth.md#heading-after-nonstarting-ordered-text", "paragraph\n2. item\n<x-widget>\n## Heading After Nonstarting Ordered Text"],
