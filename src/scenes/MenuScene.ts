@@ -17084,8 +17084,17 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
       fontSize: `${compact ? 11 : 12}px`
     })).setOrigin(0.5);
+    // Real, measured overlap (found while restoring the visual-verification
+    // harness, headless Playwright against the authenticated fixture at
+    // 405x958): with a +17/+19 offset, padLegacyUiText's own 6px top padding
+    // on this larger label put its top edge (real bounds: top 843) above
+    // the "Welcome" label's own bottom edge (bounds: bottom 847.5) -- a real
+    // 4.5px vertical, ~30%-of-the-smaller-box overlap, not a false positive
+    // from the harness's own overlap heuristic. +7px clears it (new gap
+    // ~2.5px) while keeping 12px of clearance to the Start button below
+    // (button top measured at y=890 in the same real capture).
     const usernameLabel = this.fitLegacyUiTextToWidth(
-      this.padLegacyUiText(this.add.text(centerX, welcomeY + (compact ? 17 : 19), username, {
+      this.padLegacyUiText(this.add.text(centerX, welcomeY + (compact ? 24 : 26), username, {
         color: '#d7f7ee',
         fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
         fontSize: `${compact ? 14 : 16}px`
