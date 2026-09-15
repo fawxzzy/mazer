@@ -93,17 +93,18 @@ function isMarkdownPunctuation(character) {
 }
 
 function stripMarkdownEmphasis(value) {
+  const characters = [...value];
   const runs = [];
-  for (let index = 0; index < value.length;) {
-    const marker = value[index];
-    if ((marker !== "*" && marker !== "_") || value[index - 1] === "\\") {
+  for (let index = 0; index < characters.length;) {
+    const marker = characters[index];
+    if ((marker !== "*" && marker !== "_") || characters[index - 1] === "\\") {
       index += 1;
       continue;
     }
     let end = index + 1;
-    while (value[end] === marker) end += 1;
-    const previous = value[index - 1];
-    const next = value[end];
+    while (characters[end] === marker) end += 1;
+    const previous = characters[index - 1];
+    const next = characters[end];
     const leftFlanking = !isMarkdownWhitespace(next)
       && (!isMarkdownPunctuation(next) || isMarkdownWhitespace(previous) || isMarkdownPunctuation(previous));
     const rightFlanking = !isMarkdownWhitespace(previous)
@@ -127,21 +128,30 @@ function stripMarkdownEmphasis(value) {
     for (let openerIndex = closerIndex - 1; openerIndex >= 0 && closer.remaining > 0; openerIndex -= 1) {
       const opener = runs[openerIndex];
       if (!opener.canOpen || opener.marker !== closer.marker || opener.remaining === 0) continue;
-      const oneCanBoth = (opener.canClose || closer.canOpen);
-      const blockedByRuleOfThree = oneCanBoth
-        && (opener.remaining + closer.remaining) % 3 === 0
-        && (opener.remaining % 3 !== 0 || closer.remaining % 3 !== 0);
-      if (blockedByRuleOfThree) continue;
-      const used = opener.remaining >= 2 && closer.remaining >= 2 ? 2 : 1;
-      for (let offset = 0; offset < used; offset += 1) {
-        removed.add(opener.end - opener.length + opener.remaining - 1 - offset);
-        removed.add(closer.start + closer.length - closer.remaining + offset);
+      while (opener.remaining > 0 && closer.remaining > 0) {
+        const oneCanBoth = (opener.canClose || closer.canOpen);
+        const blockedByRuleOfThree = oneCanBoth
+          && (opener.remaining + closer.remaining) % 3 === 0
+          && (opener.remaining % 3 !== 0 || closer.remaining % 3 !== 0);
+        if (blockedByRuleOfThree) break;
+        const used = opener.remaining >= 2 && closer.remaining >= 2 ? 2 : 1;
+        for (let offset = 0; offset < used; offset += 1) {
+          removed.add(opener.end - opener.length + opener.remaining - 1 - offset);
+          removed.add(closer.start + closer.length - closer.remaining + offset);
+        }
+        opener.remaining -= used;
+        closer.remaining -= used;
       }
-      opener.remaining -= used;
-      closer.remaining -= used;
     }
   }
-  return [...value].filter((_, index) => !removed.has(index)).join("");
+  return characters.filter((_, index) => !removed.has(index)).join("");
+}
+
+function normalizeMarkdownCodeSpanContent(value) {
+  const normalized = value.replace(/\r\n?|\n/g, " ");
+  return normalized.startsWith(" ") && normalized.endsWith(" ") && /[^ ]/.test(normalized)
+    ? normalized.slice(1, -1)
+    : normalized;
 }
 
 function protectMarkdownCodeSpans(value, protect) {
@@ -155,18 +165,27 @@ function protectMarkdownCodeSpans(value, protect) {
     }
     let openerEnd = index + 1;
     while (value[openerEnd] === "`") openerEnd += 1;
-    const marker = value.slice(index, openerEnd);
-    let closing = value.indexOf(marker, openerEnd);
-    while (closing >= 0 && (value[closing - 1] === "`" || value[closing + marker.length] === "`")) {
-      closing = value.indexOf(marker, closing + marker.length);
+    const markerLength = openerEnd - index;
+    let closing = -1;
+    let cursor = openerEnd;
+    while (cursor < value.length) {
+      const candidate = value.indexOf("`", cursor);
+      if (candidate < 0) break;
+      let candidateEnd = candidate + 1;
+      while (value[candidateEnd] === "`") candidateEnd += 1;
+      if (candidateEnd - candidate === markerLength) {
+        closing = candidate;
+        break;
+      }
+      cursor = candidateEnd;
     }
     if (closing < 0) {
-      rendered += marker;
+      rendered += value.slice(index, openerEnd);
       index = openerEnd;
       continue;
     }
-    rendered += protect(value.slice(openerEnd, closing));
-    index = closing + marker.length;
+    rendered += protect(normalizeMarkdownCodeSpanContent(value.slice(openerEnd, closing)));
+    index = closing + markerLength;
   }
   return rendered;
 }
@@ -347,7 +366,50 @@ function gfmTableColumnCount(headerLine, delimiterLine) {
   const header = splitGfmTableRow(headerLine);
   const delimiter = splitGfmTableRow(delimiterLine);
   if (!header || !delimiter || header.length !== delimiter.length) return null;
-  return delimiter.every((cell) => /^:?-{3,}:?$/.test(cell)) ? delimiter.length : null;
+  return delimiter.every((cell) => /^:?-+:?$/.test(cell)) ? delimiter.length : null;
+}
+
+function stripMarkdownIndent(line, columns) {
+  let consumedColumns = 0;
+  let index = 0;
+  while (index < line.length && consumedColumns < columns && (line[index] === " " || line[index] === "\t")) {
+    const width = line[index] === "\t" ? 4 - (consumedColumns % 4) : 1;
+    consumedColumns += width;
+    index += 1;
+  }
+  return `${" ".repeat(Math.max(0, consumedColumns - columns))}${line.slice(index)}`;
+}
+
+function markdownListContainerView(line, activeListContentIndent) {
+  let candidate = line;
+  let startsNewListItem = false;
+  let canInterruptParagraph = false;
+  const lineIndent = markdownIndentColumns(line.match(/^[ \t]*/)?.[0] ?? "");
+  if (activeListContentIndent !== null && lineIndent >= activeListContentIndent) {
+    candidate = stripMarkdownIndent(line, activeListContentIndent);
+  }
+  for (let depth = 0; depth < 16; depth += 1) {
+    const listItem = parseMarkdownListItem(candidate, null);
+    if (!listItem) break;
+    startsNewListItem = true;
+    canInterruptParagraph ||= listItem.canInterruptParagraph;
+    if (listItem.startsWithIndentedCode) {
+      return { line: candidate, startsNewListItem, canInterruptParagraph, startsWithIndentedCode: true };
+    }
+    candidate = listItem.itemContent;
+  }
+  return { line: candidate, startsNewListItem, canInterruptParagraph, startsWithIndentedCode: false };
+}
+
+function startsMarkdownBlockOutsideTable(line) {
+  if (/^\s*$/.test(line)) return true;
+  if (/^ {0,3}#{1,6}(?:[ \t]+|$)/.test(line)) return true;
+  if (/^ {0,3}(?:`{3,}|~{3,})/.test(line)) return true;
+  if (/^ {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})$/.test(line)) return true;
+  if (/^ {0,3}>/.test(line)) return true;
+  if (parseMarkdownListItem(line, null)) return true;
+  if (markdownIndentColumns(line.match(/^[ \t]*/)?.[0] ?? "") >= 4) return true;
+  return detectMarkdownRawHtmlBlock(line, true) !== null;
 }
 
 function maskMarkdownRawHtmlBlock(line, state, allowType7 = true) {
@@ -381,7 +443,7 @@ function markdownHeadingAnchors(markdown) {
     }
     if (gfmTableColumns !== null) {
       const cells = splitGfmTableRow(rawLine);
-      if (cells) {
+      if (cells && !startsMarkdownBlockOutsideTable(rawLine)) {
         renderedLines.push(rawLine);
         continue;
       }
@@ -409,14 +471,22 @@ function markdownHeadingAnchors(markdown) {
       continue;
     }
     const rawIndent = markdownIndentColumns(rawLine.match(/^[ \t]*/)?.[0] ?? "");
+    const containerView = markdownListContainerView(rawLine, paragraphState.listContentIndent);
     if (paragraphState.open && paragraphState.listContentIndent !== null
-      && rawIndent < paragraphState.listContentIndent && isMarkdownType7Start(rawLine)) {
+      && (rawIndent < paragraphState.listContentIndent || containerView.canInterruptParagraph)
+      && isMarkdownType7Start(containerView.line)) {
       paragraphState = { open: false, listContentIndent: null };
     }
-    const rawMasked = maskMarkdownRawHtmlBlock(rawLine, null, !paragraphState.open);
+    const rawMasked = containerView.startsWithIndentedCode
+      ? { masked: rawLine, state: null, isBlock: false }
+      : maskMarkdownRawHtmlBlock(
+        containerView.line,
+        null,
+        !paragraphState.open || (containerView.startsNewListItem && containerView.canInterruptParagraph),
+      );
     if (rawMasked.isBlock) {
       rawHtmlBlock = rawMasked.state;
-      renderedLines.push(rawMasked.masked);
+      renderedLines.push(" ".repeat(rawLine.length));
       paragraphState = { ...paragraphState, open: false };
       continue;
     }
@@ -585,7 +655,7 @@ export function assertPublicSafety(exported) {
     ["authorization value", /\bbearer\s+[A-Z0-9._~+/=-]{8,}/i],
     ["sensitive query value", /https?:\/\/[^\s"']+\?[^\s"']*(?:token|key|secret|code|password|credential|session|cookie|email|phone|user_id)=/i],
     ["credential-like assignment", /\b(?:secret|credential|password|token|cookie|session(?:_data)?|supabase_key|service_role)\b\s*(?:=|:)\s*["']?[^\s"',;]{4,}/i],
-    ["known secret format", /\b(?:gh[pousr]_[A-Z0-9]{20,}|github_pat_[A-Z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Z0-9-]{10,}|sk_(?:live|test)_[A-Z0-9]{16,}|AIza[A-Z0-9_-]{30,}|sk-[A-Z0-9_-]{20,}|sb_secret_[A-Z0-9_-]{10,}|eyJ[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,})\b/i],
+    ["known secret format", /\b(?:gh[pousr]_[A-Z0-9]{20,}|github_pat_[A-Z0-9_]{20,}|(?:AKIA|ASIA)[0-9A-Z]{16}|xox[baprs]-[A-Z0-9-]{10,}|sk_(?:live|test)_[A-Z0-9]{16,}|AIza[A-Z0-9_-]{30,}|sk-[A-Z0-9_-]{20,}|sb_secret_[A-Z0-9_-]{10,}|eyJ[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,})\b/i],
     ["PEM private key", /-{5}[ \t]*BEGIN[ \t]+(?:[A-Z0-9]+[ \t]+)*PRIVATE[ \t]+KEY(?:[ \t]+BLOCK)?[ \t]*-{5}/i],
   ];
   const visit = (value, location = "export") => {

@@ -145,8 +145,13 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
   for (const [sourceRef, heading] of [
     ["docs/current-truth.md#this-is-emphasis", "## This _is_ emphasis"],
     ["docs/current-truth.md#outer-inner-and-adjacentmarks-punctuation", "## _Outer **inner**_ and __adjacent__*marks* punctuation!"],
+    ["docs/current-truth.md#both", "## ___both___"],
+    ["docs/current-truth.md#-this-is-emphasized", "## 😀 This _is_ emphasized"],
     ["docs/current-truth.md#keep-_literal_-underscores", "## Keep \\_literal\\_ underscores"],
     ["docs/current-truth.md#use-_literal_", "## Use `_literal_`"],
+    ["docs/current-truth.md#use-foo", "## Use ` foo `"],
+    ["docs/current-truth.md#use--foo", "## Use `  foo  `"],
+    ["docs/current-truth.md#use-a--b", "## Use ``a ` b``"],
   ]) {
     const emphasizedHeading = structuredClone(registry);
     emphasizedHeading.workItems[0].sourceRef = sourceRef;
@@ -164,6 +169,21 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     "mazer-owner-work-registry": JSON.stringify(markupSlug),
     "mazer-current-truth": `${bytes["mazer-current-truth"]}\n## This _is_ emphasis\n`,
   }), /sourceRef fragment does not exist/);
+
+  for (const [sourceRef, heading] of [
+    ["docs/current-truth.md#_both_", "## ___both___"],
+    ["docs/current-truth.md#-this-_s_emphasized", "## 😀 This _is_ emphasized"],
+    ["docs/current-truth.md#use--foo", "## Use ` foo `"],
+    ["docs/current-truth.md#use-a-b", "## Use ``a ` b``"],
+  ]) {
+    const danglingMarkup = structuredClone(registry);
+    danglingMarkup.workItems[0].sourceRef = sourceRef;
+    assert.throws(() => buildProjectBoardOwnerExport(danglingMarkup, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(danglingMarkup),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${heading}\n`,
+    }), /sourceRef fragment does not exist/);
+  }
 
   for (const [label, fencedMarkdown] of [
     ["backtick fence with info string", "````markdown\n## Fenced Heading\n````"],
@@ -277,8 +297,14 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["five-space plus item starts with code before type 7", "+     code\n  <span>\n  ## Hidden Raw Heading\n"],
     ["five-space star item starts with code before type 7", "*     code\n  <span>\n  ## Hidden Raw Heading\n"],
     ["five-space ordered item starts with code before type 7", "1.     code\n   <span>\n   ## Hidden Raw Heading\n"],
+    ["type 7 inside an unordered list item", "- <x-widget>\n  ## Hidden Raw Heading\n"],
+    ["type 7 inside an ordered list item", "1. <x-widget>\n   ## Hidden Raw Heading\n"],
+    ["type 7 inside a nested list item", "- outer\n  - <x-widget>\n    ## Hidden Raw Heading\n"],
+    ["type 7 after a one-hyphen GFM delimiter", "| Column |\n| - |\n<span>\n## Hidden Raw Heading\n"],
+    ["type 7 after a two-hyphen GFM delimiter", "| Column |\n| -- |\n<span>\n## Hidden Raw Heading\n"],
     ["type 7 after a GFM table header and delimiter", "| Column |\n| --- |\n<span>\n## Hidden Raw Heading\n"],
     ["type 7 after aligned multi-column GFM table body", "| Left | Right |\n| :--- | ---: |\n| value | value |\n<span>\n## Hidden Raw Heading\n"],
+    ["type 7 with a pipe-valued attribute terminates a GFM table", "| Column |\n| --- |\n<x-widget data-x=\"|\">\n## Hidden Raw Heading\n"],
   ]) {
     const rawHeading = structuredClone(registry);
     rawHeading.workItems[0].sourceRef = "docs/current-truth.md#hidden-raw-heading";
@@ -304,7 +330,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["docs/current-truth.md#heading-after-indented-paragraph-line", "paragraph\n    continuation\n<x-widget>\n## Heading After Indented Paragraph Line"],
     ["docs/current-truth.md#heading-after-nonstarting-ordered-text", "paragraph\n2. item\n<x-widget>\n## Heading After Nonstarting Ordered Text"],
     ["docs/current-truth.md#heading-after-list-inline-tag", "- paragraph\n  <span>\n  ## Heading After List Inline Tag"],
-    ["docs/current-truth.md#heading-after-short-table-delimiter", "| Column |\n| -- |\n<span>\n## Heading After Short Table Delimiter"],
+    ["docs/current-truth.md#heading-after-invalid-table-delimiter", "| Column |\n| : |\n<span>\n## Heading After Invalid Table Delimiter"],
     ["docs/current-truth.md#heading-after-mismatched-table-delimiter", "| Left | Right |\n| --- |\n<span>\n## Heading After Mismatched Table Delimiter"],
   ]) {
     const visibleHeading = structuredClone(registry);
@@ -314,6 +340,23 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "mazer-owner-work-registry": JSON.stringify(visibleHeading),
       "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
     }));
+  }
+
+  for (const [label, markdown] of [
+    ["heading with a pipe terminates the table", "| Column |\n| --- |\n## Visible |Heading"],
+    ["list block terminates the table", "| Column |\n| --- |\n- item | value\n## Visible Heading"],
+    ["blockquote terminates the table", "| Column |\n| --- |\n> quote | value\n## Visible Heading"],
+    ["fenced code terminates the table", "| Column |\n| --- |\n```text | metadata\n## Hidden Fenced Heading\n```\n## Visible Heading"],
+    ["indented code terminates the table", "| Column |\n| --- |\n    code | value\n## Visible Heading"],
+    ["blank line terminates the table", "| Column |\n| --- |\n\n## Visible Heading"],
+  ]) {
+    const visibleAfterTable = structuredClone(registry);
+    visibleAfterTable.workItems[0].sourceRef = "docs/current-truth.md#visible-heading";
+    assert.doesNotThrow(() => buildProjectBoardOwnerExport(visibleAfterTable, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(visibleAfterTable),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+    }), label);
   }
 
   const dangling = structuredClone(registry);
@@ -481,6 +524,7 @@ test("scans the complete public envelope and rejects sensitive values without ec
     ["PGP private key block", (value) => { value.cards[0].content.summary = "-----BEGIN PGP PRIVATE KEY BLOCK-----"; }, /sensitive PEM private key/],
     ["wrapped Slack service credential", (value) => { value.cards[0].record.title = `wrapped (${["xoxb", "123456789012", "syntheticvalue"].join("-")})`; }, /sensitive known secret format/],
     ["AWS access-key prefix", (value) => { value.cards[0].record.description = `cloud ${`AKIA${"0".repeat(16)}`}`; }, /sensitive known secret format/],
+    ["AWS temporary access-key prefix", (value) => { value.cards[0].record.description = `temporary ${`ASIA${"0".repeat(16)}`}`; }, /sensitive known secret format/],
     ["wrapped Stripe service credential", (value) => { value.cards[0].content.acceptance_criteria[0] = `(${`sk_live_${"A".repeat(20)}`})`; }, /sensitive known secret format/],
     ["Google API-key prefix", (value) => { value.cards[0].content.summary = `key ${`AIza${"A".repeat(35)}`}`; }, /sensitive known secret format/],
   ];
@@ -489,7 +533,7 @@ test("scans the complete public envelope and rejects sensitive values without ec
     mutate(hostile);
     assert.throws(() => assertPublicSafety(hostile), (error) => {
       assert.match(error.message, expected, label);
-      assert.doesNotMatch(error.message, /owner@example\.com|private-value|not-public|BEGIN.*PRIVATE KEY|xoxb-|AKIA0|sk_live_|AIzaA/i, `${label} echoed a sensitive value`);
+      assert.doesNotMatch(error.message, /owner@example\.com|private-value|not-public|BEGIN.*PRIVATE KEY|xoxb-|AKIA0|ASIA0|sk_live_|AIzaA/i, `${label} echoed a sensitive value`);
       return true;
     });
   }
