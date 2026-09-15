@@ -125,8 +125,9 @@ function maskMarkdownHtmlComments(line, inComment) {
 }
 
 function detectMarkdownRawHtmlBlock(line, allowType7) {
-  if (/^ {0,3}<(?:pre|script|style|textarea)(?:[\t >]|$)/i.test(line)) {
-    return { endPattern: /<\/(?:pre|script|style|textarea)\s*>/i, endOnBlank: false };
+  const rawTextOpening = line.match(/^ {0,3}<(pre|script|style|textarea)(?:[\t >]|$)/i);
+  if (rawTextOpening) {
+    return { endPattern: new RegExp(`</${rawTextOpening[1]}\\s*>`, "i"), endOnBlank: false };
   }
   if (/^ {0,3}<!--/.test(line)) return { endPattern: /-->/, endOnBlank: false };
   if (/^ {0,3}<\?/.test(line)) return { endPattern: /\?>/, endOnBlank: false };
@@ -137,6 +138,23 @@ function detectMarkdownRawHtmlBlock(line, allowType7) {
     return { endPattern: null, endOnBlank: true };
   }
   return null;
+}
+
+function nextMarkdownParagraphState(line, paragraphOpen) {
+  if (/^\s*$/.test(line)) return false;
+  if (/^ {0,3}#{1,6}(?:[ \t]+|$)/.test(line)) return false;
+  if (paragraphOpen && /^ {0,3}(?:=+|-+)[ \t]*$/.test(line)) return false;
+  if (/^ {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})$/.test(line)) return false;
+  if (/^ {0,3}>/.test(line)) return false;
+  const listMarker = line.match(/^ {0,3}(?:([*+-])|(\d{1,9})[.)])(?:([ \t]+)(.*)|[ \t]*)$/);
+  if (listMarker) {
+    if (!paragraphOpen) return false;
+    const itemContent = listMarker[4] ?? "";
+    const canInterruptParagraph = itemContent.trim() !== "" && (listMarker[1] !== undefined || listMarker[2] === "1");
+    return !canInterruptParagraph;
+  }
+  if (/^(?: {4}|\t)/.test(line)) return paragraphOpen;
+  return true;
 }
 
 function maskMarkdownRawHtmlBlock(line, state, allowType7 = true) {
@@ -199,10 +217,7 @@ function markdownHeadingAnchors(markdown) {
     htmlComment = commentMasked.inComment;
     const visibleLine = commentMasked.masked;
     renderedLines.push(visibleLine);
-    if (/^\s*$/.test(visibleLine) || /^\s{0,3}#{1,6}(?:[ \t]+|$)/.test(visibleLine)
-      || (paragraphOpen && /^\s{0,3}(?:=+|-+)[ \t]*$/.test(visibleLine))
-      || /^(?: {4}|\t)/.test(visibleLine)) paragraphOpen = false;
-    else paragraphOpen = true;
+    paragraphOpen = nextMarkdownParagraphState(visibleLine, paragraphOpen);
   }
   for (let index = 0; index < renderedLines.length; index += 1) {
     const line = renderedLines[index];

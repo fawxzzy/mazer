@@ -203,7 +203,8 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
 
   for (const [label, rawHtml] of [
     ["pre block", "<pre>\n## Hidden Raw Heading\n</pre>"],
-    ["type 1 closes on a different raw-text tag", "<pre>\n## Hidden Raw Heading\n</style>"],
+    ["type 1 ignores a different raw-text close", "<pre>\n</style>\n## Hidden Raw Heading\n</pre>"],
+    ["type 1 ignores multiple different raw-text closes", "<textarea>\n</pre>\n</script>\n</style>\n## Hidden Raw Heading\n</textarea>"],
     ["script block with mixed case and attributes", "<ScRiPt type=\"application/json\">\n## Hidden Raw Heading\n</sCrIpT>"],
     ["style block", "<style>\n## Hidden Raw Heading\n</style>"],
     ["textarea block", "<textarea name=\"example\">\n## Hidden Raw Heading\n</textarea>"],
@@ -214,6 +215,14 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["type 7 complete open tag", "<x-widget data-example=\"1\">\n## Hidden Raw Heading"],
     ["type 7 complete closing tag", "</x-widget>\n## Hidden Raw Heading"],
     ["type 6 interrupts a paragraph", "paragraph\n<table>\n## Hidden Raw Heading"],
+    ["type 7 after thematic break", "---\n<x-widget>\n## Hidden Raw Heading\n"],
+    ["type 7 after indented thematic break", "   * * *   \n<x-widget>\n## Hidden Raw Heading\n"],
+    ["type 7 after bare blockquote", ">   \n<x-widget>\n## Hidden Raw Heading\n"],
+    ["type 7 after empty dash list marker", "-   \n<x-widget>\n## Hidden Raw Heading\n"],
+    ["type 7 after empty plus list marker", " +\t\n<x-widget>\n## Hidden Raw Heading\n"],
+    ["type 7 after empty star list marker", "  * \n<x-widget>\n## Hidden Raw Heading\n"],
+    ["type 7 after empty ordered dot marker", "1.   \n<x-widget>\n## Hidden Raw Heading\n"],
+    ["type 7 after empty ordered paren marker", "  2)\t\n<x-widget>\n## Hidden Raw Heading\n"],
     ["unclosed raw block", "<pre class=\"example\">\n## Hidden Raw Heading\n## Still Hidden"],
     ["unclosed processing instruction", "<?target\n## Hidden Raw Heading"],
     ["unclosed CDATA", "<![CDATA[\n## Hidden Raw Heading"],
@@ -239,6 +248,8 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["docs/current-truth.md#heading-after-table", "<table>\n## Hidden Raw Heading\n</table>\n\n## Heading After Table"],
     ["docs/current-truth.md#heading-after-custom", "<x-widget>\n## Hidden Raw Heading\n\n## Heading After Custom"],
     ["docs/current-truth.md#heading-after-inline-tag", "paragraph\n<x-widget>\n## Heading After Inline Tag"],
+    ["docs/current-truth.md#heading-after-indented-paragraph-line", "paragraph\n    continuation\n<x-widget>\n## Heading After Indented Paragraph Line"],
+    ["docs/current-truth.md#heading-after-nonstarting-ordered-text", "paragraph\n2. item\n<x-widget>\n## Heading After Nonstarting Ordered Text"],
   ]) {
     const visibleHeading = structuredClone(registry);
     visibleHeading.workItems[0].sourceRef = sourceRef;
