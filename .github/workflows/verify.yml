@@ -18,6 +18,19 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          # Full history and remote branch refs, not the default shallow
+          # single-ref checkout: the decision-registry integrator-wave-mix
+          # self-check (tests/architecture/decision-registry-contract.test.ts
+          # / ui-state-model-contract.test.ts) diffs against origin/main or
+          # this PR's own base branch to find committed changes, and neither
+          # ref exists in a default `actions/checkout@v4` pull_request
+          # checkout (confirmed empirically: it only contains the synthetic
+          # `pull/<PR>/merge` ref, so every named-branch candidate the check
+          # tries -- origin/<base>, origin/main, main -- was UNRESOLVED,
+          # silently degrading the check to comparing zero files and passing
+          # vacuously regardless of what the PR actually changed).
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -63,6 +76,9 @@ jobs:
 
       - name: Verify Wave 4E World Identity required coverage
         run: node ./scripts/verify/run-world-identity-required-tests.mjs
+
+      - name: Verify Wave 5C shared-account OAuth consumer required coverage
+        run: node ./scripts/verify/run-shared-account-oauth-required-tests.mjs
 
       - name: Build production bundle and PWA assets
         run: npm run build
