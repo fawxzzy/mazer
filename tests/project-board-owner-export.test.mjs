@@ -101,6 +101,26 @@ test("validates stable dependency relationships and preserves deterministic dedu
     () => buildProjectBoardOwnerExport(self, { ...bytes, "mazer-owner-work-registry": JSON.stringify(self) }),
     /cannot depend on itself/,
   );
+
+  for (const [label, mutate] of [
+    ["two-node public cycle", (value) => {
+      value.workItems.find((item) => item.id === "MAZER-2D-001").dependencies = ["MAZER-WORLD-001"];
+    }],
+    ["three-node completed cycle", (value) => {
+      value.workItems.find((item) => item.id === "MAZER-DATA-001").dependencies = ["MAZER-AUTH-QA-001"];
+    }],
+    ["lifecycle-crossing cycle", (value) => {
+      value.workItems.find((item) => item.id === "MAZER-2D-001").dependencies = ["MAZER-PLANET-001"];
+    }],
+  ]) {
+    const cyclic = structuredClone(registry);
+    mutate(cyclic);
+    assert.throws(
+      () => buildProjectBoardOwnerExport(cyclic, { ...bytes, "mazer-owner-work-registry": JSON.stringify(cyclic) }),
+      /dependency graph must be acyclic/,
+      label,
+    );
+  }
 });
 
 test("resolves only rendered Markdown headings with the required GitHub-compatible slug behavior", () => {
@@ -183,10 +203,20 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
 
   for (const [label, rawHtml] of [
     ["pre block", "<pre>\n## Hidden Raw Heading\n</pre>"],
+    ["type 1 closes on a different raw-text tag", "<pre>\n## Hidden Raw Heading\n</style>"],
     ["script block with mixed case and attributes", "<ScRiPt type=\"application/json\">\n## Hidden Raw Heading\n</sCrIpT>"],
     ["style block", "<style>\n## Hidden Raw Heading\n</style>"],
     ["textarea block", "<textarea name=\"example\">\n## Hidden Raw Heading\n</textarea>"],
+    ["processing instruction", "<?target\n## Hidden Raw Heading\n?>"],
+    ["declaration", "<!DOCTYPE\n## Hidden Raw Heading\n>"],
+    ["CDATA", "<![CDATA[\n## Hidden Raw Heading\n]]>"],
+    ["type 6 block tag", "<TaBlE class=\"example\">\n## Hidden Raw Heading\n</table>\nstill raw"],
+    ["type 7 complete open tag", "<x-widget data-example=\"1\">\n## Hidden Raw Heading"],
+    ["type 7 complete closing tag", "</x-widget>\n## Hidden Raw Heading"],
+    ["type 6 interrupts a paragraph", "paragraph\n<table>\n## Hidden Raw Heading"],
     ["unclosed raw block", "<pre class=\"example\">\n## Hidden Raw Heading\n## Still Hidden"],
+    ["unclosed processing instruction", "<?target\n## Hidden Raw Heading"],
+    ["unclosed CDATA", "<![CDATA[\n## Hidden Raw Heading"],
   ]) {
     const rawHeading = structuredClone(registry);
     rawHeading.workItems[0].sourceRef = "docs/current-truth.md#hidden-raw-heading";
@@ -205,6 +235,10 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["docs/current-truth.md#heading-before-raw", "## Heading Before Raw\n<pre>\n## Hidden Raw Heading\n</pre>"],
     ["docs/current-truth.md#heading-after-raw", "<SCRIPT type=\"application/json\">\n## Hidden Raw Heading\n</SCRIPT>\n## Heading After Raw"],
     ["docs/current-truth.md#heading-after-same-line-raw", "<style>hidden</style>\n## Heading After Same Line Raw"],
+    ["docs/current-truth.md#heading-after-pi", "<?target\n## Hidden Raw Heading\n?>\n## Heading After PI"],
+    ["docs/current-truth.md#heading-after-table", "<table>\n## Hidden Raw Heading\n</table>\n\n## Heading After Table"],
+    ["docs/current-truth.md#heading-after-custom", "<x-widget>\n## Hidden Raw Heading\n\n## Heading After Custom"],
+    ["docs/current-truth.md#heading-after-inline-tag", "paragraph\n<x-widget>\n## Heading After Inline Tag"],
   ]) {
     const visibleHeading = structuredClone(registry);
     visibleHeading.workItems[0].sourceRef = sourceRef;
@@ -240,6 +274,31 @@ test("requires every work item card type to match the atlas.card-record.v2 enum"
   }
 });
 
+test("requires every emitted priority to match the nullable atlas.card-record.v2 enum", () => {
+  for (const [label, priority] of [
+    ["missing", undefined],
+    ["non-scalar", {}],
+    ["unsupported", "urgent_typo"],
+  ]) {
+    const malformed = structuredClone(registry);
+    if (priority === undefined) delete malformed.workItems[0].priority;
+    else malformed.workItems[0].priority = priority;
+    assert.throws(
+      () => buildProjectBoardOwnerExport(malformed, { ...bytes, "mazer-owner-work-registry": JSON.stringify(malformed) }),
+      /priority must match the atlas\.card-record\.v2 priority enum/,
+      label,
+    );
+  }
+
+  const nullable = structuredClone(registry);
+  nullable.workItems[0].priority = null;
+  const output = buildProjectBoardOwnerExport(nullable, {
+    ...bytes,
+    "mazer-owner-work-registry": JSON.stringify(nullable),
+  });
+  assert.equal(output.cards.find((card) => card.record.card_id === nullable.workItems[0].id).record.priority, null);
+});
+
 test("requires canonical calendar-valid UTC timestamps without coercion", () => {
   for (const [label, timestamp] of [
     ["boolean coercion", true],
@@ -256,6 +315,38 @@ test("requires canonical calendar-valid UTC timestamps without coercion", () => 
       label,
     );
   }
+
+  for (const id of ["MAZER-DATA-001", "MAZER-PLANET-001"]) {
+    const malformed = structuredClone(registry);
+    malformed.workItems.find((item) => item.id === id).updatedAt = true;
+    assert.throws(
+      () => buildProjectBoardOwnerExport(malformed, { ...bytes, "mazer-owner-work-registry": JSON.stringify(malformed) }),
+      new RegExp(`${id}\\.updatedAt must be a canonical UTC timestamp`),
+      `${id} timestamp is validated before lifecycle filtering`,
+    );
+  }
+
+  const unsupportedLifecycle = structuredClone(registry);
+  unsupportedLifecycle.workItems[0].updatedAt = true;
+  unsupportedLifecycle.workItems[0].status = "active_typo";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(unsupportedLifecycle, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(unsupportedLifecycle),
+    }),
+    /updatedAt must be a canonical UTC timestamp/,
+    "timestamp validation precedes lifecycle admission",
+  );
+
+  const malformedRegistryTimestamp = structuredClone(registry);
+  malformedRegistryTimestamp.updatedAt = "2026-02-30T00:00:00.000Z";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(malformedRegistryTimestamp, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(malformedRegistryTimestamp),
+    }),
+    /registry\.updatedAt must be a canonical UTC timestamp/,
+  );
   assert.doesNotThrow(() => buildProjectBoardOwnerExport(registry, bytes));
 });
 

@@ -38,6 +38,23 @@ const SUPPORTED_CARD_TYPES = new Set([
   "reliability",
   "technical-debt",
 ]);
+// Exact atlas.card-record.v2 priority enum, including its explicit nullable value.
+const SUPPORTED_PRIORITIES = new Set(["critical", "high", "medium", "low", null]);
+const COMMONMARK_HTML_BLOCK_TAGS = [
+  "address", "article", "aside", "base", "basefont", "blockquote", "body", "caption", "center", "col", "colgroup",
+  "dd", "details", "dialog", "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure", "footer", "form",
+  "frame", "frameset", "h1", "h2", "h3", "h4", "h5", "h6", "head", "header", "hr", "html", "iframe",
+  "legend", "li", "link", "main", "menu", "menuitem", "nav", "noframes", "ol", "optgroup", "option", "p",
+  "param", "search", "section", "summary", "table", "tbody", "td", "tfoot", "th", "thead", "title", "tr",
+  "track", "ul",
+].join("|");
+const COMMONMARK_TYPE_6_START = new RegExp(`^ {0,3}</?(?:${COMMONMARK_HTML_BLOCK_TAGS})(?:[\\t >]|/>|$)`, "i");
+const HTML_ATTRIBUTE_NAME = "[A-Za-z_:][A-Za-z0-9_.:-]*";
+const HTML_ATTRIBUTE_VALUE = "(?:[^\\t\\n\\f\\r \\\"'=<>`]+|'[^']*'|\\\"[^\\\"]*\\\")";
+const COMMONMARK_COMPLETE_OPEN_TAG = new RegExp(
+  `^ {0,3}<[A-Za-z][A-Za-z0-9-]*(?:[ \\t]+${HTML_ATTRIBUTE_NAME}(?:[ \\t]*=[ \\t]*${HTML_ATTRIBUTE_VALUE})?)*[ \\t]*/?>[ \\t]*$`,
+);
+const COMMONMARK_COMPLETE_CLOSING_TAG = /^ {0,3}<\/[A-Za-z][A-Za-z0-9-]*[ \t]*>[ \t]*$/;
 const SOURCE_PATHS = Object.freeze({
   "mazer-owner-work-registry": { kind: "manual-registry", path: REGISTRY_PATH },
   "mazer-current-truth": { kind: "markdown", path: CURRENT_TRUTH_PATH },
@@ -107,16 +124,31 @@ function maskMarkdownHtmlComments(line, inComment) {
   return { masked, inComment };
 }
 
-function maskMarkdownRawHtmlBlock(line, blockTag) {
-  if (!blockTag) {
-    const opening = line.match(/^ {0,3}<(pre|script|style|textarea)(?:[\t >]|$)/i);
-    if (!opening) return { masked: line, blockTag: null };
-    blockTag = opening[1].toLowerCase();
+function detectMarkdownRawHtmlBlock(line, allowType7) {
+  if (/^ {0,3}<(?:pre|script|style|textarea)(?:[\t >]|$)/i.test(line)) {
+    return { endPattern: /<\/(?:pre|script|style|textarea)\s*>/i, endOnBlank: false };
   }
-  const closing = new RegExp(`</${blockTag}\\s*>`, "i").exec(line);
-  if (!closing) return { masked: " ".repeat(line.length), blockTag };
-  const closingEnd = closing.index + closing[0].length;
-  return { masked: `${" ".repeat(closingEnd)}${line.slice(closingEnd)}`, blockTag: null };
+  if (/^ {0,3}<!--/.test(line)) return { endPattern: /-->/, endOnBlank: false };
+  if (/^ {0,3}<\?/.test(line)) return { endPattern: /\?>/, endOnBlank: false };
+  if (/^ {0,3}<![A-Za-z]/.test(line)) return { endPattern: />/, endOnBlank: false };
+  if (/^ {0,3}<!\[CDATA\[/.test(line)) return { endPattern: /\]\]>/, endOnBlank: false };
+  if (COMMONMARK_TYPE_6_START.test(line)) return { endPattern: null, endOnBlank: true };
+  if (allowType7 && (COMMONMARK_COMPLETE_OPEN_TAG.test(line) || COMMONMARK_COMPLETE_CLOSING_TAG.test(line))) {
+    return { endPattern: null, endOnBlank: true };
+  }
+  return null;
+}
+
+function maskMarkdownRawHtmlBlock(line, state, allowType7 = true) {
+  const active = state ?? detectMarkdownRawHtmlBlock(line, allowType7);
+  if (!active) return { masked: line, state: null, isBlock: false };
+  if (active.endOnBlank && /^\s*$/.test(line)) return { masked: line, state: null, isBlock: false };
+  const ended = active.endPattern?.test(line) ?? false;
+  return {
+    masked: " ".repeat(line.length),
+    state: ended ? null : active,
+    isBlock: true,
+  };
 }
 
 function markdownHeadingAnchors(markdown) {
@@ -126,6 +158,7 @@ function markdownHeadingAnchors(markdown) {
   let fence = null;
   let htmlComment = false;
   let rawHtmlBlock = null;
+  let paragraphOpen = false;
   for (const rawLine of lines) {
     if (fence) {
       const fenceMatch = rawLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
@@ -136,23 +169,40 @@ function markdownHeadingAnchors(markdown) {
     }
     if (rawHtmlBlock) {
       const rawMasked = maskMarkdownRawHtmlBlock(rawLine, rawHtmlBlock);
-      rawHtmlBlock = rawMasked.blockTag;
-      const commentMasked = maskMarkdownHtmlComments(rawMasked.masked, htmlComment);
+      rawHtmlBlock = rawMasked.state;
+      renderedLines.push(rawMasked.masked);
+      if (!rawHtmlBlock && /^\s*$/.test(rawLine)) paragraphOpen = false;
+      continue;
+    }
+    if (htmlComment) {
+      const commentMasked = maskMarkdownHtmlComments(rawLine, htmlComment);
       htmlComment = commentMasked.inComment;
       renderedLines.push(commentMasked.masked);
+      if (!htmlComment && /^\s*$/.test(commentMasked.masked)) paragraphOpen = false;
+      continue;
+    }
+    const fenceMatch = rawLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (fenceMatch && (fenceMatch[1][0] === "~" || !fenceMatch[2].includes("`"))) {
+      fence = { marker: fenceMatch[1][0], length: fenceMatch[1].length };
+      renderedLines.push(null);
+      paragraphOpen = false;
+      continue;
+    }
+    const rawMasked = maskMarkdownRawHtmlBlock(rawLine, null, !paragraphOpen);
+    if (rawMasked.isBlock) {
+      rawHtmlBlock = rawMasked.state;
+      renderedLines.push(rawMasked.masked);
+      paragraphOpen = false;
       continue;
     }
     const commentMasked = maskMarkdownHtmlComments(rawLine, htmlComment);
     htmlComment = commentMasked.inComment;
-    const fenceMatch = commentMasked.masked.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
-    if (fenceMatch && (fenceMatch[1][0] === "~" || !fenceMatch[2].includes("`"))) {
-      fence = { marker: fenceMatch[1][0], length: fenceMatch[1].length };
-      renderedLines.push(null);
-      continue;
-    }
-    const rawMasked = maskMarkdownRawHtmlBlock(commentMasked.masked, null);
-    rawHtmlBlock = rawMasked.blockTag;
-    renderedLines.push(rawMasked.masked);
+    const visibleLine = commentMasked.masked;
+    renderedLines.push(visibleLine);
+    if (/^\s*$/.test(visibleLine) || /^\s{0,3}#{1,6}(?:[ \t]+|$)/.test(visibleLine)
+      || (paragraphOpen && /^\s{0,3}(?:=+|-+)[ \t]*$/.test(visibleLine))
+      || /^(?: {4}|\t)/.test(visibleLine)) paragraphOpen = false;
+    else paragraphOpen = true;
   }
   for (let index = 0; index < renderedLines.length; index += 1) {
     const line = renderedLines[index];
@@ -192,25 +242,17 @@ function validateRegistry(registry, sourceBytes) {
   }
   const stableIds = new Set(ids);
   const headingAnchorsBySource = new Map();
-  const unsupportedStatus = registry.workItems.find((item) => !ADMITTED_STATUSES.has(item.status));
-  if (unsupportedStatus) throw new Error(`${unsupportedStatus.id} has an unsupported lifecycle status`);
-  const publicCount = registry.workItems.filter((item) => PUBLIC_STATUSES.has(item.status)).length;
-  const completedCount = registry.workItems.filter((item) => item.status === COMPLETED_STATUS).length;
-  const candidateCount = registry.workItems.filter((item) => item.status === DEFERRED_CANDIDATE_STATUS).length;
-  if (publicCount !== registry.provenance.publicCardCount || completedCount !== registry.provenance.completedExcludedCount
-    || candidateCount !== registry.provenance.candidateExcludedCount
-    || publicCount + completedCount + candidateCount !== registry.workItems.length
-    || publicCount + completedCount + candidateCount !== registry.provenance.stableIdentityCount
-    || registry.provenance.researchCandidateImportCount !== 0
-    || registry.provenance.discordosRole !== "provenance-and-board-identity-only") {
-    throw new Error("Mazer owner reconciliation counts are inconsistent");
-  }
   for (const item of registry.workItems) {
     requireString(item.id, "work item id");
     requireString(item.title, `${item.id}.title`);
     requireString(item.description, `${item.id}.description`);
+    normalizeTimestamp(item.updatedAt, `${item.id}.updatedAt`);
+    if (!ADMITTED_STATUSES.has(item.status)) throw new Error(`${item.id} has an unsupported lifecycle status`);
     if (typeof item.cardType !== "string" || !SUPPORTED_CARD_TYPES.has(item.cardType)) {
       throw new Error(`${item.id}.cardType must be a supported atlas.card-record.v2 card type`);
+    }
+    if (!SUPPORTED_PRIORITIES.has(item.priority)) {
+      throw new Error(`${item.id}.priority must match the atlas.card-record.v2 priority enum`);
     }
     if (!SOURCE_PATHS[item.sourceId] || item.sourceId === "mazer-owner-export-adapter") throw new Error(`${item.id} has an unsupported source`);
     if (!item.sourceRef.startsWith(`${SOURCE_PATHS[item.sourceId].path}#`)) throw new Error(`${item.id} sourceRef is not bound to its source`);
@@ -229,6 +271,29 @@ function validateRegistry(registry, sourceBytes) {
       }
     }
     if (!Array.isArray(item.acceptanceCriteria) || item.acceptanceCriteria.length < 3) throw new Error(`${item.id} requires at least three acceptance criteria`);
+  }
+  const dependencyGraph = new Map(registry.workItems.map((item) => [item.id, uniqueSorted(item.dependencies)]));
+  const visiting = new Set();
+  const visited = new Set();
+  const visit = (id) => {
+    if (visiting.has(id)) throw new Error("Mazer registry dependency graph must be acyclic");
+    if (visited.has(id)) return;
+    visiting.add(id);
+    for (const dependency of dependencyGraph.get(id)) visit(dependency);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const id of stableIds) visit(id);
+  const publicCount = registry.workItems.filter((item) => PUBLIC_STATUSES.has(item.status)).length;
+  const completedCount = registry.workItems.filter((item) => item.status === COMPLETED_STATUS).length;
+  const candidateCount = registry.workItems.filter((item) => item.status === DEFERRED_CANDIDATE_STATUS).length;
+  if (publicCount !== registry.provenance.publicCardCount || completedCount !== registry.provenance.completedExcludedCount
+    || candidateCount !== registry.provenance.candidateExcludedCount
+    || publicCount + completedCount + candidateCount !== registry.workItems.length
+    || publicCount + completedCount + candidateCount !== registry.provenance.stableIdentityCount
+    || registry.provenance.researchCandidateImportCount !== 0
+    || registry.provenance.discordosRole !== "provenance-and-board-identity-only") {
+    throw new Error("Mazer owner reconciliation counts are inconsistent");
   }
 }
 
