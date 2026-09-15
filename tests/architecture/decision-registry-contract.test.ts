@@ -540,6 +540,7 @@ describe('Mazer UI rework decision registry contract', () => {
         return;
       }
 
+      console.error('[DIAG-BASE-REF]', JSON.stringify({ GITHUB_BASE_REF: process.env.GITHUB_BASE_REF ?? null, changedFilesCount: changedFiles.length, sample: changedFiles.slice(0, 8) }));
       const violations = collectIntegratorWaveMixViolations(changedFiles, registry);
       expect(violations).toEqual([]);
     });
