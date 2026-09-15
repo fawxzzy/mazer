@@ -140,6 +140,58 @@ const readDiagnostics = async (page) => ({
   visual: await readJsonAttribute(page, VISUAL_DIAGNOSTICS_ATTRIBUTE)
 });
 
+// Richer variant used ONLY on the failure-explanation path (readDiagnostics'
+// plain {runtime, visual} contract above is relied on by every passing
+// caller and stays untouched). Missing, malformed-JSON, and
+// present-but-wrong-shape (valid JSON that isn't a plain object -- e.g. the
+// attribute holding a bare string or array) are genuinely different causes
+// and are reported as such, instead of all three collapsing into the same
+// `null`.
+const readAttributePresence = async (page, attribute) => page.evaluate((attr) => {
+  const raw = document.documentElement.getAttribute(attr);
+  if (raw === null) {
+    return { parsed: null, presence: 'absent' };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    return { parseError: error instanceof Error ? error.message : String(error), parsed: null, presence: 'malformed-json' };
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { parsed: null, presence: 'invalid-shape' };
+  }
+  return { parsed, presence: 'present' };
+}, attribute);
+
+const readDiagnosticsPresence = async (page) => {
+  const runtimeAttr = await readAttributePresence(page, RUNTIME_DIAGNOSTICS_ATTRIBUTE);
+  const visualAttr = await readAttributePresence(page, VISUAL_DIAGNOSTICS_ATTRIBUTE);
+  return {
+    runtime: runtimeAttr.parsed,
+    runtimePresence: runtimeAttr.presence,
+    visual: visualAttr.parsed,
+    visualPresence: visualAttr.presence
+  };
+};
+
+// Defensive coercion for a diagnostics-supplied list: only a genuine array
+// survives, and only its genuine-object entries are kept. A malformed
+// payload (wrong type entirely, or an array mixed with non-object entries)
+// must degrade to "no usable labels" here, never throw -- this is the exact
+// same tolerance the browser-side waitForFunction predicates already give
+// the identical field (each wrapped in try/catch, treating any shape error
+// as "not ready yet"), so the failure-explaining path cannot disagree with
+// the passing-path check about what counts as valid. See
+// 'evaluateSurfaceReadiness tolerates malformed diagnostic shapes exactly
+// like the browser-side predicates' in ui-surface-capture-script.test.mjs
+// for the parity coverage.
+const toTextLabelEntries = (textLabels) => (
+  Array.isArray(textLabels)
+    ? textLabels.filter((entry) => entry !== null && typeof entry === 'object')
+    : []
+);
+
 const isFiniteBounds = (bounds) => (
   bounds
   && Number.isFinite(bounds.left)
@@ -172,7 +224,9 @@ const isUsableInViewportBounds = (bounds, viewport, minimumSize = 16) => (
 // evaluateAuthenticatedFixtureReadiness's clauses/failedClauses/state shape.
 export const evaluateSurfaceReadiness = ({
   runtime = null,
+  runtimePresence = runtime !== null ? 'present' : 'absent',
   visual = null,
+  visualPresence = visual !== null ? 'present' : 'absent',
   expectedLabels = [],
   mode,
   overlay,
@@ -193,14 +247,14 @@ export const evaluateSurfaceReadiness = ({
       && Number.isFinite(board?.bottom)
       && visual?.runtime?.playLifecycle?.inputLocked === false
     );
-  const actualLabels = (visual?.textLabels ?? []).map((entry) => entry.text);
+  const actualLabels = toTextLabelEntries(visual?.textLabels).map((entry) => entry.text);
   const missingLabels = expectedLabels.filter((expectedLabel) => (
     !actualLabels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
   ));
 
   const clauses = {
-    hasRuntimeDiagnostics: runtime !== null,
-    hasVisualDiagnostics: visual !== null,
+    hasRuntimeDiagnostics: runtimePresence === 'present',
+    hasVisualDiagnostics: visualPresence === 'present',
     modeMatches: actualMode === mode,
     overlayMatches: actualOverlay === overlay,
     playGeometrySettled,
@@ -220,7 +274,9 @@ export const evaluateSurfaceReadiness = ({
       expectedMode: mode,
       expectedOverlay: overlay,
       inputLocked: visual?.runtime?.playLifecycle?.inputLocked ?? null,
-      missingLabels
+      missingLabels,
+      runtimePresence,
+      visualPresence
     }
   };
 };
@@ -234,23 +290,42 @@ export const waitForSurface = async (page, {
   requireSettledPlayGeometry = true,
   timeoutMs = DEFAULT_TIMEOUT_MS
 }) => {
-  const throwSurfaceReadinessTimeout = async (cause) => {
-    const diagnostics = await readDiagnostics(page);
-    const evaluation = evaluateSurfaceReadiness({
-      ...diagnostics,
-      expectedLabels,
-      mode,
-      overlay,
-      requireSettledPlayGeometry
-    });
-    const evidence = {
-      cause,
-      clauses: evaluation.clauses,
-      failedClauses: evaluation.failedClauses,
-      lastState: evaluation.state,
-      timeoutMs
-    };
-    const error = new Error(`Surface readiness timed out: ${JSON.stringify(evidence)}`);
+  const throwSurfaceReadinessTimeout = async (cause, originalError) => {
+    // The original timeout is the real failure being reported. Diagnosing
+    // it is best-effort: if the diagnosis itself throws for any reason (a
+    // future diagnostics-shape change this function hasn't been taught
+    // about, a closed page, anything), that must become supplementary
+    // evidence alongside the original error, never a replacement for it --
+    // a broken failure reporter must not hide the failure it was trying to
+    // report.
+    let evidence;
+    try {
+      const diagnostics = await readDiagnosticsPresence(page);
+      const evaluation = evaluateSurfaceReadiness({
+        ...diagnostics,
+        expectedLabels,
+        mode,
+        overlay,
+        requireSettledPlayGeometry
+      });
+      evidence = {
+        cause,
+        clauses: evaluation.clauses,
+        failedClauses: evaluation.failedClauses,
+        lastState: evaluation.state,
+        timeoutMs
+      };
+    } catch (diagnosisError) {
+      evidence = {
+        cause,
+        diagnosisError: diagnosisError instanceof Error ? diagnosisError.message : String(diagnosisError),
+        timeoutMs
+      };
+    }
+    const error = new Error(
+      `Surface readiness timed out: ${JSON.stringify(evidence)}`,
+      originalError ? { cause: originalError } : undefined
+    );
     error.code = 'SURFACE_READINESS_TIMEOUT';
     error.evidence = evidence;
     throw error;
@@ -300,7 +375,7 @@ export const waitForSurface = async (page, {
     if (!isPlaywrightTimeoutError(error)) {
       throw error;
     }
-    await throwSurfaceReadinessTimeout('mode-overlay-geometry');
+    await throwSurfaceReadinessTimeout('mode-overlay-geometry', error);
   }
   if (expectedLabels.length > 0) {
     const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
@@ -314,7 +389,15 @@ export const waitForSurface = async (page, {
 
           try {
             const visual = JSON.parse(raw);
-            const labels = (visual?.textLabels ?? []).map((entry) => entry.text);
+            // Same tolerance as evaluateSurfaceReadiness's toTextLabelEntries
+            // (that helper can't be imported across the page.evaluate
+            // boundary, so this stays a parallel inline check, verified
+            // to agree by a parity test) -- a non-array or malformed
+            // textLabels degrades to "no labels yet", not a thrown error.
+            const rawLabels = Array.isArray(visual?.textLabels) ? visual.textLabels : [];
+            const labels = rawLabels
+              .filter((entry) => entry !== null && typeof entry === 'object')
+              .map((entry) => entry.text);
             return expected.every(({ allowStateSuffix, expectedLabel }) => labels.some((actualLabel) => (
               actualLabel === expectedLabel
               || (
@@ -338,7 +421,7 @@ export const waitForSurface = async (page, {
       if (!isPlaywrightTimeoutError(error)) {
         throw error;
       }
-      await throwSurfaceReadinessTimeout('labels');
+      await throwSurfaceReadinessTimeout('labels', error);
     }
   }
   return readDiagnostics(page);

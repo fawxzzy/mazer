@@ -23,20 +23,24 @@ const signedOutMenuDiagnostics = () => ({
 
 // A minimal Playwright Page stand-in for waitForSurface's own wiring (the
 // try/catch around page.waitForFunction that turns a timeout into a rich
-// error). evaluate() mirrors readJsonAttribute's contract by attribute name
-// instead of running real browser code, since there is no DOM here to run
-// document.documentElement.getAttribute() against.
+// error). evaluate() mirrors readAttributePresence's {parsed, presence}
+// contract by attribute name instead of running real browser code, since
+// there is no DOM here to run document.documentElement.getAttribute()
+// against.
 const makeFakeSurfacePage = ({ diagnosticsSequence, timesOut }) => {
   let readIndex = -1;
+  const current = () => diagnosticsSequence[Math.min(Math.max(readIndex, 0), diagnosticsSequence.length - 1)];
   return {
     evaluate: async (_fn, attribute) => {
       if (attribute === RUNTIME_DIAGNOSTICS_ATTRIBUTE) {
-        return diagnosticsSequence[Math.min(Math.max(readIndex, 0), diagnosticsSequence.length - 1)].runtime;
+        const value = current().runtime;
+        return value === null ? { parsed: null, presence: 'absent' } : { parsed: value, presence: 'present' };
       }
       if (attribute === VISUAL_DIAGNOSTICS_ATTRIBUTE) {
-        return diagnosticsSequence[Math.min(Math.max(readIndex, 0), diagnosticsSequence.length - 1)].visual;
+        const value = current().visual;
+        return value === null ? { parsed: null, presence: 'absent' } : { parsed: value, presence: 'present' };
       }
-      return null;
+      return { parsed: null, presence: 'absent' };
     },
     waitForFunction: async () => {
       readIndex += 1;
@@ -270,6 +274,82 @@ describe('UI surface generic readiness evaluation', () => {
     });
     expect(withStateSuffix.state.missingLabels).toEqual([]);
     expect(withStateSuffix.ready).toBe(true);
+  });
+
+  // Reference copy of the browser-side page.waitForFunction predicate's own
+  // label-extraction logic (capture-ui-surfaces.mjs, inside waitForSurface's
+  // labels wait) -- independently written, not imported, specifically so
+  // this test can catch the two implementations disagreeing about a
+  // malformed shape instead of both silently sharing the same bug. Keep
+  // this in sync if that inline logic changes.
+  const referenceExtractLabels = (textLabels) => (
+    Array.isArray(textLabels) ? textLabels : []
+  )
+    .filter((entry) => entry !== null && typeof entry === 'object')
+    .map((entry) => entry.text);
+
+  const malformedTextLabelsInputs = [
+    undefined,
+    null,
+    'not-an-array',
+    42,
+    {},
+    [null, 'oops', 42, { text: 'Sign in' }, { text: 'Create account' }]
+  ];
+
+  test('tolerates a malformed textLabels shape instead of throwing, and agrees with the browser-side predicate', () => {
+    for (const textLabels of malformedTextLabelsInputs) {
+      expect(() => evaluateSurfaceReadiness({
+        runtime: { auth: { status: 'guest' } },
+        visual: { runtime: { mode: 'menu', overlay: 'auth' }, textLabels },
+        mode: 'menu',
+        overlay: 'auth',
+        expectedLabels: ['Sign in']
+      })).not.toThrow();
+
+      const evaluation = evaluateSurfaceReadiness({
+        runtime: { auth: { status: 'guest' } },
+        visual: { runtime: { mode: 'menu', overlay: 'auth' }, textLabels },
+        mode: 'menu',
+        overlay: 'auth',
+        expectedLabels: ['Sign in']
+      });
+      expect(evaluation.state.actualLabels).toEqual(referenceExtractLabels(textLabels));
+    }
+  });
+
+  test('reports a distinct presence for missing, malformed-JSON-shaped, and present diagnostics instead of collapsing them to one clause value', () => {
+    const missing = evaluateSurfaceReadiness({
+      mode: 'menu',
+      overlay: 'auth',
+      runtimePresence: 'absent',
+      visualPresence: 'absent'
+    });
+    expect(missing.failedClauses).toEqual(['hasRuntimeDiagnostics', 'hasVisualDiagnostics', 'modeMatches', 'overlayMatches']);
+    expect(missing.state.runtimePresence).toBe('absent');
+    expect(missing.state.visualPresence).toBe('absent');
+
+    const malformed = evaluateSurfaceReadiness({
+      mode: 'menu',
+      overlay: 'auth',
+      runtimePresence: 'malformed-json',
+      visualPresence: 'invalid-shape'
+    });
+    expect(malformed.failedClauses).toContain('hasRuntimeDiagnostics');
+    expect(malformed.failedClauses).toContain('hasVisualDiagnostics');
+    expect(malformed.state.runtimePresence).toBe('malformed-json');
+    expect(malformed.state.visualPresence).toBe('invalid-shape');
+
+    const present = evaluateSurfaceReadiness({
+      runtime: { auth: { status: 'guest' } },
+      visual: { runtime: { mode: 'menu', overlay: 'auth' }, textLabels: [] },
+      mode: 'menu',
+      overlay: 'auth'
+    });
+    expect(present.clauses.hasRuntimeDiagnostics).toBe(true);
+    expect(present.clauses.hasVisualDiagnostics).toBe(true);
+    expect(present.state.runtimePresence).toBe('present');
+    expect(present.state.visualPresence).toBe('present');
   });
 });
 
