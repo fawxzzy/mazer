@@ -189,7 +189,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["backtick fence with info string", "````markdown\n## Fenced Heading\n````"],
     ["tilde fence with a longer closer", "~~~md\nFenced Heading\n---\n~~~~"],
     ["short closer does not end a fence", "````md\n## Fenced Heading\n```\n## Still Fenced\n````"],
-    ["indented code", "    ## Fenced Heading"],
+    ["indented code", "paragraph\n\n    ## Fenced Heading"],
   ]) {
     const fencedHeading = structuredClone(registry);
     fencedHeading.workItems[0].sourceRef = "docs/current-truth.md#fenced-heading";
@@ -211,6 +211,53 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     "mazer-owner-work-registry": JSON.stringify(headingAfterFence),
     "mazer-current-truth": `${bytes["mazer-current-truth"]}\n\`\`\`md\n## Fenced Heading\n\`\`\`\n## Heading After Fence\n`,
   }));
+
+  for (const [label, markdown] of [
+    ["four leading spaces", "paragraph\n\n    ## Hidden Indented Heading"],
+    ["leading tab", "paragraph\n\n\t## Hidden Indented Heading"],
+    ["one space then tab", "paragraph\n\n \t## Hidden Indented Heading"],
+    ["two spaces then tab reproduces hosted finding", "paragraph\n\n  \t## Hidden Tab Indented"],
+    ["three spaces then tab", "paragraph\n\n   \t## Hidden Indented Heading"],
+    ["tab retains four columns after unordered-list container projection", "- item\n    \t## Hidden Indented Heading"],
+    ["tab retains four columns after nested-list container projection", "- outer\n  - item\n        \t## Hidden Indented Heading"],
+    ["four-column setext underline", "Hidden Indented Heading\n  \t---"],
+  ]) {
+    const indentedHeading = structuredClone(registry);
+    indentedHeading.workItems[0].sourceRef = label.includes("hosted finding")
+      ? "docs/current-truth.md#hidden-tab-indented"
+      : "docs/current-truth.md#hidden-indented-heading";
+    assert.throws(
+      () => buildProjectBoardOwnerExport(indentedHeading, {
+        ...bytes,
+        "mazer-owner-work-registry": JSON.stringify(indentedHeading),
+        "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+      }),
+      /sourceRef fragment does not exist/,
+      label,
+    );
+  }
+
+  for (const [label, markdown] of [
+    ["zero-space heading", "## Visible Heading"],
+    ["one-space heading", " ## Visible Heading"],
+    ["two-space heading", "  ## Visible Heading"],
+    ["three-space heading", "   ## Visible Heading"],
+    ["unordered-list projected heading", "- item\n  ## Visible Heading"],
+    ["unordered-list projected tab heading", "- item\n  \t## Visible Heading"],
+    ["ordered-list projected tab heading", "1. item\n   \t## Visible Heading"],
+    ["nested-list projected heading", "- outer\n  - item\n    ### Visible Heading"],
+    ["nested ordered-list projected tab heading", "- outer\n  1. item\n     \t### Visible Heading"],
+    ["heading resumes after four-column code", "    ## Hidden Indented Heading\n## Visible Heading"],
+    ["heading resumes after mixed-tab code", "  \t## Hidden Tab Indented\n## Visible Heading"],
+  ]) {
+    const visibleHeading = structuredClone(registry);
+    visibleHeading.workItems[0].sourceRef = "docs/current-truth.md#visible-heading";
+    assert.doesNotThrow(() => buildProjectBoardOwnerExport(visibleHeading, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(visibleHeading),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+    }), label);
+  }
 
   for (const [label, fencedMarkdown] of [
     ["unordered list-contained fence", "- ```md\n  ## Hidden List Fence\n  ```"],

@@ -271,6 +271,11 @@ function markdownIndentColumns(text, startColumn = 0) {
   return column - startColumn;
 }
 
+function markdownHeadingLine(line) {
+  const indentation = line.match(/^[ \t]*/)?.[0] ?? "";
+  return markdownIndentColumns(indentation) <= 3 ? line : null;
+}
+
 function parseMarkdownListItem(line, activeListContentIndent) {
   const indentation = line.match(/^[ \t]*/)?.[0] ?? "";
   const markerIndent = markdownIndentColumns(indentation);
@@ -382,7 +387,10 @@ function stripMarkdownIndent(line, columns) {
     consumedColumns += width;
     index += 1;
   }
-  return `${" ".repeat(Math.max(0, consumedColumns - columns))}${line.slice(index)}`;
+  const remainder = line.slice(index);
+  const remainingIndentation = remainder.match(/^[ \t]*/)?.[0] ?? "";
+  const remainingColumns = markdownIndentColumns(remainingIndentation, consumedColumns);
+  return `${" ".repeat(Math.max(0, consumedColumns - columns) + remainingColumns)}${remainder.slice(remainingIndentation.length)}`;
 }
 
 function markdownListContainerView(line, activeListContentIndent, activeListContentIndents = []) {
@@ -461,6 +469,7 @@ function markdownHeadingAnchors(markdown) {
   const headings = [];
   const lines = normalize(markdown).split("\n");
   const renderedLines = [];
+  const renderedHeadingLines = [];
   let fence = null;
   let htmlComment = false;
   let rawHtmlBlock = null;
@@ -478,6 +487,7 @@ function markdownHeadingAnchors(markdown) {
         if (fenceMatch && fenceMatch[1][0] === fence.marker && fenceMatch[1].length >= fence.length
           && fenceMatch[2].trim() === "") fence = null;
         renderedLines.push(null);
+        renderedHeadingLines.push(null);
         continue;
       }
       const exitedFence = fence;
@@ -494,6 +504,7 @@ function markdownHeadingAnchors(markdown) {
       const cells = splitGfmTableRow(rawLine);
       if (cells && !startsMarkdownBlockOutsideTable(rawLine)) {
         renderedLines.push(rawLine);
+        renderedHeadingLines.push(null);
         continue;
       }
       gfmTableColumns = null;
@@ -502,6 +513,7 @@ function markdownHeadingAnchors(markdown) {
       const rawMasked = maskMarkdownRawHtmlBlock(rawLine, rawHtmlBlock);
       rawHtmlBlock = rawMasked.state;
       renderedLines.push(rawMasked.masked);
+      renderedHeadingLines.push(null);
       if (!rawHtmlBlock && /^\s*$/.test(rawLine)) paragraphState = { ...paragraphState, open: false };
       continue;
     }
@@ -509,6 +521,7 @@ function markdownHeadingAnchors(markdown) {
       const commentMasked = maskMarkdownHtmlComments(rawLine, htmlComment);
       htmlComment = commentMasked.inComment;
       renderedLines.push(commentMasked.masked);
+      renderedHeadingLines.push(null);
       if (!htmlComment && /^\s*$/.test(commentMasked.masked)) paragraphState = { ...paragraphState, open: false };
       continue;
     }
@@ -536,6 +549,7 @@ function markdownHeadingAnchors(markdown) {
         listContentIndents: containerView.listContentIndents,
       };
       renderedLines.push(null);
+      renderedHeadingLines.push(null);
       paragraphState = {
         open: false,
         listContentIndent: containerView.listContentIndent,
@@ -559,6 +573,7 @@ function markdownHeadingAnchors(markdown) {
     if (rawMasked.isBlock) {
       rawHtmlBlock = rawMasked.state;
       renderedLines.push(" ".repeat(rawLine.length));
+      renderedHeadingLines.push(null);
       paragraphState = { ...paragraphState, open: false };
       continue;
     }
@@ -566,6 +581,8 @@ function markdownHeadingAnchors(markdown) {
     htmlComment = commentMasked.inComment;
     const visibleLine = commentMasked.masked;
     renderedLines.push(visibleLine);
+    const headingCommentMasked = maskMarkdownHtmlComments(containerView.line, false);
+    renderedHeadingLines.push(markdownHeadingLine(headingCommentMasked.masked));
     const previousLine = renderedLines.at(-2);
     const tableColumnCount = previousLine === null || previousLine === undefined
       ? null
@@ -577,16 +594,16 @@ function markdownHeadingAnchors(markdown) {
     }
     paragraphState = nextMarkdownParagraphState(visibleLine, paragraphState);
   }
-  for (let index = 0; index < renderedLines.length; index += 1) {
-    const line = renderedLines[index];
-    if (!line || /^(?: {4}|\t)/.test(line)) continue;
-    const atx = line.match(/^\s{0,3}#{1,6}(?:[ \t]+|$)(.*)$/);
+  for (let index = 0; index < renderedHeadingLines.length; index += 1) {
+    const line = renderedHeadingLines[index];
+    if (!line) continue;
+    const atx = line.match(/^[ \t]*#{1,6}(?:[ \t]+|$)(.*)$/);
     if (atx) {
       headings.push(atx[1].replace(/[ \t]+#+[ \t]*$/, "").trim());
       continue;
     }
-    const next = renderedLines[index + 1];
-    if (line.trim() && next && /^\s{0,3}(?:=+|-+)[ \t]*$/.test(next)) {
+    const next = renderedHeadingLines[index + 1];
+    if (line.trim() && next && /^[ \t]*(?:=+|-+)[ \t]*$/.test(next)) {
       headings.push(line.trim());
       index += 1;
     }
