@@ -55,6 +55,65 @@ test("maps active and planned lifecycle without inventing readiness", () => {
   assert.ok(output.cards.every((card) => card.content.blockers.length === 0));
 });
 
+test("validates stable dependency relationships and preserves deterministic deduplication", () => {
+  const withDuplicate = structuredClone(registry);
+  const world = withDuplicate.workItems.find((item) => item.id === "MAZER-WORLD-001");
+  world.dependencies = ["MAZER-2D-001", "MAZER-2D-001"];
+  const output = buildProjectBoardOwnerExport(withDuplicate, {
+    ...bytes,
+    "mazer-owner-work-registry": JSON.stringify(withDuplicate),
+  });
+  const exportedWorld = output.cards.find((card) => card.record.card_id === "MAZER-WORLD-001");
+  assert.deepEqual(exportedWorld.record.dependencies, ["MAZER-2D-001"]);
+
+  const malformed = structuredClone(registry);
+  malformed.workItems[0].dependencies = "MAZER-WORLD-001";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(malformed, { ...bytes, "mazer-owner-work-registry": JSON.stringify(malformed) }),
+    /dependencies must be an array/,
+  );
+
+  const dangling = structuredClone(registry);
+  dangling.workItems[0].dependencies = ["MAZER-MISSING-001"];
+  assert.throws(
+    () => buildProjectBoardOwnerExport(dangling, { ...bytes, "mazer-owner-work-registry": JSON.stringify(dangling) }),
+    /unknown stable registry identity/,
+  );
+
+  const malformedEntry = structuredClone(registry);
+  malformedEntry.workItems[0].dependencies = [null];
+  assert.throws(
+    () => buildProjectBoardOwnerExport(malformedEntry, { ...bytes, "mazer-owner-work-registry": JSON.stringify(malformedEntry) }),
+    /unknown stable registry identity/,
+  );
+
+  const self = structuredClone(registry);
+  self.workItems[0].dependencies = [self.workItems[0].id];
+  assert.throws(
+    () => buildProjectBoardOwnerExport(self, { ...bytes, "mazer-owner-work-registry": JSON.stringify(self) }),
+    /cannot depend on itself/,
+  );
+});
+
+test("resolves normalized and duplicate Markdown heading anchors", () => {
+  assert.doesNotThrow(() => buildProjectBoardOwnerExport(registry, bytes));
+
+  const duplicateHeading = structuredClone(registry);
+  duplicateHeading.workItems[0].sourceRef = "docs/current-truth.md#repeated-heading-1";
+  assert.doesNotThrow(() => buildProjectBoardOwnerExport(duplicateHeading, {
+    ...bytes,
+    "mazer-owner-work-registry": JSON.stringify(duplicateHeading),
+    "mazer-current-truth": `${bytes["mazer-current-truth"]}\n## Repeated heading\n\n## Repeated heading\n`,
+  }));
+
+  const dangling = structuredClone(registry);
+  dangling.workItems[0].sourceRef = "docs/current-truth.md#renamed-or-missing-heading";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(dangling, { ...bytes, "mazer-owner-work-registry": JSON.stringify(dangling) }),
+    /sourceRef fragment does not exist/,
+  );
+});
+
 test("keeps DiscordOS as provenance and board identity only", () => {
   const output = buildProjectBoardOwnerExport(registry, bytes);
   assert.equal(output.extensions.discordos_role, "provenance-and-board-identity-only");

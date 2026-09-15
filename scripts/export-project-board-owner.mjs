@@ -50,7 +50,46 @@ function normalizeTimestamp(value, label) {
   return parsed.toISOString();
 }
 
-function validateRegistry(registry) {
+function githubHeadingBaseSlug(value) {
+  return value
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/<[^>]*>/g, "")
+    .replace(/[`*_~]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\t\r\n]/g, " ")
+    .replace(/[^\p{L}\p{M}\p{N}\p{Pc}\- ]/gu, "")
+    .replace(/ /g, "-");
+}
+
+function markdownHeadingAnchors(markdown) {
+  const headings = [];
+  const lines = normalize(markdown).split("\n");
+  for (let index = 0; index < lines.length; index += 1) {
+    const atx = lines[index].match(/^\s{0,3}#{1,6}(?:[ \t]+|$)(.*)$/);
+    if (atx) {
+      headings.push(atx[1].replace(/[ \t]+#+[ \t]*$/, "").trim());
+      continue;
+    }
+    if (lines[index].trim() && index + 1 < lines.length && /^\s{0,3}(?:=+|-+)[ \t]*$/.test(lines[index + 1])) {
+      headings.push(lines[index].trim());
+      index += 1;
+    }
+  }
+  const anchors = new Set();
+  for (const heading of headings) {
+    const base = githubHeadingBaseSlug(heading);
+    if (!base) continue;
+    let anchor = base;
+    let suffix = 0;
+    while (anchors.has(anchor)) anchor = `${base}-${++suffix}`;
+    anchors.add(anchor);
+  }
+  return anchors;
+}
+
+function validateRegistry(registry, sourceBytes) {
   if (registry?.schemaVersion !== 1 || registry.projectId !== PROJECT_ID || registry.boardId !== BOARD_ID
     || registry.owner !== OWNER || registry.state !== "active") throw new Error("unexpected Mazer registry identity");
   if (!Array.isArray(registry.workItems) || registry.workItems.length !== registry.provenance?.stableIdentityCount) {
@@ -60,6 +99,8 @@ function validateRegistry(registry) {
   if (new Set(ids).size !== ids.length || ids.some((id) => !/^MAZER-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$/.test(id))) {
     throw new Error("Mazer registry ids must be unique stable MAZER ids");
   }
+  const stableIds = new Set(ids);
+  const headingAnchorsBySource = new Map();
   const unsupportedStatus = registry.workItems.find((item) => !ADMITTED_STATUSES.has(item.status));
   if (unsupportedStatus) throw new Error(`${unsupportedStatus.id} has an unsupported lifecycle status`);
   const publicCount = registry.workItems.filter((item) => PUBLIC_STATUSES.has(item.status)).length;
@@ -79,6 +120,20 @@ function validateRegistry(registry) {
     requireString(item.description, `${item.id}.description`);
     if (!SOURCE_PATHS[item.sourceId] || item.sourceId === "mazer-owner-export-adapter") throw new Error(`${item.id} has an unsupported source`);
     if (!item.sourceRef.startsWith(`${SOURCE_PATHS[item.sourceId].path}#`)) throw new Error(`${item.id} sourceRef is not bound to its source`);
+    if (!Array.isArray(item.dependencies)) throw new Error(`${item.id}.dependencies must be an array`);
+    for (const dependency of item.dependencies) {
+      if (typeof dependency !== "string" || !stableIds.has(dependency)) throw new Error(`${item.id} depends on an unknown stable registry identity`);
+      if (dependency === item.id) throw new Error(`${item.id} cannot depend on itself`);
+    }
+    if (SOURCE_PATHS[item.sourceId].kind === "markdown") {
+      const fragment = item.sourceRef.slice(item.sourceRef.indexOf("#") + 1);
+      if (!headingAnchorsBySource.has(item.sourceId)) {
+        headingAnchorsBySource.set(item.sourceId, markdownHeadingAnchors(sourceBytes[item.sourceId]));
+      }
+      if (!fragment || !headingAnchorsBySource.get(item.sourceId).has(fragment)) {
+        throw new Error(`${item.id} sourceRef fragment does not exist in its source document`);
+      }
+    }
     if (!Array.isArray(item.acceptanceCriteria) || item.acceptanceCriteria.length < 3) throw new Error(`${item.id} requires at least three acceptance criteria`);
   }
 }
@@ -173,10 +228,10 @@ export function assertFawxzzyWebConsumerAcceptance(exported) {
 }
 
 export function buildProjectBoardOwnerExport(registry, sourceBytes) {
-  validateRegistry(registry);
   for (const sourceId of Object.keys(SOURCE_PATHS)) {
     if (typeof sourceBytes[sourceId] !== "string") throw new Error(`missing source bytes for ${sourceId}`);
   }
+  validateRegistry(registry, sourceBytes);
   const sourceRevision = `sha256:${digest(Object.keys(SOURCE_PATHS).map((sourceId) => normalize(sourceBytes[sourceId])).join("\n--MAZER-OWNER-SOURCE--\n"))}`;
   const generatedAt = normalizeTimestamp(registry.updatedAt, "registry.updatedAt");
   const cards = registry.workItems.filter((item) => PUBLIC_STATUSES.has(item.status)).map(mapCard)
