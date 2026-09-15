@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "projectId": "mazer",
+  "boardId": "discordos:project-feedback:mazer",
+  "owner": "mazer",
+  "state": "active",
+  "updatedAt": "2026-09-14T22:54:28.000Z",
+  "provenance": {
+    "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
+    "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
+    "stableIdentityCount": 13,
+    "publicCardCount": 3,
+    "completedExcludedCount": 8,
+    "candidateExcludedCount": 2,
+    "researchCandidateImportCount": 0,
+    "discordosRole": "provenance-and-board-identity-only"
+  },
+  "workItems": [
+    {
+      "id": "MAZER-2D-001",
+      "status": "active",
+      "updatedAt": "2026-09-14T22:54:28.000Z",
+      "sourceId": "mazer-current-truth",
+      "sourceRef": "docs/current-truth.md#active-lane",
+      "title": "Maintain the mobile-clean 2D shipping baseline",
+      "description": "Keep the current Phaser maze readable, responsive, mechanically faithful, and regression-safe across supported desktop and mobile play.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The active mechanics and mobile contract stays at its verified baseline without reopening retired screenshot parity.",
+        "Menu, gameplay, progression, input, and generation regressions fail deterministic repository checks.",
+        "Production claims remain tied to exact reviewed source and route-aware acceptance."
+      ]
+    },
+    {
+      "id": "MAZER-WORLD-001",
+      "status": "in_progress",
+      "updatedAt": "2026-09-14T22:54:28.000Z",
+      "sourceId": "mazer-current-truth",
+      "sourceRef": "docs/current-truth.md#current-precision-arcade-visual-integration",
+      "title": "Complete the World Identity visual maintenance lane",
+      "description": "Finish bounded World Identity fixes while preserving the accepted Navigation Core, Teleport System, and gameplay contracts.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": ["MAZER-2D-001", "MAZER-TELEPORT-001"],
+      "acceptanceCriteria": [
+        "World Identity changes remain isolated from accepted navigation and teleport ownership.",
+        "Motion, reduced-motion, layout, and render contracts remain deterministic and test-backed.",
+        "Any publication or production action stays behind its own exact lifecycle boundary."
+      ]
+    },
+    {
+      "id": "MAZER-NATIVE-001",
+      "status": "planning",
+      "updatedAt": "2026-04-06T00:00:00.000Z",
+      "sourceId": "mazer-mobile-plan",
+      "sourceRef": "docs/mobile-plan.md#capacitor--app-store-path-later",
+      "title": "Plan the native app-store wrapper after web stabilization",
+      "description": "Prepare a Capacitor-based native wrapper only after the web gameplay and UI baseline is stable and independently verified.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": ["MAZER-2D-001"],
+      "acceptanceCriteria": [
+        "System back behavior maps to the existing one-overlay-at-a-time contract.",
+        "Safe-area, orientation, and device input behavior match the verified web baseline.",
+        "Store packaging begins only after privacy, metadata, screenshot, and parity gates are explicit."
+      ]
+    },
+    {
+      "id": "MAZER-DATA-001",
+      "status": "completed",
+      "updatedAt": "2026-08-27T00:00:00.000Z",
+      "sourceId": "mazer-current-truth",
+      "sourceRef": "docs/current-truth.md#supabase-master-cutover-truth--2026-08-27",
+      "title": "Complete the Supabase master cutover",
+      "description": "Move Mazer production to the master project while preserving progression, identities, receipts, and the exact legacy rollback source.",
+      "cardType": "migration",
+      "priority": "critical",
+      "dependencies": [],
+      "acceptanceCriteria": ["Master binding is exact.", "Progression and receipt conservation are proven.", "Legacy rollback remains retained and protected."]
+    },
+    {
+      "id": "MAZER-ACCOUNT-001",
+      "status": "completed",
+      "updatedAt": "2026-09-13T00:00:00.000Z",
+      "sourceId": "mazer-current-truth",
+      "sourceRef": "docs/current-truth.md#shared-account-consumer-contract--2026-09-13",
+      "title": "Adopt the shared account consumer contract",
+      "description": "Use the canonical public-client authorization flow and shared account routes without embedding credentials or competing account screens.",
+      "cardType": "architecture",
+      "priority": "critical",
+      "dependencies": ["MAZER-DATA-001"],
+      "acceptanceCriteria": ["Authorization uses PKCE and an exact redirect.", "Account and recovery routes use fixed safe return context.", "Session validation fails closed on claim or readback mismatch."]
+    },
+    {
+      "id": "MAZER-ICON-001",
+      "status": "completed",
+      "updatedAt": "2026-08-28T00:00:00.000Z",
+      "sourceId": "mazer-current-truth",
+      "sourceRef": "docs/current-truth.md#final-app-icon-authority--2026-08-28",
+      "title": "Establish one deterministic app-icon authority",
+      "description": "Generate every browser, Apple, PWA, maskable, Workbox, and shortcut icon from one exact master artwork.",
+      "cardType": "architecture",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": ["One master artwork remains authoritative.", "Generated derivatives are deterministic.", "Maskable assets preserve the complete safe geometry."]
+    },
+    {
+      "id": "MAZER-PWA-001",
+      "status": "completed",
+      "updatedAt": "2026-08-28T00:00:00.000Z",
+      "sourceId": "mazer-mobile-plan",
+      "sourceRef": "docs/mobile-plan.md#installability-checks",
+      "title": "Harden PWA installability and delivery assets",
+      "description": "Keep manifest, service-worker, icon, and install guidance truthful and reproducible without stale localhost service workers.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": ["MAZER-ICON-001"],
+      "acceptanceCriteria": ["Manifest and metadata reference generated assets.", "Production builds include the intended service worker.", "Local development does not register a stale service worker."]
+    },
+    {
+      "id": "MAZER-NAV-001",
+      "status": "completed",
+      "updatedAt": "2026-08-29T00:00:00.000Z",
+      "sourceId": "mazer-current-truth",
+      "sourceRef": "docs/current-truth.md#current-precision-arcade-visual-integration",
+      "title": "Freeze Navigation Core v1",
+      "description": "Ship the accepted floor, player, goal, and continuous trail rendering baseline with deterministic visual and lifecycle proof.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": ["MAZER-2D-001"],
+      "acceptanceCriteria": ["Floor, player, goal, and trail share the accepted visual authority.", "Movement and lifecycle evidence use real commands.", "Raster and performance regressions remain bounded and reproducible."]
+    },
+    {
+      "id": "MAZER-TELEPORT-001",
+      "status": "completed",
+      "updatedAt": "2026-08-29T00:00:00.000Z",
+      "sourceId": "mazer-current-truth",
+      "sourceRef": "docs/current-truth.md#current-precision-arcade-visual-integration",
+      "title": "Freeze Teleport System v1",
+      "description": "Ship the single-primary gameplay transfer contract with pause-safe timing, deterministic anchor selection, and real lifecycle verification.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": ["MAZER-NAV-001"],
+      "acceptanceCriteria": ["Transfer timing is phase-aware and pause-safe.", "Anchor selection fails closed when geometry is unavailable.", "Real solver-driven gameplay exercises the full transfer lifecycle."]
+    },
+    {
+      "id": "MAZER-MAZEV2-001",
+      "status": "completed",
+      "updatedAt": "2026-09-02T00:00:00.000Z",
+      "sourceId": "mazer-current-truth",
+      "sourceRef": "docs/current-truth.md#current-implementation-truth",
+      "title": "Land the MazeV2 convergence analysis contract",
+      "description": "Provide deterministic canonical maze comparison, adapter, corpus, timeout, provenance, and nullable metric semantics.",
+      "cardType": "architecture",
+      "priority": "medium",
+      "dependencies": ["MAZER-2D-001"],
+      "acceptanceCriteria": ["Domain and legacy adapters preserve their declared topology semantics.", "Corpus work is interruptible and source-proven.", "Metrics distinguish zero from genuinely unavailable values."]
+    },
+    {
+      "id": "MAZER-AUTH-QA-001",
+      "status": "completed",
+      "updatedAt": "2026-09-02T00:00:00.000Z",
+      "sourceId": "mazer-current-truth",
+      "sourceRef": "docs/current-truth.md#shared-account-consumer-contract--2026-09-13",
+      "title": "Align production auth persistence verification",
+      "description": "Verify the current signed-out account gate and diagnostics-only authenticated setting persistence without touching real accounts or data.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": ["MAZER-ACCOUNT-001"],
+      "acceptanceCriteria": ["Signed-out controls match the current account gate.", "Changed diagnostics-fixture state must persist across reload.", "Cleanup restores only fixture-local state and preserves failure evidence."]
+    },
+    {
+      "id": "MAZER-PLANET-001",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-04-16T00:00:00.000Z",
+      "sourceId": "mazer-roadmap",
+      "sourceRef": "docs/roadmap.md#parked-future-lane",
+      "title": "Research a rotating planet maze",
+      "description": "Retain the parked planet-maze research sequence without presenting it as current product work.",
+      "cardType": "research",
+      "priority": null,
+      "dependencies": ["MAZER-2D-001"],
+      "acceptanceCriteria": ["A separate spike proves clarity.", "A separate spike proves orientation.", "Integration requires a future owner decision."]
+    },
+    {
+      "id": "MAZER-CYBERDECK-001",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-04-16T00:00:00.000Z",
+      "sourceId": "mazer-roadmap",
+      "sourceRef": "docs/roadmap.md#deep-research-ingestion",
+      "title": "Retain Cyberdeck research as planning evidence",
+      "description": "Keep the merged research synthesis available without claiming primary Cyberdeck implementation is active or approved.",
+      "cardType": "research",
+      "priority": null,
+      "dependencies": ["MAZER-2D-001"],
+      "acceptanceCriteria": ["Research stays clearly labeled as planning truth.", "The shipping 2D lane remains primary.", "Implementation requires a separate admitted packet."]
+    }
+  ]
+}

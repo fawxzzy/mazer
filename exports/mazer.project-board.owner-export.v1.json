@@ -1,0 +1,223 @@
+{
+  "contract_version": "atlas.project-board.owner-export.v1",
+  "export_id": "pbe_mazer_owner_registry_77f1bf67634f",
+  "project_id": "mazer",
+  "board_id": "discordos:project-feedback:mazer",
+  "owner": "mazer",
+  "adapter_id": "mazer-owner-registry-v1",
+  "source_revision": "sha256:77f1bf67634f8494eb9d2b5f2d4fb10d03aab7bc454f97fe82e8d1a0ed43ab6f",
+  "generated_at": "2026-09-14T22:54:28.000Z",
+  "sources": [
+    {
+      "source_id": "mazer-owner-work-registry",
+      "kind": "manual-registry",
+      "repository": "mazer",
+      "path": "repos/mazer/config/mazer-owner-work-registry.json",
+      "revision": "sha256:82e44e996ddaeb1ee59d27fb6c3f5c1bacdc1128422f9b8b282652cb34f6d36e",
+      "observed_at": "2026-09-14T22:54:28.000Z"
+    },
+    {
+      "source_id": "mazer-current-truth",
+      "kind": "markdown",
+      "repository": "mazer",
+      "path": "repos/mazer/docs/current-truth.md",
+      "revision": "sha256:5fa0e6963b3b2c9de7b7930d535a51aa00d8fb499787f3c8c30c3d7625a1cf58",
+      "observed_at": "2026-09-14T22:54:28.000Z"
+    },
+    {
+      "source_id": "mazer-roadmap",
+      "kind": "markdown",
+      "repository": "mazer",
+      "path": "repos/mazer/docs/roadmap.md",
+      "revision": "sha256:36df33c480be02d1dc575876fda81e95db0bd57d7dec990ddf9cf206ce450207",
+      "observed_at": "2026-09-14T22:54:28.000Z"
+    },
+    {
+      "source_id": "mazer-mobile-plan",
+      "kind": "markdown",
+      "repository": "mazer",
+      "path": "repos/mazer/docs/mobile-plan.md",
+      "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
+      "observed_at": "2026-09-14T22:54:28.000Z"
+    },
+    {
+      "source_id": "mazer-owner-export-adapter",
+      "kind": "generated",
+      "repository": "mazer",
+      "path": "repos/mazer/scripts/export-project-board-owner.mjs",
+      "revision": "sha256:535387d50e9a6113e762d7dc2f5de9b2b29090df272e51dff190310df9722642",
+      "observed_at": "2026-09-14T22:54:28.000Z"
+    }
+  ],
+  "cards": [
+    {
+      "idempotency_key": "pbk_mazer_mazer-2d-001_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-2D-001",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Maintain the mobile-clean 2D shipping baseline",
+        "description": "Keep the current Phaser maze readable, responsive, mechanically faithful, and regression-safe across supported desktop and mobile play.",
+        "card_type": "reliability",
+        "lifecycle": "in-progress",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-09-14T22:54:28.000Z",
+        "source_ref": "repos/mazer/docs/current-truth.md#active-lane",
+        "extensions": {
+          "owner_status": "active",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-current-truth",
+        "source_ref": "repos/mazer/docs/current-truth.md#active-lane",
+        "source_status": "current",
+        "source_updated_at": "2026-09-14T22:54:28.000Z"
+      },
+      "content": {
+        "summary": "Keep the current Phaser maze readable, responsive, mechanically faithful, and regression-safe across supported desktop and mobile play.",
+        "objective": "Keep the current Phaser maze readable, responsive, mechanically faithful, and regression-safe across supported desktop and mobile play.",
+        "acceptance_criteria": [
+          "The active mechanics and mobile contract stays at its verified baseline without reopening retired screenshot parity.",
+          "Menu, gameplay, progression, input, and generation regressions fail deterministic repository checks.",
+          "Production claims remain tied to exact reviewed source and route-aware acceptance."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/docs/current-truth.md"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-native-001_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-NATIVE-001",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Plan the native app-store wrapper after web stabilization",
+        "description": "Prepare a Capacitor-based native wrapper only after the web gameplay and UI baseline is stable and independently verified.",
+        "card_type": "feature",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-2D-001"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-04-06T00:00:00.000Z",
+        "source_ref": "repos/mazer/docs/mobile-plan.md#capacitor--app-store-path-later",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-mobile-plan",
+        "source_ref": "repos/mazer/docs/mobile-plan.md#capacitor--app-store-path-later",
+        "source_status": "current",
+        "source_updated_at": "2026-04-06T00:00:00.000Z"
+      },
+      "content": {
+        "summary": "Prepare a Capacitor-based native wrapper only after the web gameplay and UI baseline is stable and independently verified.",
+        "objective": "Prepare a Capacitor-based native wrapper only after the web gameplay and UI baseline is stable and independently verified.",
+        "acceptance_criteria": [
+          "System back behavior maps to the existing one-overlay-at-a-time contract.",
+          "Safe-area, orientation, and device input behavior match the verified web baseline.",
+          "Store packaging begins only after privacy, metadata, screenshot, and parity gates are explicit."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/docs/mobile-plan.md"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-world-001_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-WORLD-001",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Complete the World Identity visual maintenance lane",
+        "description": "Finish bounded World Identity fixes while preserving the accepted Navigation Core, Teleport System, and gameplay contracts.",
+        "card_type": "feature",
+        "lifecycle": "in-progress",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-2D-001",
+          "MAZER-TELEPORT-001"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-09-14T22:54:28.000Z",
+        "source_ref": "repos/mazer/docs/current-truth.md#current-precision-arcade-visual-integration",
+        "extensions": {
+          "owner_status": "in_progress",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-current-truth",
+        "source_ref": "repos/mazer/docs/current-truth.md#current-precision-arcade-visual-integration",
+        "source_status": "current",
+        "source_updated_at": "2026-09-14T22:54:28.000Z"
+      },
+      "content": {
+        "summary": "Finish bounded World Identity fixes while preserving the accepted Navigation Core, Teleport System, and gameplay contracts.",
+        "objective": "Finish bounded World Identity fixes while preserving the accepted Navigation Core, Teleport System, and gameplay contracts.",
+        "acceptance_criteria": [
+          "World Identity changes remain isolated from accepted navigation and teleport ownership.",
+          "Motion, reduced-motion, layout, and render contracts remain deterministic and test-backed.",
+          "Any publication or production action stays behind its own exact lifecycle boundary."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/docs/current-truth.md"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    }
+  ],
+  "extensions": {
+    "stable_identity_count": 13,
+    "exported_public_card_count": 3,
+    "excluded_completed_card_count": 8,
+    "excluded_deferred_candidate_count": 2,
+    "imported_research_candidate_count": 0,
+    "research_candidate_exported_count": 0,
+    "discordos_role": "provenance-and-board-identity-only",
+    "private_records_included": false,
+    "external_system_identifiers_included": false
+  }
+}
