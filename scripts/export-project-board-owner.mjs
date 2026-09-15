@@ -19,6 +19,13 @@ const PUBLIC_STATUSES = new Map([
   ["in_progress", { recordStatus: "active", lifecycle: "in-progress" }],
   ["planning", { recordStatus: "candidate", lifecycle: "planning" }],
 ]);
+const COMPLETED_STATUS = "completed";
+const DEFERRED_CANDIDATE_STATUS = "deferred_candidate";
+const ADMITTED_STATUSES = new Set([
+  ...PUBLIC_STATUSES.keys(),
+  COMPLETED_STATUS,
+  DEFERRED_CANDIDATE_STATUS,
+]);
 const SOURCE_PATHS = Object.freeze({
   "mazer-owner-work-registry": { kind: "manual-registry", path: REGISTRY_PATH },
   "mazer-current-truth": { kind: "markdown", path: CURRENT_TRUTH_PATH },
@@ -53,11 +60,15 @@ function validateRegistry(registry) {
   if (new Set(ids).size !== ids.length || ids.some((id) => !/^MAZER-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$/.test(id))) {
     throw new Error("Mazer registry ids must be unique stable MAZER ids");
   }
+  const unsupportedStatus = registry.workItems.find((item) => !ADMITTED_STATUSES.has(item.status));
+  if (unsupportedStatus) throw new Error(`${unsupportedStatus.id} has an unsupported lifecycle status`);
   const publicCount = registry.workItems.filter((item) => PUBLIC_STATUSES.has(item.status)).length;
-  const completedCount = registry.workItems.filter((item) => item.status === "completed").length;
-  const candidateCount = registry.workItems.filter((item) => item.status === "deferred_candidate").length;
+  const completedCount = registry.workItems.filter((item) => item.status === COMPLETED_STATUS).length;
+  const candidateCount = registry.workItems.filter((item) => item.status === DEFERRED_CANDIDATE_STATUS).length;
   if (publicCount !== registry.provenance.publicCardCount || completedCount !== registry.provenance.completedExcludedCount
     || candidateCount !== registry.provenance.candidateExcludedCount
+    || publicCount + completedCount + candidateCount !== registry.workItems.length
+    || publicCount + completedCount + candidateCount !== registry.provenance.stableIdentityCount
     || registry.provenance.researchCandidateImportCount !== 0
     || registry.provenance.discordosRole !== "provenance-and-board-identity-only") {
     throw new Error("Mazer owner reconciliation counts are inconsistent");
@@ -119,17 +130,28 @@ function mapCard(item) {
 
 export function assertPublicSafety(exported) {
   const forbiddenKey = /(?:secret|credential|password|token|cookie|session_data|user_id|email|phone|message_id|thread_id|channel_id|supabase_key|service_role)/i;
+  const sensitiveValues = [
+    ["email address", /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i],
+    ["authorization value", /\bbearer\s+[A-Z0-9._~+/=-]{8,}/i],
+    ["sensitive query value", /https?:\/\/[^\s"']+\?[^\s"']*(?:token|key|secret|code|password|credential|session|cookie|email|phone|user_id)=/i],
+    ["credential-like assignment", /\b(?:secret|credential|password|token|cookie|session(?:_data)?|supabase_key|service_role)\b\s*(?:=|:)\s*["']?[^\s"',;]{4,}/i],
+    ["known secret format", /\b(?:gh[pousr]_[A-Z0-9]{20,}|github_pat_[A-Z0-9_]{20,}|sk-[A-Z0-9_-]{20,}|sb_secret_[A-Z0-9_-]{10,}|eyJ[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,})\b/i],
+  ];
   const visit = (value, location = "export") => {
     if (Array.isArray(value)) return value.forEach((entry, index) => visit(entry, `${location}[${index}]`));
+    if (typeof value === "string") {
+      for (const [label, pattern] of sensitiveValues) {
+        if (pattern.test(value)) throw new Error(`public export contains sensitive ${label} at ${location}`);
+      }
+      return;
+    }
     if (!value || typeof value !== "object") return;
     for (const [key, child] of Object.entries(value)) {
       if (forbiddenKey.test(key)) throw new Error(`public export contains forbidden key ${location}.${key}`);
       visit(child, `${location}.${key}`);
     }
   };
-  visit(exported.cards);
-  const rendered = JSON.stringify(exported.cards);
-  if (/https?:\/\/[^\s"']+\?[^\s"']*(?:token|key|secret|code)=/i.test(rendered)) throw new Error("public export contains a sensitive query value");
+  visit(exported);
   return true;
 }
 

@@ -75,6 +75,26 @@ test("passes the public-safety and FawxzzyWeb consumer contracts", () => {
   assert.throws(() => assertFawxzzyWebConsumerAcceptance(terminal), /non-public lifecycle/);
 });
 
+test("scans the complete public envelope and rejects sensitive values without echoing them", () => {
+  const output = buildProjectBoardOwnerExport(registry, bytes);
+  const hostileCases = [
+    ["top-level forbidden metadata", (value) => { value.access_token = "not-public"; }, /forbidden key export\.access_token/],
+    ["source forbidden metadata", (value) => { value.sources[0].credential = "not-public"; }, /forbidden key export\.sources\[0\]\.credential/],
+    ["email in title", (value) => { value.cards[0].record.title = "Contact owner@example.com"; }, /sensitive email address/],
+    ["secret in description", (value) => { value.cards[0].record.description = "token=private-value"; }, /sensitive credential-like assignment/],
+    ["secret in acceptance criteria", (value) => { value.cards[0].content.acceptance_criteria[0] = "Use https:\/\/example.test\/?token=private-value"; }, /sensitive query value/],
+  ];
+  for (const [label, mutate, expected] of hostileCases) {
+    const hostile = structuredClone(output);
+    mutate(hostile);
+    assert.throws(() => assertPublicSafety(hostile), (error) => {
+      assert.match(error.message, expected, label);
+      assert.doesNotMatch(error.message, /owner@example\.com|private-value|not-public/, `${label} echoed a sensitive value`);
+      return true;
+    });
+  }
+});
+
 test("renders deterministically and keeps the checked export current", () => {
   assert.equal(renderProjectBoardOwnerExport(repoRoot), renderProjectBoardOwnerExport(repoRoot));
   runProjectBoardOwnerExport(["--check"], repoRoot);
@@ -88,6 +108,15 @@ test("fails closed on denominator, identity, source, and stale-output drift", ()
   const missing = structuredClone(registry);
   missing.workItems.pop();
   assert.throws(() => buildProjectBoardOwnerExport(missing, { ...bytes, "mazer-owner-work-registry": JSON.stringify(missing) }), /stable identity denominator/);
+
+  const unsupported = structuredClone(registry);
+  const completed = unsupported.workItems.find((item) => item.status === "completed");
+  completed.status = "complete_typo";
+  unsupported.provenance.completedExcludedCount -= 1;
+  assert.throws(
+    () => buildProjectBoardOwnerExport(unsupported, { ...bytes, "mazer-owner-work-registry": JSON.stringify(unsupported) }),
+    /unsupported lifecycle status/,
+  );
 
   const badSource = structuredClone(registry);
   badSource.workItems[0].sourceRef = "docs/roadmap.md#active-lane";
