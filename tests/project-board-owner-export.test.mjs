@@ -26,6 +26,10 @@ test("exports only the exact current public Mazer owner set", () => {
   assert.equal(output.cards.length, 3);
   assert.deepEqual(output.cards.map((card) => card.record.card_id), ["MAZER-2D-001", "MAZER-NATIVE-001", "MAZER-WORLD-001"]);
   assert.equal(new Set(output.cards.map((card) => card.idempotency_key)).size, 3);
+  assert.deepEqual(
+    output.cards.find((card) => card.record.card_id === "MAZER-WORLD-001").record.dependencies,
+    ["MAZER-2D-001", "MAZER-TELEPORT-001"],
+  );
   assert.equal(
     output.cards.length + output.extensions.excluded_completed_card_count + output.extensions.excluded_deferred_candidate_count,
     output.extensions.stable_identity_count,
@@ -145,6 +149,38 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     "mazer-current-truth": `${bytes["mazer-current-truth"]}\n\`\`\`md\n## Fenced Heading\n\`\`\`\n## Heading After Fence\n`,
   }));
 
+  for (const [label, commentedMarkdown] of [
+    ["same-line comment", "<!-- ## Commented Heading -->"],
+    ["multiline comment", "<!--\n## Commented Heading\n-->"],
+    ["comment then heading on the same line", "<!-- hidden --> ## Commented Heading"],
+  ]) {
+    const commentedHeading = structuredClone(registry);
+    commentedHeading.workItems[0].sourceRef = "docs/current-truth.md#commented-heading";
+    assert.throws(
+      () => buildProjectBoardOwnerExport(commentedHeading, {
+        ...bytes,
+        "mazer-owner-work-registry": JSON.stringify(commentedHeading),
+        "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${commentedMarkdown}\n`,
+      }),
+      /sourceRef fragment does not exist/,
+      label,
+    );
+  }
+
+  for (const [sourceRef, markdown] of [
+    ["docs/current-truth.md#heading-before-comment", "## Heading Before Comment\n<!--\n## Hidden Heading\n-->"],
+    ["docs/current-truth.md#heading-after-comment", "<!-- hidden -->\n## Heading After Comment"],
+    ["docs/current-truth.md#heading-with-trailing-comment", "## Heading With Trailing Comment <!-- hidden -->"],
+  ]) {
+    const visibleHeading = structuredClone(registry);
+    visibleHeading.workItems[0].sourceRef = sourceRef;
+    assert.doesNotThrow(() => buildProjectBoardOwnerExport(visibleHeading, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(visibleHeading),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+    }));
+  }
+
   const dangling = structuredClone(registry);
   dangling.workItems[0].sourceRef = "docs/current-truth.md#renamed-or-missing-heading";
   assert.throws(
@@ -198,15 +234,25 @@ test("scans the complete public envelope and rejects sensitive values without ec
     ["email in title", (value) => { value.cards[0].record.title = "Contact owner@example.com"; }, /sensitive email address/],
     ["secret in description", (value) => { value.cards[0].record.description = "token=private-value"; }, /sensitive credential-like assignment/],
     ["secret in acceptance criteria", (value) => { value.cards[0].content.acceptance_criteria[0] = "Use https:\/\/example.test\/?token=private-value"; }, /sensitive query value/],
+    ["PKCS8 private key", (value) => { value.cards[0].record.title = "-----BEGIN PRIVATE KEY-----\nprivate-material"; }, /sensitive PEM private key/],
+    ["RSA private key with case and spacing drift", (value) => { value.cards[0].record.description = "-----begin  rsa   private key -----"; }, /sensitive PEM private key/],
+    ["OpenSSH private key", (value) => { value.cards[0].content.acceptance_criteria[0] = "-----BEGIN OPENSSH PRIVATE KEY-----"; }, /sensitive PEM private key/],
+    ["PGP private key block", (value) => { value.cards[0].content.summary = "-----BEGIN PGP PRIVATE KEY BLOCK-----"; }, /sensitive PEM private key/],
   ];
   for (const [label, mutate, expected] of hostileCases) {
     const hostile = structuredClone(output);
     mutate(hostile);
     assert.throws(() => assertPublicSafety(hostile), (error) => {
       assert.match(error.message, expected, label);
-      assert.doesNotMatch(error.message, /owner@example\.com|private-value|not-public/, `${label} echoed a sensitive value`);
+      assert.doesNotMatch(error.message, /owner@example\.com|private-value|not-public|BEGIN.*PRIVATE KEY/i, `${label} echoed a sensitive value`);
       return true;
     });
+  }
+
+  for (const safePemLabel of ["-----BEGIN PUBLIC KEY-----", "-----BEGIN CERTIFICATE-----"]) {
+    const safe = structuredClone(output);
+    safe.cards[0].record.title = safePemLabel;
+    assert.doesNotThrow(() => assertPublicSafety(safe));
   }
 });
 

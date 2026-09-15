@@ -75,30 +75,72 @@ function githubHeadingBaseSlug(value) {
     .replace(/ /g, "-");
 }
 
+function maskMarkdownHtmlComments(line, inComment) {
+  let visible = "";
+  let structural = "";
+  let cursor = 0;
+  while (cursor < line.length) {
+    if (inComment) {
+      const end = line.indexOf("-->", cursor);
+      if (end < 0) {
+        structural += " ".repeat(line.length - cursor);
+        return { visible, structural, inComment: true };
+      }
+      structural += " ".repeat(end + 3 - cursor);
+      cursor = end + 3;
+      inComment = false;
+      continue;
+    }
+    const start = line.indexOf("<!--", cursor);
+    if (start < 0) {
+      visible += line.slice(cursor);
+      structural += line.slice(cursor);
+      break;
+    }
+    visible += line.slice(cursor, start);
+    structural += line.slice(cursor, start);
+    cursor = start;
+    inComment = true;
+  }
+  return { visible, structural, inComment };
+}
+
 function markdownHeadingAnchors(markdown) {
   const headings = [];
   const lines = normalize(markdown).split("\n");
+  const renderedLines = [];
   let fence = null;
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const fenceMatch = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+  let htmlComment = false;
+  for (const rawLine of lines) {
     if (fence) {
+      const fenceMatch = rawLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
       if (fenceMatch && fenceMatch[1][0] === fence.marker && fenceMatch[1].length >= fence.length
         && fenceMatch[2].trim() === "") fence = null;
+      renderedLines.push(null);
       continue;
     }
+    const masked = maskMarkdownHtmlComments(rawLine, htmlComment);
+    htmlComment = masked.inComment;
+    const fenceMatch = masked.structural.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     if (fenceMatch && (fenceMatch[1][0] === "~" || !fenceMatch[2].includes("`"))) {
       fence = { marker: fenceMatch[1][0], length: fenceMatch[1].length };
+      renderedLines.push(null);
       continue;
     }
-    if (/^(?: {4}|\t)/.test(line)) continue;
-    const atx = line.match(/^\s{0,3}#{1,6}(?:[ \t]+|$)(.*)$/);
-    if (atx) {
+    renderedLines.push(masked);
+  }
+  for (let index = 0; index < renderedLines.length; index += 1) {
+    const line = renderedLines[index];
+    if (!line || /^(?: {4}|\t)/.test(line.structural)) continue;
+    const structuralAtx = line.structural.match(/^\s{0,3}#{1,6}(?:[ \t]+|$)/);
+    const atx = line.visible.match(/^\s{0,3}#{1,6}(?:[ \t]+|$)(.*)$/);
+    if (structuralAtx && atx) {
       headings.push(atx[1].replace(/[ \t]+#+[ \t]*$/, "").trim());
       continue;
     }
-    if (line.trim() && index + 1 < lines.length && /^\s{0,3}(?:=+|-+)[ \t]*$/.test(lines[index + 1])) {
-      headings.push(line.trim());
+    const next = renderedLines[index + 1];
+    if (line.visible.trim() && next && /^\s{0,3}(?:=+|-+)[ \t]*$/.test(next.structural)) {
+      headings.push(line.visible.trim());
       index += 1;
     }
   }
@@ -219,6 +261,7 @@ export function assertPublicSafety(exported) {
     ["sensitive query value", /https?:\/\/[^\s"']+\?[^\s"']*(?:token|key|secret|code|password|credential|session|cookie|email|phone|user_id)=/i],
     ["credential-like assignment", /\b(?:secret|credential|password|token|cookie|session(?:_data)?|supabase_key|service_role)\b\s*(?:=|:)\s*["']?[^\s"',;]{4,}/i],
     ["known secret format", /\b(?:gh[pousr]_[A-Z0-9]{20,}|github_pat_[A-Z0-9_]{20,}|sk-[A-Z0-9_-]{20,}|sb_secret_[A-Z0-9_-]{10,}|eyJ[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,}\.[A-Z0-9_-]{8,})\b/i],
+    ["PEM private key", /-{5}[ \t]*BEGIN[ \t]+(?:[A-Z0-9]+[ \t]+)*PRIVATE[ \t]+KEY(?:[ \t]+BLOCK)?[ \t]*-{5}/i],
   ];
   const visit = (value, location = "export") => {
     if (Array.isArray(value)) return value.forEach((entry, index) => visit(entry, `${location}[${index}]`));

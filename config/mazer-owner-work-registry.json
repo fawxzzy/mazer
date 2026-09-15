@@ -43,7 +43,7 @@
       "description": "Finish bounded World Identity fixes while preserving the accepted Navigation Core, Teleport System, and gameplay contracts.",
       "cardType": "feature",
       "priority": "medium",
-      "dependencies": ["MAZER-2D-001"],
+      "dependencies": ["MAZER-2D-001", "MAZER-TELEPORT-001"],
       "acceptanceCriteria": [
         "World Identity changes remain isolated from accepted navigation and teleport ownership.",
         "Motion, reduced-motion, layout, and render contracts remain deterministic and test-backed.",
