@@ -181,6 +181,40 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     }));
   }
 
+  for (const [label, rawHtml] of [
+    ["pre block", "<pre>\n## Hidden Raw Heading\n</pre>"],
+    ["script block with mixed case and attributes", "<ScRiPt type=\"application/json\">\n## Hidden Raw Heading\n</sCrIpT>"],
+    ["style block", "<style>\n## Hidden Raw Heading\n</style>"],
+    ["textarea block", "<textarea name=\"example\">\n## Hidden Raw Heading\n</textarea>"],
+    ["unclosed raw block", "<pre class=\"example\">\n## Hidden Raw Heading\n## Still Hidden"],
+  ]) {
+    const rawHeading = structuredClone(registry);
+    rawHeading.workItems[0].sourceRef = "docs/current-truth.md#hidden-raw-heading";
+    assert.throws(
+      () => buildProjectBoardOwnerExport(rawHeading, {
+        ...bytes,
+        "mazer-owner-work-registry": JSON.stringify(rawHeading),
+        "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${rawHtml}\n`,
+      }),
+      /sourceRef fragment does not exist/,
+      label,
+    );
+  }
+
+  for (const [sourceRef, markdown] of [
+    ["docs/current-truth.md#heading-before-raw", "## Heading Before Raw\n<pre>\n## Hidden Raw Heading\n</pre>"],
+    ["docs/current-truth.md#heading-after-raw", "<SCRIPT type=\"application/json\">\n## Hidden Raw Heading\n</SCRIPT>\n## Heading After Raw"],
+    ["docs/current-truth.md#heading-after-same-line-raw", "<style>hidden</style>\n## Heading After Same Line Raw"],
+  ]) {
+    const visibleHeading = structuredClone(registry);
+    visibleHeading.workItems[0].sourceRef = sourceRef;
+    assert.doesNotThrow(() => buildProjectBoardOwnerExport(visibleHeading, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(visibleHeading),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+    }));
+  }
+
   const dangling = structuredClone(registry);
   dangling.workItems[0].sourceRef = "docs/current-truth.md#renamed-or-missing-heading";
   assert.throws(
@@ -204,6 +238,25 @@ test("requires every work item card type to match the atlas.card-record.v2 enum"
       label,
     );
   }
+});
+
+test("requires canonical calendar-valid UTC timestamps without coercion", () => {
+  for (const [label, timestamp] of [
+    ["boolean coercion", true],
+    ["impossible calendar date", "2026-02-30T00:00:00.000Z"],
+    ["missing millisecond precision", "2026-09-14T22:54:28Z"],
+    ["timezone offset normalization", "2026-09-14T18:54:28.000-04:00"],
+    ["lowercase UTC suffix", "2026-09-14T22:54:28.000z"],
+  ]) {
+    const malformed = structuredClone(registry);
+    malformed.workItems[0].updatedAt = timestamp;
+    assert.throws(
+      () => buildProjectBoardOwnerExport(malformed, { ...bytes, "mazer-owner-work-registry": JSON.stringify(malformed) }),
+      /must be a canonical UTC timestamp/,
+      label,
+    );
+  }
+  assert.doesNotThrow(() => buildProjectBoardOwnerExport(registry, bytes));
 });
 
 test("keeps DiscordOS as provenance and board identity only", () => {
@@ -291,8 +344,21 @@ test("fails closed on denominator, identity, source, and stale-output drift", ()
       fs.copyFileSync(path.join(repoRoot, relativePath), target);
     }
     fs.mkdirSync(path.join(temp, "exports"), { recursive: true });
-    fs.writeFileSync(path.join(temp, "exports/mazer.project-board.owner-export.v1.json"), "{}\n");
+    const exportPath = path.join(temp, "exports/mazer.project-board.owner-export.v1.json");
+    fs.writeFileSync(exportPath, "{}\n");
     assert.throws(() => runProjectBoardOwnerExport(["--check"], temp), /stale/);
+
+    const canonical = renderProjectBoardOwnerExport(temp);
+    for (const [label, driftedBytes] of [
+      ["CRLF", canonical.replace(/\n/g, "\r\n")],
+      ["UTF-8 BOM", `\uFEFF${canonical}`],
+      ["trailing bytes", `${canonical} `],
+    ]) {
+      fs.writeFileSync(exportPath, driftedBytes, "utf8");
+      assert.throws(() => runProjectBoardOwnerExport(["--check"], temp), /stale/, label);
+    }
+    fs.writeFileSync(exportPath, canonical, "utf8");
+    assert.doesNotThrow(() => runProjectBoardOwnerExport(["--check"], temp));
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }

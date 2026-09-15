@@ -1,11 +1,11 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_db77cd21eb12",
+  "export_id": "pbe_mazer_owner_registry_b827c7627784",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:db77cd21eb125e0a403338d7626ab158414d7b4922600fe20b1f5f6aac7ae23e",
+  "source_revision": "sha256:b827c7627784c3774f90446c4b58b00d74172df23baac7817ec0635a2db5624a",
   "generated_at": "2026-09-14T22:54:28.000Z",
   "sources": [
     {
@@ -45,7 +45,7 @@
       "kind": "generated",
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
-      "revision": "sha256:1ef2868f502fd85cc9871b02fa0c9263e37ac7cf587b3de03dc5f800319340fe",
+      "revision": "sha256:5f347fde9fbd63ab5a5c8b3e9c26b45ebce5d72e91a8ec1ce48ee5b7ac96a43e",
       "observed_at": "2026-09-14T22:54:28.000Z"
     }
   ],

@@ -57,9 +57,14 @@ function requireString(value, label) {
 }
 
 function normalizeTimestamp(value, label) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) {
+    throw new Error(`${label} must be a canonical UTC timestamp`);
+  }
   const parsed = new Date(value);
-  if (!value || Number.isNaN(parsed.getTime())) throw new Error(`${label} must be a valid timestamp`);
-  return parsed.toISOString();
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== value) {
+    throw new Error(`${label} must be a canonical UTC timestamp`);
+  }
+  return value;
 }
 
 function githubHeadingBaseSlug(value) {
@@ -76,33 +81,42 @@ function githubHeadingBaseSlug(value) {
 }
 
 function maskMarkdownHtmlComments(line, inComment) {
-  let visible = "";
-  let structural = "";
+  let masked = "";
   let cursor = 0;
   while (cursor < line.length) {
     if (inComment) {
       const end = line.indexOf("-->", cursor);
       if (end < 0) {
-        structural += " ".repeat(line.length - cursor);
-        return { visible, structural, inComment: true };
+        masked += " ".repeat(line.length - cursor);
+        return { masked, inComment: true };
       }
-      structural += " ".repeat(end + 3 - cursor);
+      masked += " ".repeat(end + 3 - cursor);
       cursor = end + 3;
       inComment = false;
       continue;
     }
     const start = line.indexOf("<!--", cursor);
     if (start < 0) {
-      visible += line.slice(cursor);
-      structural += line.slice(cursor);
+      masked += line.slice(cursor);
       break;
     }
-    visible += line.slice(cursor, start);
-    structural += line.slice(cursor, start);
+    masked += line.slice(cursor, start);
     cursor = start;
     inComment = true;
   }
-  return { visible, structural, inComment };
+  return { masked, inComment };
+}
+
+function maskMarkdownRawHtmlBlock(line, blockTag) {
+  if (!blockTag) {
+    const opening = line.match(/^ {0,3}<(pre|script|style|textarea)(?:[\t >]|$)/i);
+    if (!opening) return { masked: line, blockTag: null };
+    blockTag = opening[1].toLowerCase();
+  }
+  const closing = new RegExp(`</${blockTag}\\s*>`, "i").exec(line);
+  if (!closing) return { masked: " ".repeat(line.length), blockTag };
+  const closingEnd = closing.index + closing[0].length;
+  return { masked: `${" ".repeat(closingEnd)}${line.slice(closingEnd)}`, blockTag: null };
 }
 
 function markdownHeadingAnchors(markdown) {
@@ -111,6 +125,7 @@ function markdownHeadingAnchors(markdown) {
   const renderedLines = [];
   let fence = null;
   let htmlComment = false;
+  let rawHtmlBlock = null;
   for (const rawLine of lines) {
     if (fence) {
       const fenceMatch = rawLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
@@ -119,28 +134,37 @@ function markdownHeadingAnchors(markdown) {
       renderedLines.push(null);
       continue;
     }
-    const masked = maskMarkdownHtmlComments(rawLine, htmlComment);
-    htmlComment = masked.inComment;
-    const fenceMatch = masked.structural.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (rawHtmlBlock) {
+      const rawMasked = maskMarkdownRawHtmlBlock(rawLine, rawHtmlBlock);
+      rawHtmlBlock = rawMasked.blockTag;
+      const commentMasked = maskMarkdownHtmlComments(rawMasked.masked, htmlComment);
+      htmlComment = commentMasked.inComment;
+      renderedLines.push(commentMasked.masked);
+      continue;
+    }
+    const commentMasked = maskMarkdownHtmlComments(rawLine, htmlComment);
+    htmlComment = commentMasked.inComment;
+    const fenceMatch = commentMasked.masked.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     if (fenceMatch && (fenceMatch[1][0] === "~" || !fenceMatch[2].includes("`"))) {
       fence = { marker: fenceMatch[1][0], length: fenceMatch[1].length };
       renderedLines.push(null);
       continue;
     }
-    renderedLines.push(masked);
+    const rawMasked = maskMarkdownRawHtmlBlock(commentMasked.masked, null);
+    rawHtmlBlock = rawMasked.blockTag;
+    renderedLines.push(rawMasked.masked);
   }
   for (let index = 0; index < renderedLines.length; index += 1) {
     const line = renderedLines[index];
-    if (!line || /^(?: {4}|\t)/.test(line.structural)) continue;
-    const structuralAtx = line.structural.match(/^\s{0,3}#{1,6}(?:[ \t]+|$)/);
-    const atx = line.visible.match(/^\s{0,3}#{1,6}(?:[ \t]+|$)(.*)$/);
-    if (structuralAtx && atx) {
+    if (!line || /^(?: {4}|\t)/.test(line)) continue;
+    const atx = line.match(/^\s{0,3}#{1,6}(?:[ \t]+|$)(.*)$/);
+    if (atx) {
       headings.push(atx[1].replace(/[ \t]+#+[ \t]*$/, "").trim());
       continue;
     }
     const next = renderedLines[index + 1];
-    if (line.visible.trim() && next && /^\s{0,3}(?:=+|-+)[ \t]*$/.test(next.structural)) {
-      headings.push(line.visible.trim());
+    if (line.trim() && next && /^\s{0,3}(?:=+|-+)[ \t]*$/.test(next)) {
+      headings.push(line.trim());
       index += 1;
     }
   }
@@ -360,7 +384,8 @@ export function runProjectBoardOwnerExport(argv, repoRoot = process.cwd()) {
   const rendered = renderProjectBoardOwnerExport(repoRoot);
   const outputPath = path.join(repoRoot, DEFAULT_OUTPUT_PATH);
   if (check) {
-    if (!fs.existsSync(outputPath) || normalize(fs.readFileSync(outputPath, "utf8")) !== normalize(rendered)) throw new Error(`${DEFAULT_OUTPUT_PATH} is stale`);
+    const expectedBytes = Buffer.from(rendered, "utf8");
+    if (!fs.existsSync(outputPath) || !fs.readFileSync(outputPath).equals(expectedBytes)) throw new Error(`${DEFAULT_OUTPUT_PATH} is stale`);
     process.stdout.write(`mazer-project-board-owner-export: ok (${JSON.parse(rendered).cards.length} cards)\n`);
     return;
   }
