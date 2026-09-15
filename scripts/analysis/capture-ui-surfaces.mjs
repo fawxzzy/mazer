@@ -55,9 +55,23 @@ const INLINE_STATE_TEXT_LABELS = Object.freeze([
   'Trail Fade',
   'Trail Shine'
 ]);
+// The two inline auth field labels were removed here (2026-09-15): commit
+// 769e63f6 ("feat(auth): adopt shared account OAuth portal", 2026-09-13)
+// replaced the auth overlay's default signed-out content with
+// buildSharedAccountEntrySection, which never calls createAuthFieldBox --
+// that function's own inline email/password fields are only reachable from
+// a completely different overlay (buildPasswordRecoveryOverlay), and even
+// there only the password/confirmPassword field ids are ever passed, never
+// email. Confirmed live (real built app, headless Playwright): the
+// signed-out auth gate's actual rendered text labels are the wordmark, the
+// "Use your shared Fawxzzy account..." explainer, and the Reset
+// password/Privacy/Terms/Create account/Sign in controls kept below --
+// never the two inline field labels this constant used to require, which
+// predates the redesign by four weeks (1585c671, 2026-08-16) and was never
+// updated to match. Not a stale-test-vs-still-fixable-app judgment call:
+// there is no reachable code path left that renders those two labels for
+// this surface.
 const AUTH_EXPECTED_LABELS = Object.freeze([
-  'EMAIL',
-  'PASSWORD',
   'Sign in',
   'Create account',
   'Reset password'
@@ -148,83 +162,184 @@ const isUsableInViewportBounds = (bounds, viewport, minimumSize = 16) => (
   && bounds.bottom <= viewport.height
 );
 
-const waitForSurface = async (page, {
+// Pure, Node-side re-check used ONLY to explain a waitForSurface timeout --
+// the actual wait above stays browser-side (page.waitForFunction, checked
+// every animation frame) for speed. On timeout this re-evaluates the exact
+// same clauses against one final diagnostics read so the thrown error can
+// say WHICH clause was still false, instead of a single opaque "timed out"
+// with no way to tell missing/malformed diagnostics apart from a wrong
+// mode/overlay or unsettled play geometry. Mirrors
+// evaluateAuthenticatedFixtureReadiness's clauses/failedClauses/state shape.
+export const evaluateSurfaceReadiness = ({
+  runtime = null,
+  visual = null,
+  expectedLabels = [],
+  mode,
+  overlay,
+  requireSettledPlayGeometry = true
+}) => {
+  const board = visual?.board?.bounds;
+  const actualMode = visual?.runtime?.mode ?? null;
+  const actualOverlay = visual?.runtime?.overlay ?? null;
+  // Starting a game changes the mode before the next layout publication.
+  // Do not treat that transitional diagnostics frame as settled play UI.
+  const playGeometrySettled = !requireSettledPlayGeometry
+    || mode !== 'play'
+    || overlay !== 'none'
+    || (
+      Number.isFinite(board?.left)
+      && Number.isFinite(board?.top)
+      && Number.isFinite(board?.right)
+      && Number.isFinite(board?.bottom)
+      && visual?.runtime?.playLifecycle?.inputLocked === false
+    );
+  const actualLabels = (visual?.textLabels ?? []).map((entry) => entry.text);
+  const missingLabels = expectedLabels.filter((expectedLabel) => (
+    !actualLabels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
+  ));
+
+  const clauses = {
+    hasRuntimeDiagnostics: runtime !== null,
+    hasVisualDiagnostics: visual !== null,
+    modeMatches: actualMode === mode,
+    overlayMatches: actualOverlay === overlay,
+    playGeometrySettled,
+    labelsPresent: missingLabels.length === 0
+  };
+
+  return {
+    clauses,
+    failedClauses: Object.entries(clauses).filter(([, passed]) => !passed).map(([clause]) => clause),
+    ready: Object.values(clauses).every(Boolean),
+    state: {
+      actualLabels,
+      actualMode,
+      actualOverlay,
+      board: board ?? null,
+      expectedLabels,
+      expectedMode: mode,
+      expectedOverlay: overlay,
+      inputLocked: visual?.runtime?.playLifecycle?.inputLocked ?? null,
+      missingLabels
+    }
+  };
+};
+
+const isPlaywrightTimeoutError = (error) => error instanceof Error && error.name === 'TimeoutError';
+
+export const waitForSurface = async (page, {
   expectedLabels = [],
   mode,
   overlay,
   requireSettledPlayGeometry = true,
   timeoutMs = DEFAULT_TIMEOUT_MS
 }) => {
-  await page.waitForFunction(
-    ({ runtimeAttribute, visualAttribute, mode: expectedMode, overlay: expectedOverlay, requireSettledPlayGeometry }) => {
-      const runtimeRaw = document.documentElement.getAttribute(runtimeAttribute);
-      const visualRaw = document.documentElement.getAttribute(visualAttribute);
-      if (!runtimeRaw || !visualRaw) {
-        return false;
-      }
+  const throwSurfaceReadinessTimeout = async (cause) => {
+    const diagnostics = await readDiagnostics(page);
+    const evaluation = evaluateSurfaceReadiness({
+      ...diagnostics,
+      expectedLabels,
+      mode,
+      overlay,
+      requireSettledPlayGeometry
+    });
+    const evidence = {
+      cause,
+      clauses: evaluation.clauses,
+      failedClauses: evaluation.failedClauses,
+      lastState: evaluation.state,
+      timeoutMs
+    };
+    const error = new Error(`Surface readiness timed out: ${JSON.stringify(evidence)}`);
+    error.code = 'SURFACE_READINESS_TIMEOUT';
+    error.evidence = evidence;
+    throw error;
+  };
 
-      try {
-        const visual = JSON.parse(visualRaw);
-        const board = visual?.board?.bounds;
-        // Starting a game changes the mode before the next layout publication.
-        // Do not capture that transitional diagnostics frame as active play UI.
-        const playGeometrySettled = !requireSettledPlayGeometry
-          || expectedMode !== 'play'
-          || expectedOverlay !== 'none'
-          || (
-            Number.isFinite(board?.left)
-            && Number.isFinite(board?.top)
-            && Number.isFinite(board?.right)
-            && Number.isFinite(board?.bottom)
-            && visual?.runtime?.playLifecycle?.inputLocked === false
-          );
-        return visual?.runtime?.mode === expectedMode
-          && visual?.runtime?.overlay === expectedOverlay
-          && playGeometrySettled;
-      } catch {
-        return false;
-      }
-    },
-    {
-      runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
-      visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE,
-       mode,
-       overlay,
-       requireSettledPlayGeometry
-    },
-    { timeout: timeoutMs }
-  );
-  if (expectedLabels.length > 0) {
-    const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
+  try {
     await page.waitForFunction(
-      ({ expected, visualAttribute }) => {
-        const raw = document.documentElement.getAttribute(visualAttribute);
-        if (!raw) {
+      ({ runtimeAttribute, visualAttribute, mode: expectedMode, overlay: expectedOverlay, requireSettledPlayGeometry }) => {
+        const runtimeRaw = document.documentElement.getAttribute(runtimeAttribute);
+        const visualRaw = document.documentElement.getAttribute(visualAttribute);
+        if (!runtimeRaw || !visualRaw) {
           return false;
         }
 
         try {
-          const visual = JSON.parse(raw);
-          const labels = (visual?.textLabels ?? []).map((entry) => entry.text);
-          return expected.every(({ allowStateSuffix, expectedLabel }) => labels.some((actualLabel) => (
-            actualLabel === expectedLabel
+          const visual = JSON.parse(visualRaw);
+          const board = visual?.board?.bounds;
+          // Starting a game changes the mode before the next layout publication.
+          // Do not capture that transitional diagnostics frame as active play UI.
+          const playGeometrySettled = !requireSettledPlayGeometry
+            || expectedMode !== 'play'
+            || expectedOverlay !== 'none'
             || (
-              allowStateSuffix
-              && typeof actualLabel === 'string'
-              && actualLabel.startsWith(`${expectedLabel}: `)
-              && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
-            )
-          )));
+              Number.isFinite(board?.left)
+              && Number.isFinite(board?.top)
+              && Number.isFinite(board?.right)
+              && Number.isFinite(board?.bottom)
+              && visual?.runtime?.playLifecycle?.inputLocked === false
+            );
+          return visual?.runtime?.mode === expectedMode
+            && visual?.runtime?.overlay === expectedOverlay
+            && playGeometrySettled;
         } catch {
           return false;
         }
       },
       {
-        expected: expectedLabelDescriptors,
-        visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
+        runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
+        visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE,
+         mode,
+         overlay,
+         requireSettledPlayGeometry
       },
       { timeout: timeoutMs }
     );
+  } catch (error) {
+    if (!isPlaywrightTimeoutError(error)) {
+      throw error;
+    }
+    await throwSurfaceReadinessTimeout('mode-overlay-geometry');
+  }
+  if (expectedLabels.length > 0) {
+    const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
+    try {
+      await page.waitForFunction(
+        ({ expected, visualAttribute }) => {
+          const raw = document.documentElement.getAttribute(visualAttribute);
+          if (!raw) {
+            return false;
+          }
+
+          try {
+            const visual = JSON.parse(raw);
+            const labels = (visual?.textLabels ?? []).map((entry) => entry.text);
+            return expected.every(({ allowStateSuffix, expectedLabel }) => labels.some((actualLabel) => (
+              actualLabel === expectedLabel
+              || (
+                allowStateSuffix
+                && typeof actualLabel === 'string'
+                && actualLabel.startsWith(`${expectedLabel}: `)
+                && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
+              )
+            )));
+          } catch {
+            return false;
+          }
+        },
+        {
+          expected: expectedLabelDescriptors,
+          visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
+        },
+        { timeout: timeoutMs }
+      );
+    } catch (error) {
+      if (!isPlaywrightTimeoutError(error)) {
+        throw error;
+      }
+      await throwSurfaceReadinessTimeout('labels');
+    }
   }
   return readDiagnostics(page);
 };
