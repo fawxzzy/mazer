@@ -26,6 +26,10 @@ test("exports only the exact current public Mazer owner set", () => {
   assert.equal(output.cards.length, 3);
   assert.deepEqual(output.cards.map((card) => card.record.card_id), ["MAZER-2D-001", "MAZER-NATIVE-001", "MAZER-WORLD-001"]);
   assert.equal(new Set(output.cards.map((card) => card.idempotency_key)).size, 3);
+  assert.equal(
+    output.cards.length + output.extensions.excluded_completed_card_count + output.extensions.excluded_deferred_candidate_count,
+    output.extensions.stable_identity_count,
+  );
 });
 
 test("retains completed truth in the registry and excludes it from public cards", () => {
@@ -95,7 +99,7 @@ test("validates stable dependency relationships and preserves deterministic dedu
   );
 });
 
-test("resolves normalized and duplicate Markdown heading anchors", () => {
+test("resolves only rendered Markdown headings with the required GitHub-compatible slug behavior", () => {
   assert.doesNotThrow(() => buildProjectBoardOwnerExport(registry, bytes));
 
   const duplicateHeading = structuredClone(registry);
@@ -106,12 +110,64 @@ test("resolves normalized and duplicate Markdown heading anchors", () => {
     "mazer-current-truth": `${bytes["mazer-current-truth"]}\n## Repeated heading\n\n## Repeated heading\n`,
   }));
 
+  const underscoreHeading = structuredClone(registry);
+  underscoreHeading.workItems[0].sourceRef = "docs/current-truth.md#heading_with_underscore-punctuation";
+  assert.doesNotThrow(() => buildProjectBoardOwnerExport(underscoreHeading, {
+    ...bytes,
+    "mazer-owner-work-registry": JSON.stringify(underscoreHeading),
+    "mazer-current-truth": `${bytes["mazer-current-truth"]}\n## Heading_with_underscore: punctuation!\n`,
+  }));
+
+  for (const [label, fencedMarkdown] of [
+    ["backtick fence with info string", "````markdown\n## Fenced Heading\n````"],
+    ["tilde fence with a longer closer", "~~~md\nFenced Heading\n---\n~~~~"],
+    ["short closer does not end a fence", "````md\n## Fenced Heading\n```\n## Still Fenced\n````"],
+    ["indented code", "    ## Fenced Heading"],
+  ]) {
+    const fencedHeading = structuredClone(registry);
+    fencedHeading.workItems[0].sourceRef = "docs/current-truth.md#fenced-heading";
+    assert.throws(
+      () => buildProjectBoardOwnerExport(fencedHeading, {
+        ...bytes,
+        "mazer-owner-work-registry": JSON.stringify(fencedHeading),
+        "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${fencedMarkdown}\n`,
+      }),
+      /sourceRef fragment does not exist/,
+      label,
+    );
+  }
+
+  const headingAfterFence = structuredClone(registry);
+  headingAfterFence.workItems[0].sourceRef = "docs/current-truth.md#heading-after-fence";
+  assert.doesNotThrow(() => buildProjectBoardOwnerExport(headingAfterFence, {
+    ...bytes,
+    "mazer-owner-work-registry": JSON.stringify(headingAfterFence),
+    "mazer-current-truth": `${bytes["mazer-current-truth"]}\n\`\`\`md\n## Fenced Heading\n\`\`\`\n## Heading After Fence\n`,
+  }));
+
   const dangling = structuredClone(registry);
   dangling.workItems[0].sourceRef = "docs/current-truth.md#renamed-or-missing-heading";
   assert.throws(
     () => buildProjectBoardOwnerExport(dangling, { ...bytes, "mazer-owner-work-registry": JSON.stringify(dangling) }),
     /sourceRef fragment does not exist/,
   );
+});
+
+test("requires every work item card type to match the atlas.card-record.v2 enum", () => {
+  for (const [label, cardType] of [
+    ["missing", undefined],
+    ["non-string", null],
+    ["unsupported", "feature_typo"],
+  ]) {
+    const malformed = structuredClone(registry);
+    if (cardType === undefined) delete malformed.workItems[0].cardType;
+    else malformed.workItems[0].cardType = cardType;
+    assert.throws(
+      () => buildProjectBoardOwnerExport(malformed, { ...bytes, "mazer-owner-work-registry": JSON.stringify(malformed) }),
+      /cardType must be a supported atlas\.card-record\.v2 card type/,
+      label,
+    );
+  }
 });
 
 test("keeps DiscordOS as provenance and board identity only", () => {

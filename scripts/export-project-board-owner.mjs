@@ -26,6 +26,18 @@ const ADMITTED_STATUSES = new Set([
   COMPLETED_STATUS,
   DEFERRED_CANDIDATE_STATUS,
 ]);
+const SUPPORTED_CARD_TYPES = new Set([
+  "feature",
+  "bug",
+  "governance",
+  "architecture",
+  "documentation",
+  "automation",
+  "research",
+  "migration",
+  "reliability",
+  "technical-debt",
+]);
 const SOURCE_PATHS = Object.freeze({
   "mazer-owner-work-registry": { kind: "manual-registry", path: REGISTRY_PATH },
   "mazer-current-truth": { kind: "markdown", path: CURRENT_TRUTH_PATH },
@@ -55,7 +67,7 @@ function githubHeadingBaseSlug(value) {
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/<[^>]*>/g, "")
-    .replace(/[`*_~]/g, "")
+    .replace(/[`*~]/g, "")
     .trim()
     .toLowerCase()
     .replace(/[\t\r\n]/g, " ")
@@ -66,14 +78,27 @@ function githubHeadingBaseSlug(value) {
 function markdownHeadingAnchors(markdown) {
   const headings = [];
   const lines = normalize(markdown).split("\n");
+  let fence = null;
   for (let index = 0; index < lines.length; index += 1) {
-    const atx = lines[index].match(/^\s{0,3}#{1,6}(?:[ \t]+|$)(.*)$/);
+    const line = lines[index];
+    const fenceMatch = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (fence) {
+      if (fenceMatch && fenceMatch[1][0] === fence.marker && fenceMatch[1].length >= fence.length
+        && fenceMatch[2].trim() === "") fence = null;
+      continue;
+    }
+    if (fenceMatch && (fenceMatch[1][0] === "~" || !fenceMatch[2].includes("`"))) {
+      fence = { marker: fenceMatch[1][0], length: fenceMatch[1].length };
+      continue;
+    }
+    if (/^(?: {4}|\t)/.test(line)) continue;
+    const atx = line.match(/^\s{0,3}#{1,6}(?:[ \t]+|$)(.*)$/);
     if (atx) {
       headings.push(atx[1].replace(/[ \t]+#+[ \t]*$/, "").trim());
       continue;
     }
-    if (lines[index].trim() && index + 1 < lines.length && /^\s{0,3}(?:=+|-+)[ \t]*$/.test(lines[index + 1])) {
-      headings.push(lines[index].trim());
+    if (line.trim() && index + 1 < lines.length && /^\s{0,3}(?:=+|-+)[ \t]*$/.test(lines[index + 1])) {
+      headings.push(line.trim());
       index += 1;
     }
   }
@@ -118,6 +143,9 @@ function validateRegistry(registry, sourceBytes) {
     requireString(item.id, "work item id");
     requireString(item.title, `${item.id}.title`);
     requireString(item.description, `${item.id}.description`);
+    if (typeof item.cardType !== "string" || !SUPPORTED_CARD_TYPES.has(item.cardType)) {
+      throw new Error(`${item.id}.cardType must be a supported atlas.card-record.v2 card type`);
+    }
     if (!SOURCE_PATHS[item.sourceId] || item.sourceId === "mazer-owner-export-adapter") throw new Error(`${item.id} has an unsupported source`);
     if (!item.sourceRef.startsWith(`${SOURCE_PATHS[item.sourceId].path}#`)) throw new Error(`${item.id} sourceRef is not bound to its source`);
     if (!Array.isArray(item.dependencies)) throw new Error(`${item.id}.dependencies must be an array`);
