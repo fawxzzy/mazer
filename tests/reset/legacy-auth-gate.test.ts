@@ -108,6 +108,37 @@ describe('legacy full auth gate', () => {
     );
   });
 
+  test('a freshly-loaded, signed-out session actually opens the forced auth overlay, not just computes the locked flag', () => {
+    // Real regression, found live (not invented for this test): commit
+    // c59c2a27 ("fix: complete shared account consumer contract") removed
+    // the one branch in update()'s pendingAuthGateTransition handler that
+    // ever calls enterForcedLegacyAuthOverlay() for the ordinary "just
+    // booted, signed out" case, and nothing replaced it. authGateLocked was
+    // still computed correctly and pendingAuthGateTransition still got set,
+    // but nothing consumed that combination afterward -- confirmed live via
+    // a real headless load with no auth fixture settling into
+    // mode:'menu', overlay:'none' (a fully interactive, unauthenticated
+    // menu) and staying there, never reaching overlay:'auth' at all. This
+    // pins the exact restored branch so it cannot be silently dropped again
+    // the way the original one was.
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const updateStart = menuSceneSource.indexOf('  public update(time: number, delta: number): void {');
+    const pendingBlockEnd = menuSceneSource.indexOf('// pendingBootPlayStart intentionally stays pending', updateStart);
+    const pendingBlockSource = menuSceneSource.slice(updateStart, pendingBlockEnd);
+
+    expect(pendingBlockSource).toContain("} else if (this.authGateLocked && this.overlay !== 'auth') {\n        this.enterForcedLegacyAuthOverlay();");
+    // Ordering matters: this branch must come from an else-if chain after
+    // the password-recovery branch (which already forces 'auth' when
+    // needed) and before the close branch, so the three remain mutually
+    // exclusive on a single pendingAuthGateTransition tick.
+    const passwordRecoveryAt = pendingBlockSource.indexOf("if (this.isLegacyPasswordRecoveryActive() && this.overlay !== 'auth') {");
+    const openGateAt = pendingBlockSource.indexOf("} else if (this.authGateLocked && this.overlay !== 'auth') {");
+    const closeGateAt = pendingBlockSource.indexOf("} else if (!this.authGateLocked && !this.authGateAwaitingResolution && this.overlay === 'auth') {");
+    expect(passwordRecoveryAt).toBeGreaterThanOrEqual(0);
+    expect(openGateAt).toBeGreaterThan(passwordRecoveryAt);
+    expect(closeGateAt).toBeGreaterThan(openGateAt);
+  });
+
   test('signing in successfully closes an auth overlay the gate opened, and clears the loading blocker', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 

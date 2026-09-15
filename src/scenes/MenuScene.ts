@@ -3955,15 +3955,54 @@ export class MenuScene extends Phaser.Scene {
         this.enterForcedLegacyAuthOverlay();
         this.uiDirty = true;
         this.rebuildUi();
+      // Real, confirmed regression (found while restoring a broken visual
+      // verification harness, not invented to satisfy the harness): this
+      // branch -- the one that actually OPENS the forced auth gate for the
+      // ordinary "freshly loaded, signed out" case -- was removed in
+      // c59c2a27 ("fix: complete shared account consumer contract", PR #350)
+      // and never replaced. `authGateLocked` is still computed correctly by
+      // applyLegacyAuthSnapshot on every real boot, and pendingAuthGateTransition
+      // still gets set, but nothing in this handler ever consumed a plain
+      // "locked, not already on the auth surface" state afterward -- so a
+      // signed-out visitor settled into mode:'menu', overlay:'none' with a
+      // fully interactive, unauthenticated menu, contradicting this app's
+      // own documented policy (docs/current-truth.md: "gameplay and ambient
+      // board simulation remain halted" pre-auth, "no guest bypass") and
+      // silently defeating the actual product gate. Confirmed live via a
+      // real headless Playwright load with no auth fixture: mode/overlay
+      // settled at 'menu'/'none' within ~400ms and stayed there for the
+      // remainder of a 32s observation window -- not a slow-resolving race,
+      // a genuinely missing transition. Two later commits (d124dd1b, then
+      // 4a50dcfb) added and then correctly relocated a NARROWER case --
+      // forcing the gate when an already-authenticated account signs out
+      // mid-Play -- into applyLegacyAuthSnapshot's own
+      // accountOwnerChangedDuringPlay branch (which still exists and is
+      // unrelated to this restoration); neither ever restored the general
+      // case this branch covers. Restored verbatim from before c59c2a27's
+      // removal -- not a new design, an exact revert of the one deleted
+      // branch. Mutually exclusive with the branches above/below via
+      // else-if: password-recovery is checked first and already forces
+      // 'auth' when needed, and applyLegacyAuthSnapshot's own synchronous
+      // accountOwnerChangedDuringPlay handling (which sets overlay='auth'
+      // directly, before this deferred handler ever runs) makes this
+      // branch's own `this.overlay !== 'auth'` condition already false for
+      // that case, so it cannot double-fire.
+      } else if (this.authGateLocked && this.overlay !== 'auth') {
+        this.enterForcedLegacyAuthOverlay();
+        this.uiDirty = true;
+        this.rebuildUi();
       } else if (!this.authGateLocked && !this.authGateAwaitingResolution && this.overlay === 'auth') {
         if (this.isLegacyPasswordRecoveryActive()) {
           this.uiDirty = true;
           this.rebuildUi();
         } else {
-          // Signed in successfully (or the gate was never actually locking,
-          // e.g. the auth backend isn't configured) -- if the auth overlay is
-          // still open because the gate put it there, let it close now that
-          // there's nothing left to gate on.
+          // Signed in successfully (or a guest-play grant was issued) -- if
+          // the auth overlay is still open because the gate put it there,
+          // let it close now that there's nothing left to gate on. An
+          // unconfigured backend (authSnapshot.status === 'unavailable')
+          // does NOT reach this branch: authGateLocked stays true for it
+          // (see applyLegacyAuthSnapshot), same as a real signed-out guest --
+          // confirmed live, the gate correctly locks either way.
           this.overlay = 'none';
           this.uiDirty = true;
           this.rebuildUi();
