@@ -2324,6 +2324,69 @@ const buildMarkdownReport = (summary) => {
   ].join('\n');
 };
 
+// The failure-path counterpart to buildMarkdownReport above -- same overall
+// shape (a short fact list, then detail sections), extended rather than
+// replaced, so a broken run still produces a report shaped like the one a
+// reviewer already knows how to read instead of an unfamiliar new format.
+export const buildFailureMarkdownReport = (failureSummary) => {
+  const { failure } = failureSummary;
+  const completedRows = failure.completedSteps.length > 0
+    ? failure.completedSteps.map((step) => `- ${step}`).join('\n')
+    : '_none_';
+  const notRunRows = failure.notRunSteps.length > 0
+    ? failure.notRunSteps.map((step) => `- ${step}`).join('\n')
+    : '_none_';
+  const evidenceBlock = failure.evidence
+    ? `\`\`\`json\n${JSON.stringify(failure.evidence, null, 2)}\n\`\`\``
+    : '_No structured expected-vs-observed evidence was attached to this error (it did not carry an `.evidence` field) -- see the raw error message/stack below instead._';
+
+  return [
+    `# ${failureSummary.label}`,
+    '',
+    '- Pass: no',
+    '- Result: FAILED (harness did not complete)',
+    `- Target: ${failureSummary.targetUrl}`,
+    `- Failed step: ${failure.failedStep}`,
+    `- Repo commit: ${failure.buildIdentity.commit}`,
+    `- Dirty worktree: ${failure.buildIdentity.dirty ? 'yes' : 'no'}`,
+    `- Console warnings/errors: ${failure.consoleMessages.length}`,
+    `- Page errors: ${failure.pageErrors.length}`,
+    '',
+    '## Completed surfaces',
+    '',
+    completedRows,
+    '',
+    '## Not-run surfaces (never reached)',
+    '',
+    notRunRows,
+    '',
+    '## Failed step: expected vs. last observed',
+    '',
+    evidenceBlock,
+    '',
+    '## Error',
+    '',
+    `\`\`\`\n${failure.error.name ?? 'Error'}: ${failure.error.message}\n${failure.error.stack ?? ''}\n\`\`\``,
+    '',
+    failure.diagnosisError ? `_Diagnosing this failure also hit its own error and could not attach full evidence: ${failure.diagnosisError}_\n` : '',
+    '## Failure screenshot',
+    '',
+    // Taken moments AFTER the expected-vs-observed evidence above was read
+    // (the error still has to propagate out of waitForSurface and up to
+    // this function's own catch block first) -- not a guaranteed
+    // same-render-frame pairing, the same honest limit already noted for
+    // the evidence-package screenshot/diagnostics pairing elsewhere in this
+    // repo. A real, observed case of this gap: the evidence can show
+    // overlay:'none' at the moment of timeout while the screenshot taken
+    // slightly later already shows the overlay fully rendered, if the
+    // underlying transition completed in between the two reads.
+    failure.screenshotPath
+      ? `_Captured shortly after the evidence above was read, not the same frame -- the page can visibly change in between (e.g. a transition finishing) while this remains the best available look at the failure state._\n\n![Failure state](${failure.screenshotPath})`
+      : `_No failure screenshot could be captured${failure.screenshotError ? ` (${failure.screenshotError})` : ' (no page was available at the point of failure)'}._`,
+    ''
+  ].join('\n');
+};
+
 export const runUiSurfaceCapture = async (options = {}) => {
   const label = options.label ?? DEFAULT_LABEL;
   const sessionId = resolveSessionId(options.sessionId);
@@ -2354,6 +2417,30 @@ export const runUiSurfaceCapture = async (options = {}) => {
   const consoleMessages = [];
   const pageErrors = [];
 
+  // Ordered plan for this specific invocation's config, used only to report
+  // "not yet reached" steps on a genuine failure -- never to gate normal
+  // execution, which stays exactly as it already was below.
+  const plannedSteps = firstVisibleHomeOnly
+    ? ['boot', 'initial-diagnostics', '01-standalone-first-visible-home', 'writing-report']
+    : [
+      'boot',
+      'initial-diagnostics',
+      ...(authFixture !== 'authenticated' ? ['02-auth'] : []),
+      '01-menu',
+      '02-options',
+      ...(transition ? [] : ['02-options-bottom']),
+      '03-play',
+      '04-pause',
+      ...(transition ? [] : ['04-pause-bottom']),
+      'writing-report'
+    ];
+  const completedSteps = [];
+  let currentStep = 'boot';
+  // Hoisted out of the try block below so a failure-path screenshot can
+  // still be attempted after an error inside it -- a plain `const page =`
+  // declared inside try is not visible to a sibling catch block.
+  let page = null;
+
   await ensureDir(outputDir);
 
   if (!options.skipBuild) {
@@ -2380,7 +2467,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       reducedMotion: options.reducedMotion ? 'reduce' : 'no-preference',
       viewport
     });
-    const page = await context.newPage();
+    page = await context.newPage();
     if (firstVisibleHomeOnly) {
       await installStandaloneFirstVisibleHarness(page);
     }
@@ -2412,6 +2499,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
 
     await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: timeoutMs });
     if (firstVisibleHomeOnly) {
+      currentStep = 'initial-diagnostics';
       await page.waitForFunction(() => Number.isInteger(window.__MAZER_VIEWPORT_GEOMETRY__?.revision), null, {
         timeout: timeoutMs
       });
@@ -2427,6 +2515,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         requireReadableTitle: true,
         timeoutMs
       });
+      completedSteps.push('initial-diagnostics');
+      currentStep = '01-standalone-first-visible-home';
       const menu = await captureSurface({
         page,
         outputDir,
@@ -2448,6 +2538,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         error.evidence = readiness;
         throw error;
       }
+      completedSteps.push('01-standalone-first-visible-home');
+      currentStep = 'writing-report';
       const checks = [
         ...Object.entries(readiness.clauses).map(([id, passed]) => createCheck(
           `standalone-first-visible-${id}`,
@@ -2497,6 +2589,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       ].join('\n')}\n`, 'utf8');
       return { ...summary, summaryPath };
     }
+    currentStep = 'initial-diagnostics';
     let initialDiagnostics;
     if (authFixture === 'authenticated') {
       await waitForAuthenticatedFixtureReady(page, { timeoutMs });
@@ -2516,8 +2609,10 @@ export const runUiSurfaceCapture = async (options = {}) => {
         timeoutMs
       });
     }
+    completedSteps.push(currentStep);
     const startsAtAuthOverlay = initialDiagnostics.visual?.runtime?.mode === 'menu'
       && initialDiagnostics.visual?.runtime?.overlay === 'auth';
+    currentStep = '02-auth';
     const authSurface = startsAtAuthOverlay
       ? await (async () => {
         const captured = await captureSurface({
@@ -2554,6 +2649,9 @@ export const runUiSurfaceCapture = async (options = {}) => {
         skipped: true,
         reason: 'already-authenticated'
       };
+    if (startsAtAuthOverlay) {
+      completedSteps.push('02-auth');
+    }
     const reducedMotionToggle = options.reducedMotion
       ? null
       : await exerciseReducedMotionPreferenceChange(page, timeoutMs);
@@ -2564,6 +2662,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       requireReadableTitle: true,
       timeoutMs
     });
+    currentStep = '01-menu';
     const menu = await captureSurface({
       page,
       outputDir,
@@ -2580,12 +2679,14 @@ export const runUiSurfaceCapture = async (options = {}) => {
         id: '01-menu', mode: 'menu', overlay: 'none', page, route, timeoutMs, transition
       })
       : null;
+    completedSteps.push('01-menu');
     const authGatedMenu = isAuthGatedMenuSurface(menu.diagnostics.visual);
     const optionsBottomExpectedLabels = OPTIONS_BOTTOM_EXPECTED_LABELS;
     const currentMenuDiagnostics = transition ? await readDiagnostics(page) : menu.diagnostics;
     const menuButtons = getMenuButtonPoints(currentMenuDiagnostics.visual);
     await waitForVisualBuildSettled(page, { timeoutMs });
     let optionsBottomSurface = null;
+    currentStep = '02-options';
     const optionsSurface = await (async () => {
         await waitForVisualBuildSettled(page, { timeoutMs });
         const optionsCaptureExpectedLabels = [...OPTIONS_BASE_EXPECTED_LABELS];
@@ -2624,6 +2725,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
           };
         } else {
           const optionsScrollResult = await scrollOverlayToBottom(page, { timeoutMs });
+          currentStep = '02-options-bottom';
           optionsBottomSurface = optionsScrollResult.visual?.overlayUi?.scroll?.enabled === true
             ? await captureSurface({
               page,
@@ -2642,6 +2744,10 @@ export const runUiSurfaceCapture = async (options = {}) => {
         await closeOverlayToMenu(page, timeoutMs);
         return captured;
       })();
+    completedSteps.push('02-options');
+    if (!transition) {
+      completedSteps.push('02-options-bottom');
+    }
 
     const playRoute = authGatedMenu
       ? resolveRouteWithParams(route, { authFixture: 'authenticated' })
@@ -2660,6 +2766,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         expectTrailShineEnabled: !options.reducedMotion,
         timeoutMs
       });
+    currentStep = '03-play';
     const play = await captureSurface({
       page,
       outputDir,
@@ -2676,7 +2783,9 @@ export const runUiSurfaceCapture = async (options = {}) => {
         id: '03-play', mode: 'play', overlay: 'none', page, route: playRoute, timeoutMs, transition
       })
       : null;
+    completedSteps.push('03-play');
 
+    currentStep = '04-pause';
     await openPauseOverlayViaQa(page, timeoutMs);
     const pause = await captureSurface({
       page,
@@ -2696,6 +2805,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         id: '04-pause', mode: 'play', overlay: 'pause', page, route: playRoute, timeoutMs, transition
       })
       : null;
+    completedSteps.push('04-pause');
+    currentStep = '04-pause-bottom';
     const pauseBottomSurface = transition
       ? { diagnostics: { runtime: null, visual: null }, nativeInputs: [], screenContract: null, skipped: true }
       : await (async () => {
@@ -2713,6 +2824,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
           viewport
         });
       })();
+    completedSteps.push('04-pause-bottom');
+    currentStep = 'writing-report';
 
     const surfaces = {
       menu: {
@@ -2900,10 +3013,102 @@ export const runUiSurfaceCapture = async (options = {}) => {
       ...summary,
       summaryPath
     };
+  } catch (error) {
+    // A genuine harness failure must still retain a report: the failed
+    // step/route, expected-vs-observed evidence (already attached by
+    // waitForSurface/waitForAuthenticatedFixtureReady when the error came
+    // from one of those), completed/failed/not-run surface accounting,
+    // build identity, sanitized error detail, and a best-effort screenshot.
+    // Every piece below is independently best-effort: if gathering or
+    // writing any one of them throws, that must become supplementary
+    // evidence, never something that replaces or swallows the original
+    // error being reported -- the whole point of this block is that a
+    // broken failure reporter must not turn a real failure into a false
+    // pass or a silent, evidence-free crash.
+    let screenshotPath = null;
+    let screenshotError = null;
+    if (page) {
+      try {
+        screenshotPath = resolve(outputDir, 'failure.png');
+        await page.screenshot({ path: screenshotPath, fullPage: false });
+      } catch (captureError) {
+        screenshotPath = null;
+        screenshotError = captureError instanceof Error ? captureError.message : String(captureError);
+      }
+    }
+
+    const failedStepIndex = plannedSteps.indexOf(currentStep);
+    const notRunSteps = failedStepIndex === -1
+      ? plannedSteps.filter((step) => !completedSteps.includes(step))
+      : plannedSteps.slice(failedStepIndex + 1);
+
+    const failure = {
+      buildIdentity: {
+        commit: getCommitSha(),
+        dirty: isWorktreeDirty()
+      },
+      code: error?.code ?? null,
+      completedSteps,
+      diagnosisError: null,
+      error: {
+        message: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : null,
+        stack: error instanceof Error ? error.stack : null
+      },
+      evidence: error?.evidence ?? null,
+      failedStep: currentStep,
+      notRunSteps,
+      pageErrors,
+      consoleMessages,
+      screenshotError,
+      screenshotPath
+    };
+
+    const failureSummary = {
+      pass: false,
+      label,
+      sessionId,
+      targetUrl,
+      authFixture: authFixture ?? null,
+      failure
+    };
+
+    try {
+      const summaryPath = resolve(outputDir, 'summary.json');
+      const reportPath = resolve(outputDir, 'report.md');
+      failureSummary.summaryPath = summaryPath;
+      failureSummary.reportPath = reportPath;
+      await writeFile(summaryPath, `${JSON.stringify(failureSummary, null, 2)}\n`, 'utf8');
+      await writeFile(reportPath, `${buildFailureMarkdownReport(failureSummary)}\n`, 'utf8');
+    } catch (writeError) {
+      failure.diagnosisError = writeError instanceof Error
+        ? `Failed to write the failure report itself: ${writeError.message}`
+        : `Failed to write the failure report itself: ${String(writeError)}`;
+      // Surfaced via the rethrown error's own message below and via
+      // stderr, since the file we would have written it to is exactly what
+      // just failed.
+      console.error(failure.diagnosisError);
+    }
+
+    // The original error is what actually happened and is never replaced
+    // by anything above -- only ever supplemented via error.evidence /
+    // the retained failure report on disk.
+    throw error;
   } finally {
-    await browser.close();
+    // Each cleanup attempted independently: a browser that fails to close
+    // must not prevent an attempt to stop the task-owned preview server,
+    // and vice versa.
+    try {
+      await browser.close();
+    } catch (closeError) {
+      console.error('Failed to close the browser during cleanup:', closeError);
+    }
     if (preview) {
-      await stopPreviewServer(preview.child);
+      try {
+        await stopPreviewServer(preview.child);
+      } catch (stopError) {
+        console.error('Failed to stop the preview server during cleanup:', stopError);
+      }
     }
   }
 };
