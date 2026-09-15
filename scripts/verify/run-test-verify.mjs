@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { NAVIGATION_CORE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './navigation-core-required-tests.mjs';
 import { TELEPORT_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './teleport-required-tests.mjs';
 import { WORLD_IDENTITY_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './world-identity-required-tests.mjs';
+import { SHARED_ACCOUNT_OAUTH_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './shared-account-oauth-required-tests.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPO_ROOT = resolve(SCRIPT_PATH, '..', '..', '..');
@@ -53,6 +54,13 @@ runVitest([
   // Wave 4E's World Identity required coverage -- same silent-gap class;
   // see world-identity-required-tests.mjs's own header.
   ...WORLD_IDENTITY_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
+  // Wave 5C's shared-account OAuth consumer required coverage -- same
+  // silent-gap class; see shared-account-oauth-required-tests.mjs's own
+  // header. Currently empty after the tests/reset/* filter (its one entry
+  // is already covered by TEST_SPINE's glob above) -- kept here anyway so a
+  // future non-tests/reset/* addition to this wave's list is covered
+  // automatically instead of silently missed again.
+  ...SHARED_ACCOUNT_OAUTH_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
   '--exclude', CWD_MUTATING_FIXTURE,
   '--maxWorkers', '1',
   '--pool=threads',
