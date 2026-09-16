@@ -5,11 +5,53 @@ import {
   collectMenuControlSpacingIssues,
   evaluateAuthenticatedFixtureReadiness,
   evaluateStandaloneFirstVisibleHomeReadiness,
+  evaluateSurfaceReadiness,
   hasExpectedTextLabels,
   matchesExpectedTextLabel,
   resolveCaptureTarget,
-  waitForAuthenticatedFixtureReady
+  waitForAuthenticatedFixtureReady,
+  waitForSurface
 } from '../../scripts/analysis/capture-ui-surfaces.mjs';
+
+const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';
+const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
+
+const signedOutMenuDiagnostics = () => ({
+  runtime: { auth: { status: 'guest' } },
+  visual: { runtime: { mode: 'menu', overlay: 'none' }, textLabels: [] }
+});
+
+// A minimal Playwright Page stand-in for waitForSurface's own wiring (the
+// try/catch around page.waitForFunction that turns a timeout into a rich
+// error). evaluate() mirrors readAttributePresence's {parsed, presence}
+// contract by attribute name instead of running real browser code, since
+// there is no DOM here to run document.documentElement.getAttribute()
+// against.
+const makeFakeSurfacePage = ({ diagnosticsSequence, timesOut }) => {
+  let readIndex = -1;
+  const current = () => diagnosticsSequence[Math.min(Math.max(readIndex, 0), diagnosticsSequence.length - 1)];
+  return {
+    evaluate: async (_fn, attribute) => {
+      if (attribute === RUNTIME_DIAGNOSTICS_ATTRIBUTE) {
+        const value = current().runtime;
+        return value === null ? { parsed: null, presence: 'absent' } : { parsed: value, presence: 'present' };
+      }
+      if (attribute === VISUAL_DIAGNOSTICS_ATTRIBUTE) {
+        const value = current().visual;
+        return value === null ? { parsed: null, presence: 'absent' } : { parsed: value, presence: 'present' };
+      }
+      return { parsed: null, presence: 'absent' };
+    },
+    waitForFunction: async () => {
+      readIndex += 1;
+      if (timesOut) {
+        const error = new Error('waitForFunction: Timeout exceeded');
+        error.name = 'TimeoutError';
+        throw error;
+      }
+    }
+  };
+};
 
 const bounds = (left = 0, top = 0, width = 44, height = 44) => ({
   bottom: top + height,
@@ -115,6 +157,271 @@ describe('UI surface authenticated fixture readiness', () => {
         }
       }
     });
+  });
+});
+
+describe('UI surface generic readiness evaluation', () => {
+  // Real gap this closes: the original waitForSurface folded "missing
+  // diagnostics", "malformed JSON", "wrong mode", "wrong overlay", and
+  // "unsettled play geometry" into one opaque page.waitForFunction timeout,
+  // with no way to tell which one actually happened. Each test below pins
+  // evaluateSurfaceReadiness to report exactly one distinct failing clause
+  // for exactly one distinct real-world cause.
+  test('reports every clause satisfied for a fully-settled matching surface', () => {
+    const evaluation = evaluateSurfaceReadiness({
+      ...signedOutMenuDiagnostics(),
+      mode: 'menu',
+      overlay: 'none'
+    });
+
+    expect(evaluation.ready).toBe(true);
+    expect(evaluation.failedClauses).toEqual([]);
+    expect(evaluation.clauses).toEqual({
+      hasRuntimeDiagnostics: true,
+      hasVisualDiagnostics: true,
+      modeMatches: true,
+      overlayMatches: true,
+      playGeometrySettled: true,
+      labelsPresent: true
+    });
+  });
+
+  test('distinguishes missing diagnostics attributes from a wrong mode or overlay', () => {
+    const missing = evaluateSurfaceReadiness({ runtime: null, visual: null, mode: 'menu', overlay: 'auth' });
+    expect(missing.failedClauses).toEqual(['hasRuntimeDiagnostics', 'hasVisualDiagnostics', 'modeMatches', 'overlayMatches']);
+
+    const wrongMode = evaluateSurfaceReadiness({
+      runtime: { auth: { status: 'guest' } },
+      visual: { runtime: { mode: 'play', overlay: 'none' }, textLabels: [] },
+      mode: 'menu',
+      overlay: 'none'
+    });
+    expect(wrongMode.failedClauses).toEqual(['modeMatches']);
+    expect(wrongMode.state.actualMode).toBe('play');
+    expect(wrongMode.state.expectedMode).toBe('menu');
+
+    const wrongOverlay = evaluateSurfaceReadiness({
+      runtime: { auth: { status: 'guest' } },
+      visual: { runtime: { mode: 'menu', overlay: 'none' }, textLabels: [] },
+      mode: 'menu',
+      overlay: 'auth'
+    });
+    expect(wrongOverlay.failedClauses).toEqual(['overlayMatches']);
+    expect(wrongOverlay.state.actualOverlay).toBe('none');
+    expect(wrongOverlay.state.expectedOverlay).toBe('auth');
+  });
+
+  test('flags unsettled play geometry independently of mode/overlay, only when play geometry is actually required', () => {
+    const unsettled = evaluateSurfaceReadiness({
+      runtime: { auth: { status: 'authenticated' } },
+      visual: { board: { bounds: {} }, runtime: { mode: 'play', overlay: 'none', playLifecycle: { inputLocked: true } }, textLabels: [] },
+      mode: 'play',
+      overlay: 'none'
+    });
+    expect(unsettled.failedClauses).toEqual(['playGeometrySettled']);
+
+    const settled = evaluateSurfaceReadiness({
+      runtime: { auth: { status: 'authenticated' } },
+      visual: {
+        board: { bounds: { left: 0, top: 0, right: 100, bottom: 100 } },
+        runtime: { mode: 'play', overlay: 'none', playLifecycle: { inputLocked: false } },
+        textLabels: []
+      },
+      mode: 'play',
+      overlay: 'none'
+    });
+    expect(settled.ready).toBe(true);
+
+    // Geometry settlement is only meaningful for the live play/none surface;
+    // an unsettled board must not block a menu or overlay check.
+    const menuIgnoresGeometry = evaluateSurfaceReadiness({
+      runtime: { auth: { status: 'guest' } },
+      visual: { board: { bounds: {} }, runtime: { mode: 'menu', overlay: 'auth' }, textLabels: [] },
+      mode: 'menu',
+      overlay: 'auth'
+    });
+    expect(menuIgnoresGeometry.ready).toBe(true);
+  });
+
+  test('names exactly the missing labels, including ones with an allowed inline-state suffix', () => {
+    const evaluation = evaluateSurfaceReadiness({
+      runtime: { auth: { status: 'guest' } },
+      visual: {
+        runtime: { mode: 'menu', overlay: 'auth' },
+        textLabels: [{ text: 'EMAIL' }, { text: 'Sign in' }]
+      },
+      mode: 'menu',
+      overlay: 'auth',
+      expectedLabels: ['EMAIL', 'PASSWORD', 'Sign in', 'Create account', 'Reset password']
+    });
+
+    expect(evaluation.failedClauses).toEqual(['labelsPresent']);
+    expect(evaluation.state.missingLabels).toEqual(['PASSWORD', 'Create account', 'Reset password']);
+
+    // 'Camera Follow' (an options toggle row, unlike the fixed auth labels
+    // above) is one of the INLINE_STATE_TEXT_LABELS that legitimately renders
+    // with a live value suffix -- matchesExpectedTextLabel must accept that
+    // suffixed form as present, not just an exact match.
+    const withStateSuffix = evaluateSurfaceReadiness({
+      runtime: { auth: { status: 'guest' } },
+      visual: {
+        runtime: { mode: 'menu', overlay: 'options' },
+        textLabels: [{ text: 'Camera Follow: On' }, { text: 'Board Zoom' }]
+      },
+      mode: 'menu',
+      overlay: 'options',
+      expectedLabels: ['Camera Follow', 'Board Zoom']
+    });
+    expect(withStateSuffix.state.missingLabels).toEqual([]);
+    expect(withStateSuffix.ready).toBe(true);
+  });
+
+  // Reference copy of the browser-side page.waitForFunction predicate's own
+  // label-extraction logic (capture-ui-surfaces.mjs, inside waitForSurface's
+  // labels wait) -- independently written, not imported, specifically so
+  // this test can catch the two implementations disagreeing about a
+  // malformed shape instead of both silently sharing the same bug. Keep
+  // this in sync if that inline logic changes.
+  const referenceExtractLabels = (textLabels) => (
+    Array.isArray(textLabels) ? textLabels : []
+  )
+    .filter((entry) => entry !== null && typeof entry === 'object')
+    .map((entry) => entry.text);
+
+  const malformedTextLabelsInputs = [
+    undefined,
+    null,
+    'not-an-array',
+    42,
+    {},
+    [null, 'oops', 42, { text: 'Sign in' }, { text: 'Create account' }]
+  ];
+
+  test('tolerates a malformed textLabels shape instead of throwing, and agrees with the browser-side predicate', () => {
+    for (const textLabels of malformedTextLabelsInputs) {
+      expect(() => evaluateSurfaceReadiness({
+        runtime: { auth: { status: 'guest' } },
+        visual: { runtime: { mode: 'menu', overlay: 'auth' }, textLabels },
+        mode: 'menu',
+        overlay: 'auth',
+        expectedLabels: ['Sign in']
+      })).not.toThrow();
+
+      const evaluation = evaluateSurfaceReadiness({
+        runtime: { auth: { status: 'guest' } },
+        visual: { runtime: { mode: 'menu', overlay: 'auth' }, textLabels },
+        mode: 'menu',
+        overlay: 'auth',
+        expectedLabels: ['Sign in']
+      });
+      expect(evaluation.state.actualLabels).toEqual(referenceExtractLabels(textLabels));
+    }
+  });
+
+  test('reports a distinct presence for missing, malformed-JSON-shaped, and present diagnostics instead of collapsing them to one clause value', () => {
+    const missing = evaluateSurfaceReadiness({
+      mode: 'menu',
+      overlay: 'auth',
+      runtimePresence: 'absent',
+      visualPresence: 'absent'
+    });
+    expect(missing.failedClauses).toEqual(['hasRuntimeDiagnostics', 'hasVisualDiagnostics', 'modeMatches', 'overlayMatches']);
+    expect(missing.state.runtimePresence).toBe('absent');
+    expect(missing.state.visualPresence).toBe('absent');
+
+    const malformed = evaluateSurfaceReadiness({
+      mode: 'menu',
+      overlay: 'auth',
+      runtimePresence: 'malformed-json',
+      visualPresence: 'invalid-shape'
+    });
+    expect(malformed.failedClauses).toContain('hasRuntimeDiagnostics');
+    expect(malformed.failedClauses).toContain('hasVisualDiagnostics');
+    expect(malformed.state.runtimePresence).toBe('malformed-json');
+    expect(malformed.state.visualPresence).toBe('invalid-shape');
+
+    const present = evaluateSurfaceReadiness({
+      runtime: { auth: { status: 'guest' } },
+      visual: { runtime: { mode: 'menu', overlay: 'auth' }, textLabels: [] },
+      mode: 'menu',
+      overlay: 'auth'
+    });
+    expect(present.clauses.hasRuntimeDiagnostics).toBe(true);
+    expect(present.clauses.hasVisualDiagnostics).toBe(true);
+    expect(present.state.runtimePresence).toBe('present');
+    expect(present.state.visualPresence).toBe('present');
+  });
+});
+
+describe('UI surface waitForSurface self-describing failures', () => {
+  // Wiring tests for the try/catch around page.waitForFunction: on a real
+  // Playwright TimeoutError, waitForSurface must re-check with
+  // evaluateSurfaceReadiness and throw a rich, typed error -- never resolve
+  // with a false "success", and never swallow a non-timeout error.
+  test('throws SURFACE_READINESS_TIMEOUT with clause-level evidence when mode/overlay never settle', async () => {
+    const page = makeFakeSurfacePage({
+      diagnosticsSequence: [{
+        runtime: { auth: { status: 'guest' } },
+        visual: { runtime: { mode: 'menu', overlay: 'none' }, textLabels: [] }
+      }],
+      timesOut: true
+    });
+
+    await expect(waitForSurface(page, { mode: 'menu', overlay: 'auth', timeoutMs: 5 })).rejects.toMatchObject({
+      code: 'SURFACE_READINESS_TIMEOUT',
+      evidence: {
+        cause: 'mode-overlay-geometry',
+        failedClauses: ['overlayMatches'],
+        lastState: { actualMode: 'menu', actualOverlay: 'none', expectedMode: 'menu', expectedOverlay: 'auth' }
+      }
+    });
+  });
+
+  test('throws with cause "labels" when the surface settles but expected text never appears', async () => {
+    const page = makeFakeSurfacePage({
+      diagnosticsSequence: [{
+        runtime: { auth: { status: 'guest' } },
+        visual: { runtime: { mode: 'menu', overlay: 'auth' }, textLabels: [{ text: 'Sign in' }] }
+      }],
+      timesOut: false
+    });
+    // The first (mode/overlay/geometry) waitForFunction call succeeds; only
+    // the second (labels) call should time out and drive the evidence.
+    let call = 0;
+    page.waitForFunction = async () => {
+      call += 1;
+      if (call === 2) {
+        const error = new Error('waitForFunction: Timeout exceeded');
+        error.name = 'TimeoutError';
+        throw error;
+      }
+    };
+
+    await expect(waitForSurface(page, {
+      expectedLabels: ['EMAIL', 'Sign in'],
+      mode: 'menu',
+      overlay: 'auth',
+      timeoutMs: 5
+    })).rejects.toMatchObject({
+      code: 'SURFACE_READINESS_TIMEOUT',
+      evidence: {
+        cause: 'labels',
+        failedClauses: ['labelsPresent'],
+        lastState: { missingLabels: ['EMAIL'] }
+      }
+    });
+  });
+
+  test('does not swallow a non-timeout page error as a readiness failure', async () => {
+    const page = {
+      evaluate: async () => null,
+      waitForFunction: async () => {
+        throw new Error('Target page, context or browser has been closed');
+      }
+    };
+
+    await expect(waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs: 5 }))
+      .rejects.toThrow('Target page, context or browser has been closed');
   });
 });
 
@@ -383,7 +690,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("if (authFixture === 'authenticated') {");
     expect(source).toContain('await waitForAuthenticatedFixtureReady(page, { timeoutMs });');
     expect(source).toContain('expectedOverlay: overlay');
-    expect(source).toContain("visual?.runtime?.mode === expectedMode\n          && visual?.runtime?.overlay === expectedOverlay");
+    expect(source).toContain("visual?.runtime?.mode === expectedMode\n            && visual?.runtime?.overlay === expectedOverlay");
     expect(source).toContain('screenContract: optionsSurface.screenContract');
     expect(source).toContain('const resolveRouteWithParams = (route, params) => {');
     expect(source).toContain('const isAuthGatedMenuSurface = (surface) => (');
@@ -484,8 +791,12 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'auth-text-labels'");
     expect(source).toContain('const AUTH_EXPECTED_LABELS = Object.freeze([');
     expect(source).not.toContain("'Play as guest'");
-    expect(source).toContain("'EMAIL'");
-    expect(source).toContain("'PASSWORD'");
+    // EMAIL/PASSWORD inline field labels were removed from this list: the
+    // shared account OAuth portal redesign (769e63f6) means the signed-out
+    // auth gate never renders them (see the comment above the constant's
+    // declaration for the full evidence trail).
+    expect(source).not.toContain("'EMAIL'");
+    expect(source).not.toContain("'PASSWORD'");
     expect(source).toContain('hasLabels(surfaces.auth, AUTH_EXPECTED_LABELS)');
     expect(source).toContain('const collectTextBoundsIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain('const collectNativeInputBoundsIssues = (surfaceId, surface, viewport) => {');
