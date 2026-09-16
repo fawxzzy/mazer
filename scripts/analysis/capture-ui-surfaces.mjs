@@ -341,6 +341,21 @@ export const waitForSurface = async (page, {
         }
 
         try {
+          // Actually parse and shape-check runtimeRaw, not just require it
+          // non-empty: this predicate's own decision only ever reads from
+          // the parsed visual payload's nested .runtime, so a malformed
+          // runtimeRaw (present but not valid JSON, or valid JSON that
+          // isn't a plain object) previously passed straight through the
+          // truthiness check above with its content never inspected --
+          // disagreeing with evaluateSurfaceReadiness's own
+          // hasRuntimeDiagnostics clause, which does require it parseable.
+          // Reproduced: a broken '{broken', a bare '"not an object"', or
+          // '[]'/'null' all satisfied the old check while every one of them
+          // would report hasRuntimeDiagnostics: false on the failure path.
+          const runtime = JSON.parse(runtimeRaw);
+          if (runtime === null || typeof runtime !== 'object' || Array.isArray(runtime)) {
+            return false;
+          }
           const visual = JSON.parse(visualRaw);
           const board = visual?.board?.bounds;
           // Starting a game changes the mode before the next layout publication.

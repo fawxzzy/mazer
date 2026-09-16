@@ -1,24 +1,40 @@
 /**
- * Wave 0C: bounded, real-process negative control for the visual-
+ * Wave 0C: bounded, real-process negative controls for the visual-
  * verification harness's OWN failure-reporting path
- * (capture-ui-surfaces.mjs's runUiSurfaceCapture catch block).
+ * (capture-ui-surfaces.mjs's runUiSurfaceCapture catch block) AND for
+ * waitForSurface's runtime-diagnostics parsing.
  *
  * A real gap this closes: tests/reset/ui-surface-capture-script.test.mjs's
  * unit tests exercise evaluateSurfaceReadiness and waitForSurface's own
  * error-throwing against a mocked Playwright page -- valuable, but a mock
  * cannot prove the actual CLI entry point exits nonzero, actually writes a
- * retained summary.json/report.md to disk on a real failure, or actually
- * releases the preview server port afterward. This script proves those
- * three things against the real `node capture-ui-surfaces.mjs` process and
- * a real (deliberately-broken) browser run, then restores nothing because
- * it never modifies source -- the "negative control" here is an
- * impossible-to-satisfy timeout passed as a normal CLI argument, not a
- * temporary source edit.
+ * retained summary.json/report.md to disk on a real failure, actually
+ * releases the preview server port afterward, or that the REAL browser-side
+ * predicate (not a reference copy) agrees with evaluateSurfaceReadiness
+ * about malformed diagnostics. This script proves all of that against the
+ * real `node capture-ui-surfaces.mjs` process and real (deliberately
+ * provoked) browser runs, then restores nothing because it never edits
+ * source -- every negative control here is a normal function argument or
+ * CLI flag, not a temporary source edit.
  *
- * Deliberately forces failure via `--timeout-ms=1` (no real page can ever
- * signal readiness in 1ms) rather than disabling a real assertion, so this
- * stays a pure black-box check of the reporting contract and can be left
- * permanently wired into CI without ever needing to "restore" anything.
+ * Four parts, each proving a distinct failure mode -- do not collapse them:
+ *   1-2. BOOT/NAVIGATION failure (a page that never loads at all --
+ *        `--timeout-ms=1`, a value no real page can ever satisfy). Proves
+ *        the reporting contract works for the earliest possible failure.
+ *   3.   RUNTIME-DIAGNOSTICS PARITY (no app, a blank page with a hand-set
+ *        `data-mazer-runtime-diagnostics` attribute). Proves the real
+ *        browser-side predicate -- not a reference copy -- now rejects a
+ *        malformed runtime payload the same way evaluateSurfaceReadiness's
+ *        hasRuntimeDiagnostics clause does, closing the exact gap an owner
+ *        review reproduced live (a bare truthiness check on runtimeRaw that
+ *        never actually parsed it).
+ *   4.   POST-NAVIGATION READINESS failure (the real app, real navigation
+ *        genuinely completes, then the specific mode/overlay readiness
+ *        clause fails). Proves SURFACE_READINESS_TIMEOUT's own
+ *        clause-level evidence is retained, not just a navigation timeout
+ *        -- the earlier version of this script only ever demonstrated #1-2
+ *        and mislabeling that as covering the readiness path was itself a
+ *        review finding.
  *
  * Usage: node scripts/analysis/verify-ui-surfaces-failure-reporting.mjs [--skip-build]
  */
@@ -27,8 +43,10 @@ import { readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { REPO_ROOT, STACK_ROOT, parseCliArgs } from '../visual/common.mjs';
-import { runUiSurfaceCapture } from './capture-ui-surfaces.mjs';
+import { chromium } from 'playwright';
+import { DEFAULT_BASE_URL, DEFAULT_PREVIEW_TIMEOUT_MS, REPO_ROOT, STACK_ROOT, normalizeBaseUrl, parseCliArgs } from '../visual/common.mjs';
+import { launchPreviewServer, stopPreviewServer } from '../visual/preview-server.mjs';
+import { runUiSurfaceCapture, waitForSurface } from './capture-ui-surfaces.mjs';
 
 const CLI_SCRIPT_PATH = fileURLToPath(new URL('./capture-ui-surfaces.mjs', import.meta.url));
 const CAPTURES_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-ui-surfaces');
@@ -84,9 +102,12 @@ const main = async () => {
     runBuild();
   }
 
-  // === Part 1: call runUiSurfaceCapture directly in-process, asserting the
-  // function-level contract (rejects, does not hang, still releases its
-  // own preview server). ===
+  // === Part 1: BOOT/NAVIGATION failure -- call runUiSurfaceCapture
+  // directly in-process with a 1ms timeout (the page never even finishes
+  // loading), asserting the function-level contract (rejects, does not
+  // hang, still releases its own preview server). This is the earliest
+  // possible failure point (currentStep stays 'boot'), NOT a
+  // SURFACE_READINESS_TIMEOUT -- see Part 4 below for that. ===
   const directSessionId = `verify-failure-reporting-direct-${Date.now()}`;
   let directError = null;
   try {
@@ -100,7 +121,7 @@ const main = async () => {
     directError = error;
   }
   check(
-    'a deliberately-impossible 1ms readiness timeout makes runUiSurfaceCapture actually reject, not resolve with a false pass',
+    'a deliberately-impossible 1ms navigation timeout makes runUiSurfaceCapture actually reject, not resolve with a false pass',
     directError !== null,
     directError ? `${directError.name ?? 'Error'}: ${directError.message}` : 'resolved without throwing'
   );
@@ -119,9 +140,11 @@ const main = async () => {
     `port 4173 free: ${directPortFree}`
   );
 
-  // === Part 2: the real CLI entry point as its own OS process, asserting
-  // the actual exit code a CI step or a human running this by hand would
-  // see -- the in-process call above cannot prove this by itself. ===
+  // === Part 2: BOOT/NAVIGATION failure, the real CLI entry point as its
+  // own OS process, asserting the actual exit code a CI step or a human
+  // running this by hand would see -- the in-process call above cannot
+  // prove this by itself. Same 1ms boot-level failure as Part 1, not a
+  // readiness-clause failure. ===
   const cliSessionId = `verify-failure-reporting-cli-${Date.now()}`;
   let cliExitCode = 0;
   try {
@@ -181,9 +204,140 @@ const main = async () => {
     `port 4173 free: ${cliPortFree}`
   );
 
-  // This script only ever passes a CLI flag (--timeout-ms=1); it never
-  // edits source, so there is nothing to restore. Only its own scratch
-  // capture directories need cleaning up.
+  // === Part 3: RUNTIME-DIAGNOSTICS PARITY. No app needed -- a blank page
+  // with the two diagnostics attributes set by hand, so the ONLY variable
+  // is whether waitForSurface's real (not a reference copy) browser-side
+  // predicate treats a malformed data-mazer-runtime-diagnostics value the
+  // same way evaluateSurfaceReadiness's hasRuntimeDiagnostics clause does.
+  // Before the fix this round, the predicate only checked runtimeRaw for
+  // non-emptiness and never parsed it -- every one of the malformed cases
+  // below satisfied that check and the predicate resolved anyway, purely
+  // because its own mode/overlay decision only ever reads the SEPARATE
+  // visual payload's nested .runtime, never the runtime payload itself. ===
+  const parityBrowser = await chromium.launch({ headless: true });
+  try {
+    const setDiagnosticsAttributes = (page, { runtimeRaw, visualRaw }) => page.evaluate(({ runtimeRaw: r, visualRaw: v }) => {
+      document.documentElement.setAttribute('data-mazer-runtime-diagnostics', r);
+      document.documentElement.setAttribute('data-mazer-visual-diagnostics', v);
+    }, { runtimeRaw, visualRaw });
+    const validVisualRaw = JSON.stringify({ runtime: { mode: 'menu', overlay: 'none' }, textLabels: [] });
+    const malformedRuntimeCases = [
+      ['malformed JSON', '{broken'],
+      ['valid JSON, wrong top-level shape (string)', JSON.stringify('not an object')],
+      ['valid JSON, wrong top-level shape (array)', '[]'],
+      ['valid JSON, null', 'null']
+    ];
+
+    for (const [label, runtimeRaw] of malformedRuntimeCases) {
+      const page = await parityBrowser.newPage();
+      await page.goto('about:blank');
+      await setDiagnosticsAttributes(page, { runtimeRaw, visualRaw: validVisualRaw });
+      let rejected = false;
+      try {
+        await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs: 300 });
+      } catch {
+        rejected = true;
+      }
+      check(
+        `the real waitForSurface predicate does not resolve when data-mazer-runtime-diagnostics is ${label}, even though the visual payload alone would satisfy it`,
+        rejected,
+        `runtimeRaw=${runtimeRaw}`
+      );
+      await page.close();
+    }
+
+    const page = await parityBrowser.newPage();
+    await page.goto('about:blank');
+    await setDiagnosticsAttributes(page, {
+      runtimeRaw: JSON.stringify({ surface: { mode: 'menu', overlay: 'none' } }),
+      visualRaw: validVisualRaw
+    });
+    let validResolved = false;
+    try {
+      await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs: 2000 });
+      validResolved = true;
+    } catch {
+      validResolved = false;
+    }
+    check(
+      'the same predicate DOES resolve once data-mazer-runtime-diagnostics is genuinely valid JSON shaped as a plain object -- the fix only rejects malformed shapes, it does not newly require content it never checked before',
+      validResolved,
+      `validResolved=${validResolved}`
+    );
+    await page.close();
+  } finally {
+    await parityBrowser.close();
+  }
+
+  // === Part 4: POST-NAVIGATION READINESS failure. The real app, real
+  // navigation genuinely completes -- then waitForSurface is asked to wait
+  // for an overlay value ('__verify_never_reached__') the app can never
+  // actually produce. This is deterministic, not a timing race: an earlier
+  // version of this check picked a timeout meant to land between real
+  // navigation and real auth-gate readiness (empirically ~700ms vs.
+  // ~1720ms in an isolated measurement) and it flaked on its very first
+  // run inside this same script -- warmed caches from Parts 1-3 running
+  // first sped up the real app's own boot enough that 1000ms was no longer
+  // short enough, resolving instead of failing. Asking for a value that
+  // structurally never occurs removes the race entirely: correctness no
+  // longer depends on how fast the app happens to boot on a given
+  // machine/run, only on whether it ever produces the requested overlay
+  // (it never will), so a generous timeout is safe and appropriate here. ===
+  const readinessPreview = await launchPreviewServer({
+    requestedBaseUrl: normalizeBaseUrl(DEFAULT_BASE_URL),
+    previewTimeoutMs: DEFAULT_PREVIEW_TIMEOUT_MS
+  });
+  try {
+    const readinessBrowser = await chromium.launch({ headless: true });
+    try {
+      const page = await (await readinessBrowser.newContext({ viewport: { width: 405, height: 958 } })).newPage();
+      const targetUrl = `${readinessPreview.baseUrl}/?content=core-only&theme=aurora&runtimeDiagnostics=1&mazeSeed=3749&v=readiness-negative-control-${Date.now()}`;
+      const gotoStartedAt = Date.now();
+      await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 30000 });
+      const gotoElapsedMs = Date.now() - gotoStartedAt;
+      check(
+        'navigation itself genuinely completes before the readiness check below even starts (proving a subsequent readiness failure is not a disguised navigation error)',
+        gotoElapsedMs < 30000,
+        `page.goto took ${gotoElapsedMs}ms`
+      );
+
+      let readinessError = null;
+      try {
+        await waitForSurface(page, { mode: 'menu', overlay: '__verify_never_reached__', timeoutMs: 5000 });
+      } catch (error) {
+        readinessError = error;
+      }
+      check(
+        'after navigation genuinely completes, requesting an overlay value the app can never produce makes waitForSurface reject with SURFACE_READINESS_TIMEOUT specifically (not a navigation error)',
+        readinessError?.code === 'SURFACE_READINESS_TIMEOUT',
+        readinessError ? `code=${readinessError.code} message=${readinessError.message.slice(0, 200)}` : 'resolved without throwing'
+      );
+      check(
+        'the retained evidence correctly blames overlayMatches specifically, with the real observed overlay named (proving this reached real, settled diagnostics, not a boot-time gap)',
+        readinessError?.evidence?.failedClauses?.includes('overlayMatches')
+          && readinessError?.evidence?.lastState?.actualOverlay != null
+          && readinessError.evidence.lastState.actualOverlay !== '__verify_never_reached__',
+        JSON.stringify(readinessError?.evidence ?? null).slice(0, 300)
+      );
+      check(
+        'modeMatches is NOT among the failed clauses -- the real app did reach mode:"menu" as requested, isolating the failure to the deliberately-impossible overlay alone',
+        readinessError?.evidence?.failedClauses != null && !readinessError.evidence.failedClauses.includes('modeMatches'),
+        JSON.stringify(readinessError?.evidence?.failedClauses ?? null)
+      );
+
+      await page.close();
+    } finally {
+      await readinessBrowser.close();
+    }
+  } finally {
+    await stopPreviewServer(readinessPreview.child);
+  }
+
+  // This script only ever passes a CLI flag (--timeout-ms=1), sets DOM
+  // attributes on a blank page, or calls waitForSurface with a real but
+  // deliberately narrow timeout -- it never edits source, so there is
+  // nothing to restore. Only its own scratch capture directories need
+  // cleaning up.
   for (const dir of [resolve(CAPTURES_ROOT, directSessionId), cliOutputDir]) {
     try {
       rmSync(dir, { recursive: true, force: true });
