@@ -674,6 +674,24 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     }),
     /sourceRef fragment does not exist/,
   );
+
+  for (const [label, markdown] of [
+    ["outer thematic break does not become a lazy quoted setext underline", "> Foo\n---"],
+    ["outer equals line does not become a lazy quoted setext underline", "> Foo\n==="],
+    ["outer ordered list and thematic break do not enter the quote paragraph", "> Foo\n2. bar\n---"],
+  ]) {
+    const outerBlock = structuredClone(registry);
+    outerBlock.workItems[0].sourceRef = "docs/current-truth.md#foo";
+    assert.throws(
+      () => buildProjectBoardOwnerExport(outerBlock, {
+        ...bytes,
+        "mazer-owner-work-registry": JSON.stringify(outerBlock),
+        "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+      }),
+      /sourceRef fragment does not exist/,
+      label,
+    );
+  }
 });
 
 test("requires every work item card type to match the atlas.card-record.v2 enum", () => {

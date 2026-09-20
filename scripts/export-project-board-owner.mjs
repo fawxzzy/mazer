@@ -549,9 +549,6 @@ function maskMarkdownHtmlComments(line, inComment) {
 
 function canLazilyContinueBlockQuoteParagraph(line) {
   if (/^\s*$/.test(line)) return false;
-  if (/^ {0,3}(?:=+|-+)[ \t]*$/.test(line)) return true;
-  const listItem = parseMarkdownListItem(line, null);
-  if (listItem) return !listItem.canInterruptParagraph;
   return !startsMarkdownBlockOutsideTable(line);
 }
 
@@ -842,6 +839,7 @@ function markdownHeadingAnchors(markdown) {
   const renderedLines = [];
   const renderedHeadingLines = [];
   const renderedHeadingBlocks = [];
+  const setextUnderlineIndexes = new Set();
   const referenceDefinitionLines = [];
   let fence = null;
   let htmlCommentQuoteDepth = null;
@@ -857,8 +855,8 @@ function markdownHeadingAnchors(markdown) {
     const quoteView = paragraphState.open
       && parsedQuoteView.depth < paragraphState.quoteDepth
       && canLazilyContinueBlockQuoteParagraph(parsedQuoteView.line)
-      ? { ...parsedQuoteView, depth: paragraphState.quoteDepth }
-      : parsedQuoteView;
+      ? { ...parsedQuoteView, depth: paragraphState.quoteDepth, lazy: true }
+      : { ...parsedQuoteView, lazy: false };
     let rawLine = quoteView.line;
     if (fence) {
       rawLine = markdownBlockQuoteContainerView(sourceLine, fence.quoteDepth).line;
@@ -1074,6 +1072,7 @@ function markdownHeadingAnchors(markdown) {
       listContentIndents: effectiveContainerView.listContentIndents.join(","),
     };
     renderedHeadingLines.push(markdownHeadingLine(effectiveContainerView.line));
+    if (!quoteView.lazy) setextUnderlineIndexes.add(renderedHeadingLines.length - 1);
     renderedHeadingBlocks.push(headingBlock);
     referenceDefinitionLines.push(effectiveContainerView.line);
     const tableColumnCount = previousTableLine === null || !isDeepStrictEqual(previousTableBlock, headingBlock)
@@ -1107,6 +1106,7 @@ function markdownHeadingAnchors(markdown) {
     const block = renderedHeadingBlocks[index];
     const nextBlock = renderedHeadingBlocks[index + 1];
     if (line.trim() && next && /^[ \t]*(?:=+|-+)[ \t]*$/.test(next)
+      && setextUnderlineIndexes.has(index + 1)
       && block && nextBlock && isDeepStrictEqual(block, nextBlock)) {
       let paragraphStart = index;
       while (paragraphStart > 0) {
