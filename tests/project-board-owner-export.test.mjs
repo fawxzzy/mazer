@@ -629,6 +629,11 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "First <!--\ncomment -->\nlast\n---",
     ],
     [
+      "multiline inline-comment close suffix remains only setext paragraph text",
+      "docs/current-truth.md#first--bar-last",
+      "First <!--\n-->## Bar\nlast\n---",
+    ],
+    [
       "unclosed inline-comment opener remains literal in a setext paragraph",
       "docs/current-truth.md#first----last",
       "First <!--\nlast\n---",
@@ -687,6 +692,17 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
     }), label);
   }
+
+  const commentSuffixAtx = structuredClone(registry);
+  commentSuffixAtx.workItems[0].sourceRef = "docs/current-truth.md#bar";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(commentSuffixAtx, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(commentSuffixAtx),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\nFirst <!--\n-->## Bar\nlast\n---\n`,
+    }),
+    /sourceRef fragment does not exist/,
+  );
 
   for (const [label, sourceRef, markdown] of [
     [

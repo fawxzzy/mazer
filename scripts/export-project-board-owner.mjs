@@ -960,6 +960,7 @@ function markdownHeadingAnchors(markdown) {
       );
       renderedLines.push(commentMasked.masked);
       renderedHeadingLines.push(markdownHeadingLine(commentContainerView.line));
+      paragraphOnlyHeadingIndexes.add(renderedHeadingLines.length - 1);
       renderedHeadingBlocks.push({
         paragraphBlockSerial,
         quoteDepth: quoteView.depth,
