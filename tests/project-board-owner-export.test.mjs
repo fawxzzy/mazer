@@ -628,6 +628,16 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "docs/current-truth.md#first-last",
       "First <!--\ncomment -->\nlast\n---",
     ],
+    [
+      "unclosed inline-comment opener remains literal in a setext paragraph",
+      "docs/current-truth.md#first----last",
+      "First <!--\nlast\n---",
+    ],
+    [
+      "blank line terminates the comment-owning paragraph",
+      "docs/current-truth.md#comment----last",
+      "First <!--\n\ncomment -->\nlast\n---",
+    ],
   ]) {
     const setext = structuredClone(registry);
     setext.workItems[0].sourceRef = sourceRef;
@@ -637,6 +647,23 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
     }), label);
   }
+
+  const siblingListComment = structuredClone(registry);
+  siblingListComment.workItems[0].sourceRef = "docs/current-truth.md#visible-heading";
+  assert.doesNotThrow(() => buildProjectBoardOwnerExport(siblingListComment, {
+    ...bytes,
+    "mazer-owner-work-registry": JSON.stringify(siblingListComment),
+    "mazer-current-truth": `${bytes["mazer-current-truth"]}\n- Paragraph <!--\n- ## Visible Heading\n`,
+  }));
+  siblingListComment.workItems[0].sourceRef = "docs/current-truth.md#first-last";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(siblingListComment, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(siblingListComment),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\nFirst <!--\n\ncomment -->\nlast\n---\n`,
+    }),
+    /sourceRef fragment does not exist/,
+  );
 });
 
 test("requires every work item card type to match the atlas.card-record.v2 enum", () => {

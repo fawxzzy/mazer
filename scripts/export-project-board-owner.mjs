@@ -547,6 +547,29 @@ function maskMarkdownHtmlComments(line, inComment) {
   return { masked, inComment };
 }
 
+function hasValidInlineCommentCloseWithinParagraph(lines, sourceIndex, rawLine, quoteDepth, containerView) {
+  const opening = rawLine.lastIndexOf("<!--");
+  if (opening < 0) return false;
+  let comment = rawLine.slice(opening);
+  for (let index = sourceIndex + 1; index < lines.length; index += 1) {
+    const quoteView = markdownBlockQuoteContainerView(lines[index]);
+    if (quoteView.depth !== quoteDepth || /^\s*$/.test(quoteView.line)) return false;
+    const continuationView = markdownListContainerView(
+      quoteView.line,
+      containerView.listContentIndent,
+      containerView.listContentIndents,
+    );
+    const exitsOwningList = containerView.listContentIndent !== null
+      && continuationView.startsNewListItem
+      && continuationView.firstListMarkerIndent < containerView.listContentIndent;
+    if (continuationView.startsNewListItem && (continuationView.canInterruptParagraph || exitsOwningList)) return false;
+    if (startsMarkdownBlockOutsideTable(continuationView.line)) return false;
+    comment += `\n${quoteView.line}`;
+    if (quoteView.line.includes("-->")) return markdownInlineHtmlEnd(comment, 0) !== null;
+  }
+  return false;
+}
+
 function isMarkdownType7Start(line) {
   return COMMONMARK_COMPLETE_OPEN_TAG.test(line) || COMMONMARK_COMPLETE_CLOSING_TAG.test(line);
 }
@@ -816,7 +839,8 @@ function markdownHeadingAnchors(markdown) {
   let previousTableBlock = null;
   let paragraphBlockSerial = 0;
   let paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: 0 };
-  for (const sourceLine of lines) {
+  for (let sourceIndex = 0; sourceIndex < lines.length; sourceIndex += 1) {
+    const sourceLine = lines[sourceIndex];
     const quoteView = markdownBlockQuoteContainerView(sourceLine);
     let rawLine = quoteView.line;
     if (fence) {
@@ -994,7 +1018,11 @@ function markdownHeadingAnchors(markdown) {
       paragraphState = { ...paragraphState, open: false };
       continue;
     }
-    const commentMasked = maskMarkdownHtmlComments(rawLine, false);
+    let commentMasked = maskMarkdownHtmlComments(rawLine, false);
+    if (commentMasked.inComment
+      && !hasValidInlineCommentCloseWithinParagraph(lines, sourceIndex, rawLine, quoteView.depth, containerView)) {
+      commentMasked = { masked: rawLine, inComment: false };
+    }
     htmlCommentQuoteDepth = commentMasked.inComment ? quoteView.depth : null;
     const visibleLine = commentMasked.masked;
     const visibleContainerView = markdownListContainerView(
