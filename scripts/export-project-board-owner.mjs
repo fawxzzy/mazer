@@ -658,6 +658,35 @@ function parseMarkdownListItem(line, activeListContentIndent) {
 
 function nextMarkdownParagraphState(line, state, containerView = null) {
   if (/^\s*$/.test(line)) return { ...state, open: false };
+  if (containerView?.startsNewListItem) {
+    const exitsActiveListParagraph = state.listContentIndent !== null
+      && containerView.firstListMarkerIndent < state.listContentIndent;
+    if (state.open && !exitsActiveListParagraph && !containerView.canInterruptParagraph) return state;
+    if (state.open && state.listContentIndent === null && !containerView.canInterruptParagraph) return state;
+    const nextState = {
+      ...state,
+      listContentIndent: containerView.listContentIndent,
+      listContentIndents: containerView.listContentIndents,
+    };
+    if (containerView.startsWithIndentedCode
+      || /^ {0,3}#{1,6}(?:[ \t]+|$)/.test(line)
+      || /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})$/.test(line)
+      || /^ {0,3}>/.test(line)) return { ...nextState, open: false };
+    return { ...nextState, open: line.trim() !== "" };
+  }
+  if (containerView?.listContentIndent !== null) {
+    const nextState = {
+      ...state,
+      listContentIndent: containerView.listContentIndent,
+      listContentIndents: containerView.listContentIndents,
+    };
+    if (containerView.startsWithIndentedCode
+      || /^ {0,3}#{1,6}(?:[ \t]+|$)/.test(line)
+      || (state.open && /^ {0,3}(?:=+|-+)[ \t]*$/.test(line))
+      || /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})$/.test(line)
+      || /^ {0,3}>/.test(line)) return { ...nextState, open: false };
+    return { ...nextState, open: true };
+  }
   if (/^ {0,3}#{1,6}(?:[ \t]+|$)/.test(line)) return { ...state, open: false };
   if (state.open && /^ {0,3}(?:=+|-+)[ \t]*$/.test(line)) return { ...state, open: false };
   if (/^ {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})$/.test(line)) {
@@ -666,18 +695,6 @@ function nextMarkdownParagraphState(line, state, containerView = null) {
   if (/^ {0,3}>/.test(line)) return { ...state, open: false };
 
   const listItem = parseMarkdownListItem(line, state.listContentIndent);
-  if (containerView?.startsNewListItem) {
-    const exitsActiveListParagraph = state.listContentIndent !== null
-      && containerView.firstListMarkerIndent < state.listContentIndent;
-    if (state.open && !exitsActiveListParagraph && !containerView.canInterruptParagraph) return state;
-    if (state.open && state.listContentIndent === null && !containerView.canInterruptParagraph) return state;
-    return {
-      ...state,
-      open: containerView.line.trim() !== "" && !containerView.startsWithIndentedCode,
-      listContentIndent: containerView.listContentIndent,
-      listContentIndents: containerView.listContentIndents,
-    };
-  }
   if (listItem) {
     const exitsActiveListParagraph = state.listContentIndent !== null
       && listItem.markerIndent < state.listContentIndent;
@@ -1045,7 +1062,7 @@ function markdownHeadingAnchors(markdown) {
       continue;
     }
     let commentMasked = maskMarkdownHtmlComments(rawLine, false);
-    const commentOwnerState = nextMarkdownParagraphState(rawLine, paragraphState, containerView);
+    const commentOwnerState = nextMarkdownParagraphState(containerView.line, paragraphState, containerView);
     if (commentMasked.inComment
       && (!commentOwnerState.open
         || !hasValidInlineCommentCloseWithinParagraph(lines, sourceIndex, rawLine, quoteView.depth, containerView))) {
@@ -1108,7 +1125,7 @@ function markdownHeadingAnchors(markdown) {
     previousTableBlock = quoteView.lazy ? null : headingBlock;
     paragraphState = quoteView.lazy
       ? { ...paragraphState, open: true }
-      : nextMarkdownParagraphState(visibleLine, paragraphState, effectiveContainerView);
+      : nextMarkdownParagraphState(effectiveContainerView.line, paragraphState, effectiveContainerView);
   }
   for (let index = 0; index < renderedHeadingLines.length; index += 1) {
     const line = renderedHeadingLines[index];

@@ -345,9 +345,10 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["root inline-comment state cannot enter a new quote", "Paragraph <!--\n> ## Visible Heading"],
     ["quoted inline-comment state cannot enter a nested quote", "> Paragraph <!--\n> > ## Visible Heading"],
     ["ATX leaf cannot open multiline comment state", "## Prior <!--\n-->Bar\n---"],
+    ["list-contained ATX leaf cannot open multiline comment state", "- ## Prior <!--\n  -->Bar\n  ---"],
   ]) {
     const visibleHeading = structuredClone(registry);
-    visibleHeading.workItems[0].sourceRef = label === "ATX leaf cannot open multiline comment state"
+    visibleHeading.workItems[0].sourceRef = label.includes("ATX leaf cannot open multiline comment state")
       ? "docs/current-truth.md#--bar"
       : "docs/current-truth.md#visible-heading";
     assert.doesNotThrow(() => buildProjectBoardOwnerExport(visibleHeading, {
