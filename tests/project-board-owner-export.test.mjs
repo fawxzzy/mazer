@@ -480,6 +480,54 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     "an unchanged list-nested quote does not override its noninterrupting ordered marker",
   );
 
+  const lazyQuoteNoninterruptingMarker = structuredClone(registry);
+  lazyQuoteNoninterruptingMarker.workItems[0].sourceRef = "docs/current-truth.md#hidden-lazy-quote-heading-zz";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(lazyQuoteNoninterruptingMarker, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(lazyQuoteNoninterruptingMarker),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n> paragraph\n2. > > - ## Hidden Lazy Quote Heading Zz\n`,
+    }),
+    /sourceRef fragment does not exist/,
+    "a noninterrupting outer ordered marker remains lazy when it leaves a quote",
+  );
+
+  const changedQuoteOwnership = structuredClone(registry);
+  changedQuoteOwnership.workItems[0].sourceRef = "docs/current-truth.md#hidden-after-quote-ownership-change-zz";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(changedQuoteOwnership, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(changedQuoteOwnership),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n- > old paragraph\n> new paragraph\n> 2. ## Hidden After Quote Ownership Change Zz\n`,
+    }),
+    /sourceRef fragment does not exist/,
+    "root-versus-nested quote ownership resets stale list paragraph state even at equal total depth",
+  );
+
+  for (const [label, sourceRef, markdown] of [
+    [
+      "root quote lazy comment continuation keeps inner markers literal",
+      "docs/current-truth.md#first-last-zz",
+      "> First <!--\n2. > > - continuation -->\n> Last Zz\n> ---",
+    ],
+    [
+      "active-list lazy comment continuation keeps inner markers literal",
+      "docs/current-truth.md#first-last-list-zz",
+      "- > First <!--\n  2. > > - continuation -->\n  > Last List Zz\n  > ---",
+    ],
+  ]) {
+    const lazyCommentContinuation = structuredClone(registry);
+    lazyCommentContinuation.workItems[0].sourceRef = sourceRef;
+    assert.doesNotThrow(
+      () => buildProjectBoardOwnerExport(lazyCommentContinuation, {
+        ...bytes,
+        "mazer-owner-work-registry": JSON.stringify(lazyCommentContinuation),
+        "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+      }),
+      label,
+    );
+  }
+
   for (const [label, commentedMarkdown] of [
     ["same-line comment", "<!-- ## Commented Heading -->"],
     ["multiline comment", "<!--\n## Commented Heading\n-->"],
