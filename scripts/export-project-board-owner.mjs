@@ -842,8 +842,9 @@ function markdownActiveBlockContainerView(
   const retainsLazyQuote = lazyQuoteDepth === rootQuoteDepth + nestedQuoteDepth;
   const blank = /^\s*$/.test(rootQuoteView.line);
   const lineIndent = markdownIndentColumns(rootQuoteView.line.match(/^[ \t]*/)?.[0] ?? "");
-  const retainsList = listContentIndent === null || blank || lineIndent >= listContentIndent;
-  const listLine = listContentIndent !== null && retainsList && !blank
+  const hasListIndent = listContentIndent === null || blank || lineIndent >= listContentIndent;
+  const retainsList = hasListIndent || retainsLazyQuote;
+  const listLine = listContentIndent !== null && hasListIndent && !blank
     ? stripMarkdownIndent(rootQuoteView.line, listContentIndent)
     : rootQuoteView.line;
   const nestedQuoteView = markdownBlockQuoteContainerView(listLine, nestedQuoteDepth);

@@ -674,6 +674,11 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "- > First <!--\n  > hidden -->\n  > last\n  > ---",
     ],
     [
+      "fully lazy list-contained quoted comment retains every owning container",
+      "docs/current-truth.md#first-last",
+      "- > First <!--\ncontinuation -->\n  > last\n  > ---",
+    ],
+    [
       "indented lazy blockquote continuation remains paragraph text",
       "docs/current-truth.md#foo-bar",
       "> Foo\n    bar\n> ---",
