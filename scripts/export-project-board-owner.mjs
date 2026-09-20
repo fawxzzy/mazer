@@ -2,6 +2,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 
@@ -805,11 +806,15 @@ function markdownHeadingAnchors(markdown) {
   const lines = normalize(markdown).split("\n");
   const renderedLines = [];
   const renderedHeadingLines = [];
+  const renderedHeadingBlocks = [];
   const referenceDefinitionLines = [];
   let fence = null;
   let htmlCommentQuoteDepth = null;
   let rawHtmlBlock = null;
   let gfmTableColumns = null;
+  let previousTableLine = null;
+  let previousTableBlock = null;
+  let paragraphBlockSerial = 0;
   let paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: 0 };
   for (const sourceLine of lines) {
     const quoteView = markdownBlockQuoteContainerView(sourceLine);
@@ -828,7 +833,10 @@ function markdownHeadingAnchors(markdown) {
           && fenceMatch[2].trim() === "") fence = null;
         renderedLines.push(null);
         renderedHeadingLines.push(null);
+        renderedHeadingBlocks.push(null);
         referenceDefinitionLines.push(null);
+        previousTableLine = null;
+        previousTableBlock = null;
         continue;
       }
       const exitedFence = fence;
@@ -844,11 +852,19 @@ function markdownHeadingAnchors(markdown) {
       rawLine = quoteView.line;
     }
     if (gfmTableColumns !== null) {
-      const cells = gfmTableColumns.quoteDepth === quoteView.depth ? splitGfmTableRow(rawLine) : null;
-      if (cells && !startsMarkdownBlockOutsideTable(rawLine)) {
+      const tableView = markdownListContainerView(
+        rawLine,
+        gfmTableColumns.listContentIndent,
+        gfmTableColumns.listContentIndents,
+      );
+      const cells = gfmTableColumns.quoteDepth === quoteView.depth ? splitGfmTableRow(tableView.line) : null;
+      if (cells && !startsMarkdownBlockOutsideTable(tableView.line)) {
         renderedLines.push(rawLine);
         renderedHeadingLines.push(null);
+        renderedHeadingBlocks.push(null);
         referenceDefinitionLines.push(null);
+        previousTableLine = null;
+        previousTableBlock = null;
         continue;
       }
       gfmTableColumns = null;
@@ -865,7 +881,10 @@ function markdownHeadingAnchors(markdown) {
         rawHtmlBlock = rawMasked.state;
         renderedLines.push(rawMasked.masked);
         renderedHeadingLines.push(null);
+        renderedHeadingBlocks.push(null);
         referenceDefinitionLines.push(null);
+        previousTableLine = null;
+        previousTableBlock = null;
         if (!rawHtmlBlock && /^\s*$/.test(rawLine)) paragraphState = { ...paragraphState, open: false };
         continue;
       }
@@ -887,7 +906,10 @@ function markdownHeadingAnchors(markdown) {
       htmlCommentQuoteDepth = commentMasked.inComment ? htmlCommentQuoteDepth : null;
       renderedLines.push(commentMasked.masked);
       renderedHeadingLines.push(null);
+      renderedHeadingBlocks.push(null);
       referenceDefinitionLines.push(null);
+      previousTableLine = null;
+      previousTableBlock = null;
       if (htmlCommentQuoteDepth === null && /^\s*$/.test(commentMasked.masked)) paragraphState = { ...paragraphState, open: false };
       continue;
     }
@@ -921,7 +943,10 @@ function markdownHeadingAnchors(markdown) {
       };
       renderedLines.push(null);
       renderedHeadingLines.push(null);
+      renderedHeadingBlocks.push(null);
       referenceDefinitionLines.push(null);
+      previousTableLine = null;
+      previousTableBlock = null;
       paragraphState = {
         open: false,
         listContentIndent: containerView.listContentIndent,
@@ -954,7 +979,10 @@ function markdownHeadingAnchors(markdown) {
         };
       renderedLines.push(" ".repeat(rawLine.length));
       renderedHeadingLines.push(null);
+      renderedHeadingBlocks.push(null);
       referenceDefinitionLines.push(null);
+      previousTableLine = null;
+      previousTableBlock = null;
       paragraphState = { ...paragraphState, open: false };
       continue;
     }
@@ -962,17 +990,32 @@ function markdownHeadingAnchors(markdown) {
     htmlCommentQuoteDepth = commentMasked.inComment ? quoteView.depth : null;
     const visibleLine = commentMasked.masked;
     renderedLines.push(visibleLine);
+    if (!paragraphState.open || containerView.startsNewListItem) paragraphBlockSerial += 1;
+    const headingBlock = {
+      paragraphBlockSerial,
+      quoteDepth: quoteView.depth,
+      listContentIndents: containerView.listContentIndents.join(","),
+    };
     renderedHeadingLines.push(markdownHeadingLine(containerView.line));
+    renderedHeadingBlocks.push(headingBlock);
     referenceDefinitionLines.push(containerView.line);
-    const previousLine = renderedLines.at(-2);
-    const tableColumnCount = previousLine === null || previousLine === undefined
+    const tableColumnCount = previousTableLine === null || !isDeepStrictEqual(previousTableBlock, headingBlock)
       ? null
-      : gfmTableColumnCount(previousLine, visibleLine);
+      : gfmTableColumnCount(previousTableLine, containerView.line);
     if (tableColumnCount !== null) {
-      gfmTableColumns = { columnCount: tableColumnCount, quoteDepth: quoteView.depth };
+      gfmTableColumns = {
+        columnCount: tableColumnCount,
+        quoteDepth: quoteView.depth,
+        listContentIndent: containerView.listContentIndent,
+        listContentIndents: containerView.listContentIndents,
+      };
       paragraphState = { ...paragraphState, open: false };
+      previousTableLine = null;
+      previousTableBlock = null;
       continue;
     }
+    previousTableLine = containerView.line;
+    previousTableBlock = headingBlock;
     paragraphState = nextMarkdownParagraphState(visibleLine, paragraphState, containerView);
   }
   for (let index = 0; index < renderedHeadingLines.length; index += 1) {
@@ -984,8 +1027,18 @@ function markdownHeadingAnchors(markdown) {
       continue;
     }
     const next = renderedHeadingLines[index + 1];
-    if (line.trim() && next && /^[ \t]*(?:=+|-+)[ \t]*$/.test(next)) {
-      headings.push(line.trim());
+    const block = renderedHeadingBlocks[index];
+    const nextBlock = renderedHeadingBlocks[index + 1];
+    if (line.trim() && next && /^[ \t]*(?:=+|-+)[ \t]*$/.test(next)
+      && block && nextBlock && isDeepStrictEqual(block, nextBlock)) {
+      let paragraphStart = index;
+      while (paragraphStart > 0) {
+        const prior = renderedHeadingLines[paragraphStart - 1];
+        const priorBlock = renderedHeadingBlocks[paragraphStart - 1];
+        if (!prior?.trim() || !priorBlock || !isDeepStrictEqual(priorBlock, block)) break;
+        paragraphStart -= 1;
+      }
+      headings.push(renderedHeadingLines.slice(paragraphStart, index + 1).map((part) => part.trim()).join(" "));
       index += 1;
     }
   }
@@ -1167,6 +1220,15 @@ export function assertFawxzzyWebConsumerAcceptance(exported) {
 export function buildProjectBoardOwnerExport(registry, sourceBytes) {
   for (const sourceId of Object.keys(SOURCE_PATHS)) {
     if (typeof sourceBytes[sourceId] !== "string") throw new Error(`missing source bytes for ${sourceId}`);
+  }
+  let sourceRegistry;
+  try {
+    sourceRegistry = JSON.parse(sourceBytes["mazer-owner-work-registry"]);
+  } catch {
+    throw new Error("mazer-owner-work-registry source bytes must contain valid JSON");
+  }
+  if (!isDeepStrictEqual(registry, sourceRegistry)) {
+    throw new Error("registry argument must exactly match mazer-owner-work-registry source bytes");
   }
   validateRegistry(registry, sourceBytes);
   const sourceRevision = `sha256:${digest(Object.keys(SOURCE_PATHS).map((sourceId) => normalize(sourceBytes[sourceId])).join("\n--MAZER-OWNER-SOURCE--\n"))}`;

@@ -534,6 +534,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["type 7 after a GFM table header and delimiter", "| Column |\n| --- |\n<span>\n## Hidden Raw Heading\n"],
     ["type 7 after aligned multi-column GFM table body", "| Left | Right |\n| :--- | ---: |\n| value | value |\n<span>\n## Hidden Raw Heading\n"],
     ["type 7 with a pipe-valued attribute terminates a GFM table", "| Column |\n| --- |\n<x-widget data-x=\"|\">\n## Hidden Raw Heading\n"],
+    ["type 7 after a list-contained GFM table", "- | Column |\n  | --- |\n  <x-widget>\n  ## Hidden Raw Heading\n"],
   ]) {
     const rawHeading = structuredClone(registry);
     rawHeading.workItems[0].sourceRef = "docs/current-truth.md#hidden-raw-heading";
@@ -564,6 +565,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["docs/current-truth.md#heading-after-list-inline-tag", "- paragraph\n  <span>\n  ## Heading After List Inline Tag"],
     ["docs/current-truth.md#heading-after-invalid-table-delimiter", "| Column |\n| : |\n<span>\n## Heading After Invalid Table Delimiter"],
     ["docs/current-truth.md#heading-after-mismatched-table-delimiter", "| Left | Right |\n| --- |\n<span>\n## Heading After Mismatched Table Delimiter"],
+    ["docs/current-truth.md#heading-after-cross-quote-delimiter", "| Column |\n> | --- |\n> <span>\n> ## Heading After Cross Quote Delimiter"],
   ]) {
     const visibleHeading = structuredClone(registry);
     visibleHeading.workItems[0].sourceRef = sourceRef;
@@ -595,6 +597,23 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
   dangling.workItems[0].sourceRef = "docs/current-truth.md#renamed-or-missing-heading";
   assert.throws(
     () => buildProjectBoardOwnerExport(dangling, { ...bytes, "mazer-owner-work-registry": JSON.stringify(dangling) }),
+    /sourceRef fragment does not exist/,
+  );
+
+  const multilineSetext = structuredClone(registry);
+  multilineSetext.workItems[0].sourceRef = "docs/current-truth.md#first-line-second-line";
+  assert.doesNotThrow(() => buildProjectBoardOwnerExport(multilineSetext, {
+    ...bytes,
+    "mazer-owner-work-registry": JSON.stringify(multilineSetext),
+    "mazer-current-truth": `${bytes["mazer-current-truth"]}\nFirst line\nsecond line\n---\n`,
+  }));
+  multilineSetext.workItems[0].sourceRef = "docs/current-truth.md#second-line";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(multilineSetext, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(multilineSetext),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\nFirst line\nsecond line\n---\n`,
+    }),
     /sourceRef fragment does not exist/,
   );
 });
@@ -783,6 +802,13 @@ test("renders deterministically and keeps the checked export current", () => {
 });
 
 test("fails closed on denominator, identity, source, and stale-output drift", () => {
+  const sourceIdentityDrift = structuredClone(registry);
+  sourceIdentityDrift.workItems[0].title = `${sourceIdentityDrift.workItems[0].title} drift`;
+  assert.throws(
+    () => buildProjectBoardOwnerExport(sourceIdentityDrift, bytes),
+    /registry argument must exactly match mazer-owner-work-registry source bytes/,
+  );
+
   const duplicate = structuredClone(registry);
   duplicate.workItems[1].id = duplicate.workItems[0].id;
   assert.throws(() => buildProjectBoardOwnerExport(duplicate, { ...bytes, "mazer-owner-work-registry": JSON.stringify(duplicate) }), /unique stable MAZER ids/);
