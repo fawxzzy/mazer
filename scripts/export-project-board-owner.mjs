@@ -904,13 +904,21 @@ function markdownHeadingAnchors(markdown) {
       rawLine = markdownBlockQuoteContainerView(sourceLine, htmlCommentQuoteDepth).line;
       const commentMasked = maskMarkdownHtmlComments(rawLine, true);
       htmlCommentQuoteDepth = commentMasked.inComment ? htmlCommentQuoteDepth : null;
+      const commentContainerView = markdownListContainerView(
+        commentMasked.masked,
+        paragraphState.listContentIndent,
+        paragraphState.listContentIndents,
+      );
       renderedLines.push(commentMasked.masked);
-      renderedHeadingLines.push(null);
-      renderedHeadingBlocks.push(null);
+      renderedHeadingLines.push(markdownHeadingLine(commentContainerView.line));
+      renderedHeadingBlocks.push({
+        paragraphBlockSerial,
+        quoteDepth: quoteView.depth,
+        listContentIndents: paragraphState.listContentIndents.join(","),
+      });
       referenceDefinitionLines.push(null);
       previousTableLine = null;
       previousTableBlock = null;
-      if (htmlCommentQuoteDepth === null && /^\s*$/.test(commentMasked.masked)) paragraphState = { ...paragraphState, open: false };
       continue;
     }
     if (htmlCommentQuoteDepth !== null) htmlCommentQuoteDepth = null;
@@ -989,34 +997,58 @@ function markdownHeadingAnchors(markdown) {
     const commentMasked = maskMarkdownHtmlComments(rawLine, false);
     htmlCommentQuoteDepth = commentMasked.inComment ? quoteView.depth : null;
     const visibleLine = commentMasked.masked;
+    const visibleContainerView = markdownListContainerView(
+      commentMasked.inComment ? visibleLine : rawLine,
+      paragraphState.listContentIndent,
+      paragraphState.listContentIndents,
+    );
+    const effectiveExitsActiveListParagraph = paragraphState.listContentIndent !== null
+      && visibleContainerView.startsNewListItem
+      && visibleContainerView.firstListMarkerIndent < paragraphState.listContentIndent;
+    const markerInterruptsParagraph = !visibleContainerView.startsNewListItem
+      || !paragraphState.open
+      || visibleContainerView.canInterruptParagraph
+      || effectiveExitsActiveListParagraph;
+    const effectiveContainerView = markerInterruptsParagraph
+      ? visibleContainerView
+      : {
+        ...visibleContainerView,
+        line: visibleLine,
+        listContentIndent: paragraphState.listContentIndent,
+        listContentIndents: paragraphState.listContentIndents,
+        startsNewListItem: false,
+        firstListMarkerIndent: null,
+        canInterruptParagraph: false,
+        startsWithIndentedCode: false,
+      };
     renderedLines.push(visibleLine);
-    if (!paragraphState.open || containerView.startsNewListItem) paragraphBlockSerial += 1;
+    if (!paragraphState.open || effectiveContainerView.startsNewListItem) paragraphBlockSerial += 1;
     const headingBlock = {
       paragraphBlockSerial,
       quoteDepth: quoteView.depth,
-      listContentIndents: containerView.listContentIndents.join(","),
+      listContentIndents: effectiveContainerView.listContentIndents.join(","),
     };
-    renderedHeadingLines.push(markdownHeadingLine(containerView.line));
+    renderedHeadingLines.push(markdownHeadingLine(effectiveContainerView.line));
     renderedHeadingBlocks.push(headingBlock);
-    referenceDefinitionLines.push(containerView.line);
+    referenceDefinitionLines.push(effectiveContainerView.line);
     const tableColumnCount = previousTableLine === null || !isDeepStrictEqual(previousTableBlock, headingBlock)
       ? null
-      : gfmTableColumnCount(previousTableLine, containerView.line);
+      : gfmTableColumnCount(previousTableLine, effectiveContainerView.line);
     if (tableColumnCount !== null) {
       gfmTableColumns = {
         columnCount: tableColumnCount,
         quoteDepth: quoteView.depth,
-        listContentIndent: containerView.listContentIndent,
-        listContentIndents: containerView.listContentIndents,
+        listContentIndent: effectiveContainerView.listContentIndent,
+        listContentIndents: effectiveContainerView.listContentIndents,
       };
       paragraphState = { ...paragraphState, open: false };
       previousTableLine = null;
       previousTableBlock = null;
       continue;
     }
-    previousTableLine = containerView.line;
+    previousTableLine = effectiveContainerView.line;
     previousTableBlock = headingBlock;
-    paragraphState = nextMarkdownParagraphState(visibleLine, paragraphState, containerView);
+    paragraphState = nextMarkdownParagraphState(visibleLine, paragraphState, effectiveContainerView);
   }
   for (let index = 0; index < renderedHeadingLines.length; index += 1) {
     const line = renderedHeadingLines[index];
@@ -1033,12 +1065,14 @@ function markdownHeadingAnchors(markdown) {
       && block && nextBlock && isDeepStrictEqual(block, nextBlock)) {
       let paragraphStart = index;
       while (paragraphStart > 0) {
-        const prior = renderedHeadingLines[paragraphStart - 1];
         const priorBlock = renderedHeadingBlocks[paragraphStart - 1];
-        if (!prior?.trim() || !priorBlock || !isDeepStrictEqual(priorBlock, block)) break;
+        if (!priorBlock || !isDeepStrictEqual(priorBlock, block)) break;
         paragraphStart -= 1;
       }
-      headings.push(renderedHeadingLines.slice(paragraphStart, index + 1).map((part) => part.trim()).join(" "));
+      headings.push(renderedHeadingLines.slice(paragraphStart, index + 1)
+        .map((part) => part?.trim())
+        .filter(Boolean)
+        .join(" "));
       index += 1;
     }
   }

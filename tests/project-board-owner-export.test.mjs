@@ -616,6 +616,27 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     }),
     /sourceRef fragment does not exist/,
   );
+
+  for (const [label, sourceRef, markdown] of [
+    [
+      "noninterrupting ordered marker remains visible in the setext paragraph",
+      "docs/current-truth.md#first-line-2-second-line",
+      "First line\n2. second line\n---",
+    ],
+    [
+      "multiline inline comment preserves surrounding setext paragraph text",
+      "docs/current-truth.md#first-last",
+      "First <!--\ncomment -->\nlast\n---",
+    ],
+  ]) {
+    const setext = structuredClone(registry);
+    setext.workItems[0].sourceRef = sourceRef;
+    assert.doesNotThrow(() => buildProjectBoardOwnerExport(setext, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(setext),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+    }), label);
+  }
 });
 
 test("requires every work item card type to match the atlas.card-record.v2 enum", () => {
