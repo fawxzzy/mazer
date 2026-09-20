@@ -382,6 +382,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "- outer\n  - ````md\n    ## Hidden List Fence\n    ```\n    ## Hidden After Short Fence\n    `````",
     ],
     ["quoted fence markers cannot close a root fence", "```text\n> ```\n## Hidden List Fence\n```"],
+    ["list-contained quoted fence", "- > ```md\n  > ## Hidden List Fence\n  > ```"],
   ]) {
     const listFencedHeading = structuredClone(registry);
     listFencedHeading.workItems[0].sourceRef = "docs/current-truth.md#hidden-list-fence";
@@ -477,6 +478,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
 
   for (const [label, rawHtml] of [
     ["pre block", "<pre>\n## Hidden Raw Heading\n</pre>"],
+    ["list-contained quoted pre block", "- > <pre>\n  > ## Hidden Raw Heading\n  > </pre>"],
     ["type 1 ignores a different raw-text close", "<pre>\n</style>\n## Hidden Raw Heading\n</pre>"],
     ["type 1 ignores multiple different raw-text closes", "<textarea>\n</pre>\n</script>\n</style>\n## Hidden Raw Heading\n</textarea>"],
     ["type 1 requires a literal raw-text close", "<pre>\n</pre >\n## Hidden Raw Heading\n</pre>"],
@@ -541,6 +543,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["type 7 after aligned multi-column GFM table body", "| Left | Right |\n| :--- | ---: |\n| value | value |\n<span>\n## Hidden Raw Heading\n"],
     ["type 7 with a pipe-valued attribute terminates a GFM table", "| Column |\n| --- |\n<x-widget data-x=\"|\">\n## Hidden Raw Heading\n"],
     ["type 7 after a list-contained GFM table", "- | Column |\n  | --- |\n  <x-widget>\n  ## Hidden Raw Heading\n"],
+    ["type 7 after a list-contained quoted GFM table", "- > | Column |\n  > | --- |\n  > <x-widget>\n  > ## Hidden Raw Heading\n"],
   ]) {
     const rawHeading = structuredClone(registry);
     rawHeading.workItems[0].sourceRef = "docs/current-truth.md#hidden-raw-heading";
@@ -664,6 +667,11 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "list-contained blockquote retains setext ownership",
       "docs/current-truth.md#nested-heading",
       "- > Nested Heading\n  > ---",
+    ],
+    [
+      "list-contained quoted comment retains setext ownership",
+      "docs/current-truth.md#first-last",
+      "- > First <!--\n  > hidden -->\n  > last\n  > ---",
     ],
     [
       "indented lazy blockquote continuation remains paragraph text",
