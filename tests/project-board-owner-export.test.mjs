@@ -445,6 +445,41 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     }));
   }
 
+  const noninterruptingOuterMarker = structuredClone(registry);
+  noninterruptingOuterMarker.workItems[0].sourceRef = "docs/current-truth.md#definitely-noninterrupting-nested-heading-zz";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(noninterruptingOuterMarker, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(noninterruptingOuterMarker),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\nparagraph\n2. > - ## Definitely Noninterrupting Nested Heading Zz\n`,
+    }),
+    /sourceRef fragment does not exist/,
+    "an inner bullet cannot make a noninterrupting outer ordered marker interrupt its paragraph",
+  );
+
+  const interruptingOuterQuote = structuredClone(registry);
+  interruptingOuterQuote.workItems[0].sourceRef = "docs/current-truth.md#visible-heading-after-outer-quote-zz";
+  assert.doesNotThrow(
+    () => buildProjectBoardOwnerExport(interruptingOuterQuote, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(interruptingOuterQuote),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\nparagraph\n> 2. ## Visible Heading After Outer Quote Zz\n`,
+    }),
+    "an outer blockquote interrupts before its inner noninterrupting ordered marker is evaluated",
+  );
+
+  const nestedQuoteNoninterruptingMarker = structuredClone(registry);
+  nestedQuoteNoninterruptingMarker.workItems[0].sourceRef = "docs/current-truth.md#hidden-nested-heading-zz";
+  assert.throws(
+    () => buildProjectBoardOwnerExport(nestedQuoteNoninterruptingMarker, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(nestedQuoteNoninterruptingMarker),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n- > paragraph\n  > 2. > - ## Hidden Nested Heading Zz\n`,
+    }),
+    /sourceRef fragment does not exist/,
+    "an unchanged list-nested quote does not override its noninterrupting ordered marker",
+  );
+
   for (const [label, commentedMarkdown] of [
     ["same-line comment", "<!-- ## Commented Heading -->"],
     ["multiline comment", "<!--\n## Commented Heading\n-->"],

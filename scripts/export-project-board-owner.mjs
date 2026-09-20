@@ -801,9 +801,9 @@ function markdownListContainerView(
   while (true) {
     const listItem = parseMarkdownListItem(candidate, null);
     if (!listItem) break;
+    if (!startsNewListItem) canInterruptParagraph = listItem.canInterruptParagraph;
     startsNewListItem = true;
     firstListMarkerIndent ??= projectedBaseIndent + listItem.markerIndent;
-    canInterruptParagraph ||= listItem.canInterruptParagraph;
     const listContentIndent = projectedBaseIndent + listItem.contentIndent;
     listContentIndents = listContentIndents.filter((indent) => indent < listContentIndent);
     listContentIndents.push(listContentIndent);
@@ -863,7 +863,9 @@ function markdownListBlockQuoteContainerView(line, activeListContentIndent, acti
       ...nextListView,
       startsNewListItem: listView.startsNewListItem || nextListView.startsNewListItem,
       firstListMarkerIndent: listView.firstListMarkerIndent ?? nextListView.firstListMarkerIndent,
-      canInterruptParagraph: listView.canInterruptParagraph || nextListView.canInterruptParagraph,
+      canInterruptParagraph: listView.startsNewListItem
+        ? listView.canInterruptParagraph
+        : nextListView.canInterruptParagraph,
     };
   }
   return { ...listView, nestedQuoteDepth, containerPath };
@@ -945,7 +947,13 @@ function markdownHeadingAnchors(markdown) {
   let previousTableLine = null;
   let previousTableBlock = null;
   let paragraphBlockSerial = 0;
-  let paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: 0 };
+  let paragraphState = {
+    open: false,
+    listContentIndent: null,
+    listContentIndents: [],
+    quoteDepth: 0,
+    rootQuoteDepth: 0,
+  };
   for (let sourceIndex = 0; sourceIndex < lines.length; sourceIndex += 1) {
     const sourceLine = lines[sourceIndex];
     const sourceIndent = markdownIndentColumns(sourceLine.match(/^[ \t]*/)?.[0] ?? "");
@@ -963,6 +971,7 @@ function markdownHeadingAnchors(markdown) {
     const quoteView = isLazyQuoteContinuation
       ? { ...parsedQuoteView, line: lazyQuoteLine, depth: paragraphState.quoteDepth, lazy: true }
       : { ...parsedQuoteView, lazy: false };
+    const rootQuoteDepth = quoteView.lazy ? paragraphState.rootQuoteDepth : parsedQuoteView.depth;
     let rawLine = quoteView.line;
     if (fence) {
       const activeView = markdownActiveBlockContainerView(
@@ -991,6 +1000,7 @@ function markdownHeadingAnchors(markdown) {
         listContentIndent: listContentIndents.at(-1) ?? null,
         listContentIndents,
         quoteDepth: quoteView.depth,
+        rootQuoteDepth,
       };
       rawLine = quoteView.line;
     }
@@ -1041,6 +1051,7 @@ function markdownHeadingAnchors(markdown) {
         listContentIndent: listContentIndents.at(-1) ?? null,
         listContentIndents,
         quoteDepth: quoteView.depth,
+        rootQuoteDepth,
       };
       rawLine = quoteView.line;
     }
@@ -1075,9 +1086,25 @@ function markdownHeadingAnchors(markdown) {
       paragraphState.listContentIndent,
       paragraphState.listContentIndents,
     );
-    let effectiveQuoteDepth = quoteView.depth + containerView.nestedQuoteDepth;
-    if (paragraphState.quoteDepth !== effectiveQuoteDepth) {
-      paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: effectiveQuoteDepth };
+    const projectedExitsActiveListParagraph = paragraphState.listContentIndent !== null
+      && containerView.startsNewListItem
+      && containerView.firstListMarkerIndent < paragraphState.listContentIndent;
+    const projectedContainersInterruptParagraph = rootQuoteDepth !== paragraphState.rootQuoteDepth
+      || !paragraphState.open
+      || !containerView.startsNewListItem
+      || containerView.canInterruptParagraph
+      || projectedExitsActiveListParagraph;
+    let effectiveQuoteDepth = projectedContainersInterruptParagraph
+      ? quoteView.depth + containerView.nestedQuoteDepth
+      : paragraphState.quoteDepth;
+    if (projectedContainersInterruptParagraph && paragraphState.quoteDepth !== effectiveQuoteDepth) {
+      paragraphState = {
+        open: false,
+        listContentIndent: null,
+        listContentIndents: [],
+        quoteDepth: effectiveQuoteDepth,
+        rootQuoteDepth,
+      };
       containerView = markdownListBlockQuoteContainerView(rawLine, null, []);
       effectiveQuoteDepth = quoteView.depth + containerView.nestedQuoteDepth;
     }
@@ -1113,6 +1140,7 @@ function markdownHeadingAnchors(markdown) {
         listContentIndent: containerView.listContentIndent,
         listContentIndents: containerView.listContentIndents,
         quoteDepth: effectiveQuoteDepth,
+        rootQuoteDepth,
       };
       continue;
     }
@@ -1120,7 +1148,13 @@ function markdownHeadingAnchors(markdown) {
     if (!quoteView.lazy && paragraphState.open && paragraphState.listContentIndent !== null
       && (rawIndent < paragraphState.listContentIndent || containerView.canInterruptParagraph)
       && isMarkdownType7Start(containerView.line)) {
-      paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: effectiveQuoteDepth };
+      paragraphState = {
+        open: false,
+        listContentIndent: null,
+        listContentIndents: [],
+        quoteDepth: effectiveQuoteDepth,
+        rootQuoteDepth,
+      };
     }
     const rawMasked = quoteView.lazy || containerView.startsWithIndentedCode
       ? { masked: rawLine, state: null, isBlock: false }
