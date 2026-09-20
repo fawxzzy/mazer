@@ -590,11 +590,11 @@ function isMarkdownType7Start(line) {
 function detectMarkdownRawHtmlBlock(line, allowType7) {
   const rawTextOpening = line.match(/^ {0,3}<(pre|script|style|textarea)(?:[\t >]|$)/i);
   if (rawTextOpening) {
-    return { endPattern: new RegExp(`</${rawTextOpening[1]}\\s*>`, "i"), endOnBlank: false };
+    return { endPattern: new RegExp(`</${rawTextOpening[1]}>`, "i"), endOnBlank: false };
   }
   if (/^ {0,3}<!--/.test(line)) return { endPattern: /-->/, endOnBlank: false };
   if (/^ {0,3}<\?/.test(line)) return { endPattern: /\?>/, endOnBlank: false };
-  if (/^ {0,3}<![A-Za-z]/.test(line)) return { endPattern: />/, endOnBlank: false };
+  if (/^ {0,3}<![A-Z]/.test(line)) return { endPattern: />/, endOnBlank: false };
   if (/^ {0,3}<!\[CDATA\[/.test(line)) return { endPattern: /\]\]>/, endOnBlank: false };
   if (COMMONMARK_TYPE_6_START.test(line)) return { endPattern: null, endOnBlank: true };
   if (allowType7 && isMarkdownType7Start(line)) {
@@ -1045,8 +1045,10 @@ function markdownHeadingAnchors(markdown) {
       continue;
     }
     let commentMasked = maskMarkdownHtmlComments(rawLine, false);
+    const commentOwnerState = nextMarkdownParagraphState(rawLine, paragraphState, containerView);
     if (commentMasked.inComment
-      && !hasValidInlineCommentCloseWithinParagraph(lines, sourceIndex, rawLine, quoteView.depth, containerView)) {
+      && (!commentOwnerState.open
+        || !hasValidInlineCommentCloseWithinParagraph(lines, sourceIndex, rawLine, quoteView.depth, containerView))) {
       commentMasked = { masked: rawLine, inComment: false };
     }
     htmlCommentQuoteDepth = commentMasked.inComment ? quoteView.depth : null;

@@ -344,9 +344,12 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["heading resumes when an unclosed quoted raw block exits its quote", "> <pre>\n> raw\n## Visible Heading"],
     ["root inline-comment state cannot enter a new quote", "Paragraph <!--\n> ## Visible Heading"],
     ["quoted inline-comment state cannot enter a nested quote", "> Paragraph <!--\n> > ## Visible Heading"],
+    ["ATX leaf cannot open multiline comment state", "## Prior <!--\n-->Bar\n---"],
   ]) {
     const visibleHeading = structuredClone(registry);
-    visibleHeading.workItems[0].sourceRef = "docs/current-truth.md#visible-heading";
+    visibleHeading.workItems[0].sourceRef = label === "ATX leaf cannot open multiline comment state"
+      ? "docs/current-truth.md#--bar"
+      : "docs/current-truth.md#visible-heading";
     assert.doesNotThrow(() => buildProjectBoardOwnerExport(visibleHeading, {
       ...bytes,
       "mazer-owner-work-registry": JSON.stringify(visibleHeading),
@@ -474,6 +477,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["pre block", "<pre>\n## Hidden Raw Heading\n</pre>"],
     ["type 1 ignores a different raw-text close", "<pre>\n</style>\n## Hidden Raw Heading\n</pre>"],
     ["type 1 ignores multiple different raw-text closes", "<textarea>\n</pre>\n</script>\n</style>\n## Hidden Raw Heading\n</textarea>"],
+    ["type 1 requires a literal raw-text close", "<pre>\n</pre >\n## Hidden Raw Heading\n</pre>"],
     ["script block with mixed case and attributes", "<ScRiPt type=\"application/json\">\n## Hidden Raw Heading\n</sCrIpT>"],
     ["style block", "<style>\n## Hidden Raw Heading\n</style>"],
     ["textarea block", "<textarea name=\"example\">\n## Hidden Raw Heading\n</textarea>"],
@@ -554,6 +558,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["docs/current-truth.md#heading-after-raw", "<SCRIPT type=\"application/json\">\n## Hidden Raw Heading\n</SCRIPT>\n## Heading After Raw"],
     ["docs/current-truth.md#heading-after-same-line-raw", "<style>hidden</style>\n## Heading After Same Line Raw"],
     ["docs/current-truth.md#heading-after-pi", "<?target\n## Hidden Raw Heading\n?>\n## Heading After PI"],
+    ["docs/current-truth.md#visible-heading", "<!a\n## Visible Heading\n>"],
     ["docs/current-truth.md#heading-after-table", "<table>\n## Hidden Raw Heading\n</table>\n\n## Heading After Table"],
     ["docs/current-truth.md#heading-after-custom", "<x-widget>\n## Hidden Raw Heading\n\n## Heading After Custom"],
     ["docs/current-truth.md#visible-heading", "1. outer\n   - <x-widget>\n## Visible Heading"],
