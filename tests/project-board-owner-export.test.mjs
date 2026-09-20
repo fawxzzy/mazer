@@ -648,6 +648,26 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "docs/current-truth.md#first-last",
       "> > First <!--\n> comment -->\n> > last\n> > ---",
     ],
+    [
+      "indented lazy blockquote continuation remains paragraph text",
+      "docs/current-truth.md#foo-bar",
+      "> Foo\n    bar\n> ---",
+    ],
+    [
+      "tab-indented lazy blockquote continuation remains paragraph text",
+      "docs/current-truth.md#foo-bar",
+      "> Foo\n\tbar\n> ---",
+    ],
+    [
+      "mixed-indented lazy blockquote continuation remains paragraph text",
+      "docs/current-truth.md#foo-bar",
+      "> Foo\n  \tbar\n> ---",
+    ],
+    [
+      "indented lazy inline-comment continuation stays in its quote paragraph",
+      "docs/current-truth.md#first-last",
+      "> First <!--\n    comment -->\n> last\n> ---",
+    ],
   ]) {
     const setext = structuredClone(registry);
     setext.workItems[0].sourceRef = sourceRef;
