@@ -334,6 +334,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["nested-list projected heading", "- outer\n  - item\n    ### Visible Heading"],
     ["nested ordered-list projected tab heading", "- outer\n  1. item\n     \t### Visible Heading"],
     ["block quote nested inside a list item", "- > ## Visible Heading"],
+    ["alternating list quote list containers", "- > - ## Visible Heading"],
     ["ancestor sibling after nested unordered item", "1.  outer\n    - child\n      continuation\n    - sibling\n      ## Visible Heading"],
     ["ancestor sibling after a blank separator", "1.  outer\n    - child\n\n    - sibling\n      ## Visible Heading"],
     ["ordered ancestor sibling after nested ordered item", "10. outer\n    1) child\n       continuation\n    2) sibling\n       ## Visible Heading"],
@@ -544,6 +545,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["type 7 with a pipe-valued attribute terminates a GFM table", "| Column |\n| --- |\n<x-widget data-x=\"|\">\n## Hidden Raw Heading\n"],
     ["type 7 after a list-contained GFM table", "- | Column |\n  | --- |\n  <x-widget>\n  ## Hidden Raw Heading\n"],
     ["type 7 after a list-contained quoted GFM table", "- > | Column |\n  > | --- |\n  > <x-widget>\n  > ## Hidden Raw Heading\n"],
+    ["type 7 inside alternating list quote list containers", "- > - <x-widget>\n  >   ## Hidden Raw Heading\n"],
   ]) {
     const rawHeading = structuredClone(registry);
     rawHeading.workItems[0].sourceRef = "docs/current-truth.md#hidden-raw-heading";

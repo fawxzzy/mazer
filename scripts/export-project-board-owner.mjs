@@ -775,19 +775,28 @@ function stripMarkdownIndent(line, columns) {
   return `${" ".repeat(Math.max(0, consumedColumns - columns) + remainingColumns)}${remainder.slice(remainingIndentation.length)}`;
 }
 
-function markdownListContainerView(line, activeListContentIndent, activeListContentIndents = []) {
+function markdownListContainerView(
+  line,
+  activeListContentIndent,
+  activeListContentIndents = [],
+  projectedBaseIndentOverride = null,
+) {
   let candidate = line;
   let startsNewListItem = false;
   let canInterruptParagraph = false;
   let firstListMarkerIndent = null;
-  let projectedBaseIndent = 0;
+  let projectedBaseIndent = projectedBaseIndentOverride ?? 0;
   const lineIndent = markdownIndentColumns(line.match(/^[ \t]*/)?.[0] ?? "");
-  let listContentIndents = activeListContentIndents.filter((indent) => indent <= lineIndent);
-  const survivingListContentIndent = listContentIndents.at(-1)
-    ?? (activeListContentIndent !== null && activeListContentIndent <= lineIndent ? activeListContentIndent : null);
-  if (survivingListContentIndent !== null) {
-    candidate = stripMarkdownIndent(line, survivingListContentIndent);
-    projectedBaseIndent = survivingListContentIndent;
+  let listContentIndents = projectedBaseIndentOverride === null
+    ? activeListContentIndents.filter((indent) => indent <= lineIndent)
+    : [...activeListContentIndents];
+  if (projectedBaseIndentOverride === null) {
+    const survivingListContentIndent = listContentIndents.at(-1)
+      ?? (activeListContentIndent !== null && activeListContentIndent <= lineIndent ? activeListContentIndent : null);
+    if (survivingListContentIndent !== null) {
+      candidate = stripMarkdownIndent(line, survivingListContentIndent);
+      projectedBaseIndent = survivingListContentIndent;
+    }
   }
   while (true) {
     const listItem = parseMarkdownListItem(candidate, null);
@@ -826,33 +835,68 @@ function markdownListContainerView(line, activeListContentIndent, activeListCont
 }
 
 function markdownListBlockQuoteContainerView(line, activeListContentIndent, activeListContentIndents = []) {
-  const listView = markdownListContainerView(line, activeListContentIndent, activeListContentIndents);
-  const nestedQuoteView = markdownBlockQuoteContainerView(listView.line);
-  return { ...listView, line: nestedQuoteView.line, nestedQuoteDepth: nestedQuoteView.depth };
+  let listView = markdownListContainerView(line, activeListContentIndent, activeListContentIndents);
+  const containerPath = [];
+  let priorListIndent = 0;
+  if (listView.listContentIndent !== null) {
+    containerPath.push({ kind: "list", columns: listView.listContentIndent });
+    priorListIndent = listView.listContentIndent;
+  }
+  let nestedQuoteDepth = 0;
+  while (!listView.startsWithIndentedCode) {
+    const quoteView = markdownBlockQuoteContainerView(listView.line);
+    if (quoteView.depth === 0) break;
+    containerPath.push({ kind: "quote", depth: quoteView.depth });
+    nestedQuoteDepth += quoteView.depth;
+    const nextListView = markdownListContainerView(
+      quoteView.line,
+      listView.listContentIndent,
+      listView.listContentIndents,
+      listView.listContentIndent ?? 0,
+    );
+    const nextListIndent = nextListView.listContentIndent ?? priorListIndent;
+    if (nextListIndent > priorListIndent) {
+      containerPath.push({ kind: "list", columns: nextListIndent - priorListIndent });
+      priorListIndent = nextListIndent;
+    }
+    listView = {
+      ...nextListView,
+      startsNewListItem: listView.startsNewListItem || nextListView.startsNewListItem,
+      firstListMarkerIndent: listView.firstListMarkerIndent ?? nextListView.firstListMarkerIndent,
+      canInterruptParagraph: listView.canInterruptParagraph || nextListView.canInterruptParagraph,
+    };
+  }
+  return { ...listView, nestedQuoteDepth, containerPath };
 }
 
 function markdownActiveBlockContainerView(
   sourceLine,
   rootQuoteDepth,
-  listContentIndent,
-  nestedQuoteDepth,
+  containerPath,
   lazyQuoteDepth = null,
 ) {
   const rootQuoteView = markdownBlockQuoteContainerView(sourceLine, rootQuoteDepth);
-  const retainsLazyQuote = lazyQuoteDepth === rootQuoteDepth + nestedQuoteDepth;
-  const blank = /^\s*$/.test(rootQuoteView.line);
-  const lineIndent = markdownIndentColumns(rootQuoteView.line.match(/^[ \t]*/)?.[0] ?? "");
-  const hasListIndent = listContentIndent === null || blank || lineIndent >= listContentIndent;
-  const retainsList = hasListIndent || retainsLazyQuote;
-  const listLine = listContentIndent !== null && hasListIndent && !blank
-    ? stripMarkdownIndent(rootQuoteView.line, listContentIndent)
-    : rootQuoteView.line;
-  const nestedQuoteView = markdownBlockQuoteContainerView(listLine, nestedQuoteDepth);
+  const totalNestedQuoteDepth = containerPath
+    .filter((entry) => entry.kind === "quote")
+    .reduce((total, entry) => total + entry.depth, 0);
+  const retainsLazyContainers = lazyQuoteDepth === rootQuoteDepth + totalNestedQuoteDepth;
+  let projected = rootQuoteView.line;
+  let retainsContainers = rootQuoteView.depth === rootQuoteDepth || retainsLazyContainers;
+  for (const entry of containerPath) {
+    if (entry.kind === "list") {
+      const blank = /^\s*$/.test(projected);
+      const lineIndent = markdownIndentColumns(projected.match(/^[ \t]*/)?.[0] ?? "");
+      if (!blank && lineIndent >= entry.columns) projected = stripMarkdownIndent(projected, entry.columns);
+      else if (!blank && !retainsLazyContainers) retainsContainers = false;
+      continue;
+    }
+    const quoteView = markdownBlockQuoteContainerView(projected, entry.depth);
+    projected = quoteView.line;
+    if (quoteView.depth !== entry.depth && !retainsLazyContainers) retainsContainers = false;
+  }
   return {
-    line: nestedQuoteView.line,
-    retainsRootQuote: rootQuoteView.depth === rootQuoteDepth || retainsLazyQuote,
-    retainsList,
-    retainsNestedQuote: nestedQuoteView.depth === nestedQuoteDepth || retainsLazyQuote,
+    line: projected,
+    retainsContainers,
   };
 }
 
@@ -924,12 +968,9 @@ function markdownHeadingAnchors(markdown) {
       const activeView = markdownActiveBlockContainerView(
         sourceLine,
         fence.rootQuoteDepth,
-        fence.listContentIndent,
-        fence.nestedQuoteDepth,
+        fence.containerPath,
       );
-      const exitsQuoteFence = !activeView.retainsRootQuote || !activeView.retainsNestedQuote;
-      const exitsListFence = !activeView.retainsList;
-      if (!exitsQuoteFence && !exitsListFence) {
+      if (activeView.retainsContainers) {
         const fenceMatch = activeView.line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
         if (fenceMatch && fenceMatch[1][0] === fence.marker && fenceMatch[1].length >= fence.length
           && fenceMatch[2].trim() === "") fence = null;
@@ -957,10 +998,9 @@ function markdownHeadingAnchors(markdown) {
       const tableView = markdownActiveBlockContainerView(
         sourceLine,
         gfmTableColumns.rootQuoteDepth,
-        gfmTableColumns.listContentIndent,
-        gfmTableColumns.nestedQuoteDepth,
+        gfmTableColumns.containerPath,
       );
-      const cells = tableView.retainsRootQuote && tableView.retainsList && tableView.retainsNestedQuote
+      const cells = tableView.retainsContainers
         ? splitGfmTableRow(tableView.line)
         : null;
       if (cells && !startsMarkdownBlockOutsideTable(tableView.line)) {
@@ -978,12 +1018,9 @@ function markdownHeadingAnchors(markdown) {
       const activeView = markdownActiveBlockContainerView(
         sourceLine,
         rawHtmlBlock.rootQuoteDepth,
-        rawHtmlBlock.listContentIndent,
-        rawHtmlBlock.nestedQuoteDepth,
+        rawHtmlBlock.containerPath,
       );
-      const exitsQuoteRawHtml = !activeView.retainsRootQuote || !activeView.retainsNestedQuote;
-      const exitsListRawHtml = !activeView.retainsList;
-      if (!exitsQuoteRawHtml && !exitsListRawHtml) {
+      if (activeView.retainsContainers) {
         const rawMasked = maskMarkdownRawHtmlBlock(activeView.line, rawHtmlBlock);
         rawHtmlBlock = rawMasked.state;
         renderedLines.push(rawMasked.masked);
@@ -1011,11 +1048,10 @@ function markdownHeadingAnchors(markdown) {
       const commentView = markdownActiveBlockContainerView(
         sourceLine,
         htmlCommentState.rootQuoteDepth,
-        htmlCommentState.listContentIndent,
-        htmlCommentState.nestedQuoteDepth,
+        htmlCommentState.containerPath,
         quoteView.lazy ? paragraphState.quoteDepth : null,
       );
-      if (commentView.retainsRootQuote && commentView.retainsList && commentView.retainsNestedQuote) {
+      if (commentView.retainsContainers) {
         const commentMasked = maskMarkdownHtmlComments(commentView.line, true);
         htmlCommentState = commentMasked.inComment ? htmlCommentState : null;
       renderedLines.push(commentMasked.masked);
@@ -1063,6 +1099,7 @@ function markdownHeadingAnchors(markdown) {
         listContentIndents: containerView.listContentIndents,
         rootQuoteDepth: quoteView.depth,
         nestedQuoteDepth: containerView.nestedQuoteDepth,
+        containerPath: containerView.containerPath,
         quoteDepth: effectiveQuoteDepth,
       };
       renderedLines.push(null);
@@ -1101,6 +1138,7 @@ function markdownHeadingAnchors(markdown) {
           listContentIndents: containerView.listContentIndents,
           rootQuoteDepth: quoteView.depth,
           nestedQuoteDepth: containerView.nestedQuoteDepth,
+          containerPath: containerView.containerPath,
           quoteDepth: effectiveQuoteDepth,
         };
       renderedLines.push(" ".repeat(rawLine.length));
@@ -1124,6 +1162,7 @@ function markdownHeadingAnchors(markdown) {
         rootQuoteDepth: quoteView.depth,
         nestedQuoteDepth: containerView.nestedQuoteDepth,
         listContentIndent: containerView.listContentIndent,
+        containerPath: containerView.containerPath,
       }
       : null;
     const visibleLine = commentMasked.masked;
@@ -1171,6 +1210,7 @@ function markdownHeadingAnchors(markdown) {
         columnCount: tableColumnCount,
         rootQuoteDepth: quoteView.depth,
         nestedQuoteDepth: effectiveContainerView.nestedQuoteDepth,
+        containerPath: effectiveContainerView.containerPath,
         quoteDepth: effectiveQuoteDepth,
         listContentIndent: effectiveContainerView.listContentIndent,
         listContentIndents: effectiveContainerView.listContentIndents,
