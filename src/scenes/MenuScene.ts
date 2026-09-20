@@ -1153,6 +1153,26 @@ const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 // Slowed way down from an initial 900ms -- per feedback that pace read as
 // too fast/flickery for a deliberate classic-menu blink.
 const LEGACY_MENU_BLINK_PULSE_MS = 2400;
+// Shared by the Options/Pause overlay's Account ring (drawLegacyProfileIcon)
+// and its own Home button's ring (createLegacyOverlayHomeButton's drawHome)
+// -- previously two independently hand-copied formulas that could silently
+// drift apart despite existing specifically to make those two icons read as
+// a matched pair. Restrained consistency pass (owner-directed refinement,
+// not a reversal of the original ring-vs-no-ring split): the menu header's
+// own bare-glyph treatment and the overlay's ringed treatment are both kept
+// -- the compact 3-icon menu row and the paired Account/Home overlay row
+// have different real layout needs -- but the ring itself was bold enough
+// (a wide, near-opaque stroke) to read as a genuinely different icon family
+// rather than a restrained accent on the same glyph, which is what drove
+// the "not the same... set up" report. Toned down (thinner stroke, softer
+// alpha) so the glyph/color/texture stay the visually dominant, consistent
+// element across Menu/Options/Pause, and the ring reads as a light halo
+// tying Account+Home together rather than a competing badge outline. The
+// ring carries no state of its own (confirmed: it's the same idle pulse
+// regardless of auth/session status) -- there is no meaning to preserve
+// beyond the pairing itself, which this keeps.
+const LEGACY_OVERLAY_ICON_RING_WIDTH_RATIO = 0.06;
+const LEGACY_OVERLAY_ICON_RING_ALPHA_FACTOR = 0.5;
 const LEGACY_MENU_PATH_TITLE_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_MENU_PATH_TITLE_ACCENT = cyberArcadeMaterial.signal.player;
 const LEGACY_MENU_PATH_TITLE_PRISM = cyberArcadeMaterial.rail.cyan;
@@ -10485,7 +10505,7 @@ export class MenuScene extends Phaser.Scene {
   // same menuStaticDrawLifecyclePhase transition, so this needs no mode
   // branch of its own beyond picking which track's level to show.
   private drawLegacyLevelAnnouncer(time: number): void {
-    const { alpha, scale } = this.resolveLegacyLevelAnnouncerVisualState(time);
+    const { alpha, scale, revealProgress } = this.resolveLegacyLevelAnnouncerVisualState(time);
     this.levelAnnouncerLabelText.setVisible(false);
     if (alpha <= 0) {
       this.levelAnnouncerNumberGraphics.setVisible(false);
@@ -10511,14 +10531,22 @@ export class MenuScene extends Phaser.Scene {
     // maze itself, the title, and Start/Login are all built from, not the
     // raster tile-font atlas (a pre-drawn glyph image merely cropped into
     // sub-tile chunks -- never actually made of discrete square tiles).
-    // revealProgress isn't threaded through here: this banner's own fade
-    // envelope (`alpha`, applied to the whole Graphics object below) already
-    // covers its in/out, and it's a short between-mazes flash rather than a
-    // tile-by-tile build.
+    // Bug fix: revealProgress was computed by resolveLegacyLevelAnnouncerVisualState
+    // (its own fade-in window) but never actually passed down to the glyph
+    // renderer -- drawLegacyLevelAnnouncerNumberGlyph hardcoded a full,
+    // instant reveal, so the number always just faded in as one flat block
+    // (via the whole-Graphics alpha below) instead of building tile-by-tile
+    // the way the title/Start/Login words next to it do. Reported directly:
+    // "is the level tiles not building out the number like it does for
+    // title text tiles". Threading the same revealProgress this banner
+    // already computes for its own fade timing through to the shared
+    // tile-block renderer is the same wiring the title's own call site
+    // already uses (this.resolveLegacyMenuPathTitleProgress()) -- no new
+    // reveal math, just no longer discarding the value already computed.
     this.levelAnnouncerNumberGlyphPool.forEach((image) => image.setVisible(false));
     const cellSize = Math.max(2, Math.round(numberFontSize / 9));
     const glyphLayout = resolveLegacyGlyphWordLayout(levelDigits, 0, 0, cellSize);
-    this.drawLegacyLevelAnnouncerNumberGlyph(this.levelAnnouncerNumberGraphics, glyphLayout, time);
+    this.drawLegacyLevelAnnouncerNumberGlyph(this.levelAnnouncerNumberGraphics, glyphLayout, time, revealProgress);
     this.levelAnnouncerNumberGraphics
       .setPosition(centerX, centerY)
       .setScale(scale)
@@ -10619,9 +10647,14 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyLevelAnnouncerNumberGlyph(
     graphics: Phaser.GameObjects.Graphics,
     layout: LegacyGlyphWordLayout,
-    time: number
+    time: number,
+    revealProgress: number = 1
   ): void {
-    this.drawLegacyGlyphWordTileBlock(graphics, layout, time, 1);
+    this.drawLegacyGlyphWordTileBlock(graphics, layout, time, 1, revealProgress);
+    // Matches the title's own call site (drawn unconditionally alongside its
+    // tile-block build, not gated on reveal completion) -- the sparkles are a
+    // constant ambient accent independent of how much of the word has
+    // dropped in yet.
     this.drawLegacyWordmarkAmbientSparkles(graphics, layout.left + (layout.width / 2), 0, layout.width / 2, layout.height / 2, time, 1);
   }
 
@@ -16739,7 +16772,7 @@ export class MenuScene extends Phaser.Scene {
     if (showOuterRing) {
       const ringRadius = (iconSize * 0.62) + 8;
       const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
-      graphics.lineStyle(Math.max(1.6, iconSize * 0.1), ringColor, alpha * 0.82);
+      graphics.lineStyle(Math.max(1.2, iconSize * LEGACY_OVERLAY_ICON_RING_WIDTH_RATIO), ringColor, alpha * LEGACY_OVERLAY_ICON_RING_ALPHA_FACTOR);
       graphics.strokeCircle(centerX, centerY, ringRadius * scale);
     }
     this.applyLegacyHudIconFrame(image, MAZER_HUD_PROFILE_ICON_METRICS, centerX, centerY, iconSize * scale, alpha);
@@ -16850,7 +16883,7 @@ export class MenuScene extends Phaser.Scene {
       const pulseScale = 0.94 + (phase * 0.06) + (this.overlayHomeActive ? 0.02 : 0);
 
       const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
-      graphics.lineStyle(Math.max(1.6, iconSize * 0.1), ringColor, pulseAlpha * 0.82);
+      graphics.lineStyle(Math.max(1.2, iconSize * LEGACY_OVERLAY_ICON_RING_WIDTH_RATIO), ringColor, pulseAlpha * LEGACY_OVERLAY_ICON_RING_ALPHA_FACTOR);
       graphics.strokeCircle(centerX, rowY, ringRadius * pulseScale);
 
       const color = cyberArcadeMaterial.signal.player;
