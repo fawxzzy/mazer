@@ -547,15 +547,27 @@ function maskMarkdownHtmlComments(line, inComment) {
   return { masked, inComment };
 }
 
+function canLazilyContinueBlockQuoteParagraph(line) {
+  if (/^\s*$/.test(line)) return false;
+  if (/^ {0,3}(?:=+|-+)[ \t]*$/.test(line)) return true;
+  const listItem = parseMarkdownListItem(line, null);
+  if (listItem) return !listItem.canInterruptParagraph;
+  return !startsMarkdownBlockOutsideTable(line);
+}
+
 function hasValidInlineCommentCloseWithinParagraph(lines, sourceIndex, rawLine, quoteDepth, containerView) {
   const opening = rawLine.lastIndexOf("<!--");
   if (opening < 0) return false;
   let comment = rawLine.slice(opening);
   for (let index = sourceIndex + 1; index < lines.length; index += 1) {
-    const quoteView = markdownBlockQuoteContainerView(lines[index]);
-    if (quoteView.depth !== quoteDepth || /^\s*$/.test(quoteView.line)) return false;
+    const parsedQuoteView = markdownBlockQuoteContainerView(lines[index]);
+    const effectiveQuoteDepth = parsedQuoteView.depth < quoteDepth
+      && canLazilyContinueBlockQuoteParagraph(parsedQuoteView.line)
+      ? quoteDepth
+      : parsedQuoteView.depth;
+    if (effectiveQuoteDepth !== quoteDepth || /^\s*$/.test(parsedQuoteView.line)) return false;
     const continuationView = markdownListContainerView(
-      quoteView.line,
+      parsedQuoteView.line,
       containerView.listContentIndent,
       containerView.listContentIndents,
     );
@@ -564,8 +576,8 @@ function hasValidInlineCommentCloseWithinParagraph(lines, sourceIndex, rawLine, 
       && continuationView.firstListMarkerIndent < containerView.listContentIndent;
     if (continuationView.startsNewListItem && (continuationView.canInterruptParagraph || exitsOwningList)) return false;
     if (startsMarkdownBlockOutsideTable(continuationView.line)) return false;
-    comment += `\n${quoteView.line}`;
-    if (quoteView.line.includes("-->")) return markdownInlineHtmlEnd(comment, 0) !== null;
+    comment += `\n${parsedQuoteView.line}`;
+    if (parsedQuoteView.line.includes("-->")) return markdownInlineHtmlEnd(comment, 0) !== null;
   }
   return false;
 }
@@ -841,7 +853,12 @@ function markdownHeadingAnchors(markdown) {
   let paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: 0 };
   for (let sourceIndex = 0; sourceIndex < lines.length; sourceIndex += 1) {
     const sourceLine = lines[sourceIndex];
-    const quoteView = markdownBlockQuoteContainerView(sourceLine);
+    const parsedQuoteView = markdownBlockQuoteContainerView(sourceLine);
+    const quoteView = paragraphState.open
+      && parsedQuoteView.depth < paragraphState.quoteDepth
+      && canLazilyContinueBlockQuoteParagraph(parsedQuoteView.line)
+      ? { ...parsedQuoteView, depth: paragraphState.quoteDepth }
+      : parsedQuoteView;
     let rawLine = quoteView.line;
     if (fence) {
       rawLine = markdownBlockQuoteContainerView(sourceLine, fence.quoteDepth).line;

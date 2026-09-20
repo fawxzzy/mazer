@@ -638,6 +638,16 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "docs/current-truth.md#comment----last",
       "First <!--\n\ncomment -->\nlast\n---",
     ],
+    [
+      "lazy blockquote continuation preserves the quoted setext paragraph",
+      "docs/current-truth.md#first-last",
+      "> First <!--\ncomment -->\n> last\n> ---",
+    ],
+    [
+      "lazy nested blockquote continuation preserves the inner setext paragraph",
+      "docs/current-truth.md#first-last",
+      "> > First <!--\n> comment -->\n> > last\n> > ---",
+    ],
   ]) {
     const setext = structuredClone(registry);
     setext.workItems[0].sourceRef = sourceRef;
