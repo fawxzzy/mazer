@@ -351,35 +351,94 @@ function normalizeMarkdownReferenceLabel(value) {
     .toLowerCase();
 }
 
+function isValidBareMarkdownLinkDestination(value) {
+  if (!value || /[\u0000-\u0020\u007f]/.test(value)) return false;
+  let depth = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === "\\" && /[!-/:-@[-`{-~]/.test(value[index + 1] ?? "")) {
+      index += 1;
+      continue;
+    }
+    if (value[index] === "(") depth += 1;
+    if (value[index] === ")" && --depth < 0) return false;
+  }
+  return depth === 0;
+}
+
+function isValidMarkdownReferenceDestination(value) {
+  const normalized = value.trim();
+  if (normalized === "") return false;
+  const separator = normalized.search(/[ \t]/);
+  const destination = separator < 0 ? normalized : normalized.slice(0, separator);
+  const title = separator < 0 ? "" : normalized.slice(separator).trim();
+  const validDestination = destination.startsWith("<")
+    ? /^<[^<>\n]*>$/.test(destination)
+    : isValidBareMarkdownLinkDestination(destination);
+  return validDestination && (title === "" || /^(?:"[^"\n]*"|'[^'\n]*'|\([^\)\n]*\))$/.test(title));
+}
+
 function markdownReferenceLabels(lines) {
   const labels = new Set();
   const definitionStart = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(.*)$/;
-  const destination = /^(?:<[^>\n]*>|\S+)(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^\)\n]*\)))?[ \t]*$/;
   for (let index = 0; index < lines.length; index += 1) {
     const match = lines[index]?.match(definitionStart);
     if (!match) continue;
     const sameLineDestination = match[2].trim();
     const nextLineDestination = sameLineDestination === "" ? lines[index + 1]?.trim() : null;
-    if (!destination.test(sameLineDestination || nextLineDestination || "")) continue;
+    if (!isValidMarkdownReferenceDestination(sameLineDestination || nextLineDestination || "")) continue;
     const label = normalizeMarkdownReferenceLabel(match[1]);
     if (label) labels.add(label);
   }
   return labels;
 }
 
+function parseMarkdownBracketedText(value, opening) {
+  if (value[opening] !== "[") return null;
+  let depth = 1;
+  for (let index = opening + 1; index < value.length; index += 1) {
+    if (value[index] === "\\" && /[!-/:-@[-`{-~]/.test(value[index + 1] ?? "")) {
+      index += 1;
+      continue;
+    }
+    if (value[index] === "[") depth += 1;
+    if (value[index] === "]" && --depth === 0) {
+      return { content: value.slice(opening + 1, index), end: index + 1 };
+    }
+  }
+  return null;
+}
+
 function renderMarkdownReferenceLinks(value, referenceLabels, protect) {
-  const fullOrCollapsed = /(!?)\[([^\]\n]+)\]\[([^\]\n]*)\]/g;
-  let rendered = value.replace(fullOrCollapsed, (match, imageMarker, label, explicitLabel, offset, source) => {
-    const openingBracket = offset + imageMarker.length;
-    if (isEscapedMarkdownDelimiter(source, openingBracket)) return protect(match);
-    const referenceLabel = explicitLabel === "" ? label : explicitLabel;
-    return referenceLabels.has(normalizeMarkdownReferenceLabel(referenceLabel)) ? label : protect(match);
-  });
-  rendered = rendered.replace(/(!?)\[([^\]\n]+)\]/g, (match, imageMarker, label, offset, source) => {
-    const openingBracket = offset + imageMarker.length;
-    if (isEscapedMarkdownDelimiter(source, openingBracket)) return match;
-    return referenceLabels.has(normalizeMarkdownReferenceLabel(label)) ? label : match;
-  });
+  let rendered = "";
+  let cursor = 0;
+  while (cursor < value.length) {
+    const openingBracket = value.indexOf("[", cursor);
+    if (openingBracket < 0) return rendered + value.slice(cursor);
+    const imageMarker = openingBracket > 0 && value[openingBracket - 1] === "!" ? "!" : "";
+    const matchStart = openingBracket - imageMarker.length;
+    rendered += value.slice(cursor, matchStart);
+    if (isEscapedMarkdownDelimiter(value, openingBracket)) {
+      rendered += value.slice(matchStart, openingBracket + 1);
+      cursor = openingBracket + 1;
+      continue;
+    }
+    const label = parseMarkdownBracketedText(value, openingBracket);
+    if (!label || label.content.includes("\n")) {
+      rendered += value.slice(matchStart, openingBracket + 1);
+      cursor = openingBracket + 1;
+      continue;
+    }
+    const explicitLabel = value[label.end] === "[" ? parseMarkdownBracketedText(value, label.end) : null;
+    const matchEnd = explicitLabel?.end ?? label.end;
+    const referenceLabel = explicitLabel
+      ? (explicitLabel.content === "" ? label.content : explicitLabel.content)
+      : label.content;
+    const resolved = !explicitLabel?.content.includes("\n")
+      && referenceLabels.has(normalizeMarkdownReferenceLabel(referenceLabel));
+    const match = value.slice(matchStart, matchEnd);
+    rendered += resolved ? label.content : (explicitLabel ? protect(match) : match);
+    cursor = matchEnd;
+  }
   return rendered;
 }
 
@@ -394,7 +453,11 @@ function markdownInlineHtmlEnd(value, opening) {
   if (suffix.startsWith("<!--->")) return opening + 6;
   if (suffix.startsWith("<!--")) {
     const closing = value.indexOf("-->", opening + 4);
-    return closing < 0 ? null : closing + 3;
+    if (closing < 0) return null;
+    const content = value.slice(opening + 4, closing);
+    return content.startsWith(">") || content.startsWith("->") || content.endsWith("-") || content.includes("--")
+      ? null
+      : closing + 3;
   }
   for (const [prefix, terminator] of [["<![CDATA[", "]]>"], ["<?", "?>"]]) {
     if (!suffix.startsWith(prefix)) continue;
@@ -414,6 +477,11 @@ function stripMarkdownInlineHtml(value) {
     const opening = value.indexOf("<", cursor);
     if (opening < 0) return rendered + value.slice(cursor);
     rendered += value.slice(cursor, opening);
+    if (isEscapedMarkdownDelimiter(value, opening)) {
+      rendered += "<";
+      cursor = opening + 1;
+      continue;
+    }
     const closing = markdownInlineHtmlEnd(value, opening);
     if (closing === null) {
       rendered += "<";
@@ -511,6 +579,18 @@ function markdownHeadingLine(line) {
   return markdownIndentColumns(indentation) <= 3 ? line : null;
 }
 
+function markdownBlockQuoteContainerView(line, maximumDepth = Number.POSITIVE_INFINITY) {
+  let projected = line;
+  let depth = 0;
+  while (depth < maximumDepth) {
+    const marker = projected.match(/^ {0,3}>[ \t]?/);
+    if (!marker) break;
+    projected = projected.slice(marker[0].length);
+    depth += 1;
+  }
+  return { line: projected, depth };
+}
+
 function parseMarkdownListItem(line, activeListContentIndent) {
   const indentation = line.match(/^[ \t]*/)?.[0] ?? "";
   const markerIndent = markdownIndentColumns(indentation);
@@ -555,6 +635,7 @@ function nextMarkdownParagraphState(line, state, containerView = null) {
     if (state.open && !exitsActiveListParagraph && !containerView.canInterruptParagraph) return state;
     if (state.open && state.listContentIndent === null && !containerView.canInterruptParagraph) return state;
     return {
+      ...state,
       open: containerView.line.trim() !== "" && !containerView.startsWithIndentedCode,
       listContentIndent: containerView.listContentIndent,
       listContentIndents: containerView.listContentIndents,
@@ -569,6 +650,7 @@ function nextMarkdownParagraphState(line, state, containerView = null) {
       .filter((indent) => indent <= listItem.markerIndent && indent < listItem.contentIndent);
     listContentIndents.push(listItem.contentIndent);
     return {
+      ...state,
       open: listItem.itemContent.trim() !== "" && !listItem.startsWithIndentedCode,
       listContentIndent: listItem.contentIndent,
       listContentIndents,
@@ -579,10 +661,10 @@ function nextMarkdownParagraphState(line, state, containerView = null) {
   if (state.listContentIndent !== null) {
     if (state.open || lineIndent >= state.listContentIndent) return { ...state, open: true };
     const listContentIndents = (state.listContentIndents ?? []).filter((indent) => indent <= lineIndent);
-    return { open: true, listContentIndent: listContentIndents.at(-1) ?? null, listContentIndents };
+    return { ...state, open: true, listContentIndent: listContentIndents.at(-1) ?? null, listContentIndents };
   }
   if (lineIndent >= 4) return state;
-  return { open: true, listContentIndent: null, listContentIndents: [] };
+  return { ...state, open: true, listContentIndent: null, listContentIndents: [] };
 }
 
 function splitGfmTableRow(line) {
@@ -725,17 +807,21 @@ function markdownHeadingAnchors(markdown) {
   const renderedHeadingLines = [];
   const referenceDefinitionLines = [];
   let fence = null;
-  let htmlComment = false;
+  let htmlCommentQuoteDepth = null;
   let rawHtmlBlock = null;
   let gfmTableColumns = null;
-  let paragraphState = { open: false, listContentIndent: null, listContentIndents: [] };
-  for (const rawLine of lines) {
+  let paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: 0 };
+  for (const sourceLine of lines) {
+    const quoteView = markdownBlockQuoteContainerView(sourceLine);
+    let rawLine = quoteView.line;
     if (fence) {
+      rawLine = markdownBlockQuoteContainerView(sourceLine, fence.quoteDepth).line;
       const rawIndent = markdownIndentColumns(rawLine.match(/^[ \t]*/)?.[0] ?? "");
+      const exitsQuoteFence = quoteView.depth < fence.quoteDepth;
       const exitsListFence = fence.listContentIndent !== null
         && !/^\s*$/.test(rawLine)
         && rawIndent < fence.listContentIndent;
-      if (!exitsListFence) {
+      if (!exitsQuoteFence && !exitsListFence) {
         const fenceLine = markdownFenceContainerView(rawLine, fence.listContentIndent);
         const fenceMatch = fenceLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
         if (fenceMatch && fenceMatch[1][0] === fence.marker && fenceMatch[1].length >= fence.length
@@ -753,10 +839,12 @@ function markdownHeadingAnchors(markdown) {
         open: false,
         listContentIndent: listContentIndents.at(-1) ?? null,
         listContentIndents,
+        quoteDepth: quoteView.depth,
       };
+      rawLine = quoteView.line;
     }
     if (gfmTableColumns !== null) {
-      const cells = splitGfmTableRow(rawLine);
+      const cells = gfmTableColumns.quoteDepth === quoteView.depth ? splitGfmTableRow(rawLine) : null;
       if (cells && !startsMarkdownBlockOutsideTable(rawLine)) {
         renderedLines.push(rawLine);
         renderedHeadingLines.push(null);
@@ -766,11 +854,13 @@ function markdownHeadingAnchors(markdown) {
       gfmTableColumns = null;
     }
     if (rawHtmlBlock) {
+      rawLine = markdownBlockQuoteContainerView(sourceLine, rawHtmlBlock.quoteDepth).line;
       const rawIndent = markdownIndentColumns(rawLine.match(/^[ \t]*/)?.[0] ?? "");
+      const exitsQuoteRawHtml = quoteView.depth < rawHtmlBlock.quoteDepth;
       const exitsListRawHtml = rawHtmlBlock.listContentIndent !== null
         && !/^\s*$/.test(rawLine)
         && rawIndent < rawHtmlBlock.listContentIndent;
-      if (!exitsListRawHtml) {
+      if (!exitsQuoteRawHtml && !exitsListRawHtml) {
         const rawMasked = maskMarkdownRawHtmlBlock(rawLine, rawHtmlBlock);
         rawHtmlBlock = rawMasked.state;
         renderedLines.push(rawMasked.masked);
@@ -787,16 +877,24 @@ function markdownHeadingAnchors(markdown) {
         open: false,
         listContentIndent: listContentIndents.at(-1) ?? null,
         listContentIndents,
+        quoteDepth: quoteView.depth,
       };
+      rawLine = quoteView.line;
     }
-    if (htmlComment) {
-      const commentMasked = maskMarkdownHtmlComments(rawLine, htmlComment);
-      htmlComment = commentMasked.inComment;
+    if (htmlCommentQuoteDepth !== null && quoteView.depth === htmlCommentQuoteDepth) {
+      rawLine = markdownBlockQuoteContainerView(sourceLine, htmlCommentQuoteDepth).line;
+      const commentMasked = maskMarkdownHtmlComments(rawLine, true);
+      htmlCommentQuoteDepth = commentMasked.inComment ? htmlCommentQuoteDepth : null;
       renderedLines.push(commentMasked.masked);
       renderedHeadingLines.push(null);
       referenceDefinitionLines.push(null);
-      if (!htmlComment && /^\s*$/.test(commentMasked.masked)) paragraphState = { ...paragraphState, open: false };
+      if (htmlCommentQuoteDepth === null && /^\s*$/.test(commentMasked.masked)) paragraphState = { ...paragraphState, open: false };
       continue;
+    }
+    if (htmlCommentQuoteDepth !== null) htmlCommentQuoteDepth = null;
+    rawLine = quoteView.line;
+    if (paragraphState.quoteDepth !== quoteView.depth) {
+      paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: quoteView.depth };
     }
     const containerView = markdownListContainerView(
       rawLine,
@@ -819,6 +917,7 @@ function markdownHeadingAnchors(markdown) {
         length: fenceMatch[1].length,
         listContentIndent: containerView.listContentIndent,
         listContentIndents: containerView.listContentIndents,
+        quoteDepth: quoteView.depth,
       };
       renderedLines.push(null);
       renderedHeadingLines.push(null);
@@ -827,6 +926,7 @@ function markdownHeadingAnchors(markdown) {
         open: false,
         listContentIndent: containerView.listContentIndent,
         listContentIndents: containerView.listContentIndents,
+        quoteDepth: quoteView.depth,
       };
       continue;
     }
@@ -834,7 +934,7 @@ function markdownHeadingAnchors(markdown) {
     if (paragraphState.open && paragraphState.listContentIndent !== null
       && (rawIndent < paragraphState.listContentIndent || containerView.canInterruptParagraph)
       && isMarkdownType7Start(containerView.line)) {
-      paragraphState = { open: false, listContentIndent: null, listContentIndents: [] };
+      paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: quoteView.depth };
     }
     const rawMasked = containerView.startsWithIndentedCode
       ? { masked: rawLine, state: null, isBlock: false }
@@ -850,6 +950,7 @@ function markdownHeadingAnchors(markdown) {
           ...rawMasked.state,
           listContentIndent: containerView.listContentIndent,
           listContentIndents: containerView.listContentIndents,
+          quoteDepth: quoteView.depth,
         };
       renderedLines.push(" ".repeat(rawLine.length));
       renderedHeadingLines.push(null);
@@ -857,19 +958,18 @@ function markdownHeadingAnchors(markdown) {
       paragraphState = { ...paragraphState, open: false };
       continue;
     }
-    const commentMasked = maskMarkdownHtmlComments(rawLine, htmlComment);
-    htmlComment = commentMasked.inComment;
+    const commentMasked = maskMarkdownHtmlComments(rawLine, false);
+    htmlCommentQuoteDepth = commentMasked.inComment ? quoteView.depth : null;
     const visibleLine = commentMasked.masked;
     renderedLines.push(visibleLine);
-    const headingCommentMasked = maskMarkdownHtmlComments(containerView.line, false);
-    renderedHeadingLines.push(markdownHeadingLine(headingCommentMasked.masked));
-    referenceDefinitionLines.push(headingCommentMasked.masked);
+    renderedHeadingLines.push(markdownHeadingLine(containerView.line));
+    referenceDefinitionLines.push(containerView.line);
     const previousLine = renderedLines.at(-2);
     const tableColumnCount = previousLine === null || previousLine === undefined
       ? null
       : gfmTableColumnCount(previousLine, visibleLine);
     if (tableColumnCount !== null) {
-      gfmTableColumns = tableColumnCount;
+      gfmTableColumns = { columnCount: tableColumnCount, quoteDepth: quoteView.depth };
       paragraphState = { ...paragraphState, open: false };
       continue;
     }

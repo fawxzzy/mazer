@@ -190,6 +190,8 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["declaration-like numeric text remains visible", "docs/current-truth.md#a1", "## <!A1>"],
     ["declaration-like hyphen text remains visible", "docs/current-truth.md#a-x", "## <!A-x>"],
     ["ordinary angle-bracket text is not inline HTML", "docs/current-truth.md#a--b--c", "## A < B > C"],
+    ["escaped inline tags remain visible heading text", "docs/current-truth.md#spanfoo", "## \\<span>foo"],
+    ["valid adjacent inline comments add no source-width spacing", "docs/current-truth.md#ab", "## A<!--ok-->B"],
   ]) {
     const referenceHeading = structuredClone(registry);
     referenceHeading.workItems[0].sourceRef = sourceRef;
@@ -206,6 +208,10 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["collapsed reference links use rendered label text", "docs/current-truth.md#foo", "## [Foo][]\n\n[foo]: /target"],
     ["shortcut reference links use rendered label text", "docs/current-truth.md#foo", "## [Foo]\n\n[FOO]: /target"],
     ["reference images use rendered alt text", "docs/current-truth.md#foo", "## ![Foo][docs]\n\n[docs]: /target"],
+    ["balanced nested reference text uses rendered label text", "docs/current-truth.md#foo-bar", "## [Foo [bar]][docs]\n\n[docs]: /target"],
+    ["block-quoted definitions resolve document-wide references", "docs/current-truth.md#foo", "## [Foo][docs]\n\n> [docs]: /target"],
+    ["balanced bare destinations define references", "docs/current-truth.md#foo", "## [Foo][docs]\n\n[docs]: /foo(bar)"],
+    ["escaped bare destination parentheses stay literal", "docs/current-truth.md#foo", "## [Foo][docs]\n\n[docs]: /foo\\(bar"],
   ]) {
     const referenceLinkHeading = structuredClone(registry);
     referenceLinkHeading.workItems[0].sourceRef = sourceRef;
@@ -219,6 +225,11 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
   for (const [label, sourceRef, markdown] of [
     ["unresolved references remain literal", "docs/current-truth.md#foo", "## [Foo][missing]"],
     ["escaped reference openers remain literal", "docs/current-truth.md#foo", "## \\[Foo][docs]\n\n[docs]: /target"],
+    ["unbalanced opening parentheses do not define references", "docs/current-truth.md#unbalancedopening", "## [UnbalancedOpening][bad-open]\n\n[bad-open]: /foo(bar"],
+    ["unbalanced closing parentheses do not define references", "docs/current-truth.md#unbalancedclosing", "## [UnbalancedClosing][bad-close]\n\n[bad-close]: /foo)bar"],
+    ["malformed inline comments remain visible", "docs/current-truth.md#ab", "## A<!-- foo -- bar -->B"],
+    ["block-quoted fenced definitions remain inert", "docs/current-truth.md#foo", "## [Foo][docs]\n\n> ```text\n> [docs]: /target\n> ```"],
+    ["block-quoted raw-HTML definitions remain inert", "docs/current-truth.md#foo", "## [Foo][docs]\n\n> <pre>\n> [docs]: /target\n> </pre>"],
   ]) {
     const danglingReferenceLink = structuredClone(registry);
     danglingReferenceLink.workItems[0].sourceRef = sourceRef;
@@ -329,6 +340,10 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["full top-level exit after a nested list", "1. outer\n   - child\n     continuation\n- top\n  ## Visible Heading"],
     ["heading resumes after four-column code", "    ## Hidden Indented Heading\n## Visible Heading"],
     ["heading resumes after mixed-tab code", "  \t## Hidden Tab Indented\n## Visible Heading"],
+    ["heading resumes when an unclosed quoted fence exits its quote", "> ```text\n> fenced\n## Visible Heading"],
+    ["heading resumes when an unclosed quoted raw block exits its quote", "> <pre>\n> raw\n## Visible Heading"],
+    ["root inline-comment state cannot enter a new quote", "Paragraph <!--\n> ## Visible Heading"],
+    ["quoted inline-comment state cannot enter a nested quote", "> Paragraph <!--\n> > ## Visible Heading"],
   ]) {
     const visibleHeading = structuredClone(registry);
     visibleHeading.workItems[0].sourceRef = "docs/current-truth.md#visible-heading";
@@ -361,6 +376,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "shorter marker does not close a nested fence",
       "- outer\n  - ````md\n    ## Hidden List Fence\n    ```\n    ## Hidden After Short Fence\n    `````",
     ],
+    ["quoted fence markers cannot close a root fence", "```text\n> ```\n## Hidden List Fence\n```"],
   ]) {
     const listFencedHeading = structuredClone(registry);
     listFencedHeading.workItems[0].sourceRef = "docs/current-truth.md#hidden-list-fence";
