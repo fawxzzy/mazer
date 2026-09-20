@@ -333,6 +333,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["ordered-list projected tab heading", "1. item\n   \t## Visible Heading"],
     ["nested-list projected heading", "- outer\n  - item\n    ### Visible Heading"],
     ["nested ordered-list projected tab heading", "- outer\n  1. item\n     \t### Visible Heading"],
+    ["block quote nested inside a list item", "- > ## Visible Heading"],
     ["ancestor sibling after nested unordered item", "1.  outer\n    - child\n      continuation\n    - sibling\n      ## Visible Heading"],
     ["ancestor sibling after a blank separator", "1.  outer\n    - child\n\n    - sibling\n      ## Visible Heading"],
     ["ordered ancestor sibling after nested ordered item", "10. outer\n    1) child\n       continuation\n    2) sibling\n       ## Visible Heading"],
@@ -660,6 +661,11 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "> > First <!--\n> comment -->\n> > last\n> > ---",
     ],
     [
+      "list-contained blockquote retains setext ownership",
+      "docs/current-truth.md#nested-heading",
+      "- > Nested Heading\n  > ---",
+    ],
+    [
       "indented lazy blockquote continuation remains paragraph text",
       "docs/current-truth.md#foo-bar",
       "> Foo\n    bar\n> ---",
@@ -759,6 +765,7 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
     ["outer thematic break does not become a lazy quoted setext underline", "> Foo\n---"],
     ["outer equals line does not become a lazy quoted setext underline", "> Foo\n==="],
     ["outer ordered list and thematic break do not enter the quote paragraph", "> Foo\n2. bar\n---"],
+    ["list-contained outer thematic break does not enter the nested quote", "- > Foo\n  ---"],
   ]) {
     const outerBlock = structuredClone(registry);
     outerBlock.workItems[0].sourceRef = "docs/current-truth.md#foo";

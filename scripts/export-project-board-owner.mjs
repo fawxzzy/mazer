@@ -825,6 +825,12 @@ function markdownListContainerView(line, activeListContentIndent, activeListCont
   };
 }
 
+function markdownListBlockQuoteContainerView(line, activeListContentIndent, activeListContentIndents = []) {
+  const listView = markdownListContainerView(line, activeListContentIndent, activeListContentIndents);
+  const nestedQuoteView = markdownBlockQuoteContainerView(listView.line);
+  return { ...listView, line: nestedQuoteView.line, nestedQuoteDepth: nestedQuoteView.depth };
+}
+
 function markdownFenceContainerView(line, listContentIndent) {
   if (listContentIndent === null) return line;
   const lineIndent = markdownIndentColumns(line.match(/^[ \t]*/)?.[0] ?? "");
@@ -873,7 +879,11 @@ function markdownHeadingAnchors(markdown) {
   let paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: 0 };
   for (let sourceIndex = 0; sourceIndex < lines.length; sourceIndex += 1) {
     const sourceLine = lines[sourceIndex];
-    const parsedQuoteView = markdownBlockQuoteContainerView(sourceLine);
+    const sourceIndent = markdownIndentColumns(sourceLine.match(/^[ \t]*/)?.[0] ?? "");
+    const parsedQuoteView = paragraphState.listContentIndent !== null
+      && sourceIndent >= paragraphState.listContentIndent
+      ? { line: sourceLine, depth: 0 }
+      : markdownBlockQuoteContainerView(sourceLine);
     const isLazyQuoteContinuation = paragraphState.open
       && parsedQuoteView.depth < paragraphState.quoteDepth
       && canLazilyContinueBlockQuoteParagraph(parsedQuoteView.line);
@@ -990,14 +1000,17 @@ function markdownHeadingAnchors(markdown) {
     }
     if (htmlCommentQuoteDepth !== null) htmlCommentQuoteDepth = null;
     rawLine = quoteView.line;
-    if (paragraphState.quoteDepth !== quoteView.depth) {
-      paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: quoteView.depth };
-    }
-    const containerView = markdownListContainerView(
+    let containerView = markdownListBlockQuoteContainerView(
       rawLine,
       paragraphState.listContentIndent,
       paragraphState.listContentIndents,
     );
+    let effectiveQuoteDepth = quoteView.depth + containerView.nestedQuoteDepth;
+    if (paragraphState.quoteDepth !== effectiveQuoteDepth) {
+      paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: effectiveQuoteDepth };
+      containerView = markdownListBlockQuoteContainerView(rawLine, null, []);
+      effectiveQuoteDepth = quoteView.depth + containerView.nestedQuoteDepth;
+    }
     const exitsActiveListParagraph = paragraphState.listContentIndent !== null
       && containerView.startsNewListItem
       && containerView.firstListMarkerIndent < paragraphState.listContentIndent;
@@ -1014,7 +1027,7 @@ function markdownHeadingAnchors(markdown) {
         length: fenceMatch[1].length,
         listContentIndent: containerView.listContentIndent,
         listContentIndents: containerView.listContentIndents,
-        quoteDepth: quoteView.depth,
+        quoteDepth: effectiveQuoteDepth,
       };
       renderedLines.push(null);
       renderedHeadingLines.push(null);
@@ -1026,7 +1039,7 @@ function markdownHeadingAnchors(markdown) {
         open: false,
         listContentIndent: containerView.listContentIndent,
         listContentIndents: containerView.listContentIndents,
-        quoteDepth: quoteView.depth,
+        quoteDepth: effectiveQuoteDepth,
       };
       continue;
     }
@@ -1034,7 +1047,7 @@ function markdownHeadingAnchors(markdown) {
     if (!quoteView.lazy && paragraphState.open && paragraphState.listContentIndent !== null
       && (rawIndent < paragraphState.listContentIndent || containerView.canInterruptParagraph)
       && isMarkdownType7Start(containerView.line)) {
-      paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: quoteView.depth };
+      paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: effectiveQuoteDepth };
     }
     const rawMasked = quoteView.lazy || containerView.startsWithIndentedCode
       ? { masked: rawLine, state: null, isBlock: false }
@@ -1050,7 +1063,7 @@ function markdownHeadingAnchors(markdown) {
           ...rawMasked.state,
           listContentIndent: containerView.listContentIndent,
           listContentIndents: containerView.listContentIndents,
-          quoteDepth: quoteView.depth,
+          quoteDepth: effectiveQuoteDepth,
         };
       renderedLines.push(" ".repeat(rawLine.length));
       renderedHeadingLines.push(null);
@@ -1065,12 +1078,12 @@ function markdownHeadingAnchors(markdown) {
     const commentOwnerState = nextMarkdownParagraphState(containerView.line, paragraphState, containerView);
     if (commentMasked.inComment
       && (!commentOwnerState.open
-        || !hasValidInlineCommentCloseWithinParagraph(lines, sourceIndex, rawLine, quoteView.depth, containerView))) {
+        || !hasValidInlineCommentCloseWithinParagraph(lines, sourceIndex, rawLine, effectiveQuoteDepth, containerView))) {
       commentMasked = { masked: rawLine, inComment: false };
     }
-    htmlCommentQuoteDepth = commentMasked.inComment ? quoteView.depth : null;
+    htmlCommentQuoteDepth = commentMasked.inComment ? effectiveQuoteDepth : null;
     const visibleLine = commentMasked.masked;
-    const visibleContainerView = markdownListContainerView(
+    const visibleContainerView = markdownListBlockQuoteContainerView(
       commentMasked.inComment ? visibleLine : rawLine,
       paragraphState.listContentIndent,
       paragraphState.listContentIndents,
@@ -1098,7 +1111,7 @@ function markdownHeadingAnchors(markdown) {
     if (!paragraphState.open || effectiveContainerView.startsNewListItem) paragraphBlockSerial += 1;
     const headingBlock = {
       paragraphBlockSerial,
-      quoteDepth: quoteView.depth,
+      quoteDepth: effectiveQuoteDepth,
       listContentIndents: effectiveContainerView.listContentIndents.join(","),
     };
     renderedHeadingLines.push(markdownHeadingLine(effectiveContainerView.line));
@@ -1112,7 +1125,7 @@ function markdownHeadingAnchors(markdown) {
     if (tableColumnCount !== null) {
       gfmTableColumns = {
         columnCount: tableColumnCount,
-        quoteDepth: quoteView.depth,
+        quoteDepth: effectiveQuoteDepth,
         listContentIndent: effectiveContainerView.listContentIndent,
         listContentIndents: effectiveContainerView.listContentIndents,
       };
