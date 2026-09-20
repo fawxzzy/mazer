@@ -844,6 +844,7 @@ function markdownHeadingAnchors(markdown) {
   const renderedHeadingLines = [];
   const renderedHeadingBlocks = [];
   const setextUnderlineIndexes = new Set();
+  const paragraphOnlyHeadingIndexes = new Set();
   const referenceDefinitionLines = [];
   let fence = null;
   let htmlCommentQuoteDepth = null;
@@ -986,7 +987,7 @@ function markdownHeadingAnchors(markdown) {
       || !containerView.startsNewListItem
       || containerView.canInterruptParagraph
       || exitsActiveListParagraph;
-    const fenceMatch = containerView.startsWithIndentedCode || !listContainerCanOpenFence
+    const fenceMatch = quoteView.lazy || containerView.startsWithIndentedCode || !listContainerCanOpenFence
       ? null
       : containerView.line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     if (fenceMatch && (fenceMatch[1][0] === "~" || !fenceMatch[2].includes("`"))) {
@@ -1012,12 +1013,12 @@ function markdownHeadingAnchors(markdown) {
       continue;
     }
     const rawIndent = markdownIndentColumns(rawLine.match(/^[ \t]*/)?.[0] ?? "");
-    if (paragraphState.open && paragraphState.listContentIndent !== null
+    if (!quoteView.lazy && paragraphState.open && paragraphState.listContentIndent !== null
       && (rawIndent < paragraphState.listContentIndent || containerView.canInterruptParagraph)
       && isMarkdownType7Start(containerView.line)) {
       paragraphState = { open: false, listContentIndent: null, listContentIndents: [], quoteDepth: quoteView.depth };
     }
-    const rawMasked = containerView.startsWithIndentedCode
+    const rawMasked = quoteView.lazy || containerView.startsWithIndentedCode
       ? { masked: rawLine, state: null, isBlock: false }
       : maskMarkdownRawHtmlBlock(
         containerView.line,
@@ -1057,10 +1058,10 @@ function markdownHeadingAnchors(markdown) {
     const effectiveExitsActiveListParagraph = paragraphState.listContentIndent !== null
       && visibleContainerView.startsNewListItem
       && visibleContainerView.firstListMarkerIndent < paragraphState.listContentIndent;
-    const markerInterruptsParagraph = !visibleContainerView.startsNewListItem
+    const markerInterruptsParagraph = !quoteView.lazy && (!visibleContainerView.startsNewListItem
       || !paragraphState.open
       || visibleContainerView.canInterruptParagraph
-      || effectiveExitsActiveListParagraph;
+      || effectiveExitsActiveListParagraph);
     const effectiveContainerView = markerInterruptsParagraph
       ? visibleContainerView
       : {
@@ -1081,10 +1082,11 @@ function markdownHeadingAnchors(markdown) {
       listContentIndents: effectiveContainerView.listContentIndents.join(","),
     };
     renderedHeadingLines.push(markdownHeadingLine(effectiveContainerView.line));
+    if (quoteView.lazy) paragraphOnlyHeadingIndexes.add(renderedHeadingLines.length - 1);
     if (!quoteView.lazy) setextUnderlineIndexes.add(renderedHeadingLines.length - 1);
     renderedHeadingBlocks.push(headingBlock);
-    referenceDefinitionLines.push(effectiveContainerView.line);
-    const tableColumnCount = previousTableLine === null || !isDeepStrictEqual(previousTableBlock, headingBlock)
+    referenceDefinitionLines.push(quoteView.lazy ? null : effectiveContainerView.line);
+    const tableColumnCount = quoteView.lazy || previousTableLine === null || !isDeepStrictEqual(previousTableBlock, headingBlock)
       ? null
       : gfmTableColumnCount(previousTableLine, effectiveContainerView.line);
     if (tableColumnCount !== null) {
@@ -1099,14 +1101,18 @@ function markdownHeadingAnchors(markdown) {
       previousTableBlock = null;
       continue;
     }
-    previousTableLine = effectiveContainerView.line;
-    previousTableBlock = headingBlock;
-    paragraphState = nextMarkdownParagraphState(visibleLine, paragraphState, effectiveContainerView);
+    previousTableLine = quoteView.lazy ? null : effectiveContainerView.line;
+    previousTableBlock = quoteView.lazy ? null : headingBlock;
+    paragraphState = quoteView.lazy
+      ? { ...paragraphState, open: true }
+      : nextMarkdownParagraphState(visibleLine, paragraphState, effectiveContainerView);
   }
   for (let index = 0; index < renderedHeadingLines.length; index += 1) {
     const line = renderedHeadingLines[index];
     if (!line) continue;
-    const atx = line.match(/^[ \t]*#{1,6}(?:[ \t]+|$)(.*)$/);
+    const atx = paragraphOnlyHeadingIndexes.has(index)
+      ? null
+      : line.match(/^[ \t]*#{1,6}(?:[ \t]+|$)(.*)$/);
     if (atx) {
       headings.push(atx[1].replace(/[ \t]+#+[ \t]*$/, "").trim());
       continue;

@@ -668,6 +668,16 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "docs/current-truth.md#first-last",
       "> First <!--\n    comment -->\n> last\n> ---",
     ],
+    [
+      "indented lazy ATX-looking continuation remains setext paragraph text",
+      "docs/current-truth.md#foo--bar-baz",
+      "> Foo\n    ## Bar\n> Baz\n> ---",
+    ],
+    [
+      "indented lazy list-looking continuation remains setext paragraph text",
+      "docs/current-truth.md#foo---bar-baz",
+      "> Foo\n    - Bar\n> Baz\n> ---",
+    ],
   ]) {
     const setext = structuredClone(registry);
     setext.workItems[0].sourceRef = sourceRef;
@@ -676,6 +686,34 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
       "mazer-owner-work-registry": JSON.stringify(setext),
       "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
     }), label);
+  }
+
+  for (const [label, sourceRef, markdown] of [
+    [
+      "indented lazy ATX-looking text does not invent a heading",
+      "docs/current-truth.md#bar",
+      "> Foo\n    ## Bar\n> Baz",
+    ],
+    [
+      "indented lazy fence-looking text does not hide a later heading",
+      "docs/current-truth.md#visible",
+      "> Foo\n    ```\n> ## Visible",
+    ],
+    [
+      "indented lazy raw-HTML-looking text does not hide a later heading",
+      "docs/current-truth.md#visible",
+      "> Foo\n    <div>\n> ## Visible\n> </div>",
+    ],
+  ]) {
+    const lazyBlock = structuredClone(registry);
+    lazyBlock.workItems[0].sourceRef = sourceRef;
+    const build = () => buildProjectBoardOwnerExport(lazyBlock, {
+      ...bytes,
+      "mazer-owner-work-registry": JSON.stringify(lazyBlock),
+      "mazer-current-truth": `${bytes["mazer-current-truth"]}\n${markdown}\n`,
+    });
+    if (label.includes("does not invent")) assert.throws(build, /sourceRef fragment does not exist/, label);
+    else assert.doesNotThrow(build, label);
   }
 
   const siblingListComment = structuredClone(registry);
