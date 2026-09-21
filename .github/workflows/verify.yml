@@ -101,6 +101,9 @@ jobs:
       - name: Verify Wave 0C ui-surfaces harness failure reporting (real process, negative control)
         run: node ./scripts/analysis/verify-ui-surfaces-failure-reporting.mjs --skip-build
 
+      - name: Verify Wave 0C Options/Account real click-through reachability (desktop + compact touch, intercepted portal navigation)
+        run: node ./scripts/analysis/verify-options-account-reachability.mjs --skip-build
+
   ai-navigation-acceptance:
     name: AI navigation acceptance shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
