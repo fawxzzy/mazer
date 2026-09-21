@@ -1302,8 +1302,17 @@ const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
   'Animated Background'
 ]);
 
+// Was ['Account'] until this finding: createLegacyOptionsSessionActionBar
+// (MenuScene.ts) only ever renders a single 'Sign out' action at the bottom
+// of the authenticated Options overlay -- 'Account' lives in a different
+// overlay entirely (buildAuthenticatedAccountSection, reached via the
+// profile/username icon button, semanticAction 'Account'), not at the
+// bottom of Options. tests/scenes/menu-render-frame.test.ts already locks
+// in the sign-out-only bar as intentional. This was a stale expectation
+// from before that split, not a reachability defect -- there is no missing
+// or broken control here, just a check verifying the wrong surface.
 const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([
-  'Account'
+  'Sign out'
 ]);
 
 const isAuthGatedMenuSurface = (surface) => (

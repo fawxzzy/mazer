@@ -706,7 +706,13 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("actualLabel.startsWith(`${expectedLabel}: `)");
     expect(source).toContain('actualLabel.slice(expectedLabel.length + 2).trim().length > 0');
     expect(source).toContain('const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([');
-    expect(source).toContain("'Account'");
+    expect(source).toContain("  'Sign out'\n]);");
+    // createLegacyOptionsSessionActionBar (MenuScene.ts) only ever renders a
+    // single 'Sign out' action at the bottom of the authenticated Options
+    // overlay -- 'Account' lives in a separate overlay reached via the
+    // profile/username icon, not at the bottom of Options. Asserting the
+    // absence of the old value keeps this contract from silently reverting.
+    expect(source).not.toContain("const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([\n  'Account'\n]);");
     expect(source).not.toContain("authenticated ? 'Log out' : 'Account'");
     expect(source).not.toContain("surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out'])");
     expect(source).toContain('hasLabels(surfaces.optionsBottom, optionsBottomExpectedLabels)');
