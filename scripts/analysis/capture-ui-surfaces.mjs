@@ -135,7 +135,7 @@ const readJsonAttribute = async (page, attribute) => page.evaluate((attr) => {
   }
 }, attribute);
 
-const readDiagnostics = async (page) => ({
+export const readDiagnostics = async (page) => ({
   runtime: await readJsonAttribute(page, RUNTIME_DIAGNOSTICS_ATTRIBUTE),
   visual: await readJsonAttribute(page, VISUAL_DIAGNOSTICS_ATTRIBUTE)
 });
@@ -882,7 +882,7 @@ const parseViewport = (value) => {
   };
 };
 
-const clickPoint = async (page, point, label) => {
+export const clickPoint = async (page, point, label) => {
   if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
     throw new Error(`Missing click point for ${label}.`);
   }
@@ -890,7 +890,7 @@ const clickPoint = async (page, point, label) => {
   await page.mouse.click(point.x, point.y);
 };
 
-const openOptionsOverlayViaQa = async (page, timeoutMs) => {
+export const openOptionsOverlayViaQa = async (page, timeoutMs) => {
   await page.waitForFunction(
     () => Boolean(window.__MAZER_QA__?.openSettingsOverlay),
     {},
@@ -1237,7 +1237,7 @@ const seedPreferences = async (page, preferences) => {
   });
 };
 
-const getVisualButtonPoint = (visual, text) => {
+export const getVisualButtonPoint = (visual, text) => {
   const button = (visual?.buttons ?? []).find((entry) => entry?.text === text && isFiniteBounds(entry?.bounds));
   if (!button) {
     return null;
@@ -1290,7 +1290,7 @@ export const hasExpectedTextLabels = (actualLabels, expectedLabels) => (
   ))
 );
 
-const hasTextLabels = (surface, expectedLabels) => {
+export const hasTextLabels = (surface, expectedLabels) => {
   const labels = collectTextLabels(surface);
   return hasExpectedTextLabels(labels, expectedLabels);
 };
@@ -1353,7 +1353,7 @@ const isIgnorableConsoleMessage = (message) => (
   && message.text.includes('WebGL: CONTEXT_LOST_WEBGL')
 );
 
-const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
+export const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
   const before = await readDiagnostics(page);
   const scroll = before.visual?.overlayUi?.scroll;
   if (

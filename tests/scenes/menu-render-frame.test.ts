@@ -1760,19 +1760,29 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("if (this.authSnapshot.status !== 'authenticated') {");
     expect(menuSceneSource).toContain("{ onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }");
     // The Options overlay's own bottom bar is intentionally Sign-out-only
-    // (above) -- the real Account entry point lives in buildAuthenticatedAccountSection
-    // (the dedicated Account/auth overlay, reached via the profile/username
-    // icon button's semanticAction 'Account'), confirmed wired to the real
-    // navigation call rather than a stub. A visual-harness capture of this
-    // surface's own content is out of scope here (mode/overlay-transition
-    // plumbing owned by scripts/analysis/capture-ui-surfaces.mjs); this pins
-    // the source wiring the way this file already pins createLegacyOptionsSessionActionBar's.
+    // (above). The real, normal way an authenticated player reaches their
+    // account is the profile/username icon (present in both the main menu
+    // and the Options header): its onClick calls openSharedAccountSurface(),
+    // which -- when already authenticated -- navigates straight to the real
+    // account portal via navigateToSharedAccountRoute('account'), with no
+    // intermediate internal overlay. Confirmed both here (source) and by a
+    // real click-through with the external navigation intercepted:
+    // scripts/analysis/verify-options-account-reachability.mjs.
+    expect(menuSceneSource).toContain('private openSharedAccountSurface(): void {');
+    expect(menuSceneSource).toContain(
+      "if (this.authSnapshot.status === 'authenticated') {\n      this.navigateToSharedAccountRoute('account');\n      return;\n    }"
+    );
+    expect(menuSceneSource).toContain('private navigateToSharedAccountRoute(route: \'account\' | \'reset-password\'): void {');
+    expect(menuSceneSource).toContain('navigateToMazerAccountPortal(route, window.location);');
+    // buildAuthenticatedAccountSection's own Account/Sign-out bar exists for
+    // a narrower path (completing sign-in while the auth overlay is already
+    // open) -- pinned as source wiring only, not claimed reachable via the
+    // profile icon while already authenticated (that click never reaches
+    // this function -- see openSharedAccountSurface above).
     expect(menuSceneSource).toContain('private buildAuthenticatedAccountSection(');
     expect(menuSceneSource).toContain(
       "{ onClick: () => this.navigateToSharedAccountRoute('account'), text: 'Account', tone: 'primary' },\n      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }"
     );
-    expect(menuSceneSource).toContain('private navigateToSharedAccountRoute(route: \'account\' | \'reset-password\'): void {');
-    expect(menuSceneSource).toContain('navigateToMazerAccountPortal(route, window.location);');
     expect(menuSceneSource).toContain('interface LegacyAuthActionDiagnostics');
     expect(menuSceneSource).toContain('private latestAuthActionDiagnostics: LegacyAuthActionDiagnostics | null = null;');
     expect(menuSceneSource).toContain('private recordLegacyAuthActionDiagnostics(');
