@@ -108,6 +108,44 @@ describe('legacy full auth gate', () => {
     );
   });
 
+  test('a freshly-loaded, signed-out session actually opens the forced auth overlay, not just computes the locked flag', () => {
+    // Real regression, found live (not invented for this test): commit
+    // c59c2a27 ("fix: complete shared account consumer contract") removed
+    // the one branch in update()'s pendingAuthGateTransition handler that
+    // ever calls enterForcedLegacyAuthOverlay() for the ordinary "just
+    // booted, signed out" case, and nothing replaced it. authGateLocked was
+    // still computed correctly and pendingAuthGateTransition still got set,
+    // but nothing consumed that combination afterward -- confirmed live via
+    // a real headless load with no auth fixture settling into
+    // mode:'menu', overlay:'none' (a fully interactive, unauthenticated
+    // menu) and staying there, never reaching overlay:'auth' at all.
+    //
+    // The restoration merges authGateLocked into the SAME condition as the
+    // password-recovery case (rather than a second, textually-separate
+    // else-if calling enterForcedLegacyAuthOverlay() again, which is what
+    // c59c2a27 actually deleted) because tests/scenes/menu-render-frame
+    // .test.ts's 'tears down the persistent play HUD before forced auth and
+    // recovery overlays' test independently pins update() to call
+    // enterForcedLegacyAuthOverlay() exactly once -- a literal two-branch
+    // revert passes this test but fails that one. Both forms are logically
+    // identical (same guard, same action); this one also satisfies the
+    // older, still-active single-call-site contract.
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const updateStart = menuSceneSource.indexOf('  public update(time: number, delta: number): void {');
+    const pendingBlockEnd = menuSceneSource.indexOf('// pendingBootPlayStart intentionally stays pending', updateStart);
+    const pendingBlockSource = menuSceneSource.slice(updateStart, pendingBlockEnd);
+
+    expect(pendingBlockSource.match(/this\.enterForcedLegacyAuthOverlay\(\);/g)).toHaveLength(1);
+    expect(pendingBlockSource).toContain('(this.isLegacyPasswordRecoveryActive() || this.authGateLocked)');
+    // Ordering matters: the combined open-gate condition must come before
+    // the close branch, so the two remain mutually exclusive on a single
+    // pendingAuthGateTransition tick.
+    const openGateAt = pendingBlockSource.indexOf('(this.isLegacyPasswordRecoveryActive() || this.authGateLocked)');
+    const closeGateAt = pendingBlockSource.indexOf("} else if (!this.authGateLocked && !this.authGateAwaitingResolution && this.overlay === 'auth') {");
+    expect(openGateAt).toBeGreaterThanOrEqual(0);
+    expect(closeGateAt).toBeGreaterThan(openGateAt);
+  });
+
   test('signing in successfully closes an auth overlay the gate opened, and clears the loading blocker', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
