@@ -55,9 +55,23 @@ const INLINE_STATE_TEXT_LABELS = Object.freeze([
   'Trail Fade',
   'Trail Shine'
 ]);
+// The two inline auth field labels were removed here (2026-09-15): commit
+// 769e63f6 ("feat(auth): adopt shared account OAuth portal", 2026-09-13)
+// replaced the auth overlay's default signed-out content with
+// buildSharedAccountEntrySection, which never calls createAuthFieldBox --
+// that function's own inline email/password fields are only reachable from
+// a completely different overlay (buildPasswordRecoveryOverlay), and even
+// there only the password/confirmPassword field ids are ever passed, never
+// email. Confirmed live (real built app, headless Playwright): the
+// signed-out auth gate's actual rendered text labels are the wordmark, the
+// "Use your shared Fawxzzy account..." explainer, and the Reset
+// password/Privacy/Terms/Create account/Sign in controls kept below --
+// never the two inline field labels this constant used to require, which
+// predates the redesign by four weeks (1585c671, 2026-08-16) and was never
+// updated to match. Not a stale-test-vs-still-fixable-app judgment call:
+// there is no reachable code path left that renders those two labels for
+// this surface.
 const AUTH_EXPECTED_LABELS = Object.freeze([
-  'EMAIL',
-  'PASSWORD',
   'Sign in',
   'Create account',
   'Reset password'
@@ -126,6 +140,58 @@ const readDiagnostics = async (page) => ({
   visual: await readJsonAttribute(page, VISUAL_DIAGNOSTICS_ATTRIBUTE)
 });
 
+// Richer variant used ONLY on the failure-explanation path (readDiagnostics'
+// plain {runtime, visual} contract above is relied on by every passing
+// caller and stays untouched). Missing, malformed-JSON, and
+// present-but-wrong-shape (valid JSON that isn't a plain object -- e.g. the
+// attribute holding a bare string or array) are genuinely different causes
+// and are reported as such, instead of all three collapsing into the same
+// `null`.
+const readAttributePresence = async (page, attribute) => page.evaluate((attr) => {
+  const raw = document.documentElement.getAttribute(attr);
+  if (raw === null) {
+    return { parsed: null, presence: 'absent' };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    return { parseError: error instanceof Error ? error.message : String(error), parsed: null, presence: 'malformed-json' };
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { parsed: null, presence: 'invalid-shape' };
+  }
+  return { parsed, presence: 'present' };
+}, attribute);
+
+const readDiagnosticsPresence = async (page) => {
+  const runtimeAttr = await readAttributePresence(page, RUNTIME_DIAGNOSTICS_ATTRIBUTE);
+  const visualAttr = await readAttributePresence(page, VISUAL_DIAGNOSTICS_ATTRIBUTE);
+  return {
+    runtime: runtimeAttr.parsed,
+    runtimePresence: runtimeAttr.presence,
+    visual: visualAttr.parsed,
+    visualPresence: visualAttr.presence
+  };
+};
+
+// Defensive coercion for a diagnostics-supplied list: only a genuine array
+// survives, and only its genuine-object entries are kept. A malformed
+// payload (wrong type entirely, or an array mixed with non-object entries)
+// must degrade to "no usable labels" here, never throw -- this is the exact
+// same tolerance the browser-side waitForFunction predicates already give
+// the identical field (each wrapped in try/catch, treating any shape error
+// as "not ready yet"), so the failure-explaining path cannot disagree with
+// the passing-path check about what counts as valid. See
+// 'evaluateSurfaceReadiness tolerates malformed diagnostic shapes exactly
+// like the browser-side predicates' in ui-surface-capture-script.test.mjs
+// for the parity coverage.
+const toTextLabelEntries = (textLabels) => (
+  Array.isArray(textLabels)
+    ? textLabels.filter((entry) => entry !== null && typeof entry === 'object')
+    : []
+);
+
 const isFiniteBounds = (bounds) => (
   bounds
   && Number.isFinite(bounds.left)
@@ -148,83 +214,230 @@ const isUsableInViewportBounds = (bounds, viewport, minimumSize = 16) => (
   && bounds.bottom <= viewport.height
 );
 
-const waitForSurface = async (page, {
+// Pure, Node-side re-check used ONLY to explain a waitForSurface timeout --
+// the actual wait above stays browser-side (page.waitForFunction, checked
+// every animation frame) for speed. On timeout this re-evaluates the exact
+// same clauses against one final diagnostics read so the thrown error can
+// say WHICH clause was still false, instead of a single opaque "timed out"
+// with no way to tell missing/malformed diagnostics apart from a wrong
+// mode/overlay or unsettled play geometry. Mirrors
+// evaluateAuthenticatedFixtureReadiness's clauses/failedClauses/state shape.
+export const evaluateSurfaceReadiness = ({
+  runtime = null,
+  runtimePresence = runtime !== null ? 'present' : 'absent',
+  visual = null,
+  visualPresence = visual !== null ? 'present' : 'absent',
+  expectedLabels = [],
+  mode,
+  overlay,
+  requireSettledPlayGeometry = true
+}) => {
+  const board = visual?.board?.bounds;
+  const actualMode = visual?.runtime?.mode ?? null;
+  const actualOverlay = visual?.runtime?.overlay ?? null;
+  // Starting a game changes the mode before the next layout publication.
+  // Do not treat that transitional diagnostics frame as settled play UI.
+  const playGeometrySettled = !requireSettledPlayGeometry
+    || mode !== 'play'
+    || overlay !== 'none'
+    || (
+      Number.isFinite(board?.left)
+      && Number.isFinite(board?.top)
+      && Number.isFinite(board?.right)
+      && Number.isFinite(board?.bottom)
+      && visual?.runtime?.playLifecycle?.inputLocked === false
+    );
+  const actualLabels = toTextLabelEntries(visual?.textLabels).map((entry) => entry.text);
+  const missingLabels = expectedLabels.filter((expectedLabel) => (
+    !actualLabels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
+  ));
+
+  const clauses = {
+    hasRuntimeDiagnostics: runtimePresence === 'present',
+    hasVisualDiagnostics: visualPresence === 'present',
+    modeMatches: actualMode === mode,
+    overlayMatches: actualOverlay === overlay,
+    playGeometrySettled,
+    labelsPresent: missingLabels.length === 0
+  };
+
+  return {
+    clauses,
+    failedClauses: Object.entries(clauses).filter(([, passed]) => !passed).map(([clause]) => clause),
+    ready: Object.values(clauses).every(Boolean),
+    state: {
+      actualLabels,
+      actualMode,
+      actualOverlay,
+      board: board ?? null,
+      expectedLabels,
+      expectedMode: mode,
+      expectedOverlay: overlay,
+      inputLocked: visual?.runtime?.playLifecycle?.inputLocked ?? null,
+      missingLabels,
+      runtimePresence,
+      visualPresence
+    }
+  };
+};
+
+const isPlaywrightTimeoutError = (error) => error instanceof Error && error.name === 'TimeoutError';
+
+export const waitForSurface = async (page, {
   expectedLabels = [],
   mode,
   overlay,
   requireSettledPlayGeometry = true,
   timeoutMs = DEFAULT_TIMEOUT_MS
 }) => {
-  await page.waitForFunction(
-    ({ runtimeAttribute, visualAttribute, mode: expectedMode, overlay: expectedOverlay, requireSettledPlayGeometry }) => {
-      const runtimeRaw = document.documentElement.getAttribute(runtimeAttribute);
-      const visualRaw = document.documentElement.getAttribute(visualAttribute);
-      if (!runtimeRaw || !visualRaw) {
-        return false;
-      }
+  const throwSurfaceReadinessTimeout = async (cause, originalError) => {
+    // The original timeout is the real failure being reported. Diagnosing
+    // it is best-effort: if the diagnosis itself throws for any reason (a
+    // future diagnostics-shape change this function hasn't been taught
+    // about, a closed page, anything), that must become supplementary
+    // evidence alongside the original error, never a replacement for it --
+    // a broken failure reporter must not hide the failure it was trying to
+    // report.
+    let evidence;
+    try {
+      const diagnostics = await readDiagnosticsPresence(page);
+      const evaluation = evaluateSurfaceReadiness({
+        ...diagnostics,
+        expectedLabels,
+        mode,
+        overlay,
+        requireSettledPlayGeometry
+      });
+      evidence = {
+        cause,
+        clauses: evaluation.clauses,
+        failedClauses: evaluation.failedClauses,
+        lastState: evaluation.state,
+        timeoutMs
+      };
+    } catch (diagnosisError) {
+      evidence = {
+        cause,
+        diagnosisError: diagnosisError instanceof Error ? diagnosisError.message : String(diagnosisError),
+        timeoutMs
+      };
+    }
+    const error = new Error(
+      `Surface readiness timed out: ${JSON.stringify(evidence)}`,
+      originalError ? { cause: originalError } : undefined
+    );
+    error.code = 'SURFACE_READINESS_TIMEOUT';
+    error.evidence = evidence;
+    throw error;
+  };
 
-      try {
-        const visual = JSON.parse(visualRaw);
-        const board = visual?.board?.bounds;
-        // Starting a game changes the mode before the next layout publication.
-        // Do not capture that transitional diagnostics frame as active play UI.
-        const playGeometrySettled = !requireSettledPlayGeometry
-          || expectedMode !== 'play'
-          || expectedOverlay !== 'none'
-          || (
-            Number.isFinite(board?.left)
-            && Number.isFinite(board?.top)
-            && Number.isFinite(board?.right)
-            && Number.isFinite(board?.bottom)
-            && visual?.runtime?.playLifecycle?.inputLocked === false
-          );
-        return visual?.runtime?.mode === expectedMode
-          && visual?.runtime?.overlay === expectedOverlay
-          && playGeometrySettled;
-      } catch {
-        return false;
-      }
-    },
-    {
-      runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
-      visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE,
-       mode,
-       overlay,
-       requireSettledPlayGeometry
-    },
-    { timeout: timeoutMs }
-  );
-  if (expectedLabels.length > 0) {
-    const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
+  try {
     await page.waitForFunction(
-      ({ expected, visualAttribute }) => {
-        const raw = document.documentElement.getAttribute(visualAttribute);
-        if (!raw) {
+      ({ runtimeAttribute, visualAttribute, mode: expectedMode, overlay: expectedOverlay, requireSettledPlayGeometry }) => {
+        const runtimeRaw = document.documentElement.getAttribute(runtimeAttribute);
+        const visualRaw = document.documentElement.getAttribute(visualAttribute);
+        if (!runtimeRaw || !visualRaw) {
           return false;
         }
 
         try {
-          const visual = JSON.parse(raw);
-          const labels = (visual?.textLabels ?? []).map((entry) => entry.text);
-          return expected.every(({ allowStateSuffix, expectedLabel }) => labels.some((actualLabel) => (
-            actualLabel === expectedLabel
+          // Actually parse and shape-check runtimeRaw, not just require it
+          // non-empty: this predicate's own decision only ever reads from
+          // the parsed visual payload's nested .runtime, so a malformed
+          // runtimeRaw (present but not valid JSON, or valid JSON that
+          // isn't a plain object) previously passed straight through the
+          // truthiness check above with its content never inspected --
+          // disagreeing with evaluateSurfaceReadiness's own
+          // hasRuntimeDiagnostics clause, which does require it parseable.
+          // Reproduced: a broken '{broken', a bare '"not an object"', or
+          // '[]'/'null' all satisfied the old check while every one of them
+          // would report hasRuntimeDiagnostics: false on the failure path.
+          const runtime = JSON.parse(runtimeRaw);
+          if (runtime === null || typeof runtime !== 'object' || Array.isArray(runtime)) {
+            return false;
+          }
+          const visual = JSON.parse(visualRaw);
+          const board = visual?.board?.bounds;
+          // Starting a game changes the mode before the next layout publication.
+          // Do not capture that transitional diagnostics frame as active play UI.
+          const playGeometrySettled = !requireSettledPlayGeometry
+            || expectedMode !== 'play'
+            || expectedOverlay !== 'none'
             || (
-              allowStateSuffix
-              && typeof actualLabel === 'string'
-              && actualLabel.startsWith(`${expectedLabel}: `)
-              && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
-            )
-          )));
+              Number.isFinite(board?.left)
+              && Number.isFinite(board?.top)
+              && Number.isFinite(board?.right)
+              && Number.isFinite(board?.bottom)
+              && visual?.runtime?.playLifecycle?.inputLocked === false
+            );
+          return visual?.runtime?.mode === expectedMode
+            && visual?.runtime?.overlay === expectedOverlay
+            && playGeometrySettled;
         } catch {
           return false;
         }
       },
       {
-        expected: expectedLabelDescriptors,
-        visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
+        runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
+        visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE,
+         mode,
+         overlay,
+         requireSettledPlayGeometry
       },
       { timeout: timeoutMs }
     );
+  } catch (error) {
+    if (!isPlaywrightTimeoutError(error)) {
+      throw error;
+    }
+    await throwSurfaceReadinessTimeout('mode-overlay-geometry', error);
+  }
+  if (expectedLabels.length > 0) {
+    const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
+    try {
+      await page.waitForFunction(
+        ({ expected, visualAttribute }) => {
+          const raw = document.documentElement.getAttribute(visualAttribute);
+          if (!raw) {
+            return false;
+          }
+
+          try {
+            const visual = JSON.parse(raw);
+            // Same tolerance as evaluateSurfaceReadiness's toTextLabelEntries
+            // (that helper can't be imported across the page.evaluate
+            // boundary, so this stays a parallel inline check, verified
+            // to agree by a parity test) -- a non-array or malformed
+            // textLabels degrades to "no labels yet", not a thrown error.
+            const rawLabels = Array.isArray(visual?.textLabels) ? visual.textLabels : [];
+            const labels = rawLabels
+              .filter((entry) => entry !== null && typeof entry === 'object')
+              .map((entry) => entry.text);
+            return expected.every(({ allowStateSuffix, expectedLabel }) => labels.some((actualLabel) => (
+              actualLabel === expectedLabel
+              || (
+                allowStateSuffix
+                && typeof actualLabel === 'string'
+                && actualLabel.startsWith(`${expectedLabel}: `)
+                && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
+              )
+            )));
+          } catch {
+            return false;
+          }
+        },
+        {
+          expected: expectedLabelDescriptors,
+          visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
+        },
+        { timeout: timeoutMs }
+      );
+    } catch (error) {
+      if (!isPlaywrightTimeoutError(error)) {
+        throw error;
+      }
+      await throwSurfaceReadinessTimeout('labels', error);
+    }
   }
   return readDiagnostics(page);
 };
@@ -2126,6 +2339,69 @@ const buildMarkdownReport = (summary) => {
   ].join('\n');
 };
 
+// The failure-path counterpart to buildMarkdownReport above -- same overall
+// shape (a short fact list, then detail sections), extended rather than
+// replaced, so a broken run still produces a report shaped like the one a
+// reviewer already knows how to read instead of an unfamiliar new format.
+export const buildFailureMarkdownReport = (failureSummary) => {
+  const { failure } = failureSummary;
+  const completedRows = failure.completedSteps.length > 0
+    ? failure.completedSteps.map((step) => `- ${step}`).join('\n')
+    : '_none_';
+  const notRunRows = failure.notRunSteps.length > 0
+    ? failure.notRunSteps.map((step) => `- ${step}`).join('\n')
+    : '_none_';
+  const evidenceBlock = failure.evidence
+    ? `\`\`\`json\n${JSON.stringify(failure.evidence, null, 2)}\n\`\`\``
+    : '_No structured expected-vs-observed evidence was attached to this error (it did not carry an `.evidence` field) -- see the raw error message/stack below instead._';
+
+  return [
+    `# ${failureSummary.label}`,
+    '',
+    '- Pass: no',
+    '- Result: FAILED (harness did not complete)',
+    `- Target: ${failureSummary.targetUrl}`,
+    `- Failed step: ${failure.failedStep}`,
+    `- Repo commit: ${failure.buildIdentity.commit}`,
+    `- Dirty worktree: ${failure.buildIdentity.dirty ? 'yes' : 'no'}`,
+    `- Console warnings/errors: ${failure.consoleMessages.length}`,
+    `- Page errors: ${failure.pageErrors.length}`,
+    '',
+    '## Completed surfaces',
+    '',
+    completedRows,
+    '',
+    '## Not-run surfaces (never reached)',
+    '',
+    notRunRows,
+    '',
+    '## Failed step: expected vs. last observed',
+    '',
+    evidenceBlock,
+    '',
+    '## Error',
+    '',
+    `\`\`\`\n${failure.error.name ?? 'Error'}: ${failure.error.message}\n${failure.error.stack ?? ''}\n\`\`\``,
+    '',
+    failure.diagnosisError ? `_Diagnosing this failure also hit its own error and could not attach full evidence: ${failure.diagnosisError}_\n` : '',
+    '## Failure screenshot',
+    '',
+    // Taken moments AFTER the expected-vs-observed evidence above was read
+    // (the error still has to propagate out of waitForSurface and up to
+    // this function's own catch block first) -- not a guaranteed
+    // same-render-frame pairing, the same honest limit already noted for
+    // the evidence-package screenshot/diagnostics pairing elsewhere in this
+    // repo. A real, observed case of this gap: the evidence can show
+    // overlay:'none' at the moment of timeout while the screenshot taken
+    // slightly later already shows the overlay fully rendered, if the
+    // underlying transition completed in between the two reads.
+    failure.screenshotPath
+      ? `_Captured shortly after the evidence above was read, not the same frame -- the page can visibly change in between (e.g. a transition finishing) while this remains the best available look at the failure state._\n\n![Failure state](${failure.screenshotPath})`
+      : `_No failure screenshot could be captured${failure.screenshotError ? ` (${failure.screenshotError})` : ' (no page was available at the point of failure)'}._`,
+    ''
+  ].join('\n');
+};
+
 export const runUiSurfaceCapture = async (options = {}) => {
   const label = options.label ?? DEFAULT_LABEL;
   const sessionId = resolveSessionId(options.sessionId);
@@ -2156,6 +2432,30 @@ export const runUiSurfaceCapture = async (options = {}) => {
   const consoleMessages = [];
   const pageErrors = [];
 
+  // Ordered plan for this specific invocation's config, used only to report
+  // "not yet reached" steps on a genuine failure -- never to gate normal
+  // execution, which stays exactly as it already was below.
+  const plannedSteps = firstVisibleHomeOnly
+    ? ['boot', 'initial-diagnostics', '01-standalone-first-visible-home', 'writing-report']
+    : [
+      'boot',
+      'initial-diagnostics',
+      ...(authFixture !== 'authenticated' ? ['02-auth'] : []),
+      '01-menu',
+      '02-options',
+      ...(transition ? [] : ['02-options-bottom']),
+      '03-play',
+      '04-pause',
+      ...(transition ? [] : ['04-pause-bottom']),
+      'writing-report'
+    ];
+  const completedSteps = [];
+  let currentStep = 'boot';
+  // Hoisted out of the try block below so a failure-path screenshot can
+  // still be attempted after an error inside it -- a plain `const page =`
+  // declared inside try is not visible to a sibling catch block.
+  let page = null;
+
   await ensureDir(outputDir);
 
   if (!options.skipBuild) {
@@ -2182,7 +2482,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       reducedMotion: options.reducedMotion ? 'reduce' : 'no-preference',
       viewport
     });
-    const page = await context.newPage();
+    page = await context.newPage();
     if (firstVisibleHomeOnly) {
       await installStandaloneFirstVisibleHarness(page);
     }
@@ -2214,6 +2514,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
 
     await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: timeoutMs });
     if (firstVisibleHomeOnly) {
+      currentStep = 'initial-diagnostics';
       await page.waitForFunction(() => Number.isInteger(window.__MAZER_VIEWPORT_GEOMETRY__?.revision), null, {
         timeout: timeoutMs
       });
@@ -2229,6 +2530,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         requireReadableTitle: true,
         timeoutMs
       });
+      completedSteps.push('initial-diagnostics');
+      currentStep = '01-standalone-first-visible-home';
       const menu = await captureSurface({
         page,
         outputDir,
@@ -2250,6 +2553,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         error.evidence = readiness;
         throw error;
       }
+      completedSteps.push('01-standalone-first-visible-home');
+      currentStep = 'writing-report';
       const checks = [
         ...Object.entries(readiness.clauses).map(([id, passed]) => createCheck(
           `standalone-first-visible-${id}`,
@@ -2299,6 +2604,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       ].join('\n')}\n`, 'utf8');
       return { ...summary, summaryPath };
     }
+    currentStep = 'initial-diagnostics';
     let initialDiagnostics;
     if (authFixture === 'authenticated') {
       await waitForAuthenticatedFixtureReady(page, { timeoutMs });
@@ -2318,8 +2624,10 @@ export const runUiSurfaceCapture = async (options = {}) => {
         timeoutMs
       });
     }
+    completedSteps.push(currentStep);
     const startsAtAuthOverlay = initialDiagnostics.visual?.runtime?.mode === 'menu'
       && initialDiagnostics.visual?.runtime?.overlay === 'auth';
+    currentStep = '02-auth';
     const authSurface = startsAtAuthOverlay
       ? await (async () => {
         const captured = await captureSurface({
@@ -2356,6 +2664,9 @@ export const runUiSurfaceCapture = async (options = {}) => {
         skipped: true,
         reason: 'already-authenticated'
       };
+    if (startsAtAuthOverlay) {
+      completedSteps.push('02-auth');
+    }
     const reducedMotionToggle = options.reducedMotion
       ? null
       : await exerciseReducedMotionPreferenceChange(page, timeoutMs);
@@ -2366,6 +2677,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       requireReadableTitle: true,
       timeoutMs
     });
+    currentStep = '01-menu';
     const menu = await captureSurface({
       page,
       outputDir,
@@ -2382,12 +2694,14 @@ export const runUiSurfaceCapture = async (options = {}) => {
         id: '01-menu', mode: 'menu', overlay: 'none', page, route, timeoutMs, transition
       })
       : null;
+    completedSteps.push('01-menu');
     const authGatedMenu = isAuthGatedMenuSurface(menu.diagnostics.visual);
     const optionsBottomExpectedLabels = OPTIONS_BOTTOM_EXPECTED_LABELS;
     const currentMenuDiagnostics = transition ? await readDiagnostics(page) : menu.diagnostics;
     const menuButtons = getMenuButtonPoints(currentMenuDiagnostics.visual);
     await waitForVisualBuildSettled(page, { timeoutMs });
     let optionsBottomSurface = null;
+    currentStep = '02-options';
     const optionsSurface = await (async () => {
         await waitForVisualBuildSettled(page, { timeoutMs });
         const optionsCaptureExpectedLabels = [...OPTIONS_BASE_EXPECTED_LABELS];
@@ -2426,6 +2740,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
           };
         } else {
           const optionsScrollResult = await scrollOverlayToBottom(page, { timeoutMs });
+          currentStep = '02-options-bottom';
           optionsBottomSurface = optionsScrollResult.visual?.overlayUi?.scroll?.enabled === true
             ? await captureSurface({
               page,
@@ -2444,6 +2759,10 @@ export const runUiSurfaceCapture = async (options = {}) => {
         await closeOverlayToMenu(page, timeoutMs);
         return captured;
       })();
+    completedSteps.push('02-options');
+    if (!transition) {
+      completedSteps.push('02-options-bottom');
+    }
 
     const playRoute = authGatedMenu
       ? resolveRouteWithParams(route, { authFixture: 'authenticated' })
@@ -2462,6 +2781,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         expectTrailShineEnabled: !options.reducedMotion,
         timeoutMs
       });
+    currentStep = '03-play';
     const play = await captureSurface({
       page,
       outputDir,
@@ -2478,7 +2798,9 @@ export const runUiSurfaceCapture = async (options = {}) => {
         id: '03-play', mode: 'play', overlay: 'none', page, route: playRoute, timeoutMs, transition
       })
       : null;
+    completedSteps.push('03-play');
 
+    currentStep = '04-pause';
     await openPauseOverlayViaQa(page, timeoutMs);
     const pause = await captureSurface({
       page,
@@ -2498,6 +2820,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         id: '04-pause', mode: 'play', overlay: 'pause', page, route: playRoute, timeoutMs, transition
       })
       : null;
+    completedSteps.push('04-pause');
+    currentStep = '04-pause-bottom';
     const pauseBottomSurface = transition
       ? { diagnostics: { runtime: null, visual: null }, nativeInputs: [], screenContract: null, skipped: true }
       : await (async () => {
@@ -2515,6 +2839,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
           viewport
         });
       })();
+    completedSteps.push('04-pause-bottom');
+    currentStep = 'writing-report';
 
     const surfaces = {
       menu: {
@@ -2702,10 +3028,102 @@ export const runUiSurfaceCapture = async (options = {}) => {
       ...summary,
       summaryPath
     };
+  } catch (error) {
+    // A genuine harness failure must still retain a report: the failed
+    // step/route, expected-vs-observed evidence (already attached by
+    // waitForSurface/waitForAuthenticatedFixtureReady when the error came
+    // from one of those), completed/failed/not-run surface accounting,
+    // build identity, sanitized error detail, and a best-effort screenshot.
+    // Every piece below is independently best-effort: if gathering or
+    // writing any one of them throws, that must become supplementary
+    // evidence, never something that replaces or swallows the original
+    // error being reported -- the whole point of this block is that a
+    // broken failure reporter must not turn a real failure into a false
+    // pass or a silent, evidence-free crash.
+    let screenshotPath = null;
+    let screenshotError = null;
+    if (page) {
+      try {
+        screenshotPath = resolve(outputDir, 'failure.png');
+        await page.screenshot({ path: screenshotPath, fullPage: false });
+      } catch (captureError) {
+        screenshotPath = null;
+        screenshotError = captureError instanceof Error ? captureError.message : String(captureError);
+      }
+    }
+
+    const failedStepIndex = plannedSteps.indexOf(currentStep);
+    const notRunSteps = failedStepIndex === -1
+      ? plannedSteps.filter((step) => !completedSteps.includes(step))
+      : plannedSteps.slice(failedStepIndex + 1);
+
+    const failure = {
+      buildIdentity: {
+        commit: getCommitSha(),
+        dirty: isWorktreeDirty()
+      },
+      code: error?.code ?? null,
+      completedSteps,
+      diagnosisError: null,
+      error: {
+        message: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : null,
+        stack: error instanceof Error ? error.stack : null
+      },
+      evidence: error?.evidence ?? null,
+      failedStep: currentStep,
+      notRunSteps,
+      pageErrors,
+      consoleMessages,
+      screenshotError,
+      screenshotPath
+    };
+
+    const failureSummary = {
+      pass: false,
+      label,
+      sessionId,
+      targetUrl,
+      authFixture: authFixture ?? null,
+      failure
+    };
+
+    try {
+      const summaryPath = resolve(outputDir, 'summary.json');
+      const reportPath = resolve(outputDir, 'report.md');
+      failureSummary.summaryPath = summaryPath;
+      failureSummary.reportPath = reportPath;
+      await writeFile(summaryPath, `${JSON.stringify(failureSummary, null, 2)}\n`, 'utf8');
+      await writeFile(reportPath, `${buildFailureMarkdownReport(failureSummary)}\n`, 'utf8');
+    } catch (writeError) {
+      failure.diagnosisError = writeError instanceof Error
+        ? `Failed to write the failure report itself: ${writeError.message}`
+        : `Failed to write the failure report itself: ${String(writeError)}`;
+      // Surfaced via the rethrown error's own message below and via
+      // stderr, since the file we would have written it to is exactly what
+      // just failed.
+      console.error(failure.diagnosisError);
+    }
+
+    // The original error is what actually happened and is never replaced
+    // by anything above -- only ever supplemented via error.evidence /
+    // the retained failure report on disk.
+    throw error;
   } finally {
-    await browser.close();
+    // Each cleanup attempted independently: a browser that fails to close
+    // must not prevent an attempt to stop the task-owned preview server,
+    // and vice versa.
+    try {
+      await browser.close();
+    } catch (closeError) {
+      console.error('Failed to close the browser during cleanup:', closeError);
+    }
     if (preview) {
-      await stopPreviewServer(preview.child);
+      try {
+        await stopPreviewServer(preview.child);
+      } catch (stopError) {
+        console.error('Failed to stop the preview server during cleanup:', stopError);
+      }
     }
   }
 };
