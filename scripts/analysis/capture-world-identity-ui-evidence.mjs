@@ -68,11 +68,15 @@
  * technique -- see that file's own header for the full rationale.
  *
  * Usage: node scripts/analysis/capture-world-identity-ui-evidence.mjs [--out-dir=<dir>] [--no-preview] [--skip-build]
+ * Every run creates a fresh child of tmp/world-identity-ui-evidence.
+ * A custom --out-dir must name a new direct child of that root; existing
+ * directories are never cleared or reused.
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 import {
   DEFAULT_BASE_URL,
@@ -258,18 +262,46 @@ const driveRealRoute = async (page, { maxSteps = Infinity, requireTurn = false }
 
 const sha256OfFile = (filePath) => createHash('sha256').update(readFileSync(filePath)).digest('hex');
 
+export const createCaptureOutputDirectory = ({ repoRoot = REPO_ROOT, outputPath } = {}) => {
+  const resolvedRepo = realpathSync(repoRoot);
+  const artifactRoot = path.join(resolvedRepo, 'tmp', 'world-identity-ui-evidence');
+  let output;
+  if (outputPath !== undefined) {
+    if (typeof outputPath !== 'string' || outputPath.trim() === '' || outputPath.split(/[\\/]/).includes('..')) {
+      throw new Error('Capture output must be a new direct child of tmp/world-identity-ui-evidence');
+    }
+    output = path.resolve(resolvedRepo, outputPath);
+    if (output === artifactRoot || path.dirname(output) !== artifactRoot) {
+      throw new Error('Capture output must be a new direct child of tmp/world-identity-ui-evidence');
+    }
+  }
+  // Check each existing component before creating the next. In particular,
+  // a tmp junction must not redirect writes into another repository.
+  for (const directory of [path.join(resolvedRepo, 'tmp'), artifactRoot]) {
+    try {
+      mkdirSync(directory);
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+    }
+    const info = lstatSync(directory);
+    if (info.isSymbolicLink() || !info.isDirectory() || realpathSync(directory) !== directory) {
+      throw new Error('Capture artifact root must contain only real directories');
+    }
+  }
+  if (output === undefined) return mkdtempSync(path.join(artifactRoot, 'run-'));
+  // Exclusive creation rejects existing evidence, files and symlinks. No
+  // caller-supplied path is ever passed to a recursive deletion operation.
+  mkdirSync(output);
+  return output;
+};
+
 const main = async () => {
   const args = parseCliArgs();
   const baseUrl = normalizeBaseUrl(typeof args.baseUrl === 'string' ? args.baseUrl : DEFAULT_BASE_URL);
   const isTruthyArg = (value) => value === true || value === 'true' || value === '1';
   const useExistingServer = isTruthyArg(args.noPreview ?? args['no-preview']);
   const skipBuild = isTruthyArg(args.skipBuild ?? args['skip-build']);
-  const outDir = typeof args['out-dir'] === 'string' ? args['out-dir'] : path.resolve(REPO_ROOT, 'tmp', 'world-identity-ui-evidence');
-  // Fresh output directory every run -- a manifest must describe exactly
-  // this run's own payloads, never a mix that includes a previous run's
-  // leftover files (review 5210728300's own instruction).
-  rmSync(outDir, { recursive: true, force: true });
-  mkdirSync(outDir, { recursive: true });
+  const outDir = createCaptureOutputDirectory({ outputPath: args['out-dir'] });
 
   if (!useExistingServer && !skipBuild) {
     runBuild();
@@ -578,7 +610,9 @@ const main = async () => {
   process.stderr.write(`${JSON.stringify({ manifest }, null, 2)}\n`);
 };
 
-main().catch((error) => {
-  console.error('FATAL', error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch((error) => {
+    console.error('FATAL', error);
+    process.exitCode = 1;
+  });
+}
