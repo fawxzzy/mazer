@@ -1882,6 +1882,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.createLegacyAuthenticatedWelcomeIdentity();');
     expect(welcomeSource).toContain("this.authSnapshot.canonicalUsername?.trim() ?? ''");
     expect(welcomeSource).toContain("'Welcome'");
+    expect(welcomeSource.match(/backgroundColor: '#060b0f'/g)).toHaveLength(2);
+    expect(welcomeSource.match(/setOrigin\(0\.5\)\.setDepth\(3\)/g)).toHaveLength(2);
     expect(welcomeSource).not.toContain('accountUsernameSavedValue');
     expect(welcomeSource).not.toContain('authSnapshot.email');
     expect(welcomeSource).not.toContain('readLegacyAccountUsername');

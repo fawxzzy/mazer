@@ -82,6 +82,14 @@ false failures. The original pixel tolerance, 2% whole image limit, 40-pixel
 connected-defect limit, and committed baselines remain unchanged; negative
 controls still reject corruption on the trail bend.
 
+The authenticated menu's Welcome and username labels have opaque dark
+backplates at UI depth so animated maze corridors cannot obscure identity.
+Their existing positions and the Start control remain unchanged. The dedicated
+`verify-welcome-identity-readability.mjs` check samples the actual canvas at
+label padding corners on desktop and compact touch layouts, then proves its
+pixel assertion rejects a deliberately white backplate. It uses only the local
+synthetic authenticated fixture; it does not establish live sign-in acceptance.
+
 ### Final app-icon authority — 2026-08-28
 
 - `src/brand/source-art/mazer-app-icon-master.png` is the sole Mazer icon design authority: 1024x1024, 1,173,366 bytes, SHA-256 `ede90e596682795d10f97bed615071ca1f60e08e290eacf1ea143006df914d78`.
