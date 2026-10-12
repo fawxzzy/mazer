@@ -41,7 +41,7 @@ import {
   parseCliArgs
 } from '../visual/common.mjs';
 import { launchPreviewServer, stopPreviewServer } from '../visual/preview-server.mjs';
-import { comparePngBuffers } from './lib/rasterCompare.mjs';
+import { comparePngBuffers, createCornerTrailRegionMask } from './lib/rasterCompare.mjs';
 
 const BASELINE_DIR = resolve(REPO_ROOT, 'tests/fixtures/trail-corner-raster');
 
@@ -186,7 +186,7 @@ const captureCanvasRegionPng = async (page, region, scale = 1) => {
 // logic (whole-image diff fraction + largest-connected-differing-region
 // cap) and tests/analysis/rasterCompare.test.ts for the negative-control
 // proof that the region cap catches what a fraction budget alone cannot.
-const compareToBaseline = async (label, candidatePng, baselinePath, updateBaseline) => {
+const compareToBaseline = async (label, candidatePng, baselinePath, updateBaseline, region) => {
   if (updateBaseline) {
     mkdirSync(dirname(baselinePath), { recursive: true });
     writeFileSync(baselinePath, candidatePng);
@@ -195,7 +195,8 @@ const compareToBaseline = async (label, candidatePng, baselinePath, updateBaseli
   if (!existsSync(baselinePath)) {
     return { passed: false, detail: `no committed baseline at ${baselinePath} -- run with --update-baseline after visually confirming the render` };
   }
-  return comparePngBuffers(candidatePng, readFileSync(baselinePath));
+  return comparePngBuffers(candidatePng, readFileSync(baselinePath),
+    createCornerTrailRegionMask(Math.round(region.w), Math.round(region.h), label));
 };
 
 const runBuild = () => {
@@ -252,7 +253,7 @@ const main = async () => {
       };
       const png = await captureCanvasRegionPng(page, region, 1);
       const baselinePath = resolve(BASELINE_DIR, `${orientation}.png`);
-      const result = await compareToBaseline(orientation, png, baselinePath, updateBaseline);
+      const result = await compareToBaseline(orientation, png, baselinePath, updateBaseline, region);
       check(`trail corner raster (${orientation}) matches its committed baseline`, result.passed, result.detail);
     }
 

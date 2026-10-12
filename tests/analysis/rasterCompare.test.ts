@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import { compareRawImages, largestConnectedRegion } from '../../scripts/analysis/lib/rasterCompare.mjs';
+import { compareRawImages, createCornerTrailRegionMask, largestConnectedRegion } from '../../scripts/analysis/lib/rasterCompare.mjs';
 
 // Negative-control proof for the trail-corner raster gate
 // (scripts/analysis/verify-trail-corner-raster.mjs): a reviewer
@@ -56,6 +56,10 @@ describe('trail corner raster gate: negative controls', () => {
     // But the real gate (fraction AND region-size) must reject it.
     expect(result.passed).toBe(false);
     expect(result.largestRegion).toBeGreaterThan(3000);
+    // The actual corner-specific gate must retain this same negative control.
+    const masked = compareRawImages(corrupted, baselineImage, createCornerTrailRegionMask(473, 473, 'cornerNE'));
+    expect(masked.passed).toBe(false);
+    expect(masked.largestRegion).toBeGreaterThan(3000);
   });
 
   test('a small, scattered speckle pattern (simulating ordinary antialiasing jitter) is still accepted', () => {
@@ -92,5 +96,41 @@ describe('trail corner raster gate: negative controls', () => {
     }
     const largest = largestConnectedRegion(differsGrid, width, height);
     expect(largest).toBeGreaterThan(40);
+  });
+});
+
+describe('trail corner fixture region', () => {
+  test.each(['cornerNE', 'cornerNW', 'cornerSE', 'cornerSW'])('protects all five floor cells and excludes only the empty quadrant for %s', (orientation) => {
+    const size = 312; // 3 x 100px cells plus the existing 6px border.
+    const mask = createCornerTrailRegionMask(size, size, orientation);
+    let protectedCells = 0;
+    for (let y = 0; y < 3; y += 1) for (let x = 0; x < 3; x += 1) {
+      const expected = (orientation.endsWith('E') ? x === 2 : x === 0) || (orientation.startsWith('cornerN') ? y === 2 : y === 0);
+      expect(Boolean(mask[(56 + y * 100) * size + 56 + x * 100])).toBe(expected);
+      if (expected) protectedCells += 1;
+    }
+    expect(protectedCells).toBe(5);
+  });
+  test('ignores a localized background star while still rejecting the same defect over the trail', () => {
+    const width = 312;
+    const baseline = {info: {width, height: width}, data: Buffer.alloc(width * width * 4)};
+    const paint = (x: number, y: number, size: number) => {
+      const data = Buffer.from(baseline.data);
+      for (let dy = 0; dy < size; dy += 1) for (let dx = 0; dx < size; dx += 1) data[((y + dy) * width + x + dx) * 4] = 255;
+      return {info: baseline.info, data};
+    };
+    const mask = createCornerTrailRegionMask(width, width, 'cornerNE');
+    expect(compareRawImages(paint(80, 80, 8), baseline).passed).toBe(false);
+    expect(compareRawImages(paint(80, 80, 8), baseline, mask).passed).toBe(true);
+    expect(compareRawImages(paint(250, 250, 8), baseline, mask).passed).toBe(false);
+    // Broad corruption remains rejected by the unchanged whole-image budget.
+    expect(compareRawImages(paint(20, 20, 60), baseline, mask).passed).toBe(false);
+  });
+  test('rejects malformed or empty comparison masks', () => {
+    const image = {info:{width: 2, height: 2}, data: Buffer.alloc(16)};
+    expect(() => compareRawImages(image, image, new Uint8Array(4))).toThrow();
+    expect(() => compareRawImages(image, image, new Uint8Array([1]))).toThrow();
+    expect(() => createCornerTrailRegionMask(10, 10, 'cornerNE')).toThrow();
+    expect(() => createCornerTrailRegionMask(473, 473, 'other')).toThrow();
   });
 });

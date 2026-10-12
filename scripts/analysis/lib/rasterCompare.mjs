@@ -76,7 +76,7 @@ export const largestConnectedRegion = (differsGrid, width, height) => {
  * `.raw().toBuffer({resolveWithObject: true})`). Pure and synchronous --
  * no file I/O, no browser -- so it can be unit-tested directly.
  */
-export const compareRawImages = (candidate, baseline) => {
+export const compareRawImages = (candidate, baseline, regionMask) => {
   if (candidate.info.width !== baseline.info.width || candidate.info.height !== baseline.info.height) {
     return {
       passed: false,
@@ -89,6 +89,9 @@ export const compareRawImages = (candidate, baseline) => {
   }
   const { width, height } = candidate.info;
   const totalPixels = width * height;
+  if (regionMask !== undefined && (!(regionMask instanceof Uint8Array) || regionMask.length !== totalPixels || !regionMask.some(Boolean))) {
+    throw new Error('Comparison region must be a nonempty image-sized mask');
+  }
   const differsGrid = new Uint8Array(totalPixels);
   let differingPixels = 0;
   for (let p = 0; p < totalPixels; p += 1) {
@@ -98,7 +101,10 @@ export const compareRawImages = (candidate, baseline) => {
     const db = Math.abs(candidate.data[i + 2] - baseline.data[i + 2]);
     const da = Math.abs(candidate.data[i + 3] - baseline.data[i + 3]);
     if (dr > CHANNEL_TOLERANCE || dg > CHANNEL_TOLERANCE || db > CHANNEL_TOLERANCE || da > CHANNEL_TOLERANCE) {
-      differsGrid[p] = 1;
+      // Keep the whole-image fraction check. The localized structural
+      // check may target the trail's fixture cells, excluding unrelated
+      // random stars in the empty background between its two legs.
+      differsGrid[p] = regionMask === undefined || regionMask[p] ? 1 : 0;
       differingPixels += 1;
     }
   }
@@ -117,10 +123,29 @@ export const compareRawImages = (candidate, baseline) => {
 };
 
 /** Convenience wrapper: decodes two PNG buffers to raw RGBA, then compares. */
-export const comparePngBuffers = async (candidatePng, baselinePng) => {
+export const comparePngBuffers = async (candidatePng, baselinePng, regionMask) => {
   const [candidate, baseline] = await Promise.all([
     sharp(candidatePng).ensureAlpha().raw().toBuffer({ resolveWithObject: true }),
     sharp(baselinePng).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   ]);
-  return compareRawImages(candidate, baseline);
+  return compareRawImages(candidate, baseline, regionMask);
+};
+
+// Protect all five full floor cells of the synthetic 3x3 L-shaped trail,
+// including its bend and both endpoints. No palette-derived pixel masking:
+// a new bright/dark defect in any protected cell remains a real difference.
+export const createCornerTrailRegionMask = (width, height, orientation) => {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 12 || height !== width || !['cornerNE', 'cornerNW', 'cornerSE', 'cornerSW'].includes(orientation)) {
+    throw new Error('Invalid corner fixture geometry');
+  }
+  const tile = (width - 12) / 3;
+  const mask = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const vertical = orientation.endsWith('E') ? x >= 6 + 2 * tile : x < 6 + tile;
+      const horizontal = orientation.startsWith('cornerN') ? y >= 6 + 2 * tile : y < 6 + tile;
+      if (vertical || horizontal) mask[y * width + x] = 1;
+    }
+  }
+  return mask;
 };

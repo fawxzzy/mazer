@@ -76,6 +76,12 @@ fail before capture or build. Regression checks live in the existing local/CI
 UI surface script suite. This capture-tool correction does not establish a new
 visual pass or production deployment.
 
+The trail-corner gate restricts its connected-defect check to the fixture's
+five full floor cells: random background stars in its empty quadrant caused
+false failures. The original pixel tolerance, 2% whole image limit, 40-pixel
+connected-defect limit, and committed baselines remain unchanged; negative
+controls still reject corruption on the trail bend.
+
 ### Final app-icon authority — 2026-08-28
 
 - `src/brand/source-art/mazer-app-icon-master.png` is the sole Mazer icon design authority: 1024x1024, 1,173,366 bytes, SHA-256 `ede90e596682795d10f97bed615071ca1f60e08e290eacf1ea143006df914d78`.
