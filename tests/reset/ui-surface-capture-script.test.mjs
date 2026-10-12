@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { createCaptureOutputDirectory } from '../../scripts/analysis/capture-world-identity-ui-evidence.mjs';
 import {
   collectMenuControlSpacingIssues,
   evaluateAuthenticatedFixtureReadiness,
@@ -15,6 +17,74 @@ import {
 
 const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';
 const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
+
+describe('World identity capture output ownership', () => {
+  let fixture;
+  let repoRoot;
+  let artifactRoot;
+  beforeEach(() => {
+    fixture = realpathSync(mkdtempSync(join(tmpdir(), 'mazer-capture-output-test-')));
+    repoRoot = join(fixture, 'repo');
+    mkdirSync(repoRoot);
+    artifactRoot = join(repoRoot, 'tmp', 'world-identity-ui-evidence');
+  });
+  afterEach(() => {
+    // Remove only this test's independently created disposable directory.
+    if (dirname(fixture) !== realpathSync(tmpdir()) || !fixture.startsWith(join(realpathSync(tmpdir()), 'mazer-capture-output-test-'))) {
+      throw new Error('Unexpected test cleanup root');
+    }
+    rmSync(fixture, { recursive: true, force: true });
+  });
+  test('default runs have distinct empty directories and retain previous evidence', () => {
+    const first = createCaptureOutputDirectory({ repoRoot });
+    writeFileSync(join(first, 'manifest.json'), 'retained');
+    const second = createCaptureOutputDirectory({ repoRoot });
+    expect(dirname(first)).toBe(artifactRoot);
+    expect(dirname(second)).toBe(artifactRoot);
+    expect(first).not.toBe(second);
+    expect(readFileSync(join(first, 'manifest.json'), 'utf8')).toBe('retained');
+    expect(existsSync(join(second, 'manifest.json'))).toBe(false);
+  });
+  test.each(['relative', 'absolute'])('allows a new %s direct child', (kind) => {
+    const outputPath = kind === 'relative' ? 'tmp/world-identity-ui-evidence/release-1' : join(artifactRoot, 'release-1');
+    expect(createCaptureOutputDirectory({ repoRoot, outputPath })).toBe(join(artifactRoot, 'release-1'));
+  });
+  test.each(['repo', 'parent', 'outside', 'artifact-root', 'traversal', 'nested', 'empty', 'flag'])('rejects %s before touching any output', (kind) => {
+    const outside = join(fixture, 'outside');
+    mkdirSync(outside);
+    writeFileSync(join(outside, 'sentinel'), 'untouched');
+    const outputPath = { repo: repoRoot, parent: fixture, outside, 'artifact-root': artifactRoot,
+      traversal: 'tmp/world-identity-ui-evidence/../world-identity-ui-evidence/run',
+      nested: join(artifactRoot, 'nested', 'run'), empty: '', flag: true }[kind];
+    expect(() => createCaptureOutputDirectory({ repoRoot, outputPath })).toThrow(/new direct child/);
+    expect(readFileSync(join(outside, 'sentinel'), 'utf8')).toBe('untouched');
+    expect(existsSync(join(repoRoot, 'tmp'))).toBe(false);
+  });
+  test.each(['directory', 'file', 'junction'])('refuses an existing %s without modifying it', (kind) => {
+    mkdirSync(artifactRoot, { recursive: true });
+    const outputPath = join(artifactRoot, 'already-owned');
+    const outside = join(fixture, 'outside');
+    mkdirSync(outside);
+    writeFileSync(join(outside, 'sentinel'), 'untouched');
+    if (kind === 'directory') { mkdirSync(outputPath); writeFileSync(join(outputPath, 'sentinel'), 'retained'); }
+    if (kind === 'file') writeFileSync(outputPath, 'retained');
+    if (kind === 'junction') symlinkSync(outside, outputPath, process.platform === 'win32' ? 'junction' : 'dir');
+    expect(() => createCaptureOutputDirectory({ repoRoot, outputPath })).toThrow();
+    expect(readFileSync(join(outside, 'sentinel'), 'utf8')).toBe('untouched');
+    if (kind === 'directory') expect(readFileSync(join(outputPath, 'sentinel'), 'utf8')).toBe('retained');
+    if (kind === 'file') expect(readFileSync(outputPath, 'utf8')).toBe('retained');
+  });
+  test.each(['tmp', 'artifact-root'])('refuses a linked %s component', (kind) => {
+    const outside = join(fixture, 'outside');
+    mkdirSync(outside);
+    writeFileSync(join(outside, 'sentinel'), 'untouched');
+    if (kind === 'artifact-root') mkdirSync(join(repoRoot, 'tmp'));
+    symlinkSync(outside, kind === 'tmp' ? join(repoRoot, 'tmp') : artifactRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    expect(() => createCaptureOutputDirectory({ repoRoot })).toThrow(/only real directories/);
+    expect(readFileSync(join(outside, 'sentinel'), 'utf8')).toBe('untouched');
+    expect(existsSync(join(outside, 'world-identity-ui-evidence'))).toBe(false);
+  });
+});
 
 const signedOutMenuDiagnostics = () => ({
   runtime: { auth: { status: 'guest' } },
