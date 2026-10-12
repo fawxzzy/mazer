@@ -48,16 +48,31 @@ describe('resolveLegacySupabaseProjectRef', () => {
 });
 
 describe('resolveLegacySupabaseSchemaForUrl', () => {
-  test('binds the legacy/rollback project to the public schema', () => {
-    expect(resolveLegacySupabaseSchemaForUrl('https://geknvnrmktchljnyddwp.supabase.co')).toBe('public');
+  test.each([
+    'https://geknvnrmktchljnyddwp.supabase.co',
+    'https://geknvnrmktchljnyddwp.supabase.co/',
+    '  https://GeknvnRmktchljnyddwp.supabase.co  '
+  ])('rejects the deleted legacy project: %s', (url) => {
+    expect(resolveLegacySupabaseSchemaForUrl(url)).toBeNull();
   });
 
   test('binds the shared consolidation-target project to the mazer schema', () => {
-    expect(resolveLegacySupabaseSchemaForUrl('https://bxtcuhkotumitoqtrcej.supabase.co')).toBe('mazer');
+    for (const url of [
+      'https://bxtcuhkotumitoqtrcej.supabase.co',
+      'https://bxtcuhkotumitoqtrcej.supabase.co/',
+      '  https://Bxtcuhkotumitoqtrcej.supabase.co  '
+    ]) {
+      expect(resolveLegacySupabaseSchemaForUrl(url)).toBe('mazer');
+    }
   });
 
   test('fails closed (returns null, never a default schema) for an unrecognized project', () => {
-    expect(resolveLegacySupabaseSchemaForUrl('https://some-other-project.supabase.co')).toBeNull();
+    expect(resolveLegacySupabaseSchemaForUrl('https://unknownproject123.supabase.co')).toBeNull();
+  });
+
+  test('does not admit inherited object keys as project refs', () => {
+    expect(resolveLegacySupabaseProjectRef('https://constructor.supabase.co')).toBe('constructor');
+    expect(resolveLegacySupabaseSchemaForUrl('https://constructor.supabase.co')).toBeNull();
   });
 
   test('fails closed for a URL that does not parse as a Supabase project URL at all', () => {
@@ -83,7 +98,6 @@ describe('LEGACY_SUPABASE_SCHEMA_BY_PROJECT_REF', () => {
     // reviewed edit to this test, not a silent side effect of some other
     // change.
     expect(LEGACY_SUPABASE_SCHEMA_BY_PROJECT_REF).toEqual({
-      geknvnrmktchljnyddwp: 'public',
       bxtcuhkotumitoqtrcej: 'mazer'
     });
   });
@@ -94,17 +108,8 @@ describe('LEGACY_SUPABASE_SCHEMA_BY_PROJECT_REF', () => {
 });
 
 describe('getLegacyAuthClient wiring', () => {
-  // getLegacyAuthClient itself is awkward to exercise end-to-end in a unit
-  // test (dynamic `import('@supabase/supabase-js')`, a module-level client
-  // singleton that survives across calls, and no env-override parameter of
-  // its own -- unlike resolveLegacyAuthConfig in this same file, which
-  // already takes one for exactly this reason). Since the fail-closed
-  // behavior itself is exhaustively covered above at the resolver level,
-  // this asserts the *wiring* is actually in place -- that the client
-  // construction path really does gate on resolveLegacySupabaseSchemaForUrl
-  // and bail out on a null schema -- by reading the source rather than
-  // re-implementing a second copy of the singleton/dynamic-import test
-  // harness just to reach the same two lines.
+  // Dynamic client-construction coverage lives in legacy-auth.test.ts.
+  // Retain this source contract to keep all data calls on one schema gate.
   test('gates client construction on resolveLegacySupabaseSchemaForUrl and fails closed on a null schema', () => {
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
 
