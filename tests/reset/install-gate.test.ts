@@ -24,12 +24,13 @@ describe('Mazer install gate', () => {
     expect(shouldShowMazerInstallGate({ ...hiddenState, mode: 'manual', instruction: 'Use Share > Add to Home Screen' })).toBe(true);
   });
 
-  test('bypasses the install gate for recovery, accepted OAuth callbacks, and legal routes', () => {
+  test('bypasses the install gate for recovery, OAuth callbacks, and legal routes', () => {
     expect(shouldRunMazerInstallGateForBoot({
       forceInstallGate: false,
       isLocalhostRuntime: false,
       legalRouteRequested: false,
       oauthCallbackAccepted: false,
+      oauthCallbackRequested: false,
       passwordRecoveryRequested: true
     })).toBe(false);
     expect(shouldRunMazerInstallGateForBoot({
@@ -37,6 +38,17 @@ describe('Mazer install gate', () => {
       isLocalhostRuntime: false,
       legalRouteRequested: false,
       oauthCallbackAccepted: true,
+      oauthCallbackRequested: true,
+      passwordRecoveryRequested: false
+    })).toBe(false);
+    // A five-to-fifteen-minute portal return is expired by the Mazer pending
+    // deadline. It must still reach Mazer's retry/error UI, not an install gate.
+    expect(shouldRunMazerInstallGateForBoot({
+      forceInstallGate: false,
+      isLocalhostRuntime: false,
+      legalRouteRequested: false,
+      oauthCallbackAccepted: false,
+      oauthCallbackRequested: true,
       passwordRecoveryRequested: false
     })).toBe(false);
     expect(shouldRunMazerInstallGateForBoot({
@@ -44,6 +56,7 @@ describe('Mazer install gate', () => {
       isLocalhostRuntime: false,
       legalRouteRequested: true,
       oauthCallbackAccepted: false,
+      oauthCallbackRequested: false,
       passwordRecoveryRequested: false
     })).toBe(false);
     expect(shouldRunMazerInstallGateForBoot({
@@ -51,6 +64,7 @@ describe('Mazer install gate', () => {
       isLocalhostRuntime: false,
       legalRouteRequested: false,
       oauthCallbackAccepted: false,
+      oauthCallbackRequested: false,
       passwordRecoveryRequested: false
     })).toBe(true);
     expect(shouldRunMazerInstallGateForBoot({
@@ -58,6 +72,7 @@ describe('Mazer install gate', () => {
       isLocalhostRuntime: true,
       legalRouteRequested: false,
       oauthCallbackAccepted: false,
+      oauthCallbackRequested: false,
       passwordRecoveryRequested: false
     })).toBe(true);
   });
@@ -101,6 +116,7 @@ describe('Mazer install gate', () => {
     expect(mainSource).toContain('captureAndScrubMazerOAuthCallback(window.location, window.history)');
     expect(mainSource).toContain("oauthCallbackAccepted = result.status === 'connected';");
     expect(mainSource).toContain('oauthCallbackAccepted,');
+    expect(mainSource).toContain('oauthCallbackRequested,');
     expect(mainSource).toContain("window.location.replace(buildMazerAccountPortalUrl('reset-password'))");
     expect(mainSource).toContain('window.location.replace(buildMazerLegalUrl(legalRoute))');
     expect(mainSource.indexOf('captureAndScrubMazerOAuthCallback(window.location, window.history)')).toBeLessThan(
