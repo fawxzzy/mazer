@@ -17080,10 +17080,11 @@ export class MenuScene extends Phaser.Scene {
     const centerX = this.layout.centerButtonX;
     const welcomeY = this.layout.centerButtonY - this.layout.buttonHeight - (compact ? 26 : 30);
     const welcome = this.padLegacyCompactUiText(this.add.text(centerX, welcomeY, 'Welcome', {
+      backgroundColor: '#060b0f',
       color: '#7894a0',
       fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
       fontSize: `${compact ? 11 : 12}px`
-    })).setOrigin(0.5);
+    })).setOrigin(0.5).setDepth(3);
     // Real, measured overlap (found while restoring the visual-verification
     // harness, headless Playwright against the authenticated fixture at
     // 405x958): with a +17/+19 offset, padLegacyUiText's own 6px top padding
@@ -17095,6 +17096,7 @@ export class MenuScene extends Phaser.Scene {
     // (button top measured at y=890 in the same real capture).
     const usernameLabel = this.fitLegacyUiTextToWidth(
       this.padLegacyUiText(this.add.text(centerX, welcomeY + (compact ? 24 : 26), username, {
+        backgroundColor: '#060b0f',
         color: '#d7f7ee',
         fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
         fontSize: `${compact ? 14 : 16}px`
@@ -17102,7 +17104,7 @@ export class MenuScene extends Phaser.Scene {
       Math.min(this.layout.width - 48, 320),
       compact ? 14 : 16,
       11
-    ).setOrigin(0.5);
+    ).setOrigin(0.5).setDepth(3);
     this.uiTexts.push(welcome, usernameLabel);
   }
 

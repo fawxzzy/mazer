@@ -104,6 +104,9 @@ jobs:
       - name: Verify Wave 0C Options/Account real click-through reachability (desktop + compact touch, intercepted portal navigation)
         run: node ./scripts/analysis/verify-options-account-reachability.mjs --skip-build
 
+      - name: Verify authenticated welcome identity remains readable over the maze
+        run: node ./scripts/analysis/verify-welcome-identity-readability.mjs --skip-build
+
   ai-navigation-acceptance:
     name: AI navigation acceptance shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
