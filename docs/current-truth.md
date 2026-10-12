@@ -43,13 +43,13 @@ Read the repo in this order:
 
 If the current web app disagrees with restored gameplay/mechanics truth, restored legacy logic wins for this lane. If the current visual direction disagrees with old screenshot composition, the active mobile-clean direction wins.
 
-### Supabase master cutover truth — 2026-08-27
+### Supabase master cutover and legacy retirement truth — 2026-10-12
 
 - Production now uses master project `bxtcuhkotumitoqtrcej`, schema `mazer`; the deployed bundle contains that Supabase URL as its only active Supabase endpoint.
-- Current master readback is `13` profiles, `17` player rows, `17` AI rows, and `1,888` conserved receipts.
-- The legacy project `geknvnrmktchljnyddwp` is retained only as the exact rollback source. Do not mutate or retire it without a separate destructive decision.
+- The historical 2026-08-27 master readback was `13` profiles, `17` player rows, `17` AI rows, and `1,888` conserved receipts; these are migration evidence, not current counts.
+- The legacy project `geknvnrmktchljnyddwp` was deleted on 2026-10-10 after its separate retirement admission. Recovery retains the encrypted archive and restore proof; there is no live legacy database rollback endpoint. The ATLAS completion receipt is `runtime/atlas/continuity/platform-supabase-mazer-retirement-r002-20261010-completion-receipt.json` (SHA-256 `16341e05dc48c0d7106968bff2bacbb342d6fe28121112fa9c58dbaa13ff81cb`).
 - R017 completed identity mapping, monotonic reconciliation, final-delta capture, Data API/Auth proof, production cutover, observation, and exact legacy restoration. Those gates are durable evidence and must not be replayed for ordinary source corrections.
-- The browser client already selects `public` for the exact legacy URL and `mazer` for the exact master URL, failing closed for unknown projects.
+- Current source permits only URLs resolving to the allowlisted master project and selects schema `mazer`; deleted legacy, unknown, and malformed project URLs fail closed before browser client construction. Historical URL parsing and local storage cleanup remain recovery internals. Production adoption of this stricter source guard requires separate deployment proof.
 - Authenticated own-row progression reads are authoritative for coherent historical player ordinals even when they predate the browser-only provenance sentinel. The client stamps that sentinel before caching the row locally; unproven local saves without it still fail closed to Level 1, impossible remote ordinals still fail closed, and obsolete remote difficulty above today's earned ceiling is clamped without erasing the server-proven level/cycle position.
 - The generated master migration sequence is schema parity, runtime RPC/leaderboard contracts, then shared-project signup username authority. The Before User Created hook is activated only after those database contracts and rollback proof pass.
 - Existing sessions are project-specific. Any future migration must still prove existing-user re-authentication and must never lower proven player or AI ordinals, discard receipts, expose usernames through anonymous availability probing, or derive a username from email.

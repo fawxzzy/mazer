@@ -202,8 +202,8 @@ describe('legacy auth runtime', () => {
     expect(events).toEqual(['oauth-start', 'oauth-end', 'refresh']);
   });
 
-  test('serializes public password mutations on each configured client storage lock', async () => {
-    for (const projectRef of ['bxtcuhkotumitoqtrcej', 'geknvnrmktchljnyddwp']) {
+  test('serializes public password mutations on the admitted master client storage lock', async () => {
+    for (const projectRef of ['bxtcuhkotumitoqtrcej']) {
       const lockManager = new NamedLockHarness();
       const storageKey = `sb-${projectRef}-auth-token`;
       const signInWithPassword = vi.fn(async () => ({
@@ -1056,11 +1056,9 @@ describe('legacy auth runtime', () => {
       'utf8'
     );
 
-    // A single project-wide `db: { schema: 'mazer' }` was correct only for
-    // the shared consolidation-target project and silently wrong for the
-    // legacy/rollback project (whose tables still live in `public`) --
-    // see legacySupabaseSchemaBinding.ts. The schema is now resolved from
-    // the configured project's URL instead of assumed.
+    // Resolve the configured URL through the master-only allowlist before
+    // constructing a client. Hardcoding the schema would admit stale or
+    // unknown project URLs without checking their identity.
     expect(authSource).not.toMatch(/db:\s*\{\s*schema:\s*'mazer'\s*\}/);
     expect(authSource).toContain(
       "import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';"
@@ -1068,6 +1066,59 @@ describe('legacy auth runtime', () => {
     expect(authSource).toContain('const schema = resolveLegacySupabaseSchemaForUrl(config.url);');
     expect(progressionSource).toContain('.from(');
     expect(progressionSource).not.toContain('.schema(');
+  });
+
+  test.each([
+    'https://geknvnrmktchljnyddwp.supabase.co',
+    '  https://GeknvnRmktchljnyddwp.supabase.co/  ',
+    'https://unknownproject123.supabase.co',
+    'https://constructor.supabase.co',
+    'https://bxtcuhkotumitoqtrcej.supabase.co/rest/v1'
+  ])('does not construct a Supabase client for a rejected target: %s', async (url) => {
+    const createClient = vi.fn();
+    vi.resetModules();
+    vi.stubEnv('VITE_SUPABASE_URL', url);
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'local-fixture-key');
+    vi.doMock('@supabase/supabase-js', () => ({ createClient }));
+    try {
+      const { getLegacyAuthClient } = await import('../../src/legacy-runtime/legacyAuth');
+      await expect(getLegacyAuthClient()).resolves.toBeNull();
+      expect(createClient).not.toHaveBeenCalled();
+    } finally {
+      vi.doUnmock('@supabase/supabase-js');
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
+  });
+
+  test('constructs and reuses the master client with the mazer schema', async () => {
+    const client = {
+      auth: {
+        onAuthStateChange: vi.fn(),
+        getSession: vi.fn(async () => ({ data: { session: null }, error: null }))
+      }
+    };
+    const createClient = vi.fn(() => client);
+    vi.resetModules();
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://bxtcuhkotumitoqtrcej.supabase.co');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'local-fixture-key');
+    vi.doMock('@supabase/supabase-js', () => ({ createClient }));
+    try {
+      const { getLegacyAuthClient } = await import('../../src/legacy-runtime/legacyAuth');
+      await expect(getLegacyAuthClient()).resolves.toBe(client);
+      await expect(getLegacyAuthClient()).resolves.toBe(client);
+      expect(createClient).toHaveBeenCalledTimes(1);
+      expect(createClient).toHaveBeenCalledWith(
+        'https://bxtcuhkotumitoqtrcej.supabase.co',
+        'local-fixture-key',
+        expect.objectContaining({ db: { schema: 'mazer' } })
+      );
+      expect(client.auth.onAuthStateChange).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.doUnmock('@supabase/supabase-js');
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
   });
 
   test('scopes learning storage by guest versus signed-in account', () => {
