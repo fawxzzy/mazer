@@ -378,17 +378,36 @@ function isValidMarkdownReferenceDestination(value) {
   return validDestination && (title === "" || /^(?:"[^"\n]*"|'[^'\n]*'|\([^\)\n]*\))$/.test(title));
 }
 
-function markdownReferenceLabels(lines) {
+function markdownReferenceLabels(lines, blocks) {
   const labels = new Set();
   const definitionStart = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(.*)$/;
+  // Definitions may form a paragraph's prefix, but cannot interrupt its text.
+  let previousBlock = null;
+  let definitionPrefixOpen = true;
   for (let index = 0; index < lines.length; index += 1) {
+    const block = blocks[index];
+    if (!block || !isDeepStrictEqual(block, previousBlock)) definitionPrefixOpen = true;
+    previousBlock = block;
+    if (!definitionPrefixOpen) continue;
     const match = lines[index]?.match(definitionStart);
-    if (!match) continue;
+    if (!match) {
+      if (lines[index]?.trim()) definitionPrefixOpen = false;
+      continue;
+    }
     const sameLineDestination = match[2].trim();
-    const nextLineDestination = sameLineDestination === "" ? lines[index + 1]?.trim() : null;
-    if (!isValidMarkdownReferenceDestination(sameLineDestination || nextLineDestination || "")) continue;
+    const nextLineDestination = sameLineDestination === "" && isDeepStrictEqual(block, blocks[index + 1])
+      ? lines[index + 1]?.trim()
+      : null;
+    const destination = sameLineDestination || nextLineDestination || "";
+    if (!isValidMarkdownReferenceDestination(destination)) {
+      definitionPrefixOpen = false;
+      continue;
+    }
     const label = normalizeMarkdownReferenceLabel(match[1]);
     if (label) labels.add(label);
+    if (sameLineDestination === "") index += 1;
+    if (!/[ \t]/.test(destination) && isDeepStrictEqual(block, blocks[index + 1])
+      && /^(?:"[^"\n]*"|'[^'\n]*'|\([^\)\n]*\))$/.test(lines[index + 1]?.trim() ?? "")) index += 1;
   }
   return labels;
 }
@@ -407,6 +426,72 @@ function parseMarkdownBracketedText(value, opening) {
     }
   }
   return null;
+}
+
+function markdownInlineLinkEnd(value, opening) {
+  if (value[opening] !== "(") return null;
+  let cursor = opening + 1;
+  while (/[ \t\n]/.test(value[cursor] ?? "")) cursor += 1;
+  if (value[cursor] === "<") {
+    cursor += 1;
+    while (cursor < value.length && value[cursor] !== ">") {
+      if (value[cursor] === "\\" && /[!-/:-@[-`{-~]/.test(value[cursor + 1] ?? "")) cursor += 2;
+      else if (value[cursor] === "<" || value[cursor] === "\n") return null;
+      else cursor += 1;
+    }
+    if (value[cursor] !== ">") return null;
+    cursor += 1;
+  } else {
+    let depth = 0;
+    while (cursor < value.length) {
+      const character = value[cursor];
+      if (character === "\\" && /[!-/:-@[-`{-~]/.test(value[cursor + 1] ?? "")) {
+        cursor += 2;
+        continue;
+      }
+      if (/[ \t\n]/.test(character) || (character === ")" && depth === 0)) break;
+      if (/[\u0000-\u001f\u007f<>]/.test(character)) return null;
+      if (character === "(") depth += 1;
+      if (character === ")") depth -= 1;
+      cursor += 1;
+    }
+    if (depth !== 0) return null;
+  }
+  const destinationEnd = cursor;
+  while (/[ \t\n]/.test(value[cursor] ?? "")) cursor += 1;
+  if (value[cursor] === ")") return cursor + 1;
+  if (cursor === destinationEnd || !['"', "'", "("].includes(value[cursor])) return null;
+  const titleEnd = value[cursor] === "(" ? ")" : value[cursor];
+  cursor += 1;
+  while (cursor < value.length && value[cursor] !== titleEnd) {
+    if (value[cursor] === "\\" && /[!-/:-@[-`{-~]/.test(value[cursor + 1] ?? "")) cursor += 2;
+    else if (titleEnd === ")" && value[cursor] === "(") return null;
+    else cursor += 1;
+  }
+  if (value[cursor] !== titleEnd) return null;
+  cursor += 1;
+  while (/[ \t\n]/.test(value[cursor] ?? "")) cursor += 1;
+  return value[cursor] === ")" ? cursor + 1 : null;
+}
+
+function renderMarkdownInlineLinks(value) {
+  let rendered = "";
+  let cursor = 0;
+  while (cursor < value.length) {
+    const opening = value.indexOf("[", cursor);
+    if (opening < 0) return rendered + value.slice(cursor);
+    const label = isEscapedMarkdownDelimiter(value, opening) ? null : parseMarkdownBracketedText(value, opening);
+    const end = label ? markdownInlineLinkEnd(value, label.end) : null;
+    if (end === null) {
+      rendered += value.slice(cursor, opening + 1);
+      cursor = opening + 1;
+      continue;
+    }
+    const start = opening > cursor && value[opening - 1] === "!" ? opening - 1 : opening;
+    rendered += value.slice(cursor, start) + label.content;
+    cursor = end;
+  }
+  return rendered;
 }
 
 function renderMarkdownReferenceLinks(value, referenceLabels, protect) {
@@ -501,9 +586,7 @@ function renderedMarkdownHeadingText(value, referenceLabels) {
     protectedText.push(text);
     return token;
   };
-  let rendered = protectMarkdownCodeSpans(value, protect)
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  let rendered = renderMarkdownInlineLinks(protectMarkdownCodeSpans(value, protect));
   rendered = renderMarkdownReferenceLinks(rendered, referenceLabels, protect);
   rendered = stripMarkdownInlineHtml(rendered)
     .replace(/\\([!-/:-@[-`{-~])/g, (_match, escaped) => protect(escaped));
@@ -1297,7 +1380,7 @@ function markdownHeadingAnchors(markdown) {
       index += 1;
     }
   }
-  const referenceLabels = markdownReferenceLabels(referenceDefinitionLines);
+  const referenceLabels = markdownReferenceLabels(referenceDefinitionLines, renderedHeadingBlocks);
   const anchors = new Set();
   for (const heading of headings) {
     const base = githubHeadingBaseSlug(heading, referenceLabels);

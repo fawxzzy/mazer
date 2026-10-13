@@ -879,6 +879,64 @@ test("resolves only rendered Markdown headings with the required GitHub-compatib
   }
 });
 
+test("parses complete balanced inline destinations without leaking URL text into anchors", () => {
+  for (const markdown of [
+    "## [Unique](/foo(bar)baz)",
+    "## ![Unique](/foo(bar(baz))qux)",
+    "## [Unique](</foo(bar)baz>)",
+    "## [Unique](/foo\\(bar\\)baz)",
+    '## [Unique](/foo(bar)baz "title (with parentheses)")',
+    "## [Unique](/foo(bar)baz 'title')",
+  ]) {
+    for (const [fragment, valid] of [["unique", true], ["uniquebaz", false]]) {
+      const candidate = structuredClone(registry);
+      candidate.workItems[0].sourceRef = `docs/current-truth.md#${fragment}`;
+      const build = () => buildProjectBoardOwnerExport(candidate, {
+        ...bytes,
+        "mazer-owner-work-registry": JSON.stringify(candidate),
+        "mazer-current-truth": `${bytes["mazer-current-truth"]}\n\n${markdown}\n`,
+      });
+      if (valid) assert.doesNotThrow(build, markdown);
+      else assert.throws(build, /sourceRef fragment/, markdown);
+    }
+  }
+  const incomplete = structuredClone(registry);
+  incomplete.workItems[0].sourceRef = "docs/current-truth.md#uniquefoobar";
+  assert.doesNotThrow(() => buildProjectBoardOwnerExport(incomplete, {
+    ...bytes,
+    "mazer-owner-work-registry": JSON.stringify(incomplete),
+    "mazer-current-truth": `${bytes["mazer-current-truth"]}\n\n## [Unique](/foo(bar)\n`,
+  }));
+});
+
+test("reference definitions only resolve at the beginning of their paragraph block", () => {
+  for (const [definition, resolves] of [
+    ["paragraph\n[docs]: /target", false],
+    ["> paragraph\n> [docs]: /target", false],
+    ["- paragraph\n  [docs]: /target", false],
+    ["[prior]: /prior\nparagraph\n[docs]: /target", false],
+    ["[prior]: /prior 'first'\n'second'\n[docs]: /target", false],
+    ["paragraph\n\n[docs]: /target", true],
+    ["> paragraph\n>\n> [docs]: /target", true],
+    ["- paragraph\n- [docs]: /target", true],
+    ["[prior]: /prior\n[docs]: /target", true],
+    ["[prior]: /prior\n'first'\n[docs]: /target", true],
+    ["[prior]:\n  /prior\n  'title'\n[docs]: /target", true],
+  ]) {
+    for (const [fragment, valid] of [["unique", resolves], ["uniquedocs", !resolves]]) {
+      const candidate = structuredClone(registry);
+      candidate.workItems[0].sourceRef = `docs/current-truth.md#${fragment}`;
+      const build = () => buildProjectBoardOwnerExport(candidate, {
+        ...bytes,
+        "mazer-owner-work-registry": JSON.stringify(candidate),
+        "mazer-current-truth": `${bytes["mazer-current-truth"]}\n\n## [Unique][docs]\n\n${definition}\n`,
+      });
+      if (valid) assert.doesNotThrow(build, definition);
+      else assert.throws(build, /sourceRef fragment/, definition);
+    }
+  }
+});
+
 test("requires every work item card type to match the atlas.card-record.v2 enum", () => {
   for (const [label, cardType] of [
     ["missing", undefined],
