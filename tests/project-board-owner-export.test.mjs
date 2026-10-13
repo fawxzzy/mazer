@@ -992,7 +992,9 @@ test("requires canonical calendar-valid UTC timestamps without coercion", () => 
 
   for (const status of ["active", "completed", "deferred_candidate"]) {
     const futureDated = structuredClone(registry);
-    futureDated.workItems.find((item) => item.status === status).updatedAt = "2026-09-14T22:54:28.001Z";
+    futureDated.workItems.find((item) => item.status === status).updatedAt = new Date(
+      Date.parse(registry.updatedAt) + 1,
+    ).toISOString();
     assert.throws(
       () => buildProjectBoardOwnerExport(futureDated, { ...bytes, "mazer-owner-work-registry": JSON.stringify(futureDated) }),
       /updatedAt must not be later than registry\.updatedAt/,

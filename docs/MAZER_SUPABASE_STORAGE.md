@@ -1,6 +1,6 @@
 # Mazer Supabase Storage Contract
 
-Mazer's consolidation target is the master Supabase project `bxtcuhkotumitoqtrcej`, isolated in the custom `mazer` schema. Do not store Mazer account, progression, AI, cycle, or license data in the Fitness namespace. The legacy Mazer project remains a rollback source until client cutover, observation, deletion-grade restore, and explicit retirement gates close.
+Mazer's only admitted Supabase target is the master project `bxtcuhkotumitoqtrcej`, isolated in the custom `mazer` schema. Do not store Mazer account, progression, AI, cycle, or license data in the Fitness namespace. The legacy Mazer project was deleted on 2026-10-10 after its retirement gates closed; recovery uses retained encrypted archives, not a live legacy endpoint.
 
 ## Live Setup Status
 
@@ -13,14 +13,15 @@ Master consolidation target:
 - production status: R017 cutover and observation are terminal; the deployed browser bundle targets this project and resolves its data client to schema `mazer`
 - access posture: forced RLS, authenticated owner-only table access, bounded RPCs, and custom-schema Data API exposure are production-proven
 
-Legacy source/rollback project:
+Retired legacy source (historical evidence):
 
 - project name: `Mazer`
 - project ref: `geknvnrmktchljnyddwp`
 - 2026-08-24 aggregate: `9` profiles, `13` player rows, `13` AI rows, and `1,865` receipts
-- retirement status: retained as the exact rollback source; it is not safe to mutate or delete
+- retirement status: deleted on 2026-10-10; retained encrypted archive and restore proof remain recovery evidence
+- canonical ATLAS completion receipt: `runtime/atlas/continuity/platform-supabase-mazer-retirement-r002-20261010-completion-receipt.json`, SHA-256 `16341e05dc48c0d7106968bff2bacbb342d6fe28121112fa9c58dbaa13ff81cb`
 
-The master cutover is complete. Source parity, identity mapping, Data API exposure, runtime RPCs, signup authority, final-delta reconciliation, production observation, and exact legacy restoration are settled R017 evidence. The master project is current application-data truth; the legacy project remains rollback evidence only. Stripe/license tables remain deferred.
+The master cutover is complete. Source parity, identity mapping, Data API exposure, runtime RPCs, signup authority, final-delta reconciliation, production observation, and exact legacy restoration are settled R017 evidence. The master project is current application-data truth; legacy restoration records are historical proof and do not imply a live rollback project. Stripe/license tables remain deferred.
 
 Three generated additive migrations define the master-side source contract in dependency order:
 
@@ -63,7 +64,9 @@ VITE_MAZER_REMOTE_PROGRESSION=true
 
 Local or fixture environments may deliberately set the flag to `false`; that is not the production contract.
 
-The shared browser Supabase client resolves the schema from the exact allowlisted project URL: legacy maps to `public`, master maps to `mazer`, and unknown projects fail closed. Auth remains project-level; unqualified `.from(...)` calls use the selected project-specific data schema without duplicating schema selection at every query site.
+The shared browser Supabase client resolves the schema from the exact allowlisted project URL: only master maps to `mazer`. The deleted legacy project, unknown projects, and malformed URLs fail closed before client construction. Parsing a historical project URL or recognizing an old session storage key does not admit that project as a client target. Auth remains project-level; unqualified `.from(...)` calls use the selected data schema without duplicating schema selection at every query site.
+
+This master-only denial is a source contract. Its local tests do not prove that a production deployment contains the guard; release acceptance must bind the deployed commit separately. The previously proven production binding to master remains distinct from adoption of this additional stale-configuration guard.
 
 When enabled, `src/legacy-runtime/legacyRemoteProgression.ts` writes:
 
@@ -73,7 +76,8 @@ When enabled, `src/legacy-runtime/legacyRemoteProgression.ts` writes:
 
 It also hydrates authenticated account state before Phaser creates the first maze:
 
-- `mazer_progression_states.state` is the canonical combined player/AI progression save; the separate AI row remains an indexed mirror.
+- `mazer_progression_states.state` owns human progression. Its historical embedded AI track is ignored when hydrating or applying human completion responses; `mazer_ai_progression_states.state` for `menu-runner` owns remote AI progression, as used by the AI completion RPC.
+- Existing account-scoped local advances and queued completions remain intact. An incomplete historical AI receipt sequence stays held for explicit reconciliation; hydration does not reset local progress, invent receipts, or replay a gapped completion.
 - `mazer_profiles.settings` is the canonical cross-device game-toggle/control preference row.
 - `revision` on progression and profile rows is a monotonic optimistic-concurrency guard. Normal advancement can rebase forward once after a conflict; destructive replacement/reset refuses to overwrite a newer revision.
 - A scoped local sync envelope records the last observed revision and local fingerprints so offline/local advancement can be reconciled without resurrecting a previously accepted reset.
@@ -94,11 +98,11 @@ R017 completed the former legacy-to-master apply sequence. Do not replay its imp
 
 For any future Supabase project or credential change:
 
-1. Preserve exact current master and rollback preimages without emitting private rows.
+1. Preserve exact current master and recovery preimages without emitting private rows; the deleted legacy project is not an available rollback endpoint.
 2. Re-certify identity ownership, monotonic progression, receipt conservation, username uniqueness, RLS/ACL, Data API exposure, and exact rollback against the proposed target.
 3. Prove nonproduction browser Auth and storage behavior before changing production environment values.
 4. Cut production once at an explicitly authorized boundary, then verify the deployed commit, project identity, authenticated persistence, leaderboard, and rollback readiness.
-5. Keep legacy deletion, credential retirement, and Stripe/license work behind separate protected decisions.
+5. Reuse the completed legacy deletion receipt without replaying it. Keep credential retirement and Stripe/license work behind separate protected decisions.
 
 ## Stripe Boundary
 

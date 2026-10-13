@@ -4,7 +4,7 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-09-14T22:54:28.000Z",
+  "updatedAt": "2026-10-13T06:54:57.592Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
@@ -70,15 +70,15 @@
     {
       "id": "MAZER-DATA-001",
       "status": "completed",
-      "updatedAt": "2026-08-27T00:00:00.000Z",
+      "updatedAt": "2026-10-13T06:54:57.592Z",
       "sourceId": "mazer-current-truth",
-      "sourceRef": "docs/current-truth.md#supabase-master-cutover-truth--2026-08-27",
+      "sourceRef": "docs/current-truth.md#supabase-master-cutover-and-legacy-retirement-truth--2026-10-12",
       "title": "Complete the Supabase master cutover",
-      "description": "Move Mazer production to the master project while preserving progression, identities, receipts, and the exact legacy rollback source.",
+      "description": "Move Mazer production to the master project while preserving progression, identities, receipts, and the encrypted legacy recovery archive.",
       "cardType": "migration",
       "priority": "critical",
       "dependencies": [],
-      "acceptanceCriteria": ["Master binding is exact.", "Progression and receipt conservation are proven.", "Legacy rollback remains retained and protected."]
+      "acceptanceCriteria": ["Master binding is exact.", "Progression and receipt conservation are proven.", "Encrypted legacy recovery material remains retained and protected."]
     },
     {
       "id": "MAZER-ACCOUNT-001",

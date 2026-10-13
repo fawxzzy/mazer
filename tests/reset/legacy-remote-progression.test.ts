@@ -82,7 +82,8 @@ const createMaybeSingleChain = (result: unknown) => {
 
 const createHydrationFrom = (
   remoteProgression: unknown,
-  remoteProfile: unknown
+  remoteProfile: unknown,
+  remoteAi: unknown = createEmptyLegacyProgressionState().tracks['ai-runner']
 ) => vi.fn((table: string) => ({
   insert: () => ({
     select: () => ({
@@ -100,7 +101,7 @@ const createHydrationFrom = (
       : table === LEGACY_REMOTE_PROFILE_TABLE
         ? { data: remoteProfile, error: null }
         : table === LEGACY_REMOTE_AI_PROGRESSION_TABLE
-          ? { data: { state: createEmptyLegacyProgressionState().tracks['ai-runner'] }, error: null }
+          ? { data: { state: remoteAi }, error: null }
           : { data: null, error: null }
   )
 }));
@@ -1712,7 +1713,8 @@ describe('legacy remote progression', () => {
 
     const from = createHydrationFrom(
       { revision: 17, state: remote },
-      { revision: 3, settings: {} }
+      { revision: 3, settings: {} },
+      remote.tracks['ai-runner']
     );
     const rpc = vi.fn();
     vi.mocked(readLegacyAuthSessionSnapshot).mockResolvedValue({

@@ -1,28 +1,28 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_c7675808e7c6",
+  "export_id": "pbe_mazer_owner_registry_6dd0ae30ac00",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:c7675808e7c671bdab4a5e40a79094b04503d6e01ff070d6f65fd29b647f1b4f",
-  "generated_at": "2026-09-14T22:54:28.000Z",
+  "source_revision": "sha256:6dd0ae30ac00b6a6da718ea527c805f034d5d2cc41075ffa29e57ecac830cb93",
+  "generated_at": "2026-10-13T06:54:57.592Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:82e44e996ddaeb1ee59d27fb6c3f5c1bacdc1128422f9b8b282652cb34f6d36e",
-      "observed_at": "2026-09-14T22:54:28.000Z"
+      "revision": "sha256:87103d7dcc7a6d2b24425f4cb32496c2125fda47d662a703d80d979f6e693058",
+      "observed_at": "2026-10-13T06:54:57.592Z"
     },
     {
       "source_id": "mazer-current-truth",
       "kind": "markdown",
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
-      "revision": "sha256:210f9d4877b358d4b953aa5abfde80b08c2772eb5ab60660f585a5e3b94b29e1",
-      "observed_at": "2026-09-14T22:54:28.000Z"
+      "revision": "sha256:68ad42173dbd53a59746a86651bdc600b10e8fc70e6c8117b24744eed6b23fca",
+      "observed_at": "2026-10-13T06:54:57.592Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:36df33c480be02d1dc575876fda81e95db0bd57d7dec990ddf9cf206ce450207",
-      "observed_at": "2026-09-14T22:54:28.000Z"
+      "observed_at": "2026-10-13T06:54:57.592Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-09-14T22:54:28.000Z"
+      "observed_at": "2026-10-13T06:54:57.592Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:270b276dbf56786d05da710f4f61c9dcce5baf3e10a85bc5a2834722c8c5a471",
-      "observed_at": "2026-09-14T22:54:28.000Z"
+      "observed_at": "2026-10-13T06:54:57.592Z"
     }
   ],
   "cards": [

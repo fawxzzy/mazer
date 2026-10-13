@@ -1,3 +1,4 @@
+import ts from 'typescript';
 import { describe, expect, test, vi } from 'vitest';
 import {
   resolveLegacyDynamicMarkerInset,
@@ -1759,6 +1760,30 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createLegacyOptionsSessionActionBar(');
     expect(menuSceneSource).toContain("if (this.authSnapshot.status !== 'authenticated') {");
     expect(menuSceneSource).toContain("{ onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }");
+    // The Options overlay's own bottom bar is intentionally Sign-out-only
+    // (above). The real, normal way an authenticated player reaches their
+    // account is the profile/username icon (present in both the main menu
+    // and the Options header): its onClick calls openSharedAccountSurface(),
+    // which -- when already authenticated -- navigates straight to the real
+    // account portal via navigateToSharedAccountRoute('account'), with no
+    // intermediate internal overlay. Confirmed both here (source) and by a
+    // real click-through with the external navigation intercepted:
+    // scripts/analysis/verify-options-account-reachability.mjs.
+    expect(menuSceneSource).toContain('private openSharedAccountSurface(): void {');
+    expect(menuSceneSource).toContain(
+      "if (this.authSnapshot.status === 'authenticated') {\n      this.navigateToSharedAccountRoute('account');\n      return;\n    }"
+    );
+    expect(menuSceneSource).toContain('private navigateToSharedAccountRoute(route: \'account\' | \'reset-password\'): void {');
+    expect(menuSceneSource).toContain('navigateToMazerAccountPortal(route, window.location);');
+    // buildAuthenticatedAccountSection's own Account/Sign-out bar exists for
+    // a narrower path (completing sign-in while the auth overlay is already
+    // open) -- pinned as source wiring only, not claimed reachable via the
+    // profile icon while already authenticated (that click never reaches
+    // this function -- see openSharedAccountSurface above).
+    expect(menuSceneSource).toContain('private buildAuthenticatedAccountSection(');
+    expect(menuSceneSource).toContain(
+      "{ onClick: () => this.navigateToSharedAccountRoute('account'), text: 'Account', tone: 'primary' },\n      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }"
+    );
     expect(menuSceneSource).toContain('interface LegacyAuthActionDiagnostics');
     expect(menuSceneSource).toContain('private latestAuthActionDiagnostics: LegacyAuthActionDiagnostics | null = null;');
     expect(menuSceneSource).toContain('private recordLegacyAuthActionDiagnostics(');
@@ -1858,6 +1883,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.createLegacyAuthenticatedWelcomeIdentity();');
     expect(welcomeSource).toContain("this.authSnapshot.canonicalUsername?.trim() ?? ''");
     expect(welcomeSource).toContain("'Welcome'");
+    expect(welcomeSource.match(/backgroundColor: '#060b0f'/g)).toHaveLength(2);
+    expect(welcomeSource.match(/setOrigin\(0\.5\)\.setDepth\(3\)/g)).toHaveLength(2);
     expect(welcomeSource).not.toContain('accountUsernameSavedValue');
     expect(welcomeSource).not.toContain('authSnapshot.email');
     expect(welcomeSource).not.toContain('readLegacyAccountUsername');
@@ -2711,5 +2738,120 @@ describe('Navigation Core v1 goal halo: real radial-gradient compositor, not two
   test('registers a unique-per-instance texture key and removes it on scene shutdown', () => {
     expect(menuSceneSource).toContain('`legacy-nav-core-goal-halo-${nextMenuSceneInstanceId()}`');
     expect(menuSceneSource).toContain('this.textures.remove(this.goalHaloCanvasTextureKey);');
+  });
+});
+
+// Exercise the actual update body without a renderer, Auth client or database.
+// Parsing the method keeps this regression sensitive to control-flow changes,
+// rather than asserting a copy of the new guard or a source-text substring.
+const sceneSource = ts.createSourceFile(
+  'MenuScene.ts',
+  readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8'),
+  ts.ScriptTarget.Latest,
+  true
+);
+const sceneClass = sceneSource.statements.find(
+  (node): node is ts.ClassDeclaration => ts.isClassDeclaration(node) && node.name?.text === 'MenuScene'
+);
+const updateMethod = sceneClass?.members.find(
+  (node): node is ts.MethodDeclaration => ts.isMethodDeclaration(node)
+    && ts.isIdentifier(node.name)
+    && node.name.text === 'update'
+);
+if (!updateMethod?.body) {
+  throw new Error('MenuScene.update must exist for the startup regression.');
+}
+const compiledUpdate = ts.transpileModule(
+  `function update(time: number, delta: number): void ${updateMethod.body.getText(sceneSource)}`,
+  { compilerOptions: { target: ts.ScriptTarget.ES2022 } }
+).outputText;
+const runUpdate = new Function(`${compiledUpdate}; return update;`)() as (
+  this: Record<string, unknown>, time: number, delta: number
+) => void;
+
+const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
+  const scene: Record<string, unknown> = {
+    mode: 'menu', overlay: 'none', pendingAuthGateTransition: false,
+    authGateAwaitingResolution: false, authGateLocked: false,
+    pendingBootPlayStart: false, pendingGenerationRequest: null,
+    pendingResetRequest: null, uiButtons: [],
+    menuStaticDrawLifecyclePhase: 'settled', levelAnnouncerWasVisible: false,
+    playerSpawnBurstWasActiveForRedraw: false, backdropDirty: false,
+    boardStaticDirty: false, boardPathDirty: false, boardDynamicDirty: false,
+    hudDirty: false, uiDirty: false,
+    levelAnnouncerLabelText: { setVisible: vi.fn() },
+    levelAnnouncerNumberGraphics: { setVisible: vi.fn() },
+    levelAnnouncerNumberGlyphPool: [],
+    prefersLegacyReducedMotion: () => true,
+    resolveLegacyLevelAnnouncerVisualState: () => ({ alpha: 0 }),
+    resolveLegacyPlayerSpawnBurstState: () => ({ active: false }),
+    resolveLegacyPlayerTransferState: () => ({ active: false }),
+    ...overrides
+  };
+  const noops = [
+    'syncLegacyAuthGateLoadingScreen', 'recordRuntimeFrame',
+    'expireLegacyPlayerMessages', 'updateStars', 'advanceLegacyOverlayScrollMomentum',
+    'holdLegacyPlayMazeLifecycleDuringPause', 'advanceLegacyMenuStaticDrawStage',
+    'isLegacyMenuBuildPrerollActive', 'hasLegacyPlayTrailPulsePendingFrame',
+    'hasLegacyBleedOffGlowPendingFrame', 'hasLegacyPlayerVisualMotionPendingFrame',
+    'settleLegacyPlayerTransferEnergy', 'isLegacyMenuHandoffAnimationActive',
+    'hasLegacyMenuTitleAnimationPendingFrame', 'drawBackdrop', 'drawStaticBoard',
+    'drawBoardPaths', 'drawDynamicBoard', 'drawHud', 'rebuildUi',
+    'publishVisualDiagnostics', 'publishRuntimeDiagnostics'
+  ];
+  for (const name of noops) scene[name] = vi.fn();
+  const demo = vi.fn();
+  const startPlay = vi.fn(() => { scene.mode = 'play'; });
+  scene.updateMenuDemo = demo;
+  scene.startPlayMode = startPlay;
+  return { scene, demo, startPlay, tick: (time = 1000) => runUpdate.call(scene, time, 16) };
+};
+
+describe('menu demo authentication boundary', () => {
+  test.each([
+    ['ordinary startup', { authGateAwaitingResolution: true }],
+    ['direct-to-play startup', { authGateAwaitingResolution: true, pendingBootPlayStart: true }],
+    ['locked account before overlay transition', { authGateLocked: true }],
+    ['locked direct-to-play', { authGateLocked: true, pendingBootPlayStart: true }]
+  ])('does not advance the demo during %s', (_label, overrides) => {
+    const frame = createFrameHarness(overrides);
+    frame.tick();
+    expect(frame.demo).not.toHaveBeenCalled();
+    expect(frame.startPlay).not.toHaveBeenCalled();
+  });
+
+  test.each(['none', 'options'])('preserves ambient demo after access resolves with overlay %s', (overlay) => {
+    const frame = createFrameHarness({ overlay });
+    frame.tick();
+    expect(frame.demo).toHaveBeenCalledExactlyOnceWith(1000);
+  });
+
+  test('starts pending play on the resolution frame before any demo advancement', () => {
+    const frame = createFrameHarness({ pendingBootPlayStart: true });
+    frame.tick();
+    expect(frame.startPlay).toHaveBeenCalledTimes(1);
+    expect(frame.scene.pendingBootPlayStart).toBe(false);
+    expect(frame.scene.mode).toBe('play');
+    expect(frame.demo).not.toHaveBeenCalled();
+  });
+
+  test('keeps a slow real-auth startup inert across frames, then enters play once', () => {
+    const frame = createFrameHarness({ authGateAwaitingResolution: true, pendingBootPlayStart: true });
+    for (let second = 0; second < 120; second += 1) frame.tick(second * 1000);
+    expect(frame.demo).not.toHaveBeenCalled();
+    expect(frame.startPlay).not.toHaveBeenCalled();
+    frame.scene.authGateAwaitingResolution = false;
+    frame.tick(120000);
+    frame.tick(121000);
+    expect(frame.startPlay).toHaveBeenCalledTimes(1);
+    expect(frame.demo).not.toHaveBeenCalled();
+  });
+
+  test('does not start an ambient demo during idle play or the auth overlay', () => {
+    for (const overrides of [{ mode: 'play' }, { overlay: 'auth', authGateLocked: true }]) {
+      const frame = createFrameHarness(overrides);
+      frame.tick();
+      expect(frame.demo).not.toHaveBeenCalled();
+    }
   });
 });

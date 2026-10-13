@@ -18,6 +18,19 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          # Full history and remote branch refs, not the default shallow
+          # single-ref checkout: the decision-registry integrator-wave-mix
+          # self-check (tests/architecture/decision-registry-contract.test.ts
+          # / ui-state-model-contract.test.ts) diffs against origin/main or
+          # this PR's own base branch to find committed changes, and neither
+          # ref exists in a default `actions/checkout@v4` pull_request
+          # checkout (confirmed empirically: it only contains the synthetic
+          # `pull/<PR>/merge` ref, so every named-branch candidate the check
+          # tries -- origin/<base>, origin/main, main -- was UNRESOLVED,
+          # silently degrading the check to comparing zero files and passing
+          # vacuously regardless of what the PR actually changed).
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -37,6 +50,7 @@ jobs:
           tests/reset/legacy-progression.test.ts
           tests/reset/legacy-player-progression-flow.test.ts
           tests/reset/legacy-remote-progression.test.ts
+          tests/reset/legacy-remote-ai-hydration.test.ts
           tests/reset/legacy-endless-progression.test.ts
           tests/reset/legacy-leaderboard.test.ts
           tests/scenes/menu-runtime-diagnostics.test.ts
@@ -64,6 +78,12 @@ jobs:
       - name: Verify Wave 4E World Identity required coverage
         run: node ./scripts/verify/run-world-identity-required-tests.mjs
 
+      - name: Verify Wave 5C shared-account OAuth consumer required coverage
+        run: node ./scripts/verify/run-shared-account-oauth-required-tests.mjs
+
+      - name: Verify Wave 0C measured-baseline required coverage
+        run: node ./scripts/verify/run-measured-baseline-required-tests.mjs
+
       - name: Build production bundle and PWA assets
         run: npm run build
 
@@ -78,6 +98,15 @@ jobs:
 
       - name: Verify Wave 4D-B gameplay transfer (real solver-driven cycle, pause/resume, reduced motion, layouts)
         run: node ./scripts/analysis/verify-gameplay-teleport-transfer.mjs --skip-build
+
+      - name: Verify Wave 0C ui-surfaces harness failure reporting (real process, negative control)
+        run: node ./scripts/analysis/verify-ui-surfaces-failure-reporting.mjs --skip-build
+
+      - name: Verify Wave 0C Options/Account real click-through reachability (desktop + compact touch, intercepted portal navigation)
+        run: node ./scripts/analysis/verify-options-account-reachability.mjs --skip-build
+
+      - name: Verify authenticated welcome identity remains readable over the maze
+        run: node ./scripts/analysis/verify-welcome-identity-readability.mjs --skip-build
 
   ai-navigation-acceptance:
     name: AI navigation acceptance shard ${{ matrix.shard }}
