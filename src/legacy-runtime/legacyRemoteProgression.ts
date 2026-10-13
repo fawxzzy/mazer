@@ -154,6 +154,20 @@ export interface LegacyRemoteProgressionSyncResult {
 
 let legacyRemoteAccountBootstrap: LegacyRemoteAccountBootstrapResult | null = null;
 
+// Human RPCs own the player track. Their historical combined JSON can carry an
+// obsolete AI copy; only the separately read AI row owns remote AI progress.
+// Keep local advances/outbox entries intact for exact receipt reconciliation.
+const normalizeRemotePlayerProgressionState = (value: unknown): LegacyProgressionState => {
+  const normalized = normalizeLegacyAuthoritativeProgressionState(value);
+  return {
+    ...normalized,
+    tracks: {
+      ...normalized.tracks,
+      'ai-runner': createEmptyLegacyProgressionState().tracks['ai-runner']
+    }
+  };
+};
+
 const readRuntimeEnv = (): Record<string, string | undefined> => {
   const meta = import.meta as unknown as { env?: Record<string, string | undefined> };
   const env = meta.env ?? {};
@@ -503,7 +517,7 @@ export const bootstrapLegacyRemoteAccountState = async (
   let progressionRevision: number | null = metadata?.progressionRevision ?? null;
   let hasUnsyncedLocalProgress = hasPendingCompletions || metadata === null;
   if (progressionRead.row) {
-    const remoteProgression = normalizeLegacyAuthoritativeProgressionState(progressionRead.row.state);
+    const remoteProgression = normalizeRemotePlayerProgressionState(progressionRead.row.state);
     hasUnsyncedLocalProgress = hasUnsyncedLocalProgress
       || localProgression.updatedAt !== metadata?.progressionUpdatedAt;
     progressionState = hasUnsyncedLocalProgress
@@ -521,7 +535,7 @@ export const bootstrapLegacyRemoteAccountState = async (
       } else {
         hasUnsyncedLocalProgress = true;
         progressionState = mergeLegacyProgressionStateAdvancements(
-          normalizeLegacyAuthoritativeProgressionState(initialized.row.state),
+          normalizeRemotePlayerProgressionState(initialized.row.state),
           localProgression
         );
         progressionRevision = initialized.row.revision;
@@ -687,7 +701,7 @@ export const hydrateLegacyRemoteAccountState = async (
     ? writeLegacyProgressionState(
       progressionStorage,
       mergeLegacyProgressionStateAdvancements(
-        normalizeLegacyAuthoritativeProgressionState(progressionRead.row.state),
+        normalizeRemotePlayerProgressionState(progressionRead.row.state),
         localProgression
       )
     )
@@ -706,7 +720,7 @@ export const hydrateLegacyRemoteAccountState = async (
     progressionRevision: progressionRead.row?.revision ?? null,
     progressionUpdatedAt: hasPendingCompletions
       || (progressionRead.row !== null
-        && localProgression.updatedAt !== normalizeLegacyAuthoritativeProgressionState(progressionRead.row.state).updatedAt)
+        && localProgression.updatedAt !== normalizeRemotePlayerProgressionState(progressionRead.row.state).updatedAt)
       ? null
       : progressionState.updatedAt,
     settingsFingerprint: fingerprintSettings(settings),
@@ -1174,7 +1188,7 @@ const ensureRemotePlayerProgressionRow = async (
     return {
       error: null,
       revision: current.row.revision,
-      state: normalizeLegacyAuthoritativeProgressionState(current.row.state)
+      state: normalizeRemotePlayerProgressionState(current.row.state)
     };
   }
 
@@ -1186,7 +1200,7 @@ const ensureRemotePlayerProgressionRow = async (
   return {
     error: initialized.error,
     revision: initialized.row?.revision ?? null,
-    state: initialized.row ? normalizeLegacyAuthoritativeProgressionState(initialized.row.state) : null
+    state: initialized.row ? normalizeRemotePlayerProgressionState(initialized.row.state) : null
   };
 };
 
@@ -1275,7 +1289,7 @@ const applyPlayerCompletionRpcRow = (
     revision: normalizeRevision(row.revision),
     state: mergeLegacyProgressionStateAdvancements(
       state,
-      normalizeLegacyAuthoritativeProgressionState(row.state)
+      normalizeRemotePlayerProgressionState(row.state)
     )
   };
 };
@@ -1333,6 +1347,7 @@ const flushLegacyRemoteCompletionOutbox = async (
       completionSyncState: 'idle',
       error: null,
       pendingCompletionCount: 0,
+      progressionState: resolvedState,
       recoveredCompletionCount,
       skippedReason: null,
       synced: true
