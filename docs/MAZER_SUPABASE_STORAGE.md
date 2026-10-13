@@ -76,7 +76,8 @@ When enabled, `src/legacy-runtime/legacyRemoteProgression.ts` writes:
 
 It also hydrates authenticated account state before Phaser creates the first maze:
 
-- `mazer_progression_states.state` is the canonical combined player/AI progression save; the separate AI row remains an indexed mirror.
+- `mazer_progression_states.state` owns human progression. Its historical embedded AI track is ignored when hydrating or applying human completion responses; `mazer_ai_progression_states.state` for `menu-runner` owns remote AI progression, as used by the AI completion RPC.
+- Existing account-scoped local advances and queued completions remain intact. An incomplete historical AI receipt sequence stays held for explicit reconciliation; hydration does not reset local progress, invent receipts, or replay a gapped completion.
 - `mazer_profiles.settings` is the canonical cross-device game-toggle/control preference row.
 - `revision` on progression and profile rows is a monotonic optimistic-concurrency guard. Normal advancement can rebase forward once after a conflict; destructive replacement/reset refuses to overwrite a newer revision.
 - A scoped local sync envelope records the last observed revision and local fingerprints so offline/local advancement can be reconciled without resurrecting a previously accepted reset.

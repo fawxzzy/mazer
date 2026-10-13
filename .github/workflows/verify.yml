@@ -50,6 +50,7 @@ jobs:
           tests/reset/legacy-progression.test.ts
           tests/reset/legacy-player-progression-flow.test.ts
           tests/reset/legacy-remote-progression.test.ts
+          tests/reset/legacy-remote-ai-hydration.test.ts
           tests/reset/legacy-endless-progression.test.ts
           tests/reset/legacy-leaderboard.test.ts
           tests/scenes/menu-runtime-diagnostics.test.ts
