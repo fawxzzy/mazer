@@ -15,6 +15,7 @@ import {
   runMazerExclusiveAuthMutation
 } from './legacyAccountPortal';
 import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';
+import { createMazerAuthFetch } from './legacyOAuthRefresh';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
 export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
@@ -699,6 +700,7 @@ export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> =>
 
     const { createClient } = await import('@supabase/supabase-js');
     legacyAuthClient = createClient(config.url, config.anonKey, {
+      global: { fetch: createMazerAuthFetch() },
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: isLegacyPasswordRecoveryRuntimeLocation(),
