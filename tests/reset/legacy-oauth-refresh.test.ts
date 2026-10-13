@@ -116,10 +116,10 @@ describe('Mazer OAuth refresh transport', () => {
     const res = await h.fetcher(URL, request()); expect(res.status).toBe(400); expect((await res.text()).length).toBeLessThan(150);
   });
 
-  test.each([400, 401, 408, 429, 500, 501, 502, 503, 504])('sanitizes provider errors with SDK-compatible status for %i', async status => {
+  test.each([400, 401, 408, 409, 429, 500, 501, 502, 503, 504])('sanitizes provider errors with SDK-compatible status for %i', async status => {
     const h = setup(vi.fn(async () => Response.json({ error_description: 'synthetic-secret' }, { status })));
     const res = await h.fetcher(URL, request());
-    expect(res.status).toBe(status === 408 || status === 429 || status >= 500 ? 503 : status);
+    expect(res.status).toBe(status === 408 || status === 409 || status === 429 || status >= 500 ? 503 : status);
     expect(await res.text()).not.toContain('synthetic-secret');
   });
 
@@ -141,7 +141,7 @@ describe('Mazer OAuth refresh transport', () => {
     expect(text).toContain('autoRefreshToken: true');
   });
 
-  test.each([429, 500])('actual SDK retains the existing session after transient %i exhausts retries', async status => {
+  test.each([409, 429, 500])('actual SDK retains the existing session after transient %i exhausts retries', async status => {
     vi.useFakeTimers(); vi.setSystemTime(NOW);
     const initial = JSON.stringify(session());
     const values = new Map([[MAZER_OAUTH_AUTH_SESSION_KEY, initial]]);
@@ -163,6 +163,26 @@ describe('Mazer OAuth refresh transport', () => {
       expect(storage.getItem(MAZER_OAUTH_AUTH_SESSION_KEY)).toBe(initial);
       expect(removeItem).not.toHaveBeenCalledWith(MAZER_OAUTH_AUTH_SESSION_KEY);
     } finally { await client.auth.stopAutoRefresh(); vi.useRealTimers(); }
+  });
+
+  test.each(['success', 'terminal', 'network'] as const)('supports browsers without static Response.json on %s', async outcome => {
+    const descriptor = Object.getOwnPropertyDescriptor(Response, 'json')!;
+    const provider = vi.fn(async () => {
+      if (outcome === 'network') throw new Error('synthetic-private-detail');
+      return new Response(JSON.stringify(outcome === 'success' ? response() : { error: 'invalid_grant' }), {
+        status: outcome === 'success' ? 200 : 400, headers: { 'content-type': 'application/json' }
+      });
+    });
+    Object.defineProperty(Response, 'json', { configurable: true, writable: true, value: undefined });
+    try {
+      const res = await setup(provider).fetcher(URL, request());
+      expect(res.status).toBe(outcome === 'success' ? 200 : outcome === 'terminal' ? 400 : 503);
+      expect(res.headers.get('content-type')).toContain('application/json');
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      const value = await res.json();
+      if (outcome === 'success') expect(value).toMatchObject({ refresh_token: 'synthetic-rotated', user: { id: SUB } });
+      else expect(value).toEqual({ msg: 'Account session refresh unavailable.', error_code: 'mazer_oauth_refresh_failed' });
+    } finally { Object.defineProperty(Response, 'json', descriptor); }
   });
 
   test('actual supabase-js refresh persists a complete same-subject OAuth session', async () => {

@@ -35,10 +35,15 @@ const validBinding = (claims: RecordValue): boolean => (
   && typeof claims.session_id === 'string' && UUID.test(claims.session_id)
 );
 
+// Response.json is newer than our supported browser baseline.
+const jsonResponse = (value: unknown, status = 200): Response => new Response(JSON.stringify(value), {
+  status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
+});
+
 // Never echo provider bodies: they can contain credentials or request details.
-const failure = (status = 400): Response => Response.json({
+const failure = (status = 400): Response => jsonResponse({
   msg: 'Account session refresh unavailable.', error_code: 'mazer_oauth_refresh_failed'
-}, { status, headers: { 'cache-control': 'no-store' } });
+}, status);
 
 const readBoundedJson = async (response: Response): Promise<RecordValue | null> => {
   if (!response.headers.get('content-type')?.toLowerCase().includes('application/json') || !response.body) return null;
@@ -118,7 +123,7 @@ export const createMazerAuthFetch = ({
     if (!response.ok) {
       // auth-js 2.75 only preserves sessions for retryable 502/503/504.
       // OAuth throttling/timeouts/server faults must not become a sign-out.
-      const transient = response.status === 408 || response.status === 429 || response.status >= 500;
+      const transient = response.status === 408 || response.status === 409 || response.status === 429 || response.status >= 500;
       return failure(transient ? 503 : response.status >= 400 ? response.status : 400);
     }
     const token = await readBoundedJson(response);
@@ -134,12 +139,12 @@ export const createMazerAuthFetch = ({
       || ('refresh_token' in token && !tokenString(token.refresh_token))) return failure();
     // The fixed TLS endpoint supplied these claims. Decoding binds the response
     // to the existing session; it does not replace server-side JWT validation.
-    return Response.json({
+    return jsonResponse({
       access_token: token.access_token,
       refresh_token: token.refresh_token ?? body.refresh_token,
       token_type: 'bearer', expires_at: claims.exp, expires_in: claims.exp - seconds,
       user: session.user
-    }, { headers: { 'cache-control': 'no-store' } });
+    });
   } catch { return failure(503); }
   finally {
     clearTimeout(timeout);

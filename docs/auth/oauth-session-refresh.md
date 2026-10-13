@@ -21,11 +21,14 @@ refresh profile metadata. A returned refresh token replaces the old one; omissio
 preserves the old token, as allowed by the provider contract.
 
 Storage drift or transport uncertainty is retryable through the existing SDK.
-HTTP 408, 429 and server errors become sanitized 503 responses because the pinned
+HTTP 408, refresh-contention 409, 429 and server errors become sanitized 503 responses because the pinned
 SDK treats other error statuses as terminal and removes the session. Invalid
 grants and malformed successful responses still fail closed. No errors contain tokens or raw provider
 body content. Tokens never belong in receipts, browser console output or tests
 using live accounts. This adapter changes no gameplay, progression or profile data.
+
+Normalized success and error responses use the baseline `Response` constructor,
+so supported browsers do not need the newer static `Response.json` method.
 
 Focused tests use synthetic tokens and a mock provider, including an actual
 supabase-js expired-session refresh. Production acceptance must separately observe
