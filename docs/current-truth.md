@@ -66,6 +66,16 @@ If the current web app disagrees with restored gameplay/mechanics truth, restore
 
 ## Current implementation truth
 
+### Menu demo Auth resolution boundary — 2026-10-13
+
+The initial menu placeholder stays inert while the real Auth check is pending
+or access is locked. This also covers `?mode=play`: its placeholder cannot
+advance AI progress before the deferred transition enters Play. Once access
+resolves, ordinary menu animation still runs behind Settings; idle Play does
+not run the menu demo. The scene-frame regression executes the actual update
+body against pending, locked, resolved and delayed-resolution states. This
+source contract does not establish production adoption or gameplay acceptance.
+
 ### World Identity capture output safety — 2026-10-12
 
 `scripts/analysis/capture-world-identity-ui-evidence.mjs` creates a fresh run

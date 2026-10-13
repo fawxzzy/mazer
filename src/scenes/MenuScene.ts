@@ -4080,6 +4080,9 @@ export class MenuScene extends Phaser.Scene {
       this.applyGenerationRequest(nextRequest, time);
     }
 
+    // Real Auth resolves asynchronously after the menu placeholder is built.
+    // Keep that placeholder inert until access resolves, including a pending
+    // direct-to-play boot, so it cannot record an incidental AI completion.
     // The demo walker keeps moving behind non-auth menu overlays -- there's no gameplay to
     // protect there, it's just ambient background motion, so it now keeps
     // playing behind Settings instead of visibly freezing/hitching each time a
@@ -4087,6 +4090,8 @@ export class MenuScene extends Phaser.Scene {
     // behind the forced account screen.
     if (
       this.mode === 'menu'
+      && !this.authGateAwaitingResolution
+      && !this.authGateLocked
       && this.pendingGenerationRequest === null
       && this.pendingResetRequest === null
     ) {
