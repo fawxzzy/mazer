@@ -12,7 +12,9 @@ permissions:
 jobs:
   verify:
     name: TypeScript, contracts, and build
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, where `playwright install chromium` is unsupported.
+    # Revisit when Playwright supports the newer image.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     steps:
