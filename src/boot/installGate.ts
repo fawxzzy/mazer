@@ -5,6 +5,7 @@ export interface MazerInstallGateBootContext {
   isLocalhostRuntime: boolean;
   legalRouteRequested: boolean;
   oauthCallbackAccepted: boolean;
+  oauthCallbackRequested: boolean;
   passwordRecoveryRequested: boolean;
 }
 
@@ -12,6 +13,7 @@ export const shouldRunMazerInstallGateForBoot = (context: MazerInstallGateBootCo
   (!context.isLocalhostRuntime || context.forceInstallGate)
   && !context.legalRouteRequested
   && !context.oauthCallbackAccepted
+  && !context.oauthCallbackRequested
   && !context.passwordRecoveryRequested
 );
 

@@ -143,6 +143,7 @@ const boot = async (): Promise<void> => {
     isLocalhostRuntime: isLocalhostRuntime(),
     legalRouteRequested: legalRoute !== null,
     oauthCallbackAccepted,
+    oauthCallbackRequested,
     passwordRecoveryRequested: passwordRecoveryRouteRequested
   })) {
     markMazerBootStatus('install-gate-checking');
