@@ -65,6 +65,12 @@ export interface LegacyMazeGenerationProfile {
   // back (never touching the solution path), which also collapses most of
   // the junctions those leaves hung off of as a side effect.
   maxDeadEndCount: number | null;
+  // Optional layout override. Undefined (the default for every band except
+  // the Level 1 tutorial) keeps the checkpoint random-walk builder exactly as
+  // before. 'corridor' bypasses the builder and emits one deterministic,
+  // seed-independent straight line: a single floor run on the center row
+  // inside an all-wall border ring, start at one end and goal at the other.
+  layout?: 'corridor';
   // Replaces the hardcoded lower clamp of 4 on requestedCheckpoints so low
   // bands can request as few as 1.
   minCheckpoints: number;
@@ -271,6 +277,9 @@ export const normalizeLegacyMazeGenerationProfile = (
   maxDeadEndCount: profile?.maxDeadEndCount === null || profile?.maxDeadEndCount === undefined
     ? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.maxDeadEndCount
     : clampInteger(profile.maxDeadEndCount, 0, 999),
+  // Only materialised when set, so every non-corridor profile keeps its
+  // exact prior shape (no `layout` key at all).
+  ...(profile?.layout === 'corridor' ? { layout: 'corridor' as const } : {}),
   minCheckpoints: clampInteger(profile?.minCheckpoints ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.minCheckpoints, 1, 50),
   requiredOppositeBorderConnections: {
     horizontal: profile?.requiredOppositeBorderConnections?.horizontal ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.requiredOppositeBorderConnections.horizontal,
@@ -2663,6 +2672,106 @@ const pruneLegacyDeadEnds = (
   return prunedTiles;
 };
 
+// Level 1 "straight line" layout. Deliberately independent of the checkpoint
+// random walk and of every post-carve stage (minimum-solution-length goal
+// rebasing, 2x2 normalisation, shortcuts, reinforcement, dead-end pruning,
+// border wrap/feeder carving): all of those exist to add or repair
+// structure, and a corridor must have none. The border ring (x=0, y=0,
+// x=w-1, y=h-1) stays wall so the corridor can never touch an edge and wrap.
+// The output is seed-independent; `seed` is only echoed back on the snapshot.
+const createLegacyCorridorMaze = (
+  width: number,
+  height: number,
+  seed: number
+): LegacyMazeSnapshot => {
+  const grid = createEmptyGrid(width, height);
+  const pathTiles: LegacyPoint[] = [];
+  // Runs along the board's longer axis so a portrait board gets a tall line
+  // (the long way up the screen) and a landscape or square board a wide one.
+  // Square boards stay horizontal. Reading order: start at the top/left end.
+  if (height > width) {
+    const columnX = Math.floor(width / 2);
+    for (let y = 1; y <= height - 2; y += 1) {
+      grid[y]![columnX] = true;
+      pathTiles.push({ x: columnX, y });
+    }
+  } else {
+    const rowY = Math.floor(height / 2);
+    for (let x = 1; x <= width - 2; x += 1) {
+      grid[rowY]![x] = true;
+      pathTiles.push({ x, y: rowY });
+    }
+  }
+
+  const start = clonePoint(pathTiles[0]!);
+  const goal = clonePoint(pathTiles[pathTiles.length - 1]!);
+  const searchWorkspace = createLegacyGridSearchWorkspace(grid);
+  const { goal: normalizedGoal, stats: playableTopologyStats } = normalizeLegacyPlayableTopology(grid, start, goal);
+  const solutionPath = buildShortestPath(grid, start, normalizedGoal);
+  const routeQualityStats = measureLegacyRouteQuality(grid, start, normalizedGoal, solutionPath, searchWorkspace);
+  playableTopologyStats.reachableFloors = resolveReachableFloorDistances(grid, start).size;
+  playableTopologyStats.resolvedGoalDistance = Math.max(0, solutionPath.length - 1);
+  const wrapTopologyDiagnostics = resolveLegacyWrapTopologyDiagnostics({
+    goal: normalizedGoal,
+    grid,
+    width,
+    height,
+    solutionPath,
+    start
+  // A corridor never carries wrap endpoints, so no wrap axis is "required"
+  // here whatever the caller's profile defaults say; otherwise a bare
+  // { layout: 'corridor' } profile would report an unsatisfied requirement.
+  }, { horizontal: false, vertical: false });
+  latestLegacyMazeSearchDiagnostics = {
+    ...searchWorkspace.diagnostics
+  };
+
+  return {
+    source: 'play-generated',
+    width,
+    height,
+    grid,
+    start: clonePoint(start),
+    goal: clonePoint(normalizedGoal),
+    solutionPath,
+    seed,
+    wrapTopologyDiagnostics,
+    generationBuildTrace: {
+      checkpointTiles: [clonePoint(goal)],
+      deadEndPrunedTiles: [],
+      finalGoal: clonePoint(normalizedGoal),
+      pathTiles: pathTiles.map(clonePoint),
+      reinforcementShortcutTiles: [],
+      shortcutTiles: [],
+      sourceGoal: clonePoint(goal),
+      start: clonePoint(start)
+    },
+    pathBuilderStats: {
+      topology: 'legacy-checkpoint-path-builder',
+      requestedCheckpoints: 1,
+      acceptedCheckpoints: 1,
+      pathTiles: pathTiles.length,
+      wallArrayEntries: 0,
+      backtracks: 0,
+      exhaustedCheckpoints: true,
+      longestPathLength: pathTiles.length - 1,
+      deterministicSafetyStart: false
+    },
+    playableTopologyStats,
+    routeQualityStats,
+    shortcutsCreated: 0,
+    shortcutStats: {
+      requested: 0,
+      attempts: 0,
+      wallArrayEntries: 0,
+      uniqueWallCandidates: 0,
+      created: 0,
+      exhaustedWallArray: false,
+      qualityReinforcementBudget: 0
+    }
+  };
+};
+
 export const createLegacyMaze = (
   width: number,
   height: number,
@@ -2674,6 +2783,9 @@ export const createLegacyMaze = (
   const normalizedHeight = normalizeGridDimension(height);
   const linearSize = (normalizedWidth + normalizedHeight) / 2;
   const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
+  if (profile.layout === 'corridor') {
+    return createLegacyCorridorMaze(normalizedWidth, normalizedHeight, seed);
+  }
   const {
     grid,
     start: sourceStart,
