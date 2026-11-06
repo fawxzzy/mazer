@@ -16,6 +16,15 @@ const TEST_SPINE = [
   'tests/cosmetics',
   'tests/tutorial',
   'tests/architecture',
+  // Integration 2: pure render modules and the lifecycle analyzer. Listed by
+  // file on purpose: tests/render/palette.test.ts fails on a clean main
+  // (resolveAmbientThemeProfile is not a function), so the directory glob
+  // must not be added until that baseline is repaired.
+  'tests/render/introTimeline.test.ts',
+  'tests/render/edgeMarkers.test.ts',
+  'tests/render/boardTileBake.test.ts',
+  'tests/render/boardTileStyle.test.ts',
+  'tests/visual/maze-lifecycle-analysis.test.mjs',
   'tests/ai/demo-walker.test.ts',
   'tests/ai/demo-walker-known-frontier.test.ts',
   'tests/ai/demo-walker-rank-ladder.test.ts',

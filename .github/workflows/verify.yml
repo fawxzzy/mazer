@@ -55,6 +55,19 @@ jobs:
           tests/architecture
           --maxWorkers=1
 
+      # Listed by file, not as tests/render: tests/render/palette.test.ts fails
+      # on a clean main (resolveAmbientThemeProfile is not a function), so the
+      # directory glob would turn this step red for a pre-existing baseline.
+      - name: Verify intro timeline, edge markers, tile bake, and lifecycle analyzer contracts
+        run: >-
+          npx --no-install vitest run
+          tests/render/introTimeline.test.ts
+          tests/render/edgeMarkers.test.ts
+          tests/render/boardTileBake.test.ts
+          tests/render/boardTileStyle.test.ts
+          tests/visual/maze-lifecycle-analysis.test.mjs
+          --maxWorkers=1
+
       - name: Verify progression, RPC, leaderboard, and UI boundaries
         run: >-
           npx --no-install vitest run
