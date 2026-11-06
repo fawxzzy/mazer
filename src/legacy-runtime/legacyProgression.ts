@@ -561,12 +561,18 @@ export const resolveLegacyProgressionLevel = (targetComplexity: number): number 
 );
 
 // The one seam that decides whether a track's maze geometry comes from the
-// continuous geometry difficulty function (every bounded level 2..LAST_BUDGET_LEVEL,
-// i.e. all of them) or from the level-1 corridor / legacy band path (null). It reads the BOUNDED level derived from the target
-// complexity -- never the server-owned, unbounded completion ordinal
-// (track.level) -- so an out-of-range or migrated save can never reach a
-// budget rung its target complexity has not earned. Level 1 is the corridor
-// (tutorial band) and also returns null here.
+// continuous geometry difficulty function (every level 2..LAST_BUDGET_LEVEL) or
+// from the level-1 corridor / legacy band path (null).
+//
+// The base level is the BOUNDED level derived from the target complexity, so an
+// out-of-range or migrated save can never reach a budget rung its target
+// complexity has not earned (levels 1..99; level 1 is the corridor and returns
+// null). Target complexity saturates at 400 (level 99), so ABOVE that the
+// geometry reads the player-facing completion ordinal (track.level) instead --
+// but only when the track already sits at the bounded top, and clamped to
+// LAST_BUDGET_LEVEL (the hard geometry ceiling). A bare target-complexity number
+// (no ordinal available) stays bounded at 99. The ordinal itself is never
+// rewritten: a player at level N keeps level N.
 export const resolveGeometryBudgetLevel = (
   trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number
 ): number | null => {
@@ -574,7 +580,16 @@ export const resolveGeometryBudgetLevel = (
     ? trackOrTargetComplexity
     : trackOrTargetComplexity.targetComplexity;
   const level = resolveLegacyProgressionLevel(targetComplexity);
-  return level >= 2 && level <= LAST_BUDGET_LEVEL ? level : null;
+  if (level < 2) {
+    return null;
+  }
+  if (typeof trackOrTargetComplexity !== 'number' && level >= 99) {
+    const ordinal = Number(trackOrTargetComplexity.level);
+    if (Number.isFinite(ordinal) && ordinal > level) {
+      return Math.min(LAST_BUDGET_LEVEL, Math.trunc(ordinal));
+    }
+  }
+  return Math.min(level, LAST_BUDGET_LEVEL);
 };
 
 const resolveLegacyProgressionLevelBaseTargetComplexity = (level: number): number => clampInteger(
@@ -713,7 +728,7 @@ const resolveLegacyMazeGenerationBaseProfileForProgression = (
     : trackOrTargetComplexity.targetComplexity;
   // Levels 2..LAST_BUDGET_LEVEL: geometry comes from the budget ladder, not
   // from the band switch below (the band stays for labels and diagnostics).
-  const geometryBudgetLevel = resolveGeometryBudgetLevel(targetComplexity);
+  const geometryBudgetLevel = resolveGeometryBudgetLevel(trackOrTargetComplexity);
   if (geometryBudgetLevel !== null) {
     return resolveGeometryBudgetProfile(geometryBudgetLevel);
   }

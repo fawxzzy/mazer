@@ -7,12 +7,13 @@ import {
   type LegacyPoint
 } from './legacyMaze';
 import {
-  GEOMETRY_BUDGET_ACCEPT_HALF_WIDTH,
-  GEOMETRY_BUDGET_GATE_CANDIDATES,
+  GEOMETRY_BUDGET_BASE_CANDIDATES,
+  GEOMETRY_BUDGET_TUNING_TOLERANCE,
   measureGeometryBudgetProxy,
   resolveGeometryBudgetCandidateSeed,
   resolveGeometryBudgetTarget
 } from './legacyGeometryBudget';
+import { tuneMazeProxyToTarget } from './legacyMazeDecoyTuning';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
 import { resolveLegacyMazeComplexity } from './legacyProgression';
@@ -570,15 +571,14 @@ const resolveLegacyAdaptiveUnderTargetScale = (scale: number): number => {
 
 // Selection for geometry-budget profiles (progression levels 2..LAST_BUDGET_LEVEL).
 // There is no target-complexity search and no pressure/adaptive retry: those
-// would resize the board and swap the profile, which the budget ladder forbids.
-// Instead up to GEOMETRY_BUDGET_GATE_CANDIDATES candidates (mixed seeds) are
-// built from the one fixed profile and the first whose H1 proxy lies within
-// GEOMETRY_BUDGET_ACCEPT_HALF_WIDTH of the level's baked target T(N) wins; if
-// none does, the nearest one wins. Because accepted candidates are within less
-// than half the target step, accepted mazes of adjacent levels can never
-// tie or invert. selectionOptions.candidateCount is deliberately ignored: the
-// goal-reset precompute passes 1, which would silently disable the gate on the
-// main level-to-level path.
+// would resize the board and swap the profile, which the budget ladder forbids,
+// and there is no candidate search either. ONE base maze is built from the
+// level's fixed profile (mixed seed, see resolveGeometryBudgetCandidateSeed) and
+// then decoy-tuned onto the level's exact proxy target T(N) within
+// GEOMETRY_BUDGET_TUNING_TOLERANCE (legacyMazeDecoyTuning.ts). Because the
+// tolerance is less than half the target step, tuned mazes of adjacent ascending
+// levels can never tie or invert, for any seeds. Cost: one maze build plus a few
+// grid edits. selectionOptions.candidateCount is deliberately ignored.
 const selectLegacyGeometryBudgetMaze = (
   mode: LegacyGenerationMode,
   scale: number,
@@ -592,35 +592,58 @@ const selectLegacyGeometryBudgetMaze = (
   review: LegacyGenerationSelectionReview;
 } => {
   const gateTarget = resolveGeometryBudgetTarget(budgetLevel);
-  let bestMaze: Omit<LegacyMazeSnapshot, 'generation'> | null = null;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  let bestComplexity = 0;
-  let complexityMin = Number.POSITIVE_INFINITY;
-  let complexityMax = Number.NEGATIVE_INFINITY;
+  let selectedMaze: Omit<LegacyMazeSnapshot, 'generation'> | null = null;
+  let selectedDistance = Number.POSITIVE_INFINITY;
   let searched = 0;
-
-  for (let index = 0; index < GEOMETRY_BUDGET_GATE_CANDIDATES; index += 1) {
+  // Usually the first base maze tunes onto the target and the loop ends after one
+  // build. Only the lowest levels can miss: there T(N) can sit below the
+  // untunable part of an unlucky base maze (route turns + length/4), so the next
+  // mixed-seed base is tried, up to GEOMETRY_BUDGET_BASE_CANDIDATES.
+  for (let index = 0; index < GEOMETRY_BUDGET_BASE_CANDIDATES; index += 1) {
     const candidateSeed = resolveGeometryBudgetCandidateSeed(seed, budgetLevel, index);
-    const candidate = buildLegacyRuntimeMazeForMode(mode, scale, candidateSeed, generationProfile, aspectRatio);
+    const base = buildLegacyRuntimeMazeForMode(mode, scale, candidateSeed, generationProfile, aspectRatio);
     searched += 1;
-    const complexity = resolveLegacyMazeComplexity(candidate);
-    complexityMin = Math.min(complexityMin, complexity.total);
-    complexityMax = Math.max(complexityMax, complexity.total);
-    const distance = gateTarget === null
-      ? 0
-      : Math.abs(measureGeometryBudgetProxy(candidate, complexity).total - gateTarget);
-    if (bestMaze === null || distance < bestDistance) {
-      bestMaze = candidate;
-      bestDistance = distance;
-      bestComplexity = complexity.total;
+    let candidate: Omit<LegacyMazeSnapshot, 'generation'> = base;
+    let distance = 0;
+    if (gateTarget !== null) {
+      const baseProxy = measureGeometryBudgetProxy(base, resolveLegacyMazeComplexity(base));
+      const tuned = tuneMazeProxyToTarget(
+        base,
+        baseProxy,
+        gateTarget,
+        resolveGeometryBudgetCandidateSeed(seed, budgetLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
+        { tolerance: GEOMETRY_BUDGET_TUNING_TOLERANCE }
+      );
+      distance = Math.abs(tuned.proxy - gateTarget);
+      if (tuned.added > 0 || tuned.pruned > 0) {
+        candidate = {
+          ...base,
+          grid: tuned.grid,
+          ...(base.generationBuildTrace
+            ? {
+              generationBuildTrace: {
+                ...base.generationBuildTrace,
+                decoyTiles: tuned.decoyTiles.map((point) => ({ ...point })),
+                decoyPrunedTiles: tuned.prunedTiles.map((point) => ({ ...point }))
+              }
+            }
+            : {})
+        };
+      }
     }
-    if (distance <= GEOMETRY_BUDGET_ACCEPT_HALF_WIDTH) {
+    if (selectedMaze === null || distance < selectedDistance) {
+      selectedMaze = candidate;
+      selectedDistance = distance;
+    }
+    if (distance <= GEOMETRY_BUDGET_TUNING_TOLERANCE) {
       break;
     }
   }
-
-  const selectedMaze = bestMaze ?? buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile, aspectRatio);
-  const reviewTarget = clampInteger(selectionOptions.targetComplexity ?? bestComplexity, 0, 999);
+  if (selectedMaze === null) {
+    selectedMaze = buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile, aspectRatio);
+  }
+  const complexity = resolveLegacyMazeComplexity(selectedMaze);
+  const reviewTarget = clampInteger(selectionOptions.targetComplexity ?? complexity.total, 0, 999);
   return {
     maze: selectedMaze,
     review: {
@@ -629,21 +652,21 @@ const selectLegacyGeometryBudgetMaze = (
       adaptiveRetryUsed: false,
       allCandidatesOverTarget: false,
       allCandidatesUnderTarget: false,
-      candidateCount: GEOMETRY_BUDGET_GATE_CANDIDATES,
-      candidateComplexityMax: Number.isFinite(complexityMax) ? complexityMax : bestComplexity,
-      candidateComplexityMin: Number.isFinite(complexityMin) ? complexityMin : bestComplexity,
-      // The 400-capped complexity target is not what budget levels are gated
+      candidateCount: GEOMETRY_BUDGET_BASE_CANDIDATES,
+      candidateComplexityMax: complexity.total,
+      candidateComplexityMin: complexity.total,
+      // The 400-capped complexity target is not what budget levels are tuned
       // on, so the under/over-target label is cosmetic here and always
-      // 'on-target'; the gate distance is reported in selectedDistance.
+      // 'on-target'; the tuning distance is reported in selectedDistance.
       delivery: 'on-target',
-      difference: bestComplexity - reviewTarget,
+      difference: complexity.total - reviewTarget,
       initialWindowOverTarget: false,
       initialWindowUnderTarget: false,
-      measuredComplexity: bestComplexity,
+      measuredComplexity: complexity.total,
       pressureRetryCandidateCount: 0,
       pressureRetryUsed: false,
       searchedCandidateCount: searched,
-      selectedDistance: bestDistance,
+      selectedDistance,
       selectedSeed: selectedMaze.seed,
       targetComplexity: reviewTarget,
       tolerance: 0

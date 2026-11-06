@@ -2,15 +2,18 @@
 // src/legacy-runtime/legacyGeometryBudget.ts (START, CEILING and the
 // level -> rung-count table).
 //
-// For every prefix r = 0..tape length it generates an UNGATED sample of mazes
-// from that rung prefix on the frozen board (three aspect classes: portrait
-// phone, landscape desktop, square), measures the H1 proxy, takes the pooled
-// mean per prefix and makes it monotone non-decreasing in r
-// (pool-adjacent-violators). Then:
-//   START   = round(mean of the base profile)
-//   CEILING = START + STEP * floor((full-tape mean - START) / STEP)
-//   RUNGS[N] = argmin_r |mean(r) - T(N)| for every level N up to the
-//              saturation level (ties pick the smaller prefix).
+// Pass 1 (style): for every prefix r = 0..tape length it generates an UNGATED
+// sample of mazes from that rung prefix on the frozen board (three aspect
+// classes: portrait phone, landscape desktop, square), measures the H1 proxy,
+// takes the pooled mean per prefix and makes it monotone non-decreasing in r
+// (pool-adjacent-violators). START = round(mean of the base profile);
+// RUNGS[N] = argmin_r |mean(r) - (T(N) - BASE_OFFSET)| (ties pick the smaller prefix).
+//
+// Pass 2 (capacity): from the FULL-tape base it runs the decoy tuner with an
+// unreachable target, so it adds decoys until none fit, and records the proxy
+// each seed reached. CEILING = the START + k * STEP grid value at or below
+// (pooled capacity quantile - margin): a target that share-of-bases-complement of
+// base mazes can reach, so the next-base fallback makes a miss astronomically rare. SATURATION level = the level where T reaches it.
 //
 // Usage (from the repo root):
 //   npx vite-node scripts/analysis/generate-geometry-budget-targets.ts
@@ -22,12 +25,13 @@
 //
 // tests/reset/legacy-geometry-budget.test.ts checks the baked block's structure
 // and spot-samples a few levels; the full recomputation is this script's
-// --check (about a minute).
+// --check (about two minutes).
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import {
+  GEOMETRY_BUDGET_BASE_OFFSET,
   GEOMETRY_BUDGET_CEILING,
   GEOMETRY_BUDGET_RUNGS_BY_LEVEL,
   GEOMETRY_BUDGET_START,
@@ -37,6 +41,7 @@ import {
   resolveGeometryBudgetCandidateSeed,
   resolveGeometryBudgetProfileForRungs
 } from '../../src/legacy-runtime/legacyGeometryBudget';
+import { tuneMazeProxyToTarget } from '../../src/legacy-runtime/legacyMazeDecoyTuning';
 import { resolveLegacyMazeComplexity } from '../../src/legacy-runtime/legacyProgression';
 
 export const GEOMETRY_BUDGET_CALIBRATION = {
@@ -48,12 +53,22 @@ export const GEOMETRY_BUDGET_CALIBRATION = {
     { name: 'square', aspectRatio: 1 }
   ],
   seedsPerBoard: 40,
+  capacitySeedsPerBoard: 300,
+  // Safety margin under the pooled capacity minimum (proxy points).
+  capacityMargin: 5,
+  // Quantile of the pooled capacity sample the ceiling is pinned to: that share of base
+  // mazes cannot reach a ceiling target and the selection simply tries the next
+  // base (GEOMETRY_BUDGET_BASE_CANDIDATES), so P(no base of 12 reaches it) = q^12.
+  capacityQuantile: 0.1,
   seedBase: 777
 } as const;
 
 export interface GeometryBudgetCalibrationResult {
   start: number;
   ceiling: number;
+  capacityMin: number;
+  capacityQuantile: number;
+  capacityMean: number;
   saturationLevel: number;
   // Pooled mean H1 per prefix length, before smoothing.
   rawMeans: number[];
@@ -64,6 +79,26 @@ export interface GeometryBudgetCalibrationResult {
 }
 
 const mean = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
+
+export const measureCapacity = (): { min: number; mean: number; quantile: number } => {
+  const { scale, boards, seedBase, capacitySeedsPerBoard } = GEOMETRY_BUDGET_CALIBRATION;
+  const profile = resolveGeometryBudgetProfileForRungs(GEOMETRY_BUDGET_TAPE.length);
+  const reached: number[] = [];
+  boards.forEach((board, boardIndex) => {
+    for (let index = 0; index < capacitySeedsPerBoard; index += 1) {
+      const seed = resolveGeometryBudgetCandidateSeed(seedBase + index, 5000, boardIndex);
+      const maze = createLegacyRuntimeMazeForMode('play', scale, seed, profile, {}, board.aspectRatio);
+      const base = measureGeometryBudgetProxy(maze, resolveLegacyMazeComplexity(maze));
+      reached.push(tuneMazeProxyToTarget(maze, base, 1e9, seed ^ 0x1234567, { maxEdits: 4000 }).proxy);
+    }
+  });
+  const sorted = [...reached].sort((a, b) => a - b);
+  return {
+    min: sorted[0]!,
+    mean: mean(reached),
+    quantile: sorted[Math.floor(GEOMETRY_BUDGET_CALIBRATION.capacityQuantile * (sorted.length - 1))]!
+  };
+};
 
 export const computeGeometryBudgetCalibration = (
   options: { seedsPerBoard?: number } = {}
@@ -108,11 +143,12 @@ export const computeGeometryBudgetCalibration = (
   }
 
   const start = Math.round(monotoneMeans[0]!);
-  const ceiling = start + (step * Math.floor((monotoneMeans[monotoneMeans.length - 1]! - start) / step));
+  const capacity = measureCapacity();
+  const ceiling = start + (step * Math.floor((capacity.quantile - GEOMETRY_BUDGET_CALIBRATION.capacityMargin - start) / step));
   const saturationLevel = 2 + Math.ceil((ceiling - start) / step);
   const rungsByLevel: Record<number, number> = {};
   for (let level = 2; level <= saturationLevel; level += 1) {
-    const target = Math.min(ceiling, start + (step * (level - 2)));
+    const target = Math.min(ceiling, start + (step * (level - 2))) - GEOMETRY_BUDGET_BASE_OFFSET;
     let best = 0;
     let bestDistance = Number.POSITIVE_INFINITY;
     monotoneMeans.forEach((value, rungs) => {
@@ -124,7 +160,7 @@ export const computeGeometryBudgetCalibration = (
     });
     rungsByLevel[level] = best;
   }
-  return { start, ceiling, saturationLevel, rawMeans, monotoneMeans, rungsByLevel };
+  return { start, ceiling, capacityMin: capacity.min, capacityQuantile: capacity.quantile, capacityMean: capacity.mean, saturationLevel, rawMeans, monotoneMeans, rungsByLevel };
 };
 
 const BLOCK_BEGIN = '// GENERATED:GEOMETRY_BUDGET_CALIBRATION:BEGIN';
@@ -160,6 +196,7 @@ const main = (): void => {
   }
   const next = `${source.slice(0, begin)}${block}${source.slice(end + BLOCK_END.length)}`;
 
+  console.log(`capacity min ${result.capacityMin.toFixed(0)} p10 ${result.capacityQuantile.toFixed(0)} mean ${result.capacityMean.toFixed(0)}`);
   console.log(`start ${result.start}  ceiling ${result.ceiling}  step ${GEOMETRY_BUDGET_TARGET_STEP}  saturation level ${result.saturationLevel}`);
   console.log('rungs  raw-mean  monotone  label');
   result.rawMeans.forEach((value, rungs) => {

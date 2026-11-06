@@ -122,6 +122,10 @@ export interface LegacyMazeSnapshot {
   generationBuildTrace?: {
     checkpointTiles: LegacyPoint[];
     deadEndPrunedTiles: LegacyPoint[];
+    // Decoy branches the progression tuning stage added / pruned after the
+    // carve (legacyMazeDecoyTuning.ts); absent unless that stage changed the grid.
+    decoyPrunedTiles?: LegacyPoint[];
+    decoyTiles?: LegacyPoint[];
     finalGoal: LegacyPoint;
     pathTiles: LegacyPoint[];
     reinforcementShortcutTiles: LegacyPoint[];

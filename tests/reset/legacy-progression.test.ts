@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import { createLegacyRuntimeMazeForMode, resolveLegacyGenerationBudgetContract } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
+import { LAST_BUDGET_LEVEL } from '../../src/legacy-runtime/legacyGeometryBudget';
 import {
   LEGACY_PROGRESSION_MENU_MIN_TILE_PX,
   LEGACY_PROGRESSION_AI_CHALLENGE_SCORE_THRESHOLD,
@@ -657,12 +658,25 @@ describe('legacy progression', () => {
       level: '1000000'
     };
 
+    // The band/label profile and the board size still ignore the ordinal.
     expect(resolveLegacyProgressionDifficultyProfile(highOrdinal))
       .toEqual(resolveLegacyProgressionDifficultyProfile(lowOrdinal));
-    expect(resolveLegacyMazeGenerationProfileForProgression(highOrdinal))
-      .toEqual(resolveLegacyMazeGenerationProfileForProgression(lowOrdinal));
     expect(resolveLegacyProgressionGenerationScale(50, highOrdinal))
       .toBe(resolveLegacyProgressionGenerationScale(50, lowOrdinal));
+    // DELIBERATE CHANGE (infinite-progression lane, 2026-11-06): target complexity
+    // saturates at 400 (level 99), so geometry difficulty past level 99 can only
+    // come from the ordinal. At the bounded top the geometry now keeps rising with
+    // the ordinal up to the hard geometry ceiling (LAST_BUDGET_LEVEL), and an
+    // ordinal below the bounded top, or a track below it, is unaffected. Far
+    // beyond the ceiling the profile is the ceiling profile: same difficulty
+    // class, never a crash or a regression.
+    const lowProfile = resolveLegacyMazeGenerationProfileForProgression(lowOrdinal);
+    const highProfile = resolveLegacyMazeGenerationProfileForProgression(highOrdinal);
+    expect(lowProfile.geometryBudgetLevel).toBe(99);
+    expect(highProfile.geometryBudgetLevel).toBe(LAST_BUDGET_LEVEL);
+    expect(resolveLegacyMazeGenerationProfileForProgression({ ...lowOrdinal, level: '150' }).geometryBudgetLevel).toBe(150);
+    expect(resolveLegacyMazeGenerationProfileForProgression({ ...highOrdinal, level: '1000000000000' }))
+      .toEqual(highProfile);
   });
 
   test('does not rebase a real account whose progress was earned under a previous, lower-rate formula', () => {
@@ -1812,7 +1826,10 @@ describe('legacy progression', () => {
     // feeders, but the shortcut and route-reinforcement multipliers stay at
     // their base value (they are inert at the frozen 35-scale).
     expect(tutorialBudget.shortcutCount).toBe(0);
-    expect(mythicProfile.checkpointCountMultiplier).toBeGreaterThan(tutorialProfile.checkpointCountMultiplier);
+    // Level 87's rung prefix is branch-count driven (an explicit checkpoint count,
+    // not the multiplier, which only the tape's tail releases).
+    expect(mythicProfile.checkpointCountOverride === null
+      || mythicProfile.checkpointCountOverride > (tutorialProfile.checkpointCountOverride ?? 0)).toBe(true);
     expect(mythicProfile.shortcutCountMultiplier).toBe(0);
     expect(mythicProfile.routeQualityReinforcementMultiplier).toBe(0);
     expect(mythicProfile.borderFeederTargetPerSide).toBeGreaterThan(tutorialProfile.borderFeederTargetPerSide ?? 0);

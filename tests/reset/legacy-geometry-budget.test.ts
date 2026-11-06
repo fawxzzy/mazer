@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import {
-  GEOMETRY_BUDGET_ACCEPT_HALF_WIDTH,
+  GEOMETRY_BUDGET_BASE_CANDIDATES,
+  GEOMETRY_BUDGET_BASE_OFFSET,
   GEOMETRY_BUDGET_CEILING,
   GEOMETRY_BUDGET_RUNGS_BY_LEVEL,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
@@ -10,6 +11,7 @@ import {
   GEOMETRY_BUDGET_TAPE,
   GEOMETRY_BUDGET_TAPE_LENGTH,
   GEOMETRY_BUDGET_TARGET_STEP,
+  GEOMETRY_BUDGET_TUNING_TOLERANCE,
   LAST_BUDGET_LEVEL,
   measureGeometryBudgetProxy,
   resolveContinuousDifficulty,
@@ -30,13 +32,15 @@ const withoutGateKey = (level: number) => {
 
 describe('geometry budget tape', () => {
   test('has the measured rung order and unlock positions', () => {
-    expect(GEOMETRY_BUDGET_TAPE.length).toBe(44);
-    expect(GEOMETRY_BUDGET_TAPE_LENGTH).toBe(44);
+    // 44 priced rungs plus the 4 appended feeder rungs (5..8 per side).
+    expect(GEOMETRY_BUDGET_TAPE.length).toBe(48);
+    expect(GEOMETRY_BUDGET_TAPE_LENGTH).toBe(48);
     const labels = GEOMETRY_BUDGET_TAPE.map((rung) => rung.label);
     expect(labels.slice(0, 8)).toEqual([
       'branch:2', 'branch:3', 'dead:1', 'dead:2', 'wrap:h', 'branch:4', 'wrap:v', 'dead:3'
     ]);
-    expect(labels[labels.length - 1]).toBe('branch:m1.6');
+    expect(labels[43]).toBe('branch:m1.6');
+    expect(labels.slice(44)).toEqual(['wrap:5', 'wrap:6', 'wrap:7', 'wrap:8']);
     // Spending-space unlock spacing K = 5: branches first, then dead ends, then wraps.
     expect(labels.findIndex((label) => label.startsWith('branch'))).toBe(0);
     expect(labels.findIndex((label) => label.startsWith('dead'))).toBe(2);
@@ -178,23 +182,13 @@ describe('geometry budget candidate seeds', () => {
 
 describe('continuous difficulty function D(level)', () => {
   test('T(N) rises by exactly the step bound from START and flattens at CEILING', () => {
-    expect(GEOMETRY_BUDGET_TARGET_STEP).toBe(5);
+    expect(GEOMETRY_BUDGET_TARGET_STEP).toBe(3);
     expect(resolveGeometryBudgetTarget(2)).toBe(GEOMETRY_BUDGET_START);
     // The last ramp step is a full step: CEILING sits exactly on the step grid.
     expect((GEOMETRY_BUDGET_CEILING - GEOMETRY_BUDGET_START) % GEOMETRY_BUDGET_TARGET_STEP).toBe(0);
-    let largestStep = 0;
     for (let level = 3; level <= LAST_BUDGET_LEVEL; level += 1) {
-      const step = resolveGeometryBudgetTarget(level)! - resolveGeometryBudgetTarget(level - 1)!;
-      largestStep = Math.max(largestStep, step);
-      if (level <= GEOMETRY_BUDGET_SATURATION_LEVEL) {
-        expect(step).toBe(GEOMETRY_BUDGET_TARGET_STEP);
-      } else {
-        expect(step).toBe(0);
-      }
+      expect(resolveGeometryBudgetTarget(level)! - resolveGeometryBudgetTarget(level - 1)!).toBe(GEOMETRY_BUDGET_TARGET_STEP);
     }
-    // Hard per-level bound: well under the previous ladder's ~40 worst target
-    // step and the ~73 band-switch cliff at level 31.
-    expect(largestStep).toBe(GEOMETRY_BUDGET_TARGET_STEP);
     expect(resolveGeometryBudgetTarget(GEOMETRY_BUDGET_SATURATION_LEVEL)).toBe(GEOMETRY_BUDGET_CEILING);
     expect(resolveGeometryBudgetTarget(GEOMETRY_BUDGET_SATURATION_LEVEL - 1))
       .toBe(GEOMETRY_BUDGET_CEILING - GEOMETRY_BUDGET_TARGET_STEP);
@@ -203,11 +197,13 @@ describe('continuous difficulty function D(level)', () => {
     expect(resolveGeometryBudgetTarget(Number.NaN)).toBeNull();
   });
 
-  test('the saturation level is derived from the data, inside the bounded range', () => {
+  test('the saturation level is derived from the data and is the last bounded level', () => {
     expect(GEOMETRY_BUDGET_SATURATION_LEVEL)
       .toBe(2 + ((GEOMETRY_BUDGET_CEILING - GEOMETRY_BUDGET_START) / GEOMETRY_BUDGET_TARGET_STEP));
-    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(54);
-    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBeLessThan(LAST_BUDGET_LEVEL);
+    expect(LAST_BUDGET_LEVEL).toBe(GEOMETRY_BUDGET_SATURATION_LEVEL);
+    // Measured hard ceiling of the frozen board (see scripts/analysis/generate-geometry-budget-targets.ts).
+    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(185);
+    expect(GEOMETRY_BUDGET_CEILING).toBe(588);
   });
 
   test('the baked rung table covers 2..saturation, never decreases and stays on the tape', () => {
@@ -224,20 +220,26 @@ describe('continuous difficulty function D(level)', () => {
     }
     expect(GEOMETRY_BUDGET_RUNGS_BY_LEVEL[2]).toBe(0);
     // Past saturation the content is frozen: the same rung count, every level.
-    for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, 60, LAST_BUDGET_LEVEL, 100, 5000]) {
+    for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, LAST_BUDGET_LEVEL, LAST_BUDGET_LEVEL + 1, 500, 5000]) {
       expect(resolveGeometryBudgetRungCount(level)).toBe(GEOMETRY_BUDGET_RUNGS_BY_LEVEL[GEOMETRY_BUDGET_SATURATION_LEVEL]);
     }
+    // The tape runs out before the ceiling: the top levels are the full tape plus decoys.
+    expect(GEOMETRY_BUDGET_RUNGS_BY_LEVEL[GEOMETRY_BUDGET_SATURATION_LEVEL]).toBe(GEOMETRY_BUDGET_TAPE_LENGTH);
   });
 
-  test('plateau levels share one profile except for the gate key', () => {
-    for (let level = GEOMETRY_BUDGET_SATURATION_LEVEL; level <= LAST_BUDGET_LEVEL; level += 1) {
-      expect(withoutGateKey(level)).toEqual(withoutGateKey(GEOMETRY_BUDGET_SATURATION_LEVEL));
+  test('once the tape is exhausted the content profile is frozen and only the target (decoy count) rises', () => {
+    const firstFull = Object.keys(GEOMETRY_BUDGET_RUNGS_BY_LEVEL).map(Number)
+      .find((level) => GEOMETRY_BUDGET_RUNGS_BY_LEVEL[level] === GEOMETRY_BUDGET_TAPE_LENGTH)!;
+    expect(firstFull).toBeLessThan(GEOMETRY_BUDGET_SATURATION_LEVEL);
+    for (let level = firstFull; level <= LAST_BUDGET_LEVEL; level += 1) {
+      expect(withoutGateKey(level)).toEqual(withoutGateKey(firstFull));
     }
-    expect(withoutGateKey(GEOMETRY_BUDGET_SATURATION_LEVEL - 1)).not.toEqual(withoutGateKey(GEOMETRY_BUDGET_SATURATION_LEVEL));
+    expect(withoutGateKey(firstFull - 1)).not.toEqual(withoutGateKey(firstFull));
   });
 
-  test('the accept window is narrower than half the step, so accepted candidates cannot invert', () => {
-    expect(2 * GEOMETRY_BUDGET_ACCEPT_HALF_WIDTH).toBeLessThan(GEOMETRY_BUDGET_TARGET_STEP);
+  test('the tuning tolerance is narrower than half the step, so tuned mazes of adjacent levels cannot tie or invert', () => {
+    expect(2 * GEOMETRY_BUDGET_TUNING_TOLERANCE).toBeLessThan(GEOMETRY_BUDGET_TARGET_STEP);
+    expect(GEOMETRY_BUDGET_BASE_CANDIDATES).toBeGreaterThanOrEqual(8);
   });
 
   test('past the ceiling difficulty is handed to the hazard budget, never silently flat', () => {
@@ -251,7 +253,7 @@ describe('continuous difficulty function D(level)', () => {
       regime: 'plateau', geometryTarget: GEOMETRY_BUDGET_CEILING, geometrySaturated: true, hazardBudgetLevels: 0
     });
     let previousHazard = -1;
-    for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, 60, 99, 100, 101, 150, 1_000_000]) {
+    for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, GEOMETRY_BUDGET_SATURATION_LEVEL + 1, 200, 250, 300, 500, 1_000_000]) {
       const difficulty = resolveContinuousDifficulty(level);
       expect(difficulty.geometryTarget).toBe(GEOMETRY_BUDGET_CEILING);
       expect(difficulty.geometryRungs).toBe(atCeiling.geometryRungs);
@@ -260,7 +262,16 @@ describe('continuous difficulty function D(level)', () => {
       previousHazard = difficulty.hazardBudgetLevels;
     }
     // Exactly +1 owed hazard level per completed level, with no cycle or cap.
-    expect(resolveContinuousDifficulty(151).hazardBudgetLevels - resolveContinuousDifficulty(150).hazardBudgetLevels).toBe(1);
+    expect(resolveContinuousDifficulty(301).hazardBudgetLevels - resolveContinuousDifficulty(300).hazardBudgetLevels).toBe(1);
+    // Every ramp level below the ceiling owes nothing and has its own, strictly rising target.
+    let previousTarget = 0;
+    for (let level = 2; level < GEOMETRY_BUDGET_SATURATION_LEVEL; level += 1) {
+      const difficulty = resolveContinuousDifficulty(level);
+      expect(difficulty.regime).toBe('ramp');
+      expect(difficulty.hazardBudgetLevels).toBe(0);
+      expect(difficulty.geometryTarget!).toBeGreaterThan(previousTarget);
+      previousTarget = difficulty.geometryTarget!;
+    }
     // Total over bad input.
     expect(resolveContinuousDifficulty(Number.NaN).regime).toBe('corridor');
     expect(resolveContinuousDifficulty(-5).regime).toBe('corridor');
@@ -269,7 +280,9 @@ describe('continuous difficulty function D(level)', () => {
   test('baked calibration still describes freshly generated mazes (spot check; the full recomputation is the script --check)', () => {
     // Each spot-checked level's ungated pool must be within the widest rung gap
     // of its target: a reordered tape or a changed generator fails this.
-    for (const level of [2, 14, 27, 44, GEOMETRY_BUDGET_SATURATION_LEVEL]) {
+    // Levels whose target is still inside the tape's own range (the top levels are
+    // decoy-tuned past it, covered by the ladder tests).
+    for (const level of [2, 14, 27, 44, 100]) {
       const { geometryBudgetLevel: _ignored, ...profile } = resolveGeometryBudgetProfile(level);
       void _ignored;
       const values: number[] = [];
@@ -281,7 +294,10 @@ describe('continuous difficulty function D(level)', () => {
         }
       });
       const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-      expect(Math.abs(mean - resolveGeometryBudgetTarget(level)!)).toBeLessThan(26);
+      // The base is chosen near T - BASE_OFFSET (the tuner adds the rest), and never
+      // below the bare base profile's own mean (START).
+      const expected = Math.max(GEOMETRY_BUDGET_START, resolveGeometryBudgetTarget(level)! - GEOMETRY_BUDGET_BASE_OFFSET);
+      expect(Math.abs(mean - expected)).toBeLessThan(26);
     }
   }, 120_000);
 });
