@@ -1,36 +1,45 @@
 /**
- * Wave 4D-B: permanent real-browser verification for the single-primary
- * gameplay Teleport transfer (teleportTransferPresentation.ts,
- * teleportTransferConduitCanvas.ts, and their scene integration in
- * MenuScene.ts). Drives the actual built game via Playwright -- no mock,
- * no reimplementation of the scene's own logic.
+ * Wave 4D-B: permanent real-browser verification for the gameplay Teleport
+ * transfer presentation in the ONE procedural edge-diamond system
+ * (src/render/edgeMarkers.ts + src/render/introTimeline.ts, driven by
+ * src/scenes/MenuScene.ts). Drives the actual built game via Playwright --
+ * no mock, no reimplementation of the scene's own logic.
  *
- * Two complementary cases, per this project's own established convention
- * (see e.g. capture-wave4d-a-evidence.mjs): a controlled near-goal
- * fixture for fast, precise boundary checks (direct scene.player/
- * scene.trail assignment to set up a position adjacent to the goal, but
- * the goal-reaching STEP itself is always a real accepted
- * window.__MAZER_QA__.movePlayPlayer command -- never a direct phase/
- * primary/elapsed-time assignment), and one FULL solver-driven run from
- * the maze's real start to its real goal, entirely through real accepted
- * moves with no direct player/goal assignment anywhere in that case --
- * proving the whole pipeline (goal detection -> arm -> deconstruct-arm
- * primary selection -> outbound -> stored -> delivery -> complete ->
- * input unlocked again) end to end from an ordinary gameplay sequence,
- * not a shortcut into the middle of it.
+ * The retired art this script used to assert (a single held "primary" shell
+ * diamond, the gameplay-transfer conduit canvas, the strip-beam image pool,
+ * the title-orbit sigil images) no longer exists. The PRODUCT behaviour is
+ * unchanged in intent and is verified here against what the scene really
+ * draws now:
  *
- * Every case also spies on the real scene.playerSpawnBurstGraphics
- * instance's own lineBetween method and asserts zero real calls during
- * Play mode. This is not redundant with the playerTransferBeamStripImages
- * checks elsewhere in this file: drawLegacyPlayerSpawnBurst is a
- * completely separate old rendering path (one procedural beam per orbit
- * sigil, drawn straight into playerSpawnBurstGraphics) that a review
- * confirmed had no mode branch and was rendering in Play mode too --
- * exactly the kind of regression an Image-pool-visibility check alone
- * cannot see (review 5144999445; verified independently before fixing).
- * Case 7 covers the specific scenario that check would have missed
- * outright: the very first maze of a run, where no transfer is ever
- * armed at all, so the old volley was the ONLY arrival visual firing.
+ *   - ARRIVAL (Start, and the maze-to-maze arrival after a goal): ALL 8
+ *     edge diamonds fire a beam INWARD to the spawn tile (every beam starts at
+ *     its own diamond, all 8 are in flight together, they converge on the
+ *     spawn tile, the diamond brightens while its beam fires), and input
+ *     unlocks about 1.2 s after the intro began;
+ *   - DEPARTURE (goal reached -> deconstruct): the player fires a beam OUTWARD
+ *     to ALL 8 diamonds, then the maze dissolves and the next maze arrives;
+ *   - the transfer lifecycle still runs outbound -> stored -> delivering ->
+ *     complete -> input unlocked again, via real accepted moves only;
+ *   - reduced motion: no beams at all, nothing lights up, 250 ms unlock;
+ *   - compact/touch layout: the same, with the diamonds inside a 390x844 viewport;
+ *   - the ring of 8 diamonds stays calm (never drifts) through the transfer;
+ *   - pause freezes the beams, the intro/outro clocks and the coupled maze
+ *     lifecycle, and resume neither races ahead nor loses the intro time;
+ *   - ordinary movement is LOCKED through every maze build (plus negative controls).
+ *
+ * How it observes the scene (all read-only, no scene change needed): it spies
+ * on the real spawnLaserGraphics.lineBetween calls (the beam geometry the
+ * player sees), on the real edgeMarkerGraphics draw calls (which diamonds are
+ * lit and where), on playerSpawnBurstGraphics.lineBetween (the retired
+ * per-sigil volley must stay silent), and reads the scene's own
+ * edgeBeamFiringIds / resolveLegacyIntroState / resolveLegacyOutroState /
+ * resolveLegacyPlayerTransferState. Beam geometry is cross-checked against the
+ * scene's own firing set, never trusted alone.
+ *
+ * Determinism: localStorage is cleared once per session, the "Player Skill
+ * Lv 01" diagnostics label is confirmed after Start, the RAF loop is stopped
+ * and the scene is stepped on a manual 16 ms clock, and every wait is on scene
+ * state (input unlocked / cycle complete), never a fixed frame count.
  *
  * Usage: node scripts/analysis/verify-gameplay-teleport-transfer.mjs
  */
@@ -67,6 +76,338 @@ const check = (label, condition, detail) => {
     process.stderr.write(`FAIL: ${label} -- ${detail}\n`);
   }
 };
+
+// introTimeline.ts nominal numbers, mirrored here as the ACCEPTANCE contract
+// (the scene must meet these; they are deliberately not imported).
+const INTRO_UNLOCK_MS = 1200;
+const INTRO_REDUCED_UNLOCK_MS = 250;
+const FRAME_MS = 16;
+const UNLOCK_TOLERANCE_MS = FRAME_MS * 2;
+const INTRO_LASER_START_MS = 100;
+const INTRO_LASER_END_MS = 500;
+const OUTRO_LASER_END_MS = 400;
+const OUTRO_TOTAL_MS = 900;
+const ALL_STATION_IDS = [0, 1, 2, 3, 4, 5, 6, 7];
+const ENERGIZED_ALPHA_FLOOR = 0.9;
+
+const sameList = (a, b) => a.length === b.length && a.every((value, index) => value === b[index]);
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+/**
+ * In-page harness, installed once per page. Everything it records comes from
+ * the scene's REAL draw calls and state:
+ *  - spawnLaserGraphics.lineBetween  -> the beam geometry (glow+core pairs, then poof sparkles)
+ *  - edgeMarkerGraphics draw calls   -> which diamonds are lit, and where they are
+ *  - playerSpawnBurstGraphics.lineBetween -> the retired per-sigil volley (must stay 0)
+ * and exposes stepFrames / stepUntil on the shared manual 16 ms clock.
+ */
+const installHarness = (page) => page.evaluate(() => {
+  const getScene = () => window.__MAZER_GAME__.scene.getScene('MenuScene');
+  const initial = getScene();
+
+  const laser = { lines: [] };
+  const volley = { count: 0 };
+  const edge = { frame: [], style: null, vertices: [] };
+  const wrap = (graphics, names, handler) => {
+    for (const name of names) {
+      const original = graphics[name].bind(graphics);
+      graphics[name] = (...args) => {
+        handler(name, args);
+        return original(...args);
+      };
+    }
+  };
+  wrap(initial.spawnLaserGraphics, ['clear', 'lineBetween'], (name, args) => {
+    if (name === 'clear') { laser.lines = []; } else { laser.lines.push([args[0], args[1], args[2], args[3]]); }
+  });
+  wrap(initial.playerSpawnBurstGraphics, ['lineBetween'], () => { volley.count += 1; });
+  wrap(initial.edgeMarkerGraphics, ['clear', 'lineStyle', 'beginPath', 'moveTo', 'lineTo', 'strokePath'], (name, args) => {
+    if (name === 'clear') { edge.frame = []; }
+    else if (name === 'lineStyle') { edge.style = { alpha: args[2] }; }
+    else if (name === 'beginPath') { edge.vertices = []; }
+    else if (name === 'moveTo' || name === 'lineTo') { edge.vertices.push({ x: args[0], y: args[1] }); }
+    else if (name === 'strokePath') { edge.frame.push({ alpha: edge.style?.alpha ?? 0, vertices: edge.vertices.slice() }); }
+  });
+
+  const state = { clock: initial.time.now, sawDelivering: false };
+
+  // Screen-space centre of a maze tile, computed with the scene's OWN render
+  // frame and board offset (the same inputs drawDynamicBoard feeds the beams).
+  const tileCenter = (scene, point) => {
+    const offset = scene.resolveBoardOffset();
+    const layout = scene.layout;
+    const frame = scene.resolveLegacyMazeRenderFrame(layout.boardLeft + offset.x, layout.boardTop + offset.y, layout.boardWidth, layout.boardHeight);
+    const container = scene.boardZoomContainer;
+    return {
+      x: container.x + ((frame.boardLeft + ((point.x + 0.5) * frame.tileSize)) * container.scaleX),
+      y: container.y + ((frame.boardTop + ((point.y + 0.5) * frame.tileSize)) * container.scaleY),
+      tile: frame.tileSize * container.scaleX
+    };
+  };
+
+  const isUnlocked = (scene) => scene.mode === 'play' && scene.menuStaticDrawLifecyclePhase === 'settled' && !scene.isLegacyPlayLifecycleInputLocked();
+
+  const sample = () => {
+    const scene = getScene();
+    const t = scene.time.now;
+    const intro = scene.resolveLegacyIntroState(t);
+    const outro = scene.resolveLegacyOutroState(t);
+    const transfer = scene.resolveLegacyPlayerTransferState(t).phase;
+    if (transfer === 'delivering') { state.sawDelivering = true; }
+    const firing = Array.from(scene.edgeBeamFiringIds).sort((a, b) => a - b);
+    const lines = laser.lines;
+    const focus = tileCenter(scene, scene.player);
+    const sparkleMids = firing.length === 0 && lines.length > 0
+      ? lines.map((l) => ({ x: (l[0] + l[2]) / 2, y: (l[1] + l[3]) / 2 }))
+      : [];
+    return {
+      t,
+      mode: scene.mode,
+      overlay: scene.overlay,
+      drawPhase: scene.menuStaticDrawLifecyclePhase,
+      locked: scene.isLegacyPlayLifecycleInputLocked(),
+      introAge: scene.introStartedAtMs === null ? null : t - scene.introStartedAtMs,
+      introActive: intro !== null,
+      outroAge: outro !== null && scene.menuStaticDeconstructStartedAtMs !== null ? t - scene.menuStaticDeconstructStartedAtMs : null,
+      laserProgress: intro !== null ? intro.laserProgress : (outro !== null ? outro.laserProgress : null),
+      transfer,
+      armed: scene.playerTransferEnergyArmed,
+      firing,
+      lineCount: lines.length,
+      beamPairs: firing.length > 0 ? lines.filter((_, index) => index % 2 === 0) : [],
+      sparkleMids,
+      focus,
+      stations: scene.resolveLegacyEdgeStations().map((s) => ({ id: s.id, x: s.x, y: s.y })),
+      lit: edge.frame.map((marker, index) => (marker.alpha >= 0.9 ? index : null)).filter((index) => index !== null),
+      markerCount: edge.frame.length,
+      ring: edge.frame.map((marker) => marker.vertices[0] ?? null),
+      markerBounds: (() => {
+        const all = edge.frame.flatMap((marker) => marker.vertices);
+        return all.length === 0 ? null : {
+          minX: Math.min(...all.map((v) => v.x)),
+          minY: Math.min(...all.map((v) => v.y)),
+          maxX: Math.max(...all.map((v) => v.x)),
+          maxY: Math.max(...all.map((v) => v.y))
+        };
+      })(),
+      player: { x: scene.player.x, y: scene.player.y },
+      start: { x: scene.maze.start.x, y: scene.maze.start.y }
+    };
+  };
+
+  const conditions = {
+    unlocked: (scene) => isUnlocked(scene),
+    introAgeAtLeast: (scene, value) => scene.introStartedAtMs !== null && (scene.time.now - scene.introStartedAtMs) >= value,
+    outroAgeAtLeast: (scene, value) => scene.menuStaticDrawLifecyclePhase === 'deconstructing' && scene.menuStaticDeconstructStartedAtMs !== null && (scene.time.now - scene.menuStaticDeconstructStartedAtMs) >= value,
+    transferPhase: (scene, value) => scene.resolveLegacyPlayerTransferState(scene.time.now).phase === value,
+    // 'complete' resets to 'idle' within the same update() it first appears
+    // in, so completion is observed as: delivering seen, then idle + unlocked.
+    cycleComplete: (scene) => state.sawDelivering && scene.resolveLegacyPlayerTransferState(scene.time.now).phase === 'idle' && isUnlocked(scene)
+  };
+
+  const step = () => {
+    state.clock += 16;
+    window.__MAZER_GAME__.loop.step(state.clock);
+    return sample();
+  };
+
+  window.__mazerQa = {
+    stepFrames: (count) => {
+      const frames = [];
+      for (let i = 0; i < count; i += 1) { frames.push(step()); }
+      return frames;
+    },
+    stepUntil: (name, value, maxFrames) => {
+      const frames = [];
+      for (let i = 0; i < maxFrames; i += 1) {
+        frames.push(step());
+        if (conditions[name](getScene(), value)) { return { met: true, frames }; }
+      }
+      return { met: false, frames };
+    },
+    sampleNow: () => sample(),
+    volleyCount: () => volley.count,
+    resetVolley: () => { volley.count = 0; },
+    resetCycleWatch: () => { state.sawDelivering = false; },
+    stations: () => getScene().resolveLegacyEdgeStations().map((s) => ({ id: s.id, x: s.x, y: s.y })),
+    viewport: () => ({ width: getScene().layout.width, height: getScene().layout.height })
+  };
+});
+
+/** Opens a real game context/page, stops the RAF loop and installs the harness. */
+const openGameContext = async (browser, baseUrl, contextOptions) => {
+  const context = await browser.newContext(contextOptions);
+  // Deterministic start: wipe persisted progression exactly once per session
+  // (same pattern as scripts/visual/capture-maze-lifecycle.mjs).
+  await context.addInitScript(() => {
+    try {
+      if (!sessionStorage.getItem('__lifecycleInit')) {
+        sessionStorage.setItem('__lifecycleInit', '1');
+        localStorage.clear();
+      }
+    } catch {
+      // storage unavailable
+    }
+  });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on('pageerror', (err) => pageErrors.push(String(err)));
+
+  await page.goto(`${baseUrl}/?runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749`, { waitUntil: 'load', timeout: 30000 });
+  await page.waitForFunction(() => Boolean(window.__MAZER_QA__?.startPlayMode), { timeout: 15000 });
+  await page.evaluate(() => window.__MAZER_GAME__.loop.stop());
+  await installHarness(page);
+
+  const stepFrames = (count) => page.evaluate((n) => window.__mazerQa.stepFrames(n), count);
+  const stepOnce = async () => { await stepFrames(1); };
+  const stepN = async (n) => { await stepFrames(n); };
+  const stepBatch = stepN;
+  const stepUntil = (name, value, maxFrames) => page.evaluate(({ n, v, m }) => window.__mazerQa.stepUntil(n, v, m), { n: name, v: value, m: maxFrames });
+  const sampleNow = () => page.evaluate(() => window.__mazerQa.sampleNow());
+  const readVolley = () => page.evaluate(() => window.__mazerQa.volleyCount());
+
+  return { context, page, pageErrors, stepOnce, stepN, stepBatch, stepFrames, stepUntil, sampleNow, readVolley };
+};
+
+/** Presses Start from a settled menu (a user cannot press it earlier) and returns the press instant. */
+const pressStartFromMenu = async (h) => {
+  await h.stepFrames(150);
+  const started = await h.page.evaluate(() => {
+    const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+    const result = window.__MAZER_QA__.startPlayMode();
+    return { accepted: result?.accepted === true, pressedAtMs: scene.time.now };
+  });
+  return started;
+};
+
+const readSkillLabels = (page) => page.evaluate(() => (document.documentElement.getAttribute('data-mazer-visual-diagnostics') || '').match(/(Player|AI) Skill Lv \d+/g));
+
+const nearPoint = (a, b, tolerance) => Math.hypot(a.x - b.x, a.y - b.y) <= tolerance;
+
+/**
+ * Which station a beam line belongs to, by geometry alone.
+ *   inward : the beam STARTS on a station (diamond -> spawn)
+ *   outward: the beam starts at the focus and points at a station (player -> diamond)
+ */
+const beamStationId = (pair, stations, focus, direction) => {
+  const from = { x: pair[0], y: pair[1] };
+  if (direction === 'inward') {
+    return stations.find((s) => nearPoint(s, from, 0.75))?.id ?? null;
+  }
+  if (!nearPoint(focus, from, Math.max(2, focus.tile * 0.75))) {
+    return null;
+  }
+  const vx = pair[2] - pair[0];
+  const vy = pair[3] - pair[1];
+  const vLen = Math.hypot(vx, vy);
+  if (vLen < 1e-6) {
+    return null;
+  }
+  return stations.find((s) => {
+    const wx = s.x - pair[0];
+    const wy = s.y - pair[1];
+    const wLen = Math.hypot(wx, wy);
+    return wLen > 0 && Math.abs((vx * wy) - (vy * wx)) / (vLen * wLen) < 0.01 && ((vx * wx) + (vy * wy)) > 0 && vLen <= wLen + 0.75;
+  })?.id ?? null;
+};
+
+/**
+ * Analyses every frame in which the scene reported a beam in flight.
+ * `direction`: 'inward' (diamonds -> spawn) or 'outward' (player -> diamonds).
+ */
+const analyzeBeams = (frames, _unusedMenuStations, direction) => {
+  const beamFrames = frames.filter((f) => f.firing.length > 0);
+  const sceneIds = new Set();
+  const geometryIds = new Set();
+  const lastTip = new Map();
+  let geometryMatchesScene = true;
+  let pairCountMatchesScene = true;
+  let wrongDirectionPairs = 0;
+  let litNeverBelowFiring = true;
+  let maxConcurrent = 0;
+  let firstAge = null;
+  let lastAge = null;
+  const opposite = direction === 'inward' ? 'outward' : 'inward';
+  for (const frame of beamFrames) {
+    frame.firing.forEach((id) => sceneIds.add(id));
+    maxConcurrent = Math.max(maxConcurrent, frame.firing.length);
+    const stations = frame.stations;
+    const ids = frame.beamPairs.map((pair) => beamStationId(pair, stations, frame.focus, direction));
+    if (frame.beamPairs.length !== frame.firing.length) { pairCountMatchesScene = false; }
+    if (ids.some((id) => id === null) || !sameList(ids.slice().sort((a, b) => a - b), frame.firing)) { geometryMatchesScene = false; }
+    ids.forEach((id) => { if (id !== null) { geometryIds.add(id); } });
+    frame.beamPairs.forEach((pair, index) => {
+      if (ids[index] !== null) { lastTip.set(ids[index], { tip: { x: pair[2], y: pair[3] }, focus: frame.focus, station: stations.find((s) => s.id === ids[index]) }); }
+      if (beamStationId(pair, stations, frame.focus, opposite) !== null) { wrongDirectionPairs += 1; }
+    });
+    if (!frame.firing.every((id) => frame.lit.includes(id))) { litNeverBelowFiring = false; }
+    const age = direction === 'inward' ? frame.introAge : frame.outroAge;
+    if (age !== null) {
+      firstAge = firstAge === null ? age : Math.min(firstAge, age);
+      lastAge = lastAge === null ? age : Math.max(lastAge, age);
+    }
+  }
+  // Each beam must end near its far end: the spawn (inward) or its diamond (outward).
+  let tipsReachFarEnd = lastTip.size === 8;
+  for (const [id, entry] of lastTip) {
+    const station = entry.station;
+    const total = dist(station, entry.focus);
+    const remaining = direction === 'inward' ? dist(entry.tip, entry.focus) : dist(entry.tip, station);
+    if (!(total > 0 && remaining <= total * 0.1)) { tipsReachFarEnd = false; }
+  }
+  return {
+    beamFrameCount: beamFrames.length,
+    sceneIds: Array.from(sceneIds).sort((a, b) => a - b),
+    geometryIds: Array.from(geometryIds).sort((a, b) => a - b),
+    geometryMatchesScene,
+    pairCountMatchesScene,
+    wrongDirectionPairs,
+    litNeverBelowFiring,
+    maxConcurrent,
+    firstAge,
+    lastAge,
+    tipsReachFarEnd
+  };
+};
+
+/** The poof where the inward beams converge must sit on the spawn tile. */
+const poofConvergesOnSpawn = (frames) => {
+  const poof = frames.filter((f) => f.firing.length === 0 && f.sparkleMids.length > 0 && f.introAge !== null);
+  if (poof.length === 0) { return { found: false, ok: false }; }
+  return {
+    found: true,
+    ok: poof.every((f) => {
+      const cx = f.sparkleMids.reduce((sum, p) => sum + p.x, 0) / f.sparkleMids.length;
+      const cy = f.sparkleMids.reduce((sum, p) => sum + p.y, 0) / f.sparkleMids.length;
+      return Math.hypot(cx - f.focus.x, cy - f.focus.y) <= f.focus.tile * 0.6;
+    })
+  };
+};
+
+/** First settled+unlocked frame of an intro, with the age it unlocked at and whether the frame before it was still locked. */
+const findUnlock = (frames) => {
+  const index = frames.findIndex((f) => f.drawPhase === 'settled' && !f.locked && f.mode === 'play');
+  if (index < 0) { return null; }
+  return { age: frames[index].introAge, previousLocked: index === 0 ? true : frames[index - 1].locked, index };
+};
+
+const ringDrift = (frames) => {
+  const base = frames.find((f) => f.ring.length === 8 && f.ring.every(Boolean));
+  if (!base) { return Number.POSITIVE_INFINITY; }
+  let max = 0;
+  for (const f of frames) {
+    f.ring.forEach((point, index) => {
+      if (point) { max = Math.max(max, Math.hypot(point.x - base.ring[index].x, point.y - base.ring[index].y)); }
+    });
+  }
+  return max;
+};
+
+const markersInsideViewport = (frame, viewport) => (
+  frame.markerCount === 8 && frame.markerBounds !== null
+  && frame.markerBounds.minX >= 0 && frame.markerBounds.minY >= 0
+  && frame.markerBounds.maxX <= viewport.width && frame.markerBounds.maxY <= viewport.height
+);
 
 const MOVE_FOR_DELTA = {
   '0,-1': 'move_up',
@@ -166,71 +507,6 @@ const solveMazeToMoveSequence = async (page) => {
   return pathToMoveSequence(result.path);
 };
 
-/** Opens a real game context/page, stops the RAF loop, and installs a manual clock-step pair (stepOnce/stepN) driving window.__MAZER_GAME__.loop.step directly -- the established workaround for the Browser pane's real RAF loop not ticking reliably under this automation. */
-const openGameContext = async (browser, baseUrl, contextOptions) => {
-  const context = await browser.newContext(contextOptions);
-  const page = await context.newPage();
-  const pageErrors = [];
-  page.on('pageerror', (err) => pageErrors.push(String(err)));
-
-  await page.goto(`${baseUrl}/?runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749`, { waitUntil: 'load', timeout: 30000 });
-  await page.waitForFunction(() => Boolean(window.__MAZER_QA__?.startPlayMode), { timeout: 15000 });
-  await page.evaluate(() => window.__MAZER_GAME__.loop.stop());
-
-  // Confirmed real defect (review 5144999445): drawLegacyPlayerSpawnBurst
-  // -- a SEPARATE old effect from playerTransferBeamStripImages, drawing
-  // one procedural beam per orbit sigil directly into
-  // playerSpawnBurstGraphics -- had no mode branch and rendered in Play
-  // mode too. Checking playerTransferBeamStripImages visibility (the
-  // check every earlier round of this suite used) could never have
-  // caught it -- that Image pool is a different rendering path this one
-  // never touches. This spy wraps the real playerSpawnBurstGraphics
-  // instance's own lineBetween method (the primitive every one of that
-  // volley's beams is drawn with) and counts real invocations, so a
-  // regression can assert on the actual old rendering path executing,
-  // not merely on the unrelated Image pool staying hidden.
-  await page.evaluate(() => {
-    const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-    const graphics = scene.playerSpawnBurstGraphics;
-    window.__mazerLegacyVolleySpyCount = 0;
-    const originalLineBetween = graphics.lineBetween.bind(graphics);
-    graphics.lineBetween = (...args) => {
-      window.__mazerLegacyVolleySpyCount += 1;
-      return originalLineBetween(...args);
-    };
-  });
-
-  let clockMs = await page.evaluate(() => window.__MAZER_GAME__.scene.getScene('MenuScene').time.now);
-  const stepOnce = async () => { clockMs += 16; await page.evaluate((t) => window.__MAZER_GAME__.loop.step(t), clockMs); };
-  // Runs n real frame-steps inside a SINGLE page.evaluate round trip
-  // (still one loop.step(t) call per real 16ms frame -- this only cuts
-  // the Node<->browser round-trip count, not the number of real frames
-  // simulated). Used by the completion-wait polling loops below, which
-  // would otherwise pay one full round trip per single 16ms frame across
-  // up to thousands of frames covering a real maze deconstruct/build/
-  // reveal cycle.
-  const stepBatch = async (n) => {
-    const nextClockMs = await page.evaluate(({ startMs, count }) => {
-      let t = startMs;
-      for (let i = 0; i < count; i += 1) {
-        t += 16;
-        window.__MAZER_GAME__.loop.step(t);
-      }
-      return t;
-    }, { startMs: clockMs, count: n });
-    clockMs = nextClockMs;
-  };
-  const stepN = async (n) => { await stepBatch(n); };
-
-  return { context, page, pageErrors, stepOnce, stepN, stepBatch };
-};
-
-/** Reads the real count of playerSpawnBurstGraphics.lineBetween calls since the spy was installed (or since the last reset) -- the forbidden old volley's own real draw primitive. */
-const readLegacyVolleySpyCount = (page) => page.evaluate(() => window.__mazerLegacyVolleySpyCount ?? 0);
-
-/** Zeroes the spy count so a case can assert on only the draw calls that happened during its own window, not everything since page load. */
-const resetLegacyVolleySpyCount = (page) => page.evaluate(() => { window.__mazerLegacyVolleySpyCount = 0; });
-
 /** Finds a real walkable neighbor of the real current goal, sets scene.player/scene.trail to it (a controlled but real fixture on GAMEPLAY POSITION -- explicitly allowed by this project's own established convention for fast boundary tests), then reaches the goal itself only via a real accepted movePlayPlayer command. Never assigns phase/primary/elapsed-time directly. */
 const setupControlledNearGoalMove = async (page, stepOnce) => {
   const goal = await page.evaluate(() => window.__MAZER_GAME__.scene.getScene('MenuScene').maze.goal);
@@ -275,6 +551,131 @@ const moveUntilAccepted = async (page, stepOnce, move, maxAttempts = 400) => {
   return lastResult;
 };
 
+const readStations = (page) => page.evaluate(() => ({ stations: window.__mazerQa.stations(), viewport: window.__mazerQa.viewport() }));
+
+/** A real legal move from the player's current tile (a walkable neighbour), or null. */
+const resolveLegalMove = (page) => page.evaluate(() => {
+  const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+  const p = scene.player;
+  const grid = scene.maze.grid;
+  const opts = [
+    { m: 'move_up', x: p.x, y: p.y - 1 }, { m: 'move_down', x: p.x, y: p.y + 1 },
+    { m: 'move_left', x: p.x - 1, y: p.y }, { m: 'move_right', x: p.x + 1, y: p.y }
+  ];
+  return opts.find((o) => grid[o.y]?.[o.x] === true)?.m ?? null;
+});
+
+/**
+ * ARRIVAL assertions (Start, or the maze-to-maze arrival): ALL 8 diamonds
+ * fire a beam inward to the spawn tile, then input unlocks ~1.2 s after the
+ * intro began. `frames` are the recorded frames of ONE build.
+ */
+const assertArrival = (label, frames, stations, { reducedMotion = false, viewport = null } = {}) => {
+  const buildFrames = frames.slice(Math.max(0, frames.findIndex((f) => f.introActive)));
+  const unlock = findUnlock(buildFrames);
+  if (reducedMotion) {
+    check(`${label}: reduced motion draws NO beam at all (no laser, no poof) during the whole build`, buildFrames.every((f) => f.firing.length === 0 && f.lineCount === 0), JSON.stringify(buildFrames.filter((f) => f.lineCount > 0).slice(0, 2)));
+    check(`${label}: reduced motion never lights a diamond (the ring is completely static)`, buildFrames.every((f) => f.lit.length === 0 && f.markerCount === 8), JSON.stringify(buildFrames.filter((f) => f.lit.length > 0).slice(0, 2)));
+    check(
+      `${label}: reduced-motion input unlocks at ~${INTRO_REDUCED_UNLOCK_MS} ms into the build, not before`,
+      unlock !== null && unlock.previousLocked && unlock.age >= INTRO_REDUCED_UNLOCK_MS && unlock.age < INTRO_REDUCED_UNLOCK_MS + UNLOCK_TOLERANCE_MS,
+      JSON.stringify(unlock)
+    );
+    return;
+  }
+  const a = analyzeBeams(buildFrames, stations, 'inward');
+  check(`${label}: ALL 8 diamonds fire a beam (the scene's own firing set covers stations 0-7)`, sameList(a.sceneIds, ALL_STATION_IDS), JSON.stringify(a));
+  check(
+    `${label}: the drawn beam geometry agrees -- every beam STARTS on its own diamond (inward, diamond -> spawn), all 8 identified, count matches the scene's firing set every frame`,
+    sameList(a.geometryIds, ALL_STATION_IDS) && a.geometryMatchesScene && a.pairCountMatchesScene,
+    JSON.stringify(a)
+  );
+  check(`${label}: no arrival beam is drawn outward from the spawn (wrong-direction pairs = 0)`, a.wrongDirectionPairs === 0, `wrongDirectionPairs=${a.wrongDirectionPairs}`);
+  check(`${label}: all 8 beams are in flight together at least once (not one at a time)`, a.maxConcurrent === 8, `maxConcurrent=${a.maxConcurrent}`);
+  check(`${label}: every beam converges on the spawn tile (its last drawn tip is within 10% of the way to it)`, a.tipsReachFarEnd, JSON.stringify(a));
+  check(`${label}: a diamond is lit (brightened) on every frame its beam is firing`, a.litNeverBelowFiring, JSON.stringify(a));
+  check(
+    `${label}: the beams fire inside the intro laser window (${INTRO_LASER_START_MS}-${INTRO_LASER_END_MS} ms, one frame of slack)`,
+    a.firstAge !== null && a.firstAge >= INTRO_LASER_START_MS && a.lastAge <= INTRO_LASER_END_MS + FRAME_MS,
+    `first=${a.firstAge} last=${a.lastAge}`
+  );
+  const poof = poofConvergesOnSpawn(buildFrames);
+  check(`${label}: the landing poof sits on the spawn tile`, poof.found && poof.ok, JSON.stringify(poof));
+  check(
+    `${label}: input unlocks ~${INTRO_UNLOCK_MS} ms after the intro began (and not before)`,
+    unlock !== null && unlock.previousLocked && unlock.age >= INTRO_UNLOCK_MS && unlock.age < INTRO_UNLOCK_MS + UNLOCK_TOLERANCE_MS,
+    JSON.stringify(unlock)
+  );
+  if (viewport !== null) {
+    check(`${label}: all 8 diamonds stay fully inside the ${viewport.width}x${viewport.height} viewport while the beams fire`, buildFrames.filter((f) => f.firing.length > 0).every((f) => markersInsideViewport(f, viewport)), JSON.stringify(buildFrames.find((f) => f.firing.length > 0)?.markerBounds));
+  }
+};
+
+/**
+ * DEPARTURE + whole-cycle assertions for one goal-reset: the player fires a
+ * beam outward to ALL 8 diamonds, the maze dissolves, the next maze arrives
+ * with all 8 beams inward, and the transfer lifecycle completes.
+ */
+const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMotion = false }) => {
+  const departure = frames.filter((f) => f.outroAge !== null);
+  const outroIndex = frames.findIndex((f) => f.outroAge !== null);
+  const buildIndex = frames.findIndex((f, index) => index > outroIndex && outroIndex >= 0 && f.introActive);
+  const phases = frames.map((f) => f.transfer).filter((phase, index, all) => index === 0 || all[index - 1] !== phase);
+  // Reduced motion has no outbound beam phase (it is skipped, not shortened).
+  const wanted = reducedMotion ? ['stored', 'delivering', 'idle'] : ['outbound', 'stored', 'delivering', 'idle'];
+  let cursor = 0;
+  phases.forEach((phase) => { if (phase === wanted[cursor]) { cursor += 1; } });
+  check(`${label}: the transfer lifecycle ran ${reducedMotion ? '' : 'outbound -> '}stored -> delivering -> complete (idle, input unlocked)`, cursor === wanted.length, JSON.stringify(phases));
+  check(`${label}: a departure (deconstruct) phase was observed`, departure.length > 0, 'n/a');
+
+  if (reducedMotion) {
+    check(`${label}: reduced motion draws no beam through the whole goal-reset cycle`, frames.every((f) => f.firing.length === 0 && f.lineCount === 0), JSON.stringify(frames.filter((f) => f.lineCount > 0).slice(0, 2)));
+    check(`${label}: reduced motion never lights a diamond through the whole cycle`, frames.every((f) => f.lit.length === 0), JSON.stringify(frames.filter((f) => f.lit.length > 0).slice(0, 2)));
+  } else {
+    const d = analyzeBeams(departure, stations, 'outward');
+    check(`${label}: on goal-reset the player fires a beam to ALL 8 diamonds (the scene's own firing set covers stations 0-7)`, sameList(d.sceneIds, ALL_STATION_IDS), JSON.stringify(d));
+    check(
+      `${label}: the departure beam geometry agrees -- every beam STARTS at the player and points at its own diamond (outward), all 8 identified`,
+      sameList(d.geometryIds, ALL_STATION_IDS) && d.geometryMatchesScene && d.pairCountMatchesScene,
+      JSON.stringify(d)
+    );
+    check(`${label}: no departure beam is drawn inward from a diamond (wrong-direction pairs = 0)`, d.wrongDirectionPairs === 0, `wrongDirectionPairs=${d.wrongDirectionPairs}`);
+    check(`${label}: all 8 departure beams are in flight together at least once`, d.maxConcurrent === 8, `maxConcurrent=${d.maxConcurrent}`);
+    check(`${label}: every departure beam reaches its diamond (last drawn tip within 10% of it)`, d.tipsReachFarEnd, JSON.stringify(d));
+    check(`${label}: a diamond is lit (brightened) on every frame its departure beam is firing`, d.litNeverBelowFiring, JSON.stringify(d));
+    check(
+      `${label}: the departure beams fire inside the deconstruct laser window (0-${OUTRO_LASER_END_MS} ms, one frame of slack)`,
+      d.firstAge !== null && d.firstAge >= 0 && d.lastAge <= OUTRO_LASER_END_MS + FRAME_MS,
+      `first=${d.firstAge} last=${d.lastAge}`
+    );
+    const arrivalFrames = outroIndex >= 0 && buildIndex >= 0 ? frames.slice(buildIndex) : [];
+    assertArrival(`${label} (next-maze arrival)`, arrivalFrames, stations, { viewport });
+  }
+
+  const handoffMs = outroIndex >= 0 && buildIndex >= 0 ? frames[buildIndex].t - frames[outroIndex].t : null;
+  check(
+    `${label}: the deconstruct hands off to the next build within ${OUTRO_TOTAL_MS} ms (+ frame slack)`,
+    handoffMs !== null && handoffMs <= OUTRO_TOTAL_MS + (FRAME_MS * 3),
+    `handoffMs=${handoffMs}`
+  );
+  const drift = ringDrift(frames);
+  check(`${label}: the ring of 8 diamonds holds its stations through the whole transfer (max drift <= 3 px)`, drift <= 3, `maxDrift=${drift}`);
+
+  const last = frames[frames.length - 1];
+  check(
+    `${label}: once the cycle completes no beam is in flight, no diamond is lit, and the player stands on the new maze's start`,
+    last.firing.length === 0 && last.lineCount === 0 && last.lit.length === 0 && last.player.x === last.start.x && last.player.y === last.start.y,
+    JSON.stringify({ firing: last.firing, lineCount: last.lineCount, lit: last.lit, player: last.player, start: last.start })
+  );
+  const legalMove = await resolveLegalMove(h.page);
+  if (legalMove !== null) {
+    const after = await moveUntilAccepted(h.page, h.stepOnce, legalMove, 200);
+    check(`${label}: real input is genuinely unlocked again after completion (a real move is accepted)`, after?.accepted === true, JSON.stringify(after));
+  }
+  const volleyCalls = await h.readVolley();
+  check(`${label}: the retired per-sigil volley (playerSpawnBurstGraphics) never drew a single beam`, volleyCalls === 0, `${volleyCalls} lineBetween call(s)`);
+};
+
 const main = async () => {
   const args = parseCliArgs();
   const baseUrl = normalizeBaseUrl(typeof args.baseUrl === 'string' ? args.baseUrl : DEFAULT_BASE_URL);
@@ -293,1091 +694,348 @@ const main = async () => {
 
   const browser = await chromium.launch({ headless: true });
   try {
-    // Real completion of one full outbound->stored->delivering->complete
-    // cycle spans the WHOLE next-maze deconstruct/build/reveal animation
-    // (armLegacyPlayerArrivalForFinalBuildStep only starts the delivery
-    // clock on that build's final step), not a short fixed window -- so
-    // the completion-wait loops below poll generously rather than assume
-    // a small fixed frame count.
-    // Polls state once per batch of real frames rather than once per real
-    // frame -- cuts Node<->browser round trips without skipping any real
-    // frame's own loop.step(t) call. 10 frames/batch * 400 batches = 4000
-    // real 16ms frames (~64s of simulated time), generous headroom over
-    // the real next-maze deconstruct/build/reveal cycle this waits on.
-    const COMPLETION_WAIT_BATCH_SIZE = 10;
-    const COMPLETION_WAIT_MAX_BATCHES = 400;
+    // A full next-maze deconstruct/build cycle is a few simulated seconds;
+    // every wait below is on scene STATE with this generous frame bound
+    // (~48 s of simulated time), never a fixed frame count.
+    const MAX_CYCLE_FRAMES = 3000;
+    const MAX_BUILD_FRAMES = 600;
 
     // ================================================================
-    // Case 1: controlled near-goal fixture, normal motion -- fast
-    // boundary check of the real full lifecycle (armed -> outbound ->
-    // stored -> delivering -> complete -> input unlocked), with the
-    // real single held primary and the real single conduit, no legacy
-    // eight-origin volley.
+    // Case 1: Start (initial arrival), normal motion. No goal is ever
+    // reached, so no transfer is armed: ALL 8 diamonds fire inward to the
+    // spawn tile, input unlocks ~1.2 s after the intro began, and the
+    // player stands on the maze start.
     // ================================================================
     {
-      const { context, page, pageErrors, stepOnce, stepN, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-      await stepN(200);
-
-      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
-      check('case 1: found a real walkable neighbor of the goal to set up from', setup !== null, 'n/a');
-      check('case 1: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
-
-      if (setup !== null) {
-        await resetLegacyVolleySpyCount(page);
-        await stepN(30); // reach the real deconstruct-arm instant
-        const armedState = await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          return {
-            phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
-            primaryId: scene.gameplayTransferPrimaryId,
-            conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
-            beamStripVisible: scene.playerTransferBeamStripImages?.some((img) => img.visible) ?? false,
-            shellInContainer: scene.gameplayTransferConduitCanvasImage?.parentContainer === scene.boardZoomContainer
-          };
-        });
-        check('case 1: a real primary was selected and held at the deconstruct-arm instant', armedState.primaryId !== null, JSON.stringify(armedState));
-        check('case 1: phase reached outbound', armedState.phase === 'outbound', JSON.stringify(armedState));
-        check('case 1: the real single conduit is visible', armedState.conduitVisible === true, JSON.stringify(armedState));
-        check('case 1: the conduit is a real boardZoomContainer child (source masking fix)', armedState.shellInContainer === true, JSON.stringify(armedState));
-        check('case 1: the OLD eight-origin beam-strip images are NOT used for a real gameplay transfer', armedState.beamStripVisible === false, JSON.stringify(armedState));
-
-        // Geometry: compare the shell's own REAL measured tip (Phaser's
-        // own TransformMatrix.transformPoint against the canonical
-        // shell's known native-tip offset -- the exact technique
-        // verify-teleport-anchor-preview-lifecycle.mjs's own "rendered
-        // port/footprint agreement" check already established and
-        // proved) against the presentation's own reported sourcePoint --
-        // not merely that the shell is visible with a non-null world
-        // position. Review 5146800659's own request.
-        const geometrySnapshot = await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          const primaryId = scene.gameplayTransferPrimaryId;
-          const shell = primaryId !== null ? scene.titleOrbitDiamondImages[primaryId] : null;
-          const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
-          if (!shell || !diag) { return null; }
-          const NATIVE_TIP_DX = 920 - 627;
-          const NATIVE_TIP_DY = 131 - 627;
-          const world = shell.getWorldTransformMatrix();
-          const measuredPort = world.transformPoint(NATIVE_TIP_DX, NATIVE_TIP_DY);
-          return { measuredPort: { x: measuredPort.x, y: measuredPort.y }, sourcePoint: diag.presentation.sourcePoint, conduitStartPoint: diag.presentation.conduitStartPoint, targetPoint: diag.presentation.targetPoint };
-        });
-        check(
-          "case 1: the shell's real measured world tip matches the presentation's own reported source point",
-          geometrySnapshot !== null
-            && Math.abs(geometrySnapshot.measuredPort.x - geometrySnapshot.sourcePoint.x) < 0.5
-            && Math.abs(geometrySnapshot.measuredPort.y - geometrySnapshot.sourcePoint.y) < 0.5,
-          JSON.stringify(geometrySnapshot)
-        );
-        check(
-          "case 1: during outbound, the conduit's fixed anchor (conduitStartPoint) is the real target (the goal), not the source",
-          geometrySnapshot !== null
-            && Math.abs(geometrySnapshot.conduitStartPoint.x - geometrySnapshot.targetPoint.x) < 0.5
-            && Math.abs(geometrySnapshot.conduitStartPoint.y - geometrySnapshot.targetPoint.y) < 0.5,
-          JSON.stringify(geometrySnapshot)
-        );
-
-        const heldPrimaryId = armedState.primaryId;
-        const trace = [];
-        let completeReached = false;
-        let sawDelivering = false;
-        for (let i = 0; i < COMPLETION_WAIT_MAX_BATCHES && !completeReached; i += 1) {
-          await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
-          const state = await page.evaluate(() => {
-            const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-            const transferState = scene.resolveLegacyPlayerTransferState(scene.time.now);
-            // Replicates drawDynamicBoard's own real playerAlpha formula
-            // exactly, from real callable/readable scene state -- NOT
-            // isLegacyMenuPointVisibleInStaticDraw, which a first attempt
-            // at this exact check used and which only reflects whether
-            // this tile has been revealed by the maze's own tile-by-tile
-            // build animation (already true almost the whole time here,
-            // since the board is long since fully revealed by this point
-            // in a real run) -- confirmed the wrong signal before
-            // shipping it. The real discriminator selects between the
-            // transfer's OWN alpha (1 during 'pending', fading via
-            // 1-outboundProgress during 'outbound', exactly 0 from that
-            // point on) while `menuStaticDrawLifecyclePhase ===
-            // 'deconstructing' && playerTransferEnergyArmed`, and an
-            // entirely separate, unrelated deconstruct/reveal alpha this
-            // feature does not own the rest of the time (most of a real
-            // 'stored' interval, once the static-draw lifecycle has moved
-            // on to 'building'/'settled') -- so the check below only
-            // asserts within the window this feature actually controls.
-            const inTransferAlphaBranch = scene.menuStaticDrawLifecyclePhase === 'deconstructing' && scene.playerTransferEnergyArmed;
-            const transferPlayerAlpha = transferState.phase === 'pending'
-              ? 1
-              : transferState.phase === 'outbound'
-                ? 1 - transferState.outboundProgress
-                : 0;
-            const markerDeconstructAlpha = scene.resolveLegacyMenuDeconstructPlayerAlpha(scene.time.now);
-            const markerRevealAlpha = scene.resolveLegacyPlayerSpawnBurstState(scene.time.now).markerRevealAlpha;
-            const playerAlpha = inTransferAlphaBranch ? transferPlayerAlpha : (markerDeconstructAlpha * markerRevealAlpha);
-            return {
-              phase: transferState.phase,
-              primaryId: scene.gameplayTransferPrimaryId,
-              conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
-              beamStripVisible: scene.playerTransferBeamStripImages?.some((img) => img.visible) ?? false,
-              inTransferAlphaBranch,
-              playerAlpha
-            };
-          });
-          trace.push(state);
-          if (state.phase === 'delivering') { sawDelivering = true; }
-          // settleLegacyPlayerTransferEnergy runs earlier in the same
-          // update() than the draw call this state is read from, and
-          // resets armed=false the INSTANT it observes phase 'complete'
-          // -- so a phase of 'complete' is never actually externally
-          // observable (this is real, confirmed by reading the two call
-          // sites' order in MenuScene.ts, not a polling-granularity
-          // artifact). 'idle' arriving right after a real 'delivering'
-          // observation IS that same completion, one tick later.
-          if (state.phase === 'complete' || (sawDelivering && state.phase === 'idle')) { completeReached = true; }
-        }
-        check('case 1: phase progressed through stored and delivering', trace.some((s) => s.phase === 'stored') && trace.some((s) => s.phase === 'delivering'), JSON.stringify(trace.map((s) => s.phase).filter((p, i, arr) => i === 0 || arr[i - 1] !== p)));
-        // Held identity: distinguishes "genuinely forgotten" (a real
-        // regression) from "the resolver reported no pose this exact
-        // frame" (poseAvailable false is a real, allowed outcome the
-        // presentation module itself documents) by checking the id
-        // itself, which this scene's own sticky-selection logic keeps
-        // non-null and CONSTANT through the entire armed session
-        // regardless of momentary pose availability -- only a genuine
-        // reset (checked separately below, at the idle/complete tail)
-        // may show null. Review 5146800659's own request.
-        const preIdleTrace = trace.filter((s) => s.phase !== 'idle' && s.phase !== 'complete');
-        check(
-          'case 1: the held primary id stays non-null and constant through the entire active/stored/delivering window (never forgotten mid-transfer)',
-          preIdleTrace.every((s) => s.primaryId === heldPrimaryId),
-          JSON.stringify(Array.from(new Set(preIdleTrace.map((s) => s.primaryId))))
-        );
-        check(
-          'case 1: the held primary id is cleared ONLY at the real completion/reset boundary, not earlier',
-          completeReached && trace[trace.length - 1].primaryId === null,
-          JSON.stringify(trace[trace.length - 1])
-        );
-        check('case 1: the old eight-origin beam strip never became visible at any point in the whole cycle', trace.every((s) => s.beamStripVisible === false), 'n/a');
-        check('case 1: conduit is closed (invisible) once the cycle genuinely completes', completeReached && !trace[trace.length - 1].conduitVisible, JSON.stringify(trace[trace.length - 1]));
-
-        // Player presentation: absent (playerAlpha === 0, the real
-        // production formula, replicated above) specifically within the
-        // window this feature's OWN alpha branch governs (outbound,
-        // while the transfer is armed and the static-draw lifecycle is
-        // still 'deconstructing'), reappears (playerAlpha > 0) once the
-        // cycle genuinely completes. Review 5146800659's own request.
-        // Batched polling (COMPLETION_WAIT_BATCH_SIZE-frame granularity)
-        // may catch anywhere from one to a few samples inside outbound's
-        // own real, short (450ms) window -- so this checks the real
-        // DIRECTION (a genuine fade toward 0, not flat or reversing), not
-        // an exact end-of-window value that batching timing could miss.
-        const ownedOutboundTrace = trace.filter((s) => s.phase === 'outbound' && s.inTransferAlphaBranch);
-        check(
-          "case 1: the real player marker genuinely fades toward 0 (not flat, not reversing) across the window this feature's own alpha branch governs (armed outbound)",
-          ownedOutboundTrace.length > 0
-            && ownedOutboundTrace[ownedOutboundTrace.length - 1].playerAlpha <= ownedOutboundTrace[0].playerAlpha
-            && ownedOutboundTrace[ownedOutboundTrace.length - 1].playerAlpha < 1,
-          JSON.stringify(ownedOutboundTrace.map((s) => s.playerAlpha))
-        );
-        check(
-          'case 1: the real player marker is visible again (playerAlpha > 0) once the cycle genuinely completes',
-          completeReached && trace[trace.length - 1].playerAlpha > 0,
-          JSON.stringify(trace[trace.length - 1])
-        );
-
-        // Confirmed real defect (review 5144999445): playerTransferBeamStripImages
-        // staying hidden (checked above) does NOT prove the OLD eight-origin
-        // volley never rendered -- drawLegacyPlayerSpawnBurst draws a
-        // completely separate set of beams directly into
-        // playerSpawnBurstGraphics with no mode branch of its own. This
-        // checks the real draw-call count on that graphics object's own
-        // lineBetween method across the ENTIRE outbound->stored->delivering->
-        // complete window, not just the moment it happens to be visible.
-        const legacyVolleyDrawCalls = await readLegacyVolleySpyCount(page);
-        check(
-          'case 1: the OLD procedural eight-origin volley (playerSpawnBurstGraphics) never drew a single beam across the whole cycle',
-          legacyVolleyDrawCalls === 0,
-          `${legacyVolleyDrawCalls} real lineBetween call(s) on playerSpawnBurstGraphics`
-        );
-
-        // After completion, real input must be genuinely unlocked again --
-        // prove it with one more REAL accepted move, not a state check
-        // alone. Direction just needs to be legal from the real current
-        // player position in the real new maze.
-        const postCompletePlayer = await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          const player = scene.player;
-          const grid = scene.maze.grid;
-          const candidates = [
-            { dx: 0, dy: -1, move: 'move_up' }, { dx: 0, dy: 1, move: 'move_down' },
-            { dx: -1, dy: 0, move: 'move_left' }, { dx: 1, dy: 0, move: 'move_right' }
-          ];
-          const legal = candidates.find((c) => grid[player.y + c.dy]?.[player.x + c.dx] === true);
-          return legal ?? null;
-        });
-        if (postCompletePlayer !== null) {
-          const postCompleteResult = await moveUntilAccepted(page, stepOnce, postCompletePlayer.move, 200);
-          check(
-            'case 1: real input is genuinely unlocked again after completion (a real move is accepted)',
-            postCompleteResult?.accepted === true,
-            JSON.stringify(postCompleteResult)
-          );
-        }
+      const h = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      const { stations, viewport } = await readStations(h.page);
+      const started = await pressStartFromMenu(h);
+      check('case 1: Start was accepted from the settled menu', started.accepted, JSON.stringify(started));
+      const build = await h.stepUntil('unlocked', 0, MAX_BUILD_FRAMES);
+      check('case 1: the first maze build finishes and unlocks input (state wait, not a fixed count)', build.met, `frames=${build.frames.length}`);
+      const labels = await readSkillLabels(h.page);
+      check('case 1: fresh progression -- diagnostics read "Player Skill Lv 01"', Array.isArray(labels) && labels.includes('Player Skill Lv 01'), JSON.stringify(labels));
+      check('case 1: no real transfer was ever armed (this case never reaches a goal)', build.frames.every((f) => f.armed === false), 'n/a');
+      assertArrival('case 1', build.frames, stations, { viewport });
+      const unlock = findUnlock(build.frames.slice(Math.max(0, build.frames.findIndex((f) => f.introActive))));
+      const unlockFrame = build.frames.find((f) => f.drawPhase === 'settled' && !f.locked);
+      check(
+        'case 1: from the Start press to unlocked input is ~1.2 s of scene time (no hidden extra delay)',
+        unlock !== null && unlockFrame !== undefined && (unlockFrame.t - started.pressedAtMs) >= INTRO_UNLOCK_MS && (unlockFrame.t - started.pressedAtMs) < INTRO_UNLOCK_MS + (UNLOCK_TOLERANCE_MS * 2),
+        `sincePressMs=${unlockFrame ? unlockFrame.t - started.pressedAtMs : null}`
+      );
+      const settled = build.frames[build.frames.length - 1];
+      check(
+        'case 1: after the arrival no beam is in flight, no diamond is lit, and the player stands on the maze start',
+        settled.firing.length === 0 && settled.lineCount === 0 && settled.lit.length === 0 && settled.player.x === settled.start.x && settled.player.y === settled.start.y,
+        JSON.stringify({ firing: settled.firing, lineCount: settled.lineCount, lit: settled.lit, player: settled.player, start: settled.start })
+      );
+      const legalMove = await resolveLegalMove(h.page);
+      if (legalMove !== null) {
+        const moved = await moveUntilAccepted(h.page, h.stepOnce, legalMove, 50);
+        check('case 1: real input is genuinely unlocked once the arrival settles (a real move is accepted)', moved?.accepted === true, JSON.stringify(moved));
       }
-
-      check('case 1: no page errors across the whole sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
+      const volleyCalls = await h.readVolley();
+      check('case 1: the retired per-sigil volley (playerSpawnBurstGraphics) never drew a single beam', volleyCalls === 0, `${volleyCalls} lineBetween call(s)`);
+      check('case 1: no page errors', h.pageErrors.length === 0, JSON.stringify(h.pageErrors));
+      await h.context.close();
     }
 
     // ================================================================
-    // Case 2: a FULL solver-driven run -- real start, real BFS-solved
-    // route, every step a real accepted movePlayPlayer command, no
-    // direct player/goal/phase/primary/elapsed-time assignment anywhere
-    // in this case. Proves the entire pipeline from an ordinary
-    // gameplay sequence, not a shortcut into the middle of it.
+    // Case 2: goal-reset on a controlled near-goal fixture (direct
+    // scene.player/trail assignment adjacent to the goal for speed; the
+    // goal-reaching STEP itself is always a real accepted movePlayPlayer).
+    // The player fires to ALL 8 diamonds, then the next maze arrives with
+    // all 8 inward beams, and the whole transfer lifecycle completes.
     // ================================================================
     {
-      const { context, page, pageErrors, stepOnce, stepN, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-      await stepN(200);
+      const h = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      const { stations, viewport } = await readStations(h.page);
+      await pressStartFromMenu(h);
+      const build = await h.stepUntil('unlocked', 0, MAX_BUILD_FRAMES);
+      check('case 2: the first build unlocked input', build.met, 'n/a');
+      const { setup, moveResult } = await setupControlledNearGoalMove(h.page, h.stepOnce);
+      check('case 2: found a real walkable neighbour of the goal to set up from', setup !== null, 'n/a');
+      check('case 2: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
+      if (setup !== null) {
+        await h.page.evaluate(() => { window.__mazerQa.resetCycleWatch(); window.__mazerQa.resetVolley(); });
+        const armed = await h.sampleNow();
+        check('case 2: reaching the goal armed a real transfer', armed.armed === true, JSON.stringify({ armed: armed.armed, transfer: armed.transfer }));
+        const cycle = await h.stepUntil('cycleComplete', 0, MAX_CYCLE_FRAMES);
+        check('case 2: the transfer cycle reached completion (state wait)', cycle.met, `frames=${cycle.frames.length}`);
+        await assertGoalCycle('case 2', cycle.frames, h, { stations, viewport });
+      }
+      check('case 2: no page errors across the whole sequence', h.pageErrors.length === 0, JSON.stringify(h.pageErrors));
+      await h.context.close();
+    }
 
-      const mazeInfo = await page.evaluate(() => {
-        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-        return { start: scene.maze.start, goal: scene.maze.goal, player: scene.player };
-      });
-      // Real production wrap-aware solver (resolveLegacyPlayableShortestPath
-      // via the QA surface), not a locally-maintained BFS.
-      const moves = await solveMazeToMoveSequence(page);
-      check('case 2: the real maze has a solvable real route (production wrap-aware solver) from the real current player position to the real goal', moves !== null && moves.length > 0, JSON.stringify({ start: mazeInfo.player, goal: mazeInfo.goal, routeLength: moves?.length ?? null }));
-
+    // ================================================================
+    // Case 3: a FULL solver-driven run -- real start, real wrap-aware
+    // solved route, every step a real accepted movePlayPlayer command, no
+    // direct player/goal assignment anywhere in this case.
+    // ================================================================
+    {
+      const h = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      const { stations, viewport } = await readStations(h.page);
+      await pressStartFromMenu(h);
+      const build = await h.stepUntil('unlocked', 0, MAX_BUILD_FRAMES);
+      check('case 3: the first build unlocked input', build.met, 'n/a');
+      const moves = await solveMazeToMoveSequence(h.page);
+      check('case 3: the real maze has a solvable route (production wrap-aware solver) from the real player position to the real goal', moves !== null && moves.length > 0, JSON.stringify({ routeLength: moves?.length ?? null }));
       if (moves !== null) {
-        await resetLegacyVolleySpyCount(page);
         let acceptedCount = 0;
         for (const move of moves) {
           // eslint-disable-next-line no-await-in-loop
-          const result = await moveUntilAccepted(page, stepOnce, move, 120);
+          const result = await moveUntilAccepted(h.page, h.stepOnce, move, 120);
           if (result?.accepted) { acceptedCount += 1; }
         }
-        check('case 2: every real BFS-solved move was eventually accepted through the real command path', acceptedCount === moves.length, JSON.stringify({ accepted: acceptedCount, expected: moves.length }));
-
-        const armedAfterSolve = await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          return { armed: scene.playerTransferEnergyArmed, phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase };
-        });
-        check('case 2: reaching the real goal via the real solved route actually armed a real transfer', armedAfterSolve.armed === true, JSON.stringify(armedAfterSolve));
-
-        let completeReached = false;
-        let sawPrimary = false;
-        let sawDelivering = false;
-        for (let i = 0; i < COMPLETION_WAIT_MAX_BATCHES && !completeReached; i += 1) {
-          await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
-          const state = await page.evaluate(() => {
-            const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-            return { phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase, primaryId: scene.gameplayTransferPrimaryId };
-          });
-          if (state.primaryId !== null) { sawPrimary = true; }
-          if (state.phase === 'delivering') { sawDelivering = true; }
-          // See case 1's own comment on this exact condition: 'complete'
-          // resets to 'idle' synchronously within the same update() it
-          // first appears in, so it is never externally observable on
-          // its own -- 'idle' right after a real 'delivering' sighting
-          // is that same completion.
-          if (state.phase === 'complete' || (sawDelivering && state.phase === 'idle')) { completeReached = true; }
-        }
-        check('case 2: a real primary was selected somewhere in the real solver-driven cycle', sawPrimary, 'n/a');
-        check('case 2: the real solver-driven cycle reached completion', completeReached, 'n/a');
-
-        const legacyVolleyDrawCalls = await readLegacyVolleySpyCount(page);
-        check(
-          'case 2: the OLD procedural eight-origin volley never drew a single beam across the whole solver-driven cycle',
-          legacyVolleyDrawCalls === 0,
-          `${legacyVolleyDrawCalls} real lineBetween call(s) on playerSpawnBurstGraphics`
-        );
+        check('case 3: every real solved move was eventually accepted through the real command path', acceptedCount === moves.length, JSON.stringify({ accepted: acceptedCount, expected: moves.length }));
+        await h.page.evaluate(() => { window.__mazerQa.resetCycleWatch(); window.__mazerQa.resetVolley(); });
+        const armed = await h.sampleNow();
+        check('case 3: reaching the real goal via the real solved route armed a real transfer', armed.armed === true, JSON.stringify({ armed: armed.armed, transfer: armed.transfer }));
+        const cycle = await h.stepUntil('cycleComplete', 0, MAX_CYCLE_FRAMES);
+        check('case 3: the solver-driven cycle reached completion', cycle.met, `frames=${cycle.frames.length}`);
+        await assertGoalCycle('case 3', cycle.frames, h, { stations, viewport });
       }
-
-      check('case 2: no page errors across the whole real solver-driven sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
+      check('case 3: no page errors across the whole real solver-driven sequence', h.pageErrors.length === 0, JSON.stringify(h.pageErrors));
+      await h.context.close();
     }
 
     // ================================================================
-    // Case 3: reduced motion -- controlled fixture (for speed), real
-    // reduced-motion emulation via a real browser context flag, not a
-    // scene-level monkeypatch.
+    // Case 4: reduced motion -- real browser reduced-motion emulation (a
+    // context flag, not a scene monkeypatch). No beams, nothing lights up,
+    // 250 ms unlock, and the transfer cycle still completes.
     // ================================================================
     {
-      const { context, page, pageErrors, stepOnce, stepN, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 }, reducedMotion: 'reduce' });
-
-      const reducedMotionActive = await page.evaluate(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-      check('case 3: reduced motion is genuinely active for this real browser context', reducedMotionActive === true, String(reducedMotionActive));
-
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-      await stepN(200);
-      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
-      check('case 3: the real goal-reaching move was accepted under reduced motion', moveResult?.accepted === true, JSON.stringify(moveResult));
-
-      // Review 5146800659's own request: verify the real intermediate
-      // crossfade alpha values (not just "visible at least once"), the
-      // real absence of a traveling packet throughout, a stable material
-      // (openFraction never spikes back to a fresh 1 mid-fade-out), and
-      // real completion -- reading resolveTeleportTransferPresentation's
-      // own reported fields directly via the new diagnostics QA surface.
-      const trace = [];
-      let sawDelivering = false;
-      let completeReached = false;
-      const readReducedMotionState = () => page.evaluate(() => {
-        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-        const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
-        return {
-          phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
-          conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
-          openFraction: diag?.presentation.openFraction ?? null,
-          packetVisible: diag?.presentation.packetVisible ?? null
-        };
-      });
+      const h = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 }, reducedMotion: 'reduce' });
+      const { stations, viewport } = await readStations(h.page);
+      const reducedMotionActive = await h.page.evaluate(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      check('case 4: reduced motion is genuinely active for this real browser context', reducedMotionActive === true, String(reducedMotionActive));
+      await pressStartFromMenu(h);
+      const build = await h.stepUntil('unlocked', 0, MAX_BUILD_FRAMES);
+      check('case 4: the first build unlocks input under reduced motion', build.met, 'n/a');
+      assertArrival('case 4', build.frames, stations, { reducedMotion: true });
+      const { setup, moveResult } = await setupControlledNearGoalMove(h.page, h.stepOnce);
+      check('case 4: the real goal-reaching move was accepted under reduced motion', moveResult?.accepted === true, JSON.stringify(moveResult));
       if (setup !== null) {
-        // Fine, single-frame stepping first -- the real crossfade windows
-        // (TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS /
-        // TELEPORT_TRANSFER_REDUCED_MOTION_FADE_EDGE_MS) are short (under
-        // 200ms), so this is what actually samples the real intermediate
-        // fade values rather than skipping past them in one large batch.
-        for (let i = 0; i < 120; i += 1) {
-          await stepOnce();
-          trace.push(await readReducedMotionState());
-          if (trace[trace.length - 1].phase === 'delivering') { sawDelivering = true; }
-          if (trace[trace.length - 1].phase === 'complete' || (sawDelivering && trace[trace.length - 1].phase === 'idle')) { completeReached = true; break; }
-        }
-        // Then coarse batched stepping (same generous budget as the
-        // completion-wait loops elsewhere in this file) to actually reach
-        // real completion -- the real next-maze build the rest of this
-        // cycle waits on is not short, and 120 single-stepped frames
-        // (< 2s) alone was nowhere near enough real time for it.
-        for (let i = 0; i < COMPLETION_WAIT_MAX_BATCHES && !completeReached; i += 1) {
-          await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
-          const state = await readReducedMotionState();
-          trace.push(state);
-          if (state.phase === 'delivering') { sawDelivering = true; }
-          if (state.phase === 'complete' || (sawDelivering && state.phase === 'idle')) { completeReached = true; }
-        }
+        await h.page.evaluate(() => { window.__mazerQa.resetCycleWatch(); window.__mazerQa.resetVolley(); });
+        const cycle = await h.stepUntil('cycleComplete', 0, MAX_CYCLE_FRAMES);
+        check('case 4: the reduced-motion cycle genuinely reaches completion', cycle.met, `frames=${cycle.frames.length}`);
+        await assertGoalCycle('case 4', cycle.frames, h, { stations, viewport, reducedMotion: true });
       }
-      check('case 3: reduced motion still shows a real transfer (short crossfade), not nothing', trace.some((s) => s.conduitVisible), JSON.stringify(trace.map((s) => `${s.phase}/${s.conduitVisible}`)));
+      check('case 4: no page errors under reduced motion', h.pageErrors.length === 0, JSON.stringify(h.pageErrors));
+      await h.context.close();
+    }
 
-      const withOpenFraction = trace.filter((s) => typeof s.openFraction === 'number');
-      const intermediateFractions = withOpenFraction.map((s) => s.openFraction).filter((v) => v > 0.02 && v < 0.98);
+    // ================================================================
+    // Case 5: compact/touch-emulated layout -- a real narrow viewport with
+    // a real touch-capable context. The same 8-in / 8-out beams, with every
+    // diamond inside a 390x844 viewport.
+    // ================================================================
+    {
+      const h = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+      const { stations, viewport } = await readStations(h.page);
+      check('case 5: the compact viewport is genuinely 390x844 and all 8 stations sit inside it', viewport.width === 390 && viewport.height === 844 && stations.length === 8 && stations.every((s) => s.x >= 0 && s.y >= 0 && s.x <= viewport.width && s.y <= viewport.height), JSON.stringify({ viewport, stations }));
+      await pressStartFromMenu(h);
+      const build = await h.stepUntil('unlocked', 0, MAX_BUILD_FRAMES);
+      check('case 5: the first build unlocks input on the compact/touch layout', build.met, 'n/a');
+      assertArrival('case 5', build.frames, stations, { viewport });
+      const { setup, moveResult } = await setupControlledNearGoalMove(h.page, h.stepOnce);
+      check('case 5: the real goal-reaching move was accepted on the compact/touch layout', moveResult?.accepted === true, JSON.stringify(moveResult));
+      if (setup !== null) {
+        await h.page.evaluate(() => { window.__mazerQa.resetCycleWatch(); window.__mazerQa.resetVolley(); });
+        const cycle = await h.stepUntil('cycleComplete', 0, MAX_CYCLE_FRAMES);
+        check('case 5: the transfer cycle reached completion on the compact/touch layout', cycle.met, `frames=${cycle.frames.length}`);
+        await assertGoalCycle('case 5', cycle.frames, h, { stations, viewport });
+      }
+      check('case 5: no page errors on the compact/touch layout', h.pageErrors.length === 0, JSON.stringify(h.pageErrors));
+      await h.context.close();
+    }
+
+    // ================================================================
+    // Case 6: pause during the DEPARTURE beams (goal-reset laser window).
+    // Pause holds the beams, the outro clock and the coupled maze lifecycle
+    // still; resume continues the same beams without racing ahead.
+    // ================================================================
+    {
+      const h = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      const { stations } = await readStations(h.page);
+      await pressStartFromMenu(h);
+      await h.stepUntil('unlocked', 0, MAX_BUILD_FRAMES);
+      const { setup, moveResult } = await setupControlledNearGoalMove(h.page, h.stepOnce);
+      check('case 6: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
+      if (setup !== null) {
+        await h.page.evaluate(() => { window.__mazerQa.resetCycleWatch(); window.__mazerQa.resetVolley(); });
+        const pre = await h.stepUntil('outroAgeAtLeast', 200, 400);
+        const before = pre.frames[pre.frames.length - 1];
+        check('case 6: reached the departure laser window with beams in flight', pre.met && before.firing.length > 0 && before.laserProgress > 0 && before.laserProgress < 1, JSON.stringify(before));
+        const boardBefore = await readBoardProgress(h.page);
+        const pauseResult = await h.page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
+        check('case 6: the real openPauseOverlay QA command was accepted', pauseResult?.accepted === true, JSON.stringify(pauseResult));
+        await h.stepOnce();
+        const first = await h.sampleNow();
+        await h.stepN(50);
+        const during = await h.sampleNow();
+        const boardDuring = await readBoardProgress(h.page);
+        check('case 6: the pause overlay genuinely opened', during.overlay === 'pause', JSON.stringify({ overlay: during.overlay }));
+        check(
+          'case 6: the departure beams are held still while paused (outro clock and laser progress identical across 50 paused frames)',
+          during.outroAge === first.outroAge && during.laserProgress === first.laserProgress && sameList(during.firing, first.firing),
+          JSON.stringify({ first: { age: first.outroAge, p: first.laserProgress }, during: { age: during.outroAge, p: during.laserProgress } })
+        );
+        check('case 6: the transfer phase is held while paused', during.transfer === first.transfer, JSON.stringify({ first: first.transfer, during: during.transfer }));
+        check(
+          'case 6: the coupled maze lifecycle is frozen while paused (draw phase, row/tile counters, visible-tile count, pending generation/reset)',
+          boardProgressFrozen(boardBefore, boardDuring),
+          JSON.stringify({ boardBefore, boardDuring })
+        );
+        const resumeDispatch = await h.page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RESUME_RUN' }));
+        check('case 6: the real RESUME_RUN bridge command was accepted', resumeDispatch?.ok === true, JSON.stringify(resumeDispatch));
+        await h.stepOnce();
+        const afterResume = await h.sampleNow();
+        const progressDelta = afterResume.laserProgress - during.laserProgress;
+        check('case 6: the pause overlay closed and the beams advance by about one frame on resume (no jump over the paused interval)', afterResume.overlay === 'none' && progressDelta >= 0 && progressDelta <= 0.2, JSON.stringify({ overlay: afterResume.overlay, progressDelta }));
+        const post = await h.stepUntil('cycleComplete', 0, MAX_CYCLE_FRAMES);
+        check('case 6: the cycle completes after resume', post.met, `frames=${post.frames.length}`);
+        const all = [...pre.frames, ...post.frames];
+        const d = analyzeBeams(all.filter((f) => f.outroAge !== null), stations, 'outward');
+        check('case 6: the pause lost no beam -- all 8 departure beams still fired across pre- and post-resume frames', sameList(d.sceneIds, ALL_STATION_IDS) && sameList(d.geometryIds, ALL_STATION_IDS), JSON.stringify(d));
+        check('case 6: the remaining beams kept firing after resume (it continued, it did not restart or vanish)', post.frames.some((f) => f.outroAge !== null && f.firing.length > 0), 'n/a');
+        const last = post.frames[post.frames.length - 1];
+        check('case 6: the next maze arrived and input is unlocked', last.player.x === last.start.x && last.player.y === last.start.y && !last.locked, JSON.stringify({ player: last.player, start: last.start, locked: last.locked }));
+      }
+      check('case 6: no page errors across the pause/resume sequence', h.pageErrors.length === 0, JSON.stringify(h.pageErrors));
+      await h.context.close();
+    }
+
+    // ================================================================
+    // Case 6b: pause during the STORED interval (the maze deconstruct /
+    // rebuild window -- the exact scenario a reviewer's recording captured).
+    // ================================================================
+    {
+      const h = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      await pressStartFromMenu(h);
+      await h.stepUntil('unlocked', 0, MAX_BUILD_FRAMES);
+      const { setup, moveResult } = await setupControlledNearGoalMove(h.page, h.stepOnce);
+      check('case 6b: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
+      if (setup !== null) {
+        await h.page.evaluate(() => { window.__mazerQa.resetCycleWatch(); window.__mazerQa.resetVolley(); });
+        const pre = await h.stepUntil('transferPhase', 'stored', 400);
+        check('case 6b: the real cycle reaches the stored interval before pausing', pre.met, `frames=${pre.frames.length}`);
+        const before = await h.sampleNow();
+        const boardBefore = await readBoardProgress(h.page);
+        const pauseResult = await h.page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
+        check('case 6b: the real openPauseOverlay QA command was accepted (stored interval)', pauseResult?.accepted === true, JSON.stringify(pauseResult));
+        await h.stepOnce();
+        const first = await h.sampleNow();
+        await h.stepN(80);
+        const during = await h.sampleNow();
+        const boardDuring = await readBoardProgress(h.page);
+        check(
+          'case 6b: the maze reveal/deconstruct lifecycle is frozen through the whole longer pause (no tiles disappear behind the pause menu)',
+          boardProgressFrozen(boardBefore, boardDuring),
+          JSON.stringify({ boardBefore, boardDuring })
+        );
+        check(
+          'case 6b: the transfer phase and the outro/intro clocks are held through the longer pause',
+          during.transfer === before.transfer && during.outroAge === first.outroAge && during.introAge === first.introAge,
+          JSON.stringify({ before: before.transfer, during: during.transfer, firstOutro: first.outroAge, duringOutro: during.outroAge, firstIntro: first.introAge, duringIntro: during.introAge })
+        );
+        const resumeDispatch = await h.page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RESUME_RUN' }));
+        check('case 6b: the real RESUME_RUN bridge command was accepted (stored interval)', resumeDispatch?.ok === true, JSON.stringify(resumeDispatch));
+        await h.stepOnce();
+        const afterResume = await h.sampleNow();
+        const boardAfter = await readBoardProgress(h.page);
+        check(
+          'case 6b: the deconstruct/rebuild does not race ahead on the first resumed frame (no completion or next-maze handoff jumped forward)',
+          boardAfter.drawPhase === boardDuring.drawPhase
+            && Math.abs(boardAfter.revealedTileCount - boardDuring.revealedTileCount) <= 6
+            && boardAfter.mazeStartKey === boardDuring.mazeStartKey
+            && boardAfter.generationPending === boardDuring.generationPending
+            && afterResume.transfer === during.transfer,
+          JSON.stringify({ boardDuring, boardAfter, duringTransfer: during.transfer, afterTransfer: afterResume.transfer })
+        );
+        const post = await h.stepUntil('cycleComplete', 0, MAX_CYCLE_FRAMES);
+        check('case 6b: the cycle completes after resume', post.met, `frames=${post.frames.length}`);
+      }
+      check('case 6b: no page errors across the stored-interval pause/resume', h.pageErrors.length === 0, JSON.stringify(h.pageErrors));
+      await h.context.close();
+    }
+
+    // ================================================================
+    // Case 6c: pause during the INITIAL ARRIVAL beams (no goal ever
+    // reached). The intro clock freezes; after resume input still unlocks
+    // ~1.2 s of INTRO time in -- the paused interval did not eat the intro.
+    // ================================================================
+    {
+      const h = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      const { stations } = await readStations(h.page);
+      const started = await pressStartFromMenu(h);
+      const pre = await h.stepUntil('introAgeAtLeast', 250, 200);
+      const before = pre.frames[pre.frames.length - 1];
+      check('case 6c: reached the initial-arrival laser window with beams in flight', pre.met && before.firing.length > 0, JSON.stringify(before));
+      const boardBefore = await readBoardProgress(h.page);
+      const pauseResult = await h.page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
+      check('case 6c: the real openPauseOverlay QA command was accepted during initial arrival', pauseResult?.accepted === true, JSON.stringify(pauseResult));
+      await h.stepOnce();
+      const first = await h.sampleNow();
+      await h.stepN(50);
+      const during = await h.sampleNow();
+      const boardDuring = await readBoardProgress(h.page);
+      check('case 6c: the intro clock and laser progress are held identically while paused', during.introAge === first.introAge && during.laserProgress === first.laserProgress, JSON.stringify({ first: first.introAge, during: during.introAge }));
+      check('case 6c: the first maze reveal is frozen while paused too (draw phase, row/tile counters, visible-tile count)', boardProgressFrozen(boardBefore, boardDuring), JSON.stringify({ boardBefore, boardDuring }));
+      const resumeDispatch = await h.page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RESUME_RUN' }));
+      check('case 6c: the real RESUME_RUN bridge command was accepted during initial arrival', resumeDispatch?.ok === true, JSON.stringify(resumeDispatch));
+      await h.stepOnce();
+      const post = await h.stepUntil('unlocked', 0, MAX_BUILD_FRAMES);
+      check('case 6c: the build unlocks input after resume', post.met, 'n/a');
+      const unlock = findUnlock(post.frames);
       check(
-        'case 3: reduced motion shows real INTERMEDIATE crossfade alpha values, not a flat on/off step',
-        intermediateFractions.length > 0,
-        JSON.stringify(withOpenFraction.map((s) => s.openFraction.toFixed(3)))
+        'case 6c: the pause did not consume the intro -- input still unlocks ~1.2 s of intro time in, well over 1.2 s after the Start press',
+        unlock !== null && unlock.age >= INTRO_UNLOCK_MS && unlock.age < INTRO_UNLOCK_MS + (UNLOCK_TOLERANCE_MS * 2)
+          && (post.frames[unlock.index].t - started.pressedAtMs) >= INTRO_UNLOCK_MS + (50 * FRAME_MS),
+        JSON.stringify({ unlock, sincePress: post.frames[unlock?.index ?? 0]?.t - started.pressedAtMs })
       );
-      check(
-        'case 3: reduced motion never shows a traveling packet (packetVisible is always false)',
-        withOpenFraction.length > 0 && withOpenFraction.every((s) => s.packetVisible === false),
-        JSON.stringify(Array.from(new Set(withOpenFraction.map((s) => s.packetVisible))))
-      );
-      check('case 3: the reduced-motion cycle genuinely reaches completion', completeReached, 'n/a');
-      check('case 3: no page errors under reduced motion', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
+      const a = analyzeBeams([...pre.frames, ...post.frames].filter((f) => f.introActive), stations, 'inward');
+      check('case 6c: the pause lost no beam -- all 8 arrival beams still fired across pre- and post-resume frames', sameList(a.sceneIds, ALL_STATION_IDS) && sameList(a.geometryIds, ALL_STATION_IDS), JSON.stringify(a));
+      check('case 6c: no page errors during the initial-arrival pause/resume', h.pageErrors.length === 0, JSON.stringify(h.pageErrors));
+      await h.context.close();
     }
 
     // ================================================================
-    // Case 4: pause mid-transfer -- controlled fixture, real
-    // openPauseOverlay/RESUME_RUN QA/bridge commands.
+    // Case 6d negative controls: with holdLegacyPlayMazeLifecycleDuringPause
+    // patched to a no-op in its own isolated context, the maze lifecycle AND
+    // the intro clock DO keep advancing while paused -- exactly the defect
+    // cases 6/6b/6c catch. Proves those assertions depend on the fix, not on
+    // the scene happening to be idle. The patch never leaves this context.
     // ================================================================
     {
-      const { context, page, pageErrors, stepOnce, stepN } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-      await stepN(200);
-      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
-      check('case 4: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
-
-      // Real per-step size (stepOnce always advances the manual clock by
-      // exactly 16ms) -- the tolerance below is derived directly from
-      // that, not a generic round number. Review 5146800659's own
-      // request.
-      const REAL_STEP_MS = 16;
-      const readPauseDiagnostics = () => page.evaluate(() => {
-        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-        const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
-        return {
-          overlay: scene.overlay,
-          primaryId: scene.gameplayTransferPrimaryId,
-          phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
-          animationElapsed: scene.gameplayTransferAnimationElapsedMs,
-          conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
-          openFraction: diag?.presentation.openFraction ?? null,
-          packetVisible: diag?.presentation.packetVisible ?? null,
-          sourceFlareIntensity: diag?.presentation.sourceFlareIntensity ?? null
-        };
-      });
-
-      if (setup !== null) {
-        await stepN(28); // real primary held, conduit genuinely open
-
-        const beforePause = await readPauseDiagnostics();
-        const boardBeforePause = await readBoardProgress(page);
-        const pauseResult = await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
-        check('case 4: the real openPauseOverlay QA command was accepted', pauseResult?.accepted === true, JSON.stringify(pauseResult));
-
-        // Diagnostic: capture the primary id on the very first frame after
-        // pause opens, and again after 50 more paused frames, to tell
-        // apart "reselected the instant the overlay opened" from
-        // "drifted slowly while paused" from "only changes on resume".
-        await stepOnce();
-        const primaryIdJustAfterPauseOpen = await page.evaluate(() => window.__MAZER_GAME__.scene.getScene('MenuScene').gameplayTransferPrimaryId);
-        await stepN(50);
-        const duringPause = await readPauseDiagnostics();
-        const boardDuringPause = await readBoardProgress(page);
-        check('case 4: pause overlay genuinely opened', duringPause.overlay === 'pause', JSON.stringify(duringPause));
-        check(
-          'case 4: the coupled maze reveal/deconstruct lifecycle is genuinely frozen while paused (draw phase, row/tile counters, visible-tile count, pending generation/reset -- the corridor does not keep disappearing behind the pause menu)',
-          boardProgressFrozen(boardBeforePause, boardDuringPause),
-          JSON.stringify({ boardBeforePause, boardDuringPause })
-        );
-        check(
-          'case 4: the material animation clock genuinely freezes while paused (does not keep advancing)',
-          duringPause.animationElapsed === beforePause.animationElapsed,
-          JSON.stringify({ beforePause, duringPause })
-        );
-        // Confirmed real defect (review 5147427468, continuing 5144999445 /
-        // 5146800659), fixed at the source: a first attempt at this exact
-        // check asserted full presentation stasis and caught the
-        // underlying lifecycle timer legitimately advancing during a
-        // "paused" window (phase genuinely progressing outbound ->
-        // stored) -- scene.time.now is never itself frozen by opening the
-        // pause overlay (this.scene.pause() is never called anywhere in
-        // this codebase). Fixed with a narrowly scoped pause-aware
-        // elapsed-time correction at the scene's own transfer/arrival
-        // boundary (gameplayTransferPausedDurationMs/PauseStartedAtMs) --
-        // NOT a second gameplay state machine or a second clock; the one
-        // authoritative lifecycle (resolveLegacyPlayerTransferVisualState)
-        // is untouched, only the elapsed-ms INPUTS this scene feeds it are
-        // now pause-compensated. This check now asserts genuine freeze.
-        check(
-          'case 4: the real presentation (phase/openFraction/packetVisible/sourceFlareIntensity) is genuinely frozen identically while paused, open-conduit interval',
-          duringPause.phase === beforePause.phase
-            && duringPause.openFraction === beforePause.openFraction
-            && duringPause.packetVisible === beforePause.packetVisible
-            && duringPause.sourceFlareIntensity === beforePause.sourceFlareIntensity,
-          JSON.stringify({ beforePause, duringPause })
-        );
-
-        const resumeDispatch = await page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RESUME_RUN' }));
-        check('case 4: the real RESUME_RUN bridge command was accepted', resumeDispatch?.ok === true, JSON.stringify(resumeDispatch));
-
-        // First resumed frame: no accumulated pause-time jump in the
-        // material clock. Step exactly one real frame past resume and
-        // confirm the elapsed delta is that one frame, not the whole
-        // paused interval.
-        await stepOnce();
-        const afterResume = await readPauseDiagnostics();
-        const boardAfterResume = await readBoardProgress(page);
-        check('case 4: pause overlay genuinely closed again after RESUME_RUN', afterResume.overlay === 'none', JSON.stringify(afterResume));
-        check(
-          'case 4: the maze reveal/deconstruct lifecycle does not race ahead on the first resumed frame (no next-maze handoff or completion jumped forward behind the frozen effect)',
-          boardAfterResume.drawPhase === boardDuringPause.drawPhase
-            && Math.abs(boardAfterResume.revealedTileCount - boardDuringPause.revealedTileCount) <= 4
-            && boardAfterResume.mazeStartKey === boardDuringPause.mazeStartKey
-            && boardAfterResume.generationPending === boardDuringPause.generationPending,
-          JSON.stringify({ boardDuringPause, boardAfterResume })
-        );
-        check(
-          'case 4: the held primary survived the pause/resume cycle unchanged',
-          afterResume.primaryId === beforePause.primaryId,
-          JSON.stringify({
-            beforePause: beforePause.primaryId,
-            justAfterPauseOpen: primaryIdJustAfterPauseOpen,
-            duringPause: duringPause.primaryId,
-            afterResume: afterResume.primaryId
-          })
-        );
-        const deltaMs = afterResume.animationElapsed - duringPause.animationElapsed;
-        check(
-          'case 4: the material clock advances by roughly one real frame after resume (tolerance derived from the real 16ms step), not the whole paused interval',
-          deltaMs >= 0 && deltaMs <= REAL_STEP_MS * 3,
-          JSON.stringify({ duringPauseElapsed: duringPause.animationElapsed, afterResumeElapsed: afterResume.animationElapsed, deltaMs, toleranceMs: REAL_STEP_MS * 3 })
-        );
-        check(
-          'case 4: the real lifecycle phase does not jump on resume (still the same phase one real frame later, not raced ahead)',
-          afterResume.phase === duringPause.phase,
-          JSON.stringify({ duringPausePhase: duringPause.phase, afterResumePhase: afterResume.phase })
-        );
-      }
-
-      check('case 4: no page errors across the pause/resume sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
-    }
-
-    // ================================================================
-    // Case 4b: pause during the CLOSED/STORED interval specifically
-    // (distinct from case 4's open-conduit pause). Review 5146800659's
-    // own request: cover both open-conduit and closed/stored intervals.
-    // ================================================================
-    {
-      const { context, page, pageErrors, stepOnce, stepN, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-      await stepN(200);
-      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
-      check('case 4b: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
-
-      if (setup !== null) {
-        // Wait for the real phase to genuinely settle into 'stored'
-        // (past outbound's own real 450ms window) before pausing --
-        // a real closed/settled interval, not a fixed guessed frame
-        // count.
-        let reachedStored = false;
-        for (let i = 0; i < 100 && !reachedStored; i += 1) {
-          await stepOnce();
-          const phase = await page.evaluate(() => {
-            const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-            return scene.resolveLegacyPlayerTransferState(scene.time.now).phase;
-          });
-          if (phase === 'stored') { reachedStored = true; }
-        }
-        check('case 4b: the real cycle reaches the stored interval before pausing', reachedStored, 'n/a');
-
-        const readDiag = () => page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
-          return {
-            phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
-            primaryId: scene.gameplayTransferPrimaryId,
-            animationElapsed: scene.gameplayTransferAnimationElapsedMs,
-            conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
-            openFraction: diag?.presentation.openFraction ?? null,
-            sourceFlareIntensity: diag?.presentation.sourceFlareIntensity ?? null
-          };
-        });
-        const beforePause = await readDiag();
-        // The 'stored' interval IS the maze deconstruct/rebuild window --
-        // the exact scenario the reviewer's pause recording captured.
-        const boardBeforePause = await readBoardProgress(page);
-        const pauseResult = await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
-        check('case 4b: the real openPauseOverlay QA command was accepted (stored interval)', pauseResult?.accepted === true, JSON.stringify(pauseResult));
-        await stepOnce();
-        await stepBatch(80); // a real, longer paused interval this time
-        const duringPause = await readDiag();
-        const boardDuringPause = await readBoardProgress(page);
-        check(
-          'case 4b: the coupled maze reveal/deconstruct lifecycle is frozen through the whole longer pause during the stored interval (draw phase, row/tile counters, visible-tile count, pending generation/reset all identical -- no tiles disappear behind the pause menu)',
-          boardProgressFrozen(boardBeforePause, boardDuringPause),
-          JSON.stringify({ boardBeforePause, boardDuringPause })
-        );
-        check(
-          'case 4b: the material animation clock genuinely freezes through a longer real pause during the stored/closed interval too',
-          duringPause.animationElapsed === beforePause.animationElapsed,
-          JSON.stringify({ beforePause, duringPause })
-        );
-        // Fixed at the source (see case 4's own comment on this exact
-        // defect and its fix) -- the pause-aware elapsed-time correction
-        // applies just as much to a longer pause as a short one.
-        check(
-          'case 4b: the real presentation is genuinely frozen identically through a longer real pause during the stored/closed interval too',
-          duringPause.phase === beforePause.phase
-            && duringPause.conduitVisible === beforePause.conduitVisible
-            && duringPause.openFraction === beforePause.openFraction
-            && duringPause.sourceFlareIntensity === beforePause.sourceFlareIntensity,
-          JSON.stringify({ beforePause, duringPause })
-        );
-
-        const resumeDispatch = await page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RESUME_RUN' }));
-        check('case 4b: the real RESUME_RUN bridge command was accepted (stored interval)', resumeDispatch?.ok === true, JSON.stringify(resumeDispatch));
-        await stepOnce();
-        const afterResume = await readDiag();
-        const boardAfterResume = await readBoardProgress(page);
-        check(
-          'case 4b: the maze deconstruct/rebuild does not race ahead on the first resumed frame after the longer stored-interval pause (no completion or next-maze handoff jumped forward)',
-          boardAfterResume.drawPhase === boardDuringPause.drawPhase
-            && Math.abs(boardAfterResume.revealedTileCount - boardDuringPause.revealedTileCount) <= 6
-            && boardAfterResume.mazeStartKey === boardDuringPause.mazeStartKey
-            && boardAfterResume.generationPending === boardDuringPause.generationPending,
-          JSON.stringify({ boardDuringPause, boardAfterResume })
-        );
-        check(
-          'case 4b: the held primary survived a pause/resume cycle during the stored/closed interval unchanged',
-          afterResume.primaryId === beforePause.primaryId,
-          JSON.stringify({ before: beforePause.primaryId, after: afterResume.primaryId })
-        );
-        const deltaMs = afterResume.animationElapsed - duringPause.animationElapsed;
-        check(
-          'case 4b: the material clock advances by roughly one real frame after resume (tolerance derived from the real 16ms step), not the whole paused interval, in the stored/closed case too',
-          deltaMs >= 0 && deltaMs <= 16 * 3,
-          JSON.stringify({ duringPauseElapsed: duringPause.animationElapsed, afterResumeElapsed: afterResume.animationElapsed, deltaMs })
-        );
-        check(
-          'case 4b: the real lifecycle phase does not jump on resume in the stored/closed case either',
-          afterResume.phase === duringPause.phase,
-          JSON.stringify({ duringPausePhase: duringPause.phase, afterResumePhase: afterResume.phase })
-        );
-      }
-      check('case 4b: no page errors across the stored-interval pause/resume sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
-    }
-
-    // ================================================================
-    // Case 4c: pause during the INITIAL ARRIVAL (no goal ever reached,
-    // no transfer ever armed) -- review 5147427468's own explicit
-    // request, distinct from cases 4/4b which both pause a REAL armed
-    // transfer. Exercises the shared pause-aware elapsed-time correction
-    // via resolveLegacyPlayerSpawnBurstState specifically.
-    // ================================================================
-    {
-      const { context, page, pageErrors, stepOnce, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-
-      // Confirmed real defect (found live this round): a tight 60-iteration
-      // stepOnce() budget assumed the initial reveal/arrival conduit shows
-      // up almost immediately. Case 7 already established the real timing
-      // is not that short and uses the same generous batched-polling
-      // budget as the completion-wait loops elsewhere in this file --
-      // matching that pattern here instead of guessing a smaller one.
-      let sawArrivalConduit = false;
-      for (let i = 0; i < COMPLETION_WAIT_MAX_BATCHES && !sawArrivalConduit; i += 1) {
-        await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
-        const visible = await page.evaluate(() => window.__MAZER_GAME__.scene.getScene('MenuScene').gameplayTransferConduitCanvasImage?.visible ?? false);
-        if (visible) { sawArrivalConduit = true; }
-      }
-      check('case 4c: the real initial-arrival conduit became visible before pausing', sawArrivalConduit, 'n/a');
-
-      if (sawArrivalConduit) {
-        const readArrivalDiag = () => page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
-          return {
-            spawnBurstActive: scene.resolveLegacyPlayerSpawnBurstState(scene.time.now).active,
-            primaryId: scene.gameplayTransferPrimaryId,
-            conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
-            openFraction: diag?.presentation.openFraction ?? null
-          };
-        });
-        const beforePause = await readArrivalDiag();
-        // The initial arrival overlaps the very first maze BUILD -- pausing
-        // here must hold that reveal still too.
-        const boardBeforePause = await readBoardProgress(page);
-        const pauseResult = await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
-        check('case 4c: the real openPauseOverlay QA command was accepted during initial arrival', pauseResult?.accepted === true, JSON.stringify(pauseResult));
-        await stepOnce();
-        await stepBatch(50);
-        const duringPause = await readArrivalDiag();
-        const boardDuringPause = await readBoardProgress(page);
-        check(
-          'case 4c: the real initial-arrival presentation is genuinely frozen identically while paused',
-          duringPause.spawnBurstActive === beforePause.spawnBurstActive
-            && duringPause.conduitVisible === beforePause.conduitVisible
-            && duringPause.openFraction === beforePause.openFraction,
-          JSON.stringify({ beforePause, duringPause })
-        );
-        check(
-          'case 4c: the first maze reveal that overlaps the initial arrival is frozen while paused too (draw phase, row/tile counters, visible-tile count all identical)',
-          boardProgressFrozen(boardBeforePause, boardDuringPause),
-          JSON.stringify({ boardBeforePause, boardDuringPause })
-        );
-        const resumeDispatch = await page.evaluate(() => window.__MAZER_QA__.dispatchUiCommand({ type: 'RESUME_RUN' }));
-        check('case 4c: the real RESUME_RUN bridge command was accepted during initial arrival', resumeDispatch?.ok === true, JSON.stringify(resumeDispatch));
-        await stepOnce();
-        const afterResume = await readArrivalDiag();
-        check(
-          'case 4c: the held primary survived a pause/resume cycle during initial arrival unchanged',
-          afterResume.primaryId === beforePause.primaryId,
-          JSON.stringify({ before: beforePause.primaryId, after: afterResume.primaryId })
-        );
-        check(
-          'case 4c: the initial-arrival presentation does not jump on the first resumed frame',
-          afterResume.spawnBurstActive === duringPause.spawnBurstActive,
-          JSON.stringify({ duringPause, afterResume })
-        );
-      }
-      check('case 4c: no page errors during the initial-arrival pause/resume sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
-    }
-
-    // ================================================================
-    // Case 4d negative control (ChatGPT-assisted review 5173052153): with
-    // holdLegacyPlayMazeLifecycleDuringPause patched to a no-op in its own
-    // isolated context, the coupled maze reveal/deconstruct lifecycle DOES
-    // keep advancing while paused (tiles disappear behind the pause menu)
-    // -- exactly the defect the reviewer's recording showed, and exactly
-    // what cases 4/4b's board-frozen assertions now catch. Proves those
-    // assertions depend on the fix, not on the maze happening to be idle.
-    // The patch never leaves this context.
-    // ================================================================
-    {
-      const { context, page, pageErrors, stepOnce, stepN } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
-      await page.evaluate(() => {
+      const h = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
+      await h.page.evaluate(() => {
         const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
         scene.holdLegacyPlayMazeLifecycleDuringPause = () => {};
       });
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-      await stepN(200);
-      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
-      check('case 4d negative control: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
-
-      if (setup !== null) {
-        // Reach the deconstruct/rebuild ('stored') interval -- the reviewer's scenario.
-        let reachedStored = false;
-        for (let i = 0; i < 120 && !reachedStored; i += 1) {
-          await stepOnce();
-          const s = await page.evaluate(() => {
-            const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-            return {
-              phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
-              drawPhase: scene.menuStaticDrawLifecyclePhase
-            };
-          });
-          if (s.phase === 'stored' && (s.drawPhase === 'deconstructing' || s.drawPhase === 'building')) { reachedStored = true; }
-        }
-        check('case 4d negative control: reached the stored/deconstruct interval', reachedStored, 'n/a');
-
-        const boardBeforePause = await readBoardProgress(page);
-        await page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
-        await stepN(60);
-        const boardDuringPause = await readBoardProgress(page);
-        check(
-          'case 4d negative control: with the pause-hold disabled, the maze reveal/deconstruct genuinely KEEPS advancing while paused (the fix in cases 4/4b is load-bearing)',
-          !boardProgressFrozen(boardBeforePause, boardDuringPause),
-          JSON.stringify({ boardBeforePause, boardDuringPause })
-        );
-      }
-      check('case 4d negative control: no page errors', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
-    }
-
-    // ================================================================
-    // Case 5: compact/touch-emulated layout -- a real narrow viewport
-    // with a real touch-capable context, controlled fixture for speed.
-    // Proves the transfer cycle still completes and the conduit/shell
-    // stay geometrically aligned at a real different mazeTileSize.
-    // ================================================================
-    {
-      const { context, page, pageErrors, stepOnce, stepN, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-      await stepN(200);
-      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
-      check('case 5: the real goal-reaching move was accepted on the compact/touch layout', moveResult?.accepted === true, JSON.stringify(moveResult));
-
-      if (setup !== null) {
-        let completeReached = false;
-        let sawAlignedConduit = false;
-        let sawDelivering = false;
-        for (let i = 0; i < COMPLETION_WAIT_MAX_BATCHES && !completeReached; i += 1) {
-          await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
-          const state = await page.evaluate(() => {
-            const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-            const image = scene.gameplayTransferConduitCanvasImage;
-            return {
-              phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
-              conduitVisible: image?.visible ?? null,
-              conduitInContainer: image?.parentContainer === scene.boardZoomContainer,
-              conduitWidth: image?.displayWidth ?? 0,
-              conduitHeight: image?.displayHeight ?? 0
-            };
-          });
-          if (state.conduitVisible && state.conduitInContainer && state.conduitWidth > 0 && state.conduitHeight > 0) {
-            sawAlignedConduit = true;
-          }
-          if (state.phase === 'delivering') { sawDelivering = true; }
-          // See case 1's own comment: 'complete' is never externally
-          // observable on its own (settleLegacyPlayerTransferEnergy
-          // resets it to 'idle' synchronously within the same frame it
-          // first appears in).
-          if (state.phase === 'complete' || (sawDelivering && state.phase === 'idle')) { completeReached = true; }
-        }
-        check('case 5: the conduit rendered with real positive size while open on the compact layout', sawAlignedConduit, 'n/a');
-        check('case 5: the transfer cycle reached completion on the compact/touch layout', completeReached, 'n/a');
-      }
-      check('case 5: no page errors on the compact/touch layout', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
-    }
-
-    // ================================================================
-    // Case 6: a real non-identity boardZoomContainer transform.
-    // boardZoomContainer is, as of this writing, always identity-scale
-    // through every real UI path in this codebase (no board-zoom
-    // command exists in uiCommands.ts) -- so this case forces a
-    // non-identity transform directly on the container, a controlled
-    // but real fixture on a RENDERING-config field, not gameplay
-    // state, mirroring the convention already established for this
-    // exact container in the shell-positioning work this transfer
-    // system reuses. It proves conduit/shell world-space alignment
-    // survives a real non-identity parent transform, not just the
-    // identity case every other scenario in this file happens to run
-    // under.
-    // ================================================================
-    {
-      const { context, page, pageErrors, stepOnce, stepN } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-      await stepN(200);
-      await page.evaluate(() => {
-        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-        scene.boardZoomContainer.setScale(1.6);
-        scene.boardZoomContainer.setPosition(37, -19);
-      });
-      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
-      check('case 6: the real goal-reaching move was accepted under a non-identity container transform', moveResult?.accepted === true, JSON.stringify(moveResult));
-
-      if (setup !== null) {
-        await stepN(28);
-        const worldCheck = await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          const primaryId = scene.gameplayTransferPrimaryId;
-          const shell = primaryId !== null ? scene.titleOrbitDiamondImages[primaryId] : null;
-          const conduit = scene.gameplayTransferConduitCanvasImage;
-          return {
-            containerScaleX: scene.boardZoomContainer.scaleX,
-            conduitVisible: conduit?.visible ?? null,
-            conduitWorld: conduit ? (() => { const m = conduit.getWorldTransformMatrix(); return { x: m.tx, y: m.ty }; })() : null,
-            shellVisible: shell?.visible ?? null,
-            shellWorld: shell ? (() => { const m = shell.getWorldTransformMatrix(); return { x: m.tx, y: m.ty }; })() : null
-          };
-        });
-        check('case 6: the container transform is genuinely non-identity for this check', Math.abs(worldCheck.containerScaleX - 1.6) < 0.001, JSON.stringify(worldCheck));
-        check('case 6: the conduit is visible and has a real world position under the non-identity transform', worldCheck.conduitVisible === true && worldCheck.conduitWorld !== null, JSON.stringify(worldCheck));
-        check('case 6: the real held shell slot is visible with a real world position under the non-identity transform', worldCheck.shellVisible === true && worldCheck.shellWorld !== null, JSON.stringify(worldCheck));
-      }
-      check('case 6: no page errors under the non-identity container transform', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
-    }
-
-    // ================================================================
-    // Case 7: initial entry into a run -- the very first maze reveal,
-    // with NO goal ever reached and so no teleport transfer ever armed.
-    // Confirmed real defect (review 5144999445): the old eight-origin
-    // volley (drawLegacyPlayerSpawnBurst) had no mode branch and fired
-    // for this exact case too, since armLegacyPlayerArrivalForFinalBuildStep
-    // arms playerSpawnBurstStartedAtMs on every settled maze build, not
-    // only when a transfer was armed. Proves BOTH halves of the fix: the
-    // old volley never draws here either, AND a real single-primary
-    // arrival presentation genuinely renders something (not silence --
-    // hiding the old burst without a real replacement was explicitly
-    // flagged as its own possible regression).
-    // ================================================================
-    {
-      const { context, page, pageErrors, stepOnce, stepBatch } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
-      await resetLegacyVolleySpyCount(page);
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-
-      // Same generous batched-polling budget as the completion-wait
-      // loops elsewhere in this file -- the initial reveal's own real
-      // deconstruct/build/reveal timing is not assumed to be short.
-      let sawRealArrivalConduit = false;
-      let sawRealArrivalPrimary = false;
-      let sawArmedTransfer = false;
-      for (let i = 0; i < COMPLETION_WAIT_MAX_BATCHES && !(sawRealArrivalConduit && sawRealArrivalPrimary); i += 1) {
-        await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
-        const state = await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          return {
-            transferActive: scene.playerTransferEnergyArmed,
-            primaryId: scene.gameplayTransferPrimaryId,
-            conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null
-          };
-        });
-        if (state.transferActive === true) { sawArmedTransfer = true; }
-        if (state.conduitVisible === true) { sawRealArrivalConduit = true; }
-        if (state.primaryId !== null) { sawRealArrivalPrimary = true; }
-      }
-
-      check('case 7: no real transfer was ever armed (this case never reaches a goal)', sawArmedTransfer === false, 'n/a');
-      check('case 7: a real single-primary arrival conduit rendered during the very first maze reveal, with no transfer ever armed', sawRealArrivalConduit, 'n/a');
-      check('case 7: a real primary was actually selected for the initial arrival (not a fabricated/absent presentation)', sawRealArrivalPrimary, 'n/a');
-
-      // Review 5146800659: continue case 7 through the arrival's own real
-      // completion -- temporary effects cleared, the real player visible
-      // at its real start position, and a subsequent real accepted move
-      // (input genuinely unlocked), not just "the replacement appeared."
-      let arrivalSettled = false;
-      for (let i = 0; i < COMPLETION_WAIT_MAX_BATCHES && !arrivalSettled; i += 1) {
-        await stepBatch(COMPLETION_WAIT_BATCH_SIZE);
-        const spawnBurstActive = await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          return scene.resolveLegacyPlayerSpawnBurstState(scene.time.now).active;
-        });
-        if (spawnBurstActive === false) { arrivalSettled = true; }
-      }
-      check('case 7: the initial arrival burst itself genuinely settles (does not stay active forever)', arrivalSettled, 'n/a');
-
-      const postArrivalState = await page.evaluate(() => {
-        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-        return {
-          conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
-          playerVisible: scene.isLegacyMenuPointVisibleInStaticDraw(scene.player),
-          player: scene.player,
-          start: scene.maze.start
-        };
-      });
-      check('case 7: the conduit is genuinely hidden again once the initial arrival settles (temporary effect cleared, not left stuck visible)', postArrivalState.conduitVisible === false, JSON.stringify(postArrivalState));
-      check('case 7: the real player is visible at its real start position once the arrival settles', postArrivalState.playerVisible === true, JSON.stringify(postArrivalState));
-
-      const postArrivalMoveCandidate = await page.evaluate(() => {
-        const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-        const player = scene.player;
-        const grid = scene.maze.grid;
-        const candidates = [
-          { dx: 0, dy: -1, move: 'move_up' }, { dx: 0, dy: 1, move: 'move_down' },
-          { dx: -1, dy: 0, move: 'move_left' }, { dx: 1, dy: 0, move: 'move_right' }
-        ];
-        return candidates.find((c) => grid[player.y + c.dy]?.[player.x + c.dx] === true) ?? null;
-      });
-      if (postArrivalMoveCandidate !== null) {
-        const postArrivalMoveResult = await moveUntilAccepted(page, stepOnce, postArrivalMoveCandidate.move, 200);
-        check('case 7: real input is genuinely unlocked once the initial arrival settles (a real move is accepted)', postArrivalMoveResult?.accepted === true, JSON.stringify(postArrivalMoveResult));
-      }
-
-      const legacyVolleyDrawCalls = await readLegacyVolleySpyCount(page);
+      await pressStartFromMenu(h);
+      const pre = await h.stepUntil('introAgeAtLeast', 250, 200);
+      check('case 6d negative control: reached the initial-arrival laser window', pre.met, 'n/a');
+      const boardBefore = await readBoardProgress(h.page);
+      const introBefore = await h.sampleNow();
+      await h.page.evaluate(() => window.__MAZER_QA__.openPauseOverlay());
+      await h.stepN(60);
+      const introDuring = await h.sampleNow();
+      const boardDuring = await readBoardProgress(h.page);
       check(
-        'case 7: the OLD procedural eight-origin volley never drew a single beam across the whole initial-entry sequence, including settling',
-        legacyVolleyDrawCalls === 0,
-        `${legacyVolleyDrawCalls} real lineBetween call(s) on playerSpawnBurstGraphics`
+        'case 6d negative control: with the pause-hold disabled the intro clock KEEPS advancing while paused (the fix in case 6c is load-bearing)',
+        introDuring.introAge > introBefore.introAge + 500,
+        JSON.stringify({ before: introBefore.introAge, during: introDuring.introAge })
       );
-      check('case 7: no page errors during initial entry', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
-    }
-
-    // ================================================================
-    // Case 8: the ambient perimeter-diamond ring stays CALM during a
-    // real gameplay transfer. Owner-reported (direct product-owner
-    // instruction, 2026-09-09): "the laser is shooting to a diamond that
-    // isn't even one of the ones on the edge". Root cause found live: a
-    // real transfer always coincides with the maze deconstruct/rebuild,
-    // which drove the title-orbit spin -- so the seven non-engaged
-    // diamonds swirled all over the viewport edge while the one engaged
-    // diamond sat pinned, reading as an unrelated object. The fix freezes
-    // the orbit spin (holds every sigil at its resting corner/edge-mid
-    // station) for the whole transfer in Play mode. This case drives a
-    // real transfer and asserts the non-engaged diamonds do NOT move.
-    // ================================================================
-    {
-      const { context, page, pageErrors, stepOnce, stepN } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-      await stepN(200);
-
-      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
-      check('case 8: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
-
-      if (setup !== null) {
-        const readRing = () => page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          const primaryId = scene.gameplayTransferPrimaryId;
-          const positions = scene.titleOrbitDiamondImages.map((img, i) => {
-            const p = img.getWorldTransformMatrix().transformPoint(0, 0);
-            return { i, x: Math.round(p.x), y: Math.round(p.y) };
-          });
-          return {
-            phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
-            // The orbit lifecycle no longer exists (edge markers never spin); the
-            // ring is calm by construction, so this is always false.
-            spinActive: typeof scene.resolveLegacyMenuPathTitleOrbitFrame === 'function'
-              ? scene.resolveLegacyMenuPathTitleOrbitFrame(scene.time.now).isLifecycleSpinActive
-              : false,
-            drawPhase: scene.menuStaticDrawLifecyclePhase,
-            primaryId,
-            nonPrimary: positions.filter((d) => d.i !== primaryId)
-          };
-        });
-
-        await stepN(30); // reach the real deconstruct-arm / outbound instant
-        const first = await readRing();
-        check('case 8: a real transfer is genuinely armed for this case', first.primaryId !== null && ['outbound', 'stored', 'delivering'].includes(first.phase), JSON.stringify(first));
-
-        // Sample the non-engaged ring across the whole rest of the real
-        // transfer. The ambient spin must read as inactive and every
-        // non-engaged diamond must stay within a couple of px of where it
-        // started (no swirl), all the way through delivery.
-        let maxDrift = 0;
-        let sawSpinActive = first.spinActive === true;
-        const baseline = new Map(first.nonPrimary.map((d) => [d.i, d]));
-        for (let i = 0; i < 260; i += 1) {
-          await stepOnce();
-          const s = await readRing();
-          if (s.spinActive === true) { sawSpinActive = true; }
-          for (const d of s.nonPrimary) {
-            const b = baseline.get(d.i);
-            if (b) { maxDrift = Math.max(maxDrift, Math.hypot(d.x - b.x, d.y - b.y)); }
-          }
-          if (s.phase === 'idle' && i > 40) { break; }
-        }
-        check('case 8: the ambient title-orbit spin reads as inactive for the whole real transfer (not swirling)', sawSpinActive === false, `sawSpinActive=${sawSpinActive}`);
-        check('case 8: every NON-engaged perimeter diamond holds its resting station through the whole transfer (max drift <= 3px)', maxDrift <= 3, `maxDrift=${maxDrift.toFixed(2)}px`);
-      }
-      check('case 8: no page errors across the calm-ring transfer', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
-    }
-
-    // ================================================================
-    // Case 8b: the sticky "last good pose" fallback must NOT keep
-    // rendering a cached pose whose footprint no longer clears the current
-    // layout (ChatGPT-assisted review 5173052153). Drives a real transfer
-    // to a held-primary state, then patches resolveLegacyTeleportAnchorPreviewExclusions
-    // to return one viewport-covering exclusion: the selector now finds NO
-    // legal anchor (fallback path), AND the cached pose validated against
-    // that same real snapshot is ineligible -> the presentation must
-    // degrade (poseAvailable false, conduit hidden), keeping the held id
-    // and all domain/lifecycle state. Unpatching restores the same held
-    // primary and re-attaches the conduit -- identity retained throughout,
-    // never an offscreen/overlapping shell drawn to avoid the blink.
-    // ================================================================
-    {
-      const { context, page, pageErrors, stepOnce, stepN } = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 } });
-      await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-      await stepN(200);
-      const { setup, moveResult } = await setupControlledNearGoalMove(page, stepOnce);
-      check('case 8b: the real goal-reaching move was accepted', moveResult?.accepted === true, JSON.stringify(moveResult));
-
-      if (setup !== null) {
-        await stepN(30);
-        const readCache = () => page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          const diag = window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics();
-          return {
-            phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
-            armed: scene.playerTransferEnergyArmed,
-            heldId: scene.gameplayTransferPrimaryId,
-            cachedPoseId: scene.gameplayTransferLastPrimaryPose?.id ?? null,
-            conduitVisible: scene.gameplayTransferConduitCanvasImage?.visible ?? null,
-            poseAvailable: diag?.presentation.poseAvailable ?? null,
-            player: { x: scene.player.x, y: scene.player.y }
-          };
-        });
-        const beforePatch = await readCache();
-        check('case 8b: a real held primary + cached pose exist before patching', beforePatch.heldId !== null && beforePatch.cachedPoseId !== null && beforePatch.conduitVisible === true, JSON.stringify(beforePatch));
-
-        // Patch: every exclusion query now returns one rectangle covering
-        // the whole viewport -> no anchor footprint can clear it.
-        await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          scene.__realExclusions = scene.resolveLegacyTeleportAnchorPreviewExclusions.bind(scene);
-          scene.resolveLegacyTeleportAnchorPreviewExclusions = (viewport) => ([
-            { x: 0, y: 0, width: viewport.width, height: viewport.height }
-          ]);
-        });
-        await stepN(8);
-        const duringPatch = await readCache();
-        check(
-          'case 8b: with the cached pose no longer clearing the layout, the presentation degrades (poseAvailable false, conduit hidden) instead of rendering the stale pose',
-          duringPatch.poseAvailable === false && duringPatch.conduitVisible === false,
-          JSON.stringify({ beforePatch, duringPatch })
-        );
-        check(
-          'case 8b: the held primary id and the domain player position are retained through the degradation (identity/gameplay state not discarded)',
-          duringPatch.heldId === beforePatch.heldId
-            && duringPatch.player.x === beforePatch.player.x
-            && duringPatch.player.y === beforePatch.player.y,
-          JSON.stringify({ beforePatch, duringPatch })
-        );
-
-        // Unpatch: the layout is legal again -> same held primary, conduit
-        // re-attaches, no reselection to a different anchor.
-        await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          scene.resolveLegacyTeleportAnchorPreviewExclusions = scene.__realExclusions;
-        });
-        await stepN(10);
-        const afterUnpatch = await readCache();
-        check(
-          'case 8b: once the layout clears again the SAME held primary is used and the conduit re-attaches (no blink-to-a-different-anchor)',
-          afterUnpatch.heldId === beforePatch.heldId
-            && (afterUnpatch.conduitVisible === true || afterUnpatch.phase === 'idle'),
-          JSON.stringify({ beforePatch, afterUnpatch })
-        );
-      }
-      check('case 8b: no page errors across the cached-pose invalidation sequence', pageErrors.length === 0, JSON.stringify(pageErrors));
-      await context.close();
+      check(
+        'case 6d negative control: with the pause-hold disabled the maze reveal genuinely KEEPS advancing while paused (the board-frozen assertions are load-bearing)',
+        !boardProgressFrozen(boardBefore, boardDuring),
+        JSON.stringify({ boardBefore, boardDuring })
+      );
+      check('case 6d negative control: no page errors', h.pageErrors.length === 0, JSON.stringify(h.pageErrors));
+      await h.context.close();
     }
 
     // ================================================================
@@ -1565,6 +1223,7 @@ const main = async () => {
       check('case 9 negative control: no page errors', pageErrors.length === 0, JSON.stringify(pageErrors));
       await context.close();
     }
+
   } finally {
     await browser.close();
     if (preview) {
