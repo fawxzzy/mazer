@@ -6,7 +6,10 @@ import {
   LEGACY_HEADER_IDENTITY_TITLE_GAP_PX
 } from '../../src/legacy-runtime/legacyHeaderIdentity';
 import {
+  LEGACY_HEADER_IDENTITY_LABEL_MAX_RESOLUTION,
+  LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX,
   LEGACY_HEADER_IDENTITY_SHORT_FORM_MIN_VISIBLE_CHARS,
+  resolveLegacyHeaderIdentityLabelResolution,
   resolveHeaderControlRects,
   resolveLegacyHeaderIdentityPlacement,
   type LegacyHeaderRect as EdgeRect
@@ -139,5 +142,31 @@ describe('header identity placement (username top-left, right of the profile ico
     const source = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyHeaderIdentityPlacement.ts'), 'utf8');
     expect(source).not.toContain("from '../render/edgeMarkers'");
     expect(source).not.toContain('edgeStations');
+  });
+
+  test('label style: no stroke / halo / plate, resolution = min(3, devicePixelRatio), padded against descender clipping', () => {
+    expect(LEGACY_HEADER_IDENTITY_LABEL_MAX_RESOLUTION).toBe(3);
+    expect(resolveLegacyHeaderIdentityLabelResolution(1)).toBe(1);
+    expect(resolveLegacyHeaderIdentityLabelResolution(2)).toBe(2);
+    expect(resolveLegacyHeaderIdentityLabelResolution(2.75)).toBe(2.75);
+    expect(resolveLegacyHeaderIdentityLabelResolution(3)).toBe(3);
+    expect(resolveLegacyHeaderIdentityLabelResolution(4)).toBe(3);
+    expect(resolveLegacyHeaderIdentityLabelResolution(0)).toBe(1);
+    expect(resolveLegacyHeaderIdentityLabelResolution(Number.NaN)).toBe(1);
+    expect(LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX).toBeGreaterThanOrEqual(2);
+
+    const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const start = source.indexOf('private createLegacyHeaderIdentityLabel(): void {');
+    const body = source.slice(start, source.indexOf('\n  }\n', start)).replace(/\/\/.*$/gm, '');
+    expect(body).toContain('this.add.text(0, 0, username, {');
+    expect(body).not.toMatch(/stroke/i);
+    expect(body).not.toMatch(/backgroundColor|setBackgroundColor|\.rectangle\(|fillRect|add\.graphics/);
+    expect(body).toContain('padding: { top: LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX, bottom: LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX }');
+    expect(body).toContain('.setResolution(resolveLegacyHeaderIdentityLabelResolution(typeof window === \'undefined\' ? 1 : window.devicePixelRatio))');
+    // The padded box is what the placement measures, so it still fits the profile icon band.
+    for (const { width, height } of VIEWPORTS) {
+      const { placement } = place(width, height, 'qa-player');
+      expect(placement.visible).toBe(true);
+    }
   });
 });
