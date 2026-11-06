@@ -55,7 +55,7 @@ Pure, exported functions over RGBA images and compact per-frame features (decode
 | stall | first tile time, mid-build runs of >= 10 unchanged frames, trailing dead time |
 | timing | Start -> first tile / build done / input unlocked / goal / deconstruct start / board empty (probe and image) |
 
-Tests: `npx vitest run tests/visual/maze-lifecycle-analysis.test.mjs` (synthetic images only, no browser). They are not in the `npm test` spine.
+Tests: `npx vitest run tests/visual/maze-lifecycle-analysis.test.mjs` (synthetic images only, no browser). Since integration 2 they run in the `test:verify` spine and the `Verify` workflow (listed by file).
 
 ## Limitations
 
