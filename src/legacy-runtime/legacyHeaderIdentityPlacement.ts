@@ -34,17 +34,8 @@ export const LEGACY_HEADER_IDENTITY_SHORT_FORM_MAX_WIDTH_PX = 360;
 /** Visible-character floor of the short form (320 px: ~41 px of room fits "qa-p..." style stubs). */
 export const LEGACY_HEADER_IDENTITY_SHORT_FORM_MIN_VISIBLE_CHARS = 4;
 
-/** The label is rasterised at the device pixel ratio, capped here. */
-export const LEGACY_HEADER_IDENTITY_LABEL_MAX_RESOLUTION = 3;
 /** Vertical padding (px, top and bottom) so descenders are never clipped; no stroke, no plate. */
 export const LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX = 2;
-
-/** min(3, devicePixelRatio), never below 1 and never NaN. */
-export const resolveLegacyHeaderIdentityLabelResolution = (devicePixelRatio: number): number => (
-  Number.isFinite(devicePixelRatio) && devicePixelRatio >= 1
-    ? Math.min(LEGACY_HEADER_IDENTITY_LABEL_MAX_RESOLUTION, devicePixelRatio)
-    : 1
-);
 
 export interface LegacyHeaderRect {
   readonly left: number;

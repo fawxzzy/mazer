@@ -192,7 +192,6 @@ import {
 import {
   LEGACY_HEADER_IDENTITY_LABEL_NAME,
   LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX,
-  resolveLegacyHeaderIdentityLabelResolution,
   resolveLegacyHeaderIdentityPlacement
 } from '../legacy-runtime/legacyHeaderIdentityPlacement';
 import {
@@ -15273,18 +15272,18 @@ export class MenuScene extends Phaser.Scene {
     }
 
     // No stroke / halo / background plate: the header backdrop is already
-    // near-black, and a 2 px stroke on a resolution-1 Text became a soft dark
-    // halo around grey-looking glyphs on a DPR 2-3 phone. Rasterised at the
-    // device pixel ratio (capped at 3) with 2 px vertical padding set at
-    // creation so descenders (q, p, y, g) are never clipped.
+    // near-black, and a 2 px dark stroke on this Text became a soft halo around
+    // grey-looking glyphs on a DPR 2-3 phone. 2 px vertical padding is set at
+    // creation so descenders (q, p, y, g) are never clipped. Text resolution is
+    // deliberately NOT raised: under this Canvas renderer (which already owns
+    // the DPR transform) Text.setResolution(n) paints the glyphs n times larger
+    // while getBounds() stays logical -- see render/textCrispness.ts.
     const label = this.add.text(0, 0, username, {
       color: '#d7f7ee',
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '14px',
       padding: { top: LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX, bottom: LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX }
-    })
-      .setResolution(resolveLegacyHeaderIdentityLabelResolution(typeof window === 'undefined' ? 1 : window.devicePixelRatio))
-      .setOrigin(0, 0.5).setDepth(3).setVisible(false);
+    }).setOrigin(0, 0.5).setDepth(3).setVisible(false);
     const placement = resolveLegacyHeaderIdentityPlacement({
       layout: this.layout,
       measure: (value, fontPx) => label.setFontSize(fontPx).setText(value).width,
