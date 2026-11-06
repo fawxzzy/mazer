@@ -1,4 +1,9 @@
 import { getInstallSurfaceState, promptInstallSurface, subscribeInstallSurface, type InstallSurfaceState } from './installSurface';
+import {
+  resolveInstallGateDecision,
+  type InstallGateDecision,
+  type InstallGateMode
+} from './installPolicy';
 
 export interface MazerInstallGateBootContext {
   forceInstallGate: boolean;
@@ -9,6 +14,13 @@ export interface MazerInstallGateBootContext {
   passwordRecoveryRequested: boolean;
 }
 
+/**
+ * Boot-level bypasses (the route/host half of the install policy; the
+ * runtime half -- standalone, platform, prompt availability -- lives in
+ * resolveInstallGateDecision). Localhost is exempt unless ?forceInstallGate=1;
+ * legal routes, any OAuth callback request and password recovery must finish
+ * wherever they started, so they are never blocked.
+ */
 export const shouldRunMazerInstallGateForBoot = (context: MazerInstallGateBootContext): boolean => (
   (!context.isLocalhostRuntime || context.forceInstallGate)
   && !context.legalRouteRequested
@@ -53,39 +65,133 @@ export const MAZER_INSTALL_GATE_OVERLAY_ID = 'mazer-install-gate-overlay';
 export interface MazerInstallGateCopy {
   title: string;
   subtitle: string;
+  /** At most three short steps; empty for the post-install "open the app" card. */
   steps: string[];
-  /** Null when the gate has no forward action of its own (the hard iOS in-app-browser block -- the only way through is to actually leave the in-app browser). */
+  /** Null when the card has no native action of its own (manual platforms). */
   primaryLabel: string | null;
-  primaryAction: 'install' | 'continue' | null;
-  /** A "Continue without installing" style skip is always offered alongside an install-capable primary action, but never for the hard block. */
-  showSkip: boolean;
+  primaryAction: 'install' | null;
   showCopyLink: boolean;
 }
 
-// Shown while the app is still deciding whether to gate at all (before the
-// first installSurface state is known) -- kept intentionally blank/neutral
-// rather than flashing a specific mode's copy for one frame.
-export const shouldShowMazerInstallGate = (state: InstallSurfaceState): boolean => state.mode !== 'hidden';
+const INSTALL_TITLE = 'Install Mazer';
+const INSTALL_SUBTITLE = 'Mazer only runs as an installed app, not in a browser tab.';
 
-export const resolveMazerInstallGateCopy = (state: InstallSurfaceState): MazerInstallGateCopy => {
-  return {
-    title: '',
-    subtitle: '',
+/**
+ * Per-platform copy. Short and plain, three steps max. There is deliberately
+ * no "skip" / "continue without installing" entry: see installPolicy.ts.
+ */
+export const MAZER_INSTALL_GATE_COPY: Readonly<Record<InstallGateMode, MazerInstallGateCopy>> = {
+  'prompt-available': {
+    title: INSTALL_TITLE,
+    subtitle: INSTALL_SUBTITLE,
     steps: [
-      "Open this page in your device's default browser.",
-      'Tap Share, then choose More.',
-      'Select Add to Home Screen, Install app, or Download.'
+      'Press Install below.',
+      'Confirm in your browser.',
+      'Open Mazer from your home screen or desktop.'
     ],
-    // `available` means installSurface has already intercepted and retained
-    // the browser's beforeinstallprompt event. The boot gate must expose the
-    // one action that can replay that native prompt or Chrome/Edge players
-    // have no way through the otherwise blocking screen.
-    primaryLabel: state.mode === 'available' && state.canPrompt ? 'Install' : null,
-    primaryAction: state.mode === 'available' && state.canPrompt ? 'install' : null,
-    showSkip: false,
+    primaryLabel: 'Install',
+    primaryAction: 'install',
     showCopyLink: false
-  };
+  },
+  'manual-desktop-chromium': {
+    title: INSTALL_TITLE,
+    subtitle: INSTALL_SUBTITLE,
+    steps: [
+      'Click the install icon at the end of the address bar, or open the browser menu and choose Install Mazer.',
+      'Confirm the install.',
+      'Open Mazer from your desktop or Start menu.'
+    ],
+    primaryLabel: null,
+    primaryAction: null,
+    showCopyLink: false
+  },
+  'manual-desktop-other': {
+    title: INSTALL_TITLE,
+    subtitle: INSTALL_SUBTITLE,
+    steps: [
+      'Open this page in Chrome or Edge. In Safari, choose File, then Add to Dock.',
+      'In Chrome or Edge, click the install icon in the address bar.',
+      'Open Mazer from your desktop, Start menu or Dock.'
+    ],
+    primaryLabel: null,
+    primaryAction: null,
+    showCopyLink: true
+  },
+  'manual-android': {
+    title: INSTALL_TITLE,
+    subtitle: INSTALL_SUBTITLE,
+    steps: [
+      'Open this page in Chrome and tap the three-dot menu.',
+      'Choose Install app or Add to Home screen.',
+      'Open Mazer from your home screen.'
+    ],
+    primaryLabel: null,
+    primaryAction: null,
+    showCopyLink: true
+  },
+  'manual-ios': {
+    title: INSTALL_TITLE,
+    subtitle: INSTALL_SUBTITLE,
+    steps: [
+      'Tap the Share button in Safari.',
+      'Choose Add to Home Screen.',
+      'Open Mazer from your home screen.'
+    ],
+    primaryLabel: null,
+    primaryAction: null,
+    showCopyLink: false
+  },
+  'in-app-browser': {
+    title: INSTALL_TITLE,
+    subtitle: 'Mazer only runs as an installed app, and in-app browsers cannot install it.',
+    steps: [
+      'Copy the link below.',
+      'Paste it into Safari or Chrome.',
+      'Install Mazer from there, then open it from your home screen.'
+    ],
+    primaryLabel: null,
+    primaryAction: null,
+    showCopyLink: true
+  },
+  'installed-open-app': {
+    title: 'Mazer is installed',
+    subtitle: 'Open it from your home screen or desktop.',
+    steps: [],
+    primaryLabel: null,
+    primaryAction: null,
+    showCopyLink: false
+  }
 };
+
+export const resolveMazerInstallGateCopy = (mode: InstallGateMode): MazerInstallGateCopy => (
+  MAZER_INSTALL_GATE_COPY[mode]
+);
+
+/**
+ * Feeds the live install-surface facts into the pure policy. Route and host
+ * bypasses are decided once at boot (shouldRunMazerInstallGateForBoot), so
+ * they are fixed to "not bypassed" here: once the gate is running, the only
+ * thing that can lift it is the page actually becoming standalone.
+ */
+export const resolveMazerInstallGateDecision = (state: InstallSurfaceState): InstallGateDecision => (
+  resolveInstallGateDecision({
+    standalone: state.standalone,
+    isLocalhost: false,
+    forceGate: false,
+    bypassRoute: false,
+    userAgentClass: state.platform,
+    hasDeferredPrompt: state.canPrompt,
+    appInstalled: state.installed && !state.standalone
+  })
+);
+
+/**
+ * Invariant: every state that is not an installed (standalone) display
+ * context shows the gate. `hidden` is not a reason to skip it.
+ */
+export const shouldShowMazerInstallGate = (state: InstallSurfaceState): boolean => (
+  resolveMazerInstallGateDecision(state).blocked
+);
 
 interface InstallGateDocumentLike {
   createElement: Document['createElement'];
@@ -99,7 +205,6 @@ export interface MazerInstallGateHandle {
 }
 
 export interface MazerInstallGateCallbacks {
-  onContinue(): void;
   onCopyLink(): void;
   onInstall(): void;
 }
@@ -139,26 +244,34 @@ export const installMazerInstallGate = (
   overlay.id = MAZER_INSTALL_GATE_OVERLAY_ID;
   overlay.setAttribute('aria-live', 'polite');
   overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-label', 'Install Mazer');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', INSTALL_TITLE);
+
+  let renderedMode: InstallGateMode | null = null;
 
   const render = (state: InstallSurfaceState): void => {
-    const copy = resolveMazerInstallGateCopy(state);
+    const decision = resolveMazerInstallGateDecision(state);
+    if (!decision.blocked || decision.mode === renderedMode) {
+      return;
+    }
+
+    renderedMode = decision.mode;
+    overlay.setAttribute('data-mazer-install-gate-mode', decision.mode);
+    const copy = resolveMazerInstallGateCopy(decision.mode);
     const buttonsHtml = [
       copy.primaryLabel !== null
         ? `<button type="button" class="mazer-install-gate-button mazer-install-gate-button-primary" data-mazer-install-gate-action="${copy.primaryAction}">${escapeHtml(copy.primaryLabel)}</button>`
         : '',
       copy.showCopyLink
-        ? '<button type="button" class="mazer-install-gate-button mazer-install-gate-button-secondary" data-mazer-install-gate-action="copy">Copy Link</button>'
-        : '',
-      copy.showSkip
-        ? '<button type="button" class="mazer-install-gate-button mazer-install-gate-button-skip" data-mazer-install-gate-action="continue">Continue without installing</button>'
+        ? '<button type="button" class="mazer-install-gate-button mazer-install-gate-button-secondary" data-mazer-install-gate-action="copy">Copy link</button>'
         : ''
     ].filter(Boolean).join('');
 
     overlay.innerHTML = `
       <div class="mazer-install-gate-card">
         <strong class="mazer-install-gate-brand">MAZER</strong>
-        <h1 class="mazer-install-gate-title">Install</h1>
+        <h1 class="mazer-install-gate-title">${escapeHtml(copy.title)}</h1>
+        <p class="mazer-install-gate-subtitle">${escapeHtml(copy.subtitle)}</p>
         ${renderStepsHtml(copy.steps)}
         <div class="mazer-install-gate-actions">${buttonsHtml}</div>
       </div>
@@ -171,8 +284,6 @@ export const installMazerInstallGate = (
           callbacks.onInstall();
         } else if (action === 'copy') {
           callbacks.onCopyLink();
-        } else if (action === 'continue') {
-          callbacks.onContinue();
         }
       });
     });
@@ -187,20 +298,30 @@ export const installMazerInstallGate = (
   };
 };
 
+export interface RunMazerInstallGateOptions {
+  /** Called once, when the gate overlay is actually about to be shown. */
+  onBlocked?: () => void;
+}
+
 /**
- * Boot-time orchestration: shows the gate (if installSurface's current state
- * calls for one) and resolves once the player either continues past it,
- * installs, or the surface otherwise transitions to 'hidden' on its own
- * (e.g. the native prompt was accepted and 'appinstalled' fired). Resolves
- * immediately, with no DOM work at all, when nothing needs to be shown --
- * this is the thing main.ts awaits before creating the Phaser game, so the
- * common case (already installed, or already dismissed) must stay cheap.
+ * Boot-time orchestration: shows the gate when the live install-surface
+ * state is not an installed display context, and keeps it up. The overlay
+ * subscribes to the install surface, so a `beforeinstallprompt` that arrives
+ * after the card is already on screen upgrades it to an Install button, and
+ * `appinstalled` switches it to "open the installed app". The returned
+ * promise only resolves if the context itself becomes standalone -- there is
+ * no skip. Resolves immediately, with no DOM work, when already standalone.
  */
-export const runMazerInstallGate = (documentRef: InstallGateDocumentLike): Promise<void> => {
+export const runMazerInstallGate = (
+  documentRef: InstallGateDocumentLike,
+  options: RunMazerInstallGateOptions = {}
+): Promise<void> => {
   const initialState = getInstallSurfaceState();
   if (!shouldShowMazerInstallGate(initialState)) {
     return Promise.resolve();
   }
+
+  options.onBlocked?.();
 
   return new Promise<void>((resolve) => {
     let resolved = false;
@@ -217,7 +338,6 @@ export const runMazerInstallGate = (documentRef: InstallGateDocumentLike): Promi
     };
 
     const handle = installMazerInstallGate(documentRef, initialState, {
-      onContinue: finish,
       onCopyLink: () => {
         void copyMazerInstallLink(typeof window === 'undefined' ? '' : window.location.href);
       },
