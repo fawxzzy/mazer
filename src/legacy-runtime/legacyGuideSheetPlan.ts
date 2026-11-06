@@ -1,12 +1,14 @@
 /**
  * Pure geometry for the "How to play" sheet (the Guide), shared by the main
- * menu Settings and the in-game Pause Settings. Same card width, close pill,
- * title and scroll rail as legacySettingsSheetPlan.ts so the two sheets read as
+ * menu Settings and the in-game Pause Settings. Same card width, title and
+ * scroll rail as legacySettingsSheetPlan.ts so the two sheets read as
  * one family; the content is legacyGuideContent.ts.
  *
  * The scene owns text measurement (Phaser), so this plan takes the measured
  * height of every body item and returns where each one sits, whether the body
  * must scroll, and the fixed footer (`Got it`, 48 high, never scrolls away).
+ * `Got it` is the Guide's only exit control: there is no Close pill, X or back
+ * arrow, so the card gets the whole panel height and is centred in it.
  *
  * Sizes are token terms: hit targets from touchTargetMinPx, gaps from the
  * spacing scale, copy at legacy.fontSizePx.body (14). Copy wraps; it never
@@ -14,9 +16,7 @@
  */
 import { designTokens } from '../theme/tokens';
 import {
-  LEGACY_OVERLAY_HEADER_RESERVE,
   LEGACY_UI_COMPACT_BREAKPOINT,
-  LEGACY_UI_MIN_TOUCH_TARGET,
   resolveLegacyOverlayPanelLayout,
   type LegacyOverlayPanelLayout
 } from './legacyUiStandards';
@@ -73,7 +73,6 @@ export interface LegacyGuideSheetPlan {
   bodyViewport: LegacySettingsRect;
   card: LegacySettingsRect;
   cardPadding: number;
-  close: { accessibleName: string; label: 'Close'; rect: LegacySettingsRect };
   compact: boolean;
   contentHeight: number;
   /** Fixed `Got it` button, inside the card below the body. */
@@ -117,13 +116,11 @@ export const buildLegacyGuideSheetPlan = (input: LegacyGuideSheetPlanInput): Leg
   });
   const contentHeight = cursor;
 
-  const headerReserve = LEGACY_OVERLAY_HEADER_RESERVE + (compact ? 6 : 8);
-  const availableHeight = Math.max(1, panel.height - headerReserve);
+  const availableHeight = Math.max(1, panel.height);
   const chrome = (cardPadding * 2) + titleHeight + titleGap + g.footerGap + g.footerHeight;
   const naturalCardHeight = chrome + contentHeight;
   const cardHeight = Math.min(naturalCardHeight, availableHeight);
-  const regionTop = panel.top + headerReserve;
-  const cardTop = Math.round(regionTop + ((availableHeight - cardHeight) / 2));
+  const cardTop = Math.round(panel.top + ((availableHeight - cardHeight) / 2));
   const cardLeft = Math.round(panel.centerX - (cardWidth / 2));
   const bodyTop = cardTop + cardPadding + titleHeight + titleGap;
   const bodyHeight = Math.max(0, cardHeight - chrome);
@@ -134,11 +131,6 @@ export const buildLegacyGuideSheetPlan = (input: LegacyGuideSheetPlanInput): Leg
     bodyViewport: rectOf(cardLeft + cardPadding, bodyTop, innerWidth, bodyHeight),
     card: rectOf(cardLeft, cardTop, cardWidth, cardHeight),
     cardPadding,
-    close: {
-      accessibleName: 'Close how to play',
-      label: 'Close',
-      rect: rectOf(cardLeft + cardWidth - s.closeWidth, panel.top, s.closeWidth, Math.max(s.closeHeight, LEGACY_UI_MIN_TOUCH_TARGET))
-    },
     compact,
     contentHeight,
     footer: rectOf(cardLeft + cardPadding, bodyTop + bodyHeight + g.footerGap, innerWidth, g.footerHeight),

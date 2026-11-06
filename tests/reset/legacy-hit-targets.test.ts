@@ -77,7 +77,6 @@ const enumerateHitZones = (viewport: { height: number; width: number }): HitZone
     buildLegacySettingsSheetPlan({ context: 'pause', height: viewport.height, settingsExpanded: true, width: viewport.width })
   ];
   for (const plan of plans) {
-    zones.push({ height: plan.close.rect.height, name: 'settings-close-pill', width: plan.close.rect.width });
     for (const item of plan.items) {
       if (item.interactive) {
         zones.push({ height: item.rect.height, name: `settings-row-${item.model.id}`, width: item.rect.width });
@@ -85,7 +84,6 @@ const enumerateHitZones = (viewport: { height: number; width: number }): HitZone
     }
   }
   const guide = buildLegacyGuideSheetPlan({ height: viewport.height, itemHeights: [58, 58, 78, 78, 78, 58, 60], width: viewport.width });
-  zones.push({ height: guide.close.rect.height, name: 'guide-close-pill', width: guide.close.rect.width });
   zones.push({ height: guide.footer.height, name: 'guide-got-it', width: guide.footer.width });
   return zones;
 };
@@ -129,16 +127,15 @@ describe('legacy hit targets (Wave 5C)', () => {
     }
     expect(undersized).toEqual([]);
     // The header trio and play pause (the 2026-11-06 UI audit's under-44 px controls) plus
-    // every interactive row of the shared Settings sheet and the Guide sheet.
+    // every interactive row of the shared Settings sheet (Back to Menu / Resume are the exits; no Close pill) and the Guide sheet (Got it).
     expect([...names].sort()).toEqual([
-      'guide-close-pill',
       'guide-got-it',
       'menu-header-account',
       'menu-header-leaderboard',
       'menu-header-settings',
       'play-pause',
-      'settings-close-pill',
       'settings-row-animated-background',
+      'settings-row-back-to-menu',
       'settings-row-board-zoom',
       'settings-row-how-to-play',
       'settings-row-quit-to-menu',
@@ -177,8 +174,7 @@ describe('MenuScene interactive-zone inventory', () => {
     createLegacyMenuLeaderboardButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
     createLegacyMenuProfileButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
     createLegacyMenuSettingsCogButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
-    createOverlayBackChevronButton: 'back chevron (72x64): leaderboard and account overlays',
-    createOverlayClosePill: 'labelled Close pill on the settings and guide sheets (76x44 from the sheet plans)',
+    createOverlayBackChevronButton: 'back chevron (72x64): leaderboard and account overlays (the settings and guide sheets have none: the primary top row / Got it is the exit)',
     createToggleSwitchRow: 'toggle card (52+)'
   };
 

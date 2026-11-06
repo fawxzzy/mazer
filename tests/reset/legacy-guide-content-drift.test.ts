@@ -97,6 +97,14 @@ describe('guide copy only names things that exist', () => {
     expect(allText).not.toMatch(/\bexit\b/i);
   });
 
+  test('the Guide names no Close pill or back arrow (the settings sheets have none; Esc and Got it are the only exits it mentions)', () => {
+    expect(allText).not.toMatch(/close/i);
+    expect(allText).not.toMatch(/[<‹←×✕]|back arrow|arrow button/i);
+    expect(LEGACY_GUIDE_CLOSE_LABEL).toBe('Got it');
+    // The scene no longer paints a Close pill, so the copy cannot be pointing at one.
+    expect(MENU_SCENE).not.toContain('createOverlayClosePill');
+  });
+
   test('Start row: Chip draws start corner brackets and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
     expect(LEGACY_GUIDE_ROWS.some((r) => r.id === 'start')).toBe(true);
     expect(row('start').text).toMatch(/Corner brackets/);
