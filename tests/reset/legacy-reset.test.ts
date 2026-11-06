@@ -1060,7 +1060,9 @@ describe('legacy reset lane', () => {
     // depend on exact line-wrapping/line-ending formatting. The Pause card's
     // Quit to Menu button replaced the old header home icon.
     expect(menuSceneSource).not.toContain('private createLegacyOverlayHomeButton(');
-    expect(menuSceneSource).toContain("actionLabel('quit-to-menu')");
+    // Wiring lane (2026-11-06): the Pause card is painted from the shared settings plan; Quit to Menu is its
+    // pause-bottom row (RETURN_HOME), routed through the bridge first like before.
+    expect(menuSceneSource).toContain("this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu'))");
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('return-menu')");
     expect(menuSceneSource).toContain('private applyLegacyPauseCommand(command: LegacyPauseCommand): void {');
     expect(menuSceneSource).toContain('const result = resolveLegacyPauseCommand(command, this.maze.start, this.trail);');
@@ -1082,13 +1084,17 @@ describe('legacy reset lane', () => {
     expect(toggleFieldSource).toContain("| 'toggleAnimatedBackdrop'");
     expect(toggleFieldSource).toContain('resolveLegacyOverlayToggleStateText');
     expect(toggleFieldSource).toContain('resolveLegacyOverlayToggleSwitchIsOn');
-    expect(menuSceneSource).toContain('private createFeatureControlRows(');
+    // Wiring lane (2026-11-06): the rows come from the shared plan (legacySettingsSheetPlan.ts) and are
+    // painted by one routine for menu AND pause; createFeatureControlRows is gone.
+    const planSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacySettingsSheetPlan.ts'), 'utf8');
+    expect(menuSceneSource).not.toContain('createFeatureControlRows');
     expect(menuSceneSource).toContain('private createToggleSwitchRow(');
+    expect(menuSceneSource).toContain('private paintLegacySettingsItem(');
     expect(menuSceneSource).not.toContain("label: 'Camera Follow'");
-    expect(menuSceneSource).toContain("label: 'Trail Fade'");
-    expect(menuSceneSource).toContain("label: 'Trail Shine'");
-    expect(menuSceneSource).toContain("? 'Slow white shine.'");
-    expect(menuSceneSource).toContain("label: 'Animated Background'");
+    expect(planSource).toContain("row('trail-fade', 'toggle', 'Trail Fade'");
+    expect(planSource).toContain("row('trail-shine', 'toggle', 'Trail Shine'");
+    expect(planSource).toContain("row('animated-background', 'toggle', 'Animated Background'");
+    expect(planSource).toContain("offLabel: 'Still'");
     expect(menuSceneSource).not.toContain("label: 'High Contrast'");
     // Play touch movement only has one control scheme now -- the floating
     // stick that spawns wherever the player touches down (see
@@ -1096,27 +1102,14 @@ describe('legacy reset lane', () => {
     // schemes no longer means anything to surface.
     expect(menuSceneSource).not.toContain("label: 'Control Style'");
     expect(menuSceneSource).not.toContain("label: 'Smart Steering'");
-    expect(menuSceneSource).toContain("label: 'Move Speed'");
-    expect(menuSceneSource).toContain('private createMovementSpeedSliderRow(');
-    expect(menuSceneSource).toContain('private applyLegacyMovementSpeed(speed: number): void {');
-    expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'");
-    expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'");
-    expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings)");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings)");
+    // The hidden Move Speed slider (never passed includeMovementSpeed) went with createFeatureControlRows.
+    expect(menuSceneSource).not.toContain('createMovementSpeedSliderRow');
+    expect(menuSceneSource).toContain('const fieldId = model.settingKey as LegacyOverlayToggleFieldId;');
+    expect(menuSceneSource).toContain('const checked = resolveLegacyOverlayToggleSwitchIsOn(fieldId, this.settings);');
+    expect(menuSceneSource).toContain('resolveLegacyOverlayToggleStateText(fieldId, checked)');
+    expect(menuSceneSource).toContain('onClick: () => this.applyOverlayToggleFieldChange(fieldId),');
     expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
-    expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
-    expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
-    expect(menuSceneSource).toContain('const groupHeight = (count: number): number => (');
-    expect(menuSceneSource).toContain('groupHeight(controlsGroupCount)');
-    expect(menuSceneSource).toContain('groupHeight(displayGroupCount)');
-    expect(menuSceneSource).toContain("addSectionHeading('Controls', contentTop)");
-    expect(menuSceneSource).toContain("addSectionHeading('Display', contentTop)");
-    expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('toggleTrailFade')");
-    expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('toggleTrailPulse')");
-    expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('toggleAnimatedBackdrop')");
-    expect(menuSceneSource).toContain('this.applyLegacyMovementSpeed(nextSpeed);');
+    expect(menuSceneSource).toContain('const parts = item.parts;');
     expect(menuSceneSource).toContain('private applyOverlayToggleFieldChange(fieldId: LegacyOverlayToggleFieldId): void {');
     expect(menuSceneSource).not.toContain("this.openNestedOverlay('features'");
     expect(menuSceneSource).not.toContain("this.openNestedOverlay('gameModes'");

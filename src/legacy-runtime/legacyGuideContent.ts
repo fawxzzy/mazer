@@ -112,9 +112,9 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       boardDraw: { module: 'src/scenes/MenuScene.ts', symbol: 'fillLegacyPlayerMarkerTile' },
       chipDraw: { marker: 'player', module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' },
       glyph: 'player-block',
-      lane: 'guide-wiring',
-      reasonId: 'player-legend-icon-missing',
-      status: 'todo-wiring'
+      lane: null,
+      reasonId: 'player-marker-draw-bound-to-board-graphics',
+      status: 'guide-local'
     },
     id: 'you',
     text: 'You are the green block.'
@@ -154,9 +154,9 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       boardDraw: { module: 'src/render/edgeMarkers.ts', symbol: 'drawEdgeMarker' },
       chipDraw: null,
       glyph: 'edge-marker',
-      lane: 'guide-wiring',
-      reasonId: 'wrap-legend-must-call-edge-marker-draw',
-      status: 'todo-wiring'
+      lane: null,
+      reasonId: 'wrap-legend-calls-edge-marker-draw',
+      status: 'shared-with-board'
     },
     id: 'wrap',
     text: 'Some mazes wrap. Leave an open edge and you come out on the opposite side.'

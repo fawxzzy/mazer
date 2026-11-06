@@ -1,6 +1,6 @@
 # Mazer settings sheet spec (menu + pause), reset progress, guide data
 
-Date 2026-11-06. Status: pure modules and tests only. NOT wired. `src/scenes/MenuScene.ts` is untouched.
+Date 2026-11-06. Status: WIRED in `src/scenes/MenuScene.ts` (Wave 5C wiring lane, see "Wiring status" at the end). The spec sections below are the contract; the "MenuScene lines the wiring lane replaces" table is kept as the record of what was replaced.
 
 Owner decision (Zac): the in-game Pause > Settings look is correct; the main-menu Settings sheet must match it fully (same structure). Add a `Reset progress` button to the main-menu Settings list: reset the account's full maze progression only. Standing rule: the Guide's UI reflections are updated with every game/UI change.
 
@@ -61,11 +61,30 @@ See the investigation closeout (kept outside the repo, settings-reset-progress-2
 | reasonId | Meaning |
 | --- | --- |
 | `goal-legend-reuses-scene-star-draw` | The legend already reuses the in-game goal star draw call; Chip wiring swaps that call and the legend follows. |
-| `player-legend-icon-missing` | The legend has no player icon today. The wiring lane draws it through `fillLegacyPlayerMarkerTile` (Chip: `drawBoardMarkers` player), not a copy. |
+| `player-marker-draw-bound-to-board-graphics` | `fillLegacyPlayerMarkerTile` draws into the board's dynamic graphics, the shared glow canvas image and the live motion state, so the Guide cannot call it. The Guide icon is a guide-local rounded square using the same ratio constants, accent stroke and the `player.core` token. When Chip lands, switch it to `drawBoardMarkers` (player). |
 | `stick-mirrors-play-stick-style-independent` | Mirrors the floating stick ring and knob drawn in play; independent of tile style. |
 | `trail-legend-uses-old-path-material` | The legend swatch uses the old path material, not the board trail draw. Chip wiring points it at the board trail colors (open item A8, trail underlay on the chip floor). |
-| `wrap-legend-must-call-edge-marker-draw` | The legend calls `drawEdgeMarker` (the perimeter diamond) instead of a bespoke glyph. Diamonds are unchanged by Chip. Their lit-on-wrap behavior is source-claimed, not observed (audit F17); the copy does not mention it. |
+| `wrap-legend-calls-edge-marker-draw` | The legend calls `drawEdgeMarker` (the perimeter diamond) instead of a bespoke glyph. Diamonds are unchanged by Chip. Their lit-on-wrap behavior is source-claimed, not observed (audit F17); the copy does not mention it. |
 | `level-numeral-shares-old-path-material` | Numeral and START/MAZER wordmarks share the old path material (audit F13). Chip wiring decides migrate-or-accept; the legend numeral follows. |
 | `start-marker-needs-chip-brackets` | Pending row. Chip draws gold corner brackets on the start tile (`drawBoardMarkers` start). Add a Start row, drawn by that function, in the PR that wires Chip. The old "begin at gold" copy is dropped: the live game shows no gold start marker in play. |
 | `rank-letters-not-visible-anywhere` | Pending row. Rank letters are not shown (`drawLegacyProgressionBadge` draws nothing). No rank copy until a player-facing rank surface exists. |
 | `level1-coach-is-owner-decision` | Pending row. A one-line level-1 coach is a separate owner decision; `src/tutorial/*` is unused. |
+
+## Wiring status (2026-11-06, Wave 5C wiring lane)
+
+What shipped in the wiring PR:
+
+- One painter for both contexts: `buildOptionsOverlay` and `buildPauseOverlay` are thin entries into `buildLegacySettingsSheetOverlay(context)`, which paints `buildLegacySettingsSheetPlan`. Menu hides Resume, the Settings disclosure and Quit to Menu; pause hides the Account section (Reset progress, Sign out). The Settings group (How to play, Display, Board Zoom, Trail Fade, Trail Shine, Animated Background) is the same plan rows at the same size in both.
+- Labelled `Close` pill (`createOverlayClosePill`, 76x44, right-aligned to the card, in the header reserve) replaces the bare chevron on the settings and guide sheets. The leaderboard and account overlays keep `createOverlayBackChevronButton` (out of scope).
+- Rows keep the full inner width while scrolling; the scroll rail sits in the card padding (`scrollRailViewport`). Toggle labels wrap to two lines and never shrink under 14 px; the state word is its own column.
+- The Guide is a sheet, not a dropdown: opened by the `How to play` row from both contexts, painted from `buildLegacyGuideSheetModel` and `buildLegacyGuideSheetPlan`, `Got it` footer pinned. It is a sub-view of the options/pause overlay (`settingsGuideOpen`), so Pause keeps holding the run while it is open. Back, Escape, Close and `Got it` return to Settings.
+- Guide icons: goal star (`drawLegacyGoalStarMarker`) and wrap diamond (`drawEdgeMarker`) call the board draw functions. Player, move stick, trail swatch and level numeral are guide-local (reason ids in the table above; trail and levels stay `chip-wiring`). The old "begin at gold" start row is gone.
+- Reset progress (menu Settings, Account section): two-step. Step 1 is the confirm card (`Level N -> Level 1`, one consequence line, Cancel first and default, `Reset to Level 1` armed after 600 ms). Step 2 is the result on the same card (working, done, failed or blocked). Account scope names the leaderboard standing; device scope says "on this device". Cancel, Back and Escape return to the Settings sheet (overlay routing now treats `options` as a recorded origin).
+- `resetLegacyPlayerProgression` is server-first and async: for a signed-in provider-eligible account with remote progression on, it awaits `writeLegacyRemoteProgressionState(..., 'replace')` (`mazer_reset_progression`), and only on success applies the local effects (baseline for both tracks, outbox and cycle telemetry removed) using the keys of the account the reset was requested for. A failed or conflicting server call leaves local progression untouched and shows the failure. Guests or remote-off reset the device key only. A reset requested while a run is active is blocked.
+
+Not done, deliberately:
+
+- The URL-flagged advanced rows (Maze Scale, Camera Scale, Path/Wall RGB; `?advancedOptions=1`) and the hidden Move Speed slider are no longer painted: they are not part of the shared spec and had no plan vocabulary. `resolveLegacyAdvancedOptionsVisible` is kept.
+- Multi-device reset epoch (BLOCKED-ON-OWNER, see above) and clearing the legacy guest progression key on account reset are not implemented. Guest play is disabled (`LEGACY_GUEST_PLAY_ACCESS_ENABLED = false`), so the guest-key re-import path only matters for progress saved before that.
+- `scripts/analysis/capture-ui-surfaces.mjs` still expects the old Guide dropdown (`guidePanel` bounds, GUIDE label) and the docked Sign out bar; it needs a follow-up in its own lane (out of scope here).
+- `legacyPauseMenuView.ts` (layout) and `legacyUiStandards.ts` (`resolveLegacyOptionsGuideLayout`, toggle/feature layouts) are no longer consumed by the scene; they stay for their own tests and are candidates for removal.
