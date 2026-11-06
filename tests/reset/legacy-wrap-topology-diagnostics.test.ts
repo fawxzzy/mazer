@@ -10,7 +10,6 @@ import {
   type LegacyMazeGenerationProfile,
   type LegacyPoint
 } from '../../src/legacy-runtime/legacyMaze';
-import { resolveLegacyMazeGenerationProfileForProgression } from '../../src/legacy-runtime/legacyProgression';
 
 const createGrid = (size: number): boolean[][] => (
   Array.from({ length: size }, () => Array.from({ length: size }, () => false))
@@ -214,13 +213,22 @@ describe('legacy wrap topology diagnostics', () => {
   }, 30_000);
 
   test('pairs the starter optional horizontal feeders before independent side filling', () => {
-    // 60, not 52 -- the optional horizontal feeder's own gate was pushed
-    // back from starterDepth >= 4 to starterDepth >= 6 (the single last
-    // level of starter) per feedback that bleed paths were appearing too
-    // early in a player's first handful of levels. targetComplexity 60
-    // resolves to real level 14, difficulty step 8 (the last starter step),
-    // starterDepth 6 -- the new gate.
-    const starterProfile = resolveLegacyMazeGenerationProfileForProgression(60);
+    // The last legacy starter-band profile (one vertical wrap, one feeder per
+    // side, no required horizontal wrap), pinned as a literal. It used to be
+    // resolveLegacyMazeGenerationProfileForProgression(60), but levels
+    // 2..30 now come from the geometry budget ladder, so the old starter
+    // band is no longer reachable through the progression resolver.
+    const starterProfile = {
+      borderFeederTargetPerSide: 1,
+      checkpointCountMultiplier: 0.64,
+      checkpointCountOverride: 40,
+      maxDeadEndCount: 13,
+      minCheckpoints: 4,
+      requiredOppositeBorderConnections: { horizontal: false, vertical: true },
+      routeQualityReinforcementMultiplier: 0.35,
+      shortcutCountMultiplier: 0.35,
+      straightnessBias: 0.12
+    };
     const failures: unknown[] = [];
 
     for (let seed = 1; seed <= 60; seed += 1) {

@@ -2,10 +2,23 @@ import {
   createLegacyGeneratedMenuMaze,
   createLegacyMaze,
   normalizeLegacyMazeGenerationProfile,
+  resolveLegacyShortestPath,
+  resolveLegacyWrapTopologyDiagnostics,
   type LegacyMazeSnapshot,
   type LegacyMazeGenerationProfile,
   type LegacyPoint
 } from './legacyMaze';
+import {
+  GEOMETRY_BUDGET_BASE_CANDIDATES,
+  GEOMETRY_BUDGET_WINDOW,
+  resolveGeometryBudgetCandidateSeed,
+  resolveGeometryBudgetForks,
+  resolveGeometryBudgetMaxBranch,
+  resolveGeometryBudgetRouteBranch,
+  resolveGeometryBudgetRouteTarget,
+  resolveGeometryBudgetTarget
+} from './legacyGeometryBudget';
+import { tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
 import { resolveLegacyMazeComplexity } from './legacyProgression';
@@ -561,6 +574,138 @@ const resolveLegacyAdaptiveUnderTargetScale = (scale: number): number => {
   );
 };
 
+// Selection for geometry-budget profiles (progression levels 2..LAST_BUDGET_LEVEL).
+// There is no target-complexity search and no pressure/adaptive retry: those
+// would resize the board and swap the profile, which the budget ladder forbids,
+// and there is no candidate search either. ONE base maze is built from the
+// level's fixed profile (mixed seed, see resolveGeometryBudgetCandidateSeed) and
+// then felt-tuned into the level's window [T(N), T(N) + GEOMETRY_BUDGET_WINDOW]
+// (legacyMazeFeltTuning.ts): the explorer's route is stretched toward the level's
+// route target, then deep deceptive branches are added or trimmed. The window is
+// narrower than the schedule's smallest step, so tuned mazes of adjacent ascending
+// levels can never tie or invert, for any seeds. Cost: one maze build plus a few
+// hundred ~20 microsecond explorer runs. selectionOptions.candidateCount is
+// deliberately ignored.
+const selectLegacyGeometryBudgetMaze = (
+  mode: LegacyGenerationMode,
+  scale: number,
+  seed: number,
+  generationProfile: LegacyMazeGenerationProfile,
+  budgetLevel: number,
+  selectionOptions: LegacyGenerationSelectionOptions,
+  aspectRatio: number
+): {
+  maze: Omit<LegacyMazeSnapshot, 'generation'>;
+  review: LegacyGenerationSelectionReview;
+} => {
+  const gateTarget = resolveGeometryBudgetTarget(budgetLevel);
+  const routeTarget = resolveGeometryBudgetRouteTarget(budgetLevel);
+  const maxBranch = resolveGeometryBudgetMaxBranch(budgetLevel);
+  const routeBranch = resolveGeometryBudgetRouteBranch(budgetLevel);
+  const forks = resolveGeometryBudgetForks(budgetLevel);
+  let selectedMaze: Omit<LegacyMazeSnapshot, 'generation'> | null = null;
+  let selectedDistance = Number.POSITIVE_INFINITY;
+  let searched = 0;
+  // Usually the first base maze tunes into the window and the loop ends after one
+  // build. A base can miss when its wrap corridors give the explorer a shortcut
+  // the tuner cannot lengthen enough (its capacity is below the target), so the
+  // next mixed-seed base is tried, up to GEOMETRY_BUDGET_BASE_CANDIDATES.
+  for (let index = 0; index < GEOMETRY_BUDGET_BASE_CANDIDATES; index += 1) {
+    const candidateSeed = resolveGeometryBudgetCandidateSeed(seed, budgetLevel, index);
+    const base = buildLegacyRuntimeMazeForMode(mode, scale, candidateSeed, generationProfile, aspectRatio);
+    searched += 1;
+    let candidate: Omit<LegacyMazeSnapshot, 'generation'> = base;
+    let distance = 0;
+    if (gateTarget !== null) {
+      const tuned = tuneMazeFeltToTarget(
+        base,
+        gateTarget,
+        resolveGeometryBudgetCandidateSeed(seed, budgetLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
+        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks }
+      );
+      distance = tuned.windowDistance;
+      if (tuned.addedTiles.length > 0 || tuned.trimmedTiles.length > 0 || tuned.bumps > 0) {
+        candidate = assembleTunedMaze(base, tuned, generationProfile);
+      }
+    }
+    if (selectedMaze === null || distance < selectedDistance) {
+      selectedMaze = candidate;
+      selectedDistance = distance;
+    }
+    if (distance === 0) {
+      break;
+    }
+  }
+  if (selectedMaze === null) {
+    selectedMaze = buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile, aspectRatio);
+  }
+  const complexity = resolveLegacyMazeComplexity(selectedMaze);
+  const reviewTarget = clampInteger(selectionOptions.targetComplexity ?? complexity.total, 0, 999);
+  return {
+    maze: selectedMaze,
+    review: {
+      adaptiveRetryCandidateCount: 0,
+      adaptiveRetryScale: null,
+      adaptiveRetryUsed: false,
+      allCandidatesOverTarget: false,
+      allCandidatesUnderTarget: false,
+      candidateCount: GEOMETRY_BUDGET_BASE_CANDIDATES,
+      candidateComplexityMax: complexity.total,
+      candidateComplexityMin: complexity.total,
+      // The 400-capped complexity target is not what budget levels are tuned
+      // on, so the under/over-target label is cosmetic here and always
+      // 'on-target'; the tuning distance is reported in selectedDistance.
+      delivery: 'on-target',
+      difference: complexity.total - reviewTarget,
+      initialWindowOverTarget: false,
+      initialWindowUnderTarget: false,
+      measuredComplexity: complexity.total,
+      pressureRetryCandidateCount: 0,
+      pressureRetryUsed: false,
+      searchedCandidateCount: searched,
+      selectedDistance,
+      selectedSeed: selectedMaze.seed,
+      targetComplexity: reviewTarget,
+      tolerance: 0
+    }
+  };
+};
+
+// The tuned grid plus everything derived from the route: the solution path is
+// recomputed with the same direct-floor shortest-path search the carve uses (the
+// stretch lever lengthens the route), and the wrap diagnostics follow it.
+const assembleTunedMaze = (
+  base: Omit<LegacyMazeSnapshot, 'generation'>,
+  tuned: ReturnType<typeof tuneMazeFeltToTarget>,
+  generationProfile: LegacyMazeGenerationProfile
+): Omit<LegacyMazeSnapshot, 'generation'> => {
+  const routed = tuned.bumps > 0
+    ? resolveLegacyShortestPath(tuned.grid, base.start, base.goal, 'direct-floor')
+    : null;
+  const solutionPath = routed !== null && routed.found ? routed.path : base.solutionPath;
+  const next: Omit<LegacyMazeSnapshot, 'generation'> = { ...base, grid: tuned.grid, solutionPath };
+  if (routed !== null && routed.found) {
+    next.wrapTopologyDiagnostics = resolveLegacyWrapTopologyDiagnostics(
+      next,
+      generationProfile.requiredOppositeBorderConnections
+    );
+    if (base.playableTopologyStats) {
+      next.playableTopologyStats = {
+        ...base.playableTopologyStats,
+        resolvedGoalDistance: Math.max(0, solutionPath.length - 1)
+      };
+    }
+  }
+  if (base.generationBuildTrace) {
+    next.generationBuildTrace = {
+      ...base.generationBuildTrace,
+      decoyTiles: [...tuned.stretchTiles, ...tuned.addedTiles].map((point) => ({ ...point })),
+      decoyPrunedTiles: [...tuned.stretchRemovedTiles, ...tuned.trimmedTiles].map((point) => ({ ...point }))
+    };
+  }
+  return next;
+};
+
 const selectLegacyRuntimeMazeForMode = (
   mode: LegacyGenerationMode,
   scale: number,
@@ -572,6 +717,18 @@ const selectLegacyRuntimeMazeForMode = (
   maze: Omit<LegacyMazeSnapshot, 'generation'>;
   review?: LegacyGenerationSelectionReview;
 } => {
+  const budgetProfile = normalizeLegacyMazeGenerationProfile(generationProfile);
+  if (budgetProfile.geometryBudgetLevel !== undefined) {
+    return selectLegacyGeometryBudgetMaze(
+      mode,
+      scale,
+      seed,
+      budgetProfile,
+      budgetProfile.geometryBudgetLevel,
+      selectionOptions,
+      aspectRatio
+    );
+  }
   const targetComplexity = selectionOptions.targetComplexity;
   if (targetComplexity === null || targetComplexity === undefined || !Number.isFinite(targetComplexity)) {
     return {

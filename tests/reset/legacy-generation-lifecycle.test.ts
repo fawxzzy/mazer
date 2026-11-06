@@ -327,7 +327,9 @@ describe('legacy generation lifecycle', () => {
 
     expect(playerLevelOne.seed).toBe(playerLevelTwo.seed);
     expect(playerLevelTwo.generationProfile).not.toEqual(playerLevelOne.generationProfile);
-    expect(playerLevelTwo.budget.scale).toBeGreaterThan(playerLevelOne.budget.scale);
+    // The board is frozen across the budget range: level 2 changes content,
+    // not size.
+    expect(playerLevelTwo.budget.scale).toBe(playerLevelOne.budget.scale);
     expect(playerLevelTwo.generationProfile).toEqual(aiLevelTwo.generationProfile);
     expect(playerLevelOne.generationProfile).toEqual(aiLevelOne.generationProfile);
   });
