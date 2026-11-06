@@ -9,27 +9,31 @@
  * lasts (an earlier implementation advanced one reveal batch per `update`, so
  * a 5 fps renderer stretched a 3 s intro past 30 s).
  *
- * Nominal timeline (full motion). Only the reveal length depends on the tile
- * count N: revealMs(N) = clamp(N / 70 tiles/s, 2000, 3200) ms. The beams come
- * FIRST and the maze appears as they land:
+ * Nominal timeline (full motion). Only the build length depends on the tile
+ * count N: buildMs(N) = clamp(N / 70 tiles/s, 2000, 3200) ms. The maze builds
+ * FIRST while the diamond ring orbits; the beams fire only AFTER the build is
+ * complete, and the player appears where they land:
  *
- *   phase        start-end ms   what happens
- *   digit-in         0-200      level digit fades/scales in (skipped when the digit is
- *                               already up from the preceding deconstruct)
- *   laser          100-500      ALL 8 edge diamonds fire a beam inward to the spawn tile
- *                               (stagger <= 60 ms, every beam lands by 500). The ring is
- *                               parked on its stations while the beams fly, then
- *                               circulates one full lap clockwise along the viewport
- *                               perimeter from 500 to the reveal end
- *   pop            500-850      6-sparkle poof where the beams converge
- *   reveal      500-(500+R)     tilesVisible = max(1, ceil(N * t / R)), R = revealMs(N);
- *                               LINEAR, grows out from the spawn tile; the digit fades
- *                               out over the last 500 ms; ALL 8 diamonds stay lit
- *   unlock         500+R        reveal complete: wrap/bleed edge paths (docks + their
- *                               border cells) appear atomically, the digit is gone,
- *                               input unlocks; the ring lighting fades over 150 ms
- *   goal pulse   +0..+250       goal marker pulse
- *   done           500+R+250    nothing left to animate
+ *   phase        start-end ms        what happens
+ *   digit-in         0-200           level digit fades/scales in (skipped when the digit is
+ *                                    already up from the preceding deconstruct)
+ *   build         100-(100+B)        tilesVisible = max(1, ceil(N * t / B)), B = buildMs(N);
+ *                                    LINEAR, grows out from the spawn tile; the digit fades
+ *                                    out over the last 500 ms; ALL 8 diamonds are lit and the
+ *                                    ring circulates one full lap clockwise along the viewport
+ *                                    perimeter, exactly back on its rest stations at build end
+ *   build end      100+B             wrap/bleed edge paths (docks + their border cells) appear
+ *                                    atomically, the digit is gone, the orbit has parked
+ *   laser     (100+B)-(500+B)        ALL 8 edge diamonds fire a beam inward from their REST
+ *                                    stations to the spawn tile (stagger <= 60 ms, every beam
+ *                                    lands by the end); a diamond brightens as its beam fires
+ *   landing        500+B             beams converge: the player appears (spawnPop 0 -> 1 over
+ *                                    350 ms), input unlocks, the goal marker pulses (250 ms);
+ *                                    the ring lighting fades over 150 ms
+ *   done        500+B+350            nothing left to animate
+ *
+ * Total time to input unlock = 100 + B + 400 = 500 + B (2.5-3.7 s): the same as before the
+ * reorder, when the beams flew in the first 400 ms and the build started as they landed.
  *
  * Deconstruct (resolveIntroDeconstruct) is the mirror: the player fires a beam out to
  * ALL 8 diamonds (0-400; each diamond lights as its beam reaches it; the ring stays
@@ -64,7 +68,7 @@ export interface IntroState {
   readonly tilesVisible: number;
   readonly digitAlpha: number;
   readonly digitScale: number;
-  /** 0..1 travel of the single spawn laser (0 before / in reduced motion, 1 once landed). */
+  /** 0..1 travel of the spawn beams (0 before the build completes / in reduced motion, 1 once landed). */
   readonly laserProgress: number;
   /** 0..1 progress of the landing poof (0 until the laser lands). */
   readonly spawnPop: number;
@@ -77,22 +81,33 @@ export interface IntroState {
   readonly bleedProgress: 0 | 1;
   /** Reduced motion only: 0..1 board fade-in (always 1 otherwise). */
   readonly boardAlpha: number;
-  /** Diamond-ring orbit phase in radians (+ = clockwise; whole laps: exactly 0 at rest, before 500 ms and after the intro). */
+  /** Diamond-ring orbit phase in radians (+ = clockwise; whole laps: exactly 0 at rest, before the build starts and from the build end on). */
   readonly ringSpinRad: number;
-  /** Ring-wide lighting envelope 0..1: 1 while the maze is generated, fading to 0 after the reveal. */
+  /** Ring-wide lighting envelope 0..1: 1 from the intro start through the build and the beam flight, fading to 0 after the landing. */
   readonly ringEnergy: number;
   readonly inputUnlocked: boolean;
   readonly done: boolean;
 }
 
 export const INTRO_DIGIT_IN_MS = 200;
+/** @deprecated Pre-reorder laser start; see INTRO_REVEAL_START_MS. The beams now leave at resolveIntroLaserStartMs(N). */
 export const INTRO_LASER_START_MS = 100;
+/** Beam flight time (build end -> landing). */
 export const INTRO_LASER_MS = 400;
+/** @deprecated Pre-reorder laser end; see INTRO_REVEAL_START_MS. */
 export const INTRO_LASER_END_MS = INTRO_LASER_START_MS + INTRO_LASER_MS;
 /** Beams stagger by at most this much across the 8 diamonds (every beam still lands by the laser end). */
 export const INTRO_BEAM_STAGGER_MS = 60;
-/** The maze appears as the beams land. */
+/**
+ * @deprecated Pre-reorder timeline (beams first, maze appears as they land). The Wave 1B design tokens
+ * (motion.durationMs.reveal = INTRO_REVEAL_END_MS - INTRO_REVEAL_START_MS) still cite these constants and
+ * that wave owns tokens.ts/tokens.css/the evidence contract, so they keep their old values. The timeline
+ * no longer reads INTRO_LASER_START_MS / INTRO_LASER_END_MS / INTRO_REVEAL_START_MS: the build starts at
+ * INTRO_BUILD_START_MS and the beams leave at resolveIntroLaserStartMs(N) (the build end).
+ */
 export const INTRO_REVEAL_START_MS = INTRO_LASER_END_MS;
+/** The maze starts building this long after the intro clock starts (the digit is already fading in). */
+export const INTRO_BUILD_START_MS = 100;
 /**
  * @deprecated Retired fixed-duration beat (the pre-pacing model revealed ANY tile
  * count in 700 ms and unlocked at 1200 ms). The timeline no longer reads these:
@@ -172,16 +187,24 @@ export const resolveIntroRevealMs = (tileCount: number): number => (
   resolveTileDurationMs(tileCount, INTRO_REVEAL_MIN_MS, INTRO_REVEAL_MAX_MS)
 );
 
-/** Instant the reveal completes; unlock, edge paths, digit-out and the goal pulse hang off it. */
+/** Instant the BUILD completes (the last tile is shown); the ring parks, the digit is gone, the beams fire. */
 export const resolveIntroRevealEndMs = (tileCount: number): number => (
-  INTRO_REVEAL_START_MS + resolveIntroRevealMs(tileCount)
+  INTRO_BUILD_START_MS + resolveIntroRevealMs(tileCount)
 );
 
-/** Wrap/bleed edge paths (docks + their border cells) switch on atomically at the reveal end. */
+/** The 8 beams leave their diamonds only once the build is complete. */
+export const resolveIntroLaserStartMs = (tileCount: number): number => resolveIntroRevealEndMs(tileCount);
+
+/** Instant the beams land on the spawn tile: the player appears and input unlocks. */
+export const resolveIntroLaserEndMs = (tileCount: number): number => (
+  resolveIntroLaserStartMs(tileCount) + INTRO_LASER_MS
+);
+
+/** Wrap/bleed edge paths (docks + their border cells) switch on atomically at the build end. */
 export const resolveIntroEdgePathsOnMs = (tileCount: number): number => resolveIntroRevealEndMs(tileCount);
 
 export const resolveIntroDoneMs = (tileCount: number): number => (
-  resolveIntroRevealEndMs(tileCount) + INTRO_GOAL_PULSE_MS
+  resolveIntroLaserEndMs(tileCount) + Math.max(INTRO_POP_MS, INTRO_GOAL_PULSE_MS)
 );
 
 /** Deconstruct tile-removal length: clamp(N / 70 tiles/s, 1800, 3000) ms. */
@@ -214,9 +237,9 @@ export const resolveIntroDurationMs = (reducedMotion: boolean, tileCount: number
   reducedMotion ? INTRO_REDUCED_MOTION_MS : resolveIntroDoneMs(tileCount)
 );
 
-/** Instant at which input unlocks (the reveal end in full motion). */
+/** Instant at which input unlocks (the beam landing, i.e. build end + beam flight, in full motion). */
 export const resolveIntroInputUnlockMs = (reducedMotion: boolean, tileCount: number): number => (
-  reducedMotion ? INTRO_REDUCED_MOTION_MS : resolveIntroRevealEndMs(tileCount)
+  reducedMotion ? INTRO_REDUCED_MOTION_MS : resolveIntroLaserEndMs(tileCount)
 );
 
 /**
@@ -297,33 +320,35 @@ export const resolveIntro = (elapsedMs: number, options: IntroOptions): IntroSta
   }
 
   const revealMs = resolveIntroRevealMs(tileCount);
-  const revealEndMs = INTRO_REVEAL_START_MS + revealMs;
-  const doneMs = revealEndMs + INTRO_GOAL_PULSE_MS;
+  const revealEndMs = resolveIntroRevealEndMs(tileCount);
+  const laserStartMs = resolveIntroLaserStartMs(tileCount);
+  const laserEndMs = resolveIntroLaserEndMs(tileCount);
+  const doneMs = resolveIntroDoneMs(tileCount);
 
-  // The spawn tile (first BFS tile) appears the instant the beams land, so
-  // the reveal visibly grows out of where they converge. Linear in time.
-  const tilesVisible = elapsed < INTRO_REVEAL_START_MS
+  // The first BFS tile (the spawn tile) appears when the build starts and the maze grows out
+  // from it. Linear in time; complete exactly at the build end, BEFORE any beam fires.
+  const tilesVisible = elapsed < INTRO_BUILD_START_MS
     ? 0
     : elapsed >= revealEndMs
       ? tileCount
-      : Math.min(tileCount, Math.max(1, Math.ceil((tileCount * (elapsed - INTRO_REVEAL_START_MS)) / revealMs)));
+      : Math.min(tileCount, Math.max(1, Math.ceil((tileCount * (elapsed - INTRO_BUILD_START_MS)) / revealMs)));
 
   const digitIn = options.digitAlreadyVisible === true ? 1 : smootherstep(elapsed / INTRO_DIGIT_IN_MS);
   const digitOutStartMs = revealEndMs - INTRO_DIGIT_OUT_MS;
   const digitOut = 1 - smootherstep((elapsed - digitOutStartMs) / INTRO_DIGIT_OUT_MS);
   const digitAlpha = elapsed >= revealEndMs ? 0 : Math.min(digitIn, digitOut);
 
-  const laser = resolveSpawnLaser(elapsed - INTRO_LASER_START_MS);
-  const laserActive = elapsed >= INTRO_LASER_START_MS;
+  const laser = resolveSpawnLaser(elapsed - laserStartMs);
+  const laserActive = elapsed >= laserStartMs;
   const popProgress = laserActive ? laser.spawnPop : 0;
-  const goalPulseProgress = clamp01((elapsed - revealEndMs) / INTRO_GOAL_PULSE_MS);
+  const goalPulseProgress = clamp01((elapsed - laserEndMs) / INTRO_GOAL_PULSE_MS);
 
-  const phase: IntroPhase = elapsed < INTRO_LASER_START_MS
+  const phase: IntroPhase = elapsed < INTRO_BUILD_START_MS
     ? 'digit-in'
-    : elapsed < INTRO_LASER_END_MS
-      ? 'laser'
-      : elapsed < revealEndMs
-        ? 'reveal'
+    : elapsed < revealEndMs
+      ? 'reveal'
+      : elapsed < laserEndMs
+        ? 'laser'
         : elapsed < doneMs
           ? 'pop'
           : 'done';
@@ -338,9 +363,10 @@ export const resolveIntro = (elapsedMs: number, options: IntroOptions): IntroSta
     goalPulse: goalPulseProgress > 0 && goalPulseProgress < 1 ? Math.sin(goalPulseProgress * Math.PI) : 0,
     bleedProgress: elapsed >= revealEndMs ? 1 : 0,
     boardAlpha: 1,
-    ringSpinRad: resolveRingOrbitRad(elapsed, INTRO_REVEAL_START_MS, revealEndMs, 1),
-    ringEnergy: resolveRingEnergyEnvelope(elapsed, revealEndMs),
-    inputUnlocked: elapsed >= revealEndMs,
+    // One clockwise lap over the whole build: exactly 0 (rest stations) when the beams fire.
+    ringSpinRad: resolveRingOrbitRad(elapsed, INTRO_BUILD_START_MS, revealEndMs, 1),
+    ringEnergy: resolveRingEnergyEnvelope(elapsed, laserEndMs),
+    inputUnlocked: elapsed >= laserEndMs,
     done: elapsed >= doneMs
   };
 };
