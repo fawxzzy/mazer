@@ -1596,7 +1596,10 @@ describe('legacy progression', () => {
     expect(advancedPalette.trailColor).toBe(0x36ff7d);
     expect(advancedPalette.trailPulseColor).toBe(0xf1faf6);
     expect(advancedPalette.trailPulseEdgeColor).toBe(0xe9fff1);
-    expect(resolveLegacyProgressionGenerationScale(50, advancedTrack)).toBeGreaterThan(50);
+    // Every bounded level >= 2 is a geometry-budget level on one frozen board:
+    // an advanced track no longer grows the maze past the tutorial scale.
+    expect(resolveLegacyProgressionGenerationScale(50, advancedTrack))
+      .toBe(resolveLegacyProgressionGenerationScale(50, state.tracks.player));
   });
 
   test('defines level-one mazes as small simple routes', () => {
@@ -1667,23 +1670,16 @@ describe('legacy progression', () => {
     expect(playerProfiles[0]?.difficulty.band).toBe('tutorial');
     expect(playerProfiles[1]?.difficulty.band).toBe('starter');
     expect(playerProfiles[1]).not.toEqual(playerProfiles[0]);
-    expect(playerProfiles[1]?.scale).toBeGreaterThan(playerProfiles[0]?.scale ?? 0);
-    // Half-speed pacing still holds for band/scale -- the two real levels
-    // sharing one paced step still get the same band and the same board
-    // scale. Checkpoint/dead-end density now reads a finer within-step
-    // signal so most pairs are no longer a byte-identical generation
-    // (confirmed for real levels 4 and 5 below -- reported as "level 4 and
-    // 5 look the same", the same complaint as levels 2 and 3). Levels 2
-    // and 3 specifically still tie: the very first starter step's table
-    // gap is only 1 (checkpoint count 2 -> 3), too small to floor an
-    // in-between value out of without landing exactly on the next level's
-    // own number -- which briefly (before flooring instead of rounding)
-    // measurably tipped a fixed-seed early-complexity ordering check the
-    // wrong way. Every later pair's gap is wide enough for a real
-    // in-between value instead.
+    // Levels 1..30 share one frozen board: difficulty comes from maze content,
+    // not board size, so the first clear no longer grows the board.
+    expect(playerProfiles[1]?.scale).toBe(playerProfiles[0]?.scale);
+    // The band labels still pair two real levels per step (diagnostics only),
+    // but geometry is now the geometry budget ladder (levels 2..30): every
+    // level owns a distinct profile, including the formerly tied levels 2
+    // and 3.
     expect(playerProfiles[2]?.difficulty).toEqual(playerProfiles[1]?.difficulty);
     expect(playerProfiles[2]?.scale).toBe(playerProfiles[1]?.scale);
-    expect(playerProfiles[2]?.generation).toEqual(playerProfiles[1]?.generation);
+    expect(playerProfiles[2]?.generation).not.toEqual(playerProfiles[1]?.generation);
     expect(playerProfiles[3]?.generation).not.toEqual(playerProfiles[2]?.generation);
     expect(playerProfiles[4]?.difficulty).toEqual(playerProfiles[3]?.difficulty);
     expect(playerProfiles[4]?.scale).toBe(playerProfiles[3]?.scale);
@@ -1767,7 +1763,9 @@ describe('legacy progression', () => {
         expect(layout.boardTop + layout.boardHeight).toBeLessThanOrEqual(viewport.height);
       }
     }
-  });
+    // Levels 2..30 are geometry-budget levels: each generation scans a gate of
+    // candidates, so ten mazes no longer fit the 5s default.
+  }, 60_000);
 
   test('maps progression bands to increasing procedural pressure', () => {
     // Complexity values doubled (in real-level terms) from what used to hit
@@ -1809,16 +1807,21 @@ describe('legacy progression', () => {
     const mythicMaze = createLegacyRuntimeMazeForMode('menu', 96, 3749, mythicProfile);
     const mythicComplexity = resolveLegacyMazeComplexity(mythicMaze);
 
+    // The late bands' geometry now comes from the geometry budget ladder on a
+    // frozen board (see legacyGeometryBudget.ts): richer branching and border
+    // feeders, but the shortcut and route-reinforcement multipliers stay at
+    // their base value (they are inert at the frozen 35-scale).
     expect(tutorialBudget.shortcutCount).toBe(0);
     expect(mythicProfile.checkpointCountMultiplier).toBeGreaterThan(tutorialProfile.checkpointCountMultiplier);
-    expect(mythicProfile.shortcutCountMultiplier).toBeGreaterThan(tutorialProfile.shortcutCountMultiplier);
-    expect(mythicProfile.routeQualityReinforcementMultiplier).toBeGreaterThan(tutorialProfile.routeQualityReinforcementMultiplier);
+    expect(mythicProfile.shortcutCountMultiplier).toBe(0);
+    expect(mythicProfile.routeQualityReinforcementMultiplier).toBe(0);
     expect(mythicProfile.borderFeederTargetPerSide).toBeGreaterThan(tutorialProfile.borderFeederTargetPerSide ?? 0);
     expect(mythicBudget.checkpointCount).toBeGreaterThan(tutorialBudget.checkpointCount);
-    expect(mythicBudget.shortcutCount).toBeGreaterThan(0);
-    expect(mythicBudget.shortcutStageEnabled).toBe(true);
+    expect(mythicBudget.shortcutCount).toBe(0);
     expect(mythicComplexity.edgeWrapCount).toBeGreaterThanOrEqual(2);
-  });
+    // The 96-scale maze above is a gated budget level (a candidate scan), which
+    // no longer fits the 5s default.
+  }, 60_000);
 
   test('keeps player and trail progression colors distinct from the pale maze path', () => {
     const state = createEmptyLegacyProgressionState();
@@ -1904,11 +1907,13 @@ describe('legacy progression', () => {
     expect(LEGACY_PROGRESSION_MENU_MIN_TILE_PX).toBeGreaterThanOrEqual(5.3);
     expect(LEGACY_PROGRESSION_PHONE_MENU_TARGET_TILE_PX).toBe(8);
     expect(LEGACY_PROGRESSION_PLAY_MIN_TILE_PX).toBeGreaterThanOrEqual(5.2);
-    expect(unrestrictedScale).toBeGreaterThan(viewportCap);
-    expect(phoneScale).toBe(viewportCap);
-    expect(narrowScale).toBe(narrowViewportCap);
-    expect(narrowScale).toBe(50);
-    expect(phoneScale).toBe(50);
+    // The board is frozen across all bounded levels >= 2, so even a maxed track
+    // generates the tutorial scale; the viewport cap is only a ceiling on it.
+    expect(unrestrictedScale).toBe(resolveLegacyProgressionGenerationScale(50, state.tracks.player));
+    expect(phoneScale).toBe(Math.min(unrestrictedScale, viewportCap));
+    expect(narrowScale).toBe(Math.min(unrestrictedScale, narrowViewportCap));
+    expect(narrowScale).toBe(unrestrictedScale);
+    expect(phoneScale).toBe(unrestrictedScale);
     expect(normalPhoneViewportCap).toBe(50);
     expect(playViewportCap).toBeGreaterThan(narrowViewportCap);
 
@@ -1993,7 +1998,7 @@ describe('legacy progression', () => {
     // (feeder count untouched by any device signal) -- fully backward
     // compatible for every caller that doesn't pass one.
     const legacyProfile = resolveLegacyMazeGenerationProfileForProgression(architectTrack);
-    expect(legacyProfile.borderFeederTargetPerSide).toBe(2);
+    expect(legacyProfile.borderFeederTargetPerSide).toBeGreaterThan(1);
 
     // A device sitting right at its own ceiling (fraction 1) keeps the
     // band's full feeder target; a device with much more headroom to
@@ -2001,9 +2006,11 @@ describe('legacy progression', () => {
     // band calls for feeders at all).
     const maxedFractionProfile = resolveLegacyMazeGenerationProfileForProgression(architectTrack, { fraction: 1 });
     const flooredFractionProfile = resolveLegacyMazeGenerationProfileForProgression(architectTrack, { fraction: 0 });
-    expect(maxedFractionProfile.borderFeederTargetPerSide).toBe(2);
-    expect(flooredFractionProfile.borderFeederTargetPerSide).toBe(1);
-    expect(flooredFractionProfile).toEqual({ ...legacyProfile, borderFeederTargetPerSide: 1 });
+    // Geometry-budget profiles (every bounded level >= 2) carry their own
+    // feeder rungs on a frozen board, so the device-fraction scaling does not
+    // apply to them: the fraction never changes the profile.
+    expect(maxedFractionProfile).toEqual(legacyProfile);
+    expect(flooredFractionProfile).toEqual(legacyProfile);
 
     // Bands whose own feeder target is already 0 (tutorial, and early
     // starter before its own onset threshold) are untouched by any

@@ -1,11 +1,11 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_7cb417bb0bc4",
+  "export_id": "pbe_mazer_owner_registry_4c07f47fb36b",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:7cb417bb0bc43a976a916ffbaac0f735fdcef03cdb7980c02302fdc1135a16c7",
+  "source_revision": "sha256:4c07f47fb36b20edc3b35a9440bbc82dc627811f051ed31c60b64e521b98dcf8",
   "generated_at": "2026-10-13T06:54:57.592Z",
   "sources": [
     {
@@ -21,7 +21,7 @@
       "kind": "markdown",
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
-      "revision": "sha256:0030bb65a4e3cf8d4de3a2a3d45719c5cf94df8969910173dd39604ab4d1bf0e",
+      "revision": "sha256:625c3bac58cf68e15e0ccb562909de82cf2b141e96741d2d4784672aeb07a24c",
       "observed_at": "2026-10-13T06:54:57.592Z"
     },
     {

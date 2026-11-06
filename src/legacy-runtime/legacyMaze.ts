@@ -1,4 +1,5 @@
 import { clampInteger } from './legacyDefaults';
+import { LAST_BUDGET_LEVEL } from './legacyGeometryBudget';
 import { resolveLegacyMenuSnapshotBlueprint } from './legacyMenuSnapshot';
 import { legacyTuning } from '../config/tuning';
 
@@ -60,6 +61,12 @@ export interface LegacyMazeGenerationProfile {
   // mercy of checkpointCountMultiplier's 0.2 floor, which alone can never
   // produce fewer than several checkpoints on a real-sized board.
   checkpointCountOverride: number | null;
+  // Set only on profiles produced by the geometry budget ladder
+  // (legacyGeometryBudget.ts, levels 2..LAST_BUDGET_LEVEL). It does not change
+  // how a single maze is carved; it tells the runtime selection to gate
+  // candidates against that level's baked proxy target instead of the
+  // target-complexity search. Absent for every other profile.
+  geometryBudgetLevel?: number;
   // Post-carve cap on dead-end tile count; null leaves dead ends fully
   // emergent (today's behavior). When set, excess dead-end leaves are pruned
   // back (never touching the solution path), which also collapses most of
@@ -280,6 +287,15 @@ export const normalizeLegacyMazeGenerationProfile = (
   // Only materialised when set, so every non-corridor profile keeps its
   // exact prior shape (no `layout` key at all).
   ...(profile?.layout === 'corridor' ? { layout: 'corridor' as const } : {}),
+  // Same rule: only materialised for a valid budget level (2..LAST_BUDGET_LEVEL).
+  ...(
+    typeof profile?.geometryBudgetLevel === 'number'
+    && Number.isInteger(profile.geometryBudgetLevel)
+    && profile.geometryBudgetLevel >= 2
+    && profile.geometryBudgetLevel <= LAST_BUDGET_LEVEL
+      ? { geometryBudgetLevel: profile.geometryBudgetLevel }
+      : {}
+  ),
   minCheckpoints: clampInteger(profile?.minCheckpoints ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.minCheckpoints, 1, 50),
   requiredOppositeBorderConnections: {
     horizontal: profile?.requiredOppositeBorderConnections?.horizontal ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.requiredOppositeBorderConnections.horizontal,

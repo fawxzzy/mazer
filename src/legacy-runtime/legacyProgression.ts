@@ -1,4 +1,5 @@
 import { clampInteger } from './legacyDefaults';
+import { LAST_BUDGET_LEVEL, resolveGeometryBudgetProfile } from './legacyGeometryBudget';
 import type { LegacyMazeGenerationProfile, LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 import { resolveLegacyMenuBoardAspectRatio, resolveLegacyMenuLayout } from './legacyMenuLayout';
 import { LEGACY_TRAIL_SHINE_COLOR, LEGACY_TRAIL_SHINE_EDGE_COLOR } from './legacyIridescentMaterial';
@@ -559,6 +560,23 @@ export const resolveLegacyProgressionLevel = (targetComplexity: number): number 
   clampInteger(Math.floor((targetComplexity - LEGACY_PROGRESSION_MIN_COMPLEXITY) / 4) + 1, 1, 99)
 );
 
+// The one seam that decides whether a track's maze geometry comes from the
+// continuous geometry difficulty function (every bounded level 2..LAST_BUDGET_LEVEL,
+// i.e. all of them) or from the level-1 corridor / legacy band path (null). It reads the BOUNDED level derived from the target
+// complexity -- never the server-owned, unbounded completion ordinal
+// (track.level) -- so an out-of-range or migrated save can never reach a
+// budget rung its target complexity has not earned. Level 1 is the corridor
+// (tutorial band) and also returns null here.
+export const resolveGeometryBudgetLevel = (
+  trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number
+): number | null => {
+  const targetComplexity = typeof trackOrTargetComplexity === 'number'
+    ? trackOrTargetComplexity
+    : trackOrTargetComplexity.targetComplexity;
+  const level = resolveLegacyProgressionLevel(targetComplexity);
+  return level >= 2 && level <= LAST_BUDGET_LEVEL ? level : null;
+};
+
 const resolveLegacyProgressionLevelBaseTargetComplexity = (level: number): number => clampInteger(
   LEGACY_PROGRESSION_MIN_COMPLEXITY + ((clampInteger(level, 1, 99) - 1) * 4),
   LEGACY_PROGRESSION_MIN_COMPLEXITY,
@@ -693,6 +711,12 @@ const resolveLegacyMazeGenerationBaseProfileForProgression = (
   const targetComplexity = typeof trackOrTargetComplexity === 'number'
     ? trackOrTargetComplexity
     : trackOrTargetComplexity.targetComplexity;
+  // Levels 2..LAST_BUDGET_LEVEL: geometry comes from the budget ladder, not
+  // from the band switch below (the band stays for labels and diagnostics).
+  const geometryBudgetLevel = resolveGeometryBudgetLevel(targetComplexity);
+  if (geometryBudgetLevel !== null) {
+    return resolveGeometryBudgetProfile(geometryBudgetLevel);
+  }
   // Use the same bounded difficulty index as band selection. Never feed the
   // unbounded completion ordinal back into maze geometry.
   const level = resolveLegacyProgressionDifficultyStep(targetComplexity);
@@ -893,7 +917,14 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
   scaleContext?: LegacyMazeGenerationScaleContext
 ): LegacyMazeGenerationProfile => {
   const profile = resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity);
-  if (scaleContext === undefined || !profile.borderFeederTargetPerSide || profile.borderFeederTargetPerSide <= 0) {
+  // Budget-ladder profiles carry their own feeder rungs and the board is
+  // frozen, so the device-fraction feeder scaling does not apply to them.
+  if (
+    scaleContext === undefined
+    || profile.geometryBudgetLevel !== undefined
+    || !profile.borderFeederTargetPerSide
+    || profile.borderFeederTargetPerSide <= 0
+  ) {
     return profile;
   }
 
@@ -1605,7 +1636,12 @@ export const resolveLegacyProgressionScaleDetail = (
 ): LegacyProgressionScaleDetail => {
   const profile = resolveLegacyProgressionDifficultyProfile(track);
   const difficultyLevel = resolveLegacyProgressionLevel(track.targetComplexity);
-  const progressionScale = profile.targetScale + Math.min(8, Math.max(0, track.targetComplexity - resolveLegacyProgressionLevelBaseTargetComplexity(difficultyLevel)) * 0.8);
+  // The board is frozen for the whole budget range: difficulty there comes
+  // from maze content, not board size, so levels 2..LAST_BUDGET_LEVEL use the
+  // tutorial band's scale with no per-level bonus.
+  const progressionScale = resolveGeometryBudgetLevel(track) !== null
+    ? resolveLegacyProgressionDifficultyProfile(LEGACY_PROGRESSION_MIN_COMPLEXITY).targetScale
+    : profile.targetScale + Math.min(8, Math.max(0, track.targetComplexity - resolveLegacyProgressionLevelBaseTargetComplexity(difficultyLevel)) * 0.8);
   const blendedScale = (baseScale * 0.28) + (progressionScale * 0.72);
   // The device's actual screen space (pixels -> the largest tile grid that
   // keeps a tile above a legible/tappable size) is now the real ceiling,
@@ -1726,11 +1762,16 @@ export const summarizeLegacyProgressionDiagnostics = (
   );
   const difference = complexity.total - targetComplexity;
   const tolerance = 8;
-  const delivery = difference < -tolerance
-    ? 'under-target'
-    : difference > tolerance
-      ? 'over-target'
-      : 'on-target';
+  // Budget levels are gated on the geometry proxy, not on the 400-capped
+  // complexity target, so the under/over-target label would be meaningless
+  // noise there: report them as on-target (the numeric difference stays).
+  const delivery = resolveGeometryBudgetLevel(activeTrack) !== null
+    ? 'on-target'
+    : difference < -tolerance
+      ? 'under-target'
+      : difference > tolerance
+        ? 'over-target'
+        : 'on-target';
   return {
     activeTrackId,
     complexity,

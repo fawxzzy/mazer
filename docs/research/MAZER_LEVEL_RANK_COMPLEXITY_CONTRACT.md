@@ -1,6 +1,6 @@
 # Mazer Level, Rank, Complexity, And AI Progression Contract
 
-Last updated: 2026-08-23
+Last updated: 2026-11-05
 
 Status: implemented source contract; provider migration and server-owned cutover remain separately gated.
 
@@ -11,6 +11,19 @@ This document defines how Mazer should connect player performance, AI-runner per
 - Room eligibility is removed from the difficulty profile and progression vocabulary. No level, rank, target-complexity, or recipe-cycle value activates a room contract.
 - Naturally open floor geometry remains valid maze topology; this is not a no-`2x2` generation rule.
 - Older room-off and future-room passages below are retained as design history and are superseded by this section.
+
+## 2026-11-06 Continuous geometry difficulty D(level) (levels 2..99, supersedes the 2..30 ladder)
+
+Owner direction: level 1 is a straight corridor, every later level is strictly harder, difficulty comes from maze content and not board size, and progression must be more gradual (the 2..30 ladder stopped at 30 and the legacy band path resumed at 31, a +52% board and a +73 proxy step). This section supersedes the 2026-11-05 "levels 2..30" ladder text and the half-speed band pairing for every bounded progression level 2 through 99. It is a source change; felt difficulty has no player testing and needs the owner's sign-off before merge.
+
+- **One function.** `resolveGeometryBudgetTarget` (in `src/legacy-runtime/legacyGeometryBudget.ts`): `T(N) = min(CEILING, START + STEP * (N - 2))` with `STEP = 5` exactly, `START` and `CEILING` baked from calibration (39 and 299 today). T is the target of the H1 geometry proxy (turns + length/4 + 3*splits + 2*max(0, dead ends - 2) + 6*wraps; a modelling choice, not a measured player-difficulty law). The hard per-level bound on the target is therefore +5; the previous ladder's targets stepped by up to ~40 (wrap rungs) and its band hand-off by ~73.
+- **Range and seam.** `LAST_BUDGET_LEVEL = 99`, the bounded level clamp of `resolveLegacyProgressionLevel`. `resolveGeometryBudgetLevel` still derives the level from the bounded target complexity, never from the unbounded completion ordinal. Every bounded level 2 through 99 now takes this path; the legacy band geometry path is no longer reachable for levels at or above 2 (the band labels, palettes, ranks and the 8..400 target track are untouched). Completion ordinals above 99 map to level 99 for geometry.
+- **Frozen board.** The progression scale for every level is the tutorial scale, on every viewport; device-fraction feeder scaling does not apply to budget profiles.
+- **Content.** One fixed ordered tape of 44 structure rungs (checkpoint branches, dead-end caps, then edge wraps: horizontal, vertical, feeders per side). Level N owns the first R(N) rungs, where R is a baked non-decreasing table (`GEOMETRY_BUDGET_RUNGS_BY_LEVEL`) chosen as the prefix whose calibrated mean proxy is closest to T(N); levels may share a profile and differ only in their gate target. `scripts/analysis/generate-geometry-budget-targets.ts --write` regenerates START, CEILING and R; `--check` recomputes and fails on drift.
+- **Strictness gate.** Budget profiles carry `geometryBudgetLevel`. Generation builds up to `GEOMETRY_BUDGET_GATE_CANDIDATES` (48) candidates with mixed seeds and accepts the first whose proxy is within `GEOMETRY_BUDGET_ACCEPT_HALF_WIDTH` (2.4, strictly less than STEP / 2) of T(N); otherwise it keeps the nearest. There is no target-complexity search and no pressure or adaptive retry on these levels, and the caller's `candidateCount` is ignored. Measured adjacent-level proxy inversions on the ramp (levels 2 to 53, 32 seeds, phone and desktop): about 0.1 to 0.2 percent at K = 48 versus about 3 percent at K = 24 and a modelled 8 percent at K = 16 for this step; it is a high-probability property, not a guarantee for every seed.
+- **Saturation (declared).** The full tape's mean proxy flattens at about 303 on the frozen 35-scale board, so T reaches CEILING (299) at `GEOMETRY_BUDGET_SATURATION_LEVEL = 54`. From level 54 geometry is a plateau: levels vary only by seed and adjacent levels are tied by construction. `resolveContinuousDifficulty(level)` reports the hand-off for any completion ordinal, including 100 and above: `geometrySaturated`, and `hazardBudgetLevels = level - 54`, which rises by exactly 1 per level without bound. That hazard share belongs to the unsigned hazard contract and is NOT wired. Past level 54 the game does not get harder in geometry; nothing pretends it does.
+- **Levels 16 to 30 versus the legacy band path.** The band path's proxy is a flat ~380 from level 16 to 35 on a 38 percent larger board, so the new curve (T = 109 at 16, 179 at 30) is deliberately easier there: that plateau was board size, which the frozen-board direction removes. Board growth, the ceiling height and how easy levels 16 to 54 should feel are owner decisions.
+- **Diagnostics.** Budget levels report `on-target` in the generation review; the 400-capped complexity target does not gate them.
 
 ## 2026-08-23 Superseding Progression Contract
 
