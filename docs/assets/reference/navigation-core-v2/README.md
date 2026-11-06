@@ -4,7 +4,7 @@
 NAVIGATION CORE V2
 Amendment to: Navigation Core v1 (APPROVED - FROZEN 2026-09-03)
 Scope: board tiles (floor, rim, junction/dead-end details, docks) and the start/goal/player marker treatment
-STATUS: DRAFT - not frozen, not applied to the live renderer
+STATUS: WIRED as the default live board style (2026-11-06) - not frozen, owner approval pending
 Owner approval: PENDING
 ```
 
@@ -13,9 +13,11 @@ redesign requires. Navigation Core v1 is frozen and its "Prohibited regressions"
 forbids a bleached floor and per-cell trail rendering; a redesign cannot ship under v1
 without a new explicitly approved revision. This draft is that revision's proposal.
 
-Nothing in this document changes runtime behavior. The implementation delivered with it
-is a pure, unwired module (`src/render/boardTileBake.ts`, `src/render/boardTileStyle.ts`).
-Scene wiring is a separate packet: `docs/ui/MAZER-BOARD-TILE-BAKE-WIRING-PLAN-2026-11-05.md`.
+Status update (2026-11-06): the owner picked B "Chip" and the Chip wiring PR applied it to the
+live renderer (`src/render/boardTileLayer.ts`, `src/render/phaserTileContext.ts`,
+`src/render/chipTileGraphics.ts`, `src/scenes/MenuScene.ts`). Chip is the default; `?tileStyle=trace`
+selects the alternate. The wiring plan (`docs/ui/MAZER-BOARD-TILE-BAKE-WIRING-PLAN-2026-11-05.md`) is now
+history; its "legacy stays default" rollout step was replaced by the owner's pick.
 
 ## Facts, assumptions, decisions
 
@@ -89,10 +91,10 @@ Style `trace` (alternate): the corridor is one stroked circuit trace in a dark c
 | A4 | Bake is deterministic and rebuild-skipping | identical draw list and hash for identical input; cache test | Unit-proven |
 | A5 | Bounded draw cost | 25x51 braided maze, chip: 7 raster ops; trace: 12; with 4 docks: 43 / 36 (path-construction ops about 5.5k chip / 3.8k trace, one time per bake) | Unit-proven |
 | A6 | Hazard slots reserved, draw nothing | `slotBlocker/slotGate/slotPatrol` tests | Unit-proven |
-| A7 | Real-game visual proof at 390x844 DPR 2 and 3, 1280x720 DPR 1 | wiring plan, "Visual proof plan" | NOT RUN (unwired) |
-| A8 | Trail readable on the chip | needs a trail underlay or lift, see Open items | OPEN |
+| A7 | Real-game visual proof at 390x844 DPR 2 and 3, 1280x720 DPR 1 | real-game lifecycle frames at 390x844 and 1280x720 (DPR 1; levels 1, 5, 20, 40) were captured with `npm run visual:lifecycle` and reviewed in the wiring PR; DPR 2/3 frames were not captured | PARTIAL |
+| A8 | Trail readable on the chip | dark underlay (`bg.canvas`, alpha 0.8, 1.25 css px wider each side) under the trail; `tests/reset/board-tile-layer.test.ts` pins every calm energy stop at 3:1 or better against chip-under-underlay | Unit-proven |
 | A9 | Colour-vision check (protan/deutan/tritan) of player vs goal vs start | prototype filters were used on the options; must be re-run on the real game | NOT RUN |
-| A10 | Frame time and memory on a real phone | bake runs once per hash; one blit per frame | NOT RUN |
+| A10 | Frame time and memory on a real phone | bake runs once per hash; one blit per frame. Desktop CPU measurement: `scripts/visual/measure-board-tile-cost.mjs` (numbers in the wiring PR). No real phone measured | PARTIAL (desktop only) |
 | A11 | Owner approval | owner picks a style after seeing the real game | PENDING |
 
 A localhost browser render of the bake output (chip and trace, 25x51 maze and a four-dock
@@ -100,7 +102,7 @@ maze at DPR 2) was inspected during implementation; it is not committed evidence
 
 ## Open items (recorded, not hidden)
 
-- Trail contrast: the Navigation Core energy stops are not all >= 3:1 against the chip
+- (Closed by the wiring PR, see A8.) Trail contrast: the Navigation Core energy stops are not all >= 3:1 against the chip
   (violet, blue, magenta and red fall below; a unit test documents this). The wiring packet
   must add a dark underlay (the prototype used `bg.canvas` at about 0.6 alpha, about 1.25
   css px wider on each side than the trail) or lift the stops toward white, and re-measure.
@@ -126,10 +128,10 @@ in the wiring plan.
 ## Owner approval
 
 ```
-Owner approval: PENDING
+Owner approval: PENDING (style pick recorded)
 Trigger: owner request for a mobile-readable board redesign (2026-11-05)
-Final approval is recorded here when the owner picks a style after seeing the real game.
-Until then v1 remains the frozen authority for the live renderer.
+Style pick: B "Chip" (owner, 2026-11-06, from the published A/B/C options page); C "Trace" kept as an alternate.
+Final approval is recorded here once the owner has reviewed Chip in the real game.
 ```
 
 ## Decision-registry amendment (DRAFT TEXT, NOT APPLIED)

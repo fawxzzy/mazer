@@ -24,6 +24,7 @@ const TEST_SPINE = [
   'tests/render/edgeMarkers.test.ts',
   'tests/render/boardTileBake.test.ts',
   'tests/render/boardTileStyle.test.ts',
+  'tests/reset/board-tile-layer.test.ts',
   'tests/visual/maze-lifecycle-analysis.test.mjs',
   'tests/ai/demo-walker.test.ts',
   'tests/ai/demo-walker-known-frontier.test.ts',

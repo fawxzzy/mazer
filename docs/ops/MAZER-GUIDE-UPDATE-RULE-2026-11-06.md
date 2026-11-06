@@ -14,6 +14,6 @@ Where the guide lives:
 
 - Content, icon specs and pending rows: `src/legacy-runtime/legacyGuideContent.ts` (one module, consumed by both the main-menu Settings sheet and the in-game Pause Settings through the shared `How to play` row in `src/legacy-runtime/legacySettingsSheetPlan.ts`).
 - Drift guard: `tests/reset/legacy-guide-content-drift.test.ts` asserts each claim against live exports and constants. A red drift test means update the guide module and its icons, not only the test.
-- Icons must be drawn by the same function as the board marker or tile where possible. Rows whose icon is not shared yet are listed as `todo-wiring` with their closing lane (`guide-wiring` or `chip-wiring`); the Chip wiring PR closes the `chip-wiring` ones and adds the pending `start-marker` row.
+- Icons must be drawn by the same function as the board marker or tile where possible. Rows whose icon is not shared yet are listed as `todo-wiring` with their closing lane (`guide-wiring` or `chip-wiring`); the Chip wiring PR (2026-11-06) closed the `chip-wiring` ones and added the Start row; every row is now `shared-with-board` or `guide-local`.
 
 The PR template carries a one-line checklist item for this rule.

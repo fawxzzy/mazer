@@ -60,13 +60,13 @@ See the investigation closeout (kept outside the repo, settings-reset-progress-2
 
 | reasonId | Meaning |
 | --- | --- |
-| `goal-legend-reuses-scene-star-draw` | The legend already reuses the in-game goal star draw call; Chip wiring swaps that call and the legend follows. |
+| `goal-legend-calls-chip-marker-draw` | The Goal icon calls `drawBoardMarkers` (goal) from `src/render/boardTileBake.ts` through `PhaserGraphicsTileContext`, over a chip tile: the same function the board uses for the live goal (Chip wiring, 2026-11-06). |
 | `player-marker-draw-bound-to-board-graphics` | `fillLegacyPlayerMarkerTile` draws into the board's dynamic graphics, the shared glow canvas image and the live motion state, so the Guide cannot call it. The Guide icon is a guide-local rounded square using the same ratio constants, accent stroke and the `player.core` token. When Chip lands, switch it to `drawBoardMarkers` (player). |
 | `stick-mirrors-play-stick-style-independent` | Mirrors the floating stick ring and knob drawn in play; independent of tile style. |
-| `trail-legend-uses-old-path-material` | The legend swatch uses the old path material, not the board trail draw. Chip wiring points it at the board trail colors (open item A8, trail underlay on the chip floor). |
+| `trail-legend-uses-chip-tile-geometry` | The trail legend is three chip tiles in an L (cells from the board's `computeChipGeometry`, via `resolveChipGridGeometry`) with a miniature trail line over the same dark underlay the board trail uses. The tile geometry is shared with the board; the trail line is a guide-local miniature of the canvas trail. |
 | `wrap-legend-calls-edge-marker-draw` | The legend calls `drawEdgeMarker` (the perimeter diamond) instead of a bespoke glyph. Diamonds are unchanged by Chip. Their lit-on-wrap behavior is source-claimed, not observed (audit F17); the copy does not mention it. |
-| `level-numeral-shares-old-path-material` | Numeral and START/MAZER wordmarks share the old path material (audit F13). Chip wiring decides migrate-or-accept; the legend numeral follows. |
-| `start-marker-needs-chip-brackets` | Pending row. Chip draws gold corner brackets on the start tile (`drawBoardMarkers` start). Add a Start row, drawn by that function, in the PR that wires Chip. The old "begin at gold" copy is dropped: the live game shows no gold start marker in play. |
+| `level-numeral-calls-wordmark-chip-draw` | The level numeral is drawn by `drawLegacyGlyphWordTileBlock`, the dot-matrix chip renderer the level announcer and wordmarks use, at icon scale. |
+| `start-legend-calls-chip-marker-draw` | The Start row (added with Chip) calls `drawBoardMarkers` (start): corner brackets and a centre dot, over a chip tile. The copy names no colour. |
 | `rank-letters-not-visible-anywhere` | Pending row. Rank letters are not shown (`drawLegacyProgressionBadge` draws nothing). No rank copy until a player-facing rank surface exists. |
 | `level1-coach-is-owner-decision` | Pending row. A one-line level-1 coach is a separate owner decision; `src/tutorial/*` is unused. |
 
@@ -88,3 +88,7 @@ Not done, deliberately:
 - Multi-device reset epoch (BLOCKED-ON-OWNER, see above) and clearing the legacy guest progression key on account reset are not implemented. Guest play is disabled (`LEGACY_GUEST_PLAY_ACCESS_ENABLED = false`), so the guest-key re-import path only matters for progress saved before that.
 - `scripts/analysis/capture-ui-surfaces.mjs` still expects the old Guide dropdown (`guidePanel` bounds, GUIDE label) and the docked Sign out bar; it needs a follow-up in its own lane (out of scope here).
 - `legacyPauseMenuView.ts` (layout) and `legacyUiStandards.ts` (`resolveLegacyOptionsGuideLayout`, toggle/feature layouts) are no longer consumed by the scene; they stay for their own tests and are candidates for removal.
+
+## Chip wiring status (2026-11-06)
+
+The `chip-wiring` guide todos are closed: goal, start, trail and levels icons now share a board draw (see the reason ids above); `you` and `move` stay guide-local. The pending `start-marker` row became the shown Start row. The drift test pins this (`tests/reset/legacy-guide-content-drift.test.ts`).

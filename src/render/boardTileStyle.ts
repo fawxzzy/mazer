@@ -210,8 +210,10 @@ export const BOARD_TILE_GEOMETRY = Object.freeze({
     goalBadgeRatio: 0.47,
     goalRingRatio: 0.09,
     goalRingMinCss: 1.25,
-    goalStarOuterRatio: 0.33,
-    goalStarInnerRatio: 0.15,
+    goalStarOuterRatio: 0.37,
+    goalStarInnerRatio: 0.17,
+    /** The end tile itself is lit: a goal-coloured pad in the cell's inscribed circle, so the cell reads at board scale. */
+    goalWashAlpha: 0.34,
     /** Player: rounded square, mint edge, dark keyline. */
     playerSizeRatio: 0.6,
     playerRadiusRatio: 0.2,

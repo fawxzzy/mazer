@@ -1106,6 +1106,12 @@ const drawGoalMarker = (
     painter.fill();
     return;
   }
+  // End tile: a goal-coloured round pad fills the cell's inscribed circle (so it never spills past a
+  // rounded dead-end chip), then the dark badge and lit ring sit on it.
+  painter.fillStyle(cssRgba(m.goal, g.goalWashAlpha));
+  painter.begin();
+  painter.circle(cx, cy, style.tileSize / 2);
+  painter.fill();
   painter.fillStyle(cssRgb(m.void));
   painter.begin();
   painter.circle(cx, cy, k.goalBadgeRadius);
