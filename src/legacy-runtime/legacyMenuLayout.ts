@@ -24,6 +24,8 @@ export interface LegacyMenuLayout {
   // shrink by the same modest amount instead of only the title visibly
   // responding to a tight header.
   headerIconScale: number;
+  /** Device safe-area left/right insets the header controls are offset by (pass to resolveLegacyHeaderControlFrame as `safeArea`). */
+  headerSafeInset: { left: number; right: number };
   footerY: number;
   buttonLayout: 'row' | 'stack';
   buttonY: number;
@@ -387,6 +389,7 @@ export const resolveLegacyMenuLayout = (
         hudHeight: menuTopHudReserve,
         hudTop: safeAreaTop,
         placement: 'leading',
+        safeArea: { left: safeAreaLeft, right: safeAreaRight },
         sizeScale: candidateIconScale,
         width
       });
@@ -395,6 +398,7 @@ export const resolveLegacyMenuLayout = (
         hudHeight: menuTopHudReserve,
         hudTop: safeAreaTop,
         placement: 'trailing',
+        safeArea: { left: safeAreaLeft, right: safeAreaRight },
         sizeScale: candidateIconScale,
         slot: 1,
         width
@@ -726,6 +730,7 @@ export const resolveLegacyMenuLayout = (
         ? (menuTitleSqueezed ? Math.round(menuInlineTitleFontSize / 0.68) : menuTopHudReserve)
         : menuTitleReserve),
     headerIconScale,
+    headerSafeInset: { left: safeAreaLeft, right: safeAreaRight },
     footerY: height - 18,
     buttonLayout: resolvedUsesStackedButtons ? 'stack' : 'row',
     buttonY: rowButtonY,

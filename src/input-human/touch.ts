@@ -3,6 +3,7 @@ import {
   type HumanInputActionKind,
   type HumanMovementActionKind
 } from './actions.ts';
+import { resolveLegacyHeaderEdgeInset } from '../legacy-runtime/legacyHeaderControl.ts';
 
 export interface TouchViewportLike {
   width: number;
@@ -138,9 +139,14 @@ const resolveTopRightPauseRect = (
   // control during play, so it never shrinks below it (landscape-split
   // layouts used to request as little as 36).
   const size = clamp(Math.round(requestedSize), TOUCH_PAUSE_MIN_SIZE, 56);
-  const inset = Math.max(8, Math.round(size * 0.18));
+  // The cog glyph is drawn at the header-control size inside this (larger)
+  // hit zone. Centre it on the same x the menu's settings control uses
+  // (shared edge inset + safe-area), so the header mirrors left/right and the
+  // glyph never hugs the screen edge.
+  const glyphSize = clamp(Math.round(Math.min(viewport.width, viewport.height) * 0.085), 36, 40);
+  const glyphCenterX = viewport.width - safeInsets.right - resolveLegacyHeaderEdgeInset(viewport.width) - (glyphSize / 2);
   const left = clamp(
-    Math.round(viewport.width - safeInsets.right - size - inset),
+    Math.round(glyphCenterX - (size / 2)),
     safeInsets.left + 4,
     Math.max(safeInsets.left + 4, viewport.width - safeInsets.right - size - 4)
   );

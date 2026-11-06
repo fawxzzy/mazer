@@ -20,6 +20,7 @@
 export const SHARED_ACCOUNT_OAUTH_REQUIRED_TESTS = [
   'tests/reset/legacy-auth-gate.test.ts',
   // Menu a11y / 320px clipping / hit-target / post-rebuild tap recovery (MenuScene.ts changes).
+  'tests/reset/legacy-header-edge-padding.test.ts',
   'tests/reset/legacy-hit-targets.test.ts',
   'tests/reset/legacy-ui-standards.test.ts',
   'tests/reset/legacy-ui-tap-recovery.test.ts'

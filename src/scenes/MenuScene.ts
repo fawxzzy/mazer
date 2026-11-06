@@ -9688,6 +9688,7 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
@@ -9731,6 +9732,7 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
       slot: 1,
       width: this.layout.width
@@ -15329,6 +15331,7 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
@@ -15389,6 +15392,7 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
       slot: 1,
       width: this.layout.width
@@ -15445,6 +15449,7 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'leading',
+      safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
