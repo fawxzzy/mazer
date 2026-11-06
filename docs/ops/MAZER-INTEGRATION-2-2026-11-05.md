@@ -75,3 +75,13 @@ Full usage and detectors: `docs/ops/MAZER-LIFECYCLE-CAPTURE-TOOL-2026-11-05.md`.
 - Board tile style: Option B "Chip" (default) vs C "Trace" (alternate) is pending; the owner picks after seeing the real game. The Navigation Core v2 amendment (`docs/assets/reference/navigation-core-v2/README.md`) approval line is PENDING.
 - Wiring the tile bake (`docs/ui/MAZER-BOARD-TILE-BAKE-WIRING-PLAN-2026-11-05.md`) is blocked on that decision.
 - The P2 budget ladder (felt difficulty) still needs owner review before its own PR.
+
+## Verification on the merged tree (local)
+
+- `npm run lint`: clean. `npm run build`: passes (PWA precache 39 entries).
+- `npx vitest run` over tests/reset, core, architecture, analysis, cosmetics, tutorial, scenes, visual plus the four render files: 192 files, 2154 passed, 1 skipped, 1 failed (the known `menu-intent-runtime` baseline). Run with `GITHUB_BASE_REF=claude/mazer-integration-1-20261105`.
+- `npm run test` (same env): 165 files, 1857 passed, 1 skipped, 0 failed. The five new files are run separately (133 tests passed) because of the held-out package.json edit.
+- `tests/render/palette.test.ts`: 3 failed, 6 passed (baseline, excluded from the spine).
+- `node scripts/check-decision-registry.mjs` passes; `checkDesignTokens()` returns true.
+- Browser proof (dev server, 390x844 and 1280x720, storage cleared, `Player Skill Lv 01` confirmed after Start): menu idle shows no red marker ahead of the walker; Start shows beams from all 8 diamonds; goal reset shows beams from the player to all 8.
+- Lifecycle tool, level 15, seed 1337: residual components after deconstruct 0 at both viewports; input unlocked at 1216 ms; islands 3 (390x844) and 4 (1280x720); partial-strip findings 2 and 2 (all in `play`/`goal-hold` phases, extent 0.79-0.88 of the dock). Islands and partial strips are heuristic pointers, not confirmed defects.
