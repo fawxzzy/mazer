@@ -1,0 +1,263 @@
+{
+  "schema": "mazer.ai-run-seed-pack.v1",
+  "packId": "mazer-ai-seed-representative",
+  "packVersion": "1.0.0",
+  "purpose": "representative",
+  "description": "One explicit generation target per difficulty band (tutorial through navigator) with the AI skill that band implies, six fixed seeds each.",
+  "runnerContract": "menu-demo-advance-walker-v1",
+  "targets": [
+    {
+      "targetId": "tutorial-t8",
+      "band": "tutorial",
+      "levelRangeHint": {
+        "min": 1,
+        "max": 1
+      },
+      "scale": 29,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 8,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 0,
+        "checkpointCountMultiplier": 0.42,
+        "checkpointCountOverride": 1,
+        "maxDeadEndCount": 0,
+        "minCheckpoints": 1,
+        "requiredOppositeBorderConnections": {
+          "horizontal": false,
+          "vertical": false
+        },
+        "routeQualityReinforcementMultiplier": 0,
+        "shortcutCountMultiplier": 0,
+        "straightnessBias": 0.88
+      },
+      "ai": {
+        "skillLevel": 1,
+        "skillRank": "E",
+        "biasProfile": null
+      },
+      "seeds": [
+        11,
+        23,
+        47,
+        101,
+        2027,
+        40961
+      ]
+    },
+    {
+      "targetId": "starter-early-t16",
+      "band": "starter",
+      "levelRangeHint": {
+        "min": 2,
+        "max": 8
+      },
+      "scale": 30,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 16,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 0,
+        "checkpointCountMultiplier": 0.44,
+        "checkpointCountOverride": 2,
+        "maxDeadEndCount": 0,
+        "minCheckpoints": 2,
+        "requiredOppositeBorderConnections": {
+          "horizontal": false,
+          "vertical": false
+        },
+        "routeQualityReinforcementMultiplier": 0,
+        "shortcutCountMultiplier": 0,
+        "straightnessBias": 0.6
+      },
+      "ai": {
+        "skillLevel": 3,
+        "skillRank": "E",
+        "biasProfile": null
+      },
+      "seeds": [
+        11,
+        23,
+        47,
+        101,
+        2027,
+        40961
+      ]
+    },
+    {
+      "targetId": "starter-mid-t32",
+      "band": "starter",
+      "levelRangeHint": {
+        "min": 2,
+        "max": 8
+      },
+      "scale": 32,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 32,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 0,
+        "checkpointCountMultiplier": 0.5066666666666667,
+        "checkpointCountOverride": 6,
+        "maxDeadEndCount": 2,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": false,
+          "vertical": false
+        },
+        "routeQualityReinforcementMultiplier": 0.11666666666666665,
+        "shortcutCountMultiplier": 0.11666666666666665,
+        "straightnessBias": 0.43999999999999995
+      },
+      "ai": {
+        "skillLevel": 7,
+        "skillRank": "D",
+        "biasProfile": null
+      },
+      "seeds": [
+        11,
+        23,
+        47,
+        101,
+        2027,
+        40961
+      ]
+    },
+    {
+      "targetId": "starter-late-t64",
+      "band": "starter",
+      "levelRangeHint": {
+        "min": 2,
+        "max": 8
+      },
+      "scale": 35,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 64,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 1,
+        "checkpointCountMultiplier": 0.64,
+        "checkpointCountOverride": 47,
+        "maxDeadEndCount": 15,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": false,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 0.35,
+        "shortcutCountMultiplier": 0.35,
+        "straightnessBias": 0.12
+      },
+      "ai": {
+        "skillLevel": 15,
+        "skillRank": "C",
+        "biasProfile": null
+      },
+      "seeds": [
+        11,
+        23,
+        47,
+        101,
+        2027,
+        40961
+      ]
+    },
+    {
+      "targetId": "explorer-t96",
+      "band": "explorer",
+      "levelRangeHint": {
+        "min": 9,
+        "max": 18
+      },
+      "scale": 43,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 96,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 1,
+        "checkpointCountMultiplier": 0.86,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 0.7,
+        "shortcutCountMultiplier": 0.62,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 23,
+        "skillRank": "A",
+        "biasProfile": null
+      },
+      "seeds": [
+        11,
+        23,
+        47,
+        101,
+        2027,
+        40961
+      ]
+    },
+    {
+      "targetId": "navigator-t160",
+      "band": "navigator",
+      "levelRangeHint": {
+        "min": 19,
+        "max": 29
+      },
+      "scale": 55,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 160,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 1,
+        "checkpointCountMultiplier": 1,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 1,
+        "shortcutCountMultiplier": 1,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 39,
+        "skillRank": "S",
+        "biasProfile": null
+      },
+      "seeds": [
+        11,
+        23,
+        47,
+        101,
+        2027,
+        40961
+      ]
+    }
+  ],
+  "hash": "sha256:0d6e8708fc36c5959ffb7e1a7e218a6a92930fd31520eb1c124f7764a01eb14b"
+}

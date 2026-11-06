@@ -1,0 +1,143 @@
+{
+  "schema": "mazer.ai-run-seed-pack.v1",
+  "packId": "mazer-ai-seed-wrap-anomaly",
+  "packVersion": "1.0.0",
+  "purpose": "wrap-anomaly",
+  "description": "Boards that force opposite-border connections and extra border feeders so wrapped shortest paths and edge-wrap complexity are exercised; includes a portrait aspect ratio.",
+  "runnerContract": "menu-demo-advance-walker-v1",
+  "targets": [
+    {
+      "targetId": "wrap-explorer-both-axes",
+      "band": "explorer",
+      "levelRangeHint": {
+        "min": 9,
+        "max": 18
+      },
+      "scale": 43,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 96,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 2,
+        "checkpointCountMultiplier": 0.86,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 0.7,
+        "shortcutCountMultiplier": 0.62,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 23,
+        "skillRank": "A",
+        "biasProfile": null
+      },
+      "seeds": [
+        3,
+        19,
+        61,
+        127,
+        509,
+        1031,
+        7919,
+        65537
+      ]
+    },
+    {
+      "targetId": "wrap-navigator-heavy-feeders",
+      "band": "navigator",
+      "levelRangeHint": {
+        "min": 19,
+        "max": 29
+      },
+      "scale": 55,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 160,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 4,
+        "checkpointCountMultiplier": 1,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 1,
+        "shortcutCountMultiplier": 1,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 39,
+        "skillRank": "S",
+        "biasProfile": null
+      },
+      "seeds": [
+        3,
+        19,
+        61,
+        127,
+        509,
+        1031,
+        7919,
+        65537
+      ]
+    },
+    {
+      "targetId": "wrap-navigator-portrait",
+      "band": "navigator",
+      "levelRangeHint": {
+        "min": 19,
+        "max": 29
+      },
+      "scale": 55,
+      "aspectRatio": 0.6,
+      "selection": {
+        "targetComplexity": 160,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 3,
+        "checkpointCountMultiplier": 1,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 1,
+        "shortcutCountMultiplier": 1,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 39,
+        "skillRank": "S",
+        "biasProfile": null
+      },
+      "seeds": [
+        3,
+        19,
+        61,
+        127,
+        509,
+        1031,
+        7919,
+        65537
+      ]
+    }
+  ],
+  "hash": "sha256:fff6da86ebfc73b45d6ffadbe599b2e6b5b7516ff04b802bc1929b990f56405c"
+}

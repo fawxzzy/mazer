@@ -1,0 +1,170 @@
+{
+  "schema": "mazer.ai-run-seed-pack.v1",
+  "packId": "mazer-ai-seed-stress",
+  "packVersion": "1.0.0",
+  "purpose": "stress",
+  "description": "Large-board architect and mythic targets, an under-skilled AI on a mythic board, and a fixed long-tail set (rank E, shortcut-gambler bias) whose seeds were selected because the AI made wrong-branch, backtrack or recovery decisions.",
+  "runnerContract": "menu-demo-advance-walker-v1",
+  "targets": [
+    {
+      "targetId": "architect-t280",
+      "band": "architect",
+      "levelRangeHint": {
+        "min": 30,
+        "max": 41
+      },
+      "scale": 71,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 280,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 2,
+        "checkpointCountMultiplier": 1.16,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 1.22,
+        "shortcutCountMultiplier": 1.28,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 69,
+        "skillRank": "S",
+        "biasProfile": null
+      },
+      "seeds": [
+        7,
+        313,
+        9001
+      ]
+    },
+    {
+      "targetId": "mythic-t400",
+      "band": "mythic",
+      "levelRangeHint": {
+        "min": 42,
+        "max": 99
+      },
+      "scale": 96,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 400,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 2,
+        "checkpointCountMultiplier": 1.32,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 1.45,
+        "shortcutCountMultiplier": 1.58,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 99,
+        "skillRank": "S",
+        "biasProfile": null
+      },
+      "seeds": [
+        7,
+        313,
+        9001
+      ]
+    },
+    {
+      "targetId": "mythic-t400-weak-ai",
+      "band": "mythic",
+      "levelRangeHint": {
+        "min": 42,
+        "max": 99
+      },
+      "scale": 96,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 400,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 2,
+        "checkpointCountMultiplier": 1.32,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 1.45,
+        "shortcutCountMultiplier": 1.58,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 1,
+        "skillRank": "E",
+        "biasProfile": null
+      },
+      "seeds": [
+        7,
+        313,
+        9001
+      ]
+    },
+    {
+      "targetId": "explorer-t96-weak-ai-long-tail",
+      "band": "explorer",
+      "levelRangeHint": {
+        "min": 9,
+        "max": 18
+      },
+      "scale": 43,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 96,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 1,
+        "checkpointCountMultiplier": 0.86,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 0.7,
+        "shortcutCountMultiplier": 0.62,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 1,
+        "skillRank": "E",
+        "biasProfile": "shortcut-gambler"
+      },
+      "seeds": [
+        265,
+        636,
+        848,
+        1378,
+        1537,
+        1590
+      ]
+    }
+  ],
+  "hash": "sha256:70bae411f671ae4780ccbcf0c17fd52d24931a9248e438c1caf6316777f1f368"
+}
