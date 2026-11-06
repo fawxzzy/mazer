@@ -124,9 +124,6 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | `src/scenes/MenuScene.ts:17547` | `Runtime diagnostics authenticated fixture.` | no | n/a | fixture | None (QA fixture) |
 | `src/boot/accessibilitySurface.ts:100` | `Use Arrow keys or WASD to move through the maze. Press Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.` | no | n/a | static | None (a11y description) |
 | `src/boot/accessibilitySurface.ts:109` | `Mazer is ready.` | no | info | static | Live region never updated; candidate sink for the message surface announcements |
-| `src/boot/installGate.ts:75` | `Open this page in your device's default browser.` | no | n/a | static | None (install instructions) |
-| `src/boot/installGate.ts:76` | `Tap Share, then choose More.` | no | n/a | static | None |
-| `src/boot/installGate.ts:77` | `Select Add to Home Screen, Install app, or Download.` | no | n/a | static | None |
 | `src/legacy-runtime/legacyAccountPortal.ts:23` | `Account connection unavailable. Return to Mazer and try again.` | no | error / auth | raw-status | Auth table key `accountConnectionUnavailable`; it is drawn directly at `MenuScene.ts:17128` and via F2 |
 | `src/legacy-runtime/legacyAuth.ts:763` | `Account connected.` | no | success / auth | raw-status | Auth table key `accountConnected`; no render site today (info on the snapshot) |
 | `src/legacy-runtime/legacyAuth.ts:1024` | `A previous password update is still pending. Please wait before trying a different password.` | mapped | n/a | technical | Stays internal; mapped by `resolveLegacyPasswordRecoveryError` |
@@ -189,6 +186,35 @@ The lane branches that added `legacyAuthScreenView.ts`, `legacyLeaderboardView.t
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Horizontal wrap pairing forced by a single-feeder, vertical-only wrap profile.` | technical | developer-facing feature registry description; never rendered to players |
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Perimeter feeder spokes: single-tile border openings carved inward from each side.` | technical | developer-facing feature registry description; never rendered to players |
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Opposite-border pairing pass that mirrors existing border openings onto the far side.` | technical | developer-facing feature registry description; never rendered to players |
+
+### 4d. Boot splash and install gate literals (PR #372, pinned in integration 3)
+
+PR #372 (deterministic install gate, boot splash and bounded account bootstrap) landed after the audit base and the pin was never updated: three old `installGate.ts` rows were stale and 23 new source sites were unclassified. All are player-facing and active. The install gate is a pre-game surface (DOM overlay, no skip action, see `installPolicy.ts`); the splash is the static boot markup that `bootStatus` updates. `installSurface.ts` and `installPolicy.ts` contribute no scanned literals. The first two rows are status text that bypasses the message module; the rest are static gate copy (instructions), not status events. `Open Mazer from your home screen.` appears at two source sites and is one pin.
+
+| file | String | Kind | Surface / routing |
+| --- | --- | --- | --- |
+| `src/boot/bootSplash.ts` | `Loading…` | raw-status | boot splash neutral message (static markup in index.html, then updated by bootStatus); active pre-game surface; not routed through the message module |
+| `src/boot/bootSplash.ts` | `Signing you in…` | raw-status | boot splash message shown only while an OAuth callback exchange is in progress; active pre-game surface; mirrors LEGACY_AUTH_MESSAGE_COPY wording |
+| `src/boot/installGate.ts` | `Mazer only runs as an installed app, not in a browser tab.` | static | install gate subtitle (prompt-available and manual platform cards); active; gate copy, not a status event |
+| `src/boot/installGate.ts` | `Press Install below.` | static | install gate step, prompt-available mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Confirm in your browser.` | static | install gate step, prompt-available mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open Mazer from your home screen or desktop.` | static | install gate step, prompt-available mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Click the install icon at the end of the address bar, or open the browser menu and choose Install Mazer.` | static | install gate step, manual-desktop-chromium mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Confirm the install.` | static | install gate step, manual-desktop-chromium mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open Mazer from your desktop or Start menu.` | static | install gate step, manual-desktop-chromium mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open this page in Chrome or Edge. In Safari, choose File, then Add to Dock.` | static | install gate step, manual-desktop-other mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `In Chrome or Edge, click the install icon in the address bar.` | static | install gate step, manual-desktop-other mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open Mazer from your desktop, Start menu or Dock.` | static | install gate step, manual-desktop-other mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open this page in Chrome and tap the three-dot menu.` | static | install gate step, manual-android mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Choose Install app or Add to Home screen.` | static | install gate step, manual-android mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open Mazer from your home screen.` | static | install gate step, manual-android and manual-ios modes (two source sites, one pin); active; none (install instructions) |
+| `src/boot/installGate.ts` | `Tap the Share button in Safari.` | static | install gate step, manual-ios mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Choose Add to Home Screen.` | static | install gate step, manual-ios mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Mazer only runs as an installed app, and in-app browsers cannot install it.` | static | install gate subtitle, in-app-browser mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Copy the link below.` | static | install gate step, in-app-browser mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Paste it into Safari or Chrome.` | static | install gate step, in-app-browser mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Install Mazer from there, then open it from your home screen.` | static | install gate step, in-app-browser mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open it from your home screen or desktop.` | static | install gate subtitle, installed-open-app mode (post-install card); active; none (install instructions) |
 
 ### 4b. Technical-only literals
 
