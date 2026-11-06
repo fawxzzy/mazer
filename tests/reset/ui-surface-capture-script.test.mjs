@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { createCaptureOutputDirectory } from '../../scripts/analysis/capture-world-identity-ui-evidence.mjs';
 import {
   collectMenuControlSpacingIssues,
+  evaluateAuthWelcomeAnatomy,
+  isFixedCardWithoutScroll,
   evaluateAuthenticatedFixtureReadiness,
   evaluateStandaloneFirstVisibleHomeReadiness,
   evaluateSurfaceReadiness,
@@ -836,7 +838,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('markerStyle: menu.diagnostics.visual?.markerStyle');
     expect(source).toContain('hud: play.diagnostics.visual?.hud');
     expect(source).toContain('expectedLabels: []');
-    expect(source).toContain("? []\n        : ['GUIDE', 'Board Zoom', 'Trail Fade', 'Trail Shine', 'Animated Background']");
+    expect(source).toContain("? []\n        : PAUSE_CARD_EXPECTED_LABELS");
     expect(source).toContain("url.searchParams.set('mazeSeed', mazeSeed);");
     expect(source).toContain("url.searchParams.set('authFixture', authFixture);");
     expect(source).not.toContain("url.searchParams.set('pathStyle', pathStyle);");
@@ -986,8 +988,15 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("!hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale'])");
     expect(source).toContain("'play-settings-cog'");
     expect(source).toContain("!hasLabels(surfaces.play, ['PAUSE', 'RESET'])");
-    expect(source).toContain("hasLabels(surfaces.pause, ['GUIDE', 'Board Zoom', 'Trail Fade', 'Trail Shine', 'Animated Background'])");
-    expect(source).toContain("!hasLabels(surfaces.pause, ['Game Toggles', 'Resume'])");
+    // Pause card: Resume / Settings / Quit to Menu with Settings collapsed on
+    // open; no Guide. The toggles are asserted after a real Settings click.
+    expect(source).toContain("const PAUSE_CARD_EXPECTED_LABELS = Object.freeze([\n  'Paused',\n  'Resume',\n  'Settings',\n  'Quit to Menu'\n]);");
+    expect(source).toContain("const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([\n  'Board Zoom',\n  'Trail Fade',\n  'Trail Shine',\n  'Animated Background'\n]);");
+    expect(source).toContain('hasLabels(surfaces.pause, PAUSE_CARD_EXPECTED_LABELS)');
+    expect(source).toContain("!hasLabels(surfaces.pause, ['GUIDE'])");
+    expect(source).toContain('hasLabels(surfaces.pauseBottom, PAUSE_SETTINGS_EXPECTED_LABELS)');
+    expect(source).toContain("getVisualButtonPoint(pause.diagnostics.visual, 'Settings')");
+    expect(source).not.toContain("hasLabels(surfaces.pause, ['GUIDE', 'Board Zoom'");
     expect(source).toContain('const reportPath = resolve(outputDir, \'report.md\');');
     expect(source).toContain('![Menu](${summary.screenshots.menu})');
     expect(source).toContain('![Auth](${summary.screenshots.auth})');
@@ -1000,5 +1009,68 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('nativeInputs: surface.nativeInputs');
     expect(source).toContain('const buildViewportTransitionChecks = (transitions) =>');
     expect(source).toContain('checks.push(...buildViewportTransitionChecks(transitions));');
+  });
+});
+
+describe('forced auth screen anatomy check (Welcome entry card)', () => {
+  const surface = (labels, buttons) => ({
+    buttons: buttons.map((text) => ({ text })),
+    textLabels: labels.map((text) => ({ text }))
+  });
+  const goodLabels = ['MAZER', 'Welcome', 'Create Account', 'Reset Password', 'Privacy Policy', 'Terms of Service', 'Sign in'];
+  const goodButtons = ['Create Account', 'Reset Password', 'Privacy Policy', 'Terms of Service', 'Sign in'];
+
+  test('passes for the Welcome anatomy: one Sign in dock, no subtitle, no guest/skip/back', () => {
+    expect(evaluateAuthWelcomeAnatomy(surface(goodLabels, goodButtons))).toEqual({ failures: [], pass: true });
+  });
+
+  test('an in-flight Opening… dock still counts as the single dock', () => {
+    const buttons = goodButtons.map((text) => (text === 'Sign in' ? 'Opening…' : text));
+    expect(evaluateAuthWelcomeAnatomy(surface(goodLabels, buttons)).pass).toBe(true);
+  });
+
+  test.each([
+    ['legacy Account title', [...goodLabels.filter((l) => l !== 'Welcome'), 'Account'], goodButtons, ['missing-title-Welcome', 'legacy-title-Account']],
+    ['subtitle paragraph', [...goodLabels, 'Use your shared Fawxzzy account to keep progression, settings, and leaderboard identity connected.'], goodButtons, ['subtitle-paragraph-present']],
+    ['two docks', goodLabels, [...goodButtons, 'Sign in'], ['sign-in-dock-count=2']],
+    ['no dock', goodLabels, goodButtons.filter((b) => b !== 'Sign in'), ['sign-in-dock-count=0']],
+    ['guest action', goodLabels, [...goodButtons, 'Play as guest'], ['forbidden-guest-skip-close-or-back-action']],
+    ['back chevron', goodLabels, [...goodButtons, 'Back'], ['forbidden-guest-skip-close-or-back-action']]
+  ])('fails closed on %s', (_name, labels, buttons, failures) => {
+    expect(evaluateAuthWelcomeAnatomy(surface(labels, buttons))).toEqual({ failures, pass: false });
+  });
+
+  test('a missing surface fails instead of passing vacuously', () => {
+    expect(evaluateAuthWelcomeAnatomy(undefined).pass).toBe(false);
+  });
+});
+
+describe('fixed pause card scroll exemption', () => {
+  const panel = { left: 8, top: 8, width: 389, height: 942, right: 397, bottom: 950, centerX: 202.5, centerY: 479 };
+  const noScroll = { enabled: false, maxOffset: 0, offset: 0, thumb: null, track: null, viewport: null };
+
+  test('accepts only a pause surface with real card bounds and no scroll viewport', () => {
+    expect(isFixedCardWithoutScroll('pause', { overlayUi: { panel, scroll: noScroll } })).toBe(true);
+    expect(isFixedCardWithoutScroll('pause-bottom', { overlayUi: { panel, scroll: noScroll } })).toBe(true);
+  });
+
+  test('fails closed for options, a missing card panel, or a real scroll viewport', () => {
+    expect(isFixedCardWithoutScroll('options', { overlayUi: { panel, scroll: noScroll } })).toBe(false);
+    expect(isFixedCardWithoutScroll('pause', { overlayUi: { scroll: noScroll } })).toBe(false);
+    expect(isFixedCardWithoutScroll('pause', undefined)).toBe(false);
+    expect(isFixedCardWithoutScroll('pause', {
+      overlayUi: { panel, scroll: { ...noScroll, viewport: { left: 24, top: 64, width: 357, height: 300, right: 381, bottom: 364, centerX: 202, centerY: 214 } } }
+    })).toBe(false);
+    expect(isFixedCardWithoutScroll('pause', { overlayUi: { panel, scroll: { ...noScroll, enabled: true } } })).toBe(false);
+  });
+});
+
+describe('Start tap retry against the menu intro input lock', () => {
+  test('the capture flow starts play through the bounded retry helper, not a single raw tap', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-ui-surfaces.mjs'), 'utf8');
+    expect(source).toContain('export const clickStartUntilPlay = async (page, point, { attempts = 6, settleMs = 1500 } = {}) => {');
+    expect(source).toContain('await clickStartUntilPlay(page, menuButtons.start);');
+    expect(source).not.toContain("await clickPoint(page, menuButtons.start, 'Start');");
+    expect(source).toContain('Start did not enter play mode after');
   });
 });
