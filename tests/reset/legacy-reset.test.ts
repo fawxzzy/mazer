@@ -863,30 +863,43 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.playStartedAtMs = settledPlayStartedAtMs;');
     expect(menuSceneSource).toContain('shouldFreezeLegacyPlayElapsedForStaticDraw({');
     expect(menuSceneSource).toContain('private menuStaticDrawRowsVisible: number | null = null;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS = 64;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;');
+    // The frame-stepped cadence constants (row/tile step ms, target ticks,
+    // settle ms, deconstruct hold) were intentionally replaced by the
+    // time-derived introTimeline module: the invariant is now "no per-frame
+    // stepping in the scene, and the cadence lives in one pure module".
+    expect(menuSceneSource).toContain("from '../render/introTimeline'");
+    for (const retired of [
+      'LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS',
+      'LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS',
+      'LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS',
+      'LEGACY_MENU_STATIC_DRAW_TARGET_TICKS',
+      'LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS',
+      'LEGACY_MENU_STATIC_DRAW_SETTLE_MS',
+      'LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS',
+      'menuStaticDrawNextRowAtMs',
+      'menuStaticDrawNextTileAtMs'
+    ]) {
+      expect(menuSceneSource).not.toContain(retired);
+    }
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;');
     // Shortened from 1000ms -- resolveLegacyMenuDeconstructHandoffProgress
     // computes a real value across this whole window but nothing ever
     // rendered anything driven by it, so the full second was a genuinely
     // static, unchanging screen between deconstruct finishing and the next
     // build starting (the reported "hard pause / screen freeze" between
     // maze generations).
-    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 300;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = 860;');
+    // Same handoff beat, now sourced from the shared outro timeline (300 ms);
+    // the deconstruct as a whole is capped at 900 ms (introTimeline tests).
+    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = OUTRO_HANDOFF_MS;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = OUTRO_PLAYER_REMOVE_MS;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = OUTRO_TRAIL_FADE_MS;');
     expect(menuSceneSource).toContain("from '../legacy-runtime/legacyPlayerTransfer';");
     expect(menuSceneSource).toContain('private playerTransferEnergyArmed = false;');
     expect(menuSceneSource).toContain("private menuStaticDrawLifecyclePhase: LegacyMenuStaticDrawLifecyclePhase = 'idle';");
     expect(menuSceneSource).toContain('private menuStaticDeconstructStartedAtMs: number | null = null;');
     expect(menuSceneSource).toContain('private menuStaticDeconstructZeroHoldStartedAtMs: number | null = null;');
     expect(menuSceneSource).toContain('private menuStaticBuildPrerollStartedAtMs: number | null = null;');
-    expect(menuSceneSource).toContain('private menuStaticDrawNextRowAtMs = 0;');
+    expect(menuSceneSource).toContain('private introStartedAtMs: number | null = null;');
     expect(menuSceneSource).toContain('private menuStaticDrawTileOrder: LegacyPoint[] = [];');
     expect(menuSceneSource).toContain('private menuStaticDrawVisibleTileKeys = new Set<string>();');
     expect(menuSceneSource).toContain('this.armLegacyMenuStaticDrawStage();');
@@ -896,8 +909,12 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.menuDemoCycleStartedAtMs = time;');
     expect(menuSceneSource).toContain('this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);');
     expect(menuSceneSource).toContain('private advanceLegacyMenuStaticDrawStage(time: number): void {');
-    expect(menuSceneSource).toContain('this.menuStaticDrawTilesVisible = Math.min(');
-    expect(menuSceneSource).toContain('this.menuStaticDrawRowsVisible = Math.min(this.maze.height, this.menuStaticDrawRowsVisible + rowBatchSize);');
+    // Tiles are DERIVED from elapsed time (resolveIntro), never incremented
+    // by a per-frame batch; the row counter no longer reveals anything and is
+    // only the "staged build in progress" flag, nulled at input unlock.
+    expect(menuSceneSource).toContain('this.menuStaticDrawTilesVisible = intro.tilesVisible;');
+    expect(menuSceneSource).toContain('this.menuStaticDrawRowsVisible = 0;');
+    expect(menuSceneSource).not.toContain('rowBatchSize');
     // Row batch size now scales with maze height the same way the tile
     // counter already does (resolveLegacyMenuStaticDrawTileBatchSize) --
     // it used to come from the generation executionPlan's static Draw-stage
@@ -906,10 +923,8 @@ describe('legacy reset lane', () => {
     // between the maze visually finishing (tile reveal, already scaled)
     // and the build actually settling (which waits for BOTH counters) once
     // a board is genuinely large.
-    expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawRowBatchSize(): number {');
-    expect(menuSceneSource).toContain('return Math.max(1, Math.ceil(this.maze.height / targetTicks));');
-    expect(menuSceneSource).toContain('this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;');
-    expect(menuSceneSource).toContain('this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS;');
+    expect(menuSceneSource).not.toContain('resolveLegacyMenuStaticDrawRowBatchSize');
+    expect(menuSceneSource).not.toContain('resolveLegacyMenuStaticDrawTileBatchSize');
     expect(menuSceneSource).toContain('private boardPathGraphics!: Phaser.GameObjects.Graphics;');
     expect(menuSceneSource).toContain('private boardPathDirty = true;');
     expect(menuSceneSource).toContain('private drawBoardPaths(time: number): void');
@@ -950,11 +965,10 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.menuStaticDeconstructZeroHoldStartedAtMs + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS');
     expect(menuSceneSource).toContain('this.titleGraphics.clear();');
     expect(menuSceneSource).toContain('const buildPrerollStartedAtMs = this.time.now - 1;');
-    expect(menuSceneSource).toContain('this.menuStaticDrawNextRowAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;');
-    expect(menuSceneSource).toContain('this.menuStaticDrawNextTileAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;');
+    expect(menuSceneSource).toContain('this.introStartedAtMs = buildPrerollStartedAtMs;');
     expect(menuSceneSource).toContain('time >= this.menuStaticBuildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS');
-    expect(menuSceneSource).toContain('const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);');
-    expect(menuSceneSource).toContain("const targetTicks = this.mode === 'play'");
+    expect(menuSceneSource).not.toContain('const tileTicks =');
+    expect(menuSceneSource).not.toContain('const targetTicks =');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase !== 'settled'");
     expect(menuSceneSource).toContain('if (nextFrame.shouldRegenerateMaze) {');
     expect(menuSceneSource).toContain('if (this.shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame)) {');

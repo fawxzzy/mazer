@@ -42,6 +42,24 @@ import {
 } from '../render/navigationCoreGoalHaloCanvas';
 import { resolveTeleportAnchorCandidates, resolveTeleportAnchorEligibility, type TeleportAnchorPose, type TeleportRect, type TeleportViewportBounds } from '../render/teleportAnchorPose';
 import {
+  INTRO_LASER_MS,
+  INTRO_LASER_START_MS,
+  INTRO_POP_MS,
+  INTRO_SKIP_GRACE_MS,
+  isEdgePathCellShown,
+  type IntroState,
+  type OutroState,
+  OUTRO_HANDOFF_MS,
+  OUTRO_PLAYER_REMOVE_MS,
+  OUTRO_TILES_END_MS,
+  OUTRO_TRAIL_FADE_MS,
+  resolveIntro,
+  resolveIntroDeconstruct,
+  resolveIntroInputUnlockMs,
+  resolveSpawnLaser,
+  skipIntroElapsedMs
+} from '../render/introTimeline';
+import {
   selectTeleportPrimaryAnchor,
   type TeleportAnchorId,
   type TeleportAnchorRejection,
@@ -112,7 +130,6 @@ import {
   createLegacyResetRequest,
   hasPendingLegacyResetRequest,
   resolveLegacyPlayLifecycleSnapshot,
-  resolveLegacyStaticDrawBuildRemainingMs,
   resolveLegacyStaticDrawPlayTimerStartAtMs,
   shouldFreezeLegacyPlayElapsedForStaticDraw,
   shouldSettleLegacyStaticDrawStage,
@@ -1193,7 +1210,7 @@ const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 14400;
 // Was 2 full rotations packed into a single building/deconstructing pass --
 // reported as the orbit diamonds getting "forced to go crazy fast" (2 full
 // laps in the same few seconds the tile reveal used to always take,
-// regardless of maze size, before resolveLegacyMenuStaticDrawTileBatchSize
+// regardless of maze size, before the (since retired) tile batch sizing
 // started letting that duration actually grow with tile count). An initial
 // cut to 0.35 overcorrected -- reported right back as "way too slow." A
 // follow-up cut to 0.85 fixed the speed complaint but introduced a real,
@@ -1689,90 +1706,14 @@ const MAZER_VFX_TELEPORT_BEAM_STRIP_WIDTH = (
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
 const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = cyberArcadeMaterial.signal.warningEdge;
-const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;
-const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;
-const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;
-const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;
-const LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS = 64;
-// Comfortable tile-reveal rate (how many tiles pop in per tick) at typical
-// board sizes -- resolveLegacyMenuStaticDrawTileBatchSize below prefers
-// this over LEGACY_*_STATIC_DRAW_TARGET_TICKS' own fixed-tick-count
-// formula once a board's tile count would otherwise force a bigger batch,
-// so build/deconstruct duration actually grows with maze size instead of
-// compressing into the same fixed total regardless of it (reported: "the
-// mazes generate at a hardcoded speed... they don't need to meet a
-// hardcoded speed as they get bigger" -- a huge board's tile reveal used
-// to batch dozens of tiles per tick to fit the same fixed tick count a
-// tiny board also used, reading as a near-instant flash instead of a
-// build). LEGACY_STATIC_DRAW_MAX_TICKS is still an upper bound so a truly
-// enormous board doesn't take unreasonably long -- batch size widens again
-// only past that.
-//
-// An initial pass (3 tiles/tick, 420-tick cap) overcorrected -- reported
-// right back as "way too slow" even at typical/early-level board sizes,
-// since most real boards are well above the old fixed-tick formula's own
-// small-board crossover point and so were hitting this new, much slower
-// flat rate on every level, not just unusually large ones. 12 tiles/tick
-// matches the old fixed-tick pace almost exactly at typical board sizes
-// (no regression there), with the 160-tick cap keeping even the largest
-// boards well under half the previous cap's worst case -- growing with
-// size, but within a real, considerably tighter middle ground instead of
-// either extreme.
-const LEGACY_STATIC_DRAW_TARGET_TILES_PER_TICK = 12;
-const LEGACY_STATIC_DRAW_MAX_TICKS = 160;
-const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
+// The build/deconstruct/arrival cadence is NOT defined here any more: it is a
+// pure function of elapsed time in src/render/introTimeline.ts (see
+// resolveIntro / resolveIntroDeconstruct). Only the preroll window used by the
+// title wipe and the pre-existing handoff beat remain scene-local.
 const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;
-const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;
-// resolveLegacyMenuDeconstructHandoffProgress computes a real 0->1 value
-// across this whole window every frame, but it is only ever read by
-// diagnostics (see its two call sites) -- nothing actually renders
-// anything driven by it, so a full second of this window was a genuinely
-// static, unchanging screen between the old maze finishing deconstruction
-// and the new one starting to build. Shortened to a brief beat rather than
-// removed outright, in case something else relies on a non-zero gap here.
-const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 300;
-const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;
-const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = 860;
-// How long the centered level announcement takes to fade/scale in once the
-// deconstruct phase starts (holds at full size for whatever's left of that
-// phase after this ramp), and separately, how long it takes to fade/scale
-// back out -- spread across the ENTIRE estimated build-phase duration
-// (see resolveLegacyLevelAnnouncerVisualState) so it dissolves at the same
-// pace the next maze's tiles are actually appearing, not on some unrelated
-// fixed clock that finishes before or after the build really does.
-// Slowed down considerably (from 560/700) and given an extra ease pass
-// (see smootherstep below) per feedback that the grow/shrink-fade should
-// read as a good deal more gradual and smoother, not just quicker/snappier.
-const LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS = 1100;
-const LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS = 1300;
-const LEGACY_LEVEL_ANNOUNCER_MIN_SCALE = 0.72;
-// Slow ambient breathing while the number is fully up, blended in only once
-// the fade envelope reaches its held plateau -- same sin-driven alpha+scale
-// technique as the header icons' blink pulse (LEGACY_MENU_BLINK_PULSE_MS =
-// 2400), just noticeably slower per feedback that this one should read
-// calmer than the icons.
-const LEGACY_LEVEL_ANNOUNCER_PULSE_PERIOD_MS = 3600;
-const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA = 0.78;
-const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE = 0.94;
-// How long the bleed-off dock corridors (resolveLegacyPathBorderDockContinuation)
-// take to shrink back from the true screen edge to the maze's own edge on
-// deconstruct -- a smooth retract instead of the full-length corridor just
-// vanishing instantly. Shrink happens in the OPENING span of deconstruct
-// (before tile removal itself even starts, per
-// LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS/PLAYER_REMOVE_MS/TRAIL_FADE_MS
-// above), timed to the same instant the outbound player-transfer laser
-// arms (see armLegacyMenuStaticDeconstructStage) so both start together.
-const LEGACY_BLEED_DOCK_GROWTH_MS = 420;
-// The build-side growth window is deliberately its own, longer constant
-// rather than sharing LEGACY_BLEED_DOCK_GROWTH_MS above -- at 420ms the
-// corridor's outward growth was compressed into the closing sliver of a
-// build that can run for seconds on a large maze, reading as "the corridor
-// just appears" rather than a visible expansion. Widened so the grow is
-// actually perceptible while still finishing at the exact instant the
-// build completes (armLegacyPlayerArrivalForFinalBuildStep pins the
-// inbound player-transfer delivery beam to that same instant), so the
-// corridor visibly reaches the screen edge right as the player arrives.
-const LEGACY_BLEED_DOCK_BUILD_GROWTH_MS = 1100;
+const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = OUTRO_HANDOFF_MS;
+const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = OUTRO_PLAYER_REMOVE_MS;
+const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = OUTRO_TRAIL_FADE_MS;
 // Mirrors ACTIVE_PLAY_GOAL_RESET_HOLD_MS's own value and purpose exactly
 // (legacyPlayLifecycle.ts), for the menu demo's own goal-arrival precompute
 // -- see updateMenuDemo's own comment on pendingMenuDemoDeconstructArmAtMs
@@ -1780,28 +1721,15 @@ const LEGACY_BLEED_DOCK_BUILD_GROWTH_MS = 1100;
 // constant's mechanism directly (a different, DOM-free state machine with
 // no shared request/consume plumbing to play mode's).
 const LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS = 340;
-// The four corner sigils fire a beam toward wherever the player marker is
-// about to appear once the final generation stage settles -- a short travel
-// span for the beams to reach the tile, then a brief impact flash the marker
-// itself pops in under.
-// Was 260/240, then 325/300 (a 25% cut matching LEGACY_PLAYER_TRANSFER_OUTBOUND_MS)
-// -- still reported "too fast, slow down" for the diamonds' own spawn-in
-// beams specifically. Slowed further, independent of the outbound laser's
-// own pace now (they're visually separate moments -- reaching the goal vs.
-// landing in the next maze -- so they don't need to match each other 1:1).
-const LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS = 480;
-const LEGACY_PLAYER_SPAWN_FLASH_MS = 340;
+// The one spawn laser (beam travel, then the landing poof the marker pops in
+// under) shares its clock with the intro timeline.
+const LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS = INTRO_LASER_MS;
+const LEGACY_PLAYER_SPAWN_FLASH_MS = INTRO_POP_MS;
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const smoothstep = (value: number): number => {
   const x = clamp(value, 0, 1);
   return x * x * (3 - (2 * x));
 };
-// A gentler S-curve than smoothstep alone -- flatter tangents at both ends,
-// used where an effect specifically needs to read as extra-smooth (the
-// level announcer's grow/shrink fade) rather than the standard ease every
-// other transition in this file uses. Deliberately its own helper instead
-// of changing smoothstep itself, which many unrelated effects share.
-const smootherstep = (value: number): number => smoothstep(smoothstep(value));
 const legacyScenePointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
 
 const createVisualRect = (left: number, top: number, width: number, height: number): VisualRect => ({
@@ -2470,21 +2398,31 @@ export class MenuScene extends Phaser.Scene {
   private uiDirty = true;
   private menuStaticDrawLifecyclePhase: LegacyMenuStaticDrawLifecyclePhase = 'idle';
   private menuStaticDrawRowsVisible: number | null = null;
-  private menuStaticDrawNextRowAtMs = 0;
   private menuStaticDrawTileOrder: LegacyPoint[] = [];
   private menuStaticDrawVisibleTileKeys = new Set<string>();
   private menuStaticDrawTilesVisible: number | null = null;
-  private menuStaticDrawNextTileAtMs = 0;
   private menuStaticDeconstructStartedAtMs: number | null = null;
   private menuStaticDeconstructZeroHoldStartedAtMs: number | null = null;
   private menuStaticBuildPrerollStartedAtMs: number | null = null;
   // menuStaticBuildPrerollStartedAtMs nulls out ~500ms into 'building' (see
   // advanceLegacyMenuStaticDrawStage) -- it's a preroll-window flag, not a
-  // "when did this build start" anchor. Anything that needs to track
-  // progress across the WHOLE building phase (the level announcer's
-  // fade-out, the bleed-off dock regrowth) needs its own timestamp that
-  // persists for the full phase instead of reusing that one.
-  private menuStaticBuildPhaseStartedAtMs: number | null = null;
+  // "when did this build start" anchor. introStartedAtMs IS that anchor: the
+  // single clock the whole intro (tile reveal, level digit, bleed docks, spawn
+  // laser, input unlock) is derived from via resolveIntro (introTimeline.ts).
+  // It is a plain timestamp, never a counter, so frame rate cannot change how
+  // long the intro takes. Persists after settle (the landing poof still reads
+  // it) and is cleared by the next deconstruct/arm.
+  private introStartedAtMs: number | null = null;
+  // ONE atomic switch for every wrap/bleed edge-path element: the dock strips,
+  // the dock-owning border cells and their facets/images all key off it
+  // (resolveIntro / resolveIntroDeconstruct bleedProgress, strictly 0 or 1).
+  // Root cause of the reported "one square left behind": the border cell was
+  // drawn by the BFS tile reveal (and removed in reverse-BFS order, so it
+  // outlived the strips), while the strips grew/retracted on a separate clock
+  // and a zero-length strip was clamped to 1 px by
+  // resolveLegacyMenuBorderDockRenderAreas / ...FacetRect, which still drew a
+  // halo + rim + bleed image around that sliver.
+  private legacyEdgePathsVisible = true;
   // Owner-reported (ChatGPT-assisted review 5173052153): a Play-mode pause
   // froze the transfer's own clocks but NOT the coupled maze
   // reveal/deconstruct/handoff lifecycle -- the submitted pause recording
@@ -5016,6 +4954,9 @@ export class MenuScene extends Phaser.Scene {
       return true;
     }
 
+    // Any key (movement, Enter, ...) skips a still-running Play intro.
+    this.skipLegacyIntroIfBuilding(this.time.now);
+
     if (this.handleLegacyPlayMovementKeyDown(event)) {
       return true;
     }
@@ -5549,6 +5490,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyPlayPointerDown(pointer: Phaser.Input.Pointer): boolean {
+    // A tap skips a still-running Play intro.
+    this.skipLegacyIntroIfBuilding(this.time.now);
     const point = this.resolveLegacyInputPointerPoint(pointer);
     if (this.handleLegacyPlayTouchControl(point.x, point.y, pointer.id)) {
       this.playPointerStart = null;
@@ -6635,7 +6578,20 @@ export class MenuScene extends Phaser.Scene {
   // check already considers revealed must stay revealed regardless of which
   // counter happens to finish first, so this is a union of both checks
   // instead of "prefer one, fall back to the other."
+  // Border cells that own a wrap/bleed dock belong to the atomic edge-path
+  // group: they are shown/hidden together with the dock strips, never by the
+  // gradual BFS reveal/dissolve.
+  private isLegacyEdgePathCellShown(point: LegacyPoint): boolean {
+    return isEdgePathCellShown(
+      this.legacyEdgePathsVisible,
+      this.resolveBleedOffDockVisualEligibility().has(legacyScenePointKey(point))
+    );
+  }
+
   private isLegacyMenuPointVisibleInStaticDraw(point: LegacyPoint): boolean {
+    if (!this.isLegacyEdgePathCellShown(point)) {
+      return false;
+    }
     const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
     const visibleByTileLimit = tileLimit === null
       || this.menuStaticDrawVisibleTileKeys.has(legacyScenePointKey(point));
@@ -6657,9 +6613,9 @@ export class MenuScene extends Phaser.Scene {
       return this.time.now;
     }
 
-    const batchSize = Math.max(1, this.resolveLegacyMenuStaticDrawTileBatchSize());
-    const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);
-    return this.time.now + (tileTicks * LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS) + LEGACY_MENU_STATIC_DRAW_SETTLE_MS;
+    // The demo walker waits for the same instant the intro unlocks input
+    // (the spawn laser landing) -- one number, independent of tile count.
+    return this.time.now + resolveIntroInputUnlockMs(this.prefersLegacyReducedMotion());
   }
 
   private releaseLegacyMenuDemoGateOnStaticDrawSettled(time: number): void {
@@ -6673,40 +6629,39 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
+  // Tiles are gone OUTRO_TILES_END_MS after the arm instant regardless of tile
+  // count (resolveIntroDeconstruct); the handoff beat is added by callers.
   private resolveLegacyMenuStaticDeconstructDurationMs(): number {
-    const batchSize = Math.max(1, this.resolveLegacyMenuStaticDrawTileBatchSize());
-    const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);
-    return LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS
-      + LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS
-      + LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS
-      + (tileTicks * LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS);
+    return this.prefersLegacyReducedMotion() ? 0 : OUTRO_TILES_END_MS;
   }
 
-  // Same estimate resolveLegacyMenuStaticDrawDemoGateAtMs already computes
-  // inline for its own purposes, factored out so every transition-timed
-  // effect (the level announcer's fade-out, the bleed-off dock corridors'
-  // grow/shrink) can share one definition of "how long will this build
-  // take" instead of drifting out of sync with slightly different copies.
-  // Returns null outside a real row-slice build (nothing meaningful to
-  // estimate for other draw stages).
-  private resolveLegacyMenuStaticBuildDurationEstimateMs(): number | null {
-    const drawStage = this.resolveLegacyMenuStaticDrawStage();
-    if (drawStage?.executionKind !== 'row-slice') {
+  // The one place the building phase's time-derived presentation state is
+  // resolved: tiles, level digit, bleed docks, spawn laser and input unlock
+  // all read this instead of keeping their own counters or estimates. Null
+  // outside a real row-slice build.
+  private resolveLegacyIntroState(time: number): IntroState | null {
+    if (this.menuStaticDrawLifecyclePhase !== 'building' || this.introStartedAtMs === null) {
       return null;
     }
 
-    const batchSize = Math.max(1, this.resolveLegacyMenuStaticDrawTileBatchSize());
-    const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);
-    return LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS
-      + (tileTicks * LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS)
-      + LEGACY_MENU_STATIC_DRAW_SETTLE_MS;
+    return resolveIntro(time - this.introStartedAtMs, {
+      digitAlreadyVisible: this.levelAnnouncerBuildFadeOutArmed,
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      tileCount: this.menuStaticDrawTileOrder.length
+    });
   }
 
-  private resolveLegacyMenuStaticDeconstructTileStartAtMs(time: number): number {
-    return time
-      + LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS
-      + LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS
-      + LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS;
+  // The deconstruct mirror of resolveLegacyIntroState (<= 900 ms with the
+  // handoff beat), measured from the arm instant.
+  private resolveLegacyOutroState(time: number): OutroState | null {
+    if (this.menuStaticDrawLifecyclePhase !== 'deconstructing' || this.menuStaticDeconstructStartedAtMs === null) {
+      return null;
+    }
+
+    return resolveIntroDeconstruct(time - this.menuStaticDeconstructStartedAtMs, {
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      tileCount: this.menuStaticDrawTileOrder.length
+    });
   }
 
   private resolveLegacyMenuDeconstructTrailAlpha(time: number): number {
@@ -6716,7 +6671,6 @@ export class MenuScene extends Phaser.Scene {
 
     const fadeElapsedMs = time
       - this.menuStaticDeconstructStartedAtMs
-      - LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS
       - LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS;
     if (fadeElapsedMs <= 0) {
       return 1;
@@ -6730,9 +6684,7 @@ export class MenuScene extends Phaser.Scene {
       return 1;
     }
 
-    const removeElapsedMs = time
-      - this.menuStaticDeconstructStartedAtMs
-      - LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS;
+    const removeElapsedMs = time - this.menuStaticDeconstructStartedAtMs;
     if (removeElapsedMs <= 0) {
       return 1;
     }
@@ -6833,51 +6785,6 @@ export class MenuScene extends Phaser.Scene {
     return this.isLegacyMenuBuildPrerollActive(time) || this.isLegacyMenuDeconstructHandoffActive(time);
   }
 
-  private resolveLegacyMenuStaticDrawTileBatchSize(): number {
-    const tileCount = this.menuStaticDrawTileOrder.length;
-    const targetTicks = this.mode === 'play'
-      ? LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS
-      : LEGACY_MENU_STATIC_DRAW_TARGET_TICKS;
-    // Below the old fixed-tick-count's own crossover point, keep matching
-    // it exactly (no regression for the board sizes this was always tuned
-    // against). Past it, prefer the flat per-tick rate instead of widening
-    // the batch further to force-fit the same tick count -- duration grows
-    // with tile count instead of staying constant. minBatchSize is the
-    // safety net past LEGACY_STATIC_DRAW_MAX_TICKS for boards large enough
-    // that even the flat rate would run unreasonably long.
-    const fixedTickBatchSize = Math.max(1, Math.ceil(tileCount / targetTicks));
-    const minBatchSize = Math.max(1, Math.ceil(tileCount / LEGACY_STATIC_DRAW_MAX_TICKS));
-    return Math.max(minBatchSize, Math.min(fixedTickBatchSize, LEGACY_STATIC_DRAW_TARGET_TILES_PER_TICK));
-  }
-
-  // Mirrors resolveLegacyMenuStaticDrawTileBatchSize's own scaling exactly,
-  // for the same reason: the row-reveal counter's batch size used to come
-  // from the generation executionPlan's static Draw-stage contract
-  // (createLegacyStageContract, id 6), which is a fixed literal batchSize
-  // of 1 -- one row per LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS tick regardless
-  // of maze height. That's invisible at a small board (a handful of rows),
-  // but shouldSettleLegacyStaticDrawStage requires BOTH the row and tile
-  // counters to finish before the build "settles" -- and
-  // resolveLegacyStaticDrawBuildRemainingMs (which
-  // armLegacyPlayerArrivalForFinalBuildStep pins the inbound player-transfer
-  // beam to) takes the LATER of the two. The tile counter already targets a
-  // fixed tick count regardless of size, so at a large board (confirmed:
-  // target_complexity 400, the level-99+ cap) the un-scaled row counter
-  // alone could take multiple seconds longer than the tile reveal the
-  // player actually watches finish -- read as "the maze looks done but the
-  // beam takes forever to fire," reported after a corrective progression
-  // migration made a previously target_complexity-starved account's boards
-  // their real (much larger) size for the first time. Targeting the same
-  // fixed tick count keeps total row-reveal duration roughly constant
-  // regardless of maze height, matching the tile counter's own pacing
-  // instead of scaling unboundedly with it.
-  private resolveLegacyMenuStaticDrawRowBatchSize(): number {
-    const targetTicks = this.mode === 'play'
-      ? LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS
-      : LEGACY_MENU_STATIC_DRAW_TARGET_TICKS;
-    return Math.max(1, Math.ceil(this.maze.height / targetTicks));
-  }
-
   private refreshLegacyMenuStaticDrawVisibleTileKeys(): void {
     this.menuStaticDrawVisibleTileKeys.clear();
     const visibleCount = this.menuStaticDrawTilesVisible ?? this.menuStaticDrawTileOrder.length;
@@ -6899,31 +6806,33 @@ export class MenuScene extends Phaser.Scene {
       // construction step.
       this.playerSpawnBurstStartedAtMs = null;
       this.menuStaticDrawLifecyclePhase = 'building';
+      this.legacyEdgePathsVisible = false;
       this.menuStaticDeconstructStartedAtMs = null;
       this.menuStaticDeconstructZeroHoldStartedAtMs = null;
       this.menuStaticBuildPrerollStartedAtMs = buildPrerollStartedAtMs;
-      this.menuStaticBuildPhaseStartedAtMs = buildPrerollStartedAtMs;
+      this.introStartedAtMs = buildPrerollStartedAtMs;
+      // The row counter is retired as a REVEAL (the BFS tile order is the one
+      // reveal); rowsVisible stays 0 for the whole build purely as the
+      // "staged build still in progress" flag its many readers key on, and is
+      // nulled at the input-unlock instant by advanceLegacyMenuStaticDrawStage.
       this.menuStaticDrawRowsVisible = 0;
-      this.menuStaticDrawNextRowAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;
       this.menuStaticDrawTileOrder = this.buildLegacyMenuStaticDrawTileOrder();
       this.menuStaticDrawTilesVisible = 0;
-      this.menuStaticDrawNextTileAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;
       this.refreshLegacyMenuStaticDrawVisibleTileKeys();
       this.titleGraphics.clear();
       return;
     }
 
     this.menuStaticDrawLifecyclePhase = 'idle';
+    this.legacyEdgePathsVisible = true;
     this.menuStaticDrawRowsVisible = null;
-    this.menuStaticDrawNextRowAtMs = 0;
     this.menuStaticDrawTileOrder = [];
     this.menuStaticDrawVisibleTileKeys.clear();
     this.menuStaticDrawTilesVisible = null;
-    this.menuStaticDrawNextTileAtMs = 0;
     this.menuStaticDeconstructStartedAtMs = null;
     this.menuStaticDeconstructZeroHoldStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
-    this.menuStaticBuildPhaseStartedAtMs = null;
+    this.introStartedAtMs = null;
   }
 
   // Call at the goal-reached instant (before armLegacyPlayerTransferEnergy /
@@ -7020,20 +6929,13 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.menuStaticDrawLifecyclePhase = 'deconstructing';
+    this.legacyEdgePathsVisible = true;
     this.menuStaticDeconstructStartedAtMs = time;
-    // The bleed-dock corridor's own outward-to-inward retraction
-    // (resolveLegacyBleedDockGrowthProgress's deconstructing branch) reads
-    // menuStaticDeconstructStartedAtMs directly and finishes retracting
-    // within LEGACY_BLEED_DOCK_GROWTH_MS of it -- fast, and fixed-length.
-    // The outbound laser/diamond-spin used to arm on a completely different,
-    // much later clock (tilesVisible dropping to within one batch of zero,
-    // which for the full tile-count-based grid clear can take far longer
-    // than the corridor's own retraction). That mismatch is exactly the
-    // visible "pause" bug report: the corridor finishes its quick shrink,
-    // its last jutting tile just sits there, and only much later does the
-    // laser/spin finally kick in. Arming it here, on the same instant and
-    // the same clock as the corridor itself, makes both start together with
-    // no gap -- if a transfer is armed for this deconstruct at all.
+    // The wrap/bleed edge paths (dock strips + their border cells) vanish ALL
+    // AT ONCE at OUTRO_EDGE_PATHS_OFF_MS of this same deconstruct clock
+    // (resolveIntroDeconstruct.bleedProgress), and the outbound transfer laser
+    // arms on that same instant/clock below -- no retraction animation, so no
+    // partial dock or lone border square can be left behind.
     if (this.playerTransferEnergyArmed && this.playerTransferEnergyOutboundStartedAtMs === null) {
       this.playerTransferEnergyOutboundStartedAtMs = time;
       // Fresh session boundary for the real transfer's own pause-offset
@@ -7046,12 +6948,10 @@ export class MenuScene extends Phaser.Scene {
     }
     this.menuStaticDeconstructZeroHoldStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
-    this.menuStaticBuildPhaseStartedAtMs = null;
+    this.introStartedAtMs = null;
     this.menuStaticDrawRowsVisible = null;
-    this.menuStaticDrawNextRowAtMs = 0;
     this.menuStaticDrawTilesVisible = this.menuStaticDrawTileOrder.length;
     this.refreshLegacyMenuStaticDrawVisibleTileKeys();
-    this.menuStaticDrawNextTileAtMs = this.resolveLegacyMenuStaticDeconstructTileStartAtMs(time);
     this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     if (this.mode === 'play') {
@@ -7128,15 +7028,15 @@ export class MenuScene extends Phaser.Scene {
 
     this.playStartedAtMs = settledPlayStartedAtMs;
     this.menuStaticDrawLifecyclePhase = 'settled';
+    this.legacyEdgePathsVisible = true;
     if (settlingFromBuild) {
-      // Normal frames arm during the last travel window below. This fallback
-      // handles a throttled/skipped frame by placing convergence on this exact
-      // final generation boundary instead of firing the beam after the maze.
-      this.armLegacyPlayerArrivalForFinalBuildStep(time, 0);
+      // Normal builds arm the laser from the intro clock on their first
+      // frame. This fallback only covers a settle that never went through
+      // the intro (laser treated as landing right now).
+      this.armLegacyPlayerArrivalForFinalBuildStep(time, -INTRO_LASER_MS);
     }
     this.menuStaticDeconstructStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
-    this.menuStaticBuildPhaseStartedAtMs = null;
     this.refreshLegacyMenuStaticDrawVisibleTileKeys();
     this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);
   }
@@ -7175,12 +7075,6 @@ export class MenuScene extends Phaser.Scene {
     if (frameDeltaMs <= 0) {
       return;
     }
-    if (Number.isFinite(this.menuStaticDrawNextRowAtMs) && this.menuStaticDrawNextRowAtMs > 0) {
-      this.menuStaticDrawNextRowAtMs += frameDeltaMs;
-    }
-    if (Number.isFinite(this.menuStaticDrawNextTileAtMs) && this.menuStaticDrawNextTileAtMs > 0) {
-      this.menuStaticDrawNextTileAtMs += frameDeltaMs;
-    }
     if (this.menuStaticDeconstructStartedAtMs !== null) {
       this.menuStaticDeconstructStartedAtMs += frameDeltaMs;
     }
@@ -7190,8 +7084,8 @@ export class MenuScene extends Phaser.Scene {
     if (this.menuStaticBuildPrerollStartedAtMs !== null) {
       this.menuStaticBuildPrerollStartedAtMs += frameDeltaMs;
     }
-    if (this.menuStaticBuildPhaseStartedAtMs !== null) {
-      this.menuStaticBuildPhaseStartedAtMs += frameDeltaMs;
+    if (this.introStartedAtMs !== null) {
+      this.introStartedAtMs += frameDeltaMs;
     }
     if (this.pendingGenerationRequest !== null) {
       this.pendingGenerationRequest = {
@@ -7207,6 +7101,11 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  // Every presentation value the build and deconstruct show is DERIVED from
+  // elapsed time here (introTimeline.ts) -- never stepped one batch per
+  // frame. A slow frame therefore catches up in one jump instead of
+  // stretching the intro, and the tile reveal, bleed docks, level digit,
+  // spawn laser and input unlock can never drift apart.
   private advanceLegacyMenuStaticDrawStage(time: number): void {
     if (this.menuStaticDrawRowsVisible === null && this.menuStaticDrawTilesVisible === null) {
       return;
@@ -7222,94 +7121,109 @@ export class MenuScene extends Phaser.Scene {
       this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     }
 
-    const rowBatchSize = this.resolveLegacyMenuStaticDrawRowBatchSize();
-    const buildRemainingMs = resolveLegacyStaticDrawBuildRemainingMs({
-      drawPhase: this.menuStaticDrawLifecyclePhase,
-      mazeHeight: this.maze.height,
-      nextRowAtMs: this.menuStaticDrawNextRowAtMs,
-      nextTileAtMs: this.menuStaticDrawNextTileAtMs,
-      nowMs: time,
-      rowBatchSize,
-      rowStepMs: LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS,
-      rowsVisible: this.menuStaticDrawRowsVisible,
-      tileBatchSize: this.resolveLegacyMenuStaticDrawTileBatchSize(),
-      tileCount: this.menuStaticDrawTileOrder.length,
-      tileStepMs: LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS,
-      tilesVisible: this.menuStaticDrawTilesVisible
-    });
-    // Widened to LEGACY_BLEED_DOCK_GROWTH_MS (the corridor's own full growth
-    // window, longer than the beam's travel time) so this reliably arms
-    // before the corridor finishes touching the edge -- armLegacyPlayerArrivalForFinalBuildStep
-    // pins the beam's own start to the future instant buildRemainingMs
-    // reaches 0, so arming early just gives that pin more lead time; it
-    // does not make the beam fire early.
-    if (buildRemainingMs !== null && buildRemainingMs <= LEGACY_BLEED_DOCK_GROWTH_MS) {
-      this.armLegacyPlayerArrivalForFinalBuildStep(time, buildRemainingMs);
-    }
-    if (
-      this.menuStaticDrawLifecyclePhase === 'building'
-      && this.menuStaticDrawRowsVisible !== null
-      && time >= this.menuStaticDrawNextRowAtMs
-    ) {
-      this.menuStaticDrawRowsVisible = Math.min(this.maze.height, this.menuStaticDrawRowsVisible + rowBatchSize);
-      this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;
-      this.boardPathDirty = true;
-      this.boardDynamicDirty = true;
-      if (this.menuStaticDrawRowsVisible >= this.maze.height) {
-        this.menuStaticDrawRowsVisible = null;
-        this.menuStaticDrawNextRowAtMs = 0;
-        this.settleLegacyMenuStaticDrawStageIfComplete(time);
+    const intro = this.resolveLegacyIntroState(time);
+    if (intro !== null && this.introStartedAtMs !== null) {
+      // The laser and the real-transfer delivery are pinned to the same
+      // intro instant (INTRO_LASER_START_MS) the moment the build begins,
+      // so the beam can neither fire early nor land after input unlocks.
+      if (
+        (this.playerSpawnBurstStartedAtMs === null && !this.prefersLegacyReducedMotion())
+        || (this.playerTransferEnergyArmed && this.playerTransferEnergyDeliveryStartedAtMs === null)
+      ) {
+        this.armLegacyPlayerArrivalForFinalBuildStep(time, (this.introStartedAtMs + INTRO_LASER_START_MS) - time);
       }
-    }
-
-    if (this.menuStaticDrawTilesVisible !== null && time >= this.menuStaticDrawNextTileAtMs) {
-      if (this.menuStaticDrawLifecyclePhase === 'deconstructing') {
-        // Outbound arming now happens once, in armLegacyMenuStaticDeconstructStage,
-        // on the same clock as the bleed-dock corridor's own retraction --
-        // see the comment there. Arming it again here on tile-count would
-        // just reintroduce the mismatch.
-        this.menuStaticDrawTilesVisible = Math.max(
-          0,
-          this.menuStaticDrawTilesVisible - this.resolveLegacyMenuStaticDrawTileBatchSize()
-        );
+      this.syncLegacyEdgePathsVisible(intro.bleedProgress === 1);
+      if (this.menuStaticDrawTilesVisible !== null && intro.tilesVisible !== this.menuStaticDrawTilesVisible) {
+        this.menuStaticDrawTilesVisible = intro.tilesVisible;
         this.refreshLegacyMenuStaticDrawVisibleTileKeys();
-        this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS;
         this.boardPathDirty = true;
         this.boardDynamicDirty = true;
-        if (this.menuStaticDrawTilesVisible <= 0) {
-          this.menuStaticDrawTilesVisible = 0;
-          this.menuStaticDrawNextTileAtMs = Number.POSITIVE_INFINITY;
-          this.drawLegacyMenuPathTitle(time);
-          if (this.menuStaticDeconstructZeroHoldStartedAtMs === null) {
-            this.menuStaticDeconstructZeroHoldStartedAtMs = time;
-          }
-          this.deferLegacyMenuDeconstructRebuildUntil(
-            this.menuStaticDeconstructZeroHoldStartedAtMs + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS
-          );
-          this.refreshLegacyMenuStaticDrawVisibleTileKeys();
-          this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
-          this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
-        }
-        return;
       }
+      if (this.menuStaticDrawTilesVisible !== null && intro.tilesVisible >= this.menuStaticDrawTileOrder.length) {
+        this.menuStaticDrawTilesVisible = null;
+        this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+        this.boardPathDirty = true;
+        this.boardDynamicDirty = true;
+      }
+      if (intro.inputUnlocked) {
+        this.menuStaticDrawTilesVisible = null;
+        this.menuStaticDrawRowsVisible = null;
+        this.boardPathDirty = true;
+        this.boardDynamicDirty = true;
+        this.settleLegacyMenuStaticDrawStageIfComplete(time);
+      }
+      return;
+    }
 
-      this.menuStaticDrawTilesVisible = Math.min(
-        this.menuStaticDrawTileOrder.length,
-        this.menuStaticDrawTilesVisible + this.resolveLegacyMenuStaticDrawTileBatchSize()
-      );
+    const outro = this.resolveLegacyOutroState(time);
+    if (outro !== null) {
+      this.syncLegacyEdgePathsVisible(outro.bleedProgress === 1);
+    }
+    if (outro !== null && this.menuStaticDrawTilesVisible !== null && outro.tilesVisible !== this.menuStaticDrawTilesVisible) {
+      this.menuStaticDrawTilesVisible = outro.tilesVisible;
       this.refreshLegacyMenuStaticDrawVisibleTileKeys();
-      this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS;
       this.boardPathDirty = true;
       this.boardDynamicDirty = true;
-      if (this.menuStaticDrawTilesVisible >= this.menuStaticDrawTileOrder.length) {
-        this.menuStaticDrawTilesVisible = null;
-        this.menuStaticDrawNextTileAtMs = 0;
-        this.settleLegacyMenuStaticDrawStageIfComplete(time);
+      if (this.menuStaticDrawTilesVisible <= 0) {
+        this.menuStaticDrawTilesVisible = 0;
+        this.drawLegacyMenuPathTitle(time);
+        if (this.menuStaticDeconstructZeroHoldStartedAtMs === null) {
+          this.menuStaticDeconstructZeroHoldStartedAtMs = time;
+        }
+        this.deferLegacyMenuDeconstructRebuildUntil(
+          this.menuStaticDeconstructZeroHoldStartedAtMs + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS
+        );
+        this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+        this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+        this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
       }
     }
   }
 
-  private armLegacyPlayerArrivalForFinalBuildStep(time: number, buildRemainingMs: number): void {
+  private syncLegacyEdgePathsVisible(visible: boolean): void {
+    if (this.legacyEdgePathsVisible === visible) {
+      return;
+    }
+    this.legacyEdgePathsVisible = visible;
+    this.boardPathDirty = true;
+    this.boardDynamicDirty = true;
+  }
+
+  // Skip (tap / key / Enter while the Play intro is still running): jumps the
+  // intro clock to its final state. The grace window ignores the very press
+  // that started the intro.
+  private skipLegacyIntroIfBuilding(time: number): boolean {
+    if (this.mode !== 'play' || this.overlay !== 'none' || this.introStartedAtMs === null) {
+      return false;
+    }
+    if (this.menuStaticDrawLifecyclePhase !== 'building') {
+      return false;
+    }
+    const elapsedMs = time - this.introStartedAtMs;
+    if (elapsedMs < INTRO_SKIP_GRACE_MS) {
+      return false;
+    }
+
+    const reducedMotion = this.prefersLegacyReducedMotion();
+    const skippedElapsedMs = skipIntroElapsedMs(elapsedMs, { reducedMotion });
+    if (skippedElapsedMs <= elapsedMs) {
+      return false;
+    }
+    this.introStartedAtMs = time - skippedElapsedMs;
+    if (this.playerSpawnBurstStartedAtMs !== null) {
+      this.playerSpawnBurstStartedAtMs = this.introStartedAtMs + INTRO_LASER_START_MS;
+    }
+    if (this.playerTransferEnergyDeliveryStartedAtMs !== null) {
+      this.playerTransferEnergyDeliveryStartedAtMs = this.introStartedAtMs + INTRO_LASER_START_MS;
+    }
+    this.advanceLegacyMenuStaticDrawStage(time);
+    return true;
+  }
+
+  // msUntilLaserStart is positive until the intro's laser instant, negative
+  // after it. The beam start is an exact point on the intro clock, so arming
+  // earlier or later (slow frames) cannot move it.
+  private armLegacyPlayerArrivalForFinalBuildStep(time: number, msUntilLaserStart: number): void {
     // A genuinely new arrival burst (this.playerSpawnBurstStartedAtMs was
     // null, about to be armed below) that is NOT part of a real armed
     // transfer is applyLegacyGameplayInitialArrivalPresentation's own
@@ -7338,25 +7252,17 @@ export class MenuScene extends Phaser.Scene {
       this.gameplayTransferPauseStartedAtMs = null;
       this.gameplayTransferLastUnpausedTimeMs = null;
     }
-    const alignedStartedAtMs = time - Math.max(
-      0,
-      LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS - Math.max(0, buildRemainingMs)
-    );
-    this.playerSpawnBurstStartedAtMs ??= alignedStartedAtMs;
+    const laserStartedAtMs = time + msUntilLaserStart;
+    // Reduced motion has no laser: leaving the burst unarmed keeps the
+    // player marker visible the instant the board crossfade finishes.
+    if (!this.prefersLegacyReducedMotion()) {
+      this.playerSpawnBurstStartedAtMs ??= laserStartedAtMs;
+    }
     if (this.playerTransferEnergyArmed) {
-      // The bleed-dock corridor's own outward growth
-      // (resolveLegacyBleedDockGrowthProgress's building branch) only
-      // reaches the true screen edge (progress 1) exactly when this build
-      // completes (buildRemainingMs 0) -- it does not arrive early. Pinning
-      // the inbound beam's own start to that same future instant, rather
-      // than back-dating it so the beam's travel time finishes at build end,
-      // means the beam visually holds at zero progress (normalizeElapsedMs
-      // clamps a negative elapsed to 0) right up until the corridor has
-      // genuinely touched the edge, then fires -- matching "once the bleed
-      // paths touch the screen's edge, that's when the lasers shoot the
-      // player back in" instead of firing partway through the corridor's
-      // own growth.
-      this.playerTransferEnergyDeliveryStartedAtMs ??= time + Math.max(0, buildRemainingMs);
+      // The inbound transfer beam fires from the same intro instant as the
+      // spawn laser (the bleed docks finish growing at INTRO_REVEAL_END_MS,
+      // just before it), so there is one arrival clock, not two.
+      this.playerTransferEnergyDeliveryStartedAtMs ??= laserStartedAtMs;
     }
   }
 
@@ -8380,34 +8286,6 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // 1 outside a transition (steady state -- corridors at their full,
-  // unanimated length, the overwhelming majority of frames). Shrinks to 0
-  // across the opening span of 'deconstructing' (before tile removal
-  // itself starts) and grows back to 1 across the closing span of
-  // 'building' (once most/all tiles, including each corridor's own anchor
-  // tile, are already visible) -- see LEGACY_BLEED_DOCK_GROWTH_MS.
-  private resolveLegacyBleedDockGrowthProgress(): number {
-    const phase = this.menuStaticDrawLifecyclePhase;
-    const time = this.time.now;
-
-    if (phase === 'deconstructing' && this.menuStaticDeconstructStartedAtMs !== null) {
-      const elapsedMs = time - this.menuStaticDeconstructStartedAtMs;
-      return 1 - smoothstep(elapsedMs / LEGACY_BLEED_DOCK_GROWTH_MS);
-    }
-
-    if (phase === 'building' && this.menuStaticBuildPhaseStartedAtMs !== null) {
-      const buildDurationMs = this.resolveLegacyMenuStaticBuildDurationEstimateMs();
-      if (buildDurationMs === null) {
-        return 1;
-      }
-      const elapsedMs = time - this.menuStaticBuildPhaseStartedAtMs;
-      const remainingMs = buildDurationMs - elapsedMs;
-      return 1 - smoothstep(remainingMs / LEGACY_BLEED_DOCK_BUILD_GROWTH_MS);
-    }
-
-    return 1;
-  }
-
   // A normal corridor stays a tile away from the board edge (the existing
   // safeInset in resolveLegacyMazeRenderFrame). A wraparound dock corridor
   // -- one whose path genuinely continues off-grid -- bleeds past the board
@@ -8441,15 +8319,10 @@ export class MenuScene extends Phaser.Scene {
     // the play-only branch makes both surfaces resolve identically, which
     // is what actually reaching the screen edge (and matching between
     // menu and play) requires.
-    const growthProgress = this.resolveLegacyBleedDockGrowthProgress();
-    const resolveContinuation = (availableGap: number): number => {
-      const target = Math.max(2, availableGap);
-      // At progress 1 (steady state, the overwhelming majority of frames)
-      // this must equal target exactly, not a rounded-through-1x copy of
-      // it -- any drift here would be a permanent few-px regression on
-      // every settled maze, not just a transition-window nicety.
-      return growthProgress >= 1 ? target : Math.max(0, Math.round(target * growthProgress));
-    };
+    // Always the full length: an edge path is either absent (the dock is not
+    // drawn at all, see drawLegacyPathBorderDock) or complete -- there is no
+    // half-grown length, so no sliver can ever be left behind.
+    const resolveContinuation = (availableGap: number): number => Math.max(2, availableGap);
 
     if (direction === 'left') {
       return resolveContinuation(boardLeft - edgeInset);
@@ -8495,6 +8368,9 @@ export class MenuScene extends Phaser.Scene {
     tileSize: number,
     options: LegacyPathMaterialOptions
   ): void {
+    if (!this.legacyEdgePathsVisible) {
+      return;
+    }
     const dockDirections = resolveLegacyMenuBorderDockDirections(pathSource, point);
     if (dockDirections.length <= 0) {
       return;
@@ -8862,6 +8738,9 @@ export class MenuScene extends Phaser.Scene {
     );
     this.boardFloorTileSprite.setTileScale(tileSize / MAZER_FLOOR_TILE_SOURCE_SIZE, tileSize / MAZER_FLOOR_TILE_SOURCE_SIZE);
     const drawPathPoint = (point: LegacyPoint): void => {
+      if (!this.isLegacyEdgePathCellShown(point)) {
+        return;
+      }
       this.drawLegacyPathMaterialTile(
         this.boardPathGraphics,
         point,
@@ -10442,29 +10321,13 @@ export class MenuScene extends Phaser.Scene {
     return null;
   }
 
-  // 0 outside the deconstructing phase (or once its own window elapses --
-  // the next maze's own 'building' phase, which starts right as this window
-  // ends, is a distinct trigger from the arm-time reset below and needs its
-  // own guard here). A plain triangular envelope: linear up, hold at 1 once
-  // both ramps clear 1, linear down -- matches the fade timing already used
-  // for the trail (resolveLegacyMenuDeconstructTrailAlpha) elsewhere in this
-  // same transition.
-  // Fades/scales in across the deconstruct phase's own opening span (holding
-  // at full size for whatever's left of that phase), then fades/scales back
-  // out only once the build is CLOSE to done -- full opacity is held
-  // through the bulk of the build (menuStaticBuildPhaseStartedAtMs anchors
-  // the whole phase, unlike the preroll-only menuStaticBuildPrerollStartedAtMs
-  // -- see its declaration), then it dissolves across a fixed closing window
-  // timed to land on zero right as the last tiles settle in, per feedback
-  // that fading across the whole build made it disappear almost immediately
-  // for anything but the shortest builds. levelAnnouncerBuildFadeOutArmed
-  // tracks whether THIS build's fade-in already happened during a preceding
-  // 'deconstructing' phase -- true for every normal maze-to-maze cycle. A
-  // build that starts without one (initial page load, first entry into play
-  // mode, a settings change that regenerates the board -- nothing to
-  // deconstruct FROM) still gets the announcement, just via its own
-  // self-contained fade-in-hold-fade-out entirely inside the build phase
-  // instead of borrowing the deconstruct phase's opening span.
+  // The centered level digit is a pure projection of the intro/outro
+  // timelines (introTimeline.ts): it fades/scales in across the first part of
+  // the deconstruct (or, on a cold start with nothing to deconstruct from,
+  // across the first 200 ms of the intro itself), holds at full opacity, and
+  // fades out so it is gone at the exact instant the spawn laser lands and
+  // input unlocks. levelAnnouncerBuildFadeOutArmed records that THIS build's
+  // fade-in already happened during a preceding deconstruct.
   private resolveLegacyLevelAnnouncerVisualState(time: number): { alpha: number; scale: number; revealProgress: number } {
     const HIDDEN = { alpha: 0, scale: 1, revealProgress: 0 };
     if (this.overlay !== 'none') {
@@ -10473,44 +10336,21 @@ export class MenuScene extends Phaser.Scene {
 
     const phase = this.menuStaticDrawLifecyclePhase;
 
-    if (phase === 'deconstructing' && this.menuStaticDeconstructStartedAtMs !== null) {
+    const outro = this.resolveLegacyOutroState(time);
+    if (outro !== null) {
+      // Fades in during the deconstruct so it is already fully up when the
+      // next intro starts (the intro then only has to fade it OUT).
       this.levelAnnouncerBuildFadeOutArmed = true;
-      const elapsedMs = time - this.menuStaticDeconstructStartedAtMs;
-      if (elapsedMs < 0) {
-        return HIDDEN;
-      }
-      const progress = smootherstep(elapsedMs / LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS);
-      return this.applyLegacyLevelAnnouncerPulse(progress, time);
+      return this.applyLegacyLevelAnnouncerPulse(outro.digitAlpha, outro.digitScale);
     }
 
-    if (phase === 'building' && this.menuStaticBuildPhaseStartedAtMs !== null) {
-      const buildDurationMs = this.resolveLegacyMenuStaticBuildDurationEstimateMs();
-      if (buildDurationMs === null) {
+    const intro = this.resolveLegacyIntroState(time);
+    if (intro !== null) {
+      if (intro.digitAlpha <= 0) {
         this.levelAnnouncerBuildFadeOutArmed = false;
         return HIDDEN;
       }
-
-      const elapsedMs = time - this.menuStaticBuildPhaseStartedAtMs;
-      const remainingMs = buildDurationMs - elapsedMs;
-      if (elapsedMs < 0 || remainingMs <= 0) {
-        this.levelAnnouncerBuildFadeOutArmed = false;
-        return HIDDEN;
-      }
-
-      const fadeOutWindowMs = Math.min(LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS, buildDurationMs);
-      const fadeOutProgress = remainingMs >= fadeOutWindowMs ? 1 : smootherstep(remainingMs / fadeOutWindowMs);
-
-      if (this.levelAnnouncerBuildFadeOutArmed) {
-        return this.applyLegacyLevelAnnouncerPulse(fadeOutProgress, time);
-      }
-
-      // Cold-start case -- also ramp UP from this build's own beginning
-      // (nothing to fade in from) instead of assuming it's already at full
-      // size the way an armed build (which already faded in during its
-      // preceding deconstruct) can.
-      const fadeInWindowMs = Math.min(LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS, buildDurationMs);
-      const fadeInProgress = smootherstep(elapsedMs / fadeInWindowMs);
-      return this.applyLegacyLevelAnnouncerPulse(Math.min(fadeInProgress, fadeOutProgress), time);
+      return this.applyLegacyLevelAnnouncerPulse(intro.digitAlpha, intro.digitScale);
     }
 
     if (phase !== 'building') {
@@ -10519,37 +10359,14 @@ export class MenuScene extends Phaser.Scene {
     return HIDDEN;
   }
 
-  // progress < 1 means the fade-in/fade-out envelope is still transitioning
-  // -- keep that motion clean, no pulse blended in yet. Once it reaches its
-  // held plateau (progress >= 1, i.e. fully up and not yet closing), swap
-  // to the slow breathing pulse instead of sitting perfectly static.
-  //
-  // revealProgress tracks the same envelope as alpha does while progress < 1
-  // (so the tile-by-tile construct/deconstruct sweep -- see
-  // drawLegacyTileFontWordTiled -- tracks the fade exactly), but pins to a
-  // flat 1 once the held plateau starts, instead of alpha's own breathing
-  // pulse (which dips as low as LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA) --
-  // using alpha directly here would have made the sweep's trailing tiles
-  // continuously flicker in and out for as long as the number stays on
-  // screen, not just play once during the actual build/deconstruct.
+  // The digit no longer breathes on a separate 3.6 s pulse (a third motion
+  // clock competing with the intro's): alpha, scale and the tile-by-tile
+  // sweep (revealProgress) all follow the one timeline-derived envelope.
   private applyLegacyLevelAnnouncerPulse(
-    progress: number,
-    time: number
+    alpha: number,
+    scale: number
   ): { alpha: number; scale: number; revealProgress: number } {
-    if (progress < 1) {
-      return {
-        alpha: progress,
-        revealProgress: progress,
-        scale: LEGACY_LEVEL_ANNOUNCER_MIN_SCALE + (progress * (1 - LEGACY_LEVEL_ANNOUNCER_MIN_SCALE))
-      };
-    }
-
-    const pulsePhase = (Math.sin((time / LEGACY_LEVEL_ANNOUNCER_PULSE_PERIOD_MS) * Math.PI * 2) + 1) / 2;
-    return {
-      alpha: LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA + (pulsePhase * (1 - LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA)),
-      revealProgress: 1,
-      scale: LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE + (pulsePhase * (1 - LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE))
-    };
+    return { alpha, revealProgress: alpha, scale };
   }
 
   // Centered, between-mazes level announcement -- replaces the old
@@ -10907,13 +10724,14 @@ export class MenuScene extends Phaser.Scene {
       return { active: false, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
     }
 
-    const travelProgress = smoothstep(elapsedMs / LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS);
-    const flashProgress = clamp((elapsedMs - LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS) / LEGACY_PLAYER_SPAWN_FLASH_MS, 0, 1);
+    // The laser is a pure function of time since it left its station
+    // (introTimeline.ts), so menu and play can never disagree about it.
+    const laser = resolveSpawnLaser(elapsedMs);
     return {
       active: true,
-      flashProgress,
-      markerRevealAlpha: travelProgress >= 1 ? 1 : 0,
-      travelProgress
+      flashProgress: laser.spawnPop,
+      markerRevealAlpha: laser.markerRevealed ? 1 : 0,
+      travelProgress: laser.laserProgress
     };
   }
 

@@ -765,10 +765,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyPlayerTransferEnergy(');
     expect(menuSceneSource).toContain('this.drawLegacyPlayerTransferEnergy(');
     expect(menuSceneSource).toContain('resolveLegacyPlayerTransferVisualState({');
-    // Pinned to the future instant the corridor's own outward growth
-    // actually touches the screen edge (buildRemainingMs reaches 0), not
-    // back-dated to make the beam's travel time finish at build end.
-    expect(menuSceneSource).toContain('this.playerTransferEnergyDeliveryStartedAtMs ??= time + Math.max(0, buildRemainingMs);');
+    // Pinned to the same exact intro-clock instant as the spawn laser (the
+    // edge paths appear atomically just before it), not to a frame-stepped
+    // build-remaining estimate.
+    expect(menuSceneSource).toContain('this.playerTransferEnergyDeliveryStartedAtMs ??= laserStartedAtMs;');
     expect(menuSceneSource).toContain('playerTransfer: LegacyPlayerTransferVisualState;');
     expect(menuSceneSource).toContain('playerTransfer,');
     expect(menuSceneSource).toContain('this.isLegacyMenuDeconstructHandoffActive(time)');
@@ -2085,8 +2085,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // visible "corridor retracts, pauses, then the laser finally fires" bug.
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase = 'deconstructing';");
     expect(menuSceneSource).toContain('if (this.playerTransferEnergyArmed && this.playerTransferEnergyOutboundStartedAtMs === null) {');
-    expect(menuSceneSource).toContain('resolveLegacyStaticDrawBuildRemainingMs({');
-    expect(menuSceneSource).toContain('this.playerSpawnBurstStartedAtMs ??= alignedStartedAtMs;');
+    expect(menuSceneSource).not.toContain('resolveLegacyStaticDrawBuildRemainingMs({');
+    expect(menuSceneSource).toContain('this.playerSpawnBurstStartedAtMs ??= laserStartedAtMs;');
   });
 
   test('hydrates the signed-in username before deciding whether leaderboard access is gated', () => {
