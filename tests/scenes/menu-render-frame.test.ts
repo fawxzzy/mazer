@@ -1734,7 +1734,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(profileButtonSource).toContain('const blinkScale = 0.92 + (phase * 0.08) + (this.menuProfileActive ? 0.02 : 0);');
     expect(profileButtonSource).toMatch(/this\.drawLegacyProfileIcon\([\s\S]*?blinkScale,\s*false\s*\);/);
     expect(menuSceneSource).toContain('if (showOuterRing) {');
-    expect(menuSceneSource).toContain('const color = cyberArcadeMaterial.signal.player;');
+    // Integration 3: this used to pin `const color = cyberArcadeMaterial.signal.player;`,
+    // which only ever matched the pause home icon (deleted by the header/pause
+    // lane) and the leaderboard title glyph (deleted by the leaderboard lane).
+    // Each lane removed a different one, so the merged tree has neither. The
+    // profile control's own contract is the profile texture it draws.
+    expect(menuSceneSource).toContain('MAZER_HUD_PROFILE_TEXTURE_KEY');
+    expect(profileButtonSource).toContain('MAZER_HUD_PROFILE_TEXTURE_KEY');
   });
 
   test('routes signed-out account entry directly through shared OAuth without a local login surface', () => {
