@@ -10,12 +10,10 @@ import {
   LEGACY_MOVEMENT_SPEED_MIN,
   normalizeLegacyMovementSpeed
 } from './legacyMovementSpeed';
-import { normalizeLegacyCameraZoom } from './legacyCameraZoom';
 
 export const LEGACY_GAME_TOGGLE_STORAGE_KEY = 'mazer.game-toggles.v1';
 
 export interface LegacyGameTogglePreferences {
-  camScale: number;
   controlMode: LegacyControlMode;
   darkMode: boolean;
   movementSpeed: number;
@@ -59,11 +57,6 @@ const isMigratableMovementSpeed = (value: unknown): boolean => (
   || (typeof value === 'string' && value.trim().length > 0 && Number.isFinite(Number(value)))
 );
 
-const isMigratableCameraZoom = (value: unknown): boolean => (
-  (typeof value === 'number' && Number.isFinite(value))
-  || (typeof value === 'string' && value.trim().length > 0 && Number.isFinite(Number(value)))
-);
-
 const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Partial<LegacyGameTogglePreferences> => {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
@@ -74,7 +67,6 @@ const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Parti
     Object.prototype.hasOwnProperty.call(record, key)
   );
   const presentKeys = [
-    'camScale',
     'controlMode',
     'darkMode',
     'movementSpeed',
@@ -89,22 +81,18 @@ const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Parti
   if (hasOwn('controlMode') && !isControlMode(record.controlMode)) {
     return false;
   }
-  if (hasOwn('camScale') && !isMigratableCameraZoom(record.camScale)) {
-    return false;
-  }
   if (hasOwn('movementSpeed') && !isMigratableMovementSpeed(record.movementSpeed)) {
     return false;
   }
 
   return presentKeys
-    .filter((key) => key !== 'camScale' && key !== 'controlMode' && key !== 'movementSpeed' && hasOwn(key))
+    .filter((key) => key !== 'controlMode' && key !== 'movementSpeed' && hasOwn(key))
     .every((key) => isMigratableBoolean(record[key]));
 };
 
 export const pickLegacyGameTogglePreferences = (
   settings: LegacySettings
 ): LegacyGameTogglePreferences => ({
-  camScale: normalizeLegacyCameraZoom(settings.camScale),
   controlMode: settings.controlMode,
   darkMode: settings.darkMode,
   movementSpeed: normalizeLegacyMovementSpeed(settings.movementSpeed),
@@ -117,7 +105,6 @@ export const normalizeLegacyGameTogglePreferences = (
   value?: Partial<LegacyGameTogglePreferences> | null,
   fallback: LegacySettings = LEGACY_DEFAULTS
 ): LegacyGameTogglePreferences => ({
-  camScale: normalizeLegacyCameraZoom(value?.camScale, fallback.camScale),
   controlMode: isControlMode(value?.controlMode) ? value.controlMode : fallback.controlMode,
   darkMode: normalizeBoolean(value?.darkMode, fallback.darkMode),
   movementSpeed: normalizeLegacyMovementSpeed(
@@ -224,6 +211,44 @@ export const migrateLegacyGameToggleSettingsToGuestScope = (
     } catch {
       // The scoped write already succeeded. A stale global key cannot overwrite guest or account data.
     }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Board Zoom was removed (the board size is frozen by product decision). A
+ * `camScale` value stored by an older build is never read back into settings,
+ * but this strips the dead key from storage so no tool or later build can
+ * resurrect it. Best effort: storage failures are swallowed like every other
+ * preference write.
+ */
+export const scrubRemovedCameraZoomFromGameToggleStorage = (
+  storage: Pick<Storage, 'getItem' | 'setItem'> | undefined
+): boolean => {
+  if (!storage) {
+    return false;
+  }
+
+  try {
+    const raw = storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY);
+    if (!raw) {
+      return false;
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      parsed === null
+      || typeof parsed !== 'object'
+      || Array.isArray(parsed)
+      || !Object.prototype.hasOwnProperty.call(parsed, 'camScale')
+    ) {
+      return false;
+    }
+
+    const { camScale: _removedCameraZoom, ...rest } = parsed as Record<string, unknown>;
+    storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify(rest));
     return true;
   } catch {
     return false;

@@ -256,7 +256,7 @@ describe('Mazer UI rework decision registry contract', () => {
 
       expect(Object.fromEntries(owners)).toEqual({
         'scripts/analysis/capture-auth-capability-surfaces.mjs': '0C',
-        'scripts/analysis/capture-ui-surfaces.mjs': '0C',
+        'scripts/analysis/capture-ui-surfaces.mjs': '5C',
         'scripts/analysis/live-auth-persistence-soak.mjs': '5C',
         'src/theme/tokens.ts': '1B',
         'src/theme/tokens.css': '1B',

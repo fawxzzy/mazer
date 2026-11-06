@@ -47,7 +47,6 @@ const EXPECTED_TRAIL_SHINE_COLOR = 0xf1faf6;
 const EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe9fff1;
 const INLINE_STATE_TEXT_LABELS = Object.freeze([
   'Animated Background',
-  'Board Zoom',
   'High Contrast',
   'Camera Follow',
   'Control Style',
@@ -1316,7 +1315,7 @@ export const evaluateAuthWelcomeAnatomy = (surface) => {
 };
 
 // Settings is ONE shared sheet (menu + pause, PR #386): a title, a `How to play`
-// row that opens the Guide sub-view, a Display group (Board Zoom + toggles) and,
+// row that opens the Guide sub-view, a Display group (toggles only; the zoom slider was removed 2026-11-06) and,
 // in the menu context, an Account section. Every label below is a row label in
 // src/legacy-runtime/legacySettingsSheetPlan.ts; tests/reset/ui-surface-capture-script.test.mjs
 // asserts each one still exists in buildLegacySettingsSheetModel, so a renamed or
@@ -1325,7 +1324,6 @@ export const evaluateAuthWelcomeAnatomy = (surface) => {
 // owned by the sheet header and changes independently of the rows.
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
   'How to play',
-  'Board Zoom',
   'Trail Fade',
   'Trail Shine',
   'Animated Background'
@@ -1371,7 +1369,6 @@ const PAUSE_CARD_EXPECTED_LABELS = Object.freeze([
   'Quit to Menu'
 ]);
 const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([
-  'Board Zoom',
   'Trail Fade',
   'Trail Shine',
   'Animated Background'

@@ -15,7 +15,9 @@ import {
   measureGeometryBudgetProxy,
   resolveContinuousDifficulty,
   resolveGeometryBudgetCandidateSeed,
+  resolveGeometryBudgetForks,
   resolveGeometryBudgetMaxBranch,
+  resolveGeometryBudgetRouteBranch,
   resolveGeometryBudgetProfile,
   resolveGeometryBudgetProfileForRungs,
   resolveGeometryBudgetRouteTarget,
@@ -193,9 +195,9 @@ describe('continuous difficulty function D(level)', () => {
     expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_SATURATION_LEVEL));
     expect(LAST_BUDGET_LEVEL).toBe(GEOMETRY_BUDGET_SATURATION_LEVEL);
     // Measured hard ceiling of the frozen board (see scripts/analysis/generate-geometry-budget-targets.ts).
-    expect(GEOMETRY_BUDGET_CEILING).toBe(780);
-    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(208);
-    expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(779);
+    expect(GEOMETRY_BUDGET_CEILING).toBe(760);
+    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(198);
+    expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(759);
   });
 
   test('route target and branch cap rise with the level and stay inside their budgets', () => {
@@ -212,7 +214,22 @@ describe('continuous difficulty function D(level)', () => {
       previousRoute = route;
       previousBranch = branch;
     }
-    // The calibration script samples capacity at route target 300 / branch cap 40.
+    // Forks on the route (and their length) also rise, within the calibration's bounds.
+    let previousForks = -1;
+    let previousFork = -1;
+    for (let level = 2; level <= LAST_BUDGET_LEVEL; level += 1) {
+      const forks = resolveGeometryBudgetForks(level);
+      const forkLength = resolveGeometryBudgetRouteBranch(level);
+      expect(forks).toBeGreaterThanOrEqual(previousForks);
+      expect(forkLength).toBeGreaterThanOrEqual(previousFork);
+      expect(forkLength).toBeLessThanOrEqual(resolveGeometryBudgetMaxBranch(level));
+      previousForks = forks;
+      previousFork = forkLength;
+    }
+    expect(resolveGeometryBudgetForks(LAST_BUDGET_LEVEL)).toBeLessThanOrEqual(30);
+    expect(resolveGeometryBudgetRouteBranch(LAST_BUDGET_LEVEL)).toBeLessThanOrEqual(16);
+    // The calibration script samples capacity at route target 300 / branch cap 40
+    // / fork length 16 / 30 forks.
     expect(resolveGeometryBudgetRouteTarget(LAST_BUDGET_LEVEL)).toBeLessThanOrEqual(300);
     expect(resolveGeometryBudgetMaxBranch(LAST_BUDGET_LEVEL)).toBe(40);
     expect(resolveGeometryBudgetRouteTarget(500)).toBe(resolveGeometryBudgetRouteTarget(LAST_BUDGET_LEVEL));

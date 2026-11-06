@@ -53,6 +53,14 @@ export interface FeltTuningOptions {
   readonly maxBumpDepth?: number;
   // Longest deceptive branch carved in one move.
   readonly maxBranch?: number;
+  // Longest branch carved directly off the route (a fork the player meets on the
+  // way); deeper wrong ground grows from the cells of those forks, up to maxBranch.
+  // Defaults to maxBranch.
+  readonly routeBranch?: number;
+  // Forks to put on the route first (route-hosted lure branches of 4..routeBranch
+  // cells, as many as the felt budget affords), so the player meets many choices on
+  // the way and not a few long dead ends. 0 (default) leaves it to the fill.
+  readonly forks?: number;
   // Hard cap on explorer evaluations per attempt (safety bound).
   readonly maxEvals?: number;
 }
@@ -107,6 +115,8 @@ const tuneOnce = (
   // Distance of a felt value from the accept window [target, target + overshoot].
   const windowGap = (value: number): number => (value < target ? target - value : (value > target + overshoot ? value - target - overshoot : 0));
   const maxBranch = Math.max(4, options.maxBranch ?? FELT_TUNING_DEFAULT_MAX_BRANCH);
+  const routeBranch = Math.max(4, Math.min(maxBranch, options.routeBranch ?? maxBranch));
+  const forkTarget = Math.max(0, Math.trunc(options.forks ?? 0));
   const maxBumpDepth = Math.max(1, options.maxBumpDepth ?? FELT_TUNING_DEFAULT_MAX_BUMP_DEPTH);
   const maxEvals = options.maxEvals ?? FELT_TUNING_DEFAULT_MAX_EVALS;
   const { width, height } = maze;
@@ -292,12 +302,15 @@ const tuneOnce = (
   let failures = 0;
   const failureCap = 40;
   let branchLimit = maxBranch;
+  let forksRemaining = forkTarget;
+  let forkFailures = 0;
   while (evals < maxEvals && !hopeless && windowGap(felt) > 0) {
     const gap = target - felt;
     let edited: number[] = [];
     let trimmed: number[] = [];
     let bumped = false;
     let mode: 'branch' | 'tip' | 'trim' = 'branch';
+    let forkMode = false;
     if (gap > 0) {
       const wanted = Math.floor(gap / 2);
       mode = wanted >= 4 ? 'branch' : 'tip';
@@ -306,16 +319,25 @@ const tuneOnce = (
       // costs the explorer nothing), else undo and probe again.
       // Half of the full-size branches are first tried on the route itself (more
       // choices for the player on the way), the rest anywhere the explorer goes.
-      const routeFirst = mode === 'branch' && (rand() & 1) === 0;
+      // A fork phase request spends an equal share of the remaining budget on each
+      // fork; when the share is below a real branch (4 cells) the phase ends.
+      let forkShare = 0;
+      if (mode === 'branch' && forksRemaining > 0) {
+        forkShare = Math.floor(wanted / forksRemaining);
+        if (forkShare < 4) { forksRemaining = 0; } else { forkMode = true; }
+      }
+      const routeFirst = forkMode || (mode === 'branch' && (rand() % 4) !== 0);
       const usable = (cell: number, strict = routeFirst): boolean => (
         open[cell] === 1 && run.visited[cell] === 1 && cell !== startCell && cell !== goalCell && interior(cell)
         && (mode !== 'tip' || (openCount(cell) === 1 && run.onPath[cell] !== 1))
         && (!strict || run.onPath[cell] === 1)
       );
-      const length = mode === 'branch' ? Math.min(wanted, branchLimit) : Math.max(1, Math.min(wanted, 12));
+      const length = forkMode
+        ? Math.min(routeBranch, forkShare, 4 + (rand() % Math.max(1, routeBranch - 3)))
+        : (mode === 'branch' ? Math.min(wanted, branchLimit) : Math.max(1, Math.min(wanted, 12)));
       const minimum = mode === 'branch' ? Math.min(length, 4) : 1;
       for (let trial = 0; trial < 90 && edited.length === 0; trial += 1) {
-        const strict = routeFirst && trial < 45;
+        const strict = routeFirst && (forkMode || trial < 45);
         let chosen = rand() % size;
         if (!usable(chosen, strict)) { continue; }
         // Goal-side clustering: half the time keep the nearer of two probes.
@@ -332,7 +354,7 @@ const tuneOnce = (
             const next = run.pathNext[chosen]!;
             if (next < 0 || dist2(entry) >= dist2(next)) { continue; }
           }
-          const carved = carveBranch(chosen, dir, length);
+          const carved = carveBranch(chosen, dir, run.onPath[chosen] === 1 ? Math.min(length, routeBranch) : length);
           if (carved.length >= minimum) {
             edited = carved;
           } else {
@@ -370,6 +392,7 @@ const tuneOnce = (
         felt = next.steps;
         if (edited.length > 0) {
           if (mode === 'branch') { branchesAdded += 1; }
+          if (forkMode) { forksRemaining -= 1; forkFailures = 0; }
           edited.forEach((cell) => addedTiles.push(point(cell)));
         }
         trimmed.forEach((cell) => trimmedTiles.push(point(cell)));
@@ -385,6 +408,10 @@ const tuneOnce = (
     if (accepted) {
       failures = 0;
     } else {
+      if (forkMode) {
+        forkFailures += 1;
+        if (forkFailures >= 12) { forksRemaining = 0; }
+      }
       failures += 1;
       if (failures % 12 === 0) { branchLimit = Math.max(4, Math.floor(branchLimit / 2)); }
       if (failures >= failureCap) {
@@ -434,7 +461,7 @@ export const tuneMazeFeltToTarget = (
     const result = tuneOnce(maze, target, (Math.imul(seed >>> 0, 0x2545f491) + Math.imul(attempt, 0x9e3779b1)) >>> 0, options);
     if (best === null || result.windowDistance < best.windowDistance) { best = result; }
     if (result.onTarget || result.hopeless) { break; }
-    if (result.capacityExhausted && attempt >= 2) { break; }
+    if (result.capacityExhausted && attempt >= 5) { break; }
   }
   return best!;
 };

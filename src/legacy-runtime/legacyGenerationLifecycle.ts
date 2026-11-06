@@ -12,7 +12,9 @@ import {
   GEOMETRY_BUDGET_BASE_CANDIDATES,
   GEOMETRY_BUDGET_WINDOW,
   resolveGeometryBudgetCandidateSeed,
+  resolveGeometryBudgetForks,
   resolveGeometryBudgetMaxBranch,
+  resolveGeometryBudgetRouteBranch,
   resolveGeometryBudgetRouteTarget,
   resolveGeometryBudgetTarget
 } from './legacyGeometryBudget';
@@ -599,6 +601,8 @@ const selectLegacyGeometryBudgetMaze = (
   const gateTarget = resolveGeometryBudgetTarget(budgetLevel);
   const routeTarget = resolveGeometryBudgetRouteTarget(budgetLevel);
   const maxBranch = resolveGeometryBudgetMaxBranch(budgetLevel);
+  const routeBranch = resolveGeometryBudgetRouteBranch(budgetLevel);
+  const forks = resolveGeometryBudgetForks(budgetLevel);
   let selectedMaze: Omit<LegacyMazeSnapshot, 'generation'> | null = null;
   let selectedDistance = Number.POSITIVE_INFINITY;
   let searched = 0;
@@ -617,7 +621,7 @@ const selectLegacyGeometryBudgetMaze = (
         base,
         gateTarget,
         resolveGeometryBudgetCandidateSeed(seed, budgetLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
-        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch }
+        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks }
       );
       distance = tuned.windowDistance;
       if (tuned.addedTiles.length > 0 || tuned.trimmedTiles.length > 0 || tuned.bumps > 0) {

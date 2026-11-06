@@ -60,9 +60,10 @@ export const GEOMETRY_BUDGET_BASE_CANDIDATES = 24;
 // measured with the same explorer (40 seeds, the larger of phone and desktop per
 // level: 87 at levels 2-3, 122 at 4, 152 at 6, 210 at 9, 257 at 12, 278 at 15,
 // then the band plateaus 369 for 16-35 and 432 for 36-57, then 345 from 58 on),
-// so no level is easier than today on either board, and the ladder then keeps
+// so no level is easier than today on either board (one measured exception: level 9
+// on phone, -10), and the ladder then keeps
 // rising where the shipped one falls back and goes flat. The one steep stretch
-// (levels 10..16, +26 per level) replaces the shipped ladder's +91 band jump at 16.
+// (levels 10..16, +27 per level at most) replaces the shipped ladder's +91 band jump at 16.
 const SCHEDULE_CONTROL_POINTS: readonly (readonly [number, number])[] = [
   [2, 89], [4, 123], [6, 153], [10, 215], [16, 372], [36, 435]
 ];
@@ -138,8 +139,9 @@ export const resolveGeometryBudgetProfileForRungs = (
 // Proxy for "harder": H1 = turns + len/4 + 3*splits + 2*max(0, dead-2) + 6*wraps
 //
 // The weights are a modelling choice, not a measured player-difficulty law.
-// They are chosen so every tape rung raises the mean H1 and so the proxy does
-// not saturate or depend on board size the way the 400-capped complexity does.
+// The proxy is kept as a SECONDARY guard (the ladder tests require its window means
+// to follow the felt target); it is no longer steered. It does not saturate or
+// depend on board size the way the 400-capped complexity does.
 // ---------------------------------------------------------------------------
 
 export interface GeometryBudgetProxyMaze {
@@ -233,7 +235,7 @@ export const resolveGeometryBudgetCandidateSeed = (
 // ---------------------------------------------------------------------------
 
 // GENERATED:GEOMETRY_BUDGET_CALIBRATION:BEGIN
-export const GEOMETRY_BUDGET_CEILING = 780;
+export const GEOMETRY_BUDGET_CEILING = 760;
 // GENERATED:GEOMETRY_BUDGET_CALIBRATION:END
 
 // The last level whose scheduled target does not exceed the ceiling: the HARD
@@ -294,6 +296,20 @@ export const resolveGeometryBudgetRouteTarget = (level: number): number => {
 // with the level (8 cells at level 2 up to 40).
 export const resolveGeometryBudgetMaxBranch = (level: number): number => (
   Math.min(40, 8 + Math.floor(clampBudgetLevel(level) / 6))
+);
+
+// Longest fork carved straight off the route at level N (a wrong turn the player
+// meets on the way); deeper wrong ground grows from those forks up to the branch
+// cap. Kept short so a level has many forks to choose between, not a few long ones.
+export const resolveGeometryBudgetRouteBranch = (level: number): number => (
+  Math.min(16, 6 + Math.floor(clampBudgetLevel(level) / 10))
+);
+
+// Forks the tuner puts on the route first at level N (route-hosted lure branches of
+// 4..routeBranch cells, as many as the felt budget affords): more choices for the
+// player on the way as the ladder climbs.
+export const resolveGeometryBudgetForks = (level: number): number => (
+  Math.min(30, 2 + Math.floor(clampBudgetLevel(level) / 5))
 );
 
 // The generation profile for budget level N. Level 1 is NOT served by this

@@ -1,1 +1,1 @@
-export { legacyTuning, resolveBoardScaleFromCamScale, toHex } from './tuning';
+export { legacyTuning, toHex } from './tuning';

@@ -138,6 +138,18 @@ describe('felt tuning', () => {
     expect(structure.lureCells).toBeGreaterThan(100);
   });
 
+  test('the fork phase puts many short lure forks on the route before the deep fill', () => {
+    const maze = build(0, 1357, BOARDS[1]!);
+    const target = measureFeltSteps(maze) + 420;
+    const plain = tuneMazeFeltToTarget(maze, target, 4, { maxBranch: 30, routeBranch: 8 });
+    const forked = tuneMazeFeltToTarget(maze, target, 4, { maxBranch: 30, routeBranch: 8, forks: 14 });
+    expect(forked.onTarget).toBe(true);
+    const forkedStructure = analyzeFeltStructure({ ...maze, grid: forked.grid });
+    const plainStructure = analyzeFeltStructure({ ...maze, grid: plain.grid });
+    expect(forkedStructure.trapBranches).toBeGreaterThan(plainStructure.trapBranches);
+    expect(forkedStructure.trapBranches).toBeGreaterThanOrEqual(8);
+  });
+
   test('is deterministic for a seed and different seeds give different mazes', () => {
     const maze = build(0, 555, BOARDS[0]!);
     const target = measureFeltSteps(maze) + 120;

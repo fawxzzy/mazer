@@ -19,8 +19,8 @@ Card (centered in the whole panel, same width in both contexts: 360 max compact,
 
 - Pause: `Paused`; `Resume` (primary); `Settings` disclosure (collapsed by default) containing the Settings group; `Quit to Menu` (tertiary).
 - Menu: `Settings`; `Back to Menu` (primary, CLOSE_OVERLAY; same slot, size and emphasis as pause's `Resume`); the Settings group always open; `Account` heading; `Reset progress` (danger-outline); 24 px separation; `Sign out` (danger, signed-in only).
-- Settings group (identical rows, identical geometry in both): `How to play` (opens the Guide sheet), `Display` heading, `Board Zoom` slider, `Trail Fade`, `Trail Shine`, `Animated Background` toggles. State words (`On`, `Off`, `Animated`, `Still`) are their own column, never merged into the label.
-- Sizes: action 48, toggle/nav row 52, slider row 68, heading 24, gaps 8/12, card padding 20/24, label font 16 (never below 14, wraps to two lines), state font 13.
+- Settings group (identical rows, identical geometry in both): `How to play` (opens the Guide sheet), `Display` heading, `Trail Fade`, `Trail Shine`, `Animated Background` toggles. State words (`On`, `Off`, `Animated`, `Still`) are their own column, never merged into the label.
+- Sizes: action 48, toggle/nav row 52, heading 24, gaps 8/12, card padding 20/24, label font 16 (never below 14, wraps to two lines), state font 13.
 
 ### Exit contract (2026-11-06, Zac: "remove both [the close button and the back arrow] cause we already have a resume button, then recover that space")
 
@@ -77,11 +77,15 @@ See the investigation closeout (kept outside the repo, settings-reset-progress-2
 | `rank-letters-not-visible-anywhere` | Pending row. Rank letters are not shown (`drawLegacyProgressionBadge` draws nothing). No rank copy until a player-facing rank surface exists. |
 | `level1-coach-is-owner-decision` | Pending row. A one-line level-1 coach is a separate owner decision; `src/tutorial/*` is unused. |
 
+## Board Zoom removed (2026-11-06)
+
+Owner decision (Zac): "remove the board zoom setting". The board is a frozen size by product decision; difficulty never comes from zoom or board size. The slider row, its `slider` row kind, the `board-zoom` row id, `LegacySettingsSliderKey`, `sliderRowHeight`, `createBoardZoomSliderRow`, `applyLegacyCameraZoom`, `legacyCameraZoom.ts`, the `camScale` setting (`LegacySettings`, option fields, overlay field commit, persisted game-toggle preferences, remote profile `settings` payload) and the `userBoardZoom` visual diagnostic are all deleted. Persistence rule: an older build's stored `camScale` is never read back into settings (the preferences normalizer builds an explicit object), is never re-written, and is scrubbed from the scoped game-toggle blob on load (`scrubRemovedCameraZoomFromGameToggleStorage`); a remote `settings.camScale` is ignored the same way and drops out of the next remote write. Nothing else can drift zoom: `boardZoomContainer` is only a draw-order container and stays at 1x (pinned), the Phaser `wheel` handler only scrolls overlays, there is no pinch handler, and `?advancedOptions=1` / `?devOptions=1` no longer paint any zoom row (only the flag resolver remains). Reflow after removal: the sheet plan is unchanged apart from the missing 68 px row, so the sheet stays centred with rows >= 48/52 px; the rail appears only on true overflow (signed-in menu at 320x568: 590 px natural vs 552 px panel).
+
 ## Wiring status (2026-11-06, Wave 5C wiring lane)
 
 What shipped in the wiring PR:
 
-- One painter for both contexts: `buildOptionsOverlay` and `buildPauseOverlay` are thin entries into `buildLegacySettingsSheetOverlay(context)`, which paints `buildLegacySettingsSheetPlan`. Menu hides Resume, the Settings disclosure and Quit to Menu; pause hides the Account section (Reset progress, Sign out). The Settings group (How to play, Display, Board Zoom, Trail Fade, Trail Shine, Animated Background) is the same plan rows at the same size in both.
+- One painter for both contexts: `buildOptionsOverlay` and `buildPauseOverlay` are thin entries into `buildLegacySettingsSheetOverlay(context)`, which paints `buildLegacySettingsSheetPlan`. Menu hides Resume, the Settings disclosure and Quit to Menu; pause hides the Account section (Reset progress, Sign out). The Settings group (How to play, Display, Trail Fade, Trail Shine, Animated Background) is the same plan rows at the same size in both.
 - (Superseded 2026-11-06, see Exit contract.) The labelled `Close` pill (`createOverlayClosePill`) that first replaced the bare chevron on the settings and guide sheets was removed; the primary Resume / Back to Menu row is the exit. The leaderboard and account overlays keep `createOverlayBackChevronButton` (out of scope).
 - Rows keep the full inner width while scrolling; the scroll rail sits in the card padding (`scrollRailViewport`). Toggle labels wrap to two lines and never shrink under 14 px; the state word is its own column.
 - The Guide is a sheet, not a dropdown: opened by the `How to play` row from both contexts, painted from `buildLegacyGuideSheetModel` and `buildLegacyGuideSheetPlan`, `Got it` footer pinned. It is a sub-view of the options/pause overlay (`settingsGuideOpen`), so Pause keeps holding the run while it is open. Back, Escape and `Got it` return to Settings.

@@ -26,7 +26,7 @@ pause/Options header.
   themselves are unchanged. Depth 3 (above the board, below overlays); the
   label object is named `header-identity` for QA.
 - Pause card: `buildPauseOverlay` renders `buildLegacyPauseMenuViewModel()` -
-  title, Resume, Settings (collapsed on every open; Board Zoom + the three
+  title, Resume, Settings (collapsed on every open; the three
   toggles via `createFeatureControlRows`), Quit to Menu. Overlay id `pause` is
   unchanged. Resume and Quit keep "bridge first (`RESUME_RUN` / `RETURN_HOME`),
   then `applyLegacyPauseCommand('resume' | 'return-menu')`". When Settings is
