@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Mazer UI rework -- Wave 1B migration meter (REPORT ONLY, never a gate).
  *
