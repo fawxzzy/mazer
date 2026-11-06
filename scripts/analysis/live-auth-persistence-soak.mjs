@@ -1218,7 +1218,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     enterPhase('diagnostics-fixture-options');
     await openOptionsViaQa(page);
     const optionsSurface = await waitForSurface(page, {
-      authenticated: true, buttons: ['Trail Shine', 'Account'], mode: 'menu', overlay: 'options'
+      authenticated: true, buttons: ['Trail Shine'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'
     });
     const initialTrailShine = optionsSurface.trailShineEnabled;
     if (typeof initialTrailShine !== 'boolean') {
@@ -1242,7 +1242,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     fixtureSettingsTouched = true;
     await page.mouse.click(trailShinePoint.x, trailShinePoint.y);
     const changedOptionsSurface = await waitForTrailShineState(page, changedTrailShine, {
-      authenticated: true, buttons: ['Trail Shine', 'Account'], mode: 'menu', overlay: 'options'
+      authenticated: true, buttons: ['Trail Shine'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'
     });
     const changedSettingsSnapshot = await readFixtureSettingsStorageSnapshot(page);
     steps.push({
@@ -1269,7 +1269,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     await openOptionsViaQa(page);
     const authenticatedOptionsReload = await waitForTrailShineState(page, changedTrailShine, {
-      authenticated: true, buttons: ['Trail Shine', 'Account'], mode: 'menu', overlay: 'options'
+      authenticated: true, buttons: ['Trail Shine'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'
     });
     const changedStatePersistence = evaluateTrailShineChangedStatePersistence({
       initialRuntime: initialTrailShine,
@@ -1317,11 +1317,23 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     });
     enterPhase('authenticated-pause-reentry');
     await openPauseViaQa(page);
-    const authenticatedPauseReentry = await waitForSurface(page, {
-      authenticated: true, buttons: ['Back', 'Guide', 'Trail Shine', 'Main Menu'], mode: 'play', overlay: 'pause'
+    // The pause card opens with Settings collapsed, so the Trail Shine
+    // control only exists after the Settings row is opened.
+    const authenticatedPauseCollapsed = await waitForSurface(page, {
+      authenticated: true,
+      buttons: ['Back', 'Resume', 'Settings', 'Quit to Menu'],
+      forbiddenButtons: ['Trail Shine', 'Guide', 'Main Menu'],
+      mode: 'play',
+      overlay: 'pause'
+    });
+    const pauseSettingsPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Settings');
+    await page.mouse.click(pauseSettingsPoint.x, pauseSettingsPoint.y);
+    const authenticatedPauseReentry = await waitForTrailShineState(page, changedTrailShine, {
+      authenticated: true, buttons: ['Back', 'Resume', 'Settings', 'Trail Shine', 'Quit to Menu'], mode: 'play', overlay: 'pause'
     });
     steps.push({
       id: 'authenticated-pause-reentry',
+      collapsedSurface: authenticatedPauseCollapsed,
       pass: authenticatedPauseReentry.userIdPresent
         && authenticatedPauseReentry.trailShineEnabled === changedTrailShine
         && authenticatedPauseReentry.trailShineUiEnabled === changedTrailShine,
@@ -1333,12 +1345,10 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     enterPhase('diagnostics-fixture-account');
     await page.goto(new URL(buildAuthPersistenceRoute(true), resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
     assertAuthPersistenceNavigationOrigin({ actualUrl: page.url(), baseUrl: resolvedBaseUrl });
-    await waitForSurface(page, {
-      authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
-    });
-    await openOptionsViaQa(page);
+    // The Options header no longer carries a profile icon; the main menu's
+    // top-left Account control is the only account entry.
     const fixtureAccount = await waitForSurface(page, {
-      authenticated: true, buttons: ['Account'], mode: 'menu', overlay: 'options'
+      authenticated: true, buttons: ['Start', 'Settings', 'Account'], mode: 'menu', overlay: 'none'
     });
     steps.push({
       id: 'diagnostics-fixture-account',
@@ -1346,10 +1356,10 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         && fixtureAccount.authStatus === 'authenticated'
         && fixtureAccount.buttons.includes('Account')
         && fixtureAccount.mode === 'menu'
-        && fixtureAccount.overlay === 'options',
+        && fixtureAccount.overlay === 'none',
       surface: fixtureAccount,
       fixtureOnly: true,
-      note: 'The authenticated Account control is present; the fixture intentionally does not follow the external shared-account portal navigation.'
+      note: 'The authenticated Account control is present on the main menu (the Options header has no profile icon); the fixture intentionally does not follow the external shared-account portal navigation.'
     });
 
     enterPhase('fixture-reentry');

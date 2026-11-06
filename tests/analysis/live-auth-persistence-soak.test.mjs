@@ -577,9 +577,19 @@ describe('live auth persistence soak contract', () => {
     expect(source).toContain("id: 'diagnostics-fixture-play'");
     expect(source).toContain("id: 'signed-out-shared-account-contract'");
     expect(source).not.toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Sign in'");
-    expect(source).toContain("buttons: ['Back', 'Guide', 'Trail Shine', 'Main Menu']");
+    // Pause card: Resume / Settings / Quit to Menu, Settings collapsed on open;
+    // Trail Shine is only reachable after the Settings row is clicked.
+    expect(source).toContain("buttons: ['Back', 'Resume', 'Settings', 'Quit to Menu']");
+    expect(source).toContain("forbiddenButtons: ['Trail Shine', 'Guide', 'Main Menu']");
+    expect(source).toContain("buttons: ['Back', 'Resume', 'Settings', 'Trail Shine', 'Quit to Menu'], mode: 'play', overlay: 'pause'");
+    expect(source).toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Settings')");
+    expect(source).not.toContain("'Back', 'Guide', 'Trail Shine', 'Main Menu'");
+    // Options has no profile icon; the main-menu Account control is the only account entry.
+    expect(source).toContain("buttons: ['Trail Shine'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'");
+    expect(source).not.toContain("buttons: ['Trail Shine', 'Account']");
     expect(source).toContain("id: 'diagnostics-fixture-account'");
-    expect(source).toContain("buttons: ['Account'], mode: 'menu', overlay: 'options'");
+    expect(source).toContain("buttons: ['Start', 'Settings', 'Account'], mode: 'menu', overlay: 'none'");
+    expect(source).not.toContain("buttons: ['Account'], mode: 'menu', overlay: 'options'");
     expect(source).not.toContain("buttons: ['username', 'Reset progress', 'Sign out']");
     expect(source).toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Trail Shine'");
     expect(source).toContain('evaluateTrailShineChangedStatePersistence({');
