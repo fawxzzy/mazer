@@ -4,6 +4,14 @@ import { dirname, join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { createCaptureOutputDirectory } from '../../scripts/analysis/capture-world-identity-ui-evidence.mjs';
 import {
+  buildLegacyGuideSheetModel,
+  LEGACY_GUIDE_CLOSE_LABEL,
+  LEGACY_GUIDE_ROWS,
+  LEGACY_GUIDE_TITLE
+} from '../../src/legacy-runtime/legacyGuideContent';
+import { buildLegacySettingsSheetModel } from '../../src/legacy-runtime/legacySettingsSheetPlan';
+import {
+  collectGuideTextContainmentIssues,
   collectMenuControlSpacingIssues,
   evaluateAuthWelcomeAnatomy,
   isFixedCardWithoutScroll,
@@ -13,6 +21,7 @@ import {
   hasExpectedTextLabels,
   matchesExpectedTextLabel,
   resolveCaptureTarget,
+  resolveOverlayExitPoint,
   waitForAuthenticatedFixtureReady,
   waitForSurface
 } from '../../scripts/analysis/capture-ui-surfaces.mjs';
@@ -825,7 +834,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('expectedLabels: []');
     expect(source).toContain("hasLabels(surfaces.menu, ['Login']) && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })");
     expect(source).toContain('const closeOverlayToMenu = async (page, timeoutMs) => {');
-    expect(source).toContain("await clickPoint(page, {\n    x: Math.round(bounds.centerX),\n    y: Math.round(bounds.centerY)\n  }, 'Back');");
+    expect(source).toContain("await clickPoint(page, point, 'Back');");
     expect(source).toContain("const pathStyleSurfaceIds = ['menu', 'options', 'play', 'pause'];");
     expect(source).toContain("resolveRouteWithParams(route, { authFixture: 'authenticated' })");
     expect(source).toContain('const openPauseOverlayViaQa = async (page, timeoutMs) => {');
@@ -1045,23 +1054,155 @@ describe('forced auth screen anatomy check (Welcome entry card)', () => {
   });
 });
 
-describe('fixed pause card scroll exemption', () => {
+describe('fixed Settings sheet scroll exemption', () => {
   const panel = { left: 8, top: 8, width: 389, height: 942, right: 397, bottom: 950, centerX: 202.5, centerY: 479 };
   const noScroll = { enabled: false, maxOffset: 0, offset: 0, thumb: null, track: null, viewport: null };
 
-  test('accepts only a pause surface with real card bounds and no scroll viewport', () => {
+  test('accepts a pause or options sheet surface with real card bounds and no scroll viewport', () => {
     expect(isFixedCardWithoutScroll('pause', { overlayUi: { panel, scroll: noScroll } })).toBe(true);
     expect(isFixedCardWithoutScroll('pause-bottom', { overlayUi: { panel, scroll: noScroll } })).toBe(true);
+    expect(isFixedCardWithoutScroll('options', { overlayUi: { panel, scroll: noScroll } })).toBe(true);
+    expect(isFixedCardWithoutScroll('options-bottom', { overlayUi: { panel, scroll: noScroll } })).toBe(true);
   });
 
-  test('fails closed for options, a missing card panel, or a real scroll viewport', () => {
-    expect(isFixedCardWithoutScroll('options', { overlayUi: { panel, scroll: noScroll } })).toBe(false);
+  test('fails closed for other surfaces, a missing card panel, or a real scroll viewport', () => {
+    expect(isFixedCardWithoutScroll('menu', { overlayUi: { panel, scroll: noScroll } })).toBe(false);
+    expect(isFixedCardWithoutScroll('options-guide', { overlayUi: { panel, scroll: noScroll } })).toBe(false);
     expect(isFixedCardWithoutScroll('pause', { overlayUi: { scroll: noScroll } })).toBe(false);
+    expect(isFixedCardWithoutScroll('options', { overlayUi: { scroll: noScroll } })).toBe(false);
     expect(isFixedCardWithoutScroll('pause', undefined)).toBe(false);
-    expect(isFixedCardWithoutScroll('pause', {
-      overlayUi: { panel, scroll: { ...noScroll, viewport: { left: 24, top: 64, width: 357, height: 300, right: 381, bottom: 364, centerX: 202, centerY: 214 } } }
-    })).toBe(false);
-    expect(isFixedCardWithoutScroll('pause', { overlayUi: { panel, scroll: { ...noScroll, enabled: true } } })).toBe(false);
+    for (const id of ['pause', 'options']) {
+      expect(isFixedCardWithoutScroll(id, {
+        overlayUi: { panel, scroll: { ...noScroll, viewport: { left: 24, top: 64, width: 357, height: 300, right: 381, bottom: 364, centerX: 202, centerY: 214 } } }
+      })).toBe(false);
+      expect(isFixedCardWithoutScroll(id, { overlayUi: { panel, scroll: { ...noScroll, enabled: true } } })).toBe(false);
+    }
+  });
+});
+
+// The capture script is plain Node and cannot import the TypeScript plan modules,
+// so its expected labels are literals. These tests are the tie to the plan
+// modules: a renamed or removed Settings row / Guide row / footer fails here
+// instead of leaving a stale expectation in the capture script (the failure mode
+// that left the pre-sheet GUIDE dropdown and docked Sign out bar expectations
+// behind after PR #386).
+describe('capture label expectations stay tied to the Settings and Guide plan modules', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-ui-surfaces.mjs'), 'utf8');
+  const readLabels = (constantName) => {
+    const match = source.match(new RegExp(`const ${constantName} = Object\\.freeze\\(\\[([^\\]]*)\\]\\);`));
+    if (!match) {
+      throw new Error(`Missing ${constantName} in capture-ui-surfaces.mjs`);
+    }
+    return [...match[1].matchAll(/'([^']*)'/g)].map((entry) => entry[1]);
+  };
+  const settingsRowLabels = (signedIn) => buildLegacySettingsSheetModel('menu', { signedIn })
+    .sections.flatMap((section) => section.rows)
+    .filter((row) => row.kind !== 'heading')
+    .map((row) => row.label);
+
+  test('OPTIONS_BASE_EXPECTED_LABELS are all rows of the menu Settings sheet', () => {
+    const labels = readLabels('OPTIONS_BASE_EXPECTED_LABELS');
+    expect(labels.length).toBeGreaterThan(0);
+    const rows = settingsRowLabels(true);
+    for (const label of labels) {
+      expect(rows, `${label} is not a Settings sheet row`).toContain(label);
+    }
+  });
+
+  test('OPTIONS_BOTTOM_EXPECTED_LABELS are all signed-in Account rows, and Sign out only exists when signed in', () => {
+    const labels = readLabels('OPTIONS_BOTTOM_EXPECTED_LABELS');
+    expect(labels).toContain('Sign out');
+    const signedInRows = settingsRowLabels(true);
+    for (const label of labels) {
+      expect(signedInRows, `${label} is not a signed-in Settings sheet row`).toContain(label);
+    }
+    expect(settingsRowLabels(false)).not.toContain('Sign out');
+  });
+
+  test('the Guide entry row label is the Settings row that opens the Guide', () => {
+    const [openRow] = buildLegacySettingsSheetModel('menu').sections
+      .flatMap((section) => section.rows)
+      .filter((row) => row.command?.type === 'OPEN_GUIDE');
+    expect(source).toContain(`const OPTIONS_GUIDE_OPEN_LABEL = '${openRow.label}';`);
+  });
+
+  test('OPTIONS_GUIDE_EXPECTED_LABELS are exactly the Guide title, row headings and footer', () => {
+    const labels = readLabels('OPTIONS_GUIDE_EXPECTED_LABELS');
+    const model = buildLegacyGuideSheetModel('menu');
+    expect(labels).toEqual([
+      LEGACY_GUIDE_TITLE,
+      ...LEGACY_GUIDE_ROWS.map((row) => row.heading),
+      LEGACY_GUIDE_CLOSE_LABEL
+    ]);
+    expect(model.closeLabel).toBe(LEGACY_GUIDE_CLOSE_LABEL);
+    expect(source).toContain(`const OPTIONS_GUIDE_CLOSE_LABEL = '${LEGACY_GUIDE_CLOSE_LABEL}';`);
+  });
+});
+
+describe('Guide sub-view containment', () => {
+  const rect = (left, top, width, height) => ({
+    bottom: top + height, centerX: left + (width / 2), centerY: top + (height / 2), height, left, right: left + width, top, width
+  });
+  const guideSurface = (labels, scroll = { enabled: false, viewport: null }) => ({
+    overlayUi: { guidePanel: rect(24, 130, 357, 700), scroll },
+    textLabels: labels
+  });
+
+  test('skips an absent or skipped surface (viewport-transition proof)', () => {
+    expect(collectGuideTextContainmentIssues('options-guide', undefined)).toEqual([]);
+    expect(collectGuideTextContainmentIssues('options-guide', { skipped: true })).toEqual([]);
+  });
+
+  test('requires the Guide card bounds once the surface was captured', () => {
+    expect(collectGuideTextContainmentIssues('options-guide', { overlayUi: { guidePanel: null }, textLabels: [] }))
+      .toEqual(['options-guide:missing-guide-panel-bounds']);
+  });
+
+  test('passes labels inside the card (the header Close pill sits above it by design) and flags escapes', () => {
+    const inside = { bounds: rect(48, 200, 200, 20), text: 'Goal' };
+    const closePill = { bounds: rect(300, 8, 76, 44), text: 'Close' };
+    expect(collectGuideTextContainmentIssues('options-guide', guideSurface([inside, closePill]))).toEqual([]);
+    const escaped = { bounds: rect(48, 200, 400, 20), text: 'Move' };
+    expect(collectGuideTextContainmentIssues('options-guide', guideSurface([inside, escaped])))
+      .toEqual(['options-guide:Move:outside-guide-panel']);
+  });
+
+  test('when the body scrolls, rows scrolled entirely out of the card are masked rather than flagged', () => {
+    const scrolling = { enabled: true, viewport: rect(40, 190, 320, 480) };
+    const maskedAbove = { bounds: rect(48, 60, 200, 20), text: 'Goal' };
+    expect(collectGuideTextContainmentIssues('options-guide', guideSurface([maskedAbove], scrolling))).toEqual([]);
+    expect(collectGuideTextContainmentIssues('options-guide', guideSurface([maskedAbove]))).toEqual([
+      'options-guide:Goal:outside-guide-panel'
+    ]);
+  });
+});
+
+describe('overlay exit control resolution', () => {
+  const rect = (left, top, width, height) => ({
+    bottom: top + height, centerX: left + (width / 2), centerY: top + (height / 2), height, left, right: left + width, top, width
+  });
+
+  test('prefers the published back affordance', () => {
+    expect(resolveOverlayExitPoint({
+      buttons: [{ bounds: rect(40, 600, 300, 48), text: 'Back to Menu' }],
+      overlayUi: { backChevron: rect(300, 8, 76, 44) }
+    })).toEqual({ x: 338, y: 30 });
+  });
+
+  test('falls back to a labelled Back to Menu row, then a Close pill, when no back affordance is published', () => {
+    expect(resolveOverlayExitPoint({
+      buttons: [{ bounds: rect(300, 8, 76, 44), text: 'Close' }, { bounds: rect(40, 600, 300, 48), text: 'Back to Menu' }],
+      overlayUi: { backChevron: null }
+    })).toEqual({ x: 190, y: 624 });
+    expect(resolveOverlayExitPoint({
+      buttons: [{ bounds: rect(300, 8, 76, 44), text: 'Close' }],
+      overlayUi: {}
+    })).toEqual({ x: 338, y: 30 });
+  });
+
+  test('returns null when the sheet exposes no exit control', () => {
+    expect(resolveOverlayExitPoint({ buttons: [], overlayUi: {} })).toBeNull();
+    expect(resolveOverlayExitPoint(undefined)).toBeNull();
   });
 });
 

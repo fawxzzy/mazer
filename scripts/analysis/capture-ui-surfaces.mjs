@@ -1315,12 +1315,51 @@ export const evaluateAuthWelcomeAnatomy = (surface) => {
   return { failures, pass: failures.length === 0 };
 };
 
+// Settings is ONE shared sheet (menu + pause, PR #386): a title, a `How to play`
+// row that opens the Guide sub-view, a Display group (Board Zoom + toggles) and,
+// in the menu context, an Account section. Every label below is a row label in
+// src/legacy-runtime/legacySettingsSheetPlan.ts; tests/reset/ui-surface-capture-script.test.mjs
+// asserts each one still exists in buildLegacySettingsSheetModel, so a renamed or
+// removed row fails a test instead of silently going stale here. The header
+// affordance (Close pill / `Back to Menu` row) is deliberately NOT listed: it is
+// owned by the sheet header and changes independently of the rows.
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
-  'GUIDE',
+  'How to play',
+  'Board Zoom',
   'Trail Fade',
   'Trail Shine',
   'Animated Background'
 ]);
+
+// The Guide sub-view opened from the `How to play` row (legacyGuideContent.ts).
+// Title, one heading per guide row and the fixed `Got it` footer. Cross-checked
+// against LEGACY_GUIDE_ROWS / LEGACY_GUIDE_TITLE / LEGACY_GUIDE_CLOSE_LABEL by the
+// same test file.
+const OPTIONS_GUIDE_EXPECTED_LABELS = Object.freeze([
+  'How to play',
+  'Goal',
+  'Start',
+  'You',
+  'Move',
+  'Your trail',
+  'Wrap',
+  'Levels',
+  'Got it'
+]);
+const OPTIONS_GUIDE_OPEN_LABEL = 'How to play';
+const OPTIONS_GUIDE_CLOSE_LABEL = 'Got it';
+// The Guide body scrolls on a short viewport and rows scrolled out of the body
+// are not painted, so only the fixed frame (title + `Got it` footer) is
+// guaranteed everywhere; the full row set is required when the body fits.
+const OPTIONS_GUIDE_FRAME_LABELS = Object.freeze([
+  OPTIONS_GUIDE_EXPECTED_LABELS[0],
+  OPTIONS_GUIDE_CLOSE_LABEL
+]);
+export const resolveOptionsGuideRequiredLabels = (surface) => (
+  surface?.overlayUi?.scroll?.enabled === true
+    ? OPTIONS_GUIDE_FRAME_LABELS
+    : OPTIONS_GUIDE_EXPECTED_LABELS
+);
 
 // Pause card (2026-11-06 header/pause lane): title, Resume, Settings (collapsed
 // on every open) and Quit to Menu. There is no Guide card and no inline toggles
@@ -1338,16 +1377,14 @@ const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([
   'Animated Background'
 ]);
 
-// Was ['Account'] until this finding: createLegacyOptionsSessionActionBar
-// (MenuScene.ts) only ever renders a single 'Sign out' action at the bottom
-// of the authenticated Options overlay -- 'Account' lives in a different
-// overlay entirely (buildAuthenticatedAccountSection, reached via the
-// profile/username icon button, semanticAction 'Account'), not at the
-// bottom of Options. tests/scenes/menu-render-frame.test.ts already locks
-// in the sign-out-only bar as intentional. This was a stale expectation
-// from before that split, not a reachability defect -- there is no missing
-// or broken control here, just a check verifying the wrong surface.
+// Account section of the Settings sheet (menu context, signed in): Reset
+// progress and Sign out are plain rows at the end of the sheet body, reached by
+// scrolling only when the viewport is too short for the card. There is no docked
+// session action bar any more (it was replaced by the shared sheet, PR #386);
+// 'Account' lives in a different overlay (the profile/username icon button).
+// Cross-checked against buildLegacySettingsSheetModel('menu', { signedIn: true }).
 const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([
+  'Reset progress',
   'Sign out'
 ]);
 
@@ -1386,17 +1423,64 @@ export const clickStartUntilPlay = async (page, point, { attempts = 6, settleMs 
   throw new Error(`Start did not enter play mode after ${attempts} taps.`);
 };
 
+const clickVisualButton = async (page, label, timeoutMs) => {
+  const diagnostics = await readDiagnostics(page);
+  const point = getVisualButtonPoint(diagnostics.visual, label);
+  if (!point) {
+    throw new Error(`Missing ${label} control (timeout ${timeoutMs}ms).`);
+  }
+  await clickPoint(page, point, label);
+};
+
+const openGuideFromOptions = async (page, timeoutMs) => {
+  await clickVisualButton(page, OPTIONS_GUIDE_OPEN_LABEL, timeoutMs);
+  await waitForSurface(page, {
+    expectedLabels: OPTIONS_GUIDE_FRAME_LABELS,
+    mode: 'menu',
+    overlay: 'options',
+    timeoutMs
+  });
+};
+
+const closeGuideToOptions = async (page, timeoutMs) => {
+  await clickVisualButton(page, OPTIONS_GUIDE_CLOSE_LABEL, timeoutMs);
+  await waitForSurface(page, {
+    expectedLabels: OPTIONS_BASE_EXPECTED_LABELS,
+    mode: 'menu',
+    overlay: 'options',
+    timeoutMs
+  });
+};
+
+// Overlay-exit controls the Settings sheet header may expose, in preference
+// order: the sheet's own back affordance (`backChevron` diagnostics, the Close
+// pill today) and the labelled buttons the header can carry instead (a
+// `Back to Menu` primary row in the menu context). Resolving through the live
+// diagnostics keeps this proof independent of which one a given build ships.
+const OVERLAY_EXIT_BUTTON_LABELS = Object.freeze(['Back to Menu', 'Close']);
+
+export const resolveOverlayExitPoint = (visual) => {
+  const bounds = visual?.overlayUi?.backChevron;
+  if (isFiniteBounds(bounds)) {
+    return { x: Math.round(bounds.centerX), y: Math.round(bounds.centerY) };
+  }
+  for (const label of OVERLAY_EXIT_BUTTON_LABELS) {
+    const point = getVisualButtonPoint(visual, label);
+    if (point) {
+      return point;
+    }
+  }
+  return null;
+};
+
 const closeOverlayToMenu = async (page, timeoutMs) => {
   const diagnostics = await readDiagnostics(page);
-  const bounds = diagnostics.visual?.overlayUi?.backChevron;
-  if (!bounds) {
+  const point = resolveOverlayExitPoint(diagnostics.visual);
+  if (!point) {
     throw new Error('Missing Back control for overlay close.');
   }
 
-  await clickPoint(page, {
-    x: Math.round(bounds.centerX),
-    y: Math.round(bounds.centerY)
-  }, 'Back');
+  await clickPoint(page, point, 'Back');
   await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs });
 };
 
@@ -1638,13 +1722,16 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
   return issues;
 };
 
-// The redesigned pause card (2026-11-06) is a fixed card, not a scroll
-// viewport and not a Guide host: its diagnostics report scroll.enabled=false
-// with a null viewport. That is only accepted for a pause surface that still
-// reports real card panel bounds; options and every other surface keep the
-// strict scroll-viewport requirements.
+// The shared Settings sheet (pause since 2026-11-06, menu Settings since PR #386)
+// is a fixed card whenever its body fits: its diagnostics report
+// scroll.enabled=false with a null viewport (applyLegacySheetScroll clears the
+// rail state). That is only accepted for a sheet surface (options or pause,
+// bottom variants included) that still reports real card panel bounds. When the
+// body does not fit the sheet scrolls and reports enabled=true, which falls
+// through to the strict viewport/track/thumb requirements below. Any other
+// surface keeps the strict scroll-viewport requirements.
 export const isFixedCardWithoutScroll = (surfaceId, surface) => (
-  String(surfaceId).startsWith('pause')
+  /^(pause|options)(-bottom)?$/.test(String(surfaceId))
   && isFiniteBounds(surface?.overlayUi?.panel) === true
   && surface?.overlayUi?.scroll?.enabled !== true
   && (surface?.overlayUi?.scroll?.viewport ?? null) === null
@@ -1842,30 +1929,31 @@ const collectOverlayScrollCueTextIssues = (surfaceId, surface) => {
   });
 };
 
-const isGuideLabel = (text) => [
-  'QUICK PLAY',
-  'Compass',
-  'follow it to the exit',
-  'Start',
-  'begin at gold',
-  'Exit',
-  'finish at red'
-].includes(text);
-
-const collectGuideTextContainmentIssues = (surfaceId, surface) => {
-  const guide = surface?.overlayUi?.guidePanel;
-  if (!isFiniteBounds(guide)) {
-    // Pause has no Guide card (pause-text-labels asserts no GUIDE label).
-    return surface?.skipped === true || String(surfaceId).startsWith('pause')
-      ? []
-      : [`${surfaceId}:missing-guide-panel-bounds`];
+// The Guide is a sub-view of the Settings sheet (PR #386): `guidePanel` is the
+// guide card and only exists while the Guide is open. The captured Guide surface
+// must therefore report it, and every label on it except the header Close pill
+// (which sits above the card by design) must stay inside the card. When the
+// guide body scrolls (short viewports) rows scrolled entirely out of the card
+// are masked, so only labels that overlap the card vertically are judged.
+export const collectGuideTextContainmentIssues = (surfaceId, surface) => {
+  if (!surface || surface.skipped === true) {
+    return [];
   }
+  const guide = surface.overlayUi?.guidePanel;
+  if (!isFiniteBounds(guide)) {
+    return [`${surfaceId}:missing-guide-panel-bounds`];
+  }
+  const scroll = surface.overlayUi?.scroll;
+  const scrollViewport = scroll?.enabled === true && isFiniteBounds(scroll.viewport) ? scroll.viewport : null;
   return collectTextLabelEntries(surface)
-    .filter((entry) => isGuideLabel(String(entry?.text ?? '')))
+    .filter((entry) => String(entry?.text ?? '') !== 'Close')
     .flatMap((entry) => {
       const bounds = entry?.bounds;
       if (!isFiniteBounds(bounds)) {
         return [`${surfaceId}:${entry?.text ?? 'unknown'}:missing-guide-label-bounds`];
+      }
+      if (scrollViewport !== null && (bounds.bottom <= guide.top || bounds.top >= guide.bottom)) {
+        return [];
       }
       const edgeTolerance = 1.5;
       return bounds.left < guide.left - edgeTolerance
@@ -2014,6 +2102,7 @@ const buildSurfaceChecks = ({
     ...collectTextBoundsIssues('auth', surfaces.auth, viewport),
     ...collectTextBoundsIssues('options', surfaces.options, viewport),
     ...collectTextBoundsIssues('options-bottom', surfaces.optionsBottom, viewport),
+    ...collectTextBoundsIssues('options-guide', surfaces.optionsGuide, viewport),
     ...collectTextBoundsIssues('play', surfaces.play, viewport),
     ...collectTextBoundsIssues('pause', surfaces.pause, viewport),
     ...collectTextBoundsIssues('pause-bottom', surfaces.pauseBottom, viewport)
@@ -2023,6 +2112,7 @@ const buildSurfaceChecks = ({
     ...collectNativeInputBoundsIssues('auth', surfaces.auth, viewport),
     ...collectNativeInputBoundsIssues('options', surfaces.options, viewport),
     ...collectNativeInputBoundsIssues('options-bottom', surfaces.optionsBottom, viewport),
+    ...collectNativeInputBoundsIssues('options-guide', surfaces.optionsGuide, viewport),
     ...collectNativeInputBoundsIssues('play', surfaces.play, viewport),
     ...collectNativeInputBoundsIssues('pause', surfaces.pause, viewport),
     ...collectNativeInputBoundsIssues('pause-bottom', surfaces.pauseBottom, viewport)
@@ -2032,6 +2122,7 @@ const buildSurfaceChecks = ({
     ...collectTextOverlapIssues('auth', surfaces.auth),
     ...collectTextOverlapIssues('options', surfaces.options),
     ...collectTextOverlapIssues('options-bottom', surfaces.optionsBottom),
+    ...collectTextOverlapIssues('options-guide', surfaces.optionsGuide),
     ...collectTextOverlapIssues('play', surfaces.play),
     ...collectTextOverlapIssues('pause', surfaces.pause),
     ...collectTextOverlapIssues('pause-bottom', surfaces.pauseBottom)
@@ -2061,6 +2152,7 @@ const buildSurfaceChecks = ({
     ...collectButtonLabelContainmentIssues('auth', surfaces.auth),
     ...collectButtonLabelContainmentIssues('options', surfaces.options),
     ...collectButtonLabelContainmentIssues('options-bottom', surfaces.optionsBottom),
+    ...collectButtonLabelContainmentIssues('options-guide', surfaces.optionsGuide),
     ...collectButtonLabelContainmentIssues('play', surfaces.play),
     ...collectButtonLabelContainmentIssues('pause', surfaces.pause),
     ...collectButtonLabelContainmentIssues('pause-bottom', surfaces.pauseBottom)
@@ -2075,8 +2167,7 @@ const buildSurfaceChecks = ({
     ...collectButtonLabelFillIssues('pause-bottom', surfaces.pauseBottom)
   ];
   const guideTextContainmentIssues = [
-    ...collectGuideTextContainmentIssues('options', surfaces.options),
-    ...collectGuideTextContainmentIssues('pause', surfaces.pause)
+    ...collectGuideTextContainmentIssues('options-guide', surfaces.optionsGuide)
   ];
   const wrapTopologyDiagnosticIssues = requireTopologyDiagnostics ? [
     ...collectWrapTopologyDiagnosticIssues('menu', surfaces.menu, { requirePairs: requireWrapPairs }),
@@ -2202,6 +2293,15 @@ const buildSurfaceChecks = ({
       hasLabels(surfaces.options, OPTIONS_BASE_EXPECTED_LABELS)
         && !hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale']),
       `labels=${labelDetail(surfaces.options)}`
+    ),
+    createCheck(
+      'options-guide-text-labels',
+      !includeOverlayBottom
+        ? surfaces.optionsGuide?.skipped === true
+        : hasLabels(surfaces.optionsGuide, resolveOptionsGuideRequiredLabels(surfaces.optionsGuide)),
+      !includeOverlayBottom
+        ? 'skipped for viewport-transition proof'
+        : `labels=${labelDetail(surfaces.optionsGuide)}`
     ),
     createCheck(
       'auth-text-labels',
@@ -2423,6 +2523,10 @@ const buildMarkdownReport = (summary) => {
     summary.screenshots.optionsBottom
       ? `![Settings bottom](${summary.screenshots.optionsBottom})`
       : '_Settings bottom capture skipped because the menu is auth-gated in the captured session._',
+    '',
+    summary.screenshots.optionsGuide
+      ? `![Settings guide](${summary.screenshots.optionsGuide})`
+      : '_Settings guide capture skipped for the viewport-transition proof._',
     '',
     `![Play](${summary.screenshots.play})`,
     '',
@@ -2795,6 +2899,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const menuButtons = getMenuButtonPoints(currentMenuDiagnostics.visual);
     await waitForVisualBuildSettled(page, { timeoutMs });
     let optionsBottomSurface = null;
+    let optionsGuideSurface = null;
     currentStep = '02-options';
     const optionsSurface = await (async () => {
         await waitForVisualBuildSettled(page, { timeoutMs });
@@ -2825,6 +2930,28 @@ export const runUiSurfaceCapture = async (options = {}) => {
             id: '02-options', mode: 'menu', overlay: 'options', page, route, timeoutMs, transition
           })
           : null;
+        // The Guide is a sub-view of the Settings sheet: open it through the real
+        // `How to play` row, capture it, then return through its `Got it` footer.
+        // This runs BEFORE the scroll-to-bottom capture below: on a short viewport
+        // the sheet scrolls and the `How to play` row is only on screen at the top.
+        if (transition) {
+          optionsGuideSurface = { diagnostics: { runtime: null, visual: null }, nativeInputs: [], screenContract: null, skipped: true };
+        } else {
+          currentStep = '02-options-guide';
+          await openGuideFromOptions(page, timeoutMs);
+          optionsGuideSurface = await captureSurface({
+            page,
+            outputDir,
+            expectedLabels: OPTIONS_GUIDE_FRAME_LABELS,
+            id: '02-options-guide',
+            mode: 'menu',
+            overlay: 'options',
+            route,
+            timeoutMs,
+            viewport
+          });
+          await closeGuideToOptions(page, timeoutMs);
+        }
         if (transition) {
           optionsBottomSurface = {
             diagnostics: { runtime: null, visual: null },
@@ -2856,6 +2983,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
     completedSteps.push('02-options');
     if (!transition) {
       completedSteps.push('02-options-bottom');
+      completedSteps.push('02-options-guide');
     }
 
     const playRoute = authGatedMenu
@@ -3012,6 +3140,18 @@ export const runUiSurfaceCapture = async (options = {}) => {
         screenContract: optionsBottomSurface.screenContract,
         materialSystem: optionsBottomSurface.diagnostics.visual?.materialSystem
       },
+      optionsGuide: {
+        skipped: optionsGuideSurface.skipped === true,
+        reason: optionsGuideSurface.reason ?? null,
+        mode: optionsGuideSurface.diagnostics.visual?.runtime?.mode ?? optionsGuideSurface.diagnostics.runtime?.surface?.mode,
+        overlay: optionsGuideSurface.diagnostics.visual?.runtime?.overlay ?? optionsGuideSurface.diagnostics.runtime?.surface?.overlay,
+        overlayUi: optionsGuideSurface.diagnostics.visual?.overlayUi,
+        buttons: optionsGuideSurface.diagnostics.visual?.buttons,
+        nativeInputs: optionsGuideSurface.nativeInputs,
+        textLabels: optionsGuideSurface.diagnostics.visual?.textLabels,
+        screenContract: optionsGuideSurface.screenContract,
+        materialSystem: optionsGuideSurface.diagnostics.visual?.materialSystem
+      },
       play: {
         mode: play.diagnostics.visual?.runtime?.mode ?? play.diagnostics.runtime?.surface?.mode,
         overlay: play.diagnostics.visual?.runtime?.overlay ?? play.diagnostics.runtime?.surface?.overlay,
@@ -3061,6 +3201,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       auth: authSurface.screenshotPath,
       options: optionsSurface.screenshotPath,
       optionsBottom: optionsBottomSurface?.screenshotPath ?? null,
+      optionsGuide: optionsGuideSurface?.screenshotPath ?? null,
       play: play.screenshotPath,
       pause: pause.screenshotPath,
       pauseBottom: pauseBottomSurface.screenshotPath

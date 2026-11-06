@@ -18,6 +18,8 @@ import {
   resolveEdgeMarkerVertices,
   resolveEdgeStationPosition,
   resolveEdgeStations,
+  resolveOrbitingEdgeStation,
+  resolveOrbitingEdgeStations,
   resolveEdgeBeamProgress,
   resolveEdgeBeams,
   resolveWrapEndStationIds,
@@ -32,6 +34,8 @@ import {
   INTRO_BEAM_STAGGER_MS,
   INTRO_LASER_END_MS,
   INTRO_LASER_MS,
+  INTRO_REVEAL_START_MS,
+  OUTRO_TILES_START_MS,
   RING_ENERGY_FADE_MS,
   resolveIntro,
   resolveIntroDeconstruct,
@@ -73,9 +77,9 @@ describe('edge marker stations', () => {
         right: viewport.width - (Math.max(...vertices.map((vertex) => vertex.x)) + 0.5)
       };
       expect(gaps[station.side], `station ${station.id} gap to ${station.side}`).toBeCloseTo(0, 9);
-      // Any rotation stays within the max extent of the centre.
+      // Any orientation stays within the max extent of the centre.
       for (let degrees = 0; degrees < 360; degrees += 15) {
-        for (const vertex of resolveEdgeMarkerVertices(station, 1, (degrees * Math.PI) / 180)) {
+        for (const vertex of resolveEdgeMarkerVertices({ ...station, inwardAngle: (degrees * Math.PI) / 180 }, 1)) {
           expect(Math.hypot(vertex.x - station.x, vertex.y - station.y)).toBeLessThanOrEqual(EDGE_MARKER_MAX_EXTENT_PX + 1e-9);
         }
       }
@@ -594,39 +598,207 @@ describe('ring lighting and spin over the intro / outro timelines (per frame)', 
     expect(restRecorder.lineColors.every((color) => color === cyberArcadeMaterial.rail.cyan)).toBe(true);
   });
 
-  test('spin: whole turns tied to the intro and outro timelines, exactly the rest orientation at both ends', () => {
+  test('orbit phase: parked while the beams fly, then one full lap (build clockwise, deconstruct counter-clockwise), exactly 0 at both ends', () => {
     const introEnd = resolveIntroRevealEndMs(TILES);
     const outroEnd = resolveOutroTotalMs(TILES);
     const cases = [
-      { label: 'intro', startMs: 100, end: introEnd, spinAt: (ms: number) => resolveIntro(ms, FULL).ringSpinRad },
-      { label: 'outro', startMs: 0, end: outroEnd, spinAt: (ms: number) => resolveIntroDeconstruct(ms, FULL).ringSpinRad }
+      { label: 'intro', startMs: INTRO_REVEAL_START_MS, end: introEnd, sign: 1, phaseAt: (ms: number) => resolveIntro(ms, FULL).ringSpinRad },
+      { label: 'outro', startMs: OUTRO_TILES_START_MS, end: outroEnd, sign: -1, phaseAt: (ms: number) => resolveIntroDeconstruct(ms, FULL).ringSpinRad }
     ];
-    for (const { label, startMs, end, spinAt } of cases) {
-      expect(spinAt(startMs), label).toBe(0);
-      expect(spinAt(end), label).toBe(0);
-      expect(spinAt(end + 5000), label).toBe(0);
+    for (const { label, startMs, end, sign, phaseAt } of cases) {
+      // Parked (an exact 0 -> the rest layout) for the whole beam flight, so every beam fires from / lands on a rest station.
+      for (let ms = 0; ms <= startMs; ms += 1) {
+        expect(phaseAt(ms), `${label} t=${ms}`).toBe(0);
+      }
+      expect(phaseAt(end), label).toBe(0);
+      expect(phaseAt(end + 5000), label).toBe(0);
       let previous = 0;
       let peak = 0;
-      for (let ms = startMs; ms < end; ms += 1) {
-        const spin = spinAt(ms);
-        expect(spin, `${label} t=${ms}`).toBeGreaterThanOrEqual(previous - 1e-12);
-        expect(spin).toBeLessThanOrEqual((Math.PI * 2) + 1e-9);
-        previous = spin;
-        peak = Math.max(peak, spin);
+      for (let ms = startMs + 1; ms < end; ms += 1) {
+        const phase = sign * phaseAt(ms);
+        expect(phase, `${label} t=${ms}`).toBeGreaterThan(previous - 1e-12);
+        expect(phase).toBeLessThanOrEqual((Math.PI * 2) + 1e-9);
+        previous = phase;
+        peak = Math.max(peak, phase);
       }
-      // It really turns (about a full lap by the end) and lands on a whole number of turns.
+      // It travels a full lap by the end of the window and lands on a whole number of laps.
       expect(peak).toBeGreaterThan(Math.PI * 2 * 0.99);
-      const station = resolveEdgeStations({ width: 390, height: 844 })[0] as EdgeStationLike & { inwardAngle: number };
-      const rested = resolveEdgeMarkerVertices(station, 1, spinAt(end));
-      resolveEdgeMarkerVertices(station).forEach((vertex, index) => {
-        expect(rested[index]?.x).toBeCloseTo(vertex.x, 9);
-        expect(rested[index]?.y).toBeCloseTo(vertex.y, 9);
+      const viewport = { width: 390, height: 844 };
+      expect(resolveOrbitingEdgeStations(viewport, phaseAt(end))).toEqual(resolveEdgeStations(viewport));
+      // The window is the ~2-3.2 s reveal / ~2.1-3.3 s deconstruct.
+      expect(end - startMs).toBeGreaterThanOrEqual(2000);
+      expect(end - startMs).toBeLessThanOrEqual(3300);
+    }
+  });
+});
+
+describe('diamond orbit: the ring circulates along the viewport perimeter', () => {
+  const ORBIT_VIEWPORTS = [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+    { width: 1280, height: 720 }
+  ] as const;
+  const STEP = (Math.PI * 2) / EDGE_STATION_COUNT;
+
+  test.each(ORBIT_VIEWPORTS)('phase 0 is exactly the fixed layout at $width x $height (same ids, same numbers)', (viewport) => {
+    expect(resolveOrbitingEdgeStations(viewport, 0)).toEqual(resolveEdgeStations(viewport));
+    expect(resolveOrbitingEdgeStations(viewport, Math.PI * 2)).toEqual(resolveEdgeStations(viewport));
+    expect(resolveOrbitingEdgeStations(viewport, -Math.PI * 2)).toEqual(resolveEdgeStations(viewport));
+  });
+
+  test.each(ORBIT_VIEWPORTS)('after k whole steps diamond i is EXACTLY on rest station i+k at $width x $height', (viewport) => {
+    const rest = resolveEdgeStations(viewport);
+    for (let k = -9; k <= 9; k += 1) {
+      const orbit = resolveOrbitingEdgeStations(viewport, k * STEP);
+      orbit.forEach((station, index) => {
+        const target = rest[(((index + k) % 8) + 8) % 8] as (typeof rest)[number];
+        expect(station.id).toBe(index);
+        expect({ ...station, id: target.id }).toEqual(target);
       });
     }
-    // Mid-spin the kite is genuinely rotated.
-    const station = resolveEdgeStations({ width: 390, height: 844 })[1] as EdgeStationLike & { inwardAngle: number };
-    const mid = resolveEdgeMarkerVertices(station, 1, Math.PI / 2);
-    expect(mid[0]?.x).not.toBeCloseTo(resolveEdgeMarkerVertices(station)[0]?.x ?? 0, 3);
+  });
+
+  test('pure: same viewport and phase give the same stations, and a positive phase is clockwise', () => {
+    const viewport = { width: 390, height: 844 };
+    expect(resolveOrbitingEdgeStations(viewport, 0.7)).toEqual(resolveOrbitingEdgeStations(viewport, 0.7));
+    expect(resolveOrbitingEdgeStations.length).toBe(2);
+    const rest = resolveEdgeStations(viewport);
+    const early = resolveOrbitingEdgeStations(viewport, STEP * 0.25);
+    // Top midpoint -> toward the top-right corner; right midpoint -> down; bottom midpoint -> left; left midpoint -> up.
+    expect((early[1] as { x: number }).x).toBeGreaterThan((rest[1] as { x: number }).x);
+    expect((early[3] as { y: number }).y).toBeGreaterThan((rest[3] as { y: number }).y);
+    expect((early[5] as { x: number }).x).toBeLessThan((rest[5] as { x: number }).x);
+    expect((early[7] as { y: number }).y).toBeLessThan((rest[7] as { y: number }).y);
+    // Negative phase is counter-clockwise (the exact mirror direction).
+    const back = resolveOrbitingEdgeStations(viewport, -STEP * 0.25);
+    expect((back[1] as { x: number }).x).toBeLessThan((rest[1] as { x: number }).x);
+    expect((back[3] as { y: number }).y).toBeLessThan((rest[3] as { y: number }).y);
+  });
+
+  test.each(ORBIT_VIEWPORTS)('no kite vertex (plus half a stroke) ever leaves the viewport at any phase at $width x $height; top/bottom travel is flush', (viewport) => {
+    let flushSamples = 0;
+    for (let index = 0; index <= 2400; index += 1) {
+      const phase = (index / 2400) * Math.PI * 2;
+      for (const station of resolveOrbitingEdgeStations(viewport, phase)) {
+        const vertices = resolveEdgeMarkerVertices(station);
+        const minX = Math.min(...vertices.map((vertex) => vertex.x)) - 0.5;
+        const maxX = Math.max(...vertices.map((vertex) => vertex.x)) + 0.5;
+        const minY = Math.min(...vertices.map((vertex) => vertex.y)) - 0.5;
+        const maxY = Math.max(...vertices.map((vertex) => vertex.y)) + 0.5;
+        const label = `phase ${phase} id ${station.id}`;
+        expect(minX, label).toBeGreaterThanOrEqual(-1e-9);
+        expect(minY, label).toBeGreaterThanOrEqual(-1e-9);
+        expect(maxX, label).toBeLessThanOrEqual(viewport.width + 1e-9);
+        expect(maxY, label).toBeLessThanOrEqual(viewport.height + 1e-9);
+        if (station.side === 'top') {
+          expect(minY, label).toBeCloseTo(0, 9);
+          flushSamples += 1;
+        }
+        if (station.side === 'bottom') {
+          expect(viewport.height - maxY, label).toBeCloseTo(0, 9);
+          flushSamples += 1;
+        }
+      }
+    }
+    expect(flushSamples).toBeGreaterThan(2000);
+  }, 30_000);
+
+  test.each(ORBIT_VIEWPORTS)('the path is continuous (no teleporting, angle swings smoothly through the corners) at $width x $height', (viewport) => {
+    const samples = 2000;
+    let previous = resolveOrbitingEdgeStations(viewport, 0);
+    // Longest rest-to-rest hop of any diamond, in px, divided by the steps it spans: bounds one sample's travel.
+    const longest = Math.max(viewport.width, viewport.height);
+    for (let index = 1; index <= samples; index += 1) {
+      const current = resolveOrbitingEdgeStations(viewport, (index / samples) * Math.PI * 2);
+      current.forEach((station, id) => {
+        const before = previous[id] as (typeof previous)[number];
+        const travelled = Math.hypot(station.x - before.x, station.y - before.y);
+        expect(travelled, `id ${id} sample ${index}`).toBeLessThan((longest * 8) / samples);
+        // Orientation is unwrapped: it always advances ~ pi/4 per station step, never flips.
+        let turn = station.inwardAngle - before.inwardAngle;
+        turn -= Math.round(turn / (Math.PI * 2)) * Math.PI * 2;
+        expect(turn, `id ${id} sample ${index}`).toBeGreaterThan(0);
+        expect(turn).toBeLessThan(((Math.PI * 2) / samples) * 2 + 1e-9);
+      });
+      previous = current;
+    }
+  }, 30_000);
+
+  test('orientation: diagonal at a corner, the pure edge normal at a side midpoint, next corner diagonal (inward)', () => {
+    const viewport = { width: 390, height: 844 };
+    const at = (id: number, steps: number) => resolveOrbitingEdgeStation(viewport, id as 0, steps * STEP + 1e-6);
+    const angle = (id: number, steps: number): number => at(id, steps).inwardAngle;
+    const near = (value: number, expected: number): void => {
+      const delta = (((value - expected) % (Math.PI * 2)) + (Math.PI * 3)) % (Math.PI * 2) - Math.PI;
+      expect(Math.abs(delta)).toBeLessThan(1e-4);
+    };
+    near(angle(0, 0), Math.PI / 4);
+    near(angle(0, 1), Math.PI / 2);
+    near(angle(0, 2), (3 * Math.PI) / 4);
+    near(angle(0, 3), Math.PI);
+    near(angle(0, 5), -Math.PI / 2);
+    near(angle(0, 7), 0);
+    // Midway between a corner and a midpoint it is 22.5 degrees off the normal.
+    near(resolveOrbitingEdgeStation(viewport, 0, STEP * 0.5).inwardAngle, (3 * Math.PI) / 8);
+  });
+
+  test('the diamonds draw ON the orbit: drawEdgeMarkers places each kite at its state phase, rest at phase 0, nothing in reduced motion', () => {
+    const viewport = { width: 390, height: 844 };
+    const rest = resolveEdgeStations(viewport);
+    const firstVertex = (recorder: Recorder, kite: number): { x: number; y: number } => {
+      // each outline contributes 1 moveTo + 3 lineTo; the unlit outline is the only polygon drawn
+      const point = recorder.points[kite * 4] as { x: number; y: number };
+      return point;
+    };
+    const phase = STEP * 0.6;
+    const states = resolveEdgeMarkerStates({ reducedMotion: false, spinRad: phase, timeMs: 0 });
+    const moving = makeRecorder();
+    drawEdgeMarkers(moving, rest, states);
+    const expected = resolveOrbitingEdgeStations(viewport, phase);
+    expected.forEach((station, index) => {
+      const tip = resolveEdgeMarkerVertices(station)[0] as { x: number; y: number };
+      expect(firstVertex(moving, index).x).toBeCloseTo(tip.x, 6);
+      expect(firstVertex(moving, index).y).toBeCloseTo(tip.y, 6);
+    });
+    // Phase 0 draws the rest kites untouched.
+    const parked = makeRecorder();
+    drawEdgeMarkers(parked, rest, resolveEdgeMarkerStates({ reducedMotion: false, timeMs: 0 }));
+    rest.forEach((station, index) => {
+      expect(firstVertex(parked, index)).toEqual(resolveEdgeMarkerVertices(station)[0]);
+    });
+    // Reduced motion: phase forced to 0 -> static.
+    const reduced = makeRecorder();
+    drawEdgeMarkers(reduced, rest, resolveEdgeMarkerStates({ reducedMotion: true, spinRad: phase, timeMs: 0 }));
+    expect(reduced.points).toEqual(parked.points);
+  });
+
+  test('beams fire from / to each diamond\'s CURRENT (moving) position, all 8', () => {
+    const viewport = { width: 390, height: 844 };
+    const stations = resolveOrbitingEdgeStations(viewport, STEP * 2.3);
+    const focus = { x: 200, y: 400 };
+    const inward = resolveEdgeBeams({ direction: 'inward', focus, laserProgress: 0.5, spawnPop: 0, stations });
+    const outward = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 0.5, spawnPop: 0, stations });
+    expect(inward.beams).toHaveLength(8);
+    stations.forEach((station, index) => {
+      expect(inward.beams[index]?.from).toEqual({ x: station.x, y: station.y });
+      expect(outward.beams[index]?.to).toEqual({ x: station.x, y: station.y });
+    });
+  });
+
+  test('the orbit never overlaps the beam flight: laserProgress < 1 only while the phase is exactly 0', () => {
+    for (const tileCount of [40, 300, 900]) {
+      const options = { reducedMotion: false, tileCount } as const;
+      for (let ms = 0; ms < 6000; ms += 1) {
+        const intro = resolveIntro(ms, options);
+        if (intro.laserProgress < 1) {
+          expect(intro.ringSpinRad, `intro n=${tileCount} t=${ms}`).toBe(0);
+        }
+        const outro = resolveIntroDeconstruct(ms, options);
+        if (outro.laserProgress < 1) {
+          expect(outro.ringSpinRad, `outro n=${tileCount} t=${ms}`).toBe(0);
+        }
+      }
+    }
   });
 });
 
@@ -636,6 +808,7 @@ interface Recorder extends EdgeGraphics {
   lineColors: number[];
   circles: Array<{ x: number; y: number; radius: number }>;
   lineBetweenCount: number;
+  points: Array<{ x: number; y: number }>;
 }
 
 function makeRecorder(): Recorder {
@@ -645,11 +818,12 @@ function makeRecorder(): Recorder {
     lineColors: [],
     circles: [],
     lineBetweenCount: 0,
+    points: [],
     fillStyle() { recorder.calls.push('fillStyle'); },
     lineStyle(width: number, color: number) { recorder.calls.push('lineStyle'); recorder.lineWidths.push(width); recorder.lineColors.push(color); },
     beginPath() { recorder.calls.push('beginPath'); },
-    moveTo() { recorder.calls.push('moveTo'); },
-    lineTo() { recorder.calls.push('lineTo'); },
+    moveTo(x: number, y: number) { recorder.calls.push('moveTo'); recorder.points.push({ x, y }); },
+    lineTo(x: number, y: number) { recorder.calls.push('lineTo'); recorder.points.push({ x, y }); },
     closePath() { recorder.calls.push('closePath'); },
     fillPath() { recorder.calls.push('fillPath'); },
     strokePath() { recorder.calls.push('strokePath'); },

@@ -22,7 +22,9 @@
  *     complete -> input unlocked again, via real accepted moves only;
  *   - reduced motion: no beams at all, nothing lights up, 250 ms unlock;
  *   - compact/touch layout: the same, with the diamonds inside a 390x844 viewport;
- *   - the ring of 8 diamonds stays calm (never drifts) through the transfer;
+ *   - the ring of 8 diamonds is parked on its stations while any beam fires, circulates the
+ *     perimeter during the build/deconstruct lap, and is exactly back on its stations at the end
+ *     (static in reduced motion);
  *   - pause freezes the beams, the intro/outro clocks and the coupled maze
  *     lifecycle, and resume neither races ahead nor loses the intro time;
  *   - ordinary movement is LOCKED through every maze build (plus negative controls).
@@ -94,8 +96,12 @@ const OUTRO_LASER_END_MS = 400;
 const ALL_STATION_IDS = [0, 1, 2, 3, 4, 5, 6, 7];
 // A diamond counts as lit when its stroke alpha is above the idle breathing maximum (0.6).
 const LIT_ALPHA_FLOOR = 0.62;
-// Spinning kites may clip the screen edge by at most (10.5 - 7.57) px at the corners.
-const SPIN_CLIP_TOLERANCE_PX = 3.5;
+// The diamond ring ORBITS the viewport perimeter (resolveOrbitingEdgeStations) and never leaves the viewport at any phase.
+// Vertices are compared without their half-pixel stroke, so a flush kite sits at 0.5 px; allow a hair of float slack only.
+const ORBIT_CLIP_TOLERANCE_PX = 0.01;
+// The ring is parked (exact rest layout) while beams fly and after the lap; it must visibly travel in between.
+const RING_PARKED_TOLERANCE_PX = 0.5;
+const RING_MIN_TRAVEL_PX = 20;
 
 const sameList = (a, b) => a.length === b.length && a.every((value, index) => value === b[index]);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -188,7 +194,7 @@ const installHarness = (page) => page.evaluate(() => {
       lit: edge.frame.map((marker, index) => (marker.alpha > 0.62 ? index : null)).filter((index) => index !== null),
       tiles: scene.menuStaticDrawTileOrder.length,
       markerCount: edge.frame.length,
-      // Kite centroid (the tip moves while the ring spins; the centre must not).
+      // Kite centroid (the ring orbits the perimeter, so it moves during the intro/outro lap and is exactly parked otherwise).
       ring: edge.frame.map((marker) => (marker.vertices.length === 0 ? null : { x: marker.vertices.reduce((s, v) => s + v.x, 0) / marker.vertices.length, y: marker.vertices.reduce((s, v) => s + v.y, 0) / marker.vertices.length })),
       markerBounds: (() => {
         const all = edge.frame.flatMap((marker) => marker.vertices);
@@ -432,8 +438,10 @@ const findUnlock = (frames) => {
   return { age: frames[index].introAge, previousLocked: index === 0 ? true : frames[index - 1].locked, index };
 };
 
-const ringDrift = (frames) => {
-  const base = frames.find((f) => f.ring.length === 8 && f.ring.every(Boolean));
+const ringBase = (frames) => frames.find((f) => f.ring.length === 8 && f.ring.every(Boolean));
+
+/** Max distance any diamond centroid in `frames` is from its centroid in `base` (the rest layout frame). */
+const ringDriftFrom = (base, frames) => {
   if (!base) { return Number.POSITIVE_INFINITY; }
   let max = 0;
   for (const f of frames) {
@@ -446,8 +454,8 @@ const ringDrift = (frames) => {
 
 const markersInsideViewport = (frame, viewport) => (
   frame.markerCount === 8 && frame.markerBounds !== null
-  && frame.markerBounds.minX >= -SPIN_CLIP_TOLERANCE_PX && frame.markerBounds.minY >= -SPIN_CLIP_TOLERANCE_PX
-  && frame.markerBounds.maxX <= viewport.width + SPIN_CLIP_TOLERANCE_PX && frame.markerBounds.maxY <= viewport.height + SPIN_CLIP_TOLERANCE_PX
+  && frame.markerBounds.minX >= -ORBIT_CLIP_TOLERANCE_PX && frame.markerBounds.minY >= -ORBIT_CLIP_TOLERANCE_PX
+  && frame.markerBounds.maxX <= viewport.width + ORBIT_CLIP_TOLERANCE_PX && frame.markerBounds.maxY <= viewport.height + ORBIT_CLIP_TOLERANCE_PX
 );
 
 const MOVE_FOR_DELTA = {
@@ -648,7 +656,7 @@ const assertArrival = (label, frames, stations, { reducedMotion = false, viewpor
     JSON.stringify(unlock)
   );
   if (viewport !== null) {
-    check(`${label}: all 8 diamonds stay inside the ${viewport.width}x${viewport.height} viewport (flush at rest, at most ${SPIN_CLIP_TOLERANCE_PX} px clipped while spinning) while the beams fire`, buildFrames.filter((f) => f.firing.length > 0).every((f) => markersInsideViewport(f, viewport)), JSON.stringify(buildFrames.find((f) => f.firing.length > 0)?.markerBounds));
+    check(`${label}: all 8 diamonds stay inside the ${viewport.width}x${viewport.height} viewport (parked on the rest stations while the beams fire) while the beams fire`, buildFrames.filter((f) => f.firing.length > 0).every((f) => markersInsideViewport(f, viewport)), JSON.stringify(buildFrames.find((f) => f.firing.length > 0)?.markerBounds));
   }
 };
 
@@ -699,8 +707,17 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
     handoffMs !== null && handoffMs <= outroTotalMs(frames[outroIndex]?.tiles ?? 0) + (FRAME_MS * 3),
     `handoffMs=${handoffMs}`
   );
-  const drift = ringDrift(frames);
-  check(`${label}: the ring of 8 diamonds holds its stations through the whole transfer (max drift <= 3 px)`, drift <= 3, `maxDrift=${drift}`);
+  const base = ringBase(frames);
+  const drift = ringDriftFrom(base, frames);
+  const parkedDrift = ringDriftFrom(base, frames.filter((f) => f.firing.length > 0));
+  const finalDrift = ringDriftFrom(base, frames.slice(-1));
+  if (reducedMotion) {
+    check(`${label}: reduced motion keeps the ring of 8 diamonds static through the whole transfer (max drift <= ${RING_PARKED_TOLERANCE_PX} px)`, drift <= RING_PARKED_TOLERANCE_PX, `maxDrift=${drift}`);
+  } else {
+    check(`${label}: the ring of 8 diamonds circulates the perimeter during the build/deconstruct lap (max travel >= ${RING_MIN_TRAVEL_PX} px)`, drift >= RING_MIN_TRAVEL_PX, `maxDrift=${drift}`);
+    check(`${label}: the ring is parked on its stations while any beam fires (drift <= ${RING_PARKED_TOLERANCE_PX} px)`, parkedDrift <= RING_PARKED_TOLERANCE_PX, `parkedDrift=${parkedDrift}`);
+    check(`${label}: the ring is back exactly on its stations when the transfer completes (drift <= ${RING_PARKED_TOLERANCE_PX} px)`, finalDrift <= RING_PARKED_TOLERANCE_PX, `finalDrift=${finalDrift}`);
+  }
 
   // The ring lighting fades over 150 ms and the goal pulse runs 250 ms after the reveal: let both finish.
   await h.stepN(40);
