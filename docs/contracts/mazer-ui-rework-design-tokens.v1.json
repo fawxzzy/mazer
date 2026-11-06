@@ -9,6 +9,7 @@
     "single-canonical-theme",
     "renderer-ownership-split"
   ],
+  "evidenceRef": "docs/contracts/mazer-ui-rework-design-tokens-evidence.v1.json",
   "notes": "Wave 1B ('Tokens/theme/profile aliases') establishes one shared Fawxzzy Precision Arcade token source. Phaser consumes numeric aliases from src/theme/tokens.ts; the live DOM shell imports src/theme/tokens.css exactly once through src/styles/base.css. Archived query aliases normalize to the canonical theme without becoming public themes. Offline ambient maze-family scheduling remains a separate variety concept. This integration is presentation-only: maze topology, progression, input, collision, persistence, and lifecycle behavior remain outside the token contract.",
   "cssVariablePrefix": "--mazer-token-",
   "tokens": {
@@ -27,6 +28,11 @@
       "semantic.reward": "#F4C84A",
       "semantic.danger": "#FF405D",
       "semantic.anomaly": "#AF79FF",
+      "tone.success": "#72E0BF",
+      "tone.warning": "#FFCF91",
+      "tone.error": "#FF7D7D",
+      "tone.info": "#B7F2FF",
+      "overlay.scrim": "#02040A",
       "text.primary": "#F1FAF6",
       "text.muted": "#94AAA8",
       "text.disabled": "#5D7478"
@@ -48,6 +54,43 @@
       "press": 140,
       "panel": 220,
       "emphasis": 420
+    },
+    "motion": {
+      "durationMs": { "fast": 120, "base": 200, "slow": 300, "long": 400, "reveal": 700 },
+      "introBeatMs": 1200,
+      "staggerMs": { "beamTotal": 60 },
+      "loopMs": { "beat": 1200, "blink": 2400, "drift": 3600 },
+      "reducedMotionMs": { "introCrossfade": 250, "outroCrossfade": 150, "teleportCrossfade": 140, "teleportFadeEdge": 45 },
+      "easing": {
+        "css": { "standard": "ease", "inOut": "ease-in-out" },
+        "functions": ["smoothstep", "smootherstep", "easeOutCubic", "sineInOut"]
+      }
+    },
+    "legacy": {
+      "color": {
+        "bg.page": "#02080F",
+        "bg.gate": "#031F20",
+        "bg.control": "#07131D",
+        "bg.toggleOn": "#0F2C22",
+        "brand.gate": "#3DDBD4",
+        "text.gate": "#A4BEB8",
+        "text.bright": "#ECFFF5",
+        "text.soft": "#D7F7EE",
+        "text.hint": "#7894A0",
+        "text.title": "#6BC96F",
+        "text.danger": "#FF9D9D",
+        "text.signOut": "#FFDCE6",
+        "player.core": "#36FF7D",
+        "player.halo": "#00B84A",
+        "player.markerAccent": "#2BB868",
+        "goal.magenta": "#E030C0",
+        "goal.violet": "#8B3FF0"
+      },
+      "spacingPx": { "rowGapCompact": 10, "rowGap": 14, "overlayHeaderReserve": 46 },
+      "radiusPx": { "inset": 9, "card": 10 },
+      "hitTargetPx": { "headerMin": 32, "header": 36, "headerMax": 40 },
+      "fontSizePx": { "micro": 9, "caption": 11, "small": 13, "body": 14, "label": 16, "heading": 18 },
+      "fonts": { "system": "\"Segoe UI Variable\", \"Helvetica Neue\", Arial, sans-serif" }
     },
     "touchTargetMinPx": 44,
     "preferredTouchTargetPx": 56,
