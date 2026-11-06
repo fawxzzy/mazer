@@ -333,3 +333,23 @@ Sequencing: P4 and P1 first (3B/3C), then P2 and P3 (5C), then P5 and P6, with P
   shared-account entry UI. Source shows entry points but no field that activates them.
 - Live visual behavior of any of these surfaces: this packet did not run the app or the visual harness.
 - Whether `Account connected.` (snapshot info on OAuth return) is ever displayed; no render site was found.
+
+### 4d. Guide and Reset progress copy (settings spec lane, 2026-11-06)
+
+Pure modules, not rendered until the Settings wiring lane lands (`docs/ui/MAZER-SETTINGS-SHEET-SPEC-2026-11-06.md`).
+
+| file | String | Kind | Recommended routing |
+| --- | --- | --- | --- |
+| `src/legacy-runtime/legacyGuideContent.ts` | `Reach the star to clear the maze.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `You are the green block.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `Touch and hold anywhere, then drag the way you want to go. Let go to stop.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `A glowing line shows your route. Turn on {} in Settings to fade old trail.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `Some mazes wrap. Leave an open edge and you come out on the opposite side.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `Each cleared maze raises your level. Mazes get harder as you climb.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your level and leaderboard standing go back to Level 1. Your account, username and settings stay as they are. This can’t be undone.` | static | Reset progress confirm/status copy; fold into the message module when wired |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Connect to the internet to reset your account progress.` | static | Reset progress confirm/status copy; fold into the message module when wired |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your account is still loading. Try again in a moment.` | static | Reset progress confirm/status copy; fold into the message module when wired |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your level on this device goes back to Level 1. Your settings stay as they are. This can’t be undone.` | static | Reset progress confirm/status copy; fold into the message module when wired |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Progress reset. You are back at Level 1.` | static | Reset progress confirm/status copy; fold into the message module when wired |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Progress changed on another device. Nothing was reset. Check your level and try again.` | static | Reset progress confirm/status copy; fold into the message module when wired |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Could not reset your progress. Nothing was changed.` | static | Reset progress confirm/status copy; fold into the message module when wired |
