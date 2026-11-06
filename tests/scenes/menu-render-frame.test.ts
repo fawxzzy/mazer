@@ -2437,13 +2437,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');
     expect(menuSceneSource).toContain('private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void');
     expect(menuSceneSource).toContain('private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton');
-    // The settings/guide sheets use the labelled Close pill (never a bare chevron). In Pause it still routes
-    // through the Wave 3A bridge first (bridge.dispatch(RESUME_RUN)) and falls back to the same real
-    // applyLegacyPauseCommand('resume'); in the menu it is handleBackAction. The chevron stays for the
-    // leaderboard and account overlays.
-    expect(menuSceneSource).toContain('private createOverlayClosePill(rect: LegacySettingsRect, label: string, onClick: () => void): UiButton');
-    expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayClosePill(');
-    expect(menuSceneSource).toContain('() => this.runLegacySettingsCommand(plan.close.command)');
+    // The settings/guide sheets have NO close control at all (Zac, 2026-11-06: no Close pill, X or back arrow):
+    // the primary Resume row (pause) / Back to Menu row (menu) is the exit and the Guide keeps its Got it footer.
+    // Resume still routes through the Wave 3A bridge first (bridge.dispatch(RESUME_RUN)) and falls back to the same
+    // real applyLegacyPauseCommand('resume'); Back to Menu is CLOSE_OVERLAY -> handleBackAction. The chevron stays
+    // for the leaderboard and account overlays.
+    expect(menuSceneSource).not.toContain('createOverlayClosePill');
+    expect(menuSceneSource).not.toContain('plan.close');
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
       "      case 'RESUME_RUN':\n"
       + '        this.dispatchUiBridgeCommand({ type: \'RESUME_RUN\' }, () => this.applyLegacyPauseCommand(\'resume\'));\n'

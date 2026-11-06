@@ -2022,6 +2022,8 @@ export class MenuScene extends Phaser.Scene {
   private uiButtons: UiButton[] = [];
   private overlayBackChevronBounds: VisualRect | null = null;
   private overlayBackChevronAction: (() => void) | null = null;
+  // Menu Settings only: the card rect; a tap outside it (the dimmed scrim) closes the sheet.
+  private overlayScrimCloseBounds: VisualRect | null = null;
   private overlayGuideBounds: VisualRect | null = null;
   // The Guide is a sub-view of the options/pause sheet, not its own overlay (Pause must keep holding the run).
   private settingsGuideOpen = false;
@@ -4042,6 +4044,9 @@ export class MenuScene extends Phaser.Scene {
       if (this.handleOverlayBackChevronPointerDown(pointer)) {
         return;
       }
+      if (this.handleOverlayScrimPointerDown(pointer, currentlyOver.length)) {
+        return;
+      }
       if (this.handleOverlayScrollPointerDown(pointer)) {
         return;
       }
@@ -4439,6 +4444,27 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
     this.overlayBackChevronAction();
+    return true;
+  }
+
+  // Menu Settings has no Close pill: besides the primary Back to Menu row and
+  // Escape, a tap on the dimmed scrim outside the card closes it. Only the
+  // un-covered scrim counts (nothing under the pointer, outside the card), and
+  // never the Guide sub-view, which keeps its own Got it exit.
+  private handleOverlayScrimPointerDown(pointer: Phaser.Input.Pointer, objectsUnderPointer: number): boolean {
+    if (
+      this.overlay !== 'options'
+      || this.settingsGuideOpen
+      || this.overlayScrimCloseBounds === null
+      || objectsUnderPointer > 0
+    ) {
+      return false;
+    }
+    const point = this.resolveLegacyInputPointerPoint(pointer);
+    if (this.isPointInVisualRect(this.overlayScrimCloseBounds, point.x, point.y)) {
+      return false;
+    }
+    this.handleBackAction();
     return true;
   }
 
@@ -10607,6 +10633,7 @@ export class MenuScene extends Phaser.Scene {
     this.clearUi();
     this.overlayBackChevronBounds = null;
     this.overlayBackChevronAction = null;
+    this.overlayScrimCloseBounds = null;
     this.overlayGuideBounds = null;
     this.overlayScrollViewportBounds = null;
     this.overlayScrollTrackBounds = null;
@@ -10816,11 +10843,12 @@ export class MenuScene extends Phaser.Scene {
     this.overlayBoardZoomSliderBounds = null;
     this.overlayMovementSpeedSliderBounds = null;
 
-    this.uiButtons.push(this.createOverlayClosePill(
-      plan.close.rect,
-      plan.close.label,
-      () => this.runLegacySettingsCommand(plan.close.command)
-    ));
+    // No Close pill / X / back arrow: the primary top row (Resume in pause,
+    // Back to Menu in the menu) is the exit. In the menu a tap on the scrim
+    // outside the card also closes the sheet (handleOverlayScrimPointerDown).
+    this.overlayScrimCloseBounds = context === 'menu'
+      ? createVisualRect(plan.card.left, plan.card.top, plan.card.width, plan.card.height)
+      : null;
     this.drawLegacySheetCard(plan.card);
     this.createOverlayTitle(plan.title.text, plan.title.centerY);
 
@@ -11039,64 +11067,6 @@ export class MenuScene extends Phaser.Scene {
       destroyButton();
     };
     return button;
-  }
-
-  // The labelled `Close` pill that replaces the bare chevron on the settings
-  // sheets. Routed through the same scene-level back handler (the invisible
-  // rect only provides hover/cursor feedback) so it is as reliable at the
-  // canvas edge as the chevron was.
-  private createOverlayClosePill(rect: LegacySettingsRect, label: string, onClick: () => void): UiButton {
-    const chrome = this.add.graphics();
-    const draw = (active: boolean): void => {
-      chrome.clear();
-      this.drawLegacyCyberPanel(chrome, {
-        active,
-        alpha: 0.96,
-        fill: 0x07131d,
-        height: rect.height,
-        left: rect.left,
-        radius: Math.round(rect.height / 2),
-        stroke: active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE,
-        strokeAlt: LEGACY_PLAY_TOUCH_BUTTON_STROKE,
-        top: rect.top,
-        width: rect.width
-      });
-    };
-    draw(false);
-    const centerX = rect.left + (rect.width / 2);
-    const centerY = rect.top + (rect.height / 2);
-    const text = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(
-      centerX,
-      resolveLegacyUiLabelCenterY(centerY, 16, 'button'),
-      label,
-      {
-        color: '#d7f7ee',
-        fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: '16px'
-      }
-    )), rect.width - 8, 16, 14).setOrigin(0.5).setAlpha(0.96);
-    this.uiTexts.push(text);
-    chrome.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
-    text.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH + 1);
-    const background = this.add.rectangle(centerX, centerY, rect.width, rect.height, 0x000000, 0.001);
-    background.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
-    background.setInteractive({ useHandCursor: true });
-    background.on('pointerover', () => draw(true));
-    background.on('pointerout', () => draw(false));
-    this.overlayBackChevronAction = onClick;
-    this.overlayBackChevronBounds = createVisualRect(rect.left, rect.top, rect.width, rect.height);
-    return {
-      background,
-      bounds: this.overlayBackChevronBounds,
-      label: text,
-      setActive: draw,
-      text: label,
-      destroy: () => {
-        chrome.destroy();
-        background.destroy();
-        text.destroy();
-      }
-    };
   }
 
   // Text that wraps to `maxLines` and only then shrinks (never below
@@ -11320,11 +11290,6 @@ export class MenuScene extends Phaser.Scene {
 
     this.overlayBoardZoomSliderBounds = null;
     this.overlayMovementSpeedSliderBounds = null;
-    this.uiButtons.push(this.createOverlayClosePill(
-      plan.close.rect,
-      plan.close.label,
-      () => this.closeLegacyGuideSheet()
-    ));
     this.drawLegacySheetCard(plan.card);
     this.createOverlayTitle(plan.title.text, plan.title.centerY);
     this.overlayGuideBounds = createVisualRect(plan.card.left, plan.card.top, plan.card.width, plan.card.height);

@@ -77,6 +77,9 @@ describe('settings sheet model', () => {
     expect(menuIds).toContain('sign-out');
     expect(menuIds).not.toContain('resume');
     expect(menuIds).not.toContain('quit-to-menu');
+    // The menu's primary exit is its own row, never the pause Resume row.
+    expect(menuIds).toContain('back-to-menu');
+    expect(pauseIds).not.toContain('back-to-menu');
     expect(pauseIds).toEqual(expect.arrayContaining(['resume', 'quit-to-menu', 'how-to-play']));
     expect(pauseIds).not.toContain('reset-progress');
     expect(pauseIds).not.toContain('sign-out');
@@ -98,15 +101,36 @@ describe('settings sheet model', () => {
     expect(rows.find((r) => r.id === 'sign-out')!.emphasis).toBe('danger');
   });
 
-  test('close affordance is labelled text in both contexts, never a bare chevron', () => {
+  test('no Close pill, X or back arrow: the primary top row is the exit in both contexts', () => {
     for (const context of ['menu', 'pause'] as const) {
-      const close = buildLegacySettingsSheetModel(context).close;
-      expect(close.label).toBe('Close');
-      expect(close.label).not.toMatch(/^[<‹←]+$/);
-      expect(close.accessibleName.length).toBeGreaterThan(5);
+      const model = buildLegacySettingsSheetModel(context, { signedIn: true });
+      expect('close' in model).toBe(false);
+      const labels = model.sections.flatMap((section) => section.rows.map((r) => r.label));
+      expect(labels).not.toContain('Close');
+      expect(labels.join('|')).not.toMatch(/[<>‹›←×✕]/);
+      // The first row of the first section is the primary action.
+      const first = model.sections[0]!.rows[0]!;
+      expect(first.emphasis).toBe('primary');
+      expect(first.kind).toBe('action');
     }
-    expect(buildLegacySettingsSheetModel('pause').close.command).toEqual({ type: 'RESUME_RUN' });
-    expect(buildLegacySettingsSheetModel('menu').close.command).toEqual({ type: 'CLOSE_OVERLAY' });
+    const pauseFirst = buildLegacySettingsSheetModel('pause').sections[0]!.rows[0]!;
+    expect([pauseFirst.id, pauseFirst.label, pauseFirst.command]).toEqual(['resume', 'Resume', { type: 'RESUME_RUN' }]);
+    const menuFirst = buildLegacySettingsSheetModel('menu').sections[0]!.rows[0]!;
+    expect([menuFirst.id, menuFirst.label, menuFirst.command]).toEqual(['back-to-menu', 'Back to Menu', { type: 'CLOSE_OVERLAY' }]);
+  });
+
+  test('Back to Menu takes the same slot, size and emphasis as Resume', () => {
+    const viewport = { height: 844, width: 390 };
+    const menuTop = plan('menu', viewport).items[0]!;
+    const pauseTop = plan('pause', viewport).items[0]!;
+    expect(menuTop.model.id).toBe('back-to-menu');
+    expect(pauseTop.model.id).toBe('resume');
+    expect(menuTop.model.emphasis).toBe(pauseTop.model.emphasis);
+    expect(menuTop.rect.top).toBe(0);
+    expect(pauseTop.rect.top).toBe(0);
+    expect(menuTop.rect.height).toBe(pauseTop.rect.height);
+    expect(menuTop.rect.width).toBe(pauseTop.rect.width);
+    expect(menuTop.parts).toEqual(pauseTop.parts);
   });
 
   test('toggle state words are separate from labels and keep today\'s copy', () => {
@@ -168,8 +192,6 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
         expect(item.rect.height, `${item.model.id} height`).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
         expect(item.rect.width, `${item.model.id} width`).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
       }
-      expect(p.close.rect.height).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
-      expect(p.close.rect.width).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
       // Headings are the only non-interactive rows.
       expect(p.items.filter((i) => !i.interactive).every((i) => i.model.kind === 'heading')).toBe(true);
     });
@@ -182,8 +204,7 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
       }
     });
 
-    test.each(cases)('%s: close sits clear of the card, card is inside the panel, body is inside the card', (_label, p) => {
-      expect(overlaps(p.close.rect, p.card)).toBe(false);
+    test.each(cases)('%s: card is inside the panel, body is inside the card', (_label, p) => {
       expect(p.card.left).toBeGreaterThanOrEqual(p.panel.left);
       expect(p.card.left + p.card.width).toBeLessThanOrEqual(p.panel.left + p.panel.width);
       expect(p.card.top).toBeGreaterThanOrEqual(p.panel.top);
@@ -231,7 +252,6 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
       expect(menu.bodyViewport.width).toBe(pause.bodyViewport.width);
       expect(menu.bodyViewport.left).toBe(pause.bodyViewport.left);
       expect(menu.title.fontSize).toBe(pause.title.fontSize);
-      expect(menu.close.rect).toEqual(pause.close.rect);
       const sharedIds = LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id);
       for (const id of sharedIds) {
         const a = menu.items.find((i) => i.model.id === id)!;
@@ -275,10 +295,11 @@ describe('settings sheet plan specifics', () => {
     ]);
   });
 
-  test('menu is always open: group rows then Account heading, Reset progress, Sign out', () => {
+  test('menu is always open: Back to Menu, group rows, then Account heading, Reset progress, Sign out', () => {
     const p = plan('menu', { height: 844, width: 390 }, { settingsExpanded: false });
     expect(p.settingsExpanded).toBe(true);
     expect(p.items.map((i) => i.model.id)).toEqual([
+      'back-to-menu',
       'how-to-play',
       'display-heading',
       'board-zoom',
@@ -308,7 +329,6 @@ describe('settings sheet plan specifics', () => {
     });
     expect(p.panel.top).toBeGreaterThanOrEqual(47);
     expect(p.card.top + p.card.height).toBeLessThanOrEqual(844 - 34);
-    expect(overlaps(p.close.rect, p.card)).toBe(false);
   });
 
   test('sizes use the token scale', () => {
@@ -343,9 +363,44 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
     expect(plan.scrollRailViewport.height).toBe(plan.bodyViewport.height);
   });
 
-  test.each(plans)('%s: the Close pill is right-aligned with the card and clear of it', (_label, plan) => {
-    expect(plan.close.rect.left + plan.close.rect.width).toBe(plan.card.left + plan.card.width);
-    expect(plan.close.rect.top + plan.close.rect.height).toBeLessThanOrEqual(plan.card.top);
+  // Close pill removal (2026-11-06): the 46 + 6/8 px header reserve that held it is
+  // reclaimed. A sheet that fits is centred in the whole panel; one that does not
+  // fills the whole panel height.
+  test.each(plans)('%s: the card is centred in the full panel height (no header reserve)', (_label, plan) => {
+    expect(plan.availableHeight).toBe(plan.panel.height);
+    const slackTop = plan.card.top - plan.panel.top;
+    const slackBottom = (plan.panel.top + plan.panel.height) - (plan.card.top + plan.card.height);
+    expect(Math.abs(slackTop - slackBottom)).toBeLessThanOrEqual(1);
+    if (plan.naturalCardHeight > plan.panel.height) {
+      expect(plan.card.height).toBe(plan.panel.height);
+      expect(plan.card.top).toBe(plan.panel.top);
+    } else {
+      expect(plan.card.height).toBe(plan.naturalCardHeight);
+      expect(plan.scrollable).toBe(false);
+    }
+  });
+
+  test('the freed header reserve gives the card back its height at 320x568', () => {
+    const plan = buildLegacySettingsSheetPlan({ context: 'pause', height: 568, settingsExpanded: true, signedIn: true, width: 320 });
+    // Before: panel.height 552 minus 52 reserve = 500 available. Now: all 552.
+    expect(plan.panel.height).toBe(552);
+    expect(plan.card.height).toBe(552);
+    expect(plan.card.top).toBe(plan.panel.top);
+  });
+
+  test('the scroll rail appears only when the content truly overflows the body', () => {
+    for (const { height, width } of LEGACY_SETTINGS_PLAN_VIEWPORTS) {
+      for (const context of ['menu', 'pause'] as const) {
+        const p = buildLegacySettingsSheetPlan({ context, height, settingsExpanded: true, signedIn: true, width });
+        expect(p.scrollable).toBe(p.contentHeight > p.bodyViewport.height);
+        if (!p.scrollable) {
+          expect(p.card.height).toBe(p.naturalCardHeight);
+        }
+      }
+    }
+    // 390x844 and 1280x720 hold the whole menu sheet without a rail now that the reserve is gone.
+    expect(plan('menu', { height: 844, width: 390 }).scrollable).toBe(false);
+    expect(plan('menu', { height: 720, width: 1280 }).scrollable).toBe(false);
   });
 
   test('at 320 wide the label column still holds a 14 px "Background" on its own line', () => {

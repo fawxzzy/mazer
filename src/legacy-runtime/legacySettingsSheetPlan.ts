@@ -7,8 +7,12 @@
  * routine. The two contexts differ only in
  *   - the card title            ('Paused' | 'Settings'),
  *   - the context actions       (pause: Resume above, Quit to Menu below;
- *                                menu: Account section with Reset progress
- *                                and Sign out),
+ *                                menu: Back to Menu above, Account section
+ *                                with Reset progress and Sign out),
+ *   - the exit                  (pause: the primary Resume row; menu: the
+ *                                primary Back to Menu row in the same slot).
+ *                                Neither sheet draws a Close pill, an X or a
+ *                                back arrow: the primary top row IS the exit.
  *   - whether the Settings group is a collapsed disclosure (pause) or the
  *     always-open body (menu).
  * Everything inside the Settings group (How to play, Display heading, Board
@@ -29,7 +33,6 @@
  */
 import { designTokens } from '../theme/tokens';
 import {
-  LEGACY_OVERLAY_HEADER_RESERVE,
   LEGACY_UI_COMPACT_BREAKPOINT,
   LEGACY_UI_MIN_TOUCH_TARGET,
   resolveLegacyOverlayPanelLayout,
@@ -44,6 +47,7 @@ export type LegacySettingsSliderKey = 'camScale';
 
 export type LegacySettingsRowId =
   | 'resume'
+  | 'back-to-menu'
   | 'settings-disclosure'
   | 'how-to-play'
   | 'display-heading'
@@ -93,7 +97,7 @@ export interface LegacySettingsRowModel {
 }
 
 export interface LegacySettingsSectionModel {
-  id: 'pause-top' | 'settings' | 'account' | 'pause-bottom';
+  id: 'pause-top' | 'menu-top' | 'settings' | 'account' | 'pause-bottom';
   /** Disclosure label (collapsible) or heading text. Null = no header. */
   title: string | null;
   collapsible: boolean;
@@ -101,19 +105,11 @@ export interface LegacySettingsSectionModel {
   rows: readonly LegacySettingsRowModel[];
 }
 
-export interface LegacySettingsCloseAffordance {
-  /** Always a visible text label: never a bare '<' chevron. */
-  label: 'Close';
-  accessibleName: string;
-  command: Extract<LegacySettingsCommand, { type: 'RESUME_RUN' | 'CLOSE_OVERLAY' }>;
-}
-
 export interface LegacySettingsSheetModel {
   context: LegacySettingsContext;
   /** Overlay id the scene routes on (pause is pinned; options is the existing menu id). */
   overlayId: 'pause' | 'options';
   title: 'Paused' | 'Settings';
-  close: LegacySettingsCloseAffordance;
   sections: readonly LegacySettingsSectionModel[];
 }
 
@@ -170,11 +166,6 @@ export const buildLegacySettingsSheetModel = (
 ): LegacySettingsSheetModel => {
   if (context === 'pause') {
     return {
-      close: {
-        accessibleName: 'Resume game',
-        command: { type: 'RESUME_RUN' },
-        label: 'Close'
-      },
       context,
       overlayId: 'pause',
       sections: [
@@ -222,14 +213,19 @@ export const buildLegacySettingsSheetModel = (
   }
 
   return {
-    close: {
-      accessibleName: 'Close settings',
-      command: { type: 'CLOSE_OVERLAY' },
-      label: 'Close'
-    },
     context,
     overlayId: 'options',
     sections: [
+      {
+        collapsedByDefault: false,
+        collapsible: false,
+        id: 'menu-top',
+        rows: [row('back-to-menu', 'action', 'Back to Menu', {
+          command: { type: 'CLOSE_OVERLAY' },
+          emphasis: 'primary'
+        })],
+        title: null
+      },
       {
         collapsedByDefault: false,
         collapsible: false,
@@ -259,9 +255,6 @@ const FONT = designTokens.legacy.fontSizePx;
 export const LEGACY_SETTINGS_SIZES = Object.freeze({
   /** Action / disclosure / nav button height. >= touchTargetMinPx. */
   actionHeight: 48,
-  /** Close pill (labelled), sits in the header reserve above the card. */
-  closeHeight: LEGACY_UI_MIN_TOUCH_TARGET,
-  closeWidth: 76,
   /** Gap between consecutive rows inside a group (spacing token 8). */
   rowGap: SPACING[1] ?? 8,
   /** Gap between sections (spacing token 12). */
@@ -341,8 +334,6 @@ export interface LegacySettingsSheetPlan {
   model: LegacySettingsSheetModel;
   compact: boolean;
   panel: LegacyOverlayPanelLayout;
-  /** Labelled close control, in the header reserve above the card. */
-  close: { rect: LegacySettingsRect; label: 'Close'; accessibleName: string; command: LegacySettingsCloseAffordance['command'] };
   card: LegacySettingsRect;
   cardPadding: number;
   title: { centerX: number; centerY: number; fontSize: number; text: string };
@@ -451,8 +442,9 @@ const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: n
 
 /**
  * Flattened row list for a model. Pause: Resume, Settings disclosure (and,
- * when expanded, the group rows), Quit to Menu. Menu: the group rows (always
- * open), then the Account heading and its rows.
+ * when expanded, the group rows), Quit to Menu. Menu: Back to Menu (same slot
+ * and size as Resume), the group rows (always open), then the Account heading
+ * and its rows.
  */
 const flattenRows = (
   model: LegacySettingsSheetModel,
@@ -525,20 +517,20 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
   const layout = layoutItems(innerWidth);
   const contentHeight = layout.contentHeight;
 
-  const headerReserve = LEGACY_OVERLAY_HEADER_RESERVE + (compact ? 6 : 8);
-  const availableHeight = Math.max(1, panel.height - headerReserve);
+  // No header reserve: there is no Close pill above the card any more, so the card
+  // gets the whole panel height and is centred in it (the panel already carries the
+  // 8/16 px viewport inset plus the safe area).
+  const availableHeight = Math.max(1, panel.height);
   const chrome = (cardPadding * 2) + titleHeight + titleGap;
   const naturalCardHeight = chrome + contentHeight;
   const cardHeight = Math.min(naturalCardHeight, availableHeight);
-  const regionTop = panel.top + headerReserve;
-  const cardTop = Math.round(regionTop + ((availableHeight - cardHeight) / 2));
+  const cardTop = Math.round(panel.top + ((availableHeight - cardHeight) / 2));
   const cardLeft = Math.round(panel.centerX - (cardWidth / 2));
 
   const bodyTop = cardTop + cardPadding + titleHeight + titleGap;
   const bodyHeight = Math.max(0, cardHeight - chrome);
   const scrollable = contentHeight > bodyHeight;
   const items = layout.items;
-  const cardRight = cardLeft + cardWidth;
 
   return {
     availableHeight,
@@ -546,12 +538,6 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
     scrollRailViewport: rectOf(cardLeft + cardPadding, bodyTop, innerWidth + s.scrollRailOverhang, bodyHeight),
     card: rectOf(cardLeft, cardTop, cardWidth, cardHeight),
     cardPadding,
-    close: {
-      accessibleName: model.close.accessibleName,
-      command: model.close.command,
-      label: model.close.label,
-      rect: rectOf(cardRight - s.closeWidth, panel.top, s.closeWidth, s.closeHeight)
-    },
     compact,
     contentHeight,
     items,

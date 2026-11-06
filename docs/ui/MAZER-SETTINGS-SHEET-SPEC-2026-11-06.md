@@ -8,19 +8,26 @@ Owner decision (Zac): the in-game Pause > Settings look is correct; the main-men
 
 | File | Role |
 | --- | --- |
-| `src/legacy-runtime/legacySettingsSheetPlan.ts` | One view model + pure layout plan for both contexts (`menu`, `pause`). Row vocabulary, order, sizes (token terms), close affordance, 320/390/1280 geometry. |
+| `src/legacy-runtime/legacySettingsSheetPlan.ts` | One view model + pure layout plan for both contexts (`menu`, `pause`). Row vocabulary, order, sizes (token terms), 320/390/1280 geometry. No close affordance: the primary top row is the exit. |
 | `src/legacy-runtime/legacyProgressionResetFlow.ts` | Reset reducer (idle, confirm, working, done/failed/blocked/cancelled), strategy (server-first vs local-only vs blocked), baseline-state function, local-effects plan, confirm copy. |
 | `src/legacy-runtime/legacyGuideContent.ts` | The Guide data: rows, icon specs (tied to the board draw functions), pending rows, keyboard bindings. |
 | `tests/reset/legacy-settings-sheet-plan.test.ts`, `legacy-progression-reset-flow.test.ts`, `legacy-guide-content-drift.test.ts` | Plan geometry at 320x568, 390x844, 1280x720; reducer and reset function; guide drift guard. |
 
 ## Structure (both contexts)
 
-Card (centered, same width in both contexts: 360 max compact, 400 regular), labelled `Close` pill in the header reserve above the card (never a bare chevron), centered title, scrolling body.
+Card (centered in the whole panel, same width in both contexts: 360 max compact, 400 regular), centered title, scrolling body. There is no Close pill, X or back arrow on the settings or guide sheets and no header reserve above the card: the primary top row is the exit (Resume in pause, Back to Menu in the menu) and the Guide keeps its pinned `Got it` footer.
 
 - Pause: `Paused`; `Resume` (primary); `Settings` disclosure (collapsed by default) containing the Settings group; `Quit to Menu` (tertiary).
-- Menu: `Settings`; the Settings group always open; `Account` heading; `Reset progress` (danger-outline); 24 px separation; `Sign out` (danger, signed-in only).
+- Menu: `Settings`; `Back to Menu` (primary, CLOSE_OVERLAY; same slot, size and emphasis as pause's `Resume`); the Settings group always open; `Account` heading; `Reset progress` (danger-outline); 24 px separation; `Sign out` (danger, signed-in only).
 - Settings group (identical rows, identical geometry in both): `How to play` (opens the Guide sheet), `Display` heading, `Board Zoom` slider, `Trail Fade`, `Trail Shine`, `Animated Background` toggles. State words (`On`, `Off`, `Animated`, `Still`) are their own column, never merged into the label.
-- Sizes: action 48, toggle/nav row 52, slider row 68, heading 24, close 76x44, gaps 8/12, card padding 20/24, label font 16 (never below 14, wraps to two lines), state font 13.
+- Sizes: action 48, toggle/nav row 52, slider row 68, heading 24, gaps 8/12, card padding 20/24, label font 16 (never below 14, wraps to two lines), state font 13.
+
+### Exit contract (2026-11-06, Zac: "remove both [the close button and the back arrow] cause we already have a resume button, then recover that space")
+
+- Pause: the primary `Resume` row (RESUME_RUN) is the exit. Escape and hardware back still resume.
+- Menu: the menu has no Resume, so removing Close alone would strand touch users. Decision (owner may overrule): the menu context gets the SAME structure as pause, a primary top action row in the same slot as `Resume`, labelled `Back to Menu` (command CLOSE_OVERLAY, primary emphasis, 48 px). Escape, hardware back and a tap on the dimmed scrim outside the card also close it (scrim tap is menu Settings only: not pause, where an accidental outside tap must not resume the run, and not the Guide sub-view). No arrow glyph or X is used.
+- Guide sub-view: `Got it` (pinned primary footer) is its exit; Escape and back return to Settings. No Close pill or chevron.
+- Reclaimed space: the 46 + 6/8 px header reserve that held the pill is gone from both sheet plans (`availableHeight = panel.height`), so the card is centred in the full panel and gets the freed height (at 320x568 the card is 552 px tall instead of 500; 390x844 and 1280x720 menu sheets now fit without a scroll rail). The scroll rail still appears only when content truly overflows the body. Leaderboard and account overlays are unchanged (they keep `LEGACY_OVERLAY_HEADER_RESERVE` and the back chevron).
 
 ## Reset progress: scope and contract
 
@@ -75,9 +82,9 @@ See the investigation closeout (kept outside the repo, settings-reset-progress-2
 What shipped in the wiring PR:
 
 - One painter for both contexts: `buildOptionsOverlay` and `buildPauseOverlay` are thin entries into `buildLegacySettingsSheetOverlay(context)`, which paints `buildLegacySettingsSheetPlan`. Menu hides Resume, the Settings disclosure and Quit to Menu; pause hides the Account section (Reset progress, Sign out). The Settings group (How to play, Display, Board Zoom, Trail Fade, Trail Shine, Animated Background) is the same plan rows at the same size in both.
-- Labelled `Close` pill (`createOverlayClosePill`, 76x44, right-aligned to the card, in the header reserve) replaces the bare chevron on the settings and guide sheets. The leaderboard and account overlays keep `createOverlayBackChevronButton` (out of scope).
+- (Superseded 2026-11-06, see Exit contract.) The labelled `Close` pill (`createOverlayClosePill`) that first replaced the bare chevron on the settings and guide sheets was removed; the primary Resume / Back to Menu row is the exit. The leaderboard and account overlays keep `createOverlayBackChevronButton` (out of scope).
 - Rows keep the full inner width while scrolling; the scroll rail sits in the card padding (`scrollRailViewport`). Toggle labels wrap to two lines and never shrink under 14 px; the state word is its own column.
-- The Guide is a sheet, not a dropdown: opened by the `How to play` row from both contexts, painted from `buildLegacyGuideSheetModel` and `buildLegacyGuideSheetPlan`, `Got it` footer pinned. It is a sub-view of the options/pause overlay (`settingsGuideOpen`), so Pause keeps holding the run while it is open. Back, Escape, Close and `Got it` return to Settings.
+- The Guide is a sheet, not a dropdown: opened by the `How to play` row from both contexts, painted from `buildLegacyGuideSheetModel` and `buildLegacyGuideSheetPlan`, `Got it` footer pinned. It is a sub-view of the options/pause overlay (`settingsGuideOpen`), so Pause keeps holding the run while it is open. Back, Escape and `Got it` return to Settings.
 - Guide icons: goal star (`drawLegacyGoalStarMarker`) and wrap diamond (`drawEdgeMarker`) call the board draw functions. Player, move stick, trail swatch and level numeral are guide-local (reason ids in the table above; trail and levels stay `chip-wiring`). The old "begin at gold" start row is gone.
 - Reset progress (menu Settings, Account section): two-step. Step 1 is the confirm card (`Level N -> Level 1`, one consequence line, Cancel first and default, `Reset to Level 1` armed after 600 ms). Step 2 is the result on the same card (working, done, failed or blocked). Account scope names the leaderboard standing; device scope says "on this device". Cancel, Back and Escape return to the Settings sheet (overlay routing now treats `options` as a recorded origin).
 - `resetLegacyPlayerProgression` is server-first and async: for a signed-in provider-eligible account with remote progression on, it awaits `writeLegacyRemoteProgressionState(..., 'replace')` (`mazer_reset_progression`), and only on success applies the local effects (baseline for both tracks, outbox and cycle telemetry removed) using the keys of the account the reset was requested for. A failed or conflicting server call leaves local progression untouched and shows the failure. Guests or remote-off reset the device key only. A reset requested while a run is active is blocked.
@@ -86,7 +93,7 @@ Not done, deliberately:
 
 - The URL-flagged advanced rows (Maze Scale, Camera Scale, Path/Wall RGB; `?advancedOptions=1`) and the hidden Move Speed slider are no longer painted: they are not part of the shared spec and had no plan vocabulary. `resolveLegacyAdvancedOptionsVisible` is kept.
 - Multi-device reset epoch (BLOCKED-ON-OWNER, see above) and clearing the legacy guest progression key on account reset are not implemented. Guest play is disabled (`LEGACY_GUEST_PLAY_ACCESS_ENABLED = false`), so the guest-key re-import path only matters for progress saved before that.
-- `scripts/analysis/capture-ui-surfaces.mjs` still expects the old Guide dropdown (`guidePanel` bounds, GUIDE label) and the docked Sign out bar; it needs a follow-up in its own lane (out of scope here).
+- `scripts/analysis/capture-ui-surfaces.mjs` still expects the old Guide dropdown (`guidePanel` bounds, GUIDE label) and the docked Sign out bar; it needs a follow-up in its own lane (out of scope here). Its `closeOverlayToMenu` also clicks the `backChevron` diagnostic to leave Options; Options no longer registers one, so that step must press Escape or click `Back to Menu` instead (same follow-up).
 - `legacyPauseMenuView.ts` (layout) and `legacyUiStandards.ts` (`resolveLegacyOptionsGuideLayout`, toggle/feature layouts) are no longer consumed by the scene; they stay for their own tests and are candidates for removal.
 
 ## Chip wiring status (2026-11-06)
