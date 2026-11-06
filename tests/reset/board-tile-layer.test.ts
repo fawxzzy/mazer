@@ -11,6 +11,7 @@ import {
 } from '../../src/render/boardTileLayer';
 import { BOARD_TILE_GEOMETRY, boardMaterial, DEFAULT_BOARD_TILE_STYLE } from '../../src/render/boardTileStyle';
 import { PhaserGraphicsTileContext, parseCssRgba } from '../../src/render/phaserTileContext';
+import { compositeTrailUnderlay, liftTrailColor } from '../../src/render/trailLegibility';
 import { braidedMazeGrid, contrast, inputFor, wrapDockMaze } from '../render/support/boardTileFixtures';
 
 const MENU_SCENE = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n?/g, '\n');
@@ -237,20 +238,16 @@ describe('Phaser graphics adapter for the Chip marker draw code', () => {
 });
 
 describe('trail on the Chip floor (amendment open item A8)', () => {
+  // The full contrast pins (every energy stop and in-between, against chip / rim / gap, width floors) live in
+  // tests/reset/marker-trail-legibility.test.ts; this keeps the original A8 intent: the underlay is what earns it.
   const stops = [...MENU_SCENE.matchAll(/const LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS = \[([^\]]+)\]/g)][0]![1]!
     .match(/0x[0-9a-f]{6}/gi)!.map((hex) => parseInt(hex, 16));
-  const alpha = Number(/const LEGACY_TRAIL_UNDERLAY_ALPHA = ([0-9.]+);/.exec(MENU_SCENE)![1]);
-
-  const mix = (a: number, b: number, t: number): number => {
-    const channel = (shift: number): number => Math.round(((a >> shift) & 255) * (1 - t) + ((b >> shift) & 255) * t);
-    return (channel(16) << 16) | (channel(8) << 8) | channel(0);
-  };
 
   test('every calm trail energy stop clears 3:1 against the chip under the dark underlay', () => {
     expect(stops.length).toBe(8);
-    const underlaid = mix(boardMaterial.chip, boardMaterial.void, alpha);
+    const underlaid = compositeTrailUnderlay(boardMaterial.chip);
     for (const stop of stops) {
-      expect(contrast(stop, underlaid), `0x${stop.toString(16)}`).toBeGreaterThanOrEqual(3);
+      expect(contrast(liftTrailColor(stop), underlaid), `0x${stop.toString(16)}`).toBeGreaterThanOrEqual(3);
     }
   });
 

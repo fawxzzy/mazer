@@ -2622,8 +2622,9 @@ describe('Chip wiring: start/goal markers, trail underlay, board layer', () => {
 
   test('the trail sits on a dark underlay on the Chip floor (amendment open item A8), drawn by the same trail compositor', () => {
     expect(menuSceneSource).toContain("if (this.boardTileStyle === 'chip') {");
-    expect(menuSceneSource).toContain('alpha: segment.alpha * LEGACY_TRAIL_UNDERLAY_ALPHA');
-    expect(menuSceneSource).toContain('coreWidth: coreWidth + (2 * LEGACY_TRAIL_UNDERLAY_PAD_CSS)');
+    expect(menuSceneSource).toContain('drawTrailLayersToCanvasContext(this.trailCanvasTexture.context, segments, {');
+    expect(menuSceneSource).toContain('underlayAlpha: LEGACY_TRAIL_UNDERLAY_ALPHA');
+    expect(menuSceneSource).toContain('underlayWidth,');
   });
 
   test('wordmark cells (title, Start/Login, level numeral) are chip cells from the board geometry, with no black border stroke', () => {
