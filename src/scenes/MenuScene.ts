@@ -5907,6 +5907,25 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
+  // The same intro clock, but still resolvable after the build has settled so
+  // the diamond ring's fade-out (RING_ENERGY_FADE_MS after the reveal end) and
+  // the wrap-end lighting window (reveal end .. done) play out and the LAST
+  // redraw clears them. Null once the intro is over or the maze deconstructs.
+  private resolveLegacyEdgeRingIntroState(time: number): IntroState | null {
+    if (
+      this.introStartedAtMs === null
+      || (this.menuStaticDrawLifecyclePhase !== 'building' && this.menuStaticDrawLifecyclePhase !== 'settled')
+    ) {
+      return null;
+    }
+
+    return resolveIntro(time - this.introStartedAtMs, {
+      digitAlreadyVisible: this.levelAnnouncerBuildFadeOutArmed,
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      tileCount: this.menuStaticDrawTileOrder.length
+    });
+  }
+
   // The deconstruct mirror of resolveLegacyIntroState (<= 900 ms with the
   // handoff beat), measured from the arm instant.
   private resolveLegacyOutroState(time: number): OutroState | null {
@@ -8818,7 +8837,7 @@ export class MenuScene extends Phaser.Scene {
         spinRad: outro.ringSpinRad
       };
     }
-    const intro = this.resolveLegacyIntroState(time);
+    const intro = this.resolveLegacyEdgeRingIntroState(time);
     if (intro !== null && !intro.done) {
       return {
         lifecycle: { direction: 'inward', laserProgress: intro.laserProgress, ringEnergy: intro.ringEnergy },
@@ -8847,7 +8866,7 @@ export class MenuScene extends Phaser.Scene {
 
     const reducedMotion = this.prefersLegacyReducedMotion();
     const energizedIds = new Set<number>();
-    const introState = this.resolveLegacyIntroState(time);
+    const introState = this.resolveLegacyEdgeRingIntroState(time);
     if (
       (introState !== null && introState.bleedProgress === 1 && !introState.done)
       || this.playerTransferEnergyArmed

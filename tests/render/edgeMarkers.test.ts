@@ -458,6 +458,30 @@ describe('all-8 beams (arrival and departure)', () => {
   });
 });
 
+describe('scene wiring of the ring lifecycle', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+  const section = (from: string, to: string): string => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)));
+
+  test('the ring keeps its intro clock after the build settles so the fade-out and the last clearing redraw play', () => {
+    const helper = section('private resolveLegacyEdgeRingIntroState(', 'private resolveLegacyOutroState(');
+    expect(helper).toContain("this.menuStaticDrawLifecyclePhase !== 'building' && this.menuStaticDrawLifecyclePhase !== 'settled'");
+    const ring = section('private resolveLegacyEdgeRing(', 'private drawLegacyEdgeMarkers(');
+    expect(ring).toContain('this.resolveLegacyEdgeRingIntroState(time)');
+    expect(ring).toContain('outro.ringEnergy');
+    expect(ring).toContain('intro.ringEnergy');
+    // Reduced motion and overlays: no lifecycle at all.
+    expect(ring).toContain('this.prefersLegacyReducedMotion() || this.overlay !== \'none\'');
+  });
+
+  test('markers redraw every frame while the lifecycle is active and once more after it ends', () => {
+    const lasers = section('private drawLegacyEdgeLasers(', 'private resolveLegacyEdgeRing(');
+    expect(lasers).toContain('if (firing || this.edgeBeamWasFiring || ringActive || this.edgeRingActive) {');
+    expect(lasers).toContain('this.edgeRingActive = ringActive;');
+    // The dirty-flag gate keeps drawDynamicBoard running for the same condition.
+    expect(source).toContain('      || this.edgeRingActive\n    ) {\n      this.boardDynamicDirty = true;');
+  });
+});
+
 describe('ring lighting and spin over the intro / outro timelines (per frame)', () => {
   const TILES = 300;
   const FULL = { reducedMotion: false, tileCount: TILES } as const;
