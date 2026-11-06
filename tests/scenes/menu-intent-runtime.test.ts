@@ -50,6 +50,36 @@ const createSpectatorEpisode = (): MazeEpisode => ({
   size: 'medium'
 } as unknown as MazeEpisode);
 
+// The full spectator profile only places its six mechanics (key, plate, door,
+// patrol lane, hazard, gate) on paths with at least 17 segments; shorter routes
+// deliberately fall back to the core-only plan (a8808918, which fixed tile
+// collisions for segmentCount 6-16). The 8-tile fixture above is therefore a
+// SHORT route, so the mechanic-semantics test needs this longer one. 24 tiles
+// is 23 segments: comfortably past the floor, so the test is not pinned to it.
+const LONG_SPECTATOR_PATH_LENGTH = 24;
+
+const createLongSpectatorEpisode = (): MazeEpisode => ({
+  accepted: true,
+  checkpointsCreated: 0,
+  difficulty: 'standard',
+  family: 'classic',
+  pathLength: LONG_SPECTATOR_PATH_LENGTH,
+  placementStrategy: 'farthest-pair',
+  presentationPreset: 'classic',
+  raster: {
+    width: LONG_SPECTATOR_PATH_LENGTH,
+    height: 1,
+    tiles: new Uint8Array(Array.from({ length: LONG_SPECTATOR_PATH_LENGTH }, () => 1)),
+    startIndex: 0,
+    endIndex: LONG_SPECTATOR_PATH_LENGTH - 1,
+    pathIndices: Array.from({ length: LONG_SPECTATOR_PATH_LENGTH }, (_, index) => index)
+  },
+  score: 0,
+  seed: 1204,
+  shortcutsCreated: 0,
+  size: 'medium'
+} as unknown as MazeEpisode);
+
 const createEntry = (id: string, slot = 0, summary = `scanning ${id}`): IntentVisibleEntry => ({
   id,
   speaker: 'Runner',
@@ -312,11 +342,23 @@ describe('menu intent runtime', () => {
     expect(commitHeld?.events?.map((entry) => entry.id) ?? commitHeld?.entries.map((entry) => entry.id)).toEqual(['commit-a']);
   });
 
-  test('emits spectator-first trap, patrol, plate, and key semantics for longer shipping paths', () => {
+  test('falls back to route guidance without mechanic telegraphs on a short shipping path', () => {
     const session = createMenuIntentRuntimeSession(createSpectatorEpisode());
 
     session.advanceToStep(6);
     const boardState = session.getBoardState(6);
+
+    expect(boardState).not.toBeNull();
+    expect(boardState?.telegraphs).toEqual([]);
+  });
+
+  test('emits spectator-first trap, patrol, plate, and key semantics for longer shipping paths', () => {
+    const session = createMenuIntentRuntimeSession(createLongSpectatorEpisode());
+
+    // Late enough that every mechanic has been seen, still before the final tile.
+    const lateStep = LONG_SPECTATOR_PATH_LENGTH - 2;
+    session.advanceToStep(lateStep);
+    const boardState = session.getBoardState(lateStep);
     const allKinds = new Set(
       session.intentDeliveries.flatMap((delivery) => delivery.bus.records.map((record) => record.kind))
     );
