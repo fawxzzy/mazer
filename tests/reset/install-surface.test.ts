@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import {
+  INSTALL_SURFACE_LEGACY_DISMISSED_STORAGE_KEY,
   dismissInstallSurface,
   getInstallSurfaceState,
   initializeInstallSurface,
@@ -24,6 +25,8 @@ class FakeWindow {
       this.storage.set(key, value);
     }
   };
+  public document: { referrer?: string } = {};
+  public matchingQueries: string[] = [];
   public navigator: {
     maxTouchPoints?: number;
     platform?: string;
@@ -32,7 +35,7 @@ class FakeWindow {
   } = {};
 
   private readonly standalone: boolean;
-  private readonly storage = new Map<string, string>();
+  public readonly storage = new Map<string, string>();
 
   public constructor(standalone = false) {
     this.standalone = standalone;
@@ -70,8 +73,8 @@ class FakeWindow {
     }
   }
 
-  public matchMedia(): Pick<MediaQueryList, 'matches'> {
-    return { matches: this.standalone };
+  public matchMedia(query: string): Pick<MediaQueryList, 'matches'> {
+    return { matches: this.standalone || this.matchingQueries.includes(query) };
   }
 }
 
@@ -99,7 +102,7 @@ describe('install surface runtime', () => {
     })).toBeUndefined();
   });
 
-  test('state resolution prefers standalone/install hiding before manual fallback', () => {
+  test('state resolution: only standalone/installed hides the surface; every other context is at least manual', () => {
     expect(resolveInstallSurfaceState({
       standalone: false,
       installed: false,
@@ -108,19 +111,35 @@ describe('install surface runtime', () => {
       mode: 'available',
       canPrompt: true,
       installed: false,
-      standalone: false
+      standalone: false,
+      platform: 'desktop-other'
     });
     expect(resolveInstallSurfaceState({
       standalone: false,
       installed: false,
       canPrompt: false,
-      instruction: 'Use Share > Add to Home Screen'
+      instruction: 'Use Share > Add to Home Screen',
+      platform: 'ios'
     })).toEqual<InstallSurfaceState>({
       mode: 'manual',
       canPrompt: false,
       installed: false,
       standalone: false,
+      platform: 'ios',
       instruction: 'Use Share > Add to Home Screen'
+    });
+    // CHANGED: a browser tab with nothing to say used to fail open to `hidden`.
+    expect(resolveInstallSurfaceState({
+      standalone: false,
+      installed: false,
+      canPrompt: false,
+      platform: 'desktop-chromium'
+    })).toEqual<InstallSurfaceState>({
+      mode: 'manual',
+      canPrompt: false,
+      installed: false,
+      standalone: false,
+      platform: 'desktop-chromium'
     });
     expect(resolveInstallSurfaceState({
       standalone: true,
@@ -131,11 +150,12 @@ describe('install surface runtime', () => {
       mode: 'hidden',
       canPrompt: false,
       installed: true,
-      standalone: true
+      standalone: true,
+      platform: 'desktop-other'
     });
   });
 
-  test('beforeinstallprompt drives the single install action and accepted installs hide it', async () => {
+  test('beforeinstallprompt drives the single install action and an accepted install keeps the tab marked installed-but-not-standalone', async () => {
     const runtime = new FakeWindow();
     const snapshots: InstallSurfaceState[] = [];
     initializeInstallSurface(runtime);
@@ -147,31 +167,75 @@ describe('install surface runtime', () => {
 
     expect(getInstallSurfaceState().mode).toBe('available');
     await expect(promptInstallSurface()).resolves.toBe('accepted');
+    // standalone stays false: the install gate keys off this to show
+    // "Mazer is installed. Open it from ..." instead of letting the tab run.
     expect(getInstallSurfaceState()).toEqual<InstallSurfaceState>({
       mode: 'hidden',
       canPrompt: false,
       installed: true,
-      standalone: false
+      standalone: false,
+      platform: 'desktop-other'
     });
     expect(snapshots.some((state) => state.mode === 'available')).toBe(true);
     unsubscribe();
   });
 
-  test('dismissed install prompts stay hidden until the runtime is reset', async () => {
+  test('a cancelled native prompt falls back to manual steps and is never remembered', async () => {
     const runtime = new FakeWindow();
     initializeInstallSurface(runtime);
     runtime.dispatchEvent('beforeinstallprompt', createPromptEvent('dismissed'));
 
     expect(getInstallSurfaceState().mode).toBe('available');
     await expect(promptInstallSurface()).resolves.toBe('dismissed');
-    expect(getInstallSurfaceState().mode).toBe('hidden');
+    // CHANGED: used to become `hidden` (and persist that). Now the tab stays gated.
+    expect(getInstallSurfaceState().mode).toBe('manual');
+    expect(getInstallSurfaceState().canPrompt).toBe(false);
+    expect(runtime.storage.has(INSTALL_SURFACE_LEGACY_DISMISSED_STORAGE_KEY)).toBe(false);
 
     resetInstallSurfaceRuntimeForTests();
 
-    expect(initializeInstallSurface(runtime).mode).toBe('hidden');
+    // CHANGED: a fresh page load after a cancel is manual again, not hidden.
+    expect(initializeInstallSurface(runtime).mode).toBe('manual');
   });
 
-  test('manual install fallback can be dismissed explicitly', () => {
+  test('a fresh beforeinstallprompt after a cancel upgrades the surface again, and a second click cannot replay a spent event', async () => {
+    const runtime = new FakeWindow();
+    initializeInstallSurface(runtime);
+    runtime.dispatchEvent('beforeinstallprompt', createPromptEvent('dismissed'));
+    await promptInstallSurface();
+    await expect(promptInstallSurface()).resolves.toBe('unavailable');
+
+    runtime.dispatchEvent('beforeinstallprompt', createPromptEvent('accepted'));
+    expect(getInstallSurfaceState().mode).toBe('available');
+  });
+
+  test('a beforeinstallprompt that arrives after boot upgrades subscribers from manual to available', () => {
+    const runtime = new FakeWindow();
+    runtime.navigator = {
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+      platform: 'Win32'
+    };
+    const seen: Array<InstallSurfaceState['mode']> = [];
+
+    expect(initializeInstallSurface(runtime)).toMatchObject({ mode: 'manual', platform: 'desktop-chromium' });
+    subscribeInstallSurface((state) => {
+      seen.push(state.mode);
+    });
+    runtime.dispatchEvent('beforeinstallprompt', createPromptEvent('accepted'));
+
+    expect(seen).toEqual(['available']);
+  });
+
+  test('appinstalled in a browser tab marks it installed but not standalone', () => {
+    const runtime = new FakeWindow();
+    initializeInstallSurface(runtime);
+    runtime.dispatchEvent('beforeinstallprompt', createPromptEvent('accepted'));
+    runtime.dispatchEvent('appinstalled', new Event('appinstalled'));
+
+    expect(getInstallSurfaceState()).toMatchObject({ installed: true, standalone: false, canPrompt: false });
+  });
+
+  test('dismissInstallSurface is a compatibility no-op: it never hides a browser tab', () => {
     const runtime = new FakeWindow(false);
     runtime.navigator = {
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
@@ -179,11 +243,25 @@ describe('install surface runtime', () => {
     };
 
     expect(initializeInstallSurface(runtime).mode).toBe('manual');
-    expect(dismissInstallSurface().mode).toBe('hidden');
-    expect(initializeInstallSurface(runtime).mode).toBe('hidden');
+    // CHANGED: used to return `hidden` and persist the preference.
+    expect(dismissInstallSurface().mode).toBe('manual');
+    expect(runtime.storage.has(INSTALL_SURFACE_LEGACY_DISMISSED_STORAGE_KEY)).toBe(false);
+    resetInstallSurfaceRuntimeForTests();
+    expect(initializeInstallSurface(runtime).mode).toBe('manual');
   });
 
-  test('standalone mode stays hidden and manual iOS fallback remains fail-open', () => {
+  test('a stale dismissed flag written by an older build is ignored', () => {
+    const runtime = new FakeWindow(false);
+    runtime.storage.set(INSTALL_SURFACE_LEGACY_DISMISSED_STORAGE_KEY, '1');
+    runtime.navigator = {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+      platform: 'iPhone'
+    };
+
+    expect(initializeInstallSurface(runtime).mode).toBe('manual');
+  });
+
+  test('standalone mode stays hidden; a non-standalone iOS browser tab is manual', () => {
     const standaloneRuntime = new FakeWindow(true);
     standaloneRuntime.navigator = {
       standalone: true,
@@ -195,7 +273,8 @@ describe('install surface runtime', () => {
       mode: 'hidden',
       canPrompt: false,
       installed: true,
-      standalone: true
+      standalone: true,
+      platform: 'ios'
     });
 
     resetInstallSurfaceRuntimeForTests();
@@ -211,8 +290,28 @@ describe('install surface runtime', () => {
       canPrompt: false,
       installed: false,
       standalone: false,
+      platform: 'ios',
       instruction: 'Use Share > Add to Home Screen'
     });
+  });
+
+  test('installed display modes and the Android app referrer are recognised as standalone; bare fullscreen is not', () => {
+    for (const query of ['(display-mode: minimal-ui)', '(display-mode: window-controls-overlay)']) {
+      resetInstallSurfaceRuntimeForTests();
+      const runtime = new FakeWindow(false);
+      runtime.matchingQueries = [query];
+      expect(initializeInstallSurface(runtime)).toMatchObject({ standalone: true, installed: true, mode: 'hidden' });
+    }
+
+    resetInstallSurfaceRuntimeForTests();
+    const twaRuntime = new FakeWindow(false);
+    twaRuntime.document = { referrer: 'android-app://com.example.mazer' };
+    expect(initializeInstallSurface(twaRuntime)).toMatchObject({ standalone: true });
+
+    resetInstallSurfaceRuntimeForTests();
+    const fullscreenTab = new FakeWindow(false);
+    fullscreenTab.matchingQueries = ['(display-mode: fullscreen)'];
+    expect(initializeInstallSurface(fullscreenTab)).toMatchObject({ standalone: false, mode: 'manual' });
   });
 
   test('detects iOS in-app browsers (TikTok, Instagram, etc.) that cannot install PWAs at all', () => {
@@ -233,7 +332,7 @@ describe('install surface runtime', () => {
     })).toBe(false);
   });
 
-  test('iOS in-app browser hard-blocks with its own mode and ignores the dismissed preference', () => {
+  test('iOS in-app browser gets its own mode and dismissing does nothing', () => {
     const runtime = new FakeWindow(false);
     runtime.navigator = {
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) ... [FBAN/FBIOS]',
@@ -244,14 +343,13 @@ describe('install surface runtime', () => {
       mode: 'ios-open-in-browser',
       canPrompt: false,
       installed: false,
-      standalone: false
+      standalone: false,
+      platform: 'ios-in-app'
     });
-    // Unlike the manual-instruction case, this can't be dismissed away --
-    // the player has to actually leave the in-app browser first.
     expect(dismissInstallSurface().mode).toBe('ios-open-in-browser');
   });
 
-  test('resolveInstallSurfaceState still treats the in-app-browser snapshot flag as a hard block ahead of dismissed', () => {
+  test('resolveInstallSurfaceState still treats the in-app-browser snapshot flag as a hard block and ignores the deprecated dismissed field', () => {
     expect(resolveInstallSurfaceState({
       standalone: false,
       installed: false,
@@ -262,7 +360,14 @@ describe('install surface runtime', () => {
       mode: 'ios-open-in-browser',
       canPrompt: false,
       installed: false,
-      standalone: false
+      standalone: false,
+      platform: 'desktop-other'
     });
+    expect(resolveInstallSurfaceState({
+      standalone: false,
+      installed: false,
+      canPrompt: true,
+      dismissed: true
+    }).mode).toBe('available');
   });
 });

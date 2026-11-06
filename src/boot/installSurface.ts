@@ -1,8 +1,30 @@
+import {
+  classifyInstallUserAgent,
+  detectInstalledDisplayContext,
+  detectIOSFromUserAgentFacts,
+  isIOSInAppBrowserUserAgent,
+  type InstallUserAgentClass
+} from './installPolicy';
+
+/**
+ * Legacy surface mode, kept stable for MenuScene's QA bridge / UI bridge:
+ * - `hidden`: running as an installed app (standalone), or `appinstalled`
+ *   fired in this tab (`installed` true, `standalone` false).
+ * - `ios-open-in-browser`: iOS in-app browser.
+ * - `available`: a deferred beforeinstallprompt can be replayed.
+ * - `manual`: every other non-installed context (the install gate decides
+ *   per-platform copy from `platform`; see installPolicy.ts).
+ *
+ * The browser-gate decision itself is NOT derived from `mode`; installGate.ts
+ * feeds `standalone` / `installed` / `canPrompt` / `platform` into
+ * resolveInstallGateDecision so a non-standalone tab is never "hidden".
+ */
 export interface InstallSurfaceState {
   mode: 'hidden' | 'ios-open-in-browser' | 'available' | 'manual';
   canPrompt: boolean;
   installed: boolean;
   standalone: boolean;
+  platform: InstallUserAgentClass;
   instruction?: string;
 }
 
@@ -10,15 +32,14 @@ export interface InstallSurfaceSnapshot {
   standalone: boolean;
   installed: boolean;
   canPrompt: boolean;
+  /** @deprecated Ignored. A dismissed/cancelled install prompt never unlocks the browser tab. */
   dismissed?: boolean;
   instruction?: string;
+  platform?: InstallUserAgentClass;
   /**
    * iOS PWA installs literally cannot happen from inside an in-app browser
    * (TikTok, Instagram, etc. sandbox their WebView and don't expose "Add to
-   * Home Screen") -- this is the one case that hard-blocks and ignores the
-   * dismissed preference, since it's a technical impossibility, not a
-   * preference the player can dismiss their way past. They have to actually
-   * leave the in-app browser first.
+   * Home Screen"); they have to actually leave the in-app browser first.
    */
   isIOSInAppBrowser?: boolean;
 }
@@ -40,8 +61,13 @@ interface InstallSurfaceNavigatorLike {
   userAgent?: string;
 }
 
+interface InstallSurfaceDocumentLike {
+  referrer?: string;
+}
+
 interface InstallSurfaceWindowLike {
   addEventListener(type: string, listener: EventListenerOrEventListenerObject): void;
+  document?: InstallSurfaceDocumentLike;
   localStorage?: Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>;
   matchMedia?(query: string): Pick<MediaQueryList, 'matches'>;
   navigator?: InstallSurfaceNavigatorLike;
@@ -51,23 +77,28 @@ interface InstallSurfaceWindowLike {
 export type InstallPromptOutcome = DeferredInstallPromptChoice['outcome'] | 'unavailable';
 
 const IOS_MANUAL_INSTALL_INSTRUCTION = 'Use Share > Add to Home Screen';
-const INSTALL_SURFACE_DISMISSED_STORAGE_KEY = 'mazer-install-surface-dismissed-v1';
-// Ported from the Fitness app's own in-app-browser detection (same list of
-// sandboxed WebView user agents that block PWA install).
-const IOS_IN_APP_BROWSER_PATTERN =
-  /(TikTok|musical_ly|Instagram|FBAN|FBAV|Messenger|Twitter|Line|LinkedInApp|Pinterest|Snapchat|Discord|WhatsApp|Telegram|MicroMessenger|LinkMe|Linktree|Beacons)/i;
+/**
+ * Legacy "dismissed" preference key. It used to force the surface hidden and
+ * is now IGNORED (never read, never written): a cancelled native prompt must
+ * not unlock the browser tab. Exported only so tests can prove a stale value
+ * left by an older build has no effect.
+ */
+export const INSTALL_SURFACE_LEGACY_DISMISSED_STORAGE_KEY = 'mazer-install-surface-dismissed-v1';
 
-let installState: InstallSurfaceState = {
+const idleInstallState = (): InstallSurfaceState => ({
   mode: 'hidden',
   canPrompt: false,
   installed: false,
-  standalone: false
-};
+  standalone: false,
+  platform: 'desktop-other'
+});
+
+let installState: InstallSurfaceState = idleInstallState();
 let deferredPrompt: DeferredInstallPromptEvent | undefined;
 let installRuntimeWindow: InstallSurfaceWindowLike | undefined;
 let initialized = false;
 let installed = false;
-let dismissed = false;
+let promptInFlight = false;
 
 const subscribers = new Set<(state: InstallSurfaceState) => void>();
 
@@ -79,48 +110,17 @@ const resolveGlobalWindow = (): InstallSurfaceWindowLike | undefined => (
   typeof window === 'undefined' ? undefined : window
 );
 
-const readDismissedPreference = (runtime: InstallSurfaceWindowLike | undefined): boolean => {
-  try {
-    return runtime?.localStorage?.getItem(INSTALL_SURFACE_DISMISSED_STORAGE_KEY) === '1';
-  } catch {
-    return false;
-  }
-};
-
-const writeDismissedPreference = (runtime: InstallSurfaceWindowLike | undefined, value: boolean): void => {
-  try {
-    if (value) {
-      runtime?.localStorage?.setItem(INSTALL_SURFACE_DISMISSED_STORAGE_KEY, '1');
-    } else {
-      runtime?.localStorage?.removeItem(INSTALL_SURFACE_DISMISSED_STORAGE_KEY);
-    }
-  } catch {
-    // Ignore storage failures; the in-memory state is enough to keep the chrome quiet.
-  }
-};
-
 const resolveStandaloneState = (runtime: InstallSurfaceWindowLike | undefined): boolean => {
   if (!runtime) {
     return false;
   }
 
-  const navigatorLike = runtime.navigator;
-  if (navigatorLike?.standalone === true) {
-    return true;
-  }
-
-  try {
-    return runtime.matchMedia?.('(display-mode: standalone)').matches ?? false;
-  } catch {
-    return false;
-  }
-};
-
-const detectIOSFromNavigator = (navigatorLike: InstallSurfaceNavigatorLike): boolean => {
-  const userAgent = (navigatorLike.userAgent ?? '').toLowerCase();
-  const platform = (navigatorLike.platform ?? '').toLowerCase();
-  return /iphone|ipad|ipod/.test(userAgent)
-    || (platform.includes('mac') && (navigatorLike.maxTouchPoints ?? 0) > 1);
+  const matchMedia = runtime.matchMedia;
+  return detectInstalledDisplayContext({
+    navigatorStandalone: runtime.navigator?.standalone,
+    matchMedia: matchMedia ? (query) => matchMedia.call(runtime, query) : undefined,
+    referrer: runtime.document?.referrer
+  });
 };
 
 export const resolveManualInstallInstruction = (
@@ -130,26 +130,29 @@ export const resolveManualInstallInstruction = (
     return undefined;
   }
 
-  return detectIOSFromNavigator(navigatorLike) ? IOS_MANUAL_INSTALL_INSTRUCTION : undefined;
+  return detectIOSFromUserAgentFacts(navigatorLike) ? IOS_MANUAL_INSTALL_INSTRUCTION : undefined;
 };
 
 export const resolveIsIOSInAppBrowser = (
   navigatorLike: InstallSurfaceNavigatorLike | undefined
 ): boolean => {
-  if (!navigatorLike || !detectIOSFromNavigator(navigatorLike)) {
+  if (!navigatorLike) {
     return false;
   }
 
-  return IOS_IN_APP_BROWSER_PATTERN.test(navigatorLike.userAgent ?? '');
+  return isIOSInAppBrowserUserAgent(navigatorLike);
 };
 
 export const resolveInstallSurfaceState = (snapshot: InstallSurfaceSnapshot): InstallSurfaceState => {
+  const platform = snapshot.platform ?? 'desktop-other';
+
   if (snapshot.standalone || snapshot.installed) {
     return {
       mode: 'hidden',
       canPrompt: false,
       installed: true,
-      standalone: snapshot.standalone
+      standalone: snapshot.standalone,
+      platform
     };
   }
 
@@ -158,16 +161,8 @@ export const resolveInstallSurfaceState = (snapshot: InstallSurfaceSnapshot): In
       mode: 'ios-open-in-browser',
       canPrompt: false,
       installed: false,
-      standalone: false
-    };
-  }
-
-  if (snapshot.dismissed) {
-    return {
-      mode: 'hidden',
-      canPrompt: false,
-      installed: false,
-      standalone: false
+      standalone: false,
+      platform
     };
   }
 
@@ -176,37 +171,34 @@ export const resolveInstallSurfaceState = (snapshot: InstallSurfaceSnapshot): In
       mode: 'available',
       canPrompt: true,
       installed: false,
-      standalone: false
-    };
-  }
-
-  if (snapshot.instruction) {
-    return {
-      mode: 'manual',
-      canPrompt: false,
-      installed: false,
       standalone: false,
-      instruction: snapshot.instruction
+      platform
     };
   }
 
+  // Every other non-installed context is `manual`: there is no "nothing to
+  // show" state for a browser tab any more (the old fail-open `hidden`).
   return {
-    mode: 'hidden',
+    mode: 'manual',
     canPrompt: false,
     installed: false,
-    standalone: false
+    standalone: false,
+    platform,
+    ...(snapshot.instruction ? { instruction: snapshot.instruction } : {})
   };
 };
 
 const publishInstallSurfaceState = (): InstallSurfaceState => {
   const standalone = resolveStandaloneState(installRuntimeWindow);
+  const navigatorLike = installRuntimeWindow?.navigator;
+  const platform = classifyInstallUserAgent(navigatorLike);
   installState = resolveInstallSurfaceState({
     standalone,
     installed: installed || standalone,
-    dismissed: dismissed && !standalone && !installed,
     canPrompt: !standalone && !installed && deferredPrompt !== undefined,
-    instruction: standalone || installed ? undefined : resolveManualInstallInstruction(installRuntimeWindow?.navigator),
-    isIOSInAppBrowser: standalone || installed ? false : resolveIsIOSInAppBrowser(installRuntimeWindow?.navigator)
+    instruction: standalone || installed ? undefined : resolveManualInstallInstruction(navigatorLike),
+    isIOSInAppBrowser: standalone || installed ? false : resolveIsIOSInAppBrowser(navigatorLike),
+    platform
   });
 
   for (const subscriber of subscribers) {
@@ -233,9 +225,7 @@ const handleBeforeInstallPrompt = (event: Event): void => {
 
 const handleAppInstalled = (): void => {
   installed = true;
-  dismissed = false;
   deferredPrompt = undefined;
-  writeDismissedPreference(installRuntimeWindow, false);
   publishInstallSurfaceState();
 };
 
@@ -253,7 +243,6 @@ export const initializeInstallSurface = (
   installRuntimeWindow = runtime;
   initialized = true;
   installed = resolveStandaloneState(runtime);
-  dismissed = !installed && readDismissedPreference(runtime);
   runtime.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
   runtime.addEventListener('appinstalled', handleAppInstalled as EventListener);
 
@@ -272,38 +261,41 @@ export const subscribeInstallSurface = (
   };
 };
 
-export const dismissInstallSurface = (): InstallSurfaceState => {
-  if (installState.mode === 'hidden' || installed) {
-    return installState;
-  }
-
-  dismissed = true;
-  deferredPrompt = undefined;
-  writeDismissedPreference(installRuntimeWindow, true);
-  return publishInstallSurfaceState();
-};
+/**
+ * Compatibility wrapper (MenuScene's QA bridge still calls this). Dismissing
+ * used to hide the surface and persist that choice; the install policy no
+ * longer lets a browser tab be dismissed past the gate, so this is now a
+ * no-op that returns the unchanged state.
+ */
+export const dismissInstallSurface = (): InstallSurfaceState => installState;
 
 export const promptInstallSurface = async (): Promise<InstallPromptOutcome> => {
   const promptEvent = deferredPrompt;
-  if (!promptEvent) {
+  if (!promptEvent || promptInFlight) {
     return 'unavailable';
   }
 
-  deferredPrompt = undefined;
-  publishInstallSurfaceState();
-
-  await promptEvent.prompt();
-
+  // Keep the event (and so the Install button) in place while the native
+  // dialog is open; the in-flight guard stops a second click replaying it.
+  promptInFlight = true;
   let choice: DeferredInstallPromptChoice = { outcome: 'dismissed' };
   try {
+    await promptEvent.prompt();
     choice = await promptEvent.userChoice;
   } catch {
     choice = { outcome: 'dismissed' };
+  } finally {
+    promptInFlight = false;
   }
 
-  installed = choice.outcome === 'accepted';
-  dismissed = choice.outcome !== 'accepted';
-  writeDismissedPreference(installRuntimeWindow, dismissed);
+  // A prompt event can only be replayed once. Whether the player accepted or
+  // cancelled, it is spent; a cancel simply falls back to the manual steps
+  // (and Chromium may fire a fresh beforeinstallprompt later, which upgrades
+  // the card again). A cancel never unlocks the tab.
+  deferredPrompt = undefined;
+  if (choice.outcome === 'accepted') {
+    installed = true;
+  }
   publishInstallSurfaceState();
 
   return choice.outcome;
@@ -318,13 +310,8 @@ export const resetInstallSurfaceRuntimeForTests = (): void => {
   subscribers.clear();
   initialized = false;
   installed = false;
-  dismissed = false;
+  promptInFlight = false;
   deferredPrompt = undefined;
   installRuntimeWindow = undefined;
-  installState = {
-    mode: 'hidden',
-    canPrompt: false,
-    installed: false,
-    standalone: false
-  };
+  installState = idleInstallState();
 };

@@ -107,6 +107,9 @@ const boot = async (): Promise<void> => {
     return;
   }
 
+  // Subscribe to beforeinstallprompt / appinstalled as early as boot allows so
+  // the event is captured even when it fires before the gate is evaluated.
+  initializeInstallSurface(window);
   const viewportGeometry = installMazerViewportGeometry();
 
   if (isLocalhostRuntime()) {
@@ -123,7 +126,6 @@ const boot = async (): Promise<void> => {
     window.sessionStorage.removeItem(LOCALHOST_SW_RESET_KEY);
   }
 
-  initializeInstallSurface(window);
   let oauthCallbackAccepted = false;
   if (oauthCallback !== null) {
     const result = await consumeMazerOAuthCallback(oauthCallback, async () => (
