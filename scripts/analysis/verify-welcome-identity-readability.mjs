@@ -35,8 +35,14 @@ const DIAMOND_EXTENT_PX = 10.5;
 // some platforms (the Linux CI fallback font painted only 4 pixels at the
 // strict 170/215/205 floor at 320 px), so a pixel counts as label ink when it is
 // clearly bright against the dark header (the stroke is near black).
+// With the self-hosted Space Grotesk (thin 14px glyphs + 2px dark stroke) the
+// strict floor yields only 28/9/108 pixels at 390/320/1280 (measured 2026-11-06,
+// Windows Chromium), so the loosened floor stays; it is now font-deterministic
+// (552/304/808 pixels) rather than dependent on an OS fallback face.
 const LABEL_PIXEL_FLOOR = [120, 150, 140];
 const isLabelPixel = ([r, g, b, a]) => a > 200 && r >= LABEL_PIXEL_FLOOR[0] && g >= LABEL_PIXEL_FLOOR[1] && b >= LABEL_PIXEL_FLOOR[2];
+const STRICT_LABEL_PIXEL_FLOOR = [170, 215, 205];
+const isStrictLabelPixel = ([r, g, b, a]) => a > 200 && r >= STRICT_LABEL_PIXEL_FLOOR[0] && g >= STRICT_LABEL_PIXEL_FLOOR[1] && b >= STRICT_LABEL_PIXEL_FLOOR[2];
 const MIN_LABEL_PIXELS = 12;
 
 const LAYOUTS = [
@@ -157,7 +163,7 @@ const main = async () => {
         await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
         const state = await readHeader(page);
         await page.screenshot({ path: join(output, `${name}.png`) });
-        report.checks.push({ name, label: state.label && { ...state.label, pixels: undefined, painted: paintedPixels(state.label) }, welcome: state.welcome, passed: true });
+        report.checks.push({ name, label: state.label && { ...state.label, pixels: undefined, painted: paintedPixels(state.label), paintedStrict: state.label.pixels.filter(isStrictLabelPixel).length }, welcome: state.welcome, passed: true });
         assertHeaderIdentity(name, whole, state);
 
         // Negative control: with the label hidden, the very same pixel assertion must fail.

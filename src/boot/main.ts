@@ -17,6 +17,7 @@ import { bootstrapLegacyRemoteAccountStateForRoute } from '../legacy-runtime/leg
 import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { runBoundedAccountBootstrap } from './bootAccountBootstrap';
 import { MAZER_BOOT_SPLASH_MAX_AFTER_GAME_CREATE_MS } from './bootSplash';
+import { waitForMazerUiFonts } from './fontReadiness';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
 import { initializeInstallSurface } from './installSurface';
@@ -94,6 +95,10 @@ const boot = async (): Promise<void> => {
     ? captureAndScrubMazerOAuthCallback(window.location, window.history)
     : null;
   markMazerBootStatus('boot-start');
+  // Start the UI font fetch immediately (it is also <link rel=preload>ed in
+  // index.html) so it overlaps with the install gate / account bootstrap;
+  // only the Phaser.Game creation below waits on it, and only up to a bound.
+  const uiFontReady = waitForMazerUiFonts();
   const legalRoute = resolveMazerLegalRoute(window.location.pathname);
   let game: Phaser.Game | null = null;
 
@@ -170,6 +175,9 @@ const boot = async (): Promise<void> => {
       console.warn('[mazer] account bootstrap failed; starting on cached state', error);
     }
   });
+  // Phaser rasterizes Text once, so the face must be ready before the first
+  // Text exists. Bounded (MAZER_FONT_READY_TIMEOUT_MS): never throws, never hangs.
+  await uiFontReady;
   markMazerBootStatus('game-creating');
   game = new Phaser.Game(createMazerPhaserConfig(viewportGeometry.getSnapshot().fullBleed));
   attachMazerGameToWindow(game);

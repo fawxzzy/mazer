@@ -15544,7 +15544,7 @@ export class MenuScene extends Phaser.Scene {
 
     const label = this.add.text(0, 0, username, {
       color: '#d7f7ee',
-      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '14px',
       stroke: '#060b0f',
       strokeThickness: 2

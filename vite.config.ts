@@ -44,7 +44,8 @@ export default defineConfig({
         'icons/icon-192.png',
         'icons/icon-512.png',
         'icons/icon-192-maskable.png',
-        'icons/icon-512-maskable.png'
+        'icons/icon-512-maskable.png',
+        'fonts/space-grotesk/space-grotesk-latin-wght-normal.woff2'
       ],
       manifest: false,
       // Keep localhost development SW-free to prevent stale caches while iterating.
