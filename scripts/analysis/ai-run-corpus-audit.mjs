@@ -331,22 +331,76 @@ const readStdin = async () => {
 };
 
 const parseArgs = (argv) => {
-  const args = { input: null, output: null, pretty: false };
+  const args = {
+    input: null, output: null, pretty: false,
+    seedPack: null, markdownOutput: null, coverageDir: null, sealSeedPack: null
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--input') { args.input = argv[index + 1] ?? null; index += 1; }
     else if (arg === '--output') { args.output = argv[index + 1] ?? null; index += 1; }
+    else if (arg === '--seed-pack') { args.seedPack = argv[index + 1] ?? null; index += 1; }
+    else if (arg === '--markdown-output') { args.markdownOutput = argv[index + 1] ?? null; index += 1; }
+    else if (arg === '--seed-pack-coverage') { args.coverageDir = argv[index + 1] ?? null; index += 1; }
+    else if (arg === '--seal-seed-pack') { args.sealSeedPack = argv[index + 1] ?? null; index += 1; }
     else if (arg === '--pretty') args.pretty = true;
     else if (arg === '--help' || arg === '-h') args.help = true;
   }
   return args;
 };
 
-const helpText = `Usage:\n  node scripts/analysis/ai-run-corpus-audit.mjs --input <redacted-export.json|-> [--output <audit.json>] [--pretty]\n\nThe command reads an existing export only. It does not create a Supabase client, write a database row, or include raw account identifiers or paths in its output.\n`;
+const helpText = `Usage:\n  node scripts/analysis/ai-run-corpus-audit.mjs --input <redacted-export.json|-> [--output <audit.json>] [--pretty]\n\nThe command reads an existing export only. It does not create a Supabase client, write a database row, or include raw account identifiers or paths in its output.\n\nSeed-pack modes (fixtures and generated mazes only; never account data):\n  npm run ai:corpus:baseline -- --seed-pack <pack.json> [--output <baseline.json>] [--markdown-output <baseline.md>]\n      Runs the production menu-demo AI runner over a seed pack (needs vite-node, hence the npm script).\n  node scripts/analysis/ai-run-corpus-audit.mjs --seed-pack-coverage <pack-dir> [--output <coverage.json>] [--markdown-output <coverage.md>]\n      Idempotent coverage accounting over committed packs and baselines.\n  node scripts/analysis/ai-run-corpus-audit.mjs --seal-seed-pack <pack.json>\n      Recomputes and writes the pack content hash.\n`;
+
+// Output is written only when content differs, so re-running any seed-pack mode
+// against unchanged inputs leaves files (and their mtimes) untouched.
+const writeIfChanged = async (path, text) => {
+  const target = resolve(path);
+  let existing = null;
+  try { existing = await readFile(target, 'utf8'); } catch (error) { if (error?.code !== 'ENOENT') throw error; }
+  if (existing === text) return { path: target, changed: false };
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, text, 'utf8');
+  return { path: target, changed: true };
+};
+
+const runSeedPackModes = async (args) => {
+  const seedPacks = await import('./lib/ai-run-seed-packs.mjs');
+  const indent = args.pretty || args.output || args.markdownOutput ? 2 : 0;
+  const emit = async (report, markdown) => {
+    const text = JSON.stringify(report, null, indent) + '\n';
+    const writes = {};
+    if (args.output) writes.output = await writeIfChanged(args.output, text);
+    if (args.markdownOutput) writes.markdownOutput = await writeIfChanged(args.markdownOutput, `${markdown}\n`);
+    if (!args.output && !args.markdownOutput) process.stdout.write(text);
+    return writes;
+  };
+
+  if (args.sealSeedPack) {
+    const pack = seedPacks.sealSeedPack(JSON.parse(await readFile(resolve(args.sealSeedPack), 'utf8')));
+    seedPacks.assertValidSeedPack(pack);
+    const write = await writeIfChanged(args.sealSeedPack, JSON.stringify(pack, null, 2) + '\n');
+    return { pack, writes: { pack: write } };
+  }
+  if (args.coverageDir) {
+    const coverage = seedPacks.createSeedPackCoverageReport(
+      await seedPacks.loadSeedPackCoverageInputs(resolve(args.coverageDir))
+    );
+    return { coverage, writes: await emit(coverage, seedPacks.renderCoverageMarkdown(coverage)) };
+  }
+  let runner;
+  try {
+    runner = await import('./lib/ai-run-seed-pack-runner.ts');
+  } catch (error) {
+    throw new Error(`Seed-pack baseline needs a TypeScript-aware runner; use "npm run ai:corpus:baseline -- --seed-pack <pack.json>" (${error instanceof Error ? error.message : String(error)})`);
+  }
+  const baseline = runner.runSeedPackBaseline(JSON.parse(await readFile(resolve(args.seedPack), 'utf8')));
+  return { baseline, writes: await emit(baseline, seedPacks.renderBaselineMarkdown(baseline)) };
+};
 
 export const runMazerAiRunCorpusAuditCli = async (argv = process.argv.slice(2)) => {
   const args = parseArgs(argv);
   if (args.help) { process.stdout.write(helpText); return { help: true }; }
+  if (args.seedPack || args.coverageDir || args.sealSeedPack) return runSeedPackModes(args);
   const inputText = args.input === '-' ? await readStdin() : args.input ? await readFile(resolve(args.input), 'utf8') : await readStdin();
   const audit = createMazerAiRunCorpusAudit(JSON.parse(inputText));
   const text = JSON.stringify(audit, null, args.pretty ? 2 : 0) + '\n';

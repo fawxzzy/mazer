@@ -1,0 +1,893 @@
+{
+  "schema": "mazer.ai-run-seed-pack-baseline.v1",
+  "pack": {
+    "packId": "mazer-ai-seed-stress",
+    "packVersion": "1.0.0",
+    "hash": "sha256:70bae411f671ae4780ccbcf0c17fd52d24931a9248e438c1caf6316777f1f368",
+    "purpose": "stress",
+    "runnerContract": "menu-demo-advance-walker-v1"
+  },
+  "environment": {
+    "aiScorer": {
+      "id": "mazer.maze-cycle-ai-decision-pressure",
+      "version": "1.0.0"
+    },
+    "runQualityScorer": {
+      "id": "mazer.maze-cycle-run-quality",
+      "version": "1.1.0",
+      "shortestPathModel": "playable-wrap-aware-shortest-path-v1",
+      "topologyMetricsVersion": "1.0.0"
+    },
+    "runner": {
+      "averageFrameMs": 16,
+      "completedAt": "2026-01-01T00:00:00.000Z",
+      "controlMode": "stick",
+      "maxStepsFloor": 512,
+      "maxStepsRouteSlack": 12,
+      "surface": "menu-demo",
+      "contract": "menu-demo-advance-walker-v1",
+      "thinkingModel": "human-local-memory"
+    }
+  },
+  "dataPolicy": {
+    "fixturesAndGeneratedMazesOnly": true,
+    "accountDataAccessed": false,
+    "liveDatabaseAccessed": false,
+    "progressionMutationPerformed": false,
+    "receiptsPersisted": false,
+    "rawPathsExcluded": true,
+    "scoringOrReceiptContractChanged": false
+  },
+  "totals": {
+    "caseCount": 15,
+    "reachedGoalCount": 15,
+    "resetUsedCount": 0,
+    "wrappedMazeCount": 15,
+    "actualShorterThanBenchmarkCount": 0,
+    "profileNormalizationDriftCount": 0,
+    "aiSignalCounts": {
+      "clean": 15
+    },
+    "runQualitySignalCounts": {
+      "challenge": 15
+    },
+    "selectionDeliveryCounts": {
+      "on-target": 7,
+      "over-target": 8
+    },
+    "measuredComplexity": {
+      "count": 15,
+      "min": 161,
+      "median": 297,
+      "max": 400,
+      "mean": 289.933
+    },
+    "edgeWrapCount": {
+      "count": 15,
+      "min": 2,
+      "median": 6,
+      "max": 6,
+      "mean": 4.4
+    },
+    "shortestPathLength": {
+      "count": 15,
+      "min": 69,
+      "median": 128,
+      "max": 248,
+      "mean": 141.867
+    },
+    "playerPathLength": {
+      "count": 15,
+      "min": 81,
+      "median": 141,
+      "max": 248,
+      "mean": 147.733
+    },
+    "routeOverrunRatio": {
+      "count": 15,
+      "min": 0,
+      "median": 0,
+      "max": 0.224,
+      "mean": 0.067
+    },
+    "runQualityTotal": {
+      "count": 15,
+      "min": 92,
+      "median": 100,
+      "max": 100,
+      "mean": 97.467
+    },
+    "aiPressureScore": {
+      "count": 15,
+      "min": 0,
+      "median": 0,
+      "max": 13.523,
+      "mean": 4.019
+    },
+    "coverageRatio": {
+      "count": 15,
+      "min": 0.04,
+      "median": 0.069,
+      "max": 0.184,
+      "mean": 0.087
+    }
+  },
+  "targets": [
+    {
+      "targetId": "architect-t280",
+      "band": "architect",
+      "scale": 71,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 280,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 2,
+        "checkpointCountMultiplier": 1.16,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 1.22,
+        "shortcutCountMultiplier": 1.28,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 69,
+        "skillRank": "S",
+        "biasProfile": null
+      },
+      "summary": {
+        "caseCount": 3,
+        "reachedGoalCount": 3,
+        "resetUsedCount": 0,
+        "wrappedMazeCount": 3,
+        "actualShorterThanBenchmarkCount": 0,
+        "profileNormalizationDriftCount": 0,
+        "aiSignalCounts": {
+          "clean": 3
+        },
+        "runQualitySignalCounts": {
+          "challenge": 3
+        },
+        "selectionDeliveryCounts": {
+          "on-target": 1,
+          "over-target": 2
+        },
+        "measuredComplexity": {
+          "count": 3,
+          "min": 274,
+          "median": 297,
+          "max": 297,
+          "mean": 289.333
+        },
+        "edgeWrapCount": {
+          "count": 3,
+          "min": 6,
+          "median": 6,
+          "max": 6,
+          "mean": 6
+        },
+        "shortestPathLength": {
+          "count": 3,
+          "min": 119,
+          "median": 128,
+          "max": 212,
+          "mean": 153
+        },
+        "playerPathLength": {
+          "count": 3,
+          "min": 119,
+          "median": 128,
+          "max": 212,
+          "mean": 153
+        },
+        "routeOverrunRatio": {
+          "count": 3,
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "runQualityTotal": {
+          "count": 3,
+          "min": 100,
+          "median": 100,
+          "max": 100,
+          "mean": 100
+        },
+        "aiPressureScore": {
+          "count": 3,
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "coverageRatio": {
+          "count": 3,
+          "min": 0.057,
+          "median": 0.061,
+          "max": 0.103,
+          "mean": 0.074
+        }
+      }
+    },
+    {
+      "targetId": "mythic-t400",
+      "band": "mythic",
+      "scale": 96,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 400,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 2,
+        "checkpointCountMultiplier": 1.32,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 1.45,
+        "shortcutCountMultiplier": 1.58,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 99,
+        "skillRank": "S",
+        "biasProfile": null
+      },
+      "summary": {
+        "caseCount": 3,
+        "reachedGoalCount": 3,
+        "resetUsedCount": 0,
+        "wrappedMazeCount": 3,
+        "actualShorterThanBenchmarkCount": 0,
+        "profileNormalizationDriftCount": 0,
+        "aiSignalCounts": {
+          "clean": 3
+        },
+        "runQualitySignalCounts": {
+          "challenge": 3
+        },
+        "selectionDeliveryCounts": {
+          "on-target": 3
+        },
+        "measuredComplexity": {
+          "count": 3,
+          "min": 400,
+          "median": 400,
+          "max": 400,
+          "mean": 400
+        },
+        "edgeWrapCount": {
+          "count": 3,
+          "min": 6,
+          "median": 6,
+          "max": 6,
+          "mean": 6
+        },
+        "shortestPathLength": {
+          "count": 3,
+          "min": 141,
+          "median": 179,
+          "max": 248,
+          "mean": 189.333
+        },
+        "playerPathLength": {
+          "count": 3,
+          "min": 141,
+          "median": 179,
+          "max": 248,
+          "mean": 189.333
+        },
+        "routeOverrunRatio": {
+          "count": 3,
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "runQualityTotal": {
+          "count": 3,
+          "min": 100,
+          "median": 100,
+          "max": 100,
+          "mean": 100
+        },
+        "aiPressureScore": {
+          "count": 3,
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "coverageRatio": {
+          "count": 3,
+          "min": 0.04,
+          "median": 0.05,
+          "max": 0.069,
+          "mean": 0.053
+        }
+      }
+    },
+    {
+      "targetId": "mythic-t400-weak-ai",
+      "band": "mythic",
+      "scale": 96,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 400,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 2,
+        "checkpointCountMultiplier": 1.32,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 1.45,
+        "shortcutCountMultiplier": 1.58,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 1,
+        "skillRank": "E",
+        "biasProfile": null
+      },
+      "summary": {
+        "caseCount": 3,
+        "reachedGoalCount": 3,
+        "resetUsedCount": 0,
+        "wrappedMazeCount": 3,
+        "actualShorterThanBenchmarkCount": 0,
+        "profileNormalizationDriftCount": 0,
+        "aiSignalCounts": {
+          "clean": 3
+        },
+        "runQualitySignalCounts": {
+          "challenge": 3
+        },
+        "selectionDeliveryCounts": {
+          "on-target": 3
+        },
+        "measuredComplexity": {
+          "count": 3,
+          "min": 400,
+          "median": 400,
+          "max": 400,
+          "mean": 400
+        },
+        "edgeWrapCount": {
+          "count": 3,
+          "min": 6,
+          "median": 6,
+          "max": 6,
+          "mean": 6
+        },
+        "shortestPathLength": {
+          "count": 3,
+          "min": 141,
+          "median": 179,
+          "max": 248,
+          "mean": 189.333
+        },
+        "playerPathLength": {
+          "count": 3,
+          "min": 141,
+          "median": 179,
+          "max": 248,
+          "mean": 189.333
+        },
+        "routeOverrunRatio": {
+          "count": 3,
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "runQualityTotal": {
+          "count": 3,
+          "min": 100,
+          "median": 100,
+          "max": 100,
+          "mean": 100
+        },
+        "aiPressureScore": {
+          "count": 3,
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "coverageRatio": {
+          "count": 3,
+          "min": 0.04,
+          "median": 0.05,
+          "max": 0.069,
+          "mean": 0.053
+        }
+      }
+    },
+    {
+      "targetId": "explorer-t96-weak-ai-long-tail",
+      "band": "explorer",
+      "scale": 43,
+      "aspectRatio": 1,
+      "selection": {
+        "targetComplexity": 96,
+        "candidateCount": 3,
+        "tolerance": 8
+      },
+      "generationProfile": {
+        "borderFeederTargetPerSide": 1,
+        "checkpointCountMultiplier": 0.86,
+        "checkpointCountOverride": null,
+        "maxDeadEndCount": null,
+        "minCheckpoints": 4,
+        "requiredOppositeBorderConnections": {
+          "horizontal": true,
+          "vertical": true
+        },
+        "routeQualityReinforcementMultiplier": 0.7,
+        "shortcutCountMultiplier": 0.62,
+        "straightnessBias": 0
+      },
+      "ai": {
+        "skillLevel": 1,
+        "skillRank": "E",
+        "biasProfile": "shortcut-gambler"
+      },
+      "summary": {
+        "caseCount": 6,
+        "reachedGoalCount": 6,
+        "resetUsedCount": 0,
+        "wrappedMazeCount": 6,
+        "actualShorterThanBenchmarkCount": 0,
+        "profileNormalizationDriftCount": 0,
+        "aiSignalCounts": {
+          "clean": 6
+        },
+        "runQualitySignalCounts": {
+          "challenge": 6
+        },
+        "selectionDeliveryCounts": {
+          "over-target": 6
+        },
+        "measuredComplexity": {
+          "count": 6,
+          "min": 161,
+          "median": 167,
+          "max": 243,
+          "mean": 180.167
+        },
+        "edgeWrapCount": {
+          "count": 6,
+          "min": 2,
+          "median": 2,
+          "max": 2,
+          "mean": 2
+        },
+        "shortestPathLength": {
+          "count": 6,
+          "min": 69,
+          "median": 87,
+          "max": 122,
+          "mean": 88.833
+        },
+        "playerPathLength": {
+          "count": 6,
+          "min": 81,
+          "median": 101.5,
+          "max": 142,
+          "mean": 103.5
+        },
+        "routeOverrunRatio": {
+          "count": 6,
+          "min": 0.112,
+          "median": 0.169,
+          "max": 0.224,
+          "mean": 0.167
+        },
+        "runQualityTotal": {
+          "count": 6,
+          "min": 92,
+          "median": 93.5,
+          "max": 96,
+          "mean": 93.667
+        },
+        "aiPressureScore": {
+          "count": 6,
+          "min": 8.283,
+          "median": 9.313,
+          "max": 13.523,
+          "mean": 10.048
+        },
+        "coverageRatio": {
+          "count": 6,
+          "min": 0.096,
+          "median": 0.125,
+          "max": 0.184,
+          "mean": 0.128
+        }
+      }
+    }
+  ],
+  "cases": [
+    {
+      "targetId": "architect-t280",
+      "seed": 7,
+      "effectiveMazeSeed": 8,
+      "width": 71,
+      "height": 71,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "over-target",
+      "measuredComplexity": 297,
+      "edgeWrapCount": 6,
+      "shortestPathLength": 128,
+      "playerPathLength": 128,
+      "routeOverrunRatio": 0,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 0,
+      "backtracks": 0,
+      "runQualityTotal": 100,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 0,
+      "aiSignal": "clean",
+      "coverageRatio": 0.061,
+      "cleanRun": true
+    },
+    {
+      "targetId": "architect-t280",
+      "seed": 313,
+      "effectiveMazeSeed": 314,
+      "width": 71,
+      "height": 71,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "on-target",
+      "measuredComplexity": 274,
+      "edgeWrapCount": 6,
+      "shortestPathLength": 212,
+      "playerPathLength": 212,
+      "routeOverrunRatio": 0,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 0,
+      "backtracks": 0,
+      "runQualityTotal": 100,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 0,
+      "aiSignal": "clean",
+      "coverageRatio": 0.103,
+      "cleanRun": true
+    },
+    {
+      "targetId": "architect-t280",
+      "seed": 9001,
+      "effectiveMazeSeed": 9003,
+      "width": 71,
+      "height": 71,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "over-target",
+      "measuredComplexity": 297,
+      "edgeWrapCount": 6,
+      "shortestPathLength": 119,
+      "playerPathLength": 119,
+      "routeOverrunRatio": 0,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 0,
+      "backtracks": 0,
+      "runQualityTotal": 100,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 0,
+      "aiSignal": "clean",
+      "coverageRatio": 0.057,
+      "cleanRun": true
+    },
+    {
+      "targetId": "mythic-t400",
+      "seed": 7,
+      "effectiveMazeSeed": 8,
+      "width": 95,
+      "height": 95,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "on-target",
+      "measuredComplexity": 400,
+      "edgeWrapCount": 6,
+      "shortestPathLength": 248,
+      "playerPathLength": 248,
+      "routeOverrunRatio": 0,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 0,
+      "backtracks": 0,
+      "runQualityTotal": 100,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 0,
+      "aiSignal": "clean",
+      "coverageRatio": 0.069,
+      "cleanRun": true
+    },
+    {
+      "targetId": "mythic-t400",
+      "seed": 313,
+      "effectiveMazeSeed": 313,
+      "width": 95,
+      "height": 95,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "on-target",
+      "measuredComplexity": 400,
+      "edgeWrapCount": 6,
+      "shortestPathLength": 141,
+      "playerPathLength": 141,
+      "routeOverrunRatio": 0,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 0,
+      "backtracks": 0,
+      "runQualityTotal": 100,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 0,
+      "aiSignal": "clean",
+      "coverageRatio": 0.04,
+      "cleanRun": true
+    },
+    {
+      "targetId": "mythic-t400",
+      "seed": 9001,
+      "effectiveMazeSeed": 9001,
+      "width": 95,
+      "height": 95,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "on-target",
+      "measuredComplexity": 400,
+      "edgeWrapCount": 6,
+      "shortestPathLength": 179,
+      "playerPathLength": 179,
+      "routeOverrunRatio": 0,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 0,
+      "backtracks": 0,
+      "runQualityTotal": 100,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 0,
+      "aiSignal": "clean",
+      "coverageRatio": 0.05,
+      "cleanRun": true
+    },
+    {
+      "targetId": "mythic-t400-weak-ai",
+      "seed": 7,
+      "effectiveMazeSeed": 8,
+      "width": 95,
+      "height": 95,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "on-target",
+      "measuredComplexity": 400,
+      "edgeWrapCount": 6,
+      "shortestPathLength": 248,
+      "playerPathLength": 248,
+      "routeOverrunRatio": 0,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 0,
+      "backtracks": 0,
+      "runQualityTotal": 100,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 0,
+      "aiSignal": "clean",
+      "coverageRatio": 0.069,
+      "cleanRun": true
+    },
+    {
+      "targetId": "mythic-t400-weak-ai",
+      "seed": 313,
+      "effectiveMazeSeed": 313,
+      "width": 95,
+      "height": 95,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "on-target",
+      "measuredComplexity": 400,
+      "edgeWrapCount": 6,
+      "shortestPathLength": 141,
+      "playerPathLength": 141,
+      "routeOverrunRatio": 0,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 0,
+      "backtracks": 0,
+      "runQualityTotal": 100,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 0,
+      "aiSignal": "clean",
+      "coverageRatio": 0.04,
+      "cleanRun": true
+    },
+    {
+      "targetId": "mythic-t400-weak-ai",
+      "seed": 9001,
+      "effectiveMazeSeed": 9001,
+      "width": 95,
+      "height": 95,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "on-target",
+      "measuredComplexity": 400,
+      "edgeWrapCount": 6,
+      "shortestPathLength": 179,
+      "playerPathLength": 179,
+      "routeOverrunRatio": 0,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 0,
+      "backtracks": 0,
+      "runQualityTotal": 100,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 0,
+      "aiSignal": "clean",
+      "coverageRatio": 0.05,
+      "cleanRun": true
+    },
+    {
+      "targetId": "explorer-t96-weak-ai-long-tail",
+      "seed": 265,
+      "effectiveMazeSeed": 267,
+      "width": 43,
+      "height": 43,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "over-target",
+      "measuredComplexity": 165,
+      "edgeWrapCount": 2,
+      "shortestPathLength": 74,
+      "playerPathLength": 88,
+      "routeOverrunRatio": 0.189,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 5,
+      "backtracks": 9,
+      "runQualityTotal": 92,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 13.523,
+      "aiSignal": "clean",
+      "coverageRatio": 0.097,
+      "cleanRun": false
+    },
+    {
+      "targetId": "explorer-t96-weak-ai-long-tail",
+      "seed": 636,
+      "effectiveMazeSeed": 636,
+      "width": 43,
+      "height": 43,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "over-target",
+      "measuredComplexity": 181,
+      "edgeWrapCount": 2,
+      "shortestPathLength": 69,
+      "playerPathLength": 81,
+      "routeOverrunRatio": 0.174,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 5,
+      "backtracks": 7,
+      "runQualityTotal": 93,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 11.358,
+      "aiSignal": "clean",
+      "coverageRatio": 0.096,
+      "cleanRun": false
+    },
+    {
+      "targetId": "explorer-t96-weak-ai-long-tail",
+      "seed": 848,
+      "effectiveMazeSeed": 850,
+      "width": 43,
+      "height": 43,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "over-target",
+      "measuredComplexity": 162,
+      "edgeWrapCount": 2,
+      "shortestPathLength": 89,
+      "playerPathLength": 99,
+      "routeOverrunRatio": 0.112,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 4,
+      "backtracks": 6,
+      "runQualityTotal": 96,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 8.498,
+      "aiSignal": "clean",
+      "coverageRatio": 0.12,
+      "cleanRun": false
+    },
+    {
+      "targetId": "explorer-t96-weak-ai-long-tail",
+      "seed": 1378,
+      "effectiveMazeSeed": 1378,
+      "width": 43,
+      "height": 43,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "over-target",
+      "measuredComplexity": 243,
+      "edgeWrapCount": 2,
+      "shortestPathLength": 85,
+      "playerPathLength": 104,
+      "routeOverrunRatio": 0.224,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 9,
+      "backtracks": 5,
+      "runQualityTotal": 92,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 9.928,
+      "aiSignal": "clean",
+      "coverageRatio": 0.129,
+      "cleanRun": false
+    },
+    {
+      "targetId": "explorer-t96-weak-ai-long-tail",
+      "seed": 1537,
+      "effectiveMazeSeed": 1539,
+      "width": 43,
+      "height": 43,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "over-target",
+      "measuredComplexity": 169,
+      "edgeWrapCount": 2,
+      "shortestPathLength": 122,
+      "playerPathLength": 142,
+      "routeOverrunRatio": 0.164,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 9,
+      "backtracks": 11,
+      "runQualityTotal": 94,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 8.697,
+      "aiSignal": "clean",
+      "coverageRatio": 0.184,
+      "cleanRun": false
+    },
+    {
+      "targetId": "explorer-t96-weak-ai-long-tail",
+      "seed": 1590,
+      "effectiveMazeSeed": 1592,
+      "width": 43,
+      "height": 43,
+      "generationProfileNormalized": true,
+      "selectionDelivery": "over-target",
+      "measuredComplexity": 161,
+      "edgeWrapCount": 2,
+      "shortestPathLength": 94,
+      "playerPathLength": 107,
+      "routeOverrunRatio": 0.138,
+      "reachedGoal": true,
+      "resetUsed": false,
+      "wrongTurns": 5,
+      "backtracks": 6,
+      "runQualityTotal": 95,
+      "runQualitySignal": "challenge",
+      "aiPressureScore": 8.283,
+      "aiSignal": "clean",
+      "coverageRatio": 0.14,
+      "cleanRun": false
+    }
+  ],
+  "resultDigest": "sha256:41ac9201267fdc0a134fbab341306466598faef33d6ce9ec86aa4c9d06f9f9b7"
+}
