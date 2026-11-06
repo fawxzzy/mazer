@@ -15277,13 +15277,9 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    // No stroke / halo / background plate: the header backdrop is already
-    // near-black, and a 2 px dark stroke on this Text became a soft halo around
-    // grey-looking glyphs on a DPR 2-3 phone. 2 px vertical padding is set at
-    // creation so descenders (q, p, y, g) are never clipped. Text resolution is
-    // deliberately NOT raised: under this Canvas renderer (which already owns
-    // the DPR transform) Text.setResolution(n) paints the glyphs n times larger
-    // while getBounds() stays logical -- see render/textCrispness.ts.
+    // No stroke/halo/plate (audit finding 1); 2 px padding keeps descenders.
+    // Text resolution stays at the baseline: n > 1 paints glyphs n times larger
+    // under this Canvas renderer (render/textCrispness.ts).
     const label = this.add.text(0, 0, username, {
       color: '#d7f7ee',
       fontFamily: LEGACY_UI_FONT_FAMILY,
