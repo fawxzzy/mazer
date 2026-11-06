@@ -55,26 +55,20 @@ const INLINE_STATE_TEXT_LABELS = Object.freeze([
   'Trail Fade',
   'Trail Shine'
 ]);
-// The two inline auth field labels were removed here (2026-09-15): commit
-// 769e63f6 ("feat(auth): adopt shared account OAuth portal", 2026-09-13)
-// replaced the auth overlay's default signed-out content with
-// buildSharedAccountEntrySection, which never calls createAuthFieldBox --
-// that function's own inline email/password fields are only reachable from
-// a completely different overlay (buildPasswordRecoveryOverlay), and even
-// there only the password/confirmPassword field ids are ever passed, never
-// email. Confirmed live (real built app, headless Playwright): the
-// signed-out auth gate's actual rendered text labels are the wordmark, the
-// "Use your shared Fawxzzy account..." explainer, and the Reset
-// password/Privacy/Terms/Create account/Sign in controls kept below --
-// never the two inline field labels this constant used to require, which
-// predates the redesign by four weeks (1585c671, 2026-08-16) and was never
-// updated to match. Not a stale-test-vs-still-fixable-app judgment call:
-// there is no reachable code path left that renders those two labels for
-// this surface.
+// The two inline auth field labels were removed here (2026-09-15): the
+// signed-out auth overlay has no inline credential fields (Mazer authenticates
+// through the account host's OAuth flow). 2026-11-05: the forced screen was
+// rebuilt to the shared auth-surface family anatomy (MenuScene
+// buildSharedAccountEntrySection, drawn from legacyAuthScreenView.ts): marker,
+// `Welcome`, NO subtitle, a `Create Account | Reset Password` rail, a
+// `Privacy Policy | Terms of Service` legal row and ONE full-width bottom-dock
+// `Sign in`. These are the labels that structure exposes as buttons.
 const AUTH_EXPECTED_LABELS = Object.freeze([
   'Sign in',
-  'Create account',
-  'Reset password'
+  'Create Account',
+  'Reset Password',
+  'Privacy Policy',
+  'Terms of Service'
 ]);
 
 const buildExpectedTextLabelDescriptors = (expectedLabels) => (
@@ -1295,8 +1289,50 @@ export const hasTextLabels = (surface, expectedLabels) => {
   return hasExpectedTextLabels(labels, expectedLabels);
 };
 
+// The forced signed-out auth screen follows the shared auth-surface family
+// anatomy: `Welcome` (never `Account`), no subtitle paragraph, ONE bottom-dock
+// `Sign in` button, and no guest / skip / close / back action.
+export const evaluateAuthWelcomeAnatomy = (surface) => {
+  const labels = collectTextLabels(surface);
+  const buttonTexts = (surface?.buttons ?? []).map((button) => button?.text);
+  const failures = [];
+  if (!labels.includes('Welcome')) {
+    failures.push('missing-title-Welcome');
+  }
+  if (labels.includes('Account')) {
+    failures.push('legacy-title-Account');
+  }
+  if (labels.some((label) => typeof label === 'string' && /shared fawxzzy account|keep progression/i.test(label))) {
+    failures.push('subtitle-paragraph-present');
+  }
+  const signInCount = buttonTexts.filter((text) => text === 'Sign in' || text === 'Opening…').length;
+  if (signInCount !== 1) {
+    failures.push(`sign-in-dock-count=${signInCount}`);
+  }
+  if (buttonTexts.some((text) => typeof text === 'string' && /guest|skip|later|close|back/i.test(text))) {
+    failures.push('forbidden-guest-skip-close-or-back-action');
+  }
+  return { failures, pass: failures.length === 0 };
+};
+
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
   'GUIDE',
+  'Trail Fade',
+  'Trail Shine',
+  'Animated Background'
+]);
+
+// Pause card (2026-11-06 header/pause lane): title, Resume, Settings (collapsed
+// on every open) and Quit to Menu. There is no Guide card and no inline toggles
+// until Settings is opened; the toggles then render inside the card.
+const PAUSE_CARD_EXPECTED_LABELS = Object.freeze([
+  'Paused',
+  'Resume',
+  'Settings',
+  'Quit to Menu'
+]);
+const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([
+  'Board Zoom',
   'Trail Fade',
   'Trail Shine',
   'Animated Background'
@@ -1325,6 +1361,29 @@ const getPauseButtonPoint = (visual) => {
   return pause
     ? { x: Math.round(pause.centerX), y: Math.round(pause.centerY) }
     : null;
+};
+
+// The menu intro locks input for a short, timing-dependent window after a
+// reload; a Start tap that lands inside it is ignored. Re-tap (bounded) until
+// the app actually reports play mode, so a swallowed tap is not mistaken for a
+// product failure. Fails loudly if play never starts.
+export const clickStartUntilPlay = async (page, point, { attempts = 6, settleMs = 1500 } = {}) => {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    await clickPoint(page, point, 'Start');
+    try {
+      await page.waitForFunction((attribute) => {
+        try {
+          return JSON.parse(document.documentElement.getAttribute(attribute) ?? 'null')?.runtime?.mode === 'play';
+        } catch {
+          return false;
+        }
+      }, VISUAL_DIAGNOSTICS_ATTRIBUTE, { timeout: settleMs });
+      return attempt;
+    } catch {
+      // Not in play yet: the tap was swallowed by the intro input lock; retry.
+    }
+  }
+  throw new Error(`Start did not enter play mode after ${attempts} taps.`);
 };
 
 const closeOverlayToMenu = async (page, timeoutMs) => {
@@ -1579,8 +1638,20 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
   return issues;
 };
 
+// The redesigned pause card (2026-11-06) is a fixed card, not a scroll
+// viewport and not a Guide host: its diagnostics report scroll.enabled=false
+// with a null viewport. That is only accepted for a pause surface that still
+// reports real card panel bounds; options and every other surface keep the
+// strict scroll-viewport requirements.
+export const isFixedCardWithoutScroll = (surfaceId, surface) => (
+  String(surfaceId).startsWith('pause')
+  && isFiniteBounds(surface?.overlayUi?.panel) === true
+  && surface?.overlayUi?.scroll?.enabled !== true
+  && (surface?.overlayUi?.scroll?.viewport ?? null) === null
+);
+
 const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {
-  if (surface?.skipped === true) {
+  if (surface?.skipped === true || isFixedCardWithoutScroll(surfaceId, surface)) {
     return [];
   }
 
@@ -1732,7 +1803,7 @@ const collectButtonLabelFillIssues = (surfaceId, surface) => (surface?.buttons ?
 });
 
 const collectOverlayScrollCueTextIssues = (surfaceId, surface) => {
-  if (surface?.skipped === true) {
+  if (surface?.skipped === true || isFixedCardWithoutScroll(surfaceId, surface)) {
     return [];
   }
   const scroll = surface?.overlayUi?.scroll;
@@ -1784,7 +1855,10 @@ const isGuideLabel = (text) => [
 const collectGuideTextContainmentIssues = (surfaceId, surface) => {
   const guide = surface?.overlayUi?.guidePanel;
   if (!isFiniteBounds(guide)) {
-    return surface?.skipped === true ? [] : [`${surfaceId}:missing-guide-panel-bounds`];
+    // Pause has no Guide card (pause-text-labels asserts no GUIDE label).
+    return surface?.skipped === true || String(surfaceId).startsWith('pause')
+      ? []
+      : [`${surfaceId}:missing-guide-panel-bounds`];
   }
   return collectTextLabelEntries(surface)
     .filter((entry) => isGuideLabel(String(entry?.text ?? '')))
@@ -2139,6 +2213,15 @@ const buildSurfaceChecks = ({
         : `skipped=${surfaces.auth.skipped === true} reason=${surfaces.auth.reason ?? 'missing'}`
     ),
     createCheck(
+      'auth-welcome-anatomy',
+      surfaces.auth.captured === true
+        ? evaluateAuthWelcomeAnatomy(surfaces.auth).pass
+        : surfaces.auth.skipped === true,
+      surfaces.auth.captured === true
+        ? `failures=${evaluateAuthWelcomeAnatomy(surfaces.auth).failures.join(',') || 'none'}`
+        : `skipped=${surfaces.auth.skipped === true} reason=${surfaces.auth.reason ?? 'missing'}`
+    ),
+    createCheck(
       'options-bottom-account-action',
       !includeOverlayBottom
         ? surfaces.optionsBottom.skipped === true
@@ -2179,9 +2262,11 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'pause-text-labels',
-      hasLabels(surfaces.pause, ['GUIDE', 'Board Zoom', 'Trail Fade', 'Trail Shine', 'Animated Background'])
-        && !hasLabels(surfaces.pause, ['Game Toggles', 'Resume']),
-      `labels=${labelDetail(surfaces.pause)}`
+      hasLabels(surfaces.pause, PAUSE_CARD_EXPECTED_LABELS)
+        && !hasLabels(surfaces.pause, ['Game Toggles'])
+        && !hasLabels(surfaces.pause, ['GUIDE'])
+        && (!includeOverlayBottom || hasLabels(surfaces.pauseBottom, PAUSE_SETTINGS_EXPECTED_LABELS)),
+      `labels=${labelDetail(surfaces.pause)}; settings-open=${includeOverlayBottom ? labelDetail(surfaces.pauseBottom) : 'skipped for viewport-transition proof'}`
     ),
     createCheck(
       'mobile-text-label-bounds',
@@ -2777,7 +2862,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       ? resolveRouteWithParams(route, { authFixture: 'authenticated' })
       : route;
     await waitForVisualBuildSettled(page, { timeoutMs });
-    await clickPoint(page, menuButtons.start, 'Start');
+    await clickStartUntilPlay(page, menuButtons.start);
     await waitForVisualBuildSettled(page, { timeoutMs });
     const playTrailSeed = options.skipPlayTrailSeed
       ? {
@@ -2816,7 +2901,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       outputDir,
       expectedLabels: transition
         ? []
-        : ['GUIDE', 'Board Zoom', 'Trail Fade', 'Trail Shine', 'Animated Background'],
+        : PAUSE_CARD_EXPECTED_LABELS,
       id: '04-pause',
       mode: 'play',
       overlay: 'pause',
@@ -2834,6 +2919,16 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const pauseBottomSurface = transition
       ? { diagnostics: { runtime: null, visual: null }, nativeInputs: [], screenContract: null, skipped: true }
       : await (async () => {
+        // Settings is collapsed on every open: expand it with a real click so
+        // the bottom capture proves the toggles render inside the card.
+        const pauseSettingsPoint = getVisualButtonPoint(pause.diagnostics.visual, 'Settings');
+        await clickPoint(page, pauseSettingsPoint, 'Pause Settings');
+        await waitForSurface(page, {
+          expectedLabels: PAUSE_SETTINGS_EXPECTED_LABELS,
+          mode: 'play',
+          overlay: 'pause',
+          timeoutMs
+        });
         await scrollOverlayToBottom(page, { timeoutMs });
         return captureSurface({
           page,
@@ -2879,6 +2974,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         progressionBadge: authSurface.diagnostics.visual?.progressionBadge,
         title: authSurface.diagnostics.visual?.title,
         nativeInputs: authSurface.nativeInputs,
+        buttons: authSurface.diagnostics.visual?.buttons,
         textLabels: authSurface.diagnostics.visual?.textLabels,
         screenContract: authSurface.screenContract,
         materialSystem: authSurface.diagnostics.visual?.materialSystem
