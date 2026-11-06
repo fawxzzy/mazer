@@ -709,6 +709,10 @@ const resolveLegacyMazeGenerationBaseProfileForProgression = (
         checkpointCountMultiplier: 0.42,
         checkpointCountOverride: 1,
         maxDeadEndCount: 0,
+        // Level 1 is a literal straight corridor: createLegacyMaze bypasses
+        // the path builder entirely for this layout (the knobs around this
+        // line only matter if the layout is ever removed).
+        layout: 'corridor',
         minCheckpoints: 1,
         requiredOppositeBorderConnections: { horizontal: false, vertical: false },
         routeQualityReinforcementMultiplier: 0,
