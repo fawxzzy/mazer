@@ -561,8 +561,8 @@ export const resolveLegacyProgressionLevel = (targetComplexity: number): number 
 );
 
 // The one seam that decides whether a track's maze geometry comes from the
-// geometry budget ladder (levels 2..LAST_BUDGET_LEVEL) or from the legacy
-// band path (null). It reads the BOUNDED level derived from the target
+// continuous geometry difficulty function (every bounded level 2..LAST_BUDGET_LEVEL,
+// i.e. all of them) or from the level-1 corridor / legacy band path (null). It reads the BOUNDED level derived from the target
 // complexity -- never the server-owned, unbounded completion ordinal
 // (track.level) -- so an out-of-range or migrated save can never reach a
 // budget rung its target complexity has not earned. Level 1 is the corridor

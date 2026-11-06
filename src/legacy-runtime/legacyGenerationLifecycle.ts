@@ -575,7 +575,7 @@ const resolveLegacyAdaptiveUnderTargetScale = (scale: number): number => {
 // built from the one fixed profile and the first whose H1 proxy lies within
 // GEOMETRY_BUDGET_ACCEPT_HALF_WIDTH of the level's baked target T(N) wins; if
 // none does, the nearest one wins. Because accepted candidates are within less
-// than half the minimum T(N) step, accepted mazes of adjacent levels can never
+// than half the target step, accepted mazes of adjacent levels can never
 // tie or invert. selectionOptions.candidateCount is deliberately ignored: the
 // goal-reset precompute passes 1, which would silently disable the gate on the
 // main level-to-level path.
