@@ -186,6 +186,7 @@ import {
 } from '../legacy-runtime/legacyPathVisualStyle';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
+import { resolveLegacyMinHitRect } from '../legacy-runtime/legacyHitTarget';
 import {
   LEGACY_HEADER_IDENTITY_LABEL_NAME,
   resolveLegacyHeaderIdentityPlacement
@@ -12129,7 +12130,15 @@ export class MenuScene extends Phaser.Scene {
     width: number,
     height: number
   ): UiButton {
-    const background = this.add.rectangle(centerX, centerY, width, height, 0x000000, 0);
+    // The card's header row can be shorter than the touch-target floor on
+    // compact widths (40px); grow only the invisible zone, centered on the row.
+    const hit = resolveLegacyMinHitRect({
+      height,
+      left: centerX - (width / 2),
+      top: centerY - (height / 2),
+      width
+    });
+    const background = this.add.rectangle(hit.centerX, hit.centerY, hit.width, hit.height, 0x000000, 0);
     background.setInteractive({ useHandCursor: true });
     const label = this.padLegacyUiText(this.add.text(centerX, centerY, '', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
@@ -12157,7 +12166,7 @@ export class MenuScene extends Phaser.Scene {
 
     return {
       background,
-      bounds: createVisualRect(centerX - (width / 2), centerY - (height / 2), width, height),
+      bounds: createVisualRect(hit.left, hit.top, hit.width, hit.height),
       label,
       setActive: () => undefined,
       text: 'Guide',
@@ -15272,20 +15281,17 @@ export class MenuScene extends Phaser.Scene {
       sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
-    const hitSize = Math.max(36, pauseRect.width, pauseRect.height);
-    const hitBounds = createVisualRect(
-      pauseRect.centerX - (hitSize / 2),
-      pauseRect.centerY - (hitSize / 2),
-      hitSize,
-      hitSize
-    );
+    // Visual glyph stays 32-40px; the interactive zone is grown to the 44px
+    // touch-target floor (see legacyHitTarget.ts).
+    const hit = resolveLegacyMinHitRect(pauseRect, this.layout);
+    const hitBounds = createVisualRect(hit.left, hit.top, hit.width, hit.height);
     this.menuSettingsCogActive = false;
 
     const background = this.add.rectangle(
-      pauseRect.centerX,
-      pauseRect.centerY,
-      hitSize,
-      hitSize,
+      hit.centerX,
+      hit.centerY,
+      hit.width,
+      hit.height,
       0x000000,
       0.001
     );
@@ -15336,16 +15342,11 @@ export class MenuScene extends Phaser.Scene {
       slot: 1,
       width: this.layout.width
     });
-    const hitSize = Math.max(36, rect.width, rect.height);
-    const hitBounds = createVisualRect(
-      rect.centerX - (hitSize / 2),
-      rect.centerY - (hitSize / 2),
-      hitSize,
-      hitSize
-    );
+    const hit = resolveLegacyMinHitRect(rect, this.layout);
+    const hitBounds = createVisualRect(hit.left, hit.top, hit.width, hit.height);
     this.menuLeaderboardActive = false;
 
-    const background = this.add.rectangle(rect.centerX, rect.centerY, hitSize, hitSize, 0x000000, 0.001);
+    const background = this.add.rectangle(hit.centerX, hit.centerY, hit.width, hit.height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     background.setDepth(3);
     const label = this.add.text(rect.centerX, rect.centerY, '', {
@@ -15396,14 +15397,9 @@ export class MenuScene extends Phaser.Scene {
       sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
-    const hitSize = Math.max(36, frame.width, frame.height);
-    const hitBounds = createVisualRect(
-      frame.centerX - (hitSize / 2),
-      frame.centerY - (hitSize / 2),
-      hitSize,
-      hitSize
-    );
-    const background = this.add.rectangle(frame.centerX, frame.centerY, hitSize, hitSize, 0x000000, 0.001);
+    const hit = resolveLegacyMinHitRect(frame, this.layout);
+    const hitBounds = createVisualRect(hit.left, hit.top, hit.width, hit.height);
+    const background = this.add.rectangle(hit.centerX, hit.centerY, hit.width, hit.height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     background.setDepth(3);
     this.menuProfileActive = false;

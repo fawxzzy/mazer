@@ -128,12 +128,16 @@ const normalizeInset = (value: unknown): number => (
 
 const EMPTY_TOUCH_RECT = createRect(-10_000, -10_000, 0, 0);
 
+const TOUCH_PAUSE_MIN_SIZE = 44;
 const resolveTopRightPauseRect = (
   viewport: TouchViewportLike,
   safeInsets: Required<TouchSafeInsetsLike>,
   requestedSize: number
 ): TouchRect => {
-  const size = clamp(Math.round(requestedSize), 36, 56);
+  // 44px is the touch-target floor: the pause control is the only on-screen
+  // control during play, so it never shrinks below it (landscape-split
+  // layouts used to request as little as 36).
+  const size = clamp(Math.round(requestedSize), TOUCH_PAUSE_MIN_SIZE, 56);
   const inset = Math.max(8, Math.round(size * 0.18));
   const left = clamp(
     Math.round(viewport.width - safeInsets.right - size - inset),
