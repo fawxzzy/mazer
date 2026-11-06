@@ -187,6 +187,14 @@ import {
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import {
+  LEGACY_HEADER_IDENTITY_LABEL_NAME,
+  resolveLegacyHeaderIdentityPlacement
+} from '../legacy-runtime/legacyHeaderIdentityPlacement';
+import {
+  buildLegacyPauseMenuViewModel,
+  resolveLegacyPauseMenuLayout
+} from '../legacy-runtime/legacyPauseMenuView';
+import {
   LEGACY_UI_COMPACT_BREAKPOINT,
   resolveLegacyFeatureControlLayout,
   resolveLegacyOverlayContentFlowLayout,
@@ -1163,7 +1171,7 @@ const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 // too fast/flickery for a deliberate classic-menu blink.
 const LEGACY_MENU_BLINK_PULSE_MS = 2400;
 // Shared by the Options/Pause overlay's Account ring (drawLegacyProfileIcon)
-// and its own Home button's ring (createLegacyOverlayHomeButton's drawHome)
+// and its own Home button's ring (the Home button is gone; Pause is now a card)
 // -- previously two independently hand-copied formulas that could silently
 // drift apart despite existing specifically to make those two icons read as
 // a matched pair. Restrained consistency pass (owner-directed refinement,
@@ -1351,7 +1359,6 @@ const LEGACY_BLEED_GLOW_MAX_ALPHA = 0.5;
 const LEGACY_BLEED_GLOW_STEPS = 8;
 const LEGACY_PLAY_HUD_TIMER_PANE = cyberArcadeMaterial.substrate.panel;
 const LEGACY_PLAY_TOUCH_BUTTON_FILL = cyberArcadeMaterial.substrate.panelRaised;
-const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_TOUCH_BUTTON_STROKE = cyberArcadeMaterial.rail.cyan;
 const LEGACY_PLAY_TOUCH_ICON = cyberArcadeMaterial.rail.white;
 const LEGACY_PLAY_TOUCH_ACCENT = cyberArcadeMaterial.rail.mint;
@@ -1732,8 +1739,8 @@ export class MenuScene extends Phaser.Scene {
   private authUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private menuLeaderboardActive = false;
   private menuProfileActive = false;
-  private overlayUsernameActive = false;
-  private overlayHomeActive = false;
+  // Pause card: the collapsible Settings section (collapsed on every open).
+  private pauseSettingsExpanded = false;
   private leaderboardStatus: 'empty' | 'error' | 'idle' | 'loading' | 'ready' = 'idle';
   private leaderboardErrorMessage: string | null = null;
   private leaderboardEntries: readonly LegacyLeaderboardEntry[] = [];
@@ -1937,8 +1944,8 @@ export class MenuScene extends Phaser.Scene {
   // boardDynamicGraphics/boardZoomContainer space -- one persistent Image
   // each, same lifetime as boardDynamicGraphics itself. The profile icon's
   // own Image(s) are NOT scene-level fields: that glyph is drawn from
-  // per-button closures (createLegacyMenuProfileButton/
-  // createLegacyOverlayUsernameButton) whose graphics/background/label are
+  // per-button closure (createLegacyMenuProfileButton) whose
+  // graphics/background/label are
   // already created and destroyed alongside each button instance, so its
   // Image lives and dies with that same closure instead.
   private headerSettingsIconImage!: Phaser.GameObjects.Image;
@@ -11477,7 +11484,7 @@ export class MenuScene extends Phaser.Scene {
         this.uiButtons.push(this.createLegacyMenuProfileButton(
           () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
         ));
-        this.createLegacyAuthenticatedWelcomeIdentity();
+        this.createLegacyHeaderIdentityLabel();
       }
 
       this.uiDirty = false;
@@ -11655,11 +11662,6 @@ export class MenuScene extends Phaser.Scene {
     });
     let rowY = shell.contentTop;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    this.uiButtons.push(this.createLegacyOverlayUsernameButton(
-      panel,
-      () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface()),
-      panel.centerX
-    ));
 
     if (!showAdvancedOptions) {
       const viewportTop = rowY + (compact ? 4 : 6);
@@ -12161,73 +12163,148 @@ export class MenuScene extends Phaser.Scene {
     return resolveLegacyAdvancedOptionsVisible(typeof window === 'undefined' ? '' : window.location.search);
   }
 
+  // Pause card (legacyPauseMenuView.ts): title, Resume, a collapsible
+  // Settings section (collapsed on every open) and Quit to Menu on one
+  // near-black card in the shared overlay palette. No profile/account entry and
+  // no Guide. Resume / Quit keep the existing "bridge first, then
+  // applyLegacyPauseCommand" paths, so the board stays held while paused and
+  // Quit to Menu is the existing return-menu command. All actions are at least
+  // 44px tall. When Settings is open on a short viewport only the toggle rows
+  // scroll (existing overlay scroll metrics); the three actions stay put.
   private buildPauseOverlay(): void {
     const panel = this.resolveOverlayPanelFrame();
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    // Matches createLegacyBottomActionBar's own height exactly (both above
-    // the standard 44px touch-target minimum) so the scrollable content
-    // above reserves precisely the space the bar actually occupies.
-    const actionButtonHeight = stacked ? 48 : 52;
-    const shell = resolveLegacyOverlayShellLayout({
-      actionHeight: actionButtonHeight,
-      // Down from 3 -- Reset (reset-player) was removed from the game
-      // entirely, and Reset Progress moved into the account screen with
-      // the rest of the account actions (it resets account-level
-      // progression, not just the current attempt, so it belongs there).
-      // Account now pairs with Menu in the one remaining row instead of
-      // getting its own row underneath.
-      actionRows: 1,
-      panel
-    });
-    this.uiButtons.push(this.createOverlayBackChevronButton(
-      panel,
-      () => this.dispatchUiBridgeCommand({ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume'))
-    ));
-    // Account is not an entry point from the in-play Pause screen -- home
-    // (return to menu) is the only header icon here, centered alone the
-    // same way the menu-context Options screen centers its own profile
-    // icon (see createLegacyOverlayUsernameButton's Options call site).
-    this.uiButtons.push(this.createLegacyOverlayHomeButton(
-      panel,
-      () => this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')),
-      panel.centerX
-    ));
-    const viewportTop = shell.contentTop;
-    const viewport = createVisualRect(
-      shell.contentLeft,
-      viewportTop,
-      shell.contentWidth,
-      Math.max(120, shell.contentHeight)
-    );
-    const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {
+    const view = buildLegacyPauseMenuViewModel();
+    const safeArea = readMazerViewportGeometry().safeArea;
+    const expanded = this.pauseSettingsExpanded;
+    const collapsed = resolveLegacyPauseMenuLayout(this.layout.width, this.layout.height, safeArea);
+    const rowsPanel: OverlayPanelFrame = {
+      centerX: collapsed.centerX,
+      height: 0,
+      left: collapsed.cardLeft + collapsed.cardPadding - 28,
+      top: 0,
+      width: collapsed.cardWidth - (collapsed.cardPadding * 2) + 56
+    };
+    const rowsContentHeight = this.resolveFeatureControlRowsContentHeight(rowsPanel, {
+      includeControlStyle: false,
       includeMovementSpeed: false
     });
-    const contentFlow = resolveLegacyOverlayContentFlowLayout({
-      contentTop: viewport.top,
-      controlsHeight: controlContentHeight,
-      guideHeight: this.resolveLegacyOptionsGuideEffectiveHeight(panel.width),
-      panelWidth: panel.width
+    const card = resolveLegacyPauseMenuLayout(this.layout.width, this.layout.height, safeArea, {
+      settingsContentHeight: rowsContentHeight,
+      settingsExpanded: expanded
     });
-    const scrollMetrics = resolveLegacyOverlayScrollMetrics({
-      contentHeight: contentFlow.contentHeight,
-      offset: this.overlayScrollOffset,
-      viewport: this.visualRectToLegacyOverlayScrollRect(viewport)
+    const actionLabel = (id: 'resume' | 'settings' | 'quit-to-menu'): string => (
+      view.actions.find((action) => action.id === id)?.label ?? id
+    );
+    const resumePause = (): void => this.dispatchUiBridgeCommand({ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume'));
+
+    // Back chevron stays the standard overlay exit and is an alias for Resume.
+    this.uiButtons.push(this.createOverlayBackChevronButton(panel, resumePause));
+
+    this.drawLegacyCyberPanel(this.overlayGraphics, {
+      alpha: 0.96,
+      // bg.canvas (near-black) rather than bg.panel: the card is the only
+      // surface on the dimmed board, so it should read as the darkest layer.
+      fill: cyberArcadeMaterial.substrate.field,
+      height: card.cardHeight,
+      left: card.cardLeft,
+      radius: LEGACY_UI_CONTROL_RADIUS + 4,
+      stroke: LEGACY_CYBER_PANEL_STROKE,
+      top: card.cardTop,
+      width: card.cardWidth
     });
-    this.applyLegacyOverlayScrollMetrics(scrollMetrics);
-    const renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);
-    this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {
-      exactTop: true,
-      rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
-      scrollOffset: scrollMetrics.offset,
-      viewport: renderViewport
-    });
-    this.createFeatureControlRows(contentFlow.controlsTop, panel, {
-      includeMovementSpeed: false,
-      rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
-      scrollOffset: scrollMetrics.offset,
-      viewport: renderViewport
-    });
-    this.drawLegacyOverlayScrollFacade(scrollMetrics);
+
+    const buttonWidth = card.cardWidth - (card.cardPadding * 2);
+    let cursorY = card.cardTop + card.cardPadding;
+    this.createOverlayTitle(view.title, cursorY + Math.round(card.titleHeight / 2));
+    cursorY += card.titleHeight + (card.compact ? 14 : 16);
+
+    this.uiButtons.push(this.createLegacyAuthActionButton(
+      card.centerX,
+      cursorY + (card.actionHeight / 2),
+      buttonWidth,
+      card.actionHeight,
+      actionLabel('resume'),
+      resumePause,
+      'primary'
+    ));
+    cursorY += card.actionHeight + card.actionGap;
+
+    const settingsCenterY = cursorY + (card.actionHeight / 2);
+    const settingsButton = this.createLegacyAuthActionButton(
+      card.centerX,
+      settingsCenterY,
+      buttonWidth,
+      card.actionHeight,
+      actionLabel('settings'),
+      () => {
+        this.pauseSettingsExpanded = !this.pauseSettingsExpanded;
+        this.resetLegacyOverlayScrollState();
+        this.uiDirty = true;
+      },
+      'secondary'
+    );
+    // Disclosure chevron (down = collapsed, up = expanded) on the button's
+    // right. Its own Graphics so it sits above the button chrome, and it is
+    // destroyed together with the button on every rebuild.
+    const chevron = this.add.graphics();
+    const chevronX = card.centerX + (buttonWidth / 2) - 24;
+    const chevronDirection = expanded ? -1 : 1;
+    chevron.lineStyle(2, LEGACY_CYBER_PANEL_STROKE, 0.9);
+    chevron.beginPath();
+    chevron.moveTo(chevronX - 6, settingsCenterY - (3 * chevronDirection));
+    chevron.lineTo(chevronX, settingsCenterY + (3 * chevronDirection));
+    chevron.lineTo(chevronX + 6, settingsCenterY - (3 * chevronDirection));
+    chevron.strokePath();
+    const destroySettingsButton = settingsButton.destroy;
+    settingsButton.destroy = () => {
+      chevron.destroy();
+      destroySettingsButton();
+    };
+    this.uiButtons.push(settingsButton);
+    cursorY += card.actionHeight + card.actionGap;
+
+    if (expanded) {
+      const clipped = Math.max(0, card.naturalCardHeight - card.cardHeight);
+      const rowsViewportHeight = Math.max(
+        card.actionHeight,
+        rowsContentHeight - clipped
+      );
+      const viewport = createVisualRect(card.cardLeft + card.cardPadding, cursorY, buttonWidth, rowsViewportHeight);
+      let scrollOffset = 0;
+      let renderViewport: VisualRect | null = null;
+      let scrollMetrics: LegacyOverlayScrollMetrics | null = null;
+      if (card.scrollable) {
+        scrollMetrics = resolveLegacyOverlayScrollMetrics({
+          contentHeight: rowsContentHeight,
+          offset: this.overlayScrollOffset,
+          viewport: this.visualRectToLegacyOverlayScrollRect(viewport)
+        });
+        this.applyLegacyOverlayScrollMetrics(scrollMetrics);
+        renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);
+        scrollOffset = scrollMetrics.offset;
+      }
+      this.createFeatureControlRows(cursorY, rowsPanel, {
+        includeControlStyle: false,
+        includeMovementSpeed: false,
+        rightGutter: card.scrollable ? LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER : 0,
+        scrollOffset,
+        viewport: renderViewport
+      });
+      if (scrollMetrics !== null) {
+        this.drawLegacyOverlayScrollFacade(scrollMetrics);
+      }
+      cursorY += rowsViewportHeight + card.actionGap;
+    }
+
+    this.uiButtons.push(this.createLegacyAuthActionButton(
+      card.centerX,
+      cursorY + (card.actionHeight / 2),
+      buttonWidth,
+      card.actionHeight,
+      actionLabel('quit-to-menu'),
+      () => this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')),
+      'secondary'
+    ));
   }
 
   // Product page size: exactly ten public users per page. Pagination uses
@@ -15324,179 +15401,6 @@ export class MenuScene extends Phaser.Scene {
     this.applyLegacyHudIconFrame(image, MAZER_HUD_PROFILE_ICON_METRICS, centerX, centerY, iconSize * scale, alpha);
   }
 
-  // Same header row the back chevron sits on, toward the left side (the
-  // account screen's own Account button is gone -- this is the one entry
-  // point to it now, from both the menu-context Options screen and the
-  // in-play Pause screen, where it sits right next to createLegacyOverlayHomeButton).
-  // A profile glyph in the same rainbow-ring/Mazer-green/blink-pulse
-  // treatment as that home icon instead of plain username text, per
-  // feedback that the two should read as a matched pair. centerX is supplied by the
-  // caller rather than computed here: alone (the menu-context Options
-  // overlay, no home button) it's dead-centered same as the home icon;
-  // paired with the home icon (Pause) the two need to split evenly around
-  // center instead of both landing on the same point.
-  private createLegacyOverlayUsernameButton(panel: OverlayPanelFrame, onClick: () => void, centerX: number): UiButton {
-    const chevronSize = Math.max(cyberArcadeMaterial.controls.minimumTouchTarget, this.layout.width < 480 ? 42 : 46);
-    const rowY = panel.top + 8 + Math.round(chevronSize / 2);
-    const iconSize = Math.max(18, Math.round(chevronSize * 0.78));
-
-    const graphics = this.add.graphics();
-    const iconImage = this.add.image(0, 0, MAZER_HUD_PROFILE_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
-    const background = this.add.rectangle(centerX, rowY, iconSize + 24, iconSize + 24, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    background.setDepth(3);
-    background.setVisible(false);
-    this.overlayUsernameActive = false;
-
-    const drawProfile = (time: number): void => {
-      if (this.authSnapshot.status !== 'authenticated') {
-        graphics.clear();
-        iconImage.setVisible(false);
-        background.setVisible(false);
-        return;
-      }
-      // Idempotent per signed-in user id -- safe to call every frame, it
-      // only actually fetches once. Nothing here reads the result: the
-      // icon doesn't display the username itself, but the account screen
-      // this button opens still wants it preloaded by the time it lands.
-      this.loadAccountUsernameIfNeeded();
-      background.setVisible(true);
-
-      const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
-      const pulseAlpha = clamp(0.5 + (phase * 0.5) + (this.overlayUsernameActive ? 0.1 : 0), 0.4, 1);
-      const pulseScale = 0.94 + (phase * 0.06) + (this.overlayUsernameActive ? 0.02 : 0);
-      this.drawLegacyProfileIcon(graphics, iconImage, centerX, rowY, iconSize, time, pulseAlpha, pulseScale);
-    };
-    drawProfile(this.time.now);
-
-    const setActive = (active: boolean): void => {
-      this.overlayUsernameActive = active;
-    };
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', onClick);
-
-    const label = this.add.text(centerX, rowY, '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '1px'
-    }).setOrigin(0.5).setVisible(false);
-    this.uiTexts.push(label);
-
-    return {
-      background,
-      bounds: createVisualRect(centerX - (iconSize / 2) - 12, rowY - (iconSize / 2) - 12, iconSize + 24, iconSize + 24),
-      iconOnly: true,
-      label,
-      semanticAction: 'Account',
-      setActive,
-      text: 'Account',
-      updateFrame: (time: number) => drawProfile(time),
-      destroy: () => {
-        graphics.destroy();
-        iconImage.destroy();
-        background.destroy();
-        label.destroy();
-      }
-    };
-  }
-
-  // Play-mode-only: centered in the same header row as the back chevron and
-  // the account username. Replaces the old bottom-bar "Menu" button -- the
-  // menu-context Options screen has no equivalent (you're already at the
-  // main menu there), so this is never created for that overlay.
-  private createLegacyOverlayHomeButton(panel: OverlayPanelFrame, onClick: () => void, centerX: number): UiButton {
-    const chevronSize = Math.max(cyberArcadeMaterial.controls.minimumTouchTarget, this.layout.width < 480 ? 42 : 46);
-    const rowY = panel.top + 8 + Math.round(chevronSize / 2);
-    const iconSize = Math.max(18, Math.round(chevronSize * 0.42));
-    const ringRadius = (iconSize * 0.62) + 8;
-
-    const graphics = this.add.graphics();
-    const background = this.add.rectangle(centerX, rowY, iconSize + 24, iconSize + 24, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    background.setDepth(3);
-    this.overlayHomeActive = false;
-
-    // Rainbow ring (same midnight-rainbow material the trail/level number
-    // cycle through) plus the Mazer signature green for the house glyph
-    // itself, both breathing on the classic blink/grow-shrink pulse the
-    // settings cog and Start/Login glyphs already use -- redrawn every
-    // frame via updateFrame instead of the old static once-drawn icon. The
-    // house itself is filled with a darker-rim edge and a cut door.
-    const drawHome = (time: number): void => {
-      graphics.clear();
-      const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
-      const pulseAlpha = clamp(0.5 + (phase * 0.5) + (this.overlayHomeActive ? 0.1 : 0), 0.4, 1);
-      const pulseScale = 0.94 + (phase * 0.06) + (this.overlayHomeActive ? 0.02 : 0);
-
-      const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
-      graphics.lineStyle(Math.max(1.2, iconSize * LEGACY_OVERLAY_ICON_RING_WIDTH_RATIO), ringColor, pulseAlpha * LEGACY_OVERLAY_ICON_RING_ALPHA_FACTOR);
-      graphics.strokeCircle(centerX, rowY, ringRadius * pulseScale);
-
-      const color = cyberArcadeMaterial.signal.player;
-      const rimColor = mixLegacyIridescentColor(color, 0x000000, 0.32);
-      const halfWidth = iconSize * 0.5 * pulseScale;
-      const roofTop = rowY - (iconSize * 0.5 * pulseScale);
-      const baseTop = rowY - (iconSize * 0.06 * pulseScale);
-      const baseBottom = rowY + (iconSize * 0.42 * pulseScale);
-      const wallHalfWidth = halfWidth * 0.6;
-
-      graphics.fillStyle(color, pulseAlpha * 0.92);
-      graphics.fillTriangle(centerX - halfWidth, baseTop, centerX, roofTop, centerX + halfWidth, baseTop);
-      graphics.fillRect(centerX - wallHalfWidth, baseTop, wallHalfWidth * 2, baseBottom - baseTop);
-      graphics.lineStyle(Math.max(1.2, iconSize * 0.07), rimColor, pulseAlpha);
-      graphics.beginPath();
-      graphics.moveTo(centerX - halfWidth, baseTop);
-      graphics.lineTo(centerX, roofTop);
-      graphics.lineTo(centerX + halfWidth, baseTop);
-      graphics.strokePath();
-      graphics.strokeRect(centerX - wallHalfWidth, baseTop, wallHalfWidth * 2, baseBottom - baseTop);
-
-      // Door cutout -- a small dark notch instead of a solid block reads as
-      // an opening in the wall, the same way the settings cog's hub reads
-      // as a socket rather than a second gear.
-      const doorHalfWidth = wallHalfWidth * 0.42;
-      const doorTop = baseBottom - ((baseBottom - baseTop) * 0.56);
-      graphics.fillStyle(LEGACY_PLAY_TOUCH_COG_HUB, pulseAlpha * 0.85);
-      graphics.fillRect(centerX - doorHalfWidth, doorTop, doorHalfWidth * 2, baseBottom - doorTop);
-      graphics.lineStyle(Math.max(1, iconSize * 0.05), rimColor, pulseAlpha * 0.8);
-      graphics.strokeRect(centerX - doorHalfWidth, doorTop, doorHalfWidth * 2, baseBottom - doorTop);
-
-      // No gem catchlight here -- it's a short diagonal arc calibrated for a
-      // round gem-shaped marker; on this house glyph it just reads as a
-      // stray diagonal white line in the corner (reported and removed).
-    };
-    drawHome(this.time.now);
-
-    const setActive = (active: boolean): void => {
-      this.overlayHomeActive = active;
-    };
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', onClick);
-
-    const label = this.add.text(centerX, rowY, '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '1px'
-    }).setOrigin(0.5).setVisible(false);
-    this.uiTexts.push(label);
-
-    return {
-      background,
-      bounds: createVisualRect(centerX - (iconSize / 2) - 12, rowY - (iconSize / 2) - 12, iconSize + 24, iconSize + 24),
-      iconOnly: true,
-      label,
-      semanticAction: 'Main Menu',
-      setActive,
-      text: 'Main Menu',
-      updateFrame: (time: number) => drawHome(time),
-      destroy: () => {
-        graphics.destroy();
-        background.destroy();
-        label.destroy();
-      }
-    };
-  }
-
   private clearUi(): void {
     this.overlayScrollGraphics?.destroy();
     this.overlayScrollGraphics = null;
@@ -15566,7 +15470,15 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
-  private createLegacyAuthenticatedWelcomeIdentity(): void {
+  // Header identity: the verified canonical username, top-left, immediately
+  // right of the profile icon (replaces the old greeting + username pair
+  // that sat above the Start button). Geometry comes from
+  // resolveLegacyHeaderIdentityPlacement: the real profile-icon frame, the
+  // real title footprint (not an assumed width), ellipsized to the room
+  // between them, shortened/hidden on a tight header, and kept clear of the
+  // edge diamonds. Signed out / guest / no username -> no label at all.
+  // Depth 3 like the other menu controls: above the board, below overlays.
+  private createLegacyHeaderIdentityLabel(): void {
     const username = this.authSnapshot.status === 'authenticated'
       ? this.authSnapshot.canonicalUsername?.trim() ?? ''
       : '';
@@ -15574,36 +15486,31 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const compact = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const centerX = this.layout.centerButtonX;
-    const welcomeY = this.layout.centerButtonY - this.layout.buttonHeight - (compact ? 26 : 30);
-    const welcome = this.padLegacyCompactUiText(this.add.text(centerX, welcomeY, 'Welcome', {
-      backgroundColor: '#060b0f',
-      color: '#7894a0',
+    const label = this.add.text(0, 0, username, {
+      color: '#d7f7ee',
       fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-      fontSize: `${compact ? 11 : 12}px`
-    })).setOrigin(0.5).setDepth(3);
-    // Real, measured overlap (found while restoring the visual-verification
-    // harness, headless Playwright against the authenticated fixture at
-    // 405x958): with a +17/+19 offset, padLegacyUiText's own 6px top padding
-    // on this larger label put its top edge (real bounds: top 843) above
-    // the "Welcome" label's own bottom edge (bounds: bottom 847.5) -- a real
-    // 4.5px vertical, ~30%-of-the-smaller-box overlap, not a false positive
-    // from the harness's own overlap heuristic. +7px clears it (new gap
-    // ~2.5px) while keeping 12px of clearance to the Start button below
-    // (button top measured at y=890 in the same real capture).
-    const usernameLabel = this.fitLegacyUiTextToWidth(
-      this.padLegacyUiText(this.add.text(centerX, welcomeY + (compact ? 24 : 26), username, {
-        backgroundColor: '#060b0f',
-        color: '#d7f7ee',
-        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-        fontSize: `${compact ? 14 : 16}px`
-      })),
-      Math.min(this.layout.width - 48, 320),
-      compact ? 14 : 16,
-      11
-    ).setOrigin(0.5).setDepth(3);
-    this.uiTexts.push(welcome, usernameLabel);
+      fontSize: '14px',
+      stroke: '#060b0f',
+      strokeThickness: 2
+    }).setOrigin(0, 0.5).setDepth(3).setVisible(false);
+    const placement = resolveLegacyHeaderIdentityPlacement({
+      edgeStations: this.resolveLegacyEdgeStations(),
+      layout: this.layout,
+      measure: (value, fontPx) => label.setFontSize(fontPx).setText(value).width,
+      measureHeight: (fontPx) => label.setFontSize(fontPx).setText(username).height,
+      username
+    });
+    if (!placement.visible || placement.anchor === null) {
+      label.destroy();
+      return;
+    }
+    label
+      .setName(LEGACY_HEADER_IDENTITY_LABEL_NAME)
+      .setFontSize(placement.identity.fontPx)
+      .setText(placement.identity.displayText)
+      .setPosition(placement.anchor.x, placement.anchor.y)
+      .setVisible(true);
+    this.uiTexts.push(label);
   }
 
   private createLegacySignedOutOAuthFailure(): void {
@@ -15683,6 +15590,9 @@ export class MenuScene extends Phaser.Scene {
       this.destroyLegacyAuthNativeInput();
       this.destroyAccountUsernameNativeInput();
       this.accountUsernameActive = false;
+    }
+    if (kind === 'pause') {
+      this.pauseSettingsExpanded = false;
     }
     if (kind === 'options' || kind === 'pause') {
       this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);

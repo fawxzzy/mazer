@@ -117,6 +117,12 @@ export interface LegacyHeaderIdentityLayoutInput {
   profileFrameCenterY?: number;
   /** Injected measure; defaults to estimateLegacyUiTextWidth. */
   measure?: LegacyUiSizedTextMeasure;
+  /**
+   * Visible-character floor before the label is hidden; defaults to
+   * LEGACY_HEADER_IDENTITY_MIN_VISIBLE_CHARS. The scene lowers it on the
+   * tightest phones ("short form") instead of dropping to icon-only.
+   */
+  minVisibleChars?: number;
 }
 
 export interface LegacyHeaderIdentityLayout {
@@ -228,7 +234,10 @@ export const resolveLegacyHeaderIdentityLayout = (
 
   const minFont = LEGACY_HEADER_IDENTITY_MIN_FONT_PX;
   const ellipsized = ellipsizeLegacyUiText(text, maxWidth, (value) => measure(value, minFont));
-  const required = Math.min(LEGACY_HEADER_IDENTITY_MIN_VISIBLE_CHARS, Array.from(text).length);
+  const floor = typeof input.minVisibleChars === 'number' && Number.isFinite(input.minVisibleChars)
+    ? Math.max(1, Math.round(input.minVisibleChars))
+    : LEGACY_HEADER_IDENTITY_MIN_VISIBLE_CHARS;
+  const required = Math.min(floor, Array.from(text).length);
   if (ellipsized.length === 0 || countVisibleCharacters(ellipsized) < required) {
     return hidden(
       ellipsized.length === 0 ? 'no-room' : 'too-few-visible-characters',
