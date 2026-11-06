@@ -7,7 +7,7 @@
  *   1. no visible "Welcome" text object exists anywhere on the menu;
  *   2. the username label (Phaser name "header-identity") is visible, in the
  *      header band, depth >= 3, to the RIGHT of the profile icon and LEFT of
- *      the title, overlapping neither, nor any of the 8 edge diamonds;
+ *      the title, overlapping neither (the edge diamonds sit behind all UI);
  *   3. its text is truncated with an ellipsis only when the room demands it
  *      (whole name on the wide layout) and is actually painted. "Painted" is a
  *      DIFFERENTIAL measurement: the label rect is rendered twice from the
@@ -203,9 +203,7 @@ const assertHeaderIdentity = (name, whole, state, measured) => {
   for (const button of state.buttons.filter((b) => b.action && b.action !== 'Start' && b.action !== 'Account')) {
     assert(!overlaps(label.rect, button), `${name}: identity overlaps the ${button.action} control`);
   }
-  for (const station of state.stations) {
-    assert(!overlaps(label.rect, station), `${name}: identity overlaps edge diamond ${station.id}`);
-  }
+  // Edge diamonds sit at fixed positions BEHIND all UI (edgeMarkers.ts): no overlap rule.
   if (whole) {
     assert.equal(label.text, state.username, `${name}: wide layout must show the whole username`);
   } else {

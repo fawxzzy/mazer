@@ -78,17 +78,24 @@ const check = (label, condition, detail) => {
 };
 
 // introTimeline.ts nominal numbers, mirrored here as the ACCEPTANCE contract
-// (the scene must meet these; they are deliberately not imported).
-const INTRO_UNLOCK_MS = 1200;
+// (the scene must meet these; they are deliberately not imported). The reveal
+// length is a pure function of the tile count N:
+//   revealMs(N) = clamp(N / 70 tiles/s, 2000, 3200); input unlocks at 500 + revealMs
+//   removeMs(N) = clamp(N / 70 tiles/s, 1800, 3000); the deconstruct is 400 + removeMs + 300
+const introUnlockMs = (tiles) => 500 + Math.max(2000, Math.min(3200, (tiles / 70) * 1000));
+const outroTotalMs = (tiles) => 400 + Math.max(1800, Math.min(3000, (tiles / 70) * 1000)) + 300;
 const INTRO_REDUCED_UNLOCK_MS = 250;
+const RING_FADE_MS = 150;
 const FRAME_MS = 16;
 const UNLOCK_TOLERANCE_MS = FRAME_MS * 2;
 const INTRO_LASER_START_MS = 100;
 const INTRO_LASER_END_MS = 500;
 const OUTRO_LASER_END_MS = 400;
-const OUTRO_TOTAL_MS = 900;
 const ALL_STATION_IDS = [0, 1, 2, 3, 4, 5, 6, 7];
-const ENERGIZED_ALPHA_FLOOR = 0.9;
+// A diamond counts as lit when its stroke alpha is above the idle breathing maximum (0.6).
+const LIT_ALPHA_FLOOR = 0.62;
+// Spinning kites may clip the screen edge by at most (10.5 - 7.57) px at the corners.
+const SPIN_CLIP_TOLERANCE_PX = 3.5;
 
 const sameList = (a, b) => a.length === b.length && a.every((value, index) => value === b[index]);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -178,9 +185,11 @@ const installHarness = (page) => page.evaluate(() => {
       sparkleMids,
       focus,
       stations: scene.resolveLegacyEdgeStations().map((s) => ({ id: s.id, x: s.x, y: s.y })),
-      lit: edge.frame.map((marker, index) => (marker.alpha >= 0.9 ? index : null)).filter((index) => index !== null),
+      lit: edge.frame.map((marker, index) => (marker.alpha > 0.62 ? index : null)).filter((index) => index !== null),
+      tiles: scene.menuStaticDrawTileOrder.length,
       markerCount: edge.frame.length,
-      ring: edge.frame.map((marker) => marker.vertices[0] ?? null),
+      // Kite centroid (the tip moves while the ring spins; the centre must not).
+      ring: edge.frame.map((marker) => (marker.vertices.length === 0 ? null : { x: marker.vertices.reduce((s, v) => s + v.x, 0) / marker.vertices.length, y: marker.vertices.reduce((s, v) => s + v.y, 0) / marker.vertices.length })),
       markerBounds: (() => {
         const all = edge.frame.flatMap((marker) => marker.vertices);
         return all.length === 0 ? null : {
@@ -312,6 +321,40 @@ const beamStationId = (pair, stations, focus, direction) => {
 };
 
 /**
+ * The ring lighting contract (live audit findings 4 and 6), checked on every frame:
+ *  - arrival (inward): a diamond is lit from (nearly) the instant its beam leaves and ALL 8 stay lit
+ *    until the reveal ends (the whole generation); after the intro is over none is lit.
+ *  - departure (outward): a diamond is lit once the player's beam has REACHED it, and all stay lit
+ *    until the lighting fades in the last RING_FADE_MS of the deconstruct.
+ */
+const analyzeLighting = (frames, direction) => {
+  const firstFiring = new Map();
+  let ok = true;
+  const problems = [];
+  let allLitFrames = 0;
+  let litAfterEnd = 0;
+  frames.forEach((frame, index) => {
+    frame.firing.forEach((id) => { if (!firstFiring.has(id)) { firstFiring.set(id, index); } });
+    if (direction === 'inward') {
+      // Each diamond is lit again within 6 frames (~100 ms) of its beam leaving.
+      for (const [id, start] of firstFiring) {
+        if (index - start >= 6 && !frame.lit.includes(id) && frame.introActive) { ok = false; problems.push({ index, id, why: 'unlit during arrival' }); }
+      }
+      if (firstFiring.size === 8 && frame.lit.length === 8) { allLitFrames += 1; }
+    } else {
+      for (const [id, start] of firstFiring) {
+        const landed = !frame.firing.includes(id) && index > start;
+        const fadeStart = frame.outroAge !== null && frame.tiles > 0 ? outroTotalMs(frame.tiles) - RING_FADE_MS : Number.POSITIVE_INFINITY;
+        if (landed && frame.outroAge !== null && frame.outroAge < fadeStart - FRAME_MS && !frame.lit.includes(id)) { ok = false; problems.push({ index, id, why: 'unlit after its beam landed' }); }
+        if (frame.firing.includes(id) && frame.lit.includes(id) && index - start < 2) { /* a beam that just left may already be rising; allowed */ }
+      }
+      if (firstFiring.size === 8 && frame.lit.length === 8) { allLitFrames += 1; }
+    }
+  });
+  return { ok: ok && allLitFrames > 0, allLitFrames, litAfterEnd, problems: problems.slice(0, 3) };
+};
+
+/**
  * Analyses every frame in which the scene reported a beam in flight.
  * `direction`: 'inward' (diamonds -> spawn) or 'outward' (player -> diamonds).
  */
@@ -323,7 +366,6 @@ const analyzeBeams = (frames, _unusedMenuStations, direction) => {
   let geometryMatchesScene = true;
   let pairCountMatchesScene = true;
   let wrongDirectionPairs = 0;
-  let litNeverBelowFiring = true;
   let maxConcurrent = 0;
   let firstAge = null;
   let lastAge = null;
@@ -340,7 +382,6 @@ const analyzeBeams = (frames, _unusedMenuStations, direction) => {
       if (ids[index] !== null) { lastTip.set(ids[index], { tip: { x: pair[2], y: pair[3] }, focus: frame.focus, station: stations.find((s) => s.id === ids[index]) }); }
       if (beamStationId(pair, stations, frame.focus, opposite) !== null) { wrongDirectionPairs += 1; }
     });
-    if (!frame.firing.every((id) => frame.lit.includes(id))) { litNeverBelowFiring = false; }
     const age = direction === 'inward' ? frame.introAge : frame.outroAge;
     if (age !== null) {
       firstAge = firstAge === null ? age : Math.min(firstAge, age);
@@ -362,7 +403,7 @@ const analyzeBeams = (frames, _unusedMenuStations, direction) => {
     geometryMatchesScene,
     pairCountMatchesScene,
     wrongDirectionPairs,
-    litNeverBelowFiring,
+    lighting: analyzeLighting(frames, direction),
     maxConcurrent,
     firstAge,
     lastAge,
@@ -405,8 +446,8 @@ const ringDrift = (frames) => {
 
 const markersInsideViewport = (frame, viewport) => (
   frame.markerCount === 8 && frame.markerBounds !== null
-  && frame.markerBounds.minX >= 0 && frame.markerBounds.minY >= 0
-  && frame.markerBounds.maxX <= viewport.width && frame.markerBounds.maxY <= viewport.height
+  && frame.markerBounds.minX >= -SPIN_CLIP_TOLERANCE_PX && frame.markerBounds.minY >= -SPIN_CLIP_TOLERANCE_PX
+  && frame.markerBounds.maxX <= viewport.width + SPIN_CLIP_TOLERANCE_PX && frame.markerBounds.maxY <= viewport.height + SPIN_CLIP_TOLERANCE_PX
 );
 
 const MOVE_FOR_DELTA = {
@@ -593,7 +634,7 @@ const assertArrival = (label, frames, stations, { reducedMotion = false, viewpor
   check(`${label}: no arrival beam is drawn outward from the spawn (wrong-direction pairs = 0)`, a.wrongDirectionPairs === 0, `wrongDirectionPairs=${a.wrongDirectionPairs}`);
   check(`${label}: all 8 beams are in flight together at least once (not one at a time)`, a.maxConcurrent === 8, `maxConcurrent=${a.maxConcurrent}`);
   check(`${label}: every beam converges on the spawn tile (its last drawn tip is within 10% of the way to it)`, a.tipsReachFarEnd, JSON.stringify(a));
-  check(`${label}: a diamond is lit (brightened) on every frame its beam is firing`, a.litNeverBelowFiring, JSON.stringify(a));
+  check(`${label}: each diamond lights as its beam leaves and ALL 8 stay lit through the whole generation`, a.lighting.ok, JSON.stringify(a.lighting));
   check(
     `${label}: the beams fire inside the intro laser window (${INTRO_LASER_START_MS}-${INTRO_LASER_END_MS} ms, one frame of slack)`,
     a.firstAge !== null && a.firstAge >= INTRO_LASER_START_MS && a.lastAge <= INTRO_LASER_END_MS + FRAME_MS,
@@ -602,12 +643,12 @@ const assertArrival = (label, frames, stations, { reducedMotion = false, viewpor
   const poof = poofConvergesOnSpawn(buildFrames);
   check(`${label}: the landing poof sits on the spawn tile`, poof.found && poof.ok, JSON.stringify(poof));
   check(
-    `${label}: input unlocks ~${INTRO_UNLOCK_MS} ms after the intro began (and not before)`,
-    unlock !== null && unlock.previousLocked && unlock.age >= INTRO_UNLOCK_MS && unlock.age < INTRO_UNLOCK_MS + UNLOCK_TOLERANCE_MS,
+    `${label}: input unlocks ~${Math.round(introUnlockMs(buildFrames[0]?.tiles ?? 0))} ms (500 + clamp(N/70 tiles/s, 2000, 3200)) after the intro began (and not before)`,
+    unlock !== null && unlock.previousLocked && unlock.age >= introUnlockMs(buildFrames[0]?.tiles ?? 0) && unlock.age < introUnlockMs(buildFrames[0]?.tiles ?? 0) + UNLOCK_TOLERANCE_MS,
     JSON.stringify(unlock)
   );
   if (viewport !== null) {
-    check(`${label}: all 8 diamonds stay fully inside the ${viewport.width}x${viewport.height} viewport while the beams fire`, buildFrames.filter((f) => f.firing.length > 0).every((f) => markersInsideViewport(f, viewport)), JSON.stringify(buildFrames.find((f) => f.firing.length > 0)?.markerBounds));
+    check(`${label}: all 8 diamonds stay inside the ${viewport.width}x${viewport.height} viewport (flush at rest, at most ${SPIN_CLIP_TOLERANCE_PX} px clipped while spinning) while the beams fire`, buildFrames.filter((f) => f.firing.length > 0).every((f) => markersInsideViewport(f, viewport)), JSON.stringify(buildFrames.find((f) => f.firing.length > 0)?.markerBounds));
   }
 };
 
@@ -642,7 +683,7 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
     check(`${label}: no departure beam is drawn inward from a diamond (wrong-direction pairs = 0)`, d.wrongDirectionPairs === 0, `wrongDirectionPairs=${d.wrongDirectionPairs}`);
     check(`${label}: all 8 departure beams are in flight together at least once`, d.maxConcurrent === 8, `maxConcurrent=${d.maxConcurrent}`);
     check(`${label}: every departure beam reaches its diamond (last drawn tip within 10% of it)`, d.tipsReachFarEnd, JSON.stringify(d));
-    check(`${label}: a diamond is lit (brightened) on every frame its departure beam is firing`, d.litNeverBelowFiring, JSON.stringify(d));
+    check(`${label}: each diamond lights as the player beam REACHES it and all 8 stay lit until the end fade`, d.lighting.ok, JSON.stringify(d.lighting));
     check(
       `${label}: the departure beams fire inside the deconstruct laser window (0-${OUTRO_LASER_END_MS} ms, one frame of slack)`,
       d.firstAge !== null && d.firstAge >= 0 && d.lastAge <= OUTRO_LASER_END_MS + FRAME_MS,
@@ -654,16 +695,18 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
 
   const handoffMs = outroIndex >= 0 && buildIndex >= 0 ? frames[buildIndex].t - frames[outroIndex].t : null;
   check(
-    `${label}: the deconstruct hands off to the next build within ${OUTRO_TOTAL_MS} ms (+ frame slack)`,
-    handoffMs !== null && handoffMs <= OUTRO_TOTAL_MS + (FRAME_MS * 3),
+    `${label}: the deconstruct hands off to the next build within 400 + clamp(N/70 tiles/s, 1800, 3000) + 300 ms (+ frame slack)`,
+    handoffMs !== null && handoffMs <= outroTotalMs(frames[outroIndex]?.tiles ?? 0) + (FRAME_MS * 3),
     `handoffMs=${handoffMs}`
   );
   const drift = ringDrift(frames);
   check(`${label}: the ring of 8 diamonds holds its stations through the whole transfer (max drift <= 3 px)`, drift <= 3, `maxDrift=${drift}`);
 
-  const last = frames[frames.length - 1];
+  // The ring lighting fades over 150 ms and the goal pulse runs 250 ms after the reveal: let both finish.
+  await h.stepN(40);
+  const last = await h.sampleNow();
   check(
-    `${label}: once the cycle completes no beam is in flight, no diamond is lit, and the player stands on the new maze's start`,
+    `${label}: once the cycle completes (and the lighting has faded) no beam is in flight, no diamond is lit, and the player stands on the new maze's start`,
     last.firing.length === 0 && last.lineCount === 0 && last.lit.length === 0 && last.player.x === last.start.x && last.player.y === last.start.y,
     JSON.stringify({ firing: last.firing, lineCount: last.lineCount, lit: last.lit, player: last.player, start: last.start })
   );
@@ -720,13 +763,14 @@ const main = async () => {
       const unlock = findUnlock(build.frames.slice(Math.max(0, build.frames.findIndex((f) => f.introActive))));
       const unlockFrame = build.frames.find((f) => f.drawPhase === 'settled' && !f.locked);
       check(
-        'case 1: from the Start press to unlocked input is ~1.2 s of scene time (no hidden extra delay)',
-        unlock !== null && unlockFrame !== undefined && (unlockFrame.t - started.pressedAtMs) >= INTRO_UNLOCK_MS && (unlockFrame.t - started.pressedAtMs) < INTRO_UNLOCK_MS + (UNLOCK_TOLERANCE_MS * 2),
+        'case 1: from the Start press to unlocked input is 500 + clamp(N/70 tiles/s, 2000, 3200) ms of scene time (no hidden extra delay)',
+        unlock !== null && unlockFrame !== undefined && (unlockFrame.t - started.pressedAtMs) >= introUnlockMs(build.frames[0]?.tiles ?? 0) && (unlockFrame.t - started.pressedAtMs) < introUnlockMs(build.frames[0]?.tiles ?? 0) + (UNLOCK_TOLERANCE_MS * 2),
         `sincePressMs=${unlockFrame ? unlockFrame.t - started.pressedAtMs : null}`
       );
-      const settled = build.frames[build.frames.length - 1];
+      await h.stepN(40);
+      const settled = await h.sampleNow();
       check(
-        'case 1: after the arrival no beam is in flight, no diamond is lit, and the player stands on the maze start',
+        'case 1: after the arrival (and the 150 ms lighting fade) no beam is in flight, no diamond is lit, and the player stands on the maze start',
         settled.firing.length === 0 && settled.lineCount === 0 && settled.lit.length === 0 && settled.player.x === settled.start.x && settled.player.y === settled.start.y,
         JSON.stringify({ firing: settled.firing, lineCount: settled.lineCount, lit: settled.lit, player: settled.player, start: settled.start })
       );
@@ -991,9 +1035,9 @@ const main = async () => {
       check('case 6c: the build unlocks input after resume', post.met, 'n/a');
       const unlock = findUnlock(post.frames);
       check(
-        'case 6c: the pause did not consume the intro -- input still unlocks ~1.2 s of intro time in, well over 1.2 s after the Start press',
-        unlock !== null && unlock.age >= INTRO_UNLOCK_MS && unlock.age < INTRO_UNLOCK_MS + (UNLOCK_TOLERANCE_MS * 2)
-          && (post.frames[unlock.index].t - started.pressedAtMs) >= INTRO_UNLOCK_MS + (50 * FRAME_MS),
+        'case 6c: the pause did not consume the intro -- input still unlocks at the full intro time (500 + revealMs), well over that after the Start press',
+        unlock !== null && unlock.age >= introUnlockMs(post.frames[0]?.tiles ?? 0) && unlock.age < introUnlockMs(post.frames[0]?.tiles ?? 0) + (UNLOCK_TOLERANCE_MS * 2)
+          && (post.frames[unlock.index].t - started.pressedAtMs) >= introUnlockMs(post.frames[0]?.tiles ?? 0) + (50 * FRAME_MS),
         JSON.stringify({ unlock, sincePress: post.frames[unlock?.index ?? 0]?.t - started.pressedAtMs })
       );
       const a = analyzeBeams([...pre.frames, ...post.frames].filter((f) => f.introActive), stations, 'inward');

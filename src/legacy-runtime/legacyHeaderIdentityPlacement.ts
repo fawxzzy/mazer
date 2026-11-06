@@ -5,7 +5,7 @@
  * Pure: no Phaser, no DOM. It feeds legacyHeaderIdentity.ts the REAL header
  * geometry instead of that module's assumed 220 px title footprint:
  *  - the profile icon frame comes from resolveLegacyHeaderControlFrame (the
- *    same call the icon itself and the diamond-marker avoidance use);
+ *    same call the icon itself uses);
  *  - the title's left edge comes from resolveLegacyMenuPathTitleLayout, the
  *    same layout the scene draws and reports as `title.bounds` in the runtime
  *    diagnostics (measured 2026-11-05: left 113 / width 164 at 390x844,
@@ -14,17 +14,9 @@
  *  - when the title is not inline in the header row (fallback lane), the
  *    label is bounded by the leftmost trailing header control instead.
  *
- * The label is also kept clear of every edge diamond: if its text rect would
- * touch a diamond's worst-case bounding square it is nudged down (never up,
- * never below the profile icon's bottom edge); if it still cannot clear, it is
- * hidden rather than overlapping.
+ * The edge diamonds sit at fixed positions BEHIND all UI (edgeMarkers.ts), so
+ * the label no longer avoids them.
  */
-import {
-  resolveEdgeMarkerBounds,
-  resolveHeaderControlRects,
-  type EdgeRect,
-  type EdgeStation
-} from '../render/edgeMarkers';
 import { resolveLegacyHeaderControlFrame } from './legacyHeaderControl';
 import {
   LEGACY_HEADER_IDENTITY_PREFERRED_FONT_PX,
@@ -42,8 +34,42 @@ export const LEGACY_HEADER_IDENTITY_SHORT_FORM_MAX_WIDTH_PX = 360;
 /** Visible-character floor of the short form (320 px: ~41 px of room fits "qa-p..." style stubs). */
 export const LEGACY_HEADER_IDENTITY_SHORT_FORM_MIN_VISIBLE_CHARS = 4;
 
-/** Minimum gap between the label's text rect and any edge diamond bounding square. */
-export const LEGACY_HEADER_IDENTITY_DIAMOND_CLEARANCE_PX = 1;
+/** Vertical padding (px, top and bottom) so descenders are never clipped; no stroke, no plate. */
+export const LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX = 2;
+
+export interface LegacyHeaderRect {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+
+/**
+ * The three header controls (profile, leaderboard, settings) exactly as
+ * MenuScene lays them out: the same resolveLegacyHeaderControlFrame inputs the
+ * draw/hit-test code uses.
+ */
+export const resolveHeaderControlRects = (layout: {
+  readonly width: number;
+  readonly height: number;
+  readonly headerIconScale: number;
+  readonly headerSafeInset?: { readonly left: number; readonly right: number };
+  readonly lanes: { readonly hud: { readonly top: number; readonly height: number } | null };
+}): ReadonlyArray<LegacyHeaderRect> => {
+  const base = {
+    height: layout.height,
+    hudHeight: layout.lanes.hud?.height ?? 64,
+    hudTop: layout.lanes.hud?.top ?? 0,
+    safeArea: layout.headerSafeInset,
+    sizeScale: layout.headerIconScale,
+    width: layout.width
+  };
+  return [
+    resolveLegacyHeaderControlFrame({ ...base, placement: 'leading' }),
+    resolveLegacyHeaderControlFrame({ ...base, placement: 'trailing' }),
+    resolveLegacyHeaderControlFrame({ ...base, placement: 'trailing', slot: 1 })
+  ].map((frame) => ({ left: frame.left, top: frame.top, right: frame.right, bottom: frame.bottom }));
+};
 
 export interface LegacyHeaderIdentityPlacementLayout {
   readonly width: number;
@@ -66,8 +92,6 @@ export interface LegacyHeaderIdentityPlacementInput {
   measure: LegacyUiSizedTextMeasure;
   /** Rendered text-box height in px at a given font size (includes stroke/padding). */
   measureHeight?: (fontPx: number) => number;
-  /** Edge diamonds the label must clear. */
-  edgeStations?: ReadonlyArray<Pick<EdgeStation, 'x' | 'y'>>;
 }
 
 export interface LegacyHeaderIdentityPlacement {
@@ -77,24 +101,14 @@ export interface LegacyHeaderIdentityPlacement {
   /** Left-anchored, vertically centered anchor point for a Phaser text (origin 0, 0.5). */
   anchor: { x: number; y: number } | null;
   /** Text rect when visible. */
-  rect: EdgeRect | null;
-  profileFrame: EdgeRect & { centerY: number };
+  rect: LegacyHeaderRect | null;
+  profileFrame: LegacyHeaderRect & { centerY: number };
   /** Right limit the label had to stay left of (title left edge, or trailing control). */
   titleLeft: number;
   titleInline: boolean;
-  /** Vertical nudge applied to clear a diamond (0 when none needed). */
-  nudgeY: number;
-  clearsEdgeDiamonds: boolean;
 }
 
 const defaultMeasureHeight = (fontPx: number): number => Math.ceil(fontPx * 1.4);
-
-const rectsOverlap = (a: EdgeRect, b: EdgeRect, clearance: number): boolean => (
-  a.left < b.right + clearance
-  && a.right > b.left - clearance
-  && a.top < b.bottom + clearance
-  && a.bottom > b.top - clearance
-);
 
 export const resolveLegacyHeaderIdentityPlacement = (
   input: LegacyHeaderIdentityPlacementInput
@@ -141,9 +155,7 @@ export const resolveLegacyHeaderIdentityPlacement = (
   if (!identity.visible) {
     return {
       anchor: null,
-      clearsEdgeDiamonds: true,
       identity,
-      nudgeY: 0,
       profileFrame: frame,
       rect: null,
       titleInline,
@@ -153,33 +165,18 @@ export const resolveLegacyHeaderIdentityPlacement = (
   }
 
   const boxHeight = (input.measureHeight ?? defaultMeasureHeight)(identity.fontPx);
-  const rectAt = (centerY: number): EdgeRect => ({
+  const centerY = profileFrame.centerY;
+  const rect: LegacyHeaderRect = {
     bottom: centerY + (boxHeight / 2),
     left: identity.left,
     right: identity.right,
     top: centerY - (boxHeight / 2)
-  });
-
-  let centerY = profileFrame.centerY;
-  let rect = rectAt(centerY);
-  const diamonds = (input.edgeStations ?? []).map((station) => resolveEdgeMarkerBounds(station));
-  let nudgeY = 0;
-  for (const diamond of diamonds) {
-    if (rectsOverlap(rect, diamond, LEGACY_HEADER_IDENTITY_DIAMOND_CLEARANCE_PX)) {
-      const delta = Math.ceil((diamond.bottom + LEGACY_HEADER_IDENTITY_DIAMOND_CLEARANCE_PX) - rect.top);
-      centerY += delta;
-      nudgeY += delta;
-      rect = rectAt(centerY);
-    }
-  }
-  const clears = diamonds.every((diamond) => !rectsOverlap(rect, diamond, LEGACY_HEADER_IDENTITY_DIAMOND_CLEARANCE_PX))
-    && rect.bottom <= profileFrame.bottom + 0.001;
-  if (!clears) {
+  };
+  // Never taller than the profile icon row: hide rather than overlap the content below.
+  if (rect.bottom > profileFrame.bottom + 0.001) {
     return {
       anchor: null,
-      clearsEdgeDiamonds: false,
       identity,
-      nudgeY,
       profileFrame: frame,
       rect: null,
       titleInline,
@@ -189,9 +186,7 @@ export const resolveLegacyHeaderIdentityPlacement = (
   }
   return {
     anchor: { x: identity.left, y: centerY },
-    clearsEdgeDiamonds: true,
     identity,
-    nudgeY,
     profileFrame: frame,
     rect,
     titleInline,

@@ -4,23 +4,33 @@ import { describe, expect, test } from 'vitest';
 import { buildLegacyMazeRevealOrder } from '../../src/legacy-runtime/legacyAnimationCadence';
 import { resolveLegacyBleedOffDockVisualEligibility } from '../../src/legacy-runtime/legacyMenuRender';
 import {
-  INTRO_DIGIT_OUT_START_MS,
-  INTRO_DONE_MS,
-  INTRO_EDGE_PATHS_ON_MS,
-  INTRO_INPUT_UNLOCK_MS,
+  INTRO_DIGIT_OUT_MS,
+  INTRO_GOAL_PULSE_MS,
   INTRO_LASER_END_MS,
   INTRO_LASER_START_MS,
   INTRO_REDUCED_MOTION_MS,
-  INTRO_REVEAL_END_MS,
+  INTRO_REVEAL_MAX_MS,
+  INTRO_REVEAL_MIN_MS,
   INTRO_REVEAL_START_MS,
+  INTRO_REVEAL_TILES_PER_S,
   OUTRO_EDGE_PATHS_OFF_MS,
+  OUTRO_HANDOFF_MS,
   OUTRO_LASER_MS,
+  OUTRO_REMOVE_MAX_MS,
+  OUTRO_REMOVE_MIN_MS,
   OUTRO_TILES_START_MS,
-  OUTRO_TOTAL_MS,
   isEdgePathCellShown,
   resolveIntro,
   resolveIntroDeconstruct,
+  resolveIntroDoneMs,
   resolveIntroDurationMs,
+  resolveIntroEdgePathsOnMs,
+  resolveIntroInputUnlockMs,
+  resolveIntroRevealEndMs,
+  resolveIntroRevealMs,
+  resolveOutroRemoveMs,
+  resolveOutroTilesEndMs,
+  resolveOutroTotalMs,
   resolveSpawnLaser,
   skipIntroElapsedMs
 } from '../../src/render/introTimeline';
@@ -43,11 +53,11 @@ describe('introTimeline (time-driven intro)', () => {
     const sampleAt = (fps: number): Map<number, ReturnType<typeof resolveIntro>> => {
       const states = new Map<number, ReturnType<typeof resolveIntro>>();
       const frameMs = 1000 / fps;
-      for (let frame = 0; frame * frameMs <= 2600; frame += 1) {
+      for (let frame = 0; frame * frameMs <= 3900; frame += 1) {
         // 200 ms boundaries are shared by all three frame rates.
-        const elapsed = Math.round(frame * frameMs * 1e6) / 1e6;
-        if (Math.abs((elapsed / 200) - Math.round(elapsed / 200)) < 1e-9) {
-          states.set(Math.round(elapsed), resolveIntro(elapsed, options));
+        const elapsed = Math.round(frame * frameMs * 1e3) / 1e3;
+        if (Math.abs((elapsed / 200) - Math.round(elapsed / 200)) < 1e-4) {
+          states.set(Math.round(elapsed), resolveIntro(Math.round(elapsed), options));
         }
       }
       return states;
@@ -64,35 +74,82 @@ describe('introTimeline (time-driven intro)', () => {
     const late = resolveIntro(1200, options);
     resolveIntro(50, options);
     expect(resolveIntro(1200, options)).toEqual(late);
+    // The nominal duration is the same number whatever the frame rate: nothing counts frames.
+    expect(resolveIntroDoneMs(300)).toBe(resolveIntroRevealEndMs(300) + INTRO_GOAL_PULSE_MS);
   });
 
   test('a slow frame catches up: the first frame after a long stall already shows the full reveal', () => {
-    const afterStall = resolveIntro(1500, { ...FULL, tileCount: 2000 });
+    const afterStall = resolveIntro(resolveIntroDoneMs(2000), { ...FULL, tileCount: 2000 });
     expect(afterStall.tilesVisible).toBe(2000);
     expect(afterStall.inputUnlocked).toBe(true);
   });
 
-  test.each([45, 300, 2000])('reveal duration is constant for N = %i tiles', (tileCount) => {
-    const full = firstMs((ms) => resolveIntro(ms, { ...FULL, tileCount }).tilesVisible === tileCount);
-    expect(full).toBeGreaterThanOrEqual(INTRO_REVEAL_START_MS);
-    expect(full).toBeLessThanOrEqual(INTRO_REVEAL_END_MS);
-    const half = firstMs((ms) => resolveIntro(ms, { ...FULL, tileCount }).tilesVisible >= tileCount / 2);
-    const reference = firstMs((ms) => resolveIntro(ms, { ...FULL, tileCount: 45 }).tilesVisible >= 45 / 2);
-    expect(Math.abs(half - reference)).toBeLessThanOrEqual(6);
-    expect(full).toBeGreaterThan(half);
+  test('reveal length is clamp(N / 70 tiles/s, 2000, 3200) ms (the audit duration model)', () => {
+    expect(INTRO_REVEAL_TILES_PER_S).toBe(70);
+    expect([INTRO_REVEAL_MIN_MS, INTRO_REVEAL_MAX_MS]).toEqual([2000, 3200]);
+    expect([OUTRO_REMOVE_MIN_MS, OUTRO_REMOVE_MAX_MS]).toEqual([1800, 3000]);
+    expect(resolveIntroRevealMs(0)).toBe(2000);
+    expect(resolveIntroRevealMs(49)).toBe(2000); // Level 1: 24.5 tiles/s
+    expect(resolveIntroRevealMs(166)).toBeCloseTo(2371.43, 1); // Level 5: 70 tiles/s
+    expect(resolveIntroRevealMs(224)).toBeCloseTo(3200, 6);
+    expect(resolveIntroRevealMs(788)).toBe(3200); // Level 20: 246 tiles/s
+    expect(resolveIntroRevealMs(100000)).toBe(3200);
+    expect(resolveOutroRemoveMs(49)).toBe(1800);
+    expect(resolveOutroRemoveMs(166)).toBeCloseTo(2371.43, 1);
+    expect(resolveOutroRemoveMs(788)).toBe(3000);
+    // Monotonic in N.
+    let previous = 0;
+    for (let n = 0; n <= 1000; n += 7) {
+      expect(resolveIntroRevealMs(n)).toBeGreaterThanOrEqual(previous);
+      previous = resolveIntroRevealMs(n);
+    }
   });
 
-  test('total duration stays within the 2.5 s cap and done flips exactly once', () => {
-    expect(INTRO_DONE_MS).toBeLessThanOrEqual(2500);
-    expect(resolveIntro(INTRO_DONE_MS - 1, { ...FULL, tileCount: 100 }).done).toBe(false);
-    expect(resolveIntro(INTRO_DONE_MS, { ...FULL, tileCount: 100 }).done).toBe(true);
-    expect(resolveIntroDurationMs(false)).toBe(INTRO_DONE_MS);
+  test.each([49, 166, 788])('N = %i: the last tile appears exactly at the reveal end, linearly (not front-loaded)', (tileCount) => {
+    const revealMs = resolveIntroRevealMs(tileCount);
+    const revealEnd = resolveIntroRevealEndMs(tileCount);
+    expect(revealEnd).toBe(INTRO_REVEAL_START_MS + revealMs);
+    const full = firstMs((ms) => resolveIntro(ms, { ...FULL, tileCount }).tilesVisible === tileCount, 6000);
+    // The last tile shows up within one tile-interval (R / N) of the reveal end, never before.
+    expect(full).toBeGreaterThanOrEqual(revealEnd - (revealMs / tileCount) - 1);
+    expect(full).toBeLessThanOrEqual(Math.ceil(revealEnd));
+    // Linear: tiles revealed at each quarter of the window are the matching fraction of N.
+    for (const fraction of [0.25, 0.5, 0.75]) {
+      const state = resolveIntro(INTRO_REVEAL_START_MS + (revealMs * fraction), { ...FULL, tileCount });
+      expect(Math.abs(state.tilesVisible - (tileCount * fraction))).toBeLessThanOrEqual(1.5);
+    }
+    // easeOutCubic would already show ~58% at 25% of the window: linear must not.
+    expect(resolveIntro(INTRO_REVEAL_START_MS + (revealMs * 0.1), { ...FULL, tileCount }).tilesVisible).toBeLessThanOrEqual(Math.ceil(tileCount * 0.1) + 1);
+  });
+
+  test('measured durations at the harness levels vs the audit old numbers (L1 / L5 / L20)', () => {
+    const rows = [
+      { level: 1, tiles: 49, oldRevealS: 2.08 },
+      { level: 5, tiles: 166, oldRevealS: 2.66 },
+      { level: 20, tiles: 788, oldRevealS: 3.14 }
+    ];
+    for (const { tiles, oldRevealS } of rows) {
+      const revealS = resolveIntroRevealMs(tiles) / 1000;
+      // Within ~0.4 s of the old per-tick pacing the audit measured.
+      expect(Math.abs(revealS - oldRevealS)).toBeLessThan(0.4);
+      expect(resolveOutroRemoveMs(tiles) / 1000).toBeGreaterThanOrEqual(1.8);
+    }
+  });
+
+  test('done flips exactly once at the reveal end + goal pulse', () => {
+    for (const tileCount of [49, 166, 788]) {
+      const done = resolveIntroDoneMs(tileCount);
+      expect(resolveIntro(done - 1, { ...FULL, tileCount }).done).toBe(false);
+      expect(resolveIntro(done, { ...FULL, tileCount }).done).toBe(true);
+      expect(resolveIntroDurationMs(false, tileCount)).toBe(done);
+      expect(done).toBeLessThanOrEqual(INTRO_REVEAL_START_MS + INTRO_REVEAL_MAX_MS + INTRO_GOAL_PULSE_MS);
+    }
   });
 
   test('tilesVisible is monotonic, bounded, starts at 0 and ends at N', () => {
     for (const tileCount of [0, 1, 45, 300, 2000]) {
       let previous = -1;
-      for (let ms = 0; ms <= 2600; ms += 1) {
+      for (let ms = 0; ms <= 4200; ms += 1) {
         const { tilesVisible } = resolveIntro(ms, { ...FULL, tileCount });
         expect(tilesVisible).toBeGreaterThanOrEqual(previous);
         expect(tilesVisible).toBeLessThanOrEqual(tileCount);
@@ -110,6 +167,7 @@ describe('introTimeline (time-driven intro)', () => {
 
   test('beams come first, the maze appears as they land, and input unlocks when the reveal completes (one clock)', () => {
     const options = { ...FULL, tileCount: 120 };
+    const revealEnd = resolveIntroRevealEndMs(120);
     const laserLanded = firstMs((ms) => resolveIntro(ms, options).laserProgress >= 1);
     const firstTile = firstMs((ms) => resolveIntro(ms, options).tilesVisible > 0);
     const allTiles = firstMs((ms) => resolveIntro(ms, options).tilesVisible >= 120);
@@ -121,46 +179,49 @@ describe('introTimeline (time-driven intro)', () => {
     expect(resolveIntro(INTRO_LASER_END_MS - 1, options).tilesVisible).toBe(0);
     expect(resolveIntro(INTRO_LASER_END_MS, options).tilesVisible).toBeGreaterThanOrEqual(1);
     // Input unlocks only once the maze has finished appearing, after the beams landed.
-    expect(allTiles).toBeLessThanOrEqual(INTRO_REVEAL_END_MS);
-    expect(unlocked).toBe(INTRO_INPUT_UNLOCK_MS);
+    expect(allTiles).toBeLessThanOrEqual(Math.ceil(revealEnd));
+    expect(unlocked).toBe(Math.ceil(revealEnd));
+    expect(resolveIntroInputUnlockMs(false, 120)).toBe(revealEnd);
     expect(unlocked).toBeGreaterThanOrEqual(laserLanded);
     expect(unlocked).toBeGreaterThanOrEqual(allTiles);
-    expect(INTRO_DONE_MS).toBeLessThanOrEqual(2000);
-    // The scene's spawn-laser clock (time since the beams left) agrees on the landing.
+    // The scene spawn-laser clock (time since the beams left) agrees on the landing.
     expect(resolveSpawnLaser(INTRO_LASER_END_MS - INTRO_LASER_START_MS - 1).markerRevealed).toBe(false);
     expect(resolveSpawnLaser(INTRO_LASER_END_MS - INTRO_LASER_START_MS).markerRevealed).toBe(true);
     expect(resolveIntro(INTRO_LASER_END_MS - 1, options).spawnPop).toBe(0);
     expect(resolveIntro(INTRO_LASER_END_MS + 100, options).spawnPop).toBeGreaterThan(0);
-    // The goal pulse plays on unlock.
-    expect(resolveIntro(INTRO_INPUT_UNLOCK_MS + 100, options).goalPulse).toBeGreaterThan(0);
-    expect(resolveIntro(INTRO_INPUT_UNLOCK_MS - 1, options).goalPulse).toBe(0);
+    // The goal pulse plays on unlock, hung off the reveal end.
+    expect(resolveIntro(revealEnd + 100, options).goalPulse).toBeGreaterThan(0);
+    expect(resolveIntro(revealEnd - 1, options).goalPulse).toBe(0);
   });
 
   test('laser progress is monotonic 0..1 and the digit is gone when the beam lands', () => {
     const options = { ...FULL, tileCount: 80 };
     let previous = 0;
-    for (let ms = 0; ms <= INTRO_DONE_MS; ms += 1) {
+    for (let ms = 0; ms <= resolveIntroDoneMs(80); ms += 1) {
       const { laserProgress } = resolveIntro(ms, options);
       expect(laserProgress).toBeGreaterThanOrEqual(previous);
       previous = laserProgress;
     }
     expect(previous).toBe(1);
-    expect(resolveIntro(INTRO_DIGIT_OUT_START_MS - 1, options).digitAlpha).toBeGreaterThan(0.99);
-    expect(resolveIntro(INTRO_INPUT_UNLOCK_MS, options).digitAlpha).toBe(0);
+    const revealEnd = resolveIntroRevealEndMs(80);
+    // The digit holds until the last INTRO_DIGIT_OUT_MS of the reveal, then fades out by the reveal end.
+    expect(resolveIntro(revealEnd - INTRO_DIGIT_OUT_MS - 1, options).digitAlpha).toBeGreaterThan(0.99);
+    expect(resolveIntro(revealEnd - (INTRO_DIGIT_OUT_MS / 2), options).digitAlpha).toBeLessThan(0.99);
+    expect(resolveIntro(revealEnd, options).digitAlpha).toBe(0);
     expect(resolveIntro(0, { ...options, digitAlreadyVisible: true }).digitAlpha).toBe(1);
     expect(resolveIntro(0, options).digitAlpha).toBe(0);
   });
 
   test('skip jumps to the final state and never moves time backwards', () => {
     const options = { ...FULL, tileCount: 500 };
-    const skipped = skipIntroElapsedMs(250, FULL);
-    expect(skipped).toBe(INTRO_DONE_MS);
+    const skipped = skipIntroElapsedMs(250, { ...FULL, tileCount: 500 });
+    expect(skipped).toBe(resolveIntroDoneMs(500));
     const state = resolveIntro(skipped, options);
     expect(state.done).toBe(true);
     expect(state.inputUnlocked).toBe(true);
     expect(state.tilesVisible).toBe(500);
-    expect(skipIntroElapsedMs(9000, FULL)).toBe(9000);
-    expect(skipIntroElapsedMs(100, REDUCED)).toBe(INTRO_REDUCED_MOTION_MS);
+    expect(skipIntroElapsedMs(9000, { ...FULL, tileCount: 500 })).toBe(9000);
+    expect(skipIntroElapsedMs(100, { ...REDUCED, tileCount: 500 })).toBe(INTRO_REDUCED_MOTION_MS);
   });
 
   test('reduced motion: ~250 ms crossfade, no laser, no sparkles, unlock at 250', () => {
@@ -185,20 +246,26 @@ describe('introTimeline (time-driven intro)', () => {
     }
     expect(resolveIntro(INTRO_REDUCED_MOTION_MS, options).digitAlpha).toBe(0);
     expect(resolveIntro(INTRO_REDUCED_MOTION_MS, options).boardAlpha).toBe(1);
+    // Reduced motion keeps the 250 ms crossfade whatever the tile count, deconstruct 150 ms.
+    expect(resolveIntroInputUnlockMs(true, 5)).toBe(250);
+    expect(resolveIntroInputUnlockMs(true, 5000)).toBe(250);
+    expect(resolveIntroDurationMs(true, 5000)).toBe(250);
+    expect(resolveIntroDeconstruct(150, { ...REDUCED, tileCount: 900 }).done).toBe(true);
+    expect(resolveIntroDeconstruct(149, { ...REDUCED, tileCount: 900 }).done).toBe(false);
   });
 });
 
 describe('introTimeline edge paths are atomic (no partial bleed state)', () => {
   test('intro: bleedProgress is strictly 0 or 1 and flips once, when the reveal completes', () => {
-    expect(INTRO_EDGE_PATHS_ON_MS).toBe(INTRO_REVEAL_END_MS);
+    expect(resolveIntroEdgePathsOnMs(100)).toBe(resolveIntroRevealEndMs(100));
     let previous = 0;
     let flips = 0;
-    for (let ms = 0; ms <= INTRO_DONE_MS + 500; ms += 1) {
+    for (let ms = 0; ms <= resolveIntroDoneMs(100) + 500; ms += 1) {
       const { bleedProgress } = resolveIntro(ms, { ...FULL, tileCount: 100 });
       expect([0, 1]).toContain(bleedProgress);
       if (bleedProgress !== previous) {
         flips += 1;
-        expect(ms).toBe(INTRO_EDGE_PATHS_ON_MS);
+        expect(ms).toBe(Math.ceil(resolveIntroEdgePathsOnMs(100)));
       }
       previous = bleedProgress;
     }
@@ -211,6 +278,7 @@ describe('introTimeline edge paths are atomic (no partial bleed state)', () => {
     let previous = 1;
     let flips = 0;
     let previousTiles = Number.POSITIVE_INFINITY;
+    const OUTRO_TOTAL_MS = resolveOutroTotalMs(100);
     for (let ms = 0; ms <= OUTRO_TOTAL_MS + 400; ms += 1) {
       const state = resolveIntroDeconstruct(ms, options);
       expect([0, 1]).toContain(state.bleedProgress);
@@ -224,7 +292,7 @@ describe('introTimeline edge paths are atomic (no partial bleed state)', () => {
     }
     expect(flips).toBe(1);
     const end = resolveIntroDeconstruct(OUTRO_TOTAL_MS, options);
-    expect(OUTRO_TOTAL_MS).toBeLessThanOrEqual(900);
+    expect(OUTRO_TOTAL_MS).toBe(OUTRO_TILES_START_MS + resolveOutroRemoveMs(100) + OUTRO_HANDOFF_MS);
     // Mirror of the arrival: the player's beams go OUT first (monotonic 0..1), the
     // edge paths vanish atomically when they have landed, and only then do tiles dissolve.
     let previousBeam = 0;
@@ -275,7 +343,7 @@ describe('introTimeline edge paths are atomic (no partial bleed state)', () => {
     );
 
     const options = { ...FULL, tileCount: order.length };
-    for (let ms = 0; ms <= INTRO_DONE_MS + 200; ms += 1) {
+    for (let ms = 0; ms <= resolveIntroDoneMs(order.length) + 200; ms += 1) {
       const state = resolveIntro(ms, options);
       const drawn = drawnDockCells(state.tilesVisible, state.bleedProgress === 1);
       // All four dock cells appear in the same millisecond, never one by one:
@@ -288,14 +356,15 @@ describe('introTimeline edge paths are atomic (no partial bleed state)', () => {
         expect(drawn).toBe(0);
       }
     }
-    for (let ms = 0; ms <= OUTRO_TOTAL_MS + 200; ms += 1) {
+    const outroTotal = resolveOutroTotalMs(order.length);
+    for (let ms = 0; ms <= outroTotal + 200; ms += 1) {
       const state = resolveIntroDeconstruct(ms, options);
       const drawn = drawnDockCells(state.tilesVisible, state.bleedProgress === 1);
       if (state.bleedProgress === 0) {
         expect(drawn).toBe(0);
       }
     }
-    const end = resolveIntroDeconstruct(OUTRO_TOTAL_MS, options);
+    const end = resolveIntroDeconstruct(outroTotal, options);
     expect(end.tilesVisible).toBe(0);
     expect(drawnDockCells(end.tilesVisible, end.bleedProgress === 1)).toBe(0);
   });
@@ -317,6 +386,30 @@ describe('introTimeline edge paths are atomic (no partial bleed state)', () => {
   });
 
   test('the edge group switches on only once the gradual reveal is complete', () => {
-    expect(INTRO_EDGE_PATHS_ON_MS).toBe(INTRO_REVEAL_END_MS);
+    for (const tileCount of [49, 166, 788]) {
+      expect(resolveIntroEdgePathsOnMs(tileCount)).toBe(resolveIntroRevealEndMs(tileCount));
+      expect(resolveIntro(resolveIntroEdgePathsOnMs(tileCount) - 1, { ...FULL, tileCount }).bleedProgress).toBe(0);
+      expect(resolveIntro(resolveIntroEdgePathsOnMs(tileCount), { ...FULL, tileCount }).bleedProgress).toBe(1);
+    }
+  });
+});
+
+describe('deconstruct pacing (tiles dissolve linearly over removeMs(N))', () => {
+  test.each([49, 166, 788])('N = %i: tiles start at 400 ms, are linear, and are gone at 400 + removeMs(N)', (tileCount) => {
+    const options = { ...FULL, tileCount };
+    const removeMs = resolveOutroRemoveMs(tileCount);
+    expect(OUTRO_TILES_START_MS).toBe(OUTRO_LASER_MS);
+    expect(resolveOutroTilesEndMs(tileCount)).toBe(OUTRO_TILES_START_MS + removeMs);
+    expect(resolveOutroTotalMs(tileCount)).toBe(OUTRO_TILES_START_MS + removeMs + OUTRO_HANDOFF_MS);
+    expect(resolveIntroDeconstruct(OUTRO_TILES_START_MS, options).tilesVisible).toBe(tileCount);
+    expect(resolveIntroDeconstruct(resolveOutroTilesEndMs(tileCount), options).tilesVisible).toBe(0);
+    expect(resolveIntroDeconstruct(resolveOutroTilesEndMs(tileCount), options).tilesGone).toBe(true);
+    expect(resolveIntroDeconstruct(resolveOutroTilesEndMs(tileCount) - 1, options).tilesGone).toBe(false);
+    for (const fraction of [0.25, 0.5, 0.75]) {
+      const visible = resolveIntroDeconstruct(OUTRO_TILES_START_MS + (removeMs * fraction), options).tilesVisible;
+      expect(Math.abs(visible - (tileCount * (1 - fraction)))).toBeLessThanOrEqual(1.5);
+    }
+    expect(resolveIntroDeconstruct(resolveOutroTotalMs(tileCount) - 1, options).done).toBe(false);
+    expect(resolveIntroDeconstruct(resolveOutroTotalMs(tileCount), options).done).toBe(true);
   });
 });

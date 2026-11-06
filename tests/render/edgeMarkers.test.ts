@@ -12,26 +12,32 @@ import {
   drawEdgeMarkers,
   drawEdgeBeams,
   resolveEdgeMarkerIdleAlpha,
-  resolveEdgeMarkerInsets,
+  resolveEdgeStationNormalExtent,
+  resolveEdgeRingEnergies,
   resolveEdgeMarkerStates,
   resolveEdgeMarkerVertices,
   resolveEdgeStationPosition,
   resolveEdgeStations,
   resolveEdgeBeamProgress,
   resolveEdgeBeams,
-  resolveEdgeMarkerBounds,
-  resolveHeaderControlRects,
   resolveWrapEndStationIds,
   resolveWrapFlashStationIds,
-  EDGE_MARKER_CONTROL_CLEARANCE_PX,
-  type EdgeGraphics,
-  type EdgeRect
+  type EdgeGraphics
 } from '../../src/render/edgeMarkers';
 import { cyberArcadeMaterial } from '../../src/render/cyberArcadeMaterial';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
-import { INTRO_BEAM_STAGGER_MS, INTRO_LASER_MS } from '../../src/render/introTimeline';
+import {
+  INTRO_BEAM_STAGGER_MS,
+  INTRO_LASER_END_MS,
+  INTRO_LASER_MS,
+  RING_ENERGY_FADE_MS,
+  resolveIntro,
+  resolveIntroDeconstruct,
+  resolveIntroRevealEndMs,
+  resolveOutroTotalMs
+} from '../../src/render/introTimeline';
 import { resolveTeleportAnchorPoses } from '../../src/render/teleportAnchorPose';
 
 const VIEWPORTS = [
@@ -40,44 +46,100 @@ const VIEWPORTS = [
   { width: 499, height: 958 }
 ] as const;
 
-const SAFE_AREAS = [
-  undefined,
-  { top: 47, right: 0, bottom: 34, left: 0 },
-  { top: 24, right: 24, bottom: 24, left: 24 }
+const MIRROR_VIEWPORTS = [
+  { width: 390, height: 844 },
+  { width: 320, height: 568 },
+  { width: 1280, height: 720 }
 ] as const;
 
 describe('edge marker stations', () => {
-  test.each(VIEWPORTS)('all 8 kites are fully inside a $width x $height viewport (with and without safe-area insets)', (viewport) => {
-    for (const safeArea of SAFE_AREAS) {
-      const stations = resolveEdgeStations(viewport, safeArea);
-      expect(stations).toHaveLength(EDGE_STATION_COUNT);
-      const insets = resolveEdgeMarkerInsets(safeArea);
-      for (const station of stations) {
-        // Centre inset >= max(12, safeArea + 12) on every edge it touches.
-        expect(station.x).toBeGreaterThanOrEqual(insets.left - 1e-9);
-        expect(station.x).toBeLessThanOrEqual(viewport.width - insets.right + 1e-9);
-        expect(station.y).toBeGreaterThanOrEqual(insets.top - 1e-9);
-        expect(station.y).toBeLessThanOrEqual(viewport.height - insets.bottom + 1e-9);
-        expect(insets.left).toBeGreaterThanOrEqual(Math.max(12, (safeArea?.left ?? 0) + 12));
-        expect(insets.top).toBeGreaterThanOrEqual(Math.max(12, (safeArea?.top ?? 0) + 12));
-        // Every outline vertex plus half a stroke stays inside the viewport,
-        // at the real rotation AND at every other rotation (worst case).
-        for (const vertex of resolveEdgeMarkerVertices(station)) {
-          expect(vertex.x - 0.5).toBeGreaterThanOrEqual(0);
-          expect(vertex.y - 0.5).toBeGreaterThanOrEqual(0);
-          expect(vertex.x + 0.5).toBeLessThanOrEqual(viewport.width);
-          expect(vertex.y + 0.5).toBeLessThanOrEqual(viewport.height);
-        }
-        for (let degrees = 0; degrees < 360; degrees += 15) {
-          const rotated = resolveEdgeMarkerVertices({ ...station, inwardAngle: (degrees * Math.PI) / 180 });
-          for (const vertex of rotated) {
-            expect(Math.hypot(vertex.x - station.x, vertex.y - station.y)).toBeLessThanOrEqual(EDGE_MARKER_MAX_EXTENT_PX);
-          }
+  test.each(VIEWPORTS)('all 8 kites rest fully inside a $width x $height viewport with the outer tip flush to its edge', (viewport) => {
+    const stations = resolveEdgeStations(viewport);
+    expect(stations).toHaveLength(EDGE_STATION_COUNT);
+    for (const station of stations) {
+      const vertices = resolveEdgeMarkerVertices(station);
+      // Nothing clipped at rest (outline vertex +/- half a stroke)...
+      for (const vertex of vertices) {
+        expect(vertex.x - 0.5).toBeGreaterThanOrEqual(-1e-9);
+        expect(vertex.y - 0.5).toBeGreaterThanOrEqual(-1e-9);
+        expect(vertex.x + 0.5).toBeLessThanOrEqual(viewport.width + 1e-9);
+        expect(vertex.y + 0.5).toBeLessThanOrEqual(viewport.height + 1e-9);
+      }
+      // ...and the outer tip touches the screen edge the station sits on (0 px gap).
+      const gaps = {
+        top: Math.min(...vertices.map((vertex) => vertex.y)) - 0.5,
+        bottom: viewport.height - (Math.max(...vertices.map((vertex) => vertex.y)) + 0.5),
+        left: Math.min(...vertices.map((vertex) => vertex.x)) - 0.5,
+        right: viewport.width - (Math.max(...vertices.map((vertex) => vertex.x)) + 0.5)
+      };
+      expect(gaps[station.side], `station ${station.id} gap to ${station.side}`).toBeCloseTo(0, 9);
+      // Any rotation stays within the max extent of the centre.
+      for (let degrees = 0; degrees < 360; degrees += 15) {
+        for (const vertex of resolveEdgeMarkerVertices(station, 1, (degrees * Math.PI) / 180)) {
+          expect(Math.hypot(vertex.x - station.x, vertex.y - station.y)).toBeLessThanOrEqual(EDGE_MARKER_MAX_EXTENT_PX + 1e-9);
         }
       }
     }
     expect(EDGE_MARKER_MAX_EXTENT_PX).toBeLessThanOrEqual(EDGE_MARKER_MIN_INSET_PX);
+    // Midpoint kites reach 10.5 px from the centre toward their edge; 45 degree corner kites ~7.57 px.
+    expect(resolveEdgeStationNormalExtent(1)).toBeCloseTo(10.5, 9);
+    expect(resolveEdgeStationNormalExtent(3)).toBeCloseTo(10.5, 9);
+    expect(resolveEdgeStationNormalExtent(0)).toBeCloseTo((10 * Math.SQRT1_2) + 0.5, 9);
   });
+
+  test('fixed positions: top row is 12 / w/2 / w-12 and the layout depends on the viewport size ONLY', () => {
+    const stations = resolveEdgeStations({ width: 390, height: 844 });
+    expect([stations[0]?.x, stations[1]?.x, stations[2]?.x]).toEqual([12, 195, 378]);
+    expect(stations[1]?.y).toBeCloseTo(10.5, 9);
+    expect(stations[5]?.y).toBeCloseTo(844 - 10.5, 9);
+    expect(stations[3]?.x).toBeCloseTo(390 - 10.5, 9);
+    expect(stations[7]?.x).toBeCloseTo(10.5, 9);
+    expect(stations[3]?.y).toBeCloseTo(422, 9);
+    expect(stations[7]?.y).toBeCloseTo(422, 9);
+    expect(resolveEdgeStations.length).toBe(1);
+    const wide = resolveEdgeStations({ width: 1280, height: 720 });
+    expect([wide[0]?.x, wide[1]?.x, wide[2]?.x]).toEqual([12, 640, 1268]);
+  });
+
+  test.each(MIRROR_VIEWPORTS)('layout is mirror-symmetric at $width x $height in the menu AND play layouts (bottom row is the reference)', (viewport) => {
+    for (const surface of ['menu', 'play'] as const) {
+      // The scene feeds the stations only width/height, so the layout surface cannot move them.
+      const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 49, surface, { menuActionMode: 'authenticated' });
+      const stations = resolveEdgeStations({ width: layout.width, height: layout.height });
+      const at = (id: number) => stations[id] as { x: number; y: number };
+      // Vertical mirror: top row (0,1,2) <-> bottom row (6,5,4) share x and mirror y.
+      for (const [topId, bottomId] of [[0, 6], [1, 5], [2, 4]] as const) {
+        expect(at(topId).x, `x ${topId}/${bottomId}`).toBeCloseTo(at(bottomId).x, 9);
+        expect(at(topId).y + at(bottomId).y, `y ${topId}/${bottomId}`).toBeCloseTo(layout.height, 9);
+      }
+      // Horizontal mirror: left (7) <-> right (3) share y and mirror x; both exactly mid-height.
+      expect(at(7).y).toBeCloseTo(at(3).y, 9);
+      expect(at(7).y).toBeCloseTo(layout.height / 2, 9);
+      expect(at(7).x + at(3).x).toBeCloseTo(layout.width, 9);
+      // The left and right corner columns mirror each other too.
+      for (const [leftId, rightId] of [[0, 2], [6, 4]] as const) {
+        expect(at(leftId).x + at(rightId).x).toBeCloseTo(layout.width, 9);
+        expect(at(leftId).y).toBeCloseTo(at(rightId).y, 9);
+      }
+      // Top and bottom midpoints are exactly centred.
+      expect(at(1).x).toBeCloseTo(layout.width / 2, 9);
+      expect(at(5).x).toBeCloseTo(layout.width / 2, 9);
+    }
+  });
+
+  test('the scene feeds the stations the viewport ONLY: no safe area, no header-control avoidance', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const start = source.indexOf('private resolveLegacyEdgeStations()');
+    const body = source.slice(start, source.indexOf('\n  }', start));
+    expect(body).toContain('return resolveEdgeStations({ width: this.layout.width, height: this.layout.height });');
+    expect(body).not.toContain('safeArea');
+    expect(body).not.toContain('resolveHeaderControlRects');
+    const markers = readFileSync(resolve(process.cwd(), 'src/render/edgeMarkers.ts'), 'utf8');
+    expect(markers).not.toContain('clearStationOfControls');
+    expect(markers).not.toContain('resolveHeaderControlRects');
+    expect(markers).not.toContain('safeArea');
+  });
+
 
   test('kite is ~14 x 20 px', () => {
     const [tip, side, tail, otherSide] = resolveEdgeMarkerVertices({ x: 100, y: 100, inwardAngle: Math.PI / 2 });
@@ -119,9 +181,6 @@ describe('edge marker stations', () => {
     expect(stations.map((station) => station.id)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     // even ids are the corners, odd ids the edge midpoints
     expect(stations.map((station) => station.isCorner)).toEqual([true, false, true, false, true, false, true, false]);
-    expect(stations[0]).toMatchObject({ x: 12, y: 12 });
-    expect(stations[1]?.x).toBeCloseTo(195, 9);
-    expect(stations[3]).toMatchObject({ x: 378 });
   });
 
   test('every kite points inward (along the edge normal; diagonally at corners)', () => {
@@ -230,56 +289,7 @@ describe('wrap flash', () => {
   });
 });
 
-describe('header controls and depth', () => {
-  const overlaps = (a: EdgeRect, b: EdgeRect, gap: number): boolean => (
-    a.left < b.right + gap && a.right > b.left - gap && a.top < b.bottom + gap && a.bottom > b.top - gap
-  );
-  const layoutFor = (width: number, height: number, surface: 'menu' | 'play') => (
-    resolveLegacyMenuLayout(width, height, 50, 49, 49, surface, { menuActionMode: 'authenticated' })
-  );
-
-  test.each([
-    { width: 390, height: 844 },
-    { width: 320, height: 568 },
-    { width: 1280, height: 720 }
-  ])('no diamond overlaps a header control (+8 px clearance) at $width x $height', (viewport) => {
-    for (const surface of ['menu', 'play'] as const) {
-      const controls = resolveHeaderControlRects(layoutFor(viewport.width, viewport.height, surface));
-      expect(controls).toHaveLength(3);
-      const stations = resolveEdgeStations(viewport, undefined, controls);
-      expect(stations.map((station) => station.id)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
-      for (const station of stations) {
-        const bounds = resolveEdgeMarkerBounds(station);
-        expect(bounds.left).toBeGreaterThanOrEqual(0);
-        expect(bounds.top).toBeGreaterThanOrEqual(0);
-        expect(bounds.right).toBeLessThanOrEqual(viewport.width);
-        expect(bounds.bottom).toBeLessThanOrEqual(viewport.height);
-        for (const control of controls) {
-          expect(
-            overlaps(bounds, control, EDGE_MARKER_CONTROL_CLEARANCE_PX),
-            `station ${station.id} vs control ${JSON.stringify(control)}`
-          ).toBe(false);
-        }
-      }
-      // Only the two top corners ever move (along the edge); every other station keeps its base position.
-      const base = resolveEdgeStations(viewport);
-      base.forEach((station, index) => {
-        if (station.id !== 0 && station.id !== 2) {
-          expect(stations[index]).toEqual(station);
-        } else {
-          expect(stations[index]?.y).toBe(station.y);
-        }
-      });
-    }
-  });
-
-  test('at 390x844 the un-nudged top corners DO collide (the nudge is load-bearing)', () => {
-    const controls = resolveHeaderControlRects(layoutFor(390, 844, 'menu'));
-    const base = resolveEdgeStations({ width: 390, height: 844 });
-    const colliding = [0, 2].filter((id) => controls.some((control) => overlaps(resolveEdgeMarkerBounds(base[id] as EdgeStationLike), control, 0)));
-    expect(colliding).toEqual([0, 2]);
-  });
-
+describe('depth (diamonds sit behind all UI)', () => {
   test('diamonds render BELOW the title, header icons, board and every UI element but above the backdrop', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const listStart = source.indexOf('this.boardZoomContainer.add([');
@@ -445,6 +455,178 @@ describe('all-8 beams (arrival and departure)', () => {
     drawEdgeBeams(recorder, { direction: 'outward', focus, laserProgress: 0, spawnPop: 0, stations });
     drawEdgeBeams(recorder, { direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations });
     expect(recorder.lineBetweenCount).toBe(0);
+  });
+});
+
+describe('scene wiring of the ring lifecycle', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+  const section = (from: string, to: string): string => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)));
+
+  test('the ring keeps its intro clock after the build settles so the fade-out and the last clearing redraw play', () => {
+    const helper = section('private resolveLegacyEdgeRingIntroState(', 'private resolveLegacyOutroState(');
+    expect(helper).toContain("this.menuStaticDrawLifecyclePhase !== 'building' && this.menuStaticDrawLifecyclePhase !== 'settled'");
+    const ring = section('private resolveLegacyEdgeRing(', 'private drawLegacyEdgeMarkers(');
+    expect(ring).toContain('this.resolveLegacyEdgeRingIntroState(time)');
+    expect(ring).toContain('outro.ringEnergy');
+    expect(ring).toContain('intro.ringEnergy');
+    // Reduced motion and overlays: no lifecycle at all.
+    expect(ring).toContain('this.prefersLegacyReducedMotion() || this.overlay !== \'none\'');
+  });
+
+  test('markers redraw every frame while the lifecycle is active and once more after it ends', () => {
+    const lasers = section('private drawLegacyEdgeLasers(', 'private resolveLegacyEdgeRing(');
+    expect(lasers).toContain('if (firing || this.edgeBeamWasFiring || ringActive || this.edgeRingActive) {');
+    expect(lasers).toContain('this.edgeRingActive = ringActive;');
+    // The dirty-flag gate keeps drawDynamicBoard running for the same condition.
+    expect(source).toContain('      || this.edgeRingActive\n    ) {\n      this.boardDynamicDirty = true;');
+  });
+});
+
+describe('ring lighting and spin over the intro / outro timelines (per frame)', () => {
+  const TILES = 300;
+  const FULL = { reducedMotion: false, tileCount: TILES } as const;
+  const energiesAt = (direction: 'inward' | 'outward', ms: number): ReadonlyArray<number> => {
+    if (direction === 'inward') {
+      const intro = resolveIntro(ms, FULL);
+      return resolveEdgeRingEnergies(intro.done ? null : { direction, laserProgress: intro.laserProgress, ringEnergy: intro.ringEnergy });
+    }
+    const outro = resolveIntroDeconstruct(ms, FULL);
+    return resolveEdgeRingEnergies(outro.done ? null : { direction, laserProgress: outro.laserProgress, ringEnergy: outro.ringEnergy });
+  };
+  const litCount = (energies: ReadonlyArray<number>): number => energies.filter((energy) => energy > 0).length;
+  const fullyLit = (energies: ReadonlyArray<number>): number => energies.filter((energy) => energy === 1).length;
+
+  test('arrival: every diamond lights when its beam leaves, ALL 8 are lit for the whole maze generation, then fade together', () => {
+    const revealEnd = resolveIntroRevealEndMs(TILES);
+    // Unlit at rest (before the beams leave).
+    for (let ms = 0; ms <= 100; ms += 1) {
+      expect(litCount(energiesAt('inward', ms)), `t=${ms}`).toBe(0);
+    }
+    // Each diamond is lit from its own beam start.
+    expect(energiesAt('inward', 101)[0]).toBeGreaterThan(0);
+    // The first frame with all 8 fully lit must be inside the laser window.
+    let allLitAt = Number.POSITIVE_INFINITY;
+    for (let ms = 0; ms <= revealEnd; ms += 1) {
+      if (fullyLit(energiesAt('inward', ms)) === 8) {
+        allLitAt = ms;
+        break;
+      }
+    }
+    expect(allLitAt).toBeLessThanOrEqual(INTRO_LASER_END_MS);
+    // From then until the reveal ends (the whole generation) ALL 8 stay fully lit, every ms.
+    for (let ms = allLitAt; ms <= revealEnd; ms += 1) {
+      expect(fullyLit(energiesAt('inward', ms)), `t=${ms}`).toBe(8);
+    }
+    // Then the ring fades out together, monotonically, to exactly 0 and stays 0 through done.
+    let previous = 8;
+    for (let ms = revealEnd; ms <= revealEnd + RING_ENERGY_FADE_MS; ms += 1) {
+      const total = energiesAt('inward', ms).reduce((sum, energy) => sum + energy, 0);
+      expect(total).toBeLessThanOrEqual(previous + 1e-9);
+      previous = total;
+    }
+    expect(previous).toBe(0);
+    for (let ms = revealEnd + RING_ENERGY_FADE_MS; ms <= revealEnd + 3000; ms += 1) {
+      expect(litCount(energiesAt('inward', ms)), `t=${ms}`).toBe(0);
+    }
+  });
+
+  test('departure: a diamond lights as the player beam REACHES it; all 8 lit when the beams land and held until the end fade', () => {
+    const total = resolveOutroTotalMs(TILES);
+    expect(litCount(energiesAt('outward', 0))).toBe(0);
+    for (let index = 0; index < 8; index += 1) {
+      let landedAt = Number.POSITIVE_INFINITY;
+      let litAt = Number.POSITIVE_INFINITY;
+      for (let ms = 0; ms <= 600; ms += 1) {
+        const outro = resolveIntroDeconstruct(ms, FULL);
+        if (landedAt === Number.POSITIVE_INFINITY && resolveEdgeBeamProgress(outro.laserProgress, index) >= 1) {
+          landedAt = ms;
+        }
+        if (litAt === Number.POSITIVE_INFINITY && energiesAt('outward', ms)[index] === 1) {
+          litAt = ms;
+        }
+      }
+      // Fully lit exactly when its beam arrives; not lit while the beam is still well short of it.
+      expect(litAt, `diamond ${index}`).toBe(landedAt);
+      expect(energiesAt('outward', Math.max(0, landedAt - 120))[index]).toBeLessThan(1);
+    }
+    // By the time all outbound beams have landed (400 ms) all 8 are lit, and stay lit until the last 150 ms.
+    for (let ms = 400; ms <= total - RING_ENERGY_FADE_MS; ms += 1) {
+      expect(fullyLit(energiesAt('outward', ms)), `t=${ms}`).toBe(8);
+    }
+    // Fade out together and end unlit (no stale lit frame after the outro).
+    expect(litCount(energiesAt('outward', total))).toBe(0);
+    for (let ms = total; ms <= total + 2000; ms += 25) {
+      expect(litCount(energiesAt('outward', ms))).toBe(0);
+    }
+  });
+
+  test('no lifecycle (rest) and reduced motion are completely unlit and unspun', () => {
+    expect(resolveEdgeRingEnergies(null)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+    const states = resolveEdgeMarkerStates({
+      reducedMotion: true,
+      ringEnergies: [1, 1, 1, 1, 1, 1, 1, 1],
+      spinRad: 3,
+      timeMs: 0
+    });
+    expect(states.every((state) => !state.energized && state.energy === 0 && state.spinRad === 0)).toBe(true);
+    for (let ms = 0; ms <= 4000; ms += 50) {
+      const intro = resolveIntro(ms, { reducedMotion: true, tileCount: TILES });
+      const outro = resolveIntroDeconstruct(ms, { reducedMotion: true, tileCount: TILES });
+      expect([intro.ringSpinRad, intro.ringEnergy, outro.ringSpinRad, outro.ringEnergy]).toEqual([0, 0, 0, 0]);
+    }
+  });
+
+  test('the markers actually draw all 8 mint cores while the ring is lit and none at rest', () => {
+    const stations = resolveEdgeStations({ width: 390, height: 844 });
+    const lit = resolveEdgeMarkerStates({
+      reducedMotion: false,
+      ringEnergies: resolveEdgeRingEnergies({ direction: 'inward', laserProgress: 1, ringEnergy: 1 }),
+      timeMs: 0
+    });
+    const litRecorder = makeRecorder();
+    drawEdgeMarkers(litRecorder, stations, lit);
+    expect(litRecorder.calls.filter((call) => call === 'fillPath')).toHaveLength(8);
+    expect(litRecorder.lineColors.filter((color) => color === cyberArcadeMaterial.rail.mint)).toHaveLength(8);
+    const rest = resolveEdgeMarkerStates({ reducedMotion: false, ringEnergies: resolveEdgeRingEnergies(null), timeMs: 0 });
+    const restRecorder = makeRecorder();
+    drawEdgeMarkers(restRecorder, stations, rest);
+    expect(restRecorder.calls.filter((call) => call === 'fillPath')).toHaveLength(0);
+    expect(restRecorder.lineColors.every((color) => color === cyberArcadeMaterial.rail.cyan)).toBe(true);
+  });
+
+  test('spin: whole turns tied to the intro and outro timelines, exactly the rest orientation at both ends', () => {
+    const introEnd = resolveIntroRevealEndMs(TILES);
+    const outroEnd = resolveOutroTotalMs(TILES);
+    const cases = [
+      { label: 'intro', startMs: 100, end: introEnd, spinAt: (ms: number) => resolveIntro(ms, FULL).ringSpinRad },
+      { label: 'outro', startMs: 0, end: outroEnd, spinAt: (ms: number) => resolveIntroDeconstruct(ms, FULL).ringSpinRad }
+    ];
+    for (const { label, startMs, end, spinAt } of cases) {
+      expect(spinAt(startMs), label).toBe(0);
+      expect(spinAt(end), label).toBe(0);
+      expect(spinAt(end + 5000), label).toBe(0);
+      let previous = 0;
+      let peak = 0;
+      for (let ms = startMs; ms < end; ms += 1) {
+        const spin = spinAt(ms);
+        expect(spin, `${label} t=${ms}`).toBeGreaterThanOrEqual(previous - 1e-12);
+        expect(spin).toBeLessThanOrEqual((Math.PI * 2) + 1e-9);
+        previous = spin;
+        peak = Math.max(peak, spin);
+      }
+      // It really turns (about a full lap by the end) and lands on a whole number of turns.
+      expect(peak).toBeGreaterThan(Math.PI * 2 * 0.99);
+      const station = resolveEdgeStations({ width: 390, height: 844 })[0] as EdgeStationLike & { inwardAngle: number };
+      const rested = resolveEdgeMarkerVertices(station, 1, spinAt(end));
+      resolveEdgeMarkerVertices(station).forEach((vertex, index) => {
+        expect(rested[index]?.x).toBeCloseTo(vertex.x, 9);
+        expect(rested[index]?.y).toBeCloseTo(vertex.y, 9);
+      });
+    }
+    // Mid-spin the kite is genuinely rotated.
+    const station = resolveEdgeStations({ width: 390, height: 844 })[1] as EdgeStationLike & { inwardAngle: number };
+    const mid = resolveEdgeMarkerVertices(station, 1, Math.PI / 2);
+    expect(mid[0]?.x).not.toBeCloseTo(resolveEdgeMarkerVertices(station)[0]?.x ?? 0, 3);
   });
 });
 
