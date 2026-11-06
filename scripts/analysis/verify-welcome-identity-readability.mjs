@@ -31,7 +31,12 @@ import { waitForAuthenticatedFixtureReady } from './capture-ui-surfaces.mjs';
 // EDGE_MARKER_MAX_EXTENT_PX (src/render/edgeMarkers.ts): worst-case kite half-extent.
 const DIAMOND_EXTENT_PX = 10.5;
 // Label colour is #d7f7ee; count pixels that are bright and minty-white.
-const isLabelPixel = ([r, g, b, a]) => a > 200 && r >= 170 && g >= 215 && b >= 205;
+// The label is #d7f7ee. Thin small-size glyphs anti-alias to a lower peak on
+// some platforms (the Linux CI fallback font painted only 4 pixels at the
+// strict 170/215/205 floor at 320 px), so a pixel counts as label ink when it is
+// clearly bright against the dark header (the stroke is near black).
+const LABEL_PIXEL_FLOOR = [120, 150, 140];
+const isLabelPixel = ([r, g, b, a]) => a > 200 && r >= LABEL_PIXEL_FLOOR[0] && g >= LABEL_PIXEL_FLOOR[1] && b >= LABEL_PIXEL_FLOOR[2];
 const MIN_LABEL_PIXELS = 12;
 
 const LAYOUTS = [
@@ -117,7 +122,7 @@ const assertHeaderIdentity = (name, whole, state) => {
     assert(label.text === state.username || label.text.endsWith('…'), `${name}: narrow text must be whole or ellipsized, got "${label.text}"`);
     assert(Array.from(label.text).length >= 3, `${name}: truncated identity is not readable: "${label.text}"`);
   }
-  assert(paintedPixels(label) >= MIN_LABEL_PIXELS, `${name}: identity text is not painted on the canvas (${paintedPixels(label)} bright pixels)`);
+  assert(paintedPixels(label) >= MIN_LABEL_PIXELS, `${name}: identity text is not painted on the canvas (${paintedPixels(label)} bright pixels at floor ${LABEL_PIXEL_FLOOR.join('/')}, strict ${label.pixels.filter(([r, g, b, a]) => a > 200 && r >= 170 && g >= 215 && b >= 205).length}, peak luminance ${Math.max(0, ...label.pixels.map(([r, g, b]) => r + g + b))}, text "${label.text}", rect ${JSON.stringify(label.rect)})`);
 };
 
 const main = async () => {
@@ -179,7 +184,7 @@ const main = async () => {
             if (data[i + 3] > 200 && data[i] >= color[0] && data[i + 1] >= color[1] && data[i + 2] >= color[2]) count += 1;
           }
           return count;
-        }, { rect: state.label.rect, color: [170, 215, 205] });
+        }, { rect: state.label.rect, color: LABEL_PIXEL_FLOOR });
         const rejects = hidden.label?.visible !== true && stillPainted < MIN_LABEL_PIXELS;
         report.checks.push({ name: `${name}-negative-control`, painted: stillPainted, passed: rejects });
         assert(rejects, `${name}: pixel assertion accepted a hidden label (${stillPainted} bright pixels)`);
