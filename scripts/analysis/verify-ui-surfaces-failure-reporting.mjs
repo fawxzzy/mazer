@@ -44,7 +44,7 @@ import { createServer } from 'node:net';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { DEFAULT_BASE_URL, DEFAULT_PREVIEW_TIMEOUT_MS, REPO_ROOT, STACK_ROOT, normalizeBaseUrl, parseCliArgs } from '../visual/common.mjs';
+import { DEFAULT_PREVIEW_TIMEOUT_MS, REPO_ROOT, STACK_ROOT, normalizeBaseUrl, parseCliArgs } from '../visual/common.mjs';
 import { launchPreviewServer, stopPreviewServer } from '../visual/preview-server.mjs';
 import { runUiSurfaceCapture, waitForSurface } from './capture-ui-surfaces.mjs';
 
@@ -93,6 +93,23 @@ const isPortFree = (port) => new Promise((resolvePromise) => {
   server.listen(port, '127.0.0.1');
 });
 
+// Ask the OS for a currently-unused loopback port. The release assertions below
+// ("the preview server child no longer holds the port") are only meaningful for
+// a port this run itself handed to the harness: the default 4173 can legitimately
+// be held by an unrelated process (a dev preview, another lane), which would make
+// "port 4173 free" false for reasons that have nothing to do with a leaked child.
+const pickFreePort = () => new Promise((resolvePromise, rejectPromise) => {
+  const server = createServer();
+  server.once('error', rejectPromise);
+  server.listen(0, '127.0.0.1', () => {
+    const address = server.address();
+    const port = typeof address === 'object' && address !== null ? address.port : null;
+    server.close(() => (port === null
+      ? rejectPromise(new Error('Could not resolve a free loopback port.'))
+      : resolvePromise(port)));
+  });
+});
+
 const main = async () => {
   const args = parseCliArgs();
   const isTruthyArg = (value) => value === true || value === 'true' || value === '1';
@@ -109,9 +126,11 @@ const main = async () => {
   // possible failure point (currentStep stays 'boot'), NOT a
   // SURFACE_READINESS_TIMEOUT -- see Part 4 below for that. ===
   const directSessionId = `verify-failure-reporting-direct-${Date.now()}`;
+  const directPort = await pickFreePort();
   let directError = null;
   try {
     await runUiSurfaceCapture({
+      baseUrl: `http://127.0.0.1:${directPort}`,
       mazeSeed: 3749,
       sessionId: directSessionId,
       skipBuild: true,
@@ -133,11 +152,11 @@ const main = async () => {
     JSON.stringify(directSummary?.failure ?? null).slice(0, 300)
   );
 
-  const directPortFree = await isPortFree(4173);
+  const directPortFree = await isPortFree(directPort);
   check(
-    'after the direct call rejects, its own preview server child no longer holds the default port',
+    'after the direct call rejects, its own preview server child no longer holds the port it was given',
     directPortFree,
-    `port 4173 free: ${directPortFree}`
+    `port ${directPort} free: ${directPortFree}`
   );
 
   // === Part 2: BOOT/NAVIGATION failure, the real CLI entry point as its
@@ -146,11 +165,13 @@ const main = async () => {
   // prove this by itself. Same 1ms boot-level failure as Part 1, not a
   // readiness-clause failure. ===
   const cliSessionId = `verify-failure-reporting-cli-${Date.now()}`;
+  const cliPort = await pickFreePort();
   let cliExitCode = 0;
   try {
     execFileSync(process.execPath, [
       CLI_SCRIPT_PATH,
       '--maze-seed=3749',
+      `--base-url=http://127.0.0.1:${cliPort}`,
       `--session=${cliSessionId}`,
       '--skip-build',
       '--timeout-ms=1'
@@ -197,11 +218,11 @@ const main = async () => {
     cliReportMarkdown.slice(0, 200)
   );
 
-  const cliPortFree = await isPortFree(4173);
+  const cliPortFree = await isPortFree(cliPort);
   check(
-    'after the CLI process exits, its own preview server child no longer holds the default port',
+    'after the CLI process exits, its own preview server child no longer holds the port it was given',
     cliPortFree,
-    `port 4173 free: ${cliPortFree}`
+    `port ${cliPort} free: ${cliPortFree}`
   );
 
   // === Part 3: RUNTIME-DIAGNOSTICS PARITY. No app needed -- a blank page
@@ -284,7 +305,7 @@ const main = async () => {
   // machine/run, only on whether it ever produces the requested overlay
   // (it never will), so a generous timeout is safe and appropriate here. ===
   const readinessPreview = await launchPreviewServer({
-    requestedBaseUrl: normalizeBaseUrl(DEFAULT_BASE_URL),
+    requestedBaseUrl: normalizeBaseUrl(`http://127.0.0.1:${await pickFreePort()}`),
     previewTimeoutMs: DEFAULT_PREVIEW_TIMEOUT_MS
   });
   try {
