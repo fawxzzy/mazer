@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuPathTitleOrbitPose } from '../../src/legacy-runtime/legacyMenuTitle';
 import {
   EDGE_MARKER_IDLE_ALPHA_MAX,
+  EDGE_RING_BUILD_LIT,
   EDGE_MARKER_IDLE_ALPHA_MIN,
   EDGE_MARKER_IDLE_PERIOD_MS,
   EDGE_MARKER_FLASH_MS,
@@ -32,13 +33,14 @@ import { resolve } from 'node:path';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import {
   INTRO_BEAM_STAGGER_MS,
-  INTRO_LASER_END_MS,
+  INTRO_BUILD_START_MS,
   INTRO_LASER_MS,
-  INTRO_REVEAL_START_MS,
   OUTRO_TILES_START_MS,
   RING_ENERGY_FADE_MS,
   resolveIntro,
   resolveIntroDeconstruct,
+  resolveIntroLaserEndMs,
+  resolveIntroLaserStartMs,
   resolveIntroRevealEndMs,
   resolveOutroTotalMs
 } from '../../src/render/introTimeline';
@@ -500,36 +502,38 @@ describe('ring lighting and spin over the intro / outro timelines (per frame)', 
   const litCount = (energies: ReadonlyArray<number>): number => energies.filter((energy) => energy > 0).length;
   const fullyLit = (energies: ReadonlyArray<number>): number => energies.filter((energy) => energy === 1).length;
 
-  test('arrival: every diamond lights when its beam leaves, ALL 8 are lit for the whole maze generation, then fade together', () => {
-    const revealEnd = resolveIntroRevealEndMs(TILES);
-    // Unlit at rest (before the beams leave).
-    for (let ms = 0; ms <= 100; ms += 1) {
-      expect(litCount(energiesAt('inward', ms)), `t=${ms}`).toBe(0);
+  test('arrival: ALL 8 diamonds are lit from the start of the build and brighten as THEIR beam fires (after the build), then fade together', () => {
+    const buildEnd = resolveIntroRevealEndMs(TILES);
+    const laserStart = resolveIntroLaserStartMs(TILES);
+    const laserEnd = resolveIntroLaserEndMs(TILES);
+    expect(laserStart).toBe(buildEnd);
+    // Lit from the very first frame, at the build level, for the whole build (the ring is orbiting): never dark, never full.
+    for (let ms = 0; ms <= buildEnd; ms += 1) {
+      const energies = energiesAt('inward', ms);
+      expect(litCount(energies), `t=${ms}`).toBe(8);
+      expect(energies.every((energy) => energy === EDGE_RING_BUILD_LIT), `t=${ms}`).toBe(true);
     }
-    // Each diamond is lit from its own beam start.
-    expect(energiesAt('inward', 101)[0]).toBeGreaterThan(0);
-    // The first frame with all 8 fully lit must be inside the laser window.
-    let allLitAt = Number.POSITIVE_INFINITY;
-    for (let ms = 0; ms <= revealEnd; ms += 1) {
-      if (fullyLit(energiesAt('inward', ms)) === 8) {
-        allLitAt = ms;
-        break;
+    // Each diamond brightens only when its own beam leaves, all the way to full by its landing; never dims in between.
+    for (let index = 0; index < 8; index += 1) {
+      let previous = EDGE_RING_BUILD_LIT;
+      for (let ms = buildEnd; ms <= laserEnd; ms += 1) {
+        const energy = energiesAt('inward', ms)[index] as number;
+        expect(energy, `diamond ${index} t=${ms}`).toBeGreaterThanOrEqual(previous - 1e-12);
+        previous = energy;
       }
+      expect(previous, `diamond ${index}`).toBe(1);
     }
-    expect(allLitAt).toBeLessThanOrEqual(INTRO_LASER_END_MS);
-    // From then until the reveal ends (the whole generation) ALL 8 stay fully lit, every ms.
-    for (let ms = allLitAt; ms <= revealEnd; ms += 1) {
-      expect(fullyLit(energiesAt('inward', ms)), `t=${ms}`).toBe(8);
-    }
+    expect(energiesAt('inward', Math.ceil(buildEnd) + 1)[0]).toBeGreaterThan(EDGE_RING_BUILD_LIT);
+    expect(fullyLit(energiesAt('inward', Math.ceil(laserEnd)))).toBe(8);
     // Then the ring fades out together, monotonically, to exactly 0 and stays 0 through done.
     let previous = 8;
-    for (let ms = revealEnd; ms <= revealEnd + RING_ENERGY_FADE_MS; ms += 1) {
+    for (let ms = laserEnd; ms <= laserEnd + RING_ENERGY_FADE_MS; ms += 1) {
       const total = energiesAt('inward', ms).reduce((sum, energy) => sum + energy, 0);
       expect(total).toBeLessThanOrEqual(previous + 1e-9);
       previous = total;
     }
     expect(previous).toBe(0);
-    for (let ms = revealEnd + RING_ENERGY_FADE_MS; ms <= revealEnd + 3000; ms += 1) {
+    for (let ms = laserEnd + RING_ENERGY_FADE_MS; ms <= laserEnd + 3000; ms += 1) {
       expect(litCount(energiesAt('inward', ms)), `t=${ms}`).toBe(0);
     }
   });
@@ -602,7 +606,7 @@ describe('ring lighting and spin over the intro / outro timelines (per frame)', 
     const introEnd = resolveIntroRevealEndMs(TILES);
     const outroEnd = resolveOutroTotalMs(TILES);
     const cases = [
-      { label: 'intro', startMs: INTRO_REVEAL_START_MS, end: introEnd, sign: 1, phaseAt: (ms: number) => resolveIntro(ms, FULL).ringSpinRad },
+      { label: 'intro', startMs: INTRO_BUILD_START_MS, end: introEnd, sign: 1, phaseAt: (ms: number) => resolveIntro(ms, FULL).ringSpinRad },
       { label: 'outro', startMs: OUTRO_TILES_START_MS, end: outroEnd, sign: -1, phaseAt: (ms: number) => resolveIntroDeconstruct(ms, FULL).ringSpinRad }
     ];
     for (const { label, startMs, end, sign, phaseAt } of cases) {
@@ -785,12 +789,14 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
     });
   });
 
-  test('the orbit never overlaps the beam flight: laserProgress < 1 only while the phase is exactly 0', () => {
+  test('the orbit never overlaps the beam flight (intro: beams only after the orbit ended; outro: orbit only after the beams landed)', () => {
     for (const tileCount of [40, 300, 900]) {
       const options = { reducedMotion: false, tileCount } as const;
       for (let ms = 0; ms < 6000; ms += 1) {
         const intro = resolveIntro(ms, options);
-        if (intro.laserProgress < 1) {
+        // Reordered intro: the ring orbits during the BUILD and is parked (exact rest stations) from the build end,
+        // so every beam that fires (laserProgress > 0) leaves from a rest station.
+        if (intro.laserProgress > 0) {
           expect(intro.ringSpinRad, `intro n=${tileCount} t=${ms}`).toBe(0);
         }
         const outro = resolveIntroDeconstruct(ms, options);

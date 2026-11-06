@@ -125,6 +125,9 @@ jobs:
       - name: Verify Wave 4D-B gameplay transfer (real solver-driven cycle, pause/resume, reduced motion, layouts)
         run: node ./scripts/analysis/verify-gameplay-teleport-transfer.mjs --skip-build
 
+      - name: Verify outro deconstruct is visible on the real clock (real held key, 390x844 + 1280x720, drawn floor falls N -> 0)
+        run: node ./scripts/analysis/verify-outro-deconstruct.mjs --skip-build
+
       - name: Verify Wave 0C ui-surfaces harness failure reporting (real process, negative control)
         run: node ./scripts/analysis/verify-ui-surfaces-failure-reporting.mjs --skip-build
 

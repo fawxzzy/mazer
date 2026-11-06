@@ -6,6 +6,7 @@ import {
   BOARD_TILE_STYLE_PARAM,
   buildRankGrid,
   composeBoardTileReveal,
+  isBoardCellRevealed,
   resolveBoardTileStyleFromSearch,
   type BoardRevealContext2D
 } from '../../src/render/boardTileLayer';
@@ -72,6 +73,41 @@ const floorCells = (grid: boolean[][]): Array<{ x: number; y: number }> => {
   grid.forEach((row, y) => row.forEach((on, x) => { if (on) cells.push({ x, y }); }));
   return cells;
 };
+
+describe('staged reveal predicate (build AND deconstruct)', () => {
+  // Regression: the deconstruct arms rowLimit = null while the tile limit counts DOWN. A null row limit was read as
+  // "show everything", so the whole board stayed on screen for the entire dissolve (live app, 2026-11-06).
+  test('deconstruct (rowLimit null): only cells ranked below the live tile limit are shown, and it shrinks to nothing', () => {
+    const ranks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    let previous = ranks.length + 1;
+    for (let limit = ranks.length; limit >= 0; limit -= 1) {
+      const shown = ranks.filter((rank) => isBoardCellRevealed(limit, null, rank, rank)).length;
+      expect(shown).toBe(limit);
+      expect(shown).toBeLessThan(previous);
+      previous = shown;
+    }
+    expect(isBoardCellRevealed(0, null, 3, 0)).toBe(false);
+    expect(isBoardCellRevealed(5, null, -1, 0)).toBe(false);
+  });
+
+  test('build (rowLimit 0): the tile limit alone decides; unlimited (null tile limit) shows everything', () => {
+    expect(isBoardCellRevealed(3, 0, 2, 9)).toBe(true);
+    expect(isBoardCellRevealed(3, 0, 3, 9)).toBe(false);
+    expect(isBoardCellRevealed(null, 0, -1, 9)).toBe(true);
+    expect(isBoardCellRevealed(null, null, 7, 9)).toBe(true);
+  });
+
+  test('a live row limit still reveals the rows above it (union with the tile limit)', () => {
+    expect(isBoardCellRevealed(2, 5, 9, 4)).toBe(true);
+    expect(isBoardCellRevealed(2, 5, 9, 5)).toBe(false);
+  });
+
+  test('the scene routes the floor mask AND the marker/player visibility through the same predicate', () => {
+    expect(MENU_SCENE).toContain('isBoardCellRevealed(tileLimit, rowLimit,');
+    expect(MENU_SCENE).not.toContain('rowLimit === null || y < rowLimit');
+    expect(MENU_SCENE).not.toContain('return rowLimit === null || point.y < rowLimit;');
+  });
+});
 
 describe('rank-based reveal composite', () => {
   const grid = braidedMazeGrid(12, 25, 4242, 12);

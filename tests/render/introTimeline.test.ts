@@ -6,12 +6,12 @@ import { resolveLegacyBleedOffDockVisualEligibility } from '../../src/legacy-run
 import {
   INTRO_DIGIT_OUT_MS,
   INTRO_GOAL_PULSE_MS,
-  INTRO_LASER_END_MS,
-  INTRO_LASER_START_MS,
+  INTRO_BUILD_START_MS,
+  INTRO_LASER_MS,
+  INTRO_POP_MS,
   INTRO_REDUCED_MOTION_MS,
   INTRO_REVEAL_MAX_MS,
   INTRO_REVEAL_MIN_MS,
-  INTRO_REVEAL_START_MS,
   INTRO_REVEAL_TILES_PER_S,
   OUTRO_EDGE_PATHS_OFF_MS,
   OUTRO_HANDOFF_MS,
@@ -26,6 +26,8 @@ import {
   resolveIntroDurationMs,
   resolveIntroEdgePathsOnMs,
   resolveIntroInputUnlockMs,
+  resolveIntroLaserEndMs,
+  resolveIntroLaserStartMs,
   resolveIntroRevealEndMs,
   resolveIntroRevealMs,
   resolveOutroRemoveMs,
@@ -53,7 +55,7 @@ describe('introTimeline (time-driven intro)', () => {
     const sampleAt = (fps: number): Map<number, ReturnType<typeof resolveIntro>> => {
       const states = new Map<number, ReturnType<typeof resolveIntro>>();
       const frameMs = 1000 / fps;
-      for (let frame = 0; frame * frameMs <= 3900; frame += 1) {
+      for (let frame = 0; frame * frameMs <= 4300; frame += 1) {
         // 200 ms boundaries are shared by all three frame rates.
         const elapsed = Math.round(frame * frameMs * 1e3) / 1e3;
         if (Math.abs((elapsed / 200) - Math.round(elapsed / 200)) < 1e-4) {
@@ -75,7 +77,7 @@ describe('introTimeline (time-driven intro)', () => {
     resolveIntro(50, options);
     expect(resolveIntro(1200, options)).toEqual(late);
     // The nominal duration is the same number whatever the frame rate: nothing counts frames.
-    expect(resolveIntroDoneMs(300)).toBe(resolveIntroRevealEndMs(300) + INTRO_GOAL_PULSE_MS);
+    expect(resolveIntroDoneMs(300)).toBe(resolveIntroLaserEndMs(300) + Math.max(INTRO_POP_MS, INTRO_GOAL_PULSE_MS));
   });
 
   test('a slow frame catches up: the first frame after a long stall already shows the full reveal', () => {
@@ -105,21 +107,21 @@ describe('introTimeline (time-driven intro)', () => {
     }
   });
 
-  test.each([49, 166, 788])('N = %i: the last tile appears exactly at the reveal end, linearly (not front-loaded)', (tileCount) => {
+  test.each([49, 166, 788])('N = %i: the last tile appears exactly at the build end, linearly (not front-loaded)', (tileCount) => {
     const revealMs = resolveIntroRevealMs(tileCount);
     const revealEnd = resolveIntroRevealEndMs(tileCount);
-    expect(revealEnd).toBe(INTRO_REVEAL_START_MS + revealMs);
+    expect(revealEnd).toBe(INTRO_BUILD_START_MS + revealMs);
     const full = firstMs((ms) => resolveIntro(ms, { ...FULL, tileCount }).tilesVisible === tileCount, 6000);
     // The last tile shows up within one tile-interval (R / N) of the reveal end, never before.
     expect(full).toBeGreaterThanOrEqual(revealEnd - (revealMs / tileCount) - 1);
     expect(full).toBeLessThanOrEqual(Math.ceil(revealEnd));
     // Linear: tiles revealed at each quarter of the window are the matching fraction of N.
     for (const fraction of [0.25, 0.5, 0.75]) {
-      const state = resolveIntro(INTRO_REVEAL_START_MS + (revealMs * fraction), { ...FULL, tileCount });
+      const state = resolveIntro(INTRO_BUILD_START_MS + (revealMs * fraction), { ...FULL, tileCount });
       expect(Math.abs(state.tilesVisible - (tileCount * fraction))).toBeLessThanOrEqual(1.5);
     }
     // easeOutCubic would already show ~58% at 25% of the window: linear must not.
-    expect(resolveIntro(INTRO_REVEAL_START_MS + (revealMs * 0.1), { ...FULL, tileCount }).tilesVisible).toBeLessThanOrEqual(Math.ceil(tileCount * 0.1) + 1);
+    expect(resolveIntro(INTRO_BUILD_START_MS + (revealMs * 0.1), { ...FULL, tileCount }).tilesVisible).toBeLessThanOrEqual(Math.ceil(tileCount * 0.1) + 1);
   });
 
   test('measured durations at the harness levels vs the audit old numbers (L1 / L5 / L20)', () => {
@@ -136,13 +138,13 @@ describe('introTimeline (time-driven intro)', () => {
     }
   });
 
-  test('done flips exactly once at the reveal end + goal pulse', () => {
+  test('done flips exactly once, one pop after the beams land (build end + beam flight)', () => {
     for (const tileCount of [49, 166, 788]) {
       const done = resolveIntroDoneMs(tileCount);
       expect(resolveIntro(done - 1, { ...FULL, tileCount }).done).toBe(false);
       expect(resolveIntro(done, { ...FULL, tileCount }).done).toBe(true);
       expect(resolveIntroDurationMs(false, tileCount)).toBe(done);
-      expect(done).toBeLessThanOrEqual(INTRO_REVEAL_START_MS + INTRO_REVEAL_MAX_MS + INTRO_GOAL_PULSE_MS);
+      expect(done).toBeLessThanOrEqual(INTRO_BUILD_START_MS + INTRO_REVEAL_MAX_MS + INTRO_LASER_MS + INTRO_POP_MS);
     }
   });
 
@@ -165,33 +167,58 @@ describe('introTimeline (time-driven intro)', () => {
     expect(resolveIntro(Number.NaN, { ...FULL, tileCount: 50 }).tilesVisible).toBe(0);
   });
 
-  test('beams come first, the maze appears as they land, and input unlocks when the reveal completes (one clock)', () => {
+  test('the maze builds FIRST; the beams fire only after the build is complete, the player lands, and input unlocks at the landing (one clock)', () => {
     const options = { ...FULL, tileCount: 120 };
-    const revealEnd = resolveIntroRevealEndMs(120);
-    const laserLanded = firstMs((ms) => resolveIntro(ms, options).laserProgress >= 1);
+    const buildEnd = resolveIntroRevealEndMs(120);
+    const laserStart = resolveIntroLaserStartMs(120);
+    const laserEnd = resolveIntroLaserEndMs(120);
+    expect(laserStart).toBe(buildEnd);
+    expect(laserEnd).toBe(buildEnd + INTRO_LASER_MS);
     const firstTile = firstMs((ms) => resolveIntro(ms, options).tilesVisible > 0);
     const allTiles = firstMs((ms) => resolveIntro(ms, options).tilesVisible >= 120);
+    const firstBeam = firstMs((ms) => resolveIntro(ms, options).laserProgress > 0);
+    const laserLanded = firstMs((ms) => resolveIntro(ms, options).laserProgress >= 1);
     const unlocked = firstMs((ms) => resolveIntro(ms, options).inputUnlocked);
-    expect(laserLanded).toBe(INTRO_LASER_END_MS);
-    // The spawn tile appears the instant the beams land (not before), then grows.
-    expect(firstTile).toBe(INTRO_LASER_END_MS);
-    expect(INTRO_REVEAL_START_MS).toBe(INTRO_LASER_END_MS);
-    expect(resolveIntro(INTRO_LASER_END_MS - 1, options).tilesVisible).toBe(0);
-    expect(resolveIntro(INTRO_LASER_END_MS, options).tilesVisible).toBeGreaterThanOrEqual(1);
-    // Input unlocks only once the maze has finished appearing, after the beams landed.
-    expect(allTiles).toBeLessThanOrEqual(Math.ceil(revealEnd));
-    expect(unlocked).toBe(Math.ceil(revealEnd));
-    expect(resolveIntroInputUnlockMs(false, 120)).toBe(revealEnd);
-    expect(unlocked).toBeGreaterThanOrEqual(laserLanded);
-    expect(unlocked).toBeGreaterThanOrEqual(allTiles);
+    // The first (spawn) tile appears when the build starts, then the maze grows to completion.
+    expect(firstTile).toBe(INTRO_BUILD_START_MS);
+    expect(allTiles).toBeLessThanOrEqual(Math.ceil(buildEnd));
+    // No beam is in flight (and no landing pop) until the build is COMPLETE.
+    expect(firstBeam).toBeGreaterThan(buildEnd);
+    expect(firstBeam).toBeLessThanOrEqual(Math.ceil(buildEnd) + 20);
+    expect(allTiles).toBeLessThanOrEqual(firstBeam);
+    for (let ms = 0; ms <= buildEnd; ms += 1) {
+      const state = resolveIntro(ms, options);
+      expect(state.laserProgress, `t=${ms}`).toBe(0);
+      expect(state.spawnPop, `t=${ms}`).toBe(0);
+      expect(state.inputUnlocked, `t=${ms}`).toBe(false);
+    }
+    // The beams land after the fixed 400 ms flight; the player appears (pop starts) and input unlocks right there.
+    expect(laserLanded).toBe(Math.ceil(laserEnd));
+    expect(unlocked).toBe(Math.ceil(laserEnd));
+    expect(resolveIntroInputUnlockMs(false, 120)).toBe(laserEnd);
+    expect(resolveIntro(laserEnd - 1, options).spawnPop).toBe(0);
+    expect(resolveIntro(laserEnd + 100, options).spawnPop).toBeGreaterThan(0);
+    expect(resolveIntro(laserEnd - 1, options).inputUnlocked).toBe(false);
+    // Total time to input unlock = build start + build + beam flight (500 + B).
+    expect(unlocked).toBe(INTRO_BUILD_START_MS + resolveIntroRevealMs(120) + INTRO_LASER_MS);
     // The scene spawn-laser clock (time since the beams left) agrees on the landing.
-    expect(resolveSpawnLaser(INTRO_LASER_END_MS - INTRO_LASER_START_MS - 1).markerRevealed).toBe(false);
-    expect(resolveSpawnLaser(INTRO_LASER_END_MS - INTRO_LASER_START_MS).markerRevealed).toBe(true);
-    expect(resolveIntro(INTRO_LASER_END_MS - 1, options).spawnPop).toBe(0);
-    expect(resolveIntro(INTRO_LASER_END_MS + 100, options).spawnPop).toBeGreaterThan(0);
-    // The goal pulse plays on unlock, hung off the reveal end.
-    expect(resolveIntro(revealEnd + 100, options).goalPulse).toBeGreaterThan(0);
-    expect(resolveIntro(revealEnd - 1, options).goalPulse).toBe(0);
+    expect(resolveSpawnLaser(INTRO_LASER_MS - 1).markerRevealed).toBe(false);
+    expect(resolveSpawnLaser(INTRO_LASER_MS).markerRevealed).toBe(true);
+    // The goal pulse plays on the landing/unlock.
+    expect(resolveIntro(laserEnd + 100, options).goalPulse).toBeGreaterThan(0);
+    expect(resolveIntro(laserEnd - 1, options).goalPulse).toBe(0);
+    // Phases run in order: digit-in -> reveal (build) -> laser -> pop -> done.
+    expect(resolveIntro(0, options).phase).toBe('digit-in');
+    expect(resolveIntro(INTRO_BUILD_START_MS + 1, options).phase).toBe('reveal');
+    expect(resolveIntro(buildEnd + 1, options).phase).toBe('laser');
+    expect(resolveIntro(laserEnd + 1, options).phase).toBe('pop');
+    expect(resolveIntro(resolveIntroDoneMs(120), options).phase).toBe('done');
+  });
+
+  test.each([49, 166, 788])('N = %i: unlock = 500 + build ms (2.5-3.7 s), identical to the pre-reorder total', (tileCount) => {
+    expect(resolveIntroInputUnlockMs(false, tileCount)).toBe(500 + resolveIntroRevealMs(tileCount));
+    expect(resolveIntroInputUnlockMs(false, tileCount)).toBeGreaterThanOrEqual(2500);
+    expect(resolveIntroInputUnlockMs(false, tileCount)).toBeLessThanOrEqual(3700);
   });
 
   test('laser progress is monotonic 0..1 and the digit is gone when the beam lands', () => {

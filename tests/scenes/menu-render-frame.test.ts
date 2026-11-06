@@ -764,7 +764,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PATH_CONNECTOR_SEAM_CORE_ALPHA_RATIO = 0.94;');
     expect(menuSceneSource).toContain('Math.round(originX + (point.x * tileSize))');
     // Rank mask: a cell is shown while its rank in the reveal order is below the live tile limit.
-    expect(menuSceneSource).toContain('ranks[index]! >= 0 && ranks[index]! < tileLimit');
+    expect(menuSceneSource).toContain('isBoardCellRevealed(tileLimit, rowLimit, ranks === null ? -1 : ranks[index]!, y)');
     expect(menuSceneSource).toContain('renderBounds: mazeRenderBounds');
     expect(menuSceneSource).toContain('renderSafeInset: mazeRenderFrame.safeInset');
     expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);');
