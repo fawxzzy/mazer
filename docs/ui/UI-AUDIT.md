@@ -205,7 +205,7 @@ impression from a screenshot.
 
 ## 3. Confirmed: icon duplication survives past this session's own icon work
 
-This session wired real HUD icon assets (`hud-profile.png`,
+This session wired real HUD icon assets (`hud-profile.png (now .webp, see the provenance doc)`,
 `hud-leaderboard.png`, `hud-settings.png`) into the main menu header, the
 profile buttons, and the in-play pause control. But
 `drawLegacyLeaderboardTitleGlyph` (`MenuScene.ts:11123`) — the decorative
