@@ -24,6 +24,11 @@
   --mazer-token-color-semantic-reward: #F4C84A;
   --mazer-token-color-semantic-danger: #FF405D;
   --mazer-token-color-semantic-anomaly: #AF79FF;
+  --mazer-token-color-tone-success: #72E0BF;
+  --mazer-token-color-tone-warning: #FFCF91;
+  --mazer-token-color-tone-error: #FF7D7D;
+  --mazer-token-color-tone-info: #B7F2FF;
+  --mazer-token-color-overlay-scrim: #02040A;
   --mazer-token-color-text-primary: #F1FAF6;
   --mazer-token-color-text-muted: #94AAA8;
   --mazer-token-color-text-disabled: #5D7478;
@@ -52,9 +57,61 @@
   --mazer-token-motion-panel: 220ms;
   --mazer-token-motion-emphasis: 420ms;
 
+  /* Motion scale: every value equals a duration/period/easing that already ships (tokens evidence file). */
+  --mazer-token-motion-duration-fast: 120ms;
+  --mazer-token-motion-duration-base: 200ms;
+  --mazer-token-motion-duration-slow: 300ms;
+  --mazer-token-motion-duration-long: 400ms;
+  --mazer-token-motion-duration-reveal: 700ms;
+  --mazer-token-motion-intro-beat: 1200ms;
+  --mazer-token-motion-stagger-beam-total: 60ms;
+  --mazer-token-motion-loop-beat: 1200ms;
+  --mazer-token-motion-loop-blink: 2400ms;
+  --mazer-token-motion-loop-drift: 3600ms;
+  --mazer-token-motion-reduced-intro-crossfade: 250ms;
+  --mazer-token-motion-reduced-outro-crossfade: 150ms;
+  --mazer-token-motion-reduced-teleport-crossfade: 140ms;
+  --mazer-token-motion-reduced-teleport-fade-edge: 45ms;
+  --mazer-token-motion-ease-standard: ease;
+  --mazer-token-motion-ease-in-out: ease-in-out;
+
   --mazer-token-touch-target-min: 44px;
   --mazer-token-touch-target-preferred: 56px;
 
   --mazer-token-font-ui: Space Grotesk, ui-sans-serif, system-ui;
   --mazer-token-font-metrics: IBM Plex Mono, ui-monospace, monospace;
+
+  /* Legacy namespace: named shipping values that are not canonical tokens; see src/theme/tokens.ts. */
+  --mazer-token-legacy-color-bg-page: #02080F;
+  --mazer-token-legacy-color-bg-gate: #031F20;
+  --mazer-token-legacy-color-bg-control: #07131D;
+  --mazer-token-legacy-color-bg-toggleOn: #0F2C22;
+  --mazer-token-legacy-color-brand-gate: #3DDBD4;
+  --mazer-token-legacy-color-text-gate: #A4BEB8;
+  --mazer-token-legacy-color-text-bright: #ECFFF5;
+  --mazer-token-legacy-color-text-soft: #D7F7EE;
+  --mazer-token-legacy-color-text-hint: #7894A0;
+  --mazer-token-legacy-color-text-title: #6BC96F;
+  --mazer-token-legacy-color-text-danger: #FF9D9D;
+  --mazer-token-legacy-color-text-signOut: #FFDCE6;
+  --mazer-token-legacy-color-player-core: #36FF7D;
+  --mazer-token-legacy-color-player-halo: #00B84A;
+  --mazer-token-legacy-color-player-markerAccent: #2BB868;
+  --mazer-token-legacy-color-goal-magenta: #E030C0;
+  --mazer-token-legacy-color-goal-violet: #8B3FF0;
+  --mazer-token-legacy-spacing-row-gap-compact: 10px;
+  --mazer-token-legacy-spacing-row-gap: 14px;
+  --mazer-token-legacy-spacing-overlay-header-reserve: 46px;
+  --mazer-token-legacy-radius-inset: 9px;
+  --mazer-token-legacy-radius-card: 10px;
+  --mazer-token-legacy-hit-target-header-min: 32px;
+  --mazer-token-legacy-hit-target-header: 36px;
+  --mazer-token-legacy-hit-target-header-max: 40px;
+  --mazer-token-legacy-font-size-micro: 9px;
+  --mazer-token-legacy-font-size-caption: 11px;
+  --mazer-token-legacy-font-size-small: 13px;
+  --mazer-token-legacy-font-size-body: 14px;
+  --mazer-token-legacy-font-size-label: 16px;
+  --mazer-token-legacy-font-size-heading: 18px;
+  --mazer-token-legacy-font-system: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
 }

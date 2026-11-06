@@ -48,6 +48,27 @@ export const deriveExpectedCssDeclarations = (registry) => {
     declarations.push({ cssVar: `${prefix}motion-${key}`, value: `${ms}ms` });
   }
 
+  const motion = tokens.motion ?? {};
+  const kebab = (key) => key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+  for (const [key, ms] of Object.entries(motion.durationMs ?? {})) {
+    declarations.push({ cssVar: `${prefix}motion-duration-${kebab(key)}`, value: `${ms}ms` });
+  }
+  if (motion.introBeatMs !== undefined) {
+    declarations.push({ cssVar: `${prefix}motion-intro-beat`, value: `${motion.introBeatMs}ms` });
+  }
+  for (const [key, ms] of Object.entries(motion.staggerMs ?? {})) {
+    declarations.push({ cssVar: `${prefix}motion-stagger-${kebab(key)}`, value: `${ms}ms` });
+  }
+  for (const [key, ms] of Object.entries(motion.loopMs ?? {})) {
+    declarations.push({ cssVar: `${prefix}motion-loop-${kebab(key)}`, value: `${ms}ms` });
+  }
+  for (const [key, ms] of Object.entries(motion.reducedMotionMs ?? {})) {
+    declarations.push({ cssVar: `${prefix}motion-reduced-${kebab(key)}`, value: `${ms}ms` });
+  }
+  for (const [key, value] of Object.entries(motion.easing?.css ?? {})) {
+    declarations.push({ cssVar: `${prefix}motion-ease-${kebab(key)}`, value });
+  }
+
   if (tokens.touchTargetMinPx !== undefined) {
     declarations.push({ cssVar: `${prefix}touch-target-min`, value: `${tokens.touchTargetMinPx}px` });
   }
@@ -60,6 +81,26 @@ export const deriveExpectedCssDeclarations = (registry) => {
   }
   if (tokens.fonts?.metrics) {
     declarations.push({ cssVar: `${prefix}font-metrics`, value: tokens.fonts.metrics });
+  }
+  // Legacy namespace: named shipping values that are not canonical tokens (see src/theme/tokens.ts).
+  const legacy = tokens.legacy ?? {};
+  for (const [key, hex] of Object.entries(legacy.color ?? {})) {
+    declarations.push({ cssVar: `${prefix}legacy-color-${key.replace(/\./g, '-')}`, value: hex });
+  }
+  for (const [key, px] of Object.entries(legacy.spacingPx ?? {})) {
+    declarations.push({ cssVar: `${prefix}legacy-spacing-${kebab(key)}`, value: `${px}px` });
+  }
+  for (const [key, px] of Object.entries(legacy.radiusPx ?? {})) {
+    declarations.push({ cssVar: `${prefix}legacy-radius-${kebab(key)}`, value: `${px}px` });
+  }
+  for (const [key, px] of Object.entries(legacy.hitTargetPx ?? {})) {
+    declarations.push({ cssVar: `${prefix}legacy-hit-target-${kebab(key)}`, value: `${px}px` });
+  }
+  for (const [key, px] of Object.entries(legacy.fontSizePx ?? {})) {
+    declarations.push({ cssVar: `${prefix}legacy-font-size-${kebab(key)}`, value: `${px}px` });
+  }
+  for (const [key, value] of Object.entries(legacy.fonts ?? {})) {
+    declarations.push({ cssVar: `${prefix}legacy-font-${kebab(key)}`, value });
   }
   // tokens.fonts.title ("topology-rendered") is intentionally excluded: it is not a CSS font
   // stack, it flags that the title is rendered via the topology/path geometry source (Wave 2B/4D),
@@ -162,6 +203,30 @@ const checkCssFile = (registry, root) => {
         'css-declaration-missing-or-mismatched',
         cssPath,
         `expected "${cssVar}: ${value};" in ${CSS_PATH}, not found (or value differs).`
+      ));
+    }
+  }
+
+  // Reverse direction: the CSS file may not declare a token the registry does not know about, and may
+  // not declare any token twice (a duplicate would silently let a stale value win by cascade order).
+  const expectedNames = new Set(expected.map((entry) => entry.cssVar));
+  const declaredCounts = new Map();
+  for (const match of css.matchAll(/(--mazer-token-[A-Za-z0-9-]+)\s*:/g)) {
+    declaredCounts.set(match[1], (declaredCounts.get(match[1]) ?? 0) + 1);
+  }
+  for (const [name, count] of declaredCounts) {
+    if (!expectedNames.has(name)) {
+      violations.push(violation(
+        'css-declaration-orphan',
+        cssPath,
+        `${CSS_PATH} declares "${name}" but the design token registry has no matching token.`
+      ));
+    }
+    if (count > 1) {
+      violations.push(violation(
+        'css-declaration-duplicate',
+        cssPath,
+        `${CSS_PATH} declares "${name}" ${count} times.`
       ));
     }
   }

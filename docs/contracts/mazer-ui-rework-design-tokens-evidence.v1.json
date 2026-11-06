@@ -1,0 +1,389 @@
+{
+ "schemaVersion": 1,
+ "wave": "1B",
+ "purpose": "Machine-checkable provenance: every token added on top of the original Wave 1B set equals a literal that already ships. tests/architecture/design-tokens-sync.test.ts proves each entry (entries without \"pattern\" cite a hex colour, matched as #rrggbb or 0xrrggbb case-insensitively; \"pattern\" entries are regular expressions). Keys are token paths separated by \"/\".",
+ "tokenRegistryRef": "docs/contracts/mazer-ui-rework-design-tokens.v1.json",
+ "evidence": {
+  "color/tone.success": [
+   {
+    "file": "src/legacy-runtime/legacyPlayerMessage.ts"
+   }
+  ],
+  "color/tone.warning": [
+   {
+    "file": "src/legacy-runtime/legacyPlayerMessage.ts"
+   }
+  ],
+  "color/tone.error": [
+   {
+    "file": "src/legacy-runtime/legacyPlayerMessage.ts"
+   },
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "color/tone.info": [
+   {
+    "file": "src/legacy-runtime/legacyPlayerMessage.ts"
+   }
+  ],
+  "color/overlay.scrim": [
+   {
+    "file": "src/config/tuning.ts"
+   },
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/bg.page": [
+   {
+    "file": "src/boot/phaserConfig.ts"
+   },
+   {
+    "file": "src/styles/base.css"
+   },
+   {
+    "file": "index.html"
+   },
+   {
+    "file": "public/manifest.webmanifest"
+   }
+  ],
+  "legacy/color/bg.gate": [
+   {
+    "file": "src/styles/base.css"
+   }
+  ],
+  "legacy/color/bg.control": [
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/bg.toggleOn": [
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/brand.gate": [
+   {
+    "file": "src/styles/base.css"
+   },
+   {
+    "file": "index.html"
+   },
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/text.gate": [
+   {
+    "file": "src/styles/base.css"
+   },
+   {
+    "file": "index.html"
+   }
+  ],
+  "legacy/color/text.bright": [
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/text.soft": [
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/text.hint": [
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/text.title": [
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/text.danger": [
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/text.signOut": [
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/player.core": [
+   {
+    "file": "src/legacy-runtime/legacyProgression.ts"
+   },
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/player.halo": [
+   {
+    "file": "src/legacy-runtime/legacyProgression.ts"
+   }
+  ],
+  "legacy/color/player.markerAccent": [
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/goal.magenta": [
+   {
+    "file": "src/render/navigationCoreTrail.ts"
+   },
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/color/goal.violet": [
+   {
+    "file": "src/render/navigationCoreTrail.ts"
+   },
+   {
+    "file": "src/scenes/MenuScene.ts"
+   }
+  ],
+  "legacy/spacingPx/rowGapCompact": [
+   {
+    "file": "src/legacy-runtime/legacyUiStandards.ts",
+    "pattern": "actionRowGap = compact [?] 10 : 14"
+   }
+  ],
+  "legacy/spacingPx/rowGap": [
+   {
+    "file": "src/legacy-runtime/legacyUiStandards.ts",
+    "pattern": "actionRowGap = compact [?] 10 : 14"
+   }
+  ],
+  "legacy/spacingPx/overlayHeaderReserve": [
+   {
+    "file": "src/legacy-runtime/legacyUiStandards.ts",
+    "pattern": "LEGACY_OVERLAY_HEADER_RESERVE = 46"
+   }
+  ],
+  "legacy/radiusPx/inset": [
+   {
+    "file": "src/scenes/MenuScene.ts",
+    "pattern": "cardHeight - 8, 9[)]"
+   }
+  ],
+  "legacy/radiusPx/card": [
+   {
+    "file": "src/scenes/MenuScene.ts",
+    "pattern": "radius: 10,"
+   }
+  ],
+  "legacy/hitTargetPx/headerMin": [
+   {
+    "file": "src/legacy-runtime/legacyHeaderControl.ts",
+    "pattern": "Math[.]max[(]32,"
+   }
+  ],
+  "legacy/hitTargetPx/header": [
+   {
+    "file": "src/legacy-runtime/legacyHeaderControl.ts",
+    "pattern": "0[.]085[)], 36, 40[)]"
+   }
+  ],
+  "legacy/hitTargetPx/headerMax": [
+   {
+    "file": "src/legacy-runtime/legacyHeaderControl.ts",
+    "pattern": "0[.]085[)], 36, 40[)]"
+   }
+  ],
+  "legacy/fonts/system": [
+   {
+    "file": "src/scenes/MenuScene.ts",
+    "pattern": "\"Segoe UI Variable\", \"Helvetica Neue\", Arial, sans-serif"
+   },
+   {
+    "file": "src/styles/base.css",
+    "pattern": "\"Segoe UI Variable\", \"Helvetica Neue\", Arial, sans-serif"
+   },
+   {
+    "file": "index.html",
+    "pattern": "\"Segoe UI Variable\", \"Helvetica Neue\", Arial, sans-serif"
+   }
+  ],
+  "motion/durationMs/fast": [
+   {
+    "file": "src/render/edgeMarkers.ts",
+    "pattern": "EDGE_MARKER_FLASH_MS = 120(?![0-9])"
+   },
+   {
+    "file": "src/ui/dom/primitives.css",
+    "pattern": "transition: transform 120ms ease"
+   }
+  ],
+  "motion/durationMs/base": [
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "INTRO_DIGIT_IN_MS = 200(?![0-9])"
+   }
+  ],
+  "motion/durationMs/slow": [
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "OUTRO_DIGIT_IN_MS = 300(?![0-9])"
+   },
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "OUTRO_HANDOFF_MS = 300(?![0-9])"
+   }
+  ],
+  "motion/durationMs/long": [
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "INTRO_LASER_MS = 400(?![0-9])"
+   },
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "OUTRO_LASER_MS = 400(?![0-9])"
+   }
+  ],
+  "motion/durationMs/reveal": [
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "INTRO_REVEAL_END_MS = 1200(?![0-9])"
+   },
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "INTRO_LASER_START_MS = 100(?![0-9])"
+   }
+  ],
+  "motion/introBeatMs": [
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "INTRO_REVEAL_END_MS = 1200(?![0-9])"
+   },
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "INTRO_INPUT_UNLOCK_MS = INTRO_REVEAL_END_MS"
+   }
+  ],
+  "motion/staggerMs/beamTotal": [
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "INTRO_BEAM_STAGGER_MS = 60(?![0-9])"
+   }
+  ],
+  "motion/loopMs/beat": [
+   {
+    "file": "src/legacy-runtime/legacyPlayerTransfer.ts",
+    "pattern": "LEGACY_PLAYER_TRANSFER_SWIRL_PERIOD_MS = 1200(?![0-9])"
+   }
+  ],
+  "motion/loopMs/blink": [
+   {
+    "file": "src/scenes/MenuScene.ts",
+    "pattern": "LEGACY_MENU_BLINK_PULSE_MS = 2400(?![0-9])"
+   }
+  ],
+  "motion/loopMs/drift": [
+   {
+    "file": "src/render/edgeMarkers.ts",
+    "pattern": "EDGE_MARKER_IDLE_PERIOD_MS = 3600(?![0-9])"
+   }
+  ],
+  "motion/reducedMotionMs/introCrossfade": [
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "INTRO_REDUCED_MOTION_MS = 250(?![0-9])"
+   }
+  ],
+  "motion/reducedMotionMs/outroCrossfade": [
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "OUTRO_REDUCED_MOTION_MS = 150(?![0-9])"
+   }
+  ],
+  "motion/reducedMotionMs/teleportCrossfade": [
+   {
+    "file": "src/render/teleportTransferPresentation.ts",
+    "pattern": "REDUCED_MOTION_CROSSFADE_MS = 140(?![0-9])"
+   }
+  ],
+  "motion/reducedMotionMs/teleportFadeEdge": [
+   {
+    "file": "src/render/teleportTransferPresentation.ts",
+    "pattern": "REDUCED_MOTION_FADE_EDGE_MS = 45(?![0-9])"
+   }
+  ],
+  "motion/easing/css/standard": [
+   {
+    "file": "src/ui/dom/primitives.css",
+    "pattern": "transition: transform 120ms ease,"
+   }
+  ],
+  "motion/easing/css/inOut": [
+   {
+    "file": "index.html",
+    "pattern": "1.4s ease-in-out"
+   }
+  ],
+  "motion/easing/functions/smoothstep": [
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "const smoothstep = "
+   }
+  ],
+  "motion/easing/functions/smootherstep": [
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "const smootherstep = "
+   }
+  ],
+  "motion/easing/functions/easeOutCubic": [
+   {
+    "file": "src/render/introTimeline.ts",
+    "pattern": "export const easeOutCubic = "
+   }
+  ],
+  "motion/easing/functions/sineInOut": [
+   {
+    "file": "src/scenes/MenuScene.ts",
+    "pattern": "ease: 'Sine.easeInOut'"
+   }
+  ],
+  "legacy/fontSizePx/micro": [
+   {
+    "file": "src/scenes/MenuScene.ts",
+    "pattern": "fontSize: '9px'"
+   }
+  ],
+  "legacy/fontSizePx/caption": [
+   {
+    "file": "src/scenes/MenuScene.ts",
+    "pattern": "fontSize: '11px'"
+   }
+  ],
+  "legacy/fontSizePx/small": [
+   {
+    "file": "src/scenes/MenuScene.ts",
+    "pattern": "fontSize: '13px'"
+   }
+  ],
+  "legacy/fontSizePx/body": [
+   {
+    "file": "src/scenes/MenuScene.ts",
+    "pattern": "fontSize: '14px'"
+   }
+  ],
+  "legacy/fontSizePx/label": [
+   {
+    "file": "src/scenes/MenuScene.ts",
+    "pattern": "fontSize: '16px'"
+   }
+  ],
+  "legacy/fontSizePx/heading": [
+   {
+    "file": "src/scenes/MenuScene.ts",
+    "pattern": "fontSize: '18px'"
+   }
+  ]
+ }
+}
