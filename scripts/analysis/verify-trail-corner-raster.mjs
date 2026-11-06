@@ -238,6 +238,12 @@ const main = async () => {
     await page.waitForFunction(() => Boolean(window.__MAZER_QA__?.startPlayMode), { timeout: 15000 });
     await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
     await page.waitForTimeout(200);
+    // The maze intro is a time-derived timeline (src/render/introTimeline.ts); the
+    // first orientation otherwise captures mid-intro. Input unlock is the intro's end.
+    await page.waitForFunction(
+      () => window.__MAZER_GAME__.scene.getScene('MenuScene').isLegacyPlayLifecycleInputLocked() === false,
+      { timeout: 15000 }
+    );
 
     for (const [orientation, spec] of Object.entries(MAZES)) {
       const maze = buildMazeSnapshot(spec);

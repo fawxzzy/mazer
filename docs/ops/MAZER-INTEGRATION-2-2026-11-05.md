@@ -61,7 +61,8 @@ Full usage and detectors: `docs/ops/MAZER-LIFECYCLE-CAPTURE-TOOL-2026-11-05.md`.
 - The lifecycle analyzer reports partial-strip findings on the merged tree; the graphics lane believes they are trail pulses, not dock remnants. Not independently confirmed.
 - `goalPulse` is computed by the timeline but not drawn.
 - Reduced motion and the tap/key skip were not exercised in a browser.
-- `scripts/analysis/verify-gameplay-teleport-transfer.mjs` (guard updated by the lane) is a stale QA script and was not run here.
+- CI RED, owner decision needed: `verify-teleport-anchor-preview-lifecycle.mjs` and `verify-gameplay-teleport-transfer.mjs` (steps still enabled in `.github/workflows/verify.yml`) fail on the merged tree because they assert the retired diamond shell pool, the gameplay-transfer conduit and strip-image beams (local run: `titleOrbitDiamondImages` undefined; case 1 conduit checks). They need a rewrite against the edge-marker system, or the owner must approve retiring the two steps. They were not disabled here.
+- `verify-trail-corner-raster.mjs` failed in CI on `cornerNE` only (9815 px region) because it captured the first orientation mid-intro; it now waits for input unlock after `startPlayMode()` and passes 4/4. Baselines were not regenerated.
 - `npm test` does not yet include the five new test files (package.json follow-up above).
 
 ## Known failing on clean main (recorded, not fixed, no assertion loosened)
