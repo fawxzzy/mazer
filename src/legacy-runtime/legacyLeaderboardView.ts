@@ -30,7 +30,7 @@ import {
 /** The overlay id the scene routes on (LegacyOverlayKind). Kept. */
 export const LEGACY_LEADERBOARD_OVERLAY_ID = 'leaderboard' as const;
 /** Header icon asset that is KEPT by the redesign (served from public/). */
-export const LEGACY_LEADERBOARD_ICON_ASSET_PATH = 'assets/hud/hud-leaderboard.png';
+export const LEGACY_LEADERBOARD_ICON_ASSET_PATH = 'assets/hud/hud-leaderboard.webp';
 
 /** Rows shown per page; matches MenuScene.LEADERBOARD_VISIBLE_ROWS. */
 export const LEGACY_LEADERBOARD_VISIBLE_ROWS = 10;

@@ -182,7 +182,7 @@ describe('leaderboard overlay plan: loading, empty, error and gate states', () =
 
 describe('leaderboard overlay: scene wiring and the kept icon', () => {
   test('the header entry icon asset path and its menu placement are unchanged', () => {
-    expect(LEGACY_LEADERBOARD_ICON_ASSET_PATH).toBe('assets/hud/hud-leaderboard.png');
+    expect(LEGACY_LEADERBOARD_ICON_ASSET_PATH).toBe('assets/hud/hud-leaderboard.webp');
     expect(existsSync(resolve(process.cwd(), 'public', LEGACY_LEADERBOARD_ICON_ASSET_PATH))).toBe(true);
     const scene = read('src/scenes/MenuScene.ts');
     expect(scene).toContain('MAZER_HUD_LEADERBOARD_TEXTURE_KEY');

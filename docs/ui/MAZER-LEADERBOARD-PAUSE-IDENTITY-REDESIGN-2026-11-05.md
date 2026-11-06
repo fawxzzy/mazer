@@ -9,7 +9,7 @@ renders `buildLegacyLeaderboardViewModel` through the pure draw plan
 `src/legacy-runtime/legacyLeaderboardOverlayPlan.ts` (near-black card, pinned own-rank card, rank/name/level rows,
 skeleton loading, friendly empty/error states with Retry, Previous/Next with the limit+1 fetch, 44 px targets, safe
 area aware); the old row/glyph/accent drawing code and `createAuthAccountSummaryCard` were removed. The header entry
-icon (`public/assets/hud/hud-leaderboard.png`, `drawLegacyMenuLeaderboardIcon`) is unchanged. The pause card and
+icon (`public/assets/hud/hud-leaderboard.webp`, `drawLegacyMenuLeaderboardIcon`) is unchanged. The pause card and
 header identity parts below remain unwired here.
 
 ## Owner direction (verbatim intent)
@@ -60,7 +60,7 @@ profileFrameRight, titleLeft, text, fontPx, measure?, profileFrameCenterY? })`,
 
 ## Kept
 
-- Leaderboard header icon asset `public/assets/hud/hud-leaderboard.png` and its
+- Leaderboard header icon asset `public/assets/hud/hud-leaderboard.webp` and its
   header placement (the menu header leaderboard icon and its
   `drawLegacyMenuLeaderboardIcon` glyph).
 - The in-play settings cog that opens Pause.
