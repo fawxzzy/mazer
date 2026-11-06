@@ -6,6 +6,13 @@ import {
   type LegacyMazeGenerationProfile,
   type LegacyPoint
 } from './legacyMaze';
+import {
+  GEOMETRY_BUDGET_ACCEPT_HALF_WIDTH,
+  GEOMETRY_BUDGET_GATE_CANDIDATES,
+  measureGeometryBudgetProxy,
+  resolveGeometryBudgetCandidateSeed,
+  resolveGeometryBudgetTarget
+} from './legacyGeometryBudget';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
 import { resolveLegacyMazeComplexity } from './legacyProgression';
@@ -561,6 +568,89 @@ const resolveLegacyAdaptiveUnderTargetScale = (scale: number): number => {
   );
 };
 
+// Selection for geometry-budget profiles (progression levels 2..LAST_BUDGET_LEVEL).
+// There is no target-complexity search and no pressure/adaptive retry: those
+// would resize the board and swap the profile, which the budget ladder forbids.
+// Instead up to GEOMETRY_BUDGET_GATE_CANDIDATES candidates (mixed seeds) are
+// built from the one fixed profile and the first whose H1 proxy lies within
+// GEOMETRY_BUDGET_ACCEPT_HALF_WIDTH of the level's baked target T(N) wins; if
+// none does, the nearest one wins. Because accepted candidates are within less
+// than half the minimum T(N) step, accepted mazes of adjacent levels can never
+// tie or invert. selectionOptions.candidateCount is deliberately ignored: the
+// goal-reset precompute passes 1, which would silently disable the gate on the
+// main level-to-level path.
+const selectLegacyGeometryBudgetMaze = (
+  mode: LegacyGenerationMode,
+  scale: number,
+  seed: number,
+  generationProfile: LegacyMazeGenerationProfile,
+  budgetLevel: number,
+  selectionOptions: LegacyGenerationSelectionOptions,
+  aspectRatio: number
+): {
+  maze: Omit<LegacyMazeSnapshot, 'generation'>;
+  review: LegacyGenerationSelectionReview;
+} => {
+  const gateTarget = resolveGeometryBudgetTarget(budgetLevel);
+  let bestMaze: Omit<LegacyMazeSnapshot, 'generation'> | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  let bestComplexity = 0;
+  let complexityMin = Number.POSITIVE_INFINITY;
+  let complexityMax = Number.NEGATIVE_INFINITY;
+  let searched = 0;
+
+  for (let index = 0; index < GEOMETRY_BUDGET_GATE_CANDIDATES; index += 1) {
+    const candidateSeed = resolveGeometryBudgetCandidateSeed(seed, budgetLevel, index);
+    const candidate = buildLegacyRuntimeMazeForMode(mode, scale, candidateSeed, generationProfile, aspectRatio);
+    searched += 1;
+    const complexity = resolveLegacyMazeComplexity(candidate);
+    complexityMin = Math.min(complexityMin, complexity.total);
+    complexityMax = Math.max(complexityMax, complexity.total);
+    const distance = gateTarget === null
+      ? 0
+      : Math.abs(measureGeometryBudgetProxy(candidate, complexity).total - gateTarget);
+    if (bestMaze === null || distance < bestDistance) {
+      bestMaze = candidate;
+      bestDistance = distance;
+      bestComplexity = complexity.total;
+    }
+    if (distance <= GEOMETRY_BUDGET_ACCEPT_HALF_WIDTH) {
+      break;
+    }
+  }
+
+  const selectedMaze = bestMaze ?? buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile, aspectRatio);
+  const reviewTarget = clampInteger(selectionOptions.targetComplexity ?? bestComplexity, 0, 999);
+  return {
+    maze: selectedMaze,
+    review: {
+      adaptiveRetryCandidateCount: 0,
+      adaptiveRetryScale: null,
+      adaptiveRetryUsed: false,
+      allCandidatesOverTarget: false,
+      allCandidatesUnderTarget: false,
+      candidateCount: GEOMETRY_BUDGET_GATE_CANDIDATES,
+      candidateComplexityMax: Number.isFinite(complexityMax) ? complexityMax : bestComplexity,
+      candidateComplexityMin: Number.isFinite(complexityMin) ? complexityMin : bestComplexity,
+      // The 400-capped complexity target is not what budget levels are gated
+      // on, so the under/over-target label is cosmetic here and always
+      // 'on-target'; the gate distance is reported in selectedDistance.
+      delivery: 'on-target',
+      difference: bestComplexity - reviewTarget,
+      initialWindowOverTarget: false,
+      initialWindowUnderTarget: false,
+      measuredComplexity: bestComplexity,
+      pressureRetryCandidateCount: 0,
+      pressureRetryUsed: false,
+      searchedCandidateCount: searched,
+      selectedDistance: bestDistance,
+      selectedSeed: selectedMaze.seed,
+      targetComplexity: reviewTarget,
+      tolerance: 0
+    }
+  };
+};
+
 const selectLegacyRuntimeMazeForMode = (
   mode: LegacyGenerationMode,
   scale: number,
@@ -572,6 +662,18 @@ const selectLegacyRuntimeMazeForMode = (
   maze: Omit<LegacyMazeSnapshot, 'generation'>;
   review?: LegacyGenerationSelectionReview;
 } => {
+  const budgetProfile = normalizeLegacyMazeGenerationProfile(generationProfile);
+  if (budgetProfile.geometryBudgetLevel !== undefined) {
+    return selectLegacyGeometryBudgetMaze(
+      mode,
+      scale,
+      seed,
+      budgetProfile,
+      budgetProfile.geometryBudgetLevel,
+      selectionOptions,
+      aspectRatio
+    );
+  }
   const targetComplexity = selectionOptions.targetComplexity;
   if (targetComplexity === null || targetComplexity === undefined || !Number.isFinite(targetComplexity)) {
     return {

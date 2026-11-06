@@ -1667,23 +1667,16 @@ describe('legacy progression', () => {
     expect(playerProfiles[0]?.difficulty.band).toBe('tutorial');
     expect(playerProfiles[1]?.difficulty.band).toBe('starter');
     expect(playerProfiles[1]).not.toEqual(playerProfiles[0]);
-    expect(playerProfiles[1]?.scale).toBeGreaterThan(playerProfiles[0]?.scale ?? 0);
-    // Half-speed pacing still holds for band/scale -- the two real levels
-    // sharing one paced step still get the same band and the same board
-    // scale. Checkpoint/dead-end density now reads a finer within-step
-    // signal so most pairs are no longer a byte-identical generation
-    // (confirmed for real levels 4 and 5 below -- reported as "level 4 and
-    // 5 look the same", the same complaint as levels 2 and 3). Levels 2
-    // and 3 specifically still tie: the very first starter step's table
-    // gap is only 1 (checkpoint count 2 -> 3), too small to floor an
-    // in-between value out of without landing exactly on the next level's
-    // own number -- which briefly (before flooring instead of rounding)
-    // measurably tipped a fixed-seed early-complexity ordering check the
-    // wrong way. Every later pair's gap is wide enough for a real
-    // in-between value instead.
+    // Levels 1..30 share one frozen board: difficulty comes from maze content,
+    // not board size, so the first clear no longer grows the board.
+    expect(playerProfiles[1]?.scale).toBe(playerProfiles[0]?.scale);
+    // The band labels still pair two real levels per step (diagnostics only),
+    // but geometry is now the geometry budget ladder (levels 2..30): every
+    // level owns a distinct profile, including the formerly tied levels 2
+    // and 3.
     expect(playerProfiles[2]?.difficulty).toEqual(playerProfiles[1]?.difficulty);
     expect(playerProfiles[2]?.scale).toBe(playerProfiles[1]?.scale);
-    expect(playerProfiles[2]?.generation).toEqual(playerProfiles[1]?.generation);
+    expect(playerProfiles[2]?.generation).not.toEqual(playerProfiles[1]?.generation);
     expect(playerProfiles[3]?.generation).not.toEqual(playerProfiles[2]?.generation);
     expect(playerProfiles[4]?.difficulty).toEqual(playerProfiles[3]?.difficulty);
     expect(playerProfiles[4]?.scale).toBe(playerProfiles[3]?.scale);
@@ -1767,7 +1760,9 @@ describe('legacy progression', () => {
         expect(layout.boardTop + layout.boardHeight).toBeLessThanOrEqual(viewport.height);
       }
     }
-  });
+    // Levels 2..30 are geometry-budget levels: each generation scans a gate of
+    // candidates, so ten mazes no longer fit the 5s default.
+  }, 60_000);
 
   test('maps progression bands to increasing procedural pressure', () => {
     // Complexity values doubled (in real-level terms) from what used to hit

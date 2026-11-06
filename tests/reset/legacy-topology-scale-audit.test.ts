@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { createHash } from 'node:crypto';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
+import { measureGeometryBudgetProxy } from '../../src/legacy-runtime/legacyGeometryBudget';
 import {
   createLegacyGeneratedMenuMaze,
   createLegacyMaze,
@@ -403,7 +404,11 @@ describe('legacy topology scale audit', () => {
     console.info('PR284_SEARCH_DIAGNOSTICS', JSON.stringify(timingDiagnostics));
   }, 120_000);
 
-  test('keeps the fixed-seed early curve nondecreasing with a measurable level-one to level-two step', () => {
+  // Levels 2..30 are geometry-budget levels gated on the H1 geometry proxy, not
+  // on the 400-capped complexity (which is not monotone along the tape), so the
+  // early curve is asserted on the proxy. It is strictly increasing because the
+  // gate steers every level to its baked target.
+  test('keeps the fixed-seed early curve strictly increasing on the geometry proxy with a measurable level-one to level-two step', () => {
     const seeds = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233];
     const targets = [8, 12, 16, 20, 24];
     const baseline = createEmptyLegacyProgressionState();
@@ -419,15 +424,16 @@ describe('legacy topology scale audit', () => {
         const scale = resolveLegacyProgressionGenerationScale(50, track, {
           surface: mode === 'play' ? 'play' : 'menu-demo'
         });
-        const complexities = seeds.map((seed) => resolveLegacyMazeComplexity(
-          createLegacyRuntimeMazeForMode(
+        const complexities = seeds.map((seed) => {
+          const maze = createLegacyRuntimeMazeForMode(
             mode,
             scale,
             seed,
             generationProfile,
             { targetComplexity }
-          )
-        ).total);
+          );
+          return measureGeometryBudgetProxy(maze, resolveLegacyMazeComplexity(maze)).total;
+        });
         return {
           mean: complexities.reduce((total, value) => total + value, 0) / complexities.length,
           median: resolveMedian(complexities)
@@ -439,14 +445,28 @@ describe('legacy topology scale audit', () => {
       expect(results[1]?.mean).toBeGreaterThan(results[0]?.mean ?? Number.POSITIVE_INFINITY);
       expect(results[1]?.median).toBeGreaterThan(results[0]?.median ?? Number.POSITIVE_INFINITY);
       for (let index = 1; index < results.length; index += 1) {
-        expect(results[index]?.mean).toBeGreaterThanOrEqual(results[index - 1]?.mean ?? Number.POSITIVE_INFINITY);
-        expect(results[index]?.median).toBeGreaterThanOrEqual(results[index - 1]?.median ?? Number.POSITIVE_INFINITY);
+        expect(results[index]?.mean).toBeGreaterThan(results[index - 1]?.mean ?? Number.POSITIVE_INFINITY);
+        expect(results[index]?.median).toBeGreaterThan(results[index - 1]?.median ?? Number.POSITIVE_INFINITY);
       }
     }
-  }, 20_000);
+  }, 240_000);
 
   test('PR #284 spends the route-quality reinforcement budget only once across normalization passes', () => {
-    const generationProfile = resolveLegacyMazeGenerationProfileForProgression(36);
+    // Literal: the legacy level-8 starter-band profile. Levels 2..30 now come
+    // from the geometry budget ladder, so this multiplier pairing is no longer
+    // reachable through the progression resolver; the generator behavior under
+    // test (one reinforcement budget across normalization passes) is unchanged.
+    const generationProfile = {
+      borderFeederTargetPerSide: 0,
+      checkpointCountMultiplier: 0.54,
+      checkpointCountOverride: 8,
+      maxDeadEndCount: 3,
+      minCheckpoints: 4,
+      requiredOppositeBorderConnections: { horizontal: false, vertical: false },
+      routeQualityReinforcementMultiplier: 0.175,
+      shortcutCountMultiplier: 0.175,
+      straightnessBias: 0.36
+    };
     const maze = createLegacyMaze(37, 37, 5, undefined, generationProfile);
 
     expect(generationProfile).toMatchObject({
