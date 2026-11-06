@@ -333,11 +333,10 @@ describe('one diamond system: no old diamond art anywhere in the scene', () => {
     expect(source).not.toMatch(/this\.add\.image\([^)]*(Diamond|DIAMOND|BEAM|Beam)/);
   });
 
-  test('only the two Wave 4D-B teleport modules still name the old art in comments (tracked removal)', () => {
-    // BootScene no longer preloads the PNGs (retired). The two Wave 4D-B teleport
-    // modules still mention the frozen manifest in comments; they cannot be edited in
-    // the same change set as BootScene (integrator-wave guard), so this allow-list is
-    // EXACT: any other src file naming old diamond art fails.
+  test('no src file (including the Wave 4D-B teleport modules) names the old diamond art', () => {
+    // BootScene no longer preloads the PNGs (retired) and the two Wave 4D-B teleport
+    // modules' comments now describe the procedural 8-diamond ring, so the former
+    // allow-list is empty: any src file naming old diamond art fails.
     const root = process.cwd().replace(/\\/g, '/');
     const files: string[] = [];
     const walk = (dir: string): void => {
@@ -351,14 +350,7 @@ describe('one diamond system: no old diamond art anywhere in the scene', () => {
       }
     };
     walk(`${root}/src`);
-    const allowed = new Set([
-      'src/render/teleportAnchorPose.ts',
-      'src/render/teleportPrimaryAnchor.ts'
-    ]);
     const offenders = files.filter((file) => {
-      if (allowed.has(file)) {
-        return false;
-      }
       const text = readFileSync(`${root}/${file}`, 'utf8');
       return OLD_ART.some((needle) => text.includes(needle));
     });
