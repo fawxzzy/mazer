@@ -242,12 +242,63 @@ describe('guide icons are tied to the draw functions the board uses', () => {
     }
   });
 
-  test('the Chip wiring lane has an explicit todo row list: goal is shared; player, trail, wrap, levels are tracked', () => {
+  test('the Chip wiring lane has an explicit todo row list: goal and wrap share the board draw; you and move are guide-local; trail and levels are tracked', () => {
     const byStatus = (status: string): string[] => LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === status).map((r) => r.id);
-    expect(byStatus('shared-with-board')).toEqual(['goal']);
-    expect(byStatus('guide-local')).toEqual(['move']);
-    expect(byStatus('todo-wiring')).toEqual(['you', 'trail', 'wrap', 'levels']);
+    expect(byStatus('shared-with-board')).toEqual(['goal', 'wrap']);
+    expect(byStatus('guide-local')).toEqual(['you', 'move']);
+    expect(byStatus('todo-wiring')).toEqual(['trail', 'levels']);
     const chipLane = LEGACY_GUIDE_ROWS.filter((r) => r.icon.lane === 'chip-wiring').map((r) => r.id);
     expect(chipLane).toEqual(['trail', 'levels']);
+  });
+});
+
+describe('the scene paints exactly what the guide data declares', () => {
+  const method = (signature: string): string => {
+    const start = MENU_SCENE.indexOf(signature);
+    expect(start, signature).toBeGreaterThanOrEqual(0);
+    return MENU_SCENE.slice(start, MENU_SCENE.indexOf('\n  }\n', start));
+  };
+
+  test('every glyph the data names has a draw case in the scene, and nothing else is drawn', () => {
+    const icon = method('private drawLegacyGuideIcon(');
+    const drawn = [...icon.matchAll(/case '([a-z-]+)':/g)].map((m) => m[1]).sort();
+    const declared = LEGACY_GUIDE_ROWS.map((r) => r.icon.glyph).sort();
+    expect(drawn).toEqual(declared);
+  });
+
+  test('icons declared shared-with-board call the board draw function itself, not a copy', () => {
+    const icon = method('private drawLegacyGuideIcon(');
+    const shared = LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === 'shared-with-board');
+    expect(shared.map((r) => r.id)).toEqual(['goal', 'wrap']);
+    expect(icon).toContain('this.drawLegacyGoalStarMarker(');
+    expect(icon).toContain('drawEdgeMarker(');
+    // guide-local icons reuse the board constants/tokens (player) or mirror the stick (move).
+    expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('LEGACY_PLAY_PLAYER_MARKER_ACCENT_COLOR');
+    expect(method('private drawLegacyOptionsGuideMoveGlyph(')).toContain('LEGACY_PLAY_TOUCH_BUTTON_STROKE');
+    expect(icon).toContain('this.progressionState.tracks.player.level');
+  });
+
+  test('the scene holds no guide copy of its own: rows come from the data, headings and text both', () => {
+    const guide = method('private buildLegacyGuideSheetOverlay(context: LegacySettingsContext): void');
+    for (const r of LEGACY_GUIDE_ROWS) {
+      expect(MENU_SCENE, r.id).not.toContain(r.text);
+      expect(guide).not.toContain(`'${r.heading}'`);
+    }
+    expect(guide).toContain('row.heading,');
+    expect(guide).toContain('row.text,');
+    expect(MENU_SCENE).not.toContain(buildLegacyGuideKeyboardLine());
+  });
+
+  test('the keyboard line is shown only for a fine pointer with hover (desktop), never on touch', () => {
+    const keyboard = method('private resolveLegacyGuideHasKeyboard(): boolean');
+    expect(keyboard).toContain("(pointer: fine)");
+    expect(keyboard).toContain("(hover: hover)");
+  });
+
+  test('the old Guide dropdown and its stale rows are gone from the scene', () => {
+    expect(MENU_SCENE).not.toContain('createLegacyOptionsInfoSection');
+    expect(MENU_SCENE).not.toContain('createLegacyOptionsGuideHeaderButton');
+    expect(MENU_SCENE).not.toContain('overlayGuideExpanded');
+    expect(MENU_SCENE).not.toMatch(/'begin at gold'|'reach the star'|'touch and drag anywhere'/);
   });
 });

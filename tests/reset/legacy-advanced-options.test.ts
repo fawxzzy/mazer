@@ -17,19 +17,17 @@ describe('legacy advanced options visibility', () => {
     expect(resolveLegacyAdvancedOptionsVisible(new URLSearchParams('advancedOptions=yes'))).toBe(true);
   });
 
-  test('routes menu options through the player-facing gate', () => {
+  // 2026-11-06 wiring lane: the main-menu Settings sheet is the shared Pause-style sheet
+  // (legacySettingsSheetPlan). The URL-flagged tuning rows (Maze Scale, Camera Scale, Path/Wall RGB)
+  // are not part of that spec and are no longer painted; only the flag resolver above remains.
+  test('the shared Settings sheet paints player-facing rows only; the Board Zoom slider is the zoom control', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(source).toContain('const showAdvancedOptions = this.shouldShowLegacyAdvancedOptions();');
-    expect(source).toContain('if (showAdvancedOptions) {');
-    expect(source).toContain("this.createInputRow('Maze Scale'");
-    expect(source).toContain("this.createInputRow('Camera Scale'");
-    expect(source).toContain("label: 'Board Zoom'");
+    expect(source).not.toContain('shouldShowLegacyAdvancedOptions');
+    expect(source).not.toContain("this.createInputRow('Maze Scale'");
+    expect(source).not.toContain("this.createColorInputRow('Path RGB 0-255'");
     expect(source).toContain('formatLegacyCameraZoomPercent(this.settings.camScale)');
     expect(source).toContain('resolveLegacyCameraZoomPosition(this.settings.camScale)');
     expect(source).toContain('private applyLegacyCameraZoom(value: number): void {');
-    expect(source).toContain('if (showAdvancedOptions && !compact) {');
-    expect(source).toContain("this.createColorInputRow('Path RGB 0-255'");
-    expect(source).toContain("this.createColorInputRow('Wall RGB 0-255'");
   });
 });

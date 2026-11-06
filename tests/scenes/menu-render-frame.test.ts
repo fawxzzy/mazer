@@ -67,15 +67,29 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(completionFlow).toContain('this.authAccountHydrationSequence');
     expect(completionFlow).toContain('writeLegacyProgressionState(\n              completionProgressionStorage,');
 
-    const resetSyncFlow = menuSceneSource.slice(
-      menuSceneSource.indexOf("private syncLegacyRemoteProgressionState(mode: 'replace'): void"),
-      menuSceneSource.indexOf('private publishLegacyRemoteSyncResult')
+    // Wiring lane (2026-11-06): Reset progress is SERVER-FIRST. The RPC (mazer_reset_progression via
+    // writeLegacyRemoteProgressionState 'replace') is awaited before any local write, a failed or
+    // conflicting call returns without touching local progression, and the local effects use the keys of
+    // the account the reset was requested for, guarded by the same account-switch check as completions.
+    const resetFlow = menuSceneSource.slice(
+      menuSceneSource.indexOf('private async resetLegacyPlayerProgression(): Promise<boolean>'),
+      menuSceneSource.indexOf('private applyOverlayToggleFieldChange(')
     );
-    expect(resetSyncFlow).toContain('const syncAuthSnapshot = { ...this.authSnapshot };');
-    expect(resetSyncFlow).toContain('const syncAuthSequence = this.authAccountHydrationSequence;');
-    expect(resetSyncFlow).toContain('const syncProgressionStorage = this.resolveLegacyProgressionStorage();');
-    expect(resetSyncFlow.match(/isLegacyRemoteCompletionContextCurrent\(/g)).toHaveLength(2);
-    expect(resetSyncFlow).toContain('writeLegacyProgressionState(\n            syncProgressionStorage,');
+    expect(resetFlow).toContain('const snapshot = { ...this.authSnapshot };');
+    expect(resetFlow).toContain('const sequence = this.authAccountHydrationSequence;');
+    expect(resetFlow.match(/isLegacyRemoteCompletionContextCurrent\(/g)).toHaveLength(1);
+    const awaitRpc = resetFlow.indexOf("await writeLegacyRemoteProgressionState(snapshot, this.progressionState, undefined, 'replace')");
+    const failureReturn = resetFlow.indexOf('if (result === null || !result.synced) {');
+    const localEffects = resetFlow.indexOf('applyLegacyProgressionResetLocalEffects(');
+    const progressionAssign = resetFlow.indexOf('this.progressionState = effects.state;');
+    expect(awaitRpc).toBeGreaterThan(0);
+    expect(failureReturn).toBeGreaterThan(awaitRpc);
+    expect(localEffects).toBeGreaterThan(failureReturn);
+    expect(progressionAssign).toBeGreaterThan(localEffects);
+    // Nothing local is written between the RPC and its failure return.
+    expect(resetFlow.slice(awaitRpc, resetFlow.indexOf('return false;', failureReturn))).not.toMatch(/writeLegacyProgressionState|applyLegacyProgressionResetLocalEffects|this\.progressionState =/);
+    expect(resetFlow).toContain('failure: classifyLegacyProgressionResetFailure(result)');
+    expect(menuSceneSource).not.toContain("private syncLegacyRemoteProgressionState(mode: 'replace'): void");
   });
 
   test('keeps semantic source assertions identical across LF and CRLF checkouts', () => {
@@ -112,47 +126,38 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps the Settings and Pause overlays compact, player-facing, and grouped by purpose', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
-    const buildOptionsSource = menuSceneSource.slice(
-      menuSceneSource.indexOf('private buildOptionsOverlay(): void {'),
-      menuSceneSource.indexOf('private createLegacyOptionsInfoSection(')
-    );
-    const guideSource = menuSceneSource.slice(
-      menuSceneSource.indexOf('private createLegacyOptionsInfoSection('),
-      menuSceneSource.indexOf('private createLegacyOptionsAccountActionRow(')
-    );
-    const buildPauseStart = menuSceneSource.indexOf('private buildPauseOverlay(): void {');
-    const buildPauseSource = menuSceneSource.slice(
-      buildPauseStart,
-      menuSceneSource.indexOf('\n  }\n', buildPauseStart)
-    );
+    const entry = (signature: string): string => {
+      const start = menuSceneSource.indexOf(signature);
+      return menuSceneSource.slice(start, menuSceneSource.indexOf('\n  }\n', start));
+    };
+    const buildOptionsSource = entry('private buildOptionsOverlay(): void {');
+    const buildPauseSource = entry('private buildPauseOverlay(): void {');
+    const sheetSource = entry('private buildLegacySettingsSheetOverlay(context: LegacySettingsContext): void {');
+    const guideSource = entry('private buildLegacyGuideSheetOverlay(context: LegacySettingsContext): void {');
 
-    expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
-    expect(menuSceneSource).toContain('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {');
-    expect(menuSceneSource).toContain("'GUIDE',");
-    expect(buildOptionsSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
-      buildOptionsSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel')
-    );
-    // Pause is a card now (legacyPauseMenuView.ts): no Guide section; the
-    // Settings disclosure reuses the same createFeatureControlRows toggles.
-    expect(buildPauseSource).not.toContain('createLegacyOptionsInfoSection');
-    expect(buildPauseSource).toContain('buildLegacyPauseMenuViewModel()');
-    expect(buildPauseSource).toContain('this.pauseSettingsExpanded');
-    expect(buildPauseSource).toContain('this.createFeatureControlRows(cursorY, rowsPanel, {');
-    expect(guideSource).toContain("drawLegendRow(legendRowIndex, 'start', 'Start'");
-    expect(guideSource).toContain("drawLegendRow(legendRowIndex, 'end', 'Exit'");
+    // Wiring lane (2026-11-06): ONE painter for both contexts. The Guide is a sheet opened from the
+    // `How to play` row (not a GUIDE dropdown), painted from legacyGuideContent.ts.
+    expect(buildOptionsSource).toContain("this.buildLegacySettingsSheetOverlay('menu')");
+    expect(buildPauseSource).toContain("this.buildLegacySettingsSheetOverlay('pause')");
+    expect(sheetSource).toContain('buildLegacySettingsSheetPlan({');
+    expect(sheetSource).toContain('this.buildLegacyGuideSheetOverlay(context);');
+    expect(sheetSource).toContain('settingsExpanded: this.pauseSettingsExpanded,');
+    expect(menuSceneSource).not.toContain('createLegacyOptionsInfoSection');
+    expect(menuSceneSource).not.toContain('createLegacyOptionsGuideHeaderButton');
+    expect(menuSceneSource).not.toContain('createLegacyOptionsSessionActionBar');
+    expect(menuSceneSource).not.toContain("'GUIDE',");
+    expect(guideSource).toContain('buildLegacyGuideSheetModel(context,');
+    expect(guideSource).toContain('buildLegacyGuideSheetPlan({');
     expect(guideSource).not.toContain('includeCompassRow');
-    expect(guideSource).toContain("'begin at gold'");
-    expect(guideSource).toContain("'reach the star'");
+    expect(guideSource).not.toContain("'begin at gold'");
     expect(guideSource).not.toContain("'Player • green trail'");
     expect(guideSource).not.toContain("'Score • run quality'");
     expect(guideSource).not.toContain('activeTargetComplexity');
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
     expect(menuSceneSource).not.toContain('drawLegacyCompassGlyph');
-    expect(menuSceneSource).toContain('drawLegacyOptionsGuideGlyph');
-    expect(menuSceneSource).toContain("addSectionHeading('Controls'");
-    expect(menuSceneSource).toContain("addSectionHeading('Display'");
-    expect(menuSceneSource).toContain("label: 'Animated Background'");
+    expect(menuSceneSource).toContain('private drawLegacyGuideIcon(');
+    expect(menuSceneSource).toContain('private createLegacySheetHeading(');
     expect(menuSceneSource).not.toContain("label: 'High Contrast'");
   });
 
@@ -979,7 +984,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps active play HUD minimal, with the level glyph staying separate', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_PANE =');
     expect(menuSceneSource).toContain('const LEGACY_CYBER_PANEL_STROKE = cyberArcadeMaterial.rail.mint;');
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
     expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
@@ -1335,10 +1339,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // falling back to the same real applyLegacyPauseCommand('return-menu')
     // call only if the bridge rejects or is unavailable.
     expect(menuSceneSource).not.toContain('private createLegacyOverlayHomeButton(');
+    // Wiring lane: Quit to Menu is the pause-bottom row of the shared settings plan; its command runs here.
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
-      "      actionLabel('quit-to-menu'),\n"
-      + '      () => this.dispatchUiBridgeCommand({ type: \'RETURN_HOME\' }, () => this.applyLegacyPauseCommand(\'return-menu\')),\n'
-      + "      'secondary'\n"
+      "      case 'RETURN_HOME':\n"
+      + '        this.dispatchUiBridgeCommand({ type: \'RETURN_HOME\' }, () => this.applyLegacyPauseCommand(\'return-menu\'));\n'
     );
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
@@ -1478,16 +1482,19 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(toggleFieldSource).toContain('export const resolveLegacyOverlayToggleSwitchIsOn = (');
     expect(toggleFieldSource).toContain("case 'controlMode':");
     expect(toggleFieldSource).toContain("return settings.controlMode === 'stick';");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings)");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings)");
+    // The three toggle rows now come from the shared plan (settingKey per row) and one painter resolves
+    // each switch position through the canonical resolver.
+    expect(menuSceneSource).toContain('const checked = resolveLegacyOverlayToggleSwitchIsOn(fieldId, this.settings);');
+    const planSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacySettingsSheetPlan.ts'), 'utf8');
+    expect(planSource).toContain("settingKey: 'toggleTrailFade'");
+    expect(planSource).toContain("settingKey: 'toggleTrailPulse'");
+    expect(planSource).toContain("settingKey: 'toggleAnimatedBackdrop'");
     // Play touch movement only has one control scheme now (the floating
     // stick), so the settings list no longer surfaces a meaningless
     // arrows-vs-stick row for it -- the underlying resolver keeps the
     // 'controlMode' case (asserted above) for the settings field itself,
     // just unrendered.
     expect(menuSceneSource).not.toContain("label: 'Control Style'");
-    expect(menuSceneSource).toContain("switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
   });
 
   test('applies capped high-DPI text resolution to menu and overlay UI text', () => {
@@ -1786,9 +1793,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createAuthFooterLink(');
     expect(menuSceneSource).toContain('private navigateToSharedAccountRoute(');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSignOut(): Promise<void>');
-    expect(menuSceneSource).toContain('private createLegacyOptionsSessionActionBar(');
+    // Sign out is a row of the shared settings plan (menu context, signed in only), not a docked bar.
+    expect(menuSceneSource).not.toContain('createLegacyOptionsSessionActionBar');
+    expect(menuSceneSource).toContain("case 'SIGN_OUT':\n        void this.handleLegacyAuthSignOut();");
     expect(menuSceneSource).toContain("if (this.authSnapshot.status !== 'authenticated') {");
-    expect(menuSceneSource).toContain("{ onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }");
     // The Options overlay's own bottom bar is intentionally Sign-out-only
     // (above). The real, normal way an authenticated player reaches their
     // account is the profile/username icon (present in both the main menu
@@ -2165,24 +2173,22 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("from '../legacy-runtime/legacyUiStandards';");
     expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, buttonFontSize, options.labelRole ?? 'button')");
     expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title')");
-    expect(menuSceneSource).toContain('resolveLegacyToggleRowLayout(input.width, input.height, hasDescription, input.compact)');
+    // Toggle rows take their geometry from the shared plan, not from panel width.
+    expect(menuSceneSource).toContain('const parts = item.parts;');
   });
 
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, 5);');
-    expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
-    expect(menuSceneSource).toContain('const guideTitleFontSize = guideLayout.titleFontSize;');
-    expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
-    expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
-    expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);');
-    expect(menuSceneSource).toContain("'GUIDE',");
-    expect(menuSceneSource).toContain("drawLegendRow(legendRowIndex, 'start', 'Start', 'begin at gold', cyberArcadeMaterial.signal.start);");
-    expect(menuSceneSource.replace(/\r\n/g, '\n')).toContain("'GUIDE',\n      detailLeft,\n      titleY,");
-    expect(menuSceneSource).toContain('const glyphX = detailLeft + badgeRadius;');
-    expect(menuSceneSource).toContain('const labelX = detailLeft + (badgeRadius * 2) + badgeToTextGap;');
-    expect(menuSceneSource).not.toContain('const contentLeft = detailLeft + Math.max(0, (detailWidth - titleBlockWidth) / 2);');
+    // Wiring lane (2026-11-06): the Guide is a sheet (legacyGuideSheetPlan.ts + legacyGuideContent.ts) with
+    // wrapped 14 px copy and an icon per row; the old dropdown's 8-11 px legend and its start/exit rows are gone.
+    expect(menuSceneSource).toContain('const model = buildLegacyGuideSheetModel(context, { hasKeyboard: this.resolveLegacyGuideHasKeyboard() });');
+    expect(menuSceneSource).toContain('let plan = buildLegacyGuideSheetPlan({ ...planInput, itemHeights: measure(Number.MAX_SAFE_INTEGER) });');
+    expect(menuSceneSource).toContain('model.closeLabel,');
+    expect(menuSceneSource).toContain('private closeLegacyGuideSheet(): void {');
+    expect(menuSceneSource).not.toContain("drawLegendRow(legendRowIndex, 'start', 'Start'");
+    expect(menuSceneSource).not.toContain("'begin at gold'");
+    expect(menuSceneSource).not.toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, 5);');
     expect(menuSceneSource).not.toContain("'Player • green trail'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
     expect(menuSceneSource).not.toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`");
@@ -2425,30 +2431,28 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');
     expect(menuSceneSource).toContain('private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void');
     expect(menuSceneSource).toContain('private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton');
-    // Pause's back-chevron now routes through the Wave 3A bridge first
-    // (bridge.dispatch(RESUME_RUN)), falling back to the same real
-    // applyLegacyPauseCommand('resume') call only if the bridge rejects or
-    // is unavailable -- the underlying action is unchanged.
+    // The settings/guide sheets use the labelled Close pill (never a bare chevron). In Pause it still routes
+    // through the Wave 3A bridge first (bridge.dispatch(RESUME_RUN)) and falls back to the same real
+    // applyLegacyPauseCommand('resume'); in the menu it is handleBackAction. The chevron stays for the
+    // leaderboard and account overlays.
+    expect(menuSceneSource).toContain('private createOverlayClosePill(rect: LegacySettingsRect, label: string, onClick: () => void): UiButton');
+    expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayClosePill(');
+    expect(menuSceneSource).toContain('() => this.runLegacySettingsCommand(plan.close.command)');
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
-      'const resumePause = (): void => this.dispatchUiBridgeCommand({ type: \'RESUME_RUN\' }, () => this.applyLegacyPauseCommand(\'resume\'));'
+      "      case 'RESUME_RUN':\n"
+      + '        this.dispatchUiBridgeCommand({ type: \'RESUME_RUN\' }, () => this.applyLegacyPauseCommand(\'resume\'));\n'
     );
-    expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, resumePause));');
-    expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));');
+    expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.closeOverlay()));');
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain('return resolveLegacyOverlayPanelLayout(\n      this.layout.width,\n      this.layout.height,\n      readMazerViewportGeometry().safeArea\n    );');
-    expect(menuSceneSource).toContain('const shell = resolveLegacyOverlayShellLayout({');
     expect(menuSceneSource).not.toContain("if (kind === 'pause' && this.mode === 'play')");
-    expect(menuSceneSource).toContain('rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER');
+    // Sheets keep full-width rows; the rail sits in the card padding (plan.scrollRailViewport) and only rows
+    // that are fully inside the body viewport are painted.
+    expect(menuSceneSource).toContain('this.applyLegacySheetScroll(plan.scrollRailViewport, plan.contentHeight, plan.scrollable);');
+    expect(menuSceneSource).toContain('isLegacySettingsItemFullyVisible(plan, item, scrollOffset)');
+    expect(menuSceneSource).toContain('const parts = item.parts;');
+    expect(menuSceneSource).toContain('text.setWordWrapWidth(Math.max(1, width - 16), true);');
     expect(menuSceneSource).toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics);');
-    expect(menuSceneSource).toContain('private resolveLegacyOverlayScrollRenderViewport(metrics: LegacyOverlayScrollMetrics): VisualRect');
-    expect(menuSceneSource).toContain('const renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);');
-    expect(menuSceneSource).toContain('const maskGraphics = this.make.graphics({ x: 0, y: 0 }, false);');
-    expect(menuSceneSource).toContain('label.setMask(this.overlayGuideMask);');
-    expect(menuSceneSource).toContain('cardTop < viewport.bottom - 2 && cardTop + cardHeight > viewport.top + 2');
-    expect(menuSceneSource).toContain('resolveLegacyOverlayScrollRenderRect(metrics.viewport)');
-    expect(menuSceneSource).toContain('legacyOverlayScrollRectIntersectsViewport(bounds, viewport)');
     // Pause scrolls only its Settings rows (the card's three actions stay put).
-    expect(menuSceneSource).toContain('const viewport = createVisualRect(card.cardLeft + card.cardPadding, cursorY, buttonWidth, rowsViewportHeight);');
-    expect(menuSceneSource).toContain('cardTop < viewport.bottom - 2 && cardTop + cardHeight > viewport.top + 2');
     expect(menuSceneSource).not.toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics, true);');
     expect(menuSceneSource).toContain('this.overlayScrollTrackBounds = metrics.enabled');
     expect(menuSceneSource).toContain('this.overlayScrollThumbBounds = metrics.enabled');
@@ -2457,10 +2461,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('drawScrollEdgeCue(viewport.top + viewport.height - 2, metrics.bottomFadeAlpha);');
     expect(menuSceneSource).not.toContain('graphics.fillRect(viewport.left, viewport.top, viewport.width, fadeHeight);');
     expect(menuSceneSource).not.toContain('viewport.top + viewport.height - fadeHeight');
-    expect(menuSceneSource).toContain('if (!showAdvancedOptions) {');
-    expect(menuSceneSource).toContain('const viewportTop = rowY + (compact ? 4 : 6);');
-    expect(menuSceneSource).toContain('const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {');
-    expect(menuSceneSource).toContain('contentHeight: contentFlow.contentHeight');
     expect(menuSceneSource).toContain('this.input.on(\'wheel\'');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerDown(pointer: Phaser.Input.Pointer): boolean');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerMove(pointer: Phaser.Input.Pointer): boolean');
@@ -2470,19 +2470,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('|| this.overlayScrollGestureLockPointerId !== null');
     expect(menuSceneSource).toContain('private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number');
     expect(menuSceneSource).toContain('fillScrollPill(track.left - 3, track.top - 2, track.width + 6, track.height + 4');
-    expect(menuSceneSource).toContain('centerY - (height / 2) >= viewport.top + 2');
-    expect(menuSceneSource).toContain('centerY + (height / 2) <= viewport.bottom - 2');
     expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
     expect(menuSceneSource).toContain('const buttonHorizontalInset = Math.max(10, Math.min(18, Math.round(width * 0.08)));');
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchLabel');
     expect(menuSceneSource).toContain('labelFontSize: Number.isFinite(Number.parseFloat(String(button.label.style.fontSize)))');
     expect(menuSceneSource).not.toContain('topActionHeight:');
-    expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
-    expect(menuSceneSource).toContain('const stateLabelRight = trackLeft - trackGap;');
-    expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
-    expect(menuSceneSource).toContain('resolveLegacyToggleLabelCandidates(input.label, displayStateText, showStateLabel)');
-    expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 1 : 0)');
-    expect(menuSceneSource).toContain('setVisible(showStateLabel)');
     expect(menuSceneSource).not.toContain("const tightWidth = input.width < 260;");
     expect(menuSceneSource).not.toContain("tightWidth && input.label !== 'Controls'");
     expect(menuSceneSource).not.toMatch(/fillRoundedRect\([^;]*,\s*999\)/);

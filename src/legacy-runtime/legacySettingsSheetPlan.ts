@@ -297,7 +297,13 @@ export const LEGACY_SETTINGS_SIZES = Object.freeze({
   titleGapCompact: 14,
   titleGapRegular: 16,
   cardPaddingCompact: 20,
-  cardPaddingRegular: 24
+  cardPaddingRegular: 24,
+  /**
+   * The scroll rail is drawn this far to the right of the body viewport, in the
+   * card's own padding, so rows keep the full inner width while scrolling.
+   * Must stay smaller than the compact card padding (20).
+   */
+  scrollRailOverhang: 14
 });
 
 export interface LegacySettingsRect {
@@ -342,6 +348,8 @@ export interface LegacySettingsSheetPlan {
   title: { centerX: number; centerY: number; fontSize: number; text: string };
   /** Visible, scrollable body window inside the card (screen space). */
   bodyViewport: LegacySettingsRect;
+  /** Viewport handed to the scroll-rail metrics: the body window widened so the rail sits in the card padding. */
+  scrollRailViewport: LegacySettingsRect;
   /** Items in body-content space: screen y = bodyViewport.top + item.rect.top - scrollOffset. */
   items: readonly LegacySettingsPlanItem[];
   contentHeight: number;
@@ -495,23 +503,27 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
   const innerWidth = Math.max(1, cardWidth - (cardPadding * 2));
 
   const flat = flattenRows(model, settingsExpanded);
-  let cursor = 0;
-  const items: LegacySettingsPlanItem[] = flat.map(({ gapBefore, row: rowModel }) => {
-    const height = rowHeightOf(rowModel);
-    cursor += gapBefore;
-    const rect = rectOf(0, cursor, innerWidth, height);
-    cursor += height;
-    return {
-      interactive: isInteractiveKind(rowModel.kind),
-      labelFontSize: s.labelFontSize,
-      labelMaxLines: rowModel.kind === 'heading' || rowModel.kind === 'slider' ? 1 : s.labelMaxLines,
-      model: rowModel,
-      parts: resolveRowParts(rowModel, innerWidth, height),
-      rect,
-      stateFontSize: s.stateFontSize
-    };
-  });
-  const contentHeight = cursor;
+  const layoutItems = (rowWidth: number): { contentHeight: number; items: LegacySettingsPlanItem[] } => {
+    let cursor = 0;
+    const laidOut = flat.map(({ gapBefore, row: rowModel }): LegacySettingsPlanItem => {
+      const height = rowHeightOf(rowModel);
+      cursor += gapBefore;
+      const rect = rectOf(0, cursor, rowWidth, height);
+      cursor += height;
+      return {
+        interactive: isInteractiveKind(rowModel.kind),
+        labelFontSize: s.labelFontSize,
+        labelMaxLines: rowModel.kind === 'heading' || rowModel.kind === 'slider' ? 1 : s.labelMaxLines,
+        model: rowModel,
+        parts: resolveRowParts(rowModel, rowWidth, height),
+        rect,
+        stateFontSize: s.stateFontSize
+      };
+    });
+    return { contentHeight: cursor, items: laidOut };
+  };
+  const layout = layoutItems(innerWidth);
+  const contentHeight = layout.contentHeight;
 
   const headerReserve = LEGACY_OVERLAY_HEADER_RESERVE + (compact ? 6 : 8);
   const availableHeight = Math.max(1, panel.height - headerReserve);
@@ -525,17 +537,20 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
   const bodyTop = cardTop + cardPadding + titleHeight + titleGap;
   const bodyHeight = Math.max(0, cardHeight - chrome);
   const scrollable = contentHeight > bodyHeight;
+  const items = layout.items;
+  const cardRight = cardLeft + cardWidth;
 
   return {
     availableHeight,
     bodyViewport: rectOf(cardLeft + cardPadding, bodyTop, innerWidth, bodyHeight),
+    scrollRailViewport: rectOf(cardLeft + cardPadding, bodyTop, innerWidth + s.scrollRailOverhang, bodyHeight),
     card: rectOf(cardLeft, cardTop, cardWidth, cardHeight),
     cardPadding,
     close: {
       accessibleName: model.close.accessibleName,
       command: model.close.command,
       label: model.close.label,
-      rect: rectOf(panel.left + panel.width - s.closeWidth, panel.top, s.closeWidth, s.closeHeight)
+      rect: rectOf(cardRight - s.closeWidth, panel.top, s.closeWidth, s.closeHeight)
     },
     compact,
     contentHeight,

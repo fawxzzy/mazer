@@ -174,12 +174,15 @@ export const LEGACY_PROGRESSION_RESET_COPY = Object.freeze({
   blockedOffline: 'Connect to the internet to reset your account progress.',
   blockedSessionPending: 'Your account is still loading. Try again in a moment.',
   cancel: 'Cancel',
+  close: 'Close',
   deviceConsequence: 'Your level on this device goes back to Level 1. Your settings stay as they are. This can’t be undone.',
   done: 'Progress reset. You are back at Level 1.',
+  doneButton: 'Done',
   failedConflict: 'Progress changed on another device. Nothing was reset. Check your level and try again.',
   failedGeneric: 'Could not reset your progress. Nothing was changed.',
   menuButton: 'Reset progress',
-  title: 'Reset progress?'
+  title: 'Reset progress?',
+  working: 'Resetting…'
 });
 
 export const formatLegacyProgressionResetConfirmLabel = (): string => 'Reset to Level 1';
@@ -222,6 +225,22 @@ export type LegacyProgressionResetEvent =
   | { type: 'failed'; failure: LegacyProgressionResetFailure }
   /** Acknowledge a terminal state (done/cancelled/failed/blocked) and return to idle. */
   | { type: 'dismiss' };
+
+/**
+ * Maps the outcome of the awaited mazer_reset_progression call to a failure
+ * kind. `null` means the call threw (no response at all). The RPC raises
+ * 'Progression changed on another device (expected revision X, found Y)'
+ * with errcode 40001 when the expected revision is stale; the sync result
+ * carries only the message, so the revision conflict is recognised by it.
+ */
+export const classifyLegacyProgressionResetFailure = (
+  result: { error: string | null } | null
+): LegacyProgressionResetFailure => {
+  if (result === null) {
+    return 'network';
+  }
+  return /changed on another device/i.test(result.error ?? '') ? 'conflict' : 'unknown';
+};
 
 export const INITIAL_LEGACY_PROGRESSION_RESET_STATE: LegacyProgressionResetState = Object.freeze({ phase: 'idle' });
 

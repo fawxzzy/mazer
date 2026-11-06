@@ -177,12 +177,17 @@ describe('320 px clipping guards (Wave 5C)', () => {
     }
   });
 
-  test('MenuScene wires the clipping guards instead of the old 8 px legend floor and unbounded toggle label', () => {
+  // Wave 5C wiring (2026-11-06): the Settings rows and the Guide are painted from
+  // legacySettingsSheetPlan / legacyGuideSheetPlan. The old "label: state" fallback and the 8-11 px
+  // legend floors are gone; labels and guide copy wrap and never shrink below the body token (14).
+  test('MenuScene paints the sheets with wrap-then-shrink text at the 14 px floor, not the old legend floor or label/state merge', () => {
     const source = normalizeSourceLineEndings(readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8'));
     expect(source).not.toContain('compact ? 8 : guideRowMinFontSize');
-    expect(source).toContain('LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE');
-    expect(source).toContain('label.setWordWrapWidth(wrapWidth, true);');
-    expect(source).toContain('resolveLegacyToggleLabelCandidates(input.label, displayStateText, showStateLabel)');
-    expect(source).toContain('LEGACY_UI_MIN_BODY_FONT_SIZE).setOrigin(0, 0.5).setAlpha(0.96);');
+    expect(source).not.toContain('resolveLegacyToggleLabelCandidates');
+    expect(source).not.toContain('LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE');
+    expect(source).toContain('private addLegacySheetWrappedText(');
+    expect(source).toContain('text.setWordWrapWidth(Math.max(1, width - 16), true);');
+    expect(source).toContain('LEGACY_SETTINGS_SIZES.labelMinFontSize');
+    expect(source).toContain('sizes.copyFontSize,\n        sizes.copyFontSize,');
   });
 });

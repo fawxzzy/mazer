@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { resolveLegacyOverlayBackAction } from '../../src/legacy-runtime/legacyOverlayRouting';
+import { buildLegacySettingsSheetModel, buildLegacySettingsSheetPlan } from '../../src/legacy-runtime/legacySettingsSheetPlan';
 import {
   LEGACY_PAUSE_OVERLAY_ID,
   buildLegacyPauseMenuViewModel,
@@ -42,54 +43,73 @@ describe('MenuScene wiring: header identity replaces the bottom Welcome block', 
   });
 });
 
+// Wiring lane (2026-11-06): Pause and the main-menu Settings are ONE sheet. buildPauseOverlay and
+// buildOptionsOverlay are thin entries into buildLegacySettingsSheetOverlay, which paints
+// buildLegacySettingsSheetPlan (legacySettingsSheetPlan.ts). The pause-specific expectations below
+// therefore pin the shared painter plus the plan's pause model.
 describe('MenuScene wiring: pause card', () => {
   const pause = methodSource('private buildPauseOverlay(): void');
+  const sheet = methodSource('private buildLegacySettingsSheetOverlay(context: LegacySettingsContext): void');
+  const commands = methodSource('private runLegacySettingsCommand(command: LegacySettingsCommand): void');
+  const items = methodSource('private paintLegacySettingsItem(');
+  const card = methodSource('private drawLegacySheetCard(card: LegacySettingsRect): void');
 
   test('keeps the overlay id "pause" and the QA/lifecycle hooks that depend on it', () => {
     expect(LEGACY_PAUSE_OVERLAY_ID).toBe('pause');
     expect(buildLegacyPauseMenuViewModel().overlayId).toBe('pause');
+    expect(buildLegacySettingsSheetModel('pause').overlayId).toBe('pause');
     expect(scene).toContain("case 'pause':\n        this.buildPauseOverlay();");
+    expect(pause).toContain("this.buildLegacySettingsSheetOverlay('pause')");
     expect(scene).toContain("this.overlay !== 'pause'");
     expect(scene).toContain("kind === 'pause'");
     expect(resolveLegacyOverlayBackAction({ mode: 'play', overlay: 'pause', overlayReturn: 'none' }).kind).toBe('close-overlay');
   });
 
-  test('has exactly Resume / Settings / Quit to Menu action buttons (plus the standard back chevron)', () => {
-    expect(buildLegacyPauseMenuViewModel().actions.map((action) => action.label)).toEqual(['Resume', 'Settings', 'Quit to Menu']);
-    expect(pause.match(/createLegacyAuthActionButton\(/g)).toHaveLength(3);
-    expect(pause).toContain("actionLabel('resume')");
-    expect(pause).toContain("actionLabel('settings')");
-    expect(pause).toContain("actionLabel('quit-to-menu')");
-    expect(pause.match(/createOverlayBackChevronButton\(/g)).toHaveLength(1);
-    // nothing else is a button: no restart/reset/progress/log out/guide.
-    expect(pause).not.toMatch(/Restart|Reset|Log out|Guide|createLegacyBottomActionBar|createLegacyOptionsInfoSection/);
+  test('pause has exactly Resume / Settings / Quit to Menu plus the labelled Close pill; no account, reset or sign-out rows', () => {
+    const model = buildLegacySettingsSheetModel('pause', { signedIn: true });
+    const ids = model.sections.flatMap((section) => (
+      section.collapsible ? [section.title as string] : section.rows.map((row) => row.label)
+    ));
+    expect(ids).toEqual(['Resume', 'Settings', 'Quit to Menu']);
+    expect(model.close.label).toBe('Close');
+    expect(items.match(/createLegacyAuthActionButton\(/g)).toHaveLength(1);
+    expect(sheet.match(/createOverlayClosePill\(/g)).toHaveLength(1);
+    expect(sheet).not.toContain('createOverlayBackChevronButton');
+    // nothing else is a button: no restart/log out/bottom bar/old Guide dropdown.
+    expect(`${sheet}${items}`).not.toMatch(/Restart|Log out|createLegacyBottomActionBar|createLegacyOptionsInfoSection/);
+    const allRows = model.sections.flatMap((section) => section.rows.map((row) => row.id));
+    expect(allRows).not.toContain('reset-progress');
+    expect(allRows).not.toContain('sign-out');
   });
 
   test('has no profile / account icon', () => {
-    expect(pause).not.toContain('createLegacyMenuProfileButton');
-    expect(pause).not.toContain('createLegacyOverlayUsernameButton');
-    expect(pause).not.toContain('createLegacyOverlayHomeButton');
-    expect(pause).not.toContain('drawLegacyProfileIcon');
-    expect(pause).not.toContain("surface: 'account'");
-    expect(pause).not.toContain('openSharedAccountSurface');
+    for (const source of [pause, sheet, items, commands]) {
+      expect(source).not.toContain('createLegacyMenuProfileButton');
+      expect(source).not.toContain('createLegacyOverlayUsernameButton');
+      expect(source).not.toContain('createLegacyOverlayHomeButton');
+      expect(source).not.toContain('drawLegacyProfileIcon');
+      expect(source).not.toContain("surface: 'account'");
+      expect(source).not.toContain('openSharedAccountSurface');
+    }
     expect(scene).not.toContain('private createLegacyOverlayUsernameButton(');
   });
 
   test('Resume and Quit use the existing bridge-then-lifecycle paths; Settings starts collapsed', () => {
-    expect(pause).toContain("{ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume')");
-    expect(pause).toContain("{ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')");
+    expect(commands).toContain("{ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume')");
+    expect(commands).toContain("{ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')");
     expect(scene).toContain('private pauseSettingsExpanded = false;');
     expect(scene).toContain("if (kind === 'pause') {\n      this.pauseSettingsExpanded = false;");
-    // Settings toggles are the same feature-control rows Options uses (no movement speed).
-    expect(pause).toContain('this.createFeatureControlRows(cursorY, rowsPanel, {');
-    expect(pause).toContain('includeMovementSpeed: false');
+    // The Settings group is the same plan rows the main-menu sheet paints (no movement speed).
+    expect(sheet).toContain('settingsExpanded: this.pauseSettingsExpanded,');
+    expect(buildLegacySettingsSheetPlan({ context: 'pause', height: 844, width: 390 }).items.map((item) => item.model.id))
+      .toEqual(['resume', 'settings-disclosure', 'quit-to-menu']);
   });
 
   test('uses existing tokens only (no new free hex colours) and 44 px minimum actions', () => {
-    expect(pause).not.toMatch(/0x[0-9a-fA-F]{6}/);
-    expect(pause).not.toMatch(/'#[0-9a-fA-F]{3,8}'/);
-    expect(pause).toContain('cyberArcadeMaterial.substrate.field');
-    expect(pause).toContain('LEGACY_CYBER_PANEL_STROKE');
+    expect(`${sheet}${card}`).not.toMatch(/0x[0-9a-fA-F]{6}/);
+    expect(`${sheet}${card}`).not.toMatch(/'#[0-9a-fA-F]{3,8}'/);
+    expect(card).toContain('cyberArcadeMaterial.substrate.field');
+    expect(card).toContain('LEGACY_CYBER_PANEL_STROKE');
     for (const [width, height, safeArea] of [
       [390, 844, {}],
       [320, 568, {}],
@@ -97,14 +117,23 @@ describe('MenuScene wiring: pause card', () => {
       [390, 844, { bottom: 34, top: 47 }]
     ] as const) {
       expect(resolveLegacyPauseMenuLayout(width, height, safeArea).actionHeight).toBeGreaterThanOrEqual(44);
+      for (const context of ['menu', 'pause'] as const) {
+        const plan = buildLegacySettingsSheetPlan({ context, height, safeArea, settingsExpanded: true, signedIn: true, width });
+        for (const item of plan.items.filter((entry) => entry.interactive)) {
+          expect(item.rect.height).toBeGreaterThanOrEqual(44);
+        }
+        expect(plan.close.rect.height).toBeGreaterThanOrEqual(44);
+      }
     }
   });
 
-  test('the Options header no longer carries a profile icon', () => {
+  test('the Options sheet is the same painter, with the labelled Close pill and no profile icon', () => {
     const options = methodSource('private buildOptionsOverlay(): void');
     expect(options).not.toContain('createLegacyOverlayUsernameButton');
     expect(options).not.toContain('semanticAction');
-    expect(options).toContain('this.createOverlayBackChevronButton(panel, () => this.handleBackAction())');
+    expect(options).toContain("this.buildLegacySettingsSheetOverlay('menu')");
+    expect(sheet).toContain('() => this.runLegacySettingsCommand(plan.close.command)');
+    expect(commands).toContain("case 'CLOSE_OVERLAY':\n        this.handleBackAction();");
   });
 });
 

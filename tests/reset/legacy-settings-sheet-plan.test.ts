@@ -323,3 +323,36 @@ describe('settings sheet plan specifics', () => {
     expect(LEGACY_SETTINGS_SIZES.labelFontSize).toBe(designTokens.legacy.fontSizePx.label);
   });
 });
+
+describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
+  const plans = LEGACY_SETTINGS_PLAN_VIEWPORTS.flatMap(({ height, width }) => (
+    (['menu', 'pause'] as const).map((context) => [
+      `${context} ${width}x${height}`,
+      buildLegacySettingsSheetPlan({ context, height, settingsExpanded: true, signedIn: true, width })
+    ] as const)
+  ));
+
+  test.each(plans)('%s: rows keep the full inner width and the rail sits in the card padding', (_label, plan) => {
+    for (const item of plan.items) {
+      expect(item.rect.width).toBe(plan.bodyViewport.width);
+    }
+    const overhang = plan.scrollRailViewport.left + plan.scrollRailViewport.width;
+    expect(overhang).toBeGreaterThan(plan.bodyViewport.left + plan.bodyViewport.width);
+    expect(overhang).toBeLessThanOrEqual(plan.card.left + plan.card.width);
+    expect(plan.scrollRailViewport.top).toBe(plan.bodyViewport.top);
+    expect(plan.scrollRailViewport.height).toBe(plan.bodyViewport.height);
+  });
+
+  test.each(plans)('%s: the Close pill is right-aligned with the card and clear of it', (_label, plan) => {
+    expect(plan.close.rect.left + plan.close.rect.width).toBe(plan.card.left + plan.card.width);
+    expect(plan.close.rect.top + plan.close.rect.height).toBeLessThanOrEqual(plan.card.top);
+  });
+
+  test('at 320 wide the label column still holds a 14 px "Background" on its own line', () => {
+    const plan = buildLegacySettingsSheetPlan({ context: 'menu', height: 568, signedIn: true, width: 320 });
+    const toggle = plan.items.find((item) => item.model.id === 'animated-background')!;
+    // "Background" at 14 px is about 78 px wide; the label column must not be narrower.
+    expect(toggle.parts.label.width).toBeGreaterThanOrEqual(88);
+    expect(toggle.parts.state!.width).toBeGreaterThanOrEqual(58);
+  });
+});
