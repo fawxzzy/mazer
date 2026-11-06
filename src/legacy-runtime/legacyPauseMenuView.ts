@@ -131,6 +131,12 @@ export const LEGACY_PAUSE_DEFAULT_TOGGLE_ROWS = 3;
 export interface LegacyPauseMenuLayoutOptions {
   settingsExpanded?: boolean;
   toggleRowCount?: number;
+  /**
+   * Exact height of the expanded settings rows as the scene renders them
+   * (createFeatureControlRows incl. section heading). When given it replaces
+   * the toggleRowCount estimate so the card sizes to what is really drawn.
+   */
+  settingsContentHeight?: number;
 }
 
 export interface LegacyPauseMenuLayout {
@@ -173,7 +179,9 @@ export const resolveLegacyPauseMenuLayout = (
   const toggleRowCount = Math.max(0, Math.round(options.toggleRowCount ?? LEGACY_PAUSE_DEFAULT_TOGGLE_ROWS));
 
   let settingsSectionHeight = 0;
-  if (options.settingsExpanded === true && toggleRowCount > 0) {
+  if (options.settingsExpanded === true && typeof options.settingsContentHeight === 'number' && options.settingsContentHeight > 0) {
+    settingsSectionHeight = actionGap + Math.round(options.settingsContentHeight);
+  } else if (options.settingsExpanded === true && toggleRowCount > 0) {
     const rows = resolveLegacyFeatureControlLayout(cardWidth, false);
     settingsSectionHeight = actionGap + (toggleRowCount * rows.rowHeight) + ((toggleRowCount - 1) * rows.rowGap);
   }

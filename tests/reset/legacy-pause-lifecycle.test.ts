@@ -47,18 +47,20 @@ describe('legacy pause lifecycle', () => {
     expect(pauseOverlaySource).not.toContain("'Reset', resetAction");
     expect(pauseOverlaySource).not.toContain("'Reset Progress'");
     expect(pauseOverlaySource).not.toContain("'Log out'");
-    // Menu no longer lives in a bottom action bar at all -- it's a home
-    // icon sharing the header row with the back chevron instead (see
-    // createLegacyOverlayHomeButton), leaving the bottom of the panel empty.
-    // Now routed through the Wave 3A bridge first (bridge.dispatch(RETURN_HOME)),
-    // falling back to this same real call only if the bridge rejects or is
-    // unavailable -- checked as the bare call, not the full multi-line
-    // createLegacyOverlayHomeButton(...) wrapper, so this doesn't depend on
-    // exact line-wrapping/line-ending formatting.
-    expect(pauseOverlaySource).toContain('createLegacyOverlayHomeButton');
+    // Pause is a card: Resume / Settings / Quit to Menu (legacyPauseMenuView.ts).
+    // Quit to Menu is routed through the Wave 3A bridge first
+    // (bridge.dispatch(RETURN_HOME)), falling back to the same real
+    // applyLegacyPauseCommand('return-menu') call; Resume does the same with
+    // RESUME_RUN / 'resume'. The old header home icon is gone, and there is
+    // no profile/account entry.
+    expect(pauseOverlaySource).not.toContain('createLegacyOverlayHomeButton');
+    expect(pauseOverlaySource).not.toContain('createLegacyOverlayUsernameButton');
+    expect(pauseOverlaySource).not.toContain('createLegacyMenuProfileButton');
     expect(pauseOverlaySource).toContain("this.applyLegacyPauseCommand('return-menu')");
-    expect(pauseOverlaySource).not.toContain("'Resume'");
-    expect(pauseOverlaySource).not.toContain('resumeAction');
+    expect(pauseOverlaySource).toContain("this.applyLegacyPauseCommand('resume')");
+    expect(pauseOverlaySource).toContain("actionLabel('resume')");
+    expect(pauseOverlaySource).toContain("actionLabel('settings')");
+    expect(pauseOverlaySource).toContain("actionLabel('quit-to-menu')");
     expect(menuSceneSource).toContain("this.createLegacyAuthActionButton(");
     expect(menuSceneSource).toContain("() => this.openOverlay('confirm-progression-reset')");
     expect(menuSceneSource).toContain('this.playCyclePath = [copyPoint(result.nextPlayer)];');

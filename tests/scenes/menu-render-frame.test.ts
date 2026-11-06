@@ -120,9 +120,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       menuSceneSource.indexOf('private createLegacyOptionsInfoSection('),
       menuSceneSource.indexOf('private createLegacyOptionsAccountActionRow(')
     );
+    const buildPauseStart = menuSceneSource.indexOf('private buildPauseOverlay(): void {');
     const buildPauseSource = menuSceneSource.slice(
-      menuSceneSource.indexOf('private buildPauseOverlay(): void {'),
-      menuSceneSource.indexOf('private createFeatureControlRows(')
+      buildPauseStart,
+      menuSceneSource.indexOf('\n  }\n', buildPauseStart)
     );
 
     expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
@@ -131,9 +132,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(buildOptionsSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
       buildOptionsSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel')
     );
-    expect(buildPauseSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
-      buildPauseSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel, {')
-    );
+    // Pause is a card now (legacyPauseMenuView.ts): no Guide section; the
+    // Settings disclosure reuses the same createFeatureControlRows toggles.
+    expect(buildPauseSource).not.toContain('createLegacyOptionsInfoSection');
+    expect(buildPauseSource).toContain('buildLegacyPauseMenuViewModel()');
+    expect(buildPauseSource).toContain('this.pauseSettingsExpanded');
+    expect(buildPauseSource).toContain('this.createFeatureControlRows(cursorY, rowsPanel, {');
     expect(guideSource).toContain("drawLegendRow(legendRowIndex, 'start', 'Start'");
     expect(guideSource).toContain("drawLegendRow(legendRowIndex, 'end', 'Exit'");
     expect(guideSource).not.toContain('includeCompassRow');
@@ -1337,21 +1341,19 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('event.target === this.game.canvas');
     expect(menuSceneSource).toContain('event.stopImmediatePropagation()');
     expect(menuSceneSource).toContain("case 'pause':");
-    // Reset (reset-player) was removed from the game entirely; Menu no
-    // longer lives in a bottom action bar at all -- it's a home icon
-    // sharing the header row with the back chevron instead (see
-    // createLegacyOverlayHomeButton). Account is not an entry point from
-    // Pause at all.
+    // Reset (reset-player) was removed from the game entirely; Pause is a
+    // card with Resume / Settings / Quit to Menu (the old header home icon,
+    // createLegacyOverlayHomeButton, is gone). Account is not an entry point
+    // from Pause at all.
     expect(menuSceneSource).not.toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
     // Now routes through the Wave 3A bridge first (bridge.dispatch(RETURN_HOME)),
     // falling back to the same real applyLegacyPauseCommand('return-menu')
     // call only if the bridge rejects or is unavailable.
+    expect(menuSceneSource).not.toContain('private createLegacyOverlayHomeButton(');
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
-      'this.uiButtons.push(this.createLegacyOverlayHomeButton(\n'
-      + '      panel,\n'
+      "      actionLabel('quit-to-menu'),\n"
       + '      () => this.dispatchUiBridgeCommand({ type: \'RETURN_HOME\' }, () => this.applyLegacyPauseCommand(\'return-menu\')),\n'
-      + '      panel.centerX\n'
-      + '    ));'
+      + "      'secondary'\n"
     );
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
@@ -1602,7 +1604,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createLegacyMenuSettingsCogButton(onClick: () => void): UiButton');
     expect(menuSceneSource).toContain("semanticAction: 'Settings'");
     expect(menuSceneSource).toContain("text: 'Settings'");
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;');
+    // Only the removed pause home icon's door cutout used this constant.
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_TOUCH_COG_HUB');
     expect(menuSceneSource).not.toContain('fillStyle(0x05070a');
     expect(menuSceneSource).toContain('private drawLegacySettingsCogControl(');
     // No panel/border chrome behind the play cog at all, and now the same
@@ -1845,18 +1848,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.layout.centerButtonX,');
     expect(menuSceneSource).toContain('this.layout.centerButtonY,');
     expect(menuSceneSource).not.toContain('const accountActionLabel =');
-    // The Options overlay's Account action is the username label in the
-    // header row now (next to the back chevron), not a bottom action bar
-    // button -- there's no "go to main menu" equivalent here since you're
-    // already at the main menu, so the bottom of the panel is simply empty.
+    // The Options overlay no longer carries a profile/account icon in its
+    // header (owner request, 2026-11-05); the account entry is the main
+    // menu's top-left profile icon only, which uses the same shared surface.
     expect(menuSceneSource).not.toContain('private createLegacyOptionsAccountActionRow(');
-    // The header account action uses that same shared surface.
-    expect(menuSceneSource).toContain(
-      'this.uiButtons.push(this.createLegacyOverlayUsernameButton(\n'
-      + '      panel,\n'
-      + '      () => this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface()),\n'
-      + '      panel.centerX\n'
-      + '    ));'
+    expect(menuSceneSource).not.toContain('createLegacyOverlayUsernameButton');
+    expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
+      'this.uiButtons.push(this.createLegacyMenuProfileButton(\n'
+      + '          () => this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
+      + '        ));'
     );
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain('Account access is unavailable right now. You can still play as a guest.');
@@ -1903,21 +1903,31 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.resolveLegacyProgressionStorageKey()');
   });
 
-  test('shows the verified master username beneath Welcome without consulting the Mazer profile row', () => {
+  test('shows the verified master username in the header, right of the profile icon, without a bottom Welcome block', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
-    const welcomeSource = menuSceneSource.slice(
-      menuSceneSource.indexOf('private createLegacyAuthenticatedWelcomeIdentity(): void'),
-      menuSceneSource.indexOf('private openSharedAccountSurface(): void')
+    const identitySource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private createLegacyHeaderIdentityLabel(): void'),
+      menuSceneSource.indexOf('private createLegacySignedOutOAuthFailure(): void')
     );
 
-    expect(menuSceneSource).toContain('this.createLegacyAuthenticatedWelcomeIdentity();');
-    expect(welcomeSource).toContain("this.authSnapshot.canonicalUsername?.trim() ?? ''");
-    expect(welcomeSource).toContain("'Welcome'");
-    expect(welcomeSource.match(/backgroundColor: '#060b0f'/g)).toHaveLength(2);
-    expect(welcomeSource.match(/setOrigin\(0\.5\)\.setDepth\(3\)/g)).toHaveLength(2);
-    expect(welcomeSource).not.toContain('accountUsernameSavedValue');
-    expect(welcomeSource).not.toContain('authSnapshot.email');
-    expect(welcomeSource).not.toContain('readLegacyAccountUsername');
+    // The old bottom-of-menu Welcome + username pair is gone entirely.
+    expect(menuSceneSource).not.toContain('createLegacyAuthenticatedWelcomeIdentity');
+    expect(menuSceneSource).not.toContain("'Welcome', {");
+    expect(identitySource).not.toContain('Welcome');
+    expect(identitySource).not.toContain('centerButtonY');
+    // The header label is created right after the profile icon.
+    expect(menuSceneSource).toContain('this.createLegacyHeaderIdentityLabel();');
+    expect(identitySource).toContain("this.authSnapshot.canonicalUsername?.trim() ?? ''");
+    expect(identitySource).toContain('resolveLegacyHeaderIdentityPlacement({');
+    expect(identitySource).toContain('edgeStations: this.resolveLegacyEdgeStations(),');
+    expect(identitySource).toContain('layout: this.layout,');
+    // Left-anchored and vertically centered like the placement contract says;
+    // depth 3 = above the board, below the modal overlays.
+    expect(identitySource).toContain('.setOrigin(0, 0.5).setDepth(3)');
+    expect(identitySource).toContain('.setName(LEGACY_HEADER_IDENTITY_LABEL_NAME)');
+    expect(identitySource).not.toContain('accountUsernameSavedValue');
+    expect(identitySource).not.toContain('authSnapshot.email');
+    expect(identitySource).not.toContain('readLegacyAccountUsername');
   });
 
   test('records the Fitness account-surface reuse contract without coupling Phaser to Fitness React components', () => {
@@ -2410,11 +2420,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // applyLegacyPauseCommand('resume') call only if the bridge rejects or
     // is unavailable -- the underlying action is unchanged.
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
-      'this.uiButtons.push(this.createOverlayBackChevronButton(\n'
-      + '      panel,\n'
-      + '      () => this.dispatchUiBridgeCommand({ type: \'RESUME_RUN\' }, () => this.applyLegacyPauseCommand(\'resume\'))\n'
-      + '    ));'
+      'const resumePause = (): void => this.dispatchUiBridgeCommand({ type: \'RESUME_RUN\' }, () => this.applyLegacyPauseCommand(\'resume\'));'
     );
+    expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, resumePause));');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));');
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain('return resolveLegacyOverlayPanelLayout(\n      this.layout.width,\n      this.layout.height,\n      readMazerViewportGeometry().safeArea\n    );');
     expect(menuSceneSource).toContain('const shell = resolveLegacyOverlayShellLayout({');
@@ -2428,7 +2436,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('cardTop < viewport.bottom - 2 && cardTop + cardHeight > viewport.top + 2');
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollRenderRect(metrics.viewport)');
     expect(menuSceneSource).toContain('legacyOverlayScrollRectIntersectsViewport(bounds, viewport)');
-    expect(menuSceneSource).toContain('const viewportTop = shell.contentTop;');
+    // Pause scrolls only its Settings rows (the card's three actions stay put).
+    expect(menuSceneSource).toContain('const viewport = createVisualRect(card.cardLeft + card.cardPadding, cursorY, buttonWidth, rowsViewportHeight);');
     expect(menuSceneSource).toContain('cardTop < viewport.bottom - 2 && cardTop + cardHeight > viewport.top + 2');
     expect(menuSceneSource).not.toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics, true);');
     expect(menuSceneSource).toContain('this.overlayScrollTrackBounds = metrics.enabled');
