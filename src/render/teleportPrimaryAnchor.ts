@@ -12,17 +12,16 @@
  * free" from this function's own retention rule, without this module
  * needing to know what a phase is.
  *
- * Anchor identity reuses the existing eight-slot index convention already
- * in source: MenuScene.ts's title-orbit sigils
- * (LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 8, plain integer indices 0..7,
- * resting at the 4 viewport corners + 4 edge midpoints when idle -- see
- * drawLegacyMenuPathTitleOrbitSigils). That existing code already reuses
- * the Teleport System v1 shell asset for ambient menu/title choreography
- * (explicitly permitted by docs/assets/reference/teleport-system-v1/README.md:
- * "The full eight-origin volley is reserved for menu/title choreography...
- * it is never the default gameplay transfer"). This module does not import
- * or depend on that scene code -- it only keeps the same 0..7 identity
- * space so a later pose/render adapter can map between them directly,
+ * Anchor identity is the eight-station index space of the procedural
+ * diamond ring in edgeMarkers.ts (EdgeStationId: plain integer indices
+ * 0..7, the 4 viewport corners + 4 edge midpoints, clockwise from the
+ * top-left corner). In the current presentation all eight diamonds fire a
+ * beam inward on arrival and the player fires a beam out to all eight on
+ * departure; this module is the separate "which single anchor is the
+ * primary?" policy (used by the QA anchor-pose preview, which energizes
+ * the held station's diamond), and has no say in the ring's beams. It does
+ * not import edgeMarkers.ts or any scene code -- it only keeps the same
+ * 0..7 identity space so a pose/render adapter maps between them directly,
  * without a translation layer. There is no other named ID convention
  * (e.g. compass directions) anywhere in source to conflict with.
  *
@@ -38,11 +37,11 @@
  *      the held anchor.
  *
  * Distance is by the anchor's measured INWARD BEAM PORT position, never the
- * anchor's sprite/canvas center -- the two disagree in general (the shell's
- * canonical asset, edge-diamond-energized.png, has an off-center visible
- * tip; see the derivative manifest's measured_tip_px), and selecting by
- * center would violate the frozen contract's own explicit wording ("whose
- * inward beam port is closest").
+ * anchor's own center -- the two disagree in general (the frozen reference
+ * shell has an off-center visible tip; see the derivative manifest's
+ * measured_tip_px, which teleportAnchorPose.ts uses to place the port), and
+ * selecting by center would violate the frozen contract's own explicit
+ * wording ("whose inward beam port is closest").
  *
  * Retention (point 5 above) is expressed purely through this function's own
  * input/output, not hidden module state: a caller passes `heldAnchorId`
@@ -64,8 +63,8 @@
  *
  * A `no-valid-anchor` outcome (outcome: 'unavailable') is reported honestly
  * and does not authorize any fallback behavior on its own -- no hanging
- * gameplay, no dropped stored energy, no reintroducing the prohibited
- * eight-beam default volley, no moving a diamond into the HUD. Resolving
+ * gameplay, no dropped stored energy, no moving a diamond into the HUD.
+ * Resolving
  * what the running scene actually does when no anchor is available is the
  * runtime integration slice's job, not this pure policy's.
  */

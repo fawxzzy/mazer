@@ -57,7 +57,7 @@ Full usage and detectors: `docs/ops/MAZER-LIFECYCLE-CAPTURE-TOOL-2026-11-05.md`.
 
 ## Known gaps and follow-ups
 
-- RESOLVED (retire PR, 2026-11-06): BootScene no longer preloads the old diamond/beam PNGs and `public/assets/vfx/diamonds/` was deleted (BootScene.ts Wave 4D-A plus asset files only). The comments in `teleportAnchorPose.ts` / `teleportPrimaryAnchor.ts` (Wave 4D-B) still name `edge-diamond-energized.png` and remain a tracked, allow-listed leftover.
+- RESOLVED (retire PR, 2026-11-06): BootScene no longer preloads the old diamond/beam PNGs and `public/assets/vfx/diamonds/` was deleted (BootScene.ts Wave 4D-A plus asset files only). The comments in `teleportAnchorPose.ts` / `teleportPrimaryAnchor.ts` (Wave 4D-B) were rewritten in a separate comment-only Wave 4D-B PR to describe the procedural 8-diamond ring; the `edgeMarkers.test.ts` old-art allow-list is now empty.
 - The lifecycle analyzer reports partial-strip findings on the merged tree; the graphics lane believes they are trail pulses, not dock remnants. Not independently confirmed.
 - `goalPulse` is computed by the timeline but not drawn.
 - Reduced motion and the tap/key skip were not exercised in a browser.

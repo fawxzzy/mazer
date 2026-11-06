@@ -9,80 +9,69 @@
  * Like teleportPrimaryAnchor.ts, this module has no Phaser, DOM, network,
  * persistence, wall-clock, or randomness dependency, and never mutates its
  * inputs. It does not render anything -- a scene adapter supplies real
- * layout/exclusion numbers and is responsible for actually drawing the
- * shell at the pose this module returns.
+ * layout/exclusion numbers and is responsible for any drawing.
  *
  * ---------------------------------------------------------------------
- * Anchor POSITION: reproduces MenuScene.ts's own existing perimeter-
- * anchor formula exactly, rather than inventing a new one.
+ * Current model: logical poses for the procedural edge markers.
  * ---------------------------------------------------------------------
- * MenuScene.ts already places 8 anchors along the viewport edge for two
- * existing ambient uses: the title's orbit sigils
- * (drawLegacyMenuPathTitleOrbitSigils) and the player-spawn transfer beam
- * origins (resolveLegacyPlayerTransferOrbitPoses) -- both via its private
- * resolveLegacyMenuPathTitleOrbitGeometry() (inset=2 from the viewport
- * edge; left/right/top/bottom = the inset viewport rectangle;
- * centerX/centerY = viewport center) and the exported, already-pure
- * resolveLegacyMenuPathTitleOrbitPose(geometry, orbit) from
- * src/legacy-runtime/legacyMenuTitle.ts, called with orbit = index/8 for
- * index 0..7. At that geometry's own idle phase (orbitPhase=0, the
- * "isLifecycleSpinActive=false" case, which is what MenuScene.ts's own
- * comment describes as freezing "exactly on the 4 corners and 4 edge
- * midpoints"), this traces the inset rectangle's perimeter clockwise
- * starting at the top-left corner: index 0/2/4/6 land on the four
- * corners, index 1/3/5/7 land on the four edge midpoints.
- *
- * anchorPerimeterPosition() below is a direct reproduction of that
- * function's own perimeter-parametrization branch logic (same four
- * branches, same fractions) -- not a re-derivation from scratch. Its
- * MenuScene.ts:8123 private geometry constructor and
- * legacyMenuTitle.ts's exported resolveLegacyMenuPathTitleOrbitPose are
- * not directly importable/reusable here (the geometry constructor is
- * private and reads `this.layout`; the pose function's own `facing`
- * output points toward the geometry's fixed center, which is only
- * correct for the ambient/idle menu case -- this module needs to face
- * the real, moving extraction target instead, not a fixed viewport
- * center; see "Anchor ROTATION" below). tests/render/teleportAnchorPose.test.ts
- * cross-checks anchorPerimeterPosition's output against the real
- * imported resolveLegacyMenuPathTitleOrbitPose for all 8 indices to prove
- * the reproduction is exact, not just similar.
+ * The eight anchors are the eight stations of the procedural diamond
+ * ring in edgeMarkers.ts (4 corners + 4 edge midpoints, ids 0..7,
+ * clockwise from the top-left corner). On arrival all eight diamonds fire
+ * a beam inward and on departure the player fires a beam out to all eight;
+ * the diamonds themselves are drawn by edgeMarkers.ts as small kites, not
+ * as a sprite. This module draws nothing: it resolves a LOGICAL pose per
+ * station (position, target-facing rotation, beam-port position and a
+ * conservative footprint) so the primary-anchor selector and the QA
+ * anchor-pose preview have real clearance data to work with.
  *
  * ---------------------------------------------------------------------
- * Anchor ROTATION and PORT: uses the canonical shell's own MEASURED tip,
- * not MenuScene's rough approximation.
+ * Anchor POSITION: the same perimeter formula edgeMarkers.ts uses.
  * ---------------------------------------------------------------------
- * MenuScene.ts's own diamond rendering uses
- * MAZER_VFX_DIAMOND_INTRINSIC_TIP_ANGLE = -Math.PI/4, which its own
- * comment admits is only "roughly -45 degrees" -- adequate for a
- * decorative sparkle, not for the frozen Teleport contract's explicit
- * requirement: "the shell rotates so its measured visible inward tip
- * (found via the source PNG's own alpha-channel bounds, not eyeballed...)
- * faces the target." The derivative manifest
+ * Station `index` sits index/8 of the way round the viewport rectangle
+ * inset by `inset` px, clockwise from the top-left corner: even ids land
+ * on the four corners, odd ids on the four edge midpoints.
+ * anchorPerimeterPosition() below is the same arithmetic as
+ * edgeMarkers.ts's resolveEdgeStationPosition and as the settled (non-
+ * spinning) case of legacyMenuTitle.ts's resolveLegacyMenuPathTitleOrbitPose.
+ * It is reproduced rather than imported because the pose function's own
+ * `facing` output points at a fixed viewport center, which is only
+ * correct for the ambient menu case -- this module needs to face the real,
+ * moving extraction/delivery target instead (see "Anchor ROTATION" below).
+ * tests/render/edgeMarkers.test.ts checks the positions agree with
+ * resolveEdgeStationPosition for every id, and
+ * tests/render/teleportAnchorPose.test.ts cross-checks them against the
+ * real resolveLegacyMenuPathTitleOrbitPose, so the reproduction is exact,
+ * not just similar.
+ *
+ * ---------------------------------------------------------------------
+ * Anchor ROTATION and PORT: calibrated from the frozen reference shell's
+ * measured tip.
+ * ---------------------------------------------------------------------
+ * The rotation/port math is calibrated from the frozen reference
+ * package's measurement, not from anything drawn at runtime. The
+ * derivative manifest
  * (docs/assets/reference/teleport-system-v1/mazer-teleport-system-v1-derivative-manifest.json,
- * "_revision.measured_for_rotation") records that real measurement for
- * edge-diamond-energized.png: canvas 1254x1254, canvas center (627,627),
- * measured tip at (920,131), native_tip_angle_deg -59.43 (alpha-channel
- * bounding analysis, not eyeballed). NATIVE_TIP_* below is that exact
- * measurement, not MenuScene's approximation -- atan2(131-627, 920-627)
- * independently reproduces -59.43 degrees (see
- * tests/render/teleportAnchorPose.test.ts).
+ * "_revision.measured_for_rotation") records, for the reference shell
+ * canvas: 1254x1254 px, canvas center (627,627), measured visible inward
+ * tip at (920,131), native_tip_angle_deg -59.43 (alpha-channel bounding
+ * analysis, not eyeballed). NATIVE_TIP_* below is that exact measurement;
+ * atan2(131-627, 920-627) independently reproduces -59.43 degrees (see
+ * tests/render/teleportAnchorPose.test.ts). No reference image is loaded
+ * or drawn: the live diamonds are the procedural kites in edgeMarkers.ts,
+ * which point along each station's inward normal. The values here only
+ * shape the logical pose (and therefore selection and clearance).
  *
- * Rotating the shell image by `rotation` moves any of its own
+ * Rotating the shell canvas by `rotation` moves any of its own
  * native-orientation features to (nativeAngle + rotation) in world space.
  * To make the measured tip (at NATIVE_TIP_ANGLE natively) face the real
- * inward angle toward the target, `rotation = inwardAngle - NATIVE_TIP_ANGLE`
- * -- the same structural convention MenuScene.ts's own diamond rendering
- * already uses (rotation = inwardAngle - INTRINSIC_TIP_ANGLE), just with
- * the precisely measured angle instead of the approximated one. The
- * resulting real-space port position is then the anchor's own render
+ * inward angle toward the target, `rotation = inwardAngle - NATIVE_TIP_ANGLE`.
+ * The resulting real-space port position is then the anchor's own
  * position plus the measured tip's native distance from center (scaled by
- * the shell's actual render scale) at that same inward angle.
+ * the shell's logical render scale) at that same inward angle.
  *
- * TELEPORT_SHELL_SOURCE_SIZE_PX duplicates MenuScene.ts's own
- * MAZER_VFX_DIAMOND_SOURCE_SIZE (1254) -- that constant is module-private
- * to MenuScene.ts, not exported, so it is reproduced here rather than
- * imported; both values are cross-checked against the same manifest's
- * own canvas_px in the test file.
+ * TELEPORT_SHELL_SOURCE_SIZE_PX is the reference shell canvas side (1254)
+ * and is cross-checked against the same manifest's canvas_px in the test
+ * file.
  *
  * ---------------------------------------------------------------------
  * Clearance: a conservative, ROTATION-AWARE axis-aligned bounding box.
@@ -129,15 +118,15 @@ import type { TeleportAnchorCandidate, TeleportAnchorId } from './teleportPrimar
 
 const ANCHOR_IDS: ReadonlyArray<TeleportAnchorId> = [0, 1, 2, 3, 4, 5, 6, 7];
 
-/** Matches MenuScene.ts's own resolveLegacyMenuPathTitleOrbitGeometry's inset. */
+/** Default perimeter inset in px (matches the settled legacy title-orbit geometry's inset). */
 const DEFAULT_VIEWPORT_INSET_PX = 2;
 
-/** Matches MenuScene.ts's own module-private MAZER_VFX_DIAMOND_SOURCE_SIZE. */
+/** Canvas side of the frozen reference shell, from the derivative manifest's canvas_px. */
 const TELEPORT_SHELL_SOURCE_SIZE_PX = 1254;
 
-// The frozen contract's own measured tip (see module doc above) --
-// edge-diamond-energized.png, 1254x1254 canvas, center (627,627), tip at
-// (920,131), alpha-channel bounding analysis.
+// The frozen reference package's measured tip (see module doc above) --
+// 1254x1254 canvas, center (627,627), tip at (920,131), alpha-channel
+// bounding analysis. Calibration data only; nothing is drawn from it.
 const NATIVE_TIP_DX = 920 - 627;
 const NATIVE_TIP_DY = 131 - 627;
 /** Radians. Independently reproduces the manifest's native_tip_angle_deg (-59.43). */
@@ -164,25 +153,24 @@ export interface TeleportPoseTarget {
 
 export interface TeleportAnchorPose {
   readonly id: TeleportAnchorId;
-  /** The shell's own render position (its center), along the viewport's inset perimeter. */
+  /** The station's own position (its center), along the viewport's inset perimeter. */
   readonly anchorX: number;
   readonly anchorY: number;
-  /** Radians to rotate the shell image so its measured tip faces `target`. */
+  /** Radians to rotate the reference shell canvas so its measured tip faces `target`. */
   readonly rotation: number;
-  /** The measured tip's real-space position after that rotation -- the beam originates here. */
+  /** The measured tip's real-space position after that rotation -- the logical beam port. */
   readonly portX: number;
   readonly portY: number;
-  /** Conservative axis-aligned bounding-box approximation of the rendered shell's footprint. */
+  /** Conservative axis-aligned bounding-box approximation of the shell canvas's footprint. */
   readonly footprint: TeleportRect;
 }
 
 /**
- * Direct reproduction of resolveLegacyMenuPathTitleOrbitPose's own
- * perimeter-parametrization (legacyMenuTitle.ts) for orbit = index/8,
- * isLifecycleSpinActive = false -- see module doc above. Returns only the
- * position; this module computes its own target-facing rotation
- * separately (that function's own `facing` output faces a fixed geometry
- * center, not a real moving target).
+ * The shared perimeter parametrization (same arithmetic as edgeMarkers.ts's
+ * resolveEdgeStationPosition and the settled case of legacyMenuTitle.ts's
+ * resolveLegacyMenuPathTitleOrbitPose) -- see module doc above. Returns
+ * only the position; this module computes its own target-facing rotation
+ * separately.
  */
 const anchorPerimeterPosition = (
   id: TeleportAnchorId,
@@ -283,7 +271,7 @@ const containsRect = (outer: TeleportRect, inner: TeleportRect): boolean => (
  * rectangles. An anchor whose footprint exceeds the viewport, or
  * intersects ANY exclusion, is ineligible -- this is a clearance
  * decision, not a rendering-visibility decision: a pose is ineligible
- * because it cannot legally be placed there, never because its sprite
+ * because it cannot legally be placed there, never because its diamond
  * happens to be hidden, dimmed, or not yet mounted this frame.
  */
 export const resolveTeleportAnchorEligibility = (
