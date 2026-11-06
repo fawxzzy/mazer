@@ -32,7 +32,7 @@ export const NAVIGATION_CORE_REQUIRED_TESTS = [
   // same silent-gap class this whole module exists to close, so it's
   // listed here rather than assumed to be picked up automatically.
   'tests/analysis/rasterCompare.test.ts',
-  'tests/reset/boot-floor-texture.test.ts',
+  'tests/architecture/boot-payload-budget.test.ts',
   'tests/reset/legacy-playable-graph.test.ts',
   'tests/architecture/decision-registry-contract.test.ts',
   'tests/architecture/ui-state-model-contract.test.ts'

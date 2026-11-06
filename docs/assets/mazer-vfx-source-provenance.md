@@ -1,5 +1,20 @@
 # Mazer VFX Source Asset Provenance
 
+> **Boot payload diet (2026-11-06):** only the HUD icons below are still shipped
+> from this catalogue, and they ship as lossless WebP (see "Third asset batch").
+> Deleted from `public/` because nothing draws them: `tiles/mazer-floor-tile.png`,
+> `tiles/mazer-bleed-path-strip.png`, `vfx/trail/mazer-player-trail.png`,
+> `vfx/starfield/mazer-starfield-tile.png` (all four were still preloaded by
+> `BootScene.ts`, ~3.5 MB on every cold load, but the Chip board, procedural
+> trail and procedural starfield replaced every use) and the four
+> `vfx/goal-star/edge-goal-star-frame-*.png` reference frames (5.3 MB, never
+> loaded by any scene). `BootScene.ts` no longer preloads or derives a texture
+> from any of them. Where the sections below say "wired in" or "loaded" for
+> those files, that is the historical state at the time. Paths, dimensions and
+> SHA-256 digests are kept as provenance; the bytes are recoverable from git
+> history (commit `a58395ee` or earlier). `tests/architecture/boot-payload-budget.test.ts`
+> fails if `public/assets` gains a file `BootScene` does not preload.
+
 > **Retired (2026-11-06):** the five files under `public/assets/vfx/diamonds/`
 > (`edge-diamond-iridescent.png`, `edge-diamond-energy-core.png`,
 > `edge-diamond-energy-absorption-state.png`, `edge-diamond-energized.png`,
@@ -101,7 +116,10 @@ close variants of art already covered by `edge-diamond-iridescent.png` /
   brightest stars to the same rainbow four-point sparkle every other
   element uses, rather than replacing the whole simulated field with a
   static tiled backdrop.
-- `mazer-player-trail.png` -- **wired in** (2026-08-29): one real square
+- `mazer-player-trail.png` -- **was wired in (2026-08-29), since retired**
+  (never wired by the time of the 2026-11-06 diet: the procedural Chip trail
+  replaced it, and the file was preloaded but drawn by nothing). Historical
+  description: one real square
   tile per visible trail cell (`drawLegacyPlayerTrailTileOverlay`), sampled
   from the strip's own baked left-to-right rainbow (a window that slides
   along the strip based on how far back in the trail a cell is), not the
@@ -121,9 +139,25 @@ bundle before copying, same as the first batch).
 
 | File | Dimensions | SHA-256 |
 |---|---|---|
-| `hud/hud-profile.png` | 1254x1254 | `f3b6ecb436711083b62ac3d3b0706e884da6432c5dd2887a9c94e0c519fd1e37` |
-| `hud/hud-leaderboard.png` | 1254x1254 | `5e1f6ab3707c0fb7429b46b6e32eb06fc44bd384c3d3a864a6429140efc0096a` |
-| `hud/hud-settings.png` | 1254x1254 | `7912689b5935acbc9617222fe301cfd27830fdb658dbe59f342988271b5b4acc` |
+| `hud/hud-profile.png` (original, now `.webp`) | 1254x1254 | `f3b6ecb436711083b62ac3d3b0706e884da6432c5dd2887a9c94e0c519fd1e37` |
+| `hud/hud-leaderboard.png` (original, now `.webp`) | 1254x1254 | `5e1f6ab3707c0fb7429b46b6e32eb06fc44bd384c3d3a864a6429140efc0096a` |
+| `hud/hud-settings.png` (original, now `.webp`) | 1254x1254 | `7912689b5935acbc9617222fe301cfd27830fdb658dbe59f342988271b5b4acc` |
+
+**Format (2026-11-06):** shipped as `hud/hud-profile.webp`, `hud/hud-leaderboard.webp`,
+`hud/hud-settings.webp` -- LOSSLESS WebP, same 1254x1254 canvas, 1,019,276 B total
+versus 1,548,664 B of PNG. Derivation is render-identical, not "visually close":
+every pixel outside the crop bounds below (all alpha <= 1 in the originals, never
+drawn by `applyLegacyHudIconFrame`) is cleared, RGB under alpha 0 is cleared, and
+everything inside the crop with alpha > 0 is byte-equal to the original (proof:
+0 differing visible pixels per icon). Regenerate with
+`node scripts/assets/build-hud-icon-webp.mjs --source-dir <dir>` after recovering the
+original PNGs (`git show a58395ee:public/assets/hud/hud-<name>.png`); the script
+verifies the SHA-256 digests in the table below against those sources. WebP needs
+Safari/iOS 14+ and any current Chromium/Firefox; the app already requires
+ES2022-era browsers. The decoded texture is still 1254x1254 RGBA (~6.3 MB each);
+downscaling them needs the crop constants in `MenuScene.ts` (Wave 5C) changed in
+the same PR and is a separate follow-up. The SHA-256 digests in the table are those
+of the ORIGINAL PNG sources.
 
 **Wired in**, replacing the procedural thin-line gear/bar-chart/head-and-
 shoulders icons for: the main-menu header settings button
@@ -184,7 +218,7 @@ game-ready as-is**: all four are opaque RGB on a near-white
 (`253,253,253`) rounded-card background, no alpha channel -- reference/
 concept renders, not drop-in transparent runtime assets, the same
 category as the previously-reviewed-but-not-copied `04_24_52 PM` diamond
-render. **Status: found, reviewed, not yet wired into anything.** If
+render. **Status: found, reviewed, never wired into anything; deleted from `public/` in the 2026-11-06 boot payload diet (recoverable from git history, digests above).** If
 runtime integration is ever wanted, this needs either a transparent
 re-render from the same source, or a background-removal derivative
 generated into a separate directory (documented here, originals kept
