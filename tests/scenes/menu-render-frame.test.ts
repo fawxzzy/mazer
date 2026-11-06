@@ -889,7 +889,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('textLabels: this.resolveVisualTextLabels()');
     expect(menuSceneSource).toContain('buttons: this.uiButtons');
     expect(menuSceneSource).toContain('text: button.text');
-    expect(menuSceneSource).toContain('this.uiTexts.push(label, stateLabel);');
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).toContain('private boardPathGraphics!: Phaser.GameObjects.Graphics;');
     expect(menuSceneSource).toContain('private boardPathDirty = true;');
@@ -2048,7 +2047,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('No unlock.');
   });
 
-  test('centers the level announcer and keeps board content at neutral visual scale until the user changes Board Zoom', () => {
+  test('centers the level announcer and keeps board content at neutral visual scale and there is no Board Zoom setting', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const centerX = this.layout.width / 2;');
@@ -2059,9 +2058,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('updateLegacyBoardZoom');
     expect(menuSceneSource).not.toContain('this.boardZoomContainer.setScale(');
     expect(menuSceneSource).not.toContain('this.boardZoomContainer.setPosition(');
-    expect(menuSceneSource).toContain('this.settings.scale + this.settings.camScale');
+    expect(menuSceneSource).not.toContain('camScale');
+    expect(menuSceneSource).not.toContain('userBoardZoom');
+    expect(menuSceneSource).not.toContain('createBoardZoomSliderRow');
+    expect(menuSceneSource).not.toContain('applyLegacyCameraZoom');
     expect(menuSceneSource).toContain('implicitZoomApplied: false');
-    expect(menuSceneSource).toContain('userBoardZoom: this.settings.camScale');
     expect(menuSceneSource).toContain('x: this.boardZoomContainer.scaleX');
     expect(menuSceneSource).toContain('y: this.boardZoomContainer.scaleY');
   });
@@ -2472,7 +2473,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerMove(pointer: Phaser.Input.Pointer): boolean');
     expect(menuSceneSource).toContain('private overlayScrollGestureLockPointerId: number | null = null;');
     expect(menuSceneSource).toContain('private overlayMovementSpeedSliderBounds: VisualRect | null = null;');
-    expect(menuSceneSource).toContain('this.overlayScrollGestureLockPointerId = this.normalizeLegacyPlayTouchPointerId(pointer.id) ?? -1;');
+    expect(menuSceneSource).toContain('this.overlayScrollGestureLockPointerId = pointerId;');
     expect(menuSceneSource).toContain('|| this.overlayScrollGestureLockPointerId !== null');
     expect(menuSceneSource).toContain('private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number');
     expect(menuSceneSource).toContain('fillScrollPill(track.left - 3, track.top - 2, track.width + 6, track.height + 4');

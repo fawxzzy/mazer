@@ -312,6 +312,7 @@ import {
   LEGACY_GAME_TOGGLE_STORAGE_KEY,
   migrateLegacyGameToggleSettingsToGuestScope,
   readLegacyGameToggleSettings,
+  scrubRemovedCameraZoomFromGameToggleStorage,
   writeLegacyGameToggleSettings
 } from '../legacy-runtime/legacyGameTogglePreferences';
 import {
@@ -461,12 +462,6 @@ import {
   normalizeLegacyMovementSpeed,
   resolveLegacyMovementSpeedProfile
 } from '../legacy-runtime/legacyMovementSpeed';
-import {
-  formatLegacyCameraZoomPercent,
-  quantizeLegacyCameraZoom,
-  resolveLegacyCameraZoomFromPosition,
-  resolveLegacyCameraZoomPosition
-} from '../legacy-runtime/legacyCameraZoom';
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
@@ -663,7 +658,6 @@ interface MenuSceneVisualDiagnostics {
     safeBounds: VisualRect;
     pathVisualStyle: LegacyPathVisualStyle;
     tileSize: number;
-    userBoardZoom: number;
     visualScale: {
       x: number;
       y: number;
@@ -1810,8 +1804,8 @@ export class MenuScene extends Phaser.Scene {
   private playPointerStart: LegacyPlayPointerStart | null = null;
   private titleGraphics!: Phaser.GameObjects.Graphics;
   // Board layers share one untransformed container for stable draw ordering.
-  // User-controlled Board Zoom changes generation/layout through camScale;
-  // the container itself must remain at 1x so a fresh maze never applies an
+  // The board size is frozen by product decision (no user zoom setting): the
+  // container itself must remain at 1x so a fresh maze never applies an
   // implicit zoom or desynchronizes visual and input coordinates.
   private boardZoomContainer!: Phaser.GameObjects.Container;
   // Was a Phaser.GameObjects.Text rendered in a plain web font -- now built
@@ -2064,7 +2058,6 @@ export class MenuScene extends Phaser.Scene {
   private overlayScrollLastMoveAtMs = 0;
   private overlayScrollVelocityPxPerMs = 0;
   private overlayScrollMomentumActive = false;
-  private overlayBoardZoomSliderBounds: VisualRect | null = null;
   private overlayMovementSpeedSliderBounds: VisualRect | null = null;
   private viewportGeometryListener: (() => void) | null = null;
   private oauthPageShowCleanup: (() => void) | null = null;
@@ -4411,7 +4404,6 @@ export class MenuScene extends Phaser.Scene {
     this.overlayScrollViewportBounds = null;
     this.overlayScrollTrackBounds = null;
     this.overlayScrollThumbBounds = null;
-    this.overlayBoardZoomSliderBounds = null;
     this.overlayMovementSpeedSliderBounds = null;
     this.overlayScrollGestureLockPointerId = null;
     this.releaseOverlayScrollPointer();
@@ -4558,10 +4550,7 @@ export class MenuScene extends Phaser.Scene {
     }
     const pointerId = this.normalizeLegacyPlayTouchPointerId(pointer.id) ?? -1;
     const point = this.resolveLegacyInputPointerPoint(pointer);
-    if (
-      this.isPointInVisualRect(this.overlayBoardZoomSliderBounds, point.x, point.y, 2)
-      || this.isPointInVisualRect(this.overlayMovementSpeedSliderBounds, point.x, point.y, 2)
-    ) {
+    if (this.isPointInVisualRect(this.overlayMovementSpeedSliderBounds, point.x, point.y, 2)) {
       this.releaseOverlayScrollPointer();
       this.overlayScrollGestureLockPointerId = pointerId;
       return false;
@@ -5495,7 +5484,7 @@ export class MenuScene extends Phaser.Scene {
     this.layout = resolveLegacyMenuLayout(
       width,
       height,
-      this.settings.scale + this.settings.camScale,
+      this.settings.scale,
       this.maze.width,
       this.maze.height,
       layoutSurface,
@@ -5546,7 +5535,7 @@ export class MenuScene extends Phaser.Scene {
     const width = viewportGeometry.fullBleed.width;
     const height = viewportGeometry.fullBleed.height;
     const layoutSurface = mode === 'play' ? 'play' : 'menu';
-    const boardScale = this.settings.scale + this.settings.camScale;
+    const boardScale = this.settings.scale;
     const layoutOptions = {
       browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height),
       knownCellScale,
@@ -10939,7 +10928,6 @@ export class MenuScene extends Phaser.Scene {
       signedIn: this.authSnapshot.status === 'authenticated',
       width: this.layout.width
     });
-    this.overlayBoardZoomSliderBounds = null;
     this.overlayMovementSpeedSliderBounds = null;
 
     // No Close pill / X / back arrow: the primary top row (Resume in pause,
@@ -11081,19 +11069,6 @@ export class MenuScene extends Phaser.Scene {
         return;
       case 'nav':
         this.uiButtons.push(this.createLegacySheetDisclosureButton(rect, model.label, run, 'right'));
-        return;
-      case 'slider':
-        this.uiButtons.push(this.createBoardZoomSliderRow({
-          height: rect.height,
-          label: model.label,
-          labelFontSize: item.labelFontSize,
-          stateFontSize: item.stateFontSize,
-          stateText: formatLegacyCameraZoomPercent(this.settings.camScale),
-          value: resolveLegacyCameraZoomPosition(this.settings.camScale),
-          width: rect.width,
-          x: centerX,
-          y: centerY
-        }));
         return;
       case 'toggle': {
         const fieldId = model.settingKey as LegacyOverlayToggleFieldId;
@@ -11387,7 +11362,6 @@ export class MenuScene extends Phaser.Scene {
     plan = buildLegacyGuideSheetPlan({ ...planInput, itemHeights: measure(plan.itemWidth) });
     const heights = measure(plan.itemWidth);
 
-    this.overlayBoardZoomSliderBounds = null;
     this.overlayMovementSpeedSliderBounds = null;
     this.drawLegacySheetCard(plan.card);
     this.createOverlayTitle(plan.title.text, plan.title.centerY);
@@ -13094,116 +13068,6 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private createBoardZoomSliderRow(input: {
-    height: number;
-    label: string;
-    labelFontSize?: number;
-    stateFontSize?: number;
-    stateText: string;
-    value: number;
-    width: number;
-    x: number;
-    y: number;
-  }): UiButton {
-    const left = input.x - (input.width / 2);
-    const rowFill = LEGACY_CYBER_PANEL_FILL;
-    const rowStroke = LEGACY_PLAY_TOUCH_BUTTON_STROKE;
-    const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, 0.5);
-    background.setStrokeStyle(1, rowStroke, 0.38);
-    background.setInteractive({ useHandCursor: true });
-    this.overlayBoardZoomSliderBounds = createVisualRect(left, input.y - (input.height / 2), input.width, input.height);
-
-    const labelFontSize = input.labelFontSize ?? Math.max(16, Math.min(20, Math.round(input.height * 0.3)));
-    const stateFontSize = input.stateFontSize ?? Math.max(11, Math.min(13, Math.round(input.height * 0.2)));
-    const labelY = resolveLegacyUiLabelCenterY(input.y - Math.round(input.height * 0.2), labelFontSize, 'toggle-title');
-    const trackY = input.y + Math.round(input.height * 0.23);
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(left + 4, labelY, input.label, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${labelFontSize}px`,
-      color: '#ecfff5'
-    })), input.width - 100, labelFontSize, LEGACY_SETTINGS_SIZES.labelMinFontSize).setOrigin(0, 0.5).setAlpha(0.94);
-
-    const stateLabel = this.padLegacyUiText(this.add.text(left + input.width - 4, labelY, input.stateText, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${stateFontSize}px`,
-      color: '#72e0bf'
-    })).setOrigin(1, 0.5).setAlpha(0.92);
-    this.uiTexts.push(label, stateLabel);
-
-    const trackLeft = left + 16;
-    const trackRight = left + input.width - 16;
-    const trackWidth = Math.max(44, trackRight - trackLeft);
-    const normalizedValue = Math.max(0, Math.min(1, input.value));
-    const track = this.add.rectangle(
-      trackLeft + Math.round(trackWidth / 2),
-      trackY,
-      trackWidth,
-      6,
-      0x07131d,
-      0.86
-    );
-    track.setStrokeStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.46);
-    const fill = this.add.rectangle(
-      trackLeft + Math.round((trackWidth * normalizedValue) / 2),
-      trackY,
-      Math.max(4, Math.round(trackWidth * normalizedValue)),
-      6,
-      LEGACY_PLAY_TOUCH_ACCENT,
-      0.72
-    );
-    const knob = this.add.circle(
-      trackLeft + Math.round(trackWidth * normalizedValue),
-      trackY,
-      8,
-      LEGACY_PLAY_TOUCH_ACCENT,
-      0.98
-    );
-    knob.setStrokeStyle(1, 0xecfff5, 0.72);
-
-    const commitPointerZoom = (pointerX: number): void => {
-      const nextZoom = resolveLegacyCameraZoomFromPosition((pointerX - trackLeft) / trackWidth);
-      this.applyLegacyCameraZoom(nextZoom);
-    };
-
-    const setActive = (active: boolean): void => {
-      background.setFillStyle(rowFill, active ? 0.7 : 0.5);
-      background.setStrokeStyle(1, LEGACY_PLAY_TOUCH_ACCENT, active ? 0.72 : 0.38);
-      track.setStrokeStyle(1, LEGACY_PLAY_TOUCH_ACCENT, active ? 0.75 : 0.46);
-      knob.setScale(active ? 1.08 : 1);
-      label.setAlpha(active ? 1 : 0.94);
-      stateLabel.setAlpha(active ? 1 : 0.92);
-    };
-
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.overlayScrollGestureLockPointerId = this.normalizeLegacyPlayTouchPointerId(pointer.id) ?? -1;
-      this.releaseOverlayScrollPointer();
-      commitPointerZoom(pointer.x);
-    });
-    background.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (pointer.isDown) {
-        commitPointerZoom(pointer.x);
-      }
-    });
-
-    return {
-      background,
-      bounds: createVisualRect(left, input.y - (input.height / 2), input.width, input.height),
-      label,
-      setActive,
-      text: input.label,
-      destroy: () => {
-        background.destroy();
-        label.destroy();
-        stateLabel.destroy();
-        track.destroy();
-        fill.destroy();
-        knob.destroy();
-      }
-    };
-  }
-
   private selectLegacyAuthField(
     fieldId: LegacyAuthFieldId,
     bounds?: { height: number; width: number; x: number; y: number }
@@ -13824,10 +13688,6 @@ export class MenuScene extends Phaser.Scene {
     if (result.triggersReloadOnBack) {
       this.pendingOverlayMazeRebuild = true;
     }
-    if (result.refreshLayout) {
-      this.refreshLayout();
-    }
-
     this.uiDirty = true;
   }
 
@@ -13835,7 +13695,7 @@ export class MenuScene extends Phaser.Scene {
     const previousScale = this.settings.scale;
     const fieldIds: LegacyOptionFieldId[] = this.overlay === 'pause'
       ? []
-      : ['scale', 'camScale', 'pathR', 'pathG', 'pathB', 'wallR', 'wallG', 'wallB'];
+      : ['scale', 'pathR', 'pathG', 'pathB', 'wallR', 'wallG', 'wallB'];
 
     for (const fieldId of fieldIds) {
       this.commitOverlayField(fieldId);
@@ -14346,7 +14206,6 @@ export class MenuScene extends Phaser.Scene {
   private clearUi(): void {
     this.overlayScrollGraphics?.destroy();
     this.overlayScrollGraphics = null;
-    this.overlayBoardZoomSliderBounds = null;
     this.overlayMovementSpeedSliderBounds = null;
 
     this.overlayGuideGraphics?.clearMask(false);
@@ -14807,28 +14666,6 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private applyLegacyCameraZoom(value: number): void {
-    const currentZoom = quantizeLegacyCameraZoom(this.settings.camScale);
-    const nextZoom = quantizeLegacyCameraZoom(value);
-    if (currentZoom === nextZoom) {
-      return;
-    }
-
-    const nextSettings = copyLegacySettings(this.settings);
-    nextSettings.camScale = nextZoom;
-    this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), nextSettings);
-    this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
-    this.syncLegacyRemoteSettings();
-    this.refreshLayout();
-    this.boardStaticDirty = true;
-    this.boardPathDirty = true;
-    this.boardDynamicDirty = true;
-    this.uiDirty = true;
-    if (this.mode === 'play') {
-      this.publishInteractionDiagnostics();
-    }
-  }
-
   private loadPersistedLegacyGameToggleSettings(): void {
     const browserStorage = this.resolveBrowserLocalStorage();
     migrateLegacyGameToggleSettingsToGuestScope(
@@ -14838,6 +14675,8 @@ export class MenuScene extends Phaser.Scene {
     );
     const scopedStorage = this.resolveLegacyGameToggleStorage();
     this.settings = readLegacyGameToggleSettings(scopedStorage, LEGACY_DEFAULTS);
+    // Board Zoom was removed: drop the zoom key an older build stored so a player cannot stay zoomed.
+    scrubRemovedCameraZoomFromGameToggleStorage(scopedStorage);
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
   }
 
@@ -16063,7 +15902,6 @@ export class MenuScene extends Phaser.Scene {
         safeBounds,
         pathVisualStyle: this.pathVisualStyle,
         tileSize: mazeRenderFrame.tileSize,
-        userBoardZoom: this.settings.camScale,
         visualScale: {
           x: this.boardZoomContainer.scaleX,
           y: this.boardZoomContainer.scaleY

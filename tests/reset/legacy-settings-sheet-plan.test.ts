@@ -52,7 +52,6 @@ describe('settings sheet model', () => {
     expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual([
       'how-to-play',
       'display-heading',
-      'board-zoom',
       'trail-fade',
       'trail-shine',
       'animated-background'
@@ -164,7 +163,7 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
       }
       for (const item of p.items) {
         const local: LegacySettingsRect = { height: item.rect.height, left: 0, top: 0, width: item.rect.width };
-        const parts = [item.parts.label, item.parts.state, item.parts.switchControl, item.parts.track, item.parts.chevron]
+        const parts = [item.parts.label, item.parts.state, item.parts.switchControl, item.parts.chevron]
           .filter((part): part is LegacySettingsRect => part !== null);
         for (const part of parts) {
           expect(inside(part, local), `${item.model.id} part inside row`).toBe(true);
@@ -178,9 +177,6 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
               expect(overlaps(columns[i]!, columns[j]!), `${item.model.id} columns`).toBe(false);
             }
           }
-        }
-        if (item.model.kind === 'slider') {
-          expect(overlaps(item.parts.label, item.parts.track!)).toBe(false);
         }
       }
     });
@@ -199,7 +195,7 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
     test.each(cases)('%s: label fonts never shrink below the body token and labels may wrap', (_label, p) => {
       for (const item of p.items) {
         expect(item.labelFontSize).toBeGreaterThanOrEqual(designTokens.legacy.fontSizePx.body);
-        expect(item.labelMaxLines).toBe(item.model.kind === 'heading' || item.model.kind === 'slider' ? 1 : 2);
+        expect(item.labelMaxLines).toBe(item.model.kind === 'heading' ? 1 : 2);
         expect(item.labelMaxLines * LEGACY_SETTINGS_SIZES.labelLineHeight).toBeLessThanOrEqual(item.rect.height);
       }
     });
@@ -287,7 +283,6 @@ describe('settings sheet plan specifics', () => {
       'settings-disclosure',
       'how-to-play',
       'display-heading',
-      'board-zoom',
       'trail-fade',
       'trail-shine',
       'animated-background',
@@ -302,7 +297,6 @@ describe('settings sheet plan specifics', () => {
       'back-to-menu',
       'how-to-play',
       'display-heading',
-      'board-zoom',
       'trail-fade',
       'trail-shine',
       'animated-background',
@@ -380,12 +374,20 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
     }
   });
 
-  test('the freed header reserve gives the card back its height at 320x568', () => {
+  test('the freed header reserve gives the panel its full height at 320x568; Board Zoom removal lets Pause fit without a rail', () => {
     const plan = buildLegacySettingsSheetPlan({ context: 'pause', height: 568, settingsExpanded: true, signedIn: true, width: 320 });
-    // Before: panel.height 552 minus 52 reserve = 500 available. Now: all 552.
+    // Before the header reserve was freed: panel.height 552 minus 52 = 500 available. Now: all 552.
     expect(plan.panel.height).toBe(552);
-    expect(plan.card.height).toBe(552);
-    expect(plan.card.top).toBe(plan.panel.top);
+    // Board Zoom (a 68 px slider row plus its 8 px gap) is gone, so the expanded pause card (538) fits
+    // inside the 552 panel at its natural height, centred, with no scroll rail.
+    expect(plan.naturalCardHeight).toBe(538);
+    expect(plan.card.height).toBe(538);
+    expect(plan.scrollable).toBe(false);
+    expect(Math.abs((plan.card.top - plan.panel.top) - ((plan.panel.top + plan.panel.height) - (plan.card.top + plan.card.height)))).toBeLessThanOrEqual(1);
+    // The signed-in menu sheet is still 590 tall at 320x568: it genuinely overflows and keeps the rail.
+    const menu = buildLegacySettingsSheetPlan({ context: 'menu', height: 568, signedIn: true, width: 320 });
+    expect(menu.card.height).toBe(menu.panel.height);
+    expect(menu.scrollable).toBe(true);
   });
 
   test('the scroll rail appears only when the content truly overflows the body', () => {
