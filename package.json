@@ -8,6 +8,7 @@
     "brand:icons": "node ./scripts/brand/generate-mazer-icons.mjs",
     "brand:icons:check": "node ./scripts/brand/generate-mazer-icons.mjs --check",
     "brand:delivery:check": "node ./scripts/brand/verify-mazer-icon-delivery.mjs",
+    "assets:validate": "node ./scripts/assets/validate-asset-manifest.mjs",
     "build": "node ./scripts/build/run-build.mjs",
     "build:raw": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173 --strictPort",
