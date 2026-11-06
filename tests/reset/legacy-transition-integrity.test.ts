@@ -95,25 +95,26 @@ describe('legacy scene transition integrity', () => {
     expect(arrival).toContain('this.playerTransferEnergyDeliveryStartedAtMs ??= laserStartedAtMs;');
   });
 
-  test('pins proof-route seeds and shares exact orbit geometry between diamonds and transferred energy', () => {
+  test('pins proof-route seeds and shares exact edge-station geometry between markers and transferred energy', () => {
     const rebuild = methodSource(
       '  private rebuildMaze(nextDemoMoveAtMs = 0): void {',
       '  private refreshRuntimeMazeSeedIfUnpinned(): void {'
     );
-    const orbitGeometry = methodSource(
-      '  private resolveLegacyMenuPathTitleOrbitGeometry(',
-      '  private drawLegacyMenuPathTitleOrbitSigils('
+    const lasers = methodSource(
+      '  private drawLegacyEdgeLasers(',
+      '  private drawLegacyEdgeMarkers('
     );
-    const transferPoses = methodSource(
-      '  private resolveLegacyPlayerTransferOrbitPoses(time: number):',
-      '  private drawLegacyPlayerTransferEnergy('
+    const edgeMarkers = methodSource(
+      '  private drawLegacyEdgeMarkers(',
+      '  private resolveLegacyWrapEndStationIds('
     );
 
     expect(rebuild).toContain('this.explicitRuntimeMazeSeed');
     expect(rebuild).toContain('? this.mazeSeed');
-    expect(orbitGeometry).toContain('crownHalf: titleLayout.cellSize * 0.56');
-    expect(transferPoses).toContain('this.resolveLegacyMenuPathTitleOrbitGeometry()');
-    expect(transferPoses).not.toContain('crownHalf: 0');
+    // One station geometry: the markers, the departure beams and the arrival
+    // beams all resolve their endpoints through resolveLegacyEdgeStations().
+    expect(edgeMarkers).toContain('this.resolveLegacyEdgeStations()');
+    expect(lasers.match(/this\.resolveLegacyEdgeStations\(\)/g)?.length).toBe(2);
   });
 
   test('keeps the player visible until outbound energy has actually left the tile', () => {

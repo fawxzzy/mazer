@@ -1260,7 +1260,11 @@ const main = async () => {
           });
           return {
             phase: scene.resolveLegacyPlayerTransferState(scene.time.now).phase,
-            spinActive: scene.resolveLegacyMenuPathTitleOrbitFrame(scene.time.now).isLifecycleSpinActive,
+            // The orbit lifecycle no longer exists (edge markers never spin); the
+            // ring is calm by construction, so this is always false.
+            spinActive: typeof scene.resolveLegacyMenuPathTitleOrbitFrame === 'function'
+              ? scene.resolveLegacyMenuPathTitleOrbitFrame(scene.time.now).isLifecycleSpinActive
+              : false,
             drawPhase: scene.menuStaticDrawLifecyclePhase,
             primaryId,
             nonPrimary: positions.filter((d) => d.i !== primaryId)

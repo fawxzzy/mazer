@@ -9,22 +9,26 @@
  * lasts (the previous implementation advanced one reveal batch per `update`, so
  * a 5 fps renderer stretched a 3 s intro past 30 s).
  *
- * Nominal timeline (full motion, any tile count):
+ * Nominal timeline (full motion, any tile count). The beams come FIRST and the
+ * maze appears as they land:
  *
  *   phase        start-end ms   what happens
  *   digit-in         0-200      level digit fades/scales in (skipped when the digit is
  *                               already up from the preceding deconstruct)
- *   reveal          100-900     tilesVisible = ceil(N * easeOutCubic((t - 100) / 800)). Duration
- *                               does not depend on N. Wrap/bleed edge paths are NOT part of
- *                               this gradual reveal: they appear atomically at 900 (below).
- *   edge paths          900     docks + their border cells appear all at once, the instant the
- *                               reveal completes (never partial)
- *   laser          900-1300     ONE beam travels edge station -> spawn tile; the digit fades
- *                               out over 850-1300 so it is gone when the beam lands
- *   unlock            1300      the beam lands: player marker + start/goal markers appear,
- *                               input unlocks, the play timer starts (inputUnlocked)
- *   pop           1300-1650     6-sparkle poof at the landing tile + goal pulse
- *   done              1650      nothing left to animate
+ *   laser          100-500      ALL 8 edge diamonds fire a beam inward to the spawn tile
+ *                               (stagger <= 60 ms, every beam lands by 500); the digit
+ *                               starts fading out at 700
+ *   pop            500-850      6-sparkle poof where the beams converge
+ *   reveal        500-1200      tilesVisible = max(1, ceil(N * easeOutCubic((t - 500) / 700)))
+ *                               grows out from the spawn tile; duration does not depend on N
+ *   unlock           1200      reveal complete: wrap/bleed edge paths (docks + their border
+ *                               cells) appear atomically, the digit is gone, input unlocks
+ *   goal pulse    1200-1450     goal marker pulse
+ *   done             1450      nothing left to animate
+ *
+ * Deconstruct (resolveIntroDeconstruct) is the mirror, <= 900 ms: the player fires a
+ * beam out to ALL 8 diamonds (0-400), the edge paths vanish atomically at 400, the
+ * tiles dissolve 400-600, then a 300 ms handoff beat.
  *
  * Reduced motion: a 250 ms crossfade (digit fades out while the finished board
  * fades in), no laser, no sparkles, input unlocks at 250 ms.
@@ -69,12 +73,15 @@ export interface IntroState {
 }
 
 export const INTRO_DIGIT_IN_MS = 200;
-export const INTRO_REVEAL_START_MS = 100;
-export const INTRO_REVEAL_END_MS = 900;
-export const INTRO_LASER_START_MS = 900;
+export const INTRO_LASER_START_MS = 100;
 export const INTRO_LASER_MS = 400;
 export const INTRO_LASER_END_MS = INTRO_LASER_START_MS + INTRO_LASER_MS;
-export const INTRO_DIGIT_OUT_START_MS = 850;
+/** Beams stagger by at most this much across the 8 diamonds (every beam still lands by the laser end). */
+export const INTRO_BEAM_STAGGER_MS = 60;
+/** The maze appears as the beams land. */
+export const INTRO_REVEAL_START_MS = INTRO_LASER_END_MS;
+export const INTRO_REVEAL_END_MS = 1200;
+export const INTRO_DIGIT_OUT_START_MS = 700;
 /**
  * Wrap/bleed edge paths (the dock strips AND the border cells that own them)
  * are ONE atomic group: absent before this instant, fully present from it.
@@ -82,9 +89,10 @@ export const INTRO_DIGIT_OUT_START_MS = 850;
  */
 export const INTRO_EDGE_PATHS_ON_MS = INTRO_REVEAL_END_MS;
 export const INTRO_POP_MS = 350;
-/** The beam landing is the single event that unlocks input. */
-export const INTRO_INPUT_UNLOCK_MS = INTRO_LASER_END_MS;
-export const INTRO_DONE_MS = INTRO_LASER_END_MS + INTRO_POP_MS;
+/** Input unlocks once the beams have landed AND the maze has finished appearing. */
+export const INTRO_INPUT_UNLOCK_MS = INTRO_REVEAL_END_MS;
+export const INTRO_GOAL_PULSE_MS = 250;
+export const INTRO_DONE_MS = INTRO_INPUT_UNLOCK_MS + INTRO_GOAL_PULSE_MS;
 export const INTRO_REDUCED_MOTION_MS = 250;
 export const INTRO_DIGIT_MIN_SCALE = 0.72;
 /** Taps/keys inside this window after the intro began are ignored (the Start press itself). */
@@ -94,8 +102,9 @@ export const INTRO_SKIP_GRACE_MS = 200;
 export const OUTRO_PLAYER_REMOVE_MS = 150;
 export const OUTRO_TRAIL_FADE_MS = 250;
 /** The edge-path group disappears all at once at this instant of the deconstruct. */
-export const OUTRO_EDGE_PATHS_OFF_MS = OUTRO_PLAYER_REMOVE_MS;
-export const OUTRO_TILES_START_MS = 300;
+export const OUTRO_LASER_MS = 400;
+export const OUTRO_EDGE_PATHS_OFF_MS = OUTRO_LASER_MS;
+export const OUTRO_TILES_START_MS = OUTRO_EDGE_PATHS_OFF_MS;
 export const OUTRO_TILES_END_MS = 600;
 export const OUTRO_DIGIT_IN_MS = 300;
 export const OUTRO_HANDOFF_MS = 300;
@@ -200,9 +209,11 @@ export const resolveIntro = (elapsedMs: number, options: IntroOptions): IntroSta
   }
 
   const revealProgress = (elapsed - INTRO_REVEAL_START_MS) / (INTRO_REVEAL_END_MS - INTRO_REVEAL_START_MS);
-  const tilesVisible = elapsed <= INTRO_REVEAL_START_MS
+  // The spawn tile (first BFS tile) appears the instant the beams land, so
+  // the reveal visibly grows out of where they converge.
+  const tilesVisible = elapsed < INTRO_REVEAL_START_MS
     ? 0
-    : Math.min(tileCount, Math.ceil(tileCount * easeOutCubic(revealProgress)));
+    : Math.min(tileCount, Math.max(1, Math.ceil(tileCount * easeOutCubic(revealProgress))));
 
   const digitIn = options.digitAlreadyVisible === true ? 1 : smootherstep(elapsed / INTRO_DIGIT_IN_MS);
   const digitOut = 1 - smootherstep((elapsed - INTRO_DIGIT_OUT_START_MS) / (INTRO_INPUT_UNLOCK_MS - INTRO_DIGIT_OUT_START_MS));
@@ -211,13 +222,14 @@ export const resolveIntro = (elapsedMs: number, options: IntroOptions): IntroSta
   const laser = resolveSpawnLaser(elapsed - INTRO_LASER_START_MS);
   const laserActive = elapsed >= INTRO_LASER_START_MS;
   const popProgress = laserActive ? laser.spawnPop : 0;
+  const goalPulseProgress = clamp01((elapsed - INTRO_INPUT_UNLOCK_MS) / INTRO_GOAL_PULSE_MS);
 
-  const phase: IntroPhase = elapsed < INTRO_REVEAL_START_MS
+  const phase: IntroPhase = elapsed < INTRO_LASER_START_MS
     ? 'digit-in'
-    : elapsed < INTRO_LASER_START_MS
-      ? 'reveal'
-      : elapsed < INTRO_LASER_END_MS
-        ? 'laser'
+    : elapsed < INTRO_LASER_END_MS
+      ? 'laser'
+      : elapsed < INTRO_INPUT_UNLOCK_MS
+        ? 'reveal'
         : elapsed < INTRO_DONE_MS
           ? 'pop'
           : 'done';
@@ -229,7 +241,7 @@ export const resolveIntro = (elapsedMs: number, options: IntroOptions): IntroSta
     digitScale: INTRO_DIGIT_MIN_SCALE + ((1 - INTRO_DIGIT_MIN_SCALE) * digitAlpha),
     laserProgress: laserActive ? laser.laserProgress : 0,
     spawnPop: popProgress,
-    goalPulse: popProgress > 0 && popProgress < 1 ? Math.sin(popProgress * Math.PI) : 0,
+    goalPulse: goalPulseProgress > 0 && goalPulseProgress < 1 ? Math.sin(goalPulseProgress * Math.PI) : 0,
     bleedProgress: elapsed >= INTRO_EDGE_PATHS_ON_MS ? 1 : 0,
     boardAlpha: 1,
     inputUnlocked: elapsed >= INTRO_INPUT_UNLOCK_MS,
@@ -247,6 +259,8 @@ export interface OutroState {
   readonly digitScale: number;
   /** Atomic edge-path visibility: strictly 1 then 0 (never a fraction). */
   readonly bleedProgress: 0 | 1;
+  /** 0..1 travel of the beams from the player OUT to all 8 diamonds (0 in reduced motion). */
+  readonly laserProgress: number;
   /** True once the tiles are gone (the handoff beat starts here). */
   readonly tilesGone: boolean;
   /** True once the whole deconstruct including the handoff beat has run. */
@@ -266,6 +280,7 @@ export const resolveIntroDeconstruct = (elapsedMs: number, options: IntroOptions
       digitAlpha: 1,
       digitScale: 1,
       bleedProgress: elapsed > 0 ? 0 : 1,
+      laserProgress: 0,
       tilesGone: elapsed > 0,
       done: finished
     };
@@ -284,6 +299,7 @@ export const resolveIntroDeconstruct = (elapsedMs: number, options: IntroOptions
     digitAlpha,
     digitScale: INTRO_DIGIT_MIN_SCALE + ((1 - INTRO_DIGIT_MIN_SCALE) * digitAlpha),
     bleedProgress: elapsed < OUTRO_EDGE_PATHS_OFF_MS ? 1 : 0,
+    laserProgress: smoothstep(elapsed / OUTRO_LASER_MS),
     tilesGone: elapsed >= OUTRO_TILES_END_MS,
     done: elapsed >= OUTRO_TOTAL_MS
   };

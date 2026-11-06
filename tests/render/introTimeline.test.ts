@@ -14,6 +14,8 @@ import {
   INTRO_REVEAL_END_MS,
   INTRO_REVEAL_START_MS,
   OUTRO_EDGE_PATHS_OFF_MS,
+  OUTRO_LASER_MS,
+  OUTRO_TILES_START_MS,
   OUTRO_TOTAL_MS,
   isEdgePathCellShown,
   resolveIntro,
@@ -106,21 +108,32 @@ describe('introTimeline (time-driven intro)', () => {
     expect(resolveIntro(Number.NaN, { ...FULL, tileCount: 50 }).tilesVisible).toBe(0);
   });
 
-  test('input unlock is tied to the laser end: same instant, same clock', () => {
+  test('beams come first, the maze appears as they land, and input unlocks when the reveal completes (one clock)', () => {
     const options = { ...FULL, tileCount: 120 };
     const laserLanded = firstMs((ms) => resolveIntro(ms, options).laserProgress >= 1);
+    const firstTile = firstMs((ms) => resolveIntro(ms, options).tilesVisible > 0);
+    const allTiles = firstMs((ms) => resolveIntro(ms, options).tilesVisible >= 120);
     const unlocked = firstMs((ms) => resolveIntro(ms, options).inputUnlocked);
     expect(laserLanded).toBe(INTRO_LASER_END_MS);
-    expect(unlocked).toBe(laserLanded);
-    expect(INTRO_INPUT_UNLOCK_MS).toBe(INTRO_LASER_END_MS);
-    // The scene's spawn-laser clock (time since the beam left) agrees.
+    // The spawn tile appears the instant the beams land (not before), then grows.
+    expect(firstTile).toBe(INTRO_LASER_END_MS);
+    expect(INTRO_REVEAL_START_MS).toBe(INTRO_LASER_END_MS);
+    expect(resolveIntro(INTRO_LASER_END_MS - 1, options).tilesVisible).toBe(0);
+    expect(resolveIntro(INTRO_LASER_END_MS, options).tilesVisible).toBeGreaterThanOrEqual(1);
+    // Input unlocks only once the maze has finished appearing, after the beams landed.
+    expect(allTiles).toBeLessThanOrEqual(INTRO_REVEAL_END_MS);
+    expect(unlocked).toBe(INTRO_INPUT_UNLOCK_MS);
+    expect(unlocked).toBeGreaterThanOrEqual(laserLanded);
+    expect(unlocked).toBeGreaterThanOrEqual(allTiles);
+    expect(INTRO_DONE_MS).toBeLessThanOrEqual(2000);
+    // The scene's spawn-laser clock (time since the beams left) agrees on the landing.
     expect(resolveSpawnLaser(INTRO_LASER_END_MS - INTRO_LASER_START_MS - 1).markerRevealed).toBe(false);
     expect(resolveSpawnLaser(INTRO_LASER_END_MS - INTRO_LASER_START_MS).markerRevealed).toBe(true);
-    // The laser never leaves before the reveal started and the pop follows the landing.
-    expect(INTRO_LASER_START_MS).toBeGreaterThan(INTRO_REVEAL_START_MS);
     expect(resolveIntro(INTRO_LASER_END_MS - 1, options).spawnPop).toBe(0);
     expect(resolveIntro(INTRO_LASER_END_MS + 100, options).spawnPop).toBeGreaterThan(0);
-    expect(resolveIntro(INTRO_LASER_END_MS + 100, options).goalPulse).toBeGreaterThan(0);
+    // The goal pulse plays on unlock.
+    expect(resolveIntro(INTRO_INPUT_UNLOCK_MS + 100, options).goalPulse).toBeGreaterThan(0);
+    expect(resolveIntro(INTRO_INPUT_UNLOCK_MS - 1, options).goalPulse).toBe(0);
   });
 
   test('laser progress is monotonic 0..1 and the digit is gone when the beam lands', () => {
@@ -176,8 +189,8 @@ describe('introTimeline (time-driven intro)', () => {
 });
 
 describe('introTimeline edge paths are atomic (no partial bleed state)', () => {
-  test('intro: bleedProgress is strictly 0 or 1, flips once, before the laser leaves', () => {
-    expect(INTRO_EDGE_PATHS_ON_MS).toBeLessThanOrEqual(INTRO_LASER_START_MS);
+  test('intro: bleedProgress is strictly 0 or 1 and flips once, when the reveal completes', () => {
+    expect(INTRO_EDGE_PATHS_ON_MS).toBe(INTRO_REVEAL_END_MS);
     let previous = 0;
     let flips = 0;
     for (let ms = 0; ms <= INTRO_DONE_MS + 500; ms += 1) {
@@ -212,6 +225,20 @@ describe('introTimeline edge paths are atomic (no partial bleed state)', () => {
     expect(flips).toBe(1);
     const end = resolveIntroDeconstruct(OUTRO_TOTAL_MS, options);
     expect(OUTRO_TOTAL_MS).toBeLessThanOrEqual(900);
+    // Mirror of the arrival: the player's beams go OUT first (monotonic 0..1), the
+    // edge paths vanish atomically when they have landed, and only then do tiles dissolve.
+    let previousBeam = 0;
+    for (let ms = 0; ms <= OUTRO_TOTAL_MS; ms += 1) {
+      const { laserProgress } = resolveIntroDeconstruct(ms, options);
+      expect(laserProgress).toBeGreaterThanOrEqual(previousBeam);
+      previousBeam = laserProgress;
+    }
+    expect(previousBeam).toBe(1);
+    expect(resolveIntroDeconstruct(OUTRO_LASER_MS, options).laserProgress).toBe(1);
+    expect(OUTRO_EDGE_PATHS_OFF_MS).toBe(OUTRO_LASER_MS);
+    expect(OUTRO_TILES_START_MS).toBeGreaterThanOrEqual(OUTRO_EDGE_PATHS_OFF_MS);
+    expect(resolveIntroDeconstruct(OUTRO_EDGE_PATHS_OFF_MS - 1, options).tilesVisible).toBe(100);
+    expect(resolveIntroDeconstruct(5000, { ...REDUCED, tileCount: 100 }).laserProgress).toBe(0);
     expect(end).toMatchObject({ bleedProgress: 0, done: true, playerAlpha: 0, tilesVisible: 0, trailAlpha: 0 });
     expect(resolveIntroDeconstruct(0, options).tilesVisible).toBe(100);
   });

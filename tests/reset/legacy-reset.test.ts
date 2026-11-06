@@ -940,7 +940,11 @@ describe('legacy reset lane', () => {
     // the reveal sequence (a visible "confetti" scatter), where BFS
     // guarantees a tile only reveals once something already-revealed is
     // physically adjacent to it.
-    expect(animationCadenceSource).toContain('resolveLegacyWalkableGridNeighbors(grid, point)');
+    // Screen adjacency only: a wrap-aware flood made wrap partners appear/vanish as
+    // detached islands, so wrap-only components are flooded as their own contiguous
+    // component after the main one.
+    expect(animationCadenceSource).toContain('resolveScreenAdjacentWalkableTiles(grid, point)');
+    expect(animationCadenceSource).not.toContain('resolveLegacyWalkableGridNeighbors');
     expect(animationCadenceSource).not.toContain('generationBuildTrace?.pathTiles');
     expect(animationCadenceSource).not.toContain('generationBuildTrace?.shortcutTiles');
     expect(menuSceneSource).toContain('private refreshLegacyMenuStaticDrawVisibleTileKeys(): void');
@@ -954,7 +958,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private deferLegacyMenuDeconstructRebuildUntil(dueAtMs: number): void');
     expect(menuSceneSource).toContain('private resolveLegacyMenuBuildPrerollProgress(time: number): number');
     expect(menuSceneSource).toContain('private isLegacyMenuBuildPrerollActive(time: number): boolean');
-    expect(menuSceneSource).toContain('private drawLegacyPlayerTransferEnergy(');
+    expect(menuSceneSource).toContain('private drawLegacyEdgeLasers(');
     expect(menuSceneSource).toContain('private armLegacyMenuStaticDeconstructStage(time: number): void');
     expect(menuSceneSource).toContain('private shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame: LegacyMenuDemoAdvance): boolean');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase = 'deconstructing';");
