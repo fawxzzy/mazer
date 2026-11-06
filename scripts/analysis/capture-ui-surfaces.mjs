@@ -1487,10 +1487,26 @@ const createCheck = (id, passed, detail) => ({
   detail
 });
 
+// Chrome's "preloaded ... but not used within a few seconds" hint for the
+// self-hosted UI font (index.html <link rel=preload>) fires only on a warm
+// second navigation. This harness always makes one (the signed-out auth capture
+// is followed by a reload under the authenticated fixture): the font is then
+// already in the HTTP cache, the document's @font-face is satisfied without
+// consuming the preload entry, and Chrome reports the preload as unused although
+// the font loads and renders (document.fonts reports it loaded). Cold first loads
+// are clean, and with the preload removed the hint disappears, so the preload
+// itself is correct and stays: it moves the font fetch ahead of the large JS
+// chunks on a real first visit. Only that one URL is ignored.
 const isIgnorableConsoleMessage = (message) => (
   message.type === 'warning'
   && typeof message.text === 'string'
-  && message.text.includes('WebGL: CONTEXT_LOST_WEBGL')
+  && (
+    message.text.includes('WebGL: CONTEXT_LOST_WEBGL')
+    || (
+      message.text.includes('preloaded using link preload but not used')
+      && message.text.includes('/fonts/space-grotesk/space-grotesk-latin-wght-normal.woff2')
+    )
+  )
 );
 
 export const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
