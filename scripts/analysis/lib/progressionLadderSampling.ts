@@ -2,11 +2,16 @@
 import { createLegacyRuntimeMazeForMode } from '../../../src/legacy-runtime/legacyGenerationLifecycle';
 import {
   GEOMETRY_BUDGET_SATURATION_LEVEL,
-  GEOMETRY_BUDGET_TUNING_TOLERANCE,
+  GEOMETRY_BUDGET_WINDOW,
   measureGeometryBudgetProxy,
   resolveGeometryBudgetTarget
 } from '../../../src/legacy-runtime/legacyGeometryBudget';
 import { analyzeMazeDifficulty } from '../../../src/legacy-runtime/legacyMazeDifficultyMetrics';
+import {
+  analyzeFeltStructure,
+  measureFelt,
+  simulatePullToGoalWalker
+} from '../../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import {
   createEmptyLegacyProgressionState,
   resolveLegacyMazeComplexity,
@@ -29,11 +34,19 @@ export interface LadderLevelSample {
   level: number;
   board: string;
   seed: number;
+  // PRIMARY: deterministic pull-to-goal explorer steps (felt difficulty).
+  felt: number;
+  // Mean explorer steps over 8 other tie seeds (Monte-Carlo validation of `felt`).
+  feltMonteCarlo: number;
+  // Length of the path the explorer finally walks (backtracks excluded).
+  explorerPath: number;
+  // SECONDARY: the H1 structure proxy.
   proxy: number;
   ms: number;
+  // Realized felt is inside [T(level), T(level) + window].
   onTarget: boolean;
   metrics: ReturnType<typeof analyzeMazeDifficulty>;
-  grid: string;
+  structure: ReturnType<typeof analyzeFeltStructure>;
 }
 
 export const seedForIndex = (index: number): number => 1337 + (index * 104729);
@@ -75,17 +88,22 @@ export const sampleLevel = (level: number, board: typeof LADDER_BOARDS[number], 
   const started = performance.now();
   const maze = createLegacyRuntimeMazeForMode('play', 35, seed, profile, {}, board.aspectRatio);
   const ms = performance.now() - started;
-  const proxy = measureGeometryBudgetProxy(maze, resolveLegacyMazeComplexity(maze)).total;
+  const measured = measureFelt(maze);
+  const felt = measured.steps;
+  let monteCarlo = 0;
+  for (let tie = 1; tie <= 8; tie += 1) { monteCarlo += simulatePullToGoalWalker(maze, tie * 7919); }
   const target = resolveGeometryBudgetTarget(Math.min(Math.max(level, 2), GEOMETRY_BUDGET_SATURATION_LEVEL));
   return {
     level,
     board: board.name,
     seed,
-    proxy,
+    felt,
+    feltMonteCarlo: monteCarlo / 8,
+    explorerPath: measured.pathLength,
+    proxy: measureGeometryBudgetProxy(maze, resolveLegacyMazeComplexity(maze)).total,
     ms,
-    onTarget: level < 2 || target === null || Math.abs(proxy - target) <= GEOMETRY_BUDGET_TUNING_TOLERANCE,
+    onTarget: level < 2 || target === null || (felt >= target && felt <= target + GEOMETRY_BUDGET_WINDOW),
     metrics: analyzeMazeDifficulty(maze),
-    grid: ''
+    structure: analyzeFeltStructure(maze)
   };
 };
-

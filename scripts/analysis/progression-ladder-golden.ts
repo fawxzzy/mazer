@@ -2,9 +2,11 @@
 // the generated maze of every level 1..300 on the frozen phone and desktop boards
 // at one fixed seed. tests/reset/legacy-progression-ladder.test.ts compares fresh
 // generation against it, so a change to the generators, the tape, the tuner or the
-// calibration cannot silently reshuffle the ladder.
+// calibration cannot silently reshuffle the ladder. (Regenerated for the felt-difficulty ladder:
+// every level 2+ changed because the tuner, the schedule, the style bands and the
+// ceiling all changed; level 1, the corridor, is unchanged.)
 //
-//   npx vite-node --script scripts/analysis/progression-ladder-golden.ts -- --write
+//   npx vite-node scripts/analysis/progression-ladder-golden.ts --write
 //   (omit --write to print a diff summary instead)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

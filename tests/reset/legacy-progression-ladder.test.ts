@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import {
-  GEOMETRY_BUDGET_CEILING,
+  GEOMETRY_BUDGET_TOP_TARGET,
+  GEOMETRY_BUDGET_MIN_STEP,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
-  GEOMETRY_BUDGET_TARGET_STEP,
-  GEOMETRY_BUDGET_TUNING_TOLERANCE,
+  GEOMETRY_BUDGET_WINDOW,
   resolveGeometryBudgetTarget
 } from '../../src/legacy-runtime/legacyGeometryBudget';
 import {
@@ -46,23 +46,24 @@ describe('progression ladder: strictly harder every level up to the geometry cei
         const samples = [0, 1].map((index) => sampleLevel(level, board, seedForIndex(index)));
         samples.forEach((sample) => {
           expect(sample.onTarget).toBe(true);
-          expect(Math.abs(sample.proxy - resolveGeometryBudgetTarget(level)!)).toBeLessThanOrEqual(GEOMETRY_BUDGET_TUNING_TOLERANCE);
+          expect(sample.felt).toBeGreaterThanOrEqual(resolveGeometryBudgetTarget(level)!);
+          expect(sample.felt).toBeLessThanOrEqual(resolveGeometryBudgetTarget(level)! + GEOMETRY_BUDGET_WINDOW);
         });
-        const worst = Math.min(...samples.map((sample) => sample.proxy));
+        const worst = Math.min(...samples.map((sample) => sample.felt));
         expect(worst).toBeGreaterThan(previousBest);
-        previousBest = Math.max(...samples.map((sample) => sample.proxy));
+        previousBest = Math.max(...samples.map((sample) => sample.felt));
       }
     }
   }, 300_000);
 
   test('a denser seed sweep on sampled levels keeps the ordering guarantee', () => {
-    const levels = [2, 3, 9, 27, 60, 99, 100, 140, SAT - 2, SAT - 1];
+    const levels = [2, 3, 9, 27, 40, 60, 99, 100, 140, SAT - 2, SAT - 1];
     for (const board of LADDER_BOARDS) {
       for (const level of levels) {
-        const low = Array.from({ length: 10 }, (_, index) => sampleLevel(level, board, seedForIndex(index + 7)).proxy);
-        const high = Array.from({ length: 10 }, (_, index) => sampleLevel(level + 1, board, seedForIndex(index + 7)).proxy);
+        const low = Array.from({ length: 10 }, (_, index) => sampleLevel(level, board, seedForIndex(index + 7)).felt);
+        const high = Array.from({ length: 10 }, (_, index) => sampleLevel(level + 1, board, seedForIndex(index + 7)).felt);
         expect(Math.min(...high)).toBeGreaterThan(Math.max(...low));
-        expect(Math.min(...high) - Math.max(...low)).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_TARGET_STEP - (2 * GEOMETRY_BUDGET_TUNING_TOLERANCE) - 1e-9);
+        expect(Math.min(...high) - Math.max(...low)).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_MIN_STEP - GEOMETRY_BUDGET_WINDOW);
       }
     }
   }, 300_000);
@@ -90,7 +91,8 @@ describe('progression ladder: beyond the hard ceiling', () => {
         expect(hashLadderMaze(again)).toBe(hashLadderMaze(maze));
         expect(maze.solutionPath.length).toBeGreaterThan(2);
         const sample = sampleLevel(level, board, 4242 + level);
-        expect(Math.abs(sample.proxy - GEOMETRY_BUDGET_CEILING)).toBeLessThanOrEqual(GEOMETRY_BUDGET_TUNING_TOLERANCE);
+        expect(sample.felt).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_TOP_TARGET);
+        expect(sample.felt).toBeLessThanOrEqual(GEOMETRY_BUDGET_TOP_TARGET + GEOMETRY_BUDGET_WINDOW);
         hashes.add(hashLadderMaze(maze));
       }
       // Documented seed progression: the play seed still advances one per level, so the
@@ -101,7 +103,7 @@ describe('progression ladder: beyond the hard ceiling', () => {
 
   test('the geometry seam clamps at the ceiling for an arbitrarily large ordinal and never throws', () => {
     const base = createEmptyLegacyProgressionState().tracks.player;
-    for (const level of ['185', '186', '999999999999', '9'.repeat(60)]) {
+    for (const level of [String(SAT - 1), String(SAT), String(SAT + 1), '999999999999', '9'.repeat(60)]) {
       const track = { ...base, level, targetComplexity: 400 };
       expect(resolveGeometryBudgetLevel(track)).toBe(Math.min(SAT, Math.max(99, Number(level))));
       expect(resolveLegacyMazeGenerationProfileForProgression(track).geometryBudgetLevel).toBe(Math.min(SAT, Math.max(99, Number(level))));
@@ -171,7 +173,7 @@ describe('saved progression stays valid (a player at level N keeps level N)', ()
 
 describe('progression ladder golden fingerprints (levels 1..300)', () => {
   // Regenerate deliberately with
-  //   npx vite-node --script scripts/analysis/progression-ladder-golden.ts -- --write
+  //   npx vite-node scripts/analysis/progression-ladder-golden.ts --write
   // and explain the change in review: it reshuffles every player's mazes.
   const golden = JSON.parse(readFileSync(new URL('../fixtures/progression-ladder-golden.v1.json', import.meta.url), 'utf8')) as {
     seed: number;

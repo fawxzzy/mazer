@@ -1,0 +1,440 @@
+// Felt-difficulty tuning: a deterministic, integer-only post-carve stage that
+// takes one generated base maze and lands its FELT difficulty (explorer steps,
+// legacyMazeFeltDifficulty.ts) on an exact per-level target, instead of searching
+// hundreds of candidate mazes for one that happens to be close.
+//
+// Two levers, both inside the frozen board, both leaving the border ring, the
+// start and the goal alone (so wrap topology and the edge-wrap count never
+// change):
+//
+//  1. ROUTE STRETCH (switchback bumps). Pick three consecutive collinear route
+//     cells a, b, c with b a plain corridor cell, wall b off, and carve a U-shaped
+//     detour a -> a1..ad -> bd -> cd..c1 -> c on free wall space. The route gets
+//     2 * depth cells longer and cannot be short-circuited, because every carved
+//     cell touches exactly one open neighbour when it is carved (the last cell
+//     touches the previous chain cell and c). Bumps recurse: the detour has
+//     straight stretches of its own.
+//  2. DEEP DECEPTIVE BRANCHES. Dead-end branches (up to maxBranch cells, much
+//     longer than the single-tile nubs of the first ladder) hosted on cells the
+//     explorer actually visits: off the final path anywhere inside a wrong region,
+//     and on the path only with a first step that points at the goal (a lure).
+//     Hosts nearer the goal are preferred half of the time, which clusters decoys
+//     on the goal side. Extending a visited dead-end tip by a few cells and
+//     trimming one give the fine control (+-2 per cell), so any integer target is
+//     reachable to within the tolerance.
+//
+// Every move is verified by re-running the explorer on the edited grid (about
+// 20 microseconds), so the landing is exact for the real final grid, wrap loops
+// included -- there is no model between the edit and the number. A move that does
+// not bring the number closer to the target is rolled back. With a target step
+// larger than twice the tolerance, the realized felt value of adjacent levels can
+// therefore never tie or invert, for any seeds, up to the capacity ceiling.
+//
+// Pure: no ambient randomness or clock, no floats, no I/O.
+
+import { createFeltExplorer, type FeltRun } from './legacyMazeFeltDifficulty';
+
+export interface FeltTuningMaze {
+  readonly width: number;
+  readonly height: number;
+  readonly grid: ReadonlyArray<ReadonlyArray<boolean>>;
+  readonly start: { readonly x: number; readonly y: number };
+  readonly goal: { readonly x: number; readonly y: number };
+  readonly solutionPath: ReadonlyArray<{ readonly x: number; readonly y: number }>;
+}
+
+export interface FeltTuningOptions {
+  // The accept window is [target, target + overshoot] (default FELT_TUNING_OVERSHOOT):
+  // one-sided, so a target step of at least overshoot + 1 can never tie or invert.
+  readonly overshoot?: number;
+  // Route length the stretch lever aims for (cells - 1). Omit or <= current: no stretch.
+  readonly routeTarget?: number;
+  // Deepest single switchback bump (cells added per side).
+  readonly maxBumpDepth?: number;
+  // Longest deceptive branch carved in one move.
+  readonly maxBranch?: number;
+  // Hard cap on explorer evaluations per attempt (safety bound).
+  readonly maxEvals?: number;
+}
+
+export interface FeltTuningResult {
+  // New grid (the input is never mutated).
+  readonly grid: boolean[][];
+  readonly felt: number;
+  readonly target: number;
+  readonly onTarget: boolean;
+  // Route length (cells - 1) after the stretch lever, before any wrap shortcut.
+  readonly routeLength: number;
+  readonly bumps: number;
+  readonly branchesAdded: number;
+  readonly cellsTrimmed: number;
+  readonly addedTiles: { x: number; y: number }[];
+  readonly trimmedTiles: { x: number; y: number }[];
+  // Cells the stretch lever carved / removed.
+  readonly stretchTiles: { x: number; y: number }[];
+  readonly stretchRemovedTiles: { x: number; y: number }[];
+  // True when an add was needed and no site brought the number closer.
+  readonly capacityExhausted: boolean;
+  readonly evals: number;
+  // Distance of felt from the accept window (0 when onTarget).
+  readonly windowDistance: number;
+  // The base's own route is already longer than the target allows (route cells
+  // are never removed), so no edit can land; nothing was tried.
+  readonly hopeless: boolean;
+}
+
+export const FELT_TUNING_OVERSHOOT = 1;
+export const FELT_TUNING_DEFAULT_MAX_BRANCH = 24;
+export const FELT_TUNING_DEFAULT_MAX_BUMP_DEPTH = 12;
+export const FELT_TUNING_DEFAULT_MAX_EVALS = 700;
+export const FELT_TUNING_ATTEMPTS = 6;
+
+const createStream = (seed: number): (() => number) => {
+  let state = (Math.imul(seed >>> 0, 0x9e3779b1) ^ 0x85ebca6b) >>> 0 || 1;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state >>> 8;
+  };
+};
+
+const tuneOnce = (
+  maze: FeltTuningMaze,
+  target: number,
+  seed: number,
+  options: FeltTuningOptions
+): FeltTuningResult => {
+  const overshoot = options.overshoot ?? FELT_TUNING_OVERSHOOT;
+  // Distance of a felt value from the accept window [target, target + overshoot].
+  const windowGap = (value: number): number => (value < target ? target - value : (value > target + overshoot ? value - target - overshoot : 0));
+  const maxBranch = Math.max(4, options.maxBranch ?? FELT_TUNING_DEFAULT_MAX_BRANCH);
+  const maxBumpDepth = Math.max(1, options.maxBumpDepth ?? FELT_TUNING_DEFAULT_MAX_BUMP_DEPTH);
+  const maxEvals = options.maxEvals ?? FELT_TUNING_DEFAULT_MAX_EVALS;
+  const { width, height } = maze;
+  const size = width * height;
+  const open = new Uint8Array(size);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (maze.grid[y]?.[x] === true) { open[(y * width) + x] = 1; }
+    }
+  }
+  const startCell = (maze.start.y * width) + maze.start.x;
+  const goalCell = (maze.goal.y * width) + maze.goal.x;
+  const goalX = maze.goal.x;
+  const goalY = maze.goal.y;
+  const explorer = createFeltExplorer(width, height);
+  const rand = createStream(seed);
+
+  const interior = (cell: number): boolean => {
+    const x = cell % width;
+    const y = (cell - x) / width;
+    return x >= 1 && y >= 1 && x <= width - 2 && y <= height - 2;
+  };
+  const openCount = (cell: number): number => {
+    let n = 0;
+    for (let d = 0; d < 4; d += 1) { n += open[explorer.neighbors[(cell * 4) + d]!]!; }
+    return n;
+  };
+  const dist2 = (cell: number): number => {
+    const x = cell % width;
+    const y = (cell - x) / width;
+    const dx = Math.min(Math.abs(x - goalX), width - Math.abs(x - goalX));
+    const dy = Math.min(Math.abs(y - goalY), height - Math.abs(y - goalY));
+    return (dx * dx) + (dy * dy);
+  };
+  const point = (cell: number): { x: number; y: number } => ({ x: cell % width, y: (cell - (cell % width)) / width });
+  const step = [1, -1, width, -width] as const;
+
+  // Cells never trimmed: the base route, and every cell the stretch lever carves.
+  const onRoute = new Uint8Array(size);
+  maze.solutionPath.forEach((p) => { onRoute[(p.y * width) + p.x] = 1; });
+
+  let evals = 0;
+  const evaluate = (): FeltRun => { evals += 1; return explorer.run(open, startCell, goalCell); };
+
+  // ---- Lever 1: route stretch ------------------------------------------------
+  // The route that is stretched is the explorer's final path: the way a player
+  // actually walks, which on a maze with wrap corridors can be much shorter than
+  // the direct-floor solution path.
+  const stretchTiles: { x: number; y: number }[] = [];
+  const stretchRemovedTiles: { x: number; y: number }[] = [];
+  let bumps = 0;
+  let run = evaluate();
+  let routeLength = run.pathLength;
+  const hopeless = run.reachedGoal && run.pathLength > target + overshoot;
+
+  // Try one switchback bump on a random straight stretch of the explorer's path,
+  // `depthWanted` deep (shallower when it does not fit). It is kept only when
+  // `accept` approves the re-run explorer; otherwise it is rolled back.
+  const tryBump = (depthWanted: number, accept: (next: FeltRun) => boolean): boolean => {
+    const path: number[] = [];
+    for (let cell = startCell; cell >= 0 && path.length <= size; cell = run.pathNext[cell]!) { path.push(cell); if (cell === goalCell) { break; } }
+    const i = rand() % Math.max(1, path.length - 2);
+    const a = path[i]!;
+    const b = path[i + 1];
+    const c = path[i + 2];
+    if (b === undefined || c === undefined || b - a !== c - b
+      || !(Math.abs(b - a) === 1 || Math.abs(b - a) === width)
+      || !interior(a) || !interior(b) || !interior(c) || openCount(b) !== 2
+      || b === startCell || b === goalCell) {
+      return false;
+    }
+    const axis = b - a;
+    const perps = Math.abs(axis) === 1 ? [width, -width] : [1, -1];
+    const first = rand() % 2;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const p = perps[(first + attempt) % 2]!;
+      for (let d = depthWanted; d >= 1; d -= 1) {
+        // Chain: a1..ad, bd, cd..c1.
+        const chain: number[] = [];
+        for (let k = 1; k <= d; k += 1) { chain.push(a + (k * p)); }
+        chain.push(b + (d * p));
+        for (let k = d; k >= 1; k -= 1) { chain.push(c + (k * p)); }
+        open[b] = 0;
+        const carved: number[] = [];
+        let ok = true;
+        for (let k = 0; k < chain.length && ok; k += 1) {
+          const cell = chain[k]!;
+          const last = k === chain.length - 1;
+          if (!interior(cell) || open[cell] === 1 || openCount(cell) !== (last ? 2 : 1)) { ok = false; break; }
+          open[cell] = 1;
+          carved.push(cell);
+        }
+        if (ok) {
+          const next = evaluate();
+          if (next.reachedGoal && accept(next)) {
+            run = next;
+            routeLength = next.pathLength;
+            chain.forEach((cell) => { onRoute[cell] = 1; stretchTiles.push(point(cell)); });
+            stretchRemovedTiles.push(point(b));
+            bumps += 1;
+            return true;
+          }
+        }
+        carved.forEach((cell) => { open[cell] = 0; });
+        open[b] = 1;
+        // A rejected re-run overwrote the explorer's shared buffers: refresh them
+        // so `run` describes the (restored) grid again.
+        if (ok) { run = evaluate(); }
+      }
+    }
+    return false;
+  };
+
+  // Never stretch the route past the felt target itself (the route is part of it).
+  const routeTarget = Math.min(options.routeTarget ?? 0, target - 8);
+  if (routeTarget > routeLength && run.reachedGoal && !hopeless) {
+    let failures = 0;
+    while (routeLength < routeTarget && failures < 160) {
+      const wanted = Math.max(1, Math.min(maxBumpDepth, Math.floor((routeTarget - routeLength) / 2)));
+      const before = routeLength;
+      if (!tryBump(1 + (rand() % wanted), (next) => next.pathLength > before && next.pathLength <= routeTarget + 1)) { failures += 1; }
+    }
+    run = evaluate();
+  }
+
+  // ---- Lever 2: deceptive branches, tips and trims --------------------------
+  const addedTiles: { x: number; y: number }[] = [];
+  const trimmedTiles: { x: number; y: number }[] = [];
+  let branchesAdded = 0;
+  let cellsTrimmed = 0;
+  let capacityExhausted = false;
+
+  // Carve up to `length` cells from `host` heading into `dir0` (a cell index
+  // offset index into `step`). Returns the carved cells (possibly fewer).
+  const carveBranch = (host: number, dirIndex: number, length: number): number[] => {
+    const carved: number[] = [];
+    let cell = host + step[dirIndex]!;
+    if (!interior(cell) || open[cell] === 1 || openCount(cell) !== 1) { return carved; }
+    let heading = dirIndex;
+    for (;;) {
+      open[cell] = 1;
+      carved.push(cell);
+      if (carved.length >= length) { break; }
+      const straightFirst = (rand() % 3) !== 0;
+      const turnA = (heading < 2 ? 2 : 0) + (rand() & 1);
+      const turnB = (heading < 2 ? 2 : 0) + (1 - (turnA & 1));
+      const order = straightFirst ? [heading, turnA, turnB] : [turnA, heading, turnB];
+      let moved = false;
+      for (const next of order) {
+        const candidate = cell + step[next]!;
+        if (interior(candidate) && open[candidate] !== 1 && openCount(candidate) === 1) {
+          cell = candidate;
+          heading = next;
+          moved = true;
+          break;
+        }
+      }
+      if (!moved) { break; }
+    }
+    return carved;
+  };
+
+  // Remove up to `count` cells from a dead-end tip back toward its junction.
+  const trimTip = (tip: number, count: number): number[] => {
+    const removed: number[] = [];
+    let cell = tip;
+    while (removed.length < count) {
+      if (open[cell] !== 1 || onRoute[cell] === 1 || cell === startCell || cell === goalCell || !interior(cell) || openCount(cell) > 1) { break; }
+      let parent = -1;
+      for (let d = 0; d < 4; d += 1) {
+        const next = explorer.neighbors[(cell * 4) + d]!;
+        if (open[next] === 1) { parent = next; }
+      }
+      open[cell] = 0;
+      removed.push(cell);
+      if (parent < 0) { break; }
+      cell = parent;
+    }
+    return removed;
+  };
+
+  let felt = run.steps;
+  let failures = 0;
+  const failureCap = 40;
+  let branchLimit = maxBranch;
+  while (evals < maxEvals && !hopeless && windowGap(felt) > 0) {
+    const gap = target - felt;
+    let edited: number[] = [];
+    let trimmed: number[] = [];
+    let bumped = false;
+    let mode: 'branch' | 'tip' | 'trim' = 'branch';
+    if (gap > 0) {
+      const wanted = Math.floor(gap / 2);
+      mode = wanted >= 4 ? 'branch' : 'tip';
+      // Probe visited cells (productive hosts); carve; keep the first carve long
+      // enough to matter (a branch of 3 cells or fewer is a visible nub and
+      // costs the explorer nothing), else undo and probe again.
+      // Half of the full-size branches are first tried on the route itself (more
+      // choices for the player on the way), the rest anywhere the explorer goes.
+      const routeFirst = mode === 'branch' && (rand() & 1) === 0;
+      const usable = (cell: number, strict = routeFirst): boolean => (
+        open[cell] === 1 && run.visited[cell] === 1 && cell !== startCell && cell !== goalCell && interior(cell)
+        && (mode !== 'tip' || (openCount(cell) === 1 && run.onPath[cell] !== 1))
+        && (!strict || run.onPath[cell] === 1)
+      );
+      const length = mode === 'branch' ? Math.min(wanted, branchLimit) : Math.max(1, Math.min(wanted, 12));
+      const minimum = mode === 'branch' ? Math.min(length, 4) : 1;
+      for (let trial = 0; trial < 90 && edited.length === 0; trial += 1) {
+        const strict = routeFirst && trial < 45;
+        let chosen = rand() % size;
+        if (!usable(chosen, strict)) { continue; }
+        // Goal-side clustering: half the time keep the nearer of two probes.
+        if ((rand() & 1) === 0) {
+          const other = rand() % size;
+          if (usable(other, strict) && dist2(other) < dist2(chosen)) { chosen = other; }
+        }
+        const startDir = rand() % 4;
+        for (let k = 0; k < 4 && edited.length === 0; k += 1) {
+          const dir = (startDir + k) % 4;
+          const entry = chosen + step[dir]!;
+          if (!interior(entry) || open[entry] === 1 || openCount(entry) !== 1) { continue; }
+          if (run.onPath[chosen] === 1) {
+            const next = run.pathNext[chosen]!;
+            if (next < 0 || dist2(entry) >= dist2(next)) { continue; }
+          }
+          const carved = carveBranch(chosen, dir, length);
+          if (carved.length >= minimum) {
+            edited = carved;
+          } else {
+            carved.forEach((cell) => { open[cell] = 0; });
+          }
+        }
+      }
+      // No dead-end tip to extend (a bare base): a switchback bump of depth gap/2
+      // adds exactly the missing 2 per level of depth to the route instead.
+      if (edited.length === 0 && mode === 'tip') {
+        const gapBefore = windowGap(felt);
+        bumped = tryBump(Math.max(1, Math.min(wanted, maxBumpDepth)), (next) => windowGap(next.steps) < gapBefore);
+        if (bumped) { felt = run.steps; }
+      }
+    } else {
+      mode = 'trim';
+      let tip = -1;
+      for (let probe = 0; probe < 80 && tip < 0; probe += 1) {
+        const cell = rand() % size;
+        if (open[cell] === 1 && run.visited[cell] === 1 && run.onPath[cell] !== 1 && onRoute[cell] !== 1
+          && cell !== startCell && cell !== goalCell && interior(cell) && openCount(cell) === 1) {
+          tip = cell;
+        }
+      }
+      if (tip >= 0) {
+        trimmed = trimTip(tip, Math.max(1, Math.ceil((-gap - overshoot) / 2)));
+      }
+    }
+    let accepted = bumped;
+    if (edited.length > 0 || trimmed.length > 0) {
+      const next = evaluate();
+      if (windowGap(next.steps) < windowGap(felt)) {
+        accepted = true;
+        run = next;
+        felt = next.steps;
+        if (edited.length > 0) {
+          if (mode === 'branch') { branchesAdded += 1; }
+          edited.forEach((cell) => addedTiles.push(point(cell)));
+        }
+        trimmed.forEach((cell) => trimmedTiles.push(point(cell)));
+        cellsTrimmed += trimmed.length;
+      } else {
+        edited.forEach((cell) => { open[cell] = 0; });
+        trimmed.forEach((cell) => { open[cell] = 1; });
+        // The rollback left the grid as `run` saw it; run arrays stay valid
+        // only if nothing re-ran, so refresh them.
+        run = evaluate();
+      }
+    }
+    if (accepted) {
+      failures = 0;
+    } else {
+      failures += 1;
+      if (failures % 12 === 0) { branchLimit = Math.max(4, Math.floor(branchLimit / 2)); }
+      if (failures >= failureCap) {
+        capacityExhausted = gap > 0;
+        break;
+      }
+    }
+  }
+
+  const grid: boolean[][] = [];
+  for (let y = 0; y < height; y += 1) {
+    const row: boolean[] = [];
+    for (let x = 0; x < width; x += 1) { row.push(open[(y * width) + x] === 1); }
+    grid.push(row);
+  }
+  return {
+    grid,
+    felt,
+    target,
+    onTarget: windowGap(felt) === 0,
+    routeLength,
+    bumps,
+    branchesAdded,
+    cellsTrimmed,
+    addedTiles,
+    trimmedTiles,
+    stretchTiles,
+    stretchRemovedTiles,
+    capacityExhausted,
+    evals,
+    windowDistance: windowGap(felt),
+    hopeless
+  };
+};
+
+// Cheap restarts from the untouched base with another deterministic stream (a
+// pass costs about a millisecond, far less than building another base maze). The
+// first pass that lands wins; otherwise the closest one is returned.
+export const tuneMazeFeltToTarget = (
+  maze: FeltTuningMaze,
+  target: number,
+  seed: number,
+  options: FeltTuningOptions = {}
+): FeltTuningResult => {
+  let best: FeltTuningResult | null = null;
+  for (let attempt = 0; attempt < FELT_TUNING_ATTEMPTS; attempt += 1) {
+    const result = tuneOnce(maze, target, (Math.imul(seed >>> 0, 0x2545f491) + Math.imul(attempt, 0x9e3779b1)) >>> 0, options);
+    if (best === null || result.windowDistance < best.windowDistance) { best = result; }
+    if (result.onTarget || result.hopeless) { break; }
+    if (result.capacityExhausted && attempt >= 2) { break; }
+  }
+  return best!;
+};

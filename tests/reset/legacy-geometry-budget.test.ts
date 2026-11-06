@@ -3,72 +3,48 @@ import { describe, expect, test } from 'vitest';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import {
   GEOMETRY_BUDGET_BASE_CANDIDATES,
-  GEOMETRY_BUDGET_BASE_OFFSET,
   GEOMETRY_BUDGET_CEILING,
-  GEOMETRY_BUDGET_RUNGS_BY_LEVEL,
+  GEOMETRY_BUDGET_MIN_STEP,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
-  GEOMETRY_BUDGET_START,
+  GEOMETRY_BUDGET_STYLE_BANDS,
+  GEOMETRY_BUDGET_TOP_TARGET,
+  GEOMETRY_BUDGET_TAIL_STEP,
   GEOMETRY_BUDGET_TAPE,
-  GEOMETRY_BUDGET_TAPE_LENGTH,
-  GEOMETRY_BUDGET_TARGET_STEP,
-  GEOMETRY_BUDGET_TUNING_TOLERANCE,
+  GEOMETRY_BUDGET_WINDOW,
   LAST_BUDGET_LEVEL,
   measureGeometryBudgetProxy,
   resolveContinuousDifficulty,
   resolveGeometryBudgetCandidateSeed,
+  resolveGeometryBudgetMaxBranch,
   resolveGeometryBudgetProfile,
   resolveGeometryBudgetProfileForRungs,
+  resolveGeometryBudgetRouteTarget,
   resolveGeometryBudgetRungCount,
+  resolveGeometryBudgetSchedule,
   resolveGeometryBudgetTarget
 } from '../../src/legacy-runtime/legacyGeometryBudget';
+import { measureFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import { normalizeLegacyMazeGenerationProfile } from '../../src/legacy-runtime/legacyMaze';
-import { resolveLegacyMazeComplexity } from '../../src/legacy-runtime/legacyProgression';
 
-const withoutGateKey = (level: number) => {
-  const { geometryBudgetLevel: _ignored, ...rest } = resolveGeometryBudgetProfile(level);
-  void _ignored;
-  return rest;
-};
-
-describe('geometry budget tape', () => {
-  test('has the measured rung order and unlock positions', () => {
-    // 44 priced rungs plus the 4 appended feeder rungs (5..8 per side).
-    expect(GEOMETRY_BUDGET_TAPE.length).toBe(48);
-    expect(GEOMETRY_BUDGET_TAPE_LENGTH).toBe(48);
-    const labels = GEOMETRY_BUDGET_TAPE.map((rung) => rung.label);
-    expect(labels.slice(0, 8)).toEqual([
-      'branch:2', 'branch:3', 'dead:1', 'dead:2', 'wrap:h', 'branch:4', 'wrap:v', 'dead:3'
-    ]);
-    expect(labels[43]).toBe('branch:m1.6');
-    expect(labels.slice(44)).toEqual(['wrap:5', 'wrap:6', 'wrap:7', 'wrap:8']);
-    // Spending-space unlock spacing K = 5: branches first, then dead ends, then wraps.
-    expect(labels.findIndex((label) => label.startsWith('branch'))).toBe(0);
-    expect(labels.findIndex((label) => label.startsWith('dead'))).toBe(2);
-    expect(labels.findIndex((label) => label.startsWith('wrap'))).toBe(4);
-  });
-
-  test('each structure dimension only ever grows along the tape', () => {
-    let previous = resolveGeometryBudgetProfileForRungs(0);
-    for (let rungs = 1; rungs <= GEOMETRY_BUDGET_TAPE_LENGTH; rungs += 1) {
-      const next = resolveGeometryBudgetProfileForRungs(rungs);
-      const branches = (p: typeof next): number => (
-        p.checkpointCountOverride === null ? 1000 + (p.checkpointCountMultiplier * 100) : p.checkpointCountOverride
-      );
-      expect(branches(next)).toBeGreaterThanOrEqual(branches(previous));
-      const dead = (p: typeof next): number => p.maxDeadEndCount ?? Number.POSITIVE_INFINITY;
-      expect(dead(next)).toBeGreaterThanOrEqual(dead(previous));
-      expect(next.borderFeederTargetPerSide ?? 0).toBeGreaterThanOrEqual(previous.borderFeederTargetPerSide ?? 0);
-      expect(Number(next.requiredOppositeBorderConnections.horizontal))
-        .toBeGreaterThanOrEqual(Number(previous.requiredOppositeBorderConnections.horizontal));
-      expect(Number(next.requiredOppositeBorderConnections.vertical))
-        .toBeGreaterThanOrEqual(Number(previous.requiredOppositeBorderConnections.vertical));
-      // Every rung changes the profile.
-      expect(JSON.stringify(next)).not.toBe(JSON.stringify(previous));
-      previous = next;
+describe('geometry budget style bands', () => {
+  test('the tape is two wrap corridors and the bands pick how many a level owns', () => {
+    expect(GEOMETRY_BUDGET_TAPE).toEqual(['wrap:v', 'wrap:h']);
+    expect(GEOMETRY_BUDGET_STYLE_BANDS[0]).toEqual({ fromLevel: 2, rungs: 0 });
+    let previous = -1;
+    for (const band of GEOMETRY_BUDGET_STYLE_BANDS) {
+      expect(band.fromLevel).toBeGreaterThan(previous);
+      expect(band.rungs).toBeGreaterThanOrEqual(0);
+      expect(band.rungs).toBeLessThanOrEqual(GEOMETRY_BUDGET_TAPE.length);
+      previous = band.fromLevel;
     }
-    // The tape clamps: more rungs than exist is the full tape.
-    expect(resolveGeometryBudgetProfileForRungs(GEOMETRY_BUDGET_TAPE_LENGTH + 50))
-      .toEqual(resolveGeometryBudgetProfileForRungs(GEOMETRY_BUDGET_TAPE_LENGTH));
+    expect(resolveGeometryBudgetRungCount(2)).toBe(0);
+    expect(resolveGeometryBudgetRungCount(10)).toBe(1);
+    expect(resolveGeometryBudgetRungCount(30)).toBe(2);
+    expect(resolveGeometryBudgetRungCount(119)).toBe(2);
+    // The top of the ladder uses plain bases: the wrap corridors cost felt headroom.
+    expect(resolveGeometryBudgetRungCount(120)).toBe(0);
+    expect(resolveGeometryBudgetRungCount(LAST_BUDGET_LEVEL)).toBe(0);
+    expect(resolveGeometryBudgetRungCount(1_000_000)).toBe(0);
   });
 
   test('profiles carry no layout key, fixed base knobs and the gate key', () => {
@@ -76,16 +52,20 @@ describe('geometry budget tape', () => {
       const profile = resolveGeometryBudgetProfile(level);
       expect(Object.prototype.hasOwnProperty.call(profile, 'layout')).toBe(false);
       expect(profile.geometryBudgetLevel).toBe(level);
-      expect(profile.straightnessBias).toBe(0.95);
+      expect(profile.straightnessBias).toBe(0.8);
       expect(profile.shortcutCountMultiplier).toBe(0);
       expect(profile.routeQualityReinforcementMultiplier).toBe(0);
       expect(profile.minCheckpoints).toBe(1);
+      expect(profile.checkpointCountOverride).toBe(1);
+      expect(profile.maxDeadEndCount).toBe(0);
+      expect(profile.borderFeederTargetPerSide).toBe(0);
     }
-    // Level 2 is the bare base profile (no rungs): one checkpoint, no wraps.
-    expect(resolveGeometryBudgetProfile(2).checkpointCountOverride).toBe(1);
     expect(resolveGeometryBudgetProfile(2).requiredOppositeBorderConnections).toEqual({ horizontal: false, vertical: false });
-    // An ungated rung profile has no gate key at all.
-    expect(Object.prototype.hasOwnProperty.call(resolveGeometryBudgetProfileForRungs(5), 'geometryBudgetLevel')).toBe(false);
+    expect(resolveGeometryBudgetProfile(15).requiredOppositeBorderConnections).toEqual({ horizontal: false, vertical: true });
+    expect(resolveGeometryBudgetProfile(60).requiredOppositeBorderConnections).toEqual({ horizontal: true, vertical: true });
+    // An ungated rung profile has no gate key at all; more rungs than exist clamp.
+    expect(Object.prototype.hasOwnProperty.call(resolveGeometryBudgetProfileForRungs(1), 'geometryBudgetLevel')).toBe(false);
+    expect(resolveGeometryBudgetProfileForRungs(99)).toEqual(resolveGeometryBudgetProfileForRungs(GEOMETRY_BUDGET_TAPE.length));
   });
 
   test('is deterministic, immutable across calls and stable under normalization', () => {
@@ -97,15 +77,16 @@ describe('geometry budget tape', () => {
       expect(first.requiredOppositeBorderConnections).not.toBe(second.requiredOppositeBorderConnections);
       expect(normalizeLegacyMazeGenerationProfile(first)).toEqual(first);
     }
-    // Mutating a returned profile must not leak into later calls.
-    const mutated = resolveGeometryBudgetProfile(LAST_BUDGET_LEVEL);
+    const mutated = resolveGeometryBudgetProfile(60);
     mutated.requiredOppositeBorderConnections.horizontal = false;
-    expect(resolveGeometryBudgetProfile(LAST_BUDGET_LEVEL).requiredOppositeBorderConnections.horizontal).toBe(true);
+    expect(resolveGeometryBudgetProfile(60).requiredOppositeBorderConnections.horizontal).toBe(true);
   });
 
   test('module source is free of ambient nondeterminism', () => {
-    const source = readFileSync(new URL('../../src/legacy-runtime/legacyGeometryBudget.ts', import.meta.url), 'utf8');
-    expect(source).not.toMatch(/Math\.random|Date\.now|new Date|performance\.now/);
+    for (const file of ['legacyGeometryBudget', 'legacyMazeFeltTuning', 'legacyMazeFeltDifficulty']) {
+      const source = readFileSync(new URL(`../../src/legacy-runtime/${file}.ts`, import.meta.url), 'utf8');
+      expect(source).not.toMatch(/Math\.random|Date\.now|new Date|performance\.now/);
+    }
   });
 });
 
@@ -126,7 +107,7 @@ describe('geometry budget profile normalization', () => {
   });
 });
 
-describe('geometry budget proxy', () => {
+describe('geometry budget proxy (secondary H1 guard)', () => {
   const point = (x: number, y: number) => ({ x, y });
 
   test('counts turns, length, splits, dead ends and wraps with the documented weights', () => {
@@ -181,64 +162,64 @@ describe('geometry budget candidate seeds', () => {
 });
 
 describe('continuous difficulty function D(level)', () => {
-  test('T(N) rises by exactly the step bound from START and flattens at CEILING', () => {
-    expect(GEOMETRY_BUDGET_TARGET_STEP).toBe(3);
-    expect(resolveGeometryBudgetTarget(2)).toBe(GEOMETRY_BUDGET_START);
-    // The last ramp step is a full step: CEILING sits exactly on the step grid.
-    expect((GEOMETRY_BUDGET_CEILING - GEOMETRY_BUDGET_START) % GEOMETRY_BUDGET_TARGET_STEP).toBe(0);
+  test('the schedule is a felt-step target that rises by at least window + 1 per level and flattens at CEILING', () => {
+    expect(GEOMETRY_BUDGET_WINDOW).toBe(1);
+    expect(GEOMETRY_BUDGET_MIN_STEP).toBe(GEOMETRY_BUDGET_WINDOW + 1);
+    expect(GEOMETRY_BUDGET_TAIL_STEP).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_MIN_STEP);
+    expect(resolveGeometryBudgetTarget(2)).toBe(89);
+    let maxStep = 0;
     for (let level = 3; level <= LAST_BUDGET_LEVEL; level += 1) {
-      expect(resolveGeometryBudgetTarget(level)! - resolveGeometryBudgetTarget(level - 1)!).toBe(GEOMETRY_BUDGET_TARGET_STEP);
+      const step = resolveGeometryBudgetTarget(level)! - resolveGeometryBudgetTarget(level - 1)!;
+      if (level < GEOMETRY_BUDGET_SATURATION_LEVEL) {
+        expect(step).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_MIN_STEP);
+      }
+      maxStep = Math.max(maxStep, step);
     }
-    expect(resolveGeometryBudgetTarget(GEOMETRY_BUDGET_SATURATION_LEVEL)).toBe(GEOMETRY_BUDGET_CEILING);
-    expect(resolveGeometryBudgetTarget(GEOMETRY_BUDGET_SATURATION_LEVEL - 1))
-      .toBe(GEOMETRY_BUDGET_CEILING - GEOMETRY_BUDGET_TARGET_STEP);
+    // The early steep part is the largest step anywhere; the tail is the minimum step.
+    expect(maxStep).toBeLessThanOrEqual(27);
+    expect(resolveGeometryBudgetTarget(GEOMETRY_BUDGET_SATURATION_LEVEL)).toBe(GEOMETRY_BUDGET_TOP_TARGET);
+    expect(resolveGeometryBudgetTarget(GEOMETRY_BUDGET_SATURATION_LEVEL - 1)).toBeLessThan(GEOMETRY_BUDGET_TOP_TARGET);
     expect(resolveGeometryBudgetTarget(1)).toBeNull();
     expect(resolveGeometryBudgetTarget(LAST_BUDGET_LEVEL + 1)).toBeNull();
     expect(resolveGeometryBudgetTarget(Number.NaN)).toBeNull();
+    // Past the knee the schedule is the plain tail.
+    expect(resolveGeometryBudgetSchedule(41) - resolveGeometryBudgetSchedule(40)).toBe(GEOMETRY_BUDGET_TAIL_STEP);
+    expect(resolveGeometryBudgetSchedule(36)).toBe(435);
   });
 
   test('the saturation level is derived from the data and is the last bounded level', () => {
-    expect(GEOMETRY_BUDGET_SATURATION_LEVEL)
-      .toBe(2 + ((GEOMETRY_BUDGET_CEILING - GEOMETRY_BUDGET_START) / GEOMETRY_BUDGET_TARGET_STEP));
+    expect(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_SATURATION_LEVEL)).toBeLessThanOrEqual(GEOMETRY_BUDGET_CEILING);
+    expect(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_SATURATION_LEVEL + 1)).toBeGreaterThan(GEOMETRY_BUDGET_CEILING);
+    expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_SATURATION_LEVEL));
     expect(LAST_BUDGET_LEVEL).toBe(GEOMETRY_BUDGET_SATURATION_LEVEL);
     // Measured hard ceiling of the frozen board (see scripts/analysis/generate-geometry-budget-targets.ts).
-    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(185);
-    expect(GEOMETRY_BUDGET_CEILING).toBe(588);
+    expect(GEOMETRY_BUDGET_CEILING).toBe(780);
+    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(208);
+    expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(779);
   });
 
-  test('the baked rung table covers 2..saturation, never decreases and stays on the tape', () => {
-    expect(Object.keys(GEOMETRY_BUDGET_RUNGS_BY_LEVEL).map(Number)).toEqual(
-      Array.from({ length: GEOMETRY_BUDGET_SATURATION_LEVEL - 1 }, (_, index) => index + 2)
-    );
-    let previous = 0;
-    for (let level = 2; level <= GEOMETRY_BUDGET_SATURATION_LEVEL; level += 1) {
-      const rungs = GEOMETRY_BUDGET_RUNGS_BY_LEVEL[level]!;
-      expect(Number.isInteger(rungs)).toBe(true);
-      expect(rungs).toBeGreaterThanOrEqual(previous);
-      expect(rungs).toBeLessThanOrEqual(GEOMETRY_BUDGET_TAPE_LENGTH);
-      previous = rungs;
+  test('route target and branch cap rise with the level and stay inside their budgets', () => {
+    let previousRoute = -1;
+    let previousBranch = -1;
+    for (let level = 2; level <= LAST_BUDGET_LEVEL; level += 1) {
+      const route = resolveGeometryBudgetRouteTarget(level);
+      const branch = resolveGeometryBudgetMaxBranch(level);
+      expect(route).toBeGreaterThanOrEqual(previousRoute);
+      expect(branch).toBeGreaterThanOrEqual(previousBranch);
+      expect(route).toBeLessThan(resolveGeometryBudgetTarget(level)!);
+      expect(branch).toBeGreaterThanOrEqual(8);
+      expect(branch).toBeLessThanOrEqual(40);
+      previousRoute = route;
+      previousBranch = branch;
     }
-    expect(GEOMETRY_BUDGET_RUNGS_BY_LEVEL[2]).toBe(0);
-    // Past saturation the content is frozen: the same rung count, every level.
-    for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, LAST_BUDGET_LEVEL, LAST_BUDGET_LEVEL + 1, 500, 5000]) {
-      expect(resolveGeometryBudgetRungCount(level)).toBe(GEOMETRY_BUDGET_RUNGS_BY_LEVEL[GEOMETRY_BUDGET_SATURATION_LEVEL]);
-    }
-    // The tape runs out before the ceiling: the top levels are the full tape plus decoys.
-    expect(GEOMETRY_BUDGET_RUNGS_BY_LEVEL[GEOMETRY_BUDGET_SATURATION_LEVEL]).toBe(GEOMETRY_BUDGET_TAPE_LENGTH);
+    // The calibration script samples capacity at route target 300 / branch cap 40.
+    expect(resolveGeometryBudgetRouteTarget(LAST_BUDGET_LEVEL)).toBeLessThanOrEqual(300);
+    expect(resolveGeometryBudgetMaxBranch(LAST_BUDGET_LEVEL)).toBe(40);
+    expect(resolveGeometryBudgetRouteTarget(500)).toBe(resolveGeometryBudgetRouteTarget(LAST_BUDGET_LEVEL));
   });
 
-  test('once the tape is exhausted the content profile is frozen and only the target (decoy count) rises', () => {
-    const firstFull = Object.keys(GEOMETRY_BUDGET_RUNGS_BY_LEVEL).map(Number)
-      .find((level) => GEOMETRY_BUDGET_RUNGS_BY_LEVEL[level] === GEOMETRY_BUDGET_TAPE_LENGTH)!;
-    expect(firstFull).toBeLessThan(GEOMETRY_BUDGET_SATURATION_LEVEL);
-    for (let level = firstFull; level <= LAST_BUDGET_LEVEL; level += 1) {
-      expect(withoutGateKey(level)).toEqual(withoutGateKey(firstFull));
-    }
-    expect(withoutGateKey(firstFull - 1)).not.toEqual(withoutGateKey(firstFull));
-  });
-
-  test('the tuning tolerance is narrower than half the step, so tuned mazes of adjacent levels cannot tie or invert', () => {
-    expect(2 * GEOMETRY_BUDGET_TUNING_TOLERANCE).toBeLessThan(GEOMETRY_BUDGET_TARGET_STEP);
+  test('the accept window is narrower than the step, so tuned mazes of adjacent levels cannot tie or invert', () => {
+    expect(GEOMETRY_BUDGET_WINDOW).toBeLessThan(GEOMETRY_BUDGET_MIN_STEP);
     expect(GEOMETRY_BUDGET_BASE_CANDIDATES).toBeGreaterThanOrEqual(8);
   });
 
@@ -250,20 +231,18 @@ describe('continuous difficulty function D(level)', () => {
     expect(ramp).toMatchObject({ regime: 'ramp', geometrySaturated: false, hazardBudgetLevels: 0 });
     const atCeiling = resolveContinuousDifficulty(GEOMETRY_BUDGET_SATURATION_LEVEL);
     expect(atCeiling).toMatchObject({
-      regime: 'plateau', geometryTarget: GEOMETRY_BUDGET_CEILING, geometrySaturated: true, hazardBudgetLevels: 0
+      regime: 'plateau', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: true, hazardBudgetLevels: 0
     });
     let previousHazard = -1;
-    for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, GEOMETRY_BUDGET_SATURATION_LEVEL + 1, 200, 250, 300, 500, 1_000_000]) {
+    for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, GEOMETRY_BUDGET_SATURATION_LEVEL + 1, 300, 500, 1_000_000]) {
       const difficulty = resolveContinuousDifficulty(level);
-      expect(difficulty.geometryTarget).toBe(GEOMETRY_BUDGET_CEILING);
+      expect(difficulty.geometryTarget).toBe(GEOMETRY_BUDGET_TOP_TARGET);
       expect(difficulty.geometryRungs).toBe(atCeiling.geometryRungs);
       expect(difficulty.hazardBudgetLevels).toBe(level - GEOMETRY_BUDGET_SATURATION_LEVEL);
       expect(difficulty.hazardBudgetLevels).toBeGreaterThan(previousHazard);
       previousHazard = difficulty.hazardBudgetLevels;
     }
-    // Exactly +1 owed hazard level per completed level, with no cycle or cap.
     expect(resolveContinuousDifficulty(301).hazardBudgetLevels - resolveContinuousDifficulty(300).hazardBudgetLevels).toBe(1);
-    // Every ramp level below the ceiling owes nothing and has its own, strictly rising target.
     let previousTarget = 0;
     for (let level = 2; level < GEOMETRY_BUDGET_SATURATION_LEVEL; level += 1) {
       const difficulty = resolveContinuousDifficulty(level);
@@ -272,32 +251,23 @@ describe('continuous difficulty function D(level)', () => {
       expect(difficulty.geometryTarget!).toBeGreaterThan(previousTarget);
       previousTarget = difficulty.geometryTarget!;
     }
-    // Total over bad input.
     expect(resolveContinuousDifficulty(Number.NaN).regime).toBe('corridor');
     expect(resolveContinuousDifficulty(-5).regime).toBe('corridor');
   });
 
-  test('baked calibration still describes freshly generated mazes (spot check; the full recomputation is the script --check)', () => {
-    // Each spot-checked level's ungated pool must be within the widest rung gap
-    // of its target: a reordered tape or a changed generator fails this.
-    // Levels whose target is still inside the tape's own range (the top levels are
-    // decoy-tuned past it, covered by the ladder tests).
-    for (const level of [2, 14, 27, 44, 100]) {
-      const { geometryBudgetLevel: _ignored, ...profile } = resolveGeometryBudgetProfile(level);
-      void _ignored;
-      const values: number[] = [];
-      [23 / 51, 45 / 27, 1].forEach((aspectRatio, boardIndex) => {
-        for (let index = 0; index < 14; index += 1) {
+  test('freshly generated mazes land in [T, T + window] (spot check; the ladder tests sweep every level)', () => {
+    for (const level of [2, 14, 27, 44, 100, 180, GEOMETRY_BUDGET_SATURATION_LEVEL]) {
+      const profile = resolveGeometryBudgetProfile(level);
+      [23 / 51, 45 / 27].forEach((aspectRatio, boardIndex) => {
+        for (let index = 0; index < 4; index += 1) {
           const seed = resolveGeometryBudgetCandidateSeed(910 + index, 1000 + level, boardIndex);
           const maze = createLegacyRuntimeMazeForMode('play', 35, seed, profile, {}, aspectRatio);
-          values.push(measureGeometryBudgetProxy(maze, resolveLegacyMazeComplexity(maze)).total);
+          const felt = measureFeltSteps(maze);
+          const target = resolveGeometryBudgetTarget(level)!;
+          expect(felt).toBeGreaterThanOrEqual(target);
+          expect(felt).toBeLessThanOrEqual(target + GEOMETRY_BUDGET_WINDOW);
         }
       });
-      const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-      // The base is chosen near T - BASE_OFFSET (the tuner adds the rest), and never
-      // below the bare base profile's own mean (START).
-      const expected = Math.max(GEOMETRY_BUDGET_START, resolveGeometryBudgetTarget(level)! - GEOMETRY_BUDGET_BASE_OFFSET);
-      expect(Math.abs(mean - expected)).toBeLessThan(26);
     }
   }, 120_000);
 });

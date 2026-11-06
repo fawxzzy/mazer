@@ -1,17 +1,17 @@
 import { describe, expect, test } from 'vitest';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import {
-  GEOMETRY_BUDGET_CEILING,
+  GEOMETRY_BUDGET_TOP_TARGET,
   GEOMETRY_BUDGET_BASE_CANDIDATES,
-  GEOMETRY_BUDGET_TUNING_TOLERANCE,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
-  GEOMETRY_BUDGET_TARGET_STEP,
+  GEOMETRY_BUDGET_WINDOW,
   LAST_BUDGET_LEVEL,
   measureGeometryBudgetProxy,
   resolveGeometryBudgetProfile,
   resolveGeometryBudgetRungCount,
   resolveGeometryBudgetTarget
 } from '../../src/legacy-runtime/legacyGeometryBudget';
+import { measureFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import { createLegacyMaze } from '../../src/legacy-runtime/legacyMaze';
 import {
   createEmptyLegacyProgressionState,
@@ -68,14 +68,12 @@ describe('geometry budget wiring (every bounded progression level 2..99)', () =>
     }
   });
 
-  test('content never shrinks with level and is frozen from the saturation level on', () => {
-    let previousRungs = 0;
+  test('the wrap-corridor style follows the bands and is frozen from the saturation level on', () => {
     for (let level = 2; level <= LAST_BUDGET_LEVEL; level += 1) {
       const profile = resolveLegacyMazeGenerationProfileForProgression(trackForLevel(level));
       const rungs = resolveGeometryBudgetRungCount(level);
-      expect(rungs).toBeGreaterThanOrEqual(previousRungs);
-      previousRungs = rungs;
       expect(profile.geometryBudgetLevel).toBe(level);
+      expect(profile.requiredOppositeBorderConnections).toEqual({ horizontal: rungs >= 2, vertical: rungs >= 1 });
       if (level >= GEOMETRY_BUDGET_SATURATION_LEVEL) {
         expect(rungs).toBe(resolveGeometryBudgetRungCount(GEOMETRY_BUDGET_SATURATION_LEVEL));
       }
@@ -175,11 +173,10 @@ describe('geometry budget wiring (every bounded progression level 2..99)', () =>
     }
   });
 
-  test('guard (d): 98 real completions walk the budget levels one at a time, then hold the plateau', () => {
+  test('guard (d): every real completion walks the budget levels one at a time, then hold the plateau', () => {
     const storage = new MemoryStorage();
     let state = createEmptyLegacyProgressionState();
     const maze = createLegacyMaze(25, 25, 1, undefined, { layout: 'corridor' });
-    let previousRungs = 0;
     for (let step = 0; step < LAST_BUDGET_LEVEL; step += 1) {
       const track = state.tracks.player;
       const profile = resolveLegacyMazeGenerationProfileForProgression(track);
@@ -189,8 +186,6 @@ describe('geometry budget wiring (every bounded progression level 2..99)', () =>
       } else {
         // Bounded level = step + 1 (+4 target per clear, clamp 400 at level 99).
         expect(profile.geometryBudgetLevel).toBe(step + 1);
-        expect(resolveGeometryBudgetRungCount(step + 1)).toBeGreaterThanOrEqual(previousRungs);
-        previousRungs = resolveGeometryBudgetRungCount(step + 1);
       }
       const receipt = createMazeCycleTelemetryReceipt({
         averageFrameMs: 16,
@@ -241,23 +236,23 @@ describe('geometry budget wiring (every bounded progression level 2..99)', () =>
       const profile = resolveLegacyMazeGenerationProfileForProgression(trackForLevel(level));
       expect(profile.geometryBudgetLevel).toBe(Math.min(level, LAST_BUDGET_LEVEL));
       expect(Object.prototype.hasOwnProperty.call(profile, 'layout')).toBe(false);
-      expect(profile.straightnessBias).toBe(0.95);
+      expect(profile.straightnessBias).toBe(0.8);
     }
     expect(LAST_BUDGET_LEVEL).toBeGreaterThan(99);
   });
 });
 
-describe('geometry budget decoy tuning (realized proxy)', () => {
-  // Each level's maze is decoy-tuned onto its exact target T(N) (+-1), and the
-  // target step (3) exceeds twice that tolerance, so realized proxies of adjacent
-  // ramp levels cannot tie or invert FOR ANY SEEDS. These fixed seeds are
-  // regression seeds; the any-two-seeds bound is asserted in
-  // legacy-progression-ladder.test.ts and the report script.
+describe('geometry budget felt tuning (realized felt difficulty)', () => {
+  // Each level's maze is felt-tuned into [T(N), T(N) + 1] and the schedule step is
+  // at least 2, so realized felt values of adjacent ramp levels cannot tie or
+  // invert FOR ANY SEEDS. These fixed seeds are regression seeds; the any-two-seeds
+  // bound is asserted in legacy-progression-ladder.test.ts and the report script.
   const SEEDS: Record<keyof typeof VIEWPORTS, number> = { phone: 3000, desktop: 1000, square: 4000 };
 
   for (const [name, viewport] of Object.entries(VIEWPORTS) as [keyof typeof VIEWPORTS, (typeof VIEWPORTS)[keyof typeof VIEWPORTS]][]) {
-    test(`realized H1 is strictly increasing for levels 2..${GEOMETRY_BUDGET_SATURATION_LEVEL} and holds the ceiling after (${name})`, () => {
+    test(`realized felt difficulty is strictly increasing for levels 2..${GEOMETRY_BUDGET_SATURATION_LEVEL} and holds the ceiling after (${name})`, () => {
       const realized: number[] = [];
+      const proxies: number[] = [];
       const dimensions = new Set<string>();
       for (const level of [...Array.from({ length: GEOMETRY_BUDGET_SATURATION_LEVEL - 1 }, (_, index) => index + 2), 250, 1000]) {
         const track = trackForLevel(level);
@@ -273,19 +268,22 @@ describe('geometry budget decoy tuning (realized proxy)', () => {
           { targetComplexity: track.targetComplexity },
           viewport.aspectRatio
         );
-        const proxy = measureGeometryBudgetProxy(maze, resolveLegacyMazeComplexity(maze)).total;
+        const felt = measureFeltSteps(maze);
         // No pressure/adaptive retry and no resize on budget levels.
         expect(maze.generation?.selection?.pressureRetryUsed).toBe(false);
         expect(maze.generation?.selection?.adaptiveRetryUsed).toBe(false);
         expect(maze.generation?.selection?.delivery).toBe('on-target');
-        expect(maze.generation?.selection?.selectedDistance).toBeLessThanOrEqual(GEOMETRY_BUDGET_TUNING_TOLERANCE);
+        expect(maze.generation?.selection?.selectedDistance).toBe(0);
         dimensions.add(`${maze.width}x${maze.height}`);
+        const target = resolveGeometryBudgetTarget(Math.min(level, LAST_BUDGET_LEVEL))!;
+        expect(felt).toBeGreaterThanOrEqual(target);
+        expect(felt).toBeLessThanOrEqual(target + GEOMETRY_BUDGET_WINDOW);
         if (level <= GEOMETRY_BUDGET_SATURATION_LEVEL) {
-          realized.push(proxy);
-          expect(Math.abs(proxy - resolveGeometryBudgetTarget(level)!)).toBeLessThanOrEqual(GEOMETRY_BUDGET_TUNING_TOLERANCE);
+          realized.push(felt);
+          proxies.push(measureGeometryBudgetProxy(maze, resolveLegacyMazeComplexity(maze)).total);
         } else {
           // Beyond the hard ceiling every level steers to the same ceiling target.
-          expect(Math.abs(proxy - GEOMETRY_BUDGET_CEILING)).toBeLessThanOrEqual(GEOMETRY_BUDGET_TUNING_TOLERANCE);
+          expect(target).toBe(GEOMETRY_BUDGET_TOP_TARGET);
         }
       }
       // Frozen board: every level realizes the same grid dimensions.
@@ -294,6 +292,16 @@ describe('geometry budget decoy tuning (realized proxy)', () => {
       for (let index = 1; index < realized.length; index += 1) {
         expect(realized[index]).toBeGreaterThan(realized[index - 1]!);
       }
+      // Secondary guard: the old H1 proxy is no longer steered. Over 40-level
+      // windows its mean must not fall away from the previous window's mean by
+      // more than 10%, and the top of the ladder must be far above the bottom.
+      const windowMean = (from: number, to: number): number => (
+        proxies.slice(from, to).reduce((sum, value) => sum + value, 0) / (to - from)
+      );
+      for (let from = 0; from + 80 <= proxies.length; from += 40) {
+        expect(windowMean(from + 40, from + 80)).toBeGreaterThan(windowMean(from, from + 40) * 0.9);
+      }
+      expect(windowMean(proxies.length - 40, proxies.length)).toBeGreaterThan(windowMean(0, 40) * 1.5);
     }, 300_000);
   }
 
@@ -303,6 +311,7 @@ describe('geometry budget decoy tuning (realized proxy)', () => {
     const first = createLegacyRuntimeMazeForMode('play', 35, 4242, profile, { candidateCount: 1, targetComplexity: track.targetComplexity }, 1);
     const second = createLegacyRuntimeMazeForMode('play', 35, 4242, profile, { targetComplexity: track.targetComplexity }, 1);
     expect(second.grid).toEqual(first.grid);
+    expect(second.solutionPath).toEqual(first.solutionPath);
     expect(second.seed).toBe(first.seed);
     expect(first.generation?.selection?.searchedCandidateCount).toBeGreaterThanOrEqual(1);
     expect(first.generation?.selection?.searchedCandidateCount).toBeLessThanOrEqual(GEOMETRY_BUDGET_BASE_CANDIDATES);

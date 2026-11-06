@@ -1826,13 +1826,13 @@ describe('legacy progression', () => {
     // feeders, but the shortcut and route-reinforcement multipliers stay at
     // their base value (they are inert at the frozen 35-scale).
     expect(tutorialBudget.shortcutCount).toBe(0);
-    // Level 87's rung prefix is branch-count driven (an explicit checkpoint count,
-    // not the multiplier, which only the tape's tail releases).
-    expect(mythicProfile.checkpointCountOverride === null
-      || mythicProfile.checkpointCountOverride > (tutorialProfile.checkpointCountOverride ?? 0)).toBe(true);
+    // Level 87 is in the two-wrap-corridor style band (see
+    // GEOMETRY_BUDGET_STYLE_BANDS); the deceptive structure comes from the felt
+    // tuner after the carve, not from feeders or extra checkpoints.
+    expect(mythicProfile.requiredOppositeBorderConnections).toEqual({ horizontal: true, vertical: true });
+    expect(tutorialProfile.requiredOppositeBorderConnections).toEqual({ horizontal: false, vertical: false });
     expect(mythicProfile.shortcutCountMultiplier).toBe(0);
     expect(mythicProfile.routeQualityReinforcementMultiplier).toBe(0);
-    expect(mythicProfile.borderFeederTargetPerSide).toBeGreaterThan(tutorialProfile.borderFeederTargetPerSide ?? 0);
     expect(mythicBudget.checkpointCount).toBeGreaterThan(tutorialBudget.checkpointCount);
     expect(mythicBudget.shortcutCount).toBe(0);
     expect(mythicComplexity.edgeWrapCount).toBeGreaterThanOrEqual(2);
@@ -2015,7 +2015,9 @@ describe('legacy progression', () => {
     // (feeder count untouched by any device signal) -- fully backward
     // compatible for every caller that doesn't pass one.
     const legacyProfile = resolveLegacyMazeGenerationProfileForProgression(architectTrack);
-    expect(legacyProfile.borderFeederTargetPerSide).toBeGreaterThan(1);
+    // (Budget profiles carry no feeders: the felt tuner supplies the structure.)
+    expect(legacyProfile.geometryBudgetLevel).toBeDefined();
+    expect(legacyProfile.borderFeederTargetPerSide).toBe(0);
 
     // A device sitting right at its own ceiling (fraction 1) keeps the
     // band's full feeder target; a device with much more headroom to

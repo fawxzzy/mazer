@@ -6,8 +6,8 @@
 // at rank E (the weakest, most mistake-prone) and rank S until it reaches the
 // goal, and records how many steps that took.
 //
-//   npx vite-node --script scripts/analysis/progression-ai-solvability.ts -- \
-//     [--levels=1..300/10,197,300] [--seeds=3] [--out=<dir>]
+//   npx vite-node scripts/analysis/progression-ai-solvability.ts \
+//     [--levels=1,2,5,10..220/10,219,220,221,250,300,500] [--seeds=3] [--out=<dir>]
 // Exits 1 if any (level, board, seed, rank) fails to reach the goal.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -39,7 +39,7 @@ const parseLevels = (spec: string): number[] => {
   return [...out].sort((a, b) => a - b);
 };
 
-const levels = parseLevels(arg('levels', '1,10..300/10,197,300'));
+const levels = parseLevels(arg('levels', '1,2,5,10..220/10,219,220,221,250,300,500'));
 const seeds = Number(arg('seeds', '3'));
 const outDir = arg('out', '');
 const ranks: DemoWalkerAiSkillRank[] = ['E', 'S'];
