@@ -244,7 +244,8 @@ describe('legacy menu layout', () => {
     // The title stays on the actual screen center while the profile icon and
     // controls adapt around it. The decorative orbit remains inside the HUD
     // and clear of both occupied regions.
-    expect(orbitGeometry.centerX).toBe(expectedCenterX);
+    // Pixel-snapped title geometry may land half a pixel off the exact midpoint.
+    expect(Math.abs(orbitGeometry.centerX - expectedCenterX)).toBeLessThanOrEqual(0.5);
     expect(orbitGeometry.left).toBeGreaterThanOrEqual(leadingFrame.right);
     expect(orbitGeometry.right).toBeLessThanOrEqual(trailingFrame.left);
     expect(orbitGeometry.top).toBeGreaterThanOrEqual(layout.lanes.hud?.top ?? 0);

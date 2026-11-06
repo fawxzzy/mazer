@@ -270,8 +270,8 @@ describe('legacy header identity: layout rules', () => {
 describe('legacy header identity: phone widths under the DERIVED title-footprint assumption', () => {
   const widths = [320, 360, 390, 430];
 
-  test('the assumption reproduces the investigated 390x844 figures (icon ~44, title ~85)', () => {
-    expect(profileFrameRightAt(390)).toBe(44);
+  test('the assumption reproduces the 390x844 figures (icon right edge 52 = 16px edge inset + 36px glyph box, title ~85)', () => {
+    expect(profileFrameRightAt(390)).toBe(52);
     expect(assumedTitleLeft(390)).toBe(85);
   });
 
@@ -299,10 +299,13 @@ describe('legacy header identity: phone widths under the DERIVED title-footprint
     }
   });
 
-  test('records what actually fits at 390 (3-char name yes, 6+ char names no): the room is only ~25px', () => {
+  // Under this 220px ASSUMED footprint the 16px header edge inset leaves ~17px at 390, so even a
+  // 3-char name collapses to icon-only here; the REAL footprint (164px) leaves ~46px, which
+  // legacy-header-identity-placement.test.ts pins.
+  test('records what fits at 390 under the assumed footprint (nothing: the room is only ~17px)', () => {
     const layout390 = layoutFor(390, 'Zac');
-    expect(layout390.maxWidth).toBe(85 - LEGACY_HEADER_IDENTITY_TITLE_GAP_PX - 52);
-    expect(layout390.visible).toBe(true);
+    expect(layout390.maxWidth).toBe(85 - LEGACY_HEADER_IDENTITY_TITLE_GAP_PX - (profileFrameRightAt(390) + LEGACY_HEADER_IDENTITY_ICON_GAP_PX));
+    expect(layout390.visible).toBe(false);
     expect(layoutFor(390, 'fawxzzy').visible).toBe(false);
     expect(layoutFor(390, 'maze_runner').visible).toBe(false);
   });

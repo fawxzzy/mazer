@@ -17,6 +17,12 @@ interface ResolveLegacyHeaderControlFrameInput {
   hudTop: number;
   placement: LegacyHeaderControlPlacement;
   /**
+   * Device safe-area insets (css px, e.g. env(safe-area-inset-left/right)).
+   * Added on top of the edge inset so a notch or landscape cutout never
+   * overlaps the leading/trailing control.
+   */
+  safeArea?: { left?: number; right?: number };
+  /**
    * Header controls can share a side without inventing a second visual
    * language. Slot zero is the original leading/trailing control; later
    * slots flow inward with the same safe gap.
@@ -35,6 +41,32 @@ interface ResolveLegacyHeaderControlFrameInput {
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
   Math.max(minimum, Math.min(maximum, value))
+);
+
+/** Floor for the gap between a header control's glyph box and the screen edge (css px). */
+export const LEGACY_HEADER_EDGE_INSET_MIN_PX = 10;
+/** Ceiling, so wide desktop viewports do not push the controls far from the corner. */
+export const LEGACY_HEADER_EDGE_INSET_MAX_PX = 24;
+/** The reference phone: 390 css px wide gets a 16px edge gap. */
+export const LEGACY_HEADER_EDGE_INSET_REFERENCE_WIDTH_PX = 390;
+export const LEGACY_HEADER_EDGE_INSET_REFERENCE_PX = 16;
+/** Edge gap gained per css px of extra viewport width (and lost per px narrower). */
+export const LEGACY_HEADER_EDGE_INSET_SLOPE = 0.0857;
+
+/**
+ * Horizontal gap between the screen edge and the leading/trailing header
+ * controls. Shared by both sides (and by the in-play pause control) so the
+ * header mirrors left/right: 10px at 320 (the username label still needs the
+ * room), 16px at 390, 24px from ~480px up. Device safe-area insets (notch /
+ * landscape) are added on top by the caller.
+ */
+export const resolveLegacyHeaderEdgeInset = (viewportWidth: number): number => clamp(
+  Math.round(
+    LEGACY_HEADER_EDGE_INSET_REFERENCE_PX
+      + ((viewportWidth - LEGACY_HEADER_EDGE_INSET_REFERENCE_WIDTH_PX) * LEGACY_HEADER_EDGE_INSET_SLOPE)
+  ),
+  LEGACY_HEADER_EDGE_INSET_MIN_PX,
+  LEGACY_HEADER_EDGE_INSET_MAX_PX
 );
 
 /**
@@ -68,7 +100,9 @@ export const resolveLegacyHeaderControlFrame = (
   const baseSize = clamp(Math.round(minDimension * 0.085), 36, 40);
   const sizeScale = input.sizeScale ?? 1;
   const size = sizeScale >= 1 ? baseSize : Math.max(32, Math.round(baseSize * sizeScale));
-  const inset = Math.max(8, Math.round(size * 0.2));
+  const safeLeft = Math.max(0, Math.round(input.safeArea?.left ?? 0));
+  const safeRight = Math.max(0, Math.round(input.safeArea?.right ?? 0));
+  const edgeInset = resolveLegacyHeaderEdgeInset(input.width);
   const slot = Math.max(0, Math.round(input.slot ?? 0));
   const gap = Math.max(8, Math.round(size * 0.18));
   const top = clamp(
@@ -77,9 +111,13 @@ export const resolveLegacyHeaderControlFrame = (
     Math.max(6, input.height - size - 6)
   );
   const left = input.placement === 'leading'
-    ? clamp(inset + (slot * (size + gap)), 8, Math.max(8, input.width - size - inset))
+    ? clamp(
+      safeLeft + edgeInset + (slot * (size + gap)),
+      8,
+      Math.max(8, input.width - size - edgeInset - safeRight)
+    )
     : clamp(
-      input.width - size - inset - (slot * (size + gap)),
+      input.width - size - edgeInset - safeRight - (slot * (size + gap)),
       8,
       Math.max(8, input.width - size - 8)
     );

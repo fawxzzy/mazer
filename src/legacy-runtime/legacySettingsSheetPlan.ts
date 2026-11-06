@@ -1,0 +1,589 @@
+/**
+ * One settings view model + pure layout plan for BOTH settings surfaces.
+ *
+ * Owner decision (Zac, 2026-11-06): the in-game Pause > Settings look is
+ * canonical; the main-menu Settings sheet must have the same structure. This
+ * module is that structure: one row vocabulary, one set of sizes, one layout
+ * routine. The two contexts differ only in
+ *   - the card title            ('Paused' | 'Settings'),
+ *   - the context actions       (pause: Resume above, Quit to Menu below;
+ *                                menu: Account section with Reset progress
+ *                                and Sign out),
+ *   - whether the Settings group is a collapsed disclosure (pause) or the
+ *     always-open body (menu).
+ * Everything inside the Settings group (How to play, Display heading, Board
+ * Zoom, Trail Fade, Trail Shine, Animated Background) is the SAME row spec
+ * with the SAME geometry, so the surfaces cannot drift apart again.
+ *
+ * Pure: no Phaser, no DOM, no storage, no network, no wiring. A later lane
+ * paints this plan from MenuScene (replacing buildOptionsOverlay's body and
+ * the row geometry in createFeatureControlRows / buildPauseOverlay). See
+ * docs/ui/MAZER-SETTINGS-SHEET-SPEC-2026-11-06.md for the exact MenuScene
+ * lines to replace.
+ *
+ * Sizes are design-token terms: hit targets come from
+ * designTokens.touchTargetMinPx (44), gaps/padding from the spacingPx scale
+ * (4 8 12 16 20 24 32 48 64), font sizes from legacy.fontSizePx
+ * (body 14, label 16, small 13). No font in a plan row is ever below the
+ * `body` token for labels; the plan wraps instead of shrinking.
+ */
+import { designTokens } from '../theme/tokens';
+import {
+  LEGACY_OVERLAY_HEADER_RESERVE,
+  LEGACY_UI_COMPACT_BREAKPOINT,
+  LEGACY_UI_MIN_TOUCH_TARGET,
+  resolveLegacyOverlayPanelLayout,
+  type LegacyOverlayPanelLayout
+} from './legacyUiStandards';
+
+export type LegacySettingsContext = 'menu' | 'pause';
+
+/** Setting keys the scene already persists (legacyOverlayToggleFields / camScale). */
+export type LegacySettingsToggleKey = 'toggleTrailFade' | 'toggleTrailPulse' | 'toggleAnimatedBackdrop';
+export type LegacySettingsSliderKey = 'camScale';
+
+export type LegacySettingsRowId =
+  | 'resume'
+  | 'settings-disclosure'
+  | 'how-to-play'
+  | 'display-heading'
+  | 'board-zoom'
+  | 'trail-fade'
+  | 'trail-shine'
+  | 'animated-background'
+  | 'account-heading'
+  | 'reset-progress'
+  | 'sign-out'
+  | 'quit-to-menu';
+
+export type LegacySettingsRowKind =
+  | 'action'
+  | 'disclosure'
+  | 'nav'
+  | 'heading'
+  | 'slider'
+  | 'toggle';
+
+export type LegacySettingsEmphasis = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'danger-outline';
+
+/** What a tap on a row does. The scene maps these to its existing handlers. */
+export type LegacySettingsCommand =
+  | { type: 'RESUME_RUN' }
+  | { type: 'RETURN_HOME' }
+  | { type: 'CLOSE_OVERLAY' }
+  | { type: 'TOGGLE_SETTINGS_GROUP' }
+  | { type: 'OPEN_GUIDE' }
+  | { type: 'BEGIN_RESET_PROGRESS' }
+  | { type: 'SIGN_OUT' };
+
+export interface LegacySettingsRowModel {
+  id: LegacySettingsRowId;
+  kind: LegacySettingsRowKind;
+  label: string;
+  emphasis: LegacySettingsEmphasis | null;
+  /** Tap command for action/nav/disclosure rows. Null for heading/slider/toggle. */
+  command: LegacySettingsCommand | null;
+  /** Persisted setting this row edits (toggle/slider only). */
+  settingKey: LegacySettingsToggleKey | LegacySettingsSliderKey | null;
+  /** Toggle state words, pinned to today's copy (never merged into the label). */
+  onLabel: string | null;
+  offLabel: string | null;
+  /** Extra vertical gap above this row, in px (spacing-scale value). Null = default for the section. */
+  gapBefore: number | null;
+}
+
+export interface LegacySettingsSectionModel {
+  id: 'pause-top' | 'settings' | 'account' | 'pause-bottom';
+  /** Disclosure label (collapsible) or heading text. Null = no header. */
+  title: string | null;
+  collapsible: boolean;
+  collapsedByDefault: boolean;
+  rows: readonly LegacySettingsRowModel[];
+}
+
+export interface LegacySettingsCloseAffordance {
+  /** Always a visible text label: never a bare '<' chevron. */
+  label: 'Close';
+  accessibleName: string;
+  command: Extract<LegacySettingsCommand, { type: 'RESUME_RUN' | 'CLOSE_OVERLAY' }>;
+}
+
+export interface LegacySettingsSheetModel {
+  context: LegacySettingsContext;
+  /** Overlay id the scene routes on (pause is pinned; options is the existing menu id). */
+  overlayId: 'pause' | 'options';
+  title: 'Paused' | 'Settings';
+  close: LegacySettingsCloseAffordance;
+  sections: readonly LegacySettingsSectionModel[];
+}
+
+export interface LegacySettingsModelOptions {
+  /** Menu only: whether a signed-in account exists (Sign out is shown only then). */
+  signedIn?: boolean;
+}
+
+/* ------------------------------------------------------------------ */
+/* Row vocabulary (shared by both contexts)                            */
+/* ------------------------------------------------------------------ */
+
+const row = (
+  id: LegacySettingsRowId,
+  kind: LegacySettingsRowKind,
+  label: string,
+  extra: Partial<Omit<LegacySettingsRowModel, 'id' | 'kind' | 'label'>> = {}
+): LegacySettingsRowModel => Object.freeze({
+  command: null,
+  emphasis: null,
+  gapBefore: null,
+  offLabel: null,
+  onLabel: null,
+  settingKey: null,
+  ...extra,
+  id,
+  kind,
+  label
+});
+
+/**
+ * The Settings group. IDENTICAL object list in both contexts. Labels and
+ * state words are today's shipping copy (createFeatureControlRows).
+ */
+export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsRowModel[] = Object.freeze([
+  row('how-to-play', 'nav', 'How to play', { command: { type: 'OPEN_GUIDE' }, emphasis: 'secondary' }),
+  row('display-heading', 'heading', 'Display'),
+  row('board-zoom', 'slider', 'Board Zoom', { settingKey: 'camScale' }),
+  row('trail-fade', 'toggle', 'Trail Fade', { offLabel: 'Off', onLabel: 'On', settingKey: 'toggleTrailFade' }),
+  row('trail-shine', 'toggle', 'Trail Shine', { offLabel: 'Off', onLabel: 'On', settingKey: 'toggleTrailPulse' }),
+  row('animated-background', 'toggle', 'Animated Background', {
+    offLabel: 'Still',
+    onLabel: 'Animated',
+    settingKey: 'toggleAnimatedBackdrop'
+  })
+]);
+
+/** Separation between Reset progress and Sign out (spacing token 24). */
+export const LEGACY_SETTINGS_DANGER_SEPARATION = 24;
+
+export const buildLegacySettingsSheetModel = (
+  context: LegacySettingsContext,
+  options: LegacySettingsModelOptions = {}
+): LegacySettingsSheetModel => {
+  if (context === 'pause') {
+    return {
+      close: {
+        accessibleName: 'Resume game',
+        command: { type: 'RESUME_RUN' },
+        label: 'Close'
+      },
+      context,
+      overlayId: 'pause',
+      sections: [
+        {
+          collapsedByDefault: false,
+          collapsible: false,
+          id: 'pause-top',
+          rows: [row('resume', 'action', 'Resume', { command: { type: 'RESUME_RUN' }, emphasis: 'primary' })],
+          title: null
+        },
+        {
+          collapsedByDefault: true,
+          collapsible: true,
+          id: 'settings',
+          rows: LEGACY_SETTINGS_GROUP_ROWS,
+          title: 'Settings'
+        },
+        {
+          collapsedByDefault: false,
+          collapsible: false,
+          id: 'pause-bottom',
+          rows: [row('quit-to-menu', 'action', 'Quit to Menu', {
+            command: { type: 'RETURN_HOME' },
+            emphasis: 'tertiary'
+          })],
+          title: null
+        }
+      ],
+      title: 'Paused'
+    };
+  }
+
+  const accountRows: LegacySettingsRowModel[] = [
+    row('reset-progress', 'action', 'Reset progress', {
+      command: { type: 'BEGIN_RESET_PROGRESS' },
+      emphasis: 'danger-outline'
+    })
+  ];
+  if (options.signedIn === true) {
+    accountRows.push(row('sign-out', 'action', 'Sign out', {
+      command: { type: 'SIGN_OUT' },
+      emphasis: 'danger',
+      gapBefore: LEGACY_SETTINGS_DANGER_SEPARATION
+    }));
+  }
+
+  return {
+    close: {
+      accessibleName: 'Close settings',
+      command: { type: 'CLOSE_OVERLAY' },
+      label: 'Close'
+    },
+    context,
+    overlayId: 'options',
+    sections: [
+      {
+        collapsedByDefault: false,
+        collapsible: false,
+        id: 'settings',
+        rows: LEGACY_SETTINGS_GROUP_ROWS,
+        title: null
+      },
+      {
+        collapsedByDefault: false,
+        collapsible: false,
+        id: 'account',
+        rows: accountRows,
+        title: 'Account'
+      }
+    ],
+    title: 'Settings'
+  };
+};
+
+/* ------------------------------------------------------------------ */
+/* Token-term sizes                                                    */
+/* ------------------------------------------------------------------ */
+
+const SPACING = designTokens.spacingPx; // [4, 8, 12, 16, 20, 24, 32, 48, 64]
+const FONT = designTokens.legacy.fontSizePx;
+
+export const LEGACY_SETTINGS_SIZES = Object.freeze({
+  /** Action / disclosure / nav button height. >= touchTargetMinPx. */
+  actionHeight: 48,
+  /** Close pill (labelled), sits in the header reserve above the card. */
+  closeHeight: LEGACY_UI_MIN_TOUCH_TARGET,
+  closeWidth: 76,
+  /** Gap between consecutive rows inside a group (spacing token 8). */
+  rowGap: SPACING[1] ?? 8,
+  /** Gap between sections (spacing token 12). */
+  sectionGap: SPACING[2] ?? 12,
+  /** Toggle / nav row height. */
+  rowHeight: 52,
+  /** Non-interactive heading row. */
+  headingHeight: 24,
+  /** Slider row (label + track). */
+  sliderRowHeight: 68,
+  /** Switch graphic (the whole row is the hit target). */
+  switchHeight: 24,
+  switchWidth: LEGACY_UI_MIN_TOUCH_TARGET,
+  /** Inner row padding (spacing token 16). */
+  rowPadding: SPACING[3] ?? 16,
+  /** State text column ("On", "Animated") width. */
+  stateWidth: 64,
+  /** Gap between label / state / switch columns (spacing token 8). */
+  columnGap: SPACING[1] ?? 8,
+  /** Row label font (legacy.fontSizePx.label = 16), floor = body (14). */
+  labelFontSize: FONT.label,
+  labelMinFontSize: FONT.body,
+  labelMaxLines: 2,
+  labelLineHeight: 20,
+  /** State word font (legacy.fontSizePx.small = 13). */
+  stateFontSize: FONT.small,
+  headingFontSize: FONT.small,
+  /** Title: pause card literal today (24 compact, 34 regular); not a token. */
+  titleFontSizeCompact: 24,
+  titleFontSizeRegular: 34,
+  titleHeightCompact: 40,
+  titleHeightRegular: 46,
+  titleGapCompact: 14,
+  titleGapRegular: 16,
+  cardPaddingCompact: 20,
+  cardPaddingRegular: 24
+});
+
+export interface LegacySettingsRect {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+}
+
+export interface LegacySettingsRowParts {
+  /** Left column; wraps up to labelMaxLines, never shrinks below labelMinFontSize. */
+  label: LegacySettingsRect;
+  /** Toggle only: state word column ("On"), its own element, never merged into the label. */
+  state: LegacySettingsRect | null;
+  /** Toggle only: switch graphic. */
+  switchControl: LegacySettingsRect | null;
+  /** Slider only: track under the label line. */
+  track: LegacySettingsRect | null;
+  /** Nav/disclosure only: trailing chevron slot. */
+  chevron: LegacySettingsRect | null;
+}
+
+export interface LegacySettingsPlanItem {
+  model: LegacySettingsRowModel;
+  /** Row rect in card-body content space (scroll offset 0). */
+  rect: LegacySettingsRect;
+  interactive: boolean;
+  parts: LegacySettingsRowParts;
+  labelFontSize: number;
+  labelMaxLines: number;
+  stateFontSize: number;
+}
+
+export interface LegacySettingsSheetPlan {
+  model: LegacySettingsSheetModel;
+  compact: boolean;
+  panel: LegacyOverlayPanelLayout;
+  /** Labelled close control, in the header reserve above the card. */
+  close: { rect: LegacySettingsRect; label: 'Close'; accessibleName: string; command: LegacySettingsCloseAffordance['command'] };
+  card: LegacySettingsRect;
+  cardPadding: number;
+  title: { centerX: number; centerY: number; fontSize: number; text: string };
+  /** Visible, scrollable body window inside the card (screen space). */
+  bodyViewport: LegacySettingsRect;
+  /** Items in body-content space: screen y = bodyViewport.top + item.rect.top - scrollOffset. */
+  items: readonly LegacySettingsPlanItem[];
+  contentHeight: number;
+  scrollable: boolean;
+  maxScrollOffset: number;
+  /** Natural (unclipped) card height. */
+  naturalCardHeight: number;
+  availableHeight: number;
+  /** Whether the Settings group rows are currently laid out. */
+  settingsExpanded: boolean;
+}
+
+export interface LegacySettingsPlanInput {
+  context: LegacySettingsContext;
+  height: number;
+  width: number;
+  safeArea?: { bottom?: number; top?: number };
+  /** Menu only. */
+  signedIn?: boolean;
+  /** Pause only: whether the Settings disclosure is open. Menu is always open. */
+  settingsExpanded?: boolean;
+}
+
+const rectOf = (left: number, top: number, width: number, height: number): LegacySettingsRect => ({
+  height,
+  left,
+  top,
+  width
+});
+
+const rowHeightOf = (model: LegacySettingsRowModel): number => {
+  switch (model.kind) {
+    case 'action':
+    case 'disclosure':
+      return LEGACY_SETTINGS_SIZES.actionHeight;
+    case 'nav':
+    case 'toggle':
+      return LEGACY_SETTINGS_SIZES.rowHeight;
+    case 'heading':
+      return LEGACY_SETTINGS_SIZES.headingHeight;
+    case 'slider':
+      return LEGACY_SETTINGS_SIZES.sliderRowHeight;
+    default:
+      return model.kind satisfies never;
+  }
+};
+
+const isInteractiveKind = (kind: LegacySettingsRowKind): boolean => kind !== 'heading';
+
+/** Inner part layout of one row, relative to the row's own rect (left/top are ROW-LOCAL). */
+const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: number): LegacySettingsRowParts => {
+  const s = LEGACY_SETTINGS_SIZES;
+  const pad = s.rowPadding;
+  const none: LegacySettingsRowParts = { chevron: null, label: rectOf(0, 0, width, height), state: null, switchControl: null, track: null };
+
+  switch (model.kind) {
+    case 'toggle': {
+      const switchLeft = width - pad - s.switchWidth;
+      const stateLeft = switchLeft - s.columnGap - s.stateWidth;
+      const labelWidth = Math.max(1, stateLeft - s.columnGap - pad);
+      return {
+        chevron: null,
+        label: rectOf(pad, 0, labelWidth, height),
+        state: rectOf(stateLeft, 0, s.stateWidth, height),
+        switchControl: rectOf(switchLeft, Math.round((height - s.switchHeight) / 2), s.switchWidth, s.switchHeight),
+        track: null
+      };
+    }
+    case 'slider': {
+      const labelHeight = s.labelLineHeight + (s.columnGap / 2);
+      const trackTop = labelHeight + s.columnGap;
+      return {
+        chevron: null,
+        label: rectOf(pad, Math.round(s.columnGap / 2), Math.max(1, width - (pad * 2)), s.labelLineHeight),
+        state: null,
+        switchControl: null,
+        track: rectOf(pad, trackTop, Math.max(1, width - (pad * 2)), Math.max(LEGACY_UI_MIN_TOUCH_TARGET - 16, height - trackTop - s.columnGap))
+      };
+    }
+    case 'nav':
+    case 'disclosure': {
+      const chevronSize = 24;
+      const chevronLeft = width - pad - chevronSize;
+      return {
+        chevron: rectOf(chevronLeft, Math.round((height - chevronSize) / 2), chevronSize, chevronSize),
+        label: rectOf(pad, 0, Math.max(1, chevronLeft - s.columnGap - pad), height),
+        state: null,
+        switchControl: null,
+        track: null
+      };
+    }
+    case 'action':
+    case 'heading':
+      return { ...none, label: rectOf(pad, 0, Math.max(1, width - (pad * 2)), height) };
+    default:
+      return model.kind satisfies never;
+  }
+};
+
+/**
+ * Flattened row list for a model. Pause: Resume, Settings disclosure (and,
+ * when expanded, the group rows), Quit to Menu. Menu: the group rows (always
+ * open), then the Account heading and its rows.
+ */
+const flattenRows = (
+  model: LegacySettingsSheetModel,
+  settingsExpanded: boolean
+): Array<{ gapBefore: number; row: LegacySettingsRowModel }> => {
+  const s = LEGACY_SETTINGS_SIZES;
+  const out: Array<{ gapBefore: number; row: LegacySettingsRowModel }> = [];
+  const push = (r: LegacySettingsRowModel, defaultGap: number): void => {
+    out.push({ gapBefore: out.length === 0 ? 0 : (r.gapBefore ?? defaultGap), row: r });
+  };
+
+  for (const section of model.sections) {
+    const sectionGap = s.sectionGap;
+    if (section.collapsible && section.title !== null) {
+      push(row('settings-disclosure', 'disclosure', section.title, {
+        command: { type: 'TOGGLE_SETTINGS_GROUP' },
+        emphasis: 'secondary'
+      }), sectionGap);
+      if (!settingsExpanded) {
+        continue;
+      }
+      section.rows.forEach((r, index) => push(r, index === 0 ? sectionGap : s.rowGap));
+      continue;
+    }
+    if (section.title !== null) {
+      push(row('account-heading', 'heading', section.title), sectionGap + s.rowGap);
+    }
+    section.rows.forEach((r, index) => {
+      // First row of an un-headed section follows the previous section; after a heading it is a normal row gap.
+      const afterHeading = index === 0 && section.title !== null;
+      push(r, index === 0 && !afterHeading ? sectionGap : s.rowGap);
+    });
+  }
+  return out;
+};
+
+export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): LegacySettingsSheetPlan => {
+  const s = LEGACY_SETTINGS_SIZES;
+  const model = buildLegacySettingsSheetModel(input.context, { signedIn: input.signedIn });
+  const panel = resolveLegacyOverlayPanelLayout(input.width, input.height, input.safeArea ?? {});
+  const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
+  const settingsExpanded = input.context === 'menu' ? true : input.settingsExpanded === true;
+
+  const cardPadding = compact ? s.cardPaddingCompact : s.cardPaddingRegular;
+  const titleHeight = compact ? s.titleHeightCompact : s.titleHeightRegular;
+  const titleGap = compact ? s.titleGapCompact : s.titleGapRegular;
+  const cardWidth = Math.min(compact ? 360 : 400, Math.max(1, panel.width - (compact ? 16 : 48)));
+  const innerWidth = Math.max(1, cardWidth - (cardPadding * 2));
+
+  const flat = flattenRows(model, settingsExpanded);
+  let cursor = 0;
+  const items: LegacySettingsPlanItem[] = flat.map(({ gapBefore, row: rowModel }) => {
+    const height = rowHeightOf(rowModel);
+    cursor += gapBefore;
+    const rect = rectOf(0, cursor, innerWidth, height);
+    cursor += height;
+    return {
+      interactive: isInteractiveKind(rowModel.kind),
+      labelFontSize: s.labelFontSize,
+      labelMaxLines: rowModel.kind === 'heading' || rowModel.kind === 'slider' ? 1 : s.labelMaxLines,
+      model: rowModel,
+      parts: resolveRowParts(rowModel, innerWidth, height),
+      rect,
+      stateFontSize: s.stateFontSize
+    };
+  });
+  const contentHeight = cursor;
+
+  const headerReserve = LEGACY_OVERLAY_HEADER_RESERVE + (compact ? 6 : 8);
+  const availableHeight = Math.max(1, panel.height - headerReserve);
+  const chrome = (cardPadding * 2) + titleHeight + titleGap;
+  const naturalCardHeight = chrome + contentHeight;
+  const cardHeight = Math.min(naturalCardHeight, availableHeight);
+  const regionTop = panel.top + headerReserve;
+  const cardTop = Math.round(regionTop + ((availableHeight - cardHeight) / 2));
+  const cardLeft = Math.round(panel.centerX - (cardWidth / 2));
+
+  const bodyTop = cardTop + cardPadding + titleHeight + titleGap;
+  const bodyHeight = Math.max(0, cardHeight - chrome);
+  const scrollable = contentHeight > bodyHeight;
+
+  return {
+    availableHeight,
+    bodyViewport: rectOf(cardLeft + cardPadding, bodyTop, innerWidth, bodyHeight),
+    card: rectOf(cardLeft, cardTop, cardWidth, cardHeight),
+    cardPadding,
+    close: {
+      accessibleName: model.close.accessibleName,
+      command: model.close.command,
+      label: model.close.label,
+      rect: rectOf(panel.left + panel.width - s.closeWidth, panel.top, s.closeWidth, s.closeHeight)
+    },
+    compact,
+    contentHeight,
+    items,
+    maxScrollOffset: Math.max(0, contentHeight - bodyHeight),
+    model,
+    naturalCardHeight,
+    panel,
+    scrollable,
+    settingsExpanded,
+    title: {
+      centerX: panel.centerX,
+      centerY: cardTop + cardPadding + Math.round(titleHeight / 2),
+      fontSize: compact ? s.titleFontSizeCompact : s.titleFontSizeRegular,
+      text: model.title
+    }
+  };
+};
+
+/** Screen-space rect of an item for a given scroll offset (clamped by the caller). */
+export const resolveLegacySettingsItemScreenRect = (
+  plan: LegacySettingsSheetPlan,
+  item: LegacySettingsPlanItem,
+  scrollOffset = 0
+): LegacySettingsRect => {
+  const offset = Math.min(plan.maxScrollOffset, Math.max(0, scrollOffset));
+  return rectOf(
+    plan.bodyViewport.left + item.rect.left,
+    plan.bodyViewport.top + item.rect.top - offset,
+    item.rect.width,
+    item.rect.height
+  );
+};
+
+/** Whether an item is fully inside the body viewport at a scroll offset (drawable and tappable). */
+export const isLegacySettingsItemFullyVisible = (
+  plan: LegacySettingsSheetPlan,
+  item: LegacySettingsPlanItem,
+  scrollOffset = 0
+): boolean => {
+  const rect = resolveLegacySettingsItemScreenRect(plan, item, scrollOffset);
+  return rect.top >= plan.bodyViewport.top
+    && rect.top + rect.height <= plan.bodyViewport.top + plan.bodyViewport.height;
+};
+
+/** Viewports every plan must hold at (the audit set). */
+export const LEGACY_SETTINGS_PLAN_VIEWPORTS: ReadonlyArray<{ height: number; width: number }> = Object.freeze([
+  { height: 568, width: 320 },
+  { height: 844, width: 390 },
+  { height: 720, width: 1280 }
+]);

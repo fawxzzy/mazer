@@ -50,12 +50,14 @@ export const resolveHeaderControlRects = (layout: {
   readonly width: number;
   readonly height: number;
   readonly headerIconScale: number;
+  readonly headerSafeInset?: { readonly left: number; readonly right: number };
   readonly lanes: { readonly hud: { readonly top: number; readonly height: number } | null };
 }): ReadonlyArray<LegacyHeaderRect> => {
   const base = {
     height: layout.height,
     hudHeight: layout.lanes.hud?.height ?? 64,
     hudTop: layout.lanes.hud?.top ?? 0,
+    safeArea: layout.headerSafeInset,
     sizeScale: layout.headerIconScale,
     width: layout.width
   };
@@ -70,6 +72,7 @@ export interface LegacyHeaderIdentityPlacementLayout {
   readonly width: number;
   readonly height: number;
   readonly headerIconScale: number;
+  readonly headerSafeInset?: { readonly left: number; readonly right: number };
   readonly titleX: number;
   readonly titleReserveHeight: number;
   readonly lanes: {
@@ -113,6 +116,7 @@ export const resolveLegacyHeaderIdentityPlacement = (
     hudHeight: layout.lanes.hud?.height ?? 64,
     hudTop: layout.lanes.hud?.top ?? 0,
     placement: 'leading',
+    safeArea: layout.headerSafeInset,
     sizeScale: layout.headerIconScale,
     width: layout.width
   });

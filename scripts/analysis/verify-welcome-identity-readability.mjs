@@ -9,9 +9,17 @@
  *      header band, depth >= 3, to the RIGHT of the profile icon and LEFT of
  *      the title, overlapping neither, nor any of the 8 edge diamonds;
  *   3. its text is truncated with an ellipsis only when the room demands it
- *      (whole name on the wide layout) and is actually painted: bright label
- *      pixels exist inside its rect, and a negative control (label hidden)
- *      makes the same pixel assertion fail.
+ *      (whole name on the wide layout) and is actually painted. "Painted" is a
+ *      DIFFERENTIAL measurement: the label rect is rendered twice from the
+ *      exact same scene state (game loop asleep, no update between the two
+ *      renders, so same frame / seed / clock), once with the label visible and
+ *      once hidden, and the delta is the number of label-ink pixels present
+ *      only in the visible render. Backdrop stars and maze bleed are identical
+ *      in both renders, so they cancel; an absolute bright-pixel count could
+ *      not tell them from ink (Linux CI measured 16 bright pixels in the
+ *      hidden label's box at 320). Negative control: hidden vs hidden is
+ *      measured the same way, must be exactly 0, and must fail the same
+ *      assertion.
  * Uses only localhost and the synthetic authenticated QA fixture; no live
  * account or remote request is involved.
  * Run after building, or pass --skip-build to reuse that build. Pass
@@ -43,7 +51,14 @@ const LABEL_PIXEL_FLOOR = [120, 150, 140];
 const isLabelPixel = ([r, g, b, a]) => a > 200 && r >= LABEL_PIXEL_FLOOR[0] && g >= LABEL_PIXEL_FLOOR[1] && b >= LABEL_PIXEL_FLOOR[2];
 const STRICT_LABEL_PIXEL_FLOOR = [170, 215, 205];
 const isStrictLabelPixel = ([r, g, b, a]) => a > 200 && r >= STRICT_LABEL_PIXEL_FLOOR[0] && g >= STRICT_LABEL_PIXEL_FLOOR[1] && b >= STRICT_LABEL_PIXEL_FLOOR[2];
-const MIN_LABEL_PIXELS = 12;
+// Minimum label-ink delta (visible render minus hidden render of the same
+// frame). Measured locally 2026-11-06 (Windows Chromium, Space Grotesk, dpr 2):
+// 381 / 304 / 808 at 390 / 320 / 1280 (the hidden render still has 16 bright
+// background pixels at 390, which the differential cancels). The floor is ~1/5
+// of the weakest measured delta (values are
+// printed per layout and written to welcome-identity.json) and far above the
+// control delta, which is exactly 0 by construction.
+const MIN_LABEL_DELTA_PIXELS = 60;
 
 const LAYOUTS = [
   { name: 'phone-390', viewport: { width: 390, height: 844 }, mobile: true, whole: false },
@@ -101,9 +116,78 @@ const readHeader = (page) => page.evaluate((extent) => {
 }, DIAMOND_EXTENT_PX);
 
 const paintedPixels = (label) => (label?.visible ? label.pixels.filter(isLabelPixel).length : 0);
+
+/**
+ * Renders the label rect with the label visible and hidden from one frozen
+ * scene state and counts ink that exists only when the label is visible.
+ * `controlDelta` repeats the measurement with the label hidden in BOTH renders.
+ */
+const measureLabelDelta = (page, rect, floor) => page.evaluate(({ rect: box, floor: colorFloor }) => {
+  const game = window.__MAZER_GAME__;
+  const scene = game.scene.getScene('MenuScene');
+  const label = scene.uiTexts.find((text) => text.active && text.name === 'header-identity');
+  const canvas = document.querySelector('canvas');
+  const sx = canvas.width / scene.scale.gameSize.width;
+  const sy = canvas.height / scene.scale.gameSize.height;
+  const x0 = Math.max(0, Math.floor(box.left * sx));
+  const y0 = Math.max(0, Math.floor(box.top * sy));
+  const w = Math.max(1, Math.ceil((box.right - box.left) * sx));
+  const h = Math.max(1, Math.ceil((box.bottom - box.top) * sy));
+  const probe = document.createElement('canvas');
+  probe.width = canvas.width;
+  probe.height = canvas.height;
+  const ctx = probe.getContext('2d');
+  const wasVisible = label.visible;
+  const renderNow = () => {
+    game.renderer.preRender();
+    scene.sys.render(game.renderer);
+    game.renderer.postRender();
+  };
+  game.loop.sleep();
+  try {
+    // Re-render the current display list as-is: no scene update runs, so the
+    // renders differ only in the label's visibility.
+    const ink = (visible) => {
+      label.setVisible(visible);
+      renderNow();
+      ctx.clearRect(0, 0, probe.width, probe.height);
+      ctx.drawImage(canvas, 0, 0);
+      const data = ctx.getImageData(x0, y0, w, h).data;
+      const mask = new Uint8Array(w * h);
+      for (let i = 0; i < mask.length; i += 1) {
+        const o = i * 4;
+        mask[i] = data[o + 3] > 200 && data[o] >= colorFloor[0] && data[o + 1] >= colorFloor[1] && data[o + 2] >= colorFloor[2] ? 1 : 0;
+      }
+      return mask;
+    };
+    const only = (a, b) => {
+      let n = 0;
+      for (let i = 0; i < a.length; i += 1) {
+        if (a[i] === 1 && b[i] === 0) n += 1;
+      }
+      return n;
+    };
+    const count = (a) => a.reduce((n, v) => n + v, 0);
+    const shown = ink(true);
+    const hidden = ink(false);
+    const hiddenAgain = ink(false);
+    return { shownInk: count(shown), hiddenInk: count(hidden), delta: only(shown, hidden), controlDelta: only(hiddenAgain, hidden) };
+  } finally {
+    label.setVisible(wasVisible);
+    renderNow();
+    game.loop.wake();
+  }
+}, { rect, floor });
+
+const assertLabelDelta = (name, measured, label) => {
+  assert(
+    measured.delta >= MIN_LABEL_DELTA_PIXELS,
+    `${name}: identity text is not painted on the canvas (label-only ink delta ${measured.delta} < ${MIN_LABEL_DELTA_PIXELS}; visible render ${measured.shownInk} bright / hidden render ${measured.hiddenInk} bright at floor ${LABEL_PIXEL_FLOOR.join('/')}, text "${label?.text}")`
+  );
+};
 const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 
-const assertHeaderIdentity = (name, whole, state) => {
+const assertHeaderIdentity = (name, whole, state, measured) => {
   assert.deepEqual(state.welcome, [], `${name}: a Welcome label is still rendered: ${JSON.stringify(state.welcome)}`);
   assert(state.username && state.username.length > 0, `${name}: fixture has no canonical username`);
   const { label } = state;
@@ -128,7 +212,7 @@ const assertHeaderIdentity = (name, whole, state) => {
     assert(label.text === state.username || label.text.endsWith('…'), `${name}: narrow text must be whole or ellipsized, got "${label.text}"`);
     assert(Array.from(label.text).length >= 3, `${name}: truncated identity is not readable: "${label.text}"`);
   }
-  assert(paintedPixels(label) >= MIN_LABEL_PIXELS, `${name}: identity text is not painted on the canvas (${paintedPixels(label)} bright pixels at floor ${LABEL_PIXEL_FLOOR.join('/')}, strict ${label.pixels.filter(([r, g, b, a]) => a > 200 && r >= 170 && g >= 215 && b >= 205).length}, peak luminance ${Math.max(0, ...label.pixels.map(([r, g, b]) => r + g + b))}, text "${label.text}", rect ${JSON.stringify(label.rect)})`);
+  assertLabelDelta(name, measured, label);
 };
 
 const main = async () => {
@@ -164,37 +248,23 @@ const main = async () => {
         const state = await readHeader(page);
         await page.screenshot({ path: join(output, `${name}.png`) });
         report.checks.push({ name, label: state.label && { ...state.label, pixels: undefined, painted: paintedPixels(state.label), paintedStrict: state.label.pixels.filter(isStrictLabelPixel).length }, welcome: state.welcome, passed: true });
-        assertHeaderIdentity(name, whole, state);
+        const measured = await measureLabelDelta(page, state.label.rect, LABEL_PIXEL_FLOOR);
+        report.checks[report.checks.length - 1].delta = measured;
+        assertHeaderIdentity(name, whole, state, measured);
 
-        // Negative control: with the label hidden, the very same pixel assertion must fail.
-        await page.evaluate(() => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          scene.uiTexts.find((text) => text.active && text.name === 'header-identity').setVisible(false);
-        });
-        await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-        const hidden = await readHeader(page);
-        // A hidden label contributes no painted pixels; re-measure the same rect from the canvas.
-        const stillPainted = await page.evaluate(({ rect, color }) => {
-          const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-          const canvas = document.querySelector('canvas');
-          const copy = document.createElement('canvas');
-          copy.width = canvas.width; copy.height = canvas.height;
-          const ctx = copy.getContext('2d');
-          ctx.drawImage(canvas, 0, 0);
-          const sx = canvas.width / scene.scale.gameSize.width;
-          const sy = canvas.height / scene.scale.gameSize.height;
-          const data = ctx.getImageData(Math.floor(rect.left * sx), Math.floor(rect.top * sy),
-            Math.max(1, Math.ceil((rect.right - rect.left) * sx)), Math.max(1, Math.ceil((rect.bottom - rect.top) * sy))).data;
-          let count = 0;
-          for (let i = 0; i < data.length; i += 4) {
-            if (data[i + 3] > 200 && data[i] >= color[0] && data[i + 1] >= color[1] && data[i + 2] >= color[2]) count += 1;
-          }
-          return count;
-        }, { rect: state.label.rect, color: LABEL_PIXEL_FLOOR });
-        const rejects = hidden.label?.visible !== true && stillPainted < MIN_LABEL_PIXELS;
-        report.checks.push({ name: `${name}-negative-control`, painted: stillPainted, passed: rejects });
-        assert(rejects, `${name}: pixel assertion accepted a hidden label (${stillPainted} bright pixels)`);
-        process.stdout.write(`PASS ${name}: header identity "${state.label.text}" top-left, no Welcome, negative control\n`);
+        // Negative control: hidden vs hidden, measured identically, is exactly 0 by
+        // construction and must be rejected by the very same assertion.
+        assert.equal(measured.controlDelta, 0, `${name}: control delta must be exactly 0 (same frame, label hidden twice), got ${measured.controlDelta}`);
+        let controlRejected = false;
+        try {
+          assertLabelDelta(name, { ...measured, delta: measured.controlDelta }, state.label);
+        } catch {
+          controlRejected = true;
+        }
+        report.checks.push({ name: `${name}-negative-control`, delta: measured.controlDelta, hiddenInk: measured.hiddenInk, passed: controlRejected });
+        assert(controlRejected, `${name}: label-delta assertion accepted a hidden label (control delta ${measured.controlDelta})`);
+        process.stdout.write(`PASS ${name}: header identity "${state.label.text}" top-left, no Welcome, label-only ink delta ${measured.delta} (shown ${measured.shownInk} / hidden ${measured.hiddenInk} bright), control delta ${measured.controlDelta}
+`);
       } finally { await context.close(); }
     }
     report.passed = true;

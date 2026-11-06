@@ -83,9 +83,9 @@ describe('header identity placement (username top-left, right of the profile ico
     expect(phone.titleLayout.left).toBe(113);
     expect(phone.titleLayout.width).toBe(164);
     expect(phone.placement.titleLeft).toBe(113);
-    // 113 - 8 gap - (43.5 + 8 left) = ~53 px of room, as measured on the real game.
-    expect(phone.placement.identity.maxWidth).toBeGreaterThan(52);
-    expect(phone.placement.identity.maxWidth).toBeLessThan(55);
+    // 113 - 8 gap - (51.5 + 8 left) = ~46 px of room (the 16px header edge inset cost ~7px vs the old 8px inset).
+    expect(phone.placement.identity.maxWidth).toBeGreaterThan(45);
+    expect(phone.placement.identity.maxWidth).toBeLessThan(48);
     const tight = place(320, 568, 'qa-player');
     expect(tight.titleLayout.left).toBe(99);
     expect(tight.titleLayout.width).toBe(123);

@@ -235,6 +235,35 @@ export const resolveLegacyOverlayContentFlowLayout = ({
   };
 };
 
+/**
+ * Body copy never renders below this size (audit: no mobile body text under
+ * 11 px). Toggle labels and the Guide legend both clamp to it.
+ */
+export const LEGACY_UI_MIN_BODY_FONT_SIZE = 11;
+
+/**
+ * Smallest legend-copy size. The Guide legend wraps onto a second line before
+ * it is allowed to shrink below this, so it never reaches the old 8 px floor.
+ */
+export const LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE = 10;
+
+/**
+ * Ordered label candidates for a toggle row, richest first. When the row has
+ * no dedicated state lane (narrow cards) the state is appended to the label
+ * ("Trail Fade: Off"); the switch already shows on/off, so if that composite
+ * cannot fit at the minimum body size the bare label is the fallback instead
+ * of letting the text run under the switch.
+ */
+export const resolveLegacyToggleLabelCandidates = (
+  label: string,
+  stateText: string,
+  showStateLabel: boolean
+): string[] => (
+  showStateLabel || stateText.length === 0
+    ? [label]
+    : [`${label}: ${stateText}`, label]
+);
+
 export interface LegacyToggleRowLayout {
   labelFontSize: number;
   rowPaddingX: number;
