@@ -34,27 +34,9 @@ export const resolveMazerTileFontRainbowTextureKey = (step: number): string => (
   `mazerTileFontAtlasRainbow${((step % MAZER_TILE_FONT_RAINBOW_STEPS) + MAZER_TILE_FONT_RAINBOW_STEPS) % MAZER_TILE_FONT_RAINBOW_STEPS}`
 );
 
-// The iridescent diamond/teleport VFX source art -- exact, unmodified PNGs
-// (see docs/assets/mazer-vfx-source-provenance.md for hashes/provenance),
-// the first non-font raster assets this game loads. Base filenames are kept
-// identical to the supplied source so a hash check against the original
-// bundle stays a trivial diff.
-export const MAZER_VFX_DIAMOND_TEXTURE_KEY = 'mazerVfxEdgeDiamond';
-export const MAZER_VFX_DIAMOND_ENERGY_CORE_TEXTURE_KEY = 'mazerVfxEdgeDiamondEnergyCore';
-export const MAZER_VFX_DIAMOND_ABSORPTION_TEXTURE_KEY = 'mazerVfxEdgeDiamondAbsorption';
-export const MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY = 'mazerVfxTeleportBeam';
-// A second-pass diamond render with visible internal "energy" linework
-// baked directly into the same source art -- used instead of compositing
-// the separate energy-core image on top of MAZER_VFX_DIAMOND_TEXTURE_KEY.
-// That composite (two independently-shaped diamond silhouettes stacked at
-// nearly the same scale) was reported as "an extra diamond appearing over
-// them... not pointing to mid" -- a real bug: edge-diamond-energy-core.png
-// is its own symmetric diamond shape with no inherent "point toward
-// center" orientation, so no rotation of it ever aligned with the outer
-// shell's elongated shape. One single image with the energy already part
-// of its own linework sidesteps the compositing problem entirely.
-export const MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY = 'mazerVfxEdgeDiamondEnergized';
-const MAZER_VFX_ASSET_BASE_URL = '/assets/vfx/diamonds';
+// The old iridescent diamond and teleport-beam raster art is retired: the edge
+// diamonds, beams and conduit are drawn procedurally by
+// src/render/edgeMarkers.ts, so nothing in this scene preloads that art.
 // See the cache-busting comment in preload() below.
 const MAZER_VFX_ASSET_CACHE_BUST = 'v=20260829';
 
@@ -157,10 +139,6 @@ export class BootScene extends Phaser.Scene {
   public preload(): void {
     this.load.image(MAZER_TILE_FONT_TEXTURE_KEY, MAZER_TILE_FONT_IMAGE_URL);
     this.load.json(MAZER_TILE_FONT_DATA_KEY, MAZER_TILE_FONT_JSON_URL);
-    this.load.image(MAZER_VFX_DIAMOND_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/edge-diamond-iridescent.png`);
-    this.load.image(MAZER_VFX_DIAMOND_ENERGY_CORE_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/edge-diamond-energy-core.png`);
-    this.load.image(MAZER_VFX_DIAMOND_ABSORPTION_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/edge-diamond-energy-absorption-state.png`);
-    this.load.image(MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/teleport-beam-iridescent.png`);
     // MAZER_VFX_ASSET_CACHE_BUST query suffix: this project's PWA service
     // worker (vite-plugin-pwa generateSW, see vite.config.ts) precaches
     // every built asset by bare URL. If a device already had an older
@@ -174,7 +152,6 @@ export class BootScene extends Phaser.Scene {
     // never had an entry for, so it always falls through to a real network
     // fetch. Bump the suffix whenever one of these specific files' content
     // changes again.
-    this.load.image(MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY, `${MAZER_VFX_ASSET_BASE_URL}/edge-diamond-energized.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
     this.load.image(MAZER_STARFIELD_TEXTURE_KEY, `/assets/vfx/starfield/mazer-starfield-tile.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
     this.load.image(MAZER_FLOOR_TILE_TEXTURE_KEY, `/assets/tiles/mazer-floor-tile.png?${MAZER_VFX_ASSET_CACHE_BUST}`);
     this.load.image(MAZER_BLEED_PATH_TEXTURE_KEY, `/assets/tiles/mazer-bleed-path-strip.png?${MAZER_VFX_ASSET_CACHE_BUST}`);

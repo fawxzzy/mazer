@@ -1,5 +1,16 @@
 # Mazer VFX Source Asset Provenance
 
+> **Retired (2026-11-06):** the five files under `public/assets/vfx/diamonds/`
+> (`edge-diamond-iridescent.png`, `edge-diamond-energy-core.png`,
+> `edge-diamond-energy-absorption-state.png`, `edge-diamond-energized.png`,
+> `teleport-beam-iridescent.png`) were deleted and BootScene no longer
+> preloads them. The edge diamonds, beams and conduit are drawn procedurally
+> by `src/render/edgeMarkers.ts`. The paths, dimensions and SHA-256 digests
+> below are kept as provenance; the bytes are recoverable from git history
+> (commit before the retire PR) or the frozen reference bundle in
+> `docs/assets/reference/teleport-system-v1/`. The sections below describe the
+> historical state.
+
 Source: user-supplied `mazer-vfx-source-bundle.zip` (iridescent diamond/teleport
 VFX), 2026-08-28. Copied byte-for-byte into `public/assets/vfx/diamonds/` --
 verified via SHA-256 against the bundle's own `IMPORT-MANIFEST.json` before
