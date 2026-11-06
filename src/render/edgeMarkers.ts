@@ -8,9 +8,16 @@
  * replace the 1254 px iridescent PNG sigils that sat 2 px from the edge and
  * were mostly clipped by the viewport.
  *
- * - Fully inside the viewport: the station centre is inset by at least
- *   max(12, safe-area + 12) px per edge and a kite never reaches more than
- *   10.5 px from its centre in ANY rotation, so no pixel can be clipped.
+ * - Fixed, UI-independent layout: the stations are a pure perimeter
+ *   parametrization of the viewport (no safe-area, no header-control
+ *   avoidance -- the kites sit BEHIND all UI). Along its edge a station sits
+ *   at index/8 of the way round the rectangle inset EDGE_MARKER_MIN_INSET_PX
+ *   (top row at 12 / w/2 / w-12); across it, the kite's outer tip is flush
+ *   with the screen edge (inset by its own extent along the edge normal, 10.5
+ *   px for a midpoint, ~7.6 px for a 45 degree corner kite). The layout is
+ *   mirror-symmetric (top row = y-mirror of the bottom row, left = x-mirror of
+ *   right). While the ring spins (intro / outro) the swinging tips may clip
+ *   the screen edge for a few frames; at rest nothing is clipped.
  * - Calm: one slow breathing alpha (0.45-0.6 over 3.6 s). No orbit, no
  *   per-marker sparkles. In reduced motion the markers are completely static.
  * - Meaningful: a marker lights up (mint core) while it is a live wrap end or
@@ -27,7 +34,6 @@
  * surface declared below (so they are testable without Phaser). Colours come
  * exclusively from cyberArcadeMaterial tokens.
  */
-import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import { isLegacyWrappedStepTransition } from '../legacy-runtime/legacyMaze';
 import { cyberArcadeMaterial } from './cyberArcadeMaterial';
 import { INTRO_BEAM_STAGGER_MS, INTRO_LASER_MS } from './introTimeline';
@@ -38,13 +44,6 @@ export type EdgeStationId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export interface EdgeViewport {
   readonly width: number;
   readonly height: number;
-}
-
-export interface EdgeSafeArea {
-  readonly top: number;
-  readonly right: number;
-  readonly bottom: number;
-  readonly left: number;
 }
 
 export interface EdgeStation {
@@ -135,124 +134,51 @@ const STATION_SIDE: Readonly<Record<EdgeStationId, EdgeSide>> = Object.freeze({
   7: 'left'
 });
 
-const finiteNonNegative = (value: number | undefined): number => (
-  value !== undefined && Number.isFinite(value) ? Math.max(0, value) : 0
-);
-
-/** Per-edge centre inset: never closer than max(12, safeArea + 12). */
-export const resolveEdgeMarkerInsets = (safeArea?: Partial<EdgeSafeArea>): EdgeSafeArea => ({
-  top: Math.max(EDGE_MARKER_MIN_INSET_PX, finiteNonNegative(safeArea?.top) + EDGE_MARKER_MIN_INSET_PX),
-  right: Math.max(EDGE_MARKER_MIN_INSET_PX, finiteNonNegative(safeArea?.right) + EDGE_MARKER_MIN_INSET_PX),
-  bottom: Math.max(EDGE_MARKER_MIN_INSET_PX, finiteNonNegative(safeArea?.bottom) + EDGE_MARKER_MIN_INSET_PX),
-  left: Math.max(EDGE_MARKER_MIN_INSET_PX, finiteNonNegative(safeArea?.left) + EDGE_MARKER_MIN_INSET_PX)
+/** Outward unit normal of the edge each station is flush with. */
+const OUTWARD_NORMAL: Readonly<Record<EdgeSide, EdgePoint>> = Object.freeze({
+  top: { x: 0, y: -1 },
+  right: { x: 1, y: 0 },
+  bottom: { x: 0, y: 1 },
+  left: { x: -1, y: 0 }
 });
 
-export interface EdgeRect {
-  readonly left: number;
-  readonly top: number;
-  readonly right: number;
-  readonly bottom: number;
-}
-
-/** Gap kept between a kite's bounding square and any header control. */
-export const EDGE_MARKER_CONTROL_CLEARANCE_PX = 8;
-
 /**
- * The three header controls (profile, leaderboard, settings) exactly as
- * MenuScene lays them out: same resolveLegacyHeaderControlFrame inputs the
- * draw/hit-test code uses, so the avoidance can never drift from the icons.
+ * How far the kite (at its REST orientation, plus half a stroke) reaches from
+ * its centre toward the outside of the edge it is flush with. 10.5 px for an
+ * edge midpoint, ~7.57 px for a 45 degree corner kite.
  */
-export const resolveHeaderControlRects = (layout: {
-  readonly width: number;
-  readonly height: number;
-  readonly headerIconScale: number;
-  readonly lanes: { readonly hud: { readonly top: number; readonly height: number } | null };
-}): ReadonlyArray<EdgeRect> => {
-  const base = {
-    height: layout.height,
-    hudHeight: layout.lanes.hud?.height ?? 64,
-    hudTop: layout.lanes.hud?.top ?? 0,
-    sizeScale: layout.headerIconScale,
-    width: layout.width
-  };
-  return [
-    resolveLegacyHeaderControlFrame({ ...base, placement: 'leading' }),
-    resolveLegacyHeaderControlFrame({ ...base, placement: 'trailing' }),
-    resolveLegacyHeaderControlFrame({ ...base, placement: 'trailing', slot: 1 })
-  ].map((frame) => ({ left: frame.left, top: frame.top, right: frame.right, bottom: frame.bottom }));
+export const resolveEdgeStationNormalExtent = (id: EdgeStationId): number => {
+  const normal = OUTWARD_NORMAL[STATION_SIDE[id]];
+  const reach = resolveEdgeMarkerVertices({ x: 0, y: 0, inwardAngle: INWARD_ANGLE[id] })
+    .reduce((max, vertex) => Math.max(max, (vertex.x * normal.x) + (vertex.y * normal.y)), 0);
+  return reach + (EDGE_MARKER_STROKE_PX / 2);
 };
 
-/** Kite bounding square (worst-case rotation) around a centre. */
-export const resolveEdgeMarkerBounds = (station: Pick<EdgeStation, 'x' | 'y'>): EdgeRect => ({
-  left: station.x - EDGE_MARKER_MAX_EXTENT_PX,
-  top: station.y - EDGE_MARKER_MAX_EXTENT_PX,
-  right: station.x + EDGE_MARKER_MAX_EXTENT_PX,
-  bottom: station.y + EDGE_MARKER_MAX_EXTENT_PX
-});
-
-const overlapsInflated = (bounds: EdgeRect, rect: EdgeRect, clearance: number): boolean => (
-  bounds.left < rect.right + clearance
-  && bounds.right > rect.left - clearance
-  && bounds.top < rect.bottom + clearance
-  && bounds.bottom > rect.top - clearance
-);
-
 /**
- * Slides a top-edge station along the edge, only as far as needed, until its
- * bounding square clears every control rect by EDGE_MARKER_CONTROL_CLEARANCE_PX.
- * Corners slide toward the middle; the station id/edge never change.
+ * The eight stations for a viewport: pure function of width/height only. Along
+ * the edge: the shared perimeter parametrization of the rectangle inset by
+ * EDGE_MARKER_MIN_INSET_PX. Across it: flush (outer tip on the screen edge).
  */
-const clearStationOfControls = (
-  station: EdgeStation,
-  controls: ReadonlyArray<EdgeRect>,
-  minX: number,
-  maxX: number
-): EdgeStation => {
-  const direction = station.id === 0 ? 1 : station.id === 2 ? -1 : 0;
-  if (direction === 0) {
-    return station;
-  }
-  let x = station.x;
-  for (let pass = 0; pass < controls.length + 1; pass += 1) {
-    const blocker = controls.find((rect) => overlapsInflated(
-      resolveEdgeMarkerBounds({ x, y: station.y }),
-      rect,
-      EDGE_MARKER_CONTROL_CLEARANCE_PX
-    ));
-    if (!blocker) {
-      break;
-    }
-    x = direction > 0
-      ? blocker.right + EDGE_MARKER_CONTROL_CLEARANCE_PX + EDGE_MARKER_MAX_EXTENT_PX
-      : blocker.left - EDGE_MARKER_CONTROL_CLEARANCE_PX - EDGE_MARKER_MAX_EXTENT_PX;
-  }
-  return { ...station, x: Math.max(minX, Math.min(maxX, x)) };
-};
-
-export const resolveEdgeStations = (
-  viewport: EdgeViewport,
-  safeArea?: Partial<EdgeSafeArea>,
-  controls: ReadonlyArray<EdgeRect> = []
-): ReadonlyArray<EdgeStation> => {
-  const inset = resolveEdgeMarkerInsets(safeArea);
-  const left = inset.left;
-  const right = Math.max(left, viewport.width - inset.right);
-  const top = inset.top;
-  const bottom = Math.max(top, viewport.height - inset.bottom);
+export const resolveEdgeStations = (viewport: EdgeViewport): ReadonlyArray<EdgeStation> => {
+  const inset = EDGE_MARKER_MIN_INSET_PX;
+  const left = inset;
+  const right = Math.max(left, viewport.width - inset);
+  const top = inset;
+  const bottom = Math.max(top, viewport.height - inset);
   return STATION_IDS.map((id) => {
-    const { x, y } = resolveEdgeStationPosition(id, left, right, top, bottom);
-    const station: EdgeStation = {
+    const along = resolveEdgeStationPosition(id, left, right, top, bottom);
+    const side = STATION_SIDE[id];
+    const extent = resolveEdgeStationNormalExtent(id);
+    const x = side === 'left' ? extent : side === 'right' ? viewport.width - extent : along.x;
+    const y = side === 'top' ? extent : side === 'bottom' ? viewport.height - extent : along.y;
+    return {
       id,
       x,
       y,
       inwardAngle: INWARD_ANGLE[id],
-      side: STATION_SIDE[id],
+      side,
       isCorner: id % 2 === 0
     };
-    // Only the two top corners can collide with the header controls.
-    return controls.length > 0 && (id === 0 || id === 2)
-      ? clearStationOfControls(station, controls, left, right)
-      : station;
   });
 };
 
@@ -264,10 +190,14 @@ export interface EdgePoint {
 /** Kite outline (tip first, inward), in screen space. Long axis = inward direction. */
 export const resolveEdgeMarkerVertices = (
   station: Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>,
-  scale = 1
+  scale = 1,
+  spinRad = 0
 ): ReadonlyArray<EdgePoint> => {
-  const ux = Math.cos(station.inwardAngle);
-  const uy = Math.sin(station.inwardAngle);
+  // spinRad rotates the kite about its own centre; a whole number of turns is
+  // exactly the rest orientation (the timelines return an exact 0 at rest).
+  const angle = station.inwardAngle + spinRad;
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
   const vx = -uy;
   const vy = ux;
   const at = (along: number, across: number): EdgePoint => ({
@@ -286,6 +216,10 @@ export interface EdgeMarkerState {
   readonly id: EdgeStationId;
   readonly alpha: number;
   readonly energized: boolean;
+  /** 0..1 lighting strength (1 for a plain energized marker; ring lighting ramps/fades). */
+  readonly energy: number;
+  /** Spin in radians about the kite's own centre (0 at rest and in reduced motion). */
+  readonly spinRad: number;
   /** 1 at the instant of a wrap flash, falling to 0 over EDGE_MARKER_FLASH_MS. */
   readonly flash: number;
   readonly hidden: boolean;
@@ -300,6 +234,10 @@ export interface EdgeMarkerStateInput {
   readonly timeMs: number;
   readonly reducedMotion: boolean;
   readonly energizedIds?: ReadonlySet<number>;
+  /** Per-station ring lighting 0..1 indexed by id (resolveEdgeRingEnergies). */
+  readonly ringEnergies?: ReadonlyArray<number>;
+  /** Ring spin in radians (timeline ringSpinRad). */
+  readonly spinRad?: number;
   readonly flash?: EdgeWrapFlash | null;
   /** Stations whose kite must not draw (e.g. the teleport shell is occupying it). */
   readonly hiddenIds?: ReadonlySet<number>;
@@ -314,6 +252,10 @@ export const resolveEdgeMarkerIdleAlpha = (timeMs: number, reducedMotion: boolea
   return EDGE_MARKER_IDLE_ALPHA_MIN + ((EDGE_MARKER_IDLE_ALPHA_MAX - EDGE_MARKER_IDLE_ALPHA_MIN) * breath);
 };
 
+const clampUnit = (value: number): number => (
+  Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0
+);
+
 export const resolveEdgeMarkerStates = (input: EdgeMarkerStateInput): ReadonlyArray<EdgeMarkerState> => {
   const idleAlpha = resolveEdgeMarkerIdleAlpha(input.timeMs, input.reducedMotion);
   const flashProgress = !input.reducedMotion && input.flash
@@ -322,12 +264,18 @@ export const resolveEdgeMarkerStates = (input: EdgeMarkerStateInput): ReadonlyAr
   const flashLive = !input.reducedMotion && input.flash != null && flashProgress < 1 && input.timeMs >= input.flash.startedAtMs;
   return STATION_IDS.map((id) => {
     // Reduced motion: nothing animates, so nothing lights up either.
-    const energized = !input.reducedMotion && (input.energizedIds?.has(id) ?? false);
+    const ring = input.reducedMotion ? 0 : clampUnit(input.ringEnergies?.[id] ?? 0);
+    const energy = input.reducedMotion ? 0 : Math.max(ring, (input.energizedIds?.has(id) ?? false) ? 1 : 0);
+    const energized = energy > 0;
     const flash = flashLive && (input.flash?.ids.includes(id) ?? false) ? 1 - flashProgress : 0;
     return {
       id,
-      alpha: energized || flash > 0 ? EDGE_MARKER_ENERGIZED_ALPHA : idleAlpha,
+      alpha: energized || flash > 0
+        ? idleAlpha + ((EDGE_MARKER_ENERGIZED_ALPHA - idleAlpha) * Math.max(energy, flash > 0 ? 1 : 0))
+        : idleAlpha,
       energized,
+      energy,
+      spinRad: input.reducedMotion || !Number.isFinite(input.spinRad) ? 0 : (input.spinRad ?? 0),
       flash,
       hidden: input.hiddenIds?.has(id) ?? false
     };
@@ -423,11 +371,14 @@ export const drawEdgeMarker = (
   if (state.hidden) {
     return;
   }
-  const outline = resolveEdgeMarkerVertices(station);
+  const outline = resolveEdgeMarkerVertices(station, 1, state.spinRad);
   if (state.energized || state.flash > 0) {
     // Mint core: a smaller kite inside the outline.
-    tracePolygon(graphics, resolveEdgeMarkerVertices(station, 0.5));
-    graphics.fillStyle(cyberArcadeMaterial.rail.mint, Math.max(state.flash, state.energized ? 0.7 : 0) * state.alpha);
+    tracePolygon(graphics, resolveEdgeMarkerVertices(station, 0.5, state.spinRad));
+    graphics.fillStyle(
+      cyberArcadeMaterial.rail.mint,
+      Math.max(state.flash, state.energized ? 0.7 * state.energy : 0) * state.alpha
+    );
     graphics.fillPath();
   }
   tracePolygon(graphics, outline);
@@ -451,6 +402,48 @@ export const drawEdgeMarkers = (
     }
   });
 };
+
+export interface EdgeRingLifecycle {
+  /** inward = arrival (diamonds -> spawn tile), outward = departure (player -> diamonds). */
+  readonly direction: EdgeBeamDirection;
+  /** Timeline laserProgress (intro.laserProgress / outro.laserProgress), 0..1. */
+  readonly laserProgress: number;
+  /** Timeline ringEnergy envelope, 0..1 (1 while active, fading to 0 at the end). */
+  readonly ringEnergy: number;
+}
+
+/** Fraction of the beam flight over which a departing beam brightens the diamond it reaches. */
+export const EDGE_RING_LANDING_RAMP = 0.2;
+/** Fraction of the beam flight over which an arriving diamond brightens after it fires. */
+export const EDGE_RING_FIRE_RAMP = 0.2;
+
+const smoothUnit = (value: number): number => {
+  const x = clampUnit(value);
+  return x * x * (3 - (2 * x));
+};
+
+/**
+ * Per-station lighting (index = station id) derived from each beam's own
+ * progress and the ring-wide envelope:
+ * - arrival (inward): a diamond is lit from the instant its beam leaves and STAYS
+ *   lit for the whole maze generation; the envelope fades all 8 out together;
+ * - departure (outward): a diamond lights as the player's beam REACHES it
+ *   (progress -> 1) and stays lit until the envelope fades at the end.
+ * Null lifecycle = at rest = all zero.
+ */
+export const resolveEdgeRingEnergies = (
+  lifecycle: EdgeRingLifecycle | null,
+  count = EDGE_STATION_COUNT
+): ReadonlyArray<number> => Array.from({ length: count }, (_, index) => {
+  if (lifecycle === null) {
+    return 0;
+  }
+  const progress = resolveEdgeBeamProgress(clampUnit(lifecycle.laserProgress), index, count);
+  const own = lifecycle.direction === 'inward'
+    ? (progress > 0 ? smoothUnit(progress / EDGE_RING_FIRE_RAMP) : 0)
+    : smoothUnit((progress - (1 - EDGE_RING_LANDING_RAMP)) / EDGE_RING_LANDING_RAMP);
+  return own * clampUnit(lifecycle.ringEnergy);
+});
 
 export interface SpawnSparkle {
   readonly x: number;

@@ -1,19 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import {
-  EDGE_MARKER_CONTROL_CLEARANCE_PX,
-  resolveEdgeMarkerBounds,
-  resolveEdgeStations,
-  resolveHeaderControlRects,
-  type EdgeRect
-} from '../../src/render/edgeMarkers';
 import {
   LEGACY_HEADER_IDENTITY_MIN_FONT_PX,
   LEGACY_HEADER_IDENTITY_TITLE_GAP_PX
 } from '../../src/legacy-runtime/legacyHeaderIdentity';
 import {
-  LEGACY_HEADER_IDENTITY_DIAMOND_CLEARANCE_PX,
   LEGACY_HEADER_IDENTITY_SHORT_FORM_MIN_VISIBLE_CHARS,
-  resolveLegacyHeaderIdentityPlacement
+  resolveHeaderControlRects,
+  resolveLegacyHeaderIdentityPlacement,
+  type LegacyHeaderRect as EdgeRect
 } from '../../src/legacy-runtime/legacyHeaderIdentityPlacement';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import { resolveLegacyMenuPathTitleLayout, resolveLegacyMenuTitleFontSize } from '../../src/legacy-runtime/legacyMenuTitle';
@@ -36,9 +32,7 @@ const overlaps = (a: EdgeRect, b: EdgeRect): boolean => (
 const place = (width: number, height: number, username: string | null) => {
   const layout = resolveLegacyMenuLayout(width, height, 50, 49, 49, 'menu', { menuActionMode: 'authenticated' });
   const controls = resolveHeaderControlRects(layout);
-  const stations = resolveEdgeStations({ width, height }, undefined, controls);
   const placement = resolveLegacyHeaderIdentityPlacement({
-    edgeStations: stations,
     layout,
     measure,
     measureHeight,
@@ -49,12 +43,12 @@ const place = (width: number, height: number, username: string | null) => {
     layout.titleY,
     resolveLegacyMenuTitleFontSize(layout.titleReserveHeight)
   );
-  return { controls, layout, placement, stations, titleLayout };
+  return { controls, layout, placement, titleLayout };
 };
 
 describe('header identity placement (username top-left, right of the profile icon)', () => {
-  test.each(VIEWPORTS)('is visible, right of the profile icon and clear of icon, title and diamonds at $width x $height', ({ width, height }) => {
-    const { controls, layout, placement, stations, titleLayout } = place(width, height, 'qa-player');
+  test.each(VIEWPORTS)('is visible, right of the profile icon and clear of icon and title at $width x $height', ({ width, height }) => {
+    const { controls, layout, placement, titleLayout } = place(width, height, 'qa-player');
     expect(layout.lanes.title).toBeNull();
     expect(placement.visible).toBe(true);
     const rect = placement.rect as EdgeRect;
@@ -73,10 +67,8 @@ describe('header identity placement (username top-left, right of the profile ico
     expect(placement.titleLeft).toBe(titleLayout.left);
     expect(rect.right).toBeLessThanOrEqual(titleRect.left - LEGACY_HEADER_IDENTITY_TITLE_GAP_PX);
     expect(overlaps(rect, titleRect)).toBe(false);
-    // Clear of every one of the 8 diamond bounding squares (incl. top-left corner and top-centre).
-    for (const station of stations) {
-      expect(overlaps(rect, resolveEdgeMarkerBounds(station)), `station ${station.id}`).toBe(false);
-    }
+    // Vertically centred on the profile icon: the diamonds sit behind the UI, so there is no nudge.
+    expect(placement.anchor?.y).toBe(placement.profileFrame.centerY);
     // Stays inside the profile icon's vertical band and the other header controls are untouched.
     expect(rect.top).toBeGreaterThanOrEqual(profile.top - 1);
     expect(rect.bottom).toBeLessThanOrEqual(profile.bottom);
@@ -137,44 +129,15 @@ describe('header identity placement (username top-left, right of the profile ico
     }
   });
 
-  test('nudges down (never up, never past the profile icon) to clear the top-left diamond, or hides', () => {
-    const { controls, placement, stations } = place(320, 568, 'qa-player');
-    const topLeft = resolveEdgeMarkerBounds(stations[0] as { x: number; y: number });
-    const rect = placement.rect as EdgeRect;
-    expect(rect.top).toBeGreaterThanOrEqual(topLeft.bottom + LEGACY_HEADER_IDENTITY_DIAMOND_CLEARANCE_PX);
-    expect(placement.nudgeY).toBeGreaterThanOrEqual(0);
-    expect(rect.bottom).toBeLessThanOrEqual((controls[0] as EdgeRect).bottom);
-
-    // A diamond that can never be cleared inside the icon band hides the label.
-    const layout = resolveLegacyMenuLayout(320, 568, 50, 49, 49, 'menu', { menuActionMode: 'authenticated' });
-    const blocked = resolveLegacyHeaderIdentityPlacement({
-      edgeStations: [{ x: 70, y: 40 }],
-      layout,
-      measure,
-      measureHeight,
-      username: 'qa-player'
-    });
-    expect(blocked.visible).toBe(false);
-    expect(blocked.clearsEdgeDiamonds).toBe(false);
-  });
-
-  test('keeps the diamond-vs-header clearance contract the diamonds were built for', () => {
-    // The corner diamonds were nudged clear of the 36 px header controls + 8 px;
-    // the label sits in the slot those diamonds slid past, so re-assert it here.
+  test('no diamond-avoid nudge: the label stays centred on the profile icon even in the tightest header', () => {
     for (const { width, height } of VIEWPORTS) {
-      const { controls, stations } = place(width, height, 'qa-player');
-      for (const station of stations) {
-        const bounds = resolveEdgeMarkerBounds(station);
-        for (const control of controls) {
-          const inflated: EdgeRect = {
-            bottom: control.bottom + EDGE_MARKER_CONTROL_CLEARANCE_PX,
-            left: control.left - EDGE_MARKER_CONTROL_CLEARANCE_PX,
-            right: control.right + EDGE_MARKER_CONTROL_CLEARANCE_PX,
-            top: control.top - EDGE_MARKER_CONTROL_CLEARANCE_PX
-          };
-          expect(overlaps(bounds, inflated)).toBe(false);
-        }
-      }
+      const { placement } = place(width, height, 'qa-player');
+      expect(placement.anchor?.y).toBe(placement.profileFrame.centerY);
+      expect('nudgeY' in placement).toBe(false);
+      expect('clearsEdgeDiamonds' in placement).toBe(false);
     }
+    const source = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyHeaderIdentityPlacement.ts'), 'utf8');
+    expect(source).not.toContain("from '../render/edgeMarkers'");
+    expect(source).not.toContain('edgeStations');
   });
 });

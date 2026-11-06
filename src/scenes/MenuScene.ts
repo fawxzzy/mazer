@@ -44,16 +44,15 @@ import {
   drawEdgeBeams,
   drawEdgeMarkers,
   resolveEdgeMarkerStates,
+  resolveEdgeRingEnergies,
   resolveEdgeStations,
-  resolveHeaderControlRects,
   resolveWrapEndStationIds,
   resolveWrapFlashStationIds,
+  type EdgeRingLifecycle,
   type EdgeStation,
   type EdgeWrapFlash
 } from '../render/edgeMarkers';
 import {
-  INTRO_DONE_MS,
-  INTRO_EDGE_PATHS_ON_MS,
   INTRO_LASER_MS,
   INTRO_LASER_START_MS,
   INTRO_POP_MS,
@@ -63,11 +62,11 @@ import {
   type OutroState,
   OUTRO_HANDOFF_MS,
   OUTRO_PLAYER_REMOVE_MS,
-  OUTRO_TILES_END_MS,
   OUTRO_TRAIL_FADE_MS,
   resolveIntro,
   resolveIntroDeconstruct,
   resolveIntroInputUnlockMs,
+  resolveOutroTilesEndMs,
   resolveSpawnLaser,
   skipIntroElapsedMs
 } from '../render/introTimeline';
@@ -2268,8 +2267,11 @@ export class MenuScene extends Phaser.Scene {
   // spawn laser is currently leaving from (energized while it fires).
   private edgeMarkerWrapFlash: EdgeWrapFlash | null = null;
   // Stations whose beam is in flight right now (they brighten), and whether any was last frame.
-  private edgeBeamFiringIds: ReadonlySet<number> = new Set<number>();
   private edgeBeamWasFiring = false;
+  // Ring lighting + spin of the current frame (resolveLegacyEdgeRing) and whether
+  // the previous frame had a lifecycle (one more redraw clears the last lit frame).
+  private edgeRing: { lifecycle: EdgeRingLifecycle | null; spinRad: number } = { lifecycle: null, spinRad: 0 };
+  private edgeRingActive = false;
   private visualDiagnosticsRevision = 0;
   private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   private visualDiagnosticsPlayLifecycleSignature: string | null = null;
@@ -3368,6 +3370,7 @@ export class MenuScene extends Phaser.Scene {
       || this.resolveLegacyPlayerTransferState(time).active
       || this.playerSpawnBurstWasActiveForRedraw
       || this.edgeBeamWasFiring
+      || this.edgeRingActive
     ) {
       this.boardDynamicDirty = true;
     }
@@ -5867,8 +5870,8 @@ export class MenuScene extends Phaser.Scene {
     }
 
     // The demo walker waits for the same instant the intro unlocks input
-    // (the spawn laser landing) -- one number, independent of tile count.
-    return this.time.now + resolveIntroInputUnlockMs(this.prefersLegacyReducedMotion());
+    // (the reveal end, a pure function of the tile count).
+    return this.time.now + resolveIntroInputUnlockMs(this.prefersLegacyReducedMotion(), this.menuStaticDrawTileOrder.length);
   }
 
   private releaseLegacyMenuDemoGateOnStaticDrawSettled(time: number): void {
@@ -5882,10 +5885,11 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
-  // Tiles are gone OUTRO_TILES_END_MS after the arm instant regardless of tile
-  // count (resolveIntroDeconstruct); the handoff beat is added by callers.
+  // Tiles are gone resolveOutroTilesEndMs(N) after the arm instant (a pure
+  // function of the tile count, see resolveIntroDeconstruct); the handoff beat
+  // is added by callers.
   private resolveLegacyMenuStaticDeconstructDurationMs(): number {
-    return this.prefersLegacyReducedMotion() ? 0 : OUTRO_TILES_END_MS;
+    return this.prefersLegacyReducedMotion() ? 0 : resolveOutroTilesEndMs(this.menuStaticDrawTileOrder.length);
   }
 
   // The one place the building phase's time-derived presentation state is
@@ -6458,7 +6462,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const reducedMotion = this.prefersLegacyReducedMotion();
-    const skippedElapsedMs = skipIntroElapsedMs(elapsedMs, { reducedMotion });
+    const skippedElapsedMs = skipIntroElapsedMs(elapsedMs, { reducedMotion, tileCount: this.menuStaticDrawTileOrder.length });
     if (skippedElapsedMs <= elapsedMs) {
       return false;
     }
@@ -6494,8 +6498,8 @@ export class MenuScene extends Phaser.Scene {
     }
     if (this.playerTransferEnergyArmed) {
       // The inbound transfer beam fires from the same intro instant as the
-      // spawn laser (the bleed docks finish growing at INTRO_REVEAL_END_MS,
-      // just before it), so there is one arrival clock, not two.
+      // spawn laser (the edge paths switch on at the reveal end,
+      // long after it), so there is one arrival clock, not two.
       this.playerTransferEnergyDeliveryStartedAtMs ??= laserStartedAtMs;
     }
   }
@@ -8742,14 +8746,10 @@ export class MenuScene extends Phaser.Scene {
 
   // Edge stations in screen space (corners + edge midpoints), the one place
   // every edge-anchored effect (markers, arrival beams, departure beams)
-  // asks. The two top corners slide along the edge only as far as needed to
-  // clear the header controls (profile / leaderboard / settings).
+  // asks. The stations are fixed positions that depend on the viewport size
+  // ONLY (no safe area, no header-control avoidance): the kites sit behind all UI.
   private resolveLegacyEdgeStations(): ReadonlyArray<EdgeStation> {
-    return resolveEdgeStations(
-      { width: this.layout.width, height: this.layout.height },
-      readMazerViewportGeometry().safeArea,
-      resolveHeaderControlRects(this.layout)
-    );
+    return resolveEdgeStations({ width: this.layout.width, height: this.layout.height });
   }
 
   // All 8 beams, both directions, in one place. Drawn into spawnLaserGraphics
@@ -8762,7 +8762,7 @@ export class MenuScene extends Phaser.Scene {
     playerPoint: LegacyPoint,
     spawnBurst: ReturnType<typeof this.resolveLegacyPlayerSpawnBurstState>
   ): void {
-    let firingIds: ReadonlySet<number> = new Set<number>();
+    let firing = false;
     if (!this.prefersLegacyReducedMotion() && this.overlay === 'none') {
       const boardRelativeX = mazeLeft + ((playerPoint.x + 0.5) * mazeTileSize);
       const boardRelativeY = mazeTop + ((playerPoint.y + 0.5) * mazeTileSize);
@@ -8772,32 +8772,68 @@ export class MenuScene extends Phaser.Scene {
       };
       const outro = this.resolveLegacyOutroState(time);
       if (outro !== null) {
-        firingIds = drawEdgeBeams(this.spawnLaserGraphics, {
+        firing = drawEdgeBeams(this.spawnLaserGraphics, {
           direction: 'outward',
           focus,
           laserProgress: outro.laserProgress,
           spawnPop: 0,
           stations: this.resolveLegacyEdgeStations()
-        }).firingIds;
+        }).firingIds.size > 0;
       } else if (spawnBurst.active) {
-        firingIds = drawEdgeBeams(this.spawnLaserGraphics, {
+        firing = drawEdgeBeams(this.spawnLaserGraphics, {
           direction: 'inward',
           focus,
           laserProgress: spawnBurst.travelProgress,
           spawnPop: spawnBurst.flashProgress,
           stations: this.resolveLegacyEdgeStations()
-        }).firingIds;
+        }).firingIds.size > 0;
       }
     }
-    // The diamonds brighten while their beam fires, so the markers redraw on
-    // every frame a beam is in flight (and once more when the last one lands).
-    const firing = firingIds.size > 0;
-    if (firing || this.edgeBeamWasFiring) {
-      this.edgeBeamFiringIds = firingIds;
+    // The diamonds lighting + spin are derived from the intro / outro
+    // timelines, so the markers redraw on EVERY frame while a lifecycle is
+    // active and once more when it ends (the final frame clears the lighting:
+    // no stale lit frames survive into play).
+    const ring = this.resolveLegacyEdgeRing(time, spawnBurst);
+    const ringActive = ring.lifecycle !== null;
+    this.edgeRing = ring;
+    if (firing || this.edgeBeamWasFiring || ringActive || this.edgeRingActive) {
       this.drawLegacyEdgeMarkers(time);
     }
-    this.edgeBeamFiringIds = firingIds;
     this.edgeBeamWasFiring = firing;
+    this.edgeRingActive = ringActive;
+  }
+
+  // Ring lighting + spin for this frame: the departure (outro) or arrival
+  // (intro) timeline, or null at rest / in reduced motion / under an overlay.
+  private resolveLegacyEdgeRing(
+    time: number,
+    spawnBurst: ReturnType<typeof this.resolveLegacyPlayerSpawnBurstState>
+  ): { lifecycle: EdgeRingLifecycle | null; spinRad: number } {
+    if (this.prefersLegacyReducedMotion() || this.overlay !== 'none') {
+      return { lifecycle: null, spinRad: 0 };
+    }
+    const outro = this.resolveLegacyOutroState(time);
+    if (outro !== null && !outro.done) {
+      return {
+        lifecycle: { direction: 'outward', laserProgress: outro.laserProgress, ringEnergy: outro.ringEnergy },
+        spinRad: outro.ringSpinRad
+      };
+    }
+    const intro = this.resolveLegacyIntroState(time);
+    if (intro !== null && !intro.done) {
+      return {
+        lifecycle: { direction: 'inward', laserProgress: intro.laserProgress, ringEnergy: intro.ringEnergy },
+        spinRad: intro.ringSpinRad
+      };
+    }
+    if (outro === null && intro === null && spawnBurst.active) {
+      // Arrival without an intro clock (never expected): keep the beams diamonds lit while they fly.
+      return {
+        lifecycle: { direction: 'inward', laserProgress: spawnBurst.travelProgress, ringEnergy: 1 },
+        spinRad: 0
+      };
+    }
+    return { lifecycle: null, spinRad: 0 };
   }
 
   // The eight calm edge markers (edgeMarkers.ts), drawn into their OWN
@@ -8811,10 +8847,10 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const reducedMotion = this.prefersLegacyReducedMotion();
-    const energizedIds = new Set<number>(this.edgeBeamFiringIds);
-    const introElapsedMs = this.introStartedAtMs === null ? null : time - this.introStartedAtMs;
+    const energizedIds = new Set<number>();
+    const introState = this.resolveLegacyIntroState(time);
     if (
-      (introElapsedMs !== null && introElapsedMs >= INTRO_EDGE_PATHS_ON_MS && introElapsedMs < INTRO_DONE_MS)
+      (introState !== null && introState.bleedProgress === 1 && !introState.done)
       || this.playerTransferEnergyArmed
     ) {
       this.resolveLegacyWrapEndStationIds().forEach((id) => energizedIds.add(id));
@@ -8832,6 +8868,8 @@ export class MenuScene extends Phaser.Scene {
         energizedIds,
         flash: this.edgeMarkerWrapFlash,
         reducedMotion,
+        ringEnergies: resolveEdgeRingEnergies(this.edgeRing.lifecycle),
+        spinRad: this.edgeRing.spinRad,
         timeMs: time
       })
     );
@@ -15531,8 +15569,8 @@ export class MenuScene extends Phaser.Scene {
   // that sat above the Start button). Geometry comes from
   // resolveLegacyHeaderIdentityPlacement: the real profile-icon frame, the
   // real title footprint (not an assumed width), ellipsized to the room
-  // between them, shortened/hidden on a tight header, and kept clear of the
-  // edge diamonds. Signed out / guest / no username -> no label at all.
+  // between them, shortened/hidden on a tight header (the edge diamonds sit
+  // behind it at fixed positions). Signed out / guest / no username -> no label at all.
   // Depth 3 like the other menu controls: above the board, below overlays.
   private createLegacyHeaderIdentityLabel(): void {
     const username = this.authSnapshot.status === 'authenticated'
@@ -15550,7 +15588,6 @@ export class MenuScene extends Phaser.Scene {
       strokeThickness: 2
     }).setOrigin(0, 0.5).setDepth(3).setVisible(false);
     const placement = resolveLegacyHeaderIdentityPlacement({
-      edgeStations: this.resolveLegacyEdgeStations(),
       layout: this.layout,
       measure: (value, fontPx) => label.setFontSize(fontPx).setText(value).width,
       measureHeight: (fontPx) => label.setFontSize(fontPx).setText(username).height,

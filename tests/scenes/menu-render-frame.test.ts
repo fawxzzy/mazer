@@ -1929,7 +1929,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.createLegacyHeaderIdentityLabel();');
     expect(identitySource).toContain("this.authSnapshot.canonicalUsername?.trim() ?? ''");
     expect(identitySource).toContain('resolveLegacyHeaderIdentityPlacement({');
-    expect(identitySource).toContain('edgeStations: this.resolveLegacyEdgeStations(),');
+    expect(identitySource).not.toContain('edgeStations');
     expect(identitySource).toContain('layout: this.layout,');
     // Left-anchored and vertically centered like the placement contract says;
     // depth 3 = above the board, below the modal overlays.
