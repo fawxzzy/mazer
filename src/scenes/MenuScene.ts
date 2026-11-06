@@ -144,6 +144,18 @@ import {
   type LegacyResetRequest,
 } from '../legacy-runtime/legacyPlayLifecycle';
 import {
+  INITIAL_LEGACY_PAGE_VISIBILITY_STATE,
+  consumeLegacyResumeFrame,
+  isLegacyLifecycleHeld,
+  reduceLegacyPageVisibilityOnLeave,
+  reduceLegacyPageVisibilityOnReturn,
+  resolveLegacyLifecycleHoldMs,
+  shouldAutoPauseLegacyRun,
+  type LegacyPageLeaveSignal,
+  type LegacyPageReturnSignal,
+  type LegacyPageVisibilityState
+} from '../legacy-runtime/legacyLifecycleHold';
+import {
   resolveLegacyPauseCommand,
   type LegacyPauseCommand
 } from '../legacy-runtime/legacyPauseLifecycle';
@@ -2221,6 +2233,15 @@ export class MenuScene extends Phaser.Scene {
   private legacyPlayFocusGuardAttached = false;
   private legacyPlayWindowBlurHandler: (() => void) | null = null;
   private legacyPlayVisibilityChangeHandler: (() => void) | null = null;
+  private legacyPlayPageHideHandler: (() => void) | null = null;
+  private legacyPlayPageShowHandler: (() => void) | null = null;
+  // Page visibility for the lifecycle hold (legacyLifecycleHold.ts): hidden
+  // tab/background/page-hide, plus the one resume frame whose delta is the
+  // whole hidden gap. legacyLifecycleHeldThisFrame is the per-frame verdict
+  // (set in holdLegacyPlayMazeLifecycleDuringPause) the transfer pause
+  // tracker reads so both clocks agree.
+  private legacyPageVisibility: LegacyPageVisibilityState = INITIAL_LEGACY_PAGE_VISIBILITY_STATE;
+  private legacyLifecycleHeldThisFrame = false;
   private legacyPlayDocumentKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
   private legacyPlayDocumentKeyUpHandler: ((event: KeyboardEvent) => void) | null = null;
   private legacyPlayTouchControlPointerDownHandler: ((event: PointerEvent) => void) | null = null;
@@ -3957,15 +3978,28 @@ export class MenuScene extends Phaser.Scene {
 
     this.legacyPlayWindowBlurHandler = () => {
       this.handleLegacyPlayInputFocusLoss();
+      this.handleLegacyPageLeave('window-blur');
     };
     this.legacyPlayVisibilityChangeHandler = () => {
       if (typeof document !== 'undefined' && document.hidden) {
         this.handleLegacyPlayInputFocusLoss();
+        this.handleLegacyPageLeave('visibility-hidden');
+      } else {
+        this.handleLegacyPageReturn('visibility-visible');
       }
+    };
+    this.legacyPlayPageHideHandler = () => {
+      this.handleLegacyPlayInputFocusLoss();
+      this.handleLegacyPageLeave('page-hide');
+    };
+    this.legacyPlayPageShowHandler = () => {
+      this.handleLegacyPageReturn('page-show');
     };
 
     if (typeof window !== 'undefined') {
       window.addEventListener('blur', this.legacyPlayWindowBlurHandler);
+      window.addEventListener('pagehide', this.legacyPlayPageHideHandler);
+      window.addEventListener('pageshow', this.legacyPlayPageShowHandler);
     }
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.legacyPlayVisibilityChangeHandler);
@@ -3981,11 +4015,19 @@ export class MenuScene extends Phaser.Scene {
     if (typeof window !== 'undefined' && this.legacyPlayWindowBlurHandler !== null) {
       window.removeEventListener('blur', this.legacyPlayWindowBlurHandler);
     }
+    if (typeof window !== 'undefined' && this.legacyPlayPageHideHandler !== null) {
+      window.removeEventListener('pagehide', this.legacyPlayPageHideHandler);
+    }
+    if (typeof window !== 'undefined' && this.legacyPlayPageShowHandler !== null) {
+      window.removeEventListener('pageshow', this.legacyPlayPageShowHandler);
+    }
     if (typeof document !== 'undefined' && this.legacyPlayVisibilityChangeHandler !== null) {
       document.removeEventListener('visibilitychange', this.legacyPlayVisibilityChangeHandler);
     }
     this.legacyPlayWindowBlurHandler = null;
     this.legacyPlayVisibilityChangeHandler = null;
+    this.legacyPlayPageHideHandler = null;
+    this.legacyPlayPageShowHandler = null;
     this.legacyPlayFocusGuardAttached = false;
   }
 
@@ -4130,7 +4172,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyKeyboardDown(event: KeyboardEvent): boolean {
-    if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
+    // Swallow gameplay keys during the goal-reset chain, but never while an
+    // overlay is open: a run paused inside the goal hold (cog tap, or the
+    // hidden-tab auto-pause) must still be resumable from the keyboard.
+    // Swallowing P/Esc there left the pause card with no keyboard way out.
+    if (this.overlay === 'none' && hasPendingLegacyResetRequest(this.pendingResetRequest)) {
       this.resetLegacyPlayInputBuffer();
       return true;
     }
@@ -5293,6 +5339,23 @@ export class MenuScene extends Phaser.Scene {
     this.resetLegacyPlayInputBuffer();
   }
 
+  // The page went away (tab hidden, app backgrounded, page-hide, window
+  // blur). A live run pauses itself; it never resumes by itself -- the player
+  // taps Resume. Only opens Pause when no overlay is open, so two overlays
+  // can never stack, and the lifecycle hold (see
+  // holdLegacyPlayMazeLifecycleDuringPause) then freezes the intro/outro,
+  // reset/generation deadlines and the run timer for the whole interval.
+  private handleLegacyPageLeave(signal: LegacyPageLeaveSignal): void {
+    this.legacyPageVisibility = reduceLegacyPageVisibilityOnLeave(this.legacyPageVisibility, signal);
+    if (shouldAutoPauseLegacyRun({ mode: this.mode, overlay: this.overlay })) {
+      this.openOverlay('pause');
+    }
+  }
+
+  private handleLegacyPageReturn(signal: LegacyPageReturnSignal): void {
+    this.legacyPageVisibility = reduceLegacyPageVisibilityOnReturn(this.legacyPageVisibility, signal);
+  }
+
   private resolveLegacyPlayInputBuffer(): void {
     this.playMoveTimer?.remove(false);
     this.playMoveTimer = null;
@@ -5450,6 +5513,11 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicDirty = true;
     this.backdropDirty = true;
     this.uiDirty = true;
+    // A geometry change is a real state change: the next diagnostics publish
+    // must not wait out the throttle (it used to report the previous
+    // orientation's board and player screen coordinates for up to 1.5 s).
+    this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+    this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
   // Probes the current viewport's available board box (independent of any
@@ -6281,6 +6349,10 @@ export class MenuScene extends Phaser.Scene {
   // consumers yields the same result it did on the last unpaused frame,
   // and on resume each deadline is still exactly as far in the future as
   // when the pause began -- unpaused durations and ordering are unchanged.
+  // The same hold now also covers a hidden page / the resume frame after one
+  // (legacyLifecycleHold.ts), in both modes, and moves the run timer anchors
+  // (playStartedAtMs/playCompletedAtMs) so paused time never counts toward
+  // completion time. The rules live in the pure module and its tests.
   // Menu mode never reaches overlay === 'pause', so the demo AI's own
   // goal-reset choreography is completely untouched. The transfer's OWN
   // anchors (playerTransferEnergyOutboundStartedAtMs etc.) are
@@ -6290,10 +6362,16 @@ export class MenuScene extends Phaser.Scene {
   private holdLegacyPlayMazeLifecycleDuringPause(time: number): void {
     const previousFrameMs = this.legacyPlayMazeLifecyclePrevFrameMs;
     this.legacyPlayMazeLifecyclePrevFrameMs = time;
-    if (this.mode !== 'play' || this.overlay !== 'pause' || previousFrameMs === null) {
-      return;
-    }
-    const frameDeltaMs = Math.max(0, time - previousFrameMs);
+    const holdInput = {
+      mode: this.mode,
+      overlay: this.overlay,
+      pageVisibility: this.legacyPageVisibility
+    };
+    this.legacyLifecycleHeldThisFrame = isLegacyLifecycleHeld(holdInput);
+    const frameDeltaMs = previousFrameMs === null
+      ? 0
+      : resolveLegacyLifecycleHoldMs({ ...holdInput, frameDeltaMs: time - previousFrameMs });
+    this.legacyPageVisibility = consumeLegacyResumeFrame(this.legacyPageVisibility);
     if (frameDeltaMs <= 0) {
       return;
     }
@@ -6320,6 +6398,27 @@ export class MenuScene extends Phaser.Scene {
         ...this.pendingResetRequest,
         dueAtMs: this.pendingResetRequest.dueAtMs + frameDeltaMs
       };
+    }
+    if (this.mode === 'play') {
+      // The run timer feeds completion time (pace scoring): a paused or
+      // hidden interval must not count. Start and completion move together
+      // so an already-completed run keeps its elapsed value.
+      this.playStartedAtMs += frameDeltaMs;
+      if (this.playCompletedAtMs !== null) {
+        this.playCompletedAtMs += frameDeltaMs;
+      }
+    } else {
+      // Menu mode only holds for a hidden page (its overlays never hold):
+      // keep the demo walker's step/goal-reset schedule and cycle clock from
+      // catching up in one burst on return.
+      this.nextDemoMoveAtMs += frameDeltaMs;
+      if (this.pendingMenuDemoDeconstructArmAtMs !== null) {
+        this.pendingMenuDemoDeconstructArmAtMs += frameDeltaMs;
+      }
+      this.menuDemoCycleStartedAtMs += frameDeltaMs;
+      if (this.menuDemoCompletedAtMs !== null) {
+        this.menuDemoCompletedAtMs += frameDeltaMs;
+      }
     }
   }
 
@@ -8446,7 +8545,7 @@ export class MenuScene extends Phaser.Scene {
   // afterward this same frame. See gameplayTransferPausedDurationMs's own
   // field comment for the real defect this fixes.
   private updateGameplayTransferPauseTracking(time: number): void {
-    const paused = this.overlay === 'pause';
+    const paused = this.overlay === 'pause' || this.legacyLifecycleHeldThisFrame;
     if (paused && this.gameplayTransferPauseStartedAtMs === null) {
       // Anchor at the last real pre-pause time, not this frame's own
       // `time` -- see gameplayTransferLastUnpausedTimeMs's own field

@@ -70,7 +70,7 @@ export interface LegacyGuideRow {
 /** A guide row that must exist once its blocker lands. Never shown until then. */
 export interface LegacyGuidePendingRow {
   id: string;
-  blockedOn: 'rank-surface' | 'first-run-coach';
+  blockedOn: 'rank-surface' | 'first-run-coach' | 'guide-icon-construction';
   /** Kebab id; prose in the spec doc ("Guide icon reasons"). */
   reasonId: string;
 }
@@ -207,6 +207,16 @@ export const LEGACY_GUIDE_PENDING_ROWS: readonly LegacyGuidePendingRow[] = Objec
     blockedOn: 'first-run-coach',
     id: 'first-run-coach',
     reasonId: 'level1-coach-is-owner-decision'
+  },
+  {
+    // Gameplay pauses itself when the tab is hidden, the app is backgrounded or
+    // the window loses focus, and only Resume continues it. The Pause card is
+    // unchanged and no existing row says anything the behaviour contradicts;
+    // the row below needs a guide icon, and icon construction is an open
+    // owner pick, so the row waits for it instead of borrowing a wrong glyph.
+    blockedOn: 'guide-icon-construction',
+    id: 'auto-pause',
+    reasonId: 'auto-pause-row-needs-owner-icon-pick'
   }
 ]);
 

@@ -69,6 +69,12 @@ describe('guide structure', () => {
     }
   });
 
+  test('the pending auto-pause row names a behaviour the scene really has (so the row cannot go stale before it ships)', () => {
+    expect(LEGACY_GUIDE_PENDING_ROWS.find((p) => p.id === 'auto-pause')?.blockedOn).toBe('guide-icon-construction');
+    expect(MENU_SCENE).toContain("this.handleLegacyPageLeave('visibility-hidden');");
+    expect(MENU_SCENE).toContain('shouldAutoPauseLegacyRun({ mode: this.mode, overlay: this.overlay })');
+  });
+
   test('pending rows are never shown, and each names what must land first', () => {
     const shown = new Set<string>(LEGACY_GUIDE_ROWS.map((r) => r.id));
     for (const pending of LEGACY_GUIDE_PENDING_ROWS) {
@@ -76,7 +82,7 @@ describe('guide structure', () => {
       expect(pending.reasonId).toMatch(/^[a-z0-9]+(-[a-z0-9]+){2,}$/);
     }
     // The Start row left the pending list when Chip was wired (the brackets are on the board now).
-    expect(LEGACY_GUIDE_PENDING_ROWS.map((p) => p.id)).toEqual(['ranks', 'first-run-coach']);
+    expect(LEGACY_GUIDE_PENDING_ROWS.map((p) => p.id)).toEqual(['ranks', 'first-run-coach', 'auto-pause']);
   });
 });
 
