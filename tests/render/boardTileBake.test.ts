@@ -430,11 +430,14 @@ describe('markers', () => {
     ]);
   });
 
-  test('chip goal: dark disc badge, lit ring and a star in the danger colour', () => {
+  test('chip goal: goal-coloured end pad, dark disc badge, lit ring and a star in the danger colour', () => {
     const { rec } = draw({ start: undefined, player: undefined });
     expect(rec.log).toContain(`set fillStyle=${cssRgb(boardMaterial.void)}`);
     expect(rec.log).toContain(`set fillStyle=${cssRgb(boardMaterial.goal)}`);
-    expect(rec.count('arc(')).toBe(2);
+    // Chip wiring (2026-11-06) added the end pad (the cell's inscribed circle, goal colour at goalWashAlpha)
+    // under the badge so the goal cell reads at board scale: three arcs now (pad, badge, ring), was two.
+    expect(rec.log).toContain(`set fillStyle=${cssRgba(boardMaterial.goal, BOARD_TILE_GEOMETRY.marker.goalWashAlpha)}`);
+    expect(rec.count('arc(')).toBe(3);
   });
 
   test('chip start: gold corner brackets in one stroked path', () => {

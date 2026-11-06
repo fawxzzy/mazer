@@ -128,22 +128,26 @@ describe('BootScene floor-tile texture generation failure safety (source-level i
   });
 });
 
-describe('MenuScene floor-tile texture fallback safety (source-level invariants)', () => {
+// Chip wiring (2026-11-06): the board no longer uses the floor-tile texture. MenuScene stopped creating
+// the TileSprite (and its GeometryMask) when the baked Chip board replaced the pale-mint tile, so the two
+// fallback-safety assertions that pinned `floorTileTextureKey` and `boardFloorTileSprite.setVisible(false)`
+// are replaced by the invariant that nothing in MenuScene can request the textures at all. BootScene's
+// generator tests above are unchanged: it still bakes the derived texture (BootScene is not edited by the
+// Chip wiring lane); removing that dead generation is a separate BootScene-owner change.
+describe('MenuScene no longer requests the floor-tile textures (Chip board)', () => {
   const menuSceneSource = normalizeSourceLineEndings(
     readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
   );
 
-  test('checks availability before ever requesting the derived texture key', () => {
-    expect(menuSceneSource).toContain('const floorTileTextureKey = isMazerFloorTileInteriorTextureAvailable()\n      ? MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY\n      : \'__DEFAULT\';');
+  test('never constructs the floor TileSprite or its mask, and never imports the floor/bleed texture keys', () => {
+    expect(menuSceneSource).not.toContain('floorTileTextureKey');
+    expect(menuSceneSource).not.toContain('tileSprite(');
+    expect(menuSceneSource).not.toContain('MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY');
+    expect(menuSceneSource).not.toContain('MAZER_FLOOR_TILE_TEXTURE_KEY');
+    expect(menuSceneSource).not.toContain('MAZER_BLEED_PATH_TEXTURE_KEY');
   });
 
-  test('never falls back to the raw bordered source texture key', () => {
-    // The only floor-tile-sprite construction call must use the
-    // availability-gated key, never MAZER_FLOOR_TILE_TEXTURE_KEY directly.
-    expect(menuSceneSource).not.toContain("this.add.tileSprite(0, 0, 1, 1, MAZER_FLOOR_TILE_TEXTURE_KEY)");
-  });
-
-  test('holds the fallback sprite permanently invisible rather than showing a placeholder texture', () => {
-    expect(menuSceneSource).toContain("if (floorTileTextureKey === '__DEFAULT') {\n      this.boardFloorTileSprite.setVisible(false);\n    }");
+  test('draws the board through the baked tile layer instead', () => {
+    expect(menuSceneSource).toContain('new BoardTileLayer(this, this.boardTileLayerTextureKey)');
   });
 });

@@ -58,9 +58,12 @@ describe('legacy pause lifecycle', () => {
     expect(pauseOverlaySource).not.toContain('createLegacyMenuProfileButton');
     expect(pauseOverlaySource).toContain("this.applyLegacyPauseCommand('return-menu')");
     expect(pauseOverlaySource).toContain("this.applyLegacyPauseCommand('resume')");
-    expect(pauseOverlaySource).toContain("actionLabel('resume')");
-    expect(pauseOverlaySource).toContain("actionLabel('settings')");
-    expect(pauseOverlaySource).toContain("actionLabel('quit-to-menu')");
+    // Wiring lane (2026-11-06): the card is painted from buildLegacySettingsSheetPlan, whose pause
+    // model carries Resume / Settings disclosure / Quit to Menu (legacySettingsSheetPlan.ts).
+    expect(pauseOverlaySource).toContain("this.buildLegacySettingsSheetOverlay('pause')");
+    expect(pauseOverlaySource).toContain("case 'RESUME_RUN':");
+    expect(pauseOverlaySource).toContain("case 'RETURN_HOME':");
+    expect(pauseOverlaySource).toContain("case 'TOGGLE_SETTINGS_GROUP':");
     expect(menuSceneSource).toContain("this.createLegacyAuthActionButton(");
     expect(menuSceneSource).toContain("() => this.openOverlay('confirm-progression-reset')");
     expect(menuSceneSource).toContain('this.playCyclePath = [copyPoint(result.nextPlayer)];');

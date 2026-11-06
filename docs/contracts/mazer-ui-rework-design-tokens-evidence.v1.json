@@ -134,17 +134,11 @@
   "legacy/color/goal.magenta": [
    {
     "file": "src/render/navigationCoreTrail.ts"
-   },
-   {
-    "file": "src/scenes/MenuScene.ts"
    }
   ],
   "legacy/color/goal.violet": [
    {
     "file": "src/render/navigationCoreTrail.ts"
-   },
-   {
-    "file": "src/scenes/MenuScene.ts"
    }
   ],
   "legacy/spacingPx/rowGapCompact": [
@@ -168,7 +162,7 @@
   "legacy/radiusPx/inset": [
    {
     "file": "src/scenes/MenuScene.ts",
-    "pattern": "cardHeight - 8, 9[)]"
+    "pattern": "half [*] 2, half [*] 2, 9[)]"
    }
   ],
   "legacy/radiusPx/card": [

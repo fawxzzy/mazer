@@ -65,6 +65,7 @@ jobs:
           tests/render/edgeMarkers.test.ts
           tests/render/boardTileBake.test.ts
           tests/render/boardTileStyle.test.ts
+          tests/reset/board-tile-layer.test.ts
           tests/visual/maze-lifecycle-analysis.test.mjs
           --maxWorkers=1
 

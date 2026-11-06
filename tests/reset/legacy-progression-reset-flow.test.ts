@@ -8,6 +8,7 @@ import {
   LEGACY_PROGRESSION_RESET_LOCAL_EFFECTS,
   applyLegacyProgressionResetLocalEffects,
   buildLegacyProgressionResetConfirmView,
+  classifyLegacyProgressionResetFailure,
   reduceLegacyProgressionReset,
   resetLegacyProgressionState,
   resolveLegacyProgressionResetStatusLine,
@@ -322,6 +323,28 @@ describe('confirm view', () => {
     expect(all).not.toMatch(/\brank\b|skill/i);
     expect(LEGACY_PROGRESSION_RESET_COPY.accountConsequence).toMatch(/account, username and settings stay/);
     expect(LEGACY_PROGRESSION_RESET_COPY.accountConsequence).toMatch(/can.t be undone/);
+  });
+});
+
+describe('server failure classification', () => {
+  test('a stale-revision RPC error (errcode 40001 message) is a conflict; everything else is generic; no response is network', () => {
+    expect(classifyLegacyProgressionResetFailure({
+      error: 'Progression changed on another device (expected revision 4, found 6)'
+    })).toBe('conflict');
+    expect(classifyLegacyProgressionResetFailure({ error: 'permission denied for function' })).toBe('unknown');
+    expect(classifyLegacyProgressionResetFailure({ error: null })).toBe('unknown');
+    expect(classifyLegacyProgressionResetFailure(null)).toBe('network');
+  });
+
+  test('a failed server reset keeps the confirm card honest: nothing was reset, and only the conflict names another device', () => {
+    const working: LegacyProgressionResetState = { level: '42', phase: 'working', scope: 'account' };
+    const conflict = reduceLegacyProgressionReset(working, { failure: 'conflict', type: 'failed' });
+    const generic = reduceLegacyProgressionReset(working, { failure: 'unknown', type: 'failed' });
+    if (conflict.phase !== 'failed' || generic.phase !== 'failed') {
+      throw new Error('expected failed phases');
+    }
+    expect(resolveLegacyProgressionResetStatusLine(conflict)).toMatch(/another device. Nothing was reset/);
+    expect(resolveLegacyProgressionResetStatusLine(generic)).toMatch(/Nothing was changed/);
   });
 });
 

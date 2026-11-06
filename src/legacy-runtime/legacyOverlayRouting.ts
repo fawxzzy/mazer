@@ -29,11 +29,16 @@ export const resolveLegacyOverlayBackAction = (
   }
 
   if (state.overlay === 'confirm-progression-reset') {
-    // The confirmation can be opened from either Pause or the authenticated
-    // Account screen (see MenuScene's two openOverlay('confirm-progression-reset')
+    // The confirmation can be opened from Pause, the authenticated
+    // Account screen or the main-menu Settings sheet (see MenuScene's two openOverlay('confirm-progression-reset')
     // call sites). Route back to whichever one actually opened it instead of
     // always landing on Pause -- overlayReturn is the recorded origin, and
-    // 'pause' is the safe fallback when no origin was recorded.
+    // 'pause' is the safe fallback when no origin was recorded. The main-menu
+    // Settings sheet is the third origin: it is left in place underneath, so
+    // going back just closes the confirmation (closeOverlay restores it).
+    if (state.overlayReturn === 'options') {
+      return { kind: 'close-overlay' };
+    }
     return {
       kind: 'open-overlay',
       overlay: state.overlayReturn === 'auth' ? 'auth' : 'pause'

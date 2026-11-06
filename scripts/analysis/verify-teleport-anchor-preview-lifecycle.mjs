@@ -496,12 +496,12 @@ const main = async () => {
         mode: scene.mode,
         trailCanvasExists: Boolean(scene.trailCanvasImage),
         playerGlowExists: Boolean(scene.playerGlowCanvasImage),
-        goalHaloExists: Boolean(scene.goalHaloCanvasImage)
+        boardTileLayerExists: Boolean(scene.boardTileLayer && scene.boardTileLayer.image)
       };
     });
     check(
-      "Navigation Core's trail/player-glow/goal-halo canvas layers are unaffected",
-      navCoreState.mode === 'play' && navCoreState.trailCanvasExists && navCoreState.playerGlowExists && navCoreState.goalHaloExists,
+      "Navigation Core's trail/player-glow canvas layers and the baked board tile layer are unaffected",
+      navCoreState.mode === 'play' && navCoreState.trailCanvasExists && navCoreState.playerGlowExists && navCoreState.boardTileLayerExists,
       JSON.stringify(navCoreState)
     );
 

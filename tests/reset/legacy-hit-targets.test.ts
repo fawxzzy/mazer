@@ -8,10 +8,8 @@ import {
   resolveLegacyMinHitRect
 } from '../../src/legacy-runtime/legacyHitTarget';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
-import {
-  resolveLegacyOptionsGuideLayout,
-  resolveLegacyOverlayPanelLayout
-} from '../../src/legacy-runtime/legacyUiStandards';
+import { buildLegacyGuideSheetPlan } from '../../src/legacy-runtime/legacyGuideSheetPlan';
+import { buildLegacySettingsSheetPlan } from '../../src/legacy-runtime/legacySettingsSheetPlan';
 
 const normalizeSourceLineEndings = (source: string): string => source.replace(/\r\n?/g, '\n');
 
@@ -72,15 +70,23 @@ const enumerateHitZones = (viewport: { height: number; width: number }): HitZone
     width: touch.controls.pause.width
   });
 
-  const panel = resolveLegacyOverlayPanelLayout(viewport.width, viewport.height);
-  const guide = resolveLegacyOptionsGuideLayout(panel.width, 5);
-  const guideHit = resolveLegacyMinHitRect({
-    height: guide.collapsedHeight,
-    left: 0,
-    top: 100,
-    width: Math.min(panel.width - guide.horizontalMargin, guide.cardWidthLimit)
-  });
-  zones.push({ height: guideHit.height, name: 'options-guide-header', width: guideHit.width });
+  // The shared Settings sheet (menu + pause) and the Guide sheet are painted
+  // from their plans, so the plan rects ARE the hit zones.
+  const plans = [
+    buildLegacySettingsSheetPlan({ context: 'menu', height: viewport.height, signedIn: true, width: viewport.width }),
+    buildLegacySettingsSheetPlan({ context: 'pause', height: viewport.height, settingsExpanded: true, width: viewport.width })
+  ];
+  for (const plan of plans) {
+    zones.push({ height: plan.close.rect.height, name: 'settings-close-pill', width: plan.close.rect.width });
+    for (const item of plan.items) {
+      if (item.interactive) {
+        zones.push({ height: item.rect.height, name: `settings-row-${item.model.id}`, width: item.rect.width });
+      }
+    }
+  }
+  const guide = buildLegacyGuideSheetPlan({ height: viewport.height, itemHeights: [58, 58, 78, 78, 78, 58, 60], width: viewport.width });
+  zones.push({ height: guide.close.rect.height, name: 'guide-close-pill', width: guide.close.rect.width });
+  zones.push({ height: guide.footer.height, name: 'guide-got-it', width: guide.footer.width });
   return zones;
 };
 
@@ -122,13 +128,26 @@ describe('legacy hit targets (Wave 5C)', () => {
       }
     }
     expect(undersized).toEqual([]);
-    // The five controls the 2026-11-06 UI audit found under 44 px.
+    // The header trio and play pause (the 2026-11-06 UI audit's under-44 px controls) plus
+    // every interactive row of the shared Settings sheet and the Guide sheet.
     expect([...names].sort()).toEqual([
+      'guide-close-pill',
+      'guide-got-it',
       'menu-header-account',
       'menu-header-leaderboard',
       'menu-header-settings',
-      'options-guide-header',
-      'play-pause'
+      'play-pause',
+      'settings-close-pill',
+      'settings-row-animated-background',
+      'settings-row-board-zoom',
+      'settings-row-how-to-play',
+      'settings-row-quit-to-menu',
+      'settings-row-reset-progress',
+      'settings-row-resume',
+      'settings-row-settings-disclosure',
+      'settings-row-sign-out',
+      'settings-row-trail-fade',
+      'settings-row-trail-shine'
     ]);
   });
 });
@@ -153,15 +172,13 @@ describe('MenuScene interactive-zone inventory', () => {
     createAuthScreenLink: 'auth screen link: row height = LEGACY_AUTH_SCREEN_LINK_ROW_HEIGHT (44)',
     createBoardZoomSliderRow: 'settings slider row (52+)',
     createButton: 'generic button; front-door Start/Login use the full-screen zone',
-    createInputFieldBox: 'options input field row',
     createLegacyAuthActionButton: 'auth action button (44+)',
     createLegacyAuthPasswordVisibilityButton: 'password visibility toggle: size passed by caller',
     createLegacyMenuLeaderboardButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
     createLegacyMenuProfileButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
     createLegacyMenuSettingsCogButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
-    createLegacyOptionsGuideHeaderButton: 'guide header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
-    createMovementSpeedSliderRow: 'settings slider row (52+)',
-    createOverlayBackChevronButton: 'back chevron (72x64)',
+    createOverlayBackChevronButton: 'back chevron (72x64): leaderboard and account overlays',
+    createOverlayClosePill: 'labelled Close pill on the settings and guide sheets (76x44 from the sheet plans)',
     createToggleSwitchRow: 'toggle card (52+)'
   };
 
@@ -175,8 +192,9 @@ describe('MenuScene interactive-zone inventory', () => {
     expect([...found].sort()).toEqual(Object.keys(EXPECTED_INTERACTIVE_SITES).sort());
   });
 
-  test('the header trio and Guide header size their zones through the shared 44 px resolver', () => {
+  test('the header trio sizes its zones through the shared 44 px resolver', () => {
     expect(source).not.toMatch(/Math\.max\(36,\s*(?:pauseRect|rect|frame)\.width/);
-    expect(source.match(/resolveLegacyMinHitRect\(/g)?.length).toBeGreaterThanOrEqual(4);
+    // Three header controls (the Guide header that made it 4 is gone: the Guide is a sheet now).
+    expect(source.match(/resolveLegacyMinHitRect\(/g)?.length).toBeGreaterThanOrEqual(3);
   });
 });

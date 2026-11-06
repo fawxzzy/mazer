@@ -56,6 +56,16 @@ describe('legacy overlay routing', () => {
       overlay: 'auth'
     });
 
+    // The main-menu Settings sheet stays underneath the confirmation, so back just closes it
+    // (closeOverlay restores the recorded origin).
+    expect(resolveLegacyOverlayBackAction({
+      mode: 'menu',
+      overlay: 'confirm-progression-reset',
+      overlayReturn: 'options'
+    })).toEqual({
+      kind: 'close-overlay'
+    });
+
     // Unknown/unrecorded origin falls back to the prior always-pause behavior
     // rather than routing somewhere it was never actually opened from.
     expect(resolveLegacyOverlayBackAction({

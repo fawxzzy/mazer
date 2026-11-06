@@ -371,15 +371,18 @@ describe('introTimeline edge paths are atomic (no partial bleed state)', () => {
 
   test('MenuScene wires every edge-path element to the one atomic switch (no clamped sliver, no growth length)', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
-    // Dock strips: not drawn at all while the group is hidden.
-    expect(source).toContain('if (!this.legacyEdgePathsVisible) {');
-    // Border cells: hidden/shown with the same switch, in both draw paths and in point visibility.
+    // Dock strips (Chip wiring: part of the baked board, shown by the reveal mask): the margin strips are
+    // erased while the group is hidden, and dock-owner border cells are hidden by the same switch.
+    expect(source).toContain('docksVisible: edgeShown,');
+    expect(source).toContain('if (!edgeShown && owners !== null && owners[index] === 1) {');
+    // Border cells: hidden/shown with the same switch in point visibility too.
     expect(source).toContain('private isLegacyEdgePathCellShown(point: LegacyPoint): boolean {');
     expect(source).toContain('if (!this.isLegacyEdgePathCellShown(point)) {');
     // The half-grown continuation (and the 1 px clamp it fed) is gone.
     expect(source).not.toContain('resolveLegacyBleedDockGrowthProgress');
     expect(source).not.toContain('target * growthProgress');
-    expect(source).toContain('const resolveContinuation = (availableGap: number): number => Math.max(2, availableGap);');
+    // The Chip dock is a short fixed-length stub (dockDefaultLengthTiles), still all-or-nothing.
+    expect(source).toContain('Math.min(availableGap, tileSize * BOARD_TILE_GEOMETRY.dockDefaultLengthTiles)');
     // Driven from the timelines, never from a scene-local clock.
     expect(source).toContain('this.syncLegacyEdgePathsVisible(intro.bleedProgress === 1);');
     expect(source).toContain('this.syncLegacyEdgePathsVisible(outro.bleedProgress === 1);');

@@ -114,11 +114,7 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | file:line | String (or key) | Via module | Tone / source | Kind | Recommended routing |
 | --- | --- | --- | --- | --- | --- |
 | `src/scenes/MenuScene.ts:2703` | `Signing you in…` | no | info / auth | raw-status | Copy key in auth table; render on the message surface |
-| `src/scenes/MenuScene.ts:14002` | `This resets your rank progress, score, runs, and maze level to the starting baseline, including the menu AI's progression.` | no | n/a (confirm) | raw-static | Keep as ConfirmDialog copy |
 | `src/scenes/MenuScene.ts:14171` | `{account}\nManage your profile and account from the shared Fawxzzy account portal.` | no | n/a (helper) | raw-static | Keep as screen helper |
-| `src/scenes/MenuScene.ts:15008` | `Old trail fades.` | no | n/a | static | Setting caption; not a message |
-| `src/scenes/MenuScene.ts:15020` | `Slow white shine.` | no | n/a | static | Setting caption; not a message |
-| `src/scenes/MenuScene.ts:15021` | `No trail shine.` | no | n/a | static | Setting caption; not a message |
 | `src/scenes/MenuScene.ts:16054` | `Request timed out.` | no (diverges, F9) | error / auth | raw-status | Auth table key `requestTimedOut`; render the resolved message |
 | `src/scenes/MenuScene.ts:17346` | `Progression reset.` | yes (inline copy) | success / progression | routed-inline | Move copy into a progression copy table; add a render surface |
 | `src/scenes/MenuScene.ts:17547` | `Runtime diagnostics authenticated fixture.` | no | n/a | fixture | None (QA fixture) |
@@ -341,15 +337,17 @@ Pure modules, not rendered until the Settings wiring lane lands (`docs/ui/MAZER-
 | file | String | Kind | Recommended routing |
 | --- | --- | --- | --- |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Reach the star to clear the maze.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `Corner brackets mark the tile where each maze begins.` | static | Guide Start row copy (added with the Chip board wiring); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `You are the green block.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Touch and hold anywhere, then drag the way you want to go. Let go to stop.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `A glowing line shows your route. Turn on {} in Settings to fade old trail.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Some mazes wrap. Leave an open edge and you come out on the opposite side.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Each cleared maze raises your level. Mazes get harder as you climb.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
-| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your level and leaderboard standing go back to Level 1. Your account, username and settings stay as they are. This can’t be undone.` | static | Reset progress confirm/status copy; fold into the message module when wired |
-| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Connect to the internet to reset your account progress.` | static | Reset progress confirm/status copy; fold into the message module when wired |
-| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your account is still loading. Try again in a moment.` | static | Reset progress confirm/status copy; fold into the message module when wired |
-| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your level on this device goes back to Level 1. Your settings stay as they are. This can’t be undone.` | static | Reset progress confirm/status copy; fold into the message module when wired |
-| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Progress reset. You are back at Level 1.` | static | Reset progress confirm/status copy; fold into the message module when wired |
-| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Progress changed on another device. Nothing was reset. Check your level and try again.` | static | Reset progress confirm/status copy; fold into the message module when wired |
-| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Could not reset your progress. Nothing was changed.` | static | Reset progress confirm/status copy; fold into the message module when wired |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your level and leaderboard standing go back to Level 1. Your account, username and settings stay as they are. This can’t be undone.` | static | Reset progress confirm/status copy; rendered by the shared Settings reset card; fold into the message module later |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Connect to the internet to reset your account progress.` | static | Reset progress confirm/status copy; rendered by the shared Settings reset card; fold into the message module later |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your account is still loading. Try again in a moment.` | static | Reset progress confirm/status copy; rendered by the shared Settings reset card; fold into the message module later |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your level on this device goes back to Level 1. Your settings stay as they are. This can’t be undone.` | static | Reset progress confirm/status copy; rendered by the shared Settings reset card; fold into the message module later |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Progress reset. You are back at Level 1.` | static | Reset progress confirm/status copy; rendered by the shared Settings reset card; fold into the message module later |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Progress changed on another device. Nothing was reset. Check your level and try again.` | static | Reset progress confirm/status copy; rendered by the shared Settings reset card; fold into the message module later |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Could not reset your progress. Nothing was changed.` | static | Reset progress confirm/status copy; rendered by the shared Settings reset card; fold into the message module later |
+| `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Resetting…` | static | Reset progress working-state button label; rendered by the shared Settings reset card |

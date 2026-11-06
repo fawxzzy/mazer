@@ -1,9 +1,5 @@
 import Phaser from 'phaser';
 import {
-  MAZER_BLEED_PATH_TEXTURE_KEY,
-  MAZER_FLOOR_TILE_INTERIOR_CROP,
-  MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY,
-  isMazerFloorTileInteriorTextureAvailable,
   MAZER_HUD_LEADERBOARD_TEXTURE_KEY,
   MAZER_HUD_PROFILE_TEXTURE_KEY,
   MAZER_HUD_SETTINGS_TEXTURE_KEY,
@@ -18,6 +14,16 @@ import {
   type MazerRenderResolutionDiagnostics,
   type MazerRenderResolutionStatus
 } from '../boot/canvasResolution';
+import {
+  BoardTileLayer,
+  buildRankGrid,
+  type BoardTileReveal,
+  resolveBoardTileStyleFromSearch
+} from '../render/boardTileLayer';
+import { drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
+import { BOARD_TILE_GEOMETRY, boardMaterial, type BoardTileStyleId } from '../render/boardTileStyle';
+import { drawChipCell, resolveChipGridGeometry } from '../render/chipTileGraphics';
+import { PhaserGraphicsTileContext } from '../render/phaserTileContext';
 import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameToViewport } from '../boot/viewportGeometry';
 import {
   advanceTrailShineState,
@@ -33,14 +39,11 @@ import {
   computePlayerGlowCanvasBounds,
   drawPlayerGlowToCanvasContext
 } from '../render/navigationCorePlayerGlowCanvas';
-import {
-  computeGoalHaloCanvasBounds,
-  drawGoalHaloToCanvasContext
-} from '../render/navigationCoreGoalHaloCanvas';
 import { resolveTeleportAnchorCandidates, type TeleportRect, type TeleportViewportBounds } from '../render/teleportAnchorPose';
 import {
   EDGE_STATION_COUNT,
   drawEdgeBeams,
+  drawEdgeMarker,
   drawEdgeMarkers,
   resolveEdgeMarkerStates,
   resolveEdgeRingEnergies,
@@ -96,10 +99,8 @@ import {
   LEGACY_DEFAULTS,
   MAIN_MENU_BUTTONS,
   copyLegacySettings,
-  linearColorToHex,
   type LegacySettings
 } from '../legacy-runtime/legacyDefaults';
-import { resolveLegacyAdvancedOptionsVisible } from '../legacy-runtime/legacyAdvancedOptions';
 import {
   isLegacyWrappedStepTransition,
   resolveLegacyPlayableShortestPath,
@@ -195,23 +196,47 @@ import {
   resolveLegacyHeaderIdentityPlacement
 } from '../legacy-runtime/legacyHeaderIdentityPlacement';
 import {
-  buildLegacyPauseMenuViewModel,
-  resolveLegacyPauseMenuLayout
-} from '../legacy-runtime/legacyPauseMenuView';
-import {
-  LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE,
   LEGACY_UI_COMPACT_BREAKPOINT,
-  LEGACY_UI_MIN_BODY_FONT_SIZE,
-  resolveLegacyFeatureControlLayout,
-  resolveLegacyOverlayContentFlowLayout,
   resolveLegacyOverlayPanelLayout,
-  resolveLegacyOverlayShellLayout,
-  resolveLegacyOptionsGuideLayout,
-  resolveLegacyToggleLabelCandidates,
-  resolveLegacyToggleRowLayout,
   resolveLegacyUiLabelCenterY,
   type LegacyUiLabelRole
 } from '../legacy-runtime/legacyUiStandards';
+import {
+  LEGACY_SETTINGS_SIZES,
+  buildLegacySettingsSheetPlan,
+  isLegacySettingsItemFullyVisible,
+  resolveLegacySettingsItemScreenRect,
+  type LegacySettingsCommand,
+  type LegacySettingsContext,
+  type LegacySettingsPlanItem,
+  type LegacySettingsRect,
+  type LegacySettingsSheetPlan
+} from '../legacy-runtime/legacySettingsSheetPlan';
+import {
+  buildLegacyGuideSheetModel,
+  type LegacyGuideGlyph,
+  type LegacyGuideIconSpec
+} from '../legacy-runtime/legacyGuideContent';
+import {
+  LEGACY_GUIDE_SHEET_SIZES,
+  buildLegacyGuideSheetPlan,
+  resolveLegacyGuideKeyboardLineHeight,
+  resolveLegacyGuideRowHeight
+} from '../legacy-runtime/legacyGuideSheetPlan';
+import {
+  INITIAL_LEGACY_PROGRESSION_RESET_STATE,
+  LEGACY_PROGRESSION_RESET_ARM_DELAY_MS,
+  LEGACY_PROGRESSION_RESET_COPY,
+  applyLegacyProgressionResetLocalEffects,
+  buildLegacyProgressionResetConfirmView,
+  classifyLegacyProgressionResetFailure,
+  reduceLegacyProgressionReset,
+  resolveLegacyProgressionResetStatusLine,
+  resolveLegacyProgressionResetStrategy,
+  type LegacyProgressionResetEvent,
+  type LegacyProgressionResetState,
+  type LegacyProgressionResetStrategy
+} from '../legacy-runtime/legacyProgressionResetFlow';
 import {
   isLegacyGlyphWordRenderable,
   resolveLegacyGlyphWordColumns,
@@ -403,6 +428,7 @@ import {
   hydrateLegacyRemoteAccountState,
   isLegacyRuntimeDiagnosticsAuthFixtureRoute,
   isLegacyRemoteAccountProviderEligible,
+  isLegacyRemoteProgressionEnabled,
   isLegacyRemoteCompletionContextCurrent,
   LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID,
   readLegacyBootstrappedAccountState,
@@ -414,8 +440,6 @@ import {
 } from '../legacy-runtime/legacyRemoteProgression';
 import {
   clampLegacyOverlayScrollOffset,
-  legacyOverlayScrollRectIntersectsViewport,
-  resolveLegacyOverlayScrollRenderRect,
   resolveLegacyOverlayScrollMetrics,
   type LegacyOverlayScrollMetrics,
   type LegacyOverlayScrollRect
@@ -423,7 +447,6 @@ import {
 import {
   formatLegacyMovementSpeedPercent,
   normalizeLegacyMovementSpeed,
-  quantizeLegacyMovementSpeed,
   resolveLegacyMovementSpeedProfile
 } from '../legacy-runtime/legacyMovementSpeed';
 import {
@@ -440,13 +463,11 @@ import {
 import {
   resolveLegacyBleedOffDockVisualEligibility,
   resolveLegacyMenuBorderDockDirections,
-  resolveLegacyMenuBorderDockFacetRect,
   resolveLegacyMenuBorderDockRenderFrames,
   resolveLegacyMenuBorderDockRenderAreas,
   resolveLegacyPlayerLocatorRenderMetrics,
   resolveLegacyPlayerMarkerRenderMetrics,
-  type LegacyMenuBorderDockDirection,
-  type LegacyMenuPixelRect
+  type LegacyMenuBorderDockDirection
 } from '../legacy-runtime/legacyMenuRender';
 import {
   clearMenuSceneRuntimeDiagnostics,
@@ -1260,9 +1281,6 @@ const LEGACY_PATH_CORE_EYE_COMFORT_DIM_AMOUNT = 0.22;
 const LEGACY_MENU_PATH_CORE = mixLegacyIridescentColor(cyberArcadeMaterial.path.core, 0x000000, LEGACY_PATH_CORE_EYE_COMFORT_DIM_AMOUNT);
 const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;
 const LEGACY_MENU_PATH_EDGE_ALPHA = 0.58;
-const LEGACY_PLAY_PATH_CORE = mixLegacyIridescentColor(cyberArcadeMaterial.path.core, 0x000000, LEGACY_PATH_CORE_EYE_COMFORT_DIM_AMOUNT);
-const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;
-const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
 const LEGACY_PLAY_WALL_FILL = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;
 // Navigation Core v1's continuous play trail (src/render/navigationCoreTrail.ts) --
@@ -1272,6 +1290,11 @@ const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;
 // only describes the qualitative behavior, documented here rather than left
 // as unexplained magic numbers.
 const LEGACY_PLAY_TRAIL_WIDTH_RATIO = 0.16;
+// Dark underlay beneath the trail on the Chip floor (amendment open item A8): bg.canvas at this alpha,
+// this many css px wider than the core on each side. tests/reset/board-tile-layer.test.ts pins that every
+// calm trail energy stop clears 3:1 against chip-under-underlay.
+const LEGACY_TRAIL_UNDERLAY_ALPHA = 0.8;
+const LEGACY_TRAIL_UNDERLAY_PAD_CSS = 1.25;
 // Amendment 6.2's neon-tube glow refinement: a soft outer spectral glow
 // pass drawn from the same canonical geometry/color as the crisp core,
 // wider but bounded well under the player/goal markers' own glow alpha
@@ -1387,7 +1410,6 @@ const LEGACY_BLEED_GLOW_PERIOD_MS = 1900;
 const LEGACY_BLEED_GLOW_BAND_HALF_WIDTH = 0.24;
 const LEGACY_BLEED_GLOW_MAX_ALPHA = 0.5;
 const LEGACY_BLEED_GLOW_STEPS = 8;
-const LEGACY_PLAY_HUD_TIMER_PANE = cyberArcadeMaterial.substrate.panel;
 const LEGACY_PLAY_TOUCH_BUTTON_FILL = cyberArcadeMaterial.substrate.panelRaised;
 const LEGACY_PLAY_TOUCH_BUTTON_STROKE = cyberArcadeMaterial.rail.cyan;
 const LEGACY_PLAY_TOUCH_ICON = cyberArcadeMaterial.rail.white;
@@ -1398,7 +1420,6 @@ const LEGACY_CYBER_PANEL_STROKE_ALT = cyberArcadeMaterial.rail.cyan;
 const LEGACY_CYBER_PANEL_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_OVERLAY_SCROLL_WHEEL_STEP = 42;
 const LEGACY_OVERLAY_SCROLL_DRAG_START_PX = 3;
-const LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER = 20;
 // Momentum/flick scrolling tuning. Below MIN_PX_PER_MS a release just stops
 // (a slow, deliberate drag shouldn't keep gliding); FRICTION_PER_MS decays
 // the coast velocity multiplicatively every millisecond -- ~0.994 lands
@@ -1455,7 +1476,7 @@ const LEGACY_PLAY_PLAYER_MARKER_STROKE_RATIO = 2.4 / 64;
 // BootScene.ts's tint comment) has no CSS filter/blur to reproduce a true
 // Gaussian drop-shadow; a soft-then-crisp layered rounded-rect stack is
 // this file's existing convention for faking glow (see
-// drawLegacyPathTileFacet, drawLegacyGoalStarMarker).
+// drawLegacyPathTileFacet).
 const LEGACY_PLAY_PLAYER_MARKER_GLOW_TIGHT_SPREAD_RATIO = 3 / 64;
 const LEGACY_PLAY_PLAYER_MARKER_GLOW_TIGHT_ALPHA = 0xee / 0xff;
 const LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_SPREAD_RATIO = 8 / 64;
@@ -1490,53 +1511,15 @@ const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent
 const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;
 const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;
 const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;
-// Navigation Core v1's reference (startPreSpawnSVG/startPostSpawnSVG in
-// docs/assets/reference/navigation-core-v1/mazer-navigation-core-v1-approved.html)
-// gives the start tile two states, not one persistent glow: a visible
-// pre-spawn marker (two thin PLAYER_HALO rings + a small pulsing dot,
-// while the player still occupies the tile) that gives way, once the
-// player has moved off it, to what the reference's own source comment
-// calls a "near-silent residue, not the loud three-ring effect that
-// otherwise sits under the whole run" -- a faint rounded-square outline
-// plus a tiny dim center dot. Both states use PLAYER_HALO
-// (cyberArcadeMaterial.signal.playerHalo, #A7E7D9), never the gold
-// LEGACY_PLAY_START_MARKER_CORE above, which the old single-state glow
-// used for the entire run -- exactly the "loud... under the whole run"
-// effect the reference replaces. Every ratio below is that reference's
-// own SVG numbers divided by its 64 viewBox unit.
-const LEGACY_PLAY_START_MARKER_PRE_SPAWN_OUTER_RING_RADIUS_RATIO = 14.5 / 64;
-const LEGACY_PLAY_START_MARKER_PRE_SPAWN_INNER_RING_RADIUS_RATIO = 10 / 64;
-const LEGACY_PLAY_START_MARKER_PRE_SPAWN_RING_STROKE_RATIO = 1.3 / 64;
-const LEGACY_PLAY_START_MARKER_PRE_SPAWN_OUTER_RING_ALPHA = 0.45;
-const LEGACY_PLAY_START_MARKER_PRE_SPAWN_INNER_RING_ALPHA = 0.72;
-const LEGACY_PLAY_START_MARKER_PRE_SPAWN_CORE_RADIUS_RATIO = 0.22 / 2;
-const LEGACY_PLAY_START_MARKER_PRE_SPAWN_PULSE_PERIOD_MS = 2000;
-const LEGACY_PLAY_START_MARKER_PRE_SPAWN_PULSE_AMOUNT = 0.12;
-const LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_HALF_RATIO = 12 / 64;
-const LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_CORNER_RATIO = 3 / 64;
-const LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_STROKE_RATIO = 1 / 64;
-const LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_ALPHA = 0.26;
-const LEGACY_PLAY_START_MARKER_POST_SPAWN_DOT_RADIUS_RATIO = 2.6 / 64;
-const LEGACY_PLAY_START_MARKER_POST_SPAWN_DOT_ALPHA = 0.45;
 const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = cyberArcadeMaterial.signal.goalEdge;
-// Navigation Core v1's reference end-star (endStarNode/.end-halo in
-// docs/assets/reference/navigation-core-v1/mazer-navigation-core-v1-approved.html)
-// glows via a radial gradient from magenta (0% stop) through violet (60%
-// stop, fading to transparent by 75%) -- both from the reference's own
-// ENERGY palette array, never red. drawLegacyGoalStarMarker's halo used to
-// anchor on LEGACY_PLAY_GOAL_MARKER_CORE (#FF405D, semantic.danger red)
-// instead, contradicting the reference's own canonical-palette rule ("red
-// ... as brief accents" -- never a resting/anchor color). Canvas-mode
-// Phaser Graphics has no radial-gradient fill, so this is approximated
-// with two concentric circles standing in for the gradient's two color
-// stops (see drawLegacyGoalStarMarker).
-const LEGACY_PLAY_GOAL_MARKER_HALO_INNER_COLOR = 0xe030c0;
-const LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR = 0x8b3ff0;
-// Full rotation period for the goal marker's rainbow ring (drawLegacyGoalStarMarker)
-// -- the star itself spins slower (0.6x this rate, see that method) so the
-// two read as two independently-moving parts rather than one rigid unit.
+// Colour-cycle period of the dot-matrix wordmarks (drawLegacyGlyphWordTileBlock). The goal marker no
+// longer rotates: Chip draws it as a static badge with an optional ring-alpha pulse.
 const LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS = 5200;
+// Wordmark chips: the fill keeps nearly all of the rainbow hue (a small pull toward the canvas), and
+// the one lit rim is the same hue lightened toward white, so small cells stay solid and legible.
+const LEGACY_WORDMARK_CHIP_FILL_CANVAS_MIX = 0.12;
+const LEGACY_WORDMARK_CHIP_RIM_LIGHTEN = 0.4;
 // One frame's worth of defer (at 60fps) for the goal-reached maze precompute
 // (applyLegacyWorldTurnPlayerMovement) -- just enough for the arrival
 // frame's render to happen before the still-blocking build runs, with
@@ -1570,27 +1553,6 @@ const LEGACY_WORDMARK_SPARKLE_PULSE_HALF_WIDTH = 0.22;
 const LEGACY_TILE_FONT_SUB_TILE_COLUMNS = 4;
 const LEGACY_TILE_FONT_SUB_TILE_ROWS = 5;
 const LEGACY_TILE_FONT_TILES_PER_GLYPH = LEGACY_TILE_FONT_SUB_TILE_COLUMNS * LEGACY_TILE_FONT_SUB_TILE_ROWS;
-// Native pixel size (square) of the *derived interior-crop* floor-tile
-// texture (MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY, baked once at boot from
-// MAZER_FLOOR_TILE_INTERIOR_CROP) -- not the raw 1254x1254 source art, which
-// includes a per-tile border/glow that must never be repeated directly. See
-// the border-duplication comment above MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY
-// in BootScene.ts.
-const MAZER_FLOOR_TILE_SOURCE_SIZE = MAZER_FLOOR_TILE_INTERIOR_CROP.width;
-// Native pixel size of the bleed-path strip source art (see
-// docs/assets/mazer-vfx-source-provenance.md) -- a horizontal strip of
-// tile-like segments, solid on the left, fading to a sparkle point on the
-// right. Not tileable (the fade only happens once), so each dock instance
-// gets its own stretched (non-uniform scale, never tiled) Image, oriented
-// so the solid end always faces back toward the board and the fade points
-// outward -- see drawLegacyPathBorderDock's own comment on the
-// rotation/flip scheme this drives.
-const MAZER_BLEED_PATH_SOURCE_WIDTH = 2172;
-const MAZER_BLEED_PATH_SOURCE_HEIGHT = 724;
-// Comfortably covers every dock instance a maze's wrap-pair count
-// realistically produces at once (Wave 1.5's own convergence corpus never
-// measured more than a handful of wrap pairs per board), with headroom.
-const LEGACY_BLEED_PATH_IMAGE_POOL_SIZE = 24;
 // Real HUD icon source art (see docs/assets/mazer-vfx-source-provenance.md):
 // three 1254x1254 transparent PNGs, each with a different amount of
 // transparent padding baked in around its own glyph. Measured directly from
@@ -1774,7 +1736,7 @@ export class MenuScene extends Phaser.Scene {
   // Cache keyed by object identity -- this.maze is replaced wholesale on
   // every regeneration (never mutated in place), so a reference check is
   // enough to know the cached set still matches. Recomputing this is an
-  // O(perimeter) scan; drawLegacyPathBorderDock runs it once per tile per
+  // O(perimeter) scan; ensureBoardTileMazeCaches and the reveal mask read it every
   // redraw, so caching keeps that from becoming O(perimeter * cellCount).
   private bleedOffDockVisualEligibilityForMaze: LegacyMazeSnapshot | null = null;
   private bleedOffDockVisualEligibilityKeys: Set<string> = new Set();
@@ -1922,20 +1884,17 @@ export class MenuScene extends Phaser.Scene {
   private backdropGraphics!: Phaser.GameObjects.Graphics;
   private boardStaticGraphics!: Phaser.GameObjects.Graphics;
   private boardPathGraphics!: Phaser.GameObjects.Graphics;
-  // Real floor-tile material (see docs/assets/mazer-vfx-source-provenance.md)
-  // tiled across exactly the walkable-cell shape via boardFloorMaskGraphics
-  // (a GeometryMask, rebuilt every drawBoardPaths call from the identical
-  // per-cell rects the color fill itself uses) and layered on top of
-  // boardPathGraphics at partial alpha -- an overlay, not a replacement, so
-  // the existing progression-palette/trail coloring and rim-light glow
-  // still show through underneath it.
-  private boardFloorTileSprite!: Phaser.GameObjects.TileSprite;
-  private boardFloorMaskGraphics!: Phaser.GameObjects.Graphics;
-  // Real bleed-path VFX art (see docs/assets/mazer-vfx-source-provenance.md),
-  // one pooled Image per currently-visible border-dock instance -- see
-  // drawLegacyPathBorderDock's own comment.
-  private boardBleedPathImages: Phaser.GameObjects.Image[] = [];
-  private boardBleedPathImageCursor = 0;
+  // Z-order anchor for the board layer (edgeMarkers.test pins it). The board's tiles are NOT drawn
+  // here any more: boardTileLayer.image (the baked Chip/Trace board) sits right after it.
+  // Board tile style flag: Chip by default, ?tileStyle=trace for the alternate.
+  private boardTileStyle: BoardTileStyleId = 'chip';
+  private boardTileLayer!: BoardTileLayer;
+  private boardTileLayerTextureKey: string | null = null;
+  private boardTileRankOrder: LegacyPoint[] | null = null;
+  private boardTileRankGrid: Int32Array | null = null;
+  private boardTileDockMaze: LegacyMazeSnapshot | null = null;
+  private boardTileDocks: BoardTileDock[] = [];
+  private boardTileDockOwners: Uint8Array | null = null;
   // Real HUD icon art (see docs/assets/mazer-vfx-source-provenance.md) for
   // the two menu-header icons drawn every frame into the permanent
   // boardDynamicGraphics/boardZoomContainer space -- one persistent Image
@@ -1996,22 +1955,6 @@ export class MenuScene extends Phaser.Scene {
   private playerGlowCanvasWidth = 0;
   private playerGlowCanvasHeight = 0;
   private playerGlowCanvasResolution = 0;
-  // Same real-2D-canvas pattern as playerGlowCanvasImage above, for the
-  // goal star's own ambient halo (see navigationCoreGoalHaloCanvas.ts's own
-  // header comment) -- a real radial gradient, replacing two flat
-  // fillCircle discs that read as sharply bounded "target" rings instead of
-  // one soft glow. Only used for the real on-board goal marker
-  // (drawLegacyGoalStarMarker called with graphics === boardDynamicGraphics);
-  // the Options/Guide legend's own miniature goal icon (a different,
-  // static, non-gameplay caller passing overlayGraphics instead) keeps the
-  // prior Graphics-only halo unchanged -- out of scope for this reference,
-  // and never composited into boardZoomContainer where this image lives.
-  private goalHaloCanvasTextureKey: string | null = null;
-  private goalHaloCanvasTexture: Phaser.Textures.CanvasTexture | null = null;
-  private goalHaloCanvasImage: Phaser.GameObjects.Image | null = null;
-  private goalHaloCanvasWidth = 0;
-  private goalHaloCanvasHeight = 0;
-  private goalHaloCanvasResolution = 0;
   // Confirmed real defect (review 5147427468, continuing 5144999445 /
   // 5146800659): the gameplay transfer's own outbound/delivery elapsed
   // computation (time - startedAtMs) is not itself pause-aware --
@@ -2080,7 +2023,9 @@ export class MenuScene extends Phaser.Scene {
   private overlayBackChevronBounds: VisualRect | null = null;
   private overlayBackChevronAction: (() => void) | null = null;
   private overlayGuideBounds: VisualRect | null = null;
-  private overlayGuideExpanded = false;
+  // The Guide is a sub-view of the options/pause sheet, not its own overlay (Pause must keep holding the run).
+  private settingsGuideOpen = false;
+  private progressionResetState: LegacyProgressionResetState = INITIAL_LEGACY_PROGRESSION_RESET_STATE;
   private overlayScrollOffset = 0;
   private overlayScrollMax = 0;
   private overlayScrollContentHeight = 0;
@@ -2342,34 +2287,15 @@ export class MenuScene extends Phaser.Scene {
     this.edgeMarkerGraphics = this.add.graphics();
     this.boardStaticGraphics = this.add.graphics();
     this.boardPathGraphics = this.add.graphics();
-    // 1x1 placeholder size -- resized/repositioned every drawBoardPaths call
-    // once the real maze render frame is known. Masked to
-    // boardFloorMaskGraphics so it only ever shows through the actual
-    // walkable-cell shape, never over walls/void.
-    //
-    // The derived interior texture (BootScene.generateMazerFloorTileInteriorTexture)
-    // can fail to generate (missing source, no Canvas 2D) -- if it does,
-    // this MUST NOT request MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY anyway:
-    // Phaser silently substitutes its own built-in __MISSING placeholder
-    // (a visible purple/black checkerboard) for an unknown texture key, and
-    // falling back to the raw bordered mazer-floor-tile.png would silently
-    // reintroduce the exact per-cell border-duplication defect this texture
-    // exists to fix. The only safe fallback is no floor-texture accent at
-    // all -- Phaser's own always-registered '__DEFAULT' texture, held
-    // permanently invisible below, so the procedural corridor material
-    // (drawBoardPaths) is the only thing that ever shows.
-    const floorTileTextureKey = isMazerFloorTileInteriorTextureAvailable()
-      ? MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY
-      : '__DEFAULT';
-    this.boardFloorTileSprite = this.add.tileSprite(0, 0, 1, 1, floorTileTextureKey).setOrigin(0, 0).setAlpha(0.5);
-    if (floorTileTextureKey === '__DEFAULT') {
-      this.boardFloorTileSprite.setVisible(false);
-    }
-    this.boardFloorMaskGraphics = this.add.graphics().setVisible(false);
-    this.boardFloorTileSprite.setMask(new Phaser.Display.Masks.GeometryMask(this, this.boardFloorMaskGraphics));
-    this.boardBleedPathImages = Array.from({ length: LEGACY_BLEED_PATH_IMAGE_POOL_SIZE }, () => (
-      this.add.image(0, 0, MAZER_BLEED_PATH_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
-    ));
+    // The board's tiles: one baked Chip (default) or Trace (?tileStyle=trace) canvas, shown through
+    // one Image that drawBoardPaths re-places and, only while the reveal changes, re-masks. The old
+    // floor texture sprite, its GeometryMask and the pooled bleed-strip images are gone with the old
+    // pale-mint tile; BootScene still generates the textures (it is not edited here).
+    this.boardTileStyle = resolveBoardTileStyleFromSearch(
+      typeof window === 'undefined' ? '' : window.location.search
+    );
+    this.boardTileLayerTextureKey = `legacy-board-tile-layer-${nextMenuSceneInstanceId()}`;
+    this.boardTileLayer = new BoardTileLayer(this, this.boardTileLayerTextureKey);
     // Navigation Core v1's continuous play trail -- a real 2D canvas, not a
     // Graphics object (see the field's own comment for why). 1x1 initially;
     // drawLegacyContinuousPlayTrail resizes/repositions/redraws it every
@@ -2385,9 +2311,6 @@ export class MenuScene extends Phaser.Scene {
     this.playerGlowCanvasImage = this.add.image(0, 0, this.playerGlowCanvasTextureKey).setOrigin(0, 0).setVisible(false);
     // Same real-2D-canvas approach as the player glow above, for the goal
     // star's own ambient halo -- see the field's own comment.
-    this.goalHaloCanvasTextureKey = `legacy-nav-core-goal-halo-${nextMenuSceneInstanceId()}`;
-    this.goalHaloCanvasTexture = this.textures.createCanvas(this.goalHaloCanvasTextureKey, 1, 1);
-    this.goalHaloCanvasImage = this.add.image(0, 0, this.goalHaloCanvasTextureKey).setOrigin(0, 0).setVisible(false);
     this.boardDynamicGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
     this.headerSettingsIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
@@ -2398,9 +2321,7 @@ export class MenuScene extends Phaser.Scene {
       this.edgeMarkerGraphics,
       this.boardStaticGraphics,
       this.boardPathGraphics,
-      this.boardFloorTileSprite,
-      this.boardFloorMaskGraphics,
-      ...this.boardBleedPathImages,
+      this.boardTileLayer.image,
       // Before boardDynamicGraphics: the play trail's canvas-composited
       // core/glow render here, underneath the start/goal/player markers
       // drawn into boardDynamicGraphics right after it. The player marker's
@@ -2408,7 +2329,6 @@ export class MenuScene extends Phaser.Scene {
       // reason -- both must render before the crisp shapes Graphics draws.
       this.trailCanvasImage,
       this.playerGlowCanvasImage,
-      this.goalHaloCanvasImage,
       this.boardDynamicGraphics,
       // Same boardZoomContainer/boardDynamicGraphics-relative coordinate
       // space the settings-cog/leaderboard header icons were previously
@@ -2553,12 +2473,10 @@ export class MenuScene extends Phaser.Scene {
       this.playerGlowCanvasTexture = null;
       this.playerGlowCanvasImage = null;
       this.playerGlowCanvasTextureKey = null;
-      if (this.goalHaloCanvasTextureKey !== null && this.textures.exists(this.goalHaloCanvasTextureKey)) {
-        this.textures.remove(this.goalHaloCanvasTextureKey);
+      if (this.boardTileLayerTextureKey !== null && this.textures.exists(this.boardTileLayerTextureKey)) {
+        this.textures.remove(this.boardTileLayerTextureKey);
       }
-      this.goalHaloCanvasTexture = null;
-      this.goalHaloCanvasImage = null;
-      this.goalHaloCanvasTextureKey = null;
+      this.boardTileLayerTextureKey = null;
       if (this.remoteSettingsSyncTimer !== null) {
         clearTimeout(this.remoteSettingsSyncTimer);
         this.remoteSettingsSyncTimer = null;
@@ -2719,7 +2637,7 @@ export class MenuScene extends Phaser.Scene {
         this.applyLegacyPauseCommand('reset-player');
         return true;
       },
-      resetProgress: (): boolean => { this.resetLegacyPlayerProgression(); return true; },
+      resetProgress: (): boolean => { void this.resetLegacyPlayerProgression(); return true; },
       returnHome: (): boolean => { this.enterMenuMode(); return true; },
       logOut: (): boolean => { void this.handleLegacyAuthSignOut(); return true; },
       setControlMode: (mode): boolean => {
@@ -6539,7 +6457,6 @@ export class MenuScene extends Phaser.Scene {
     // as exposed to this same ghost-image risk -- hidden here too.
     this.trailCanvasImage?.setVisible(false);
     this.playerGlowCanvasImage?.setVisible(false);
-    this.goalHaloCanvasImage?.setVisible(false);
     this.resetLegacyPlayInputBuffer();
     this.clearPlayHudImmediately();
     this.resetLegacyPlayerTransferEnergy();
@@ -7057,7 +6974,7 @@ export class MenuScene extends Phaser.Scene {
         // one fixed hue reads as an actual star; a field of them
         // continuously rainbow-shifting reads as a light show even once
         // the shift itself is smooth. The goal-ring/title sparkle call
-        // sites (drawLegacyGoalStarMarker, the wordmark sparkles) are
+        // sites (the wordmark sparkles) are
         // unaffected -- their own animated/per-cycle hues are a
         // deliberate, different, attention-drawing design for those
         // specific contexts and are not touched here.
@@ -7415,8 +7332,7 @@ export class MenuScene extends Phaser.Scene {
     originX: number,
     originY: number,
     tileSize: number,
-    options: LegacyPathMaterialOptions,
-    floorMaskGraphics?: Phaser.GameObjects.Graphics
+    options: LegacyPathMaterialOptions
   ): void {
     if (pathSource.grid[point.y]?.[point.x] !== true) {
       return;
@@ -7449,15 +7365,6 @@ export class MenuScene extends Phaser.Scene {
     // overlap here without re-verifying against the live renderer first.
     graphics.fillStyle(options.coreColor, options.coreAlpha);
     graphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
-    // Board callers pass their own mask graphics so the real floor-tile
-    // texture (boardFloorTileSprite) only ever shows through exactly the
-    // same connectivity-aware shape the color fill above just drew -- title/
-    // level-number/button callers of this same method never pass one, so
-    // they're unaffected.
-    if (floorMaskGraphics) {
-      floorMaskGraphics.fillStyle(0xffffff, 1);
-      floorMaskGraphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
-    }
     this.drawLegacyPathTileFacet(
       graphics,
       tileRect,
@@ -7562,7 +7469,7 @@ export class MenuScene extends Phaser.Scene {
     boardTop: number,
     boardWidth: number,
     boardHeight: number,
-    _tileSize: number
+    tileSize: number
   ): number {
     const edgeInset = 2;
     // Both surfaces are full-bleed now -- play's top HUD and (floating)
@@ -7579,9 +7486,15 @@ export class MenuScene extends Phaser.Scene {
     // is what actually reaching the screen edge (and matching between
     // menu and play) requires.
     // Always the full length: an edge path is either absent (the dock is not
-    // drawn at all, see drawLegacyPathBorderDock) or complete -- there is no
-    // half-grown length, so no sliver can ever be left behind.
-    const resolveContinuation = (availableGap: number): number => Math.max(2, availableGap);
+    // drawn at all, see the atomic dock group in resolveBoardTileReveal) or
+    // complete -- there is no half-grown length, so no sliver can ever be left
+    // behind. The Chip dock is four diminishing chip slices plus a lintel, about
+    // dockDefaultLengthTiles tiles long (the length the bake uses), not a strip
+    // to the screen edge, so the wrap-glow pulse is capped to the same extent.
+    const resolveContinuation = (availableGap: number): number => Math.max(
+      2,
+      Math.min(availableGap, tileSize * BOARD_TILE_GEOMETRY.dockDefaultLengthTiles)
+    );
 
     if (direction === 'left') {
       return resolveContinuation(boardLeft - edgeInset);
@@ -7612,208 +7525,6 @@ export class MenuScene extends Phaser.Scene {
     return this.bleedOffDockVisualEligibilityKeys;
   }
 
-  private drawLegacyPathBorderDock(
-    graphics: Phaser.GameObjects.Graphics,
-    point: LegacyPoint,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
-    boardLeft: number,
-    boardTop: number,
-    boardWidth: number,
-    boardHeight: number,
-    mazeLeft: number,
-    mazeTop: number,
-    mazeWidth: number,
-    mazeHeight: number,
-    tileSize: number,
-    options: LegacyPathMaterialOptions
-  ): void {
-    if (!this.legacyEdgePathsVisible) {
-      return;
-    }
-    const dockDirections = resolveLegacyMenuBorderDockDirections(pathSource, point);
-    if (dockDirections.length <= 0) {
-      return;
-    }
-    // Two bleed-off openings sitting right next to each other on the same
-    // edge are both fully valid, walkable, correctly-wrapping tiles -- the
-    // grid topology's pairing invariant requires that. This purely decides
-    // which of two close-together ones gets the decorative "poking past
-    // the border" dock treatment, so they don't visually read as one
-    // corridor accidentally split in two right next to itself.
-    if (!this.resolveBleedOffDockVisualEligibility().has(`${point.x},${point.y}`)) {
-      return;
-    }
-
-    const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, point);
-    const materialTileSize = Math.max(1, Math.round(tileSize));
-    const fillDockFrame = (
-      direction: LegacyMenuBorderDockDirection,
-      frame: { height: number; leftInset: number; topInset: number; width: number }
-    ): void => {
-      const dockAreas = resolveLegacyMenuBorderDockRenderAreas(direction, frame, {
-        boardLeft,
-        boardTop,
-        boardWidth,
-        boardHeight,
-        continuationLength: this.resolveLegacyPathBorderDockContinuation(
-          direction,
-          boardLeft,
-          boardTop,
-          boardWidth,
-          boardHeight,
-          tileSize
-        ),
-        materialTileSize,
-        mazeLeft,
-        mazeTop,
-        mazeWidth,
-        mazeHeight,
-        tileRect,
-        topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth)
-      });
-
-      for (const dockArea of dockAreas) {
-        graphics.fillRect(
-          Math.round(dockArea.left),
-          Math.round(dockArea.top),
-          Math.round(dockArea.right - dockArea.left),
-          Math.round(dockArea.bottom - dockArea.top)
-        );
-      }
-    };
-
-    for (const direction of dockDirections) {
-      const dockFrames = resolveLegacyMenuBorderDockRenderFrames(direction, materialTileSize);
-      graphics.fillStyle(options.edgeColor, options.edgeAlpha);
-      fillDockFrame(direction, dockFrames.edge);
-
-      graphics.fillStyle(options.coreColor, options.coreAlpha);
-      fillDockFrame(direction, dockFrames.core);
-
-      // The flat-filled bands above give the continuation the right two-tone
-      // coloring, but nothing else about it read as a tile -- it was just a
-      // plain color bar. Giving its outward-facing edges the same soft-halo +
-      // crisp-line rim as every other corridor tile (drawLegacyPathTileFacet),
-      // connected only on the side that meets the board's real edge tile,
-      // makes it read as "one more tile poking past the border" instead.
-      this.drawLegacyPathBorderDockFacet(
-        graphics,
-        direction,
-        tileRect,
-        materialTileSize,
-        dockFrames.edge,
-        boardLeft,
-        boardTop,
-        boardWidth,
-        boardHeight,
-        this.resolveLegacyPathBorderDockContinuation(direction, boardLeft, boardTop, boardWidth, boardHeight, tileSize),
-        options.edgeColor,
-        options.coreAlpha
-      );
-    }
-  }
-
-  private drawLegacyPathBorderDockFacet(
-    graphics: Phaser.GameObjects.Graphics,
-    direction: LegacyMenuBorderDockDirection,
-    tileRect: LegacyPixelTileRect,
-    materialTileSize: number,
-    frame: { height: number; leftInset: number; topInset: number; width: number },
-    boardLeft: number,
-    boardTop: number,
-    boardWidth: number,
-    boardHeight: number,
-    continuationLength: number,
-    rimColor: number,
-    intensity: number
-  ): void {
-    // Reuse the exact rounded terminal-tile band that owns the flat dock fill.
-    // Reconstructing this from aggregate maze/board bounds was the remaining
-    // source of the visible one-tile seam after PR #252.
-    const facetRect = resolveLegacyMenuBorderDockFacetRect(direction, frame, {
-      boardHeight,
-      boardLeft,
-      boardTop,
-      boardWidth,
-      continuationLength,
-      materialTileSize,
-      tileRect
-    });
-    if (!facetRect) {
-      return;
-    }
-
-    this.drawLegacyBleedPathImage(direction, facetRect);
-
-    let hasTop = false;
-    let hasLeft = false;
-    let hasBottom = false;
-    let hasRight = false;
-
-    if (direction === 'left') {
-      hasRight = true;
-    } else if (direction === 'right') {
-      hasLeft = true;
-    } else if (direction === 'top') {
-      hasBottom = true;
-    } else {
-      hasTop = true;
-    }
-
-    this.drawLegacyPathTileFacet(graphics, facetRect, intensity, rimColor, hasTop, hasLeft, hasBottom, hasRight);
-  }
-
-  // Real bleed-path VFX art (see docs/assets/mazer-vfx-source-provenance.md)
-  // over exactly the dock's own facet rect -- solid tile segments on the
-  // source art's left, fading to a sparkle point on its right, so it isn't
-  // tileable the way the floor material is; each dock instance gets its own
-  // stretched (non-uniform scale, never tiled) Image instead of a
-  // TileSprite. Oriented so the solid end always faces back toward the
-  // board and the fade points outward into the void, regardless of which
-  // of the four directions this dock pokes past the border in:
-  //   'right' -- source's own natural orientation (solid-left/fade-right
-  //     already matches solid-toward-board/fade-outward), no transform.
-  //   'left' -- mirrored horizontally (flipX) so the fade (still on the
-  //     source's own right) ends up pointing further left/outward instead
-  //     of back into the board.
-  //   'top'/'bottom' -- the source is a horizontal strip; rotating it ±90
-  //     degrees turns its left/right ends into top/bottom ends. -90
-  //     (top) sends left(solid)->bottom, right(fade)->top; +90 (bottom)
-  //     sends left(solid)->top, right(fade)->bottom -- both put the solid
-  //     end on the board-facing side. Local width/height are swapped
-  //     before that rotation (scaleX maps to the rect's own height, scaleY
-  //     to its width) since Image.setScale operates in pre-rotation local
-  //     space.
-  // Pulls from boardBleedPathImages/boardBleedPathImageCursor, reset once
-  // per drawBoardPaths call (not per-dock) -- see that method's own start
-  // and end for the reset/hide-unused-slots bookend.
-  private drawLegacyBleedPathImage(
-    direction: LegacyMenuBorderDockDirection,
-    facetRect: LegacyMenuPixelRect
-  ): void {
-    if (!this.textures.exists(MAZER_BLEED_PATH_TEXTURE_KEY)) {
-      return;
-    }
-    const image = this.boardBleedPathImages[this.boardBleedPathImageCursor];
-    this.boardBleedPathImageCursor += 1;
-    if (!image) {
-      return;
-    }
-    const centerX = facetRect.left + (facetRect.width / 2);
-    const centerY = facetRect.top + (facetRect.height / 2);
-    const isVertical = direction === 'top' || direction === 'bottom';
-    const scaleX = (isVertical ? facetRect.height : facetRect.width) / MAZER_BLEED_PATH_SOURCE_WIDTH;
-    const scaleY = (isVertical ? facetRect.width : facetRect.height) / MAZER_BLEED_PATH_SOURCE_HEIGHT;
-    const rotation = direction === 'top' ? -Math.PI / 2 : direction === 'bottom' ? Math.PI / 2 : 0;
-    image
-      .setPosition(centerX, centerY)
-      .setRotation(rotation)
-      .setFlipX(direction === 'left')
-      .setScale(scaleX, scaleY)
-      .setAlpha(0.85)
-      .setVisible(true);
-  }
-
   private hasLegacyBleedOffGlowPendingFrame(): boolean {
     // Gated to 'settled' only -- the glow shouldn't appear while the maze
     // is still building in, and should vanish the instant deconstruction
@@ -7826,9 +7537,9 @@ export class MenuScene extends Phaser.Scene {
     return (wrap?.horizontal.endpointCount ?? 0) > 0 || (wrap?.vertical.endpointCount ?? 0) > 0;
   }
 
-  // Bleed-off/wrap corridors are drawn as one more real tile past the
-  // board's own edge (drawLegacyPathBorderDock), same color as every other
-  // corridor tile -- which reads as "structurally there" but doesn't call
+  // Bleed-off/wrap corridors are drawn as a short Chip dock past the
+  // board's own edge (four diminishing chip slices plus a lintel, part of the
+  // baked board) -- which reads as "structurally there" but doesn't call
   // attention to the fact that this specific tile is special (it's the
   // player's way off the visible grid entirely). This overlays a traveling
   // green pulse on top of that base tile, from the inner end (where the
@@ -7965,107 +7676,104 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  // The board's floor. One baked Chip (default) / Trace (alternate) canvas per bake hash -- the bake
+  // runs only when the maze, tile size, backing scale, docks or style change, never per frame. The
+  // tile-by-tile build/deconstruct reveal is a rank-based mask over that bake: a cell is shown while its
+  // rank in the reveal order is below the live tile limit (see composeBoardTileReveal), so the lifecycle
+  // timeline's pacing is unchanged. The composite is redrawn only on frames where the reveal key changed.
   private drawBoardPaths(time: number): void {
     const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardWidth, boardHeight } = this.layout;
     const boardOffset = this.resolveBoardOffset();
     const boardLeft = layoutBoardLeft + boardOffset.x;
     const boardTop = layoutBoardTop + boardOffset.y;
     const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardWidth, boardHeight);
-    const mazeLeft = mazeRenderFrame.boardLeft;
-    const mazeTop = mazeRenderFrame.boardTop;
-    const tileSize = mazeRenderFrame.tileSize;
-    const isMenuMode = this.mode === 'menu';
-    const pathColor = isMenuMode
-      ? LEGACY_MENU_PATH_CORE
-      : LEGACY_PLAY_PATH_CORE;
-    const pathGlow = isMenuMode
-      ? LEGACY_MENU_PATH_EDGE
-      : LEGACY_PLAY_PATH_EDGE;
 
+    // Retained as the z-order anchor only (see its field comment); nothing is drawn into it.
     this.boardPathGraphics.clear();
-    this.boardFloorMaskGraphics.clear();
-    this.boardBleedPathImageCursor = 0;
-    // Real floor-tile material's own scale: its 1254x1254 source maps to
-    // exactly one board tile, positioned to line up with mazeLeft/mazeTop
-    // exactly like the color fill above. Repositioned/rescaled every call
-    // since tileSize and the maze's own pixel origin both change with
-    // layout/zoom/board size.
-    this.boardFloorTileSprite.setPosition(mazeLeft, mazeTop);
-    this.boardFloorTileSprite.setSize(
-      Math.max(1, this.maze.width * tileSize),
-      Math.max(1, this.maze.height * tileSize)
-    );
-    this.boardFloorTileSprite.setTileScale(tileSize / MAZER_FLOOR_TILE_SOURCE_SIZE, tileSize / MAZER_FLOOR_TILE_SOURCE_SIZE);
-    const drawPathPoint = (point: LegacyPoint): void => {
-      if (!this.isLegacyEdgePathCellShown(point)) {
-        return;
-      }
-      this.drawLegacyPathMaterialTile(
-        this.boardPathGraphics,
-        point,
-        this.maze,
-        mazeLeft,
-        mazeTop,
-        tileSize,
-        {
-          coreAlpha: isMenuMode ? 0.92 : 0.96,
-          coreColor: pathColor,
-          cueAlpha: isMenuMode ? LEGACY_PATH_TILE_CUE_ALPHA : LEGACY_PATH_TILE_CUE_ALPHA * 0.82,
-          drawCue: false,
-          edgeAlpha: isMenuMode ? LEGACY_MENU_PATH_EDGE_ALPHA : LEGACY_PLAY_PATH_EDGE_ALPHA,
-          edgeColor: isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE
-        },
-        this.boardFloorMaskGraphics
-      );
-      this.drawLegacyPathBorderDock(
-        this.boardPathGraphics,
-        point,
-        this.maze,
-        boardLeft,
-        boardTop,
-        boardWidth,
-        boardHeight,
-        mazeLeft,
-        mazeTop,
-        mazeRenderFrame.boardWidth,
-        mazeRenderFrame.boardHeight,
-        tileSize,
-        {
-          coreAlpha: isMenuMode ? 0.92 : 0.96,
-          coreColor: pathColor,
-          cueAlpha: isMenuMode ? LEGACY_PATH_TILE_CUE_ALPHA : LEGACY_PATH_TILE_CUE_ALPHA * 0.82,
-          drawCue: false,
-          edgeAlpha: isMenuMode ? LEGACY_MENU_PATH_EDGE_ALPHA : LEGACY_PLAY_PATH_EDGE_ALPHA,
-          edgeColor: isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE
-        }
-      );
-    };
-
-    const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
-    if (tileLimit !== null) {
-      for (let index = 0; index < Math.min(tileLimit, this.menuStaticDrawTileOrder.length); index += 1) {
-        const point = this.menuStaticDrawTileOrder[index];
-        if (point) {
-          drawPathPoint(point);
-        }
-      }
-    } else {
-      for (let y = 0; y < this.maze.height; y += 1) {
-        for (let x = 0; x < this.maze.width; x += 1) {
-          if (!this.isLegacyMenuPointVisibleInStaticDraw({ x, y })) {
-            continue;
-          }
-          drawPathPoint({ x, y });
-        }
-      }
-    }
-
-    for (let index = this.boardBleedPathImageCursor; index < this.boardBleedPathImages.length; index += 1) {
-      this.boardBleedPathImages[index]?.setVisible(false);
-    }
+    this.ensureBoardTileMazeCaches();
+    this.boardTileLayer.update({
+      grid: this.maze.grid,
+      width: this.maze.width,
+      height: this.maze.height,
+      tileSize: mazeRenderFrame.tileSize,
+      devicePixelRatio: this.resolveBoardTileBackingScale(),
+      style: this.boardTileStyle,
+      docks: this.boardTileDocks,
+      start: this.maze.start ? { x: this.maze.start.x, y: this.maze.start.y } : undefined,
+      goal: this.maze.goal ? { x: this.maze.goal.x, y: this.maze.goal.y } : undefined,
+      boardLeft: mazeRenderFrame.boardLeft,
+      boardTop: mazeRenderFrame.boardTop,
+      reveal: this.resolveBoardTileReveal(),
+      visible: true
+    });
 
     this.drawLegacyMenuPathTitle(time);
     this.boardPathDirty = false;
+  }
+
+  // Backing scale for the baked board: the scene canvas resolution times the board zoom, the same
+  // product every other scene canvas (trail, glow) uses, so the bake is 1:1 with device pixels.
+  private resolveBoardTileBackingScale(): number {
+    const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
+    return Math.min(MAZER_CANVAS_RESOLUTION_MAX * 2, resolveMazerCanvasResolution() * zoomScale);
+  }
+
+  // Per-maze caches the reveal mask needs: the wrap docks (border cells the scene already treats as
+  // dock owners), a dock-owner mask, and the rank grid built from the scene's reveal order. Rebuilt
+  // only when the maze or its reveal-order array is replaced.
+  private ensureBoardTileMazeCaches(): void {
+    if (this.boardTileDockMaze !== this.maze) {
+      this.boardTileDockMaze = this.maze;
+      const docks: BoardTileDock[] = [];
+      const owners = new Uint8Array(this.maze.width * this.maze.height);
+      const eligible = this.resolveBleedOffDockVisualEligibility();
+      for (let y = 0; y < this.maze.height; y += 1) {
+        for (let x = 0; x < this.maze.width; x += 1) {
+          if (!eligible.has(legacyScenePointKey({ x, y }))) {
+            continue;
+          }
+          const sides = resolveLegacyMenuBorderDockDirections(this.maze, { x, y });
+          for (const side of sides) {
+            docks.push({ x, y, side });
+          }
+          if (sides.length > 0) {
+            owners[(y * this.maze.width) + x] = 1;
+          }
+        }
+      }
+      this.boardTileDocks = docks;
+      this.boardTileDockOwners = owners;
+      this.boardTileRankOrder = null;
+    }
+    if (this.boardTileRankOrder !== this.menuStaticDrawTileOrder) {
+      this.boardTileRankOrder = this.menuStaticDrawTileOrder;
+      this.boardTileRankGrid = buildRankGrid(this.menuStaticDrawTileOrder, this.maze.width, this.maze.height);
+    }
+  }
+
+  private resolveBoardTileReveal(): BoardTileReveal {
+    const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
+    const rowLimit = this.resolveLegacyMenuStaticDrawRowLimit();
+    const edgeShown = this.legacyEdgePathsVisible;
+    if (tileLimit === null && rowLimit === null && edgeShown) {
+      return { kind: 'all' };
+    }
+    const width = this.maze.width;
+    const ranks = this.boardTileRankGrid;
+    const owners = this.boardTileDockOwners;
+    return {
+      kind: 'cells',
+      key: `${tileLimit ?? 'n'}|${rowLimit ?? 'n'}`,
+      docksVisible: edgeShown,
+      isVisible: (x, y) => {
+        const index = (y * width) + x;
+        if (!edgeShown && owners !== null && owners[index] === 1) {
+          return false;
+        }
+        const byTile = tileLimit === null || (ranks !== null && ranks[index]! >= 0 && ranks[index]! < tileLimit);
+        return byTile || rowLimit === null || y < rowLimit;
+      }
+    };
   }
 
   private resolveLegacyMenuPathTitleProgress(): number {
@@ -8957,11 +8665,8 @@ export class MenuScene extends Phaser.Scene {
     // fillLegacyPlayerMarkerTile's showLocatorTicks branch (the only one
     // that draws into this image) is itself gated behind playerAlpha > 0 /
     // markersBuiltIn / on-screen checks further down, so there are real
-    // dirty frames where it never runs at all. Same reasoning for the
-    // goal's own halo canvas -- drawLegacyGoalStarMarker's real-board branch
-    // is reached only when the goal tile itself is on-screen/revealed.
+    // dirty frames where it never runs at all.
     this.playerGlowCanvasImage?.setVisible(false);
-    this.goalHaloCanvasImage?.setVisible(false);
 
     // resolveLegacyPlayPerfectPathTrail only ever reads this.maze/this.trail/
     // this.player -- the exact same shared fields the menu demo AI already
@@ -9270,27 +8975,36 @@ export class MenuScene extends Phaser.Scene {
   // already used for their own tile-by-tile build -- a cell is either fully
   // drawn or not drawn, never partially faded, matching the maze's own
   // reveal.
-  // Border: a thin black stroke around each cell's own outer edge (centered
-  // on the boundary, so it bleeds slightly outside the fill) for contrast/
-  // visibility against the busy rainbow-on-rainbow background.
+  // Tile art (Chip): each cell is a chip drawn by chipTileGraphics.drawChipCell from the board's own
+  // computeChipGeometry (rounded outer corners, joins merged, one lit rim on exposed sides), replacing
+  // the flat pale-mint material tile and its black border stroke. `clearFirst` is false for the Guide's
+  // level numeral, which draws into the shared overlay graphics.
   private drawLegacyGlyphWordTileBlock(
     graphics: Phaser.GameObjects.Graphics,
     layout: LegacyGlyphWordLayout,
     time: number,
     alpha: number,
-    revealProgress: number = 1
+    revealProgress: number = 1,
+    clearFirst: boolean = true
   ): void {
-    graphics.clear();
+    if (clearFirst) {
+      graphics.clear();
+    }
     if (layout.cells.length <= 0 || alpha <= 0) {
       return;
     }
-    const pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'> = {
+    // Chip geometry (the board's own: rounded convex corners, joins merged, one lit rim on exposed
+    // sides) computed once per wordmark grid; per-cell colour stays the rainbow sweep. See the two
+    // LEGACY_WORDMARK_CHIP_* constants for the rim/fill split.
+    const geometry = resolveChipGridGeometry({
       grid: layout.grid,
-      height: layout.rows,
-      width: layout.columns
-    };
+      columns: layout.columns,
+      rows: layout.rows,
+      left: layout.left,
+      top: layout.top,
+      cellSize: layout.cellSize
+    });
     const visibleCellCount = clamp(Math.ceil(layout.cells.length * clamp(revealProgress, 0, 1)), 0, layout.cells.length);
-    const borderWidth = Math.max(1, Math.round(layout.cellSize * 0.08));
     for (let index = 0; index < visibleCellCount; index += 1) {
       const cell = layout.cells[index];
       const cellColor = Phaser.Display.Color.HSVToRGB(
@@ -9298,24 +9012,19 @@ export class MenuScene extends Phaser.Scene {
         0.8,
         1
       ).color;
-      this.drawLegacyPathMaterialTile(
+      drawChipCell(
         graphics,
-        { x: cell.column, y: cell.row },
-        pathSource,
+        geometry,
         layout.left,
         layout.top,
-        layout.cellSize,
+        cell.column,
+        cell.row,
         {
-          coreAlpha: 0.96 * alpha,
-          coreColor: cellColor,
-          drawCue: false,
-          edgeAlpha: 0.88 * alpha,
-          edgeColor: mixLegacyIridescentColor(cellColor, 0x000000, 0.35)
-        }
+          rim: mixLegacyIridescentColor(cellColor, boardMaterial.white, LEGACY_WORDMARK_CHIP_RIM_LIGHTEN),
+          fill: mixLegacyIridescentColor(cellColor, boardMaterial.void, LEGACY_WORDMARK_CHIP_FILL_CANVAS_MIX)
+        },
+        alpha
       );
-      const tileRect = this.resolveLegacyPixelTileRect(layout.left, layout.top, layout.cellSize, { x: cell.column, y: cell.row });
-      graphics.lineStyle(borderWidth, 0x000000, 0.85 * alpha);
-      graphics.strokeRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
     }
   }
 
@@ -10084,6 +9793,24 @@ export class MenuScene extends Phaser.Scene {
     // device-pixel blur, once downscaled for display, reads as the same
     // logical radius regardless of backing resolution.
     this.trailCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
+    if (this.boardTileStyle === 'chip') {
+      // Open item A8 of the Chip amendment: several energy stops fall under 3:1 on the mid-tone chip, so
+      // the trail sits on a dark underlay (bg.canvas, wider than the core by LEGACY_TRAIL_UNDERLAY_PAD_CSS
+      // each side). Same function, same path; alpha follows the trail's own fade.
+      drawTrailToCanvasContext(this.trailCanvasTexture.context, segments.map((segment) => ({
+        ...segment,
+        glowColor: boardMaterial.void,
+        coreColor: boardMaterial.void,
+        alpha: segment.alpha * LEGACY_TRAIL_UNDERLAY_ALPHA
+      })), {
+        originX: bounds.left,
+        originY: bounds.top,
+        coreWidth: coreWidth + (2 * LEGACY_TRAIL_UNDERLAY_PAD_CSS),
+        glowWidth,
+        glowAlphaRatio: 0,
+        glowBlurPx: 0
+      });
+    }
     drawTrailToCanvasContext(this.trailCanvasTexture.context, segments, {
       originX: bounds.left,
       originY: bounds.top,
@@ -10126,6 +9853,11 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
+  // Start and goal markers: the Chip marker draw code (drawBoardMarkers), painted through the Phaser
+  // graphics adapter into boardDynamicGraphics -- the exact function the in-app Guide icons call. Cells
+  // are located with the layer's device-snapped board origin so they land on the baked tiles. Start is
+  // hidden while the player stands on it (the player marker is the start). Reduced motion freezes the
+  // goal ring (phase 0); the marker is fully legible without motion.
   private fillPlayDynamicMarkerTile(
     point: LegacyPoint,
     originX: number,
@@ -10135,315 +9867,24 @@ export class MenuScene extends Phaser.Scene {
     kind: 'start' | 'goal',
     time?: number
   ): void {
-    // Uses the exact same rounded tile-rect math as every corridor tile
-    // (resolveLegacyPixelTileRect) instead of re-deriving one from a center
-    // point, so the glow lands pixel-identical in size/position to the real
-    // tile underneath it.
-    const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
-    // Reads the one-way latch only -- it is flipped exclusively at the
-    // authoritative accepted-movement commit boundary
-    // (markLegacyPlayerLeftStartIfApplicable), never here. Rendering must
-    // never be the place persistent lifecycle state changes: a skipped
-    // render, a hidden tab, or a future renderer swap must never be able to
-    // affect whether the player "has left start".
-    const hasLeftStart = kind === 'start' ? this.hasPlayerEverLeftStart : false;
-    this.drawLegacyEndpointGlow(this.boardDynamicGraphics, tileRect, alpha, kind, time, hasLeftStart);
-  }
-
-  // The actual maze tile underneath is left completely alone (drawBoardPaths
-  // already renders it as a normal corridor tile) -- this just lays a soft
-  // colored glow plus a small bright catchlight on top for visibility,
-  // instead of recoloring the whole tile. Per feedback that restyling the
-  // entire tile was more than needed; a simple glow reads as "marked" just
-  // as clearly without fighting the corridor's own material underneath it.
-  private drawLegacyEndpointGlow(
-    graphics: Phaser.GameObjects.Graphics,
-    tileRect: LegacyPixelTileRect,
-    alpha: number,
-    kind: 'start' | 'goal',
-    time?: number,
-    hasLeftStart: boolean = false
-  ): void {
-    if (kind === 'goal') {
-      this.drawLegacyGoalStarMarker(graphics, tileRect, alpha, time);
+    if (kind === 'start' && this.player.x === point.x && this.player.y === point.y) {
       return;
     }
-    const centerX = tileRect.left + (tileRect.width / 2);
-    const centerY = tileRect.top + (tileRect.height / 2);
-    const tileSize = Math.min(tileRect.width, tileRect.height);
-    const haloColor = LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_COLOR;
-
-    if (hasLeftStart) {
-      // Post-spawn: "near-silent residue" per the reference's own comment
-      // -- a faint rounded-square outline plus a tiny dim center dot,
-      // nothing that competes with the trail/player once the run is under
-      // way.
-      const half = tileSize * LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_HALF_RATIO;
-      graphics.lineStyle(
-        Math.max(1, tileSize * LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_STROKE_RATIO),
-        haloColor,
-        LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_ALPHA * alpha
-      );
-      graphics.strokeRoundedRect(
-        centerX - half,
-        centerY - half,
-        half * 2,
-        half * 2,
-        tileSize * LEGACY_PLAY_START_MARKER_POST_SPAWN_SQUARE_CORNER_RATIO
-      );
-      graphics.fillStyle(haloColor, LEGACY_PLAY_START_MARKER_POST_SPAWN_DOT_ALPHA * alpha);
-      graphics.fillCircle(centerX, centerY, tileSize * LEGACY_PLAY_START_MARKER_POST_SPAWN_DOT_RADIUS_RATIO);
-      return;
-    }
-
-    // Pre-spawn: two thin concentric rings plus a small pulsing core dot
-    // and catchlight glint, all in PLAYER_HALO -- visible while the player
-    // still occupies the start tile.
-    graphics.lineStyle(
-      Math.max(1, tileSize * LEGACY_PLAY_START_MARKER_PRE_SPAWN_RING_STROKE_RATIO),
-      haloColor,
-      LEGACY_PLAY_START_MARKER_PRE_SPAWN_OUTER_RING_ALPHA * alpha
-    );
-    graphics.strokeCircle(centerX, centerY, tileSize * LEGACY_PLAY_START_MARKER_PRE_SPAWN_OUTER_RING_RADIUS_RATIO);
-    graphics.lineStyle(
-      Math.max(1, tileSize * LEGACY_PLAY_START_MARKER_PRE_SPAWN_RING_STROKE_RATIO),
-      haloColor,
-      LEGACY_PLAY_START_MARKER_PRE_SPAWN_INNER_RING_ALPHA * alpha
-    );
-    graphics.strokeCircle(centerX, centerY, tileSize * LEGACY_PLAY_START_MARKER_PRE_SPAWN_INNER_RING_RADIUS_RATIO);
-
-    const pulse = time !== undefined && !this.prefersLegacyReducedMotion()
-      ? 1 + (Math.sin((time / LEGACY_PLAY_START_MARKER_PRE_SPAWN_PULSE_PERIOD_MS) * Math.PI * 2) * LEGACY_PLAY_START_MARKER_PRE_SPAWN_PULSE_AMOUNT)
-      : 1;
-    const coreRadius = tileSize * LEGACY_PLAY_START_MARKER_PRE_SPAWN_CORE_RADIUS_RATIO * pulse;
-    graphics.fillStyle(haloColor, alpha);
-    graphics.fillCircle(centerX, centerY, coreRadius);
-    graphics.fillStyle(cyberArcadeMaterial.rail.white, 0.85 * alpha);
-    graphics.fillCircle(centerX - (coreRadius * 0.3), centerY - (coreRadius * 0.3), coreRadius * 0.32);
-  }
-
-  // The goal marker: a hollow five-pointed star (no fill -- the board and
-  // starfield show through its interior, per the frozen contract's own
-  // "hollow star" requirement) with a spinning outline, ringed by a
-  // matching ring, both cycling through Navigation Core v1's canonical
-  // cool-dominant ENERGY palette -- the exact same cyclic stops the
-  // continuous trail samples (NAVIGATION_CORE_TRAIL_ENERGY_STOPS), so the
-  // goal reads as visually related to the trail leading to it, not an
-  // independent equal-weight rainbow. A review against the frozen
-  // reference (docs/assets/reference/navigation-core-v1/) found this
-  // marker was still using a full equal-weight HSV rainbow (wrong hue
-  // weighting), an orbiting white highlight riding the ring (not in the
-  // reference at all), and a reduced-motion fallback that drew five
-  // sparkles at constant, never-fading alpha (exactly the "permanent
-  // decorative dots" the reference's own visual contract prohibits) --
-  // all removed here. Drawn procedurally rather than as an imported
-  // texture: every board element in this scene is already vector Graphics
-  // (no image/texture loading pipeline exists anywhere in MenuScene), so a
-  // hand-drawn equivalent stays consistent with the rest of the renderer
-  // and animates for free at any resolution/zoom instead of needing a
-  // raster asset pipeline built just for this one marker.
-  //
-  // `time` is optional -- same long-standing convention as the glow this
-  // replaces: the Guide overlay's static legend icon (drawLegacyOptionsGuideGlyph)
-  // calls this without a time and gets a fixed rest pose, fully colored but
-  // not spinning, so the guide's icon and the real in-game marker share one
-  // implementation and never drift apart.
-  private drawLegacyGoalStarMarker(
-    graphics: Phaser.GameObjects.Graphics,
-    tileRect: LegacyPixelTileRect,
-    alpha: number,
-    time?: number
-  ): void {
-    const centerX = tileRect.left + (tileRect.width / 2);
-    const centerY = tileRect.top + (tileRect.height / 2);
-    const maxRadius = Math.min(tileRect.width, tileRect.height) * 0.5;
-    const spinPhase = time !== undefined && !this.prefersLegacyReducedMotion()
-      ? time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS
-      : 0;
-    // Owner-authorized calmer palette (LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS)
-    // -- the goal-star ring's stated design intent is to read as visually
-    // related to the trail leading to it, so it tracks the same amendment.
-    const energyColorAt = (position: number): number => (
-      resolveLegacyIridescentMidnightColor(position, LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS)
-    );
-
-    // Soft pulsing glow halo, drawn first (behind everything else). The
-    // frozen reference's own .end-halo is a radial gradient on a div sized
-    // to exactly the tile (scale 1.05), fading to zero opacity by 75% of
-    // its own radius -- i.e. its true visible extent tops out around
-    // maxRadius * 1.05 * 0.75 =~ 0.79 * maxRadius, well inside one cell.
-    // The previous 1.3-1.45x radii here visibly overflowed the tile
-    // (flagged directly against the reference's adjacent/compact evidence)
-    // -- pulled in to fit the same one-cell footprint.
-    const haloPulse = time !== undefined && !this.prefersLegacyReducedMotion()
-      ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2
-      : 0.5;
-    if (graphics === this.boardDynamicGraphics) {
-      // Real shadowBlur-sibling technique (a real radial gradient this
-      // time, not a blurred shape -- see navigationCoreGoalHaloCanvas.ts's
-      // own header comment): one continuous soft glow instead of two flat,
-      // hard-edged "target" discs.
-      this.drawGoalHaloCanvas(
-        centerX,
-        centerY,
-        maxRadius * (0.72 + (haloPulse * 0.08)),
-        alpha,
-        haloPulse
-      );
-    } else {
-      // The Options/Guide legend's own miniature static goal icon -- a
-      // different, non-gameplay caller (graphics === overlayGraphics), out
-      // of scope for this reference; keeps the prior Graphics-only
-      // approximation unchanged.
-      graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR, alpha * (0.24 + (haloPulse * 0.12)));
-      graphics.fillCircle(centerX, centerY, maxRadius * (0.72 + (haloPulse * 0.08)));
-      graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_HALO_INNER_COLOR, alpha * (0.34 + (haloPulse * 0.14)));
-      graphics.fillCircle(centerX, centerY, maxRadius * 0.48);
-    }
-
-    // Ring: Graphics has no per-point gradient stroke, so the canonical
-    // energy cycle is approximated as short color-stepped arc segments
-    // swept around the full circle, rotating continuously via spinPhase.
-    // Ring diameter (1.84 * maxRadius) stays inside the tile's own full
-    // width (2 * maxRadius) -- one-cell hard geometry.
-    const ringRadius = maxRadius * 0.92;
-    const ringSegmentCount = 40;
-    for (let i = 0; i < ringSegmentCount; i += 1) {
-      const angle0 = ((i / ringSegmentCount) + spinPhase) * Math.PI * 2;
-      const angle1 = (((i + 1) / ringSegmentCount) + spinPhase) * Math.PI * 2;
-      const segmentColor = energyColorAt((i / ringSegmentCount) + spinPhase);
-      graphics.lineStyle(Math.max(1.5, maxRadius * 0.07), segmentColor, alpha * 0.92);
-      graphics.beginPath();
-      graphics.arc(centerX, centerY, ringRadius, angle0, angle1);
-      graphics.strokePath();
-    }
-
-    // Five-pointed star, deliberately HOLLOW (no fill at all -- the board
-    // and starfield behind it show straight through the interior) with a
-    // spinning canonical-energy outline instead of a flat or gradient-
-    // filled one: each of the star's 10 edges is traced as several color-
-    // stepped sub-segments (same technique as the ring above), and the
-    // star's own vertex rotation runs at the SAME rate as the ring's color
-    // cycle (spinPhase, not a slowed-down fraction of it), so the outline
-    // reads as one continuous energy sweep around a genuinely spinning
-    // star rather than a static gradient. Star diameter (1.44 * maxRadius)
-    // also stays inside the tile's own width -- one-cell hard geometry.
-    const starRotation = spinPhase * Math.PI * 2;
-    const outerRadius = maxRadius * 0.72;
-    const innerRadius = outerRadius * 0.42;
-    const starPoints: Phaser.Math.Vector2[] = [];
-    for (let i = 0; i < 10; i += 1) {
-      const radius = i % 2 === 0 ? outerRadius : innerRadius;
-      const pointAngle = starRotation - (Math.PI / 2) + (i * Math.PI / 5);
-      starPoints.push(new Phaser.Math.Vector2(
-        centerX + (Math.cos(pointAngle) * radius),
-        centerY + (Math.sin(pointAngle) * radius)
-      ));
-    }
-    const starEdgeSubdivisions = 4;
-    for (let i = 0; i < starPoints.length; i += 1) {
-      const from = starPoints[i]!;
-      const to = starPoints[(i + 1) % starPoints.length]!;
-      for (let s = 0; s < starEdgeSubdivisions; s += 1) {
-        const t0 = s / starEdgeSubdivisions;
-        const t1 = (s + 1) / starEdgeSubdivisions;
-        const segmentColor = energyColorAt(((i + t0) / starPoints.length) + spinPhase);
-        graphics.lineStyle(Math.max(1, maxRadius * 0.07), segmentColor, alpha * 0.95);
-        graphics.lineBetween(
-          from.x + ((to.x - from.x) * t0),
-          from.y + ((to.y - from.y) * t0),
-          from.x + ((to.x - from.x) * t1),
-          from.y + ((to.y - from.y) * t1)
-        );
-      }
-    }
-
-    // Transient four-point glints only, matching the reference's own
-    // staggered fixed-position sparkle divs (each individually fading in
-    // and out on its own cycle, never all constantly on at once) -- see
-    // drawLegacyWordmarkAmbientSparkles's own "fully invisible outside a
-    // short pulse window" behavior for the fade-to-zero guarantee. Only
-    // drawn when actually animating (a real time and motion is allowed):
-    // the previous reduced-motion/static fallback drew five sparkles at a
-    // constant, never-fading alpha -- exactly the "permanent decorative
-    // dots" the frozen contract prohibits -- so reduced motion and the
-    // static Guide legend icon now correctly show none at all, just the
-    // static halo/ring/star shape.
-    if (time !== undefined && !this.prefersLegacyReducedMotion()) {
-      this.drawLegacyWordmarkAmbientSparkles(
-        graphics,
-        centerX,
-        centerY,
-        outerRadius,
-        outerRadius,
-        time,
-        alpha,
-        5,
-        41
-      );
-    }
-  }
-
-  // Real radial-gradient halo for the real on-board goal marker -- see
-  // navigationCoreGoalHaloCanvas.ts's own header comment, and
-  // drawPlayerGlowCanvas's sibling comment on the DPR/zoom-aware backing
-  // resolution this reuses verbatim. innerColor/outerColor and their base
-  // alphas match this file's existing LEGACY_PLAY_GOAL_MARKER_HALO_*
-  // constants exactly -- only the RENDERING technique changed (one
-  // gradient fill instead of two flat discs), not the tuned palette.
-  private drawGoalHaloCanvas(
-    centerX: number,
-    centerY: number,
-    radius: number,
-    alpha: number,
-    haloPulse: number
-  ): void {
-    if (!this.goalHaloCanvasTexture || !this.goalHaloCanvasImage) {
-      return;
-    }
-    const padding = Math.ceil(radius * 0.25);
-    const bounds = computeGoalHaloCanvasBounds(centerX, centerY, radius, padding);
-    const width = Math.max(1, Math.ceil(bounds.width));
-    const height = Math.max(1, Math.ceil(bounds.height));
-    const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
-    const resolution = Math.min(
-      MAZER_CANVAS_RESOLUTION_MAX * 2,
-      resolveMazerCanvasResolution() * zoomScale
-    );
-    const backingWidth = Math.max(1, Math.ceil(width * resolution));
-    const backingHeight = Math.max(1, Math.ceil(height * resolution));
-    if (
-      backingWidth !== this.goalHaloCanvasWidth
-      || backingHeight !== this.goalHaloCanvasHeight
-      || resolution !== this.goalHaloCanvasResolution
-    ) {
-      this.goalHaloCanvasTexture.setSize(backingWidth, backingHeight);
-      this.goalHaloCanvasWidth = backingWidth;
-      this.goalHaloCanvasHeight = backingHeight;
-      this.goalHaloCanvasResolution = resolution;
-    } else {
-      this.goalHaloCanvasTexture.clear(0, 0, backingWidth, backingHeight, false);
-    }
-    // Unlike shadowBlur, a canvas gradient's own coordinates/radii ARE
-    // logical-space values scaled correctly by the transform -- no
-    // resolution multiplication needed here (radialGradient stops are
-    // plain path-space geometry, not a device-pixel effect radius).
-    this.goalHaloCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
-    drawGoalHaloToCanvasContext(this.goalHaloCanvasTexture.context, {
-      originX: bounds.left,
-      originY: bounds.top,
-      centerX,
-      centerY,
-      radius,
-      innerColor: LEGACY_PLAY_GOAL_MARKER_HALO_INNER_COLOR,
-      innerAlpha: alpha * (0.34 + (haloPulse * 0.14)),
-      outerColor: LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR,
-      outerAlpha: alpha * (0.24 + (haloPulse * 0.12))
+    const origin = this.boardTileLayer.snappedOrigin ?? { x: originX, y: originY };
+    const context = new PhaserGraphicsTileContext(this.boardDynamicGraphics);
+    context.opacity = Math.min(1, alpha);
+    const phase = time !== undefined ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2 : 0;
+    drawBoardMarkers(context, {
+      style: this.boardTileStyle,
+      tileSize,
+      devicePixelRatio: this.resolveBoardTileBackingScale(),
+      originX: origin.x,
+      originY: origin.y,
+      start: kind === 'start' ? point : undefined,
+      goal: kind === 'goal' ? point : undefined,
+      phase,
+      reducedMotion: this.prefersLegacyReducedMotion()
     });
-    this.goalHaloCanvasTexture.refresh();
-    this.goalHaloCanvasImage.setPosition(bounds.left, bounds.top);
-    this.goalHaloCanvasImage.setDisplaySize(width, height);
-    this.goalHaloCanvasImage.setVisible(true);
   }
 
   // Retired: drawLegacyMarkerGemCatchlight used to draw a short diagonal
@@ -10945,39 +10386,6 @@ export class MenuScene extends Phaser.Scene {
     return text;
   }
 
-  // Tries each candidate string richest-first and keeps the first that fits
-  // `maxWidth` at or above `minFontSize`. If none fit, the last (shortest)
-  // candidate is ellipsized at the minimum size instead of overrunning its
-  // lane -- a clipped label is never allowed to run under a neighbouring
-  // control (e.g. a toggle's switch).
-  private fitLegacyUiTextCandidatesToWidth<T extends Phaser.GameObjects.Text>(
-    text: T,
-    candidates: readonly string[],
-    maxWidth: number,
-    maxFontSize: number,
-    minFontSize: number
-  ): T {
-    const safeMaxWidth = Math.max(1, Math.floor(maxWidth));
-    const safeMinFontSize = Math.max(1, Math.min(Math.floor(maxFontSize), Math.floor(minFontSize)));
-    for (const candidate of candidates) {
-      text.setText(candidate);
-      this.fitLegacyUiTextToWidth(text, safeMaxWidth, maxFontSize, safeMinFontSize);
-      if (text.width <= safeMaxWidth) {
-        return text;
-      }
-    }
-
-    const fallback = candidates[candidates.length - 1] ?? '';
-    text.setText(fallback);
-    this.fitLegacyUiTextToWidth(text, safeMaxWidth, maxFontSize, safeMinFontSize);
-    let kept = fallback.length;
-    while (kept > 1 && text.width > safeMaxWidth) {
-      kept -= 1;
-      text.setText(`${fallback.slice(0, kept).trimEnd()}…`);
-    }
-    return text;
-  }
-
   private drawHud(time: number): void {
     this.hudGraphics.clear();
     this.clearHudTexts();
@@ -11310,52 +10718,6 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  private visualRectToLegacyOverlayScrollRect(rect: VisualRect): LegacyOverlayScrollRect {
-    return {
-      height: rect.height,
-      left: rect.left,
-      top: rect.top,
-      width: rect.width
-    };
-  }
-
-  private resolveLegacyOverlayScrollRenderViewport(metrics: LegacyOverlayScrollMetrics): VisualRect {
-    return this.legacyOverlayScrollRectToVisualRect(
-      resolveLegacyOverlayScrollRenderRect(metrics.viewport)
-    );
-  }
-
-  private resolveFeatureControlRowsContentHeight(
-    panel: OverlayPanelFrame,
-    options: {
-      includeBoardZoom?: boolean;
-      includeControlStyle?: boolean;
-      includeMovementSpeed?: boolean;
-      showDescriptions?: boolean;
-    } = {}
-  ): number {
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const controlLayout = resolveLegacyFeatureControlLayout(panel.width, options.showDescriptions === true);
-    const rowHeight = controlLayout.rowHeight;
-    const rowGap = controlLayout.rowGap;
-    const sectionHeaderHeight = stacked ? 18 : 20;
-    const sectionHeaderGap = stacked ? 5 : 6;
-    const sectionGap = stacked ? 12 : 14;
-    const controlsGroupCount = (options.includeControlStyle !== false ? 1 : 0) + (options.includeMovementSpeed ? 1 : 0);
-    const displayGroupCount = 3 + (options.includeBoardZoom === false ? 0 : 1);
-    const groupHeight = (count: number): number => (
-      count > 0
-        ? sectionHeaderHeight + sectionHeaderGap + (count * rowHeight) + (Math.max(0, count - 1) * rowGap)
-        : 0
-    );
-
-    return 4
-      + groupHeight(controlsGroupCount)
-      + (controlsGroupCount > 0 ? sectionGap : 0)
-      + groupHeight(displayGroupCount)
-      + 4;
-  }
-
   private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void {
     if (!metrics.enabled && !forceVisible) {
       return;
@@ -11422,423 +10784,477 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
+  // One shared Settings sheet for BOTH surfaces (owner decision 2026-11-06:
+  // the in-game Pause > Settings look is canonical and the main-menu Settings
+  // sheet must match it). buildOptionsOverlay (menu) and buildPauseOverlay
+  // (play) are thin entries into the same painter; every row, size and
+  // position comes from buildLegacySettingsSheetPlan
+  // (legacySettingsSheetPlan.ts), so the two contexts cannot drift apart. The
+  // Guide ("How to play") is a sub-view of the same overlay (settingsGuideOpen),
+  // not a second overlay, so Pause keeps holding the run while it is open.
   private buildOptionsOverlay(): void {
-    const panel = this.resolveOverlayPanelFrame();
-    const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const showAdvancedOptions = this.shouldShowLegacyAdvancedOptions();
-    // Matches createLegacyBottomActionBar's own height exactly, so the
-    // scrollable content above reserves precisely the space the bar
-    // actually occupies.
-    const actionButtonHeight = compact ? 48 : 52;
-    const shell = resolveLegacyOverlayShellLayout({
-      actionHeight: actionButtonHeight,
-      actionRows: 1,
-      panel
-    });
-    let rowY = shell.contentTop;
-    this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
+    this.buildLegacySettingsSheetOverlay('menu');
+  }
 
-    if (!showAdvancedOptions) {
-      const viewportTop = rowY + (compact ? 4 : 6);
-      const viewport = createVisualRect(
-        shell.contentLeft,
-        viewportTop,
-        shell.contentWidth,
-        Math.max(140, shell.contentHeight - (viewportTop - shell.contentTop))
-      );
-      const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {
-        includeControlStyle: false,
-        includeMovementSpeed: false
-      });
-      const contentFlow = resolveLegacyOverlayContentFlowLayout({
-        contentTop: viewport.top,
-        controlsHeight: controlContentHeight,
-        guideHeight: this.resolveLegacyOptionsGuideEffectiveHeight(panel.width),
-        panelWidth: panel.width
-      });
-      const scrollMetrics = resolveLegacyOverlayScrollMetrics({
-        contentHeight: contentFlow.contentHeight,
-        offset: this.overlayScrollOffset,
-        viewport: this.visualRectToLegacyOverlayScrollRect(viewport)
-      });
-      this.applyLegacyOverlayScrollMetrics(scrollMetrics);
-      const renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);
-      this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {
-        exactTop: true,
-        rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
-        scrollOffset: scrollMetrics.offset,
-        viewport: renderViewport
-      });
-      this.createFeatureControlRows(contentFlow.controlsTop, panel, {
-        includeControlStyle: false,
-        includeMovementSpeed: false,
-        rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
-        scrollOffset: scrollMetrics.offset,
-        viewport: renderViewport
-      });
+  private buildPauseOverlay(): void {
+    this.buildLegacySettingsSheetOverlay('pause');
+  }
+
+  private buildLegacySettingsSheetOverlay(context: LegacySettingsContext): void {
+    if (this.settingsGuideOpen) {
+      this.buildLegacyGuideSheetOverlay(context);
+      return;
+    }
+    const plan = buildLegacySettingsSheetPlan({
+      context,
+      height: this.layout.height,
+      safeArea: readMazerViewportGeometry().safeArea,
+      settingsExpanded: this.pauseSettingsExpanded,
+      signedIn: this.authSnapshot.status === 'authenticated',
+      width: this.layout.width
+    });
+    this.overlayBoardZoomSliderBounds = null;
+    this.overlayMovementSpeedSliderBounds = null;
+
+    this.uiButtons.push(this.createOverlayClosePill(
+      plan.close.rect,
+      plan.close.label,
+      () => this.runLegacySettingsCommand(plan.close.command)
+    ));
+    this.drawLegacySheetCard(plan.card);
+    this.createOverlayTitle(plan.title.text, plan.title.centerY);
+
+    const scrollMetrics = this.applyLegacySheetScroll(plan.scrollRailViewport, plan.contentHeight, plan.scrollable);
+    const scrollOffset = scrollMetrics?.offset ?? 0;
+    for (const item of plan.items) {
+      if (isLegacySettingsItemFullyVisible(plan, item, scrollOffset)) {
+        this.paintLegacySettingsItem(plan, item, scrollOffset);
+      }
+    }
+    if (scrollMetrics !== null) {
       this.drawLegacyOverlayScrollFacade(scrollMetrics);
-      this.createLegacyOptionsSessionActionBar(panel, compact);
-      return;
     }
-
-    rowY = this.createLegacyOptionsInfoSection(rowY, panel);
-
-    if (showAdvancedOptions) {
-      rowY = this.createInputRow('Maze Scale', 'scale', rowY, panel);
-      rowY = this.createInputRow('Camera Scale', 'camScale', rowY, panel);
-    }
-
-    rowY = this.createFeatureControlRows(rowY, panel, { includeControlStyle: false, includeMovementSpeed: false });
-
-    if (showAdvancedOptions && !compact) {
-      rowY = this.createColorInputRow('Path RGB 0-255', ['pathR', 'pathG', 'pathB'], rowY, panel, this.settings.pathColor);
-      rowY = this.createColorInputRow('Wall RGB 0-255', ['wallR', 'wallG', 'wallB'], rowY, panel, this.settings.wallColor);
-    }
-    this.createLegacyOptionsSessionActionBar(panel, compact);
   }
 
-  private createLegacyOptionsSessionActionBar(panel: OverlayPanelFrame, compact: boolean): void {
-    if (this.authSnapshot.status !== 'authenticated') {
-      return;
+  private runLegacySettingsCommand(command: LegacySettingsCommand): void {
+    switch (command.type) {
+      case 'RESUME_RUN':
+        this.dispatchUiBridgeCommand({ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume'));
+        return;
+      case 'RETURN_HOME':
+        this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu'));
+        return;
+      case 'CLOSE_OVERLAY':
+        this.handleBackAction();
+        return;
+      case 'TOGGLE_SETTINGS_GROUP':
+        this.pauseSettingsExpanded = !this.pauseSettingsExpanded;
+        this.resetLegacyOverlayScrollState();
+        this.uiDirty = true;
+        return;
+      case 'OPEN_GUIDE':
+        this.settingsGuideOpen = true;
+        this.resetLegacyOverlayScrollState();
+        this.uiDirty = true;
+        return;
+      case 'BEGIN_RESET_PROGRESS':
+        this.openOverlay('confirm-progression-reset');
+        return;
+      case 'SIGN_OUT':
+        void this.handleLegacyAuthSignOut();
+        return;
     }
-    this.createLegacyBottomActionBar(
-      panel,
-      compact,
-      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }
-    );
   }
 
-  // The Guide card's actual on-screen height depends on overlayGuideExpanded
-  // -- callers computing where content below it should start must use this
-  // instead of the layout's cardHeight (which is always the expanded size),
-  // or they'd reserve extra space above the toggle list while collapsed.
-  private resolveLegacyOptionsGuideEffectiveHeight(panelWidth: number): number {
-    const guideLayout = resolveLegacyOptionsGuideLayout(panelWidth, 5);
-    return this.overlayGuideExpanded ? guideLayout.cardHeight : guideLayout.collapsedHeight;
-  }
-
-  private createLegacyOptionsInfoSection(
-    rowY: number,
-    panel: OverlayPanelFrame,
-    options: {
-      exactTop?: boolean;
-      rightGutter?: number;
-      scrollOffset?: number;
-      viewport?: VisualRect | null;
-    } = {}
-  ): number {
-    const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, 5);
-    const expanded = this.overlayGuideExpanded;
-    const cardHeight = expanded ? guideLayout.cardHeight : guideLayout.collapsedHeight;
-    const rightGutter = options.rightGutter ?? 0;
-    const cardWidth = Math.min(
-      panel.width - guideLayout.horizontalMargin - rightGutter,
-      guideLayout.cardWidthLimit
-    );
-    const cardCenterX = panel.centerX - (rightGutter / 2);
-    const cardLeft = cardCenterX - (cardWidth / 2);
-    const contentCardTop = options.exactTop === true
-      ? rowY
-      : Math.max(panel.top + (compact ? 82 : 88), rowY + (compact ? 8 : 10));
-    const cardTop = contentCardTop - (options.scrollOffset ?? 0);
-    const viewport = options.viewport ?? null;
-    const cardIntersectsViewport = viewport === null
-      || (cardTop < viewport.bottom - 2 && cardTop + cardHeight > viewport.top + 2);
-
-    if (!cardIntersectsViewport) {
-      this.overlayGuideBounds = null;
-      return contentCardTop + cardHeight + (options.exactTop === true ? 0 : (compact ? 14 : 16));
-    }
-
-    const guideGraphics = this.add.graphics();
-    this.overlayGuideGraphics = guideGraphics;
-    if (viewport !== null) {
-      const maskGraphics = this.make.graphics({ x: 0, y: 0 }, false);
-      maskGraphics.fillStyle(0xffffff, 1);
-      maskGraphics.fillRect(viewport.left, viewport.top, viewport.width, viewport.height);
-      const guideMask = maskGraphics.createGeometryMask();
-      guideGraphics.setMask(guideMask);
-      this.overlayGuideMaskGraphics = maskGraphics;
-      this.overlayGuideMask = guideMask;
-    }
-
-    const inset = guideLayout.inset;
-    const headerCenterY = cardTop + Math.round(guideLayout.collapsedHeight / 2);
-    const titleY = expanded ? cardTop + guideLayout.titleOffset : headerCenterY;
-    const titleRuleY = cardTop + guideLayout.titleRuleOffset;
-    const legendTop = cardTop + guideLayout.legendTopOffset;
-    const rowHeight = guideLayout.rowHeight;
-    const guideTitleFontSize = guideLayout.titleFontSize;
-    const guideRowFontSize = guideLayout.rowFontSize;
-    const guideRowMinFontSize = guideLayout.rowMinFontSize;
-    const detailLeft = cardLeft + inset;
-    const detailWidth = cardWidth - (inset * 2);
-    const visibleCardTop = viewport === null ? cardTop : Math.max(cardTop, viewport.top);
-    const visibleCardBottom = viewport === null ? cardTop + cardHeight : Math.min(cardTop + cardHeight, viewport.bottom);
-    const visibleCardHeight = Math.max(0, visibleCardBottom - visibleCardTop);
-    if (visibleCardHeight < 30) {
-      this.overlayGuideBounds = null;
-      return contentCardTop + cardHeight + (options.exactTop === true ? 0 : (compact ? 14 : 16));
-    }
-    this.overlayGuideBounds = createVisualRect(cardLeft, visibleCardTop, cardWidth, visibleCardHeight);
-
-    this.drawLegacyCyberPanel(guideGraphics, {
-      active: true,
-      alpha: 0.66,
-      fill: LEGACY_PLAY_HUD_TIMER_PANE,
-      height: cardHeight,
-      left: cardLeft,
-      radius: 12,
-      top: cardTop,
-      width: cardWidth
+  // The card both sheets share: near-black (bg.canvas) so it reads as the
+  // darkest layer on the dimmed board, same chrome the Pause card always had.
+  private drawLegacySheetCard(card: LegacySettingsRect): void {
+    this.drawLegacyCyberPanel(this.overlayGraphics, {
+      alpha: 0.96,
+      fill: cyberArcadeMaterial.substrate.field,
+      height: card.height,
+      left: card.left,
+      radius: LEGACY_UI_CONTROL_RADIUS + 4,
+      stroke: LEGACY_CYBER_PANEL_STROKE,
+      top: card.top,
+      width: card.width
     });
-    guideGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
-    guideGraphics.strokeRoundedRect(cardLeft + 4, cardTop + 4, cardWidth - 8, cardHeight - 8, 9);
-
-    const addText = (
-      copy: string,
-      x: number,
-      y: number,
-      width: number,
-      color: string,
-      fontSize: number,
-      originX = 0,
-      alpha = 0.94,
-      minFontSize = 9,
-      wrapWhenClipped = false
-    ): Phaser.GameObjects.Text | null => {
-      const label = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(x, y, copy, {
-        align: 'left',
-        color,
-        fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: `${fontSize}px`
-      })), width, fontSize, minFontSize, guideLayout.textWidthSafetyRatio)
-        .setOrigin(originX, 0.5)
-        .setAlpha(alpha);
-      // Legend copy wraps onto a second line (centered on the row) once it
-      // would otherwise shrink below its minimum size, instead of dropping to
-      // an illegible font or running past the card edge.
-      const wrapWidth = Math.max(1, Math.floor(width * guideLayout.textWidthSafetyRatio));
-      if (wrapWhenClipped && label.width > wrapWidth) {
-        label.setWordWrapWidth(wrapWidth, true);
-      }
-      const bounds = visualRectFromBounds(label.getBounds());
-      if (viewport !== null && !legacyOverlayScrollRectIntersectsViewport(bounds, viewport)) {
-        label.destroy();
-        return null;
-      }
-      if (this.overlayGuideMask !== null) {
-        label.setMask(this.overlayGuideMask);
-      }
-      this.uiTexts.push(label);
-      return label;
-    };
-
-    const chevronX = cardLeft + cardWidth - inset - 5;
-    const drawHeaderChevron = (): void => {
-      const chevronSize = 4;
-      guideGraphics.lineStyle(1.6, cyberArcadeMaterial.rail.cyan, 0.85);
-      guideGraphics.beginPath();
-      if (expanded) {
-        guideGraphics.moveTo(chevronX - chevronSize, headerCenterY + Math.round(chevronSize * 0.4));
-        guideGraphics.lineTo(chevronX, headerCenterY - Math.round(chevronSize * 0.4));
-        guideGraphics.lineTo(chevronX + chevronSize, headerCenterY + Math.round(chevronSize * 0.4));
-      } else {
-        guideGraphics.moveTo(chevronX - chevronSize, headerCenterY - Math.round(chevronSize * 0.4));
-        guideGraphics.lineTo(chevronX, headerCenterY + Math.round(chevronSize * 0.4));
-        guideGraphics.lineTo(chevronX + chevronSize, headerCenterY - Math.round(chevronSize * 0.4));
-      }
-      guideGraphics.strokePath();
-    };
-    drawHeaderChevron();
-
-    addText(
-      'GUIDE',
-      detailLeft,
-      titleY,
-      cardWidth - (inset * 2) - 28,
-      toCyberArcadeCssHex(cyberArcadeMaterial.rail.mint),
-      guideTitleFontSize,
-      0,
-      1,
-      guideRowMinFontSize
-    );
-
-    // Collapsed by default -- a tap-to-expand header row is enough of a
-    // reference that it doesn't need to permanently occupy space above the
-    // toggle list every time Settings/Pause opens.
-    const headerButton = this.createLegacyOptionsGuideHeaderButton(cardCenterX, headerCenterY, cardWidth, guideLayout.collapsedHeight);
-    this.uiButtons.push(headerButton);
-
-    if (!expanded) {
-      return contentCardTop + cardHeight + (options.exactTop === true ? 0 : (compact ? 14 : 16));
-    }
-
-    // Two-line "rail" under the title instead of one flat divider -- a
-    // bright inset line plus a fainter full-width line reads as a small
-    // HUD console header rather than a plain section break.
-    guideGraphics.lineStyle(1.5, cyberArcadeMaterial.rail.cyan, 0.5);
-    guideGraphics.lineBetween(cardCenterX - 22, titleRuleY, cardCenterX + 22, titleRuleY);
-    guideGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.2);
-    guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);
-
-    const legendCopyColor = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
-
-    // Each row gets a colored icon badge behind its glyph instead of a bare
-    // icon on the panel background -- ties the legend visually to the same
-    // accent-badge language as the toggle rows, and the ring color doubles
-    // as the row's semantic color-key. A circular frame fits the rows whose
-    // real on-screen counterpart is itself round-ish (the start/exit glow,
-    // the move stick, the level number) -- but the trail row's real asset
-    // is a square maze tile, and forcing that into a circle just clipped
-    // it. Badge shape now matches what's actually being shown instead of
-    // defaulting every row to the same disc.
-    const drawLegendBadge = (glyphX: number, glyphY: number, badgeRadius: number, accentColor: number): void => {
-      guideGraphics.fillStyle(accentColor, 0.16);
-      guideGraphics.fillCircle(glyphX, glyphY, badgeRadius);
-      guideGraphics.lineStyle(1.2, accentColor, 0.7);
-      guideGraphics.strokeCircle(glyphX, glyphY, badgeRadius);
-    };
-    const drawLegendTileBadge = (glyphX: number, glyphY: number, badgeRadius: number, accentColor: number): void => {
-      const half = badgeRadius * 0.92;
-      guideGraphics.fillStyle(accentColor, 0.16);
-      guideGraphics.fillRect(glyphX - half, glyphY - half, half * 2, half * 2);
-      guideGraphics.lineStyle(1.2, accentColor, 0.7);
-      guideGraphics.strokeRect(glyphX - half, glyphY - half, half * 2, half * 2);
-    };
-
-    // All guide rows share the card's left content edge. This keeps the
-    // expanded guide stable as descriptions vary in length instead of
-    // visually drifting toward the centre of the dropdown.
-    const drawLegendRow = (
-      index: number,
-      kind: 'end' | 'level' | 'move' | 'start' | 'trail',
-      title: string,
-      copy: string,
-      accentColor: number
-    ): void => {
-      const rowTop = legendTop + (index * rowHeight);
-      const glyphY = rowTop + (rowHeight / 2);
-      const titleColor = toCyberArcadeCssHex(accentColor);
-      const badgeRadius = compact ? 11 : 12;
-      const badgeToTextGap = compact ? 14 : 18;
-      const titleCopyGap = compact ? 6 : 8;
-      const titleFontSize = guideRowFontSize;
-      // Titles are the same fixed short strings ("Start:", "Trail:", ...) on
-      // every screen size -- they don't need a bigger proportional share on
-      // compact just because the card is narrower. Giving them one on mobile
-      // used to squeeze the copy column exactly where space was tightest.
-      const titleMaxWidth = Math.round(detailWidth * (compact ? 0.32 : 0.36));
-      const glyphX = detailLeft + badgeRadius;
-      const labelX = detailLeft + (badgeRadius * 2) + badgeToTextGap;
-      const titleLabel = addText(`${title}:`, labelX, glyphY, titleMaxWidth, titleColor, titleFontSize, 0, compact ? 0.96 : 1, guideRowMinFontSize);
-      const titleWidth = titleLabel?.displayWidth ?? 0;
-      if (kind === 'trail') {
-        drawLegendTileBadge(glyphX, glyphY, badgeRadius, accentColor);
-      } else {
-        drawLegendBadge(glyphX, glyphY, badgeRadius, accentColor);
-      }
-      if (kind === 'level') {
-        // The real LVL badge is a number, not a shape -- Graphics can't draw
-        // text, so this is the one row whose icon is a Text object instead
-        // of a hand-drawn glyph. Shows the player's actual current level
-        // (not a placeholder), same "guide reflects reality" rule the
-        // start/exit/move rows already follow.
-        addText(
-          String(this.progressionState.tracks.player.level),
-          glyphX,
-          glyphY,
-          badgeRadius * 2,
-          titleColor,
-          compact ? 12 : 13,
-          0.5,
-          1,
-          8
-        );
-      } else if (kind === 'trail') {
-        this.drawLegacyOptionsGuideTrailGlyph(guideGraphics, glyphX, glyphY, badgeRadius);
-      } else {
-        this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, compact ? 12 : 13, guideGraphics);
-      }
-
-      const copyX = labelX + titleWidth + titleCopyGap;
-      // Floor is just a zero/negative-width guard, not a minimum promise --
-      // addText shrinks font size to fit but never wraps or clips, so a
-      // requested width bigger than the real remaining room let the copy
-      // text render straight past the card's right edge on narrow phones.
-      const copyWidth = Math.max(24, detailLeft + detailWidth - copyX);
-      addText(
-        copy,
-        copyX,
-        glyphY,
-        copyWidth,
-        legendCopyColor,
-        guideRowFontSize,
-        0,
-        0.92,
-        Math.max(guideRowMinFontSize, LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE),
-        true
-      );
-    };
-
-    let legendRowIndex = 0;
-    drawLegendRow(legendRowIndex, 'start', 'Start', 'begin at gold', cyberArcadeMaterial.signal.start);
-    legendRowIndex += 1;
-    drawLegendRow(legendRowIndex, 'end', 'Exit', 'reach the star', cyberArcadeMaterial.signal.goal);
-    legendRowIndex += 1;
-    drawLegendRow(
-      legendRowIndex,
-      'move',
-      'Move',
-      'touch and drag anywhere',
-      cyberArcadeMaterial.rail.mint
-    );
-    const playerPalette = resolveLegacyProgressionPalette(this.progressionState.tracks.player, 'player');
-    legendRowIndex += 1;
-    drawLegendRow(
-      legendRowIndex,
-      'trail',
-      'Trail',
-      'marks where you have walked',
-      playerPalette.trailColor
-    );
-    legendRowIndex += 1;
-    drawLegendRow(
-      legendRowIndex,
-      'level',
-      'Level',
-      'climbs as you clear mazes',
-      playerPalette.playerCoreColor
-    );
-    return contentCardTop + cardHeight + (options.exactTop === true ? 0 : (compact ? 14 : 16));
   }
 
-  // Invisible tap target spanning the Guide card's header row -- toggles
-  // overlayGuideExpanded and marks the UI dirty so the next rebuild redraws
-  // the card (and reflows everything below it) at the new height.
-  private createLegacyOptionsGuideHeaderButton(
-    centerX: number,
+  // Applies the scroll rail metrics for a sheet body and returns them, or null
+  // (and clears any stale rail state) when the body fits.
+  private applyLegacySheetScroll(
+    bodyViewport: LegacySettingsRect,
+    contentHeight: number,
+    scrollable: boolean
+  ): LegacyOverlayScrollMetrics | null {
+    if (!scrollable) {
+      this.overlayScrollOffset = 0;
+      this.overlayScrollMax = 0;
+      this.overlayScrollContentHeight = 0;
+      this.overlayScrollTopFadeAlpha = 0;
+      this.overlayScrollBottomFadeAlpha = 0;
+      this.overlayScrollViewportBounds = null;
+      this.overlayScrollTrackBounds = null;
+      this.overlayScrollThumbBounds = null;
+      return null;
+    }
+    const metrics = resolveLegacyOverlayScrollMetrics({
+      contentHeight,
+      offset: this.overlayScrollOffset,
+      viewport: bodyViewport
+    });
+    this.applyLegacyOverlayScrollMetrics(metrics);
+    return metrics;
+  }
+
+  private paintLegacySettingsItem(
+    plan: LegacySettingsSheetPlan,
+    item: LegacySettingsPlanItem,
+    scrollOffset: number
+  ): void {
+    const model = item.model;
+    const rect = resolveLegacySettingsItemScreenRect(plan, item, scrollOffset);
+    const centerX = rect.left + (rect.width / 2);
+    const centerY = rect.top + (rect.height / 2);
+    const run = (): void => {
+      if (model.command !== null) {
+        this.runLegacySettingsCommand(model.command);
+      }
+    };
+
+    switch (model.kind) {
+      case 'heading':
+        this.createLegacySheetHeading(rect, model.label, item.stateFontSize);
+        return;
+      case 'action':
+        this.uiButtons.push(this.createLegacyAuthActionButton(
+          centerX,
+          centerY,
+          rect.width,
+          rect.height,
+          model.label,
+          run,
+          model.emphasis === 'primary'
+            ? 'primary'
+            : model.emphasis === 'danger'
+              ? 'danger'
+              : model.emphasis === 'danger-outline'
+                ? 'danger-outline'
+                : 'secondary'
+        ));
+        return;
+      case 'disclosure':
+        this.uiButtons.push(this.createLegacySheetDisclosureButton(
+          rect,
+          model.label,
+          run,
+          plan.settingsExpanded ? 'up' : 'down'
+        ));
+        return;
+      case 'nav':
+        this.uiButtons.push(this.createLegacySheetDisclosureButton(rect, model.label, run, 'right'));
+        return;
+      case 'slider':
+        this.uiButtons.push(this.createBoardZoomSliderRow({
+          height: rect.height,
+          label: model.label,
+          labelFontSize: item.labelFontSize,
+          stateFontSize: item.stateFontSize,
+          stateText: formatLegacyCameraZoomPercent(this.settings.camScale),
+          value: resolveLegacyCameraZoomPosition(this.settings.camScale),
+          width: rect.width,
+          x: centerX,
+          y: centerY
+        }));
+        return;
+      case 'toggle': {
+        const fieldId = model.settingKey as LegacyOverlayToggleFieldId;
+        const checked = resolveLegacyOverlayToggleSwitchIsOn(fieldId, this.settings);
+        this.uiButtons.push(this.createToggleSwitchRow({
+          checked,
+          item,
+          label: model.label,
+          onClick: () => this.applyOverlayToggleFieldChange(fieldId),
+          rect,
+          stateText: resolveLegacyOverlayToggleStateText(fieldId, checked)
+            ?? (checked ? (model.onLabel ?? '') : (model.offLabel ?? ''))
+        }));
+        return;
+      }
+    }
+  }
+
+  // Section heading ("DISPLAY", "ACCOUNT"): small caps label plus a hairline.
+  private createLegacySheetHeading(rect: LegacySettingsRect, copy: string, fontSize: number): void {
+    const centerY = rect.top + Math.round(rect.height / 2);
+    const label = this.padLegacyCompactUiText(this.add.text(rect.left - 8, centerY, copy.toUpperCase(), {
+      color: '#72e0bf',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${fontSize}px`
+    })).setOrigin(0, 0.5).setAlpha(0.9);
+    this.uiTexts.push(label);
+    this.overlayGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.32);
+    this.overlayGraphics.lineBetween(rect.left, rect.top + rect.height - 2, rect.left + rect.width, rect.top + rect.height - 2);
+  }
+
+  // Full-width secondary row with a trailing chevron: the Settings disclosure
+  // (down/up) in Pause and the How to play row (right) in both contexts.
+  private createLegacySheetDisclosureButton(
+    rect: LegacySettingsRect,
+    label: string,
+    onClick: () => void,
+    chevron: 'down' | 'right' | 'up'
+  ): UiButton {
+    const centerX = rect.left + (rect.width / 2);
+    const centerY = rect.top + (rect.height / 2);
+    const button = this.createLegacyAuthActionButton(
+      centerX,
+      centerY,
+      rect.width,
+      rect.height,
+      label,
+      onClick,
+      'secondary',
+      19
+    );
+    const graphics = this.add.graphics();
+    const chevronX = rect.left + rect.width - 24;
+    graphics.lineStyle(2, LEGACY_CYBER_PANEL_STROKE, 0.9);
+    graphics.beginPath();
+    if (chevron === 'right') {
+      graphics.moveTo(chevronX - 3, centerY - 6);
+      graphics.lineTo(chevronX + 3, centerY);
+      graphics.lineTo(chevronX - 3, centerY + 6);
+    } else {
+      const direction = chevron === 'up' ? -1 : 1;
+      graphics.moveTo(chevronX - 6, centerY - (3 * direction));
+      graphics.lineTo(chevronX, centerY + (3 * direction));
+      graphics.lineTo(chevronX + 6, centerY - (3 * direction));
+    }
+    graphics.strokePath();
+    const destroyButton = button.destroy;
+    button.destroy = () => {
+      graphics.destroy();
+      destroyButton();
+    };
+    return button;
+  }
+
+  // The labelled `Close` pill that replaces the bare chevron on the settings
+  // sheets. Routed through the same scene-level back handler (the invisible
+  // rect only provides hover/cursor feedback) so it is as reliable at the
+  // canvas edge as the chevron was.
+  private createOverlayClosePill(rect: LegacySettingsRect, label: string, onClick: () => void): UiButton {
+    const chrome = this.add.graphics();
+    const draw = (active: boolean): void => {
+      chrome.clear();
+      this.drawLegacyCyberPanel(chrome, {
+        active,
+        alpha: 0.96,
+        fill: 0x07131d,
+        height: rect.height,
+        left: rect.left,
+        radius: Math.round(rect.height / 2),
+        stroke: active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE,
+        strokeAlt: LEGACY_PLAY_TOUCH_BUTTON_STROKE,
+        top: rect.top,
+        width: rect.width
+      });
+    };
+    draw(false);
+    const centerX = rect.left + (rect.width / 2);
+    const centerY = rect.top + (rect.height / 2);
+    const text = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(
+      centerX,
+      resolveLegacyUiLabelCenterY(centerY, 16, 'button'),
+      label,
+      {
+        color: '#d7f7ee',
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: '16px'
+      }
+    )), rect.width - 8, 16, 14).setOrigin(0.5).setAlpha(0.96);
+    this.uiTexts.push(text);
+    chrome.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
+    text.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH + 1);
+    const background = this.add.rectangle(centerX, centerY, rect.width, rect.height, 0x000000, 0.001);
+    background.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
+    background.setInteractive({ useHandCursor: true });
+    background.on('pointerover', () => draw(true));
+    background.on('pointerout', () => draw(false));
+    this.overlayBackChevronAction = onClick;
+    this.overlayBackChevronBounds = createVisualRect(rect.left, rect.top, rect.width, rect.height);
+    return {
+      background,
+      bounds: this.overlayBackChevronBounds,
+      label: text,
+      setActive: draw,
+      text: label,
+      destroy: () => {
+        chrome.destroy();
+        background.destroy();
+        text.destroy();
+      }
+    };
+  }
+
+  // Text that wraps to `maxLines` and only then shrinks (never below
+  // `minFontSize`); it never merges a state word into the label.
+  private addLegacySheetWrappedText(
+    copy: string,
+    left: number,
     centerY: number,
     width: number,
-    height: number
-  ): UiButton {
-    // The card's header row can be shorter than the touch-target floor on
-    // compact widths (40px); grow only the invisible zone, centered on the row.
-    const hit = resolveLegacyMinHitRect({
-      height,
-      left: centerX - (width / 2),
-      top: centerY - (height / 2),
-      width
-    });
-    const background = this.add.rectangle(hit.centerX, hit.centerY, hit.width, hit.height, 0x000000, 0);
-    background.setInteractive({ useHandCursor: true });
-    const label = this.padLegacyUiText(this.add.text(centerX, centerY, '', {
+    color: string,
+    fontSize: number,
+    minFontSize: number,
+    maxLines: number,
+    options: { alpha?: number; bold?: boolean; originX?: number } = {}
+  ): Phaser.GameObjects.Text {
+    const text = this.padLegacyCompactUiText(this.add.text(left, centerY, copy, {
+      align: options.originX === 1 ? 'right' : 'left',
+      color,
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '1px',
-      color: MENU_TEXT_COLOR
-    })).setOrigin(0.5).setAlpha(0);
+      fontSize: `${fontSize}px`,
+      fontStyle: options.bold === true ? 'bold' : 'normal',
+      wordWrap: { useAdvancedWrap: true, width: Math.max(1, width - 16) }
+    })).setOrigin(options.originX ?? 0, 0.5).setAlpha(options.alpha ?? 0.96);
+    for (let size = fontSize; size >= minFontSize; size -= 1) {
+      text.setFontSize(size);
+      text.setWordWrapWidth(Math.max(1, width - 16), true);
+      if (text.getWrappedText().length <= maxLines && text.width <= width + 0.5) {
+        break;
+      }
+    }
+    this.uiTexts.push(text);
+    return text;
+  }
+
+  // Row geometry (label / state / switch columns) comes from the shared plan;
+  // the state word is its own element and the label wraps instead of shrinking.
+  private createToggleSwitchRow(input: {
+    checked: boolean;
+    item: LegacySettingsPlanItem;
+    label: string;
+    onClick: () => void;
+    rect: LegacySettingsRect;
+    stateText: string;
+  }): UiButton {
+    const { rect, item } = input;
+    const parts = item.parts;
+    const left = rect.left;
+    const top = rect.top;
+    const onColor = cyberArcadeMaterial.signal.player;
+    const offColor = cyberArcadeMaterial.rail.muted;
+    const accentColor = input.checked ? onColor : offColor;
+    const stateColor = toCyberArcadeCssHex(accentColor);
+    const accentBarWidth = 3;
+    const centerY = top + (rect.height / 2);
+
+    const panelGraphics = this.add.graphics();
+    const drawPanel = (active: boolean): void => {
+      panelGraphics.clear();
+      this.drawLegacyCyberPanel(panelGraphics, {
+        active,
+        alpha: input.checked ? 0.62 : 0.46,
+        fill: input.checked ? 0x0f2c22 : LEGACY_CYBER_PANEL_FILL,
+        height: rect.height,
+        left,
+        radius: 10,
+        stroke: accentColor,
+        top,
+        width: rect.width
+      });
+      panelGraphics.fillStyle(accentColor, input.checked ? 0.95 : 0.5);
+      panelGraphics.fillRoundedRect(left + 5, top + 6, accentBarWidth, rect.height - 12, accentBarWidth / 2);
+    };
+    drawPanel(false);
+
+    const background = this.add.rectangle(left + (rect.width / 2), centerY, rect.width, rect.height, 0x000000, 0);
+    background.setInteractive({ useHandCursor: true });
+
+    const label = this.addLegacySheetWrappedText(
+      input.label,
+      left + parts.label.left - 8,
+      centerY,
+      parts.label.width + 16,
+      toCyberArcadeCssHex(cyberArcadeMaterial.rail.white),
+      item.labelFontSize,
+      LEGACY_SETTINGS_SIZES.labelMinFontSize,
+      item.labelMaxLines
+    );
+    const stateRect = parts.state;
+    const stateLabel = stateRect === null
+      ? null
+      : this.addLegacySheetWrappedText(
+        input.stateText,
+        left + stateRect.left + stateRect.width + 8,
+        centerY,
+        stateRect.width + 16,
+        stateColor,
+        item.stateFontSize,
+        item.stateFontSize,
+        1,
+        { alpha: 1, bold: true, originX: 1 }
+      );
+
+    const switchRect = parts.switchControl ?? {
+      height: LEGACY_SETTINGS_SIZES.switchHeight,
+      left: rect.width - LEGACY_SETTINGS_SIZES.rowPadding - LEGACY_SETTINGS_SIZES.switchWidth,
+      top: Math.round((rect.height - LEGACY_SETTINGS_SIZES.switchHeight) / 2),
+      width: LEGACY_SETTINGS_SIZES.switchWidth
+    };
+    const trackWidth = switchRect.width;
+    const trackHeight = switchRect.height;
+    const trackX = left + switchRect.left + (trackWidth / 2);
+    const trackY = top + switchRect.top + (trackHeight / 2);
+    const trackGlow = this.add.ellipse(trackX, trackY, trackWidth + 10, trackHeight + 10, onColor, input.checked ? 0.16 : 0);
+    const track = this.add.ellipse(trackX, trackY, trackWidth, trackHeight, input.checked ? 0x0f2c22 : 0x050c11, 0.95);
+    track.setStrokeStyle(2, accentColor, input.checked ? 0.85 : 0.55);
+    const knobTravel = Math.round((trackWidth - trackHeight) / 2) - 1;
+    const knobRadius = Math.round((trackHeight - 6) / 2);
+    const knobX = trackX + (input.checked ? knobTravel : -knobTravel);
+    const knobGlow = this.add.circle(knobX, trackY, knobRadius + 4, onColor, input.checked ? 0.3 : 0);
+    // A layered "glass bead": soft drop shadow, base fill, then a specular
+    // crescent up-left -- legible in the OFF state against the dark track.
+    const knobGraphics = this.add.graphics();
+    knobGraphics.setPosition(knobX, trackY);
+    const drawKnob = (active: boolean): void => {
+      knobGraphics.clear();
+      const baseColor = input.checked ? onColor : cyberArcadeMaterial.rail.muted;
+      knobGraphics.fillStyle(0x000000, 0.35);
+      knobGraphics.fillCircle(1.4, 1.8, knobRadius);
+      knobGraphics.fillStyle(baseColor, 1);
+      knobGraphics.fillCircle(0, 0, knobRadius);
+      knobGraphics.fillStyle(cyberArcadeMaterial.rail.white, active ? 0.55 : 0.4);
+      knobGraphics.fillCircle(
+        -Math.round(knobRadius * 0.32),
+        -Math.round(knobRadius * 0.32),
+        Math.max(1, Math.round(knobRadius * 0.4))
+      );
+      knobGraphics.lineStyle(1, cyberArcadeMaterial.rail.white, input.checked ? 0.9 : 0.55);
+      knobGraphics.strokeCircle(0, 0, knobRadius);
+    };
+    drawKnob(false);
     let pressStart: { x: number; y: number } | null = null;
+
+    const setActive = (active: boolean): void => {
+      drawPanel(active);
+      track.setStrokeStyle(2, accentColor, active ? 1 : (input.checked ? 0.85 : 0.55));
+      trackGlow.setAlpha(input.checked ? (active ? 0.26 : 0.16) : 0);
+      drawKnob(active);
+      knobGraphics.setScale(active ? 1.1 : 1);
+      knobGlow.setAlpha(input.checked ? (active ? 0.42 : 0.3) : (active ? 0.14 : 0));
+      label.setAlpha(active ? 1 : 0.96);
+      stateLabel?.setAlpha(active ? 1 : 0.92);
+    };
+
+    background.on('pointerover', () => setActive(true));
+    background.on('pointerout', () => {
+      setActive(false);
+      pressStart = null;
+    });
     background.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       pressStart = { x: pointer.x, y: pointer.y };
     });
@@ -11849,60 +11265,305 @@ export class MenuScene extends Phaser.Scene {
       const dragDistance = Math.hypot(pointer.x - pressStart.x, pointer.y - pressStart.y);
       pressStart = null;
       if (dragDistance <= 8) {
-        this.overlayGuideExpanded = !this.overlayGuideExpanded;
-        this.uiDirty = true;
+        input.onClick();
       }
-    });
-    background.on('pointerout', () => {
-      pressStart = null;
     });
 
     return {
       background,
-      bounds: createVisualRect(hit.left, hit.top, hit.width, hit.height),
+      bounds: createVisualRect(left, top, rect.width, rect.height),
       label,
-      setActive: () => undefined,
-      text: 'Guide',
+      setActive,
+      text: input.label,
       destroy: () => {
         background.destroy();
+        panelGraphics.destroy();
         label.destroy();
+        stateLabel?.destroy();
+        trackGlow.destroy();
+        track.destroy();
+        knobGlow.destroy();
+        knobGraphics.destroy();
       }
     };
   }
 
-  private drawLegacyOptionsGuideGlyph(
-    kind: 'start' | 'end' | 'move',
-    centerX: number,
-    centerY: number,
-    size: number,
-    graphics: Phaser.GameObjects.Graphics = this.overlayGraphics
-  ): void {
-    if (kind === 'move') {
-      this.drawLegacyOptionsGuideMoveGlyph(graphics, centerX, centerY, size);
-      return;
+  // The Guide ("How to play"): one sheet for both menu and pause, painted from
+  // buildLegacyGuideSheetModel (legacyGuideContent.ts) and laid out by
+  // buildLegacyGuideSheetPlan. Icons call the board's own draw functions where
+  // the content module says they are shared (goal star, perimeter diamond).
+  private buildLegacyGuideSheetOverlay(context: LegacySettingsContext): void {
+    const model = buildLegacyGuideSheetModel(context, { hasKeyboard: this.resolveLegacyGuideHasKeyboard() });
+    const sizes = LEGACY_GUIDE_SHEET_SIZES;
+    const safeArea = readMazerViewportGeometry().safeArea;
+    const measure = (itemWidth: number): number[] => {
+      // Measure at the exact wrap width the painter uses: it passes the column width plus the
+      // 16 px text padding that addLegacySheetWrappedText and measureLegacySheetWrappedLines both subtract.
+      const copyWidth = Math.max(1, itemWidth - sizes.badgeSize - sizes.badgeTextGap) + 16;
+      const heights = model.rows.map((row) => resolveLegacyGuideRowHeight(
+        this.measureLegacySheetWrappedLines(row.text, copyWidth, sizes.copyFontSize)
+      ));
+      if (model.keyboardLine !== null) {
+        heights.push(resolveLegacyGuideKeyboardLineHeight(
+          this.measureLegacySheetWrappedLines(model.keyboardLine, itemWidth + 16, sizes.copyFontSize)
+        ));
+      }
+      return heights;
+    };
+    const planInput = { height: this.layout.height, safeArea, width: this.layout.width };
+    let plan = buildLegacyGuideSheetPlan({ ...planInput, itemHeights: measure(Number.MAX_SAFE_INTEGER) });
+    // Measure at the real column width (the rail gutter narrows it when the
+    // body scrolls), then re-plan from the real heights.
+    plan = buildLegacyGuideSheetPlan({ ...planInput, itemHeights: measure(plan.itemWidth) });
+    plan = buildLegacyGuideSheetPlan({ ...planInput, itemHeights: measure(plan.itemWidth) });
+    const heights = measure(plan.itemWidth);
+
+    this.overlayBoardZoomSliderBounds = null;
+    this.overlayMovementSpeedSliderBounds = null;
+    this.uiButtons.push(this.createOverlayClosePill(
+      plan.close.rect,
+      plan.close.label,
+      () => this.closeLegacyGuideSheet()
+    ));
+    this.drawLegacySheetCard(plan.card);
+    this.createOverlayTitle(plan.title.text, plan.title.centerY);
+    this.overlayGuideBounds = createVisualRect(plan.card.left, plan.card.top, plan.card.width, plan.card.height);
+
+    const scrollMetrics = this.applyLegacySheetScroll(plan.scrollRailViewport, plan.contentHeight, plan.scrollable);
+    const scrollOffset = scrollMetrics?.offset ?? 0;
+    const viewport = plan.bodyViewport;
+    const playerPalette = resolveLegacyProgressionPalette(this.progressionState.tracks.player, 'player');
+    const accentFor = (glyph: LegacyGuideGlyph): number => {
+      switch (glyph) {
+        case 'goal-star': return cyberArcadeMaterial.signal.goal;
+        case 'start-marker': return cyberArcadeMaterial.signal.start;
+        case 'player-block': return cyberArcadeMaterial.signal.player;
+        case 'touch-stick': return cyberArcadeMaterial.rail.mint;
+        case 'trail-swatch': return playerPalette.trailColor;
+        case 'edge-marker': return cyberArcadeMaterial.rail.cyan;
+        case 'level-numeral': return playerPalette.playerCoreColor;
+      }
+    };
+    // The body scrolls under a geometry mask (the guide is pure text and icons), so a row that is
+    // partly scrolled out is clipped at the viewport edge instead of vanishing.
+    let guideGraphics: Phaser.GameObjects.Graphics = this.overlayGraphics;
+    let guideMask: Phaser.Display.Masks.GeometryMask | null = null;
+    if (plan.scrollable) {
+      guideGraphics = this.add.graphics();
+      this.overlayGuideGraphics = guideGraphics;
+      const maskGraphics = this.make.graphics({ x: 0, y: 0 }, false);
+      maskGraphics.fillStyle(0xffffff, 1);
+      maskGraphics.fillRect(viewport.left, viewport.top, viewport.width, viewport.height);
+      guideMask = maskGraphics.createGeometryMask();
+      guideGraphics.setMask(guideMask);
+      this.overlayGuideMaskGraphics = maskGraphics;
+      this.overlayGuideMask = guideMask;
     }
-    // Was drawLegacyEndpointMarker -- a flat colored-in tile, a completely
-    // different shape from the soft circular glow the real start/goal
-    // markers actually render as in game (drawLegacyEndpointGlow). Per
-    // feedback that the Guide's icons don't match what the app actually
-    // shows: use the exact same glow now, so the legend always reflects
-    // reality and future changes to the real marker auto-propagate here.
-    this.drawLegacyEndpointGlow(
-      graphics,
-      { height: size * 2, left: centerX - size, top: centerY - size, width: size * 2 },
-      0.94,
-      kind === 'start' ? 'start' : 'goal'
-    );
+    const masked = <T extends Phaser.GameObjects.Text>(text: T): T => {
+      if (guideMask !== null) {
+        text.setMask(guideMask);
+      }
+      return text;
+    };
+    const itemVisible = (index: number): boolean => {
+      const top = viewport.top + (plan.itemTops[index] ?? 0) - scrollOffset;
+      const height = heights[index] ?? 0;
+      return top < viewport.top + viewport.height && top + height > viewport.top;
+    };
+
+    model.rows.forEach((row, index) => {
+      if (!itemVisible(index)) {
+        return;
+      }
+      const rowTop = viewport.top + (plan.itemTops[index] ?? 0) - scrollOffset;
+      const rowHeight = heights[index] ?? sizes.rowMinHeight;
+      const accent = accentFor(row.icon.glyph);
+      const badgeCenterX = viewport.left + (sizes.badgeSize / 2);
+      const badgeCenterY = rowTop + (rowHeight / 2);
+      this.drawLegacyGuideIcon(row.icon, badgeCenterX, badgeCenterY, accent, guideGraphics);
+      const textLeft = viewport.left + sizes.badgeSize + sizes.badgeTextGap;
+      const textWidth = Math.max(1, plan.itemWidth - sizes.badgeSize - sizes.badgeTextGap);
+      const copyLines = Math.max(1, Math.round((rowHeight - (sizes.rowPaddingY * 2) - sizes.headingLineHeight) / sizes.copyLineHeight));
+      const blockHeight = sizes.headingLineHeight + (copyLines * sizes.copyLineHeight);
+      const blockTop = rowTop + ((rowHeight - blockHeight) / 2);
+      masked(this.addLegacySheetWrappedText(
+        row.heading,
+        textLeft - 8,
+        blockTop + (sizes.headingLineHeight / 2),
+        textWidth + 16,
+        toCyberArcadeCssHex(accent),
+        sizes.headingFontSize,
+        sizes.headingFontSize,
+        1,
+        { alpha: 1, bold: true }
+      ));
+      masked(this.addLegacySheetWrappedText(
+        row.text,
+        textLeft - 8,
+        blockTop + sizes.headingLineHeight + ((copyLines * sizes.copyLineHeight) / 2),
+        textWidth + 16,
+        toCyberArcadeCssHex(cyberArcadeMaterial.rail.white),
+        sizes.copyFontSize,
+        sizes.copyFontSize,
+        copyLines + 1,
+        { alpha: 0.92 }
+      ));
+    });
+
+    if (model.keyboardLine !== null) {
+      const index = model.rows.length;
+      if (itemVisible(index)) {
+        const top = viewport.top + (plan.itemTops[index] ?? 0) - scrollOffset;
+        masked(this.addLegacySheetWrappedText(
+          model.keyboardLine,
+          viewport.left - 8,
+          top + ((heights[index] ?? 0) / 2),
+          plan.itemWidth + 16,
+          toCyberArcadeCssHex(cyberArcadeMaterial.rail.muted),
+          sizes.copyFontSize,
+          sizes.copyFontSize,
+          3,
+          { alpha: 0.92 }
+        ));
+      }
+    }
+
+    if (scrollMetrics !== null) {
+      this.drawLegacyOverlayScrollFacade(scrollMetrics);
+    }
+
+    this.uiButtons.push(this.createLegacyAuthActionButton(
+      plan.footer.left + (plan.footer.width / 2),
+      plan.footer.top + (plan.footer.height / 2),
+      plan.footer.width,
+      plan.footer.height,
+      model.closeLabel,
+      () => this.closeLegacyGuideSheet(),
+      'primary'
+    ));
   }
 
-  // A miniature version of the real floating movement stick (ring + knob,
-  // same color language as drawLegacyPlayTouchStick) instead of a bespoke
-  // arrow-cross glyph that looked nothing like the actual on-screen
-  // control -- same "Guide should reflect reality" fix as the start/goal
-  // glow above. Genuinely re-rendering the real stick at legend-icon scale
-  // isn't practical (its own geometry is derived from the live viewport
-  // size, not a size parameter), so this hand-draws the same shape/colors
-  // at the small scale instead of sharing the draw call directly.
+  private closeLegacyGuideSheet(): void {
+    if (!this.settingsGuideOpen) {
+      return;
+    }
+    this.settingsGuideOpen = false;
+    this.overlayGuideBounds = null;
+    this.resetLegacyOverlayScrollState();
+    this.uiDirty = true;
+  }
+
+  private resolveLegacyGuideHasKeyboard(): boolean {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+    try {
+      return window.matchMedia('(pointer: fine)').matches && window.matchMedia('(hover: hover)').matches;
+    } catch {
+      return false;
+    }
+  }
+
+  private measureLegacySheetWrappedLines(copy: string, width: number, fontSize: number): number {
+    const probe = this.add.text(0, 0, copy, {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${fontSize}px`,
+      wordWrap: { useAdvancedWrap: true, width: Math.max(1, Math.min(width, 4096) - 16) }
+    });
+    const lines = probe.getWrappedText().length;
+    probe.destroy();
+    return Math.max(1, lines);
+  }
+
+  // Icon badge + glyph for one guide row. Each glyph names the draw function it
+  // shares with the board (legacyGuideContent.ts `boardDraw`):
+  //   goal-star / start-marker -> drawBoardMarkers via the Phaser graphics adapter (shared)
+  //   trail-swatch -> chip tiles from computeChipGeometry (shared geometry); level-numeral -> the wordmark chip draw
+  //   edge-marker  -> drawEdgeMarker (shared)
+  //   touch-stick / player-block -> guide-local
+  //   miniatures of the same shapes and tokens (see the status/reasonId there).
+  private drawLegacyGuideIcon(
+    icon: LegacyGuideIconSpec,
+    centerX: number,
+    centerY: number,
+    accentColor: number,
+    graphics: Phaser.GameObjects.Graphics
+  ): void {
+    const badgeRadius = LEGACY_GUIDE_SHEET_SIZES.badgeSize / 2;
+    if (icon.badge === 'square') {
+      const half = badgeRadius * 0.92;
+      // Rounded at the legacy inset radius (9) so the square badges sit in the
+      // same corner language as the sheet's inner keyline did.
+      graphics.fillStyle(accentColor, 0.16);
+      graphics.fillRoundedRect(centerX - half, centerY - half, half * 2, half * 2, 9);
+      graphics.lineStyle(1.2, accentColor, 0.7);
+      graphics.strokeRoundedRect(centerX - half, centerY - half, half * 2, half * 2, 9);
+    } else {
+      graphics.fillStyle(accentColor, 0.16);
+      graphics.fillCircle(centerX, centerY, badgeRadius);
+      graphics.lineStyle(1.2, accentColor, 0.7);
+      graphics.strokeCircle(centerX, centerY, badgeRadius);
+    }
+
+    switch (icon.glyph) {
+      case 'goal-star':
+        this.drawLegacyGuideBoardMarker(graphics, 'goal', centerX, centerY, Math.round(badgeRadius * 1.5));
+        return;
+      case 'start-marker':
+        this.drawLegacyGuideBoardMarker(graphics, 'start', centerX, centerY, Math.round(badgeRadius * 1.5));
+        return;
+      case 'player-block':
+        this.drawLegacyOptionsGuidePlayerGlyph(graphics, centerX, centerY, badgeRadius * 1.5);
+        return;
+      case 'touch-stick':
+        this.drawLegacyOptionsGuideMoveGlyph(graphics, centerX, centerY, badgeRadius * 0.9);
+        return;
+      case 'trail-swatch':
+        this.drawLegacyOptionsGuideTrailGlyph(graphics, centerX, centerY, badgeRadius);
+        return;
+      case 'edge-marker':
+        drawEdgeMarker(
+          graphics,
+          { id: 1, inwardAngle: Math.PI / 2, isCorner: false, side: 'top', x: centerX, y: centerY },
+          { alpha: 0.95, energized: false, energy: 0, flash: 0, hidden: false, id: 1, spinRad: 0 }
+        );
+        return;
+      case 'level-numeral': {
+        // The same dot-matrix chip renderer the level announcer and wordmarks use, at icon scale.
+        const word = String(this.progressionState.tracks.player.level);
+        const columns = resolveLegacyGlyphWordLayout(word, 0, 0, 1).columns;
+        const cellSize = clamp(Math.floor((badgeRadius * 2 - 3) / Math.max(7, columns)), 2, 5);
+        const layout = resolveLegacyGlyphWordLayout(word, centerX, centerY, cellSize);
+        this.drawLegacyGlyphWordTileBlock(graphics, layout, 0, 1, 1, false);
+        return;
+      }
+    }
+  }
+
+  // The player's rounded-square core at guide scale: same corner/accent
+  // constants and the player.core token as fillLegacyPlayerMarkerTile (which is
+  // bound to the board's dynamic graphics and glow canvas, so it cannot be
+  // called from a sheet).
+  private drawLegacyOptionsGuidePlayerGlyph(
+    graphics: Phaser.GameObjects.Graphics,
+    centerX: number,
+    centerY: number,
+    tileSize: number
+  ): void {
+    const half = (tileSize * LEGACY_PLAY_PLAYER_MARKER_SQUARE_FILL_RATIO) / 2;
+    const coreColor = resolveLegacyIridescentPlayerCoreColor(0);
+    const cornerRadius = tileSize * LEGACY_PLAY_PLAYER_MARKER_CORNER_RADIUS_RATIO;
+    graphics.fillStyle(LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_COLOR, 0.22);
+    graphics.fillCircle(centerX, centerY, tileSize * 0.5);
+    graphics.fillStyle(coreColor, 0.96);
+    graphics.fillRoundedRect(centerX - half, centerY - half, half * 2, half * 2, cornerRadius);
+    graphics.lineStyle(Math.max(1, tileSize * LEGACY_PLAY_PLAYER_MARKER_STROKE_RATIO), LEGACY_PLAY_PLAYER_MARKER_ACCENT_COLOR, 0.86);
+    graphics.strokeRoundedRect(centerX - half, centerY - half, half * 2, half * 2, cornerRadius);
+  }
+
+  // A miniature of the real floating movement stick (ring + knob, same colors
+  // as drawLegacyPlayTouchStick). That draw derives its geometry from the live
+  // viewport, so it cannot be called at icon scale; this is guide-local.
   private drawLegacyOptionsGuideMoveGlyph(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
@@ -11921,11 +11582,54 @@ export class MenuScene extends Phaser.Scene {
     graphics.strokeCircle(centerX, centerY, knobRadius);
   }
 
-  // Literally one real corridor tile, filled with the player's own trail
-  // color instead of a bespoke swatch shape -- same "guide reflects
-  // reality" rule as the start/exit/move rows: this is the actual material
-  // drawLegacyPathMaterialTile paints the maze with, just recolored to the
-  // player's trail palette and rendered as a single isolated cell.
+  // Chip tile under a Guide marker icon (single cell), then the marker itself drawn by the board's own
+  // drawBoardMarkers through the Phaser graphics adapter. Static: reduced motion, no ring pulse.
+  private drawLegacyGuideBoardMarker(
+    graphics: Phaser.GameObjects.Graphics,
+    kind: 'start' | 'goal',
+    centerX: number,
+    centerY: number,
+    size: number
+  ): void {
+    const left = centerX - (size / 2);
+    const top = centerY - (size / 2);
+    this.drawLegacyGuideChipCells(graphics, [[true]], 1, 1, left, top, size, [{ column: 0, row: 0 }]);
+    const context = new PhaserGraphicsTileContext(graphics);
+    drawBoardMarkers(context, {
+      style: this.boardTileStyle,
+      tileSize: size,
+      devicePixelRatio: this.resolveBoardTileBackingScale(),
+      originX: left,
+      originY: top,
+      start: kind === 'start' ? { x: 0, y: 0 } : undefined,
+      goal: kind === 'goal' ? { x: 0, y: 0 } : undefined,
+      phase: 0,
+      reducedMotion: true
+    });
+  }
+
+  // Board-coloured chip cells for Guide swatches: the same computeChipGeometry the board bake uses.
+  private drawLegacyGuideChipCells(
+    graphics: Phaser.GameObjects.Graphics,
+    grid: boolean[][],
+    columns: number,
+    rows: number,
+    left: number,
+    top: number,
+    cellSize: number,
+    cells: Array<{ column: number; row: number }>
+  ): void {
+    const geometry = resolveChipGridGeometry({ grid, columns, rows, left, top, cellSize });
+    const colors = this.boardTileStyle === 'trace'
+      ? { rim: boardMaterial.channelBorder, fill: boardMaterial.channel }
+      : { rim: boardMaterial.rim, fill: boardMaterial.chip };
+    for (const cell of cells) {
+      drawChipCell(graphics, geometry, left, top, cell.column, cell.row, colors, 1);
+    }
+  }
+
+  // Trail legend: three chip tiles in an L (the board's own tile geometry) with a trail line in the
+  // player's trail colour over a dark underlay, the same layering the board trail uses.
   private drawLegacyOptionsGuideTrailGlyph(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
@@ -11933,170 +11637,32 @@ export class MenuScene extends Phaser.Scene {
     badgeRadius: number
   ): void {
     const trailPalette = resolveLegacyProgressionPalette(this.progressionState.tracks.player, 'player');
-    const tileSize = Math.round(badgeRadius * 1.5);
-    this.drawLegacyPathMaterialTile(
-      graphics,
-      { x: 0, y: 0 },
-      { grid: [[true]], height: 1, width: 1 },
-      centerX - (tileSize / 2),
-      centerY - (tileSize / 2),
-      tileSize,
-      {
-        coreAlpha: 0.95,
-        coreColor: mixLegacyIridescentColor(LEGACY_PLAY_PATH_CORE, trailPalette.trailColor, 1),
-        drawCue: false,
-        edgeAlpha: LEGACY_PLAY_PATH_EDGE_ALPHA,
-        edgeColor: mixLegacyIridescentColor(LEGACY_PLAY_PATH_EDGE, trailPalette.trailColor, 1)
-      }
-    );
-  }
-
-  private shouldShowLegacyAdvancedOptions(): boolean {
-    return resolveLegacyAdvancedOptionsVisible(typeof window === 'undefined' ? '' : window.location.search);
-  }
-
-  // Pause card (legacyPauseMenuView.ts): title, Resume, a collapsible
-  // Settings section (collapsed on every open) and Quit to Menu on one
-  // near-black card in the shared overlay palette. No profile/account entry and
-  // no Guide. Resume / Quit keep the existing "bridge first, then
-  // applyLegacyPauseCommand" paths, so the board stays held while paused and
-  // Quit to Menu is the existing return-menu command. All actions are at least
-  // 44px tall. When Settings is open on a short viewport only the toggle rows
-  // scroll (existing overlay scroll metrics); the three actions stay put.
-  private buildPauseOverlay(): void {
-    const panel = this.resolveOverlayPanelFrame();
-    const view = buildLegacyPauseMenuViewModel();
-    const safeArea = readMazerViewportGeometry().safeArea;
-    const expanded = this.pauseSettingsExpanded;
-    const collapsed = resolveLegacyPauseMenuLayout(this.layout.width, this.layout.height, safeArea);
-    const rowsPanel: OverlayPanelFrame = {
-      centerX: collapsed.centerX,
-      height: 0,
-      left: collapsed.cardLeft + collapsed.cardPadding - 28,
-      top: 0,
-      width: collapsed.cardWidth - (collapsed.cardPadding * 2) + 56
-    };
-    const rowsContentHeight = this.resolveFeatureControlRowsContentHeight(rowsPanel, {
-      includeControlStyle: false,
-      includeMovementSpeed: false
-    });
-    const card = resolveLegacyPauseMenuLayout(this.layout.width, this.layout.height, safeArea, {
-      settingsContentHeight: rowsContentHeight,
-      settingsExpanded: expanded
-    });
-    const actionLabel = (id: 'resume' | 'settings' | 'quit-to-menu'): string => (
-      view.actions.find((action) => action.id === id)?.label ?? id
-    );
-    const resumePause = (): void => this.dispatchUiBridgeCommand({ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume'));
-
-    // Back chevron stays the standard overlay exit and is an alias for Resume.
-    this.uiButtons.push(this.createOverlayBackChevronButton(panel, resumePause));
-
-    this.drawLegacyCyberPanel(this.overlayGraphics, {
-      alpha: 0.96,
-      // bg.canvas (near-black) rather than bg.panel: the card is the only
-      // surface on the dimmed board, so it should read as the darkest layer.
-      fill: cyberArcadeMaterial.substrate.field,
-      height: card.cardHeight,
-      left: card.cardLeft,
-      radius: LEGACY_UI_CONTROL_RADIUS + 4,
-      stroke: LEGACY_CYBER_PANEL_STROKE,
-      top: card.cardTop,
-      width: card.cardWidth
-    });
-
-    const buttonWidth = card.cardWidth - (card.cardPadding * 2);
-    let cursorY = card.cardTop + card.cardPadding;
-    this.createOverlayTitle(view.title, cursorY + Math.round(card.titleHeight / 2));
-    cursorY += card.titleHeight + (card.compact ? 14 : 16);
-
-    this.uiButtons.push(this.createLegacyAuthActionButton(
-      card.centerX,
-      cursorY + (card.actionHeight / 2),
-      buttonWidth,
-      card.actionHeight,
-      actionLabel('resume'),
-      resumePause,
-      'primary'
-    ));
-    cursorY += card.actionHeight + card.actionGap;
-
-    const settingsCenterY = cursorY + (card.actionHeight / 2);
-    const settingsButton = this.createLegacyAuthActionButton(
-      card.centerX,
-      settingsCenterY,
-      buttonWidth,
-      card.actionHeight,
-      actionLabel('settings'),
-      () => {
-        this.pauseSettingsExpanded = !this.pauseSettingsExpanded;
-        this.resetLegacyOverlayScrollState();
-        this.uiDirty = true;
-      },
-      'secondary'
-    );
-    // Disclosure chevron (down = collapsed, up = expanded) on the button's
-    // right. Its own Graphics so it sits above the button chrome, and it is
-    // destroyed together with the button on every rebuild.
-    const chevron = this.add.graphics();
-    const chevronX = card.centerX + (buttonWidth / 2) - 24;
-    const chevronDirection = expanded ? -1 : 1;
-    chevron.lineStyle(2, LEGACY_CYBER_PANEL_STROKE, 0.9);
-    chevron.beginPath();
-    chevron.moveTo(chevronX - 6, settingsCenterY - (3 * chevronDirection));
-    chevron.lineTo(chevronX, settingsCenterY + (3 * chevronDirection));
-    chevron.lineTo(chevronX + 6, settingsCenterY - (3 * chevronDirection));
-    chevron.strokePath();
-    const destroySettingsButton = settingsButton.destroy;
-    settingsButton.destroy = () => {
-      chevron.destroy();
-      destroySettingsButton();
-    };
-    this.uiButtons.push(settingsButton);
-    cursorY += card.actionHeight + card.actionGap;
-
-    if (expanded) {
-      const clipped = Math.max(0, card.naturalCardHeight - card.cardHeight);
-      const rowsViewportHeight = Math.max(
-        card.actionHeight,
-        rowsContentHeight - clipped
-      );
-      const viewport = createVisualRect(card.cardLeft + card.cardPadding, cursorY, buttonWidth, rowsViewportHeight);
-      let scrollOffset = 0;
-      let renderViewport: VisualRect | null = null;
-      let scrollMetrics: LegacyOverlayScrollMetrics | null = null;
-      if (card.scrollable) {
-        scrollMetrics = resolveLegacyOverlayScrollMetrics({
-          contentHeight: rowsContentHeight,
-          offset: this.overlayScrollOffset,
-          viewport: this.visualRectToLegacyOverlayScrollRect(viewport)
-        });
-        this.applyLegacyOverlayScrollMetrics(scrollMetrics);
-        renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);
-        scrollOffset = scrollMetrics.offset;
-      }
-      this.createFeatureControlRows(cursorY, rowsPanel, {
-        includeControlStyle: false,
-        includeMovementSpeed: false,
-        rightGutter: card.scrollable ? LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER : 0,
-        scrollOffset,
-        viewport: renderViewport
-      });
-      if (scrollMetrics !== null) {
-        this.drawLegacyOverlayScrollFacade(scrollMetrics);
-      }
-      cursorY += rowsViewportHeight + card.actionGap;
+    const cellSize = Math.max(6, Math.round(badgeRadius * 0.85));
+    const left = Math.round(centerX - cellSize);
+    const top = Math.round(centerY - cellSize);
+    const grid = [[true, false], [true, true]];
+    this.drawLegacyGuideChipCells(graphics, grid, 2, 2, left, top, cellSize, [
+      { column: 0, row: 0 },
+      { column: 0, row: 1 },
+      { column: 1, row: 1 }
+    ]);
+    const points = [
+      { x: left + (cellSize * 0.5), y: top + (cellSize * 0.5) },
+      { x: left + (cellSize * 0.5), y: top + (cellSize * 1.5) },
+      { x: left + (cellSize * 1.5), y: top + (cellSize * 1.5) }
+    ];
+    const coreWidth = Math.max(2, cellSize * LEGACY_PLAY_TRAIL_WIDTH_RATIO);
+    for (const [width, color, alpha] of [
+      [coreWidth + (2 * LEGACY_TRAIL_UNDERLAY_PAD_CSS), boardMaterial.void, LEGACY_TRAIL_UNDERLAY_ALPHA],
+      [coreWidth, trailPalette.trailColor, 1]
+    ] as const) {
+      graphics.lineStyle(width, color, alpha);
+      graphics.beginPath();
+      graphics.moveTo(points[0]!.x, points[0]!.y);
+      graphics.lineTo(points[1]!.x, points[1]!.y);
+      graphics.lineTo(points[2]!.x, points[2]!.y);
+      graphics.strokePath();
     }
-
-    this.uiButtons.push(this.createLegacyAuthActionButton(
-      card.centerX,
-      cursorY + (card.actionHeight / 2),
-      buttonWidth,
-      card.actionHeight,
-      actionLabel('quit-to-menu'),
-      () => this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')),
-      'secondary'
-    ));
   }
 
   // Leaderboard overlay: the scene only paints the plan built from the pure
@@ -12299,48 +11865,182 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  // Reset progress confirmation, painted from the pure flow in
+  // legacyProgressionResetFlow.ts: step 1 is the confirm card (level shown,
+  // one consequence line, Cancel first and default, the destructive button
+  // armed after LEGACY_PROGRESSION_RESET_ARM_DELAY_MS); step 2 is the result
+  // (working, done, failed or blocked) on the same card. Back, Escape and
+  // Cancel all route through handleBackAction, which returns to the sheet the
+  // confirm was opened from (Settings, Account or Pause).
   private buildProgressionResetConfirmationOverlay(): void {
+    const state = this.progressionResetState;
+    if (state.phase === 'idle' || state.phase === 'cancelled') {
+      this.uiDirty = true;
+      return;
+    }
     const panel = this.resolveOverlayPanelFrame();
     const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const buttonHeight = compact ? 44 : 48;
-    const buttonWidth = Math.min(panel.width - 72, compact ? 240 : 280);
-    const bodyWidth = Math.min(panel.width - 72, compact ? 300 : 440);
-    const bodyY = panel.top + (compact ? 138 : 156);
-    const actionY = panel.top + panel.height - (compact ? 72 : 84);
+    const sizes = LEGACY_SETTINGS_SIZES;
+    const copy = LEGACY_PROGRESSION_RESET_COPY;
+    const cardPadding = compact ? sizes.cardPaddingCompact : sizes.cardPaddingRegular;
+    const titleHeight = compact ? sizes.titleHeightCompact : sizes.titleHeightRegular;
+    const titleGap = compact ? sizes.titleGapCompact : sizes.titleGapRegular;
+    const cardWidth = Math.min(compact ? 360 : 400, Math.max(1, panel.width - (compact ? 16 : 48)));
+    const innerWidth = cardWidth - (cardPadding * 2);
+    const bodyFontSize = 16;
+    const bodyLineHeight = 22;
+    const levelLineHeight = 40;
+    const blockGap = 16;
+    const buttonHeight = sizes.actionHeight;
+    const buttonGap = sizes.sectionGap;
 
-    this.createOverlayTitle('Reset Progress?', panel.top + (compact ? 52 : 58));
-    const body = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(panel.centerX, bodyY, 'This resets your rank progress, score, runs, and maze level to the starting baseline, including the menu AI\'s progression.', {
-      align: 'center',
-      color: '#d9fff5',
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${compact ? 16 : 18}px`,
-      wordWrap: { width: bodyWidth }
-    })), bodyWidth, compact ? 16 : 18, 13).setOrigin(0.5, 0.5);
-    this.uiTexts.push(body);
+    const confirmView = state.phase === 'confirm' || state.phase === 'working'
+      ? buildLegacyProgressionResetConfirmView(state, this.time.now)
+      : null;
+    const statusLine = state.phase === 'blocked' || state.phase === 'done' || state.phase === 'failed'
+      ? resolveLegacyProgressionResetStatusLine(state)
+      : null;
+    const bodyCopy = confirmView?.consequence ?? statusLine ?? '';
+    const levelLine = confirmView?.levelLine
+      ?? (state.phase === 'failed' ? `Level ${state.level} → Level 1` : null);
+    const title = confirmView?.title ?? copy.menuButton;
+    const bodyLines = this.measureLegacySheetWrappedLines(bodyCopy, innerWidth, bodyFontSize);
+    const buttonCount = confirmView === null ? 1 : 2;
+    const contentHeight = (levelLine === null ? 0 : levelLineHeight + 8)
+      + (bodyLines * bodyLineHeight)
+      + blockGap
+      + (buttonCount * buttonHeight)
+      + ((buttonCount - 1) * buttonGap);
+    const headerReserve = 46 + (compact ? 6 : 8);
+    const availableHeight = Math.max(1, panel.height - headerReserve);
+    const cardHeight = Math.min(availableHeight, (cardPadding * 2) + titleHeight + titleGap + contentHeight);
+    const cardLeft = Math.round(panel.centerX - (cardWidth / 2));
+    const cardTop = Math.round(panel.top + headerReserve + ((availableHeight - cardHeight) / 2));
 
-    // Route through the same resolver Escape/back-chevron use so Cancel and
-    // the back action can never disagree about where this overlay returns.
-    // Confirm keeps its own explicit destination (openOverlay('pause') in
-    // resetLegacyPlayerProgression) independent of this routing.
-    const cancel = (): void => this.handleBackAction();
-    const confirm = (): void => {
-      if (!this.uiBridge || !this.uiBridge.dispatch({ type: 'RESET_PROGRESS' }).ok) {
-        this.resetLegacyPlayerProgression();
-      }
+    this.drawLegacySheetCard({ height: cardHeight, left: cardLeft, top: cardTop, width: cardWidth });
+    this.createOverlayTitle(title, cardTop + cardPadding + Math.round(titleHeight / 2));
+
+    let cursorY = cardTop + cardPadding + titleHeight + titleGap;
+    if (levelLine !== null) {
+      this.addLegacySheetWrappedText(
+        levelLine,
+        panel.centerX,
+        cursorY + (levelLineHeight / 2),
+        innerWidth,
+        '#ecfff5',
+        28,
+        20,
+        1,
+        { alpha: 1, bold: true, originX: 0.5 }
+      );
+      cursorY += levelLineHeight + 8;
+    }
+    const bodyColor = state.phase === 'failed' || state.phase === 'blocked'
+      ? '#ffb4c4'
+      : state.phase === 'done' ? '#72e0bf' : '#d9fff5';
+    const body = this.addLegacySheetWrappedText(
+      bodyCopy,
+      panel.centerX,
+      cursorY + ((bodyLines * bodyLineHeight) / 2),
+      innerWidth,
+      bodyColor,
+      bodyFontSize,
+      14,
+      bodyLines + 1,
+      { alpha: 0.96, originX: 0.5 }
+    );
+    body.setAlign('center');
+    cursorY += (bodyLines * bodyLineHeight) + blockGap;
+
+    const buttonLeftCenter = cardLeft + (cardWidth / 2);
+    const addButton = (
+      label: string,
+      tone: 'danger' | 'primary',
+      onClick: () => void,
+      disabled: boolean
+    ): void => {
+      this.uiButtons.push(this.createLegacyAuthActionButton(
+        buttonLeftCenter,
+        cursorY + (buttonHeight / 2),
+        innerWidth,
+        buttonHeight,
+        label,
+        onClick,
+        tone,
+        undefined,
+        { disabled }
+      ));
+      cursorY += buttonHeight + buttonGap;
     };
-    if (compact) {
-      const width = Math.floor((buttonWidth - 12) / 2);
-      this.uiButtons.push(
-        this.createButton(panel.centerX - (width / 2) - 6, actionY, width, buttonHeight, 'Cancel', cancel),
-        this.createButton(panel.centerX + (width / 2) + 6, actionY, width, buttonHeight, 'Confirm', confirm)
+
+    if (confirmView !== null) {
+      const [cancelButton, confirmButton] = confirmView.buttons;
+      addButton(cancelButton.label, 'primary', () => this.handleBackAction(), state.phase === 'working');
+      addButton(
+        state.phase === 'working' ? copy.working : confirmButton.label,
+        'danger',
+        () => this.confirmLegacyProgressionReset(),
+        !confirmButton.enabled
       );
       return;
     }
-
-    this.uiButtons.push(
-      this.createButton(panel.centerX, actionY - 28, buttonWidth, buttonHeight, 'Confirm Reset', confirm),
-      this.createButton(panel.centerX, actionY + 30, buttonWidth, buttonHeight, 'Cancel', cancel)
+    addButton(
+      state.phase === 'done' ? copy.doneButton : copy.close,
+      'primary',
+      () => this.handleBackAction(),
+      false
     );
+  }
+
+  private confirmLegacyProgressionReset(): void {
+    const next = reduceLegacyProgressionReset(this.progressionResetState, { nowMs: this.time.now, type: 'confirm' });
+    if (next.phase !== 'working') {
+      // Not armed yet (or already working): a ghost/double tap does nothing.
+      return;
+    }
+    this.progressionResetState = next;
+    this.uiDirty = true;
+    if (!this.uiBridge || !this.uiBridge.dispatch({ type: 'RESET_PROGRESS' }).ok) {
+      void this.resetLegacyPlayerProgression();
+    }
+  }
+
+  private resolveLegacyProgressionResetStrategy(): LegacyProgressionResetStrategy {
+    return resolveLegacyProgressionResetStrategy({
+      online: typeof navigator === 'undefined' || navigator.onLine !== false,
+      remoteProgressionEnabled: isLegacyRemoteProgressionEnabled(),
+      sessionPending: this.authGateAwaitingResolution,
+      userId: isLegacyRemoteAccountProviderEligible(this.authSnapshot) ? this.authSnapshot.userId : null
+    });
+  }
+
+  private reduceLegacyProgressionResetState(event: LegacyProgressionResetEvent): void {
+    const next = reduceLegacyProgressionReset(this.progressionResetState, event);
+    if (next !== this.progressionResetState) {
+      this.progressionResetState = next;
+      this.uiDirty = true;
+    }
+  }
+
+  // Enters the confirm flow. Called from openOverlay('confirm-progression-reset')
+  // so every entry point (Settings row, Account link, QA/bridge) shares the
+  // same strategy, run-active guard and arm timer.
+  private requestLegacyProgressionReset(): void {
+    this.progressionResetState = reduceLegacyProgressionReset(INITIAL_LEGACY_PROGRESSION_RESET_STATE, {
+      level: this.progressionState.tracks.player.level,
+      nowMs: this.time.now,
+      runActive: this.mode === 'play',
+      strategy: this.resolveLegacyProgressionResetStrategy(),
+      type: 'request'
+    });
+    if (this.progressionResetState.phase === 'confirm') {
+      // Redraw once the destructive button arms.
+      this.time.delayedCall(LEGACY_PROGRESSION_RESET_ARM_DELAY_MS + 40, () => {
+        if (this.overlay === 'confirm-progression-reset') {
+          this.uiDirty = true;
+        }
+      });
+    }
   }
 
   private buildAuthOverlay(): void {
@@ -12965,10 +12665,12 @@ export class MenuScene extends Phaser.Scene {
     height: number,
     text: string,
     onClick: () => void,
-    tone: 'primary' | 'secondary' | 'danger',
-    fontSizeOverride?: number
+    tone: 'primary' | 'secondary' | 'danger' | 'danger-outline',
+    fontSizeOverride?: number,
+    options: { disabled?: boolean } = {}
   ): UiButton {
     const chrome = this.add.graphics();
+    const explicitlyDisabled = options.disabled === true;
     const unifiedAuthDockButton = this.overlay === 'auth' && (tone === 'primary' || tone === 'danger');
     const unifiedAuthPrimary = unifiedAuthDockButton && tone === 'primary';
     const unifiedAuthDanger = unifiedAuthDockButton && tone === 'danger';
@@ -12985,7 +12687,11 @@ export class MenuScene extends Phaser.Scene {
       ? { fill: 0x063a28, stroke: LEGACY_PLAY_TOUCH_ACCENT, text: '#ecfff5' }
       : tone === 'danger'
         ? { fill: 0x260f1a, stroke: cyberArcadeMaterial.signal.goal, text: '#ffdce6' }
-        : { fill: 0x07131d, stroke: LEGACY_PLAY_TOUCH_BUTTON_STROKE, text: '#d7f7ee' };
+        : tone === 'danger-outline'
+          // Outline-only danger: the dark field with a red edge, no maroon fill,
+          // so it reads as a lesser alarm than the filled Sign out button.
+          ? { fill: 0x07131d, stroke: cyberArcadeMaterial.signal.goal, text: '#ffdce6' }
+          : { fill: 0x07131d, stroke: LEGACY_PLAY_TOUCH_BUTTON_STROKE, text: '#d7f7ee' };
     const draw = (active: boolean): void => {
       chrome.clear();
       if (unifiedAuthDockButton) {
@@ -13029,8 +12735,8 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
       this.drawLegacyCyberPanel(chrome, {
-        active: active || tone === 'primary',
-        alpha: 1,
+        active: !explicitlyDisabled && (active || tone === 'primary'),
+        alpha: explicitlyDisabled ? 0.42 : 1,
         fill: colors.fill,
         height,
         left: x - (width / 2),
@@ -13044,7 +12750,8 @@ export class MenuScene extends Phaser.Scene {
     draw(false);
 
     const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);
-    if (!unifiedAuthDisabled) {
+    const inert = unifiedAuthDisabled || explicitlyDisabled;
+    if (!inert) {
       background.setInteractive({ useHandCursor: true });
     }
     const fontSize = fontSizeOverride ?? (unifiedAuthDockButton ? 19 : Math.max(15, Math.min(22, Math.round(height * 0.4))));
@@ -13059,17 +12766,17 @@ export class MenuScene extends Phaser.Scene {
         fontStyle: unifiedAuthDockButton ? '600' : 'normal',
         letterSpacing: unifiedAuthDockButton ? fontSize * 0.01 : 0
       }
-    )), width - 32, fontSize, 12).setOrigin(0.5).setAlpha(unifiedAuthDisabled ? 0.68 : 0.96);
+    )), width - 32, fontSize, 12).setOrigin(0.5).setAlpha(explicitlyDisabled ? 0.45 : (unifiedAuthDisabled ? 0.68 : 0.96));
     this.uiTexts.push(label);
 
     const setActive = (active: boolean): void => {
-      if (unifiedAuthDisabled) {
+      if (inert) {
         return;
       }
       draw(active);
       label.setAlpha(active ? 1 : 0.96);
     };
-    if (!unifiedAuthDisabled) {
+    if (!inert) {
       background.on('pointerover', () => setActive(true));
       background.on('pointerout', () => setActive(false));
       background.on('pointerdown', onClick);
@@ -13323,210 +13030,11 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private createFeatureControlRows(
-    y: number,
-    panel: OverlayPanelFrame,
-    options: {
-      includeBoardZoom?: boolean;
-      includeControlStyle?: boolean;
-      includeMovementSpeed?: boolean;
-      rightGutter?: number;
-      scrollOffset?: number;
-      showDescriptions?: boolean;
-      viewport?: VisualRect | null;
-    } = {}
-  ): number {
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const left = panel.left + 28;
-    const width = panel.width - 56 - (options.rightGutter ?? 0);
-    const showDescriptions = options.showDescriptions === true;
-    const controlLayout = resolveLegacyFeatureControlLayout(panel.width, showDescriptions);
-    const rowHeight = controlLayout.rowHeight;
-    const rowGap = controlLayout.rowGap;
-    const sectionHeaderHeight = stacked ? 18 : 20;
-    const sectionHeaderGap = stacked ? 5 : 6;
-    const sectionGap = stacked ? 12 : 14;
-    const scrollOffset = options.scrollOffset ?? 0;
-    const viewport = options.viewport ?? null;
-    const toRenderY = (contentY: number): number => contentY - scrollOffset;
-    const isVisible = (centerY: number, height: number): boolean => (
-      viewport === null || (
-        centerY - (height / 2) >= viewport.top + 2
-        && centerY + (height / 2) <= viewport.bottom - 2
-      )
-    );
-    const controls: Array<{
-      checked: boolean;
-      description: string;
-      label: string;
-      offLabel: string;
-      onClick: () => void;
-      onLabel: string;
-      // Which section this row renders under -- filtered below by tag
-      // instead of by array position, so reordering this list can never
-      // silently move a row into the wrong section.
-      section: 'controls' | 'display';
-      stateText: string;
-    }> = [
-      // Control Style (arrows vs stick) used to live here -- now that play
-      // touch movement is always the floating stick that spawns wherever
-      // the player touches down (see playFloatingStickOrigin), there's only
-      // one control scheme, so a toggle between two options no longer means
-      // anything to surface.
-      {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
-        description: this.settings.toggleTrailFade
-          ? 'Old trail fades.'
-          : 'Trail stays.',
-        label: 'Trail Fade',
-        offLabel: 'Off',
-        onClick: () => this.applyOverlayToggleFieldChange('toggleTrailFade'),
-        onLabel: 'On',
-        section: 'display',
-        stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'
-      },
-      {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
-        description: this.settings.toggleTrailPulse
-          ? 'Slow white shine.'
-          : 'No trail shine.',
-        label: 'Trail Shine',
-        offLabel: 'Off',
-        onClick: () => this.applyOverlayToggleFieldChange('toggleTrailPulse'),
-        onLabel: 'On',
-        section: 'display',
-        stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'
-      },
-      {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
-        description: this.settings.toggleAnimatedBackdrop
-          ? 'Moving background.'
-          : 'Background still.',
-        label: 'Animated Background',
-        offLabel: 'Still',
-        onClick: () => this.applyOverlayToggleFieldChange('toggleAnimatedBackdrop'),
-        onLabel: 'Animated',
-        section: 'display',
-        stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Still'
-      }
-    ];
-    // Control Style only matters once a game is actually in progress -- the
-    // main-menu Settings overlay (as opposed to in-game Pause) hides it so
-    // players aren't shown a played-game setting before they've played.
-    const includeControlStyle = options.includeControlStyle !== false;
-    const controlsSection = controls.filter((control) => (
-      control.section === 'controls' && (includeControlStyle || control.label !== 'Control Style')
-    ));
-    const displaySection = controls.filter((control) => control.section === 'display');
-    const includeBoardZoom = options.includeBoardZoom !== false;
-    const hasControlsSection = controlsSection.length > 0 || options.includeMovementSpeed === true;
-
-    const addSectionHeading = (copy: string, contentTop: number): number => {
-      const centerY = contentTop + Math.round(sectionHeaderHeight / 2);
-      const renderY = toRenderY(centerY);
-      if (isVisible(renderY, sectionHeaderHeight)) {
-        const label = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(left, renderY, copy.toUpperCase(), {
-          color: '#72e0bf',
-          fontFamily: LEGACY_UI_FONT_FAMILY,
-          fontSize: `${stacked ? 11 : 12}px`
-        })), width, stacked ? 11 : 12, 10).setOrigin(0, 0.5).setAlpha(0.9);
-        this.uiTexts.push(label);
-        this.overlayGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.32);
-        this.overlayGraphics.lineBetween(left, renderY + Math.round(sectionHeaderHeight / 2), left + width, renderY + Math.round(sectionHeaderHeight / 2));
-      }
-      return contentTop + sectionHeaderHeight + sectionHeaderGap;
-    };
-
-    const addToggleRow = (control: typeof controls[number], contentTop: number): number => {
-      const rowCenterY = contentTop + Math.round(rowHeight / 2);
-      const renderY = toRenderY(rowCenterY);
-      if (isVisible(renderY, rowHeight)) {
-        this.uiButtons.push(
-          this.createToggleSwitchRow({
-            checked: control.checked,
-            compact: stacked,
-            description: showDescriptions ? control.description : undefined,
-            label: control.label,
-            offLabel: control.offLabel,
-            onClick: control.onClick,
-            onLabel: control.onLabel,
-            stateText: control.stateText,
-            x: left + Math.round(width / 2),
-            y: renderY,
-            width,
-            height: rowHeight
-          })
-        );
-      }
-      return contentTop + rowHeight;
-    };
-
-    let contentTop = y + (stacked ? 4 : 6);
-    if (hasControlsSection) {
-      contentTop = addSectionHeading('Controls', contentTop);
-      controlsSection.forEach((control, index) => {
-        contentTop = addToggleRow(control, contentTop);
-        if (index < controlsSection.length - 1 || options.includeMovementSpeed === true) {
-          contentTop += rowGap;
-        }
-      });
-
-      if (options.includeMovementSpeed === true) {
-        const sliderY = contentTop + Math.round(rowHeight / 2);
-        const sliderRenderY = toRenderY(sliderY);
-        if (isVisible(sliderRenderY, rowHeight)) {
-          this.uiButtons.push(
-            this.createMovementSpeedSliderRow({
-              height: rowHeight,
-              label: 'Move Speed',
-              stateText: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
-              value: normalizeLegacyMovementSpeed(this.settings.movementSpeed),
-              x: left + Math.round(width / 2),
-              y: sliderRenderY,
-              width
-            })
-          );
-        }
-        contentTop += rowHeight;
-      }
-
-      contentTop += sectionGap;
-    }
-    contentTop = addSectionHeading('Display', contentTop);
-    if (includeBoardZoom) {
-      const sliderY = contentTop + Math.round(rowHeight / 2);
-      const sliderRenderY = toRenderY(sliderY);
-      if (isVisible(sliderRenderY, rowHeight)) {
-        this.uiButtons.push(
-          this.createBoardZoomSliderRow({
-            height: rowHeight,
-            label: 'Board Zoom',
-            stateText: formatLegacyCameraZoomPercent(this.settings.camScale),
-            value: resolveLegacyCameraZoomPosition(this.settings.camScale),
-            x: left + Math.round(width / 2),
-            y: sliderRenderY,
-            width
-          })
-        );
-      }
-      contentTop += rowHeight;
-      if (displaySection.length > 0) {
-        contentTop += rowGap;
-      }
-    }
-    displaySection.forEach((control, index) => {
-      contentTop = addToggleRow(control, contentTop);
-      if (index < displaySection.length - 1) {
-        contentTop += rowGap;
-      }
-    });
-
-    return contentTop + 4;
-  }
-
   private createBoardZoomSliderRow(input: {
     height: number;
     label: string;
+    labelFontSize?: number;
+    stateFontSize?: number;
     stateText: string;
     value: number;
     width: number;
@@ -13541,17 +13049,17 @@ export class MenuScene extends Phaser.Scene {
     background.setInteractive({ useHandCursor: true });
     this.overlayBoardZoomSliderBounds = createVisualRect(left, input.y - (input.height / 2), input.width, input.height);
 
-    const labelFontSize = Math.max(16, Math.min(20, Math.round(input.height * 0.3)));
-    const stateFontSize = Math.max(11, Math.min(13, Math.round(input.height * 0.2)));
+    const labelFontSize = input.labelFontSize ?? Math.max(16, Math.min(20, Math.round(input.height * 0.3)));
+    const stateFontSize = input.stateFontSize ?? Math.max(11, Math.min(13, Math.round(input.height * 0.2)));
     const labelY = resolveLegacyUiLabelCenterY(input.y - Math.round(input.height * 0.2), labelFontSize, 'toggle-title');
     const trackY = input.y + Math.round(input.height * 0.23);
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(left + 16, labelY, input.label, {
+    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(left + 4, labelY, input.label, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${labelFontSize}px`,
       color: '#ecfff5'
-    })), input.width - 100, labelFontSize, 11).setOrigin(0, 0.5).setAlpha(0.94);
+    })), input.width - 100, labelFontSize, LEGACY_SETTINGS_SIZES.labelMinFontSize).setOrigin(0, 0.5).setAlpha(0.94);
 
-    const stateLabel = this.padLegacyUiText(this.add.text(left + input.width - 16, labelY, input.stateText, {
+    const stateLabel = this.padLegacyUiText(this.add.text(left + input.width - 4, labelY, input.stateText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${stateFontSize}px`,
       color: '#72e0bf'
@@ -13630,318 +13138,6 @@ export class MenuScene extends Phaser.Scene {
         knob.destroy();
       }
     };
-  }
-
-  // Toggle rows are drawn as their own rounded cyber-panel (matching the
-  // Quick Play card's chrome) with a left accent bar that reads ON/OFF at a
-  // glance, instead of the old plain flat rectangle. The interactive hit
-  // target stays a separate invisible Rectangle on top so pointer events
-  // work exactly as before -- Phaser's Rectangle game object can't have
-  // rounded corners, so the visual panel is a Graphics draw redone on every
-  // hover/press state change instead of a fillStyle() call.
-  private createToggleSwitchRow(input: {
-    checked: boolean;
-    compact: boolean;
-    description?: string;
-    height: number;
-    label: string;
-    offLabel: string;
-    onClick: () => void;
-    onLabel: string;
-    stateText: string;
-    width: number;
-    x: number;
-    y: number;
-  }): UiButton {
-    const left = input.x - (input.width / 2);
-    const top = input.y - (input.height / 2);
-    const onColor = cyberArcadeMaterial.signal.player;
-    const offColor = cyberArcadeMaterial.rail.muted;
-    const accentColor = input.checked ? onColor : offColor;
-    const stateColor = input.checked ? toCyberArcadeCssHex(onColor) : toCyberArcadeCssHex(offColor);
-    const hasDescription = Boolean(input.description);
-    const uiLayout = resolveLegacyToggleRowLayout(input.width, input.height, hasDescription, input.compact);
-    const accentBarWidth = 3;
-    const rowPaddingX = uiLayout.rowPaddingX;
-    const trackWidth = uiLayout.trackWidth + 4;
-    const trackHeight = uiLayout.trackHeight + 2;
-    const trackX = left + input.width - rowPaddingX - Math.round(trackWidth / 2);
-    const trackLeft = trackX - Math.round(trackWidth / 2);
-    const trackGap = uiLayout.trackGap;
-    const showStateLabel = uiLayout.showStateLabel;
-    const stateLaneWidth = uiLayout.stateLaneWidth;
-    const stateLabelRight = trackLeft - trackGap;
-    const labelX = left + rowPaddingX + accentBarWidth;
-    const labelRight = showStateLabel
-      ? stateLabelRight - stateLaneWidth - trackGap
-      : stateLabelRight - trackGap;
-    const labelMaxWidth = Math.max(54, labelRight - labelX);
-    const titleY = resolveLegacyUiLabelCenterY(
-      input.y + (hasDescription ? -Math.round(input.height * 0.2) : 0),
-      uiLayout.labelFontSize,
-      'toggle-title'
-    );
-    const displayStateText = input.stateText || (input.checked ? input.onLabel : input.offLabel);
-    const labelCandidates = resolveLegacyToggleLabelCandidates(input.label, displayStateText, showStateLabel);
-
-    const panelGraphics = this.add.graphics();
-    const drawPanel = (active: boolean): void => {
-      panelGraphics.clear();
-      this.drawLegacyCyberPanel(panelGraphics, {
-        active,
-        alpha: input.checked ? 0.62 : 0.46,
-        fill: input.checked ? 0x0f2c22 : LEGACY_CYBER_PANEL_FILL,
-        height: input.height,
-        left,
-        radius: 10,
-        stroke: accentColor,
-        top,
-        width: input.width
-      });
-      panelGraphics.fillStyle(accentColor, input.checked ? 0.95 : 0.5);
-      panelGraphics.fillRoundedRect(left + 5, top + 6, accentBarWidth, input.height - 12, accentBarWidth / 2);
-    };
-    drawPanel(false);
-
-    const background = this.add.rectangle(input.x, input.y, input.width, input.height, 0x000000, 0);
-    background.setInteractive({ useHandCursor: true });
-
-    const label = this.fitLegacyUiTextCandidatesToWidth(this.padLegacyUiText(this.add.text(labelX, titleY, labelCandidates[0] ?? '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${uiLayout.labelFontSize}px`,
-      color: toCyberArcadeCssHex(cyberArcadeMaterial.rail.white)
-    })), labelCandidates, labelMaxWidth, uiLayout.labelFontSize, LEGACY_UI_MIN_BODY_FONT_SIZE).setOrigin(0, 0.5).setAlpha(0.96);
-
-    const stateLabel = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(stateLabelRight, titleY, displayStateText || input.stateText, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${uiLayout.stateFontSize}px`,
-      fontStyle: 'bold',
-      color: stateColor
-    })), stateLaneWidth, uiLayout.stateFontSize, 9)
-      .setOrigin(1, 0.5)
-      .setAlpha(showStateLabel ? 1 : 0)
-      .setVisible(showStateLabel);
-    this.uiTexts.push(label);
-    if (showStateLabel) {
-      this.uiTexts.push(stateLabel);
-    }
-
-    const descriptionFontSize = Math.max(9, Math.min(10, Math.round(input.height * 0.16)));
-    const descriptionMaxWidth = Math.max(72, labelRight - labelX);
-    const description = hasDescription
-      ? this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(labelX, input.y + Math.round(input.height * 0.18), input.description!, {
-        color: toCyberArcadeCssHex(cyberArcadeMaterial.rail.muted),
-        fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: `${descriptionFontSize}px`
-      })), descriptionMaxWidth, descriptionFontSize, 9, 0.9)
-        .setOrigin(0, 0.5)
-        .setAlpha(0.88)
-      : null;
-    if (description) {
-      this.uiTexts.push(description);
-    }
-
-    // Soft glow ring behind the track when ON -- a second, larger, low-alpha
-    // ellipse instead of a real blur filter (canvas renderer has none).
-    const trackGlow = this.add.ellipse(trackX, titleY, trackWidth + 10, trackHeight + 10, onColor, input.checked ? 0.16 : 0);
-    const track = this.add.ellipse(trackX, titleY, trackWidth, trackHeight, input.checked ? 0x0f2c22 : 0x050c11, 0.95);
-    track.setStrokeStyle(2, accentColor, input.checked ? 0.85 : 0.55);
-    const knobTravel = Math.round((trackWidth - trackHeight) / 2) - 1;
-    const knobRadius = Math.round((trackHeight - 6) / 2);
-    const knobX = trackX + (input.checked ? knobTravel : -knobTravel);
-    const knobGlow = this.add.circle(knobX, titleY, knobRadius + 4, onColor, input.checked ? 0.3 : 0);
-    // A layered "glass bead" instead of a single flat-filled circle: a soft
-    // drop shadow offset low-right for depth, a base fill, then a bright
-    // specular highlight crescent up-left -- the same lit-gem language as
-    // the title, Start button, and header badges, and legible in the OFF
-    // state (a plain rail.edge fill there used to read as nearly invisible
-    // against the dark track).
-    const knobGraphics = this.add.graphics();
-    knobGraphics.setPosition(knobX, titleY);
-    const drawKnob = (active: boolean): void => {
-      knobGraphics.clear();
-      const baseColor = input.checked ? onColor : cyberArcadeMaterial.rail.muted;
-      knobGraphics.fillStyle(0x000000, 0.35);
-      knobGraphics.fillCircle(1.4, 1.8, knobRadius);
-      knobGraphics.fillStyle(baseColor, 1);
-      knobGraphics.fillCircle(0, 0, knobRadius);
-      knobGraphics.fillStyle(cyberArcadeMaterial.rail.white, active ? 0.55 : 0.4);
-      knobGraphics.fillCircle(
-        -Math.round(knobRadius * 0.32),
-        -Math.round(knobRadius * 0.32),
-        Math.max(1, Math.round(knobRadius * 0.4))
-      );
-      knobGraphics.lineStyle(1, cyberArcadeMaterial.rail.white, input.checked ? 0.9 : 0.55);
-      knobGraphics.strokeCircle(0, 0, knobRadius);
-    };
-    drawKnob(false);
-    let pressStart: { x: number; y: number } | null = null;
-
-    const setActive = (active: boolean): void => {
-      drawPanel(active);
-      track.setStrokeStyle(2, accentColor, active ? 1 : (input.checked ? 0.85 : 0.55));
-      trackGlow.setAlpha(input.checked ? (active ? 0.26 : 0.16) : 0);
-      drawKnob(active);
-      knobGraphics.setScale(active ? 1.1 : 1);
-      knobGlow.setAlpha(input.checked ? (active ? 0.42 : 0.3) : (active ? 0.14 : 0));
-      label.setAlpha(active ? 1 : 0.96);
-      stateLabel.setAlpha(active ? 1 : 0.92);
-    };
-
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => {
-      setActive(false);
-      pressStart = null;
-    });
-    background.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      pressStart = { x: pointer.x, y: pointer.y };
-    });
-    background.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      if (pressStart === null) {
-        return;
-      }
-      const dragDistance = Math.hypot(pointer.x - pressStart.x, pointer.y - pressStart.y);
-      pressStart = null;
-      if (dragDistance <= 8) {
-        input.onClick();
-      }
-    });
-
-    return {
-      background,
-      bounds: createVisualRect(left, top, input.width, input.height),
-      label,
-      setActive,
-      text: input.label,
-      destroy: () => {
-        background.destroy();
-        panelGraphics.destroy();
-        label.destroy();
-        stateLabel.destroy();
-        description?.destroy();
-        trackGlow.destroy();
-        track.destroy();
-        knobGlow.destroy();
-        knobGraphics.destroy();
-      }
-    };
-  }
-
-  private createMovementSpeedSliderRow(input: {
-    height: number;
-    label: string;
-    stateText: string;
-    value: number;
-    width: number;
-    x: number;
-    y: number;
-  }): UiButton {
-    const left = input.x - (input.width / 2);
-    const rowFill = LEGACY_CYBER_PANEL_FILL;
-    const rowStroke = LEGACY_PLAY_TOUCH_BUTTON_STROKE;
-    const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, 0.5);
-    background.setStrokeStyle(1, rowStroke, 0.38);
-    background.setInteractive({ useHandCursor: true });
-    this.overlayMovementSpeedSliderBounds = createVisualRect(left, input.y - (input.height / 2), input.width, input.height);
-
-    const labelFontSize = Math.max(16, Math.min(20, Math.round(input.height * 0.3)));
-    const stateFontSize = Math.max(11, Math.min(13, Math.round(input.height * 0.2)));
-    const labelY = resolveLegacyUiLabelCenterY(input.y - Math.round(input.height * 0.2), labelFontSize, 'toggle-title');
-    const trackY = input.y + Math.round(input.height * 0.23);
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(left + 16, labelY, input.label, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${labelFontSize}px`,
-      color: '#ecfff5'
-    })), input.width - 100, labelFontSize, 11).setOrigin(0, 0.5).setAlpha(0.94);
-
-    const stateLabel = this.padLegacyUiText(this.add.text(left + input.width - 16, labelY, input.stateText, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${stateFontSize}px`,
-      color: '#72e0bf'
-    })).setOrigin(1, 0.5).setAlpha(0.92);
-    this.uiTexts.push(label, stateLabel);
-
-    const trackLeft = left + 16;
-    const trackRight = left + input.width - 16;
-    const trackWidth = Math.max(44, trackRight - trackLeft);
-    const normalizedValue = quantizeLegacyMovementSpeed(input.value);
-    const track = this.add.rectangle(
-      trackLeft + Math.round(trackWidth / 2),
-      trackY,
-      trackWidth,
-      6,
-      0x07131d,
-      0.86
-    );
-    track.setStrokeStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.46);
-    const fill = this.add.rectangle(
-      trackLeft + Math.round((trackWidth * normalizedValue) / 2),
-      trackY,
-      Math.max(4, Math.round(trackWidth * normalizedValue)),
-      6,
-      LEGACY_PLAY_TOUCH_ACCENT,
-      0.72
-    );
-    const knob = this.add.circle(
-      trackLeft + Math.round(trackWidth * normalizedValue),
-      trackY,
-      8,
-      LEGACY_PLAY_TOUCH_ACCENT,
-      0.98
-    );
-    knob.setStrokeStyle(1, 0xecfff5, 0.72);
-
-    const commitPointerSpeed = (pointerX: number): void => {
-      const nextSpeed = quantizeLegacyMovementSpeed((pointerX - trackLeft) / trackWidth);
-      this.applyLegacyMovementSpeed(nextSpeed);
-    };
-
-    const setActive = (active: boolean): void => {
-      background.setFillStyle(rowFill, active ? 0.7 : 0.5);
-      background.setStrokeStyle(1, LEGACY_PLAY_TOUCH_ACCENT, active ? 0.72 : 0.38);
-      track.setStrokeStyle(1, LEGACY_PLAY_TOUCH_ACCENT, active ? 0.75 : 0.46);
-      knob.setScale(active ? 1.08 : 1);
-      label.setAlpha(active ? 1 : 0.94);
-      stateLabel.setAlpha(active ? 1 : 0.92);
-    };
-
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.overlayScrollGestureLockPointerId = this.normalizeLegacyPlayTouchPointerId(pointer.id) ?? -1;
-      this.releaseOverlayScrollPointer();
-      commitPointerSpeed(pointer.x);
-    });
-    background.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (pointer.isDown) {
-        commitPointerSpeed(pointer.x);
-      }
-    });
-
-    return {
-      background,
-      bounds: createVisualRect(left, input.y - (input.height / 2), input.width, input.height),
-      label,
-      setActive,
-      text: input.label,
-      destroy: () => {
-        background.destroy();
-        label.destroy();
-        stateLabel.destroy();
-        track.destroy();
-        fill.destroy();
-        knob.destroy();
-      }
-    };
-  }
-
-  private selectOverlayField(fieldId: LegacyOptionFieldId): void {
-    if (this.activeInputField && this.activeInputField !== fieldId) {
-      this.commitOverlayField(this.activeInputField);
-    }
-
-    this.activeInputField = fieldId;
-    this.uiDirty = true;
   }
 
   private selectLegacyAuthField(
@@ -14619,113 +13815,6 @@ export class MenuScene extends Phaser.Scene {
     this.uiTexts.push(label);
   }
 
-  private createInputRow(
-    label: string,
-    fieldId: LegacyOptionFieldId,
-    y: number,
-    panel: OverlayPanelFrame
-  ): number {
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const labelX = panel.left + 28;
-    const rowLabel = this.padLegacyUiText(this.add.text(labelX, y, label, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: stacked ? '20px' : '22px',
-      color: '#ecfff5'
-    })).setOrigin(0, 0.5);
-
-    this.uiTexts.push(rowLabel);
-    this.createInputFieldBox(
-      stacked ? panel.centerX : panel.left + Math.round(panel.width * 0.72),
-      stacked ? y + 34 : y,
-      stacked ? panel.width - 56 : Math.min(188, Math.round(panel.width * 0.38)),
-      44,
-      fieldId,
-      this.optionFieldDrafts[fieldId]
-    );
-
-    return y + (stacked ? 82 : 58);
-  }
-
-  private createColorInputRow(
-    label: string,
-    fieldIds: [LegacyOptionFieldId, LegacyOptionFieldId, LegacyOptionFieldId],
-    y: number,
-    panel: OverlayPanelFrame,
-    color: { r: number; g: number; b: number }
-  ): number {
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const swatch = linearColorToHex(color);
-
-    const rowLabel = this.padLegacyUiText(this.add.text(panel.left + 28, y, label, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '20px',
-      color: '#ecfff5'
-    })).setOrigin(0, 0.5);
-    const swatchLabel = this.padLegacyUiText(this.add.text(panel.left + panel.width - 72, y, swatch, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: stacked ? '16px' : '18px',
-      color: swatch
-    })).setOrigin(0.5);
-
-    this.uiTexts.push(rowLabel, swatchLabel);
-    const startX = stacked ? panel.left + 58 : panel.left + Math.round(panel.width * 0.46);
-    const spacing = stacked ? Math.round((panel.width - 116) / 2) : 122;
-    const inputY = stacked ? y + 38 : y;
-    const channelLabelY = stacked ? y + 14 : y - 24;
-
-    for (const [index, fieldId] of fieldIds.entries()) {
-      const caption = this.padLegacyUiText(this.add.text(startX + (spacing * index), channelLabelY, ['R', 'G', 'B'][index] ?? '', {
-        fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: '14px',
-        color: '#72e0bf'
-      })).setOrigin(0.5);
-      this.uiTexts.push(caption);
-      this.createInputFieldBox(
-        startX + (spacing * index),
-        inputY,
-        stacked ? 84 : 100,
-        42,
-        fieldId,
-        this.optionFieldDrafts[fieldId]
-      );
-    }
-
-    return y + (stacked ? 92 : 82);
-  }
-
-  private createInputFieldBox(
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    fieldId: LegacyOptionFieldId,
-    value: string
-  ): void {
-    const isActive = this.activeInputField === fieldId;
-    const background = this.add.rectangle(x, y, width, height, LEGACY_CYBER_PANEL_FILL, isActive ? 0.76 : 0.5);
-    background.setStrokeStyle(2, isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, isActive ? 0.95 : 0.42);
-    background.setInteractive({ useHandCursor: true });
-    background.on('pointerdown', () => this.selectOverlayField(fieldId));
-
-    const label = this.padLegacyUiText(this.add.text(x, y, value, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${Math.max(14, Math.min(20, Math.round(height * 0.36)))}px`,
-      color: isActive ? '#72e0bf' : '#ecfff5'
-    })).setOrigin(0.5);
-
-    this.uiButtons.push({
-      background,
-      bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height),
-      label,
-      setActive: () => undefined,
-      text: fieldId,
-      destroy: () => {
-        background.destroy();
-        label.destroy();
-      }
-    });
-  }
-
   private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton {
     const size = Math.max(
       cyberArcadeMaterial.controls.minimumTouchTarget,
@@ -15377,6 +14466,11 @@ export class MenuScene extends Phaser.Scene {
 
   private openOverlay(kind: OverlayKind): void {
     const previousOverlay = this.overlay;
+    this.settingsGuideOpen = false;
+    this.overlayGuideBounds = null;
+    if (previousOverlay === 'confirm-progression-reset' && kind !== 'confirm-progression-reset') {
+      this.progressionResetState = INITIAL_LEGACY_PROGRESSION_RESET_STATE;
+    }
     if (previousOverlay === 'auth' && kind !== 'auth') {
       // Leaving Account for anything else (not just an explicit close) must
       // tear down its native DOM input first -- otherwise it stays mounted
@@ -15422,9 +14516,12 @@ export class MenuScene extends Phaser.Scene {
     this.overlay = kind;
     this.overlayReturn =
       (kind === 'auth' && (previousOverlay === 'pause' || previousOverlay === 'options'))
-      || (kind === 'confirm-progression-reset' && (previousOverlay === 'pause' || previousOverlay === 'auth'))
+      || (kind === 'confirm-progression-reset' && (previousOverlay === 'pause' || previousOverlay === 'auth' || previousOverlay === 'options'))
         ? previousOverlay
         : 'none';
+    if (kind === 'confirm-progression-reset') {
+      this.requestLegacyProgressionReset();
+    }
     this.titleGraphics.setVisible(false);
     this.boardDynamicDirty = true;
     this.uiDirty = true;
@@ -15435,6 +14532,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private closeOverlay(): void {
+    this.settingsGuideOpen = false;
+    this.overlayGuideBounds = null;
+    if (this.overlay === 'confirm-progression-reset') {
+      this.progressionResetState = INITIAL_LEGACY_PROGRESSION_RESET_STATE;
+    }
     if (this.overlay === 'options' || this.overlay === 'pause') {
       this.commitAllOverlayFields();
     }
@@ -15533,12 +14635,62 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private resetLegacyPlayerProgression(): void {
-    const baseline = createEmptyLegacyProgressionState();
-    this.progressionState = writeLegacyProgressionState(this.resolveLegacyProgressionStorage(), {
-      ...baseline,
-      updatedAt: new Date().toISOString()
-    });
+  // Server-first reset of the account's maze progression (levels and maze
+  // progress for the player AND the menu-AI track; never account, profile,
+  // credentials, username or device settings). For a signed-in account with
+  // remote progression on, the mazer_reset_progression RPC must land BEFORE
+  // anything local changes: load-time reconciliation takes the per-track MAX of
+  // local and remote, so a local-only reset would be silently restored. If the
+  // server call fails, local progression is left exactly as it was and the
+  // sheet shows the failure. Guests (or remote progression off) reset this
+  // device's own key only.
+  private async resetLegacyPlayerProgression(): Promise<boolean> {
+    const strategy = this.resolveLegacyProgressionResetStrategy();
+    if (strategy.kind === 'blocked') {
+      this.reduceLegacyProgressionResetState({ failure: 'network', type: 'failed' });
+      return false;
+    }
+    const snapshot = { ...this.authSnapshot };
+    const sequence = this.authAccountHydrationSequence;
+
+    if (strategy.kind === 'server-first') {
+      let result: LegacyRemoteProgressionSyncResult | null = null;
+      try {
+        result = await writeLegacyRemoteProgressionState(snapshot, this.progressionState, undefined, 'replace');
+      } catch (error) {
+        this.publishLegacyRemoteSyncException('progression', error);
+      }
+      if (result !== null) {
+        this.publishLegacyRemoteSyncResult(result);
+      }
+      if (result === null || !result.synced) {
+        this.reduceLegacyProgressionResetState({ failure: classifyLegacyProgressionResetFailure(result), type: 'failed' });
+        return false;
+      }
+    }
+
+    // Local effects use the keys of the account the reset was requested for,
+    // even if the session changed while the RPC was in flight.
+    const storage = this.resolveBrowserLocalStorage();
+    const effects = storage
+      ? applyLegacyProgressionResetLocalEffects(
+        storage,
+        (keyBase) => resolveLegacyAuthScopedStorageKey(keyBase, snapshot),
+        new Date().toISOString()
+      )
+      : { ok: false, state: createEmptyLegacyProgressionState() };
+    if (!isLegacyRemoteCompletionContextCurrent(snapshot, sequence, this.authSnapshot, this.authAccountHydrationSequence)) {
+      this.progressionResetState = INITIAL_LEGACY_PROGRESSION_RESET_STATE;
+      this.uiDirty = true;
+      return strategy.kind === 'server-first';
+    }
+    if (!effects.ok && strategy.kind === 'local-only') {
+      this.reduceLegacyProgressionResetState({ failure: 'unknown', type: 'failed' });
+      return false;
+    }
+
+    this.progressionState = effects.state;
+    this.loadPersistedMazeCycleTelemetryHistory();
     this.resetLegacyWorldTurnHost();
     this.setLatestOverlayMessage(createLegacyPlayerMessage({
       copy: 'Progression reset.',
@@ -15546,11 +14698,12 @@ export class MenuScene extends Phaser.Scene {
       source: 'progression',
       tone: 'success'
     }));
-    this.syncLegacyRemoteProgressionState('replace');
-    this.openOverlay('pause');
     this.boardDynamicDirty = true;
+    this.uiDirty = true;
     this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+    this.reduceLegacyProgressionResetState({ type: 'succeeded' });
+    return true;
   }
 
   private applyOverlayToggleFieldChange(fieldId: LegacyOverlayToggleFieldId): void {
@@ -15584,26 +14737,6 @@ export class MenuScene extends Phaser.Scene {
       this.boardDynamicDirty = true;
     }
 
-    this.uiDirty = true;
-    if (this.mode === 'play') {
-      this.publishInteractionDiagnostics();
-    }
-  }
-
-  private applyLegacyMovementSpeed(speed: number): void {
-    const currentSpeed = quantizeLegacyMovementSpeed(this.settings.movementSpeed);
-    const nextSpeed = quantizeLegacyMovementSpeed(speed);
-    if (currentSpeed === nextSpeed) {
-      return;
-    }
-
-    const nextSettings = copyLegacySettings(this.settings);
-    nextSettings.movementSpeed = nextSpeed;
-    this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), nextSettings);
-    this.syncLegacyRemoteSettings();
-    if (this.playHeldTouchMoves.length > 0 && this.playHeldTouchRepeatTimer !== null) {
-      this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
-    }
     this.uiDirty = true;
     if (this.mode === 'play') {
       this.publishInteractionDiagnostics();
@@ -16156,43 +15289,6 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
-  private syncLegacyRemoteProgressionState(mode: 'replace'): void {
-    const syncAuthSnapshot = { ...this.authSnapshot };
-    const syncAuthSequence = this.authAccountHydrationSequence;
-    const syncProgressionStorage = this.resolveLegacyProgressionStorage();
-    void writeLegacyRemoteProgressionState(syncAuthSnapshot, this.progressionState, undefined, mode)
-      .then((result) => {
-        if (!isLegacyRemoteCompletionContextCurrent(
-          syncAuthSnapshot,
-          syncAuthSequence,
-          this.authSnapshot,
-          this.authAccountHydrationSequence
-        )) {
-          return;
-        }
-        if (result.progressionState) {
-          this.progressionState = writeLegacyProgressionState(
-            syncProgressionStorage,
-            result.progressionState
-          );
-          this.boardDynamicDirty = true;
-          this.uiDirty = true;
-        }
-        this.publishLegacyRemoteSyncResult(result);
-      })
-      .catch((error: unknown) => {
-        if (!isLegacyRemoteCompletionContextCurrent(
-          syncAuthSnapshot,
-          syncAuthSequence,
-          this.authSnapshot,
-          this.authAccountHydrationSequence
-        )) {
-          return;
-        }
-        this.publishLegacyRemoteSyncException('progression', error);
-      });
-  }
-
   private syncLegacyRemoteSettings(): void {
     if (this.remoteSettingsSyncTimer !== null) {
       clearTimeout(this.remoteSettingsSyncTimer);
@@ -16274,6 +15370,18 @@ export class MenuScene extends Phaser.Scene {
     // pendingAuthGateTransition in update()).
     if ((this.authGateLocked || this.isLegacyPasswordRecoveryActive()) && this.overlay === 'auth') {
       return;
+    }
+    // The Guide sits on top of its Settings sheet: back returns to Settings first.
+    if (this.settingsGuideOpen && (this.overlay === 'options' || this.overlay === 'pause')) {
+      this.closeLegacyGuideSheet();
+      return;
+    }
+    if (this.overlay === 'confirm-progression-reset') {
+      // An in-flight server reset cannot be cancelled from the UI.
+      if (this.progressionResetState.phase === 'working') {
+        return;
+      }
+      this.progressionResetState = INITIAL_LEGACY_PROGRESSION_RESET_STATE;
     }
     const action = resolveLegacyOverlayBackAction({
       mode: this.mode,

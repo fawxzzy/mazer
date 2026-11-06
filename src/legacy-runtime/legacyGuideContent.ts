@@ -25,6 +25,7 @@ export type LegacyGuideContext = 'menu' | 'pause';
 
 export type LegacyGuideGlyph =
   | 'goal-star'
+  | 'start-marker'
   | 'player-block'
   | 'touch-stick'
   | 'trail-swatch'
@@ -60,7 +61,7 @@ export interface LegacyGuideIconSpec {
 }
 
 export interface LegacyGuideRow {
-  id: 'goal' | 'you' | 'move' | 'trail' | 'wrap' | 'levels';
+  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'levels';
   heading: string;
   text: string;
   icon: LegacyGuideIconSpec;
@@ -69,7 +70,7 @@ export interface LegacyGuideRow {
 /** A guide row that must exist once its blocker lands. Never shown until then. */
 export interface LegacyGuidePendingRow {
   id: string;
-  blockedOn: 'chip-wiring' | 'rank-surface' | 'first-run-coach';
+  blockedOn: 'rank-surface' | 'first-run-coach';
   /** Kebab id; prose in the spec doc ("Guide icon reasons"). */
   reasonId: string;
 }
@@ -95,15 +96,29 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
     heading: 'Goal',
     icon: {
       badge: 'circle',
-      boardDraw: { module: 'src/scenes/MenuScene.ts', symbol: 'drawLegacyGoalStarMarker' },
+      boardDraw: { module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' },
       chipDraw: { marker: 'goal', module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' },
       glyph: 'goal-star',
       lane: null,
-      reasonId: 'goal-legend-reuses-scene-star-draw',
+      reasonId: 'goal-legend-calls-chip-marker-draw',
       status: 'shared-with-board'
     },
     id: 'goal',
     text: 'Reach the star to clear the maze.'
+  },
+  {
+    heading: 'Start',
+    icon: {
+      badge: 'circle',
+      boardDraw: { module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' },
+      chipDraw: { marker: 'start', module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' },
+      glyph: 'start-marker',
+      lane: null,
+      reasonId: 'start-legend-calls-chip-marker-draw',
+      status: 'shared-with-board'
+    },
+    id: 'start',
+    text: 'Corner brackets mark the tile where each maze begins.'
   },
   {
     heading: 'You',
@@ -112,9 +127,9 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       boardDraw: { module: 'src/scenes/MenuScene.ts', symbol: 'fillLegacyPlayerMarkerTile' },
       chipDraw: { marker: 'player', module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' },
       glyph: 'player-block',
-      lane: 'guide-wiring',
-      reasonId: 'player-legend-icon-missing',
-      status: 'todo-wiring'
+      lane: null,
+      reasonId: 'player-marker-draw-bound-to-board-graphics',
+      status: 'guide-local'
     },
     id: 'you',
     text: 'You are the green block.'
@@ -137,12 +152,12 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
     heading: 'Your trail',
     icon: {
       badge: 'square',
-      boardDraw: { module: 'src/scenes/MenuScene.ts', symbol: 'drawLegacyContinuousPlayTrail' },
+      boardDraw: { module: 'src/render/boardTileBake.ts', symbol: 'computeChipGeometry' },
       chipDraw: null,
       glyph: 'trail-swatch',
-      lane: 'chip-wiring',
-      reasonId: 'trail-legend-uses-old-path-material',
-      status: 'todo-wiring'
+      lane: null,
+      reasonId: 'trail-legend-uses-chip-tile-geometry',
+      status: 'shared-with-board'
     },
     id: 'trail',
     text: `A glowing line shows your route. Turn on ${TRAIL_FADE_LABEL} in Settings to fade old trail.`
@@ -154,9 +169,9 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       boardDraw: { module: 'src/render/edgeMarkers.ts', symbol: 'drawEdgeMarker' },
       chipDraw: null,
       glyph: 'edge-marker',
-      lane: 'guide-wiring',
-      reasonId: 'wrap-legend-must-call-edge-marker-draw',
-      status: 'todo-wiring'
+      lane: null,
+      reasonId: 'wrap-legend-calls-edge-marker-draw',
+      status: 'shared-with-board'
     },
     id: 'wrap',
     text: 'Some mazes wrap. Leave an open edge and you come out on the opposite side.'
@@ -168,9 +183,9 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       boardDraw: { module: 'src/scenes/MenuScene.ts', symbol: 'drawLegacyGlyphWordTileBlock' },
       chipDraw: null,
       glyph: 'level-numeral',
-      lane: 'chip-wiring',
-      reasonId: 'level-numeral-shares-old-path-material',
-      status: 'todo-wiring'
+      lane: null,
+      reasonId: 'level-numeral-calls-wordmark-chip-draw',
+      status: 'shared-with-board'
     },
     id: 'levels',
     text: 'Each cleared maze raises your level. Mazes get harder as you climb.'
@@ -179,14 +194,10 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
 
 /**
  * Rows deliberately NOT shown yet. Each names what must land first; the
- * drift test pins that none of them is in LEGACY_GUIDE_ROWS.
+ * drift test pins that none of them is in LEGACY_GUIDE_ROWS. (The Start row
+ * left this list when Chip landed: the start brackets are now on the board.)
  */
 export const LEGACY_GUIDE_PENDING_ROWS: readonly LegacyGuidePendingRow[] = Object.freeze([
-  {
-    blockedOn: 'chip-wiring',
-    id: 'start-marker',
-    reasonId: 'start-marker-needs-chip-brackets'
-  },
   {
     blockedOn: 'rank-surface',
     id: 'ranks',
