@@ -235,6 +235,33 @@ export const BOARD_TILE_GEOMETRY = Object.freeze({
 } as const);
 
 /* ------------------------------------------------------------------------------------------ */
+/* on-screen minimum marker sizes (independent of the tile)                                   */
+/* ------------------------------------------------------------------------------------------ */
+
+/**
+ * Dense boards (25x57 .. 57x121) have tiles of 6..12 css px, where the tile-fraction goal badge is a dot.
+ * These floors keep the SAME artwork readable at a glance: the whole marker is drawn as if the tile were
+ * large enough that the goal badge is at least `goalBadgeDiameterCss` across (centred on the cell, free to
+ * overlap neighbouring chips), and the start brackets as if the tile were at least `startTileCss`. Callers
+ * opt in per draw (`BoardMarkerInput.minimumMarkerSizes`); the Guide icons do not, so they stay as drawn.
+ * The goal floor is bigger than the start floor on purpose: the goal is the thing to find.
+ */
+export const BOARD_MARKER_MIN_CSS = Object.freeze({
+  goalBadgeDiameterCss: 22,
+  startTileCss: 15
+});
+
+/** The tile size to draw a marker at: the real tile, or the smallest tile whose marker meets the css floor. */
+export const resolveMarkerEffectiveTile = (tileSize: number, ratio: number, minDiameterCss: number): number => (
+  Math.max(tileSize, minDiameterCss / (2 * ratio))
+);
+
+/** Effective tile for the goal: its badge diameter (2 * goalBadgeRatio * tile) is never below the floor. */
+export const resolveGoalEffectiveTile = (tileSize: number, minBadgeDiameterCss: number): number => (
+  resolveMarkerEffectiveTile(tileSize, BOARD_TILE_GEOMETRY.marker.goalBadgeRatio, minBadgeDiameterCss)
+);
+
+/* ------------------------------------------------------------------------------------------ */
 /* device-pixel snapping                                                                      */
 /* ------------------------------------------------------------------------------------------ */
 

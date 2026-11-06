@@ -19,6 +19,7 @@
 import {
   BOARD_TILE_GEOMETRY,
   DEFAULT_BOARD_TILE_STYLE,
+  resolveGoalEffectiveTile,
   clampBoardDevicePixelRatio,
   cssRgb,
   cssRgba,
@@ -1005,6 +1006,12 @@ export interface BoardMarkerInput {
   /** 0..1 phase that only modulates the goal ring alpha; forced to 0 when reducedMotion. */
   phase?: number;
   reducedMotion?: boolean;
+  /**
+   * Opt-in on-screen floors (css px) so the start/goal stay findable when tiles are tiny. The goal is drawn
+   * (same artwork, same colours) as if its badge were at least `goalBadgeDiameterCss` across; the start as
+   * if the tile were at least `startTileCss`. Omit for the plain tile-fraction size (Guide icons).
+   */
+  minimumMarkerSizes?: { goalBadgeDiameterCss?: number; startTileCss?: number };
 }
 
 export interface BoardMarkerStats {
@@ -1025,7 +1032,7 @@ const starPath = (p: Painter, cx: number, cy: number, outer: number, inner: numb
   p.close();
 };
 
-const centerOfCell = (cell: BoardCell, size: number, scale: number, ox: number, oy: number): [number, number] => [
+export const centerOfCell = (cell: BoardCell, size: number, scale: number, ox: number, oy: number): [number, number] => [
   ox + (Math.round(cell.x * size * scale) + Math.round((cell.x + 1) * size * scale)) / 2 / scale,
   oy + (Math.round(cell.y * size * scale) + Math.round((cell.y + 1) * size * scale)) / 2 / scale
 ];
@@ -1186,11 +1193,15 @@ export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput
     && input.player.x === input.start.x && input.player.y === input.start.y;
   if (input.start && !onStart) {
     const [cx, cy] = centerOfCell(input.start, input.tileSize, scale, ox, oy);
-    drawStartMarker(painter, style, cx, cy);
+    const startTile = Math.max(input.tileSize, input.minimumMarkerSizes?.startTileCss ?? 0);
+    const startStyle = startTile > input.tileSize ? resolveBoardTileStyle(styleId, startTile, scale) : style;
+    drawStartMarker(painter, startStyle, cx, cy);
   }
   if (input.goal) {
     const [cx, cy] = centerOfCell(input.goal, input.tileSize, scale, ox, oy);
-    drawGoalMarker(painter, style, cx, cy, phase);
+    const goalTile = resolveGoalEffectiveTile(input.tileSize, input.minimumMarkerSizes?.goalBadgeDiameterCss ?? 0);
+    const goalStyle = goalTile > input.tileSize ? resolveBoardTileStyle(styleId, goalTile, scale) : style;
+    drawGoalMarker(painter, goalStyle, cx, cy, phase);
   }
   if (input.player) {
     const cx = ox + (input.player.x + 0.5) * input.tileSize;

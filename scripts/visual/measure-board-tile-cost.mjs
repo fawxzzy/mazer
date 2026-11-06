@@ -11,6 +11,7 @@
  *                per-frame cost of the build/deconstruct animation
  *   settled    - drawBoardPaths when nothing changed (hash check only; the scene normally skips the call)
  *   dynamic    - drawDynamicBoard (trail, start/goal markers, player) on the settled board
+ *   dynamicWithFullTrail - the same with the whole shortest route as the trail (the per-frame worst case)
  * These are CPU-only numbers from the machine that runs the script; a phone was not measured.
  */
 import { chromium } from 'playwright';
@@ -75,11 +76,31 @@ const MEASURE = `(async ({ runs }) => {
     scene.drawDynamicBoard(now());
     dynamic.push(performance.now() - t0);
   }
+  // Same dynamic frame with the full route as the trail and the player beside the goal: trail canvas
+  // (bloom + underlay + core), goal beacon and both markers all draw.
+  const dynamicTrail = [];
+  const trailBuild = [];
+  const trailDraw = [];
+  const solved = window.__MAZER_QA__.resolveShortestPathToGoal();
+  if (solved && solved.found && solved.path.length > 2) {
+    const route = solved.path;
+    scene.player = { x: route[route.length - 2].x, y: route[route.length - 2].y };
+    scene.syncLegacyPlayerVisualMotionTo(scene.player);
+    scene.trail = route.slice(0, route.length - 1).map((q) => ({ x: q.x, y: q.y }));
+    scene.hasPlayerEverLeftStart = true;
+    for (let i = 0; i < runs; i += 1) {
+      const t0 = performance.now();
+      scene.drawDynamicBoard(now() + (i * 16));
+      dynamicTrail.push(performance.now() - t0);
+      const d = scene.lastTrailPerfDiagnostics;
+      if (d) { trailBuild.push(d.geometryBuildMs); trailDraw.push(d.drawMs); }
+    }
+  }
   const b = layer.currentBake;
   return {
     maze: { width: scene.maze.width, height: scene.maze.height, floorTiles: b ? b.stats.floorTiles : null, tileSize: scene.resolveLegacyMazeRenderFrame(scene.layout.boardLeft, scene.layout.boardTop, scene.layout.boardWidth, scene.layout.boardHeight).tileSize },
     bakeCanvas: b ? { pixelWidth: b.pixelWidth, pixelHeight: b.pixelHeight, scale: b.scale, paintOps: b.stats.paintOps, pathOps: b.stats.pathOps } : null,
-    bake, reveal, compose, settled, dynamic
+    bake, reveal, compose, settled, dynamic, dynamicTrail, trailBuild, trailDraw, routeCells: solved && solved.found ? solved.path.length : null
   };
 })`;
 
@@ -122,7 +143,11 @@ const main = async () => {
         revealFrameMs: stats(r.reveal),
         revealComposeMs: stats(r.compose),
         settledCallMs: stats(r.settled),
-        dynamicFrameMs: stats(r.dynamic)
+        dynamicFrameMs: stats(r.dynamic),
+        dynamicWithFullTrailMs: r.dynamicTrail.length ? stats(r.dynamicTrail) : null,
+        trailGeometryBuildMs: r.trailBuild.length ? stats(r.trailBuild) : null,
+        trailCanvasDrawMs: r.trailDraw.length ? stats(r.trailDraw) : null,
+        routeCells: r.routeCells
       });
       await context.close();
     }
