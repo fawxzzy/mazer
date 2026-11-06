@@ -6,21 +6,17 @@ import {
 } from './legacyOptionFields';
 import type { LegacySettings } from './legacyDefaults';
 
-export type LegacyOverlayFieldCommitKind = 'camera-flag' | 'material-change' | 'scale-change';
+export type LegacyOverlayFieldCommitKind = 'material-change' | 'scale-change';
 
 export interface LegacyOverlayFieldCommitResult extends LegacyOptionFieldApplyResult {
   commitKind: LegacyOverlayFieldCommitKind;
-  refreshLayout: boolean;
   triggersReloadOnBack: boolean;
-  triggersCameraFlag: boolean;
 }
 
 const resolveLegacyOverlayFieldCommitKind = (
   fieldId: LegacyOptionFieldId
 ): LegacyOverlayFieldCommitKind => {
   switch (fieldId) {
-    case 'camScale':
-      return 'camera-flag';
     case 'scale':
       return 'scale-change';
     case 'pathR':
@@ -46,8 +42,6 @@ export const applyLegacyOverlayFieldCommit = (
   return {
     ...result,
     commitKind,
-    refreshLayout: result.affectsCamera,
-    triggersReloadOnBack: commitKind !== 'camera-flag' && result.affectsMaze,
-    triggersCameraFlag: commitKind === 'camera-flag'
+    triggersReloadOnBack: result.affectsMaze
   };
 };

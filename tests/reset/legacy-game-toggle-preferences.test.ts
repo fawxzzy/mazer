@@ -10,6 +10,7 @@ import {
   mergeLegacyGameTogglePreferences,
   pickLegacyGameTogglePreferences,
   readLegacyGameToggleSettings,
+  scrubRemovedCameraZoomFromGameToggleStorage,
   writeLegacyGameToggleSettings
 } from '../../src/legacy-runtime/legacyGameTogglePreferences';
 
@@ -35,7 +36,6 @@ describe('legacy game toggle preferences', () => {
 
     expect(LEGACY_DEFAULTS.controlMode).toBe('stick');
     expect(pickLegacyGameTogglePreferences(settings)).toEqual({
-      camScale: 0,
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.04,
@@ -49,7 +49,6 @@ describe('legacy game toggle preferences', () => {
     const storage = new MemoryStorage();
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
     settings.scale = 75;
-    settings.camScale = 25;
     settings.controlMode = 'stick';
     settings.darkMode = true;
     settings.movementSpeed = 0.82;
@@ -61,7 +60,6 @@ describe('legacy game toggle preferences', () => {
 
     expect(written.scale).toBe(75);
     expect(JSON.parse(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY) ?? '{}')).toEqual({
-      camScale: 25,
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.82,
@@ -76,7 +74,6 @@ describe('legacy game toggle preferences', () => {
     const fallback = copyLegacySettings(LEGACY_DEFAULTS);
     fallback.scale = 37;
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
-      camScale: -35,
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.33,
@@ -88,9 +85,7 @@ describe('legacy game toggle preferences', () => {
     const settings = readLegacyGameToggleSettings(storage, fallback);
 
     expect(settings.scale).toBe(37);
-    expect(settings.camScale).toBe(-35);
     expect(pickLegacyGameTogglePreferences(settings)).toEqual({
-      camScale: -35,
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.33,
@@ -98,6 +93,42 @@ describe('legacy game toggle preferences', () => {
       toggleTrailFade: true,
       toggleTrailPulse: false
     });
+  });
+
+  test('a camScale stored by an older build (Board Zoom was removed) is ignored, never re-written, and scrubbed', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
+      camScale: 50,
+      controlMode: 'arrows',
+      toggleTrailFade: true
+    }));
+
+    const settings = readLegacyGameToggleSettings(storage, LEGACY_DEFAULTS);
+    expect(settings).not.toHaveProperty('camScale');
+    expect(pickLegacyGameTogglePreferences(settings)).not.toHaveProperty('camScale');
+    expect(settings.controlMode).toBe('arrows');
+
+    // Writing never resurrects the key.
+    writeLegacyGameToggleSettings(storage, settings);
+    expect(JSON.parse(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY) ?? '{}')).not.toHaveProperty('camScale');
+
+    // The scrub removes it from a blob that was not re-written, keeping the other keys.
+    storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({ camScale: -50, toggleTrailFade: true }));
+    expect(scrubRemovedCameraZoomFromGameToggleStorage(storage)).toBe(true);
+    expect(JSON.parse(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY) ?? '{}')).toEqual({ toggleTrailFade: true });
+    expect(scrubRemovedCameraZoomFromGameToggleStorage(storage)).toBe(false);
+    expect(scrubRemovedCameraZoomFromGameToggleStorage(undefined)).toBe(false);
+    storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, '{');
+    expect(scrubRemovedCameraZoomFromGameToggleStorage(storage)).toBe(false);
+  });
+
+  test('a stored blob holding only the removed camScale is not migrated into guest scope', () => {
+    const storage = new MemoryStorage();
+    const guestStorage = createLegacyAuthScopedStorage(storage, LEGACY_GAME_TOGGLE_STORAGE_KEY, { userId: null });
+    storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({ camScale: 25 }));
+
+    expect(migrateLegacyGameToggleSettingsToGuestScope(storage, guestStorage, LEGACY_DEFAULTS)).toBe(false);
+    expect(readLegacyGameToggleSettings(guestStorage, LEGACY_DEFAULTS)).toEqual(LEGACY_DEFAULTS);
   });
 
   test('preserves an explicit persisted arrows control choice', () => {
@@ -116,7 +147,6 @@ describe('legacy game toggle preferences', () => {
     const storage = new MemoryStorage();
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
       controlMode: 'teleport',
-      camScale: '500',
       darkMode: 'yes',
       movementSpeed: '1.4',
       toggleAnimatedBackdrop: 'no',
@@ -127,7 +157,6 @@ describe('legacy game toggle preferences', () => {
     const settings = readLegacyGameToggleSettings(storage, LEGACY_DEFAULTS);
 
     expect(settings.controlMode).toBe('stick');
-    expect(settings.camScale).toBe(50);
     expect(settings.darkMode).toBe(true);
     expect(settings.movementSpeed).toBe(1);
     expect(settings.toggleAnimatedBackdrop).toBe(false);
@@ -198,7 +227,6 @@ describe('legacy game toggle preferences', () => {
       { userId: 'user-456' }
     );
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
-      camScale: 15,
       controlMode: 'arrows',
       darkMode: false,
       movementSpeed: 0.72,
@@ -211,7 +239,6 @@ describe('legacy game toggle preferences', () => {
 
     const migrated = readLegacyGameToggleSettings(guestStorage, LEGACY_DEFAULTS);
     expect(pickLegacyGameTogglePreferences(migrated)).toEqual({
-      camScale: 15,
       controlMode: 'arrows',
       darkMode: false,
       movementSpeed: 0.72,

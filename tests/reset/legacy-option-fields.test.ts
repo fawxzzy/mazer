@@ -14,24 +14,20 @@ describe('legacy option field helpers', () => {
     const drafts = createLegacyOptionFieldDrafts(LEGACY_DEFAULTS);
 
     expect(drafts.scale).toBe('50');
-    expect(drafts.camScale).toBe('0');
+    expect(drafts).not.toHaveProperty('camScale');
     expect(drafts.pathR).toBe('121');
     expect(drafts.wallB).toBe('74');
   });
 
-  test('applies valid scale and camera drafts inside legacy ranges', () => {
+  test('applies valid scale drafts inside legacy ranges', () => {
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
     const drafts = createLegacyOptionFieldDrafts(settings);
     drafts.scale = '75';
-    drafts.camScale = '-12';
 
     const scaleResult = applyLegacyOptionField(settings, drafts, 'scale');
-    const camResult = applyLegacyOptionField(scaleResult.settings, scaleResult.drafts, 'camScale');
 
     expect(scaleResult.settings.scale).toBe(75);
     expect(scaleResult.affectsMaze).toBe(true);
-    expect(camResult.settings.camScale).toBe(-12);
-    expect(camResult.affectsCamera).toBe(true);
   });
 
   test('applies user-facing srgb byte drafts to internal linear colors', () => {

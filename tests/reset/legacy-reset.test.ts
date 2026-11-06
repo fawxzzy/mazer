@@ -270,7 +270,7 @@ describe('legacy reset lane', () => {
 
   test('preserves legacy default settings', () => {
     expect(LEGACY_DEFAULTS.scale).toBe(50);
-    expect(LEGACY_DEFAULTS.camScale).toBe(0);
+    expect(LEGACY_DEFAULTS).not.toHaveProperty('camScale');
     expect(LEGACY_DEFAULTS.movementSpeed).toBe(0.04);
     expect(linearColorToHex(LEGACY_DEFAULTS.pathColor)).toBe('#797978');
     expect(linearColorToHex(LEGACY_DEFAULTS.wallColor)).toBe('#4a4a4a');
@@ -1125,17 +1125,17 @@ describe('legacy reset lane', () => {
       'utf8'
     );
 
-    expect(overlayFieldCommitSource).toContain("type LegacyOverlayFieldCommitKind = 'camera-flag' | 'material-change' | 'scale-change';");
+    expect(overlayFieldCommitSource).toContain("type LegacyOverlayFieldCommitKind = 'material-change' | 'scale-change';");
     expect(overlayFieldCommitSource).toContain('applyLegacyOverlayFieldCommit');
     expect(overlayFieldCommitSource).toContain('triggersReloadOnBack');
-    expect(overlayFieldCommitSource).toContain('triggersCameraFlag');
+    expect(overlayFieldCommitSource).not.toContain('triggersCameraFlag');
     expect(menuSceneSource).toContain("const result = applyLegacyOverlayFieldCommit(this.settings, this.optionFieldDrafts, fieldId);");
     expect(menuSceneSource).not.toContain('resolveLegacyOverlayFieldCommitMessage(');
     expect(menuSceneSource).not.toContain('resolveLegacyOverlayFieldMessageLabel(fieldId)');
     expect(menuSceneSource).not.toContain('resolveLegacyOverlayFieldMessageState(fieldId)');
     expect(menuSceneSource).toContain('this.commitOverlayField(fieldId);');
     expect(menuSceneSource).toContain('if (result.triggersReloadOnBack) {');
-    expect(menuSceneSource).toContain('if (result.refreshLayout) {');
+    expect(menuSceneSource).not.toContain('if (result.refreshLayout) {');
     expect(legacyPauseMenuSource).toContain('ScaleNumChanged = true;');
     expect(legacyPauseMenuSource).toContain('MazerGameInstance->_PathMaterialChanged = MaterialChanged = true;');
     expect(legacyPauseMenuSource).toContain('MazerGameInstance->_WallMaterialChanged = MaterialChanged = true;');

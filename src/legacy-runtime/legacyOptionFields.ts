@@ -7,7 +7,6 @@ import {
 
 export type LegacyOptionFieldId =
   | 'scale'
-  | 'camScale'
   | 'pathR'
   | 'pathG'
   | 'pathB'
@@ -18,7 +17,6 @@ export type LegacyOptionFieldId =
 export type LegacyOptionFieldDrafts = Record<LegacyOptionFieldId, string>;
 
 export interface LegacyOptionFieldApplyResult {
-  affectsCamera: boolean;
   affectsMaze: boolean;
   drafts: LegacyOptionFieldDrafts;
   settings: LegacySettings;
@@ -30,7 +28,6 @@ export const createLegacyOptionFieldDrafts = (
   settings: LegacySettings
 ): LegacyOptionFieldDrafts => ({
   scale: String(settings.scale),
-  camScale: String(settings.camScale),
   pathR: formatColorByte(settings.pathColor.r),
   pathG: formatColorByte(settings.pathColor.g),
   pathB: formatColorByte(settings.pathColor.b),
@@ -55,7 +52,6 @@ export const applyLegacyOptionField = (
   const nextSettings = copyLegacySettings(settings);
   const nextDrafts = { ...drafts };
   let affectsMaze = false;
-  let affectsCamera = false;
 
   switch (fieldId) {
     case 'scale': {
@@ -65,15 +61,6 @@ export const applyLegacyOptionField = (
         affectsMaze = parsed !== settings.scale;
       }
       nextDrafts.scale = String(nextSettings.scale);
-      break;
-    }
-    case 'camScale': {
-      const parsed = normalizeIntegerDraft(drafts.camScale);
-      if (parsed !== null && parsed >= -50 && parsed <= 50) {
-        nextSettings.camScale = parsed;
-        affectsCamera = parsed !== settings.camScale;
-      }
-      nextDrafts.camScale = String(nextSettings.camScale);
       break;
     }
     case 'pathR':
@@ -102,7 +89,6 @@ export const applyLegacyOptionField = (
   }
 
   return {
-    affectsCamera,
     affectsMaze,
     drafts: nextDrafts,
     settings: nextSettings

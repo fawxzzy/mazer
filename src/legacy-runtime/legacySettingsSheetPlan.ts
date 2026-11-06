@@ -16,7 +16,7 @@
  *   - whether the Settings group is a collapsed disclosure (pause) or the
  *     always-open body (menu).
  * Everything inside the Settings group (How to play, Display heading, Board
- * Zoom, Trail Fade, Trail Shine, Animated Background) is the SAME row spec
+ * Trail Fade, Trail Shine, Animated Background) is the SAME row spec
  * with the SAME geometry, so the surfaces cannot drift apart again.
  *
  * Pure: no Phaser, no DOM, no storage, no network, no wiring. A later lane
@@ -41,9 +41,8 @@ import {
 
 export type LegacySettingsContext = 'menu' | 'pause';
 
-/** Setting keys the scene already persists (legacyOverlayToggleFields / camScale). */
+/** Setting keys the scene already persists (legacyOverlayToggleFields). */
 export type LegacySettingsToggleKey = 'toggleTrailFade' | 'toggleTrailPulse' | 'toggleAnimatedBackdrop';
-export type LegacySettingsSliderKey = 'camScale';
 
 export type LegacySettingsRowId =
   | 'resume'
@@ -51,7 +50,6 @@ export type LegacySettingsRowId =
   | 'settings-disclosure'
   | 'how-to-play'
   | 'display-heading'
-  | 'board-zoom'
   | 'trail-fade'
   | 'trail-shine'
   | 'animated-background'
@@ -65,7 +63,6 @@ export type LegacySettingsRowKind =
   | 'disclosure'
   | 'nav'
   | 'heading'
-  | 'slider'
   | 'toggle';
 
 export type LegacySettingsEmphasis = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'danger-outline';
@@ -85,10 +82,10 @@ export interface LegacySettingsRowModel {
   kind: LegacySettingsRowKind;
   label: string;
   emphasis: LegacySettingsEmphasis | null;
-  /** Tap command for action/nav/disclosure rows. Null for heading/slider/toggle. */
+  /** Tap command for action/nav/disclosure rows. Null for heading/toggle. */
   command: LegacySettingsCommand | null;
-  /** Persisted setting this row edits (toggle/slider only). */
-  settingKey: LegacySettingsToggleKey | LegacySettingsSliderKey | null;
+  /** Persisted setting this row edits (toggle only). */
+  settingKey: LegacySettingsToggleKey | null;
   /** Toggle state words, pinned to today's copy (never merged into the label). */
   onLabel: string | null;
   offLabel: string | null;
@@ -147,7 +144,6 @@ const row = (
 export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsRowModel[] = Object.freeze([
   row('how-to-play', 'nav', 'How to play', { command: { type: 'OPEN_GUIDE' }, emphasis: 'secondary' }),
   row('display-heading', 'heading', 'Display'),
-  row('board-zoom', 'slider', 'Board Zoom', { settingKey: 'camScale' }),
   row('trail-fade', 'toggle', 'Trail Fade', { offLabel: 'Off', onLabel: 'On', settingKey: 'toggleTrailFade' }),
   row('trail-shine', 'toggle', 'Trail Shine', { offLabel: 'Off', onLabel: 'On', settingKey: 'toggleTrailPulse' }),
   row('animated-background', 'toggle', 'Animated Background', {
@@ -263,8 +259,6 @@ export const LEGACY_SETTINGS_SIZES = Object.freeze({
   rowHeight: 52,
   /** Non-interactive heading row. */
   headingHeight: 24,
-  /** Slider row (label + track). */
-  sliderRowHeight: 68,
   /** Switch graphic (the whole row is the hit target). */
   switchHeight: 24,
   switchWidth: LEGACY_UI_MIN_TOUCH_TARGET,
@@ -313,8 +307,6 @@ export interface LegacySettingsRowParts {
   state: LegacySettingsRect | null;
   /** Toggle only: switch graphic. */
   switchControl: LegacySettingsRect | null;
-  /** Slider only: track under the label line. */
-  track: LegacySettingsRect | null;
   /** Nav/disclosure only: trailing chevron slot. */
   chevron: LegacySettingsRect | null;
 }
@@ -381,8 +373,6 @@ const rowHeightOf = (model: LegacySettingsRowModel): number => {
       return LEGACY_SETTINGS_SIZES.rowHeight;
     case 'heading':
       return LEGACY_SETTINGS_SIZES.headingHeight;
-    case 'slider':
-      return LEGACY_SETTINGS_SIZES.sliderRowHeight;
     default:
       return model.kind satisfies never;
   }
@@ -394,7 +384,7 @@ const isInteractiveKind = (kind: LegacySettingsRowKind): boolean => kind !== 'he
 const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: number): LegacySettingsRowParts => {
   const s = LEGACY_SETTINGS_SIZES;
   const pad = s.rowPadding;
-  const none: LegacySettingsRowParts = { chevron: null, label: rectOf(0, 0, width, height), state: null, switchControl: null, track: null };
+  const none: LegacySettingsRowParts = { chevron: null, label: rectOf(0, 0, width, height), state: null, switchControl: null };
 
   switch (model.kind) {
     case 'toggle': {
@@ -405,19 +395,7 @@ const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: n
         chevron: null,
         label: rectOf(pad, 0, labelWidth, height),
         state: rectOf(stateLeft, 0, s.stateWidth, height),
-        switchControl: rectOf(switchLeft, Math.round((height - s.switchHeight) / 2), s.switchWidth, s.switchHeight),
-        track: null
-      };
-    }
-    case 'slider': {
-      const labelHeight = s.labelLineHeight + (s.columnGap / 2);
-      const trackTop = labelHeight + s.columnGap;
-      return {
-        chevron: null,
-        label: rectOf(pad, Math.round(s.columnGap / 2), Math.max(1, width - (pad * 2)), s.labelLineHeight),
-        state: null,
-        switchControl: null,
-        track: rectOf(pad, trackTop, Math.max(1, width - (pad * 2)), Math.max(LEGACY_UI_MIN_TOUCH_TARGET - 16, height - trackTop - s.columnGap))
+        switchControl: rectOf(switchLeft, Math.round((height - s.switchHeight) / 2), s.switchWidth, s.switchHeight)
       };
     }
     case 'nav':
@@ -428,8 +406,7 @@ const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: n
         chevron: rectOf(chevronLeft, Math.round((height - chevronSize) / 2), chevronSize, chevronSize),
         label: rectOf(pad, 0, Math.max(1, chevronLeft - s.columnGap - pad), height),
         state: null,
-        switchControl: null,
-        track: null
+        switchControl: null
       };
     }
     case 'action':
@@ -505,7 +482,7 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
       return {
         interactive: isInteractiveKind(rowModel.kind),
         labelFontSize: s.labelFontSize,
-        labelMaxLines: rowModel.kind === 'heading' || rowModel.kind === 'slider' ? 1 : s.labelMaxLines,
+        labelMaxLines: rowModel.kind === 'heading' ? 1 : s.labelMaxLines,
         model: rowModel,
         parts: resolveRowParts(rowModel, rowWidth, height),
         rect,

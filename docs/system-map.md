@@ -274,9 +274,8 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - AI-only reset replay contract without menu-maze regeneration
 
 - `src/legacy-runtime/legacyOverlayFieldCommit.ts`
-  - explicit `scale-change` / `material-change` / `camera-flag` commit classes
+  - explicit `scale-change` / `material-change` commit classes (`camera-flag` removed with Board Zoom, 2026-11-06)
   - deferred reload-on-back for scale/material fields
-  - immediate camera-flag semantics for `camScale`
 
 - `src/legacy-runtime/legacyOverlayToggleFields.ts`
   - explicit features and game-modes toggle ownership

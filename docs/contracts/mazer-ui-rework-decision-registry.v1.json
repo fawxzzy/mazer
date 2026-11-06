@@ -307,10 +307,9 @@
         "dependsOn": [],
         "owner": "measured-baseline-integrator",
         "paths": [
-          "scripts/analysis/capture-auth-capability-surfaces.mjs",
-          "scripts/analysis/capture-ui-surfaces.mjs"
+          "scripts/analysis/capture-auth-capability-surfaces.mjs"
         ],
-        "note": "The live authenticated-persistence soak moved to Wave 5C when its account-entry contract became part of the shared OAuth consumer. This wave remains active for the two capture surfaces."
+        "note": "The live authenticated-persistence soak moved to Wave 5C when its account-entry contract became part of the shared OAuth consumer. scripts/analysis/capture-ui-surfaces.mjs moved to Wave 5C on 2026-11-06 (Board Zoom removal and Leaderboard redesign): that capture asserts the labels and geometry of the Settings, Guide and Leaderboard sheets painted by MenuScene.ts (5C), so a sheet change and its capture update must land in one change set; the previous split made every such change span 0C and 5C and fail the integrator-wave-mix guard. This wave remains active for the auth capability capture."
       },
       {
         "wave": "1B",
@@ -417,6 +416,7 @@
           "vercel.json",
           "vite.config.ts",
           "scripts/analysis/live-auth-persistence-soak.mjs",
+          "scripts/analysis/capture-ui-surfaces.mjs",
           "src/boot/bootStatus.ts",
           "src/boot/main.ts",
           "src/boot/installGate.ts",

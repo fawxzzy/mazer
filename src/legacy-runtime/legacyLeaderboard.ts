@@ -4,6 +4,10 @@ import {
   type LegacyAuthSessionSnapshot
 } from './legacyAuth';
 import {
+  buildLegacyLeaderboardFixtureData,
+  readLegacyLeaderboardFixtureShape
+} from './legacyLeaderboardFixture';
+import {
   compareLegacyProgressionOrdinals,
   resolveLegacyProgressionOrdinal,
   type LegacyProgressionOrdinal
@@ -107,7 +111,20 @@ export const fetchLegacyLeaderboardPage = async (
   authSnapshot?: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>
 ): Promise<LegacyLeaderboardPageResult> => {
   if (authSnapshot && isLegacyRuntimeDiagnosticsAuthFixtureSnapshot(authSnapshot)) {
-    return { entries: [], error: null };
+    // Dev/test-only seed (see legacyLeaderboardFixture.ts): inert unless the URL asks for a shape.
+    const shape = readLegacyLeaderboardFixtureShape();
+    if (shape === 'loading') {
+      return new Promise<LegacyLeaderboardPageResult>(() => undefined);
+    }
+    if (shape === 'error' || shape === 'offline') {
+      return {
+        entries: [],
+        error: shape === 'offline'
+          ? resolveLegacyLeaderboardFriendlyError('Failed to fetch')
+          : resolveLegacyLeaderboardUnavailableMessage()
+      };
+    }
+    return { entries: shape === null ? [] : buildLegacyLeaderboardFixtureData(shape).entries, error: null };
   }
   const client = await getLegacyAuthClient();
   if (!client) {
@@ -138,7 +155,8 @@ export const fetchLegacyLeaderboardSelfRank = async (
   authSnapshot?: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>
 ): Promise<LegacyLeaderboardSelfRankResult> => {
   if (authSnapshot && isLegacyRuntimeDiagnosticsAuthFixtureSnapshot(authSnapshot)) {
-    return { error: null, selfRank: null };
+    const shape = readLegacyLeaderboardFixtureShape();
+    return { error: null, selfRank: shape === null ? null : buildLegacyLeaderboardFixtureData(shape).selfRank };
   }
   const client = await getLegacyAuthClient();
   if (!client) {

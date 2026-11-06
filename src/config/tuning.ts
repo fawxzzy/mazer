@@ -217,16 +217,6 @@ export const legacyTuning = {
       keyRadiusRatio: 0.16
     }
   },
-  camera: {
-    // Legacy options range (`PauseMenuWidget` + `GamePauseMenu`): [-50, 50].
-    camScaleMin: -50,
-    camScaleMax: 50,
-    camScaleDefault: 0,
-    // Legacy camera distance behavior (`MazerPlayer`):
-    // buffer = (scale + (camScale * 2)) * preScalar
-    camScaleDoubleFactor: 2,
-    normalizedBaseline: 0.87
-  },
   menu: {
     layout: {
       narrowBreakpoint: 620,
@@ -585,13 +575,4 @@ export const legacyTuning = {
 export const toHex = (r: number, g: number, b: number): number => {
   const clamp = (value: number) => Math.max(0, Math.min(255, Math.round(value * 255)));
   return (clamp(r) << 16) | (clamp(g) << 8) | clamp(b);
-};
-
-export const resolveBoardScaleFromCamScale = (
-  camScale: number,
-  baseline = legacyTuning.camera.normalizedBaseline
-): number => {
-  const clamped = Math.max(legacyTuning.camera.camScaleMin, Math.min(legacyTuning.camera.camScaleMax, camScale));
-  const normalized = clamped / (legacyTuning.camera.camScaleMax * legacyTuning.camera.camScaleDoubleFactor);
-  return baseline + normalized;
 };

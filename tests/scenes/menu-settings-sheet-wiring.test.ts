@@ -26,7 +26,7 @@ describe('MenuScene wiring: one shared Settings sheet', () => {
 
   test('every plan row kind is painted, and every command maps to a handler', () => {
     const items = method('private paintLegacySettingsItem(');
-    for (const kind of ['heading', 'action', 'disclosure', 'nav', 'slider', 'toggle']) {
+    for (const kind of ['heading', 'action', 'disclosure', 'nav', 'toggle']) {
       expect(items).toContain(`case '${kind}':`);
     }
     const commands = method('private runLegacySettingsCommand(command: LegacySettingsCommand): void');
