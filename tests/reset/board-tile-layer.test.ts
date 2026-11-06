@@ -270,7 +270,7 @@ describe('end (goal) tile', () => {
     expect(contrast(boardMaterial.goal, boardMaterial.void)).toBeGreaterThanOrEqual(3);
   });
 
-  test('the pad and badge stay inside the one-cell footprint (the pad is the cell's inscribed circle)', () => {
+  test('the pad and badge stay inside the one-cell footprint (the pad is the inscribed circle of the cell)', () => {
     const calls: Array<{ op: string; args: number[] }> = [];
     const rec = (op: string) => (...args: number[]) => { calls.push({ op, args }); };
     const graphics = {
