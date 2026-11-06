@@ -1612,7 +1612,6 @@ const TELEPORT_ANCHOR_PREVIEW_VIEWPORT_INSET_PX = (TELEPORT_ANCHOR_PREVIEW_SHELL
 
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
-const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = cyberArcadeMaterial.signal.warningEdge;
 // The build/deconstruct/arrival cadence is NOT defined here any more: it is a
 // pure function of elapsed time in src/render/introTimeline.ts (see
 // resolveIntro / resolveIntroDeconstruct). Only the preroll window used by the
@@ -9797,7 +9796,10 @@ export class MenuScene extends Phaser.Scene {
     pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
     time: number
   ): void {
-    const { optionPoints, targetPoint } = this.resolveLegacyMenuAiMemoryPoints();
+    // The AI's committed-target tile is intentionally not marked: the red
+    // square drawn one step ahead of the demo walker was removed per owner
+    // request (2026-11-05). Option tiles still render.
+    const { optionPoints } = this.resolveLegacyMenuAiMemoryPoints();
     const optionAlpha = clamp(0.34 + (0.08 * Math.sin(time / 240)), 0.28, 0.44) * alphaMultiplier;
     for (const point of optionPoints) {
       this.fillLegacyDynamicPathTile(
@@ -9813,44 +9815,6 @@ export class MenuScene extends Phaser.Scene {
         0.72
       );
     }
-
-    if (targetPoint === null) {
-      return;
-    }
-
-    const targetPulse = 0.5 + (0.5 * Math.sin(time / 150));
-    // Edges only, no fill -- the AI's current tile should read as an outline
-    // marking its position, not a solid color wash over the whole cell.
-    this.drawLegacyTileEdgeOutline(
-      this.boardDynamicGraphics,
-      targetPoint,
-      originX,
-      originY,
-      tileSize,
-      LEGACY_MENU_AI_MEMORY_TARGET_EDGE,
-      clamp(0.66 + (targetPulse * 0.28), 0.58, 0.98) * alphaMultiplier
-    );
-  }
-
-  private drawLegacyTileEdgeOutline(
-    graphics: Phaser.GameObjects.Graphics,
-    point: LegacyPoint,
-    originX: number,
-    originY: number,
-    tileSize: number,
-    color: number,
-    alpha: number
-  ): void {
-    const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
-    const lineWidth = Math.max(1, Math.round(Math.min(tileRect.width, tileRect.height) * 0.12));
-    const inset = lineWidth / 2;
-    graphics.lineStyle(lineWidth, color, alpha);
-    graphics.strokeRect(
-      tileRect.left + inset,
-      tileRect.top + inset,
-      tileRect.width - lineWidth,
-      tileRect.height - lineWidth
-    );
   }
 
   // Real player-trail material overlay for one trail cell -- see

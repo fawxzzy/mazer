@@ -2278,9 +2278,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(aiSource).toContain('memoryFrames: readonly DemoWalkerMemoryFrame[];');
     expect(aiSource).toContain('optionIndices: resolveMemoryOptionIndices()');
     expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = cyberArcadeMaterial.signal.warningEdge;');
-    expect(menuSceneSource).toContain('private drawLegacyTileEdgeOutline(');
-    expect(menuSceneSource).toContain('LEGACY_MENU_AI_MEMORY_TARGET_EDGE,');
+    // The red target-tile outline was retired (owner request 2026-11-05); the
+    // option tiles remain the only thinking overlay drawn on the board.
+    expect(menuSceneSource).not.toContain('LEGACY_MENU_AI_MEMORY_TARGET_EDGE');
+    expect(menuSceneSource).not.toContain('drawLegacyTileEdgeOutline');
+    expect(menuSceneSource).toContain('LEGACY_MENU_AI_MEMORY_OPTION_EDGE,');
     expect(menuSceneSource).toContain('private resolveLegacyMenuAiMemoryPoints()');
     expect(menuSceneSource).toContain('const endIndex = this.menuDemoEpisode.raster.endIndex;');
     expect(menuSceneSource).toContain('targetIndex === null || targetIndex === endIndex');
@@ -2298,6 +2300,30 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(diagnosticsSource).toContain('optionPoints: Array<{ x: number; y: number }>;');
     expect(diagnosticsSource).toContain('targetPoint: { x: number; y: number } | null;');
     expect(diagnosticsSource).toContain('thoughtState: string;');
+  });
+
+  test('never draws a red or danger-colored marker for the menu demo walker next step', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const overlayStart = menuSceneSource.indexOf('private drawLegacyMenuAiMemoryOverlay(');
+    expect(overlayStart).toBeGreaterThan(-1);
+    const overlayEnd = menuSceneSource.slice(overlayStart).search(/\r?\n {2}\}\r?\n/);
+    expect(overlayEnd).toBeGreaterThan(0);
+    const overlayBody = menuSceneSource.slice(overlayStart, overlayStart + overlayEnd);
+
+    // The overlay may only fill option tiles; it must not outline/stroke the
+    // walker's committed target (the old red square one step ahead).
+    expect(overlayBody).not.toContain('targetPoint');
+    expect(overlayBody).not.toMatch(/stroke|Outline|warning|danger|signal\.goal/);
+    expect(overlayBody).toContain('LEGACY_MENU_AI_MEMORY_OPTION_CORE');
+
+    // No AI-memory color constant may alias the danger/goal/warning red.
+    const memoryColorLines = menuSceneSource
+      .split('\n')
+      .filter((line) => line.startsWith('const LEGACY_MENU_AI_MEMORY_') && line.includes(' = '));
+    expect(memoryColorLines.length).toBeGreaterThan(0);
+    for (const line of memoryColorLines) {
+      expect(line).not.toMatch(/warning|danger|signal\.goal|ff405d/i);
+    }
   });
 
   test('keeps only password-recovery entry backed by native browser inputs for mobile and automation', () => {
