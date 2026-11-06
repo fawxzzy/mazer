@@ -7,7 +7,7 @@ const read = (url: URL): string => readFileSync(url, 'utf8');
 
 describe('hazard source boundary (DRAFT, dormant)', () => {
   test('the hazards directory holds exactly the expected modules', () => {
-    expect(hazardFiles).toEqual(['graphContract.ts', 'index.ts', 'loadout.ts', 'placement.ts', 'serialization.ts', 'solvability.ts', 'validation.ts']);
+    expect(hazardFiles).toEqual(['chaserEngine.ts', 'chaserSolvability.ts', 'chaserValidation.ts', 'graphContract.ts', 'index.ts', 'loadout.ts', 'placement.ts', 'serialization.ts', 'solvability.ts', 'validation.ts']);
   });
 
   test('stays pure, runtime-agnostic and bounded to mazer-core', () => {
