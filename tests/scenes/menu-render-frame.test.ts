@@ -1726,7 +1726,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.authSnapshot');
     expect(menuSceneSource).toContain('private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null');
     expect(menuSceneSource).toContain('isLegacyRuntimeDiagnosticsAuthFixtureRoute(window.location.search)');
-    expect(bootSource).toContain('await bootstrapLegacyRemoteAccountStateForRoute(window.location.search);');
+    // Bounded by runBoundedAccountBootstrap (4000 ms) since the boot-continuity packet; the route-aware bootstrap is still the one run.
+    expect(bootSource).toContain('bootstrap: () => bootstrapLegacyRemoteAccountStateForRoute(window.location.search),');
     expect(bootSource).not.toContain('await bootstrapLegacyRemoteAccountState();');
     expect(menuSceneSource).toContain('userId: LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID');
     expect(menuSceneSource).toContain('isLegacyRemoteAccountProviderEligible(snapshot)');

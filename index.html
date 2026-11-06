@@ -36,9 +36,42 @@
     <link rel="canonical" href="https://mazer.fawxzzy.com/" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Mazer</title>
+    <!-- Static boot splash: paints before any script or the CSS bundle loads so
+         the page is never blank. Removed explicitly by src/boot/bootSplash.ts
+         (driven by bootStatus). Colors mirror the install gate / theme-color. -->
+    <style>
+      html, body { background: #02080f; margin: 0; }
+      #mazer-boot-splash {
+        position: fixed; inset: 0; z-index: 1;
+        display: grid; place-content: center; justify-items: center; gap: 22px;
+        background: #02080f; color: #d7fff8;
+        font-family: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
+      }
+      #mazer-boot-splash .mazer-boot-splash-brand {
+        color: #3ddbd4; font-size: 14px; font-weight: 500; letter-spacing: 0.32em; margin-right: -0.32em;
+      }
+      #mazer-boot-splash .mazer-boot-splash-pulse {
+        width: 10px; height: 10px; border-radius: 50%; background: #3ddbd4;
+        animation: mazer-boot-splash-pulse 1.4s ease-in-out infinite;
+      }
+      #mazer-boot-splash .mazer-boot-splash-text { margin: 0; font-size: 14px; color: #a4beb8; }
+      @keyframes mazer-boot-splash-pulse {
+        0%, 100% { opacity: 0.25; transform: scale(0.8); }
+        50% { opacity: 1; transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #mazer-boot-splash .mazer-boot-splash-pulse { animation: none; opacity: 0.7; }
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div id="mazer-boot-splash" role="status" aria-live="polite">
+        <strong class="mazer-boot-splash-brand">MAZER</strong>
+        <span class="mazer-boot-splash-pulse" aria-hidden="true"></span>
+        <p id="mazer-boot-splash-text" class="mazer-boot-splash-text">Loading&hellip;</p>
+      </div>
+    </div>
     <script type="module" src="/src/boot/main.ts"></script>
   </body>
 </html>

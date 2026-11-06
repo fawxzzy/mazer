@@ -15,6 +15,8 @@ import {
 } from '../legacy-runtime/legacyAccountPortal';
 import { bootstrapLegacyRemoteAccountStateForRoute } from '../legacy-runtime/legacyRemoteProgression';
 import { installMazerAccessibilitySurface } from './accessibilitySurface';
+import { runBoundedAccountBootstrap } from './bootAccountBootstrap';
+import { MAZER_BOOT_SPLASH_MAX_AFTER_GAME_CREATE_MS } from './bootSplash';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
 import { initializeInstallSurface } from './installSurface';
@@ -128,6 +130,9 @@ const boot = async (): Promise<void> => {
 
   let oauthCallbackAccepted = false;
   if (oauthCallback !== null) {
+    // The only stage whose splash says "Signing you in": a callback token
+    // exchange (bounded by MAZER_OAUTH_TOKEN_TIMEOUT_MS) is really running.
+    markMazerBootStatus('oauth-exchange');
     const result = await consumeMazerOAuthCallback(oauthCallback, async () => (
       await getLegacyAuthClient() as unknown as MazerOAuthClient | null
     ));
@@ -149,10 +154,22 @@ const boot = async (): Promise<void> => {
     passwordRecoveryRequested: passwordRecoveryRouteRequested
   })) {
     markMazerBootStatus('install-gate-checking');
-    await runMazerInstallGate(document);
+    // The gate overlay replaces the splash; it is up for as long as this is a
+    // browser tab (see installPolicy.ts), and only resolves when standalone.
+    await runMazerInstallGate(document, {
+      onBlocked: () => markMazerBootStatus('splash-removed')
+    });
   }
 
-  await bootstrapLegacyRemoteAccountStateForRoute(window.location.search);
+  // Bounded: a slow or failing remote account bootstrap must never keep the
+  // player on a blank page. The game starts on cached / guest state instead.
+  markMazerBootStatus('account-bootstrap');
+  await runBoundedAccountBootstrap({
+    bootstrap: () => bootstrapLegacyRemoteAccountStateForRoute(window.location.search),
+    onFailure: (error) => {
+      console.warn('[mazer] account bootstrap failed; starting on cached state', error);
+    }
+  });
   markMazerBootStatus('game-creating');
   game = new Phaser.Game(createMazerPhaserConfig(viewportGeometry.getSnapshot().fullBleed));
   attachMazerGameToWindow(game);
@@ -164,6 +181,13 @@ const boot = async (): Promise<void> => {
   });
   registerProductionServiceWorker();
   markMazerBootStatus('game-created');
+  // Bounded: if MenuScene never reports in, the splash still comes off so the
+  // canvas (or whatever it is showing) is never hidden indefinitely.
+  window.setTimeout(() => {
+    if (window.__MAZER_BOOT_STATUS__?.splashRemoved !== true) {
+      markMazerBootStatus('splash-removed');
+    }
+  }, MAZER_BOOT_SPLASH_MAX_AFTER_GAME_CREATE_MS);
 };
 
 void boot().catch((error: unknown) => {
