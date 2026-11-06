@@ -3,9 +3,14 @@
 Status: DRAFT spec for a later MenuScene wiring packet. Date: 2026-11-05.
 Owner direction: Zac, 2026-11-05.
 
-This packet ships ONLY pure, unwired view-model modules and their tests. It
-does not edit `src/scenes/MenuScene.ts` or any file owned by another lane, and
-nothing in the running game changes until the wiring packet lands.
+This packet shipped the pure view-model modules and their tests. UPDATE 2026-11-05 (wave
+`claude/mazer-w2-leaderboard-auth-20261105`): the LEADERBOARD part is now wired. `MenuScene.buildLeaderboardOverlay`
+renders `buildLegacyLeaderboardViewModel` through the pure draw plan
+`src/legacy-runtime/legacyLeaderboardOverlayPlan.ts` (near-black card, pinned own-rank card, rank/name/level rows,
+skeleton loading, friendly empty/error states with Retry, Previous/Next with the limit+1 fetch, 44 px targets, safe
+area aware); the old row/glyph/accent drawing code and `createAuthAccountSummaryCard` were removed. The header entry
+icon (`public/assets/hud/hud-leaderboard.png`, `drawLegacyMenuLeaderboardIcon`) is unchanged. The pause card and
+header identity parts below remain unwired here.
 
 ## Owner direction (verbatim intent)
 

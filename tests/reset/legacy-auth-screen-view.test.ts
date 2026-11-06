@@ -87,9 +87,10 @@ describe('legacy auth screen view model', () => {
     const idle = build();
     expect(idle.primaryDock).toEqual({ action: 'sign-in', disabled: false, label: 'Sign in', pending: false });
 
+    expect(LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS).toBe(10_000);
     const opening = build({ submitting: true, submittingElapsedMs: LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS - 1 });
     expect(opening.phase).toBe('opening');
-    expect(opening.primaryDock).toEqual({ action: 'sign-in', disabled: true, label: 'Opening', pending: true });
+    expect(opening.primaryDock).toEqual({ action: 'sign-in', disabled: true, label: 'Opening…', pending: true });
     expect(opening.secondaryRail.every((link) => link.disabled)).toBe(true);
     expect(opening.legalRow.every((link) => link.disabled)).toBe(true);
 

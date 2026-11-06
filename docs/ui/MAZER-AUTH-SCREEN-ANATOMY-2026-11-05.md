@@ -1,8 +1,22 @@
 # Mazer Auth Screen Anatomy (shared-account entry)
 
-Date: 2026-11-05. Status: SOURCE-ONLY SPEC. The view-model and layout helper are implemented and tested, but
-nothing renders them yet: `src/scenes/MenuScene.ts` is untouched and still draws the old screen. This document
-grants no wiring, release, deploy or provider authority.
+Date: 2026-11-05. Status: WIRED (wave `claude/mazer-w2-leaderboard-auth-20261105`, source-proven in a local worktree; not
+deployed). `MenuScene.buildSharedAccountEntrySection` / `buildAuthOverlay` now draw this view-model and layout. The
+opening timeout is 10 s (owner decision) and the dock label is `Opening…`. `Create Account` stays on the OAuth
+hand-off because FawxzzyWeb has no sign-up deep link (`LoginPanel` keeps `intent` in React state only; verified
+read-only at FawxzzyWeb b0a9f88). First-time signed-out visitors skip the `Signing you in…` cover entirely
+(`src/legacy-runtime/legacyAuthGateResolution.ts`). The sections below are the original spec and wiring plan. This
+document grants no release, deploy or provider authority.
+
+Wave note: `scripts/analysis/capture-ui-surfaces.mjs` (and `tests/reset/ui-surface-capture-script.test.mjs`) are
+owned by Wave 0C, so this wave did NOT edit them (the integrator-wave guard rejects a 0C + 5C mix). Its
+`AUTH_EXPECTED_LABELS` still list the old `Create account` / `Reset password`, so `npm run visual:ui-surfaces`
+reports a failing `auth-text-labels` check against the Welcome screen until Wave 0C applies the prepared follow-up
+(new labels `Sign in`, `Create Account`, `Reset Password`, `Privacy Policy`, `Terms of Service`, an
+`evaluateAuthWelcomeAnatomy` check, and `buttons` passed through for the auth surface; 41/41 against this wave's
+build). The CI steps `ui-surfaces failure reporting` and `Options/Account reachability` pass unchanged.
+`live-auth-persistence-soak.mjs` (Wave 5C) was updated: the Welcome labels are now in `RETIRED_LOCAL_AUTH_CONTROLS`
+so they cannot leak onto the signed-out menu.
 
 Implementation: `src/legacy-runtime/legacyAuthScreenView.ts` (pure; no Phaser, storage, network or clock).
 Tests: `tests/reset/legacy-auth-screen-view.test.ts`.
@@ -49,8 +63,8 @@ authenticated phases (the authenticated Account section is a different surface a
 | `loading` | `awaitingResolution` | none (loading copy only) | none |
 | `authenticated` | `status === 'authenticated'` | none | none |
 | `callback-pending` | `hasCallbackInProgress` | `Signing in`, disabled, pending | info: `Signing you in…` |
-| `opening` | `submitting`, elapsed < 8000 ms | `Opening`, disabled, pending | none |
-| `opening-slow` | `submitting`, elapsed >= 8000 ms | `Sign in`, enabled (retry) | info: `Still opening. Continue in your browser or try again.` |
+| `opening` | `submitting`, elapsed < 10000 ms | `Opening…`, disabled, pending | none |
+| `opening-slow` | `submitting`, elapsed >= 10000 ms | `Sign in`, enabled (retry) | info: `Still opening. Continue in your browser or try again.` |
 | `error` | non-empty `errorMessage`, or `status === 'unavailable'` | `Sign in`, enabled | error: message |
 | `entry` | otherwise | `Sign in`, enabled | none |
 
@@ -90,7 +104,7 @@ is the safe neutral default.
 
 ### Bounded `Opening` label
 
-`Opening` shows only while `submitting` and fewer than `LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS` (8000) ms have
+`Opening…` shows only while `submitting` and fewer than `LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS` (10000) ms have
 elapsed (`submittingElapsedMs`, supplied by the scene clock). After that the model returns `opening-slow`: the dock
 is `Sign in` and enabled and the banner offers `Continue in your browser`. The scene must also clear
 `authSubmitting` at that point, because `handleSharedAccountAuthorization` returns early while it is set;

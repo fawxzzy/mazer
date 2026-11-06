@@ -70,16 +70,7 @@ const MENU = 'src/scenes/MenuScene.ts';
  */
 const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: MENU, literal: 'Signing you in…', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY + message surface (auth gate loading)' },
-  { file: MENU, literal: 'Loading username...', kind: 'raw-status', route: 'message surface, info tone, source auth' },
-  { file: MENU, literal: 'Username unavailable. Try again.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.usernameUnavailable, warning tone' },
-  { file: MENU, literal: 'You need a username to access the leaderboard.', kind: 'raw-static', route: 'keep as screen gate copy; move to a leaderboard copy table' },
-  { file: MENU, literal: 'Set a username on the account screen to appear here.', kind: 'raw-static', route: 'keep as card copy; move to a leaderboard copy table' },
-  { file: MENU, literal: 'YOUR RANK', kind: 'label', route: 'none (label)' },
-  { file: MENU, literal: 'Loading...', kind: 'raw-status', route: 'message surface, info tone, source system (leaderboard loading)' },
-  { file: MENU, literal: 'The leaderboard is not available right now.', kind: 'parallel-mapper', route: 'duplicate of legacyLeaderboard.ts fallback; resolve once via the message module' },
-  { file: MENU, literal: 'No one has a public rank yet.', kind: 'raw-static', route: 'keep as empty-state copy; move to a leaderboard copy table' },
   { file: MENU, literal: 'This resets your rank progress, score, runs, and maze level to the starting baseline, including the menu AI\'s progression.', kind: 'raw-static', route: 'keep as confirm-dialog copy (ConfirmDialog contract)' },
-  { file: MENU, literal: 'Use your shared Fawxzzy account to keep progression, settings, and leaderboard identity connected.', kind: 'raw-static', route: 'keep as screen helper copy' },
   { file: MENU, literal: '{}\nManage your profile and account from the shared Fawxzzy account portal.', kind: 'raw-static', route: 'keep as screen helper copy' },
   { file: MENU, literal: 'Old trail fades.', kind: 'static', route: 'setting caption; not a status event' },
   { file: MENU, literal: 'Slow white shine.', kind: 'static', route: 'setting caption; not a status event' },
@@ -109,19 +100,20 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/ui/dom/MazerSwitch.ts', literal: 'Off', kind: 'static', route: 'primitive state label' },
   { file: 'src/ui/dom/StatusBanner.ts', literal: 'Info', kind: 'static', route: 'primitive tone label' },
   { file: 'src/ui/dom/StatusBanner.ts', literal: 'Error', kind: 'static', route: 'primitive tone label' },
-  { file: 'src/legacy-runtime/legacyAuthScreenView.ts', literal: 'Still opening. Continue in your browser or try again.', kind: 'duplicate-unrendered', route: 'dormant auth-screen view-model copy table (not yet wired); route through the message module when wired' },
-  { file: 'src/legacy-runtime/legacyAuthScreenView.ts', literal: 'Loading…', kind: 'duplicate-unrendered', route: 'dormant auth-screen view-model copy table (not yet wired); route through the message module when wired' },
-  { file: 'src/legacy-runtime/legacyAuthScreenView.ts', literal: 'Signing you in…', kind: 'duplicate-unrendered', route: 'dormant auth-screen view-model copy table (not yet wired); route through the message module when wired' },
-  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'No one has a public rank yet.', kind: 'duplicate-unrendered', route: 'dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired' },
-  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'No more players on this page.', kind: 'duplicate-unrendered', route: 'dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired' },
-  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'The leaderboard is not available right now.', kind: 'duplicate-unrendered', route: 'dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired' },
-  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Could not reach the leaderboard. Check your connection and try again.', kind: 'duplicate-unrendered', route: 'dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired' },
-  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'The leaderboard is not set up yet.', kind: 'duplicate-unrendered', route: 'dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired' },
-  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Loading...', kind: 'duplicate-unrendered', route: 'dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired' },
-  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Loading username...', kind: 'duplicate-unrendered', route: 'dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired' },
-  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'You need a username to access the leaderboard.', kind: 'duplicate-unrendered', route: 'dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired' },
-  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Set a username on the account screen to appear here.', kind: 'duplicate-unrendered', route: 'dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired' },
-  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Username unavailable. Try again.', kind: 'duplicate-unrendered', route: 'dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired' },
+  { file: 'src/legacy-runtime/legacyAuthScreenView.ts', literal: 'Still opening. Continue in your browser or try again.', kind: 'duplicate-unrendered', route: 'auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyAuthScreenView.ts', literal: 'Opening…', kind: 'raw-status', route: 'dock label while the OAuth redirect is in flight; bounded to LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS (10 s), then Sign in + browser notice' },
+  { file: 'src/legacy-runtime/legacyAuthScreenView.ts', literal: 'Loading…', kind: 'duplicate-unrendered', route: 'auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyAuthScreenView.ts', literal: 'Signing you in…', kind: 'duplicate-unrendered', route: 'auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'No one has a public rank yet.', kind: 'duplicate-unrendered', route: 'leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'No more players on this page.', kind: 'duplicate-unrendered', route: 'leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'The leaderboard is not available right now.', kind: 'duplicate-unrendered', route: 'leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Could not reach the leaderboard. Check your connection and try again.', kind: 'duplicate-unrendered', route: 'leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'The leaderboard is not set up yet.', kind: 'duplicate-unrendered', route: 'leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Loading...', kind: 'duplicate-unrendered', route: 'leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Loading username...', kind: 'duplicate-unrendered', route: 'leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'You need a username to access the leaderboard.', kind: 'duplicate-unrendered', route: 'leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Set a username on the account screen to appear here.', kind: 'duplicate-unrendered', route: 'leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Username unavailable. Try again.', kind: 'duplicate-unrendered', route: 'leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands' },
   { file: 'src/legacy-runtime/legacyMazeFeatureRegistry.ts', literal: 'Checkpoint-chasing corridor carve that forms the base maze; every generated maze has it.', kind: 'technical', route: 'developer-facing feature registry description; never rendered to players' },
   { file: 'src/legacy-runtime/legacyMazeFeatureRegistry.ts', literal: 'Two or more checkpoint legs, so the route bends between waypoints instead of one straight leg.', kind: 'technical', route: 'developer-facing feature registry description; never rendered to players' },
   { file: 'src/legacy-runtime/legacyMazeFeatureRegistry.ts', literal: 'Heading-continuation bias that lengthens straight runs and reduces zig-zag.', kind: 'technical', route: 'developer-facing feature registry description; never rendered to players' },
@@ -451,9 +443,15 @@ describe('message-system structure the inventory depends on', { timeout: GUARD_T
 
   test('auth feedback is rendered from the raw snapshot, not from the resolved message', () => {
     const menu = srcText(MENU);
+    // The Welcome screen feeds the raw snapshot into the auth-screen view-model
+    // (error) and draws the optional info line; each raw site appears once.
     expect(
-      menu.split('this.authSnapshot.error ?? this.authSnapshot.info').length - 1,
-      'The raw auth feedback render site changed. Update the inventory doc (section: raw render sites).'
+      menu.split('errorMessage: this.authSnapshot.error,').length - 1,
+      'The raw auth error render site changed. Update the inventory doc (section: raw render sites).'
+    ).toBe(1);
+    expect(
+      menu.split('this.authSnapshot.info?.trim()').length - 1,
+      'The raw auth info render site changed. Update the inventory doc (section: raw render sites).'
     ).toBe(1);
   });
 

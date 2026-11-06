@@ -36,8 +36,8 @@ outside `legacyPlayerMessage.ts`. "Routes through `legacyPlayerMessage.ts`" ther
 "resolves to a typed message that diagnostics can see", not "is shown to the player".
 
 F2. **Auth feedback is drawn from the raw snapshot, not from the resolved message.**
-`buildSharedAccountEntrySection` renders `this.authSnapshot.error ?? this.authSnapshot.info`
-(`MenuScene.ts:14070`) straight into `createAuthInfoText`. The resolved
+`buildSharedAccountEntrySection` feeds `errorMessage: this.authSnapshot.error,` into the auth-screen view-model and draws
+`this.authSnapshot.info?.trim()` as an info line, straight into `createAuthInfoText` (wired 2026-11-05). The resolved
 `resolveLegacyAuthFeedbackMessage` result only feeds `latestAuthMessage` (diagnostics). So the
 sanitising switch in `resolveLegacyAuthFeedbackMessage` does not protect this render path.
 Snapshot `error` can hold provider text on four reachable-in-principle paths
@@ -114,16 +114,7 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | file:line | String (or key) | Via module | Tone / source | Kind | Recommended routing |
 | --- | --- | --- | --- | --- | --- |
 | `src/scenes/MenuScene.ts:2703` | `Signing you in…` | no | info / auth | raw-status | Copy key in auth table; render on the message surface |
-| `src/scenes/MenuScene.ts:13805` | `Loading username...` | no | info / auth | raw-status | Message surface, info |
-| `src/scenes/MenuScene.ts:13815` | `Username unavailable. Try again.` | no | warning / auth | raw-status | Auth table key `usernameUnavailable`, warning |
-| `src/scenes/MenuScene.ts:13844` | `You need a username to access the leaderboard.` | no | n/a (gate) | raw-static | Keep as gate copy; move to a leaderboard copy table |
-| `src/scenes/MenuScene.ts:13870` | `Set a username on the account screen to appear here.` | no | n/a (card) | raw-static | Keep; leaderboard copy table |
-| `src/scenes/MenuScene.ts:13871` | `YOUR RANK` | no | n/a | label | None |
-| `src/scenes/MenuScene.ts:13876` | `Loading...` | no | info / system | raw-status | Message surface, info |
-| `src/scenes/MenuScene.ts:13882` | `The leaderboard is not available right now.` | no | error / system | parallel-mapper | Resolve once in the message module; delete the duplicate |
-| `src/scenes/MenuScene.ts:13892` | `No one has a public rank yet.` | no | n/a (empty) | raw-static | Keep; leaderboard copy table |
 | `src/scenes/MenuScene.ts:14002` | `This resets your rank progress, score, runs, and maze level to the starting baseline, including the menu AI's progression.` | no | n/a (confirm) | raw-static | Keep as ConfirmDialog copy |
-| `src/scenes/MenuScene.ts:14072` | `Use your shared Fawxzzy account to keep progression, settings, and leaderboard identity connected.` | no | n/a (helper) | raw-static | Keep as screen helper |
 | `src/scenes/MenuScene.ts:14171` | `{account}\nManage your profile and account from the shared Fawxzzy account portal.` | no | n/a (helper) | raw-static | Keep as screen helper |
 | `src/scenes/MenuScene.ts:15008` | `Old trail fades.` | no | n/a | static | Setting caption; not a message |
 | `src/scenes/MenuScene.ts:15020` | `Slow white shine.` | no | n/a | static | Setting caption; not a message |
@@ -162,31 +153,32 @@ These show text that is not a literal, so the literal scan cannot see them. They
 
 | Site | What it draws | Risk |
 | --- | --- | --- |
-| `MenuScene.ts:14070` `authSnapshot.error ?? authSnapshot.info` | Raw snapshot text (F2) | Provider text or ad-hoc strings can reach the screen |
-| `MenuScene.ts:13882` `leaderboardErrorMessage` | Friendly string from `legacyLeaderboard.ts` (F6) | Parallel mapper, not the message module |
+| `MenuScene.ts` `errorMessage: this.authSnapshot.error,` + `this.authSnapshot.info?.trim()` (Welcome screen) | Raw snapshot text (F2) | Provider text or ad-hoc strings can reach the screen |
+| `MenuScene.ts` `leaderboardErrorMessage` (view-state input) | Friendly string from `legacyLeaderboard.ts` (F6) | Parallel mapper, not the message module |
 | `MenuScene.ts:14138` `passwordRecoveryFeedback ?? presentation.helper` | Routed recovery copy plus raw presentation helpers | Mixed |
 | `MenuScene.ts:17128` `add.text(..., MAZER_OAUTH_SAFE_ERROR_MESSAGE)` | Safe OAuth failure drawn directly on the menu | Bypasses the queue and tone colour |
 | `MenuScene.ts:14169` `accountLabel` | Display name or email | Identity text, not a message |
 
 ### 4c. Literals added by merged lanes (integration 1)
 
-The lane branches that added `legacyAuthScreenView.ts`, `legacyLeaderboardView.ts` and `legacyMazeFeatureRegistry.ts` landed after the audit base, so their literals were not in the original pin. They are pinned here. The two view modules are dormant pure view-models (not yet rendered by a scene) whose copy duplicates strings already inventoried above; the registry descriptions are developer-facing.
+The lane branches that added `legacyAuthScreenView.ts`, `legacyLeaderboardView.ts` and `legacyMazeFeatureRegistry.ts` landed after the audit base, so their literals were not in the original pin. They are pinned here. The two view modules are pure view-models rendered by MenuScene since the 2026-11-05 Welcome/leaderboard wiring whose copy duplicates strings already inventoried above; the registry descriptions are developer-facing.
 
 | file | String | Kind | Recommended routing |
 | --- | --- | --- | --- |
-| `src/legacy-runtime/legacyAuthScreenView.ts` | `Still opening. Continue in your browser or try again.` | duplicate-unrendered | dormant auth-screen view-model copy table (not yet wired); route through the message module when wired |
-| `src/legacy-runtime/legacyAuthScreenView.ts` | `Loading…` | duplicate-unrendered | dormant auth-screen view-model copy table (not yet wired); route through the message module when wired |
-| `src/legacy-runtime/legacyAuthScreenView.ts` | `Signing you in…` | duplicate-unrendered | dormant auth-screen view-model copy table (not yet wired); route through the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `No one has a public rank yet.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `No more players on this page.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `The leaderboard is not available right now.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `Could not reach the leaderboard. Check your connection and try again.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `The leaderboard is not set up yet.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `Loading...` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `Loading username...` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `You need a username to access the leaderboard.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `Set a username on the account screen to appear here.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `Username unavailable. Try again.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyAuthScreenView.ts` | `Still opening. Continue in your browser or try again.` | duplicate-unrendered | auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands |
+| `src/legacy-runtime/legacyAuthScreenView.ts` | `Opening…` | raw-status | dock label while the OAuth redirect is in flight; bounded to `LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS` (10 s), then `Sign in` + browser notice |
+| `src/legacy-runtime/legacyAuthScreenView.ts` | `Loading…` | duplicate-unrendered | auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands |
+| `src/legacy-runtime/legacyAuthScreenView.ts` | `Signing you in…` | duplicate-unrendered | auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `No one has a public rank yet.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `No more players on this page.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `The leaderboard is not available right now.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Could not reach the leaderboard. Check your connection and try again.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `The leaderboard is not set up yet.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Loading...` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Loading username...` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `You need a username to access the leaderboard.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Set a username on the account screen to appear here.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Username unavailable. Try again.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Checkpoint-chasing corridor carve that forms the base maze; every generated maze has it.` | technical | developer-facing feature registry description; never rendered to players |
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Two or more checkpoint legs, so the route bends between waypoints instead of one straight leg.` | technical | developer-facing feature registry description; never rendered to players |
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Heading-continuation bias that lengthens straight runs and reduces zig-zag.` | technical | developer-facing feature registry description; never rendered to players |
