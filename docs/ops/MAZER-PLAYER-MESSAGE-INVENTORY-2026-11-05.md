@@ -36,8 +36,8 @@ outside `legacyPlayerMessage.ts`. "Routes through `legacyPlayerMessage.ts`" ther
 "resolves to a typed message that diagnostics can see", not "is shown to the player".
 
 F2. **Auth feedback is drawn from the raw snapshot, not from the resolved message.**
-`buildSharedAccountEntrySection` renders `this.authSnapshot.error ?? this.authSnapshot.info`
-(`MenuScene.ts:14070`) straight into `createAuthInfoText`. The resolved
+`buildSharedAccountEntrySection` feeds `errorMessage: this.authSnapshot.error,` into the auth-screen view-model and draws
+`this.authSnapshot.info?.trim()` as an info line, straight into `createAuthInfoText` (wired 2026-11-05). The resolved
 `resolveLegacyAuthFeedbackMessage` result only feeds `latestAuthMessage` (diagnostics). So the
 sanitising switch in `resolveLegacyAuthFeedbackMessage` does not protect this render path.
 Snapshot `error` can hold provider text on four reachable-in-principle paths
@@ -114,16 +114,7 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | file:line | String (or key) | Via module | Tone / source | Kind | Recommended routing |
 | --- | --- | --- | --- | --- | --- |
 | `src/scenes/MenuScene.ts:2703` | `Signing you in…` | no | info / auth | raw-status | Copy key in auth table; render on the message surface |
-| `src/scenes/MenuScene.ts:13805` | `Loading username...` | no | info / auth | raw-status | Message surface, info |
-| `src/scenes/MenuScene.ts:13815` | `Username unavailable. Try again.` | no | warning / auth | raw-status | Auth table key `usernameUnavailable`, warning |
-| `src/scenes/MenuScene.ts:13844` | `You need a username to access the leaderboard.` | no | n/a (gate) | raw-static | Keep as gate copy; move to a leaderboard copy table |
-| `src/scenes/MenuScene.ts:13870` | `Set a username on the account screen to appear here.` | no | n/a (card) | raw-static | Keep; leaderboard copy table |
-| `src/scenes/MenuScene.ts:13871` | `YOUR RANK` | no | n/a | label | None |
-| `src/scenes/MenuScene.ts:13876` | `Loading...` | no | info / system | raw-status | Message surface, info |
-| `src/scenes/MenuScene.ts:13882` | `The leaderboard is not available right now.` | no | error / system | parallel-mapper | Resolve once in the message module; delete the duplicate |
-| `src/scenes/MenuScene.ts:13892` | `No one has a public rank yet.` | no | n/a (empty) | raw-static | Keep; leaderboard copy table |
 | `src/scenes/MenuScene.ts:14002` | `This resets your rank progress, score, runs, and maze level to the starting baseline, including the menu AI's progression.` | no | n/a (confirm) | raw-static | Keep as ConfirmDialog copy |
-| `src/scenes/MenuScene.ts:14072` | `Use your shared Fawxzzy account to keep progression, settings, and leaderboard identity connected.` | no | n/a (helper) | raw-static | Keep as screen helper |
 | `src/scenes/MenuScene.ts:14171` | `{account}\nManage your profile and account from the shared Fawxzzy account portal.` | no | n/a (helper) | raw-static | Keep as screen helper |
 | `src/scenes/MenuScene.ts:15008` | `Old trail fades.` | no | n/a | static | Setting caption; not a message |
 | `src/scenes/MenuScene.ts:15020` | `Slow white shine.` | no | n/a | static | Setting caption; not a message |
@@ -133,9 +124,6 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | `src/scenes/MenuScene.ts:17547` | `Runtime diagnostics authenticated fixture.` | no | n/a | fixture | None (QA fixture) |
 | `src/boot/accessibilitySurface.ts:100` | `Use Arrow keys or WASD to move through the maze. Press Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.` | no | n/a | static | None (a11y description) |
 | `src/boot/accessibilitySurface.ts:109` | `Mazer is ready.` | no | info | static | Live region never updated; candidate sink for the message surface announcements |
-| `src/boot/installGate.ts:75` | `Open this page in your device's default browser.` | no | n/a | static | None (install instructions) |
-| `src/boot/installGate.ts:76` | `Tap Share, then choose More.` | no | n/a | static | None |
-| `src/boot/installGate.ts:77` | `Select Add to Home Screen, Install app, or Download.` | no | n/a | static | None |
 | `src/legacy-runtime/legacyAccountPortal.ts:23` | `Account connection unavailable. Return to Mazer and try again.` | no | error / auth | raw-status | Auth table key `accountConnectionUnavailable`; it is drawn directly at `MenuScene.ts:17128` and via F2 |
 | `src/legacy-runtime/legacyAuth.ts:763` | `Account connected.` | no | success / auth | raw-status | Auth table key `accountConnected`; no render site today (info on the snapshot) |
 | `src/legacy-runtime/legacyAuth.ts:1024` | `A previous password update is still pending. Please wait before trying a different password.` | mapped | n/a | technical | Stays internal; mapped by `resolveLegacyPasswordRecoveryError` |
@@ -162,31 +150,32 @@ These show text that is not a literal, so the literal scan cannot see them. They
 
 | Site | What it draws | Risk |
 | --- | --- | --- |
-| `MenuScene.ts:14070` `authSnapshot.error ?? authSnapshot.info` | Raw snapshot text (F2) | Provider text or ad-hoc strings can reach the screen |
-| `MenuScene.ts:13882` `leaderboardErrorMessage` | Friendly string from `legacyLeaderboard.ts` (F6) | Parallel mapper, not the message module |
+| `MenuScene.ts` `errorMessage: this.authSnapshot.error,` + `this.authSnapshot.info?.trim()` (Welcome screen) | Raw snapshot text (F2) | Provider text or ad-hoc strings can reach the screen |
+| `MenuScene.ts` `leaderboardErrorMessage` (view-state input) | Friendly string from `legacyLeaderboard.ts` (F6) | Parallel mapper, not the message module |
 | `MenuScene.ts:14138` `passwordRecoveryFeedback ?? presentation.helper` | Routed recovery copy plus raw presentation helpers | Mixed |
 | `MenuScene.ts:17128` `add.text(..., MAZER_OAUTH_SAFE_ERROR_MESSAGE)` | Safe OAuth failure drawn directly on the menu | Bypasses the queue and tone colour |
 | `MenuScene.ts:14169` `accountLabel` | Display name or email | Identity text, not a message |
 
 ### 4c. Literals added by merged lanes (integration 1)
 
-The lane branches that added `legacyAuthScreenView.ts`, `legacyLeaderboardView.ts` and `legacyMazeFeatureRegistry.ts` landed after the audit base, so their literals were not in the original pin. They are pinned here. The two view modules are dormant pure view-models (not yet rendered by a scene) whose copy duplicates strings already inventoried above; the registry descriptions are developer-facing.
+The lane branches that added `legacyAuthScreenView.ts`, `legacyLeaderboardView.ts` and `legacyMazeFeatureRegistry.ts` landed after the audit base, so their literals were not in the original pin. They are pinned here. The two view modules are pure view-models rendered by MenuScene since the 2026-11-05 Welcome/leaderboard wiring whose copy duplicates strings already inventoried above; the registry descriptions are developer-facing.
 
 | file | String | Kind | Recommended routing |
 | --- | --- | --- | --- |
-| `src/legacy-runtime/legacyAuthScreenView.ts` | `Still opening. Continue in your browser or try again.` | duplicate-unrendered | dormant auth-screen view-model copy table (not yet wired); route through the message module when wired |
-| `src/legacy-runtime/legacyAuthScreenView.ts` | `Loading…` | duplicate-unrendered | dormant auth-screen view-model copy table (not yet wired); route through the message module when wired |
-| `src/legacy-runtime/legacyAuthScreenView.ts` | `Signing you in…` | duplicate-unrendered | dormant auth-screen view-model copy table (not yet wired); route through the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `No one has a public rank yet.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `No more players on this page.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `The leaderboard is not available right now.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `Could not reach the leaderboard. Check your connection and try again.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `The leaderboard is not set up yet.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `Loading...` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `Loading username...` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `You need a username to access the leaderboard.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `Set a username on the account screen to appear here.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
-| `src/legacy-runtime/legacyLeaderboardView.ts` | `Username unavailable. Try again.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyAuthScreenView.ts` | `Still opening. Continue in your browser or try again.` | duplicate-unrendered | auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands |
+| `src/legacy-runtime/legacyAuthScreenView.ts` | `Opening…` | raw-status | dock label while the OAuth redirect is in flight; bounded to `LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS` (10 s), then `Sign in` + browser notice |
+| `src/legacy-runtime/legacyAuthScreenView.ts` | `Loading…` | duplicate-unrendered | auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands |
+| `src/legacy-runtime/legacyAuthScreenView.ts` | `Signing you in…` | duplicate-unrendered | auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `No one has a public rank yet.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `No more players on this page.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `The leaderboard is not available right now.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Could not reach the leaderboard. Check your connection and try again.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `The leaderboard is not set up yet.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Loading...` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Loading username...` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `You need a username to access the leaderboard.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Set a username on the account screen to appear here.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Username unavailable. Try again.` | duplicate-unrendered | leaderboard view-model copy table (rendered by the MenuScene leaderboard overlay); fold into the message module when the render surface lands |
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Checkpoint-chasing corridor carve that forms the base maze; every generated maze has it.` | technical | developer-facing feature registry description; never rendered to players |
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Two or more checkpoint legs, so the route bends between waypoints instead of one straight leg.` | technical | developer-facing feature registry description; never rendered to players |
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Heading-continuation bias that lengthens straight runs and reduces zig-zag.` | technical | developer-facing feature registry description; never rendered to players |
@@ -197,6 +186,35 @@ The lane branches that added `legacyAuthScreenView.ts`, `legacyLeaderboardView.t
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Horizontal wrap pairing forced by a single-feeder, vertical-only wrap profile.` | technical | developer-facing feature registry description; never rendered to players |
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Perimeter feeder spokes: single-tile border openings carved inward from each side.` | technical | developer-facing feature registry description; never rendered to players |
 | `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Opposite-border pairing pass that mirrors existing border openings onto the far side.` | technical | developer-facing feature registry description; never rendered to players |
+
+### 4d. Boot splash and install gate literals (PR #372, pinned in integration 3)
+
+PR #372 (deterministic install gate, boot splash and bounded account bootstrap) landed after the audit base and the pin was never updated: three old `installGate.ts` rows were stale and 23 new source sites were unclassified. All are player-facing and active. The install gate is a pre-game surface (DOM overlay, no skip action, see `installPolicy.ts`); the splash is the static boot markup that `bootStatus` updates. `installSurface.ts` and `installPolicy.ts` contribute no scanned literals. The first two rows are status text that bypasses the message module; the rest are static gate copy (instructions), not status events. `Open Mazer from your home screen.` appears at two source sites and is one pin.
+
+| file | String | Kind | Surface / routing |
+| --- | --- | --- | --- |
+| `src/boot/bootSplash.ts` | `Loading…` | raw-status | boot splash neutral message (static markup in index.html, then updated by bootStatus); active pre-game surface; not routed through the message module |
+| `src/boot/bootSplash.ts` | `Signing you in…` | raw-status | boot splash message shown only while an OAuth callback exchange is in progress; active pre-game surface; mirrors LEGACY_AUTH_MESSAGE_COPY wording |
+| `src/boot/installGate.ts` | `Mazer only runs as an installed app, not in a browser tab.` | static | install gate subtitle (prompt-available and manual platform cards); active; gate copy, not a status event |
+| `src/boot/installGate.ts` | `Press Install below.` | static | install gate step, prompt-available mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Confirm in your browser.` | static | install gate step, prompt-available mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open Mazer from your home screen or desktop.` | static | install gate step, prompt-available mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Click the install icon at the end of the address bar, or open the browser menu and choose Install Mazer.` | static | install gate step, manual-desktop-chromium mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Confirm the install.` | static | install gate step, manual-desktop-chromium mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open Mazer from your desktop or Start menu.` | static | install gate step, manual-desktop-chromium mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open this page in Chrome or Edge. In Safari, choose File, then Add to Dock.` | static | install gate step, manual-desktop-other mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `In Chrome or Edge, click the install icon in the address bar.` | static | install gate step, manual-desktop-other mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open Mazer from your desktop, Start menu or Dock.` | static | install gate step, manual-desktop-other mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open this page in Chrome and tap the three-dot menu.` | static | install gate step, manual-android mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Choose Install app or Add to Home screen.` | static | install gate step, manual-android mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open Mazer from your home screen.` | static | install gate step, manual-android and manual-ios modes (two source sites, one pin); active; none (install instructions) |
+| `src/boot/installGate.ts` | `Tap the Share button in Safari.` | static | install gate step, manual-ios mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Choose Add to Home Screen.` | static | install gate step, manual-ios mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Mazer only runs as an installed app, and in-app browsers cannot install it.` | static | install gate subtitle, in-app-browser mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Copy the link below.` | static | install gate step, in-app-browser mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Paste it into Safari or Chrome.` | static | install gate step, in-app-browser mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Install Mazer from there, then open it from your home screen.` | static | install gate step, in-app-browser mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Open it from your home screen or desktop.` | static | install gate subtitle, installed-open-app mode (post-install card); active; none (install instructions) |
 
 ### 4b. Technical-only literals
 

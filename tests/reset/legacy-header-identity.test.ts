@@ -350,6 +350,25 @@ describe('legacy header identity: invariants', () => {
     }
   });
 
+  test('minVisibleChars lowers the visible-character floor (320 px short form) without changing the default', () => {
+    // 41 px of room at 11 px / 0.62em (6.82 px per glyph): 5 glyphs + ellipsis do not fit 6 visible chars.
+    const input = {
+      profileFrameRight: 42,
+      text: 'maze_runner',
+      titleLeft: 99,
+      viewportHeight: 568,
+      viewportWidth: 320,
+      fontPx: 14
+    };
+    const strict = resolveLegacyHeaderIdentityLayout(input);
+    expect(strict.visible).toBe(false);
+    expect(strict.hiddenReason).toBe('too-few-visible-characters');
+    const shortForm = resolveLegacyHeaderIdentityLayout({ ...input, minVisibleChars: 4 });
+    expect(shortForm.visible).toBe(true);
+    expect(shortForm.displayText.endsWith(LEGACY_HEADER_IDENTITY_ELLIPSIS)).toBe(true);
+    expect(shortForm.right).toBeLessThanOrEqual(99 - LEGACY_HEADER_IDENTITY_TITLE_GAP_PX + 1e-9);
+  });
+
   test('is deterministic for identical input', () => {
     const run = () => JSON.stringify(layoutFor(390, 'maze_runner'));
     expect(run()).toBe(run());

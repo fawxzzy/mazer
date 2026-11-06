@@ -187,6 +187,14 @@ import {
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import {
+  LEGACY_HEADER_IDENTITY_LABEL_NAME,
+  resolveLegacyHeaderIdentityPlacement
+} from '../legacy-runtime/legacyHeaderIdentityPlacement';
+import {
+  buildLegacyPauseMenuViewModel,
+  resolveLegacyPauseMenuLayout
+} from '../legacy-runtime/legacyPauseMenuView';
+import {
   LEGACY_UI_COMPACT_BREAKPOINT,
   resolveLegacyFeatureControlLayout,
   resolveLegacyOverlayContentFlowLayout,
@@ -276,7 +284,6 @@ import {
   LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH,
   LEGACY_PROGRESSION_STORAGE_KEY,
   createEmptyLegacyProgressionState,
-  formatLegacyProgressionOrdinal,
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
   resolveLegacyMazeGenerationProfileForProgression,
@@ -345,6 +352,31 @@ import {
   type LegacyLeaderboardEntry,
   type LegacyLeaderboardSelfRank
 } from '../legacy-runtime/legacyLeaderboard';
+import {
+  buildLegacyLeaderboardOverlayPlan,
+  type LegacyLeaderboardPlanAction
+} from '../legacy-runtime/legacyLeaderboardOverlayPlan';
+import {
+  buildLegacyLeaderboardViewModel,
+  resolveLegacyLeaderboardPageRequest,
+  resolveLegacyLeaderboardTierColor,
+  type LegacyLeaderboardActionId,
+  type LegacyLeaderboardPagerModel,
+  type LegacyLeaderboardUsernameGate,
+  type LegacyLeaderboardViewState
+} from '../legacy-runtime/legacyLeaderboardView';
+import {
+  LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS,
+  buildLegacyAuthScreenViewModel,
+  resolveLegacyAuthLoadingCopy,
+  resolveLegacyAuthScreenLayout,
+  type LegacyAuthScreenLink,
+  type LegacyAuthScreenRect
+} from '../legacy-runtime/legacyAuthScreenView';
+import {
+  hasLegacyStoredAuthSession,
+  resolveLegacyAuthGateInitialState
+} from '../legacy-runtime/legacyAuthGateResolution';
 import {
   LEGACY_GUEST_PLAY_ACCESS_ENABLED,
   isLegacyPlayAccessAllowed
@@ -1163,7 +1195,7 @@ const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 // too fast/flickery for a deliberate classic-menu blink.
 const LEGACY_MENU_BLINK_PULSE_MS = 2400;
 // Shared by the Options/Pause overlay's Account ring (drawLegacyProfileIcon)
-// and its own Home button's ring (createLegacyOverlayHomeButton's drawHome)
+// and its own Home button's ring (the Home button is gone; Pause is now a card)
 // -- previously two independently hand-copied formulas that could silently
 // drift apart despite existing specifically to make those two icons read as
 // a matched pair. Restrained consistency pass (owner-directed refinement,
@@ -1351,7 +1383,6 @@ const LEGACY_BLEED_GLOW_MAX_ALPHA = 0.5;
 const LEGACY_BLEED_GLOW_STEPS = 8;
 const LEGACY_PLAY_HUD_TIMER_PANE = cyberArcadeMaterial.substrate.panel;
 const LEGACY_PLAY_TOUCH_BUTTON_FILL = cyberArcadeMaterial.substrate.panelRaised;
-const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_TOUCH_BUTTON_STROKE = cyberArcadeMaterial.rail.cyan;
 const LEGACY_PLAY_TOUCH_ICON = cyberArcadeMaterial.rail.white;
 const LEGACY_PLAY_TOUCH_ACCENT = cyberArcadeMaterial.rail.mint;
@@ -1719,6 +1750,13 @@ export class MenuScene extends Phaser.Scene {
   private authPasswordVisible = false;
   private authAccountHydrationSequence = 0;
   private authSubmitting = false;
+  // OAuth hand-off bookkeeping for the bounded `Opening…` dock label: -1 =
+  // started, not yet stamped by update(); null = no hand-off in flight.
+  private authOpeningStartedAtMs: number | null = null;
+  private authOpeningTimedOut = false;
+  // True only when the gate was raised because a session is being resolved
+  // (see legacyAuthGateResolution.ts); drives the loading-cover copy.
+  private authGateHasSessionEvidence = false;
   private authSubmitAttemptId = 0;
   private authInvalidFields: ReadonlySet<LegacyAuthFieldId> = new Set();
   // Check-only (never auto-saves -- there's no account to save to yet
@@ -1732,13 +1770,12 @@ export class MenuScene extends Phaser.Scene {
   private authUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private menuLeaderboardActive = false;
   private menuProfileActive = false;
-  private overlayUsernameActive = false;
-  private overlayHomeActive = false;
+  // Pause card: the collapsible Settings section (collapsed on every open).
+  private pauseSettingsExpanded = false;
   private leaderboardStatus: 'empty' | 'error' | 'idle' | 'loading' | 'ready' = 'idle';
   private leaderboardErrorMessage: string | null = null;
   private leaderboardEntries: readonly LegacyLeaderboardEntry[] = [];
   private leaderboardOffset = 0;
-  private leaderboardHasNextPage = false;
   private leaderboardSelfRank: LegacyLeaderboardSelfRank | null = null;
   private leaderboardSequence = 0;
   // Deliberately NOT part of authForm/LegacyAuthFieldId -- that state
@@ -1937,8 +1974,8 @@ export class MenuScene extends Phaser.Scene {
   // boardDynamicGraphics/boardZoomContainer space -- one persistent Image
   // each, same lifetime as boardDynamicGraphics itself. The profile icon's
   // own Image(s) are NOT scene-level fields: that glyph is drawn from
-  // per-button closures (createLegacyMenuProfileButton/
-  // createLegacyOverlayUsernameButton) whose graphics/background/label are
+  // per-button closure (createLegacyMenuProfileButton) whose
+  // graphics/background/label are
   // already created and destroyed alongside each button instance, so its
   // Image lives and dies with that same closure instead.
   private headerSettingsIconImage!: Phaser.GameObjects.Image;
@@ -2310,6 +2347,20 @@ export class MenuScene extends Phaser.Scene {
     this.loadPersistedLegacyProgressionState();
     this.applyBootstrappedLegacyAccountState();
     this.installLegacyReducedMotionPreference();
+    // Only raise the `Signing you in…` cover when a session is actually being
+    // resolved; a first-time signed-out visitor goes straight to Welcome.
+    const authGateInitialState = resolveLegacyAuthGateInitialState({
+      authFixtureRoute: isLegacyRuntimeDiagnosticsAuthFixtureRoute(runtimeSearch),
+      bootstrappedAuthenticated: readLegacyBootstrappedAuthSnapshot()?.status === 'authenticated',
+      callbackInProgress: false,
+      hasStoredSession: hasLegacyStoredAuthSession(this.resolveBrowserLocalStorage())
+    });
+    this.authGateAwaitingResolution = authGateInitialState.awaitingResolution;
+    this.authGateHasSessionEvidence = authGateInitialState.awaitingResolution;
+    if (authGateInitialState.locked) {
+      this.authGateLocked = true;
+      this.pendingAuthGateTransition = true;
+    }
     void this.initializeLegacyAuth();
     this.initializeRuntimeDiagnostics();
     this.backdropGraphics = this.add.graphics();
@@ -3177,6 +3228,7 @@ export class MenuScene extends Phaser.Scene {
       this.startPlayMode();
       this.rebuildUi();
     }
+    this.syncLegacyAuthOpeningTimeout(time);
     this.syncLegacyAuthGateLoadingScreen(time);
     this.recordRuntimeFrame(delta);
     if (this.overlay === 'auth') {
@@ -11477,7 +11529,7 @@ export class MenuScene extends Phaser.Scene {
         this.uiButtons.push(this.createLegacyMenuProfileButton(
           () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
         ));
-        this.createLegacyAuthenticatedWelcomeIdentity();
+        this.createLegacyHeaderIdentityLabel();
       }
 
       this.uiDirty = false;
@@ -11516,7 +11568,7 @@ export class MenuScene extends Phaser.Scene {
     // that concern.
     // Auth is an intentionally opaque application surface. It must not compete
     // with the animated maze/menu content underneath the input controls.
-    this.overlayGraphics.fillStyle(this.overlay === 'auth' ? 0x031f20 : 0x02040a, this.overlay === 'auth' ? 1 : 0.82);
+    this.overlayGraphics.fillStyle(this.overlay === 'auth' ? cyberArcadeMaterial.substrate.field : 0x02040a, this.overlay === 'auth' ? 1 : 0.82);
     this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);
   }
 
@@ -11655,11 +11707,6 @@ export class MenuScene extends Phaser.Scene {
     });
     let rowY = shell.contentTop;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    this.uiButtons.push(this.createLegacyOverlayUsernameButton(
-      panel,
-      () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface()),
-      panel.centerX
-    ));
 
     if (!showAdvancedOptions) {
       const viewportTop = rowY + (compact ? 4 : 6);
@@ -12161,324 +12208,347 @@ export class MenuScene extends Phaser.Scene {
     return resolveLegacyAdvancedOptionsVisible(typeof window === 'undefined' ? '' : window.location.search);
   }
 
+  // Pause card (legacyPauseMenuView.ts): title, Resume, a collapsible
+  // Settings section (collapsed on every open) and Quit to Menu on one
+  // near-black card in the shared overlay palette. No profile/account entry and
+  // no Guide. Resume / Quit keep the existing "bridge first, then
+  // applyLegacyPauseCommand" paths, so the board stays held while paused and
+  // Quit to Menu is the existing return-menu command. All actions are at least
+  // 44px tall. When Settings is open on a short viewport only the toggle rows
+  // scroll (existing overlay scroll metrics); the three actions stay put.
   private buildPauseOverlay(): void {
     const panel = this.resolveOverlayPanelFrame();
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    // Matches createLegacyBottomActionBar's own height exactly (both above
-    // the standard 44px touch-target minimum) so the scrollable content
-    // above reserves precisely the space the bar actually occupies.
-    const actionButtonHeight = stacked ? 48 : 52;
-    const shell = resolveLegacyOverlayShellLayout({
-      actionHeight: actionButtonHeight,
-      // Down from 3 -- Reset (reset-player) was removed from the game
-      // entirely, and Reset Progress moved into the account screen with
-      // the rest of the account actions (it resets account-level
-      // progression, not just the current attempt, so it belongs there).
-      // Account now pairs with Menu in the one remaining row instead of
-      // getting its own row underneath.
-      actionRows: 1,
-      panel
-    });
-    this.uiButtons.push(this.createOverlayBackChevronButton(
-      panel,
-      () => this.dispatchUiBridgeCommand({ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume'))
-    ));
-    // Account is not an entry point from the in-play Pause screen -- home
-    // (return to menu) is the only header icon here, centered alone the
-    // same way the menu-context Options screen centers its own profile
-    // icon (see createLegacyOverlayUsernameButton's Options call site).
-    this.uiButtons.push(this.createLegacyOverlayHomeButton(
-      panel,
-      () => this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')),
-      panel.centerX
-    ));
-    const viewportTop = shell.contentTop;
-    const viewport = createVisualRect(
-      shell.contentLeft,
-      viewportTop,
-      shell.contentWidth,
-      Math.max(120, shell.contentHeight)
-    );
-    const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {
+    const view = buildLegacyPauseMenuViewModel();
+    const safeArea = readMazerViewportGeometry().safeArea;
+    const expanded = this.pauseSettingsExpanded;
+    const collapsed = resolveLegacyPauseMenuLayout(this.layout.width, this.layout.height, safeArea);
+    const rowsPanel: OverlayPanelFrame = {
+      centerX: collapsed.centerX,
+      height: 0,
+      left: collapsed.cardLeft + collapsed.cardPadding - 28,
+      top: 0,
+      width: collapsed.cardWidth - (collapsed.cardPadding * 2) + 56
+    };
+    const rowsContentHeight = this.resolveFeatureControlRowsContentHeight(rowsPanel, {
+      includeControlStyle: false,
       includeMovementSpeed: false
     });
-    const contentFlow = resolveLegacyOverlayContentFlowLayout({
-      contentTop: viewport.top,
-      controlsHeight: controlContentHeight,
-      guideHeight: this.resolveLegacyOptionsGuideEffectiveHeight(panel.width),
-      panelWidth: panel.width
+    const card = resolveLegacyPauseMenuLayout(this.layout.width, this.layout.height, safeArea, {
+      settingsContentHeight: rowsContentHeight,
+      settingsExpanded: expanded
     });
-    const scrollMetrics = resolveLegacyOverlayScrollMetrics({
-      contentHeight: contentFlow.contentHeight,
-      offset: this.overlayScrollOffset,
-      viewport: this.visualRectToLegacyOverlayScrollRect(viewport)
+    const actionLabel = (id: 'resume' | 'settings' | 'quit-to-menu'): string => (
+      view.actions.find((action) => action.id === id)?.label ?? id
+    );
+    const resumePause = (): void => this.dispatchUiBridgeCommand({ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume'));
+
+    // Back chevron stays the standard overlay exit and is an alias for Resume.
+    this.uiButtons.push(this.createOverlayBackChevronButton(panel, resumePause));
+
+    this.drawLegacyCyberPanel(this.overlayGraphics, {
+      alpha: 0.96,
+      // bg.canvas (near-black) rather than bg.panel: the card is the only
+      // surface on the dimmed board, so it should read as the darkest layer.
+      fill: cyberArcadeMaterial.substrate.field,
+      height: card.cardHeight,
+      left: card.cardLeft,
+      radius: LEGACY_UI_CONTROL_RADIUS + 4,
+      stroke: LEGACY_CYBER_PANEL_STROKE,
+      top: card.cardTop,
+      width: card.cardWidth
     });
-    this.applyLegacyOverlayScrollMetrics(scrollMetrics);
-    const renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);
-    this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {
-      exactTop: true,
-      rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
-      scrollOffset: scrollMetrics.offset,
-      viewport: renderViewport
-    });
-    this.createFeatureControlRows(contentFlow.controlsTop, panel, {
-      includeMovementSpeed: false,
-      rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
-      scrollOffset: scrollMetrics.offset,
-      viewport: renderViewport
-    });
-    this.drawLegacyOverlayScrollFacade(scrollMetrics);
+
+    const buttonWidth = card.cardWidth - (card.cardPadding * 2);
+    let cursorY = card.cardTop + card.cardPadding;
+    this.createOverlayTitle(view.title, cursorY + Math.round(card.titleHeight / 2));
+    cursorY += card.titleHeight + (card.compact ? 14 : 16);
+
+    this.uiButtons.push(this.createLegacyAuthActionButton(
+      card.centerX,
+      cursorY + (card.actionHeight / 2),
+      buttonWidth,
+      card.actionHeight,
+      actionLabel('resume'),
+      resumePause,
+      'primary'
+    ));
+    cursorY += card.actionHeight + card.actionGap;
+
+    const settingsCenterY = cursorY + (card.actionHeight / 2);
+    const settingsButton = this.createLegacyAuthActionButton(
+      card.centerX,
+      settingsCenterY,
+      buttonWidth,
+      card.actionHeight,
+      actionLabel('settings'),
+      () => {
+        this.pauseSettingsExpanded = !this.pauseSettingsExpanded;
+        this.resetLegacyOverlayScrollState();
+        this.uiDirty = true;
+      },
+      'secondary'
+    );
+    // Disclosure chevron (down = collapsed, up = expanded) on the button's
+    // right. Its own Graphics so it sits above the button chrome, and it is
+    // destroyed together with the button on every rebuild.
+    const chevron = this.add.graphics();
+    const chevronX = card.centerX + (buttonWidth / 2) - 24;
+    const chevronDirection = expanded ? -1 : 1;
+    chevron.lineStyle(2, LEGACY_CYBER_PANEL_STROKE, 0.9);
+    chevron.beginPath();
+    chevron.moveTo(chevronX - 6, settingsCenterY - (3 * chevronDirection));
+    chevron.lineTo(chevronX, settingsCenterY + (3 * chevronDirection));
+    chevron.lineTo(chevronX + 6, settingsCenterY - (3 * chevronDirection));
+    chevron.strokePath();
+    const destroySettingsButton = settingsButton.destroy;
+    settingsButton.destroy = () => {
+      chevron.destroy();
+      destroySettingsButton();
+    };
+    this.uiButtons.push(settingsButton);
+    cursorY += card.actionHeight + card.actionGap;
+
+    if (expanded) {
+      const clipped = Math.max(0, card.naturalCardHeight - card.cardHeight);
+      const rowsViewportHeight = Math.max(
+        card.actionHeight,
+        rowsContentHeight - clipped
+      );
+      const viewport = createVisualRect(card.cardLeft + card.cardPadding, cursorY, buttonWidth, rowsViewportHeight);
+      let scrollOffset = 0;
+      let renderViewport: VisualRect | null = null;
+      let scrollMetrics: LegacyOverlayScrollMetrics | null = null;
+      if (card.scrollable) {
+        scrollMetrics = resolveLegacyOverlayScrollMetrics({
+          contentHeight: rowsContentHeight,
+          offset: this.overlayScrollOffset,
+          viewport: this.visualRectToLegacyOverlayScrollRect(viewport)
+        });
+        this.applyLegacyOverlayScrollMetrics(scrollMetrics);
+        renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);
+        scrollOffset = scrollMetrics.offset;
+      }
+      this.createFeatureControlRows(cursorY, rowsPanel, {
+        includeControlStyle: false,
+        includeMovementSpeed: false,
+        rightGutter: card.scrollable ? LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER : 0,
+        scrollOffset,
+        viewport: renderViewport
+      });
+      if (scrollMetrics !== null) {
+        this.drawLegacyOverlayScrollFacade(scrollMetrics);
+      }
+      cursorY += rowsViewportHeight + card.actionGap;
+    }
+
+    this.uiButtons.push(this.createLegacyAuthActionButton(
+      card.centerX,
+      cursorY + (card.actionHeight / 2),
+      buttonWidth,
+      card.actionHeight,
+      actionLabel('quit-to-menu'),
+      () => this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')),
+      'secondary'
+    ));
   }
 
-  // Product page size: exactly ten public users per page. Pagination uses
-  // this same value for fetch, render, Previous, and Next so no row is skipped
-  // or repeated between pages.
-  private static readonly LEADERBOARD_VISIBLE_ROWS = 10;
-
-  // Rank-tier accent for the top three rows on the current page -- gold for
-  // #1 (the same reward color the start marker uses), cyan for #2, mint for
-  // #3, then every row below falls back to the standard rail white/mint
-  // pairing everything else in this overlay already uses. Deliberately
-  // page-relative (row 1 of whatever page is showing), not globally tied to
-  // rank 1/2/3 specifically -- there is no real design reason a page-2 #11
-  // should read as visually unranked next to a page-1 #1.
-  private resolveLegacyLeaderboardRowAccent(rowIndex: number): number {
-    if (rowIndex === 0) {
-      return cyberArcadeMaterial.signal.start;
-    }
-    if (rowIndex === 1) {
-      return cyberArcadeMaterial.rail.cyan;
-    }
-    if (rowIndex === 2) {
-      return cyberArcadeMaterial.rail.mint;
-    }
-    return cyberArcadeMaterial.rail.white;
-  }
-
-  // The exact 3-ascending-bars glyph the header leaderboard icon draws
-  // (drawLegacyMenuLeaderboardIcon), reused here as a static decorative
-  // accent next to the title instead of a bespoke trophy/medal shape --
-  // this screen should read as "the thing that icon opens," not a
-  // different visual language.
-  private drawLegacyLeaderboardTitleGlyph(centerX: number, centerY: number, outerRadius: number): void {
-    const color = cyberArcadeMaterial.signal.player;
-    const barCount = 3;
-    const barGap = Math.max(1, Math.round(outerRadius * 0.22));
-    const barWidth = Math.max(2, Math.round(((outerRadius * 2) - (barGap * (barCount - 1))) / barCount));
-    const heights = [0.52, 1, 0.74].map((ratio) => Math.max(3, Math.round(outerRadius * 1.7 * ratio)));
-    const totalWidth = (barWidth * barCount) + (barGap * (barCount - 1));
-    const left = centerX - (totalWidth / 2);
-    const baseline = centerY + outerRadius * 0.72;
-
-    this.overlayGraphics.fillStyle(color, 0.88);
-    this.overlayGraphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, 0.92);
-    for (let index = 0; index < barCount; index += 1) {
-      const barHeight = heights[index] ?? heights[0] ?? 1;
-      const x = left + (index * (barWidth + barGap));
-      const y = baseline - barHeight;
-      this.overlayGraphics.fillRect(x, y, barWidth, barHeight);
-      this.overlayGraphics.strokeRect(x, y, barWidth, barHeight);
-    }
-  }
-
-  private buildLeaderboardOverlay(): void {
-    const panel = this.resolveOverlayPanelFrame();
-    const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const centerX = panel.centerX;
-
-    this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.closeOverlay()));
-    const titleY = panel.top + (compact ? 46 : 54);
-    this.drawLegacyLeaderboardTitleGlyph(centerX, titleY - (compact ? 30 : 34), compact ? 11 : 12);
-    this.createOverlayTitle('Leaderboard', titleY);
-
+  // Leaderboard overlay: the scene only paints the plan built from the pure
+  // view-model (legacyLeaderboardView.ts + legacyLeaderboardOverlayPlan.ts).
+  // Page size comes from the view-model; the fetch asks for one extra row
+  // (resolveLegacyLeaderboardPageRequest) so the Next control is exact.
+  private resolveLegacyLeaderboardViewState(): LegacyLeaderboardViewState {
+    let usernameGate: LegacyLeaderboardUsernameGate = 'ok';
     if (this.authSnapshot.status === 'authenticated') {
       this.loadAccountUsernameIfNeeded();
       if (this.accountUsernameHydrationPending) {
-        this.createAuthInfoText(
-          'Loading username...',
-          panel.top + (compact ? 140 : 160),
-          panel,
-          '#b7f2ff',
-          compact ? 14 : 15
-        );
+        usernameGate = 'loading';
+      } else if (this.accountUsernameHydrationError) {
+        usernameGate = 'unavailable';
+      }
+    }
+    // A named username is the only thing that puts a row on the public page
+    // (mazer_leaderboard_page filters to it), so an unnamed player gets one
+    // clear reason plus the action that unlocks it instead of a list they can
+    // never appear in.
+    if (usernameGate === 'ok' && this.accountUsernameSavedValue.length <= 0) {
+      usernameGate = 'needs-username';
+    }
+    return {
+      entries: this.leaderboardEntries,
+      errorMessage: this.leaderboardErrorMessage,
+      offset: this.leaderboardOffset,
+      selfRank: this.leaderboardSelfRank,
+      status: this.leaderboardStatus,
+      usernameGate
+    };
+  }
+
+  private runLegacyLeaderboardAction(
+    id: LegacyLeaderboardActionId,
+    pager: LegacyLeaderboardPagerModel | null
+  ): void {
+    switch (id) {
+      case 'retry-username':
+        this.accountUsernameLoadedForUserId = null;
+        this.accountUsernameHydrationError = false;
+        this.uiDirty = true;
         return;
-      }
-      if (this.accountUsernameHydrationError) {
-        const gateY = panel.top + (compact ? 140 : 160);
-        this.createAuthInfoText('Username unavailable. Try again.', gateY, panel, '#ff9d9d', compact ? 14 : 15);
-        this.uiButtons.push(this.createLegacyAuthActionButton(
-          centerX,
-          gateY + (compact ? 52 : 60),
-          Math.min(panel.width - 48, compact ? 220 : 260),
-          compact ? 46 : 52,
-          'Retry',
-          () => {
-            this.accountUsernameLoadedForUserId = null;
-            this.accountUsernameHydrationError = false;
-            this.uiDirty = true;
-          },
-          'primary'
-        ));
+      case 'retry-page':
+        void this.loadLeaderboardPage(this.leaderboardOffset);
         return;
-      }
+      case 'go-to-account':
+        this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface());
+        return;
+      case 'previous-page':
+        if (pager) {
+          void this.loadLeaderboardPage(pager.previousOffset);
+        }
+        return;
+      case 'next-page':
+        if (pager) {
+          void this.loadLeaderboardPage(pager.nextOffset);
+        }
+        return;
     }
+  }
 
-    // A named username is the only thing that puts a row on the public
-    // page (mazer_leaderboard_page filters to it) -- a guest or an
-    // authenticated player without one can never appear no matter how they
-    // rank, so showing them the live list/self-rank card the same way a
-    // named player sees it just reads as broken ("why don't I see myself,
-    // why is there no one else"). Replace the whole rest of the overlay
-    // with a single clear reason plus the one action that actually unlocks
-    // it, instead of a list they can look at but never participate in.
-    if (this.accountUsernameSavedValue.length <= 0) {
-      const gateY = panel.top + (compact ? 140 : 160);
-      this.createAuthInfoText(
-        'You need a username to access the leaderboard.',
-        gateY,
-        panel,
-        '#7894a0',
-        compact ? 14 : 15
-      );
-      const buttonWidth = Math.min(panel.width - 48, compact ? 220 : 260);
-      const buttonHeight = compact ? 46 : 52;
-      this.uiButtons.push(this.createLegacyAuthActionButton(
-        centerX,
-        gateY + (compact ? 52 : 60),
-        buttonWidth,
-        buttonHeight,
-        'Go to Account',
-        () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface()),
-        'primary'
-      ));
-      return;
-    }
-
-    let rowY = panel.top + (compact ? 100 : 116);
-
-    if (this.leaderboardSelfRank) {
-      const selfRank = this.leaderboardSelfRank;
-      const selfRankText = selfRank.hasUsername
-        ? `#${formatLegacyProgressionOrdinal(selfRank.rank ?? '0')} · Level ${formatLegacyProgressionOrdinal(selfRank.playerLevel)}`
-        : 'Set a username on the account screen to appear here.';
-      this.createAuthAccountSummaryCard(selfRankText, rowY + (compact ? 26 : 29), panel, 'YOUR RANK');
-      rowY += compact ? 66 : 74;
-    }
-
-    if (this.leaderboardStatus === 'loading') {
-      this.createAuthInfoText('Loading...', rowY + 20, panel, '#b7f2ff', compact ? 14 : 15);
-      return;
-    }
-
-    if (this.leaderboardStatus === 'error') {
-      this.createAuthInfoText(
-        this.leaderboardErrorMessage ?? 'The leaderboard is not available right now.',
-        rowY + 20,
-        panel,
-        '#ff9d9d',
-        compact ? 14 : 15
-      );
-      return;
-    }
-
-    if (this.leaderboardStatus === 'empty') {
-      this.createAuthInfoText('No one has a public rank yet.', rowY + 20, panel, '#7894a0', compact ? 14 : 15);
-      return;
-    }
-
-    const listLeft = panel.left + (compact ? 20 : 28);
-    const listRight = panel.left + panel.width - (compact ? 20 : 28);
-    const listWidth = listRight - listLeft;
-    const badgeRadius = compact ? 13 : 15;
-    const rankColumnLeft = listLeft + badgeRadius;
-    const usernameColumnLeft = listLeft + (badgeRadius * 2) + (compact ? 12 : 16);
-    const levelColumnRight = listRight - (compact ? 4 : 6);
-
-    // A small uppercase column header, matching the Guide/Options overlays'
-    // own section-heading treatment, instead of the list starting with no
-    // explanation of what the two numbers mean.
-    const headerY = rowY + (compact ? 8 : 10);
-    const headerLabel = this.padLegacyCompactUiText(this.add.text(usernameColumnLeft, headerY, 'PLAYER', {
-      color: '#5d7a72',
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${compact ? 9 : 10}px`
-    })).setOrigin(0, 0.5);
-    const levelHeaderLabel = this.padLegacyCompactUiText(this.add.text(levelColumnRight, headerY, 'LEVEL', {
-      color: '#5d7a72',
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${compact ? 9 : 10}px`
-    })).setOrigin(1, 0.5);
-    this.uiTexts.push(headerLabel, levelHeaderLabel);
-    this.overlayGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.28);
-    this.overlayGraphics.lineBetween(listLeft, headerY + (compact ? 12 : 14), listRight, headerY + (compact ? 12 : 14));
-    rowY = headerY + (compact ? 24 : 28);
-
-    const rowHeight = compact ? 40 : 44;
-    const visibleEntries = this.leaderboardEntries.slice(0, MenuScene.LEADERBOARD_VISIBLE_ROWS);
-
-    visibleEntries.forEach((entry, index) => {
-      const isSelf = entry.isRequestingUser;
-      const accentColor = this.resolveLegacyLeaderboardRowAccent(index);
-      const accentCss = toCyberArcadeCssHex(accentColor);
-
-      if (isSelf) {
-        // Same dark-fill-plus-mint-stroke card language as the account
-        // summary card and the highest-tier guide badges, instead of just a
-        // text-color swap -- your own row should be unmistakable at a
-        // glance while scanning past everyone else's.
-        this.overlayGraphics.fillStyle(0x07131d, 0.9);
-        this.overlayGraphics.fillRoundedRect(listLeft - 8, rowY - (rowHeight / 2) + 3, listWidth + 16, rowHeight - 6, 8);
-        this.overlayGraphics.lineStyle(1.5, LEGACY_PLAY_TOUCH_ACCENT, 0.7);
-        this.overlayGraphics.strokeRoundedRect(listLeft - 8, rowY - (rowHeight / 2) + 3, listWidth + 16, rowHeight - 6, 8);
-      }
-
-      this.overlayGraphics.fillStyle(accentColor, isSelf ? 0.22 : 0.14);
-      this.overlayGraphics.fillCircle(rankColumnLeft, rowY, badgeRadius);
-      this.overlayGraphics.lineStyle(1.2, accentColor, 0.85);
-      this.overlayGraphics.strokeCircle(rankColumnLeft, rowY, badgeRadius);
-      const rankBadgeLabel = this.padLegacyCompactUiText(this.add.text(rankColumnLeft, rowY, formatLegacyProgressionOrdinal(entry.rank), {
+  private addLegacyLeaderboardText(
+    x: number,
+    y: number,
+    text: string,
+    color: number,
+    fontSize: number,
+    originX: number,
+    maxWidth: number
+  ): Phaser.GameObjects.Text {
+    const label = this.fitLegacyUiTextToWidth(
+      this.padLegacyCompactUiText(this.add.text(x, y, text, {
+        color: toCyberArcadeCssHex(color),
         fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: `${compact ? 11 : 12}px`,
-        color: accentCss
-      })).setOrigin(0.5);
-      this.fitLegacyUiTextToWidth(rankBadgeLabel, badgeRadius * 1.7, compact ? 11 : 12, 8);
+        fontSize: `${fontSize}px`
+      })),
+      maxWidth,
+      fontSize,
+      Math.min(fontSize, 10)
+    ).setOrigin(originX, 0.5);
+    this.uiTexts.push(label);
+    return label;
+  }
 
-      const rowColor = isSelf ? '#ecfff5' : '#d7f7ee';
-      const usernameLabel = this.fitLegacyUiTextToWidth(
-        this.padLegacyUiText(this.add.text(usernameColumnLeft, rowY, entry.username, {
-          fontFamily: LEGACY_UI_FONT_FAMILY,
-          fontSize: `${compact ? 14 : 15}px`,
-          color: rowColor
-        })),
-        levelColumnRight - usernameColumnLeft - (compact ? 48 : 56),
-        compact ? 14 : 15,
-        10
-      ).setOrigin(0, 0.5);
-      const levelLabel = this.padLegacyCompactUiText(this.add.text(levelColumnRight, rowY, formatLegacyProgressionOrdinal(entry.playerLevel), {
-        fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: `${compact ? 14 : 15}px`,
-        color: rowColor
-      })).setOrigin(1, 0.5);
-      this.uiTexts.push(rankBadgeLabel, usernameLabel, levelLabel);
-      rowY += rowHeight;
+  private buildLeaderboardOverlay(): void {
+    const view = buildLegacyLeaderboardViewModel(this.resolveLegacyLeaderboardViewState());
+    const plan = buildLegacyLeaderboardOverlayPlan(
+      view,
+      this.layout.width,
+      this.layout.height,
+      readMazerViewportGeometry().safeArea
+    );
+    const panel = this.resolveOverlayPanelFrame();
+    const compact = plan.compact;
+    const graphics = this.overlayGraphics;
+    const material = cyberArcadeMaterial;
+
+    // Near-black card from the shared material; the close control is the
+    // standard top-right back chevron (44px+ hit area).
+    this.drawLegacyCyberPanel(graphics, {
+      alpha: 0.98,
+      fill: material.substrate.field,
+      height: plan.card.height,
+      left: plan.card.left,
+      radius: material.controls.panelRadius,
+      stroke: material.rail.edge,
+      strokeAlt: material.rail.edge,
+      top: plan.card.top,
+      width: plan.card.width
     });
+    this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.closeOverlay()));
+    this.createOverlayTitle(plan.titleText, plan.titleCenterY);
 
-    const paginationY = rowY + (compact ? 10 : 14);
-    if (this.leaderboardOffset > 0) {
-      this.createAuthFooterLink(
-        centerX - (compact ? 60 : 70),
-        paginationY,
-        'Previous',
-        () => { void this.loadLeaderboardPage(Math.max(0, this.leaderboardOffset - MenuScene.LEADERBOARD_VISIBLE_ROWS)); }
+    if (plan.selfCard !== null) {
+      const { model, rect } = plan.selfCard;
+      graphics.fillStyle(material.substrate.fieldRaised, 1);
+      graphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, 8);
+      graphics.lineStyle(1.5, material.rail.mint, 0.7);
+      graphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, 8);
+      const textLeft = rect.left + 14;
+      const textWidth = rect.width - 28;
+      this.addLegacyLeaderboardText(textLeft, rect.top + (rect.height * 0.28), model.label, material.rail.mint, compact ? 10 : 11, 0, textWidth);
+      if (model.variant === 'ranked' && model.rankText !== null && model.levelText !== null) {
+        this.addLegacyLeaderboardText(textLeft, rect.top + (rect.height * 0.69), model.rankText, material.rail.white, compact ? 18 : 20, 0, textWidth * 0.5);
+        this.addLegacyLeaderboardText(rect.left + rect.width - 14, rect.top + (rect.height * 0.69), model.levelText, material.rail.cyan, compact ? 14 : 15, 1, textWidth * 0.5);
+      } else {
+        this.addLegacyLeaderboardText(textLeft, rect.top + (rect.height * 0.69), model.summaryText, material.rail.white, compact ? 13 : 14, 0, textWidth);
+      }
+    }
+
+    if (plan.statusLine !== null) {
+      this.addLegacyLeaderboardText(plan.statusLine.centerX, plan.statusLine.centerY, plan.statusLine.text, material.rail.cyan, compact ? 14 : 15, 0.5, plan.card.width - 56);
+    }
+
+    if (plan.columnHeader !== null && view.columns !== null) {
+      const header = plan.columnHeader;
+      this.addLegacyLeaderboardText(header.playerLeft, header.centerY, view.columns.player, material.rail.muted, compact ? 9 : 10, 0, 120);
+      this.addLegacyLeaderboardText(header.levelRight, header.centerY, view.columns.level, material.rail.muted, compact ? 9 : 10, 1, 80);
+      graphics.lineStyle(1, material.rail.edge, 0.6);
+      graphics.lineBetween(header.ruleLeft, header.ruleY, header.ruleRight, header.ruleY);
+    }
+
+    for (const skeleton of plan.skeletonRows) {
+      graphics.fillStyle(material.rail.edge, 0.22);
+      graphics.fillRoundedRect(skeleton.left, skeleton.top, skeleton.width, skeleton.height, 8);
+    }
+
+    for (const row of plan.rows) {
+      const tierColor = resolveLegacyLeaderboardTierColor(row.model.tier);
+      if (row.model.isOwn) {
+        graphics.fillStyle(material.substrate.fieldRaised, 0.95);
+        graphics.fillRoundedRect(row.rect.left - 4, row.rect.top + 2, row.rect.width + 8, row.rect.height - 4, 8);
+        graphics.lineStyle(1.5, material.rail.mint, 0.7);
+        graphics.strokeRoundedRect(row.rect.left - 4, row.rect.top + 2, row.rect.width + 8, row.rect.height - 4, 8);
+      }
+      graphics.fillStyle(tierColor, row.model.isOwn ? 0.22 : 0.14);
+      graphics.fillCircle(row.chipCenterX, row.centerY, row.chipRadius);
+      graphics.lineStyle(1.2, tierColor, 0.85);
+      graphics.strokeCircle(row.chipCenterX, row.centerY, row.chipRadius);
+      this.addLegacyLeaderboardText(row.chipCenterX, row.centerY, row.model.rankChipText, tierColor, compact ? 11 : 12, 0.5, row.chipRadius * 1.7);
+      const rowColor = row.model.isOwn ? material.rail.mint : material.rail.white;
+      this.addLegacyLeaderboardText(row.usernameLeft, row.centerY, row.model.usernameText, rowColor, compact ? 14 : 15, 0, row.usernameMaxWidth);
+      this.addLegacyLeaderboardText(row.levelRight, row.centerY, row.model.levelText, rowColor, compact ? 14 : 15, 1, 80);
+    }
+
+    if (plan.body !== null) {
+      const tone = plan.body.model.tone;
+      this.createAuthInfoText(
+        plan.body.model.text,
+        plan.body.centerY,
+        panel,
+        toCyberArcadeCssHex(tone === 'error' ? material.signal.goal : tone === 'info' ? material.rail.cyan : material.rail.muted),
+        compact ? 14 : 15
       );
     }
-    if (this.leaderboardHasNextPage) {
-      this.createAuthFooterLink(
-        centerX + (compact ? 60 : 70),
-        paginationY,
-        'Next',
-        () => { void this.loadLeaderboardPage(this.leaderboardOffset + MenuScene.LEADERBOARD_VISIBLE_ROWS); }
-      );
+
+    const addAction = (item: LegacyLeaderboardPlanAction, tone: 'primary' | 'secondary'): void => {
+      this.uiButtons.push(this.createLegacyAuthActionButton(
+        item.rect.left + (item.rect.width / 2),
+        item.rect.top + (item.rect.height / 2),
+        item.rect.width,
+        item.rect.height,
+        item.action.label,
+        () => this.runLegacyLeaderboardAction(item.action.id, view.pager),
+        tone
+      ));
+    };
+    for (const item of plan.bodyActions) {
+      addAction(item, 'primary');
+    }
+    if (plan.pager !== null) {
+      this.addLegacyLeaderboardText(plan.pager.label.centerX, plan.pager.label.centerY, plan.pager.label.text, material.rail.muted, compact ? 12 : 13, 0.5, 120);
+      if (plan.pager.previous !== null) {
+        addAction(plan.pager.previous, 'secondary');
+      }
+      if (plan.pager.next !== null) {
+        addAction(plan.pager.next, 'secondary');
+      }
     }
   }
 
@@ -12543,55 +12613,150 @@ export class MenuScene extends Phaser.Scene {
       this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
     }
     this.createAuthWordmark(panel.top + (stacked ? 42 : 48));
-    this.createOverlayTitle('Account', panel.top + (stacked ? 103 : 110));
+    this.createOverlayTitle(this.buildLegacyAuthScreenModel().title ?? 'Account', panel.top + (stacked ? 103 : 110));
 
     if (this.authSnapshot.status === 'authenticated') {
       this.buildAuthenticatedAccountSection(panel, stacked, rowY);
       return;
     }
 
-    this.buildSharedAccountEntrySection(panel, stacked, centerX, rowY);
+    this.buildSharedAccountEntrySection(panel, stacked, centerX);
     this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
   }
 
+  private buildLegacyAuthScreenModel(): ReturnType<typeof buildLegacyAuthScreenViewModel> {
+    return buildLegacyAuthScreenViewModel({
+      awaitingResolution: false,
+      compact: this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT,
+      errorMessage: this.authSnapshot.error,
+      hasCallbackInProgress: false,
+      status: this.authSnapshot.status,
+      submitting: this.authSubmitting || this.authOpeningTimedOut,
+      submittingElapsedMs: this.authOpeningTimedOut ? LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS : 0
+    });
+  }
+
+  // Welcome entry card (shared auth-surface family anatomy): marker + title
+  // are drawn by buildAuthOverlay; this draws the optional status banner, the
+  // `Create Account | Reset Password` rail, the legal row and ONE full-width
+  // bottom-dock `Sign in`. No subtitle, no guest/skip/close action.
   private buildSharedAccountEntrySection(
     panel: OverlayPanelFrame,
     stacked: boolean,
-    centerX: number,
-    rowY: number
+    centerX: number
   ): void {
-    const feedback = this.authSnapshot.error ?? this.authSnapshot.info;
-    this.createAuthInfoText(
-      feedback ?? 'Use your shared Fawxzzy account to keep progression, settings, and leaderboard identity connected.',
-      rowY,
-      panel,
-      this.authSnapshot.error ? '#ff9d9d' : '#d7f7ee',
-      stacked ? 14 : 16
-    );
+    const model = this.buildLegacyAuthScreenModel();
+    const layout = resolveLegacyAuthScreenLayout(this.layout.width, this.layout.height, readMazerViewportGeometry().safeArea);
+    const material = cyberArcadeMaterial;
 
-    const footerY = panel.top + panel.height - 104;
-    this.createAuthFooterLink(
-      centerX,
-      footerY - 34,
-      'Reset password',
-      () => this.navigateToSharedAccountRoute('reset-password')
-    );
-    this.createAuthFooterLink(centerX - 48, footerY, 'Privacy', () => navigateToMazerLegalPortal('privacy'));
-    this.createAuthFooterLink(centerX + 48, footerY, 'Terms', () => navigateToMazerLegalPortal('terms'));
-    this.createLegacyBottomActionBar(
-      panel,
-      stacked,
-      {
-        onClick: () => { void this.handleSharedAccountAuthorization(); },
-        text: this.authSubmitting ? 'Opening' : 'Sign in',
-        tone: 'primary'
-      },
-      {
-        onClick: () => { void this.handleSharedAccountAuthorization(); },
-        text: 'Create account',
-        tone: 'secondary'
+    const infoCopy = this.authSnapshot.status === 'unavailable' ? '' : (this.authSnapshot.info?.trim() ?? '');
+    const banner = model.banner ?? (infoCopy.length > 0 ? { copy: infoCopy, tone: 'info' as const } : null);
+    if (banner !== null) {
+      this.createAuthInfoText(
+        banner.copy,
+        layout.body.top + (layout.body.height / 2),
+        panel,
+        toCyberArcadeCssHex(banner.tone === 'error' ? material.signal.goal : material.rail.muted),
+        stacked ? 14 : 16
+      );
+    }
+
+    const drawLinkRow = (
+      row: typeof layout.rail,
+      links: readonly LegacyAuthScreenLink<string>[],
+      color: number
+    ): void => {
+      links.forEach((link, index) => {
+        const rect = row.items[index];
+        if (rect) {
+          this.createAuthScreenLink(rect, index === 0 ? 'end' : 'start', link.label, color, link.disabled, () => this.runLegacyAuthScreenRoute(link.route));
+        }
+      });
+      this.overlayGraphics.lineStyle(1, color, 0.55);
+      this.overlayGraphics.lineBetween(centerX, row.divider.top, centerX, row.divider.top + row.divider.height);
+    };
+    drawLinkRow(layout.rail, model.secondaryRail, material.rail.cyan);
+    drawLinkRow(layout.legal, model.legalRow, material.rail.muted);
+
+    const dock = model.primaryDock;
+    if (dock !== null) {
+      this.uiButtons.push(this.createLegacyAuthActionButton(
+        layout.dock.left + (layout.dock.width / 2),
+        layout.dock.top + (layout.dock.height / 2),
+        layout.dock.width,
+        layout.dock.height,
+        dock.label,
+        () => this.runLegacyAuthScreenRoute('oauth-authorize'),
+        'primary'
+      ));
+    }
+  }
+
+  private runLegacyAuthScreenRoute(route: LegacyAuthScreenLink<string>['route']): void {
+    switch (route) {
+      // Create Account shares the OAuth hand-off: the account host has no
+      // sign-up deep link (LoginPanel keeps `intent` in React state only).
+      case 'oauth-authorize':
+        void this.handleSharedAccountAuthorization();
+        return;
+      case 'account-host-reset':
+        this.navigateToSharedAccountRoute('reset-password');
+        return;
+      case 'legal-privacy':
+        navigateToMazerLegalPortal('privacy');
+        return;
+      case 'legal-terms':
+        navigateToMazerLegalPortal('terms');
+        return;
+    }
+  }
+
+  // A text link with a full-rect (44px tall) hit area. `end` right-aligns the
+  // label to the rect so the left item of a `A | B` row hugs the divider.
+  private createAuthScreenLink(
+    rect: LegacyAuthScreenRect,
+    align: 'end' | 'start',
+    text: string,
+    color: number,
+    disabled: boolean,
+    onClick: () => void
+  ): void {
+    const fontSize = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT ? 14 : 15;
+    const x = align === 'end' ? rect.left + rect.width - 20 : rect.left + 20;
+    const y = rect.top + (rect.height / 2);
+    const label = this.fitLegacyUiTextToWidth(
+      this.padLegacyCompactUiText(this.add.text(x, y, text, {
+        color: toCyberArcadeCssHex(color),
+        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+        fontSize: `${fontSize}px`
+      })),
+      rect.width - 12,
+      fontSize,
+      11
+    ).setOrigin(align === 'end' ? 1 : 0, 0.5).setAlpha(disabled ? 0.4 : 0.9);
+    this.uiTexts.push(label);
+
+    const background = this.add.rectangle(rect.left + (rect.width / 2), y, rect.width, rect.height, 0x000000, 0.001);
+    const setActive = (active: boolean): void => {
+      label.setAlpha(disabled ? 0.4 : (active ? 1 : 0.9));
+    };
+    if (!disabled) {
+      background.setInteractive({ useHandCursor: true });
+      background.on('pointerover', () => setActive(true));
+      background.on('pointerout', () => setActive(false));
+      background.on('pointerdown', onClick);
+    }
+    this.uiButtons.push({
+      background,
+      bounds: createVisualRect(rect.left, rect.top, rect.width, rect.height),
+      label,
+      setActive,
+      text,
+      destroy: () => {
+        background.destroy();
+        label.destroy();
       }
-    );
+    });
   }
 
   private isLegacyPasswordRecoveryActive(): boolean {
@@ -13046,41 +13211,6 @@ export class MenuScene extends Phaser.Scene {
     this.uiTexts.push(label);
   }
 
-  private createAuthAccountSummaryCard(
-    copy: string,
-    y: number,
-    panel: OverlayPanelFrame,
-    eyebrowText = 'ACCOUNT'
-  ): void {
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const width = Math.min(panel.width - 56, stacked ? 330 : 420);
-    const height = stacked ? 56 : 62;
-    const background = this.add.rectangle(panel.centerX, y, width, height, 0x07131d, 1);
-    background.setStrokeStyle(2, LEGACY_PLAY_TOUCH_ACCENT, 0.76);
-    const eyebrow = this.padLegacyCompactUiText(this.add.text(panel.centerX - (width / 2) + 16, y - (height * 0.24), eyebrowText, {
-      color: '#72e0bf',
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${stacked ? 9 : 10}px`
-    })).setOrigin(0, 0.5);
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(panel.centerX - (width / 2) + 16, y + (height * 0.13), copy, {
-      color: '#ecfff5',
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${stacked ? 15 : 17}px`
-    })), width - 32, stacked ? 15 : 17, 12).setOrigin(0, 0.5);
-    this.uiTexts.push(eyebrow);
-    this.uiButtons.push({
-      background,
-      bounds: createVisualRect(panel.centerX - (width / 2), y - (height / 2), width, height),
-      label,
-      setActive: () => undefined,
-      text: 'Account',
-      destroy: () => {
-        background.destroy();
-        label.destroy();
-      }
-    });
-  }
-
   private createLegacyAuthActionButton(
     x: number,
     y: number,
@@ -13123,10 +13253,11 @@ export class MenuScene extends Phaser.Scene {
         chrome.fillRoundedRect(left, top + 4, width, height + 1, radius);
         const gradientStart = unifiedAuthDanger
           ? { blue: 0xf6, green: 0xf4, red: 0xff }
-          : { blue: 0xf5, green: 0xf4, red: 0xf4 };
+          : { blue: 0xf4, green: 0xf4, red: 0xe5 };
         const gradientEnd = unifiedAuthDanger
           ? { blue: 0xc3, green: 0xb4, red: 0xff }
-          : { blue: 0xb9, green: 0xf4, red: 0xc3 };
+          // Pale cyan, matching the account host's dock (#e5f4f4 -> ~#97f1eb).
+          : { blue: 0xe4, green: 0xef, red: 0x59 };
         for (let bandTop = 0; bandTop < height; bandTop += 1) {
           const bandCenterY = bandTop + 0.5;
           const gradientProgress = Math.min(1, (bandCenterY / height) / 1.8);
@@ -13169,7 +13300,7 @@ export class MenuScene extends Phaser.Scene {
     if (!unifiedAuthDisabled) {
       background.setInteractive({ useHandCursor: true });
     }
-    const fontSize = fontSizeOverride ?? (unifiedAuthDockButton ? 15 : Math.max(15, Math.min(22, Math.round(height * 0.4))));
+    const fontSize = fontSizeOverride ?? (unifiedAuthDockButton ? 19 : Math.max(15, Math.min(22, Math.round(height * 0.4))));
     const label = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(
       x,
       resolveLegacyUiLabelCenterY(y, fontSize, 'button'),
@@ -15324,179 +15455,6 @@ export class MenuScene extends Phaser.Scene {
     this.applyLegacyHudIconFrame(image, MAZER_HUD_PROFILE_ICON_METRICS, centerX, centerY, iconSize * scale, alpha);
   }
 
-  // Same header row the back chevron sits on, toward the left side (the
-  // account screen's own Account button is gone -- this is the one entry
-  // point to it now, from both the menu-context Options screen and the
-  // in-play Pause screen, where it sits right next to createLegacyOverlayHomeButton).
-  // A profile glyph in the same rainbow-ring/Mazer-green/blink-pulse
-  // treatment as that home icon instead of plain username text, per
-  // feedback that the two should read as a matched pair. centerX is supplied by the
-  // caller rather than computed here: alone (the menu-context Options
-  // overlay, no home button) it's dead-centered same as the home icon;
-  // paired with the home icon (Pause) the two need to split evenly around
-  // center instead of both landing on the same point.
-  private createLegacyOverlayUsernameButton(panel: OverlayPanelFrame, onClick: () => void, centerX: number): UiButton {
-    const chevronSize = Math.max(cyberArcadeMaterial.controls.minimumTouchTarget, this.layout.width < 480 ? 42 : 46);
-    const rowY = panel.top + 8 + Math.round(chevronSize / 2);
-    const iconSize = Math.max(18, Math.round(chevronSize * 0.78));
-
-    const graphics = this.add.graphics();
-    const iconImage = this.add.image(0, 0, MAZER_HUD_PROFILE_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
-    const background = this.add.rectangle(centerX, rowY, iconSize + 24, iconSize + 24, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    background.setDepth(3);
-    background.setVisible(false);
-    this.overlayUsernameActive = false;
-
-    const drawProfile = (time: number): void => {
-      if (this.authSnapshot.status !== 'authenticated') {
-        graphics.clear();
-        iconImage.setVisible(false);
-        background.setVisible(false);
-        return;
-      }
-      // Idempotent per signed-in user id -- safe to call every frame, it
-      // only actually fetches once. Nothing here reads the result: the
-      // icon doesn't display the username itself, but the account screen
-      // this button opens still wants it preloaded by the time it lands.
-      this.loadAccountUsernameIfNeeded();
-      background.setVisible(true);
-
-      const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
-      const pulseAlpha = clamp(0.5 + (phase * 0.5) + (this.overlayUsernameActive ? 0.1 : 0), 0.4, 1);
-      const pulseScale = 0.94 + (phase * 0.06) + (this.overlayUsernameActive ? 0.02 : 0);
-      this.drawLegacyProfileIcon(graphics, iconImage, centerX, rowY, iconSize, time, pulseAlpha, pulseScale);
-    };
-    drawProfile(this.time.now);
-
-    const setActive = (active: boolean): void => {
-      this.overlayUsernameActive = active;
-    };
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', onClick);
-
-    const label = this.add.text(centerX, rowY, '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '1px'
-    }).setOrigin(0.5).setVisible(false);
-    this.uiTexts.push(label);
-
-    return {
-      background,
-      bounds: createVisualRect(centerX - (iconSize / 2) - 12, rowY - (iconSize / 2) - 12, iconSize + 24, iconSize + 24),
-      iconOnly: true,
-      label,
-      semanticAction: 'Account',
-      setActive,
-      text: 'Account',
-      updateFrame: (time: number) => drawProfile(time),
-      destroy: () => {
-        graphics.destroy();
-        iconImage.destroy();
-        background.destroy();
-        label.destroy();
-      }
-    };
-  }
-
-  // Play-mode-only: centered in the same header row as the back chevron and
-  // the account username. Replaces the old bottom-bar "Menu" button -- the
-  // menu-context Options screen has no equivalent (you're already at the
-  // main menu there), so this is never created for that overlay.
-  private createLegacyOverlayHomeButton(panel: OverlayPanelFrame, onClick: () => void, centerX: number): UiButton {
-    const chevronSize = Math.max(cyberArcadeMaterial.controls.minimumTouchTarget, this.layout.width < 480 ? 42 : 46);
-    const rowY = panel.top + 8 + Math.round(chevronSize / 2);
-    const iconSize = Math.max(18, Math.round(chevronSize * 0.42));
-    const ringRadius = (iconSize * 0.62) + 8;
-
-    const graphics = this.add.graphics();
-    const background = this.add.rectangle(centerX, rowY, iconSize + 24, iconSize + 24, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    background.setDepth(3);
-    this.overlayHomeActive = false;
-
-    // Rainbow ring (same midnight-rainbow material the trail/level number
-    // cycle through) plus the Mazer signature green for the house glyph
-    // itself, both breathing on the classic blink/grow-shrink pulse the
-    // settings cog and Start/Login glyphs already use -- redrawn every
-    // frame via updateFrame instead of the old static once-drawn icon. The
-    // house itself is filled with a darker-rim edge and a cut door.
-    const drawHome = (time: number): void => {
-      graphics.clear();
-      const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
-      const pulseAlpha = clamp(0.5 + (phase * 0.5) + (this.overlayHomeActive ? 0.1 : 0), 0.4, 1);
-      const pulseScale = 0.94 + (phase * 0.06) + (this.overlayHomeActive ? 0.02 : 0);
-
-      const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
-      graphics.lineStyle(Math.max(1.2, iconSize * LEGACY_OVERLAY_ICON_RING_WIDTH_RATIO), ringColor, pulseAlpha * LEGACY_OVERLAY_ICON_RING_ALPHA_FACTOR);
-      graphics.strokeCircle(centerX, rowY, ringRadius * pulseScale);
-
-      const color = cyberArcadeMaterial.signal.player;
-      const rimColor = mixLegacyIridescentColor(color, 0x000000, 0.32);
-      const halfWidth = iconSize * 0.5 * pulseScale;
-      const roofTop = rowY - (iconSize * 0.5 * pulseScale);
-      const baseTop = rowY - (iconSize * 0.06 * pulseScale);
-      const baseBottom = rowY + (iconSize * 0.42 * pulseScale);
-      const wallHalfWidth = halfWidth * 0.6;
-
-      graphics.fillStyle(color, pulseAlpha * 0.92);
-      graphics.fillTriangle(centerX - halfWidth, baseTop, centerX, roofTop, centerX + halfWidth, baseTop);
-      graphics.fillRect(centerX - wallHalfWidth, baseTop, wallHalfWidth * 2, baseBottom - baseTop);
-      graphics.lineStyle(Math.max(1.2, iconSize * 0.07), rimColor, pulseAlpha);
-      graphics.beginPath();
-      graphics.moveTo(centerX - halfWidth, baseTop);
-      graphics.lineTo(centerX, roofTop);
-      graphics.lineTo(centerX + halfWidth, baseTop);
-      graphics.strokePath();
-      graphics.strokeRect(centerX - wallHalfWidth, baseTop, wallHalfWidth * 2, baseBottom - baseTop);
-
-      // Door cutout -- a small dark notch instead of a solid block reads as
-      // an opening in the wall, the same way the settings cog's hub reads
-      // as a socket rather than a second gear.
-      const doorHalfWidth = wallHalfWidth * 0.42;
-      const doorTop = baseBottom - ((baseBottom - baseTop) * 0.56);
-      graphics.fillStyle(LEGACY_PLAY_TOUCH_COG_HUB, pulseAlpha * 0.85);
-      graphics.fillRect(centerX - doorHalfWidth, doorTop, doorHalfWidth * 2, baseBottom - doorTop);
-      graphics.lineStyle(Math.max(1, iconSize * 0.05), rimColor, pulseAlpha * 0.8);
-      graphics.strokeRect(centerX - doorHalfWidth, doorTop, doorHalfWidth * 2, baseBottom - doorTop);
-
-      // No gem catchlight here -- it's a short diagonal arc calibrated for a
-      // round gem-shaped marker; on this house glyph it just reads as a
-      // stray diagonal white line in the corner (reported and removed).
-    };
-    drawHome(this.time.now);
-
-    const setActive = (active: boolean): void => {
-      this.overlayHomeActive = active;
-    };
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', onClick);
-
-    const label = this.add.text(centerX, rowY, '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '1px'
-    }).setOrigin(0.5).setVisible(false);
-    this.uiTexts.push(label);
-
-    return {
-      background,
-      bounds: createVisualRect(centerX - (iconSize / 2) - 12, rowY - (iconSize / 2) - 12, iconSize + 24, iconSize + 24),
-      iconOnly: true,
-      label,
-      semanticAction: 'Main Menu',
-      setActive,
-      text: 'Main Menu',
-      updateFrame: (time: number) => drawHome(time),
-      destroy: () => {
-        graphics.destroy();
-        background.destroy();
-        label.destroy();
-      }
-    };
-  }
-
   private clearUi(): void {
     this.overlayScrollGraphics?.destroy();
     this.overlayScrollGraphics = null;
@@ -15532,12 +15490,16 @@ export class MenuScene extends Phaser.Scene {
 
   private async loadLeaderboardPage(offset: number): Promise<void> {
     const sequence = ++this.leaderboardSequence;
+    const request = resolveLegacyLeaderboardPageRequest(offset);
     this.leaderboardStatus = 'loading';
     this.leaderboardErrorMessage = null;
+    // Track the requested offset up front so Retry after a failed page
+    // reloads that same page.
+    this.leaderboardOffset = request.offset;
     this.uiDirty = true;
 
     const [pageResult, selfRankResult] = await Promise.all([
-      fetchLegacyLeaderboardPage(offset, MenuScene.LEADERBOARD_VISIBLE_ROWS, this.authSnapshot),
+      fetchLegacyLeaderboardPage(request.offset, request.limit, this.authSnapshot),
       offset === 0 ? fetchLegacyLeaderboardSelfRank(this.authSnapshot) : Promise.resolve(null)
     ]);
     if (sequence !== this.leaderboardSequence) {
@@ -15551,22 +15513,28 @@ export class MenuScene extends Phaser.Scene {
       this.leaderboardStatus = 'error';
       this.leaderboardErrorMessage = pageResult.error;
       this.leaderboardEntries = [];
-      this.leaderboardHasNextPage = false;
       this.uiDirty = true;
       return;
     }
 
-    this.leaderboardOffset = offset;
+    // Raw rows (limit + 1): the view model splits visible rows / hasNext.
     this.leaderboardEntries = pageResult.entries;
-    this.leaderboardHasNextPage = pageResult.entries.length === MenuScene.LEADERBOARD_VISIBLE_ROWS;
-    this.leaderboardStatus = pageResult.entries.length === 0 && offset === 0 ? 'empty' : 'ready';
+    this.leaderboardStatus = pageResult.entries.length === 0 && request.offset === 0 ? 'empty' : 'ready';
     if (selfRankResult) {
       this.leaderboardSelfRank = selfRankResult.selfRank;
     }
     this.uiDirty = true;
   }
 
-  private createLegacyAuthenticatedWelcomeIdentity(): void {
+  // Header identity: the verified canonical username, top-left, immediately
+  // right of the profile icon (replaces the old greeting + username pair
+  // that sat above the Start button). Geometry comes from
+  // resolveLegacyHeaderIdentityPlacement: the real profile-icon frame, the
+  // real title footprint (not an assumed width), ellipsized to the room
+  // between them, shortened/hidden on a tight header, and kept clear of the
+  // edge diamonds. Signed out / guest / no username -> no label at all.
+  // Depth 3 like the other menu controls: above the board, below overlays.
+  private createLegacyHeaderIdentityLabel(): void {
     const username = this.authSnapshot.status === 'authenticated'
       ? this.authSnapshot.canonicalUsername?.trim() ?? ''
       : '';
@@ -15574,36 +15542,31 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const compact = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const centerX = this.layout.centerButtonX;
-    const welcomeY = this.layout.centerButtonY - this.layout.buttonHeight - (compact ? 26 : 30);
-    const welcome = this.padLegacyCompactUiText(this.add.text(centerX, welcomeY, 'Welcome', {
-      backgroundColor: '#060b0f',
-      color: '#7894a0',
+    const label = this.add.text(0, 0, username, {
+      color: '#d7f7ee',
       fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-      fontSize: `${compact ? 11 : 12}px`
-    })).setOrigin(0.5).setDepth(3);
-    // Real, measured overlap (found while restoring the visual-verification
-    // harness, headless Playwright against the authenticated fixture at
-    // 405x958): with a +17/+19 offset, padLegacyUiText's own 6px top padding
-    // on this larger label put its top edge (real bounds: top 843) above
-    // the "Welcome" label's own bottom edge (bounds: bottom 847.5) -- a real
-    // 4.5px vertical, ~30%-of-the-smaller-box overlap, not a false positive
-    // from the harness's own overlap heuristic. +7px clears it (new gap
-    // ~2.5px) while keeping 12px of clearance to the Start button below
-    // (button top measured at y=890 in the same real capture).
-    const usernameLabel = this.fitLegacyUiTextToWidth(
-      this.padLegacyUiText(this.add.text(centerX, welcomeY + (compact ? 24 : 26), username, {
-        backgroundColor: '#060b0f',
-        color: '#d7f7ee',
-        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-        fontSize: `${compact ? 14 : 16}px`
-      })),
-      Math.min(this.layout.width - 48, 320),
-      compact ? 14 : 16,
-      11
-    ).setOrigin(0.5).setDepth(3);
-    this.uiTexts.push(welcome, usernameLabel);
+      fontSize: '14px',
+      stroke: '#060b0f',
+      strokeThickness: 2
+    }).setOrigin(0, 0.5).setDepth(3).setVisible(false);
+    const placement = resolveLegacyHeaderIdentityPlacement({
+      edgeStations: this.resolveLegacyEdgeStations(),
+      layout: this.layout,
+      measure: (value, fontPx) => label.setFontSize(fontPx).setText(value).width,
+      measureHeight: (fontPx) => label.setFontSize(fontPx).setText(username).height,
+      username
+    });
+    if (!placement.visible || placement.anchor === null) {
+      label.destroy();
+      return;
+    }
+    label
+      .setName(LEGACY_HEADER_IDENTITY_LABEL_NAME)
+      .setFontSize(placement.identity.fontPx)
+      .setText(placement.identity.displayText)
+      .setPosition(placement.anchor.x, placement.anchor.y)
+      .setVisible(true);
+    this.uiTexts.push(label);
   }
 
   private createLegacySignedOutOAuthFailure(): void {
@@ -15659,11 +15622,14 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
     this.authSubmitting = true;
+    this.authOpeningStartedAtMs = -1;
+    this.authOpeningTimedOut = false;
     this.authSnapshot = { ...this.authSnapshot, error: null, info: null };
     this.uiDirty = true;
     const result = await beginMazerOAuthAuthorization();
     if (result.status === 'failed') {
       this.authSubmitting = false;
+      this.authOpeningStartedAtMs = null;
       this.authSnapshot = {
         ...this.authSnapshot,
         error: MAZER_OAUTH_SAFE_ERROR_MESSAGE,
@@ -15683,6 +15649,9 @@ export class MenuScene extends Phaser.Scene {
       this.destroyLegacyAuthNativeInput();
       this.destroyAccountUsernameNativeInput();
       this.accountUsernameActive = false;
+    }
+    if (kind === 'pause') {
+      this.pauseSettingsExpanded = false;
     }
     if (kind === 'options' || kind === 'pause') {
       this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
@@ -16595,6 +16564,30 @@ export class MenuScene extends Phaser.Scene {
   // the menu front door is doing underneath -- simplest way to guarantee
   // nothing is reachable during this window without auditing every place
   // create()'s own boot sequence might otherwise make a button clickable.
+  // Bounded `Opening…`: the label only claims progress while the redirect is
+  // in flight. After LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS the hand-off is
+  // released (authSubmitting cleared, otherwise the retry would be inert) and
+  // the screen shows the browser notice with an enabled `Sign in`.
+  private syncLegacyAuthOpeningTimeout(time: number): void {
+    if (this.authOpeningStartedAtMs === null) {
+      return;
+    }
+    if (!this.authSubmitting) {
+      this.authOpeningStartedAtMs = null;
+      return;
+    }
+    if (this.authOpeningStartedAtMs < 0) {
+      this.authOpeningStartedAtMs = time;
+      return;
+    }
+    if (time - this.authOpeningStartedAtMs >= LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS) {
+      this.authOpeningStartedAtMs = null;
+      this.authSubmitting = false;
+      this.authOpeningTimedOut = true;
+      this.uiDirty = true;
+    }
+  }
+
   private syncLegacyAuthGateLoadingScreen(time: number): void {
     if (!this.authGateAwaitingResolution) {
       if (this.authGateLoadingBlocker !== null) {
@@ -16636,6 +16629,11 @@ export class MenuScene extends Phaser.Scene {
     this.authGateGraphics.lineStyle(2, cyberArcadeMaterial.rail.cyan, 0.5 + (pulse * 0.3));
     this.authGateGraphics.strokePath();
 
+    this.authGateLoadingText.setText(resolveLegacyAuthLoadingCopy({
+      awaitingResolution: this.authGateAwaitingResolution,
+      callbackInProgress: false,
+      hasSession: this.authGateHasSessionEvidence
+    }));
     this.authGateLoadingText.setPosition(centerX, centerY + radius + 26);
     this.authGateLoadingText.setVisible(true);
   }

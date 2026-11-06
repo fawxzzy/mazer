@@ -1058,10 +1058,11 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('resume')");
     // Now routed through the Wave 3A bridge first (bridge.dispatch(RETURN_HOME)),
     // falling back to this same real call only if the bridge rejects or is
-    // unavailable -- checked as the bare call (not the full multi-line
-    // createLegacyOverlayHomeButton(...) wrapper) so this assertion doesn't
-    // depend on exact line-wrapping/line-ending formatting.
-    expect(menuSceneSource).toContain('createLegacyOverlayHomeButton');
+    // unavailable -- checked as the bare call so this assertion doesn't
+    // depend on exact line-wrapping/line-ending formatting. The Pause card's
+    // Quit to Menu button replaced the old header home icon.
+    expect(menuSceneSource).not.toContain('private createLegacyOverlayHomeButton(');
+    expect(menuSceneSource).toContain("actionLabel('quit-to-menu')");
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('return-menu')");
     expect(menuSceneSource).toContain('private applyLegacyPauseCommand(command: LegacyPauseCommand): void {');
     expect(menuSceneSource).toContain('const result = resolveLegacyPauseCommand(command, this.maze.start, this.trail);');
