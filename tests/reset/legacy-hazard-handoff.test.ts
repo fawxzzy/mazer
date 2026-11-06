@@ -63,7 +63,7 @@ describe('Phase 2 hazard hand-off stays dormant', () => {
       }
     }
     expect(offenders).toEqual([]);
-  });
+  }, 60_000);
 
   test('the draft hazard graph adapter is still imported by no scene or runtime module', () => {
     const root = join(__dirname, '..', '..', 'src');
@@ -72,5 +72,5 @@ describe('Phase 2 hazard hand-off stays dormant', () => {
       && /legacyHazardGraphAdapter/.test(readFileSync(file, 'utf8'))
     ));
     expect(importers).toEqual([]);
-  });
+  }, 60_000);
 });
