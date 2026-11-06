@@ -17,6 +17,7 @@ import {
 import {
   BoardTileLayer,
   buildRankGrid,
+  isBoardCellRevealed,
   type BoardTileReveal,
   resolveBoardTileStyleFromSearch
 } from '../render/boardTileLayer';
@@ -56,7 +57,6 @@ import {
 } from '../render/edgeMarkers';
 import {
   INTRO_LASER_MS,
-  INTRO_LASER_START_MS,
   INTRO_POP_MS,
   INTRO_SKIP_GRACE_MS,
   isEdgePathCellShown,
@@ -68,6 +68,7 @@ import {
   resolveIntro,
   resolveIntroDeconstruct,
   resolveIntroInputUnlockMs,
+  resolveIntroLaserStartMs,
   resolveOutroTilesEndMs,
   resolveSpawnLaser,
   skipIntroElapsedMs
@@ -5869,8 +5870,10 @@ export class MenuScene extends Phaser.Scene {
       return true;
     }
 
+    // A null row limit means the row counter is not part of this stage (the deconstruct), not "show all":
+    // see isBoardCellRevealed. Markers/player on a dissolved tile must go with it.
     const rowLimit = this.resolveLegacyMenuStaticDrawRowLimit();
-    return rowLimit === null || point.y < rowLimit;
+    return rowLimit !== null && point.y < rowLimit;
   }
 
   private buildLegacyMenuStaticDrawTileOrder(): LegacyPoint[] {
@@ -6445,13 +6448,13 @@ export class MenuScene extends Phaser.Scene {
     const intro = this.resolveLegacyIntroState(time);
     if (intro !== null && this.introStartedAtMs !== null) {
       // The laser and the real-transfer delivery are pinned to the same
-      // intro instant (INTRO_LASER_START_MS) the moment the build begins,
-      // so the beam can neither fire early nor land after input unlocks.
+      // intro instant (the BUILD end, resolveIntroLaserStartMs) the moment the build begins,
+      // so the beams can neither fire before the maze is complete nor land after input unlocks.
       if (
         (this.playerSpawnBurstStartedAtMs === null && !this.prefersLegacyReducedMotion())
         || (this.playerTransferEnergyArmed && this.playerTransferEnergyDeliveryStartedAtMs === null)
       ) {
-        this.armLegacyPlayerArrivalForFinalBuildStep(time, (this.introStartedAtMs + INTRO_LASER_START_MS) - time);
+        this.armLegacyPlayerArrivalForFinalBuildStep(time, (this.introStartedAtMs + resolveIntroLaserStartMs(this.menuStaticDrawTileOrder.length)) - time);
       }
       this.syncLegacyEdgePathsVisible(intro.bleedProgress === 1);
       if (this.menuStaticDrawTilesVisible !== null && intro.tilesVisible !== this.menuStaticDrawTilesVisible) {
@@ -6531,14 +6534,23 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
     this.introStartedAtMs = time - skippedElapsedMs;
-    if (this.playerSpawnBurstStartedAtMs !== null) {
-      this.playerSpawnBurstStartedAtMs = this.introStartedAtMs + INTRO_LASER_START_MS;
+    const laserStartedAtMs = this.resolveLegacyIntroLaserStartAtMs();
+    if (laserStartedAtMs !== null && this.playerSpawnBurstStartedAtMs !== null) {
+      this.playerSpawnBurstStartedAtMs = laserStartedAtMs;
     }
-    if (this.playerTransferEnergyDeliveryStartedAtMs !== null) {
-      this.playerTransferEnergyDeliveryStartedAtMs = this.introStartedAtMs + INTRO_LASER_START_MS;
+    if (laserStartedAtMs !== null && this.playerTransferEnergyDeliveryStartedAtMs !== null) {
+      this.playerTransferEnergyDeliveryStartedAtMs = laserStartedAtMs;
     }
     this.advanceLegacyMenuStaticDrawStage(time);
     return true;
+  }
+
+  // The beams leave their diamonds only once the BUILD is complete: an exact point on the intro clock
+  // (resolveIntroLaserStartMs, a pure function of the tile count), never a frame-stepped estimate.
+  private resolveLegacyIntroLaserStartAtMs(): number | null {
+    return this.introStartedAtMs === null
+      ? null
+      : this.introStartedAtMs + resolveIntroLaserStartMs(this.menuStaticDrawTileOrder.length);
   }
 
   // msUntilLaserStart is positive until the intro's laser instant, negative
@@ -7895,8 +7907,7 @@ export class MenuScene extends Phaser.Scene {
         if (!edgeShown && owners !== null && owners[index] === 1) {
           return false;
         }
-        const byTile = tileLimit === null || (ranks !== null && ranks[index]! >= 0 && ranks[index]! < tileLimit);
-        return byTile || rowLimit === null || y < rowLimit;
+        return isBoardCellRevealed(tileLimit, rowLimit, ranks === null ? -1 : ranks[index]!, y);
       }
     };
   }
@@ -8858,9 +8869,8 @@ export class MenuScene extends Phaser.Scene {
     // their own cell -- the whole "cast" places at once, same as it now
     // also all clears at once on deconstruct (see markerDeconstructAlpha
     // above).
-    // The beams land at INTRO_LASER_END_MS while the maze is still growing out
-    // from the spawn tile, so the cast (player/start/goal) appears at landing,
-    // not at the end of the build.
+    // The beams fire after the build is complete and land at resolveIntroLaserEndMs
+    // (== input unlock), so the cast (player/start/goal) appears at landing.
     const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== 'building'
       || (this.resolveLegacyIntroState(time)?.laserProgress ?? 0) >= 1;
     const playerSpawnBurst = this.resolveLegacyPlayerSpawnBurstState(time);
@@ -9359,7 +9369,12 @@ export class MenuScene extends Phaser.Scene {
     // serves.
     const elapsedMs = time - this.playerSpawnBurstStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time);
     const totalMs = LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS + LEGACY_PLAYER_SPAWN_FLASH_MS;
-    if (elapsedMs < 0 || elapsedMs >= totalMs) {
+    if (elapsedMs < 0) {
+      // Armed but the beams have not left yet (they leave when the BUILD completes, a long way into the
+      // intro): the player has not arrived, so its marker stays hidden until the landing.
+      return { active: false, flashProgress: 0, markerRevealAlpha: 0, travelProgress: 0 };
+    }
+    if (elapsedMs >= totalMs) {
       return { active: false, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
     }
 
