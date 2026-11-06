@@ -86,7 +86,7 @@ How to read it. Every claim carries one of three labels, and the labels are neve
 
 - `docs/architecture/MAZER-WORLD-TURN-CONTRACT.md` defines `WorldTurnHost` (`src/mazer-core/world/WorldTurnHost.ts`). A `player-move` command advances the world only when the movement handler accepts the move. Canonical phase order: player movement, enemy movement, projectile movement, pickups, item effects, duration expiry, collisions. Rejected movement cannot run downstream phases or consume a turn number. Timed mode is disabled by default.
 - Current boundary: the legacy `MenuScene` player-movement path enters `WorldTurnHost` after the directional-intent resolver selects one legal cardinal step. Enemy, projectile, item, duration, and collision handlers "remain unintegrated".
-- `src/mazer-core/enemies/WardenGraphAgent.ts` exists as a non-live graph agent. It is not wired into the shipping scene; this document does not rely on it.
+- `src/mazer-core/enemies/WardenGraphAgent.ts` exists as a non-live graph agent. It is imported only by `src/scenes/menuIntentRuntime.ts`, which no scene imports (only tests do), so it is not wired into the shipping scene; this document does not rely on it.
 
 **PROPOSAL**
 
