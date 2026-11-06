@@ -152,6 +152,8 @@ describe('guide copy only names things that exist', () => {
   test('Wrap: the perimeter diamond exists and generation still plans wraps for some levels, none for the tutorial band', () => {
     expect(edgeMarkers.EDGE_STATION_COUNT).toBe(8);
     expect(edgeMarkers.drawEdgeMarker).toBeTypeOf('function');
+    // The guide icon is the REST kite (drawEdgeMarker); the intro/outro orbit moves the ring, never the meaning.
+    expect(edgeMarkers.resolveOrbitingEdgeStations({ width: 390, height: 844 }, 0)).toEqual(edgeMarkers.resolveEdgeStations({ width: 390, height: 844 }));
     const tutorial = resolveLegacyProgressionDifficultyProfile(1);
     expect(tutorial.band).toBe('tutorial');
     expect(tutorial.expectedEdgeWraps).toEqual({ horizontal: 0, vertical: 0 });

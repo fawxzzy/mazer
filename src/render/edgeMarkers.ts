@@ -16,10 +16,21 @@
  *   with the screen edge (inset by its own extent along the edge normal, 10.5
  *   px for a midpoint, ~7.6 px for a 45 degree corner kite). The layout is
  *   mirror-symmetric (top row = y-mirror of the bottom row, left = x-mirror of
- *   right). While the ring spins (intro / outro) the swinging tips may clip
- *   the screen edge for a few frames; at rest nothing is clipped.
- * - Calm: one slow breathing alpha (0.45-0.6 over 3.6 s). No orbit, no
- *   per-marker sparkles. In reduced motion the markers are completely static.
+ *   right). At rest nothing is clipped.
+ * - Orbit ("title orbit sigils"): while the maze generates (intro) and while
+ *   it deconstructs (outro) the whole ring CIRCULATES along the viewport
+ *   perimeter (resolveOrbitingEdgeStations). The phase is the timeline's
+ *   ringSpinRad reinterpreted as laps (2 pi = one full lap = 8 station steps;
+ *   positive = clockwise, the direction of increasing station id). Diamond i
+ *   travels the same perimeter parametrization as the rest stations, so after
+ *   a whole number of steps it sits EXACTLY on station i+k and a whole lap (the
+ *   timelines return an exact 0 at rest) is exactly the fixed layout. The kite
+ *   keeps pointing inward: its angle rises linearly with the perimeter
+ *   coordinate (diagonal at a corner, pure edge normal at the midpoint, next
+ *   corner diagonal), flush with the screen edge along the top/bottom sides
+ *   and near-flush on the left/right sides, and never outside the viewport.
+ * - Calm at rest: one slow breathing alpha (0.45-0.6 over 3.6 s), no per-marker
+ *   sparkles. In reduced motion the markers are completely static (phase 0).
  * - Meaningful: a marker lights up (mint core) while it is a live wrap end or
  *   the spawn laser's emitter, and flashes once (~120 ms) on a wrapped step,
  *   paired with the destination edge.
@@ -147,9 +158,14 @@ const OUTWARD_NORMAL: Readonly<Record<EdgeSide, EdgePoint>> = Object.freeze({
  * its centre toward the outside of the edge it is flush with. 10.5 px for an
  * edge midpoint, ~7.57 px for a 45 degree corner kite.
  */
-export const resolveEdgeStationNormalExtent = (id: EdgeStationId): number => {
-  const normal = OUTWARD_NORMAL[STATION_SIDE[id]];
-  const reach = resolveEdgeMarkerVertices({ x: 0, y: 0, inwardAngle: INWARD_ANGLE[id] })
+export const resolveEdgeStationNormalExtent = (id: EdgeStationId): number => (
+  resolveEdgeKiteOutwardReach(INWARD_ANGLE[id], STATION_SIDE[id])
+);
+
+/** Reach (plus half a stroke) of a kite pointing `inwardAngle` toward the outside of `side`. */
+const resolveEdgeKiteOutwardReach = (inwardAngle: number, side: EdgeSide): number => {
+  const normal = OUTWARD_NORMAL[side];
+  const reach = resolveEdgeMarkerVertices({ x: 0, y: 0, inwardAngle })
     .reduce((max, vertex) => Math.max(max, (vertex.x * normal.x) + (vertex.y * normal.y)), 0);
   return reach + (EDGE_MARKER_STROKE_PX / 2);
 };
@@ -187,15 +203,101 @@ export interface EdgePoint {
   readonly y: number;
 }
 
+const ORBIT_SIDES: ReadonlyArray<EdgeSide> = ['top', 'right', 'bottom', 'left'];
+/** Station steps in one full lap of the perimeter (one step = id -> id + 1). */
+export const EDGE_ORBIT_STEPS_PER_LAP = EDGE_STATION_COUNT;
+const ORBIT_SNAP_EPSILON = 1e-9;
+
+const wrapStep = (value: number): number => ((value % EDGE_STATION_COUNT) + EDGE_STATION_COUNT) % EDGE_STATION_COUNT;
+
+/**
+ * One diamond at ring phase `phaseRad` (radians; 2 pi = one full clockwise lap,
+ * negative = counter-clockwise). Pure function of the viewport, the id and the
+ * phase. A whole number of station steps (a whole number of laps included)
+ * returns the REST station of id + steps (same id), copied from `restStations`,
+ * so the end of every timeline lands exactly on the fixed layout.
+ *
+ * Between stations the diamond moves along the perimeter coordinate s (station
+ * units, 2 per side, clockwise from the top-left corner): along the side it
+ * interpolates linearly between the rest corner centres, and its angle is
+ * (s + 1) pi / 4 -- the rest orientation at every station, so the kite swings
+ * smoothly through the corners. Top/bottom: outer tip flush with the screen
+ * edge. Left/right: the centre eases from the corner inset to the flush offset
+ * at the midpoint (the rest corners are inset along the left/right edges), so
+ * the kite never leaves the viewport at any phase.
+ */
+export const resolveOrbitingEdgeStation = (
+  viewport: EdgeViewport,
+  id: EdgeStationId,
+  phaseRad: number,
+  restStations: ReadonlyArray<EdgeStation> = resolveEdgeStations(viewport)
+): EdgeStation => {
+  const shift = Number.isFinite(phaseRad) ? (phaseRad / (Math.PI * 2)) * EDGE_ORBIT_STEPS_PER_LAP : 0;
+  const nearest = Math.round(shift);
+  if (Math.abs(shift - nearest) < ORBIT_SNAP_EPSILON) {
+    const rest = restStations[wrapStep(id + nearest)] as EdgeStation;
+    return { ...rest, id };
+  }
+  const s = wrapStep(id + shift);
+  const sideIndex = Math.min(3, Math.floor(s / 2));
+  const side = ORBIT_SIDES[sideIndex] as EdgeSide;
+  const u = (s - (2 * sideIndex)) / 2;
+  const angle = ((s + 1) * Math.PI) / 4;
+  const reach = resolveEdgeKiteOutwardReach(angle, side);
+  const inset = EDGE_MARKER_MIN_INSET_PX;
+  const left = inset;
+  const right = Math.max(left, viewport.width - inset);
+  const cornerReach = resolveEdgeStationNormalExtent(0);
+  const topCornerY = cornerReach;
+  const bottomCornerY = viewport.height - cornerReach;
+  // 0 at the side midpoint, 1 at its corners (squared: the kite stays flush for most of the side).
+  const cornerBlend = ((2 * u) - 1) ** 2;
+  let x: number;
+  let y: number;
+  if (side === 'top') {
+    x = left + ((right - left) * u);
+    y = reach;
+  } else if (side === 'right') {
+    x = viewport.width - (reach + (((viewport.width - right) - cornerReach) * cornerBlend));
+    y = topCornerY + ((bottomCornerY - topCornerY) * u);
+  } else if (side === 'bottom') {
+    x = right + ((left - right) * u);
+    y = viewport.height - reach;
+  } else {
+    x = reach + ((left - cornerReach) * cornerBlend);
+    y = bottomCornerY + ((topCornerY - bottomCornerY) * u);
+  }
+  return { id, x, y, inwardAngle: angle, side, isCorner: false };
+};
+
+/** All 8 diamonds at ring phase `phaseRad` (see resolveOrbitingEdgeStation). Phase 0 = resolveEdgeStations. */
+export const resolveOrbitingEdgeStations = (
+  viewport: EdgeViewport,
+  phaseRad: number
+): ReadonlyArray<EdgeStation> => {
+  const rest = resolveEdgeStations(viewport);
+  return STATION_IDS.map((id) => resolveOrbitingEdgeStation(viewport, id, phaseRad, rest));
+};
+
+/** Exact inverse of resolveEdgeStations' width/height (from the right and bottom midpoints), or null. */
+const inferRestViewport = (stations: ReadonlyArray<EdgeStation>): EdgeViewport | null => {
+  const rightMid = stations.find((station) => station.id === EDGE_MIDPOINT_STATION_ID.right);
+  const bottomMid = stations.find((station) => station.id === EDGE_MIDPOINT_STATION_ID.bottom);
+  if (stations.length !== EDGE_STATION_COUNT || !rightMid || !bottomMid) {
+    return null;
+  }
+  return {
+    width: rightMid.x + resolveEdgeStationNormalExtent(EDGE_MIDPOINT_STATION_ID.right),
+    height: bottomMid.y + resolveEdgeStationNormalExtent(EDGE_MIDPOINT_STATION_ID.bottom)
+  };
+};
+
 /** Kite outline (tip first, inward), in screen space. Long axis = inward direction. */
 export const resolveEdgeMarkerVertices = (
   station: Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>,
-  scale = 1,
-  spinRad = 0
+  scale = 1
 ): ReadonlyArray<EdgePoint> => {
-  // spinRad rotates the kite about its own centre; a whole number of turns is
-  // exactly the rest orientation (the timelines return an exact 0 at rest).
-  const angle = station.inwardAngle + spinRad;
+  const angle = station.inwardAngle;
   const ux = Math.cos(angle);
   const uy = Math.sin(angle);
   const vx = -uy;
@@ -218,7 +320,7 @@ export interface EdgeMarkerState {
   readonly energized: boolean;
   /** 0..1 lighting strength (1 for a plain energized marker; ring lighting ramps/fades). */
   readonly energy: number;
-  /** Spin in radians about the kite's own centre (0 at rest and in reduced motion). */
+  /** Ring orbit phase in radians, 2 pi = one lap (0 at rest and in reduced motion). Despite the name the kite no longer spins about itself. */
   readonly spinRad: number;
   /** 1 at the instant of a wrap flash, falling to 0 over EDGE_MARKER_FLASH_MS. */
   readonly flash: number;
@@ -236,7 +338,7 @@ export interface EdgeMarkerStateInput {
   readonly energizedIds?: ReadonlySet<number>;
   /** Per-station ring lighting 0..1 indexed by id (resolveEdgeRingEnergies). */
   readonly ringEnergies?: ReadonlyArray<number>;
-  /** Ring spin in radians (timeline ringSpinRad). */
+  /** Ring orbit phase in radians (timeline ringSpinRad: 2 pi = one lap, positive = clockwise). */
   readonly spinRad?: number;
   readonly flash?: EdgeWrapFlash | null;
   /** Stations whose kite must not draw (e.g. the teleport shell is occupying it). */
@@ -371,10 +473,10 @@ export const drawEdgeMarker = (
   if (state.hidden) {
     return;
   }
-  const outline = resolveEdgeMarkerVertices(station, 1, state.spinRad);
+  const outline = resolveEdgeMarkerVertices(station, 1);
   if (state.energized || state.flash > 0) {
     // Mint core: a smaller kite inside the outline.
-    tracePolygon(graphics, resolveEdgeMarkerVertices(station, 0.5, state.spinRad));
+    tracePolygon(graphics, resolveEdgeMarkerVertices(station, 0.5));
     graphics.fillStyle(
       cyberArcadeMaterial.rail.mint,
       Math.max(state.flash, state.energized ? 0.7 * state.energy : 0) * state.alpha
@@ -390,15 +492,24 @@ export const drawEdgeMarker = (
   graphics.strokePath();
 };
 
+/**
+ * `stations` is the REST layout (resolveEdgeStations). Each diamond is placed
+ * on its orbit at its state's phase (state.spinRad); phase 0 draws it on its
+ * rest station untouched.
+ */
 export const drawEdgeMarkers = (
   graphics: EdgeGraphics,
   stations: ReadonlyArray<EdgeStation>,
   states: ReadonlyArray<EdgeMarkerState>
 ): void => {
+  const viewport = states.some((state) => state.spinRad !== 0) ? inferRestViewport(stations) : null;
   stations.forEach((station) => {
     const state = states.find((candidate) => candidate.id === station.id);
     if (state) {
-      drawEdgeMarker(graphics, station, state);
+      const placed = viewport !== null && state.spinRad !== 0
+        ? resolveOrbitingEdgeStation(viewport, station.id, state.spinRad, stations)
+        : station;
+      drawEdgeMarker(graphics, placed, state);
     }
   });
 };
@@ -468,6 +579,7 @@ export const resolveEdgeBeamProgress = (laserProgress: number, index: number, co
 export type EdgeBeamDirection = 'inward' | 'outward';
 
 export interface EdgeBeamsInput {
+  /** Each diamond's CURRENT position (resolveOrbitingEdgeStations); the rest layout while the ring is parked. */
   readonly stations: ReadonlyArray<EdgeStation>;
   /** The maze spawn tile (arrival) or the player (departure), in screen space. */
   readonly focus: EdgePoint;
