@@ -12,6 +12,10 @@ const REPO_ROOT = resolve(SCRIPT_PATH, '..', '..', '..');
 const CWD_MUTATING_FIXTURE = 'tests/reset/legacy-unreal-source-fixture.test.ts';
 const TEST_SPINE = [
   'tests/reset',
+  'tests/core',
+  'tests/cosmetics',
+  'tests/tutorial',
+  'tests/architecture',
   'tests/ai/demo-walker.test.ts',
   'tests/ai/demo-walker-known-frontier.test.ts',
   'tests/ai/demo-walker-rank-ladder.test.ts',
