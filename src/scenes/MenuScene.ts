@@ -188,6 +188,10 @@ import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButto
 import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import { resolveLegacyMinHitRect } from '../legacy-runtime/legacyHitTarget';
 import {
+  resolveLegacyTapRecoveryTarget,
+  shouldRecoverLegacyTapAfterUiRebuild
+} from '../legacy-runtime/legacyUiTapRecovery';
+import {
   LEGACY_HEADER_IDENTITY_LABEL_NAME,
   resolveLegacyHeaderIdentityPlacement
 } from '../legacy-runtime/legacyHeaderIdentityPlacement';
@@ -1710,6 +1714,10 @@ export class MenuScene extends Phaser.Scene {
   private optionFieldDrafts: LegacyOptionFieldDrafts = createLegacyOptionFieldDrafts(LEGACY_DEFAULTS);
   private activeInputField: LegacyOptionFieldId | null = null;
   private authSnapshot: LegacyAuthSessionSnapshot = createLegacyGuestAuthSnapshot();
+  // Game-loop frame in which rebuildUi last recreated the buttons. Phaser's
+  // hit-test list lags a rebuild by a step (see legacyUiTapRecovery.ts), so a
+  // tap processed right after one is routed by recoverTapAfterUiRebuild.
+  private uiRebuiltAtFrame: number | null = null;
   // See create()'s boot-mode handling -- true only when the URL asked to
   // launch straight into play (e.g. the "Play Mazer" home-screen shortcut)
   // but boot deferred that until the real auth session resolves instead of
@@ -4110,6 +4118,45 @@ export class MenuScene extends Phaser.Scene {
     this.legacyPlayFocusGuardAttached = false;
   }
 
+  // A tap Phaser did not route to any object because the buttons were rebuilt
+  // in the previous step (its hit-test list only refreshes in preUpdate, after
+  // the queued pointer events are processed). Re-targets it to the current
+  // front-door buttons so the tap is accepted instead of silently dropped.
+  private recoverTapAfterUiRebuild(pointer: Phaser.Input.Pointer, overCount: number): boolean {
+    if (!shouldRecoverLegacyTapAfterUiRebuild({
+      currentFrame: this.game.getFrame(),
+      mode: this.mode,
+      overCount,
+      overlay: this.overlay,
+      rebuildFrame: this.uiRebuiltAtFrame
+    })) {
+      return false;
+    }
+
+    const candidates = this.uiButtons.flatMap((button, index) => {
+      if (!button.background.active || !button.background.visible || button.background.input?.enabled !== true) {
+        return [];
+      }
+      const rect = button.background.getBounds();
+      return [{
+        bottom: rect.bottom,
+        depth: button.background.depth,
+        index,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top
+      }];
+    });
+    const targetIndex = resolveLegacyTapRecoveryTarget(pointer.x, pointer.y, candidates);
+    const target = targetIndex === null ? undefined : this.uiButtons[targetIndex];
+    if (target === undefined) {
+      return false;
+    }
+
+    target.background.emit('pointerdown', pointer, pointer.x, pointer.y, pointer.event);
+    return true;
+  }
+
   private installInput(): void {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       this.handleLegacyKeyboardDown(event);
@@ -4119,7 +4166,10 @@ export class MenuScene extends Phaser.Scene {
       this.handleLegacyPlayMovementKeyUp(event);
     });
 
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer, currentlyOver: Phaser.GameObjects.GameObject[] = []) => {
+      if (this.recoverTapAfterUiRebuild(pointer, currentlyOver.length)) {
+        return;
+      }
       if (this.handleOverlayBackChevronPointerDown(pointer)) {
         return;
       }
@@ -11502,6 +11552,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private rebuildUi(): void {
+    this.uiRebuiltAtFrame = this.game.getFrame();
     this.overlayGraphics.clear();
     this.clearUi();
     this.overlayBackChevronBounds = null;
