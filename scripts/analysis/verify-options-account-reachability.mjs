@@ -17,7 +17,8 @@
  * setup step -- already covered independently elsewhere by
  * hasVisualButton(surfaces.menu, 'Settings', {iconOnly:true}). Every other
  * step here (scrolling to the bottom, clicking Account from Options,
- * clicking the main-menu profile icon, clicking Account inside the
+ * clicking the main-menu profile icon, asserting Options has no Account
+ * icon (retired 2026-11-06), clicking Account inside the
  * resulting Account overlay, and closing back out) is a real mouse
  * click/drag against bounds the app itself reports.
  *
@@ -201,33 +202,44 @@ const verifyLayout = async ({ baseUrl, browser, viewportLabel, viewport, isMobil
     }
   });
 
-  // Entry point 2: the same icon reused in the Options overlay's own
-  // header, reached after a real click on Settings and a real scroll to
-  // the bottom (also proving OPTIONS_BOTTOM_EXPECTED_LABELS's real target,
-  // 'Sign out', is genuinely visible there).
-  await verifyAccountNavigationFromEntryPoint({
-    baseUrl,
-    browser,
+  // Entry point 2 (retired 2026-11-06): the Options header no longer carries
+  // a profile/Account icon -- the main menu's top-left icon is the only
+  // account entry. Prove that instead: after a real click on Settings and a
+  // real scroll to the bottom, Sign out is still visible and no Account
+  // control exists anywhere in Options.
+  const context = await browser.newContext({
+    deviceScaleFactor: 2,
+    hasTouch: isMobile,
     isMobile,
-    label: `${viewportLabel}-options`,
-    viewport,
-    reachEntryPoint: async (page) => {
-      const menuDiagnostics = await readDiagnostics(page);
-      const settingsPoint = getVisualButtonPoint(menuDiagnostics.visual, 'Settings');
-      await clickPoint(page, settingsPoint, 'Settings');
-      await waitForSurface(page, { mode: 'menu', overlay: 'options', timeoutMs: DEFAULT_TIMEOUT_MS });
-
-      const optionsBottomDiagnostics = await scrollOverlayToBottom(page, { timeoutMs: DEFAULT_TIMEOUT_MS });
-      const optionsBottomSurface = surfaceFromDiagnostics(optionsBottomDiagnostics);
-      check(
-        `[${viewportLabel}-options] Options-bottom shows the real Sign out control after real scroll input`,
-        hasTextLabels(optionsBottomSurface, ['Sign out']),
-        `labels=${optionsBottomSurface.textLabels.map((entry) => entry.text).join(', ')}`
-      );
-
-      return getVisualButtonPoint(optionsBottomSurface, 'Account');
-    }
+    viewport
   });
+  const page = await context.newPage();
+  try {
+    const targetUrl = `${baseUrl}/?content=core-only&theme=aurora&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749&v=options-account-reachability-${viewportLabel}-options-${Date.now()}`;
+    await page.goto(targetUrl, { timeout: DEFAULT_TIMEOUT_MS, waitUntil: 'networkidle' });
+    await waitForAuthenticatedFixtureReady(page, { timeoutMs: DEFAULT_TIMEOUT_MS });
+    const menuDiagnostics = await readDiagnostics(page);
+    const settingsPoint = getVisualButtonPoint(menuDiagnostics.visual, 'Settings');
+    await clickPoint(page, settingsPoint, 'Settings');
+    await waitForSurface(page, { mode: 'menu', overlay: 'options', timeoutMs: DEFAULT_TIMEOUT_MS });
+    const optionsTopSurface = surfaceFromDiagnostics(await readDiagnostics(page));
+    const optionsBottomSurface = surfaceFromDiagnostics(await scrollOverlayToBottom(page, { timeoutMs: DEFAULT_TIMEOUT_MS }));
+    check(
+      `[${viewportLabel}-options] Options-bottom shows the real Sign out control after real scroll input`,
+      hasTextLabels(optionsBottomSurface, ['Sign out']),
+      `labels=${optionsBottomSurface.textLabels.map((entry) => entry.text).join(', ')}`
+    );
+    const optionsHasAccountControl = [optionsTopSurface, optionsBottomSurface].some((surface) => (
+      surface.buttons.some((button) => button?.semanticAction === 'Account' || button?.text === 'Account')
+    ));
+    check(
+      `[${viewportLabel}-options] the Options overlay has no profile/Account icon (the main menu icon is the only account entry)`,
+      !optionsHasAccountControl,
+      `buttons=${[...optionsTopSurface.buttons, ...optionsBottomSurface.buttons].map((button) => button?.text).join(', ')}`
+    );
+  } finally {
+    await context.close();
+  }
 };
 
 const main = async () => {
