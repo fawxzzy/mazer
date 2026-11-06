@@ -168,6 +168,36 @@ These show text that is not a literal, so the literal scan cannot see them. They
 | `MenuScene.ts:17128` `add.text(..., MAZER_OAUTH_SAFE_ERROR_MESSAGE)` | Safe OAuth failure drawn directly on the menu | Bypasses the queue and tone colour |
 | `MenuScene.ts:14169` `accountLabel` | Display name or email | Identity text, not a message |
 
+### 4c. Literals added by merged lanes (integration 1)
+
+The lane branches that added `legacyAuthScreenView.ts`, `legacyLeaderboardView.ts` and `legacyMazeFeatureRegistry.ts` landed after the audit base, so their literals were not in the original pin. They are pinned here. The two view modules are dormant pure view-models (not yet rendered by a scene) whose copy duplicates strings already inventoried above; the registry descriptions are developer-facing.
+
+| file | String | Kind | Recommended routing |
+| --- | --- | --- | --- |
+| `src/legacy-runtime/legacyAuthScreenView.ts` | `Still opening. Continue in your browser or try again.` | duplicate-unrendered | dormant auth-screen view-model copy table (not yet wired); route through the message module when wired |
+| `src/legacy-runtime/legacyAuthScreenView.ts` | `Loading…` | duplicate-unrendered | dormant auth-screen view-model copy table (not yet wired); route through the message module when wired |
+| `src/legacy-runtime/legacyAuthScreenView.ts` | `Signing you in…` | duplicate-unrendered | dormant auth-screen view-model copy table (not yet wired); route through the message module when wired |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `No one has a public rank yet.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `No more players on this page.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `The leaderboard is not available right now.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Could not reach the leaderboard. Check your connection and try again.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `The leaderboard is not set up yet.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Loading...` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Loading username...` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `You need a username to access the leaderboard.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Set a username on the account screen to appear here.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyLeaderboardView.ts` | `Username unavailable. Try again.` | duplicate-unrendered | dormant leaderboard view-model copy table mirroring legacyLeaderboard.ts and MenuScene.ts; fold into the message module when wired |
+| `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Checkpoint-chasing corridor carve that forms the base maze; every generated maze has it.` | technical | developer-facing feature registry description; never rendered to players |
+| `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Two or more checkpoint legs, so the route bends between waypoints instead of one straight leg.` | technical | developer-facing feature registry description; never rendered to players |
+| `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Heading-continuation bias that lengthens straight runs and reduces zig-zag.` | technical | developer-facing feature registry description; never rendered to players |
+| `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Disconnected-component pruning and goal rebasing so the playable graph is one connected component.` | technical | developer-facing feature registry description; never rendered to players |
+| `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Wall-bridge shortcuts that add loops and alternate routes.` | technical | developer-facing feature registry description; never rendered to players |
+| `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Left/right border openings paired across the board so the player can wrap horizontally.` | technical | developer-facing feature registry description; never rendered to players |
+| `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Top/bottom border openings paired across the board so the player can wrap vertically.` | technical | developer-facing feature registry description; never rendered to players |
+| `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Horizontal wrap pairing forced by a single-feeder, vertical-only wrap profile.` | technical | developer-facing feature registry description; never rendered to players |
+| `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Perimeter feeder spokes: single-tile border openings carved inward from each side.` | technical | developer-facing feature registry description; never rendered to players |
+| `src/legacy-runtime/legacyMazeFeatureRegistry.ts` | `Opposite-border pairing pass that mirrors existing border openings onto the far side.` | technical | developer-facing feature registry description; never rendered to players |
+
 ### 4b. Technical-only literals
 
 `src/legacy-runtime/legacyRemoteProgression.ts` carries 23 free-form provider and internal strings (receipt
@@ -187,6 +217,7 @@ pinned one by one; the routing is pinned structurally
 | of which player-visible and bypassing the module (raw-status 10, raw-static 6, parallel-mapper 4) | 20 |
 | of which technical / duplicate / fixture / label / static / routed-inline | 20 (technical 4, duplicate 1, fixture 1, label 1, static 12, routed-inline 1) |
 | Technical-only literals pinned by rule (`legacyRemoteProgression.ts`) | 23 |
+| Added by merged lanes after the audit base (section 4c): view-model duplicates 13, registry descriptions 10 | 23 |
 | Non-literal raw render sites (section 4a) | 4 message-bearing |
 | Routed messages with a render surface | 0 of the queue; 1 resolver (password recovery copy) is drawn |
 
