@@ -636,7 +636,12 @@ const selectLegacyRuntimeMazeForMode = (
 
   const initialWindowUnderTarget = initialCandidateComplexityMax < roundedTargetComplexity - tolerance;
   const initialWindowOverTarget = initialCandidateComplexityMin > roundedTargetComplexity + tolerance;
+  // A corridor is seed-independent and its pressure/adaptive retry profiles
+  // would drop the layout (and the adaptive retry would even resize the
+  // board), so under-target retries never apply to it.
+  const isCorridorLayout = normalizeLegacyMazeGenerationProfile(generationProfile).layout === 'corridor';
   const pressureRetryCandidateCount = initialWindowUnderTarget
+    && !isCorridorLayout
     && roundedTargetComplexity >= LEGACY_GENERATION_SELECTION_PRESSURE_RETRY_MIN_TARGET
     ? LEGACY_GENERATION_SELECTION_PRESSURE_RETRY_CANDIDATES
     : 0;

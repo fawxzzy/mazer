@@ -46,6 +46,15 @@ jobs:
       - name: Type-check
         run: npm run lint
 
+      - name: Verify core, hazard graph, cosmetics, tutorial, and architecture contracts
+        run: >-
+          npx --no-install vitest run
+          tests/core
+          tests/cosmetics
+          tests/tutorial
+          tests/architecture
+          --maxWorkers=1
+
       - name: Verify progression, RPC, leaderboard, and UI boundaries
         run: >-
           npx --no-install vitest run

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "example-fixture",
+  "assets": [
+    {
+      "id": "example.icon.spark",
+      "kind": "icon",
+      "path": "icons/example-icon.png",
+      "format": "png",
+      "bytes": 461,
+      "sha256": "1da486487b550adcd22c33023ffcb803b15fcc09cf485d4ea69d9db5609e3dc4",
+      "dimensions": { "width": 16, "height": 16 },
+      "source": {
+        "origin": "handcrafted",
+        "reference": "Synthetic test gradient generated for the validator fixture; not product art.",
+        "createdOn": "2026-11-05"
+      },
+      "license": { "id": "LicenseRef-Mazer-Owned", "holder": "Mazer test fixture" },
+      "author": "fixture-author",
+      "status": "approved"
+    },
+    {
+      "id": "example.image.banner",
+      "kind": "image",
+      "path": "images/example-image.png",
+      "format": "png",
+      "bytes": 125,
+      "sha256": "36cbacd9b60cbf9b157c6d1baa620bf38cd84ebc6755722c94309edbc28c955e",
+      "dimensions": { "width": 8, "height": 4 },
+      "source": {
+        "origin": "handcrafted",
+        "reference": "Synthetic test gradient generated for the validator fixture; not product art.",
+        "createdOn": "2026-11-05"
+      },
+      "license": { "id": "LicenseRef-Mazer-Owned", "holder": "Mazer test fixture" },
+      "author": "fixture-author",
+      "status": "draft"
+    }
+  ]
+}

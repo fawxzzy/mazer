@@ -453,7 +453,8 @@ describe('convergence source provenance', () => {
   });
 
   test('classifies the default compact artifact as gitignored local scratch, not committed evidence', () => {
-    const script = readFileSync(resolve(process.cwd(), 'scripts/analysis/mazev2-convergence.ts'), 'utf8');
+    // Normalize CRLF so the multi-line `toContain` below is stable on autocrlf checkouts.
+    const script = readFileSync(resolve(process.cwd(), 'scripts/analysis/mazev2-convergence.ts'), 'utf8').replace(/\r\n/gu, '\n');
     const gitignore = readFileSync(resolve(process.cwd(), '.gitignore'), 'utf8');
     expect(script).toContain("const DEFAULT_OUTPUT_DIR = './tmp/mazev2-convergence';");
     expect(script).toContain('compact artifact remains ignored');

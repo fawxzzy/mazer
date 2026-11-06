@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -630,7 +630,7 @@ export const checkDecisionRegistry = (registry = readDecisionRegistry(), root = 
   return true;
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     checkDecisionRegistry();
     console.log('Decision registry contract passed.');

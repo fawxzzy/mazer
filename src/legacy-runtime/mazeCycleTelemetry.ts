@@ -27,6 +27,12 @@ import {
   type MazeCycleRunQualityTopologyMetrics
 } from './mazeCycleRunQualityTopology';
 import {
+  LEGACY_MAZE_FEATURE_REGISTRY_UNSTAMPED_VERSION,
+  LEGACY_MAZE_FEATURE_REGISTRY_VERSION,
+  createLegacyMazeFeatureStamp,
+  type LegacyMazeFeatureMode
+} from './legacyMazeFeatureRegistry';
+import {
   resolveLegacyMazeComplexity,
   type LegacyMazeComplexityBreakdown
 } from './legacyProgression';
@@ -36,6 +42,8 @@ export const MAZE_CYCLE_TELEMETRY_HISTORY_LIMIT = 50;
 export const MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT = 256;
 export const MAZE_CYCLE_TELEMETRY_DIAGNOSTIC_RECEIPT_LIMIT = 5;
 export const MAZE_CYCLE_TELEMETRY_PATH_PREVIEW_LIMIT = 8;
+export const MAZE_CYCLE_TELEMETRY_FEATURE_ID_LIMIT = 64;
+export const MAZE_CYCLE_TELEMETRY_FEATURE_REGISTRY_VERSION_MAX_LENGTH = 64;
 
 export type MazeCycleRouteQuality = NonNullable<LegacyMazeSnapshot['routeQualityStats']>['routeQuality'];
 export type MazeCycleTelemetrySurface = 'menu-demo' | 'play';
@@ -59,6 +67,7 @@ export {
 };
 export type { MazeCycleRunQualityScore, MazeCycleRunQualityScoreComparison } from './mazeCycleRunQualityScorer.mjs';
 export { MAZE_CYCLE_RUN_QUALITY_METRICS_VERSION, summarizeMazeCycleRunQualityTopology };
+export { LEGACY_MAZE_FEATURE_REGISTRY_UNSTAMPED_VERSION, LEGACY_MAZE_FEATURE_REGISTRY_VERSION };
 export type { MazeCycleRunQualityTopologyMetrics } from './mazeCycleRunQualityTopology';
 
 export interface MazeCycleAiDecisionSummary {
@@ -76,6 +85,15 @@ export interface MazeCycleTelemetryReceipt {
   clientRunId: string;
   surface: MazeCycleTelemetrySurface;
   aiDecisionSummary: MazeCycleAiDecisionSummary | null;
+  /**
+   * Maze feature era (local snapshot only; deliberately NOT part of the remote
+   * receipt payload). `featureRegistryVersion` is the registry version that
+   * produced `activeFeatureIds`; receipts stored before the registry carry
+   * LEGACY_MAZE_FEATURE_REGISTRY_UNSTAMPED_VERSION. `activeFeatureIds` is null
+   * when the maze had no generation profile to derive features from.
+   */
+  activeFeatureIds: string[] | null;
+  featureRegistryVersion: string;
   mazeComplexity: LegacyMazeComplexityBreakdown | null;
   mazeSeed: number;
   mazeSize: number;
@@ -287,6 +305,43 @@ const normalizeAiDecisionSummary = (value: unknown): MazeCycleAiDecisionSummary 
   };
 };
 
+const normalizeFeatureRegistryVersion = (value: unknown): string => {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  return trimmed.length > 0 && trimmed.length <= MAZE_CYCLE_TELEMETRY_FEATURE_REGISTRY_VERSION_MAX_LENGTH
+    ? trimmed
+    : LEGACY_MAZE_FEATURE_REGISTRY_UNSTAMPED_VERSION;
+};
+
+const normalizeActiveFeatureIds = (value: unknown): string[] | null => {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const ids: string[] = [];
+  for (const entry of value) {
+    if (typeof entry === 'string' && entry.length > 0 && entry.length <= 64 && !ids.includes(entry)) {
+      ids.push(entry);
+    }
+    if (ids.length >= MAZE_CYCLE_TELEMETRY_FEATURE_ID_LIMIT) {
+      break;
+    }
+  }
+  return ids;
+};
+
+const resolveTelemetryFeatureMode = (
+  maze: LegacyMazeSnapshot,
+  surface: MazeCycleTelemetrySurface
+): LegacyMazeFeatureMode => {
+  const buildKind = maze.generation?.buildKind ?? maze.source;
+  if (buildKind === 'menu-generated' || buildKind === 'menu-snapshot') {
+    return 'menu';
+  }
+  if (buildKind === 'play-generated') {
+    return 'play';
+  }
+  return surface === 'menu-demo' ? 'menu' : 'play';
+};
+
 const normalizeMazeComplexityBreakdown = (value: unknown): LegacyMazeComplexityBreakdown | null => {
   if (!isRecord(value)) {
     return null;
@@ -408,6 +463,8 @@ const normalizeReceipt = (value: unknown): MazeCycleTelemetryReceipt | null => {
     clientRunId: normalizeLegacyCompletionClientRunId(value.clientRunId, value.id),
     surface,
     aiDecisionSummary: normalizeAiDecisionSummary(value.aiDecisionSummary),
+    activeFeatureIds: normalizeActiveFeatureIds(value.activeFeatureIds),
+    featureRegistryVersion: normalizeFeatureRegistryVersion(value.featureRegistryVersion),
     mazeComplexity: normalizeMazeComplexityBreakdown(value.mazeComplexity),
     mazeSeed: normalizeNonNegativeInteger(value.mazeSeed),
     mazeSize: normalizeNonNegativeInteger(value.mazeSize),
@@ -563,6 +620,10 @@ export const createMazeCycleTelemetryReceipt = (
     wrongTurns
   });
   const id = `${input.surface}-${input.maze.seed}-${Date.parse(completedAt) || Date.now()}`;
+  const featureStamp = createLegacyMazeFeatureStamp(
+    input.maze.generation?.profile,
+    resolveTelemetryFeatureMode(input.maze, input.surface)
+  );
 
   return {
     id,
@@ -572,6 +633,8 @@ export const createMazeCycleTelemetryReceipt = (
     ),
     surface: input.surface,
     aiDecisionSummary,
+    activeFeatureIds: featureStamp.activeFeatureIds,
+    featureRegistryVersion: featureStamp.featureRegistryVersion,
     mazeComplexity,
     mazeSeed: input.maze.seed,
     mazeSize: Math.max(input.maze.width, input.maze.height),
@@ -625,6 +688,8 @@ const toDiagnosticReceipt = (
       ? { ...receipt.aiDecisionSummary }
       : null,
     aiDecisionScore: scoreMazeCycleAiDecisionSummary(receipt.aiDecisionSummary),
+    activeFeatureIds: receipt.activeFeatureIds ? [...receipt.activeFeatureIds] : null,
+    featureRegistryVersion: receipt.featureRegistryVersion,
     mazeComplexity: receipt.mazeComplexity
       ? { ...receipt.mazeComplexity }
       : null,
