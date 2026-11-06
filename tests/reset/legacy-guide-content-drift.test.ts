@@ -46,7 +46,7 @@ const exportsOf = (module: string): Record<string, unknown> | null => {
 
 describe('guide structure', () => {
   test('rows are unique, ordered and short enough to wrap in two lines at 14px on 320 wide', () => {
-    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'you', 'move', 'trail', 'wrap', 'levels']);
+    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'levels']);
     expect(new Set(LEGACY_GUIDE_ROWS.map((r) => r.id)).size).toBe(LEGACY_GUIDE_ROWS.length);
     for (const r of LEGACY_GUIDE_ROWS) {
       expect(r.heading.length, r.id).toBeLessThanOrEqual(12);
@@ -75,7 +75,8 @@ describe('guide structure', () => {
       expect(shown.has(pending.id)).toBe(false);
       expect(pending.reasonId).toMatch(/^[a-z0-9]+(-[a-z0-9]+){2,}$/);
     }
-    expect(LEGACY_GUIDE_PENDING_ROWS.find((p) => p.id === 'start-marker')!.blockedOn).toBe('chip-wiring');
+    // The Start row left the pending list when Chip was wired (the brackets are on the board now).
+    expect(LEGACY_GUIDE_PENDING_ROWS.map((p) => p.id)).toEqual(['ranks', 'first-run-coach']);
   });
 });
 
@@ -96,11 +97,14 @@ describe('guide copy only names things that exist', () => {
     expect(allText).not.toMatch(/\bexit\b/i);
   });
 
-  test('"gold" start: the live game draws no gold start marker in play (the endpoint glow draw is residue-only), so the guide must not promise one', () => {
-    // If someone brings back a visible start marker (Chip start brackets), they must add the pending
-    // start-marker row and delete this expectation in the same PR.
-    expect(LEGACY_GUIDE_ROWS.some((r) => r.id === ('start' as string))).toBe(false);
+  test('Start row: Chip draws start corner brackets and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
+    expect(LEGACY_GUIDE_ROWS.some((r) => r.id === 'start')).toBe(true);
+    expect(row('start').text).toMatch(/Corner brackets/);
+    expect(row('start').icon.chipDraw?.marker).toBe('start');
+    expect(row('start').icon.boardDraw).toEqual({ module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' });
     expect(boardTileBake.drawBoardMarkers).toBeTypeOf('function');
+    // The brackets are drawn by drawBoardMarkers' start branch (corner arms + centre dot).
+    expect(read('src/render/boardTileBake.ts')).toMatch(/startArm/);
   });
 
   test('Trail row names the Settings toggle by its live label', () => {
@@ -110,9 +114,10 @@ describe('guide copy only names things that exist', () => {
     expect(row('trail').text).toMatch(/in Settings/);
   });
 
-  test('Goal is a star: the scene draws a goal star and the Chip marker module draws a star path', () => {
+  test('Goal is a star: the Chip marker module draws a star path and the scene calls it for the board and the Guide', () => {
     expect(row('goal').text).toMatch(/star/);
-    expect(MENU_SCENE).toMatch(/private drawLegacyGoalStarMarker\(/);
+    expect(MENU_SCENE).not.toMatch(/drawLegacyGoalStarMarker/);
+    expect(MENU_SCENE).toMatch(/drawBoardMarkers\(/);
     expect(read('src/render/boardTileBake.ts')).toMatch(/const starPath = /);
   });
 
@@ -242,13 +247,12 @@ describe('guide icons are tied to the draw functions the board uses', () => {
     }
   });
 
-  test('the Chip wiring lane has an explicit todo row list: goal and wrap share the board draw; you and move are guide-local; trail and levels are tracked', () => {
+  test('Chip wiring closed every chip-wiring todo: goal, start, trail, wrap and levels share a board draw; you and move are guide-local', () => {
     const byStatus = (status: string): string[] => LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === status).map((r) => r.id);
-    expect(byStatus('shared-with-board')).toEqual(['goal', 'wrap']);
+    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'trail', 'wrap', 'levels']);
     expect(byStatus('guide-local')).toEqual(['you', 'move']);
-    expect(byStatus('todo-wiring')).toEqual(['trail', 'levels']);
-    const chipLane = LEGACY_GUIDE_ROWS.filter((r) => r.icon.lane === 'chip-wiring').map((r) => r.id);
-    expect(chipLane).toEqual(['trail', 'levels']);
+    expect(byStatus('todo-wiring')).toEqual([]);
+    expect(LEGACY_GUIDE_ROWS.filter((r) => r.icon.lane === 'chip-wiring').map((r) => r.id)).toEqual([]);
   });
 });
 
@@ -269,9 +273,21 @@ describe('the scene paints exactly what the guide data declares', () => {
   test('icons declared shared-with-board call the board draw function itself, not a copy', () => {
     const icon = method('private drawLegacyGuideIcon(');
     const shared = LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === 'shared-with-board');
-    expect(shared.map((r) => r.id)).toEqual(['goal', 'wrap']);
-    expect(icon).toContain('this.drawLegacyGoalStarMarker(');
+    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'trail', 'wrap', 'levels']);
+    // goal and start: one helper that paints a chip tile and then calls drawBoardMarkers itself.
+    expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'goal',");
+    expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'start',");
+    const marker = method('private drawLegacyGuideBoardMarker(');
+    expect(marker).toContain('drawBoardMarkers(context, {');
+    expect(marker).toContain('new PhaserGraphicsTileContext(graphics)');
+    // trail: chip tiles from the board's computeChipGeometry (via resolveChipGridGeometry), plus a miniature trail line.
+    expect(icon).toContain('this.drawLegacyOptionsGuideTrailGlyph(');
+    expect(method('private drawLegacyGuideChipCells(')).toContain('resolveChipGridGeometry(');
+    expect(read('src/render/chipTileGraphics.ts')).toContain('computeChipGeometry(');
+    // wrap: the perimeter diamond itself.
     expect(icon).toContain('drawEdgeMarker(');
+    // levels: the dot-matrix wordmark chip renderer, same as the level announcer.
+    expect(icon).toContain('this.drawLegacyGlyphWordTileBlock(graphics, layout, 0, 1, 1, false)');
     // guide-local icons reuse the board constants/tokens (player) or mirror the stick (move).
     expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('LEGACY_PLAY_PLAYER_MARKER_ACCENT_COLOR');
     expect(method('private drawLegacyOptionsGuideMoveGlyph(')).toContain('LEGACY_PLAY_TOUCH_BUTTON_STROKE');

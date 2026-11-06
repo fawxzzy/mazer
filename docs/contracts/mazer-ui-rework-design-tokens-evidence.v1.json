@@ -134,17 +134,11 @@
   "legacy/color/goal.magenta": [
    {
     "file": "src/render/navigationCoreTrail.ts"
-   },
-   {
-    "file": "src/scenes/MenuScene.ts"
    }
   ],
   "legacy/color/goal.violet": [
    {
     "file": "src/render/navigationCoreTrail.ts"
-   },
-   {
-    "file": "src/scenes/MenuScene.ts"
    }
   ],
   "legacy/spacingPx/rowGapCompact": [

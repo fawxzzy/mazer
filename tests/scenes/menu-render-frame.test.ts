@@ -742,7 +742,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.14;');
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.08;');
     expect(legacyMenuRenderSource).toContain('const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {');
-    expect(menuSceneSource).toContain('const drawPathPoint = (point: LegacyPoint): void => {');
+    // Chip wiring (2026-11-06): the per-tile drawPathPoint loop is gone; drawBoardPaths hands the board
+    // to the baked tile layer and the build/deconstruct reveal is a rank mask (resolveBoardTileReveal).
+    expect(menuSceneSource).not.toContain('const drawPathPoint = (point: LegacyPoint): void => {');
+    expect(menuSceneSource).toContain('this.boardTileLayer.update({');
+    expect(menuSceneSource).toContain('reveal: this.resolveBoardTileReveal(),');
+    // drawLegacyPathMaterialTile survives for the menu AI-memory overlay tiles (fillLegacyDynamicPathTile).
     expect(menuSceneSource).toContain('private drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('private resolveLegacyPixelTileRect(');
     expect(menuSceneSource).toContain('const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });');
@@ -750,7 +755,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('graphics.fillStyle(options.coreColor, options.coreAlpha);');
     expect(menuSceneSource).toContain('graphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);');
     expect(menuSceneSource).toContain('private drawLegacyPathTileFacet(');
-    expect(menuSceneSource).toContain('const facetRect = resolveLegacyMenuBorderDockFacetRect(direction, frame, {');
+    expect(menuSceneSource).not.toContain('resolveLegacyMenuBorderDockFacetRect');
     expect(menuSceneSource).not.toContain('const top = mazeBottom;');
     expect(menuSceneSource).not.toContain('this.fillLegacyPathConnectorSeams(');
     expect(menuSceneSource).not.toContain('private fillLegacyPathConnectorSeams(');
@@ -758,8 +763,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PATH_CONNECTOR_SEAM_EDGE_ALPHA_RATIO = 0.72;');
     expect(menuSceneSource).toContain('const LEGACY_PATH_CONNECTOR_SEAM_CORE_ALPHA_RATIO = 0.94;');
     expect(menuSceneSource).toContain('Math.round(originX + (point.x * tileSize))');
-    expect(menuSceneSource).toContain('for (let index = 0; index < Math.min(tileLimit, this.menuStaticDrawTileOrder.length); index += 1)');
-    expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
+    // Rank mask: a cell is shown while its rank in the reveal order is below the live tile limit.
+    expect(menuSceneSource).toContain('ranks[index]! >= 0 && ranks[index]! < tileLimit');
     expect(menuSceneSource).toContain('renderBounds: mazeRenderBounds');
     expect(menuSceneSource).toContain('renderSafeInset: mazeRenderFrame.safeInset');
     expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);');
@@ -871,14 +876,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       normalizedMenuSceneSource.indexOf('private resolveLegacyMazeRenderFrame(')
     );
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_CORE = mixLegacyIridescentColor(cyberArcadeMaterial.path.core, 0x000000, LEGACY_PATH_CORE_EYE_COMFORT_DIM_AMOUNT);');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;');
+    // The play-mode pale path constants went with the old tile (Chip draws one board in both modes).
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_PATH_CORE');
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;');
     expect(menuSceneSource).toContain("private pathVisualStyle: LegacyPathVisualStyle = 'corridor';");
     expect(menuSceneSource).toContain('this.pathVisualStyle = resolveLegacyPathVisualStyle(runtimeSearch);');
-    expect(menuSceneSource).toContain('drawCue: false');
     expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.maze;');
     expect(menuSceneSource).toContain('this.backdropDirty = true;');
     expect(menuSceneSource).toContain('pathVisualStyle: this.pathVisualStyle');
@@ -887,7 +891,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('text: button.text');
     expect(menuSceneSource).toContain('this.uiTexts.push(label, stateLabel);');
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_PATH_RELIEF_SHADOW');
-    expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('private boardPathGraphics!: Phaser.GameObjects.Graphics;');
     expect(menuSceneSource).toContain('private boardPathDirty = true;');
     expect(menuSceneSource).toContain('this.boardPathGraphics = this.add.graphics();');
@@ -976,8 +979,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private isLegacyMenuHandoffAnimationActive(time: number): boolean');
     expect(menuSceneSource).toContain('private drawBoardPaths(time: number): void {');
     expect(menuSceneSource).toContain('this.drawLegacyPathMaterialTile(');
-    expect(menuSceneSource).toContain('coreAlpha: isMenuMode ? 0.92 : 0.96,');
-    expect(menuSceneSource).toContain(': LEGACY_PLAY_PATH_CORE;');
     expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor');
   });
 
@@ -1050,7 +1051,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('resolveLegacyProgressionBadgeText');
     expect(menuSceneSource).not.toContain('portraitMenuBadgeTextOffset');
     expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.maze;');
-    expect(menuSceneSource).toContain('this.drawLegacyPathBorderDock(');
+    // Docks are part of the bake (resolveLegacyMenuBorderDockDirections feeds BoardTileDock[]); the old
+    // per-tile dock fill and bleed-strip images are gone.
+    expect(menuSceneSource).not.toContain('drawLegacyPathBorderDock');
+    expect(menuSceneSource).toContain('docks.push({ x, y, side });');
     expect(menuSceneSource).toContain('this.trail = resolveLegacyMenuDemoTrail(');
     expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(');
     expect(menuSceneSource).toContain('const mazeTileSize = mazeRenderFrame.tileSize;');
@@ -1141,7 +1145,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('playerBeaconColor: LEGACY_PLAY_PLAYER_BEACON_COLOR');
     expect(menuSceneSource).toContain('playerBeaconPeriodMs: LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS');
     expect(menuSceneSource).toContain('playerHaloRadius: playerMarkerMetrics.haloRadius');
-    expect(menuSceneSource).toContain('private drawLegacyEndpointGlow(');
+    // Start/goal are the Chip marker draw code through the Phaser graphics adapter (shared with the Guide).
+    expect(menuSceneSource).not.toContain('drawLegacyEndpointGlow');
+    expect(menuSceneSource).toContain('drawBoardMarkers(context, {');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(renderedPlayerPoint');
     // The cast appears when the beams land (the maze is still growing out of
     // the spawn tile), not at the end of the build.
@@ -2559,279 +2565,74 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 });
 
-// Navigation Core v1's end-star (drawLegacyGoalStarMarker) has no exposed
-// pure boundary the way the trail geometry does -- it's procedural Graphics
-// calls inline in a 16k-line Scene class -- so these pin the specific,
-// reviewed-against-the-frozen-reference fixes at the source level, matching
-// this file's own established convention for hard-to-harness Scene
-// internals.
-describe('Navigation Core v1 end-star: canonical energy palette, no orbiting dot, one-cell halo, no permanent sparkles', () => {
+// Chip wiring (Navigation Core v2 amendment, owner pick B "Chip", 2026-11-06). The v1 end-star describes
+// that used to live here pinned the rainbow-ring star (drawLegacyGoalStarMarker) and the radial-gradient goal
+// halo canvas (drawGoalHaloCanvas). Both draw functions and the halo canvas were removed: start and goal are
+// the Chip marker draw code (drawBoardMarkers in src/render/boardTileBake.ts) painted into the scene's
+// dynamic graphics through the Phaser adapter. These pin the new wiring at the source level, the file's
+// convention for Scene internals; marker geometry, contrast and one-cell footprint are unit-tested in
+// tests/render/boardTileBake.test.ts and tests/render/boardTileStyle.test.ts.
+describe('Chip wiring: start/goal markers, trail underlay, board layer', () => {
   const menuSceneSource = normalizeSourceLineEndings(
     readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
   );
 
-  test('samples the canonical cool-dominant ENERGY stops (shared with the trail), never a raw equal-weight HSV rainbow, for the ring and star', () => {
-    // Owner-authorized visual amendment (2026-09-09): the goal-star ring
-    // tracks the same calmer trail palette the owner directed -- still the
-    // cyclic resolveLegacyIridescentMidnightColor sampler over a
-    // cool-dominant stop array, just LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS
-    // (the 4D-B-scoped amendment set) rather than the frozen module's own
-    // NAVIGATION_CORE_TRAIL_ENERGY_STOPS. The intent this test pins is
-    // unchanged: one shared cool-dominant energy material, never a raw
-    // equal-weight HSV rainbow.
-    expect(menuSceneSource).toContain('resolveLegacyIridescentMidnightColor(position, LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS)');
-    expect(menuSceneSource).toContain('const segmentColor = energyColorAt((i / ringSegmentCount) + spinPhase);');
-    expect(menuSceneSource).toContain('const segmentColor = energyColorAt(((i + t0) / starPoints.length) + spinPhase);');
-    // The ring/star must not call Phaser's HSV helper directly any more --
-    // that was the raw equal-weight-rainbow mechanism being replaced.
-    expect(menuSceneSource).not.toContain('Phaser.Display.Color.HSVToRGB(hue, 0.85, 1).color;\n      graphics.lineStyle(Math.max(1.5, maxRadius * 0.07)');
+  test('the old end-star, endpoint glow and goal-halo canvas are gone', () => {
+    for (const removed of [
+      'drawLegacyGoalStarMarker',
+      'drawLegacyEndpointGlow',
+      'drawGoalHaloCanvas',
+      'goalHaloCanvas',
+      'LEGACY_PLAY_GOAL_MARKER_HALO',
+      'LEGACY_PLAY_START_MARKER_PRE_SPAWN',
+      'orbitAngle'
+    ]) {
+      expect(menuSceneSource, removed).not.toContain(removed);
+    }
   });
 
-  test('never draws the orbiting white highlight that rides the ring', () => {
-    expect(menuSceneSource).not.toContain('orbitAngle');
-    expect(menuSceneSource).not.toContain('orbitX');
-    expect(menuSceneSource).not.toContain('orbiting satellite');
-  });
-
-  test('the halo stays inside one cell (reference-accurate radii, not the old 1.3-1.45x overflow)', () => {
-    expect(menuSceneSource).toContain('graphics.fillCircle(centerX, centerY, maxRadius * (0.72 + (haloPulse * 0.08)));');
-    expect(menuSceneSource).toContain('graphics.fillCircle(centerX, centerY, maxRadius * 0.48);');
-    expect(menuSceneSource).not.toContain('maxRadius * (1.3 + (haloPulse * 0.15))');
-    expect(menuSceneSource).not.toContain('graphics.fillCircle(centerX, centerY, maxRadius * 0.85);');
-  });
-
-  test('draws no sparkles at all under reduced motion or the static Guide legend icon -- no permanent decorative dots', () => {
-    expect(menuSceneSource).not.toContain('sparkleSpecs');
-    expect(menuSceneSource).not.toContain('Reduced-motion / static (Guide legend) fallback');
-  });
-
-  test('the star remains hollow and one-cell (unchanged geometry, never filled)', () => {
-    expect(menuSceneSource).toContain('const outerRadius = maxRadius * 0.72;');
-    expect(menuSceneSource).toContain('const innerRadius = outerRadius * 0.42;');
-    // The star's own polygon (starPoints) is only ever stroked edge-by-edge
-    // (lineBetween below), never handed to a fill call -- that's what makes
-    // it hollow (background visible through the interior).
-    expect(menuSceneSource).not.toContain('fillPoints(starPoints');
-    expect(menuSceneSource).not.toContain('graphics.fillPath(starPoints');
-    expect(menuSceneSource).toContain("graphics.lineBetween(\n          from.x + ((to.x - from.x) * t0),");
-  });
-});
-
-describe('Navigation Core v1 final correctness pass: Trail Fade origin, shine shrink continuity, lifecycle-gated clock', () => {
-  const menuSceneSource = normalizeSourceLineEndings(
-    readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
-  );
-
-  test('the perfect-path search originates from the trail\'s own oldest retained point, not unconditionally maze.start', () => {
-    // The fix for the Trail-Fade-truncation disconnection bug: maze.start is
-    // no longer in the visited set once Trail Fade has truncated this.trail
-    // past it, so searching from maze.start regardless (the original bug)
-    // could fail entirely and collapse the trail to a single point. See
-    // legacy-playable-graph.test.ts for the behavioral reproduction against
-    // real advanceLegacyPlayStep movement.
-    expect(menuSceneSource).toContain('const origin = this.trail.length > 0 ? this.trail[0]! : this.maze.start;');
-    expect(menuSceneSource).toContain('resolveLegacyPlayableShortestPath(visitedGrid, origin, this.player)');
-  });
-
-  test('the trail animation clock only advances during settled, unlocked play -- not merely mode/overlay', () => {
-    // mode==='play' && overlay==='none' alone is also true during portions
-    // of maze build/deconstruct, a pending reset/generation request, and a
-    // staged reveal -- isLegacyPlayLifecycleInputLocked() is the same real
-    // lifecycle lock that already gates input, reused here instead of an
-    // invented boolean.
-    expect(menuSceneSource).toContain(
-      "const isActivePlayVisible = this.mode === 'play'\n      && this.overlay === 'none'\n      && !this.isLegacyPlayLifecycleInputLocked();"
-    );
-  });
-
-  test('the shine\'s lap-completion threshold is persisted and passed explicitly, not recomputed from the live path length', () => {
-    // See advanceTrailShineState's own header: recomputing the wrap
-    // threshold from a path length that can shrink mid-lap (backtracking,
-    // or a Trail Fade origin advance) turns a harmless shrink into a
-    // modulo-teleport of an in-flight shine.
-    expect(menuSceneSource).toContain('private trailShineLapCycleLength = 0;');
-    expect(menuSceneSource).toContain('this.trailShineLapCycleLength,');
-    expect(menuSceneSource).toContain('this.trailShineLapCycleLength = shineState.lapCycleLength;');
-  });
-
-  test('color phase is sampled with the accumulated origin-advance offset, not the raw window-relative distance', () => {
-    // Trail Fade slides the visible route's own origin forward over time;
-    // without this offset, a surviving trail cell's color would visibly
-    // rebase every time the origin advances, since color is periodic over
-    // distance from the CURRENT window's zero point.
-    expect(menuSceneSource).toContain('private trailOriginAdvanceDistancePx = 0;');
-    expect(menuSceneSource).toContain('const colorPhaseDistance = midDistance + this.trailOriginAdvanceDistancePx;');
-    // Owner-authorized visual amendment (2026-09-09): the calmer trail
-    // palette is 4D-B-scoped, so the trail samples sampleCalmTrailEnergyColor
-    // (same distance/time phase math as the frozen module's
-    // sampleTrailEnergyColor, different stops) -- the stable-phase
-    // colorPhaseDistance argument this test pins is unchanged.
-    expect(menuSceneSource).toContain('sampleCalmTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions)');
-    // ageAlpha (the Trail Fade opacity gradient) must stay on the raw
-    // window-relative midDistance -- only color gets the stable-phase
-    // offset, since age-alpha is deliberately about position within the
-    // CURRENTLY visible path, not "true" absolute distance since run start.
-    expect(menuSceneSource).toContain('(midDistance / geometry.totalLength)');
-  });
-
-  test('every reset site that clears the shine/clock state also clears the new origin-advance and lap-cycle-length state', () => {
-    const resetBlockPattern = /this\.trailAnimationElapsedMs = 0;\s*this\.trailAnimationLastRealMs = null;\s*this\.trailShineLapStartedAtMs = 0;\s*this\.trailShineLapCycleLength = 0;\s*this\.trailOriginAdvanceDistancePx = 0;\s*this\.lastTrailOriginPoint = null;\s*this\.hasPlayerEverLeftStart = false;/g;
-    const matches = menuSceneSource.match(resetBlockPattern) ?? [];
-    expect(matches.length).toBe(2);
-  });
-});
-
-describe('Navigation Core v1 trail canvas: lifecycle and resolution integration', () => {
-  const menuSceneSource = normalizeSourceLineEndings(
-    readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
-  );
-
-  test('hides the trail canvas image when entering menu mode -- fixes a real ghost-trail regression, verified live in scripts/analysis/verify-trail-canvas-lifecycle.mjs', () => {
-    const fnStart = menuSceneSource.indexOf('private enterMenuMode(): void {');
+  test('start and goal are drawn by drawBoardMarkers through the Phaser adapter, with the layer-snapped origin and the reduced-motion gate', () => {
+    const fnStart = menuSceneSource.indexOf('private fillPlayDynamicMarkerTile(');
     expect(fnStart).toBeGreaterThan(-1);
-    const hideIndex = menuSceneSource.indexOf('this.trailCanvasImage?.setVisible(false);', fnStart);
-    const modeAssignIndex = menuSceneSource.indexOf("this.mode = 'menu';", fnStart);
-    expect(hideIndex).toBeGreaterThan(fnStart);
-    expect(hideIndex).toBeLessThan(modeAssignIndex);
+    const body = menuSceneSource.slice(fnStart, menuSceneSource.indexOf('\n  }\n', fnStart));
+    expect(body).toContain('new PhaserGraphicsTileContext(this.boardDynamicGraphics)');
+    expect(body).toContain('drawBoardMarkers(context, {');
+    expect(body).toContain('this.boardTileLayer.snappedOrigin');
+    expect(body).toContain('reducedMotion: this.prefersLegacyReducedMotion()');
+    expect(body).toContain("start: kind === 'start' ? point : undefined");
+    expect(body).toContain("goal: kind === 'goal' ? point : undefined");
+    // the start marker yields to the player standing on it
+    expect(body).toContain("kind === 'start' && this.player.x === point.x && this.player.y === point.y");
   });
 
-  test('never trusts the canvas texture/image without a null guard -- a failed texture creation must not throw, just skip drawing', () => {
-    expect(menuSceneSource).toContain('if (!this.trailCanvasTexture || !this.trailCanvasImage || segments.length === 0) {');
+  test('the board style flag defaults to Chip and reads ?tileStyle= through the shared resolver', () => {
+    expect(menuSceneSource).toContain("private boardTileStyle: BoardTileStyleId = 'chip';");
+    expect(menuSceneSource).toContain('this.boardTileStyle = resolveBoardTileStyleFromSearch(');
   });
 
-  test('sizes the backing pixel buffer by devicePixelRatio-derived resolution (and the board container\'s own zoom), not 1:1 with logical board-space units', () => {
-    expect(menuSceneSource).toContain('resolveMazerCanvasResolution() * zoomScale');
-    expect(menuSceneSource).toContain('this.trailCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);');
-    // The Image's own DISPLAY size must stay in logical units -- only the
-    // backing buffer is supersampled -- or the trail would render at the
-    // wrong on-screen size.
-    expect(menuSceneSource).toContain('this.trailCanvasImage.setDisplaySize(width, height);');
+  test('the baked layer sits right after the path-graphics z-order anchor and its texture is removed on shutdown', () => {
+    expect(menuSceneSource).toContain('      this.boardPathGraphics,\n      this.boardTileLayer.image,\n');
+    expect(menuSceneSource).toContain('`legacy-board-tile-layer-${nextMenuSceneInstanceId()}`');
+    expect(menuSceneSource).toContain('this.textures.remove(this.boardTileLayerTextureKey);');
+    // the floor texture sprite, its mask and the pooled bleed images are retired
+    expect(menuSceneSource).not.toContain('boardFloorTileSprite');
+    expect(menuSceneSource).not.toContain('boardFloorMaskGraphics');
+    expect(menuSceneSource).not.toContain('boardBleedPathImages');
   });
 
-  test('registers a unique-per-instance texture key and removes it on scene shutdown (the TextureManager outlives the scene, unlike a Graphics object or Image)', () => {
-    expect(menuSceneSource).toContain('`legacy-nav-core-trail-${nextMenuSceneInstanceId()}`');
-    expect(menuSceneSource).toContain('this.textures.remove(this.trailCanvasTextureKey);');
+  test('the trail sits on a dark underlay on the Chip floor (amendment open item A8), drawn by the same trail compositor', () => {
+    expect(menuSceneSource).toContain("if (this.boardTileStyle === 'chip') {");
+    expect(menuSceneSource).toContain('alpha: segment.alpha * LEGACY_TRAIL_UNDERLAY_ALPHA');
+    expect(menuSceneSource).toContain('coreWidth: coreWidth + (2 * LEGACY_TRAIL_UNDERLAY_PAD_CSS)');
   });
 
-  test('scales shadowBlur by the backing resolution -- unlike path geometry, Canvas 2D shadowBlur is a raw device-pixel radius the context transform does not touch, verified empirically (identical device-pixel halo width across setTransform scales 1-4 with a fixed-device-footprint shape)', () => {
-    const fnStart = menuSceneSource.indexOf('private drawTrailCanvasSegments(');
-    expect(fnStart).toBeGreaterThan(-1);
-    const glowBlurIndex = menuSceneSource.indexOf('glowBlurPx: Math.max(2, glowWidth * 0.5) * resolution', fnStart);
-    expect(glowBlurIndex).toBeGreaterThan(fnStart);
-  });
-});
-
-describe('Navigation Core v1 player marker glow: real shadowBlur compositor, not nested solid rounded-rect bodies', () => {
-  const menuSceneSource = normalizeSourceLineEndings(
-    readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
-  );
-
-  test('the real-play branch draws the glow via the canvas compositor, not two flat fillRoundedRect "shells"', () => {
-    const fnStart = menuSceneSource.indexOf('private fillLegacyPlayerMarkerTile(');
-    expect(fnStart).toBeGreaterThan(-1);
-    const glowCallIndex = menuSceneSource.indexOf(
-      'this.drawPlayerGlowCanvas(centerX, centerY, coreRadiusX, coreRadiusY, cornerRadius, tileSize, alpha, playerCoreColor);',
-      fnStart
-    );
-    expect(glowCallIndex).toBeGreaterThan(fnStart);
-    // The old flat-rect approximation must actually be gone, not just
-    // shadowed by the new call -- both drew into boardDynamicGraphics with
-    // these exact ratio constants, so their absence here is a real check.
-    const crispCoreIndex = menuSceneSource.indexOf('this.boardDynamicGraphics.fillStyle(playerCoreColor, alpha);', glowCallIndex);
-    expect(crispCoreIndex).toBeGreaterThan(glowCallIndex);
-    const oldFlatGlowBetween = menuSceneSource
-      .slice(glowCallIndex, crispCoreIndex)
-      .includes('LEGACY_PLAY_PLAYER_MARKER_GLOW_WIDE_ALPHA * 0.4');
-    expect(oldFlatGlowBetween).toBe(false);
-  });
-
-  test('drawPlayerGlowCanvas scales shadowBlur by the backing resolution, same correction as the trail\'s glow', () => {
-    const fnStart = menuSceneSource.indexOf('private drawPlayerGlowCanvas(');
-    expect(fnStart).toBeGreaterThan(-1);
-    expect(menuSceneSource).toContain('wideGlowBlurPx: wideGlowBlurPx * resolution');
-    expect(menuSceneSource).toContain('tightGlowBlurPx: tightGlowBlurPx * resolution');
-  });
-
-  test('never trusts the canvas texture/image without a null guard -- a failed texture creation must not throw, just skip drawing the glow', () => {
-    expect(menuSceneSource).toContain('if (!this.playerGlowCanvasTexture || !this.playerGlowCanvasImage) {');
-  });
-
-  test('hides the player glow image by default every drawDynamicBoard call -- fillLegacyPlayerMarkerTile\'s real-play branch is itself gated behind playerAlpha/markersBuiltIn/on-screen checks, so some dirty frames never redraw it', () => {
-    const fnStart = menuSceneSource.indexOf('private drawDynamicBoard(time: number): void {');
-    expect(fnStart).toBeGreaterThan(-1);
-    const hideIndex = menuSceneSource.indexOf('this.playerGlowCanvasImage?.setVisible(false);', fnStart);
-    const clearIndex = menuSceneSource.indexOf('this.boardDynamicGraphics.clear();', fnStart);
-    expect(hideIndex).toBeGreaterThan(clearIndex);
-  });
-
-  test('also hides the player glow image entering menu mode, same ghost-image risk as the trail canvas', () => {
-    const fnStart = menuSceneSource.indexOf('private enterMenuMode(): void {');
-    expect(fnStart).toBeGreaterThan(-1);
-    const hideIndex = menuSceneSource.indexOf('this.playerGlowCanvasImage?.setVisible(false);', fnStart);
-    const modeAssignIndex = menuSceneSource.indexOf("this.mode = 'menu';", fnStart);
-    expect(hideIndex).toBeGreaterThan(fnStart);
-    expect(hideIndex).toBeLessThan(modeAssignIndex);
-  });
-
-  test('registers a unique-per-instance texture key and removes it on scene shutdown', () => {
-    expect(menuSceneSource).toContain('`legacy-nav-core-player-glow-${nextMenuSceneInstanceId()}`');
-    expect(menuSceneSource).toContain('this.textures.remove(this.playerGlowCanvasTextureKey);');
-  });
-});
-
-describe('Navigation Core v1 goal halo: real radial-gradient compositor, not two flat "target" discs', () => {
-  const menuSceneSource = normalizeSourceLineEndings(
-    readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
-  );
-
-  test('the real on-board goal marker draws its halo via the canvas compositor, scoped to graphics === boardDynamicGraphics only', () => {
-    const fnStart = menuSceneSource.indexOf('private drawLegacyGoalStarMarker(');
-    expect(fnStart).toBeGreaterThan(-1);
-    const branchIndex = menuSceneSource.indexOf('if (graphics === this.boardDynamicGraphics) {', fnStart);
-    expect(branchIndex).toBeGreaterThan(fnStart);
-    const glowCallIndex = menuSceneSource.indexOf(
-      'this.drawGoalHaloCanvas(',
-      branchIndex
-    );
-    expect(glowCallIndex).toBeGreaterThan(branchIndex);
-  });
-
-  test('the Options/Guide legend\'s separate static goal icon keeps the prior flat-disc Graphics halo unchanged', () => {
-    const fnStart = menuSceneSource.indexOf('private drawLegacyGoalStarMarker(');
-    const elseIndex = menuSceneSource.indexOf('} else {', fnStart);
-    expect(elseIndex).toBeGreaterThan(fnStart);
-    const oldDiscIndex = menuSceneSource.indexOf('LEGACY_PLAY_GOAL_MARKER_HALO_OUTER_COLOR', elseIndex);
-    const closeIndex = menuSceneSource.indexOf('}', menuSceneSource.indexOf('graphics.fillCircle(centerX, centerY, maxRadius * 0.48);', elseIndex));
-    expect(oldDiscIndex).toBeGreaterThan(elseIndex);
-    expect(oldDiscIndex).toBeLessThan(closeIndex);
-  });
-
-  test('drawGoalHaloCanvas uses one radial gradient, not a resolution-scaled shadowBlur -- gradient geometry is already logical-space and the transform scales it correctly on its own', () => {
-    const fnStart = menuSceneSource.indexOf('private drawGoalHaloCanvas(');
-    expect(fnStart).toBeGreaterThan(-1);
-    expect(menuSceneSource).toContain('drawGoalHaloToCanvasContext(this.goalHaloCanvasTexture.context, {');
-  });
-
-  test('never trusts the canvas texture/image without a null guard', () => {
-    expect(menuSceneSource).toContain('if (!this.goalHaloCanvasTexture || !this.goalHaloCanvasImage) {');
-  });
-
-  test('hides the goal halo image by default every drawDynamicBoard call, and entering menu mode', () => {
-    const drawDynamicStart = menuSceneSource.indexOf('private drawDynamicBoard(time: number): void {');
-    const hideInDraw = menuSceneSource.indexOf('this.goalHaloCanvasImage?.setVisible(false);', drawDynamicStart);
-    const clearIndex = menuSceneSource.indexOf('this.boardDynamicGraphics.clear();', drawDynamicStart);
-    expect(hideInDraw).toBeGreaterThan(clearIndex);
-
-    const menuModeStart = menuSceneSource.indexOf('private enterMenuMode(): void {');
-    const hideInMenu = menuSceneSource.indexOf('this.goalHaloCanvasImage?.setVisible(false);', menuModeStart);
-    const modeAssignIndex = menuSceneSource.indexOf("this.mode = 'menu';", menuModeStart);
-    expect(hideInMenu).toBeGreaterThan(menuModeStart);
-    expect(hideInMenu).toBeLessThan(modeAssignIndex);
-  });
-
-  test('registers a unique-per-instance texture key and removes it on scene shutdown', () => {
-    expect(menuSceneSource).toContain('`legacy-nav-core-goal-halo-${nextMenuSceneInstanceId()}`');
-    expect(menuSceneSource).toContain('this.textures.remove(this.goalHaloCanvasTextureKey);');
+  test('wordmark cells (title, Start/Login, level numeral) are chip cells from the board geometry, with no black border stroke', () => {
+    const fnStart = menuSceneSource.indexOf('private drawLegacyGlyphWordTileBlock(');
+    const body = menuSceneSource.slice(fnStart, menuSceneSource.indexOf('\n  }\n', fnStart));
+    expect(body).toContain('resolveChipGridGeometry({');
+    expect(body).toContain('drawChipCell(');
+    expect(body).not.toContain('drawLegacyPathMaterialTile');
+    expect(body).not.toContain('strokeRect');
   });
 });
 

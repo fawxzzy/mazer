@@ -1,6 +1,6 @@
 # Mazer board tile bake - wiring plan (2026-11-05)
 
-Status: PLAN ONLY. No scene was edited. Line numbers are from `src/scenes/MenuScene.ts` at
+Status: EXECUTED 2026-11-06 by the Chip wiring PR (kept as history; see docs/assets/reference/navigation-core-v2/README.md). Original status: PLAN ONLY, no scene edited. Line numbers are from `src/scenes/MenuScene.ts` at
 base `1670c8af` and will move; re-grep by symbol before editing.
 Amendment this plan implements: `docs/assets/reference/navigation-core-v2/README.md` (DRAFT,
 owner approval PENDING).

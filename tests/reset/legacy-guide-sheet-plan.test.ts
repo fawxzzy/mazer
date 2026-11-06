@@ -13,6 +13,7 @@ import { LEGACY_UI_MIN_TOUCH_TARGET } from '../../src/legacy-runtime/legacyUiSta
 // Row heights as the scene would measure them: 1-3 wrapped copy lines per row, plus a 2-line keyboard line.
 const MEASURED_HEIGHTS = [
   resolveLegacyGuideRowHeight(1),
+  resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideRowHeight(1),
   resolveLegacyGuideRowHeight(3),
   resolveLegacyGuideRowHeight(3),
