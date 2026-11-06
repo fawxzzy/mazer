@@ -978,7 +978,6 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('if (this.shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame)) {');
     expect(menuSceneSource).toContain('this.armLegacyMenuStaticDeconstructStage(time);');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase !== 'deconstructing'");
-    expect(menuSceneSource).toContain('const resolvedTrailAlpha = trailAlpha * menuTrailAlphaMultiplier;');
     expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.maze;');
     expect(menuSceneSource).toContain('private drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('handoffDurationMs: LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS');
@@ -990,7 +989,6 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('titlePiecesRemaining,');
     expect(menuSceneSource).toContain('buildPrerollDurationMs: LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS');
     expect(menuSceneSource).toContain('buildPrerollProgress: this.resolveLegacyMenuBuildPrerollProgress(time)');
-    expect(menuSceneSource).toContain('trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))');
     expect(menuSceneSource).toContain('this.isLegacyMenuPointVisibleInStaticDraw(this.player)');
     expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });");
     expect(menuSceneSource).toContain("this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });");

@@ -1045,21 +1045,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('resolveLegacyRunStatusPanelLayout');
     expect(menuSceneSource).not.toContain('resolveLegacyProgressionBadgeText');
     expect(menuSceneSource).not.toContain('portraitMenuBadgeTextOffset');
-    expect(menuSceneSource).toContain('const visibleTrail = trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point));');
-    expect(menuSceneSource).toContain('trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))');
     expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.maze;');
-    expect(menuSceneSource).toContain('const alpha = this.settings.toggleTrailFade');
-    expect(menuSceneSource).toContain('this.drawLegacyDynamicTrailBorderDock(');
-    expect(menuSceneSource).toContain('private drawLegacyDynamicTrailBorderDock(');
     expect(menuSceneSource).toContain('this.drawLegacyPathBorderDock(');
-    expect(menuSceneSource).toContain(': 0.94;');
     expect(menuSceneSource).toContain('this.trail = resolveLegacyMenuDemoTrail(');
     expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(');
     expect(menuSceneSource).toContain('const mazeTileSize = mazeRenderFrame.tileSize;');
-    expect(menuSceneSource).toContain('this.fillLegacyMenuDynamicPathTile(');
     expect(menuSceneSource).toContain('pathSource: Pick<LegacyMazeSnapshot, \'grid\' | \'width\' | \'height\'>,');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE,');
-    expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE_ALPHA,');
     expect(menuSceneSource).toContain('const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(renderedPlayerPoint, mazeLeft, mazeTop, mazeTileSize');
     expect(menuSceneSource).toContain('private armLegacyPlayerVisualMotion(');
@@ -1092,12 +1084,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('palette.trailPulseColor');
     expect(menuSceneSource).toContain('palette.trailPulseEdgeColor');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS;');
-    expect(menuSceneSource).toContain('const pulseCenterIndex = useOneWaySweep');
-    expect(menuSceneSource).toContain('resolveLegacyTrailPulseSweepMotion({');
     expect(menuSceneSource).toContain('trailShineDirection: trailShineMotion.direction');
     expect(menuSceneSource).toContain('trailShineCyclePeriodMs: trailShineMotion.cyclePeriodMs');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;');
-    expect(menuSceneSource).toContain('const falloff = smoothstep(1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW));');
     expect(menuSceneSource).not.toContain('drawLegacyDynamicTrailShine');
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_DYNAMIC_TRAIL_SHINE');
     // Navigation Core v1: the real play trail is now one continuous path
@@ -1111,15 +1099,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private legacyPlayTrailPulseNextFrameAtMs = 0;');
     // The old per-cell pulse window is menu-only now -- the real play
     // trail draws its own shared shine inside drawLegacyContinuousPlayTrail.
-    expect(menuSceneSource).toContain('if (this.mode === \'menu\' && this.isLegacyTrailShineVisible()) {');
-    expect(menuSceneSource).toContain('this.drawLegacyPlayDynamicTrailPulse(');
     expect(menuSceneSource).toContain('resolvedBoardLeft,');
     expect(menuSceneSource).toContain('mazeRenderFrame.boardWidth,');
     expect(menuSceneSource).toContain('mazeRenderFrame.boardHeight,');
     expect(menuSceneSource).toContain("const active = this.isLegacyTrailShineVisible() && this.overlay === 'none' && this.trail.length > 1;");
     expect(menuSceneSource).toContain('this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;');
     expect(menuSceneSource).toContain('this.resolveLegacyPlayPerfectPathTrail()');
-    expect(menuSceneSource).toContain('oneWayPeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
     expect(menuSceneSource).not.toContain('private resolveLegacyPointPathSource(');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start', time);");
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal', time);");
@@ -2506,13 +2491,40 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('createButton(panel.centerX, panel.top + panel.height - 58, Math.min(180, panel.width - 96), 54, \'Back\'');
   });
 
+  test('AI demo (menu) and human (play) draw the trail through the SAME continuous renderer', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const start = menuSceneSource.indexOf('  private drawDynamicBoard(time: number): void {');
+    const end = menuSceneSource.indexOf('  private resolveLegacyPlayerSpawnBurstState(time: number)');
+    const dynamicBoard = menuSceneSource.slice(start, end);
+    // Exactly one trail draw call in the dynamic board pass, and it is not gated on the scene mode.
+    const calls = dynamicBoard.match(/this\.drawLegacyContinuousPlayTrail\(/g) ?? [];
+    expect(calls).toHaveLength(1);
+    const callIndex = dynamicBoard.indexOf('this.drawLegacyContinuousPlayTrail(');
+    const lineStart = dynamicBoard.lastIndexOf('\n', callIndex) + 1;
+    expect(dynamicBoard.slice(lineStart, callIndex).trim()).toBe('');
+    const before = dynamicBoard.slice(0, callIndex);
+    // The statement sits at the pass's top level: the last block opener before it is already closed.
+    expect(before.split('{').length - 1).toBe(before.split('}').length - 1 + 1);
+    // No menu-only per-tile trail, tile overlay, border dock or pulse path remains anywhere.
+    for (const retired of [
+      'drawLegacyPlayerTrailTileOverlay',
+      'fillLegacyMenuDynamicPathTile',
+      'drawLegacyDynamicTrailBorderDock',
+      'drawLegacyPlayDynamicTrailPulse',
+      'playerTrailImages'
+    ]) {
+      expect(menuSceneSource, retired).not.toContain(retired);
+    }
+    // The AI memory overlay stays a separate layer on top of the shared trail.
+    expect(dynamicBoard.indexOf('this.drawLegacyMenuAiMemoryOverlay(')).toBeGreaterThan(callIndex);
+  });
+
   test('keeps menu maze visuals aligned with the cleaned play maze language', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = mixLegacyIridescentColor(cyberArcadeMaterial.path.core, 0x000000, LEGACY_PATH_CORE_EYE_COMFORT_DIM_AMOUNT);');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE,');
-    expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE_ALPHA,');
     expect(menuSceneSource).toContain('this.drawLegacyPathMaterialTile(');
     expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.start');
     expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.goal');
