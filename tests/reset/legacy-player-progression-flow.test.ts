@@ -75,8 +75,6 @@ interface PlayerProgressionSceneHarness {
   menuStaticDeconstructStartedAtMs: number | null;
   menuStaticDeconstructZeroHoldStartedAtMs: number | null;
   menuStaticDrawLifecyclePhase: 'idle' | 'deconstructing';
-  menuStaticDrawNextRowAtMs: number;
-  menuStaticDrawNextTileAtMs: number;
   menuStaticDrawRowsVisible: number | null;
   menuStaticDrawTileOrder: Array<{ x: number; y: number }>;
   menuStaticDrawTilesVisible: number | null;
@@ -93,7 +91,6 @@ interface PlayerProgressionSceneHarness {
   pushLegacyPlayerMessage: ReturnType<typeof vi.fn>;
   refreshLegacyMenuStaticDrawVisibleTileKeys: ReturnType<typeof vi.fn>;
   resolveLegacyMenuStaticDeconstructDurationMs: () => number;
-  resolveLegacyMenuStaticDeconstructTileStartAtMs: (time: number) => number;
   resolveLegacyBoardAspectRatioForMode: () => number;
   resolveBrowserLocalStorage: () => MemoryStorage;
   resolveLegacyMazeGenerationProfileForMode: () => object;
@@ -190,8 +187,6 @@ const createScene = (): { scene: PlayerProgressionSceneHarness; storage: MemoryS
     menuStaticDeconstructStartedAtMs: null,
     menuStaticDeconstructZeroHoldStartedAtMs: null,
     menuStaticDrawLifecyclePhase: 'idle',
-    menuStaticDrawNextRowAtMs: 0,
-    menuStaticDrawNextTileAtMs: 0,
     menuStaticDrawRowsVisible: null,
     menuStaticDrawTileOrder: [{ x: 1, y: 1 }],
     menuStaticDrawTilesVisible: null,
@@ -208,7 +203,6 @@ const createScene = (): { scene: PlayerProgressionSceneHarness; storage: MemoryS
     pushLegacyPlayerMessage: vi.fn(),
     refreshLegacyMenuStaticDrawVisibleTileKeys: vi.fn(),
     resolveLegacyMenuStaticDeconstructDurationMs: () => 120,
-    resolveLegacyMenuStaticDeconstructTileStartAtMs: (time) => time,
     resolveLegacyBoardAspectRatioForMode: () => 1,
     resolveBrowserLocalStorage: () => storage,
     resolveLegacyMazeGenerationProfileForMode: () => ({}),

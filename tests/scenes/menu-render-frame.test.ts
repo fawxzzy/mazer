@@ -762,13 +762,19 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('animated: false');
     expect(menuSceneSource).toContain('shimmerPeriodMs: 0');
     expect(menuSceneSource).toContain('visible: false');
-    expect(menuSceneSource).toContain('private drawLegacyPlayerTransferEnergy(');
-    expect(menuSceneSource).toContain('this.drawLegacyPlayerTransferEnergy(');
+    // The eight-origin transfer volley (drawLegacyPlayerTransferEnergy) was
+    // intentionally replaced by the one all-8-diamond laser system in both
+    // directions (arrival: diamonds -> spawn; departure: player -> diamonds).
+    expect(menuSceneSource).not.toContain('drawLegacyPlayerTransferEnergy');
+    expect(menuSceneSource).toContain('private drawLegacyEdgeLasers(');
+    expect(menuSceneSource).toContain('this.drawLegacyEdgeLasers(time, mazeLeft, mazeTop, mazeTileSize, renderedPlayerPoint, playerSpawnBurst);');
+    expect(menuSceneSource).toContain("direction: 'outward'");
+    expect(menuSceneSource).toContain("direction: 'inward'");
     expect(menuSceneSource).toContain('resolveLegacyPlayerTransferVisualState({');
-    // Pinned to the future instant the corridor's own outward growth
-    // actually touches the screen edge (buildRemainingMs reaches 0), not
-    // back-dated to make the beam's travel time finish at build end.
-    expect(menuSceneSource).toContain('this.playerTransferEnergyDeliveryStartedAtMs ??= time + Math.max(0, buildRemainingMs);');
+    // Pinned to the same exact intro-clock instant as the spawn laser (the
+    // edge paths appear atomically just before it), not to a frame-stepped
+    // build-remaining estimate.
+    expect(menuSceneSource).toContain('this.playerTransferEnergyDeliveryStartedAtMs ??= laserStartedAtMs;');
     expect(menuSceneSource).toContain('playerTransfer: LegacyPlayerTransferVisualState;');
     expect(menuSceneSource).toContain('playerTransfer,');
     expect(menuSceneSource).toContain('this.isLegacyMenuDeconstructHandoffActive(time)');
@@ -777,11 +783,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('zeroHoldStartedAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null');
     expect(menuSceneSource).toContain('titleVisiblePieces');
     expect(menuSceneSource).toContain('titleFullyDeconstructed');
-    // The outbound laser and the diamonds' stored energy now sample the same
-    // midnight-rainbow material the player trail carries
-    // (resolveLegacyIridescentTrailColor), one stop per origin, instead of
-    // the flat green LEGACY_PLAYER_SPAWN_BEAM_COLOR used to share.
-    expect(menuSceneSource).toContain('const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);');
+    // The outbound laser and the arrival laser are the ONE edgeMarkers laser
+    // (replacing the eight-beam rainbow volley and its per-origin
+    // resolveLegacyIridescentTrailColor stops): palette tokens only, drawn
+    // from the shared edge stations.
+    expect(menuSceneSource).toContain('drawEdgeBeams(this.spawnLaserGraphics, {');
+    expect(menuSceneSource).not.toContain('const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);');
+    const edgeMarkersSource = readFileSync(resolve(process.cwd(), 'src/render/edgeMarkers.ts'), 'utf8');
+    expect(edgeMarkersSource).toContain('cyberArcadeMaterial.rail.mint');
+    expect(edgeMarkersSource).toContain('cyberArcadeMaterial.signal.player');
+    expect(edgeMarkersSource).not.toMatch(/0x[0-9a-fA-F]{6}/);
     expect(menuSceneSource).toContain('private drawLegacyBackdropSigils(width: number, height: number, time: number): void');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropGlassShards(');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropDriftRunes(');
@@ -880,14 +891,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 14400;');
+    // The orbit period/rotation constants are gone: the edge markers do not orbit.
+    expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_TITLE_ORBIT_MS');
+    expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 8;');
+    expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(time: number): void');
     expect(menuSceneSource).toContain('return resolveLegacyMenuTitleFontSize(this.layout.titleReserveHeight);');
     expect(menuTitleDrawSource).not.toMatch(/if \(visibleCells\.length <= 0\) \{\n\s*return;\n\s*\}/);
     expect(menuSceneSource).not.toContain('drawLegacyMenuPathTitleSigilRails');
-    expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);');
+    expect(menuSceneSource).toContain('this.drawLegacyEdgeMarkers(time);');
+    expect(menuSceneSource).not.toContain('drawLegacyMenuPathTitleOrbitSigils');
     expect(menuSceneSource).toContain("type LegacyMenuPathTitleSweepMode = 'build' | 'deconstruct' | 'idle';");
     expect(menuSceneSource).toContain('interface LegacyMenuPathTitleSweepState');
     expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleSweepState(');
@@ -905,12 +919,22 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("const syncedToLifecycle = mode !== 'idle';");
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitlePrismSweep(');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleGemFacets(');
-    expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleOrbitSigils(');
-    expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleOrbitPhase(time: number): number');
-    expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleOrbitSettlePhase(time: number): number');
-    expect(menuSceneSource).toContain('const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;');
+    // The spinning PNG sigils (orbit lifecycle, settle ease, twinkles) were
+    // intentionally replaced by calm procedural edge markers.
+    expect(menuSceneSource).toContain('private drawLegacyEdgeMarkers(time: number): void');
+    for (const retired of [
+      'resolveLegacyMenuPathTitleOrbitPhase',
+      'resolveLegacyMenuPathTitleOrbitSettlePhase',
+      'resolveLegacyMenuPathTitleOrbitLifecyclePhase',
+      'drawLegacyMenuPathTitleOrbitSigilTwinkle',
+      'suppressSpinForGameplayTransfer',
+      'menuOrbitSettleStartedAtMs',
+      'playerTransferBeamStripImages'
+    ]) {
+      expect(menuSceneSource).not.toContain(retired);
+    }
     expect(menuSceneSource).not.toContain('phase * 0.62');
-    expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleDiamond(');
+    expect(menuSceneSource).not.toContain('private drawLegacyMenuPathTitleDiamond(');
     expect(menuSceneSource).not.toContain('private drawLegacyMenuPathTitleSigilRails(');
     expect(menuSceneSource).toContain('private hasLegacyMenuTitleAnimationPendingFrame(time: number): boolean');
     expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleProgress(): number');
@@ -929,9 +953,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('scannerSyncedToLifecycle: sweepState.syncedToLifecycle');
     expect(menuSceneSource).toContain('scannerAttachedToVisibleEdge: sweepState.syncedToLifecycle && visibleSweepEdge !== null');
     expect(menuSceneSource).toContain('scannerVisibleEdgeColumn: visibleSweepEdge === null');
-    expect(menuSceneSource).toContain('sigilOrbitCount: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS');
-    expect(menuSceneSource).toContain('sigilOrbitPeriodMs: LEGACY_MENU_PATH_TITLE_ORBIT_MS');
-    expect(menuSceneSource).toContain('sigilOrbitPhase: Number(this.resolveLegacyMenuPathTitleOrbitPhase(this.time.now).toFixed(3))');
+    // Diagnostics field names are kept for consumers; the values now describe
+    // the eight static edge markers (no orbit period or phase).
+    expect(menuSceneSource).toContain('sigilOrbitCount: EDGE_STATION_COUNT');
+    expect(menuSceneSource).toContain('sigilOrbitPeriodMs: 0');
+    expect(menuSceneSource).toContain('sigilOrbitPhase: 0');
     expect(menuSceneSource).toContain('sweepPeriodMs: LEGACY_MENU_PATH_TITLE_SWEEP_MS');
     expect(menuSceneSource).toContain('animation: {');
     expect(menuSceneSource).toContain('if (this.boardPathDirty) {');
@@ -1124,7 +1150,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('playerHaloRadius: playerMarkerMetrics.haloRadius');
     expect(menuSceneSource).toContain('private drawLegacyEndpointGlow(');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(renderedPlayerPoint');
-    expect(menuSceneSource).toContain('const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== \'building\';');
+    // The cast appears when the beams land (the maze is still growing out of
+    // the spawn tile), not at the end of the build.
+    expect(menuSceneSource).toContain('const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== \'building\'');
+    expect(menuSceneSource).toContain('(this.resolveLegacyIntroState(time)?.laserProgress ?? 0) >= 1');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(renderedPlayerPoint, mazeLeft, mazeTop, mazeTileSize, playerAlpha, true, progressionPalette, time);');
     expect(menuSceneSource).toContain('this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, this.resolveLegacyPlayerVisualMoveDurationMs());');
     expect(menuSceneSource).toContain('renderScreenX: mazeRenderFrame.boardLeft + ((renderedPlayerPoint.x + 0.5) * mazeRenderFrame.tileSize)');
@@ -2075,9 +2104,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('private static readonly LEADERBOARD_VISIBLE_ROWS = 10;');
-    expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleOrbitFrame(time: number)');
-    expect(menuSceneSource).toContain('this.resolveLegacyPlayerTransferOrbitPoses(time)');
-    expect(menuSceneSource).toContain('(orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1');
+    // Transfer lasers bind to the SAME edge stations the markers are drawn at.
+    expect(menuSceneSource).toContain('private resolveLegacyEdgeStations(): ReadonlyArray<EdgeStation>');
+    expect(menuSceneSource).not.toContain('resolveLegacyPlayerTransferOrbitPoses');
+    expect(menuSceneSource).not.toContain('resolveLegacyMenuPathTitleOrbitFrame');
     // Outbound now arms on the same clock as the bleed-dock corridor's own
     // retraction (menuStaticDeconstructStartedAtMs, set in
     // armLegacyMenuStaticDeconstructStage) instead of waiting for the
@@ -2085,8 +2115,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // visible "corridor retracts, pauses, then the laser finally fires" bug.
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase = 'deconstructing';");
     expect(menuSceneSource).toContain('if (this.playerTransferEnergyArmed && this.playerTransferEnergyOutboundStartedAtMs === null) {');
-    expect(menuSceneSource).toContain('resolveLegacyStaticDrawBuildRemainingMs({');
-    expect(menuSceneSource).toContain('this.playerSpawnBurstStartedAtMs ??= alignedStartedAtMs;');
+    expect(menuSceneSource).not.toContain('resolveLegacyStaticDrawBuildRemainingMs({');
+    expect(menuSceneSource).toContain('this.playerSpawnBurstStartedAtMs ??= laserStartedAtMs;');
   });
 
   test('hydrates the signed-in username before deciding whether leaderboard access is gated', () => {
