@@ -28,7 +28,7 @@ import {
   type EdgeRect
 } from '../../src/render/edgeMarkers';
 import { cyberArcadeMaterial } from '../../src/render/cyberArcadeMaterial';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import { INTRO_BEAM_STAGGER_MS, INTRO_LASER_MS } from '../../src/render/introTimeline';
@@ -333,10 +333,10 @@ describe('one diamond system: no old diamond art anywhere in the scene', () => {
     expect(source).not.toMatch(/this\.add\.image\([^)]*(Diamond|DIAMOND|BEAM|Beam)/);
   });
 
-  test('only the registered wave-4D files outside MenuScene still name the old art (tracked removal)', () => {
-    // BootScene (Wave 4D-A) still preloads the PNGs and the two Wave 4D-B teleport
-    // modules mention the frozen manifest in comments. They cannot be edited in the
-    // same change set as MenuScene (integrator-wave guard), so this allow-list is
+  test('only the two Wave 4D-B teleport modules still name the old art in comments (tracked removal)', () => {
+    // BootScene no longer preloads the PNGs (retired). The two Wave 4D-B teleport
+    // modules still mention the frozen manifest in comments; they cannot be edited in
+    // the same change set as BootScene (integrator-wave guard), so this allow-list is
     // EXACT: any other src file naming old diamond art fails.
     const root = process.cwd().replace(/\\/g, '/');
     const files: string[] = [];
@@ -352,7 +352,6 @@ describe('one diamond system: no old diamond art anywhere in the scene', () => {
     };
     walk(`${root}/src`);
     const allowed = new Set([
-      'src/scenes/BootScene.ts',
       'src/render/teleportAnchorPose.ts',
       'src/render/teleportPrimaryAnchor.ts'
     ]);
@@ -365,6 +364,15 @@ describe('one diamond system: no old diamond art anywhere in the scene', () => {
     });
     expect(offenders).toEqual([]);
   }, 30000);
+
+  test('BootScene preloads none of the retired diamond/beam art and the PNGs are gone', () => {
+    const boot = readFileSync(resolve(process.cwd(), 'src/scenes/BootScene.ts'), 'utf8');
+    for (const needle of OLD_ART) {
+      expect(boot, needle).not.toContain(needle);
+    }
+    expect(boot).not.toContain('assets/vfx/diamonds');
+    expect(existsSync(resolve(process.cwd(), 'public/assets/vfx/diamonds'))).toBe(false);
+  });
 });
 
 describe('all-8 beams (arrival and departure)', () => {
