@@ -1982,7 +1982,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.createAuthAccountSummaryCard(`Signed in as ${accountLabel}`');
     const clearUiSource = menuSceneSource.slice(
       menuSceneSource.indexOf('private clearUi(): void'),
-      menuSceneSource.indexOf('private async loadLeaderboardPage(')
+      menuSceneSource.indexOf('private async loadLeaderboard(')
     );
     expect(clearUiSource).toContain('for (const graphic of this.uiGraphics) {');
     expect(clearUiSource).toContain('graphic.destroy();');
@@ -2011,6 +2011,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain('await invokeLegacyLocalSignOutWithTimeout(directSignOut)');
     expect(authSource).toContain('isLegacyRuntimeDiagnosticsAuthFixtureSnapshot(authenticatedFallback)');
     expect(menuSceneSource).toContain('fetchLegacyLeaderboardPage(request.offset, request.limit, this.authSnapshot)');
+    expect(menuSceneSource).toContain('const request = resolveLegacyLeaderboardRequest();');
     expect(menuSceneSource).toContain('fetchLegacyLeaderboardSelfRank(this.authSnapshot)');
     expect(authSource).toContain('const authenticatedPreimage = readLegacyPersistedAuthSessionSnapshot(');
     expect(authSource).toContain('const preserveAuthenticatedPreimage = (message?: string | null): LegacyAuthActionResult => ({');
@@ -2123,13 +2124,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('bootstrapped.settings');
   });
 
-  test('uses ten leaderboard users per page and binds transfer beams to the same moving diamond frame', () => {
+  test('loads the leaderboard top N in one request (no pager) and binds transfer beams to the same moving diamond frame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    // The page size lives in the leaderboard view-model (fetch asks for one
-    // extra row so Next is exact); the scene keeps no private copy.
+    // 2026-11-06 redesign: the sheet loads the top N (LEGACY_LEADERBOARD_TOP_N, in the view-model) in one
+    // request and scrolls; there is no ten-per-page pager, no offset state and no private page-size copy.
     expect(menuSceneSource).not.toContain('LEADERBOARD_VISIBLE_ROWS');
-    expect(menuSceneSource).toContain('resolveLegacyLeaderboardPageRequest(offset)');
+    expect(menuSceneSource).not.toContain('leaderboardOffset');
+    expect(menuSceneSource).not.toContain('loadLeaderboardPage');
+    expect(menuSceneSource).not.toContain('resolveLegacyLeaderboardPageRequest');
+    expect(menuSceneSource).toContain('resolveLegacyLeaderboardRequest()');
     // Transfer lasers bind to the SAME edge stations the markers are drawn at.
     expect(menuSceneSource).toContain('private resolveLegacyEdgeStations(): ReadonlyArray<EdgeStation>');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayerTransferOrbitPoses');
@@ -2148,9 +2152,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('hydrates the signed-in username before deciding whether leaderboard access is gated', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     // The gate is resolved into the view-state first; the pure view-model owns
-    // the copy ('Loading username...', 'Username unavailable. Try again.',
-    // 'Retry', 'Go to Account') and tests/reset/legacy-leaderboard-view.test.ts
-    // pins it.
+    // the copy (profile loading / unavailable, 'Retry', 'Go to Account') and
+    // tests/reset/legacy-leaderboard-view.test.ts pins it.
     const gateSource = menuSceneSource.slice(
       menuSceneSource.indexOf('private resolveLegacyLeaderboardViewState(): LegacyLeaderboardViewState'),
       menuSceneSource.indexOf('private runLegacyLeaderboardAction(')
@@ -2171,6 +2174,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(overlaySource).toContain('buildLegacyLeaderboardViewModel(this.resolveLegacyLeaderboardViewState())');
     expect(overlaySource).toContain('buildLegacyLeaderboardOverlayPlan(');
     expect(overlaySource).not.toContain('drawLegacyLeaderboardTitleGlyph');
+    // Same exit language as Settings: no chevron / X; the primary Back to Menu row, Escape (handleBackAction)
+    // and the scrim tap close the sheet. Rows scroll under the shared mask and rail; the You row is painted outside it.
+    expect(overlaySource).not.toContain('createOverlayBackChevronButton');
+    expect(overlaySource).toContain('plan.exitLabel,');
+    expect(overlaySource).toContain('() => this.handleBackAction(),');
+    expect(overlaySource).toContain('this.overlayScrimCloseBounds = createVisualRect(plan.card.left');
+    expect(overlaySource).toContain('this.applyLegacySheetScroll(');
+    expect(overlaySource).toContain('this.paintLegacyLeaderboardSelfRow(plan.selfRow)');
+    expect(menuSceneSource).toContain("(this.overlay !== 'options' && this.overlay !== 'leaderboard')");
     expect(menuSceneSource).not.toContain('resolveLegacyLeaderboardRowAccent');
   });
 
@@ -2442,14 +2454,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // the primary Resume row (pause) / Back to Menu row (menu) is the exit and the Guide keeps its Got it footer.
     // Resume still routes through the Wave 3A bridge first (bridge.dispatch(RESUME_RUN)) and falls back to the same
     // real applyLegacyPauseCommand('resume'); Back to Menu is CLOSE_OVERLAY -> handleBackAction. The chevron stays
-    // for the leaderboard and account overlays.
+    // for the account overlay only (the leaderboard joined the Settings language on 2026-11-06).
     expect(menuSceneSource).not.toContain('createOverlayClosePill');
     expect(menuSceneSource).not.toContain('plan.close');
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
       "      case 'RESUME_RUN':\n"
       + '        this.dispatchUiBridgeCommand({ type: \'RESUME_RUN\' }, () => this.applyLegacyPauseCommand(\'resume\'));\n'
     );
-    expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.closeOverlay()));');
+    // The leaderboard dropped its chevron on 2026-11-06 (primary Back to Menu row); the account overlay keeps it.
+    expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));');
+    expect(menuSceneSource).not.toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.closeOverlay()));');
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain('return resolveLegacyOverlayPanelLayout(\n      this.layout.width,\n      this.layout.height,\n      readMazerViewportGeometry().safeArea\n    );');
     expect(menuSceneSource).not.toContain("if (kind === 'pause' && this.mode === 'play')");
     // Sheets keep full-width rows; the rail sits in the card padding (plan.scrollRailViewport) and only rows

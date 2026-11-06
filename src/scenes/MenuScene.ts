@@ -398,17 +398,21 @@ import {
 } from '../legacy-runtime/legacyLeaderboard';
 import {
   buildLegacyLeaderboardOverlayPlan,
-  type LegacyLeaderboardPlanAction
+  resolveLegacyLeaderboardRowScreenRect,
+  type LegacyLeaderboardOverlayPlan
 } from '../legacy-runtime/legacyLeaderboardOverlayPlan';
 import {
   buildLegacyLeaderboardViewModel,
-  resolveLegacyLeaderboardPageRequest,
+  resolveLegacyLeaderboardRequest,
   resolveLegacyLeaderboardTierColor,
+  LEGACY_LEADERBOARD_COPY,
   type LegacyLeaderboardActionId,
-  type LegacyLeaderboardPagerModel,
+  type LegacyLeaderboardStateKind,
   type LegacyLeaderboardUsernameGate,
+  type LegacyLeaderboardViewModel,
   type LegacyLeaderboardViewState
 } from '../legacy-runtime/legacyLeaderboardView';
+import { readLegacyLeaderboardFixtureShape } from '../legacy-runtime/legacyLeaderboardFixture';
 import {
   LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS,
   buildLegacyAuthScreenViewModel,
@@ -1715,7 +1719,6 @@ export class MenuScene extends Phaser.Scene {
   private leaderboardStatus: 'empty' | 'error' | 'idle' | 'loading' | 'ready' = 'idle';
   private leaderboardErrorMessage: string | null = null;
   private leaderboardEntries: readonly LegacyLeaderboardEntry[] = [];
-  private leaderboardOffset = 0;
   private leaderboardSelfRank: LegacyLeaderboardSelfRank | null = null;
   private leaderboardSequence = 0;
   // Deliberately NOT part of authForm/LegacyAuthFieldId -- that state
@@ -4485,13 +4488,13 @@ export class MenuScene extends Phaser.Scene {
     return true;
   }
 
-  // Menu Settings has no Close pill: besides the primary Back to Menu row and
-  // Escape, a tap on the dimmed scrim outside the card closes it. Only the
+  // Menu Settings and the Leaderboard have no Close pill: besides the primary Back to Menu row and
+  // Escape, a tap on the dimmed scrim outside the card closes them. Only the
   // un-covered scrim counts (nothing under the pointer, outside the card), and
   // never the Guide sub-view, which keeps its own Got it exit.
   private handleOverlayScrimPointerDown(pointer: Phaser.Input.Pointer, objectsUnderPointer: number): boolean {
     if (
-      this.overlay !== 'options'
+      (this.overlay !== 'options' && this.overlay !== 'leaderboard')
       || this.settingsGuideOpen
       || this.overlayScrimCloseBounds === null
       || objectsUnderPointer > 0
@@ -11703,11 +11706,15 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // Leaderboard overlay: the scene only paints the plan built from the pure
-  // view-model (legacyLeaderboardView.ts + legacyLeaderboardOverlayPlan.ts).
-  // Page size comes from the view-model; the fetch asks for one extra row
-  // (resolveLegacyLeaderboardPageRequest) so the Next control is exact.
+  // Leaderboard sheet (redesign 2026-11-06): the scene only paints the plan
+  // built from the pure view-model (legacyLeaderboardView.ts) and layout
+  // (legacyLeaderboardOverlayPlan.ts). Same card, title, primary `Back to Menu`
+  // exit, masked scroll body and rail as the Settings sheet; the top N rows
+  // scroll, the You row stays pinned. Menu context only (not reachable from
+  // pause). Static: no animation, so nothing to gate for reduced motion.
   private resolveLegacyLeaderboardViewState(): LegacyLeaderboardViewState {
+    const fixtureShape = readLegacyLeaderboardFixtureShape();
+    const signedIn = this.authSnapshot.status === 'authenticated' && fixtureShape !== 'signed-out';
     let usernameGate: LegacyLeaderboardUsernameGate = 'ok';
     if (this.authSnapshot.status === 'authenticated') {
       this.loadAccountUsernameIfNeeded();
@@ -11724,20 +11731,20 @@ export class MenuScene extends Phaser.Scene {
     if (usernameGate === 'ok' && this.accountUsernameSavedValue.length <= 0) {
       usernameGate = 'needs-username';
     }
+    const deviceOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
     return {
       entries: this.leaderboardEntries,
       errorMessage: this.leaderboardErrorMessage,
-      offset: this.leaderboardOffset,
+      online: !deviceOffline && fixtureShape !== 'offline',
       selfRank: this.leaderboardSelfRank,
+      selfUsername: this.accountUsernameSavedValue,
+      signedIn,
       status: this.leaderboardStatus,
       usernameGate
     };
   }
 
-  private runLegacyLeaderboardAction(
-    id: LegacyLeaderboardActionId,
-    pager: LegacyLeaderboardPagerModel | null
-  ): void {
+  private runLegacyLeaderboardAction(id: LegacyLeaderboardActionId): void {
     switch (id) {
       case 'retry-username':
         this.accountUsernameLoadedForUserId = null;
@@ -11745,24 +11752,18 @@ export class MenuScene extends Phaser.Scene {
         this.uiDirty = true;
         return;
       case 'retry-page':
-        void this.loadLeaderboardPage(this.leaderboardOffset);
+        void this.loadLeaderboard();
         return;
       case 'go-to-account':
+      case 'sign-in':
         this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface());
-        return;
-      case 'previous-page':
-        if (pager) {
-          void this.loadLeaderboardPage(pager.previousOffset);
-        }
-        return;
-      case 'next-page':
-        if (pager) {
-          void this.loadLeaderboardPage(pager.nextOffset);
-        }
         return;
     }
   }
 
+  // One text cell. `x` is the visible glyph edge for the origin (left edge,
+  // centre or right edge): the compact text padding (8 px each side) is
+  // compensated here so columns line up with the plan.
   private addLegacyLeaderboardText(
     x: number,
     y: number,
@@ -11770,18 +11771,25 @@ export class MenuScene extends Phaser.Scene {
     color: number,
     fontSize: number,
     originX: number,
-    maxWidth: number
+    maxWidth: number,
+    options: { alpha?: number; bold?: boolean; mask?: Phaser.Display.Masks.GeometryMask | null } = {}
   ): Phaser.GameObjects.Text {
+    const pad = 8;
+    const compensatedX = originX === 0 ? x - pad : originX === 1 ? x + pad : x;
     const label = this.fitLegacyUiTextToWidth(
-      this.padLegacyCompactUiText(this.add.text(x, y, text, {
+      this.padLegacyCompactUiText(this.add.text(compensatedX, y, text, {
         color: toCyberArcadeCssHex(color),
         fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: `${fontSize}px`
+        fontSize: `${fontSize}px`,
+        fontStyle: options.bold === true ? 'bold' : 'normal'
       })),
-      maxWidth,
+      maxWidth + (pad * 2),
       fontSize,
-      Math.min(fontSize, 10)
-    ).setOrigin(originX, 0.5);
+      Math.min(fontSize, 11)
+    ).setOrigin(originX, 0.5).setAlpha(options.alpha ?? 1);
+    if (options.mask) {
+      label.setMask(options.mask);
+    }
     this.uiTexts.push(label);
     return label;
   }
@@ -11792,113 +11800,272 @@ export class MenuScene extends Phaser.Scene {
       view,
       this.layout.width,
       this.layout.height,
-      readMazerViewportGeometry().safeArea
+      readMazerViewportGeometry().safeArea,
+      {
+        measureBodyLines: (text, maxWidth, fontSize) => this.measureLegacySheetWrappedLines(text, maxWidth, fontSize)
+      }
     );
-    const panel = this.resolveOverlayPanelFrame();
-    const compact = plan.compact;
-    const graphics = this.overlayGraphics;
+    // Exit: no X, no back arrow. The primary top row (same row as Settings'
+    // Back to Menu), Escape (handleBackAction) and a tap on the scrim outside
+    // the card (handleOverlayScrimPointerDown) all close the sheet.
+    this.overlayScrimCloseBounds = createVisualRect(plan.card.left, plan.card.top, plan.card.width, plan.card.height);
+    this.drawLegacySheetCard(plan.card);
+    this.createOverlayTitle(plan.title.text, plan.title.centerY);
+    this.uiButtons.push(this.createLegacyAuthActionButton(
+      plan.exit.left + (plan.exit.width / 2),
+      plan.exit.top + (plan.exit.height / 2),
+      plan.exit.width,
+      plan.exit.height,
+      plan.exitLabel,
+      () => this.handleBackAction(),
+      'primary'
+    ));
+
+    const list = plan.list;
+    const scrollMetrics = this.applyLegacySheetScroll(
+      list?.railViewport ?? plan.card,
+      list?.contentHeight ?? 0,
+      list?.scrollable ?? false
+    );
+    const scrollOffset = scrollMetrics?.offset ?? 0;
+
+    if (plan.columnHeader !== null) {
+      this.paintLegacyLeaderboardColumnHeader(plan, view);
+    }
+    if (list !== null) {
+      this.paintLegacyLeaderboardList(plan, scrollOffset);
+    }
+    if (scrollMetrics !== null) {
+      this.drawLegacyOverlayScrollFacade(scrollMetrics);
+    }
+    if (plan.selfRow !== null) {
+      this.paintLegacyLeaderboardSelfRow(plan.selfRow);
+    }
+    if (plan.stateBlock !== null) {
+      this.paintLegacyLeaderboardState(plan.stateBlock);
+    }
+  }
+
+  private paintLegacyLeaderboardColumnHeader(
+    plan: LegacyLeaderboardOverlayPlan,
+    view: LegacyLeaderboardViewModel
+  ): void {
+    const header = plan.columnHeader;
+    if (header === null) {
+      return;
+    }
     const material = cyberArcadeMaterial;
-
-    // Near-black card from the shared material; the close control is the
-    // standard top-right back chevron (44px+ hit area).
-    this.drawLegacyCyberPanel(graphics, {
-      alpha: 0.98,
-      fill: material.substrate.field,
-      height: plan.card.height,
-      left: plan.card.left,
-      radius: material.controls.panelRadius,
-      stroke: material.rail.edge,
-      strokeAlt: material.rail.edge,
-      top: plan.card.top,
-      width: plan.card.width
-    });
-    this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.closeOverlay()));
-    this.createOverlayTitle(plan.titleText, plan.titleCenterY);
-
-    if (plan.selfCard !== null) {
-      const { model, rect } = plan.selfCard;
-      graphics.fillStyle(material.substrate.fieldRaised, 1);
-      graphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, 8);
-      graphics.lineStyle(1.5, material.rail.mint, 0.7);
-      graphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, 8);
-      const textLeft = rect.left + 14;
-      const textWidth = rect.width - 28;
-      this.addLegacyLeaderboardText(textLeft, rect.top + (rect.height * 0.28), model.label, material.rail.mint, compact ? 10 : 11, 0, textWidth);
-      if (model.variant === 'ranked' && model.rankText !== null && model.levelText !== null) {
-        this.addLegacyLeaderboardText(textLeft, rect.top + (rect.height * 0.69), model.rankText, material.rail.white, compact ? 18 : 20, 0, textWidth * 0.5);
-        this.addLegacyLeaderboardText(rect.left + rect.width - 14, rect.top + (rect.height * 0.69), model.levelText, material.rail.cyan, compact ? 14 : 15, 1, textWidth * 0.5);
-      } else {
-        this.addLegacyLeaderboardText(textLeft, rect.top + (rect.height * 0.69), model.summaryText, material.rail.white, compact ? 13 : 14, 0, textWidth);
-      }
-    }
-
-    if (plan.statusLine !== null) {
-      this.addLegacyLeaderboardText(plan.statusLine.centerX, plan.statusLine.centerY, plan.statusLine.text, material.rail.cyan, compact ? 14 : 15, 0.5, plan.card.width - 56);
-    }
-
-    if (plan.columnHeader !== null && view.columns !== null) {
-      const header = plan.columnHeader;
-      this.addLegacyLeaderboardText(header.playerLeft, header.centerY, view.columns.player, material.rail.muted, compact ? 9 : 10, 0, 120);
-      this.addLegacyLeaderboardText(header.levelRight, header.centerY, view.columns.level, material.rail.muted, compact ? 9 : 10, 1, 80);
-      graphics.lineStyle(1, material.rail.edge, 0.6);
-      graphics.lineBetween(header.ruleLeft, header.ruleY, header.ruleRight, header.ruleY);
-    }
-
-    for (const skeleton of plan.skeletonRows) {
-      graphics.fillStyle(material.rail.edge, 0.22);
-      graphics.fillRoundedRect(skeleton.left, skeleton.top, skeleton.width, skeleton.height, 8);
-    }
-
-    for (const row of plan.rows) {
-      const tierColor = resolveLegacyLeaderboardTierColor(row.model.tier);
-      if (row.model.isOwn) {
-        graphics.fillStyle(material.substrate.fieldRaised, 0.95);
-        graphics.fillRoundedRect(row.rect.left - 4, row.rect.top + 2, row.rect.width + 8, row.rect.height - 4, 8);
-        graphics.lineStyle(1.5, material.rail.mint, 0.7);
-        graphics.strokeRoundedRect(row.rect.left - 4, row.rect.top + 2, row.rect.width + 8, row.rect.height - 4, 8);
-      }
-      graphics.fillStyle(tierColor, row.model.isOwn ? 0.22 : 0.14);
-      graphics.fillCircle(row.chipCenterX, row.centerY, row.chipRadius);
-      graphics.lineStyle(1.2, tierColor, 0.85);
-      graphics.strokeCircle(row.chipCenterX, row.centerY, row.chipRadius);
-      this.addLegacyLeaderboardText(row.chipCenterX, row.centerY, row.model.rankChipText, tierColor, compact ? 11 : 12, 0.5, row.chipRadius * 1.7);
-      const rowColor = row.model.isOwn ? material.rail.mint : material.rail.white;
-      this.addLegacyLeaderboardText(row.usernameLeft, row.centerY, row.model.usernameText, rowColor, compact ? 14 : 15, 0, row.usernameMaxWidth);
-      this.addLegacyLeaderboardText(row.levelRight, row.centerY, row.model.levelText, rowColor, compact ? 14 : 15, 1, 80);
-    }
-
-    if (plan.body !== null) {
-      const tone = plan.body.model.tone;
-      this.createAuthInfoText(
-        plan.body.model.text,
-        plan.body.centerY,
-        panel,
-        toCyberArcadeCssHex(tone === 'error' ? material.signal.goal : tone === 'info' ? material.rail.cyan : material.rail.muted),
-        compact ? 14 : 15
+    if (view.columns !== null) {
+      this.addLegacyLeaderboardText(header.rankCenterX, header.centerY, view.columns.rank, material.rail.muted, 11, 0.5, 52, { bold: true });
+      this.addLegacyLeaderboardText(header.playerLeft, header.centerY, view.columns.player, material.rail.muted, 11, 0, 140, { bold: true });
+      this.addLegacyLeaderboardText(header.levelRight, header.centerY, view.columns.level, material.rail.muted, 11, 1, 64, { bold: true });
+    } else {
+      this.addLegacyLeaderboardText(
+        header.rect.left + (header.rect.width / 2),
+        header.centerY,
+        LEGACY_LEADERBOARD_COPY.loading,
+        material.rail.cyan,
+        13,
+        0.5,
+        header.rect.width
       );
     }
+    this.overlayGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.4);
+    this.overlayGraphics.lineBetween(header.rect.left, header.ruleY, header.rect.left + header.rect.width, header.ruleY);
+  }
 
-    const addAction = (item: LegacyLeaderboardPlanAction, tone: 'primary' | 'secondary'): void => {
-      this.uiButtons.push(this.createLegacyAuthActionButton(
-        item.rect.left + (item.rect.width / 2),
-        item.rect.top + (item.rect.height / 2),
-        item.rect.width,
-        item.rect.height,
-        item.action.label,
-        () => this.runLegacyLeaderboardAction(item.action.id, view.pager),
-        tone
-      ));
-    };
-    for (const item of plan.bodyActions) {
-      addAction(item, 'primary');
+  private paintLegacyLeaderboardList(
+    plan: LegacyLeaderboardOverlayPlan,
+    scrollOffset: number
+  ): void {
+    const list = plan.list;
+    if (list === null || list.viewport.height <= 0) {
+      return;
     }
-    if (plan.pager !== null) {
-      this.addLegacyLeaderboardText(plan.pager.label.centerX, plan.pager.label.centerY, plan.pager.label.text, material.rail.muted, compact ? 12 : 13, 0.5, 120);
-      if (plan.pager.previous !== null) {
-        addAction(plan.pager.previous, 'secondary');
+    const material = cyberArcadeMaterial;
+    const viewport = list.viewport;
+    // The body scrolls under a geometry mask, so a row that is partly scrolled out is clipped at
+    // the viewport edge (same technique as the Guide sheet).
+    let graphics: Phaser.GameObjects.Graphics = this.overlayGraphics;
+    let mask: Phaser.Display.Masks.GeometryMask | null = null;
+    if (list.scrollable) {
+      graphics = this.add.graphics();
+      this.overlayGuideGraphics = graphics;
+      const maskGraphics = this.make.graphics({ x: 0, y: 0 }, false);
+      maskGraphics.fillStyle(0xffffff, 1);
+      maskGraphics.fillRect(viewport.left, viewport.top, viewport.width, viewport.height);
+      mask = maskGraphics.createGeometryMask();
+      graphics.setMask(mask);
+      this.overlayGuideMaskGraphics = maskGraphics;
+      this.overlayGuideMask = mask;
+    }
+
+    for (const rect of list.skeletonRows) {
+      const top = viewport.top + rect.top;
+      graphics.fillStyle(material.rail.edge, 0.2);
+      graphics.fillRoundedRect(viewport.left + 8 + 8, top + (rect.height / 2) - 6, 32, 12, 6);
+      graphics.fillRoundedRect(viewport.left + 64, top + (rect.height / 2) - 6, Math.round(viewport.width * 0.36), 12, 6);
+      graphics.fillRoundedRect(viewport.left + viewport.width - 12 - 36, top + (rect.height / 2) - 6, 36, 12, 6);
+      graphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.18);
+      graphics.lineBetween(viewport.left + 8, top + rect.height + 9.5, viewport.left + viewport.width - 8, top + rect.height + 9.5);
+    }
+
+    list.rows.forEach((row, index) => {
+      const rect = resolveLegacyLeaderboardRowScreenRect(plan, row, scrollOffset);
+      if (rect.top + rect.height <= viewport.top || rect.top >= viewport.top + viewport.height) {
+        return;
       }
-      if (plan.pager.next !== null) {
-        addAction(plan.pager.next, 'secondary');
+      const model = row.model;
+      const centerY = rect.top + (rect.height / 2);
+      const tierColor = resolveLegacyLeaderboardTierColor(model.tier);
+      if (model.emphasized) {
+        graphics.fillStyle(tierColor, 0.1);
+        graphics.fillRoundedRect(rect.left, rect.top + 1, rect.width, rect.height - 2, 8);
+        graphics.fillStyle(tierColor, 0.95);
+        graphics.fillRoundedRect(rect.left, rect.top + 8, 3, rect.height - 16, 1.5);
+      }
+      if (model.isOwn) {
+        graphics.fillStyle(material.rail.mint, 0.14);
+        graphics.fillRoundedRect(rect.left, rect.top + 1, rect.width, rect.height - 2, 8);
+        graphics.lineStyle(1, material.rail.mint, 0.7);
+        graphics.strokeRoundedRect(rect.left + 0.5, rect.top + 1.5, rect.width - 1, rect.height - 3, 8);
+      }
+      if (index < list.rows.length - 1 && !model.isOwn) {
+        graphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.26);
+        graphics.lineBetween(rect.left + 8, rect.top + rect.height - 0.5, rect.left + rect.width - 8, rect.top + rect.height - 0.5);
+      }
+      const rankColor = model.emphasized ? tierColor : model.isOwn ? material.rail.mint : material.rail.muted;
+      const nameColor = model.isOwn ? material.rail.mint : material.rail.white;
+      this.addLegacyLeaderboardText(rect.left + row.rankCenterX, centerY, model.rankText, rankColor, model.emphasized ? 17 : 14, 0.5, 52, {
+        bold: model.emphasized || model.isOwn,
+        mask
+      });
+      const nameWidth = model.isOwn ? row.nameMaxWidth - 38 : row.nameMaxWidth;
+      const name = this.addLegacyLeaderboardText(rect.left + row.nameLeft, centerY, model.usernameText, nameColor, 15, 0, nameWidth, {
+        bold: model.emphasized || model.isOwn,
+        mask
+      });
+      this.addLegacyLeaderboardText(rect.left + row.levelRight, centerY, model.levelText, nameColor, 15, 1, row.levelMaxWidth, {
+        bold: model.emphasized || model.isOwn,
+        mask
+      });
+      if (model.isOwn) {
+        const pillLeft = rect.left + row.nameLeft + Math.max(0, name.width - 16) + 8;
+        graphics.fillStyle(material.rail.mint, 0.22);
+        graphics.fillRoundedRect(pillLeft, centerY - 8, 30, 16, 8);
+        this.addLegacyLeaderboardText(pillLeft + 15, centerY, LEGACY_LEADERBOARD_COPY.you.toUpperCase(), material.rail.mint, 10, 0.5, 28, { bold: true, mask });
+      }
+    });
+  }
+
+  // The pinned You row: always visible under the list once the player has a
+  // rank, including when they are outside the loaded top N.
+  private paintLegacyLeaderboardSelfRow(self: NonNullable<LegacyLeaderboardOverlayPlan['selfRow']>): void {
+    const material = cyberArcadeMaterial;
+    const graphics = this.overlayGraphics;
+    const rect = self.rect;
+    const model = self.model;
+    graphics.fillStyle(material.substrate.fieldRaised, 1);
+    graphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, 10);
+    graphics.lineStyle(1.5, material.rail.mint, 0.75);
+    graphics.strokeRoundedRect(rect.left + 0.5, rect.top + 0.5, rect.width - 1, rect.height - 1, 10);
+    const centerY = rect.top + (rect.height / 2);
+    this.addLegacyLeaderboardText(rect.left + self.rankCenterX, centerY, model.rankText, material.rail.mint, 19, 0.5, 52, { bold: true });
+    if (model.usernameText !== null) {
+      this.addLegacyLeaderboardText(rect.left + self.nameLeft, centerY - 10, model.label.toUpperCase(), material.rail.mint, 11, 0, self.nameMaxWidth, { bold: true, alpha: 0.9 });
+      this.addLegacyLeaderboardText(rect.left + self.nameLeft, centerY + 9, model.usernameText, material.rail.white, 15, 0, self.nameMaxWidth, { bold: true });
+    } else {
+      this.addLegacyLeaderboardText(rect.left + self.nameLeft, centerY, model.label, material.rail.mint, 17, 0, self.nameMaxWidth, { bold: true });
+    }
+    this.addLegacyLeaderboardText(rect.left + self.levelRight, centerY, model.levelText, material.rail.mint, 19, 1, self.levelMaxWidth, { bold: true });
+  }
+
+  // A designed state (gate, signed out, offline, error, empty): glyph, heading,
+  // one line, at most one action. Never the raw error text.
+  private paintLegacyLeaderboardState(block: NonNullable<LegacyLeaderboardOverlayPlan['stateBlock']>): void {
+    const material = cyberArcadeMaterial;
+    const model = block.model;
+    const tone = model.tone === 'error' ? material.signal.goal : model.tone === 'info' ? material.rail.cyan : material.rail.mint;
+    this.drawLegacyLeaderboardStateGlyph(model.kind, block.centerX, block.iconCenterY, 48, tone);
+    if (model.heading !== null && block.headingCenterY !== null) {
+      this.addLegacyLeaderboardText(block.centerX, block.headingCenterY, model.heading, material.rail.white, 18, 0.5, block.bodyMaxWidth, { bold: true });
+    }
+    const body = this.padLegacyCompactUiText(this.add.text(block.centerX, block.bodyTop, model.text, {
+      align: 'center',
+      color: toCyberArcadeCssHex(model.tone === 'error' || model.tone === 'info' ? material.rail.white : material.rail.muted),
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '15px',
+      wordWrap: { useAdvancedWrap: true, width: Math.max(1, block.bodyMaxWidth - 16) }
+    })).setOrigin(0.5, 0).setAlpha(0.94);
+    this.uiTexts.push(body);
+    if (block.action !== null && model.action !== null) {
+      const action = model.action;
+      this.uiButtons.push(this.createLegacyAuthActionButton(
+        block.action.left + (block.action.width / 2),
+        block.action.top + (block.action.height / 2),
+        block.action.width,
+        block.action.height,
+        action.label,
+        () => this.runLegacyLeaderboardAction(action.id),
+        'primary'
+      ));
+    }
+  }
+
+  private drawLegacyLeaderboardStateGlyph(
+    kind: LegacyLeaderboardStateKind,
+    cx: number,
+    cy: number,
+    size: number,
+    color: number
+  ): void {
+    const g = this.overlayGraphics;
+    const r = size / 2;
+    g.fillStyle(color, 0.12);
+    g.fillCircle(cx, cy, r);
+    g.lineStyle(1.5, color, 0.7);
+    g.strokeCircle(cx, cy, r - 0.75);
+    g.lineStyle(2.5, color, 0.95);
+    g.fillStyle(color, 0.95);
+    switch (kind) {
+      case 'empty': {
+        // Three ascending bars: the leaderboard motif.
+        const barW = 6;
+        const base = cy + 10;
+        g.fillRoundedRect(cx - 13, base - 8, barW, 8, 2);
+        g.fillRoundedRect(cx - 3, base - 16, barW, 16, 2);
+        g.fillRoundedRect(cx + 7, base - 12, barW, 12, 2);
+        return;
+      }
+      case 'offline': {
+        g.beginPath();
+        g.arc(cx, cy + 7, 15, Math.PI * 1.2, Math.PI * 1.8);
+        g.strokePath();
+        g.beginPath();
+        g.arc(cx, cy + 7, 9, Math.PI * 1.2, Math.PI * 1.8);
+        g.strokePath();
+        g.fillCircle(cx, cy + 8, 2.5);
+        g.lineBetween(cx - 14, cy - 12, cx + 14, cy + 14);
+        return;
+      }
+      case 'signed-out':
+      case 'needs-username': {
+        g.strokeCircle(cx, cy - 6, 5.5);
+        g.beginPath();
+        g.arc(cx, cy + 15, 12, Math.PI * 1.15, Math.PI * 1.85);
+        g.strokePath();
+        return;
+      }
+      case 'profile-loading': {
+        g.fillCircle(cx - 10, cy, 3);
+        g.fillCircle(cx, cy, 3);
+        g.fillCircle(cx + 10, cy, 3);
+        return;
+      }
+      default: {
+        // error / unreachable / not-set-up / profile-unavailable: an exclamation mark.
+        g.lineBetween(cx, cy - 12, cx, cy + 3);
+        g.fillCircle(cx, cy + 10, 2.5);
       }
     }
   }
@@ -14235,24 +14402,21 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGuideGraphics = null;
   }
 
-  private async loadLeaderboardPage(offset: number): Promise<void> {
+  private async loadLeaderboard(): Promise<void> {
     const sequence = ++this.leaderboardSequence;
-    const request = resolveLegacyLeaderboardPageRequest(offset);
+    const request = resolveLegacyLeaderboardRequest();
     this.leaderboardStatus = 'loading';
     this.leaderboardErrorMessage = null;
-    // Track the requested offset up front so Retry after a failed page
-    // reloads that same page.
-    this.leaderboardOffset = request.offset;
     this.uiDirty = true;
 
     const [pageResult, selfRankResult] = await Promise.all([
       fetchLegacyLeaderboardPage(request.offset, request.limit, this.authSnapshot),
-      offset === 0 ? fetchLegacyLeaderboardSelfRank(this.authSnapshot) : Promise.resolve(null)
+      fetchLegacyLeaderboardSelfRank(this.authSnapshot)
     ]);
     if (sequence !== this.leaderboardSequence) {
-      // A newer page request (or the overlay closing and reopening) has
-      // already started -- this response is stale, discard it rather than
-      // letting it clobber whatever the newer request already resolved.
+      // A newer request (or the overlay closing and reopening) has already
+      // started -- this response is stale, discard it rather than letting it
+      // clobber whatever the newer request already resolved.
       return;
     }
 
@@ -14260,16 +14424,14 @@ export class MenuScene extends Phaser.Scene {
       this.leaderboardStatus = 'error';
       this.leaderboardErrorMessage = pageResult.error;
       this.leaderboardEntries = [];
+      this.leaderboardSelfRank = null;
       this.uiDirty = true;
       return;
     }
 
-    // Raw rows (limit + 1): the view model splits visible rows / hasNext.
     this.leaderboardEntries = pageResult.entries;
-    this.leaderboardStatus = pageResult.entries.length === 0 && request.offset === 0 ? 'empty' : 'ready';
-    if (selfRankResult) {
-      this.leaderboardSelfRank = selfRankResult.selfRank;
-    }
+    this.leaderboardSelfRank = selfRankResult.selfRank;
+    this.leaderboardStatus = pageResult.entries.length === 0 ? 'empty' : 'ready';
     this.uiDirty = true;
   }
 
@@ -14411,8 +14573,9 @@ export class MenuScene extends Phaser.Scene {
       this.pendingOverlayMazeRebuild = false;
     }
     if (kind === 'leaderboard') {
-      this.leaderboardOffset = 0;
-      void this.loadLeaderboardPage(0);
+      // Fresh open: drop the previous standing so a stale You row never shows while loading.
+      this.leaderboardSelfRank = null;
+      void this.loadLeaderboard();
     }
     if (kind === 'auth') {
       // Opening account entry from a guest play session is an explicit change

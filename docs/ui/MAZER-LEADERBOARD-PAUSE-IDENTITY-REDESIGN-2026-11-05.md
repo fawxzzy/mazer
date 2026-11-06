@@ -3,6 +3,8 @@
 Status: DRAFT spec for a later MenuScene wiring packet. Date: 2026-11-05.
 Owner direction: Zac, 2026-11-05.
 
+SUPERSEDED 2026-11-06 for the leaderboard: see `MAZER-LEADERBOARD-SHEET-2026-11-06.md` (Settings-style sheet, top 50, pinned You row, no pager, no chevron).
+
 This packet shipped the pure view-model modules and their tests. UPDATE 2026-11-05 (wave
 `claude/mazer-w2-leaderboard-auth-20261105`): the LEADERBOARD part is now wired. `MenuScene.buildLeaderboardOverlay`
 renders `buildLegacyLeaderboardViewModel` through the pure draw plan
