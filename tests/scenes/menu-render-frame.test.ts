@@ -1629,8 +1629,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(controls.pause, false, time);');
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
-    expect(menuSceneSource).toContain('const background = this.add.rectangle(\n      pauseRect.centerX,');
-    expect(menuSceneSource).toContain('const hitSize = Math.max(36, pauseRect.width, pauseRect.height);');
+    expect(menuSceneSource).toContain('const background = this.add.rectangle(\n      hit.centerX,');
+    // 44px touch-target floor: the zone is grown by resolveLegacyMinHitRect (legacy-hit-targets.test.ts).
+    expect(menuSceneSource).toContain('const hit = resolveLegacyMinHitRect(pauseRect, this.layout);');
     expect(menuSceneSource).toContain('bounds: hitBounds');
     expect(menuSceneSource).toContain('text,');
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
@@ -1728,7 +1729,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('drawLegacyMenuUsernameLabel');
     expect(profileButtonSource).toContain("placement: 'leading'");
     expect(profileButtonSource).toContain('sizeScale: this.layout.headerIconScale');
-    expect(profileButtonSource).toContain('const hitSize = Math.max(36, frame.width, frame.height);');
+    expect(profileButtonSource).toContain('const hit = resolveLegacyMinHitRect(frame, this.layout);');
     expect(profileButtonSource).toContain('bounds: hitBounds');
     expect(profileButtonSource).toContain('const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuProfileActive ? 0.08 : 0), 0.14, 1);');
     expect(profileButtonSource).toContain('const blinkScale = 0.92 + (phase * 0.08) + (this.menuProfileActive ? 0.02 : 0);');
@@ -2494,8 +2495,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const stateLabelRight = trackLeft - trackGap;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
-    expect(menuSceneSource).toContain('const visibleLabelText = showStateLabel || !displayStateText');
-    expect(menuSceneSource).toContain('`${input.label}: ${displayStateText}`');
+    expect(menuSceneSource).toContain('resolveLegacyToggleLabelCandidates(input.label, displayStateText, showStateLabel)');
     expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 1 : 0)');
     expect(menuSceneSource).toContain('setVisible(showStateLabel)');
     expect(menuSceneSource).not.toContain("const tightWidth = input.width < 260;");

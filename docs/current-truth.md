@@ -95,10 +95,13 @@ controls still reject corruption on the trail bend.
 The authenticated menu's Welcome and username labels have opaque dark
 backplates at UI depth so animated maze corridors cannot obscure identity.
 Their existing positions and the Start control remain unchanged. The dedicated
-`verify-welcome-identity-readability.mjs` check samples the actual canvas at
-label padding corners on desktop and compact touch layouts, then proves its
-pixel assertion rejects a deliberately white backplate. It uses only the local
-synthetic authenticated fixture; it does not establish live sign-in acceptance.
+`verify-welcome-identity-readability.mjs` check (rewritten 2026-11-06 for the
+top-left header identity label) measures label ink DIFFERENTIALLY: it renders the
+label rect twice from one frozen scene state (label visible, then hidden) and
+requires the label-only ink delta to clear a floor (60 px; measured locally
+381/304/808 at 390/320/1280), so backdrop stars and maze bleed cancel. Its
+negative control measures hidden-vs-hidden, which must be exactly 0 and must fail
+the same assertion. It uses only the local synthetic authenticated fixture; it does not establish live sign-in acceptance.
 
 ### Final app-icon authority — 2026-08-28
 

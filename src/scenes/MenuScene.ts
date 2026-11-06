@@ -186,6 +186,11 @@ import {
 } from '../legacy-runtime/legacyPathVisualStyle';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
+import { resolveLegacyMinHitRect } from '../legacy-runtime/legacyHitTarget';
+import {
+  resolveLegacyTapRecoveryTarget,
+  shouldRecoverLegacyTapAfterUiRebuild
+} from '../legacy-runtime/legacyUiTapRecovery';
 import {
   LEGACY_HEADER_IDENTITY_LABEL_NAME,
   resolveLegacyHeaderIdentityPlacement
@@ -195,12 +200,15 @@ import {
   resolveLegacyPauseMenuLayout
 } from '../legacy-runtime/legacyPauseMenuView';
 import {
+  LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE,
   LEGACY_UI_COMPACT_BREAKPOINT,
+  LEGACY_UI_MIN_BODY_FONT_SIZE,
   resolveLegacyFeatureControlLayout,
   resolveLegacyOverlayContentFlowLayout,
   resolveLegacyOverlayPanelLayout,
   resolveLegacyOverlayShellLayout,
   resolveLegacyOptionsGuideLayout,
+  resolveLegacyToggleLabelCandidates,
   resolveLegacyToggleRowLayout,
   resolveLegacyUiLabelCenterY,
   type LegacyUiLabelRole
@@ -1706,6 +1714,10 @@ export class MenuScene extends Phaser.Scene {
   private optionFieldDrafts: LegacyOptionFieldDrafts = createLegacyOptionFieldDrafts(LEGACY_DEFAULTS);
   private activeInputField: LegacyOptionFieldId | null = null;
   private authSnapshot: LegacyAuthSessionSnapshot = createLegacyGuestAuthSnapshot();
+  // Game-loop frame in which rebuildUi last recreated the buttons. Phaser's
+  // hit-test list lags a rebuild by a step (see legacyUiTapRecovery.ts), so a
+  // tap processed right after one is routed by recoverTapAfterUiRebuild.
+  private uiRebuiltAtFrame: number | null = null;
   // See create()'s boot-mode handling -- true only when the URL asked to
   // launch straight into play (e.g. the "Play Mazer" home-screen shortcut)
   // but boot deferred that until the real auth session resolves instead of
@@ -4106,6 +4118,45 @@ export class MenuScene extends Phaser.Scene {
     this.legacyPlayFocusGuardAttached = false;
   }
 
+  // A tap Phaser did not route to any object because the buttons were rebuilt
+  // in the previous step (its hit-test list only refreshes in preUpdate, after
+  // the queued pointer events are processed). Re-targets it to the current
+  // front-door buttons so the tap is accepted instead of silently dropped.
+  private recoverTapAfterUiRebuild(pointer: Phaser.Input.Pointer, overCount: number): boolean {
+    if (!shouldRecoverLegacyTapAfterUiRebuild({
+      currentFrame: this.game.getFrame(),
+      mode: this.mode,
+      overCount,
+      overlay: this.overlay,
+      rebuildFrame: this.uiRebuiltAtFrame
+    })) {
+      return false;
+    }
+
+    const candidates = this.uiButtons.flatMap((button, index) => {
+      if (!button.background.active || !button.background.visible || button.background.input?.enabled !== true) {
+        return [];
+      }
+      const rect = button.background.getBounds();
+      return [{
+        bottom: rect.bottom,
+        depth: button.background.depth,
+        index,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top
+      }];
+    });
+    const targetIndex = resolveLegacyTapRecoveryTarget(pointer.x, pointer.y, candidates);
+    const target = targetIndex === null ? undefined : this.uiButtons[targetIndex];
+    if (target === undefined) {
+      return false;
+    }
+
+    target.background.emit('pointerdown', pointer, pointer.x, pointer.y, pointer.event);
+    return true;
+  }
+
   private installInput(): void {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       this.handleLegacyKeyboardDown(event);
@@ -4115,7 +4166,10 @@ export class MenuScene extends Phaser.Scene {
       this.handleLegacyPlayMovementKeyUp(event);
     });
 
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer, currentlyOver: Phaser.GameObjects.GameObject[] = []) => {
+      if (this.recoverTapAfterUiRebuild(pointer, currentlyOver.length)) {
+        return;
+      }
       if (this.handleOverlayBackChevronPointerDown(pointer)) {
         return;
       }
@@ -9634,6 +9688,7 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
@@ -9677,6 +9732,7 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
       slot: 1,
       width: this.layout.width
@@ -11249,6 +11305,39 @@ export class MenuScene extends Phaser.Scene {
     return text;
   }
 
+  // Tries each candidate string richest-first and keeps the first that fits
+  // `maxWidth` at or above `minFontSize`. If none fit, the last (shortest)
+  // candidate is ellipsized at the minimum size instead of overrunning its
+  // lane -- a clipped label is never allowed to run under a neighbouring
+  // control (e.g. a toggle's switch).
+  private fitLegacyUiTextCandidatesToWidth<T extends Phaser.GameObjects.Text>(
+    text: T,
+    candidates: readonly string[],
+    maxWidth: number,
+    maxFontSize: number,
+    minFontSize: number
+  ): T {
+    const safeMaxWidth = Math.max(1, Math.floor(maxWidth));
+    const safeMinFontSize = Math.max(1, Math.min(Math.floor(maxFontSize), Math.floor(minFontSize)));
+    for (const candidate of candidates) {
+      text.setText(candidate);
+      this.fitLegacyUiTextToWidth(text, safeMaxWidth, maxFontSize, safeMinFontSize);
+      if (text.width <= safeMaxWidth) {
+        return text;
+      }
+    }
+
+    const fallback = candidates[candidates.length - 1] ?? '';
+    text.setText(fallback);
+    this.fitLegacyUiTextToWidth(text, safeMaxWidth, maxFontSize, safeMinFontSize);
+    let kept = fallback.length;
+    while (kept > 1 && text.width > safeMaxWidth) {
+      kept -= 1;
+      text.setText(`${fallback.slice(0, kept).trimEnd()}…`);
+    }
+    return text;
+  }
+
   private drawHud(time: number): void {
     this.hudGraphics.clear();
     this.clearHudTexts();
@@ -11465,6 +11554,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private rebuildUi(): void {
+    this.uiRebuiltAtFrame = this.game.getFrame();
     this.overlayGraphics.clear();
     this.clearUi();
     this.overlayBackChevronBounds = null;
@@ -11875,7 +11965,8 @@ export class MenuScene extends Phaser.Scene {
       fontSize: number,
       originX = 0,
       alpha = 0.94,
-      minFontSize = 9
+      minFontSize = 9,
+      wrapWhenClipped = false
     ): Phaser.GameObjects.Text | null => {
       const label = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(x, y, copy, {
         align: 'left',
@@ -11885,6 +11976,13 @@ export class MenuScene extends Phaser.Scene {
       })), width, fontSize, minFontSize, guideLayout.textWidthSafetyRatio)
         .setOrigin(originX, 0.5)
         .setAlpha(alpha);
+      // Legend copy wraps onto a second line (centered on the row) once it
+      // would otherwise shrink below its minimum size, instead of dropping to
+      // an illegible font or running past the card edge.
+      const wrapWidth = Math.max(1, Math.floor(width * guideLayout.textWidthSafetyRatio));
+      if (wrapWhenClipped && label.width > wrapWidth) {
+        label.setWordWrapWidth(wrapWidth, true);
+      }
       const bounds = visualRectFromBounds(label.getBounds());
       if (viewport !== null && !legacyOverlayScrollRectIntersectsViewport(bounds, viewport)) {
         label.destroy();
@@ -12039,7 +12137,8 @@ export class MenuScene extends Phaser.Scene {
         guideRowFontSize,
         0,
         0.92,
-        compact ? 8 : guideRowMinFontSize
+        Math.max(guideRowMinFontSize, LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE),
+        true
       );
     };
 
@@ -12084,7 +12183,15 @@ export class MenuScene extends Phaser.Scene {
     width: number,
     height: number
   ): UiButton {
-    const background = this.add.rectangle(centerX, centerY, width, height, 0x000000, 0);
+    // The card's header row can be shorter than the touch-target floor on
+    // compact widths (40px); grow only the invisible zone, centered on the row.
+    const hit = resolveLegacyMinHitRect({
+      height,
+      left: centerX - (width / 2),
+      top: centerY - (height / 2),
+      width
+    });
+    const background = this.add.rectangle(hit.centerX, hit.centerY, hit.width, hit.height, 0x000000, 0);
     background.setInteractive({ useHandCursor: true });
     const label = this.padLegacyUiText(this.add.text(centerX, centerY, '', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
@@ -12112,7 +12219,7 @@ export class MenuScene extends Phaser.Scene {
 
     return {
       background,
-      bounds: createVisualRect(centerX - (width / 2), centerY - (height / 2), width, height),
+      bounds: createVisualRect(hit.left, hit.top, hit.width, hit.height),
       label,
       setActive: () => undefined,
       text: 'Guide',
@@ -13935,9 +14042,7 @@ export class MenuScene extends Phaser.Scene {
       'toggle-title'
     );
     const displayStateText = input.stateText || (input.checked ? input.onLabel : input.offLabel);
-    const visibleLabelText = showStateLabel || !displayStateText
-      ? input.label
-      : `${input.label}: ${displayStateText}`;
+    const labelCandidates = resolveLegacyToggleLabelCandidates(input.label, displayStateText, showStateLabel);
 
     const panelGraphics = this.add.graphics();
     const drawPanel = (active: boolean): void => {
@@ -13961,11 +14066,11 @@ export class MenuScene extends Phaser.Scene {
     const background = this.add.rectangle(input.x, input.y, input.width, input.height, 0x000000, 0);
     background.setInteractive({ useHandCursor: true });
 
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, titleY, visibleLabelText, {
+    const label = this.fitLegacyUiTextCandidatesToWidth(this.padLegacyUiText(this.add.text(labelX, titleY, labelCandidates[0] ?? '', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${uiLayout.labelFontSize}px`,
       color: toCyberArcadeCssHex(cyberArcadeMaterial.rail.white)
-    })), labelMaxWidth, uiLayout.labelFontSize, 11).setOrigin(0, 0.5).setAlpha(0.96);
+    })), labelCandidates, labelMaxWidth, uiLayout.labelFontSize, LEGACY_UI_MIN_BODY_FONT_SIZE).setOrigin(0, 0.5).setAlpha(0.96);
 
     const stateLabel = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(stateLabelRight, titleY, displayStateText || input.stateText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
@@ -15226,23 +15331,21 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
-    const hitSize = Math.max(36, pauseRect.width, pauseRect.height);
-    const hitBounds = createVisualRect(
-      pauseRect.centerX - (hitSize / 2),
-      pauseRect.centerY - (hitSize / 2),
-      hitSize,
-      hitSize
-    );
+    // Visual glyph stays 32-40px; the interactive zone is grown to the 44px
+    // touch-target floor (see legacyHitTarget.ts).
+    const hit = resolveLegacyMinHitRect(pauseRect, this.layout);
+    const hitBounds = createVisualRect(hit.left, hit.top, hit.width, hit.height);
     this.menuSettingsCogActive = false;
 
     const background = this.add.rectangle(
-      pauseRect.centerX,
-      pauseRect.centerY,
-      hitSize,
-      hitSize,
+      hit.centerX,
+      hit.centerY,
+      hit.width,
+      hit.height,
       0x000000,
       0.001
     );
@@ -15289,20 +15392,16 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
       slot: 1,
       width: this.layout.width
     });
-    const hitSize = Math.max(36, rect.width, rect.height);
-    const hitBounds = createVisualRect(
-      rect.centerX - (hitSize / 2),
-      rect.centerY - (hitSize / 2),
-      hitSize,
-      hitSize
-    );
+    const hit = resolveLegacyMinHitRect(rect, this.layout);
+    const hitBounds = createVisualRect(hit.left, hit.top, hit.width, hit.height);
     this.menuLeaderboardActive = false;
 
-    const background = this.add.rectangle(rect.centerX, rect.centerY, hitSize, hitSize, 0x000000, 0.001);
+    const background = this.add.rectangle(hit.centerX, hit.centerY, hit.width, hit.height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     background.setDepth(3);
     const label = this.add.text(rect.centerX, rect.centerY, '', {
@@ -15350,17 +15449,13 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'leading',
+      safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
-    const hitSize = Math.max(36, frame.width, frame.height);
-    const hitBounds = createVisualRect(
-      frame.centerX - (hitSize / 2),
-      frame.centerY - (hitSize / 2),
-      hitSize,
-      hitSize
-    );
-    const background = this.add.rectangle(frame.centerX, frame.centerY, hitSize, hitSize, 0x000000, 0.001);
+    const hit = resolveLegacyMinHitRect(frame, this.layout);
+    const hitBounds = createVisualRect(hit.left, hit.top, hit.width, hit.height);
+    const background = this.add.rectangle(hit.centerX, hit.centerY, hit.width, hit.height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     background.setDepth(3);
     this.menuProfileActive = false;
