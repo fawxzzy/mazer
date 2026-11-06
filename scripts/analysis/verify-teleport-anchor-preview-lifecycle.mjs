@@ -2,35 +2,35 @@
  * Wave 4D-B: real-browser integration check for the Teleport anchor-pose
  * QA preview (window.__MAZER_QA__.previewTeleportPrimaryAnchor /
  * endTeleportPrimaryAnchorPreview, wired in src/scenes/MenuScene.ts).
- * Drives the actual built game (not a mock). This is a corrected rewrite
- * responding to a real review that found the previous version proved the
- * wrong things:
- *   - it inspected images[images.length - 1] (a fixed spare slot) instead
- *     of titleOrbitDiamondImages[result.selectedId] -- so it could not
- *     have caught the real bug where the wrong identity's slot moved;
- *   - it compared the image's LOCAL x/y against the resolver's own WORLD-
- *     space output, which is only a valid comparison while
- *     boardZoomContainer happens to be at identity -- it could not have
- *     caught a real coordinate-space bug under a non-identity container
- *     transform;
- *   - it never exercised a real HUD exclusion (only synthetic ones, at the
- *     pure-function level) or the preview's session retention.
+ * Drives the actual built game (not a mock).
+ *
+ * The preview is presented by the ONE procedural edge-marker system
+ * (src/render/edgeMarkers.ts): the selector's held anchor id energizes THAT
+ * station's diamond. The retired 1254 px shell-image pool, its world-matrix
+ * port/footprint geometry and the scale-compensation negative control no
+ * longer exist, so this script verifies the same product behaviour against
+ * the markers' real draw calls instead. It spies on the scene's own
+ * edgeMarkerGraphics (clear / lineStyle / beginPath / moveTo / lineTo /
+ * strokePath) and rebuilds, for every drawn frame, which of the 8 diamonds
+ * are lit (mint, energized alpha) and where their vertices are, so it can
+ * never pass by trusting the preview bookkeeping alone.
  *
  * This version asserts:
- *   - the SELECTED identity's own slot (titleOrbitDiamondImages[selectedId])
- *     moves, while the other 7 slots remain under ambient control (no
- *     duplicate representative for one identity, no orphaned identity);
- *   - the displayed WORLD position (via Image.getWorldTransformMatrix, not
- *     local x/y) matches the resolver's real target-space pose, including
- *     under a real NON-IDENTITY boardZoomContainer transform;
- *   - a real device-independent HUD control's own live bounds (this
- *     scene's actual uiButtons, not a synthetic rectangle) genuinely
- *     excludes an anchor whose footprint overlaps it;
- *   - the preview session retains its held anchor across a target change
- *     (the real selector's own retention rule), and newSession:true starts
- *     fresh;
- *   - ending the preview lets ambient control resume, and Navigation
- *     Core's own canvases stay unaffected.
+ *   - all 8 station ids exist and 8 diamonds are drawn, fully inside the
+ *     viewport (menu and play);
+ *   - previewing lights EXACTLY the selected identity's diamond and no other,
+ *     and that diamond sits at the resolver's anchor (same edge/corner);
+ *   - a real device-independent HUD control's own live bounds (this scene's
+ *     actual uiButtons) genuinely excludes an anchor whose footprint overlaps it;
+ *   - the preview session retains its held anchor across a target change (the
+ *     real selector's own retention rule), and newSession:true starts fresh,
+ *     moving the lit diamond to the new identity;
+ *   - ending the preview clears every lit diamond back to the pre-preview
+ *     baseline, synchronously;
+ *   - under reduced motion begin/update/end redraw synchronously (no frame
+ *     step) and the markers stay completely static (nothing lights up);
+ *   - real play-control clearance (pause button, active floating stick) and
+ *     Navigation Core's own canvases stay unaffected.
  *
  * Usage: node scripts/analysis/verify-teleport-anchor-preview-lifecycle.mjs
  */
@@ -59,43 +59,131 @@ const check = (label, passed, detail) => {
   process.stderr.write(`${passed ? 'PASS' : 'FAIL'}: ${label}${detail ? ` -- ${detail}` : ''}\n`);
 };
 
-// Advances the scene's own manual clock -- the normal per-frame title-orbit
-// draw (and this wave's override riding alongside it) only runs from
-// within the real render loop, so a QA call's effect is only actually
-// drawn once a frame has run since that call.
-const stepOnce = (page) => page.evaluate(() => {
+const STATION_IDS = [0, 1, 2, 3, 4, 5, 6, 7];
+const ENERGIZED_ALPHA_FLOOR = 0.9;
+const IDLE_ALPHA_CEILING = 0.7;
+// Station centres sit at the edge-marker inset (12 px) while the teleport
+// anchor resolver uses its own slightly larger preview inset: the two agree
+// on which edge/corner, within this distance.
+const ANCHOR_STATION_TOLERANCE_PX = 24;
+
+// Advances the scene's own manual clock -- the normal per-frame draw only
+// runs from within the real render loop. The clock lives in the page so
+// every helper shares it.
+const stepFrames = (page, count = 1) => page.evaluate((n) => {
   const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-  window.__mazerTeleportQaClockMs = (window.__mazerTeleportQaClockMs ?? scene.time.now) + 16;
-  window.__MAZER_GAME__.loop.step(window.__mazerTeleportQaClockMs);
+  let t = window.__mazerTeleportQaClockMs ?? scene.time.now;
+  for (let i = 0; i < n; i += 1) {
+    t += 16;
+    window.__MAZER_GAME__.loop.step(t);
+  }
+  window.__mazerTeleportQaClockMs = t;
+}, count);
+const stepOnce = (page) => stepFrames(page, 1);
+
+/**
+ * Steps (one real 16 ms frame at a time) until the scene is in a quiet,
+ * settled state: draw lifecycle settled, no transfer armed, no beam in
+ * flight and -- in the self-playing menu -- inside the calm window between
+ * the build finishing and the demo's next goal-reset deconstruct (which
+ * fires beams from the player to all 8 diamonds and lights every marker).
+ * Waits on state, not on a fixed frame count.
+ */
+const stepToQuietSettled = (page, maxSteps = 4000) => page.evaluate((limit) => {
+  const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+  let t = window.__mazerTeleportQaClockMs ?? scene.time.now;
+  for (let i = 0; i < limit; i += 1) {
+    const age = scene.introStartedAtMs === null ? null : scene.time.now - scene.introStartedAtMs;
+    const calm = scene.menuStaticDrawLifecyclePhase === 'settled'
+      && !scene.isLegacyPlayLifecycleInputLocked()
+      && !scene.playerTransferEnergyArmed
+      && scene.edgeBeamFiringIds.size === 0
+      && (scene.mode !== 'menu' || (age !== null && age >= 1600 && age <= 3000));
+    if (calm) {
+      window.__mazerTeleportQaClockMs = t;
+      return { settled: true, steps: i, mode: scene.mode };
+    }
+    t += 16;
+    window.__MAZER_GAME__.loop.step(t);
+  }
+  window.__mazerTeleportQaClockMs = t;
+  return { settled: false, steps: limit, mode: scene.mode };
+}, maxSteps);
+
+// Spies on the scene's REAL edge-marker Graphics. Each clear() starts a new
+// frame; each strokePath() closes one diamond (drawEdgeMarker strokes the
+// outline last, after the optional mint core), so frame[i] is station i.
+const installMarkerRecorder = (page) => page.evaluate(() => {
+  const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+  const graphics = scene.edgeMarkerGraphics;
+  const rec = { clears: 0, frame: [], lineStyle: null, vertices: [] };
+  window.__mazerEdgeRec = rec;
+  for (const name of ['clear', 'lineStyle', 'beginPath', 'moveTo', 'lineTo', 'strokePath']) {
+    const original = graphics[name].bind(graphics);
+    graphics[name] = (...args) => {
+      if (name === 'clear') {
+        rec.clears += 1;
+        rec.frame = [];
+      } else if (name === 'lineStyle') {
+        rec.lineStyle = { color: args[1], alpha: args[2] };
+      } else if (name === 'beginPath') {
+        rec.vertices = [];
+      } else if (name === 'moveTo' || name === 'lineTo') {
+        rec.vertices.push({ x: args[0], y: args[1] });
+      } else if (name === 'strokePath') {
+        rec.frame.push({ color: rec.lineStyle?.color, alpha: rec.lineStyle?.alpha, vertices: rec.vertices.slice() });
+      }
+      return original(...args);
+    };
+  }
 });
 
-// Reads every slot's real WORLD position (via getWorldTransformMatrix, not
-// local x/y -- local coordinates only agree with world ones while the
-// parent container happens to be at identity) plus local x/y for
-// completeness, so a test can independently verify the coordinate
-// conversion this wave's fix relies on rather than trusting it circularly.
-const readImagePoolState = (page) => page.evaluate(() => {
+// The last drawn marker frame, plus the scene's own station list and
+// viewport, read synchronously (no frame step in between).
+const readMarkerFrame = (page) => page.evaluate(() => {
   const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-  const images = scene.titleOrbitDiamondImages;
+  const rec = window.__mazerEdgeRec;
+  const graphics = scene.edgeMarkerGraphics;
+  const world = graphics.getWorldTransformMatrix();
   return {
-    poolLength: images.length,
-    slots: images.map((image) => {
-      const world = image.getWorldTransformMatrix();
-      return {
-        localX: image.x,
-        localY: image.y,
-        localRotation: image.rotation,
-        worldX: world.tx,
-        worldY: world.ty,
-        worldRotation: world.rotationNormalized,
-        visible: image.visible,
-        texture: image.texture.key
-      };
-    })
+    clears: rec.clears,
+    markers: rec.frame.map((marker) => ({ color: marker.color, alpha: marker.alpha, vertices: marker.vertices })),
+    stations: scene.resolveLegacyEdgeStations().map((s) => ({ id: s.id, x: s.x, y: s.y })),
+    viewport: { width: scene.layout.width, height: scene.layout.height },
+    visible: graphics.visible,
+    worldIsIdentity: world.tx === 0 && world.ty === 0 && world.scaleX === 1 && world.scaleY === 1
   };
 });
 
-const anglesMatch = (a, b) => Math.abs(Math.cos(a) - Math.cos(b)) < 0.01 && Math.abs(Math.sin(a) - Math.sin(b)) < 0.01;
+// Which diamonds are lit in a frame: the stroke colour differs from the idle
+// colour (taken from a quiet baseline frame) AND the alpha is the energized one.
+const litIds = (frame, idleColor) => frame.markers
+  .map((marker, index) => (marker.color !== idleColor && marker.alpha >= ENERGIZED_ALPHA_FLOOR ? index : null))
+  .filter((index) => index !== null);
+
+const idleColorOf = (frame) => {
+  const counts = new Map();
+  frame.markers.forEach((marker) => counts.set(marker.color, (counts.get(marker.color) ?? 0) + 1));
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+};
+
+const sameIds = (a, b) => a.length === b.length && a.every((id, index) => id === b[index]);
+
+const markersInsideViewport = (frame) => frame.markers.length === 8 && frame.markers.every((marker) => (
+  marker.vertices.length > 0 && marker.vertices.every((v) => v.x >= 0 && v.y >= 0 && v.x <= frame.viewport.width && v.y <= frame.viewport.height)
+));
+
+const previewAt = (page, x, y, newSession) => page.evaluate(
+  ({ tx, ty, fresh }) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(tx, ty, fresh),
+  { tx: x, ty: y, fresh: newSession === true }
+);
+const endPreview = (page) => page.evaluate(() => window.__MAZER_QA__.endTeleportPrimaryAnchorPreview());
+
+const anchorMatchesStation = (frame, result) => {
+  const station = frame.stations.find((s) => s.id === result.selectedId);
+  return station !== undefined && result.pose !== null
+    && Math.hypot(station.x - result.pose.anchorX, station.y - result.pose.anchorY) <= ANCHOR_STATION_TOLERANCE_PX;
+};
 
 const main = async () => {
   const args = parseCliArgs();
@@ -116,6 +204,18 @@ const main = async () => {
   const browser = await chromium.launch({ headless: true });
   try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    // Deterministic start: wipe any persisted progression exactly once per
+    // session (same pattern as scripts/visual/capture-maze-lifecycle.mjs).
+    await context.addInitScript(() => {
+      try {
+        if (!sessionStorage.getItem('__lifecycleInit')) {
+          sessionStorage.setItem('__lifecycleInit', '1');
+          localStorage.clear();
+        }
+      } catch {
+        // storage unavailable
+      }
+    });
     const page = await context.newPage();
     const consoleErrors = [];
     page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
@@ -124,100 +224,81 @@ const main = async () => {
     await page.goto(`${resolvedBaseUrl}/?runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749`, { waitUntil: 'load', timeout: 30000 });
     await page.waitForFunction(() => Boolean(window.__MAZER_QA__?.previewTeleportPrimaryAnchor), { timeout: 15000 });
     await page.evaluate(() => window.__MAZER_GAME__.loop.stop());
-    // Fast-forward past the title's own build animation so the scene is
-    // fully settled before exercising the preview.
-    for (let i = 0; i < 400; i += 1) {
-      // eslint-disable-next-line no-await-in-loop
-      await stepOnce(page);
-    }
+    await installMarkerRecorder(page);
 
-    const before = await readImagePoolState(page);
-    check('the pool starts with exactly 8 diamond image slots', before.poolLength === 8, `poolLength=${before.poolLength}`);
+    const quiet = await stepToQuietSettled(page);
+    check('the menu reaches a quiet settled state (build finished, no beam in flight, no transfer armed)', quiet.settled && quiet.mode === 'menu', JSON.stringify(quiet));
 
-    // === Correct-identity + world-space placement, at IDENTITY container transform ===
-    const target = { x: 1260, y: 20 }; // near the top-right corner -> anchor 2
-    const result = await page.evaluate((t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y, true), target);
-    await stepOnce(page);
-    const during = await readImagePoolState(page);
+    // Fresh-progression gate (localStorage was cleared above): the self-playing
+    // menu reads "AI Skill Lv 01"; the Player label is confirmed after Start.
+    const readSkillLabels = () => page.evaluate(() => (document.documentElement.getAttribute('data-mazer-visual-diagnostics') || '').match(/(Player|AI) Skill Lv \d+/g));
+    const menuLabels = await readSkillLabels();
+    check('fresh progression: menu diagnostics read "AI Skill Lv 01"', Array.isArray(menuLabels) && menuLabels.includes('AI Skill Lv 01'), JSON.stringify(menuLabels));
 
+    // Baseline frame: end-preview redraws the markers synchronously.
+    await endPreview(page);
+    const baseline = await readMarkerFrame(page);
+    const idleColor = idleColorOf(baseline);
+    check('all 8 station ids exist, in order', baseline.stations.length === 8 && baseline.stations.every((s, i) => s.id === STATION_IDS[i]), JSON.stringify(baseline.stations.map((s) => s.id)));
+    check('exactly 8 diamonds are drawn, every vertex inside the viewport', baseline.visible && markersInsideViewport(baseline), JSON.stringify(baseline.markers.map((m) => m.vertices)));
+    check('the markers are drawn in screen space (their Graphics world transform is identity)', baseline.worldIsIdentity, 'n/a');
+    check(
+      'the quiet baseline lights no diamond (all 8 share the idle colour at idle alpha)',
+      litIds(baseline, idleColor).length === 0 && baseline.markers.every((m) => m.alpha < IDLE_ALPHA_CEILING),
+      JSON.stringify(baseline.markers.map((m) => ({ color: m.color, alpha: m.alpha })))
+    );
+
+    // === Previewing lights exactly the selected identity's diamond ===
+    const target = { x: 1260, y: 20 }; // near the top-right corner
+    const result = await previewAt(page, target.x, target.y, true);
+    const during = await readMarkerFrame(page);
     check('the selector actually chose an anchor for this target', result.selectedId !== null, JSON.stringify(result));
-
-    const selectedSlot = result.selectedId === null ? null : during.slots[result.selectedId];
     check(
-      'the SELECTED IDENTITY\'s own slot (not a fixed spare) moved to the real computed pose, in real WORLD space',
-      selectedSlot !== null && result.pose !== null
-        && Math.abs(selectedSlot.worldX - result.pose.anchorX) < 0.5
-        && Math.abs(selectedSlot.worldY - result.pose.anchorY) < 0.5
-        && anglesMatch(selectedSlot.worldRotation, result.pose.rotation),
-      `selectedId=${result.selectedId} slot=${JSON.stringify(selectedSlot)} pose=${JSON.stringify(result.pose)}`
+      "previewing lights EXACTLY the selected identity's own diamond and no other (synchronously, no frame step)",
+      result.selectedId !== null && sameIds(litIds(during, idleColor), [result.selectedId]),
+      `selectedId=${result.selectedId} lit=${JSON.stringify(litIds(during, idleColor))}`
     );
     check(
-      'the selected slot is visible and uses the real canonical shell texture',
-      selectedSlot?.visible === true && selectedSlot?.texture === 'mazerVfxEdgeDiamondEnergized',
-      JSON.stringify(selectedSlot)
+      "the lit diamond sits at the resolver's anchor for that identity (same edge/corner)",
+      anchorMatchesStation(during, result),
+      `station=${JSON.stringify(during.stations[result.selectedId])} pose=${JSON.stringify(result.pose)}`
     );
+    check('all 8 diamonds are still drawn, inside the viewport, while one is lit', markersInsideViewport(during), 'n/a');
+    await stepOnce(page);
+    const afterFrame = await readMarkerFrame(page);
     check(
-      'the OTHER seven identities are not pinned to the same pose -- one representative per identity, no duplicate',
-      during.slots.every((slot, id) => (
-        id === result.selectedId
-        || Math.abs(slot.worldX - result.pose.anchorX) > 1
-        || Math.abs(slot.worldY - result.pose.anchorY) > 1
-      )),
-      JSON.stringify(during.slots.map((s) => ({ worldX: Math.round(s.worldX), worldY: Math.round(s.worldY) })))
+      'the preview survives a normal frame step (still exactly that one diamond)',
+      result.selectedId !== null && sameIds(litIds(afterFrame, idleColor), [result.selectedId]),
+      JSON.stringify(litIds(afterFrame, idleColor))
     );
 
-    // === Real, non-identity boardZoomContainer transform ===
-    // Empirically, this codebase's own "Board Zoom" setting does not
-    // currently move this container (confirmed live: it changes tile size
-    // instead) -- but relying on that rather than converting explicitly is
-    // exactly the fragility a reviewer flagged, so this proves the
-    // conversion is correct under a transform regardless of whether any
-    // current UI setting happens to produce one.
-    await page.evaluate(() => {
-      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-      window.__mazerTeleportQaOriginalTransform = {
-        x: scene.boardZoomContainer.x,
-        y: scene.boardZoomContainer.y,
-        scaleX: scene.boardZoomContainer.scaleX,
-        scaleY: scene.boardZoomContainer.scaleY
-      };
-      // Uniform scale, matching the only way a real "zoom" (this container's
-      // own name and stated purpose) would ever actually scale it -- a
-      // non-uniform (anisotropic) parent scale would shear a rotated
-      // child's own effective world rotation in a way that has no single
-      // "correct" recomposition (the child's own circular/diamond
-      // silhouette itself becomes an ellipse under such a transform), so
-      // that case is intentionally not modeled as a supported scenario.
-      scene.boardZoomContainer.setPosition(37, -19).setScale(1.6, 1.6);
-    });
-    const transformedTarget = { x: 40, y: 700 }; // near the bottom-left corner -> anchor 6
-    const transformedResult = await page.evaluate(
-      (t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y, true),
-      transformedTarget
-    );
+    // === Ending the preview clears every lit diamond ===
+    await endPreview(page);
+    const cleared = await readMarkerFrame(page);
+    check('ending the preview clears the lit diamond back to the idle baseline, synchronously', litIds(cleared, idleColor).length === 0, JSON.stringify(litIds(cleared, idleColor)));
     await stepOnce(page);
-    const duringTransformed = await readImagePoolState(page);
-    const transformedSlot = transformedResult.selectedId === null ? null : duringTransformed.slots[transformedResult.selectedId];
+    const clearedAfterFrame = await readMarkerFrame(page);
+    check('and it stays cleared across the next frame (ambient resumes)', litIds(clearedAfterFrame, idleColor).length === 0, JSON.stringify(litIds(clearedAfterFrame, idleColor)));
+
+    // === Every identity the selector can choose lights its own diamond, one at a time ===
+    const targets = [[20, 790], [640, 790], [1260, 790], [1270, 400], [10, 400], [640, 10], [20, 20], [1260, 20]];
+    const seen = new Map();
+    for (const [x, y] of targets) {
+      // eslint-disable-next-line no-await-in-loop
+      const r = await previewAt(page, x, y, true);
+      // eslint-disable-next-line no-await-in-loop
+      const frame = await readMarkerFrame(page);
+      if (r.selectedId !== null) {
+        seen.set(r.selectedId, sameIds(litIds(frame, idleColor), [r.selectedId]));
+      }
+    }
+    await endPreview(page);
     check(
-      'under a real non-identity boardZoomContainer transform, the displayed WORLD position and rotation still match the real target-space pose',
-      transformedSlot !== null && transformedResult.pose !== null
-        && Math.abs(transformedSlot.worldX - transformedResult.pose.anchorX) < 0.5
-        && Math.abs(transformedSlot.worldY - transformedResult.pose.anchorY) < 0.5
-        && anglesMatch(transformedSlot.worldRotation, transformedResult.pose.rotation),
-      `selectedId=${transformedResult.selectedId} slot=${JSON.stringify(transformedSlot)} pose=${JSON.stringify(transformedResult.pose)}`
+      'every identity the selector can choose lights exactly its own diamond (never a neighbour, never two)',
+      seen.size >= 4 && [...seen.values()].every(Boolean),
+      JSON.stringify([...seen.entries()])
     );
-    check(
-      'the same non-identity transform actually moved local coordinates away from world ones (proving this case is a real test, not a no-op)',
-      transformedSlot !== null && (Math.abs(transformedSlot.localX - transformedSlot.worldX) > 1 || Math.abs(transformedSlot.localY - transformedSlot.worldY) > 1),
-      JSON.stringify(transformedSlot)
-    );
-    await page.evaluate(() => {
-      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-      const t = window.__mazerTeleportQaOriginalTransform;
-      scene.boardZoomContainer.setPosition(t.x, t.y).setScale(t.scaleX, t.scaleY);
-    });
-    await page.evaluate(() => window.__MAZER_QA__.endTeleportPrimaryAnchorPreview());
-    await stepOnce(page);
+    check('the sweep leaves the diamonds idle once the preview ends', litIds(await readMarkerFrame(page), idleColor).length === 0, 'n/a');
 
     // === Real HUD-control exclusion (this scene's own live uiButtons, not a synthetic rect) ===
     const hudProbe = await page.evaluate(() => {
@@ -238,198 +319,97 @@ const main = async () => {
     if (hudProbe.buttons.length > 0) {
       const rejectedNearButton = hudProbe.result.rejected.some((r) => r.reason.includes('excluded region'));
       check(
-        'a target placed on a real HUD control (' + (hudProbe.button.semanticAction ?? 'unnamed') + ') causes at least one anchor to be excluded by a real (non-safe-area) rectangle',
+        `a target placed on a real HUD control (${hudProbe.button.semanticAction ?? 'unnamed'}) causes at least one anchor to be excluded by a real (non-safe-area) rectangle`,
         rejectedNearButton,
         JSON.stringify(hudProbe.result.rejected)
       );
     }
-    await page.evaluate(() => window.__MAZER_QA__.endTeleportPrimaryAnchorPreview());
-    await stepOnce(page);
+    await endPreview(page);
 
     // === Session retention: held anchor survives a target change; newSession starts fresh ===
-    const sessionStart = await page.evaluate((t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y, true), { x: 20, y: 700 });
-    await stepOnce(page);
+    const sessionStart = await previewAt(page, 20, 700, true);
+    const startFrame = await readMarkerFrame(page);
     check('session start selects a real anchor', sessionStart.selectedId !== null, JSON.stringify(sessionStart));
 
     // A target now much closer to a different anchor -- the real selector's
     // own retention rule must keep the held anchor anyway.
-    const sessionContinued = await page.evaluate((t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y), { x: 1260, y: 20 });
-    await stepOnce(page);
+    const sessionContinued = await previewAt(page, 1260, 20, false);
+    const continuedFrame = await readMarkerFrame(page);
     check(
       'continuing the same session (no newSession flag) retains the held anchor even though a different one is now much closer',
       sessionContinued.outcome === 'retained' && sessionContinued.selectedId === sessionStart.selectedId,
       `start=${sessionStart.selectedId} continued=${JSON.stringify(sessionContinued)}`
     );
-
-    const sessionReset = await page.evaluate((t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y, true), { x: 1260, y: 20 });
-    await stepOnce(page);
     check(
-      'newSession: true starts a genuinely fresh selection instead of retaining the prior session\'s held anchor',
+      'the retained session keeps the SAME diamond lit (and only it)',
+      sameIds(litIds(startFrame, idleColor), [sessionStart.selectedId]) && sameIds(litIds(continuedFrame, idleColor), [sessionStart.selectedId]),
+      `start=${JSON.stringify(litIds(startFrame, idleColor))} continued=${JSON.stringify(litIds(continuedFrame, idleColor))}`
+    );
+
+    const sessionReset = await previewAt(page, 1260, 20, true);
+    const resetFrame = await readMarkerFrame(page);
+    check(
+      "newSession: true starts a genuinely fresh selection instead of retaining the prior session's held anchor",
       sessionReset.outcome === 'new' && sessionReset.selectedId !== sessionStart.selectedId,
       `start=${sessionStart.selectedId} reset=${JSON.stringify(sessionReset)}`
     );
-
-    // === Ending the preview restores ambient control ===
-    const duringReset = await readImagePoolState(page);
-    const resetSlot = duringReset.slots[sessionReset.selectedId];
-    await page.evaluate(() => window.__MAZER_QA__.endTeleportPrimaryAnchorPreview());
-    await stepOnce(page);
-    const after = await readImagePoolState(page);
-    const afterSlot = after.slots[sessionReset.selectedId];
     check(
-      'ending the preview lets the ambient draw take the selected slot back over (no longer pinned to the preview pose)',
-      afterSlot !== null && (Math.abs(afterSlot.worldX - resetSlot.worldX) > 0.5 || Math.abs(afterSlot.worldY - resetSlot.worldY) > 0.5),
-      `duringSlot=${JSON.stringify(resetSlot)} afterSlot=${JSON.stringify(afterSlot)}`
+      'the lit diamond MOVES to the new identity (the old one goes dark: one representative per identity, no orphan)',
+      sameIds(litIds(resetFrame, idleColor), [sessionReset.selectedId]) && sessionReset.selectedId !== sessionStart.selectedId,
+      `reset=${sessionReset.selectedId} lit=${JSON.stringify(litIds(resetFrame, idleColor))}`
     );
+    await endPreview(page);
+    check('ending that session clears it too', litIds(await readMarkerFrame(page), idleColor).length === 0, 'n/a');
 
-    // === Rendered port/footprint agreement (the review's finding 1) ===
-    // Independently transforms the canonical shell's own MEASURED tip
-    // (edge-diamond-energized.png: 1254x1254 canvas, center (627,627), tip
-    // at (920,131) -- see teleportAnchorPose.ts's own module doc) through
-    // the Image's ACTUAL world transform matrix (Phaser's own
-    // TransformMatrix.transformPoint, which composes position, rotation,
-    // AND scale -- position/rotation alone, which the previous round's
-    // checks used, cannot catch a scale-compensation bug). Compares that
-    // independently-measured point against the resolver's own reported
-    // portX/portY, and transforms the shell's 4 source-canvas corners the
-    // same way to confirm they fit the reported footprint -- not merely
-    // that the footprint is self-consistent with its own inputs.
-    const NATIVE_TIP_DX = 920 - 627;
-    const NATIVE_TIP_DY = 131 - 627;
-    const HALF_SOURCE = 627;
-    const verifyRenderedPortAndFootprint = (page2, label, parentScale) => page2.evaluate(({ dx, dy, half, scale, lbl }) => {
+    // === Reduced-motion, settled-scene preview updates ===
+    // NO frame step between any of these calls and reading their effect: this
+    // scene's reduced-motion path has no guaranteed next frame, so begin /
+    // update / end must each redraw the markers synchronously. Markers are
+    // completely static under reduced motion (edgeMarkers.ts: nothing
+    // animates, so nothing lights up either).
+    const reducedMotionProbe = await page.evaluate(() => {
       const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-      const original = { x: scene.boardZoomContainer.x, y: scene.boardZoomContainer.y, sx: scene.boardZoomContainer.scaleX, sy: scene.boardZoomContainer.scaleY };
-      scene.boardZoomContainer.setPosition(11, -7).setScale(scale, scale);
-      const result = window.__MAZER_QA__.previewTeleportPrimaryAnchor(1260, 20, true);
-      const image = scene.titleOrbitDiamondImages[result.selectedId];
-      const world = image.getWorldTransformMatrix();
-      const measuredPort = world.transformPoint(dx, dy);
-      const corners = [[-half, -half], [half, -half], [half, half], [-half, half]].map(([cx, cy]) => world.transformPoint(cx, cy));
-      window.__MAZER_QA__.endTeleportPrimaryAnchorPreview();
-      scene.boardZoomContainer.setPosition(original.x, original.y).setScale(original.sx, original.sy);
-      return { label: lbl, result, measuredPort, corners };
-    }, { dx: NATIVE_TIP_DX, dy: NATIVE_TIP_DY, half: HALF_SOURCE, scale: parentScale, lbl: label });
-
-    const footprintContains = (footprint, point, epsilon = 0.5) => (
-      point.x >= footprint.x - epsilon && point.y >= footprint.y - epsilon
-      && point.x <= footprint.x + footprint.width + epsilon && point.y <= footprint.y + footprint.height + epsilon
-    );
-
-    for (const parentScale of [1, 1.6, 0.5]) {
-      // eslint-disable-next-line no-await-in-loop
-      const probe = await verifyRenderedPortAndFootprint(page, `parent scale ${parentScale}`, parentScale);
-      // eslint-disable-next-line no-await-in-loop
-      await stepOnce(page);
-      const portMatches = probe.result.pose !== null
-        && Math.abs(probe.measuredPort.x - probe.result.pose.portX) < 0.5
-        && Math.abs(probe.measuredPort.y - probe.result.pose.portY) < 0.5;
-      check(
-        `the rendered port (measured by transforming the real source tip through the Image's actual world matrix) matches the resolver's portX/portY at ${probe.label}`,
-        portMatches,
-        `measuredPort=${JSON.stringify(probe.measuredPort)} pose=${JSON.stringify(probe.result.pose)}`
-      );
-      const cornersContained = probe.result.pose !== null && probe.corners.every((corner) => footprintContains(probe.result.pose.footprint, corner));
-      check(
-        `all 4 transformed source-canvas corners fit the reported footprint at ${probe.label}`,
-        cornersContained,
-        `corners=${JSON.stringify(probe.corners)} footprint=${JSON.stringify(probe.result.pose?.footprint)}`
-      );
-    }
-
-    // Negative control: reproduces the ORIGINAL uncompensated-scale bug
-    // directly (bypassing the real fix) and proves the SAME port comparison
-    // above would have failed it -- confirming this test suite actually
-    // catches the defect it claims to, not just that the current code
-    // happens to pass.
-    const negativeControl = await page.evaluate(({ dx, dy }) => {
-      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-      const original = { x: scene.boardZoomContainer.x, y: scene.boardZoomContainer.y, sx: scene.boardZoomContainer.scaleX, sy: scene.boardZoomContainer.scaleY };
-      scene.boardZoomContainer.setPosition(11, -7).setScale(1.6, 1.6);
-      const result = window.__MAZER_QA__.previewTeleportPrimaryAnchor(1260, 20, true);
-      const image = scene.titleOrbitDiamondImages[result.selectedId];
-      // Reproduce the ORIGINAL bug: a fixed local scale not divided by the
-      // parent's own scale (this is exactly what applyLegacyTeleportAnchorPreviewOverride
-      // used to do before this correction round).
-      const uncompensatedScale = 32 / 1254;
-      image.setScale(uncompensatedScale);
-      const world = image.getWorldTransformMatrix();
-      const measuredPort = world.transformPoint(dx, dy);
-      window.__MAZER_QA__.endTeleportPrimaryAnchorPreview();
-      scene.boardZoomContainer.setPosition(original.x, original.y).setScale(original.sx, original.sy);
-      return { result, measuredPort };
-    }, { dx: NATIVE_TIP_DX, dy: NATIVE_TIP_DY });
-    await stepOnce(page);
-    const negativeControlPortMatches = negativeControl.result.pose !== null
-      && Math.abs(negativeControl.measuredPort.x - negativeControl.result.pose.portX) < 0.5
-      && Math.abs(negativeControl.measuredPort.y - negativeControl.result.pose.portY) < 0.5;
-    check(
-      'negative control: the ORIGINAL uncompensated-scale bug genuinely fails this same port comparison (proving the test has teeth)',
-      negativeControlPortMatches === false,
-      `measuredPort=${JSON.stringify(negativeControl.measuredPort)} pose=${JSON.stringify(negativeControl.result.pose)}`
-    );
-
-    // === Reduced-motion, settled-scene preview updates (the review's finding 2) ===
-    // The whole point of this block is that NO stepOnce() (manual frame
-    // advance) is called between any of these calls and reading their
-    // effect -- the previous round's fix relied on the real per-frame
-    // ambient draw to apply/restore the preview, which this scene's own
-    // hasLegacyMenuTitleAnimationPendingFrame explicitly disables under
-    // reduced motion, and boardPathDirty is only forced every frame when
-    // reduced motion is OFF. A settled, reduced-motion scene therefore has
-    // no guaranteed next frame at all -- this proves begin/update/end all
-    // apply their effect SYNCHRONOUSLY, independent of any frame running.
-    const reducedMotionProbe = await page.evaluate((t) => {
-      const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
-      const originalReducedMotion = scene.prefersLegacyReducedMotion;
+      const rec = window.__mazerEdgeRec;
+      const original = scene.prefersLegacyReducedMotion;
       scene.prefersLegacyReducedMotion = () => true;
-
-      const begin = window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.beginX, t.beginY, true);
-      const afterBeginWorld = begin.selectedId === null ? null : scene.titleOrbitDiamondImages[begin.selectedId].getWorldTransformMatrix();
-      const afterBeginPos = afterBeginWorld ? { x: afterBeginWorld.tx, y: afterBeginWorld.ty } : null;
-
-      const update = window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.updateX, t.updateY);
-      const afterUpdateWorld = update.selectedId === null ? null : scene.titleOrbitDiamondImages[update.selectedId].getWorldTransformMatrix();
-      const afterUpdatePos = afterUpdateWorld ? { x: afterUpdateWorld.tx, y: afterUpdateWorld.ty } : null;
-
-      const beforeEndWorld = scene.titleOrbitDiamondImages[update.selectedId].getWorldTransformMatrix();
-      const beforeEndPos = { x: beforeEndWorld.tx, y: beforeEndWorld.ty };
+      const read = () => ({ clears: rec.clears, alphas: rec.frame.map((m) => m.alpha), colors: rec.frame.map((m) => m.color) });
+      const c0 = rec.clears;
+      const begin = window.__MAZER_QA__.previewTeleportPrimaryAnchor(20, 20, true);
+      const afterBegin = read();
+      const update = window.__MAZER_QA__.previewTeleportPrimaryAnchor(1260, 20);
+      const afterUpdate = read();
       window.__MAZER_QA__.endTeleportPrimaryAnchorPreview();
-      const afterEndWorld = scene.titleOrbitDiamondImages[update.selectedId].getWorldTransformMatrix();
-      const afterEndPos = { x: afterEndWorld.tx, y: afterEndWorld.ty };
-
-      scene.prefersLegacyReducedMotion = originalReducedMotion;
-      return { begin, afterBeginPos, update, afterUpdatePos, beforeEndPos, afterEndPos };
-    }, { beginX: 20, beginY: 20, updateX: 1260, updateY: 20 });
+      const afterEnd = read();
+      scene.prefersLegacyReducedMotion = original;
+      return { c0, begin: { selectedId: begin.selectedId }, update: { selectedId: update.selectedId }, afterBegin, afterUpdate, afterEnd };
+    });
     check(
-      'reduced motion, settled scene, NO frame step: begin displays the chosen slot immediately',
-      reducedMotionProbe.begin.selectedId !== null && reducedMotionProbe.afterBeginPos !== null
-        && Math.abs(reducedMotionProbe.afterBeginPos.x - reducedMotionProbe.begin.pose.anchorX) < 0.5
-        && Math.abs(reducedMotionProbe.afterBeginPos.y - reducedMotionProbe.begin.pose.anchorY) < 0.5,
+      'reduced motion, settled scene, NO frame step: begin / update / end each redraw the markers immediately',
+      reducedMotionProbe.begin.selectedId !== null
+        && reducedMotionProbe.afterBegin.clears === reducedMotionProbe.c0 + 1
+        && reducedMotionProbe.afterUpdate.clears === reducedMotionProbe.c0 + 2
+        && reducedMotionProbe.afterEnd.clears === reducedMotionProbe.c0 + 3,
       JSON.stringify(reducedMotionProbe)
     );
-    check(
-      'reduced motion, settled scene, NO frame step: a held-target update is applied immediately',
-      reducedMotionProbe.update.selectedId !== null && reducedMotionProbe.afterUpdatePos !== null
-        && Math.abs(reducedMotionProbe.afterUpdatePos.x - reducedMotionProbe.update.pose.anchorX) < 0.5
-        && Math.abs(reducedMotionProbe.afterUpdatePos.y - reducedMotionProbe.update.pose.anchorY) < 0.5,
-      JSON.stringify(reducedMotionProbe)
-    );
-    check(
-      'reduced motion, settled scene, NO frame step: end restores ambient presentation immediately',
-      Math.abs(reducedMotionProbe.beforeEndPos.x - reducedMotionProbe.afterEndPos.x) > 0.5 || Math.abs(reducedMotionProbe.beforeEndPos.y - reducedMotionProbe.afterEndPos.y) > 0.5,
-      JSON.stringify(reducedMotionProbe)
-    );
+    const rmStatic = [reducedMotionProbe.afterBegin, reducedMotionProbe.afterUpdate, reducedMotionProbe.afterEnd].every((frame) => (
+      frame.colors.length === 8
+      && frame.colors.every((color) => color === frame.colors[0])
+      && frame.alphas.every((alpha) => alpha === frame.alphas[0])
+    ));
+    check('reduced motion: the markers stay completely static (all 8 identical, nothing lit) through begin / update / end', rmStatic, JSON.stringify(reducedMotionProbe));
     await stepOnce(page);
 
-    // === Real play-control clearance (the review's finding 3) ===
+    // === Real play-control clearance ===
     // Distinguishes the fixed pause-button hit region (always real when
     // touch controls should render) from an ACTIVE floating stick's own
     // transient footprint (real only while a drag is genuinely in
     // progress) -- and confirms the much larger whole-canvas gesture
     // surface is NOT itself an exclusion (selection must still succeed).
     await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
-    await stepOnce(page);
+    const playQuiet = await stepToQuietSettled(page);
+    check('play mode reaches a quiet settled state once the real intro unlocks input', playQuiet.settled && playQuiet.mode === 'play', JSON.stringify(playQuiet));
+    const playLabels = await readSkillLabels();
+    check('fresh progression: play diagnostics read "Player Skill Lv 01"', Array.isArray(playLabels) && playLabels.includes('Player Skill Lv 01'), JSON.stringify(playLabels));
     const touchControlProbe = await page.evaluate(() => {
       const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
       const touchControlLayout = scene.resolveLegacyPlayTouchControlLayout();
@@ -463,14 +443,13 @@ const main = async () => {
 
       return { pause, pauseResult, stickRejectedAnchor1, noStickResult, ordinaryResult };
     });
-    await stepOnce(page);
     check(
       'a target on the real, fixed pause-button bounds is genuinely excluded',
       touchControlProbe.pauseResult.rejected.some((r) => r.reason.includes('excluded region')),
       JSON.stringify(touchControlProbe.pauseResult)
     );
     check(
-      'an active floating stick\'s real footprint genuinely excludes the anchor it overlaps',
+      "an active floating stick's real footprint genuinely excludes the anchor it overlaps",
       touchControlProbe.stickRejectedAnchor1,
       JSON.stringify(touchControlProbe)
     );
@@ -485,13 +464,25 @@ const main = async () => {
       JSON.stringify(touchControlProbe.ordinaryResult)
     );
 
-    // === Navigation Core unaffected, including in settled Active Play ===
-    await page.evaluate(() => window.__MAZER_QA__.startPlayMode());
+    // === Settled Active Play: same lit-diamond behaviour; Navigation Core unaffected ===
+    await endPreview(page);
+    const playBaseline = await readMarkerFrame(page);
+    const playIdle = idleColorOf(playBaseline);
+    check(
+      'play mode: 8 diamonds drawn inside the viewport, none lit before the preview',
+      playBaseline.visible && markersInsideViewport(playBaseline) && litIds(playBaseline, playIdle).length === 0,
+      JSON.stringify(playBaseline.markers.map((m) => ({ c: m.color, a: m.alpha })))
+    );
+    const playPreview = await previewAt(page, 20, 20, true);
+    const playFrame = await readMarkerFrame(page);
+    check(
+      'the preview also lights exactly the selected diamond while in settled Active Play, not only Main Menu',
+      playPreview.selectedId !== null && sameIds(litIds(playFrame, playIdle), [playPreview.selectedId]),
+      `selectedId=${playPreview.selectedId} lit=${JSON.stringify(litIds(playFrame, playIdle))}`
+    );
     await stepOnce(page);
-    const playPreview = await page.evaluate((t) => window.__MAZER_QA__.previewTeleportPrimaryAnchor(t.x, t.y, true), { x: 20, y: 20 });
-    await stepOnce(page);
-    check('the preview also resolves a real selection while in settled Active Play, not only Main Menu', playPreview.selectedId !== null, JSON.stringify(playPreview));
-    await page.evaluate(() => window.__MAZER_QA__.endTeleportPrimaryAnchorPreview());
+    await endPreview(page);
+    check('ending the preview in play clears the lit diamond', litIds(await readMarkerFrame(page), playIdle).length === 0, 'n/a');
     await stepOnce(page);
     const navCoreState = await page.evaluate(() => {
       const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
@@ -503,7 +494,7 @@ const main = async () => {
       };
     });
     check(
-      'Navigation Core\'s trail/player-glow/goal-halo canvas layers are unaffected',
+      "Navigation Core's trail/player-glow/goal-halo canvas layers are unaffected",
       navCoreState.mode === 'play' && navCoreState.trailCanvasExists && navCoreState.playerGlowExists && navCoreState.goalHaloExists,
       JSON.stringify(navCoreState)
     );

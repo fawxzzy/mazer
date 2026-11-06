@@ -9,8 +9,6 @@ import {
   MAZER_HUD_SETTINGS_TEXTURE_KEY,
   MAZER_PLAYER_TRAIL_TEXTURE_KEY,
   MAZER_TILE_FONT_TEXTURE_KEY,
-  MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY,
-  MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY
 } from './BootScene';
 import {
   applyMazerCanvasBackingResolution,
@@ -40,18 +38,45 @@ import {
   computeGoalHaloCanvasBounds,
   drawGoalHaloToCanvasContext
 } from '../render/navigationCoreGoalHaloCanvas';
-import { resolveTeleportAnchorCandidates, resolveTeleportAnchorEligibility, type TeleportAnchorPose, type TeleportRect, type TeleportViewportBounds } from '../render/teleportAnchorPose';
+import { resolveTeleportAnchorCandidates, type TeleportRect, type TeleportViewportBounds } from '../render/teleportAnchorPose';
+import {
+  EDGE_STATION_COUNT,
+  drawEdgeBeams,
+  drawEdgeMarkers,
+  resolveEdgeMarkerStates,
+  resolveEdgeStations,
+  resolveHeaderControlRects,
+  resolveWrapEndStationIds,
+  resolveWrapFlashStationIds,
+  type EdgeStation,
+  type EdgeWrapFlash
+} from '../render/edgeMarkers';
+import {
+  INTRO_DONE_MS,
+  INTRO_EDGE_PATHS_ON_MS,
+  INTRO_LASER_MS,
+  INTRO_LASER_START_MS,
+  INTRO_POP_MS,
+  INTRO_SKIP_GRACE_MS,
+  isEdgePathCellShown,
+  type IntroState,
+  type OutroState,
+  OUTRO_HANDOFF_MS,
+  OUTRO_PLAYER_REMOVE_MS,
+  OUTRO_TILES_END_MS,
+  OUTRO_TRAIL_FADE_MS,
+  resolveIntro,
+  resolveIntroDeconstruct,
+  resolveIntroInputUnlockMs,
+  resolveSpawnLaser,
+  skipIntroElapsedMs
+} from '../render/introTimeline';
 import {
   selectTeleportPrimaryAnchor,
   type TeleportAnchorId,
   type TeleportAnchorRejection,
   type TeleportAnchorSelectionOutcome
 } from '../render/teleportPrimaryAnchor';
-import { resolveTeleportTransferPresentation, type TeleportTransferPresentation } from '../render/teleportTransferPresentation';
-import {
-  computeTeleportTransferConduitCanvasBounds,
-  drawTeleportTransferConduitToCanvasContext
-} from '../render/teleportTransferConduitCanvas';
 import {
   collectDemoWalkerRouteDiagnostics,
   type DemoRunnerTelemetry,
@@ -112,7 +137,6 @@ import {
   createLegacyResetRequest,
   hasPendingLegacyResetRequest,
   resolveLegacyPlayLifecycleSnapshot,
-  resolveLegacyStaticDrawBuildRemainingMs,
   resolveLegacyStaticDrawPlayTimerStartAtMs,
   shouldFreezeLegacyPlayElapsedForStaticDraw,
   shouldSettleLegacyStaticDrawStage,
@@ -178,13 +202,10 @@ import {
   resolveLegacyGlyphWordColumns,
   resolveLegacyGlyphWordLayout,
   resolveLegacyMenuPathTitleLayout,
-  resolveLegacyMenuPathTitleDiamondVertices,
-  resolveLegacyMenuPathTitleOrbitPose,
   resolveLegacyMenuTitleFontSize,
   resolveLegacyMenuTitlePresentation,
   type LegacyGlyphWordLayout,
-  type LegacyMenuPathTitleCell,
-  type LegacyMenuPathTitleOrbitGeometry
+  type LegacyMenuPathTitleCell
 } from '../legacy-runtime/legacyMenuTitle';
 import {
   LEGACY_MENU_BACKDROP_SHARD_COUNT,
@@ -1008,14 +1029,11 @@ interface LegacyQaOverlayResult {
 // Wave 4D-B QA-only diagnostic surface: exercises the REAL Teleport System
 // v1 primary-anchor selector (src/render/teleportPrimaryAnchor.ts) and pose/
 // clearance adapter (src/render/teleportAnchorPose.ts) against this scene's
-// own real layout, safe-area, and HUD-control geometry, and repositions the
-// EXISTING title-orbit diamond image pool slot for the selected identity
-// (titleOrbitDiamondImages[selectedId], not a fixed spare slot) -- not a
-// duplicate mock diamond, and not a second selection implementation. See
-// resolveLegacyTeleportAnchorPreviewResult/applyLegacyTeleportAnchorPreviewOverride.
-// This is staging for real Teleport integration, not the conduit/spawn/
-// extraction choreography itself, and does not replace or pause the
-// existing player-transfer beam rendering.
+// own real layout, safe-area, and HUD-control geometry, and energizes the
+// selected identity's station in the ONE procedural edge-marker system
+// (render/edgeMarkers.ts) -- there is no separate preview/shell art any more.
+// See resolveLegacyTeleportAnchorPreviewResult. This is staging for real
+// Teleport integration only.
 //
 // This is a bounded PREVIEW SESSION, not a stateless probe: calling
 // previewTeleportPrimaryAnchor again with the same target/layout still
@@ -1087,18 +1105,9 @@ interface LegacyQaDiagnosticsApi {
   // request, continuing 5144999445. From is the real current player
   // position by default; to is always the real current goal.
   resolveShortestPathToGoal(from?: LegacyPoint): LegacyShortestPathResult;
-  // Exposes renderGameplayTransferPresentation's own last cached real
-  // presentation snapshot (source/target/conduit points, all real
-  // WORLD-space) so real-browser tests can assert on the actual
-  // displayed geometry, not just visibility. Review 5146800659's own
-  // request. Returns null whenever no gameplay transfer presentation has
-  // rendered since the last reset (mirrors the field's own null state).
-  getGameplayTransferPresentationDiagnostics(): {
-    target: { x: number; y: number };
-    primaryPoseId: number | null;
-    capturedAtMs: number;
-    presentation: TeleportTransferPresentation;
-  } | null;
+  // Retired with the old diamond/conduit presentation (the one procedural edge
+  // system replaced it): always null, kept so external QA scripts do not throw.
+  getGameplayTransferPresentationDiagnostics(): null;
 }
 
 declare global {
@@ -1182,37 +1191,6 @@ const LEGACY_MENU_PATH_TITLE_FACET_WARM = cyberArcadeMaterial.signal.warning;
 const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;
 const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;
 const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
-// Slowed from 6200 to 9600 per earlier feedback the orbiting diamonds read
-// as too fast, then slowed again to 14400 (9600 * 1.5, a 33% speed
-// reduction) per feedback the real-asset diamonds still orbited too fast --
-// every sigil reads its phase off this same period (see
-// resolveLegacyMenuPathTitleOrbitPhase), so raising it slows all of them by
-// the same factor and their relative spacing (and thus synchronous timing)
-// is unaffected.
-const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 14400;
-// Was 2 full rotations packed into a single building/deconstructing pass --
-// reported as the orbit diamonds getting "forced to go crazy fast" (2 full
-// laps in the same few seconds the tile reveal used to always take,
-// regardless of maze size, before resolveLegacyMenuStaticDrawTileBatchSize
-// started letting that duration actually grow with tile count). An initial
-// cut to 0.35 overcorrected -- reported right back as "way too slow." A
-// follow-up cut to 0.85 fixed the speed complaint but introduced a real,
-// separate bug: resolveLegacyMenuPathTitleOrbitLifecyclePhase's easing
-// reaches exactly `direction * ROTATIONS_PER_PHASE` at progress=1, then
-// `% 1`s it back into [0, 1) for the next phase -- with an INTEGER value
-// that always lands back on exactly the same angle (0) the next phase
-// starts from, but 0.85 lands on 0.85 (306 degrees), a full 306-degree
-// mismatch between "where this phase ended" and "where the next phase
-// starts." resolveLegacyMenuPathTitleOrbitSettlePhase eases across that gap
-// on the settled (non-spinning) side of a transition, but a large gap like
-// this reads as a visible extra spin-to-catch-up rather than a smooth stop,
-// and any transition that skips or interrupts the settle window (deconstruct
-// starting again before settle finishes, which the "multiple times this
-// happens" report describes) shows it as an outright jump. 1 full rotation
-// keeps essentially the same perceived speed as 0.85 while landing exactly
-// back on phase 0 every time, every phase boundary, by construction -- no
-// settle-side smoothing required to hide a gap that no longer exists.
-const LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE = 1;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;
 // A trail-color wipe across the title tiles: fills bottom-left to top-right
 // (combining "left to right" and "bottom to top" into one diagonal sweep
@@ -1228,9 +1206,6 @@ const LEGACY_MENU_TITLE_TRAIL_SWEEP_REVERT_MS = 1500;
 // every tile snapping instantly, so the wipe reads as a gradient front
 // moving across the word rather than a hard step.
 const LEGACY_MENU_TITLE_TRAIL_SWEEP_SOFT_BAND = 0.16;
-// 8 so the frozen (idle) position lands exactly on the 4 corners and 4
-// edge midpoints of the viewport -- see drawLegacyMenuPathTitleOrbitSigils.
-const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 8;
 const LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA = 0.44;
 const LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA = 0.92;
 const LEGACY_BOARD_GRID_ALPHA = 0;
@@ -1559,9 +1534,6 @@ const LEGACY_WORDMARK_SPARKLE_PULSE_HALF_WIDTH = 0.22;
 const LEGACY_TILE_FONT_SUB_TILE_COLUMNS = 4;
 const LEGACY_TILE_FONT_SUB_TILE_ROWS = 5;
 const LEGACY_TILE_FONT_TILES_PER_GLYPH = LEGACY_TILE_FONT_SUB_TILE_COLUMNS * LEGACY_TILE_FONT_SUB_TILE_ROWS;
-// Native pixel size (square) of the iridescent-diamond VFX source art --
-// see docs/assets/mazer-vfx-source-provenance.md.
-const MAZER_VFX_DIAMOND_SOURCE_SIZE = 1254;
 // Native pixel size (square) of the *derived interior-crop* floor-tile
 // texture (MAZER_FLOOR_TILE_INTERIOR_TEXTURE_KEY, baked once at boot from
 // MAZER_FLOOR_TILE_INTERIOR_CROP) -- not the raw 1254x1254 source art, which
@@ -1627,152 +1599,27 @@ interface LegacyHudIconSourceMetrics {
 const MAZER_HUD_PROFILE_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 729, bboxWidth: 615, bboxX: 320, bboxY: 268 };
 const MAZER_HUD_LEADERBOARD_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 524, bboxWidth: 692, bboxX: 281, bboxY: 359 };
 const MAZER_HUD_SETTINGS_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 828, bboxWidth: 807, bboxX: 221, bboxY: 204 };
-// The source art's own long axis runs from its lower-left corner to its
-// upper-right corner at zero rotation -- its pointed tip faces up-and-right,
-// roughly -45 degrees in screen-space angle convention (positive x, negative
-// y). Subtracted out wherever the diamond needs to face a specific absolute
-// direction (see drawLegacyMenuPathTitleOrbitSigils's inward-pointing math).
-const MAZER_VFX_DIAMOND_INTRINSIC_TIP_ANGLE = -Math.PI / 4;
-// Wave 4D-B QA-only Teleport anchor-pose preview: the shell's rendered
-// canvas side length at zero rotation, matching the SAME idle
-// (non-spinning) sizing formula drawLegacyMenuPathTitleOrbitSigils already
-// computes for itself (wave = 0.62 when not spinning -> radius =
-// round(6 + 0.62*3) = 8 -> targetDiagonal = radius*4 = 32) -- not an
-// arbitrary new number. (Reviewer-caught naming defect fixed: this used to
-// be called *_SHELL_DIAGONAL_PX while actually feeding a side-length
-// calculation; see teleportAnchorPose.ts's own module doc for the full
-// footprint-math correction this drove.)
+// Wave 4D-B QA-only Teleport anchor-pose preview: the logical anchor footprint
+// side (32 px) the pure pose/clearance resolver is asked about. Nothing is
+// rendered at this size any more; the diamonds are the procedural kites.
 const TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX = 32;
-// resolveTeleportAnchorPoses's own inset default (2px) mirrors
-// MenuScene.ts's decorative orbit-sigil geometry, which is fine for that
-// tiny sparkle but lets a real ~32px shell's own rendered footprint bleed
-// off-canvas at a corner (confirmed directly: a target near the top-left
-// corner placed the anchor's CENTER only 2px from each edge, so more than
-// half the shell's footprint fell outside the viewport). The footprint's
-// own rotated-square bound (see teleportAnchorPose.ts) grows up to
-// SIDE * sqrt(2) at a 45-degree-facing rotation, so half of THAT worst
-// case -- not merely half the unrotated side -- is the minimum inset that
-// keeps the full footprint within the viewport at every possible
-// target-facing angle, not just the axis-aligned ones.
+// resolveTeleportAnchorPoses's own inset default (2px) lets a ~32px footprint
+// bleed off-canvas at a corner. The footprint's rotated-square bound grows up
+// to SIDE * sqrt(2) at a 45-degree-facing rotation, so half of THAT worst case
+// is the minimum inset that keeps the whole footprint inside the viewport at
+// every target-facing angle.
 const TELEPORT_ANCHOR_PREVIEW_VIEWPORT_INSET_PX = (TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX * Math.SQRT2) / 2;
 
-// Real gameplay transfer conduit tuning (Wave 4D-B, single held primary --
-// see teleportTransferPresentation.ts / teleportTransferConduitCanvas.ts).
-// Values are a deliberately modest first pass matched to the shell's own
-// TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX (32px): thin core, a wider
-// soft glow pass, and a compact packet. The target flare's own radius is
-// NOT a fixed constant -- it is derived from the real target cell's own
-// world-space size at the call site (drawGameplayTransferConduitCanvas),
-// so it stays "one cell of contained energy" rather than a fixed pixel
-// count that could dwarf a compact tile or undershoot a large one.
-const TELEPORT_TRANSFER_CONDUIT_CORE_WIDTH_PX = 3;
-const TELEPORT_TRANSFER_CONDUIT_GLOW_WIDTH_PX = 10;
-const TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX = 8;
-const TELEPORT_TRANSFER_PACKET_RADIUS_PX = 4;
-// Native pixel size of the teleport-beam source art (see
-// docs/assets/mazer-vfx-source-provenance.md) -- a horizontal strip, a
-// diamond emitter/receiver cap baked into each end, with the full rainbow
-// gradient running through the middle only once (not a repeatable tile),
-// so it's sliced into three crop regions and the center one is stretched
-// (Image.setScale, non-uniform), never tiled, matching
-// CLAUDE-INTEGRATION.md's own "stretchable... center beam strip, do not
-// non-uniformly stretch the entire image" guidance -- these coordinates
-// keep the caps themselves undistorted while only the middle strip
-// stretches to whatever distance a given beam needs to span.
-const MAZER_VFX_TELEPORT_BEAM_SOURCE_WIDTH = 2172;
-const MAZER_VFX_TELEPORT_BEAM_SOURCE_HEIGHT = 724;
-const MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH = 320;
-const MAZER_VFX_TELEPORT_BEAM_STRIP_LEFT = MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH;
-const MAZER_VFX_TELEPORT_BEAM_STRIP_WIDTH = (
-  MAZER_VFX_TELEPORT_BEAM_SOURCE_WIDTH - (MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH * 2)
-);
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
-const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = cyberArcadeMaterial.signal.warningEdge;
-const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;
-const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;
-const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;
-const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;
-const LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS = 64;
-// Comfortable tile-reveal rate (how many tiles pop in per tick) at typical
-// board sizes -- resolveLegacyMenuStaticDrawTileBatchSize below prefers
-// this over LEGACY_*_STATIC_DRAW_TARGET_TICKS' own fixed-tick-count
-// formula once a board's tile count would otherwise force a bigger batch,
-// so build/deconstruct duration actually grows with maze size instead of
-// compressing into the same fixed total regardless of it (reported: "the
-// mazes generate at a hardcoded speed... they don't need to meet a
-// hardcoded speed as they get bigger" -- a huge board's tile reveal used
-// to batch dozens of tiles per tick to fit the same fixed tick count a
-// tiny board also used, reading as a near-instant flash instead of a
-// build). LEGACY_STATIC_DRAW_MAX_TICKS is still an upper bound so a truly
-// enormous board doesn't take unreasonably long -- batch size widens again
-// only past that.
-//
-// An initial pass (3 tiles/tick, 420-tick cap) overcorrected -- reported
-// right back as "way too slow" even at typical/early-level board sizes,
-// since most real boards are well above the old fixed-tick formula's own
-// small-board crossover point and so were hitting this new, much slower
-// flat rate on every level, not just unusually large ones. 12 tiles/tick
-// matches the old fixed-tick pace almost exactly at typical board sizes
-// (no regression there), with the 160-tick cap keeping even the largest
-// boards well under half the previous cap's worst case -- growing with
-// size, but within a real, considerably tighter middle ground instead of
-// either extreme.
-const LEGACY_STATIC_DRAW_TARGET_TILES_PER_TICK = 12;
-const LEGACY_STATIC_DRAW_MAX_TICKS = 160;
-const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
+// The build/deconstruct/arrival cadence is NOT defined here any more: it is a
+// pure function of elapsed time in src/render/introTimeline.ts (see
+// resolveIntro / resolveIntroDeconstruct). Only the preroll window used by the
+// title wipe and the pre-existing handoff beat remain scene-local.
 const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;
-const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;
-// resolveLegacyMenuDeconstructHandoffProgress computes a real 0->1 value
-// across this whole window every frame, but it is only ever read by
-// diagnostics (see its two call sites) -- nothing actually renders
-// anything driven by it, so a full second of this window was a genuinely
-// static, unchanging screen between the old maze finishing deconstruction
-// and the new one starting to build. Shortened to a brief beat rather than
-// removed outright, in case something else relies on a non-zero gap here.
-const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 300;
-const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;
-const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = 860;
-// How long the centered level announcement takes to fade/scale in once the
-// deconstruct phase starts (holds at full size for whatever's left of that
-// phase after this ramp), and separately, how long it takes to fade/scale
-// back out -- spread across the ENTIRE estimated build-phase duration
-// (see resolveLegacyLevelAnnouncerVisualState) so it dissolves at the same
-// pace the next maze's tiles are actually appearing, not on some unrelated
-// fixed clock that finishes before or after the build really does.
-// Slowed down considerably (from 560/700) and given an extra ease pass
-// (see smootherstep below) per feedback that the grow/shrink-fade should
-// read as a good deal more gradual and smoother, not just quicker/snappier.
-const LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS = 1100;
-const LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS = 1300;
-const LEGACY_LEVEL_ANNOUNCER_MIN_SCALE = 0.72;
-// Slow ambient breathing while the number is fully up, blended in only once
-// the fade envelope reaches its held plateau -- same sin-driven alpha+scale
-// technique as the header icons' blink pulse (LEGACY_MENU_BLINK_PULSE_MS =
-// 2400), just noticeably slower per feedback that this one should read
-// calmer than the icons.
-const LEGACY_LEVEL_ANNOUNCER_PULSE_PERIOD_MS = 3600;
-const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA = 0.78;
-const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE = 0.94;
-// How long the bleed-off dock corridors (resolveLegacyPathBorderDockContinuation)
-// take to shrink back from the true screen edge to the maze's own edge on
-// deconstruct -- a smooth retract instead of the full-length corridor just
-// vanishing instantly. Shrink happens in the OPENING span of deconstruct
-// (before tile removal itself even starts, per
-// LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS/PLAYER_REMOVE_MS/TRAIL_FADE_MS
-// above), timed to the same instant the outbound player-transfer laser
-// arms (see armLegacyMenuStaticDeconstructStage) so both start together.
-const LEGACY_BLEED_DOCK_GROWTH_MS = 420;
-// The build-side growth window is deliberately its own, longer constant
-// rather than sharing LEGACY_BLEED_DOCK_GROWTH_MS above -- at 420ms the
-// corridor's outward growth was compressed into the closing sliver of a
-// build that can run for seconds on a large maze, reading as "the corridor
-// just appears" rather than a visible expansion. Widened so the grow is
-// actually perceptible while still finishing at the exact instant the
-// build completes (armLegacyPlayerArrivalForFinalBuildStep pins the
-// inbound player-transfer delivery beam to that same instant), so the
-// corridor visibly reaches the screen edge right as the player arrives.
-const LEGACY_BLEED_DOCK_BUILD_GROWTH_MS = 1100;
+const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = OUTRO_HANDOFF_MS;
+const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = OUTRO_PLAYER_REMOVE_MS;
+const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = OUTRO_TRAIL_FADE_MS;
 // Mirrors ACTIVE_PLAY_GOAL_RESET_HOLD_MS's own value and purpose exactly
 // (legacyPlayLifecycle.ts), for the menu demo's own goal-arrival precompute
 // -- see updateMenuDemo's own comment on pendingMenuDemoDeconstructArmAtMs
@@ -1780,28 +1627,15 @@ const LEGACY_BLEED_DOCK_BUILD_GROWTH_MS = 1100;
 // constant's mechanism directly (a different, DOM-free state machine with
 // no shared request/consume plumbing to play mode's).
 const LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS = 340;
-// The four corner sigils fire a beam toward wherever the player marker is
-// about to appear once the final generation stage settles -- a short travel
-// span for the beams to reach the tile, then a brief impact flash the marker
-// itself pops in under.
-// Was 260/240, then 325/300 (a 25% cut matching LEGACY_PLAYER_TRANSFER_OUTBOUND_MS)
-// -- still reported "too fast, slow down" for the diamonds' own spawn-in
-// beams specifically. Slowed further, independent of the outbound laser's
-// own pace now (they're visually separate moments -- reaching the goal vs.
-// landing in the next maze -- so they don't need to match each other 1:1).
-const LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS = 480;
-const LEGACY_PLAYER_SPAWN_FLASH_MS = 340;
+// The one spawn laser (beam travel, then the landing poof the marker pops in
+// under) shares its clock with the intro timeline.
+const LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS = INTRO_LASER_MS;
+const LEGACY_PLAYER_SPAWN_FLASH_MS = INTRO_POP_MS;
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const smoothstep = (value: number): number => {
   const x = clamp(value, 0, 1);
   return x * x * (3 - (2 * x));
 };
-// A gentler S-curve than smoothstep alone -- flatter tangents at both ends,
-// used where an effect specifically needs to read as extra-smooth (the
-// level announcer's grow/shrink fade) rather than the standard ease every
-// other transition in this file uses. Deliberately its own helper instead
-// of changing smoothstep itself, which many unrelated effects share.
-const smootherstep = (value: number): number => smoothstep(smoothstep(value));
 const legacyScenePointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
 
 const createVisualRect = (left: number, top: number, width: number, height: number): VisualRect => ({
@@ -2009,20 +1843,8 @@ export class MenuScene extends Phaser.Scene {
   // in that case, falling back to its own procedural glyph rendering only
   // if the tile-font texture failed to load.
   private levelAnnouncerNumberGlyphPool: Phaser.GameObjects.Image[] = [];
-  // Pool of reusable Image GameObjects rendering the real iridescent-diamond
-  // VFX source art (see docs/assets/mazer-vfx-source-provenance.md) for the
-  // title's orbit sigils, one per LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS slot --
-  // replaces the procedural drawLegacyMenuPathTitleDiamond shape entirely
-  // when the texture loaded successfully.
-  private titleOrbitDiamondImages: Phaser.GameObjects.Image[] = [];
   // Wave 4D-B QA-only Teleport anchor-pose preview state -- see
-  // resolveLegacyTeleportAnchorPreviewResult/applyLegacyTeleportAnchorPreviewOverride.
-  // null means no preview is active; the real per-frame title-orbit draw
-  // (drawLegacyMenuPathTitleOrbitSigils) then keeps full, unmodified control
-  // of every titleOrbitDiamondImages slot, exactly as it did before this
-  // wave existed -- no explicit "restore" step is needed on preview end
-  // because that unconditional per-frame draw already reasserts control of
-  // every slot every frame regardless of this field's value.
+  // resolveLegacyTeleportAnchorPreviewResult. null means no preview is active.
   // Reviewer-caught defect fixed: this used to be a bare target point with
   // every resolution forced to heldAnchorId: null (a stateless "what would
   // selection choose right now" probe only). It is now a real bounded
@@ -2038,9 +1860,7 @@ export class MenuScene extends Phaser.Scene {
   private titleTileFontImagePool: Phaser.GameObjects.Image[] = [];
   private levelAnnouncerLabelText!: Phaser.GameObjects.Text;
   private levelAnnouncerWasVisible = false;
-  // One-more-redraw falling-edge tracker for the real initial-arrival
-  // conduit hide (see this field's own use in drawDynamicBoard for the
-  // confirmed real defect it fixes).
+  // One-more-redraw falling-edge tracker for the arrival laser (see update()).
   private playerSpawnBurstWasActiveForRedraw = false;
   private levelAnnouncerBuildFadeOutArmed = false;
   private playerSpawnBurstStartedAtMs: number | null = null;
@@ -2188,89 +2008,6 @@ export class MenuScene extends Phaser.Scene {
   private goalHaloCanvasWidth = 0;
   private goalHaloCanvasHeight = 0;
   private goalHaloCanvasResolution = 0;
-  // Same real-2D-canvas pattern as goalHaloCanvasImage above, for the real
-  // single-primary gameplay Teleport transfer conduit (Wave 4D-B --
-  // teleportTransferConduitCanvas.ts). A boardZoomContainer CHILD, added
-  // immediately before titleOrbitDiamondImages (see that add-call's own
-  // comment) so the real shell renders ON TOP of this conduit at the
-  // source end -- the frozen contract's own masking requirement.
-  // (Originally added directly to the scene instead; review 5142235386
-  // caught that this rendered the conduit ABOVE the shell, backwards
-  // from the masking requirement -- fixed by moving it here.) Its own
-  // draw call (drawGameplayTransferConduitCanvas) converts every WORLD-
-  // space point the presentation module returns into this container's
-  // own local space via pointToContainer, exactly the same conversion
-  // the shell's own positioning already uses (applyLegacyTeleportAnchorPreviewOverride),
-  // applied consistently to every point this draw needs, plus dividing
-  // every pixel-size constant by the container's own scale for the same
-  // reason the shell's own local scale is.
-  private gameplayTransferConduitCanvasTextureKey: string | null = null;
-  private gameplayTransferConduitCanvasTexture: Phaser.Textures.CanvasTexture | null = null;
-  private gameplayTransferConduitCanvasImage: Phaser.GameObjects.Image | null = null;
-  private gameplayTransferConduitCanvasWidth = 0;
-  private gameplayTransferConduitCanvasHeight = 0;
-  private gameplayTransferConduitCanvasResolution = 0;
-  // The real single held primary for the actual (not QA-preview) gameplay
-  // transfer -- an entirely separate session from teleportAnchorPreviewSession
-  // ("the QA preview is not gameplay session ownership"). Selected at the
-  // real goal-reached instant (see the play-mode call site right after
-  // armLegacyPlayerTransferEnergy), retained through outbound/stored/
-  // delivering via the real selector's own retention rule (passed as
-  // heldAnchorId on every call), and cleared only when
-  // resetLegacyPlayerTransferEnergy runs -- so a genuinely new transfer
-  // always starts fresh, matching the frozen contract's "same primary
-  // persists through outbound -> stored -> delivering" requirement.
-  private gameplayTransferPrimaryId: TeleportAnchorId | null = null;
-  // Confirmed real defect: applyLegacyGameplayTransferPresentation used to
-  // re-run anchor selection every frame regardless of overlay state.
-  // Opening an overlay (in practice, only the pause overlay can be open
-  // while a transfer is active) populates this.uiButtons with that
-  // overlay's own buttons, which resolveLegacyTeleportAnchorPreviewExclusions
-  // folds into the real exclusion set the very next frame -- if one of
-  // those buttons happens to cover the held anchor's real footprint, the
-  // selector legitimately (and silently) reselects a different anchor
-  // while paused, even though nothing about the transfer itself changed.
-  // Resuming would then snap the shell/conduit to the new anchor with no
-  // crossfade, a real visible jump the "same primary persists through the
-  // whole cycle" contract does not allow. This field caches the last
-  // resolved pose so the presentation can be redrawn from it, unchanged,
-  // on any frame the overlay is open -- mirroring exactly how
-  // advanceLegacyGameplayTransferAnimationClock already freezes the
-  // material clock for the same reason. Cleared alongside primaryId.
-  private gameplayTransferLastPrimaryPose: TeleportAnchorPose | null = null;
-  // Confirmed real defect, found via the gameplayTransferLastPrimaryPose
-  // fix above: this.overlay flips back to 'none' SYNCHRONOUSLY the
-  // instant a RESUME_RUN command is dispatched (outside the normal
-  // per-frame update sequence entirely), but this.uiButtons -- which
-  // resolveLegacyTeleportAnchorPreviewExclusions reads directly -- is
-  // only rebuilt from the uiDirty flag LATER in that same update(),
-  // strictly after drawDynamicBoard's own call into this method. So the
-  // very first frame after resume still sees the STALE, pause-era
-  // uiButtons (the pause menu's own wide button rects) even though
-  // overlay already reads 'none' -- gating on overlay alone reselects
-  // away from the held anchor on exactly that one transitional frame.
-  // Tracking the overlay value observed on the PREVIOUS call and
-  // requiring it to ALSO have been 'none' before trusting uiButtons
-  // again gives that rebuild exactly one extra frame to catch up.
-  // Defaults (and resets) to 'none', not null -- a brand-new transfer's
-  // very first frame has no stale pause-era uiButtons to wait out, so it
-  // should resolve selection immediately rather than paying the same
-  // one-frame delay a real resume needed.
-  private gameplayTransferLastObservedOverlay: OverlayKind = 'none';
-  // The most recent real gameplay-transfer presentation this frame
-  // actually rendered from (renderGameplayTransferPresentation's own
-  // cache of its own resolveTeleportTransferPresentation output) --
-  // exposed read-only via window.__MAZER_QA__.getGameplayTransferPresentationDiagnostics()
-  // so real-browser tests can assert on the actual displayed geometry
-  // (source tip, conduit endpoint, target point) rather than only
-  // visibility/positive-dimensions. Cleared alongside the other sticky
-  // gameplay-transfer fields.
-  private gameplayTransferLastPresentationSnapshot: {
-    presentation: TeleportTransferPresentation;
-    target: { x: number; y: number };
-    primaryPoseId: TeleportAnchorId | null;
-    capturedAtMs: number;
-  } | null = null;
   // Confirmed real defect (review 5147427468, continuing 5144999445 /
   // 5146800659): the gameplay transfer's own outbound/delivery elapsed
   // computation (time - startedAtMs) is not itself pause-aware --
@@ -2329,17 +2066,10 @@ export class MenuScene extends Phaser.Scene {
   // Cleared and redrawn every frame from within drawDynamicBoard, which
   // already runs in both modes.
   private playerSpawnBurstGraphics!: Phaser.GameObjects.Graphics;
-  // Real teleport-beam VFX art (see docs/assets/mazer-vfx-source-provenance.md)
-  // replacing drawLegacyPlayerTransferEnergy's own plain lineBetween strokes
-  // for the outbound player-spawn beams -- the stretched center strip
-  // spans [target, tip] every frame, plus a receiver-flare cap anchored at
-  // the fixed target point (where the player actually materializes; the
-  // moving `tip` end is just this beam's own current leading edge, not a
-  // real structure, so it gets no cap of its own). One of each per orbit
-  // sigil (LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS), reused every frame rather
-  // than recreated. See drawLegacyPlayerTransferEnergyBeam.
-  private playerTransferBeamStripImages: Phaser.GameObjects.Image[] = [];
-  private playerTransferBeamTargetCapImages: Phaser.GameObjects.Image[] = [];
+  // The one spawn/outbound laser (edgeMarkers.ts drawSpawnLaser).
+  private spawnLaserGraphics!: Phaser.GameObjects.Graphics;
+  // The eight edge diamonds: lowest depth in boardZoomContainer (see drawLegacyEdgeMarkers).
+  private edgeMarkerGraphics!: Phaser.GameObjects.Graphics;
   private uiTexts: Phaser.GameObjects.Text[] = [];
   private uiGraphics: Phaser.GameObjects.Graphics[] = [];
   private uiButtons: UiButton[] = [];
@@ -2404,16 +2134,6 @@ export class MenuScene extends Phaser.Scene {
   // real delta instead of the whole paused/reduced-motion gap.
   private trailAnimationElapsedMs = 0;
   private trailAnimationLastRealMs: number | null = null;
-  // Same pausable-clock pattern as trailAnimationElapsedMs/trailAnimationLastRealMs
-  // above, a SEPARATE pair (not reused directly -- advanceLegacyTrailAnimationClock
-  // has its own side effects and is only safe to call once per frame) for
-  // the real gameplay Teleport transfer conduit's own spatial energy
-  // material (Wave 4D-B). Freezes under reduced motion, Pause, or any
-  // overlay/lifecycle-lock exactly like the trail's own clock does, so the
-  // conduit's color never visibly drifts while the game is paused or
-  // reduced motion is active.
-  private gameplayTransferAnimationElapsedMs = 0;
-  private gameplayTransferAnimationLastRealMs: number | null = null;
   // The continuous play trail's shared shine lap-start timestamp, expressed
   // in trailAnimationElapsedMs units (not raw scene time) -- see
   // advanceTrailShineState's own header for why this must be explicit,
@@ -2470,21 +2190,31 @@ export class MenuScene extends Phaser.Scene {
   private uiDirty = true;
   private menuStaticDrawLifecyclePhase: LegacyMenuStaticDrawLifecyclePhase = 'idle';
   private menuStaticDrawRowsVisible: number | null = null;
-  private menuStaticDrawNextRowAtMs = 0;
   private menuStaticDrawTileOrder: LegacyPoint[] = [];
   private menuStaticDrawVisibleTileKeys = new Set<string>();
   private menuStaticDrawTilesVisible: number | null = null;
-  private menuStaticDrawNextTileAtMs = 0;
   private menuStaticDeconstructStartedAtMs: number | null = null;
   private menuStaticDeconstructZeroHoldStartedAtMs: number | null = null;
   private menuStaticBuildPrerollStartedAtMs: number | null = null;
   // menuStaticBuildPrerollStartedAtMs nulls out ~500ms into 'building' (see
   // advanceLegacyMenuStaticDrawStage) -- it's a preroll-window flag, not a
-  // "when did this build start" anchor. Anything that needs to track
-  // progress across the WHOLE building phase (the level announcer's
-  // fade-out, the bleed-off dock regrowth) needs its own timestamp that
-  // persists for the full phase instead of reusing that one.
-  private menuStaticBuildPhaseStartedAtMs: number | null = null;
+  // "when did this build start" anchor. introStartedAtMs IS that anchor: the
+  // single clock the whole intro (tile reveal, level digit, bleed docks, spawn
+  // laser, input unlock) is derived from via resolveIntro (introTimeline.ts).
+  // It is a plain timestamp, never a counter, so frame rate cannot change how
+  // long the intro takes. Persists after settle (the landing poof still reads
+  // it) and is cleared by the next deconstruct/arm.
+  private introStartedAtMs: number | null = null;
+  // ONE atomic switch for every wrap/bleed edge-path element: the dock strips,
+  // the dock-owning border cells and their facets/images all key off it
+  // (resolveIntro / resolveIntroDeconstruct bleedProgress, strictly 0 or 1).
+  // Root cause of the reported "one square left behind": the border cell was
+  // drawn by the BFS tile reveal (and removed in reverse-BFS order, so it
+  // outlived the strips), while the strips grew/retracted on a separate clock
+  // and a zero-length strip was clamped to 1 px by
+  // resolveLegacyMenuBorderDockRenderAreas / ...FacetRect, which still drew a
+  // halo + rim + bleed image around that sliver.
+  private legacyEdgePathsVisible = true;
   // Owner-reported (ChatGPT-assisted review 5173052153): a Play-mode pause
   // froze the transfer's own clocks but NOT the coupled maze
   // reveal/deconstruct/handoff lifecycle -- the submitted pause recording
@@ -2497,16 +2227,12 @@ export class MenuScene extends Phaser.Scene {
   private legacyPlayMazeLifecyclePrevFrameMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
   private legacyMenuTitleAnimationNextFrameAtMs = 0;
-  // Orbit sigils ease into their frozen resting positions instead of
-  // snapping the instant the maze finishes building/deconstructing -- see
-  // drawLegacyMenuPathTitleOrbitSigils.
-  private menuOrbitSettleStartedAtMs: number | null = null;
-  private menuOrbitSettlePhaseStart = 0;
-  // The most recent phase actually drawn while building/deconstructing was
-  // active, so the settle transition below can start from where the sigils
-  // really were instead of recomputing a phase after the lifecycle state
-  // that phase depended on has already moved on.
-  private menuOrbitLastActivePhase = 0;
+  // Edge markers (edgeMarkers.ts): the one-shot wrap flash and the station the
+  // spawn laser is currently leaving from (energized while it fires).
+  private edgeMarkerWrapFlash: EdgeWrapFlash | null = null;
+  // Stations whose beam is in flight right now (they brighten), and whether any was last frame.
+  private edgeBeamFiringIds: ReadonlySet<number> = new Set<number>();
+  private edgeBeamWasFiring = false;
   private visualDiagnosticsRevision = 0;
   private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   private visualDiagnosticsPlayLifecycleSignature: string | null = null;
@@ -2588,6 +2314,7 @@ export class MenuScene extends Phaser.Scene {
     this.initializeRuntimeDiagnostics();
     this.backdropGraphics = this.add.graphics();
     this.boardZoomContainer = this.add.container(0, 0);
+    this.edgeMarkerGraphics = this.add.graphics();
     this.boardStaticGraphics = this.add.graphics();
     this.boardPathGraphics = this.add.graphics();
     // 1x1 placeholder size -- resized/repositioned every drawBoardPaths call
@@ -2644,6 +2371,9 @@ export class MenuScene extends Phaser.Scene {
     this.headerSettingsIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.headerLeaderboardIconImage = this.add.image(0, 0, MAZER_HUD_LEADERBOARD_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.boardZoomContainer.add([
+      // First child = lowest depth: the diamonds sit under the board, the title,
+      // the header icons and every other menu element.
+      this.edgeMarkerGraphics,
       this.boardStaticGraphics,
       this.boardPathGraphics,
       this.boardFloorTileSprite,
@@ -2681,24 +2411,7 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics = this.add.graphics();
     this.touchSettingsCogIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.playerSpawnBurstGraphics = this.add.graphics();
-    // Real single-primary gameplay transfer conduit (Wave 4D-B). The
-    // TEXTURE is created here; the Image itself is created and added to
-    // boardZoomContainer further below, immediately before
-    // titleOrbitDiamondImages, specifically so the real shell renders
-    // ON TOP of (masks) this conduit at the source end -- see that
-    // field's own comment for the full reasoning. NOT the same
-    // top-level coordinate space playerSpawnBurstGraphics uses.
-    this.gameplayTransferConduitCanvasTextureKey = `legacy-teleport-transfer-conduit-${nextMenuSceneInstanceId()}`;
-    this.gameplayTransferConduitCanvasTexture = this.textures.createCanvas(this.gameplayTransferConduitCanvasTextureKey, 1, 1);
-    // Same top-level (non-boardZoomContainer) coordinate space
-    // playerSpawnBurstGraphics itself already draws the beam origins/target
-    // in -- see drawLegacyPlayerTransferEnergyBeam.
-    this.playerTransferBeamStripImages = Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, () => (
-      this.add.image(0, 0, MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY).setOrigin(0, 0.5).setVisible(false)
-    ));
-    this.playerTransferBeamTargetCapImages = Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, () => (
-      this.add.image(0, 0, MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY).setOrigin(0, 0.5).setVisible(false)
-    ));
+    this.spawnLaserGraphics = this.add.graphics();
     this.authGateGraphics = this.add.graphics();
     this.authGateLoadingText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, 'Signing you in…', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
@@ -2743,28 +2456,8 @@ export class MenuScene extends Phaser.Scene {
       { length: LEGACY_TILE_FONT_GLYPH_POOL_SIZE * LEGACY_TILE_FONT_TILES_PER_GLYPH },
       () => this.add.image(0, 0, MAZER_TILE_FONT_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
     );
-    // Added to boardZoomContainer BEFORE titleOrbitDiamondImages, so the
-    // real shell slots render ON TOP of (mask) this conduit at the
-    // source end -- the frozen contract's own masking requirement, and
-    // the actual fix for review 5142235386's real z-order finding
-    // (a prior top-level placement rendered the conduit ABOVE the
-    // shell). Its own draw call converts every point into this same
-    // container-local space via pointToContainer -- see
-    // drawGameplayTransferConduitCanvas's own comment.
-    this.gameplayTransferConduitCanvasImage = this.add.image(0, 0, this.gameplayTransferConduitCanvasTextureKey).setOrigin(0, 0).setVisible(false);
-    this.boardZoomContainer.add(this.gameplayTransferConduitCanvasImage);
-    // Added to boardZoomContainer (not the top-level scene) so these sit in
-    // the exact same local coordinate space and z-order titleGraphics itself
-    // uses (last child = renders above the board layers, and the container
-    // is what the "Board Zoom" setting scales) -- the orbit-pose math
-    // already computes positions in that same space.
-    this.titleOrbitDiamondImages = Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, () => (
-      this.add.image(0, 0, MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
-    ));
-    this.boardZoomContainer.add(this.titleOrbitDiamondImages);
-    // Added to boardZoomContainer, same reasoning as titleOrbitDiamondImages
-    // above: the title wordmark lives in that same local coordinate space
-    // (titleGraphics is a member of it too) and must scale with it.
+    // Added to boardZoomContainer: the title wordmark lives in that same local
+    // coordinate space (titleGraphics is a member of it too) and must scale with it.
     this.titleTileFontImagePool = Array.from(
       { length: LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE * LEGACY_TILE_FONT_TILES_PER_GLYPH },
       () => this.add.image(0, 0, MAZER_TILE_FONT_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false)
@@ -2853,12 +2546,6 @@ export class MenuScene extends Phaser.Scene {
       this.goalHaloCanvasTexture = null;
       this.goalHaloCanvasImage = null;
       this.goalHaloCanvasTextureKey = null;
-      if (this.gameplayTransferConduitCanvasTextureKey !== null && this.textures.exists(this.gameplayTransferConduitCanvasTextureKey)) {
-        this.textures.remove(this.gameplayTransferConduitCanvasTextureKey);
-      }
-      this.gameplayTransferConduitCanvasTexture = null;
-      this.gameplayTransferConduitCanvasImage = null;
-      this.gameplayTransferConduitCanvasTextureKey = null;
       if (this.remoteSettingsSyncTimer !== null) {
         clearTimeout(this.remoteSettingsSyncTimer);
         this.remoteSettingsSyncTimer = null;
@@ -3098,7 +2785,9 @@ export class MenuScene extends Phaser.Scene {
       resolveShortestPathToGoal: (from?: LegacyPoint): LegacyShortestPathResult => (
         resolveLegacyPlayableShortestPath(this.maze.grid, from ?? this.player, this.maze.goal)
       ),
-      getGameplayTransferPresentationDiagnostics: () => this.gameplayTransferLastPresentationSnapshot
+      // The conduit/shell presentation was retired with the old diamond art; kept as a
+      // null-returning shim so QA scripts that call it do not throw.
+      getGameplayTransferPresentationDiagnostics: () => null
     };
   }
 
@@ -3200,12 +2889,6 @@ export class MenuScene extends Phaser.Scene {
   ): {
     result: ReturnType<typeof selectTeleportPrimaryAnchor>;
     poseById: Map<TeleportAnchorId, { anchorX: number; anchorY: number; rotation: number; portX: number; portY: number; footprint: TeleportRect }>;
-    // The exact viewport + exclusion snapshot this selection was resolved
-    // against, so a caller (renderGameplayTransferPresentation's sticky-pose
-    // fallback) can re-validate a cached pose against the SAME frame's
-    // layout inputs -- never a second, independently-recomputed snapshot
-    // that could disagree with the one the selector actually used.
-    layoutSnapshot: { viewport: TeleportViewportBounds; exclusions: TeleportRect[] };
   } {
     const viewport = { width: this.layout.width, height: this.layout.height };
     const exclusions = this.resolveLegacyTeleportAnchorPreviewExclusions(viewport);
@@ -3226,456 +2909,14 @@ export class MenuScene extends Phaser.Scene {
       portY: candidate.pose.portY,
       footprint: candidate.pose.footprint
     }]));
-    return { result, poseById, layoutSnapshot: { viewport, exclusions } };
+    return { result, poseById };
   }
 
-  // Real single-primary gameplay transfer (Wave 4D-B) -- an entirely
-  // separate session from the QA preview above ("the QA preview is not
-  // gameplay session ownership"). Called from drawDynamicBoard, which is
-  // guaranteed to run every frame a transfer is active regardless of mode
-  // or reduced motion (see the update() loop's own
-  // `resolveLegacyPlayerTransferState(time).active` -> boardDynamicDirty
-  // re-arm), so this needs no separate dirty-flag/presentation-update
-  // plumbing of its own the way the QA preview did.
-  //
-  // Reuses resolveLegacyTeleportAnchorPreviewResult (real viewport, real
-  // HUD/safe-area/play-control exclusions, the real selector) rather than
-  // re-deriving candidate resolution -- the same real geometry PR #347
-  // already established and reviewed, just fed a real gameplay target/
-  // held-id instead of the QA session's.
-  //
-  // targetX/targetY (scene/world space, already computed by the caller
-  // exactly as drawLegacyPlayerTransferEnergy's own call site does) serve
-  // as BOTH the selector's own `target` (nearest-eligible-anchor
-  // candidate, only consulted on a genuinely new selection) and, passed
-  // through to the presentation module as both extractionTarget and
-  // deliveryTarget: teleportTransferPresentation.ts only ever reads
-  // whichever one is relevant to the CURRENT phase, and targetX/targetY
-  // already resolves to the correct point for that phase (the goal during
-  // 'outbound'/'stored', the real next-start point during 'delivering') --
-  // exactly mirroring drawLegacyPlayerTransferEnergy's own single-targetX/Y
-  // reuse for its two direction cases.
-  private applyLegacyGameplayTransferPresentation(
-    targetX: number,
-    targetY: number,
-    targetCellSizePx: number,
-    time: number
-  ): void {
-    const gameplayTransferAnimationTime = this.advanceLegacyGameplayTransferAnimationClock(time);
-    this.renderGameplayTransferPresentation(
-      { x: targetX, y: targetY },
-      targetCellSizePx,
-      time,
-      gameplayTransferAnimationTime,
-      {
-        armed: this.playerTransferEnergyArmed,
-        // Confirmed real defect (ChatGPT-assisted review 5147427468):
-        // these two elapsed-ms inputs feed the presentation module's own
-        // closure/crossfade windows (resolveExtractionClosurePresentation,
-        // and the delivering-phase travel/flash math) directly -- they
-        // are a SEPARATE read of the same startedAtMs fields already
-        // compensated for pause in resolveLegacyPlayerTransferState /
-        // resolveLegacyPlayerSpawnBurstState (see
-        // resolveGameplayTransferPausedOffsetMs). Subtracting the same
-        // paused offset here too keeps the presentation layer frozen in
-        // lockstep with the lifecycle phase/progress it derives from --
-        // without this, phase/progress correctly froze while paused but
-        // openFraction/conduitVisible/sourceFlareIntensity kept changing
-        // underneath, because this closure math kept advancing on real
-        // elapsed ms alone.
-        outboundElapsedMs: this.playerTransferEnergyOutboundStartedAtMs === null
-          ? null
-          : time - this.playerTransferEnergyOutboundStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time),
-        deliveryElapsedMs: this.playerTransferEnergyDeliveryStartedAtMs === null
-          ? null
-          : time - this.playerTransferEnergyDeliveryStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time),
-        deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
-        deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS
-      }
-    );
-  }
-
-  // Confirmed real defect (ChatGPT-assisted review 5144999445, verified
-  // independently by reading drawDynamicBoard's own call sites before
-  // fixing): drawLegacyPlayerSpawnBurst -- a SEPARATE old effect from
-  // drawLegacyPlayerTransferEnergy/playerTransferBeamStripImages, drawing
-  // one procedural beam per orbit sigil (the exact same eight origins the
-  // ambient volley uses) into playerSpawnBurstGraphics -- had no mode
-  // branch at all and fired in Play mode too, including on the very
-  // first maze of a run and every ordinary play reset with no preceding
-  // goal completion (armLegacyPlayerArrivalForFinalBuildStep arms
-  // playerSpawnBurstStartedAtMs on every settled maze build, not only
-  // when a real transfer was armed). The permanent test's own
-  // playerTransferBeamStripImages check could never have caught this --
-  // that field is a different pool this separate Graphics-based effect
-  // never touches.
-  //
-  // This method is Play mode's real replacement for exactly that gap:
-  // the ordinary arrival case with no preceding armed transfer (a real
-  // armed transfer's own delivering phase is already fully covered by
-  // applyLegacyGameplayTransferPresentation above -- this method is never
-  // called for that case; see the call site's own mode/active gating).
-  // Reuses the SAME single-primary conduit/shell renderer, driven by
-  // playerSpawnBurst's own elapsed/travel/flash clock (identical
-  // LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS/FLASH_MS constants the old burst
-  // itself used) instead of a real transfer's own clock, so Play mode
-  // never shows two different arrival visual languages. Menu mode keeps
-  // calling drawLegacyPlayerSpawnBurst unchanged -- the frozen contract
-  // reserves that choreography for menu/title.
-  private applyLegacyGameplayInitialArrivalPresentation(
-    targetX: number,
-    targetY: number,
-    targetCellSizePx: number,
-    time: number
-  ): void {
-    const gameplayTransferAnimationTime = this.advanceLegacyGameplayTransferAnimationClock(time);
-    this.renderGameplayTransferPresentation(
-      { x: targetX, y: targetY },
-      targetCellSizePx,
-      time,
-      gameplayTransferAnimationTime,
-      {
-        armed: this.playerSpawnBurstStartedAtMs !== null,
-        outboundElapsedMs: null,
-        // Same pause-offset correction as applyLegacyGameplayTransferPresentation
-        // above, for the initial-arrival clock (playerSpawnBurstStartedAtMs)
-        // instead of the armed-transfer clock -- see that method's comment.
-        deliveryElapsedMs: this.playerSpawnBurstStartedAtMs === null
-          ? null
-          : time - this.playerSpawnBurstStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time),
-        deliveryFlashMs: LEGACY_PLAYER_SPAWN_FLASH_MS,
-        deliveryTravelMs: LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS
-      }
-    );
-  }
-
-  // Shared by applyLegacyGameplayTransferPresentation (a real armed
-  // transfer's own delivering phase) and
-  // applyLegacyGameplayInitialArrivalPresentation (Play mode's ordinary
-  // arrival with no preceding armed transfer) -- the two differ only in
-  // which clock/phase input drives resolveTeleportTransferPresentation;
-  // selection, shell positioning, and the conduit draw call are identical
-  // and were previously duplicated once already (the exact kind of drift
-  // that produced the z-order/masking bug a prior round fixed), so this
-  // extraction keeps there being exactly one copy of that logic.
-  private renderGameplayTransferPresentation(
-    target: { x: number; y: number },
-    targetCellSizePx: number,
-    time: number,
-    gameplayTransferAnimationTime: number,
-    lifecycleInput: {
-      armed: boolean;
-      outboundElapsedMs: number | null;
-      deliveryElapsedMs: number | null;
-      deliveryFlashMs: number;
-      deliveryTravelMs: number;
-    }
-  ): void {
-    // Confirmed real defect: re-resolving anchor selection on every frame
-    // regardless of overlay state let the pause overlay's own buttons
-    // (folded into this.uiButtons the instant it opens) silently
-    // reselect the held anchor away from a footprint they newly cover --
-    // a real snap on resume, not merely a frozen frame. While an overlay
-    // is open, selection is skipped entirely and the last real resolved
-    // pose is reused unchanged -- the exact same "freeze while overlay is
-    // open" rule already applied to the material animation clock, now
-    // applied to geometry too.
-    //
-    // Confirmed real defect (found verifying the fix above): overlay
-    // itself flips back to 'none' synchronously on RESUME_RUN, one full
-    // frame before this.uiButtons is rebuilt free of the pause menu's
-    // own rects (see gameplayTransferLastObservedOverlay's own field
-    // comment) -- gating on overlay alone still reselected away from the
-    // held anchor on that one transitional frame. Requiring the
-    // PREVIOUS frame to have also been unpaused closes that window.
-    const shouldResolveSelection = this.overlay === 'none' && this.gameplayTransferLastObservedOverlay === 'none';
-    this.gameplayTransferLastObservedOverlay = this.overlay;
-    let primaryPose: TeleportAnchorPose | null;
-    if (shouldResolveSelection) {
-      const { result, poseById, layoutSnapshot } = this.resolveLegacyTeleportAnchorPreviewResult(target, this.gameplayTransferPrimaryId);
-      // Sticky held identity: only overwrite when the selector actually
-      // found a legal anchor this frame. A transient 'unavailable' result
-      // (e.g. a HUD control momentarily overlapping every candidate) must
-      // NOT forget which primary this transfer is using -- the selector's
-      // own retention rule already resumes the SAME held id automatically
-      // once it becomes eligible again, as long as this field keeps
-      // passing that id back in rather than clearing it to null. Only
-      // resetLegacyPlayerTransferEnergy (a genuine completion/reset) clears
-      // this field.
-      if (result.selectedId !== null) {
-        this.gameplayTransferPrimaryId = result.selectedId;
-      }
-      const poseFields = result.selectedId === null ? null : (poseById.get(result.selectedId) ?? null);
-      primaryPose = poseFields === null || result.selectedId === null ? null : {
-        id: result.selectedId,
-        anchorX: poseFields.anchorX,
-        anchorY: poseFields.anchorY,
-        rotation: poseFields.rotation,
-        portX: poseFields.portX,
-        portY: poseFields.portY,
-        footprint: poseFields.footprint
-      };
-      if (primaryPose !== null) {
-        this.gameplayTransferLastPrimaryPose = primaryPose;
-      } else if (
-        this.gameplayTransferLastPrimaryPose !== null
-        && (lifecycleInput.armed || this.resolveLegacyPlayerSpawnBurstState(time).active)
-        && resolveTeleportAnchorEligibility(
-          this.gameplayTransferLastPrimaryPose,
-          layoutSnapshot.exclusions,
-          layoutSnapshot.viewport
-        ).eligible
-      ) {
-        // Sticky held POSE, not just id -- owner-reported (2026-09-09): the
-        // conduit blinked out partway through a real transfer, confirmed
-        // live as the selector transiently returning NO legal pose for the
-        // held anchor during the maze rebuild inside 'stored'. Reusing the
-        // last good pose through that transient window keeps the conduit
-        // attached (the same "don't forget mid-transfer" rule already
-        // applied to the held id just above; a genuine completion/reset
-        // still clears this field via resetLegacyPlayerTransferEnergy).
-        //
-        // BUT: only when the cached pose's own footprint STILL clears the
-        // current layout (ChatGPT-assisted review 5173052153) -- validated
-        // here against `layoutSnapshot`, the EXACT viewport + exclusion set
-        // this same frame's selection was resolved against (not a second,
-        // independently-recomputed snapshot). A genuine clearance failure
-        // (a real resize, or an exclusion that actually now covers the
-        // cached footprint) falls through to primaryPose === null and the
-        // presentation module's existing explicit degradation
-        // (poseAvailable: false -- no fabricated shell/conduit, held id and
-        // all domain/lifecycle state retained), never an offscreen or
-        // HUD-overlapping shell drawn just to avoid a blink.
-        primaryPose = this.gameplayTransferLastPrimaryPose;
-      }
-    } else {
-      primaryPose = this.gameplayTransferLastPrimaryPose;
-    }
-
-    // Computed once and reused for both the shell's own intensity below
-    // and the conduit render call further down -- sourceFlareIntensity
-    // does not depend on primaryPose/targets in any branch, but sharing
-    // one call avoids resolving the same projection twice per frame.
-    const presentation = resolveTeleportTransferPresentation({
-      armed: lifecycleInput.armed,
-      outboundElapsedMs: lifecycleInput.outboundElapsedMs,
-      deliveryElapsedMs: lifecycleInput.deliveryElapsedMs,
-      deliveryFlashMs: lifecycleInput.deliveryFlashMs,
-      deliveryTravelMs: lifecycleInput.deliveryTravelMs,
-      nowMs: time,
-      reducedMotion: this.prefersLegacyReducedMotion(),
-      primaryPose,
-      extractionTarget: target,
-      deliveryTarget: target
-    });
-    // Cached for a real diagnostics QA surface (getGameplayTransferPresentationDiagnostics)
-    // -- review 5146800659's own request for geometry assertions that
-    // compare the displayed source tip, conduit endpoint, and target-cell
-    // bounds directly, not just visibility/positive-dimensions/non-null
-    // world positions. Every point here is already real WORLD-space
-    // (the same space primaryPose.portX/Y and target are both in) --
-    // no reconstruction, this is the exact input the renderer itself
-    // used this frame.
-    this.gameplayTransferLastPresentationSnapshot = { presentation, target, primaryPoseId: primaryPose?.id ?? null, capturedAtMs: time };
-
-    // Position/rotate/scale the SELECTED IDENTITY's own real shell slot --
-    // same coordinate-space conversion as applyLegacyTeleportAnchorPreviewOverride
-    // (Container.pointToContainer for position; rotation minus the
-    // container's own, correct under identity rotation + any uniform
-    // parent scale; local scale divided by the container's own scale so
-    // world size -- and so the real port -- stays correct regardless of
-    // that scale). An 'unavailable'/'invalid-input' outcome (primaryPose
-    // null) deliberately leaves every slot exactly as the ambient draw
-    // already left it -- never a fabricated placement. While paused,
-    // primaryPose is the cached pose from before the overlay opened, so
-    // this redraws the shell at the exact same position every frame --
-    // a harmless no-op, not a jump.
-    if (primaryPose !== null) {
-      const image = this.titleOrbitDiamondImages[primaryPose.id];
-      if (image) {
-        const local = this.boardZoomContainer.pointToContainer({ x: primaryPose.anchorX, y: primaryPose.anchorY });
-        const localRotation = primaryPose.rotation - this.boardZoomContainer.rotation;
-        const worldScale = TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX / MAZER_VFX_DIAMOND_SOURCE_SIZE;
-        const localScale = worldScale / this.boardZoomContainer.scaleX;
-        // Consumes the projected shell intensity (charging/absorption
-        // during outbound, the settled pulse during stored, the release
-        // glow during delivering) rather than a fixed full brightness --
-        // a real, previously-unused field. Floored, not left to reach 0,
-        // so the shell stays a legible, present object even at its
-        // dimmest moment (never fully invisible while it is the thing
-        // holding the transfer).
-        const shellAlpha = Math.max(0.55, presentation.sourceFlareIntensity);
-        image.setPosition(local.x, local.y).setRotation(localRotation).setScale(localScale).setAlpha(shellAlpha).setVisible(true);
-      }
-    }
-    this.drawGameplayTransferConduitCanvas(presentation, targetCellSizePx, gameplayTransferAnimationTime);
-  }
-
-  // Real 2D-canvas draw for the gameplay conduit -- same DPR/zoom-aware
-  // backing-resolution pattern drawGoalHaloCanvas/drawPlayerGlowCanvas
-  // already use (see either's own comment): a canvas gradient/path's own
-  // coordinates ARE scaled correctly by ctx.setTransform, but
-  // shadowBlur is a raw device-pixel radius the transform does NOT
-  // scale, so only conduitGlowBlurPx is multiplied by `resolution`
-  // explicitly here, matching this file's own established correction.
-  //
-  // LAYERING FIX (review 5142235386): this canvas Image is now a
-  // boardZoomContainer CHILD, positioned in the container's own child
-  // list immediately before titleOrbitDiamondImages (see the
-  // gameplayTransferConduitCanvasImage field's own comment for the
-  // exact reasoning) -- so it genuinely renders BENEATH the real shell
-  // at the source end, the frozen contract's own masking requirement,
-  // rather than on top of it (the real defect the previous top-level
-  // placement had). Every point `presentation` carries is in WORLD/
-  // scene space (the same space the real target/port math already
-  // uses); Container.pointToContainer converts each one into this
-  // container's own local space here -- the SAME conversion the shell's
-  // own positioning already uses just above, applied consistently to
-  // every point this draw needs, not just the shell's anchor. Every
-  // pixel SIZE constant (widths, radii, blur) is divided by the
-  // container's own scale for the same reason the shell's own local
-  // scale is (`worldScale / boardZoomContainer.scaleX`): a size meant to
-  // be a fixed WORLD pixel count must shrink/grow in LOCAL units so the
-  // container's own scale multiplies it back to the intended world size
-  // -- correct under any UNIFORM parent scale (boardZoomContainer's own
-  // stated purpose), not meaningful under a non-uniform one, exactly the
-  // same documented boundary the shell's own conversion already carries.
-  private drawGameplayTransferConduitCanvas(
-    presentation: TeleportTransferPresentation,
-    targetCellSizePx: number,
-    gameplayTransferAnimationTime: number
-  ): void {
-    if (!this.gameplayTransferConduitCanvasTexture || !this.gameplayTransferConduitCanvasImage) {
-      return;
-    }
-    if (
-      presentation.openFraction <= 0
-      || presentation.sourcePoint === null
-      || presentation.targetPoint === null
-      || presentation.conduitStartPoint === null
-      || presentation.conduitEndPoint === null
-    ) {
-      this.gameplayTransferConduitCanvasImage.setVisible(false);
-      return;
-    }
-
-    const containerScale = this.boardZoomContainer.scaleX;
-    const toContainerLocal = (point: { x: number; y: number }): { x: number; y: number } => (
-      this.boardZoomContainer.pointToContainer(point)
-    );
-    const localSourcePoint = toContainerLocal(presentation.sourcePoint);
-    const localTargetPoint = toContainerLocal(presentation.targetPoint);
-    const localConduitStartPoint = toContainerLocal(presentation.conduitStartPoint);
-    const localConduitEndPoint = toContainerLocal(presentation.conduitEndPoint);
-    const localPacketPoint = presentation.packetPoint === null ? null : toContainerLocal(presentation.packetPoint);
-
-    // A "contained one-cell" flare sized from the REAL target cell (a
-    // real WORLD pixel size, per the caller). Confirmed real defect
-    // (review 5142235386): a fixed 8px floor could exceed a compact
-    // cell's own half-size (e.g. a 10px cell only has 5px of half-width
-    // to work with), overflowing containment instead of respecting it.
-    // The containment cap (half the real cell, never more than 40px) is
-    // computed FIRST, and any readability floor is itself clamped to
-    // never exceed that cap. Converted to LOCAL units (divided by the
-    // container's own scale) only once the WORLD-space containment math
-    // is already settled.
-    const targetFlareContainmentCapWorld = Math.min(40, targetCellSizePx * 0.5);
-    const targetFlareReadabilityFloorWorld = Math.min(8, targetFlareContainmentCapWorld);
-    const targetFlareRadiusWorld = Math.max(
-      targetFlareReadabilityFloorWorld,
-      Math.min(targetFlareContainmentCapWorld, targetCellSizePx * 0.42)
-    );
-    const localTargetFlareRadius = targetFlareRadiusWorld / containerScale;
-    const localConduitCoreWidth = TELEPORT_TRANSFER_CONDUIT_CORE_WIDTH_PX / containerScale;
-    const localConduitGlowWidth = TELEPORT_TRANSFER_CONDUIT_GLOW_WIDTH_PX / containerScale;
-    const localConduitGlowBlurPx = TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX / containerScale;
-    const localPacketRadius = TELEPORT_TRANSFER_PACKET_RADIUS_PX / containerScale;
-    const localPadding = Math.ceil((targetFlareRadiusWorld + (TELEPORT_TRANSFER_CONDUIT_GLOW_BLUR_PX * 2.5)) / containerScale);
-    const bounds = computeTeleportTransferConduitCanvasBounds(localSourcePoint, localTargetPoint, localPadding);
-    const width = Math.max(1, Math.ceil(bounds.width));
-    const height = Math.max(1, Math.ceil(bounds.height));
-    const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
-    const resolution = Math.min(
-      MAZER_CANVAS_RESOLUTION_MAX * 2,
-      resolveMazerCanvasResolution() * zoomScale
-    );
-    const backingWidth = Math.max(1, Math.ceil(width * resolution));
-    const backingHeight = Math.max(1, Math.ceil(height * resolution));
-    if (
-      backingWidth !== this.gameplayTransferConduitCanvasWidth
-      || backingHeight !== this.gameplayTransferConduitCanvasHeight
-      || resolution !== this.gameplayTransferConduitCanvasResolution
-    ) {
-      this.gameplayTransferConduitCanvasTexture.setSize(backingWidth, backingHeight);
-      this.gameplayTransferConduitCanvasWidth = backingWidth;
-      this.gameplayTransferConduitCanvasHeight = backingHeight;
-      this.gameplayTransferConduitCanvasResolution = resolution;
-    } else {
-      this.gameplayTransferConduitCanvasTexture.clear(0, 0, backingWidth, backingHeight, false);
-    }
-    this.gameplayTransferConduitCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
-    // The Navigation-Core energy material -- the SAME one the play trail
-    // carries, so the conduit and the trail read as one energy language,
-    // not an independently-cycling approximation. Sampled at a REAL
-    // distance along the conduit (varying spatially, not one flat color
-    // per frame) and at this transfer's own pausable animation time
-    // (frozen under reduced motion, Pause, or any overlay).
-    // gameplayTransferAnimationTime is computed by the CALLER,
-    // unconditionally, every frame -- see applyLegacyGameplayTransferPresentation's
-    // own comment on why this must not be computed only when the conduit
-    // happens to be open. Uses sampleCalmTrailEnergyColor (the
-    // owner-authorized calmer palette, see LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS)
-    // for the same reason the trail does -- the owner reported this exact
-    // conduit beam as an abrasive rainbow.
-    const conduitColorOptions = {
-      distancePeriodPx: Math.max(1, targetCellSizePx / containerScale) * LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE,
-      timePeriodMs: LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS
-    };
-    const energyColorAtDistance = (distancePx: number): number => (
-      sampleCalmTrailEnergyColor(distancePx, gameplayTransferAnimationTime, conduitColorOptions)
-    );
-    drawTeleportTransferConduitToCanvasContext(this.gameplayTransferConduitCanvasTexture.context, {
-      originX: bounds.left,
-      originY: bounds.top,
-      targetPoint: localTargetPoint,
-      conduitStartPoint: localConduitStartPoint,
-      conduitEndPoint: localConduitEndPoint,
-      packetPoint: localPacketPoint,
-      packetVisible: presentation.packetVisible,
-      openFraction: presentation.openFraction,
-      targetFlareIntensity: presentation.targetFlareIntensity,
-      energyColorAtDistance,
-      conduitCoreWidth: localConduitCoreWidth,
-      conduitGlowWidth: localConduitGlowWidth,
-      conduitGlowBlurPx: localConduitGlowBlurPx * resolution,
-      packetRadius: localPacketRadius,
-      targetFlareRadius: localTargetFlareRadius
-    });
-    this.gameplayTransferConduitCanvasTexture.refresh();
-    this.gameplayTransferConduitCanvasImage.setPosition(bounds.left, bounds.top);
-    this.gameplayTransferConduitCanvasImage.setDisplaySize(width, height);
-    this.gameplayTransferConduitCanvasImage.setVisible(true);
-  }
-
-  // Reviewer-caught defect fixed: begin/update used to only mutate session
-  // state and rely on some future ambient frame to actually apply it --
-  // but the ambient title-orbit draw this preview rides on is dirty-gated
-  // and its own "pending frame" check (hasLegacyMenuTitleAnimationPendingFrame)
-  // explicitly returns false under reduced motion, so a settled,
-  // reduced-motion scene could have no guaranteed next frame at all. Rather
-  // than re-enabling continuous animation (which the review explicitly
-  // does not want) or fighting the dirty-flag system's own reset timing
-  // (boardPathDirty gets set back to false at the end of the very draw
-  // call that would need to see it), this calls the real
-  // drawLegacyMenuPathTitle draw function directly and synchronously --
-  // the same real function the normal per-frame path calls, not a
-  // duplicate. That function has its own real early-exit (mode/overlay
-  // guard) and internally calls drawLegacyMenuPathTitleOrbitSigils then
-  // applyLegacyTeleportAnchorPreviewOverride, so this guarantees the
-  // preview's effect (or, in an unsupported mode/overlay, the correct
-  // hidden state) is applied THIS call, independent of animation/dirty
-  // state, while the existing per-frame call site still keeps it applied
-  // across whatever real ambient frames run afterward.
+  // The QA anchor preview is drawn by the ONE edge-marker system: the held
+  // anchor id simply energizes that station's procedural diamond. Begin/update/
+  // end redraw synchronously (drawLegacyMenuPathTitle -> drawLegacyEdgeMarkers)
+  // so the result is applied THIS call even when no animation frame is pending
+  // (reduced motion, settled scene).
   private applyLegacyTeleportAnchorPreviewPresentationUpdate(): void {
     this.drawLegacyMenuPathTitle(this.time.now);
   }
@@ -3696,100 +2937,9 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  // Mirrors handleLegacyQaPreviewTeleportPrimaryAnchor's own explicit-update
-  // fix: ending the session and then merely waiting for some future ambient
-  // frame to restore the commandeered slot has the identical settled/
-  // reduced-motion gap begin/update had. Clearing the session BEFORE the
-  // explicit draw call means that draw call runs the real ambient path
-  // for every slot with no override active, immediately restoring the
-  // previously-commandeered slot to normal control.
   private handleLegacyQaEndTeleportPrimaryAnchorPreview(): void {
     this.teleportAnchorPreviewSession = null;
     this.applyLegacyTeleportAnchorPreviewPresentationUpdate();
-  }
-
-  // Called every frame from within the real per-frame title-orbit draw
-  // path (drawLegacyMenuPathTitleOrbitSigils's own call site), immediately
-  // after that function has already set every titleOrbitDiamondImages
-  // slot's transform for this frame's ambient choreography. When a preview
-  // session is active, this overrides the SELECTED IDENTITY's OWN slot
-  // (titleOrbitDiamondImages[result.selectedId] -- reviewer-caught defect
-  // fixed here: a previous version always moved a fixed spare slot,
-  // leaving the selected identity's own slot under unrelated ambient
-  // control and potentially showing two diamonds near one target) to the
-  // real selected pose for this frame -- a continuous per-frame override,
-  // not a one-shot set the next frame's ambient draw would silently
-  // clobber. The other seven identities are untouched by this override
-  // and keep their normal ambient presentation; when a later call selects
-  // a different identity, THAT identity's own slot is overridden instead,
-  // and the previously-overridden slot naturally reverts to ambient
-  // control (the unconditional ambient draw that runs immediately before
-  // this override already reset it that same frame). An
-  // 'unavailable'/'invalid-input' outcome deliberately leaves every slot
-  // exactly as the ambient draw already left it: the pure selector's own
-  // contract explicitly forbids inventing a fallback placement (never
-  // place a shell in the HUD, never fall back to the prohibited
-  // eight-beam volley) -- this override honors that by simply not acting.
-  //
-  // Coordinate-space fix: the computed pose is in real layout/viewport
-  // space, but titleOrbitDiamondImages live inside boardZoomContainer,
-  // whose own transform is not guaranteed to be identity (this codebase's
-  // "Board Zoom" setting does not currently touch it -- confirmed live,
-  // it instead changes tile size -- but relying on that rather than
-  // converting explicitly is exactly the fragility a reviewer flagged).
-  // Phaser's own Container.pointToContainer performs the real world-to-
-  // local conversion (position, scale, AND rotation) via that container's
-  // actual transform matrix, so this always agrees with wherever the
-  // container really is, not just where it happens to be today.
-  private applyLegacyTeleportAnchorPreviewOverride(): void {
-    if (!this.teleportAnchorPreviewSession) {
-      return;
-    }
-    const { result, poseById } = this.resolveLegacyTeleportAnchorPreviewResult(
-      this.teleportAnchorPreviewSession.target,
-      this.teleportAnchorPreviewSession.heldAnchorId
-    );
-    this.teleportAnchorPreviewSession = { ...this.teleportAnchorPreviewSession, heldAnchorId: result.selectedId };
-    if (result.selectedId === null) {
-      return;
-    }
-    const pose = poseById.get(result.selectedId);
-    const image = this.titleOrbitDiamondImages[result.selectedId];
-    if (!pose || !image) {
-      return;
-    }
-    const local = this.boardZoomContainer.pointToContainer({ x: pose.anchorX, y: pose.anchorY });
-    // Position conversion (pointToContainer) is correct under any real
-    // container transform. This rotation formula is correct under identity
-    // rotation plus any UNIFORM scale (real browser check covers a real
-    // non-identity offset+uniform-scale case) -- it is not meaningful under
-    // a non-uniform (anisotropic) parent scale, where a rotated child's own
-    // world-space silhouette becomes sheared into an ellipse and "the
-    // correct world rotation" stops having one answer. boardZoomContainer's
-    // own name/stated purpose ("Board Zoom") is a uniform zoom, so this is
-    // a documented scope boundary, not an unexamined gap.
-    const localRotation = pose.rotation - this.boardZoomContainer.rotation;
-    // Reviewer-caught defect fixed: this LOCAL scale used to be a fixed
-    // value regardless of the parent's own scale. Phaser composes
-    // WORLD scale = LOCAL scale * PARENT scale, so under a real non-1
-    // container scale (e.g. this codebase's own future "Board Zoom" use, or
-    // any other real transform) the previous fixed local scale rendered a
-    // shell whose WORLD size -- and so its measured tip's real-space
-    // offset from center, i.e. the beam port -- disagreed with what the
-    // pose resolver computed for TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX.
-    // Dividing by the container's own scale here keeps the rendered WORLD
-    // size (and so the real displayed port/footprint) equal to the
-    // resolver's own intended size regardless of the container's current
-    // scale -- correct under any UNIFORM parent scale (see the rotation
-    // comment above for why non-uniform scale is a documented non-goal).
-    const worldScale = TELEPORT_ANCHOR_PREVIEW_SHELL_CANVAS_SIDE_PX / MAZER_VFX_DIAMOND_SOURCE_SIZE;
-    const localScale = worldScale / this.boardZoomContainer.scaleX;
-    image
-      .setPosition(local.x, local.y)
-      .setRotation(localRotation)
-      .setScale(localScale)
-      .setAlpha(1)
-      .setVisible(true);
   }
 
   private handleLegacyQaPlayMove(move: string): LegacyQaMoveResult {
@@ -4153,30 +3303,19 @@ export class MenuScene extends Phaser.Scene {
       this.boardDynamicDirty = true;
     }
     this.levelAnnouncerWasVisible = levelAnnouncerActive;
-    // The spawn burst and completion transfer share the existing spawn clock.
-    // The transfer remains active through the rebuild so the edge sigils keep
-    // visibly holding energy, then self-clears when that same travel+flash
-    // window completes -- no new lifecycle pause is introduced.
+    // The spawn burst and completion transfer share the existing spawn clock
+    // (the transfer state now only drives the player's departure fade).
     this.settleLegacyPlayerTransferEnergy(time);
-    // Confirmed real defect (found strengthening the permanent gameplay
-    // test's own case 7 per review 5146800659): a real Play-mode initial
-    // arrival with no OTHER confounding system also forcing a redraw
-    // around the same instant (a real transfer's own completion happens
-    // to coincide with other maze-settling redraws that mask this) left
-    // gameplayTransferConduitCanvasImage stuck visible forever once
-    // playerSpawnBurst.active's own falling edge stopped forcing
-    // boardDynamicDirty -- the hide branch in applyLegacyGameplay*
-    // Presentation's own caller only runs from inside drawDynamicBoard,
-    // which is itself dirty-flag-gated, so a scene that stops requesting
-    // redraws never runs that hide branch at all. Fixed the same way this
-    // file's own settings-cog defect (levelAnnouncerWasVisible-style,
-    // see comment just below) was: force exactly one more redraw on the
-    // real falling edge (was active last frame, isn't now).
+    // drawDynamicBoard is dirty-flag-gated, so the laser graphics (cleared at
+    // the top of every drawDynamicBoard) need exactly one more redraw on the
+    // falling edge (was active last frame, isn't now) or the last beam frame
+    // would stay on screen: same for the departure beams (edgeBeamWasFiring).
     const spawnBurstActiveNow = this.resolveLegacyPlayerSpawnBurstState(time).active;
     if (
       spawnBurstActiveNow
       || this.resolveLegacyPlayerTransferState(time).active
       || this.playerSpawnBurstWasActiveForRedraw
+      || this.edgeBeamWasFiring
     ) {
       this.boardDynamicDirty = true;
     }
@@ -5016,6 +4155,9 @@ export class MenuScene extends Phaser.Scene {
       return true;
     }
 
+    // Any key (movement, Enter, ...) skips a still-running Play intro.
+    this.skipLegacyIntroIfBuilding(this.time.now);
+
     if (this.handleLegacyPlayMovementKeyDown(event)) {
       return true;
     }
@@ -5549,6 +4691,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyPlayPointerDown(pointer: Phaser.Input.Pointer): boolean {
+    // A tap skips a still-running Play intro.
+    this.skipLegacyIntroIfBuilding(this.time.now);
     const point = this.resolveLegacyInputPointerPoint(pointer);
     if (this.handleLegacyPlayTouchControl(point.x, point.y, pointer.id)) {
       this.playPointerStart = null;
@@ -6635,7 +5779,20 @@ export class MenuScene extends Phaser.Scene {
   // check already considers revealed must stay revealed regardless of which
   // counter happens to finish first, so this is a union of both checks
   // instead of "prefer one, fall back to the other."
+  // Border cells that own a wrap/bleed dock belong to the atomic edge-path
+  // group: they are shown/hidden together with the dock strips, never by the
+  // gradual BFS reveal/dissolve.
+  private isLegacyEdgePathCellShown(point: LegacyPoint): boolean {
+    return isEdgePathCellShown(
+      this.legacyEdgePathsVisible,
+      this.resolveBleedOffDockVisualEligibility().has(legacyScenePointKey(point))
+    );
+  }
+
   private isLegacyMenuPointVisibleInStaticDraw(point: LegacyPoint): boolean {
+    if (!this.isLegacyEdgePathCellShown(point)) {
+      return false;
+    }
     const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
     const visibleByTileLimit = tileLimit === null
       || this.menuStaticDrawVisibleTileKeys.has(legacyScenePointKey(point));
@@ -6657,9 +5814,9 @@ export class MenuScene extends Phaser.Scene {
       return this.time.now;
     }
 
-    const batchSize = Math.max(1, this.resolveLegacyMenuStaticDrawTileBatchSize());
-    const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);
-    return this.time.now + (tileTicks * LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS) + LEGACY_MENU_STATIC_DRAW_SETTLE_MS;
+    // The demo walker waits for the same instant the intro unlocks input
+    // (the spawn laser landing) -- one number, independent of tile count.
+    return this.time.now + resolveIntroInputUnlockMs(this.prefersLegacyReducedMotion());
   }
 
   private releaseLegacyMenuDemoGateOnStaticDrawSettled(time: number): void {
@@ -6673,40 +5830,39 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
+  // Tiles are gone OUTRO_TILES_END_MS after the arm instant regardless of tile
+  // count (resolveIntroDeconstruct); the handoff beat is added by callers.
   private resolveLegacyMenuStaticDeconstructDurationMs(): number {
-    const batchSize = Math.max(1, this.resolveLegacyMenuStaticDrawTileBatchSize());
-    const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);
-    return LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS
-      + LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS
-      + LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS
-      + (tileTicks * LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS);
+    return this.prefersLegacyReducedMotion() ? 0 : OUTRO_TILES_END_MS;
   }
 
-  // Same estimate resolveLegacyMenuStaticDrawDemoGateAtMs already computes
-  // inline for its own purposes, factored out so every transition-timed
-  // effect (the level announcer's fade-out, the bleed-off dock corridors'
-  // grow/shrink) can share one definition of "how long will this build
-  // take" instead of drifting out of sync with slightly different copies.
-  // Returns null outside a real row-slice build (nothing meaningful to
-  // estimate for other draw stages).
-  private resolveLegacyMenuStaticBuildDurationEstimateMs(): number | null {
-    const drawStage = this.resolveLegacyMenuStaticDrawStage();
-    if (drawStage?.executionKind !== 'row-slice') {
+  // The one place the building phase's time-derived presentation state is
+  // resolved: tiles, level digit, bleed docks, spawn laser and input unlock
+  // all read this instead of keeping their own counters or estimates. Null
+  // outside a real row-slice build.
+  private resolveLegacyIntroState(time: number): IntroState | null {
+    if (this.menuStaticDrawLifecyclePhase !== 'building' || this.introStartedAtMs === null) {
       return null;
     }
 
-    const batchSize = Math.max(1, this.resolveLegacyMenuStaticDrawTileBatchSize());
-    const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);
-    return LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS
-      + (tileTicks * LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS)
-      + LEGACY_MENU_STATIC_DRAW_SETTLE_MS;
+    return resolveIntro(time - this.introStartedAtMs, {
+      digitAlreadyVisible: this.levelAnnouncerBuildFadeOutArmed,
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      tileCount: this.menuStaticDrawTileOrder.length
+    });
   }
 
-  private resolveLegacyMenuStaticDeconstructTileStartAtMs(time: number): number {
-    return time
-      + LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS
-      + LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS
-      + LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS;
+  // The deconstruct mirror of resolveLegacyIntroState (<= 900 ms with the
+  // handoff beat), measured from the arm instant.
+  private resolveLegacyOutroState(time: number): OutroState | null {
+    if (this.menuStaticDrawLifecyclePhase !== 'deconstructing' || this.menuStaticDeconstructStartedAtMs === null) {
+      return null;
+    }
+
+    return resolveIntroDeconstruct(time - this.menuStaticDeconstructStartedAtMs, {
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      tileCount: this.menuStaticDrawTileOrder.length
+    });
   }
 
   private resolveLegacyMenuDeconstructTrailAlpha(time: number): number {
@@ -6716,7 +5872,6 @@ export class MenuScene extends Phaser.Scene {
 
     const fadeElapsedMs = time
       - this.menuStaticDeconstructStartedAtMs
-      - LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS
       - LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS;
     if (fadeElapsedMs <= 0) {
       return 1;
@@ -6730,9 +5885,7 @@ export class MenuScene extends Phaser.Scene {
       return 1;
     }
 
-    const removeElapsedMs = time
-      - this.menuStaticDeconstructStartedAtMs
-      - LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS;
+    const removeElapsedMs = time - this.menuStaticDeconstructStartedAtMs;
     if (removeElapsedMs <= 0) {
       return 1;
     }
@@ -6833,51 +5986,6 @@ export class MenuScene extends Phaser.Scene {
     return this.isLegacyMenuBuildPrerollActive(time) || this.isLegacyMenuDeconstructHandoffActive(time);
   }
 
-  private resolveLegacyMenuStaticDrawTileBatchSize(): number {
-    const tileCount = this.menuStaticDrawTileOrder.length;
-    const targetTicks = this.mode === 'play'
-      ? LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS
-      : LEGACY_MENU_STATIC_DRAW_TARGET_TICKS;
-    // Below the old fixed-tick-count's own crossover point, keep matching
-    // it exactly (no regression for the board sizes this was always tuned
-    // against). Past it, prefer the flat per-tick rate instead of widening
-    // the batch further to force-fit the same tick count -- duration grows
-    // with tile count instead of staying constant. minBatchSize is the
-    // safety net past LEGACY_STATIC_DRAW_MAX_TICKS for boards large enough
-    // that even the flat rate would run unreasonably long.
-    const fixedTickBatchSize = Math.max(1, Math.ceil(tileCount / targetTicks));
-    const minBatchSize = Math.max(1, Math.ceil(tileCount / LEGACY_STATIC_DRAW_MAX_TICKS));
-    return Math.max(minBatchSize, Math.min(fixedTickBatchSize, LEGACY_STATIC_DRAW_TARGET_TILES_PER_TICK));
-  }
-
-  // Mirrors resolveLegacyMenuStaticDrawTileBatchSize's own scaling exactly,
-  // for the same reason: the row-reveal counter's batch size used to come
-  // from the generation executionPlan's static Draw-stage contract
-  // (createLegacyStageContract, id 6), which is a fixed literal batchSize
-  // of 1 -- one row per LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS tick regardless
-  // of maze height. That's invisible at a small board (a handful of rows),
-  // but shouldSettleLegacyStaticDrawStage requires BOTH the row and tile
-  // counters to finish before the build "settles" -- and
-  // resolveLegacyStaticDrawBuildRemainingMs (which
-  // armLegacyPlayerArrivalForFinalBuildStep pins the inbound player-transfer
-  // beam to) takes the LATER of the two. The tile counter already targets a
-  // fixed tick count regardless of size, so at a large board (confirmed:
-  // target_complexity 400, the level-99+ cap) the un-scaled row counter
-  // alone could take multiple seconds longer than the tile reveal the
-  // player actually watches finish -- read as "the maze looks done but the
-  // beam takes forever to fire," reported after a corrective progression
-  // migration made a previously target_complexity-starved account's boards
-  // their real (much larger) size for the first time. Targeting the same
-  // fixed tick count keeps total row-reveal duration roughly constant
-  // regardless of maze height, matching the tile counter's own pacing
-  // instead of scaling unboundedly with it.
-  private resolveLegacyMenuStaticDrawRowBatchSize(): number {
-    const targetTicks = this.mode === 'play'
-      ? LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS
-      : LEGACY_MENU_STATIC_DRAW_TARGET_TICKS;
-    return Math.max(1, Math.ceil(this.maze.height / targetTicks));
-  }
-
   private refreshLegacyMenuStaticDrawVisibleTileKeys(): void {
     this.menuStaticDrawVisibleTileKeys.clear();
     const visibleCount = this.menuStaticDrawTilesVisible ?? this.menuStaticDrawTileOrder.length;
@@ -6899,31 +6007,33 @@ export class MenuScene extends Phaser.Scene {
       // construction step.
       this.playerSpawnBurstStartedAtMs = null;
       this.menuStaticDrawLifecyclePhase = 'building';
+      this.legacyEdgePathsVisible = false;
       this.menuStaticDeconstructStartedAtMs = null;
       this.menuStaticDeconstructZeroHoldStartedAtMs = null;
       this.menuStaticBuildPrerollStartedAtMs = buildPrerollStartedAtMs;
-      this.menuStaticBuildPhaseStartedAtMs = buildPrerollStartedAtMs;
+      this.introStartedAtMs = buildPrerollStartedAtMs;
+      // The row counter is retired as a REVEAL (the BFS tile order is the one
+      // reveal); rowsVisible stays 0 for the whole build purely as the
+      // "staged build still in progress" flag its many readers key on, and is
+      // nulled at the input-unlock instant by advanceLegacyMenuStaticDrawStage.
       this.menuStaticDrawRowsVisible = 0;
-      this.menuStaticDrawNextRowAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;
       this.menuStaticDrawTileOrder = this.buildLegacyMenuStaticDrawTileOrder();
       this.menuStaticDrawTilesVisible = 0;
-      this.menuStaticDrawNextTileAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;
       this.refreshLegacyMenuStaticDrawVisibleTileKeys();
       this.titleGraphics.clear();
       return;
     }
 
     this.menuStaticDrawLifecyclePhase = 'idle';
+    this.legacyEdgePathsVisible = true;
     this.menuStaticDrawRowsVisible = null;
-    this.menuStaticDrawNextRowAtMs = 0;
     this.menuStaticDrawTileOrder = [];
     this.menuStaticDrawVisibleTileKeys.clear();
     this.menuStaticDrawTilesVisible = null;
-    this.menuStaticDrawNextTileAtMs = 0;
     this.menuStaticDeconstructStartedAtMs = null;
     this.menuStaticDeconstructZeroHoldStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
-    this.menuStaticBuildPhaseStartedAtMs = null;
+    this.introStartedAtMs = null;
   }
 
   // Call at the goal-reached instant (before armLegacyPlayerTransferEnergy /
@@ -7020,20 +6130,13 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.menuStaticDrawLifecyclePhase = 'deconstructing';
+    this.legacyEdgePathsVisible = true;
     this.menuStaticDeconstructStartedAtMs = time;
-    // The bleed-dock corridor's own outward-to-inward retraction
-    // (resolveLegacyBleedDockGrowthProgress's deconstructing branch) reads
-    // menuStaticDeconstructStartedAtMs directly and finishes retracting
-    // within LEGACY_BLEED_DOCK_GROWTH_MS of it -- fast, and fixed-length.
-    // The outbound laser/diamond-spin used to arm on a completely different,
-    // much later clock (tilesVisible dropping to within one batch of zero,
-    // which for the full tile-count-based grid clear can take far longer
-    // than the corridor's own retraction). That mismatch is exactly the
-    // visible "pause" bug report: the corridor finishes its quick shrink,
-    // its last jutting tile just sits there, and only much later does the
-    // laser/spin finally kick in. Arming it here, on the same instant and
-    // the same clock as the corridor itself, makes both start together with
-    // no gap -- if a transfer is armed for this deconstruct at all.
+    // The wrap/bleed edge paths (dock strips + their border cells) vanish ALL
+    // AT ONCE at OUTRO_EDGE_PATHS_OFF_MS of this same deconstruct clock
+    // (resolveIntroDeconstruct.bleedProgress), and the outbound transfer laser
+    // arms on that same instant/clock below -- no retraction animation, so no
+    // partial dock or lone border square can be left behind.
     if (this.playerTransferEnergyArmed && this.playerTransferEnergyOutboundStartedAtMs === null) {
       this.playerTransferEnergyOutboundStartedAtMs = time;
       // Fresh session boundary for the real transfer's own pause-offset
@@ -7046,12 +6149,10 @@ export class MenuScene extends Phaser.Scene {
     }
     this.menuStaticDeconstructZeroHoldStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
-    this.menuStaticBuildPhaseStartedAtMs = null;
+    this.introStartedAtMs = null;
     this.menuStaticDrawRowsVisible = null;
-    this.menuStaticDrawNextRowAtMs = 0;
     this.menuStaticDrawTilesVisible = this.menuStaticDrawTileOrder.length;
     this.refreshLegacyMenuStaticDrawVisibleTileKeys();
-    this.menuStaticDrawNextTileAtMs = this.resolveLegacyMenuStaticDeconstructTileStartAtMs(time);
     this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     if (this.mode === 'play') {
@@ -7128,15 +6229,15 @@ export class MenuScene extends Phaser.Scene {
 
     this.playStartedAtMs = settledPlayStartedAtMs;
     this.menuStaticDrawLifecyclePhase = 'settled';
+    this.legacyEdgePathsVisible = true;
     if (settlingFromBuild) {
-      // Normal frames arm during the last travel window below. This fallback
-      // handles a throttled/skipped frame by placing convergence on this exact
-      // final generation boundary instead of firing the beam after the maze.
-      this.armLegacyPlayerArrivalForFinalBuildStep(time, 0);
+      // Normal builds arm the laser from the intro clock on their first
+      // frame. This fallback only covers a settle that never went through
+      // the intro (laser treated as landing right now).
+      this.armLegacyPlayerArrivalForFinalBuildStep(time, -INTRO_LASER_MS);
     }
     this.menuStaticDeconstructStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
-    this.menuStaticBuildPhaseStartedAtMs = null;
     this.refreshLegacyMenuStaticDrawVisibleTileKeys();
     this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);
   }
@@ -7175,12 +6276,6 @@ export class MenuScene extends Phaser.Scene {
     if (frameDeltaMs <= 0) {
       return;
     }
-    if (Number.isFinite(this.menuStaticDrawNextRowAtMs) && this.menuStaticDrawNextRowAtMs > 0) {
-      this.menuStaticDrawNextRowAtMs += frameDeltaMs;
-    }
-    if (Number.isFinite(this.menuStaticDrawNextTileAtMs) && this.menuStaticDrawNextTileAtMs > 0) {
-      this.menuStaticDrawNextTileAtMs += frameDeltaMs;
-    }
     if (this.menuStaticDeconstructStartedAtMs !== null) {
       this.menuStaticDeconstructStartedAtMs += frameDeltaMs;
     }
@@ -7190,8 +6285,8 @@ export class MenuScene extends Phaser.Scene {
     if (this.menuStaticBuildPrerollStartedAtMs !== null) {
       this.menuStaticBuildPrerollStartedAtMs += frameDeltaMs;
     }
-    if (this.menuStaticBuildPhaseStartedAtMs !== null) {
-      this.menuStaticBuildPhaseStartedAtMs += frameDeltaMs;
+    if (this.introStartedAtMs !== null) {
+      this.introStartedAtMs += frameDeltaMs;
     }
     if (this.pendingGenerationRequest !== null) {
       this.pendingGenerationRequest = {
@@ -7207,6 +6302,11 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  // Every presentation value the build and deconstruct show is DERIVED from
+  // elapsed time here (introTimeline.ts) -- never stepped one batch per
+  // frame. A slow frame therefore catches up in one jump instead of
+  // stretching the intro, and the tile reveal, bleed docks, level digit,
+  // spawn laser and input unlock can never drift apart.
   private advanceLegacyMenuStaticDrawStage(time: number): void {
     if (this.menuStaticDrawRowsVisible === null && this.menuStaticDrawTilesVisible === null) {
       return;
@@ -7222,141 +6322,129 @@ export class MenuScene extends Phaser.Scene {
       this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     }
 
-    const rowBatchSize = this.resolveLegacyMenuStaticDrawRowBatchSize();
-    const buildRemainingMs = resolveLegacyStaticDrawBuildRemainingMs({
-      drawPhase: this.menuStaticDrawLifecyclePhase,
-      mazeHeight: this.maze.height,
-      nextRowAtMs: this.menuStaticDrawNextRowAtMs,
-      nextTileAtMs: this.menuStaticDrawNextTileAtMs,
-      nowMs: time,
-      rowBatchSize,
-      rowStepMs: LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS,
-      rowsVisible: this.menuStaticDrawRowsVisible,
-      tileBatchSize: this.resolveLegacyMenuStaticDrawTileBatchSize(),
-      tileCount: this.menuStaticDrawTileOrder.length,
-      tileStepMs: LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS,
-      tilesVisible: this.menuStaticDrawTilesVisible
-    });
-    // Widened to LEGACY_BLEED_DOCK_GROWTH_MS (the corridor's own full growth
-    // window, longer than the beam's travel time) so this reliably arms
-    // before the corridor finishes touching the edge -- armLegacyPlayerArrivalForFinalBuildStep
-    // pins the beam's own start to the future instant buildRemainingMs
-    // reaches 0, so arming early just gives that pin more lead time; it
-    // does not make the beam fire early.
-    if (buildRemainingMs !== null && buildRemainingMs <= LEGACY_BLEED_DOCK_GROWTH_MS) {
-      this.armLegacyPlayerArrivalForFinalBuildStep(time, buildRemainingMs);
-    }
-    if (
-      this.menuStaticDrawLifecyclePhase === 'building'
-      && this.menuStaticDrawRowsVisible !== null
-      && time >= this.menuStaticDrawNextRowAtMs
-    ) {
-      this.menuStaticDrawRowsVisible = Math.min(this.maze.height, this.menuStaticDrawRowsVisible + rowBatchSize);
-      this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;
-      this.boardPathDirty = true;
-      this.boardDynamicDirty = true;
-      if (this.menuStaticDrawRowsVisible >= this.maze.height) {
-        this.menuStaticDrawRowsVisible = null;
-        this.menuStaticDrawNextRowAtMs = 0;
-        this.settleLegacyMenuStaticDrawStageIfComplete(time);
+    const intro = this.resolveLegacyIntroState(time);
+    if (intro !== null && this.introStartedAtMs !== null) {
+      // The laser and the real-transfer delivery are pinned to the same
+      // intro instant (INTRO_LASER_START_MS) the moment the build begins,
+      // so the beam can neither fire early nor land after input unlocks.
+      if (
+        (this.playerSpawnBurstStartedAtMs === null && !this.prefersLegacyReducedMotion())
+        || (this.playerTransferEnergyArmed && this.playerTransferEnergyDeliveryStartedAtMs === null)
+      ) {
+        this.armLegacyPlayerArrivalForFinalBuildStep(time, (this.introStartedAtMs + INTRO_LASER_START_MS) - time);
       }
-    }
-
-    if (this.menuStaticDrawTilesVisible !== null && time >= this.menuStaticDrawNextTileAtMs) {
-      if (this.menuStaticDrawLifecyclePhase === 'deconstructing') {
-        // Outbound arming now happens once, in armLegacyMenuStaticDeconstructStage,
-        // on the same clock as the bleed-dock corridor's own retraction --
-        // see the comment there. Arming it again here on tile-count would
-        // just reintroduce the mismatch.
-        this.menuStaticDrawTilesVisible = Math.max(
-          0,
-          this.menuStaticDrawTilesVisible - this.resolveLegacyMenuStaticDrawTileBatchSize()
-        );
+      this.syncLegacyEdgePathsVisible(intro.bleedProgress === 1);
+      if (this.menuStaticDrawTilesVisible !== null && intro.tilesVisible !== this.menuStaticDrawTilesVisible) {
+        this.menuStaticDrawTilesVisible = intro.tilesVisible;
         this.refreshLegacyMenuStaticDrawVisibleTileKeys();
-        this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS;
         this.boardPathDirty = true;
         this.boardDynamicDirty = true;
-        if (this.menuStaticDrawTilesVisible <= 0) {
-          this.menuStaticDrawTilesVisible = 0;
-          this.menuStaticDrawNextTileAtMs = Number.POSITIVE_INFINITY;
-          this.drawLegacyMenuPathTitle(time);
-          if (this.menuStaticDeconstructZeroHoldStartedAtMs === null) {
-            this.menuStaticDeconstructZeroHoldStartedAtMs = time;
-          }
-          this.deferLegacyMenuDeconstructRebuildUntil(
-            this.menuStaticDeconstructZeroHoldStartedAtMs + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS
-          );
-          this.refreshLegacyMenuStaticDrawVisibleTileKeys();
-          this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
-          this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
-        }
-        return;
       }
+      if (this.menuStaticDrawTilesVisible !== null && intro.tilesVisible >= this.menuStaticDrawTileOrder.length) {
+        this.menuStaticDrawTilesVisible = null;
+        this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+        this.boardPathDirty = true;
+        this.boardDynamicDirty = true;
+      }
+      if (intro.inputUnlocked) {
+        this.menuStaticDrawTilesVisible = null;
+        this.menuStaticDrawRowsVisible = null;
+        this.boardPathDirty = true;
+        this.boardDynamicDirty = true;
+        this.settleLegacyMenuStaticDrawStageIfComplete(time);
+      }
+      return;
+    }
 
-      this.menuStaticDrawTilesVisible = Math.min(
-        this.menuStaticDrawTileOrder.length,
-        this.menuStaticDrawTilesVisible + this.resolveLegacyMenuStaticDrawTileBatchSize()
-      );
+    const outro = this.resolveLegacyOutroState(time);
+    if (outro !== null) {
+      this.syncLegacyEdgePathsVisible(outro.bleedProgress === 1);
+    }
+    if (outro !== null && this.menuStaticDrawTilesVisible !== null && outro.tilesVisible !== this.menuStaticDrawTilesVisible) {
+      this.menuStaticDrawTilesVisible = outro.tilesVisible;
       this.refreshLegacyMenuStaticDrawVisibleTileKeys();
-      this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS;
       this.boardPathDirty = true;
       this.boardDynamicDirty = true;
-      if (this.menuStaticDrawTilesVisible >= this.menuStaticDrawTileOrder.length) {
-        this.menuStaticDrawTilesVisible = null;
-        this.menuStaticDrawNextTileAtMs = 0;
-        this.settleLegacyMenuStaticDrawStageIfComplete(time);
+      if (this.menuStaticDrawTilesVisible <= 0) {
+        this.menuStaticDrawTilesVisible = 0;
+        this.drawLegacyMenuPathTitle(time);
+        if (this.menuStaticDeconstructZeroHoldStartedAtMs === null) {
+          this.menuStaticDeconstructZeroHoldStartedAtMs = time;
+        }
+        this.deferLegacyMenuDeconstructRebuildUntil(
+          this.menuStaticDeconstructZeroHoldStartedAtMs + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS
+        );
+        this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+        this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+        this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
       }
     }
   }
 
-  private armLegacyPlayerArrivalForFinalBuildStep(time: number, buildRemainingMs: number): void {
-    // A genuinely new arrival burst (this.playerSpawnBurstStartedAtMs was
-    // null, about to be armed below) that is NOT part of a real armed
-    // transfer is applyLegacyGameplayInitialArrivalPresentation's own
-    // session boundary -- reset its shared sticky selection fields here so
-    // a stale primary/pose from a PRIOR, unrelated arrival or transfer
-    // never carries into this new one (the resolver's own retention rule
-    // is for continuity WITHIN one live session, not across separate
-    // ones). A real transfer manages the exact same fields' own lifetime
-    // itself (armed at its own outbound start, cleared only by
-    // resetLegacyPlayerTransferEnergy at genuine completion), so this
-    // reset is skipped whenever one is armed -- this call already runs
-    // in lockstep with a real transfer's own delivery arm below when one
-    // is armed, and must not clear the primary it selected back at
-    // outbound.
+  private syncLegacyEdgePathsVisible(visible: boolean): void {
+    if (this.legacyEdgePathsVisible === visible) {
+      return;
+    }
+    this.legacyEdgePathsVisible = visible;
+    this.boardPathDirty = true;
+    this.boardDynamicDirty = true;
+  }
+
+  // Skip (tap / key / Enter while the Play intro is still running): jumps the
+  // intro clock to its final state. The grace window ignores the very press
+  // that started the intro.
+  private skipLegacyIntroIfBuilding(time: number): boolean {
+    if (this.mode !== 'play' || this.overlay !== 'none' || this.introStartedAtMs === null) {
+      return false;
+    }
+    if (this.menuStaticDrawLifecyclePhase !== 'building') {
+      return false;
+    }
+    const elapsedMs = time - this.introStartedAtMs;
+    if (elapsedMs < INTRO_SKIP_GRACE_MS) {
+      return false;
+    }
+
+    const reducedMotion = this.prefersLegacyReducedMotion();
+    const skippedElapsedMs = skipIntroElapsedMs(elapsedMs, { reducedMotion });
+    if (skippedElapsedMs <= elapsedMs) {
+      return false;
+    }
+    this.introStartedAtMs = time - skippedElapsedMs;
+    if (this.playerSpawnBurstStartedAtMs !== null) {
+      this.playerSpawnBurstStartedAtMs = this.introStartedAtMs + INTRO_LASER_START_MS;
+    }
+    if (this.playerTransferEnergyDeliveryStartedAtMs !== null) {
+      this.playerTransferEnergyDeliveryStartedAtMs = this.introStartedAtMs + INTRO_LASER_START_MS;
+    }
+    this.advanceLegacyMenuStaticDrawStage(time);
+    return true;
+  }
+
+  // msUntilLaserStart is positive until the intro's laser instant, negative
+  // after it. The beam start is an exact point on the intro clock, so arming
+  // earlier or later (slow frames) cannot move it.
+  private armLegacyPlayerArrivalForFinalBuildStep(time: number, msUntilLaserStart: number): void {
+    // A genuinely new arrival (burst not yet armed, no armed transfer) is a new
+    // pause-offset session: reset the accumulator so a pause from an earlier,
+    // already-finished session can never bleed into this one. An armed
+    // transfer owns that accumulator itself (reset at its outbound start).
     if (this.playerSpawnBurstStartedAtMs === null && !this.playerTransferEnergyArmed) {
-      this.gameplayTransferPrimaryId = null;
-      this.gameplayTransferLastPrimaryPose = null;
-      this.gameplayTransferLastObservedOverlay = 'none';
-      this.gameplayTransferLastPresentationSnapshot = null;
-      // Fresh session boundary for the initial arrival's own pause-offset
-      // accumulator too (see gameplayTransferPausedDurationMs's own field
-      // comment). A real transfer's own outbound-arm site resets this
-      // same pair for its own case; this covers the pure-arrival case
-      // (no transfer armed) this branch is specifically guarded to.
       this.gameplayTransferPausedDurationMs = 0;
       this.gameplayTransferPauseStartedAtMs = null;
       this.gameplayTransferLastUnpausedTimeMs = null;
     }
-    const alignedStartedAtMs = time - Math.max(
-      0,
-      LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS - Math.max(0, buildRemainingMs)
-    );
-    this.playerSpawnBurstStartedAtMs ??= alignedStartedAtMs;
+    const laserStartedAtMs = time + msUntilLaserStart;
+    // Reduced motion has no laser: leaving the burst unarmed keeps the
+    // player marker visible the instant the board crossfade finishes.
+    if (!this.prefersLegacyReducedMotion()) {
+      this.playerSpawnBurstStartedAtMs ??= laserStartedAtMs;
+    }
     if (this.playerTransferEnergyArmed) {
-      // The bleed-dock corridor's own outward growth
-      // (resolveLegacyBleedDockGrowthProgress's building branch) only
-      // reaches the true screen edge (progress 1) exactly when this build
-      // completes (buildRemainingMs 0) -- it does not arrive early. Pinning
-      // the inbound beam's own start to that same future instant, rather
-      // than back-dating it so the beam's travel time finishes at build end,
-      // means the beam visually holds at zero progress (normalizeElapsedMs
-      // clamps a negative elapsed to 0) right up until the corridor has
-      // genuinely touched the edge, then fires -- matching "once the bleed
-      // paths touch the screen's edge, that's when the lasers shoot the
-      // player back in" instead of firing partway through the corridor's
-      // own growth.
-      this.playerTransferEnergyDeliveryStartedAtMs ??= time + Math.max(0, buildRemainingMs);
+      // The inbound transfer beam fires from the same intro instant as the
+      // spawn laser (the bleed docks finish growing at INTRO_REVEAL_END_MS,
+      // just before it), so there is one arrival clock, not two.
+      this.playerTransferEnergyDeliveryStartedAtMs ??= laserStartedAtMs;
     }
   }
 
@@ -8380,34 +7468,6 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // 1 outside a transition (steady state -- corridors at their full,
-  // unanimated length, the overwhelming majority of frames). Shrinks to 0
-  // across the opening span of 'deconstructing' (before tile removal
-  // itself starts) and grows back to 1 across the closing span of
-  // 'building' (once most/all tiles, including each corridor's own anchor
-  // tile, are already visible) -- see LEGACY_BLEED_DOCK_GROWTH_MS.
-  private resolveLegacyBleedDockGrowthProgress(): number {
-    const phase = this.menuStaticDrawLifecyclePhase;
-    const time = this.time.now;
-
-    if (phase === 'deconstructing' && this.menuStaticDeconstructStartedAtMs !== null) {
-      const elapsedMs = time - this.menuStaticDeconstructStartedAtMs;
-      return 1 - smoothstep(elapsedMs / LEGACY_BLEED_DOCK_GROWTH_MS);
-    }
-
-    if (phase === 'building' && this.menuStaticBuildPhaseStartedAtMs !== null) {
-      const buildDurationMs = this.resolveLegacyMenuStaticBuildDurationEstimateMs();
-      if (buildDurationMs === null) {
-        return 1;
-      }
-      const elapsedMs = time - this.menuStaticBuildPhaseStartedAtMs;
-      const remainingMs = buildDurationMs - elapsedMs;
-      return 1 - smoothstep(remainingMs / LEGACY_BLEED_DOCK_BUILD_GROWTH_MS);
-    }
-
-    return 1;
-  }
-
   // A normal corridor stays a tile away from the board edge (the existing
   // safeInset in resolveLegacyMazeRenderFrame). A wraparound dock corridor
   // -- one whose path genuinely continues off-grid -- bleeds past the board
@@ -8441,15 +7501,10 @@ export class MenuScene extends Phaser.Scene {
     // the play-only branch makes both surfaces resolve identically, which
     // is what actually reaching the screen edge (and matching between
     // menu and play) requires.
-    const growthProgress = this.resolveLegacyBleedDockGrowthProgress();
-    const resolveContinuation = (availableGap: number): number => {
-      const target = Math.max(2, availableGap);
-      // At progress 1 (steady state, the overwhelming majority of frames)
-      // this must equal target exactly, not a rounded-through-1x copy of
-      // it -- any drift here would be a permanent few-px regression on
-      // every settled maze, not just a transition-window nicety.
-      return growthProgress >= 1 ? target : Math.max(0, Math.round(target * growthProgress));
-    };
+    // Always the full length: an edge path is either absent (the dock is not
+    // drawn at all, see drawLegacyPathBorderDock) or complete -- there is no
+    // half-grown length, so no sliver can ever be left behind.
+    const resolveContinuation = (availableGap: number): number => Math.max(2, availableGap);
 
     if (direction === 'left') {
       return resolveContinuation(boardLeft - edgeInset);
@@ -8495,6 +7550,9 @@ export class MenuScene extends Phaser.Scene {
     tileSize: number,
     options: LegacyPathMaterialOptions
   ): void {
+    if (!this.legacyEdgePathsVisible) {
+      return;
+    }
     const dockDirections = resolveLegacyMenuBorderDockDirections(pathSource, point);
     if (dockDirections.length <= 0) {
       return;
@@ -8862,6 +7920,9 @@ export class MenuScene extends Phaser.Scene {
     );
     this.boardFloorTileSprite.setTileScale(tileSize / MAZER_FLOOR_TILE_SOURCE_SIZE, tileSize / MAZER_FLOOR_TILE_SOURCE_SIZE);
     const drawPathPoint = (point: LegacyPoint): void => {
+      if (!this.isLegacyEdgePathCellShown(point)) {
+        return;
+      }
       this.drawLegacyPathMaterialTile(
         this.boardPathGraphics,
         point,
@@ -9013,46 +8074,6 @@ export class MenuScene extends Phaser.Scene {
     return ((time % LEGACY_MENU_PATH_TITLE_SWEEP_MS) / LEGACY_MENU_PATH_TITLE_SWEEP_MS) <= 0.5
       ? 'forward'
       : 'reverse';
-  }
-
-  private resolveLegacyMenuPathTitleOrbitPhase(time: number): number {
-    return (time % LEGACY_MENU_PATH_TITLE_ORBIT_MS) / LEGACY_MENU_PATH_TITLE_ORBIT_MS;
-  }
-
-  // 0 at the start of the current building/deconstructing pass, 1 once its
-  // tile animation actually finishes -- reusing the same tile-visibility
-  // counter that drives the reveal itself, not wall-clock time, so this
-  // reaches exactly 1 (and the orbit lands in its resting position) exactly
-  // when generation finishes, never early or late regardless of maze size.
-  private resolveLegacyMenuPathTitleOrbitLifecycleProgress(): number {
-    const total = this.menuStaticDrawTileOrder.length;
-    if (total <= 0) {
-      return 1;
-    }
-
-    if (this.menuStaticDrawLifecyclePhase === 'deconstructing') {
-      const visible = this.menuStaticDrawTilesVisible ?? 0;
-      return clamp(1 - (visible / total), 0, 1);
-    }
-
-    const visible = this.menuStaticDrawTilesVisible ?? total;
-    return clamp(visible / total, 0, 1);
-  }
-
-  // Building spins clockwise, deconstructing spins counter-clockwise --
-  // opposite signs on the same progress-driven phase, so both directions
-  // land on the same resting points (phase 0) and neither ever needs an
-  // explicit reversal partway through. The cosine ease means velocity is
-  // zero at both ends of every pass, so a direction switch (deconstruct
-  // finishing into the next build starting) never reads as a hard flip --
-  // it decelerates into the switch and accelerates back out the same way
-  // it would ease into resting.
-  private resolveLegacyMenuPathTitleOrbitLifecyclePhase(): number {
-    const progress = this.resolveLegacyMenuPathTitleOrbitLifecycleProgress();
-    const eased = 0.5 - (0.5 * Math.cos(progress * Math.PI));
-    const direction = this.menuStaticDrawLifecyclePhase === 'deconstructing' ? -1 : 1;
-    const rotated = direction * eased * LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE;
-    return ((rotated % 1) + 1) % 1;
   }
 
   private resolveLegacyMenuPathTitleSweepTravel(columns: number, rows: number): number {
@@ -9296,263 +8317,6 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private drawLegacyMenuPathTitleDiamond(
-    centerX: number,
-    centerY: number,
-    radius: number,
-    fillColor: number,
-    fillAlpha: number,
-    edgeColor: number,
-    edgeAlpha: number,
-    facing = -Math.PI / 2
-  ): void {
-    const [top, right, bottom, left] = resolveLegacyMenuPathTitleDiamondVertices(
-      centerX,
-      centerY,
-      radius,
-      facing
-    );
-
-    // A tiny crystal-facet tile (the same flat-fill-plus-rim material as
-    // the maze corridor/title cells) rotated into a diamond, instead of a
-    // generic two-tone gem shape -- reads as a small maze tile orbiting the
-    // screen edge rather than jewelry.
-    this.titleGraphics.fillStyle(fillColor, fillAlpha);
-    this.titleGraphics.fillTriangle(top.x, top.y, right.x, right.y, bottom.x, bottom.y);
-    this.titleGraphics.fillTriangle(top.x, top.y, left.x, left.y, bottom.x, bottom.y);
-    this.titleGraphics.lineStyle(Math.max(1, radius * 0.16), edgeColor, edgeAlpha);
-    this.strokeLegacyPolyline(this.titleGraphics, [top, right, bottom, left, top]);
-    // Small white catchlight on the leading upper edge, the same convention
-    // every other crystal-facet element (tiles, markers, the settings gear)
-    // uses for its highlight.
-    this.titleGraphics.lineStyle(Math.max(1, radius * 0.14), cyberArcadeMaterial.rail.white, edgeAlpha * 0.68);
-    this.strokeLegacyPolyline(this.titleGraphics, [left, top, right]);
-  }
-
-  // Eases the orbit sigils from wherever they were spinning down to their
-  // frozen resting phase (0) over a fixed short window instead of snapping
-  // there the instant the maze finishes building/deconstructing -- a hard
-  // cut to phase 0 could jump every sigil across a large chunk of the
-  // perimeter in a single frame depending on where the wall-clock spin
-  // happened to be. Takes the shorter way around the loop (never more than
-  // half an orbit) so the ease never reverses direction mid-travel.
-  private resolveLegacyMenuPathTitleOrbitSettlePhase(time: number): number {
-    const settleDurationMs = 480;
-    if (this.menuOrbitSettleStartedAtMs === null) {
-      this.menuOrbitSettleStartedAtMs = time;
-      // Reads the cached last-drawn active phase (see
-      // drawLegacyMenuPathTitleOrbitSigils), not a freshly recomputed one --
-      // by the time this runs, isLifecycleSpinActive is already false, so
-      // recomputing from current lifecycle state would read whatever it
-      // moved on to, not where the sigils actually were. Reading the wrong
-      // phase here was exactly the bug this settle transition exists to
-      // prevent: it captured a "start" position the sigils were never
-      // really at, then visibly yanked them from that bogus point back to
-      // 0 even though they were already resting there.
-      this.menuOrbitSettlePhaseStart = this.menuOrbitLastActivePhase;
-    }
-    const elapsed = time - this.menuOrbitSettleStartedAtMs;
-    const t = clamp(elapsed / settleDurationMs, 0, 1);
-    const eased = 1 - ((1 - t) ** 3);
-    const start = this.menuOrbitSettlePhaseStart;
-    const shortestDelta = ((-start % 1) + 1.5) % 1 - 0.5;
-    return ((start + (shortestDelta * eased)) % 1 + 1) % 1;
-  }
-
-  private resolveLegacyMenuPathTitleOrbitFrame(time: number): {
-    isLifecycleSpinActive: boolean;
-    orbitPhase: number;
-    travelReversed: boolean;
-  } {
-    // Owner-reported (direct product-owner instruction, 2026-09-09): "the
-    // laser is shooting to a diamond that isn't even one of the ones on
-    // the edge". Root cause found live: a real gameplay transfer (and the
-    // Play-mode initial arrival) always coincides with the maze
-    // deconstruct/rebuild, which drives isLifecycleSpinActive true -- so
-    // the seven NON-engaged perimeter diamonds swirl chaotically around
-    // the whole viewport edge while the ONE engaged diamond sits pinned
-    // at its fixed anchor with the conduit attached, reading as an
-    // unrelated ninth object rather than one of the ring. In Play mode,
-    // while a transfer is armed or the arrival burst is presenting, hold
-    // the whole ring still at its resting stations (4 corners + 4 edge
-    // midpoints, via the existing settle-phase ease) so the perimeter
-    // reads as a calm ring with one member lit and engaged. Menu mode
-    // (the demo AI's own goal-reset choreography) is completely
-    // unaffected -- no gameplay transfer is ever armed there.
-    const suppressSpinForGameplayTransfer = this.mode === 'play'
-      && (this.playerTransferEnergyArmed || this.resolveLegacyPlayerSpawnBurstState(time).active);
-    const isLifecycleSpinActive = !suppressSpinForGameplayTransfer
-      && (this.menuStaticDrawLifecyclePhase === 'building'
-        || this.menuStaticDrawLifecyclePhase === 'deconstructing');
-    const orbitPhase = isLifecycleSpinActive
-      ? this.resolveLegacyMenuPathTitleOrbitLifecyclePhase()
-      : this.resolveLegacyMenuPathTitleOrbitSettlePhase(time);
-    if (isLifecycleSpinActive) {
-      this.menuOrbitSettleStartedAtMs = null;
-      this.menuOrbitLastActivePhase = orbitPhase;
-    }
-    return {
-      isLifecycleSpinActive,
-      orbitPhase,
-      travelReversed: this.menuStaticDrawLifecyclePhase === 'deconstructing'
-    };
-  }
-
-  private resolveLegacyMenuPathTitleOrbitGeometry(
-    titleLayout = resolveLegacyMenuPathTitleLayout(
-      this.layout.titleX,
-      this.layout.titleY,
-      this.resolveLegacyMenuPathTitleFontSize()
-    )
-  ): LegacyMenuPathTitleOrbitGeometry {
-    const inset = 2;
-    return {
-      bottom: this.layout.height - inset,
-      centerX: this.layout.width / 2,
-      centerY: this.layout.height / 2,
-      crownBottom: this.layout.height - inset,
-      crownHalf: titleLayout.cellSize * 0.56,
-      crownTop: inset,
-      left: inset,
-      right: this.layout.width - inset,
-      top: inset
-    };
-  }
-
-  private drawLegacyMenuPathTitleOrbitSigils(
-    titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
-    time: number,
-    alphaScale: number
-  ): void {
-    // Only orbit while the maze is actively building or deconstructing --
-    // otherwise freeze at phase 0, which (with 8 evenly-spaced sigils)
-    // lands exactly on the 4 corners and 4 edge midpoints instead of
-    // drifting continuously while the board sits idle.
-    const { isLifecycleSpinActive, orbitPhase, travelReversed } = this.resolveLegacyMenuPathTitleOrbitFrame(time);
-    // Orbits the viewport's own edge instead of hugging the title glyph --
-    // same relocation the deconstruct handoff burst got earlier, just for
-    // the title's sparkle sigils.
-    const orbitGeometry = this.resolveLegacyMenuPathTitleOrbitGeometry(titleLayout);
-    const useVfxDiamond = this.textures.exists(MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY);
-
-    for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
-      const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
-      const { facing, x, y } = resolveLegacyMenuPathTitleOrbitPose(
-        orbitGeometry,
-        orbit,
-        isLifecycleSpinActive,
-        travelReversed
-      );
-
-      const wave = isLifecycleSpinActive
-        ? 0.62 + (Math.sin((orbitPhase * Math.PI * 2) + (index * 1.38)) * 0.28)
-        : 0.62;
-      const radius = Math.max(4, Math.round(6 + (wave * 3)));
-      const alpha = clamp((0.22 + (wave * 0.3)) * alphaScale, 0.16, 0.56);
-
-      if (useVfxDiamond) {
-        // Real iridescent-diamond VFX source art (see
-        // docs/assets/mazer-vfx-source-provenance.md) instead of the
-        // procedural crystal-facet triangle pair -- already a rainbow/
-        // iridescent image, so no additional tint is applied. Scaled way
-        // down from its native 1254x1254 -- but not all the way down to the
-        // old procedural diamond's own tiny footprint (radius*2.3): at that
-        // extreme a downscale this asset's whole rainbow-crystal detail
-        // washes out to a pale blob, defeating the point of using the real
-        // art. radius*6.5 (screenshot-verified) was recognizable but big
-        // enough to overlap the MAZER/START lettering at some orbit
-        // positions -- radius*4 is the compromise that stayed clear of both
-        // in verification.
-        //
-        // Uses MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY, a single image with
-        // its own visible internal energy linework, NOT the plain shell
-        // composited with a separate energy-core overlay -- that composite
-        // was a real bug: edge-diamond-energy-core.png is a symmetric
-        // diamond shape with no inherent "point toward center" orientation,
-        // so stacking it near the shell's own scale read as "an extra
-        // diamond... not pointing to mid," exactly as reported. One image,
-        // one rotation, no compositing.
-        const image = this.titleOrbitDiamondImages[index];
-        if (image) {
-          const targetDiagonal = radius * 4;
-          // Always points its long axis in toward the true screen center,
-          // regardless of travel direction -- `facing` (from
-          // resolveLegacyMenuPathTitleOrbitPose) follows the travel tangent
-          // while actively spinning, which reads fine for the old symmetric
-          // procedural diamond but looks wrong for this asset's own single
-          // pointed tip. Deliberately this.layout.width/2,height/2 (the
-          // actual viewport center) rather than orbitGeometry's own
-          // centerX/centerY -- that geometry's "center" is the title's own
-          // crest-relative center, which sits well above true screen
-          // center, not what "toward screen center" means here. The source
-          // art's tip points toward the upper-right at zero rotation
-          // (roughly -45 degrees in screen space), so that offset is
-          // subtracted out before applying inwardAngle.
-          const inwardAngle = Math.atan2((this.layout.height / 2) - y, (this.layout.width / 2) - x);
-          const rotation = inwardAngle - MAZER_VFX_DIAMOND_INTRINSIC_TIP_ANGLE;
-          image
-            .setPosition(x, y)
-            .setRotation(rotation)
-            .setScale(targetDiagonal / MAZER_VFX_DIAMOND_SOURCE_SIZE)
-            .setAlpha(alpha)
-            .setVisible(true);
-        }
-        this.drawLegacyMenuPathTitleOrbitSigilTwinkle(index, x, y, radius, alpha, time);
-      } else {
-        // Smaller than the previous pass and using the same pale-core/teal-
-        // rim colors as the actual corridor and title tiles instead of the
-        // warm/gem gem-tone alternation, so these read as small maze tiles
-        // orbiting the edge rather than jewelry.
-        this.drawLegacyMenuPathTitleDiamond(
-          x,
-          y,
-          radius,
-          LEGACY_MENU_PATH_CORE,
-          alpha * 0.85,
-          LEGACY_MENU_PATH_EDGE,
-          alpha,
-          facing
-        );
-      }
-    }
-  }
-
-  // A tiny twinkling sparkle riding alongside each orbit-sigil diamond --
-  // same independently-phased sine-pulse technique as
-  // drawLegacyLevelAnnouncerTwinkles and the goal star marker's own surface
-  // glints, drawn into titleGraphics (already cleared/redrawn every frame
-  // as part of the title's own draw pass).
-  // Was a single fixed sparkle pinned to one corner of the diamond's own
-  // footprint -- reported as needing "stars twinkling in and out all
-  // around them, not just in one position." Reuses the same scattered-
-  // perimeter ambient-sparkle system the title/Start-Login/level-number
-  // wordmarks use (drawLegacyWordmarkAmbientSparkles), just centered on the
-  // diamond's own bounding box instead of a word's, with fewer slots (a
-  // small diamond doesn't need 9 sparkles crowding it) and this diamond's
-  // own index as the seed salt so all 8 orbit diamonds -- which otherwise
-  // share the same `time` -- don't all twinkle in the same relative spot in
-  // lockstep.
-  private drawLegacyMenuPathTitleOrbitSigilTwinkle(
-    index: number,
-    centerX: number,
-    centerY: number,
-    radius: number,
-    alpha: number,
-    time: number
-  ): void {
-    this.drawLegacyWordmarkAmbientSparkles(
-      this.titleGraphics,
-      centerX,
-      centerY,
-      radius * 2,
-      radius * 2,
-      time,
-      alpha,
-      4,
-      index + 1
-    );
-  }
-
   // One continuous loop: fill (0..1), hold, revert (0..1), hold. Fill and
   // revert share the same bottom-left-to-top-right ordering (see
   // resolveLegacyMenuTitleTrailCellFillAmount) -- revert isn't a mirrored
@@ -9608,16 +8372,16 @@ export class MenuScene extends Phaser.Scene {
 
   private drawLegacyMenuPathTitle(time: number): void {
     this.titleGraphics.clear();
-    // The orbit sigils (4 corners + 4 edge midpoints) are a screen-wide
-    // ambient decoration, not really part of the title itself -- they now
-    // render in play mode too (still gated off during most overlays), even
-    // though play mode has no "MAZER" wordmark to go with them, since the
-    // edge diamonds were the specific thing reported missing there. The
-    const sigilsVisible = (this.mode === 'menu' || this.mode === 'play')
+    // The eight edge diamonds (4 corners + 4 edge midpoints) are a screen-wide
+    // ambient decoration, not really part of the title itself -- they render
+    // in play mode too (still gated off during most overlays), in their own
+    // lower-depth Graphics (edgeMarkerGraphics).
+    const edgeMarkersVisible = (this.mode === 'menu' || this.mode === 'play')
       && this.overlay === 'none';
-    this.titleGraphics.setVisible(sigilsVisible);
-    if (!sigilsVisible) {
-      this.titleOrbitDiamondImages.forEach((image) => image.setVisible(false));
+    this.titleGraphics.setVisible(edgeMarkersVisible);
+    this.edgeMarkerGraphics.setVisible(edgeMarkersVisible);
+    if (!edgeMarkersVisible) {
+      this.edgeMarkerGraphics.setVisible(false);
       this.titleTileFontImagePool.forEach((image) => image.setVisible(false));
       return;
     }
@@ -9742,8 +8506,7 @@ export class MenuScene extends Phaser.Scene {
       this.drawLegacyMenuPathTitlePrismSweep(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
     }
 
-    this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);
-    this.applyLegacyTeleportAnchorPreviewOverride();
+    this.drawLegacyEdgeMarkers(time);
 
     if (!renderedTitleWithTileFont) {
       const cursorCell = visibleCells.at(-1);
@@ -9860,14 +8623,9 @@ export class MenuScene extends Phaser.Scene {
     // changes to target pose, but not a full reset). This is the ONLY
     // place gameplayTransferPrimaryId is cleared; it is retained across
     // outbound/stored/delivering by every other call site.
-    this.gameplayTransferPrimaryId = null;
-    this.gameplayTransferLastPrimaryPose = null;
-    this.gameplayTransferLastObservedOverlay = 'none';
-    this.gameplayTransferLastPresentationSnapshot = null;
     this.gameplayTransferPausedDurationMs = 0;
     this.gameplayTransferPauseStartedAtMs = null;
     this.gameplayTransferLastUnpausedTimeMs = null;
-    this.gameplayTransferConduitCanvasImage?.setVisible(false);
   }
 
   // Updates the shared pause-tracking accumulator exactly once per real
@@ -9930,133 +8688,105 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private resolveLegacyPlayerTransferOrbitPoses(time: number): ReturnType<typeof resolveLegacyMenuPathTitleOrbitPose>[] {
-    const orbitGeometry = this.resolveLegacyMenuPathTitleOrbitGeometry();
-    const { isLifecycleSpinActive, orbitPhase, travelReversed } = this.resolveLegacyMenuPathTitleOrbitFrame(time);
-    return Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, (_, index) => (
-      resolveLegacyMenuPathTitleOrbitPose(
-        orbitGeometry,
-        (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1,
-        isLifecycleSpinActive,
-        travelReversed
-      )
-    ));
+  // Edge stations in screen space (corners + edge midpoints), the one place
+  // every edge-anchored effect (markers, arrival beams, departure beams)
+  // asks. The two top corners slide along the edge only as far as needed to
+  // clear the header controls (profile / leaderboard / settings).
+  private resolveLegacyEdgeStations(): ReadonlyArray<EdgeStation> {
+    return resolveEdgeStations(
+      { width: this.layout.width, height: this.layout.height },
+      readMazerViewportGeometry().safeArea,
+      resolveHeaderControlRects(this.layout)
+    );
   }
 
-  private drawLegacyPlayerTransferEnergy(
-    targetX: number,
-    targetY: number,
-    state: LegacyPlayerTransferVisualState,
-    time: number
+  // All 8 beams, both directions, in one place. Drawn into spawnLaserGraphics
+  // (top-level, above the board, cleared every drawDynamicBoard).
+  private drawLegacyEdgeLasers(
+    time: number,
+    mazeLeft: number,
+    mazeTop: number,
+    mazeTileSize: number,
+    playerPoint: LegacyPoint,
+    spawnBurst: ReturnType<typeof this.resolveLegacyPlayerSpawnBurstState>
   ): void {
-    if (!state.active) {
-      this.playerTransferBeamStripImages.forEach((image) => image.setVisible(false));
-      this.playerTransferBeamTargetCapImages.forEach((image) => image.setVisible(false));
-      return;
-    }
-
-    const origins = this.resolveLegacyPlayerTransferOrbitPoses(time);
-    // Each beam/diamond takes its own stop along the same midnight-rainbow
-    // material the player trail already carries (resolveLegacyIridescentTrailColor),
-    // spread across the origin count so the whole ring of beams reads as one
-    // rainbow shifting over time, instead of the flat green every beam and
-    // diamond used to share.
-    if (state.phase === 'outbound') {
-      const beamTextureReady = this.textures.exists(MAZER_VFX_TELEPORT_BEAM_TEXTURE_KEY);
-      origins.forEach((origin, index) => {
-        const stagger = (index / Math.max(1, origins.length - 1)) * 0.12;
-        const localProgress = clamp((state.outboundProgress - stagger) / 0.88, 0, 1);
-        const stripImage = this.playerTransferBeamStripImages[index];
-        const capImage = this.playerTransferBeamTargetCapImages[index];
-        if (localProgress <= 0 || !beamTextureReady) {
-          stripImage?.setVisible(false);
-          capImage?.setVisible(false);
-          if (!beamTextureReady) {
-            // Real asset failed to load -- fall back to the original plain
-            // stroke rather than showing nothing.
-            const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);
-            const tipX = targetX + ((origin.x - targetX) * localProgress);
-            const tipY = targetY + ((origin.y - targetY) * localProgress);
-            const beamAlpha = 0.94 * (1 - (localProgress * 0.18));
-            if (localProgress > 0) {
-              this.playerSpawnBurstGraphics.lineStyle(5, beamColor, beamAlpha * 0.28);
-              this.playerSpawnBurstGraphics.lineBetween(targetX, targetY, tipX, tipY);
-              this.playerSpawnBurstGraphics.lineStyle(1.5, beamColor, beamAlpha);
-              this.playerSpawnBurstGraphics.lineBetween(targetX, targetY, tipX, tipY);
-              this.playerSpawnBurstGraphics.fillStyle(beamColor, beamAlpha);
-              this.playerSpawnBurstGraphics.fillCircle(tipX, tipY, 2.6);
-            }
-          }
-          return;
-        }
-        const tipX = targetX + ((origin.x - targetX) * localProgress);
-        const tipY = targetY + ((origin.y - targetY) * localProgress);
-        const beamAlpha = 0.94 * (1 - (localProgress * 0.18));
-        const dx = tipX - targetX;
-        const dy = tipY - targetY;
-        const distance = Math.max(1, Math.hypot(dx, dy));
-        const angle = Math.atan2(dy, dx);
-        const thickness = 12;
-        if (stripImage) {
-          stripImage
-            .setPosition(targetX, targetY)
-            .setRotation(angle)
-            .setCrop(MAZER_VFX_TELEPORT_BEAM_STRIP_LEFT, 0, MAZER_VFX_TELEPORT_BEAM_STRIP_WIDTH, MAZER_VFX_TELEPORT_BEAM_SOURCE_HEIGHT)
-            .setScale(distance / MAZER_VFX_TELEPORT_BEAM_STRIP_WIDTH, thickness / MAZER_VFX_TELEPORT_BEAM_SOURCE_HEIGHT)
-            .setAlpha(beamAlpha)
-            .setVisible(true);
-        }
-        if (capImage) {
-          const capWidth = 20;
-          capImage
-            .setPosition(targetX, targetY)
-            .setRotation(angle)
-            .setCrop(0, 0, MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH, MAZER_VFX_TELEPORT_BEAM_SOURCE_HEIGHT)
-            .setScale(capWidth / MAZER_VFX_TELEPORT_BEAM_CAP_WIDTH, (thickness * 2.4) / MAZER_VFX_TELEPORT_BEAM_SOURCE_HEIGHT)
-            .setAlpha(beamAlpha)
-            .setVisible(true);
-        }
-        this.playerSpawnBurstGraphics.fillStyle(0xffffff, beamAlpha);
-        this.playerSpawnBurstGraphics.fillCircle(tipX, tipY, 2.6);
-      });
-    } else {
-      this.playerTransferBeamStripImages.forEach((image) => image.setVisible(false));
-      this.playerTransferBeamTargetCapImages.forEach((image) => image.setVisible(false));
-    }
-
-    if (state.energyAlpha <= 0) {
-      return;
-    }
-
-    const baseAngle = state.swirlPhase * Math.PI * 2;
-    origins.forEach((origin, index) => {
-      const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);
-      const alpha = state.energyAlpha;
-      const pulseRadius = 5.5 + (Math.sin(baseAngle + index) * 1.2);
-      this.playerSpawnBurstGraphics.fillStyle(beamColor, alpha * 0.12);
-      this.playerSpawnBurstGraphics.fillCircle(origin.x, origin.y, pulseRadius + 4);
-      // Was also stroking a thin procedural diamond outline
-      // (resolveLegacyMenuPathTitleDiamondVertices) directly over each
-      // origin -- the exact same origin points the orbit sigils' own real
-      // MAZER_VFX_DIAMOND_ENERGIZED_TEXTURE_KEY image already renders every
-      // frame (drawLegacyMenuPathTitleOrbitSigils). Reported as "the energy
-      // in the diamonds when the player lasers shoot to them still looks
-      // like the old asset" -- it genuinely was: this leftover pre-real-
-      // asset outline was layered on top of the real diamond image the
-      // whole time the laser was charging/firing, and only during that
-      // window. Removed; the pulse-glow and spark particles below are
-      // enough of an "energy charging here" accent on their own.
-      for (let particle = 0; particle < 3; particle += 1) {
-        const angle = origin.facing + baseAngle + (particle * ((Math.PI * 2) / 3));
-        const radius = 2.2 + (particle * 1.35);
-        this.playerSpawnBurstGraphics.fillStyle(beamColor, alpha * (0.9 - (particle * 0.18)));
-        this.playerSpawnBurstGraphics.fillCircle(
-          origin.x + (Math.cos(angle) * radius),
-          origin.y + (Math.sin(angle) * radius),
-          Math.max(1, 1.7 - (particle * 0.22))
-        );
+    let firingIds: ReadonlySet<number> = new Set<number>();
+    if (!this.prefersLegacyReducedMotion() && this.overlay === 'none') {
+      const boardRelativeX = mazeLeft + ((playerPoint.x + 0.5) * mazeTileSize);
+      const boardRelativeY = mazeTop + ((playerPoint.y + 0.5) * mazeTileSize);
+      const focus = {
+        x: this.boardZoomContainer.x + (boardRelativeX * this.boardZoomContainer.scaleX),
+        y: this.boardZoomContainer.y + (boardRelativeY * this.boardZoomContainer.scaleY)
+      };
+      const outro = this.resolveLegacyOutroState(time);
+      if (outro !== null) {
+        firingIds = drawEdgeBeams(this.spawnLaserGraphics, {
+          direction: 'outward',
+          focus,
+          laserProgress: outro.laserProgress,
+          spawnPop: 0,
+          stations: this.resolveLegacyEdgeStations()
+        }).firingIds;
+      } else if (spawnBurst.active) {
+        firingIds = drawEdgeBeams(this.spawnLaserGraphics, {
+          direction: 'inward',
+          focus,
+          laserProgress: spawnBurst.travelProgress,
+          spawnPop: spawnBurst.flashProgress,
+          stations: this.resolveLegacyEdgeStations()
+        }).firingIds;
       }
-    });
+    }
+    // The diamonds brighten while their beam fires, so the markers redraw on
+    // every frame a beam is in flight (and once more when the last one lands).
+    const firing = firingIds.size > 0;
+    if (firing || this.edgeBeamWasFiring) {
+      this.edgeBeamFiringIds = firingIds;
+      this.drawLegacyEdgeMarkers(time);
+    }
+    this.edgeBeamFiringIds = firingIds;
+    this.edgeBeamWasFiring = firing;
+  }
+
+  // The eight calm edge markers (edgeMarkers.ts), drawn into their OWN
+  // Graphics that sits at the lowest depth inside boardZoomContainer: above the
+  // starfield backdrop, below the board, the title wordmark, the header icons,
+  // every button/label, the level announcer and every overlay.
+  private drawLegacyEdgeMarkers(time: number): void {
+    this.edgeMarkerGraphics.clear();
+    if (!this.edgeMarkerGraphics.visible) {
+      return;
+    }
+
+    const reducedMotion = this.prefersLegacyReducedMotion();
+    const energizedIds = new Set<number>(this.edgeBeamFiringIds);
+    const introElapsedMs = this.introStartedAtMs === null ? null : time - this.introStartedAtMs;
+    if (
+      (introElapsedMs !== null && introElapsedMs >= INTRO_EDGE_PATHS_ON_MS && introElapsedMs < INTRO_DONE_MS)
+      || this.playerTransferEnergyArmed
+    ) {
+      this.resolveLegacyWrapEndStationIds().forEach((id) => energizedIds.add(id));
+    }
+    // QA teleport-anchor preview: the held anchor id energizes ITS station's diamond.
+    const previewId = this.teleportAnchorPreviewSession?.heldAnchorId;
+    if (previewId !== undefined && previewId !== null) {
+      energizedIds.add(previewId);
+    }
+
+    drawEdgeMarkers(
+      this.edgeMarkerGraphics,
+      this.resolveLegacyEdgeStations(),
+      resolveEdgeMarkerStates({
+        energizedIds,
+        flash: this.edgeMarkerWrapFlash,
+        reducedMotion,
+        timeMs: time
+      })
+    );
+  }
+
+  private resolveLegacyWrapEndStationIds(): ReadonlySet<number> {
+    return resolveWrapEndStationIds(this.resolveBleedOffDockVisualEligibility(), this.maze);
   }
 
   // Play mode's trail/pulse should only ever show the perfect route from the
@@ -10108,6 +8838,7 @@ export class MenuScene extends Phaser.Scene {
     const { boardLeft, boardTop, boardWidth, boardHeight } = this.layout;
     this.boardDynamicGraphics.clear();
     this.playerSpawnBurstGraphics.clear();
+    this.spawnLaserGraphics.clear();
     // Same "hidden by default, shown only if actually redrawn this frame"
     // convention as trailCanvasImage (see drawLegacyContinuousPlayTrail) --
     // fillLegacyPlayerMarkerTile's showLocatorTicks branch (the only one
@@ -10276,7 +9007,11 @@ export class MenuScene extends Phaser.Scene {
     // their own cell -- the whole "cast" places at once, same as it now
     // also all clears at once on deconstruct (see markerDeconstructAlpha
     // above).
-    const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== 'building';
+    // The beams land at INTRO_LASER_END_MS while the maze is still growing out
+    // from the spawn tile, so the cast (player/start/goal) appears at landing,
+    // not at the end of the build.
+    const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== 'building'
+      || (this.resolveLegacyIntroState(time)?.laserProgress ?? 0) >= 1;
     const playerSpawnBurst = this.resolveLegacyPlayerSpawnBurstState(time);
     const playerTransferEnergy = this.resolveLegacyPlayerTransferState(time);
     // Drawn after the trail (not before) so the start/goal tiles always sit
@@ -10326,7 +9061,7 @@ export class MenuScene extends Phaser.Scene {
 
     // Held at 0 through the beam-travel half of the spawn burst so the
     // marker itself pops in exactly as the beams converge (under the
-    // flash, see drawLegacyPlayerSpawnBurst below), instead of sitting
+    // flash, see drawLegacyEdgeLasers below), instead of sitting
     // there fully visible the whole time the beams are still arriving.
     const transferPlayerAlpha = playerTransferEnergy.phase === 'pending'
       ? 1
@@ -10357,62 +9092,12 @@ export class MenuScene extends Phaser.Scene {
         this.fillLegacyPlayerMarkerTile(renderedPlayerPoint, mazeLeft, mazeTop, mazeTileSize, playerAlpha, true, progressionPalette, time);
       }
     }
-    if (playerTransferEnergy.active) {
-      const transferPoint = playerTransferEnergy.phase === 'delivering'
-        ? renderedPlayerPoint
-        : this.maze.goal;
-      const boardRelativeX = mazeLeft + ((transferPoint.x + 0.5) * mazeTileSize);
-      const boardRelativeY = mazeTop + ((transferPoint.y + 0.5) * mazeTileSize);
-      const targetX = this.boardZoomContainer.x + (boardRelativeX * this.boardZoomContainer.scaleX);
-      const targetY = this.boardZoomContainer.y + (boardRelativeY * this.boardZoomContainer.scaleY);
-      // Real gameplay (Wave 4D-B): one held primary and one continuous
-      // conduit, replacing the ambient eight-origin volley -- reserved for
-      // menu/title choreography per the frozen contract, so 'menu' keeps
-      // the original call unchanged.
-      if (this.mode === 'play') {
-        this.applyLegacyGameplayTransferPresentation(targetX, targetY, mazeTileSize * this.boardZoomContainer.scaleX, time);
-      } else {
-        this.drawLegacyPlayerTransferEnergy(targetX, targetY, playerTransferEnergy, time);
-      }
-    } else if (this.mode === 'play') {
-      this.gameplayTransferConduitCanvasImage?.setVisible(false);
-    }
-
-    if (playerSpawnBurst.active && this.isLegacyMenuPointVisibleInStaticDraw(this.player)) {
-      // Drawn on hudGraphics, NOT boardDynamicGraphics -- boardDynamicGraphics
-      // is inside boardZoomContainer, so a raw screen-corner coordinate drawn
-      // there would itself get zoomed and land somewhere other than the true
-      // corner. hudGraphics sits outside the zoom container (same as every
-      // other fixed UI element), so the corners stay accurate regardless of
-      // zoom -- but that means the TARGET point has to be pushed through the
-      // container's own current transform first, or the beams would aim at
-      // where the tile sits in unzoomed board-space instead of where the
-      // player marker is actually rendering on screen right now.
-      const boardRelativeX = mazeLeft + ((renderedPlayerPoint.x + 0.5) * mazeTileSize);
-      const boardRelativeY = mazeTop + ((renderedPlayerPoint.y + 0.5) * mazeTileSize);
-      const targetX = this.boardZoomContainer.x + (boardRelativeX * this.boardZoomContainer.scaleX);
-      const targetY = this.boardZoomContainer.y + (boardRelativeY * this.boardZoomContainer.scaleY);
-      // Confirmed real defect (review 5144999445): this call used to be
-      // unconditional -- the old eight-origin-per-orbit-sigil beam volley
-      // (drawLegacyPlayerSpawnBurst) has no mode branch of its own and
-      // was rendering in Play mode too, including the very first maze of
-      // a run and every ordinary play reset, not only real teleport
-      // transfers. Play mode now NEVER calls it: a real armed transfer's
-      // own delivering phase is already fully rendered by
-      // applyLegacyGameplayTransferPresentation above (this block would
-      // otherwise double the arrival effect), and every other Play-mode
-      // arrival routes through applyLegacyGameplayInitialArrivalPresentation,
-      // the real single-primary replacement, instead. Menu/title
-      // choreography is unchanged -- the frozen contract reserves the old
-      // volley for exactly that.
-      if (this.mode === 'play') {
-        if (!playerTransferEnergy.active) {
-          this.applyLegacyGameplayInitialArrivalPresentation(targetX, targetY, mazeTileSize * this.boardZoomContainer.scaleX, time);
-        }
-      } else {
-        this.drawLegacyPlayerSpawnBurst(targetX, targetY, playerSpawnBurst, time);
-      }
-    }
+    // ONE laser system for both modes and both directions (edgeMarkers.ts):
+    // ARRIVAL -- every diamond fires a beam inward to the spawn tile as the
+    // maze starts to appear; DEPARTURE -- the player fires a beam outward to
+    // every diamond, then the maze deconstructs. Both are pure projections of
+    // the master timeline (introTimeline.ts).
+    this.drawLegacyEdgeLasers(time, mazeLeft, mazeTop, mazeTileSize, renderedPlayerPoint, playerSpawnBurst);
 
     // Drawn last, after the trail/board content above -- the bleed-off dock
     // corridors reach the true screen edge (including the corners these
@@ -10442,29 +9127,13 @@ export class MenuScene extends Phaser.Scene {
     return null;
   }
 
-  // 0 outside the deconstructing phase (or once its own window elapses --
-  // the next maze's own 'building' phase, which starts right as this window
-  // ends, is a distinct trigger from the arm-time reset below and needs its
-  // own guard here). A plain triangular envelope: linear up, hold at 1 once
-  // both ramps clear 1, linear down -- matches the fade timing already used
-  // for the trail (resolveLegacyMenuDeconstructTrailAlpha) elsewhere in this
-  // same transition.
-  // Fades/scales in across the deconstruct phase's own opening span (holding
-  // at full size for whatever's left of that phase), then fades/scales back
-  // out only once the build is CLOSE to done -- full opacity is held
-  // through the bulk of the build (menuStaticBuildPhaseStartedAtMs anchors
-  // the whole phase, unlike the preroll-only menuStaticBuildPrerollStartedAtMs
-  // -- see its declaration), then it dissolves across a fixed closing window
-  // timed to land on zero right as the last tiles settle in, per feedback
-  // that fading across the whole build made it disappear almost immediately
-  // for anything but the shortest builds. levelAnnouncerBuildFadeOutArmed
-  // tracks whether THIS build's fade-in already happened during a preceding
-  // 'deconstructing' phase -- true for every normal maze-to-maze cycle. A
-  // build that starts without one (initial page load, first entry into play
-  // mode, a settings change that regenerates the board -- nothing to
-  // deconstruct FROM) still gets the announcement, just via its own
-  // self-contained fade-in-hold-fade-out entirely inside the build phase
-  // instead of borrowing the deconstruct phase's opening span.
+  // The centered level digit is a pure projection of the intro/outro
+  // timelines (introTimeline.ts): it fades/scales in across the first part of
+  // the deconstruct (or, on a cold start with nothing to deconstruct from,
+  // across the first 200 ms of the intro itself), holds at full opacity, and
+  // fades out so it is gone at the exact instant the spawn laser lands and
+  // input unlocks. levelAnnouncerBuildFadeOutArmed records that THIS build's
+  // fade-in already happened during a preceding deconstruct.
   private resolveLegacyLevelAnnouncerVisualState(time: number): { alpha: number; scale: number; revealProgress: number } {
     const HIDDEN = { alpha: 0, scale: 1, revealProgress: 0 };
     if (this.overlay !== 'none') {
@@ -10473,44 +9142,21 @@ export class MenuScene extends Phaser.Scene {
 
     const phase = this.menuStaticDrawLifecyclePhase;
 
-    if (phase === 'deconstructing' && this.menuStaticDeconstructStartedAtMs !== null) {
+    const outro = this.resolveLegacyOutroState(time);
+    if (outro !== null) {
+      // Fades in during the deconstruct so it is already fully up when the
+      // next intro starts (the intro then only has to fade it OUT).
       this.levelAnnouncerBuildFadeOutArmed = true;
-      const elapsedMs = time - this.menuStaticDeconstructStartedAtMs;
-      if (elapsedMs < 0) {
-        return HIDDEN;
-      }
-      const progress = smootherstep(elapsedMs / LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS);
-      return this.applyLegacyLevelAnnouncerPulse(progress, time);
+      return this.applyLegacyLevelAnnouncerPulse(outro.digitAlpha, outro.digitScale);
     }
 
-    if (phase === 'building' && this.menuStaticBuildPhaseStartedAtMs !== null) {
-      const buildDurationMs = this.resolveLegacyMenuStaticBuildDurationEstimateMs();
-      if (buildDurationMs === null) {
+    const intro = this.resolveLegacyIntroState(time);
+    if (intro !== null) {
+      if (intro.digitAlpha <= 0) {
         this.levelAnnouncerBuildFadeOutArmed = false;
         return HIDDEN;
       }
-
-      const elapsedMs = time - this.menuStaticBuildPhaseStartedAtMs;
-      const remainingMs = buildDurationMs - elapsedMs;
-      if (elapsedMs < 0 || remainingMs <= 0) {
-        this.levelAnnouncerBuildFadeOutArmed = false;
-        return HIDDEN;
-      }
-
-      const fadeOutWindowMs = Math.min(LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS, buildDurationMs);
-      const fadeOutProgress = remainingMs >= fadeOutWindowMs ? 1 : smootherstep(remainingMs / fadeOutWindowMs);
-
-      if (this.levelAnnouncerBuildFadeOutArmed) {
-        return this.applyLegacyLevelAnnouncerPulse(fadeOutProgress, time);
-      }
-
-      // Cold-start case -- also ramp UP from this build's own beginning
-      // (nothing to fade in from) instead of assuming it's already at full
-      // size the way an armed build (which already faded in during its
-      // preceding deconstruct) can.
-      const fadeInWindowMs = Math.min(LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS, buildDurationMs);
-      const fadeInProgress = smootherstep(elapsedMs / fadeInWindowMs);
-      return this.applyLegacyLevelAnnouncerPulse(Math.min(fadeInProgress, fadeOutProgress), time);
+      return this.applyLegacyLevelAnnouncerPulse(intro.digitAlpha, intro.digitScale);
     }
 
     if (phase !== 'building') {
@@ -10519,37 +9165,14 @@ export class MenuScene extends Phaser.Scene {
     return HIDDEN;
   }
 
-  // progress < 1 means the fade-in/fade-out envelope is still transitioning
-  // -- keep that motion clean, no pulse blended in yet. Once it reaches its
-  // held plateau (progress >= 1, i.e. fully up and not yet closing), swap
-  // to the slow breathing pulse instead of sitting perfectly static.
-  //
-  // revealProgress tracks the same envelope as alpha does while progress < 1
-  // (so the tile-by-tile construct/deconstruct sweep -- see
-  // drawLegacyTileFontWordTiled -- tracks the fade exactly), but pins to a
-  // flat 1 once the held plateau starts, instead of alpha's own breathing
-  // pulse (which dips as low as LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA) --
-  // using alpha directly here would have made the sweep's trailing tiles
-  // continuously flicker in and out for as long as the number stays on
-  // screen, not just play once during the actual build/deconstruct.
+  // The digit no longer breathes on a separate 3.6 s pulse (a third motion
+  // clock competing with the intro's): alpha, scale and the tile-by-tile
+  // sweep (revealProgress) all follow the one timeline-derived envelope.
   private applyLegacyLevelAnnouncerPulse(
-    progress: number,
-    time: number
+    alpha: number,
+    scale: number
   ): { alpha: number; scale: number; revealProgress: number } {
-    if (progress < 1) {
-      return {
-        alpha: progress,
-        revealProgress: progress,
-        scale: LEGACY_LEVEL_ANNOUNCER_MIN_SCALE + (progress * (1 - LEGACY_LEVEL_ANNOUNCER_MIN_SCALE))
-      };
-    }
-
-    const pulsePhase = (Math.sin((time / LEGACY_LEVEL_ANNOUNCER_PULSE_PERIOD_MS) * Math.PI * 2) + 1) / 2;
-    return {
-      alpha: LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA + (pulsePhase * (1 - LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA)),
-      revealProgress: 1,
-      scale: LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE + (pulsePhase * (1 - LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE))
-    };
+    return { alpha, revealProgress: alpha, scale };
   }
 
   // Centered, between-mazes level announcement -- replaces the old
@@ -10907,87 +9530,15 @@ export class MenuScene extends Phaser.Scene {
       return { active: false, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
     }
 
-    const travelProgress = smoothstep(elapsedMs / LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS);
-    const flashProgress = clamp((elapsedMs - LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS) / LEGACY_PLAYER_SPAWN_FLASH_MS, 0, 1);
+    // The laser is a pure function of time since it left its station
+    // (introTimeline.ts), so menu and play can never disagree about it.
+    const laser = resolveSpawnLaser(elapsedMs);
     return {
       active: true,
-      flashProgress,
-      markerRevealAlpha: travelProgress >= 1 ? 1 : 0,
-      travelProgress
+      flashProgress: laser.spawnPop,
+      markerRevealAlpha: laser.markerRevealed ? 1 : 0,
+      travelProgress: laser.laserProgress
     };
-  }
-
-  // One beam per orbit sigil -- the actual "diamond" decorations
-  // (drawLegacyMenuPathTitleOrbitSigils) rest at LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS
-  // evenly-spaced points around the viewport edge (4 corners + 4 edge
-  // midpoints at their settled phase-0 positions), so this reuses that exact
-  // geometry rather than a hardcoded 4-corner subset -- every diamond fires,
-  // not just the ones that happen to sit on a true corner. Each beam's
-  // travel is staggered slightly by index so they converge with a bit of
-  // spread instead of perfect lockstep, then a double-ring "impact" flash
-  // lands at the tile once they arrive. Both game modes funnel through the
-  // one drawDynamicBoard call site that invokes this, so menu and play get
-  // the identical effect with no mode branch here.
-  private drawLegacyPlayerSpawnBurst(
-    targetX: number,
-    targetY: number,
-    state: ReturnType<typeof this.resolveLegacyPlayerSpawnBurstState>,
-    time: number
-  ): void {
-    const origins = this.resolveLegacyPlayerTransferOrbitPoses(time);
-    // +-0.06 spread across the 8 origins so the beams arrive within a short
-    // window of each other instead of a single flat instant -- reads as a
-    // converging volley instead of a rigid, mechanical snap.
-    const staggerFor = (index: number): number => (
-      ((index / Math.max(1, LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS - 1)) - 0.5) * 0.12
-    );
-
-    if (state.travelProgress < 1) {
-      origins.forEach((origin, index) => {
-        const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);
-        const localProgress = clamp(state.travelProgress - staggerFor(index), 0, 1);
-        const tipX = origin.x + ((targetX - origin.x) * localProgress);
-        const tipY = origin.y + ((targetY - origin.y) * localProgress);
-        const beamAlpha = 0.9 * (1 - (localProgress * 0.25));
-        // Dim wide glow pass first, bright thin core pass on top -- reads as
-        // a hotter beam than a single flat-color stroke. Each beam takes its
-        // own stop along the trail's own rainbow material (see
-        // drawLegacyPlayerTransferEnergy's own comment on the same choice).
-        this.playerSpawnBurstGraphics.lineStyle(4, beamColor, beamAlpha * 0.35);
-        this.playerSpawnBurstGraphics.lineBetween(origin.x, origin.y, tipX, tipY);
-        this.playerSpawnBurstGraphics.lineStyle(1.5, beamColor, beamAlpha);
-        this.playerSpawnBurstGraphics.lineBetween(origin.x, origin.y, tipX, tipY);
-        this.playerSpawnBurstGraphics.fillStyle(beamColor, beamAlpha);
-        this.playerSpawnBurstGraphics.fillCircle(tipX, tipY, 2.5);
-      });
-      return;
-    }
-
-    const flashAlpha = 1 - state.flashProgress;
-    if (flashAlpha <= 0) {
-      return;
-    }
-    // Was a double-ring shockwave stroking out to a 26px radius -- reported
-    // as "a weird massive circle of laser at player position... remove the
-    // massive UI part, we only want the lasers coming from player, maybe a
-    // 'poof' animation w some stars that twinkle out." Replaced with exactly
-    // that: a small one-shot burst of sparkles scattered around the landing
-    // point, expanding slightly and fading out as flashProgress advances,
-    // instead of a large stroked ring.
-    const poofSparkleCount = 6;
-    const poofRadius = 3 + (state.flashProgress * 12);
-    for (let index = 0; index < poofSparkleCount; index += 1) {
-      const angle = ((index / poofSparkleCount) * Math.PI * 2) + (state.flashProgress * 0.6);
-      const sparkleColor = resolveLegacyIridescentTrailColor(index, poofSparkleCount, time);
-      this.drawLegacyFourPointSparkle(
-        this.playerSpawnBurstGraphics,
-        targetX + (Math.cos(angle) * poofRadius),
-        targetY + (Math.sin(angle) * poofRadius),
-        Math.max(1, 3.5 * flashAlpha),
-        sparkleColor,
-        flashAlpha
-      );
-    }
   }
 
   private clearLegacyPlayerProgressionBadge(): void {
@@ -11245,7 +9796,10 @@ export class MenuScene extends Phaser.Scene {
     pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
     time: number
   ): void {
-    const { optionPoints, targetPoint } = this.resolveLegacyMenuAiMemoryPoints();
+    // The AI's committed-target tile is intentionally not marked: the red
+    // square drawn one step ahead of the demo walker was removed per owner
+    // request (2026-11-05). Option tiles still render.
+    const { optionPoints } = this.resolveLegacyMenuAiMemoryPoints();
     const optionAlpha = clamp(0.34 + (0.08 * Math.sin(time / 240)), 0.28, 0.44) * alphaMultiplier;
     for (const point of optionPoints) {
       this.fillLegacyDynamicPathTile(
@@ -11261,44 +9815,6 @@ export class MenuScene extends Phaser.Scene {
         0.72
       );
     }
-
-    if (targetPoint === null) {
-      return;
-    }
-
-    const targetPulse = 0.5 + (0.5 * Math.sin(time / 150));
-    // Edges only, no fill -- the AI's current tile should read as an outline
-    // marking its position, not a solid color wash over the whole cell.
-    this.drawLegacyTileEdgeOutline(
-      this.boardDynamicGraphics,
-      targetPoint,
-      originX,
-      originY,
-      tileSize,
-      LEGACY_MENU_AI_MEMORY_TARGET_EDGE,
-      clamp(0.66 + (targetPulse * 0.28), 0.58, 0.98) * alphaMultiplier
-    );
-  }
-
-  private drawLegacyTileEdgeOutline(
-    graphics: Phaser.GameObjects.Graphics,
-    point: LegacyPoint,
-    originX: number,
-    originY: number,
-    tileSize: number,
-    color: number,
-    alpha: number
-  ): void {
-    const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
-    const lineWidth = Math.max(1, Math.round(Math.min(tileRect.width, tileRect.height) * 0.12));
-    const inset = lineWidth / 2;
-    graphics.lineStyle(lineWidth, color, alpha);
-    graphics.strokeRect(
-      tileRect.left + inset,
-      tileRect.top + inset,
-      tileRect.width - lineWidth,
-      tileRect.height - lineWidth
-    );
   }
 
   // Real player-trail material overlay for one trail cell -- see
@@ -11372,36 +9888,6 @@ export class MenuScene extends Phaser.Scene {
       this.trailAnimationLastRealMs = null;
     }
     return this.trailAnimationElapsedMs;
-  }
-
-  // Same pattern as advanceLegacyTrailAnimationClock above, a separate
-  // accumulator for the real gameplay transfer conduit's own energy
-  // material (see the field pair's own comment). Reduced motion is
-  // handled by this clock freezing entirely, NOT by the presentation
-  // module -- the conduit's own openFraction/geometry stay whatever
-  // teleportTransferPresentation.ts already computed for reduced motion;
-  // this only stops the color from visibly drifting while frozen.
-  //
-  // Deliberately does NOT gate on !isLegacyPlayLifecycleInputLocked() the
-  // way the trail's own clock does: the conduit's entire real active
-  // window (outbound/stored/delivering) falls WITHIN the locked
-  // transition period between moves, so that gate would freeze this
-  // clock for essentially its whole useful lifetime. Gates on the
-  // transfer actually being armed instead, plus Pause/overlay, which is
-  // the transfer-specific equivalent of "genuinely visible right now".
-  private advanceLegacyGameplayTransferAnimationClock(time: number): number {
-    const isActivePlayVisible = this.mode === 'play'
-      && this.overlay === 'none'
-      && this.playerTransferEnergyArmed;
-    if (isActivePlayVisible && !this.prefersLegacyReducedMotion()) {
-      if (this.gameplayTransferAnimationLastRealMs !== null) {
-        this.gameplayTransferAnimationElapsedMs += Math.max(0, time - this.gameplayTransferAnimationLastRealMs);
-      }
-      this.gameplayTransferAnimationLastRealMs = time;
-    } else {
-      this.gameplayTransferAnimationLastRealMs = null;
-    }
-    return this.gameplayTransferAnimationElapsedMs;
   }
 
   // Navigation Core v1's continuous play trail -- one logically continuous
@@ -12493,6 +10979,13 @@ export class MenuScene extends Phaser.Scene {
     time: number,
     durationMs: number
   ): void {
+    const wrapFlash = resolveWrapFlashStationIds(from, to, this.maze);
+    if (wrapFlash !== null && !this.prefersLegacyReducedMotion()) {
+      // Flash the exit edge and its paired destination edge once (~120 ms).
+      this.edgeMarkerWrapFlash = { ids: [wrapFlash.sourceId, wrapFlash.destinationId], startedAtMs: time };
+      this.legacyMenuTitleAnimationNextFrameAtMs = 0;
+      this.boardPathDirty = true;
+    }
     if (from.x === to.x && from.y === to.y || this.prefersLegacyReducedMotion()) {
       this.syncLegacyPlayerVisualMotionTo(to);
       return;
@@ -18280,9 +16773,11 @@ export class MenuScene extends Phaser.Scene {
         scannerVisibleEdgeColumn: visibleSweepEdge === null
           ? null
           : Number(visibleSweepEdge.column.toFixed(3)),
-        sigilOrbitCount: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS,
-        sigilOrbitPeriodMs: LEGACY_MENU_PATH_TITLE_ORBIT_MS,
-        sigilOrbitPhase: Number(this.resolveLegacyMenuPathTitleOrbitPhase(this.time.now).toFixed(3)),
+        // Field names kept for diagnostics consumers: the "sigils" are now the
+        // eight static edge markers, so there is no orbit period/phase (0).
+        sigilOrbitCount: EDGE_STATION_COUNT,
+        sigilOrbitPeriodMs: 0,
+        sigilOrbitPhase: 0,
         sweepColumn: Number(sweepState.column.toFixed(3)),
         sweepPeriodMs: LEGACY_MENU_PATH_TITLE_SWEEP_MS
       },

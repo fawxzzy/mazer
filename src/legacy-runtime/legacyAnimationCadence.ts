@@ -1,4 +1,4 @@
-import { resolveLegacyWalkableGridNeighbors, type LegacyPoint } from './legacyMaze';
+import type { LegacyPoint } from './legacyMaze';
 
 export const LEGACY_ANIMATION_CADENCE_VERSION = 'legacy-animation-cadence-v2' as const;
 export const LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS = 8000;
@@ -124,8 +124,7 @@ export const resolveLegacyTrailPulseSweepMotion = ({
 };
 
 // Floods outward from the start tile through the maze's own real
-// connectivity (a plain grid BFS, reusing the same wrap-aware neighbor
-// resolver the solver itself uses) instead of the old
+// connectivity (a plain screen-adjacency grid BFS) instead of the old
 // generationBuildTrace-ordered-then-row-scanned approach. The trace order
 // reflected internal carving order, not spatial adjacency, so tiles from
 // opposite corners of the board could land next to each other in the
@@ -139,6 +138,23 @@ export const resolveLegacyTrailPulseSweepMotion = ({
 // first" for free: a BFS frontier reveals every tile at a given graph
 // distance together, so a side branch at the same depth as the solution's
 // next step reveals in the same wave as that step, not after it.
+// SCREEN adjacency only (no wrap hops). The reveal is a purely visual order:
+// a wrap-aware flood put a wrap partner (and everything behind it) on the
+// opposite edge early, so on screen it appeared as an island detached from
+// the rest of the maze (and, reversed, was left standing alone when the
+// deconstruct ended). Tiles connected ONLY through a wrap are flooded as their
+// own contiguous component after the main one.
+const resolveScreenAdjacentWalkableTiles = (grid: boolean[][], point: LegacyPoint): LegacyPoint[] => {
+  const neighbors: LegacyPoint[] = [];
+  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
+    const next = { x: point.x + dx, y: point.y + dy };
+    if (grid[next.y]?.[next.x] === true) {
+      neighbors.push(next);
+    }
+  }
+  return neighbors;
+};
+
 export const buildLegacyMazeRevealOrder = (maze: LegacyRevealMaze): LegacyPoint[] => {
   const grid = maze.grid as boolean[][];
   const orderedTiles: LegacyPoint[] = [];
@@ -155,46 +171,32 @@ export const buildLegacyMazeRevealOrder = (maze: LegacyRevealMaze): LegacyPoint[
     orderedTiles.push(copyPoint(point));
     return true;
   };
-
-  const seedPoint = maze.generationBuildTrace?.start ?? maze.start;
-  let frontier: LegacyPoint[] = [];
-  if (enqueue(seedPoint)) {
-    frontier = [seedPoint];
-  } else {
-    // Defensive only: a real maze's own start is always walkable. If it
-    // somehow isn't, seed the flood from the first walkable tile found
-    // instead of producing an empty order.
-    outer: for (let y = 0; y < maze.height; y += 1) {
-      for (let x = 0; x < maze.width; x += 1) {
-        const point = { x, y };
-        if (enqueue(point)) {
-          frontier = [point];
-          break outer;
+  const flood = (seedPoint: LegacyPoint): void => {
+    if (!enqueue(seedPoint)) {
+      return;
+    }
+    let frontier: LegacyPoint[] = [seedPoint];
+    while (frontier.length > 0) {
+      const nextFrontier: LegacyPoint[] = [];
+      for (const point of frontier) {
+        for (const neighbor of resolveScreenAdjacentWalkableTiles(grid, point)) {
+          if (enqueue(neighbor)) {
+            nextFrontier.push(neighbor);
+          }
         }
       }
+      frontier = nextFrontier;
     }
-  }
+  };
 
-  while (frontier.length > 0) {
-    const nextFrontier: LegacyPoint[] = [];
-    for (const point of frontier) {
-      for (const neighbor of resolveLegacyWalkableGridNeighbors(grid, point)) {
-        if (enqueue(neighbor)) {
-          nextFrontier.push(neighbor);
-        }
-      }
-    }
-    frontier = nextFrontier;
-  }
+  flood(maze.generationBuildTrace?.start ?? maze.start);
 
-  // Defensive only: every generated play/menu maze is normalized to one
-  // connected floor component elsewhere, so BFS from a walkable start
-  // should already reach every floor tile. Kept as a fallback so an
-  // unreachable stray tile is still appended rather than silently missing
-  // from the order the draw loop iterates.
+  // Components reachable only through a wrap hop (and the defensive case of a
+  // non-walkable start): each is flooded contiguously, in raster order of its
+  // first tile, so nothing ever appears as a lone detached tile.
   for (let y = 0; y < maze.height; y += 1) {
     for (let x = 0; x < maze.width; x += 1) {
-      enqueue({ x, y });
+      flood({ x, y });
     }
   }
 
