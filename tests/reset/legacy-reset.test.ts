@@ -928,10 +928,10 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private boardPathGraphics!: Phaser.GameObjects.Graphics;');
     expect(menuSceneSource).toContain('private boardPathDirty = true;');
     expect(menuSceneSource).toContain('private drawBoardPaths(time: number): void');
-    // Chip wiring: the reveal is a rank mask over the baked board (rank < live tile limit), not a per-tile loop.
+    // Chip wiring: the reveal is a rank mask over the baked board (rank < live tile limit, via the shared isBoardCellRevealed predicate that also hides everything past a null row limit), not a per-tile loop.
     expect(menuSceneSource).toContain('const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();');
     expect(menuSceneSource).toContain('private resolveBoardTileReveal(): BoardTileReveal {');
-    expect(menuSceneSource).toContain('ranks[index]! >= 0 && ranks[index]! < tileLimit');
+    expect(menuSceneSource).toContain('isBoardCellRevealed(tileLimit, rowLimit, ranks === null ? -1 : ranks[index]!, y)');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawRowLimit(): number | null');
     expect(menuSceneSource).toContain('private buildLegacyMenuStaticDrawTileOrder(): LegacyPoint[]');
     expect(menuSceneSource).toContain('return buildLegacyMazeRevealOrder(this.maze);');

@@ -6,11 +6,13 @@ import {
   BOARD_TILE_STYLE_PARAM,
   buildRankGrid,
   composeBoardTileReveal,
+  isBoardCellRevealed,
   resolveBoardTileStyleFromSearch,
   type BoardRevealContext2D
 } from '../../src/render/boardTileLayer';
 import { BOARD_TILE_GEOMETRY, boardMaterial, DEFAULT_BOARD_TILE_STYLE } from '../../src/render/boardTileStyle';
 import { PhaserGraphicsTileContext, parseCssRgba } from '../../src/render/phaserTileContext';
+import { compositeTrailUnderlay, liftTrailColor } from '../../src/render/trailLegibility';
 import { braidedMazeGrid, contrast, inputFor, wrapDockMaze } from '../render/support/boardTileFixtures';
 
 const MENU_SCENE = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n?/g, '\n');
@@ -71,6 +73,41 @@ const floorCells = (grid: boolean[][]): Array<{ x: number; y: number }> => {
   grid.forEach((row, y) => row.forEach((on, x) => { if (on) cells.push({ x, y }); }));
   return cells;
 };
+
+describe('staged reveal predicate (build AND deconstruct)', () => {
+  // Regression: the deconstruct arms rowLimit = null while the tile limit counts DOWN. A null row limit was read as
+  // "show everything", so the whole board stayed on screen for the entire dissolve (live app, 2026-11-06).
+  test('deconstruct (rowLimit null): only cells ranked below the live tile limit are shown, and it shrinks to nothing', () => {
+    const ranks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    let previous = ranks.length + 1;
+    for (let limit = ranks.length; limit >= 0; limit -= 1) {
+      const shown = ranks.filter((rank) => isBoardCellRevealed(limit, null, rank, rank)).length;
+      expect(shown).toBe(limit);
+      expect(shown).toBeLessThan(previous);
+      previous = shown;
+    }
+    expect(isBoardCellRevealed(0, null, 3, 0)).toBe(false);
+    expect(isBoardCellRevealed(5, null, -1, 0)).toBe(false);
+  });
+
+  test('build (rowLimit 0): the tile limit alone decides; unlimited (null tile limit) shows everything', () => {
+    expect(isBoardCellRevealed(3, 0, 2, 9)).toBe(true);
+    expect(isBoardCellRevealed(3, 0, 3, 9)).toBe(false);
+    expect(isBoardCellRevealed(null, 0, -1, 9)).toBe(true);
+    expect(isBoardCellRevealed(null, null, 7, 9)).toBe(true);
+  });
+
+  test('a live row limit still reveals the rows above it (union with the tile limit)', () => {
+    expect(isBoardCellRevealed(2, 5, 9, 4)).toBe(true);
+    expect(isBoardCellRevealed(2, 5, 9, 5)).toBe(false);
+  });
+
+  test('the scene routes the floor mask AND the marker/player visibility through the same predicate', () => {
+    expect(MENU_SCENE).toContain('isBoardCellRevealed(tileLimit, rowLimit,');
+    expect(MENU_SCENE).not.toContain('rowLimit === null || y < rowLimit');
+    expect(MENU_SCENE).not.toContain('return rowLimit === null || point.y < rowLimit;');
+  });
+});
 
 describe('rank-based reveal composite', () => {
   const grid = braidedMazeGrid(12, 25, 4242, 12);
@@ -237,20 +274,16 @@ describe('Phaser graphics adapter for the Chip marker draw code', () => {
 });
 
 describe('trail on the Chip floor (amendment open item A8)', () => {
+  // The full contrast pins (every energy stop and in-between, against chip / rim / gap, width floors) live in
+  // tests/reset/marker-trail-legibility.test.ts; this keeps the original A8 intent: the underlay is what earns it.
   const stops = [...MENU_SCENE.matchAll(/const LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS = \[([^\]]+)\]/g)][0]![1]!
     .match(/0x[0-9a-f]{6}/gi)!.map((hex) => parseInt(hex, 16));
-  const alpha = Number(/const LEGACY_TRAIL_UNDERLAY_ALPHA = ([0-9.]+);/.exec(MENU_SCENE)![1]);
-
-  const mix = (a: number, b: number, t: number): number => {
-    const channel = (shift: number): number => Math.round(((a >> shift) & 255) * (1 - t) + ((b >> shift) & 255) * t);
-    return (channel(16) << 16) | (channel(8) << 8) | channel(0);
-  };
 
   test('every calm trail energy stop clears 3:1 against the chip under the dark underlay', () => {
     expect(stops.length).toBe(8);
-    const underlaid = mix(boardMaterial.chip, boardMaterial.void, alpha);
+    const underlaid = compositeTrailUnderlay(boardMaterial.chip);
     for (const stop of stops) {
-      expect(contrast(stop, underlaid), `0x${stop.toString(16)}`).toBeGreaterThanOrEqual(3);
+      expect(contrast(liftTrailColor(stop), underlaid), `0x${stop.toString(16)}`).toBeGreaterThanOrEqual(3);
     }
   });
 

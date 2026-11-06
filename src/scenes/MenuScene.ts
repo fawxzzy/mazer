@@ -17,11 +17,23 @@ import {
 import {
   BoardTileLayer,
   buildRankGrid,
+  isBoardCellRevealed,
   type BoardTileReveal,
   resolveBoardTileStyleFromSearch
 } from '../render/boardTileLayer';
 import { drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
-import { BOARD_TILE_GEOMETRY, boardMaterial, type BoardTileStyleId } from '../render/boardTileStyle';
+import { BOARD_MARKER_MIN_CSS, BOARD_TILE_GEOMETRY, boardMaterial, type BoardTileStyleId } from '../render/boardTileStyle';
+import { drawGoalBeacon } from '../render/goalBeacon';
+import { drawTrailLayersToCanvasContext, type TrailLayerSegment } from '../render/trailLayersCanvas';
+import {
+  TRAIL_FADE_ALPHA_MIN,
+  TRAIL_GLOW_ALPHA_RATIO,
+  TRAIL_UNDERLAY_ALPHA,
+  TRAIL_UNDERLAY_PAD_MIN_CSS,
+  TRAIL_WIDTH_RATIO,
+  liftTrailColor,
+  resolveTrailWidths
+} from '../render/trailLegibility';
 import { drawChipCell, resolveChipGridGeometry } from '../render/chipTileGraphics';
 import { PhaserGraphicsTileContext } from '../render/phaserTileContext';
 import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameToViewport } from '../boot/viewportGeometry';
@@ -32,8 +44,7 @@ import {
 } from '../render/navigationCoreTrail';
 import {
   computeTrailCanvasBounds,
-  drawTrailToCanvasContext,
-  type TrailCanvasSegment
+  drawTrailToCanvasContext
 } from '../render/navigationCoreTrailCanvas';
 import {
   computePlayerGlowCanvasBounds,
@@ -56,7 +67,6 @@ import {
 } from '../render/edgeMarkers';
 import {
   INTRO_LASER_MS,
-  INTRO_LASER_START_MS,
   INTRO_POP_MS,
   INTRO_SKIP_GRACE_MS,
   isEdgePathCellShown,
@@ -68,6 +78,7 @@ import {
   resolveIntro,
   resolveIntroDeconstruct,
   resolveIntroInputUnlockMs,
+  resolveIntroLaserStartMs,
   resolveOutroTilesEndMs,
   resolveSpawnLaser,
   skipIntroElapsedMs
@@ -1299,12 +1310,13 @@ const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;
 // length) are this integration's own reasonable choices where the reference
 // only describes the qualitative behavior, documented here rather than left
 // as unexplained magic numbers.
-const LEGACY_PLAY_TRAIL_WIDTH_RATIO = 0.16;
-// Dark underlay beneath the trail on the Chip floor (amendment open item A8): bg.canvas at this alpha,
-// this many css px wider than the core on each side. tests/reset/board-tile-layer.test.ts pins that every
-// calm trail energy stop clears 3:1 against chip-under-underlay.
-const LEGACY_TRAIL_UNDERLAY_ALPHA = 0.8;
-const LEGACY_TRAIL_UNDERLAY_PAD_CSS = 1.25;
+const LEGACY_PLAY_TRAIL_WIDTH_RATIO = TRAIL_WIDTH_RATIO;
+// Dark underlay beneath the trail on the Chip floor (amendment open item A8): bg.canvas at this alpha, a pad
+// of at least this many css px each side of the core (it widens with the core, see resolveTrailWidths).
+// Width, underlay, core lift and fade floor live in src/render/trailLegibility.ts;
+// tests/render/trailLegibility.test.ts pins every energy stop's contrast against the real chip, rim and gap.
+const LEGACY_TRAIL_UNDERLAY_ALPHA = TRAIL_UNDERLAY_ALPHA;
+const LEGACY_TRAIL_UNDERLAY_PAD_CSS = TRAIL_UNDERLAY_PAD_MIN_CSS;
 // Amendment 6.2's neon-tube glow refinement: a soft outer spectral glow
 // pass drawn from the same canonical geometry/color as the crisp core,
 // wider but bounded well under the player/goal markers' own glow alpha
@@ -1312,13 +1324,12 @@ const LEGACY_TRAIL_UNDERLAY_PAD_CSS = 1.25;
 // the trail never reads brighter than the things it's leading to. Both
 // ratios scale with tileSize like everything else here, so the glow stays
 // a crisp accent rather than a blurred bar at compact/mobile tile sizes.
-const LEGACY_PLAY_TRAIL_GLOW_WIDTH_RATIO = 0.3;
 // OWNER-AUTHORIZED VISUAL AMENDMENT (2026-09-09, with the calmer
 // NAVIGATION_CORE_TRAIL_ENERGY_STOPS palette): dropped from 0.22 -> 0.15
 // so the glow reads as a soft halo supporting the crisp core rather than
 // a wide translucent wash bleeding across the corridor floor. Still
 // scales with tileSize like everything else here.
-const LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO = 0.15;
+const LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO = TRAIL_GLOW_ALPHA_RATIO;
 const LEGACY_PLAY_TRAIL_CORNER_RADIUS_RATIO = 0.16;
 const LEGACY_PLAY_TRAIL_PLAYER_TRIM_RATIO = 0.3;
 // OWNER-AUTHORIZED VISUAL AMENDMENT (direct product-owner instruction,
@@ -1398,7 +1409,7 @@ const LEGACY_PLAY_TRAIL_SHINE_SPEED_TILES_PER_SEC = 4.2;
 // contract's explicit "very short trail" case.
 const LEGACY_PLAY_TRAIL_SHINE_MIN_TILES = 3;
 const LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR = 0xffffff;
-const LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN = 0.34;
+const LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN = TRAIL_FADE_ALPHA_MIN;
 const LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX = 1;
 const LEGACY_PATH_TILE_CUE_COLOR = cyberArcadeMaterial.path.edge;
 const LEGACY_PATH_TILE_CUE_ALPHA = 0.42;
@@ -1920,6 +1931,8 @@ export class MenuScene extends Phaser.Scene {
   // boardZoomContainer, matching hudGraphics' own coordinate space.
   private touchSettingsCogIconImage!: Phaser.GameObjects.Image;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
+  // Goal beacon (halo + ping): its own layer UNDER the trail canvas so the trail always sits on top of it.
+  private goalBeaconGraphics!: Phaser.GameObjects.Graphics;
   // Navigation Core v1's continuous play trail is composited on a real 2D
   // canvas (src/render/navigationCoreTrailCanvas.ts), not stroked as
   // Phaser Graphics vector paths -- the game runs Phaser.CANVAS
@@ -2331,6 +2344,7 @@ export class MenuScene extends Phaser.Scene {
     // Same real-2D-canvas approach as the player glow above, for the goal
     // star's own ambient halo -- see the field's own comment.
     this.boardDynamicGraphics = this.add.graphics();
+    this.goalBeaconGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
     this.headerSettingsIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.headerLeaderboardIconImage = this.add.image(0, 0, MAZER_HUD_LEADERBOARD_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
@@ -2341,6 +2355,7 @@ export class MenuScene extends Phaser.Scene {
       this.boardStaticGraphics,
       this.boardPathGraphics,
       this.boardTileLayer.image,
+      this.goalBeaconGraphics,
       // Before boardDynamicGraphics: the play trail's canvas-composited
       // core/glow render here, underneath the start/goal/player markers
       // drawn into boardDynamicGraphics right after it. The player marker's
@@ -5861,8 +5876,10 @@ export class MenuScene extends Phaser.Scene {
       return true;
     }
 
+    // A null row limit means the row counter is not part of this stage (the deconstruct), not "show all":
+    // see isBoardCellRevealed. Markers/player on a dissolved tile must go with it.
     const rowLimit = this.resolveLegacyMenuStaticDrawRowLimit();
-    return rowLimit === null || point.y < rowLimit;
+    return rowLimit !== null && point.y < rowLimit;
   }
 
   private buildLegacyMenuStaticDrawTileOrder(): LegacyPoint[] {
@@ -6437,13 +6454,13 @@ export class MenuScene extends Phaser.Scene {
     const intro = this.resolveLegacyIntroState(time);
     if (intro !== null && this.introStartedAtMs !== null) {
       // The laser and the real-transfer delivery are pinned to the same
-      // intro instant (INTRO_LASER_START_MS) the moment the build begins,
-      // so the beam can neither fire early nor land after input unlocks.
+      // intro instant (the BUILD end, resolveIntroLaserStartMs) the moment the build begins,
+      // so the beams can neither fire before the maze is complete nor land after input unlocks.
       if (
         (this.playerSpawnBurstStartedAtMs === null && !this.prefersLegacyReducedMotion())
         || (this.playerTransferEnergyArmed && this.playerTransferEnergyDeliveryStartedAtMs === null)
       ) {
-        this.armLegacyPlayerArrivalForFinalBuildStep(time, (this.introStartedAtMs + INTRO_LASER_START_MS) - time);
+        this.armLegacyPlayerArrivalForFinalBuildStep(time, (this.introStartedAtMs + resolveIntroLaserStartMs(this.menuStaticDrawTileOrder.length)) - time);
       }
       this.syncLegacyEdgePathsVisible(intro.bleedProgress === 1);
       if (this.menuStaticDrawTilesVisible !== null && intro.tilesVisible !== this.menuStaticDrawTilesVisible) {
@@ -6523,14 +6540,23 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
     this.introStartedAtMs = time - skippedElapsedMs;
-    if (this.playerSpawnBurstStartedAtMs !== null) {
-      this.playerSpawnBurstStartedAtMs = this.introStartedAtMs + INTRO_LASER_START_MS;
+    const laserStartedAtMs = this.resolveLegacyIntroLaserStartAtMs();
+    if (laserStartedAtMs !== null && this.playerSpawnBurstStartedAtMs !== null) {
+      this.playerSpawnBurstStartedAtMs = laserStartedAtMs;
     }
-    if (this.playerTransferEnergyDeliveryStartedAtMs !== null) {
-      this.playerTransferEnergyDeliveryStartedAtMs = this.introStartedAtMs + INTRO_LASER_START_MS;
+    if (laserStartedAtMs !== null && this.playerTransferEnergyDeliveryStartedAtMs !== null) {
+      this.playerTransferEnergyDeliveryStartedAtMs = laserStartedAtMs;
     }
     this.advanceLegacyMenuStaticDrawStage(time);
     return true;
+  }
+
+  // The beams leave their diamonds only once the BUILD is complete: an exact point on the intro clock
+  // (resolveIntroLaserStartMs, a pure function of the tile count), never a frame-stepped estimate.
+  private resolveLegacyIntroLaserStartAtMs(): number | null {
+    return this.introStartedAtMs === null
+      ? null
+      : this.introStartedAtMs + resolveIntroLaserStartMs(this.menuStaticDrawTileOrder.length);
   }
 
   // msUntilLaserStart is positive until the intro's laser instant, negative
@@ -7887,8 +7913,7 @@ export class MenuScene extends Phaser.Scene {
         if (!edgeShown && owners !== null && owners[index] === 1) {
           return false;
         }
-        const byTile = tileLimit === null || (ranks !== null && ranks[index]! >= 0 && ranks[index]! < tileLimit);
-        return byTile || rowLimit === null || y < rowLimit;
+        return isBoardCellRevealed(tileLimit, rowLimit, ranks === null ? -1 : ranks[index]!, y);
       }
     };
   }
@@ -8775,6 +8800,7 @@ export class MenuScene extends Phaser.Scene {
   private drawDynamicBoard(time: number): void {
     const { boardLeft, boardTop, boardWidth, boardHeight } = this.layout;
     this.boardDynamicGraphics.clear();
+    this.goalBeaconGraphics.clear();
     this.playerSpawnBurstGraphics.clear();
     this.spawnLaserGraphics.clear();
     // Same "hidden by default, shown only if actually redrawn this frame"
@@ -8850,9 +8876,8 @@ export class MenuScene extends Phaser.Scene {
     // their own cell -- the whole "cast" places at once, same as it now
     // also all clears at once on deconstruct (see markerDeconstructAlpha
     // above).
-    // The beams land at INTRO_LASER_END_MS while the maze is still growing out
-    // from the spawn tile, so the cast (player/start/goal) appears at landing,
-    // not at the end of the build.
+    // The beams fire after the build is complete and land at resolveIntroLaserEndMs
+    // (== input unlock), so the cast (player/start/goal) appears at landing.
     const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== 'building'
       || (this.resolveLegacyIntroState(time)?.laserProgress ?? 0) >= 1;
     const playerSpawnBurst = this.resolveLegacyPlayerSpawnBurstState(time);
@@ -9351,7 +9376,12 @@ export class MenuScene extends Phaser.Scene {
     // serves.
     const elapsedMs = time - this.playerSpawnBurstStartedAtMs - this.resolveGameplayTransferPausedOffsetMs(time);
     const totalMs = LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS + LEGACY_PLAYER_SPAWN_FLASH_MS;
-    if (elapsedMs < 0 || elapsedMs >= totalMs) {
+    if (elapsedMs < 0) {
+      // Armed but the beams have not left yet (they leave when the BUILD completes, a long way into the
+      // intro): the player has not arrived, so its marker stays hidden until the landing.
+      return { active: false, flashProgress: 0, markerRevealAlpha: 0, travelProgress: 0 };
+    }
+    if (elapsedMs >= totalMs) {
       return { active: false, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
     }
 
@@ -9725,8 +9755,7 @@ export class MenuScene extends Phaser.Scene {
       distancePeriodPx: tileSize * LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE,
       timePeriodMs: LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS
     };
-    const coreWidth = Math.max(1, tileSize * LEGACY_PLAY_TRAIL_WIDTH_RATIO);
-    const glowWidth = Math.max(coreWidth, tileSize * LEGACY_PLAY_TRAIL_GLOW_WIDTH_RATIO);
+    const { coreWidth, glowWidth, underlayWidth } = resolveTrailWidths(tileSize);
     // Trail Fade OFF: the full retained trail stays at one stable, uniform
     // base alpha (still subject to lifecycle/deconstruction alpha via
     // alphaMultiplier) -- no age gradient. Trail Fade ON: the existing
@@ -9778,7 +9807,7 @@ export class MenuScene extends Phaser.Scene {
       // sampleCalmTrailEnergyColor: owner-authorized calmer palette (see
       // LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS) -- the frozen 4D-A module
       // and its own sampleTrailEnergyColor are left untouched.
-      const baseColor = sampleCalmTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions);
+      const baseColor = liftTrailColor(sampleCalmTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions));
       let coreColor = baseColor;
       let coreAlpha = ageAlpha * alphaMultiplier;
 
@@ -9810,14 +9839,16 @@ export class MenuScene extends Phaser.Scene {
     // blur to reach for, and a raw CanvasRenderingContext2D gives real round
     // joins on one continuous path plus a genuine shadowBlur halo, neither
     // of which a Graphics stroke call exposes).
-    const canvasSegments: TrailCanvasSegment[] = segments.map((segment) => ({
+    const canvasSegments: TrailLayerSegment[] = segments.map((segment) => ({
       previous: segment.previous,
       current: segment.current,
       glowColor: segment.baseColor,
       coreColor: segment.coreColor,
-      alpha: segment.coreAlpha
+      alpha: segment.coreAlpha,
+      // The dark ground follows the lifecycle fade only, never the age fade (keeps the core's contrast).
+      underlayAlpha: alphaMultiplier
     }));
-    this.drawTrailCanvasSegments(canvasSegments, coreWidth, glowWidth);
+    this.drawTrailCanvasSegments(canvasSegments, coreWidth, glowWidth, underlayWidth);
 
     const perfDrawEndedAtMs = performance.now();
     this.lastTrailPerfDiagnostics = {
@@ -9855,9 +9886,10 @@ export class MenuScene extends Phaser.Scene {
   // board-space units and reading as soft/blurry next to the rest of the
   // (resolution-aware) scene.
   private drawTrailCanvasSegments(
-    segments: readonly TrailCanvasSegment[],
+    segments: readonly TrailLayerSegment[],
     coreWidth: number,
-    glowWidth: number
+    glowWidth: number,
+    underlayWidth: number
   ): void {
     if (!this.trailCanvasTexture || !this.trailCanvasImage || segments.length === 0) {
       return;
@@ -9910,32 +9942,29 @@ export class MenuScene extends Phaser.Scene {
     // device-pixel blur, once downscaled for display, reads as the same
     // logical radius regardless of backing resolution.
     this.trailCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
-    if (this.boardTileStyle === 'chip') {
-      // Open item A8 of the Chip amendment: several energy stops fall under 3:1 on the mid-tone chip, so
-      // the trail sits on a dark underlay (bg.canvas, wider than the core by LEGACY_TRAIL_UNDERLAY_PAD_CSS
-      // each side). Same function, same path; alpha follows the trail's own fade.
-      drawTrailToCanvasContext(this.trailCanvasTexture.context, segments.map((segment) => ({
-        ...segment,
-        glowColor: boardMaterial.void,
-        coreColor: boardMaterial.void,
-        alpha: segment.alpha * LEGACY_TRAIL_UNDERLAY_ALPHA
-      })), {
-        originX: bounds.left,
-        originY: bounds.top,
-        coreWidth: coreWidth + (2 * LEGACY_TRAIL_UNDERLAY_PAD_CSS),
-        glowWidth,
-        glowAlphaRatio: 0,
-        glowBlurPx: 0
-      });
-    }
-    drawTrailToCanvasContext(this.trailCanvasTexture.context, segments, {
+    const trailDrawOptions = {
       originX: bounds.left,
       originY: bounds.top,
       coreWidth,
       glowWidth,
       glowAlphaRatio: LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO,
       glowBlurPx: Math.max(2, glowWidth * 0.5) * resolution
-    });
+    };
+    if (this.boardTileStyle === 'chip') {
+      // Open item A8 of the Chip amendment: several energy stops fall under 3:1 on the mid-tone chip, so
+      // the trail sits on a dark underlay (bg.canvas, wider than the core: resolveTrailWidths). Layering,
+      // bottom to top: neon bloom, dark underlay, crisp core (src/render/trailLayersCanvas.ts). Same path and
+      // colours as the single compositor; the underlay follows the lifecycle fade only (underlayAlpha), the
+      // core also follows the trail's age fade.
+      drawTrailLayersToCanvasContext(this.trailCanvasTexture.context, segments, {
+        ...trailDrawOptions,
+        underlayWidth,
+        underlayColor: boardMaterial.void,
+        underlayAlpha: LEGACY_TRAIL_UNDERLAY_ALPHA
+      });
+    } else {
+      drawTrailToCanvasContext(this.trailCanvasTexture.context, segments, trailDrawOptions);
+    }
     this.trailCanvasTexture.refresh();
     this.trailCanvasImage.setPosition(bounds.left, bounds.top);
     this.trailCanvasImage.setDisplaySize(width, height);
@@ -9991,7 +10020,22 @@ export class MenuScene extends Phaser.Scene {
     const context = new PhaserGraphicsTileContext(this.boardDynamicGraphics);
     context.opacity = Math.min(1, alpha);
     const phase = time !== undefined ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2 : 0;
+    if (kind === 'goal') {
+      const beaconContext = new PhaserGraphicsTileContext(this.goalBeaconGraphics);
+      drawGoalBeacon(beaconContext, {
+        goal: point,
+        tileSize,
+        devicePixelRatio: this.resolveBoardTileBackingScale(),
+        originX: origin.x,
+        originY: origin.y,
+        timeMs: time ?? 0,
+        reducedMotion: this.prefersLegacyReducedMotion(),
+        minBadgeDiameterCss: BOARD_MARKER_MIN_CSS.goalBadgeDiameterCss,
+        opacity: Math.min(1, alpha)
+      });
+    }
     drawBoardMarkers(context, {
+      minimumMarkerSizes: BOARD_MARKER_MIN_CSS,
       style: this.boardTileStyle,
       tileSize,
       devicePixelRatio: this.resolveBoardTileBackingScale(),

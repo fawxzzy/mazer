@@ -87,7 +87,7 @@ describe('legacy scene transition integrity', () => {
     // frame-stepped build-remaining estimate), and input unlocks / the build
     // settles from the SAME timeline (intro.inputUnlocked == laser landing).
     expect(advanceBuild).not.toContain('resolveLegacyStaticDrawBuildRemainingMs');
-    expect(advanceBuild).toContain('(this.introStartedAtMs + INTRO_LASER_START_MS) - time');
+    expect(advanceBuild).toContain('(this.introStartedAtMs + resolveIntroLaserStartMs(this.menuStaticDrawTileOrder.length)) - time');
     expect(advanceBuild).toContain('if (intro.inputUnlocked) {');
     expect(arrival).toContain('this.playerSpawnBurstStartedAtMs ??= laserStartedAtMs;');
     // The inbound transfer beam fires from the same intro instant as the

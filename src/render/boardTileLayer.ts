@@ -71,6 +71,27 @@ export const buildRankGrid = (
   return ranks;
 };
 
+/**
+ * Is a floor cell shown while a staged build/deconstruct is running?
+ *
+ * tileLimit = live BFS tile count (null = no tile limit, every tile shown); rowLimit = the legacy row
+ * counter (null = not row-limited). A cell is shown when its rank is below the tile limit OR it sits
+ * above the row limit. A null row limit means "the row counter is not part of this stage", NEVER
+ * "everything is revealed": reading it as "show all" kept the whole board on screen for the entire
+ * deconstruct (the build arms rowLimit = 0, the deconstruct arms rowLimit = null), so the dissolve was
+ * invisible and the maze only vanished when the next one replaced it.
+ */
+export const isBoardCellRevealed = (
+  tileLimit: number | null,
+  rowLimit: number | null,
+  rank: number,
+  y: number
+): boolean => (
+  tileLimit === null
+  || (rank >= 0 && rank < tileLimit)
+  || (rowLimit !== null && y < rowLimit)
+);
+
 /** The subset of CanvasRenderingContext2D the reveal composite uses. */
 export interface BoardRevealContext2D {
   globalCompositeOperation: string;
