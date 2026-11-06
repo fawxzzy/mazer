@@ -657,7 +657,7 @@ const calibrateCase = (
   caseResult: CalibrationCase;
   progressionState: ReturnType<typeof createEmptyLegacyProgressionState>;
 } => {
-  const maze = createLegacyGeneratedMenuMaze(scale, seed);
+  const maze = createLegacyGeneratedMenuMaze(scale, scale, seed);
   const episode = createLegacyDemoWalkerEpisode(maze);
   const baseConfig = createLegacyMenuDemoWalkerConfig(seed);
   const config = {
