@@ -35,7 +35,8 @@
  *   the spawn laser's emitter, and flashes once (~120 ms) on a wrapped step,
  *   paired with the destination edge.
  *
- * Lasers: on arrival ALL 8 diamonds fire a beam inward to the spawn tile; on
+ * Lasers: on arrival ALL 8 diamonds (orbiting and lit through the whole build, parked on their
+ * rest stations once it completes) fire a beam inward to the spawn tile; on
  * departure the player fires a beam out to ALL 8 diamonds. Each beam is a 3 px
  * glow + 1 px core + head dot, staggered by at most 60 ms across the ring and
  * derived only from the master timeline's laserProgress, so menu and play can
@@ -527,6 +528,11 @@ export interface EdgeRingLifecycle {
 export const EDGE_RING_LANDING_RAMP = 0.2;
 /** Fraction of the beam flight over which an arriving diamond brightens after it fires. */
 export const EDGE_RING_FIRE_RAMP = 0.2;
+/**
+ * Arrival lighting floor: all 8 diamonds are lit (at this fraction of full energy) for the whole
+ * build, while the ring orbits and before any beam leaves; firing brightens a diamond to 1.
+ */
+export const EDGE_RING_BUILD_LIT = 0.6;
 
 const smoothUnit = (value: number): number => {
   const x = clampUnit(value);
@@ -536,8 +542,9 @@ const smoothUnit = (value: number): number => {
 /**
  * Per-station lighting (index = station id) derived from each beam's own
  * progress and the ring-wide envelope:
- * - arrival (inward): a diamond is lit from the instant its beam leaves and STAYS
- *   lit for the whole maze generation; the envelope fades all 8 out together;
+ * - arrival (inward): all 8 diamonds are lit (EDGE_RING_BUILD_LIT) from the start of the build
+ *   while the ring orbits, brighten to full as their own beam fires (the beams leave only after the
+ *   build is complete) and the envelope fades all 8 out together after the landing;
  * - departure (outward): a diamond lights as the player's beam REACHES it
  *   (progress -> 1) and stays lit until the envelope fades at the end.
  * Null lifecycle = at rest = all zero.
@@ -551,7 +558,7 @@ export const resolveEdgeRingEnergies = (
   }
   const progress = resolveEdgeBeamProgress(clampUnit(lifecycle.laserProgress), index, count);
   const own = lifecycle.direction === 'inward'
-    ? (progress > 0 ? smoothUnit(progress / EDGE_RING_FIRE_RAMP) : 0)
+    ? EDGE_RING_BUILD_LIT + ((1 - EDGE_RING_BUILD_LIT) * (progress > 0 ? smoothUnit(progress / EDGE_RING_FIRE_RAMP) : 0))
     : smoothUnit((progress - (1 - EDGE_RING_LANDING_RAMP)) / EDGE_RING_LANDING_RAMP);
   return own * clampUnit(lifecycle.ringEnergy);
 });
