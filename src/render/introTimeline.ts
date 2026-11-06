@@ -17,8 +17,10 @@
  *   digit-in         0-200      level digit fades/scales in (skipped when the digit is
  *                               already up from the preceding deconstruct)
  *   laser          100-500      ALL 8 edge diamonds fire a beam inward to the spawn tile
- *                               (stagger <= 60 ms, every beam lands by 500). The ring
- *                               spins one whole turn from 100 to the reveal end
+ *                               (stagger <= 60 ms, every beam lands by 500). The ring is
+ *                               parked on its stations while the beams fly, then
+ *                               circulates one full lap clockwise along the viewport
+ *                               perimeter from 500 to the reveal end
  *   pop            500-850      6-sparkle poof where the beams converge
  *   reveal      500-(500+R)     tilesVisible = max(1, ceil(N * t / R)), R = revealMs(N);
  *                               LINEAR, grows out from the spawn tile; the digit fades
@@ -30,14 +32,15 @@
  *   done           500+R+250    nothing left to animate
  *
  * Deconstruct (resolveIntroDeconstruct) is the mirror: the player fires a beam out to
- * ALL 8 diamonds (0-400; each diamond lights as its beam reaches it, and the ring
- * spins one whole turn over the whole deconstruct), the edge paths vanish atomically
+ * ALL 8 diamonds (0-400; each diamond lights as its beam reaches it; the ring stays
+ * parked while the beams fly, then circulates one full lap COUNTER-clockwise along the
+ * perimeter from 400 to the end: it unwinds what the build wound), the edge paths vanish atomically
  * at 400, the tiles dissolve LINEARLY from 400 over removeMs(N) = clamp(N / 70
  * tiles/s, 1800, 3000) ms, then a 300 ms handoff beat. The lighting fades over the
  * last 150 ms.
  *
  * Reduced motion: a 250 ms crossfade (digit fades out while the finished board
- * fades in), no laser, no sparkles, no spin, no ring lighting, input unlocks at 250 ms.
+ * fades in), no laser, no sparkles, no orbit, no ring lighting, input unlocks at 250 ms.
  *
  * No Phaser, DOM, randomness or wall-clock dependency.
  */
@@ -74,7 +77,7 @@ export interface IntroState {
   readonly bleedProgress: 0 | 1;
   /** Reduced motion only: 0..1 board fade-in (always 1 otherwise). */
   readonly boardAlpha: number;
-  /** Diamond-ring spin in radians (whole turns: exactly 0 at rest and after the intro). */
+  /** Diamond-ring orbit phase in radians (+ = clockwise; whole laps: exactly 0 at rest, before 500 ms and after the intro). */
   readonly ringSpinRad: number;
   /** Ring-wide lighting envelope 0..1: 1 while the maze is generated, fading to 0 after the reveal. */
   readonly ringEnergy: number;
@@ -116,8 +119,12 @@ export const INTRO_DIGIT_MIN_SCALE = 0.72;
 export const INTRO_SKIP_GRACE_MS = 200;
 /** The ring lighting fades out over this long once the reveal ends (arrival) / near the outro end. */
 export const RING_ENERGY_FADE_MS = 150;
-/** Whole turns the diamond ring spins over the intro and over the outro (lands on rest orientation). */
-export const RING_SPIN_TURNS = 1;
+/**
+ * Whole laps the diamond ring circulates along the viewport perimeter over the
+ * intro (clockwise, +) and over the outro (counter-clockwise, -): a whole
+ * number of laps is exactly the fixed rest layout.
+ */
+export const RING_ORBIT_LAPS = 1;
 
 /** Maze-to-maze deconstruct (mirror of the intro), measured from the arm instant. */
 export const OUTRO_PLAYER_REMOVE_MS = 150;
@@ -222,13 +229,21 @@ export const skipIntroElapsedMs = (
 ): number => Math.max(normalizeElapsed(elapsedMs), resolveIntroDurationMs(reducedMotion, tileCount));
 
 /**
- * Whole-turn ring spin in radians over [startMs, endMs]:
- * 2*pi*turns*smootherstep. Exactly 0 before the window and exactly 0 (a whole
- * number of turns = the rest orientation) once it has ended.
+ * Ring orbit phase in radians over [startMs, endMs] (the timeline field is still
+ * called ringSpinRad): direction * 2*pi*laps*smoothstep. 2*pi = one full lap
+ * of the perimeter (resolveOrbitingEdgeStations). Exactly 0 before the window
+ * and exactly 0 (a whole number of laps = the rest layout) once it has ended.
  */
-export const resolveRingSpinRad = (elapsedMs: number, startMs: number, endMs: number): number => {
+export const resolveRingOrbitRad = (
+  elapsedMs: number,
+  startMs: number,
+  endMs: number,
+  direction: 1 | -1
+): number => {
   const progress = (elapsedMs - startMs) / (endMs - startMs);
-  return progress <= 0 || progress >= 1 ? 0 : Math.PI * 2 * RING_SPIN_TURNS * smootherstep(progress);
+  // smoothstep, not smootherstep: zero speed at both ends, but the mid-window peak is 1.5x the average
+  // speed (smootherstep would be 2.25x here), which reads as travel instead of a lurch on a long edge.
+  return progress <= 0 || progress >= 1 ? 0 : direction * Math.PI * 2 * RING_ORBIT_LAPS * smoothstep(progress);
 };
 
 /** 1 until `fadeStartMs`, then falls linearly to exactly 0 over RING_ENERGY_FADE_MS. */
@@ -323,7 +338,7 @@ export const resolveIntro = (elapsedMs: number, options: IntroOptions): IntroSta
     goalPulse: goalPulseProgress > 0 && goalPulseProgress < 1 ? Math.sin(goalPulseProgress * Math.PI) : 0,
     bleedProgress: elapsed >= revealEndMs ? 1 : 0,
     boardAlpha: 1,
-    ringSpinRad: resolveRingSpinRad(elapsed, INTRO_LASER_START_MS, revealEndMs),
+    ringSpinRad: resolveRingOrbitRad(elapsed, INTRO_REVEAL_START_MS, revealEndMs, 1),
     ringEnergy: resolveRingEnergyEnvelope(elapsed, revealEndMs),
     inputUnlocked: elapsed >= revealEndMs,
     done: elapsed >= doneMs
@@ -342,7 +357,7 @@ export interface OutroState {
   readonly bleedProgress: 0 | 1;
   /** 0..1 travel of the beams from the player OUT to all 8 diamonds (0 in reduced motion). */
   readonly laserProgress: number;
-  /** Diamond-ring spin in radians (whole turns: exactly 0 at rest and after the outro). */
+  /** Diamond-ring orbit phase in radians (- = counter-clockwise; whole laps: exactly 0 at rest, before 400 ms and after the outro). */
   readonly ringSpinRad: number;
   /** Ring-wide lighting envelope 0..1: 1 until the last 150 ms of the outro, then 0. */
   readonly ringEnergy: number;
@@ -390,7 +405,7 @@ export const resolveIntroDeconstruct = (elapsedMs: number, options: IntroOptions
     digitScale: INTRO_DIGIT_MIN_SCALE + ((1 - INTRO_DIGIT_MIN_SCALE) * digitAlpha),
     bleedProgress: elapsed < OUTRO_EDGE_PATHS_OFF_MS ? 1 : 0,
     laserProgress: smoothstep(elapsed / OUTRO_LASER_MS),
-    ringSpinRad: resolveRingSpinRad(elapsed, 0, totalMs),
+    ringSpinRad: resolveRingOrbitRad(elapsed, OUTRO_TILES_START_MS, totalMs, -1),
     ringEnergy: resolveRingEnergyEnvelope(elapsed, totalMs - RING_ENERGY_FADE_MS),
     tilesGone: elapsed >= tilesEndMs,
     done: elapsed >= totalMs
