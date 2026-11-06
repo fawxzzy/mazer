@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "catalogId": "example-fixture",
+  "budget": { "maxEarnedItems": 12 },
+  "slots": [
+    {
+      "id": "player",
+      "labelKey": "example.cosmetics.slot.player",
+      "acceptedAssetKinds": ["icon"],
+      "requiresAssets": false,
+      "defaultItemId": "player.default"
+    },
+    {
+      "id": "background",
+      "labelKey": "example.cosmetics.slot.background",
+      "acceptedAssetKinds": ["image", "material"],
+      "requiresAssets": false,
+      "defaultItemId": "background.default"
+    }
+  ],
+  "items": [
+    {
+      "id": "player.default",
+      "slotId": "player",
+      "nameKey": "example.cosmetics.item.player.default",
+      "rarity": "common",
+      "source": { "type": "default" },
+      "assetRefs": {}
+    },
+    {
+      "id": "player.spark",
+      "slotId": "player",
+      "nameKey": "example.cosmetics.item.player.spark",
+      "descriptionKey": "example.cosmetics.item.player.spark.description",
+      "rarity": "rare",
+      "source": { "type": "earned", "unlockRuleId": "example.rule.first-clear" },
+      "assetRefs": { "primary": "example.icon.spark" }
+    },
+    {
+      "id": "background.default",
+      "slotId": "background",
+      "nameKey": "example.cosmetics.item.background.default",
+      "rarity": "common",
+      "source": { "type": "default" },
+      "assetRefs": {}
+    },
+    {
+      "id": "background.banner",
+      "slotId": "background",
+      "nameKey": "example.cosmetics.item.background.banner",
+      "rarity": "uncommon",
+      "source": { "type": "earned", "unlockRuleId": "example.rule.ten-clears" },
+      "assetRefs": { "primary": "example.image.banner" }
+    }
+  ]
+}
