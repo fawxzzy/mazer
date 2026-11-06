@@ -357,7 +357,8 @@ const writeIfChanged = async (path, text) => {
   const target = resolve(path);
   let existing = null;
   try { existing = await readFile(target, 'utf8'); } catch (error) { if (error?.code !== 'ENOENT') throw error; }
-  if (existing === text) return { path: target, changed: false };
+  // A CRLF checkout (core.autocrlf) must not count as a content change.
+  if (existing !== null && existing.replace(/\r\n/g, '\n') === text) return { path: target, changed: false };
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, text, 'utf8');
   return { path: target, changed: true };
