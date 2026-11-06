@@ -2235,6 +2235,10 @@ export class MenuScene extends Phaser.Scene {
   // spawn laser is currently leaving from (energized while it fires).
   private edgeMarkerWrapFlash: EdgeWrapFlash | null = null;
   // Stations whose beam is in flight right now (they brighten), and whether any was last frame.
+  // Ids whose beam is in flight THIS frame. Deliberately not private: the QA
+  // verify scripts (scripts/analysis/verify-*teleport*.mjs) read it. The diamond
+  // lighting itself comes from edgeRing, not from this.
+  edgeBeamFiringIds: ReadonlySet<number> = new Set<number>();
   private edgeBeamWasFiring = false;
   // Ring lighting + spin of the current frame (resolveLegacyEdgeRing) and whether
   // the previous frame had a lifecycle (one more redraw clears the last lit frame).
@@ -8779,7 +8783,7 @@ export class MenuScene extends Phaser.Scene {
     playerPoint: LegacyPoint,
     spawnBurst: ReturnType<typeof this.resolveLegacyPlayerSpawnBurstState>
   ): void {
-    let firing = false;
+    let firingIds: ReadonlySet<number> = new Set<number>();
     if (!this.prefersLegacyReducedMotion() && this.overlay === 'none') {
       const boardRelativeX = mazeLeft + ((playerPoint.x + 0.5) * mazeTileSize);
       const boardRelativeY = mazeTop + ((playerPoint.y + 0.5) * mazeTileSize);
@@ -8789,27 +8793,29 @@ export class MenuScene extends Phaser.Scene {
       };
       const outro = this.resolveLegacyOutroState(time);
       if (outro !== null) {
-        firing = drawEdgeBeams(this.spawnLaserGraphics, {
+        firingIds = drawEdgeBeams(this.spawnLaserGraphics, {
           direction: 'outward',
           focus,
           laserProgress: outro.laserProgress,
           spawnPop: 0,
           stations: this.resolveLegacyEdgeStations()
-        }).firingIds.size > 0;
+        }).firingIds;
       } else if (spawnBurst.active) {
-        firing = drawEdgeBeams(this.spawnLaserGraphics, {
+        firingIds = drawEdgeBeams(this.spawnLaserGraphics, {
           direction: 'inward',
           focus,
           laserProgress: spawnBurst.travelProgress,
           spawnPop: spawnBurst.flashProgress,
           stations: this.resolveLegacyEdgeStations()
-        }).firingIds.size > 0;
+        }).firingIds;
       }
     }
     // The diamonds lighting + spin are derived from the intro / outro
     // timelines, so the markers redraw on EVERY frame while a lifecycle is
     // active and once more when it ends (the final frame clears the lighting:
     // no stale lit frames survive into play).
+    const firing = firingIds.size > 0;
+    this.edgeBeamFiringIds = firingIds;
     const ring = this.resolveLegacyEdgeRing(time, spawnBurst);
     const ringActive = ring.lifecycle !== null;
     this.edgeRing = ring;

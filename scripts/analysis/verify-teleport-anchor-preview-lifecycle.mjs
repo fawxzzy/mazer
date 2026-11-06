@@ -85,7 +85,7 @@ const stepOnce = (page) => stepFrames(page, 1);
  * Steps (one real 16 ms frame at a time) until the scene is in a quiet,
  * settled state: draw lifecycle settled, no transfer armed, no beam in
  * flight and -- in the self-playing menu -- inside the calm window between
- * the build finishing and the demo's next goal-reset deconstruct (which
+ * the intro (reveal, ring lighting, goal pulse) finishing and the demo's next goal-reset deconstruct (which
  * fires beams from the player to all 8 diamonds and lights every marker).
  * Waits on state, not on a fixed frame count.
  */
@@ -94,11 +94,17 @@ const stepToQuietSettled = (page, maxSteps = 4000) => page.evaluate((limit) => {
   let t = window.__mazerTeleportQaClockMs ?? scene.time.now;
   for (let i = 0; i < limit; i += 1) {
     const age = scene.introStartedAtMs === null ? null : scene.time.now - scene.introStartedAtMs;
+    // The intro length is a pure function of the tile count (introTimeline.ts):
+    // done = 500 + clamp(N / 70 tiles/s, 2000, 3200) + 250 ms. The calm window is the
+    // 1400 ms after the ring lighting / goal pulse have finished (the diamonds idle again).
+    const tiles = scene.menuStaticDrawTileOrder.length;
+    const doneMs = 500 + Math.max(2000, Math.min(3200, (tiles / 70) * 1000)) + 250;
     const calm = scene.menuStaticDrawLifecyclePhase === 'settled'
       && !scene.isLegacyPlayLifecycleInputLocked()
       && !scene.playerTransferEnergyArmed
       && scene.edgeBeamFiringIds.size === 0
-      && (scene.mode !== 'menu' || (age !== null && age >= 1600 && age <= 3000));
+      && !scene.edgeRingActive
+      && (scene.mode !== 'menu' || (age !== null && age >= doneMs + 64 && age <= doneMs + 1464));
     if (calm) {
       window.__mazerTeleportQaClockMs = t;
       return { settled: true, steps: i, mode: scene.mode };
