@@ -1,6 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
+  LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE,
   LEGACY_UI_COMPACT_BREAKPOINT,
+  LEGACY_UI_MIN_BODY_FONT_SIZE,
   LEGACY_UI_MIN_TOUCH_TARGET,
   resolveLegacyFeatureControlLayout,
   resolveLegacyOverlayContentFlowLayout,
@@ -8,6 +12,7 @@ import {
   resolveLegacyOverlayShellLayout,
   resolveLegacyOptionsGuideLayout,
   resolveLegacyRunStatusPanelLayout,
+  resolveLegacyToggleLabelCandidates,
   resolveLegacyToggleRowLayout,
   resolveLegacyUiLabelCenterY
 } from '../../src/legacy-runtime/legacyUiStandards';
@@ -143,5 +148,41 @@ describe('legacy UI standards', () => {
       controlsTop: 334,
       guideTop: 104
     });
+  });
+});
+
+const normalizeSourceLineEndings = (source: string): string => source.replace(/\r\n?/g, '\n');
+
+describe('320 px clipping guards (Wave 5C)', () => {
+  test('toggle labels fall back from "label: state" to the bare label instead of running under the switch', () => {
+    expect(resolveLegacyToggleLabelCandidates('Animated Background', 'Animated', false)).toEqual([
+      'Animated Background: Animated',
+      'Animated Background'
+    ]);
+    expect(resolveLegacyToggleLabelCandidates('Trail Fade', 'Off', true)).toEqual(['Trail Fade']);
+    expect(resolveLegacyToggleLabelCandidates('Trail Fade', '', false)).toEqual(['Trail Fade']);
+    // 320 px phones get a 228 px card: below the state-lane threshold, so the fallback is live there.
+    expect(resolveLegacyToggleRowLayout(228, 52, false, true).showStateLabel).toBe(false);
+    expect(resolveLegacyToggleRowLayout(338, 52, false, true).showStateLabel).toBe(true);
+  });
+
+  test('body and legend copy never shrink below the minimum readable sizes', () => {
+    expect(LEGACY_UI_MIN_BODY_FONT_SIZE).toBe(11);
+    expect(LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE).toBe(10);
+    for (const width of [304, 344, 374]) {
+      const guide = resolveLegacyOptionsGuideLayout(width, 5);
+      expect(guide.rowMinFontSize).toBeGreaterThanOrEqual(LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE);
+      // A wrapped legend row has to hold two lines at the minimum size inside the row.
+      expect(guide.rowHeight).toBeGreaterThanOrEqual(Math.ceil(LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE * 2 * 1.25));
+    }
+  });
+
+  test('MenuScene wires the clipping guards instead of the old 8 px legend floor and unbounded toggle label', () => {
+    const source = normalizeSourceLineEndings(readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8'));
+    expect(source).not.toContain('compact ? 8 : guideRowMinFontSize');
+    expect(source).toContain('LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE');
+    expect(source).toContain('label.setWordWrapWidth(wrapWidth, true);');
+    expect(source).toContain('resolveLegacyToggleLabelCandidates(input.label, displayStateText, showStateLabel)');
+    expect(source).toContain('LEGACY_UI_MIN_BODY_FONT_SIZE).setOrigin(0, 0.5).setAlpha(0.96);');
   });
 });

@@ -2494,8 +2494,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const stateLabelRight = trackLeft - trackGap;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
-    expect(menuSceneSource).toContain('const visibleLabelText = showStateLabel || !displayStateText');
-    expect(menuSceneSource).toContain('`${input.label}: ${displayStateText}`');
+    expect(menuSceneSource).toContain('resolveLegacyToggleLabelCandidates(input.label, displayStateText, showStateLabel)');
     expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 1 : 0)');
     expect(menuSceneSource).toContain('setVisible(showStateLabel)');
     expect(menuSceneSource).not.toContain("const tightWidth = input.width < 260;");

@@ -195,12 +195,15 @@ import {
   resolveLegacyPauseMenuLayout
 } from '../legacy-runtime/legacyPauseMenuView';
 import {
+  LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE,
   LEGACY_UI_COMPACT_BREAKPOINT,
+  LEGACY_UI_MIN_BODY_FONT_SIZE,
   resolveLegacyFeatureControlLayout,
   resolveLegacyOverlayContentFlowLayout,
   resolveLegacyOverlayPanelLayout,
   resolveLegacyOverlayShellLayout,
   resolveLegacyOptionsGuideLayout,
+  resolveLegacyToggleLabelCandidates,
   resolveLegacyToggleRowLayout,
   resolveLegacyUiLabelCenterY,
   type LegacyUiLabelRole
@@ -11249,6 +11252,39 @@ export class MenuScene extends Phaser.Scene {
     return text;
   }
 
+  // Tries each candidate string richest-first and keeps the first that fits
+  // `maxWidth` at or above `minFontSize`. If none fit, the last (shortest)
+  // candidate is ellipsized at the minimum size instead of overrunning its
+  // lane -- a clipped label is never allowed to run under a neighbouring
+  // control (e.g. a toggle's switch).
+  private fitLegacyUiTextCandidatesToWidth<T extends Phaser.GameObjects.Text>(
+    text: T,
+    candidates: readonly string[],
+    maxWidth: number,
+    maxFontSize: number,
+    minFontSize: number
+  ): T {
+    const safeMaxWidth = Math.max(1, Math.floor(maxWidth));
+    const safeMinFontSize = Math.max(1, Math.min(Math.floor(maxFontSize), Math.floor(minFontSize)));
+    for (const candidate of candidates) {
+      text.setText(candidate);
+      this.fitLegacyUiTextToWidth(text, safeMaxWidth, maxFontSize, safeMinFontSize);
+      if (text.width <= safeMaxWidth) {
+        return text;
+      }
+    }
+
+    const fallback = candidates[candidates.length - 1] ?? '';
+    text.setText(fallback);
+    this.fitLegacyUiTextToWidth(text, safeMaxWidth, maxFontSize, safeMinFontSize);
+    let kept = fallback.length;
+    while (kept > 1 && text.width > safeMaxWidth) {
+      kept -= 1;
+      text.setText(`${fallback.slice(0, kept).trimEnd()}…`);
+    }
+    return text;
+  }
+
   private drawHud(time: number): void {
     this.hudGraphics.clear();
     this.clearHudTexts();
@@ -11875,7 +11911,8 @@ export class MenuScene extends Phaser.Scene {
       fontSize: number,
       originX = 0,
       alpha = 0.94,
-      minFontSize = 9
+      minFontSize = 9,
+      wrapWhenClipped = false
     ): Phaser.GameObjects.Text | null => {
       const label = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(x, y, copy, {
         align: 'left',
@@ -11885,6 +11922,13 @@ export class MenuScene extends Phaser.Scene {
       })), width, fontSize, minFontSize, guideLayout.textWidthSafetyRatio)
         .setOrigin(originX, 0.5)
         .setAlpha(alpha);
+      // Legend copy wraps onto a second line (centered on the row) once it
+      // would otherwise shrink below its minimum size, instead of dropping to
+      // an illegible font or running past the card edge.
+      const wrapWidth = Math.max(1, Math.floor(width * guideLayout.textWidthSafetyRatio));
+      if (wrapWhenClipped && label.width > wrapWidth) {
+        label.setWordWrapWidth(wrapWidth, true);
+      }
       const bounds = visualRectFromBounds(label.getBounds());
       if (viewport !== null && !legacyOverlayScrollRectIntersectsViewport(bounds, viewport)) {
         label.destroy();
@@ -12039,7 +12083,8 @@ export class MenuScene extends Phaser.Scene {
         guideRowFontSize,
         0,
         0.92,
-        compact ? 8 : guideRowMinFontSize
+        Math.max(guideRowMinFontSize, LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE),
+        true
       );
     };
 
@@ -13935,9 +13980,7 @@ export class MenuScene extends Phaser.Scene {
       'toggle-title'
     );
     const displayStateText = input.stateText || (input.checked ? input.onLabel : input.offLabel);
-    const visibleLabelText = showStateLabel || !displayStateText
-      ? input.label
-      : `${input.label}: ${displayStateText}`;
+    const labelCandidates = resolveLegacyToggleLabelCandidates(input.label, displayStateText, showStateLabel);
 
     const panelGraphics = this.add.graphics();
     const drawPanel = (active: boolean): void => {
@@ -13961,11 +14004,11 @@ export class MenuScene extends Phaser.Scene {
     const background = this.add.rectangle(input.x, input.y, input.width, input.height, 0x000000, 0);
     background.setInteractive({ useHandCursor: true });
 
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, titleY, visibleLabelText, {
+    const label = this.fitLegacyUiTextCandidatesToWidth(this.padLegacyUiText(this.add.text(labelX, titleY, labelCandidates[0] ?? '', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${uiLayout.labelFontSize}px`,
       color: toCyberArcadeCssHex(cyberArcadeMaterial.rail.white)
-    })), labelMaxWidth, uiLayout.labelFontSize, 11).setOrigin(0, 0.5).setAlpha(0.96);
+    })), labelCandidates, labelMaxWidth, uiLayout.labelFontSize, LEGACY_UI_MIN_BODY_FONT_SIZE).setOrigin(0, 0.5).setAlpha(0.96);
 
     const stateLabel = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(stateLabelRight, titleY, displayStateText || input.stateText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
