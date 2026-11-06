@@ -28,7 +28,7 @@ export const LEGACY_AUTH_SCREEN_COPY = Object.freeze({
   createAccountLabel: 'Create Account',
   loading: 'Loading…',
   markerLabel: 'MAZER',
-  openingDockLabel: 'Opening',
+  openingDockLabel: 'Opening…',
   privacyLabel: 'Privacy Policy',
   resetPasswordLabel: 'Reset Password',
   signInDockLabel: 'Sign in',
@@ -42,10 +42,11 @@ export const LEGACY_AUTH_SCREEN_COPY = Object.freeze({
  * stops claiming progress. After this the dock returns to `Sign in`
  * (enabled, so the player can retry) and a `Continue in your browser`
  * notice is shown. The family contract lets transient outcome labels replace
- * the dock label for five seconds; 8s adds headroom for a slow redirect. Only
- * the redirect is covered here, not the bounded token exchange.
+ * the dock label for five seconds; 10s (owner decision, 2026-11-05) adds
+ * headroom for a slow redirect. Only the redirect is covered here, not the
+ * bounded token exchange.
  */
-export const LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS = 8000;
+export const LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS = 10000;
 
 // ---------------------------------------------------------------------------
 // Loading copy

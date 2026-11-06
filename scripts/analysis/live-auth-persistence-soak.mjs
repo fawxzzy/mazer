@@ -54,7 +54,13 @@ export const RETIRED_LOCAL_AUTH_CONTROLS = Object.freeze([
   'Privacy',
   'Terms',
   'Sign in',
-  'Play as guest'
+  'Play as guest',
+  // The Welcome entry card's labels (rail + legal row) belong to the forced
+  // auth overlay only; they must never leak onto the signed-out menu.
+  'Create Account',
+  'Reset Password',
+  'Privacy Policy',
+  'Terms of Service'
 ]);
 export const AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY = 'mazer.game-toggles.v1:user:runtime-diagnostics-auth-fixture';
 export const GUEST_FIXTURE_SETTINGS_STORAGE_KEY = 'mazer.game-toggles.v1:guest';

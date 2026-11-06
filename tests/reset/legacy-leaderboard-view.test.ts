@@ -316,8 +316,9 @@ describe('legacy leaderboard view: determinism and pins', () => {
     expect(JSON.stringify(entries)).toBe(snapshot);
   });
 
-  test('pinned strings still appear in the current scene (so the later wiring keeps them)', () => {
+  test('pinned strings are rendered through the view-model: the scene draws the model, the module owns the copy', () => {
     const scene = read('src/scenes/MenuScene.ts');
+    const view = read('src/legacy-runtime/legacyLeaderboardView.ts');
     for (const copy of [
       LEGACY_LEADERBOARD_COPY.loadingUsername,
       LEGACY_LEADERBOARD_COPY.usernameUnavailable,
@@ -328,9 +329,12 @@ describe('legacy leaderboard view: determinism and pins', () => {
       LEGACY_LEADERBOARD_COPY.selfNeedsUsername,
       LEGACY_LEADERBOARD_COPY.errorFallback
     ]) {
-      expect(scene).toContain(`'${copy}'`);
+      expect(view).toContain(`'${copy}'`);
+      expect(scene).not.toContain(`'${copy}'`);
     }
-    expect(scene).toContain('private static readonly LEADERBOARD_VISIBLE_ROWS = 10;');
+    expect(scene).toContain('buildLegacyLeaderboardViewModel(this.resolveLegacyLeaderboardViewState())');
+    expect(scene).toContain('resolveLegacyLeaderboardPageRequest(offset)');
+    expect(scene).not.toContain('LEADERBOARD_VISIBLE_ROWS');
     expect(LEGACY_LEADERBOARD_VISIBLE_ROWS).toBe(10);
   });
 
