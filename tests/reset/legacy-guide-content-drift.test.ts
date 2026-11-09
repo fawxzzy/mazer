@@ -306,6 +306,8 @@ describe('the scene paints exactly what the guide data declares', () => {
     expect(icon).toContain('this.drawLegacyGlyphWordTileBlock(graphics, layout, 0, 1, 1, false)');
     // guide-local icons reuse the board constants/tokens (player) or mirror the stick (move).
     expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('LEGACY_PLAY_PLAYER_MARKER_ACCENT_COLOR');
+    // the ring in the copy is the board's own locator draw (src/render/playerLocator.ts), frozen for the icon.
+    expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('drawPlayerLocator(graphics, {');
     expect(method('private drawLegacyOptionsGuideMoveGlyph(')).toContain('LEGACY_PLAY_TOUCH_BUTTON_STROKE');
     expect(icon).toContain('this.progressionState.tracks.player.level');
   });

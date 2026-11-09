@@ -132,7 +132,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'guide-local'
     },
     id: 'you',
-    text: 'You are the green block.'
+    text: 'You are the green block inside a bright ring.'
   },
   {
     heading: 'Move',
