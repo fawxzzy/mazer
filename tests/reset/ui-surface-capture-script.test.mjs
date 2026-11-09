@@ -862,6 +862,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("'skipped for focused material and layout proof'");
     expect(source).toContain('const isIgnorableConsoleMessage = (message) => (');
     expect(source).toContain("message.text.includes('WebGL: CONTEXT_LOST_WEBGL')");
+    expect(source).toContain("message.text.includes('preloaded using link preload but not used')");
+    expect(source).toContain("message.text.includes('/fonts/space-grotesk/space-grotesk-latin-wght-normal.woff2')");
     expect(source).toContain("createCheck(\n      'play-player-green'");
     expect(source).toContain("createCheck(\n      'play-goal-red'");
     expect(source).toContain("createCheck(\n      'play-stick-controls'");
