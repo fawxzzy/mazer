@@ -559,7 +559,7 @@ export const legacyTuning = {
     trailGlow: 0x15598b,
     goal: 0xff6274,
     goalCore: 0xffe6ea,
-    floor: 0xb2b2b2,
+    floor: 0xc8c8c8,
     hud: {
       panel: 0x07101a,
       panelStroke: 0x6e9bd6,

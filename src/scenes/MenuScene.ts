@@ -24,6 +24,7 @@ import {
 import { drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
 import { BOARD_MARKER_MIN_CSS, BOARD_TILE_GEOMETRY, boardMaterial, type BoardTileStyleId } from '../render/boardTileStyle';
 import { drawGoalBeacon } from '../render/goalBeacon';
+import { PlayerLocatorState, drawPlayerLocator } from '../render/playerLocator';
 import { drawTrailLayersToCanvasContext, type TrailLayerSegment } from '../render/trailLayersCanvas';
 import {
   TRAIL_FADE_ALPHA_MIN,
@@ -1953,6 +1954,8 @@ export class MenuScene extends Phaser.Scene {
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
   // Goal beacon (halo + ping): its own layer UNDER the trail canvas so the trail always sits on top of it.
   private goalBeaconGraphics!: Phaser.GameObjects.Graphics;
+  // Find-me ping scheduler for the play-mode player locator (src/render/playerLocator.ts).
+  private readonly playerLocatorState = new PlayerLocatorState();
   // Navigation Core v1's continuous play trail is composited on a real 2D
   // canvas (src/render/navigationCoreTrailCanvas.ts), not stroked as
   // Phaser Graphics vector paths -- the game runs Phaser.CANVAS
@@ -3264,6 +3267,12 @@ export class MenuScene extends Phaser.Scene {
       this.hudDirty = true;
     }
     if (this.hasLegacyPlayTrailPulsePendingFrame(time)) {
+      this.boardDynamicDirty = true;
+    }
+    // Player locator: a find-me ping on spawn / unpause / next level and after the player idles. It only forces
+    // redraws while a ping is on screen (plus the one that clears it).
+    this.updateLegacyPlayerLocator(time);
+    if (this.playerLocatorState.needsRedraw()) {
       this.boardDynamicDirty = true;
     }
     if (this.hasLegacyBleedOffGlowPendingFrame()) {
@@ -10147,6 +10156,20 @@ export class MenuScene extends Phaser.Scene {
       // underneath standing in for the reference's radial-gradient circle.
       // See LEGACY_PLAY_PLAYER_MARKER_* above for where every ratio here
       // comes from.
+      // Locator (glow, ring, find-me ping, core keyline) sits under the core and the ambient halo; see
+      // src/render/playerLocator.ts. Css-px sized, so it stays findable on dense boards.
+      drawPlayerLocator(this.boardDynamicGraphics, {
+        centerX,
+        centerY,
+        tileSize,
+        coreHalfWidth: coreRadiusX,
+        coreHalfHeight: coreRadiusY,
+        coreCornerRadius: tileSize * LEGACY_PLAY_PLAYER_MARKER_CORNER_RADIUS_RATIO,
+        alpha,
+        timeMs: time,
+        pingStartMs: this.playerLocatorState.activePingStartMs,
+        reducedMotion: this.prefersLegacyReducedMotion()
+      });
       const haloRadiusPx = (tileSize * LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_DIAMETER_RATIO) / 2;
       const haloSteps = 3;
       for (let step = 0; step < haloSteps; step += 1) {
@@ -10634,6 +10657,14 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
     window.location.replace(buildLegacyLevelPreviewExitUrl(window.location.href));
+  }
+
+  private updateLegacyPlayerLocator(time: number): void {
+    const live = this.mode === 'play'
+      && this.overlay === 'none'
+      && (this.menuStaticDrawLifecyclePhase === 'idle' || this.menuStaticDrawLifecyclePhase === 'settled')
+      && this.resolveLegacyPlayerSpawnBurstState(time).markerRevealAlpha >= 1;
+    this.playerLocatorState.update(time, live, this.player?.x ?? -1, this.player?.y ?? -1, this.prefersLegacyReducedMotion());
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
@@ -11729,8 +11760,19 @@ export class MenuScene extends Phaser.Scene {
     const half = (tileSize * LEGACY_PLAY_PLAYER_MARKER_SQUARE_FILL_RATIO) / 2;
     const coreColor = resolveLegacyIridescentPlayerCoreColor(0);
     const cornerRadius = tileSize * LEGACY_PLAY_PLAYER_MARKER_CORNER_RADIUS_RATIO;
-    graphics.fillStyle(LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_COLOR, 0.22);
-    graphics.fillCircle(centerX, centerY, tileSize * 0.5);
+    // Same locator draw as the board (glow, ring, core keyline), frozen: no ping, reduced motion.
+    drawPlayerLocator(graphics, {
+      centerX,
+      centerY,
+      tileSize,
+      coreHalfWidth: half,
+      coreHalfHeight: half,
+      coreCornerRadius: cornerRadius,
+      alpha: 1,
+      timeMs: 0,
+      pingStartMs: -1,
+      reducedMotion: true
+    });
     graphics.fillStyle(coreColor, 0.96);
     graphics.fillRoundedRect(centerX - half, centerY - half, half * 2, half * 2, cornerRadius);
     graphics.lineStyle(Math.max(1, tileSize * LEGACY_PLAY_PLAYER_MARKER_STROKE_RATIO), LEGACY_PLAY_PLAYER_MARKER_ACCENT_COLOR, 0.86);

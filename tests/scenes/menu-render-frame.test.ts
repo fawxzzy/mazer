@@ -2697,6 +2697,7 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
     resolveLegacyLevelAnnouncerVisualState: () => ({ alpha: 0 }),
     resolveLegacyPlayerSpawnBurstState: () => ({ active: false }),
     resolveLegacyPlayerTransferState: () => ({ active: false }),
+    playerLocatorState: { needsRedraw: () => false },
     ...overrides
   };
   const noops = [
@@ -2704,7 +2705,7 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
     'expireLegacyPlayerMessages', 'updateStars', 'advanceLegacyOverlayScrollMomentum',
     'holdLegacyPlayMazeLifecycleDuringPause', 'advanceLegacyMenuStaticDrawStage',
     'isLegacyMenuBuildPrerollActive', 'hasLegacyPlayTrailPulsePendingFrame',
-    'hasLegacyBleedOffGlowPendingFrame', 'hasLegacyPlayerVisualMotionPendingFrame',
+    'hasLegacyBleedOffGlowPendingFrame', 'hasLegacyPlayerVisualMotionPendingFrame', 'updateLegacyPlayerLocator',
     'settleLegacyPlayerTransferEnergy', 'isLegacyMenuHandoffAnimationActive',
     'hasLegacyMenuTitleAnimationPendingFrame', 'drawBackdrop', 'drawStaticBoard',
     'drawBoardPaths', 'drawDynamicBoard', 'drawHud', 'rebuildUi',

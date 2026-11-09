@@ -207,10 +207,12 @@ const buildLocalBoardSupportPalette = (
         glow: mixColor(board.shadow, board.player, 0.18),
         accent: mixColor(board.shadow, board.playerCore, 0.08)
       },
+      // Light-mode support is built from the (always light) core: the halo token follows the floor repair, and
+      // on a mid-light floor it is dark, which would leave the player's support weaker than the trail's.
       light: {
-        underlay: mixColor(board.playerHalo, 0xffffff, 0.26),
-        line: mixColor(board.playerHalo, 0xffffff, 0.54),
-        glow: mixColor(board.playerHalo, board.playerCore, 0.46),
+        underlay: mixColor(board.playerCore, 0xffffff, 0.26),
+        line: mixColor(board.playerCore, 0xffffff, 0.54),
+        glow: mixColor(board.playerCore, board.playerHalo, 0.18),
         accent: mixColor(board.playerCore, 0xffffff, 0.16)
       }
     };
