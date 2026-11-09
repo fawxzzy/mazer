@@ -56,7 +56,11 @@ export type LegacySettingsRowId =
   | 'account-heading'
   | 'reset-progress'
   | 'sign-out'
-  | 'quit-to-menu';
+  | 'quit-to-menu'
+  | 'preview-next'
+  | 'preview-prev'
+  | 'preview-jump-disclosure'
+  | `preview-jump-${number}`;
 
 export type LegacySettingsRowKind =
   | 'action'
@@ -75,7 +79,10 @@ export type LegacySettingsCommand =
   | { type: 'TOGGLE_SETTINGS_GROUP' }
   | { type: 'OPEN_GUIDE' }
   | { type: 'BEGIN_RESET_PROGRESS' }
-  | { type: 'SIGN_OUT' };
+  | { type: 'SIGN_OUT' }
+  // Level Preview (dev/QA route ?previewLevel=N) only; never emitted by the default sheet.
+  | { type: 'PREVIEW_JUMP'; level: number }
+  | { type: 'TOGGLE_PREVIEW_LEVELS' };
 
 export interface LegacySettingsRowModel {
   id: LegacySettingsRowId;
@@ -94,7 +101,7 @@ export interface LegacySettingsRowModel {
 }
 
 export interface LegacySettingsSectionModel {
-  id: 'pause-top' | 'menu-top' | 'settings' | 'account' | 'pause-bottom';
+  id: 'pause-top' | 'menu-top' | 'settings' | 'account' | 'pause-bottom' | 'preview' | 'preview-jump';
   /** Disclosure label (collapsible) or heading text. Null = no header. */
   title: string | null;
   collapsible: boolean;
@@ -110,9 +117,21 @@ export interface LegacySettingsSheetModel {
   sections: readonly LegacySettingsSectionModel[];
 }
 
+export interface LegacySettingsLevelPreviewOptions {
+  /** The level currently being previewed. */
+  level: number;
+  /** Jump-list levels. */
+  checkpoints: readonly number[];
+  /** Smallest / largest valid level (previous / next are omitted at the ends). */
+  minLevel: number;
+  maxLevel: number;
+}
+
 export interface LegacySettingsModelOptions {
   /** Menu only: whether a signed-in account exists (Sign out is shown only then). */
   signedIn?: boolean;
+  /** Pause only: adds the Level Preview section (dev/QA route). Absent = default sheet, unchanged. */
+  levelPreview?: LegacySettingsLevelPreviewOptions;
 }
 
 /* ------------------------------------------------------------------ */
@@ -161,6 +180,37 @@ export const buildLegacySettingsSheetModel = (
   options: LegacySettingsModelOptions = {}
 ): LegacySettingsSheetModel => {
   if (context === 'pause') {
+    const preview = options.levelPreview;
+    const previewSections: LegacySettingsSectionModel[] = preview === undefined ? [] : [
+      {
+        collapsedByDefault: false,
+        collapsible: false,
+        id: 'preview',
+        rows: [
+          row('preview-next', 'action', `Next level (L${Math.min(preview.maxLevel, preview.level + 1)})`, {
+            command: { type: 'PREVIEW_JUMP', level: Math.min(preview.maxLevel, preview.level + 1) },
+            emphasis: 'secondary'
+          }),
+          ...(preview.level > preview.minLevel
+            ? [row('preview-prev', 'action', `Previous level (L${preview.level - 1})`, {
+              command: { type: 'PREVIEW_JUMP', level: preview.level - 1 },
+              emphasis: 'secondary'
+            })]
+            : [])
+        ],
+        title: `Level preview L${preview.level}`
+      },
+      {
+        collapsedByDefault: true,
+        collapsible: true,
+        id: 'preview-jump',
+        rows: preview.checkpoints.map((level) => row(`preview-jump-${level}`, 'action', `Level ${level}`, {
+          command: { type: 'PREVIEW_JUMP', level },
+          emphasis: level === preview.level ? 'primary' : 'tertiary'
+        })),
+        title: 'Jump to level'
+      }
+    ];
     return {
       context,
       overlayId: 'pause',
@@ -172,6 +222,7 @@ export const buildLegacySettingsSheetModel = (
           rows: [row('resume', 'action', 'Resume', { command: { type: 'RESUME_RUN' }, emphasis: 'primary' })],
           title: null
         },
+        ...previewSections,
         {
           collapsedByDefault: true,
           collapsible: true,
@@ -343,6 +394,8 @@ export interface LegacySettingsSheetPlan {
   availableHeight: number;
   /** Whether the Settings group rows are currently laid out. */
   settingsExpanded: boolean;
+  /** Whether the Level Preview jump list is currently laid out. */
+  previewLevelsExpanded: boolean;
 }
 
 export interface LegacySettingsPlanInput {
@@ -354,6 +407,10 @@ export interface LegacySettingsPlanInput {
   signedIn?: boolean;
   /** Pause only: whether the Settings disclosure is open. Menu is always open. */
   settingsExpanded?: boolean;
+  /** Pause only: Level Preview section (dev/QA route). Absent = default sheet. */
+  levelPreview?: LegacySettingsLevelPreviewOptions;
+  /** Pause + levelPreview only: whether the Jump to level disclosure is open. */
+  previewLevelsExpanded?: boolean;
 }
 
 const rectOf = (left: number, top: number, width: number, height: number): LegacySettingsRect => ({
@@ -425,7 +482,8 @@ const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: n
  */
 const flattenRows = (
   model: LegacySettingsSheetModel,
-  settingsExpanded: boolean
+  settingsExpanded: boolean,
+  previewLevelsExpanded: boolean
 ): Array<{ gapBefore: number; row: LegacySettingsRowModel }> => {
   const s = LEGACY_SETTINGS_SIZES;
   const out: Array<{ gapBefore: number; row: LegacySettingsRowModel }> = [];
@@ -436,11 +494,12 @@ const flattenRows = (
   for (const section of model.sections) {
     const sectionGap = s.sectionGap;
     if (section.collapsible && section.title !== null) {
-      push(row('settings-disclosure', 'disclosure', section.title, {
-        command: { type: 'TOGGLE_SETTINGS_GROUP' },
+      const isPreviewJump = section.id === 'preview-jump';
+      push(row(isPreviewJump ? 'preview-jump-disclosure' : 'settings-disclosure', 'disclosure', section.title, {
+        command: isPreviewJump ? { type: 'TOGGLE_PREVIEW_LEVELS' } : { type: 'TOGGLE_SETTINGS_GROUP' },
         emphasis: 'secondary'
       }), sectionGap);
-      if (!settingsExpanded) {
+      if (!(isPreviewJump ? previewLevelsExpanded : settingsExpanded)) {
         continue;
       }
       section.rows.forEach((r, index) => push(r, index === 0 ? sectionGap : s.rowGap));
@@ -460,7 +519,10 @@ const flattenRows = (
 
 export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): LegacySettingsSheetPlan => {
   const s = LEGACY_SETTINGS_SIZES;
-  const model = buildLegacySettingsSheetModel(input.context, { signedIn: input.signedIn });
+  const model = buildLegacySettingsSheetModel(input.context, {
+    levelPreview: input.context === 'pause' ? input.levelPreview : undefined,
+    signedIn: input.signedIn
+  });
   const panel = resolveLegacyOverlayPanelLayout(input.width, input.height, input.safeArea ?? {});
   const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
   const settingsExpanded = input.context === 'menu' ? true : input.settingsExpanded === true;
@@ -471,7 +533,10 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
   const cardWidth = Math.min(compact ? 360 : 400, Math.max(1, panel.width - (compact ? 16 : 48)));
   const innerWidth = Math.max(1, cardWidth - (cardPadding * 2));
 
-  const flat = flattenRows(model, settingsExpanded);
+  const previewLevelsExpanded = input.context === 'pause'
+    && input.levelPreview !== undefined
+    && input.previewLevelsExpanded === true;
+  const flat = flattenRows(model, settingsExpanded, previewLevelsExpanded);
   const layoutItems = (rowWidth: number): { contentHeight: number; items: LegacySettingsPlanItem[] } => {
     let cursor = 0;
     const laidOut = flat.map(({ gapBefore, row: rowModel }): LegacySettingsPlanItem => {
@@ -523,6 +588,7 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
     naturalCardHeight,
     panel,
     scrollable,
+    previewLevelsExpanded,
     settingsExpanded,
     title: {
       centerX: panel.centerX,

@@ -13,6 +13,7 @@ import {
   resolveMazerLegalRoute,
   type MazerOAuthClient
 } from '../legacy-runtime/legacyAccountPortal';
+import { isLegacyLevelPreviewRoute } from '../legacy-runtime/legacyLevelPreview';
 import { bootstrapLegacyRemoteAccountStateForRoute } from '../legacy-runtime/legacyRemoteProgression';
 import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { runBoundedAccountBootstrap } from './bootAccountBootstrap';
@@ -154,6 +155,7 @@ const boot = async (): Promise<void> => {
     forceInstallGate,
     isLocalhostRuntime: isLocalhostRuntime(),
     legalRouteRequested: legalRoute !== null,
+    levelPreviewRequested: isLegacyLevelPreviewRoute(window.location.search),
     oauthCallbackAccepted,
     oauthCallbackRequested,
     passwordRecoveryRequested: passwordRecoveryRouteRequested
