@@ -123,6 +123,19 @@ import {
 } from '../legacy-runtime/legacyMaze';
 import { resolveInitialRuntimeMode } from '../legacy-runtime/legacyLaunchMode';
 import {
+  LEGACY_LEVEL_PREVIEW_CHECKPOINTS,
+  LEGACY_LEVEL_PREVIEW_MAX_LEVEL,
+  LEGACY_LEVEL_PREVIEW_MIN_LEVEL,
+  buildLegacyLevelPreviewExitUrl,
+  clampLegacyLevelPreviewLevel,
+  createLegacyLevelPreviewAuthSnapshot,
+  createLegacyLevelPreviewProgressionState,
+  createLegacyLevelPreviewStorage,
+  formatLegacyLevelPreviewBadge,
+  resolveLegacyLevelPreviewLevel,
+  type LegacyLevelPreviewStorage
+} from '../legacy-runtime/legacyLevelPreview';
+import {
   resolveLegacyOverlayBackAction,
   type LegacyOverlayKind,
   type LegacyRuntimeMode
@@ -1727,6 +1740,13 @@ export class MenuScene extends Phaser.Scene {
   private menuProfileActive = false;
   // Pause card: the collapsible Settings section (collapsed on every open).
   private pauseSettingsExpanded = false;
+  // Level Preview (dev/QA route ?previewLevel=N; see legacyLevelPreview.ts).
+  // Null on every ordinary boot. When set, the scene runs against an
+  // in-memory sandbox storage and the remote-ineligible fixture session, so
+  // nothing reaches the real account, progression keys or Supabase.
+  private levelPreviewLevel: number | null = null;
+  private levelPreviewStorage: LegacyLevelPreviewStorage | null = null;
+  private previewLevelsExpanded = false;
   private leaderboardStatus: 'empty' | 'error' | 'idle' | 'loading' | 'ready' = 'idle';
   private leaderboardErrorMessage: string | null = null;
   private leaderboardEntries: readonly LegacyLeaderboardEntry[] = [];
@@ -2278,6 +2298,11 @@ export class MenuScene extends Phaser.Scene {
     // run and check this flag before this function ever reaches the line
     // that used to set it, leaving it permanently unconsumed.
     this.pendingBootPlayStart = resolveInitialRuntimeMode(runtimeSearch) === 'play';
+    this.levelPreviewLevel = resolveLegacyLevelPreviewLevel(runtimeSearch);
+    this.levelPreviewStorage = this.levelPreviewLevel === null ? null : createLegacyLevelPreviewStorage();
+    if (this.levelPreviewLevel !== null) {
+      this.pendingBootPlayStart = true;
+    }
     this.passwordRecoveryUrlState = readLegacyPasswordRecoveryBootUrlState();
     this.passwordRecoveryState = resolveLegacyPasswordRecoveryEntry(
       createLegacyPasswordRecoveryState(),
@@ -2301,7 +2326,7 @@ export class MenuScene extends Phaser.Scene {
     // Only raise the `Signing you in…` cover when a session is actually being
     // resolved; a first-time signed-out visitor goes straight to Welcome.
     const authGateInitialState = resolveLegacyAuthGateInitialState({
-      authFixtureRoute: isLegacyRuntimeDiagnosticsAuthFixtureRoute(runtimeSearch),
+      authFixtureRoute: isLegacyRuntimeDiagnosticsAuthFixtureRoute(runtimeSearch) || this.levelPreviewLevel !== null,
       bootstrappedAuthenticated: readLegacyBootstrappedAuthSnapshot()?.status === 'authenticated',
       callbackInProgress: false,
       hasStoredSession: hasLegacyStoredAuthSession(this.resolveBrowserLocalStorage())
@@ -6587,6 +6612,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private enterMenuMode(): void {
+    if (this.levelPreviewLevel !== null) {
+      // Preview has no menu of its own: every route back to the menu leaves it.
+      this.exitLegacyLevelPreview();
+      return;
+    }
     // drawLegacyContinuousPlayTrail (which hides this image on every one of
     // its own early-return paths) only ever runs from drawDynamicBoard's
     // play-mode branch -- once mode flips to 'menu' here, that branch (and
@@ -10557,9 +10587,53 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
     this.footerText.setText('');
+    this.drawLegacyLevelPreviewBadge();
 
     const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
     this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);
+  }
+
+  // Level Preview only: a small, quiet "PREVIEW L100" tag in the footer slot
+  // (unused in play). The level is read from the live player track, so it
+  // follows goal-to-goal advances as well as jumps.
+  private drawLegacyLevelPreviewBadge(): void {
+    if (this.levelPreviewLevel === null) {
+      return;
+    }
+    this.footerText
+      .setText(formatLegacyLevelPreviewBadge(this.progressionState.tracks.player.level))
+      .setPosition(this.layout.width / 2, this.layout.footerY - 22)
+      .setFontSize(12)
+      .setColor('#72e0bf')
+      .setAlpha(0.6);
+  }
+
+  // Level Preview only. The sandbox progression is replaced outright (never
+  // merged, never persisted beyond the in-memory store) and play restarts on a
+  // fresh maze built by the unchanged real generation path.
+  private jumpLegacyLevelPreview(level: number): void {
+    if (this.levelPreviewLevel === null) {
+      return;
+    }
+    const next = clampLegacyLevelPreviewLevel(level);
+    this.levelPreviewLevel = next;
+    this.progressionState = writeLegacyProgressionState(
+      this.resolveLegacyProgressionStorage(),
+      createLegacyLevelPreviewProgressionState(next)
+    );
+    this.previewLevelsExpanded = false;
+    this.closeOverlay();
+    this.startPlayMode();
+    this.hudDirty = true;
+  }
+
+  // Leaving preview is a full reload of the URL without the preview param:
+  // the ordinary app then boots from scratch on the real session and storage.
+  private exitLegacyLevelPreview(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.location.replace(buildLegacyLevelPreviewExitUrl(window.location.href));
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
@@ -10971,6 +11045,15 @@ export class MenuScene extends Phaser.Scene {
       context,
       height: this.layout.height,
       safeArea: readMazerViewportGeometry().safeArea,
+      levelPreview: context === 'pause' && this.levelPreviewLevel !== null
+        ? {
+          checkpoints: LEGACY_LEVEL_PREVIEW_CHECKPOINTS,
+          level: Number(this.progressionState.tracks.player.level),
+          maxLevel: LEGACY_LEVEL_PREVIEW_MAX_LEVEL,
+          minLevel: LEGACY_LEVEL_PREVIEW_MIN_LEVEL
+        }
+        : undefined,
+      previewLevelsExpanded: this.previewLevelsExpanded,
       settingsExpanded: this.pauseSettingsExpanded,
       signedIn: this.authSnapshot.status === 'authenticated',
       width: this.layout.width
@@ -11011,6 +11094,14 @@ export class MenuScene extends Phaser.Scene {
         return;
       case 'TOGGLE_SETTINGS_GROUP':
         this.pauseSettingsExpanded = !this.pauseSettingsExpanded;
+        this.resetLegacyOverlayScrollState();
+        this.uiDirty = true;
+        return;
+      case 'PREVIEW_JUMP':
+        this.jumpLegacyLevelPreview(command.level);
+        return;
+      case 'TOGGLE_PREVIEW_LEVELS':
+        this.previewLevelsExpanded = !this.previewLevelsExpanded;
         this.resetLegacyOverlayScrollState();
         this.uiDirty = true;
         return;
@@ -11111,7 +11202,7 @@ export class MenuScene extends Phaser.Scene {
           rect,
           model.label,
           run,
-          plan.settingsExpanded ? 'up' : 'down'
+          (model.id === 'preview-jump-disclosure' ? plan.previewLevelsExpanded : plan.settingsExpanded) ? 'up' : 'down'
         ));
         return;
       case 'nav':
@@ -14611,6 +14702,7 @@ export class MenuScene extends Phaser.Scene {
     }
     if (kind === 'pause') {
       this.pauseSettingsExpanded = false;
+      this.previewLevelsExpanded = false;
     }
     if (kind === 'options' || kind === 'pause') {
       this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
@@ -14971,6 +15063,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null {
+    if (this.levelPreviewLevel !== null) {
+      return createLegacyLevelPreviewAuthSnapshot();
+    }
     if (typeof window === 'undefined') {
       return null;
     }
@@ -15134,6 +15229,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private loadPersistedLegacyProgressionState(): void {
+    if (this.levelPreviewLevel !== null) {
+      this.progressionState = createLegacyLevelPreviewProgressionState(this.levelPreviewLevel);
+      return;
+    }
     this.progressionState = readLegacyProgressionState(this.resolveLegacyProgressionStorage());
   }
 
@@ -15178,6 +15277,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveBrowserLocalStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | undefined {
+    if (this.levelPreviewStorage !== null) {
+      return this.levelPreviewStorage;
+    }
     if (typeof window === 'undefined') {
       return undefined;
     }

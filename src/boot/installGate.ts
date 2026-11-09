@@ -9,6 +9,8 @@ export interface MazerInstallGateBootContext {
   forceInstallGate: boolean;
   isLocalhostRuntime: boolean;
   legalRouteRequested: boolean;
+  /** Dev/QA Level Preview route (?previewLevel=N): sandboxed, so it is never install-gated. */
+  levelPreviewRequested?: boolean;
   oauthCallbackAccepted: boolean;
   oauthCallbackRequested: boolean;
   passwordRecoveryRequested: boolean;
@@ -24,6 +26,7 @@ export interface MazerInstallGateBootContext {
 export const shouldRunMazerInstallGateForBoot = (context: MazerInstallGateBootContext): boolean => (
   (!context.isLocalhostRuntime || context.forceInstallGate)
   && !context.legalRouteRequested
+  && context.levelPreviewRequested !== true
   && !context.oauthCallbackAccepted
   && !context.oauthCallbackRequested
   && !context.passwordRecoveryRequested

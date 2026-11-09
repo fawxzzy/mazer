@@ -53,6 +53,8 @@ import {
   type LegacyRemoteSkippedReason
 } from './legacyPlayerMessage';
 
+import { isLegacyLevelPreviewRoute } from './legacyLevelPreview';
+
 export const LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY = 'VITE_MAZER_REMOTE_PROGRESSION';
 export const LEGACY_REMOTE_AI_PROGRESSION_TABLE = 'mazer_ai_progression_states';
 export const LEGACY_REMOTE_CYCLE_RECEIPTS_TABLE = 'mazer_cycle_receipts';
@@ -614,7 +616,8 @@ export const bootstrapLegacyRemoteAccountStateForRoute = async (
   search: string,
   bootstrap: () => Promise<LegacyRemoteAccountBootstrapResult> = () => bootstrapLegacyRemoteAccountState()
 ): Promise<LegacyRemoteAccountBootstrapResult | null> => {
-  if (isLegacyRuntimeDiagnosticsAuthFixtureRoute(search)) {
+  // The Level Preview sandbox route never touches the real account either.
+  if (isLegacyRuntimeDiagnosticsAuthFixtureRoute(search) || isLegacyLevelPreviewRoute(search)) {
     return null;
   }
 
