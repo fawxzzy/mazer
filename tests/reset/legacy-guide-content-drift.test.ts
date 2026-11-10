@@ -101,9 +101,13 @@ describe('guide copy only names things that exist', () => {
     LEGACY_GUIDE_CLOSE_LABEL
   ].join(' \n ');
 
-  test('retired or non-visible vocabulary is absent: gold start, rank letters, compass, Teleport, Skill, Exit', () => {
+  test('retired or non-visible vocabulary is absent: gold start, compass, Teleport, Skill, Exit; rank wording is only the level-row beat', () => {
     expect(allText).not.toMatch(/\bgold\b/i);
-    expect(allText).not.toMatch(/\brank/i);
+    // Rank letters are visible ONLY as the rank-up caption (legacyFlowBeat.ts); there is no rank chip or rank surface yet.
+    expect(allText.match(/\brank/gi)?.length).toBe(1);
+    expect(row('levels').text).toMatch(/new ranks flash a letter/);
+    expect(MENU_SCENE).toContain('resolveLegacyFlowBeat({');
+    expect(MENU_SCENE).toContain('this.startLegacyFlowBeat(previousProgressionState.tracks.player, this.progressionState.tracks.player);');
     expect(allText).not.toMatch(/compass/i);
     expect(allText).not.toMatch(/teleport/i);
     expect(allText).not.toMatch(/skill/i);
@@ -231,7 +235,7 @@ describe('guide copy only names things that exist', () => {
     expect(plans(60).some((plan) => plan.shortcuts > 0)).toBe(true);
     expect(plans(198).some((plan) => legacyLoopPlanSize(plan) > 0)).toBe(true);
     expect(plans(198).some((plan) => legacyLoopPlanSize(plan) === 0)).toBe(true);
-    // Ranks are not player-visible, so the copy says levels only.
+    // Ranks are visible only as the rank-up caption; the board still draws no level or rank badge.
     expect(MENU_SCENE).toMatch(/private drawLegacyProgressionBadge\(\): VisualRect \| null \{\s*this\.clearLegacyPlayerProgressionBadge\(\);\s*this\.clearLegacyMenuAiProgressionBadge\(\);\s*return null;\s*\}/);
   });
 });
@@ -256,6 +260,7 @@ describe('keyboard line resolves against the live input maps', () => {
     expect(MENU_SCENE).toMatch(/lower === 'a' \|\| event\.key === 'ArrowLeft'/);
     expect(MENU_SCENE).toMatch(/lower === 'd' \|\| event\.key === 'ArrowRight'/);
     expect(MENU_SCENE).toMatch(/lowerKey === 'p' && this\.mode === 'play'/);
+    expect(MENU_SCENE).toMatch(/lowerKey === 'q' && this\.mode === 'play' && this\.overlay === 'pause'/);
     expect(MENU_SCENE).toMatch(/event\.key === 'Escape'/);
   });
 
@@ -266,7 +271,7 @@ describe('keyboard line resolves against the live input maps', () => {
   });
 
   test('the keyboard line is built from the bindings and reads as expected', () => {
-    expect(buildLegacyGuideKeyboardLine()).toBe('Arrow keys or WASD to move. P pauses. Esc goes back.');
+    expect(buildLegacyGuideKeyboardLine()).toBe('Arrow keys or WASD to move. P pauses. Esc goes back. Q twice quits from Pause.');
   });
 });
 

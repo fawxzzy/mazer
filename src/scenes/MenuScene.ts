@@ -256,6 +256,20 @@ import {
   type LegacySettingsSheetPlan
 } from '../legacy-runtime/legacySettingsSheetPlan';
 import {
+  LEGACY_FLOW_BEAT_LEVEL_COLOR,
+  formatLegacyFlowBeatColor,
+  resolveLegacyFlowBeat,
+  resolveLegacyFlowBeatFrame,
+  type LegacyFlowBeat
+} from '../legacy-runtime/legacyFlowBeat';
+import {
+  IDLE_LEGACY_QUIT_CONFIRM_STATE,
+  hasLegacyQuitConfirmExpired,
+  isLegacyQuitConfirmArmed,
+  pressLegacyQuitConfirm,
+  type LegacyQuitConfirmState
+} from '../legacy-runtime/legacyQuitConfirm';
+import {
   buildLegacyGuideSheetModel,
   type LegacyGuideGlyph,
   type LegacyGuideIconSpec
@@ -372,6 +386,7 @@ import {
   type LegacyProgressionGenerationScaleOptions,
   type LegacyProgressionPalette,
   type LegacyProgressionState,
+  type LegacyProgressionTrack,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
 import {
@@ -1834,6 +1849,13 @@ export class MenuScene extends Phaser.Scene {
   // loaded.
   private titleTileFontImagePool: Phaser.GameObjects.Image[] = [];
   private levelAnnouncerLabelText!: Phaser.GameObjects.Text;
+  // Level-complete / rank-up caption (legacyFlowBeat.ts): painted over the board
+  // from the goal-reached instant, concurrent with the goal hold and deconstruct.
+  private flowBeatCaptionText!: Phaser.GameObjects.Text;
+  private flowBeatActive: { beat: LegacyFlowBeat; color: string; startedAtMs: number } | null = null;
+  private flowBeatLastFrameMs: number | null = null;
+  // Pause > Quit to Menu two-step confirm (legacyQuitConfirm.ts).
+  private quitConfirmState: LegacyQuitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
   private levelAnnouncerWasVisible = false;
   // One-more-redraw falling-edge tracker for the arrival laser (see update()).
   private playerSpawnBurstWasActiveForRedraw = false;
@@ -2414,6 +2436,15 @@ export class MenuScene extends Phaser.Scene {
       color: '#36ff7d',
       align: 'center'
     })).setOrigin(0.5).setVisible(false);
+    this.flowBeatCaptionText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '32px',
+      fontStyle: 'bold',
+      color: LEGACY_FLOW_BEAT_LEVEL_COLOR,
+      align: 'center',
+      stroke: '#04100c',
+      strokeThickness: 6
+    })).setOrigin(0.5).setDepth(900).setVisible(false);
     this.levelAnnouncerNumberGraphics = this.add.graphics().setVisible(false);
     this.levelAnnouncerNumberGlyphPool = Array.from(
       { length: LEGACY_TILE_FONT_GLYPH_POOL_SIZE * LEGACY_TILE_FONT_TILES_PER_GLYPH },
@@ -3174,6 +3205,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.holdLegacyPlayMazeLifecycleDuringPause(time);
+    this.updateLegacyFlowFeedback(time);
 
     const pendingReset = this.pendingResetRequest;
     if (pendingReset !== null && shouldConsumeLegacyResetRequest(pendingReset, time)) {
@@ -4227,6 +4259,12 @@ export class MenuScene extends Phaser.Scene {
       } else if (this.overlay === 'none') {
         this.openOverlay('pause');
       }
+      return true;
+    }
+
+    if (lowerKey === 'q' && this.mode === 'play' && this.overlay === 'pause' && !this.settingsGuideOpen) {
+      event.preventDefault();
+      this.pressLegacyQuitToMenu();
       return true;
     }
 
@@ -10572,6 +10610,76 @@ export class MenuScene extends Phaser.Scene {
     return resolveHudTextResolution({ width, height });
   }
 
+  // Starts the caption for a cleared PLAY maze (never the menu demo): "Level N",
+  // or "Rank X" in that rank's colour when this clear crossed into a new rank.
+  // Runs concurrently with the goal hold and deconstruct; it gates nothing.
+  private startLegacyFlowBeat(
+    previousTrack: LegacyProgressionTrack,
+    nextTrack: LegacyProgressionTrack
+  ): void {
+    const beat = resolveLegacyFlowBeat({
+      nextTrack,
+      previousTrack,
+      reducedMotion: this.prefersLegacyReducedMotion()
+    });
+    this.flowBeatActive = {
+      beat,
+      color: beat.kind === 'rank'
+        ? formatLegacyFlowBeatColor(resolveLegacyProgressionPalette(nextTrack, 'player').rankColor)
+        : LEGACY_FLOW_BEAT_LEVEL_COLOR,
+      startedAtMs: this.time.now
+    };
+    this.flowBeatLastFrameMs = this.time.now;
+  }
+
+  // Per-frame flow feedback: reverts an expired "Tap again to quit" row and
+  // paints the level/rank caption.
+  private updateLegacyFlowFeedback(time: number): void {
+    if (hasLegacyQuitConfirmExpired(this.quitConfirmState, time)) {
+      this.quitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
+      this.uiDirty = true;
+    }
+    this.updateLegacyFlowBeatCaption(time);
+  }
+
+  private updateLegacyFlowBeatCaption(time: number): void {
+    const active = this.flowBeatActive;
+    const previousFrameMs = this.flowBeatLastFrameMs;
+    this.flowBeatLastFrameMs = time;
+    if (active === null) {
+      return;
+    }
+    if (this.mode !== 'play') {
+      this.flowBeatActive = null;
+      this.flowBeatCaptionText.setVisible(false);
+      return;
+    }
+    if (this.overlay !== 'none') {
+      // A pause holds the caption (hidden under the sheet) so it is not eaten while paused.
+      if (previousFrameMs !== null) {
+        active.startedAtMs += Math.max(0, time - previousFrameMs);
+      }
+      this.flowBeatCaptionText.setVisible(false);
+      return;
+    }
+    const frame = resolveLegacyFlowBeatFrame(active.beat, time - active.startedAtMs);
+    if (frame.done) {
+      this.flowBeatActive = null;
+      this.flowBeatCaptionText.setVisible(false);
+      return;
+    }
+    const minSide = Math.min(this.layout.width, this.layout.height);
+    // Above the centered level numeral (which spans about +-0.06 * minSide around the middle).
+    this.flowBeatCaptionText
+      .setText(active.beat.text)
+      .setFontSize(`${Math.max(24, Math.min(44, Math.round(minSide * 0.075)))}px`)
+      .setColor(active.color)
+      .setPosition(this.layout.width / 2, (this.layout.height / 2) - (minSide * 0.15))
+      .setScale(frame.scale)
+      .setAlpha(frame.alpha)
+      .setVisible(frame.visible);
+  }
+
   private applyLegacyUiTextCrispness<T extends Phaser.GameObjects.Text>(text: T): T {
     return applyTextResolution(text, this.resolveLegacyUiTextResolution());
   }
@@ -11095,6 +11203,7 @@ export class MenuScene extends Phaser.Scene {
         }
         : undefined,
       previewLevelsExpanded: this.previewLevelsExpanded,
+      quitConfirmArmed: context === 'pause' && isLegacyQuitConfirmArmed(this.quitConfirmState, this.time.now),
       settingsExpanded: this.pauseSettingsExpanded,
       signedIn: this.authSnapshot.status === 'authenticated',
       width: this.layout.width
@@ -11122,13 +11231,29 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  // Pause > Quit to Menu (tap, click or Q). With no move made on this maze it
+  // quits at once; after a move the first press arms the row ("Tap again to
+  // quit", reverts after LEGACY_QUIT_CONFIRM_TIMEOUT_MS) and the second quits.
+  private pressLegacyQuitToMenu(): void {
+    const press = pressLegacyQuitConfirm(this.quitConfirmState, {
+      movesMade: this.playCyclePath.length > 1,
+      nowMs: this.time.now
+    });
+    this.quitConfirmState = press.state;
+    this.uiDirty = true;
+    if (press.outcome === 'armed') {
+      return;
+    }
+    this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu'));
+  }
+
   private runLegacySettingsCommand(command: LegacySettingsCommand): void {
     switch (command.type) {
       case 'RESUME_RUN':
         this.dispatchUiBridgeCommand({ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume'));
         return;
       case 'RETURN_HOME':
-        this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu'));
+        this.pressLegacyQuitToMenu();
         return;
       case 'CLOSE_OVERLAY':
         this.handleBackAction();
@@ -14763,6 +14888,7 @@ export class MenuScene extends Phaser.Scene {
       this.destroyAccountUsernameNativeInput();
       this.accountUsernameActive = false;
     }
+    this.quitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
     if (kind === 'pause') {
       this.pauseSettingsExpanded = false;
       this.previewLevelsExpanded = false;
@@ -14817,6 +14943,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private closeOverlay(): void {
+    this.quitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
     this.settingsGuideOpen = false;
     this.overlayGuideBounds = null;
     if (this.overlay === 'confirm-progression-reset') {
@@ -15517,6 +15644,9 @@ export class MenuScene extends Phaser.Scene {
         latestReceipt,
         this.maze
       );
+      if (surface === 'play') {
+        this.startLegacyFlowBeat(previousProgressionState.tracks.player, this.progressionState.tracks.player);
+      }
       void writeLegacyRemoteCompletion(
         completionAuthSnapshot,
         previousProgressionState,
