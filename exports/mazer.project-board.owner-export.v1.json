@@ -1,11 +1,11 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_80ef484ac111",
+  "export_id": "pbe_mazer_owner_registry_1f31c5d0d414",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:80ef484ac111d5ec8c3a8bbed77f70e356e2efd93d8c5e7cb5a0bd20018a61dc",
+  "source_revision": "sha256:1f31c5d0d41416d25131f765162160b6a59fa10d10b2c9242e26c758aaf93ae3",
   "generated_at": "2026-11-10T16:00:00.000Z",
   "sources": [
     {
@@ -13,7 +13,7 @@
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:44561b8d3137d55d831c07be322088386507e930beafb0fa4dd23017265a63c5",
+      "revision": "sha256:1c2b7bb0f29c0781f2ac8e36f885d60e8b6be0977b1fd06ebc0f220a4ab49ec3",
       "observed_at": "2026-11-10T16:00:00.000Z"
     },
     {
@@ -4215,9 +4215,9 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Extend the ladder to level 268 with side stubs the explorer does not pay for",
-        "description": "The owner saw that the menu maze for level 18000 looks like a level 30 maze. Every level from 198 was the same maze class because the ladder steers on one explorer number and the board is full at level 198. Shrinking the route to raise that number made the other walkers 40 to 57 percent easier, so it was rejected. The new pull request adds exactly one more cell of short side stubs per level (the explorer does not enter stubs of 3 cells or fewer), which keeps the explorer number fixed and strictly orders levels 199 to 268 by cell count. At level 268 against 198 the maze has 38 route junctions instead of 12, 87 dead ends instead of 27 and the random walk takes 3.6 times as many steps. Levels 1 to 198 are byte-identical and levels 268 and above are one class again; the hazard hand-off now starts at 268. This is an open pull request, not merged and not deployed. The numbers are modelled walker difficulty, not player-tested, and the stubs are visible at a glance to a person.",
+        "description": "The owner saw that the menu maze for level 18000 looks like a level 30 maze. Every level from 198 was the same maze class because the ladder steers on one explorer number and the board is full at level 198. Shrinking the route to raise that number made the other walkers 40 to 57 percent easier, so it was rejected. The new pull request adds exactly one more cell of short side stubs per level (the explorer does not enter stubs of 3 cells or fewer), which keeps the explorer number fixed and strictly orders levels 199 to 268 by cell count. At level 268 against 198 the maze has 38 route junctions instead of 12, 87 dead ends instead of 27 and the random walk takes 3.6 times as many steps. Levels 1 to 198 are byte-identical and levels 268 and above are one class again; the hazard hand-off now starts at 268. This is an open pull request, not merged and not deployed. The numbers are modelled walker difficulty, not player-tested, and the stubs are visible at a glance to a person. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "review",
+        "lifecycle": "completed",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [
@@ -4227,7 +4227,7 @@
         "updated_at": "2026-11-10T00:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-013",
         "extensions": {
-          "owner_status": "review",
+          "owner_status": "completed",
           "public_safe": true
         }
       },
@@ -4238,8 +4238,8 @@
         "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "The owner saw that the menu maze for level 18000 looks like a level 30 maze. Every level from 198 was the same maze class because the ladder steers on one explorer number and the board is full at level 198. Shrinking the route to raise that number made the other walkers 40 to 57 percent easier, so it was rejected. The new pull request adds exactly one more cell of short side stubs per level (the explorer does not enter stubs of 3 cells or fewer), which keeps the explorer number fixed and strictly orders levels 199 to 268 by cell count. At level 268 against 198 the maze has 38 route junctions instead of 12, 87 dead ends instead of 27 and the random walk takes 3.6 times as many steps. Levels 1 to 198 are byte-identical and levels 268 and above are one class again; the hazard hand-off now starts at 268. This is an open pull request, not merged and not deployed. The numbers are modelled walker difficulty, not player-tested, and the stubs are visible at a glance to a person.",
-        "objective": "The owner saw that the menu maze for level 18000 looks like a level 30 maze. Every level from 198 was the same maze class because the ladder steers on one explorer number and the board is full at level 198. Shrinking the route to raise that number made the other walkers 40 to 57 percent easier, so it was rejected. The new pull request adds exactly one more cell of short side stubs per level (the explorer does not enter stubs of 3 cells or fewer), which keeps the explorer number fixed and strictly orders levels 199 to 268 by cell count. At level 268 against 198 the maze has 38 route junctions instead of 12, 87 dead ends instead of 27 and the random walk takes 3.6 times as many steps. Levels 1 to 198 are byte-identical and levels 268 and above are one class again; the hazard hand-off now starts at 268. This is an open pull request, not merged and not deployed. The numbers are modelled walker difficulty, not player-tested, and the stubs are visible at a glance to a person.",
+        "summary": "The owner saw that the menu maze for level 18000 looks like a level 30 maze. Every level from 198 was the same maze class because the ladder steers on one explorer number and the board is full at level 198. Shrinking the route to raise that number made the other walkers 40 to 57 percent easier, so it was rejected. The new pull request adds exactly one more cell of short side stubs per level (the explorer does not enter stubs of 3 cells or fewer), which keeps the explorer number fixed and strictly orders levels 199 to 268 by cell count. At level 268 against 198 the maze has 38 route junctions instead of 12, 87 dead ends instead of 27 and the random walk takes 3.6 times as many steps. Levels 1 to 198 are byte-identical and levels 268 and above are one class again; the hazard hand-off now starts at 268. This is an open pull request, not merged and not deployed. The numbers are modelled walker difficulty, not player-tested, and the stubs are visible at a glance to a person. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The owner saw that the menu maze for level 18000 looks like a level 30 maze. Every level from 198 was the same maze class because the ladder steers on one explorer number and the board is full at level 198. Shrinking the route to raise that number made the other walkers 40 to 57 percent easier, so it was rejected. The new pull request adds exactly one more cell of short side stubs per level (the explorer does not enter stubs of 3 cells or fewer), which keeps the explorer number fixed and strictly orders levels 199 to 268 by cell count. At level 268 against 198 the maze has 38 route junctions instead of 12, 87 dead ends instead of 27 and the random walk takes 3.6 times as many steps. Levels 1 to 198 are byte-identical and levels 268 and above are one class again; the hazard hand-off now starts at 268. This is an open pull request, not merged and not deployed. The numbers are modelled walker difficulty, not player-tested, and the stubs are visible at a glance to a person. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Levels 1 to 198 generate the same mazes as before and the golden fixture changes only for levels 199 and above",
           "For any two seeds level N + 1 beats level N as the pair of felt value and fringe cells, up to level 268",
@@ -6876,9 +6876,9 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "End markers without a box, start arrow, visible trail shift, matched diamonds",
-        "description": "After PR #402 went live the owner asked for five changes. (1) The square pad behind the goal star and start marker is gone: the star and play arrow sit directly on the board tile with a thin dark outline for legibility. (2) The start arrow points the way the player will first move (the first step of the solution path; down on the portrait level 1, right on landscape). (3) The trail colour shift is now clearly visible: a shorter, faster hue sweep plus a travelling white sheen band that also shifts the hue, still at least 3:1 against the chip tile and static under reduced motion. (4) The edge diamond border is always the live trail colour and (5) the colour inside the diamonds and the beams is always the player's green, both from one shared palette module. The Guide copy and icons were updated. Open as a pull request; not merged, not deployed, not checked on a real phone.",
+        "description": "After PR #402 went live the owner asked for five changes. (1) The square pad behind the goal star and start marker is gone: the star and play arrow sit directly on the board tile with a thin dark outline for legibility. (2) The start arrow points the way the player will first move (the first step of the solution path; down on the portrait level 1, right on landscape). (3) The trail colour shift is now clearly visible: a shorter, faster hue sweep plus a travelling white sheen band that also shifts the hue, still at least 3:1 against the chip tile and static under reduced motion. (4) The edge diamond border is always the live trail colour and (5) the colour inside the diamonds and the beams is always the player's green, both from one shared palette module. The Guide copy and icons were updated. Open as a pull request; not merged, not deployed, not checked on a real phone. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "review",
+        "lifecycle": "completed",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [
@@ -6889,7 +6889,7 @@
         "updated_at": "2026-11-10T00:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-013",
         "extensions": {
-          "owner_status": "review",
+          "owner_status": "completed",
           "public_safe": true
         }
       },
@@ -6900,8 +6900,8 @@
         "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "After PR #402 went live the owner asked for five changes. (1) The square pad behind the goal star and start marker is gone: the star and play arrow sit directly on the board tile with a thin dark outline for legibility. (2) The start arrow points the way the player will first move (the first step of the solution path; down on the portrait level 1, right on landscape). (3) The trail colour shift is now clearly visible: a shorter, faster hue sweep plus a travelling white sheen band that also shifts the hue, still at least 3:1 against the chip tile and static under reduced motion. (4) The edge diamond border is always the live trail colour and (5) the colour inside the diamonds and the beams is always the player's green, both from one shared palette module. The Guide copy and icons were updated. Open as a pull request; not merged, not deployed, not checked on a real phone.",
-        "objective": "After PR #402 went live the owner asked for five changes. (1) The square pad behind the goal star and start marker is gone: the star and play arrow sit directly on the board tile with a thin dark outline for legibility. (2) The start arrow points the way the player will first move (the first step of the solution path; down on the portrait level 1, right on landscape). (3) The trail colour shift is now clearly visible: a shorter, faster hue sweep plus a travelling white sheen band that also shifts the hue, still at least 3:1 against the chip tile and static under reduced motion. (4) The edge diamond border is always the live trail colour and (5) the colour inside the diamonds and the beams is always the player's green, both from one shared palette module. The Guide copy and icons were updated. Open as a pull request; not merged, not deployed, not checked on a real phone.",
+        "summary": "After PR #402 went live the owner asked for five changes. (1) The square pad behind the goal star and start marker is gone: the star and play arrow sit directly on the board tile with a thin dark outline for legibility. (2) The start arrow points the way the player will first move (the first step of the solution path; down on the portrait level 1, right on landscape). (3) The trail colour shift is now clearly visible: a shorter, faster hue sweep plus a travelling white sheen band that also shifts the hue, still at least 3:1 against the chip tile and static under reduced motion. (4) The edge diamond border is always the live trail colour and (5) the colour inside the diamonds and the beams is always the player's green, both from one shared palette module. The Guide copy and icons were updated. Open as a pull request; not merged, not deployed, not checked on a real phone. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
+        "objective": "After PR #402 went live the owner asked for five changes. (1) The square pad behind the goal star and start marker is gone: the star and play arrow sit directly on the board tile with a thin dark outline for legibility. (2) The start arrow points the way the player will first move (the first step of the solution path; down on the portrait level 1, right on landscape). (3) The trail colour shift is now clearly visible: a shorter, faster hue sweep plus a travelling white sheen band that also shifts the hue, still at least 3:1 against the chip tile and static under reduced motion. (4) The edge diamond border is always the live trail colour and (5) the colour inside the diamonds and the beams is always the player's green, both from one shared palette module. The Guide copy and icons were updated. Open as a pull request; not merged, not deployed, not checked on a real phone. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "No pad or disc is painted behind the start or goal marker, proven on raster pixels at tile sizes 6 to 25 px and pixel ratios 1 to 3",
           "The start arrow points along the first step of the solution path in all four directions, proven by tests and real-game captures",
@@ -6980,8 +6980,8 @@
   "extensions": {
     "stable_identity_count": 133,
     "exported_public_card_count": 133,
-    "exported_open_card_count": 64,
-    "exported_completed_card_count": 54,
+    "exported_open_card_count": 62,
+    "exported_completed_card_count": 56,
     "exported_deferred_card_count": 15,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
