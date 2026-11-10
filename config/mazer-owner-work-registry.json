@@ -8,11 +8,11 @@
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 130,
+    "stableIdentityCount": 131,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 64,
-    "completedCardCount": 51,
+    "openCardCount": 62,
+    "completedCardCount": 54,
     "deferredCardCount": 15,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out."
   },
@@ -278,12 +278,12 @@
     },
     {
       "id": "MAZER-VIS-002",
-      "status": "review",
+      "status": "completed",
       "updatedAt": "2026-11-10T00:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-002",
       "title": "Polish the Chip board: junction dots, player shape, start tile and goal alignment",
-      "description": "The owner asked to remove the dots at path splits, make the player a rounded square that matches the chip tile shape, line the goal tile up exactly with its tile edges at every pixel ratio, and redesign the start tile in the same chip language. PR #402 makes all four changes and is open for review; it has not been checked on a real phone.",
+      "description": "The owner asked to remove the dots at path splits, make the player a rounded square that matches the chip tile shape, line the goal tile up exactly with its tile edges at every pixel ratio, and redesign the start tile in the same chip language. PR #402 makes all four changes and is merged and deployed to mazer.fawxzzy.com on 2026-11-10; it has not been checked on a real phone.",
       "cardType": "feature",
       "priority": "high",
       "dependencies": [
@@ -297,12 +297,12 @@
     },
     {
       "id": "MAZER-VIS-003",
-      "status": "review",
+      "status": "completed",
       "updatedAt": "2026-11-10T00:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-003",
       "title": "Make the player trail iridescent with a gentle pulse",
-      "description": "The owner wants the trail to look like a midnight-sun shimmer that shifts colour along its length and over time, with a gentle pulse. PR #402 adds a back-and-forth sweep through cyan, violet, orchid and apricot that avoids the player's green, the goal's red and the start's gold, clears the contrast floor against the dark underlay, and freezes to a static gradient under reduced motion. It is open for review and not yet checked on a real phone.",
+      "description": "The owner wants the trail to look like a midnight-sun shimmer that shifts colour along its length and over time, with a gentle pulse. PR #402 adds a back-and-forth sweep through cyan, violet, orchid and apricot that avoids the player's green, the goal's red and the start's gold, clears the contrast floor against the dark underlay, and freezes to a static gradient under reduced motion. It is merged and deployed on 2026-11-10 and not yet checked on a real phone.",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
@@ -1201,6 +1201,25 @@
         "Wrap topology diagnostics exist in the legacy maze runtime",
         "A topology contract document exists",
         "An architecture test pins the contract (read, not re-run)"
+      ]
+    },
+    {
+      "id": "MAZER-GEN-004",
+      "status": "completed",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-004",
+      "title": "Fade wrap corridors out between levels 100 and 140 and price them",
+      "description": "Wrap corridors used to switch off at level 120 and make level 120 about 88 steps longer than level 119. PR #404 fades them out from level 100 to 140 and prices each wrap's saving the way loops are priced, so a wrap cannot make a level easier than its target. The largest smoothed single-level step in levels 100 to 150 dropped from 19.4 times the median step to 2.3 times. It is merged and deployed on 2026-11-10. The numbers are modelled walker difficulty, not player-tested, and no wrap level was checked on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-GEN-002"
+      ],
+      "acceptanceCriteria": [
+        "Levels 140 and above own no wrap corridors and levels 1 to 9 are unchanged",
+        "The progression ladder assertion passes with every tuned maze priced inside its target window",
+        "Generation time stays under the worst-build budget at a 4x CPU throttle"
       ]
     },
     {

@@ -1,11 +1,11 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_ce0619345a21",
+  "export_id": "pbe_mazer_owner_registry_2cbc7f245e45",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:ce0619345a21a14fdcf7e3c32762ed7cc8e57584a77e4481f5e7adcfc4f5b421",
+  "source_revision": "sha256:2cbc7f245e45d56bec3a2f6fa18424a117bc3062a76d0ed2da1ecc9895571d79",
   "generated_at": "2026-11-10T14:20:02.000Z",
   "sources": [
     {
@@ -13,7 +13,7 @@
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:6a913cbff191ec8027cd3ae3efbc923a036d8f512fedb097eb25db17e032ca81",
+      "revision": "sha256:c836a06adbc98bfbee49e8e360b743e71693a0cdfc06e2d1c58a19914ef8b1ff",
       "observed_at": "2026-11-10T14:20:02.000Z"
     },
     {
@@ -2110,6 +2110,59 @@
           "Each module has its own source boundary",
           "Each module has dedicated contract tests independent of the shared core",
           "Descendants stay framed as modern extractions, not legacy recoveries"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-gen-004_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-GEN-004",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Fade wrap corridors out between levels 100 and 140 and price them",
+        "description": "Wrap corridors used to switch off at level 120 and make level 120 about 88 steps longer than level 119. PR #404 fades them out from level 100 to 140 and prices each wrap's saving the way loops are priced, so a wrap cannot make a level easier than its target. The largest smoothed single-level step in levels 100 to 150 dropped from 19.4 times the median step to 2.3 times. It is merged and deployed on 2026-11-10. The numbers are modelled walker difficulty, not player-tested, and no wrap level was checked on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "completed",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-GEN-002"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-10T00:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-004",
+        "extensions": {
+          "owner_status": "completed",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-004",
+        "source_status": "current",
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
+      },
+      "content": {
+        "summary": "Wrap corridors used to switch off at level 120 and make level 120 about 88 steps longer than level 119. PR #404 fades them out from level 100 to 140 and prices each wrap's saving the way loops are priced, so a wrap cannot make a level easier than its target. The largest smoothed single-level step in levels 100 to 150 dropped from 19.4 times the median step to 2.3 times. It is merged and deployed on 2026-11-10. The numbers are modelled walker difficulty, not player-tested, and no wrap level was checked on a real phone.",
+        "objective": "Wrap corridors used to switch off at level 120 and make level 120 about 88 steps longer than level 119. PR #404 fades them out from level 100 to 140 and prices each wrap's saving the way loops are priced, so a wrap cannot make a level easier than its target. The largest smoothed single-level step in levels 100 to 150 dropped from 19.4 times the median step to 2.3 times. It is merged and deployed on 2026-11-10. The numbers are modelled walker difficulty, not player-tested, and no wrap level was checked on a real phone.",
+        "acceptance_criteria": [
+          "Levels 140 and above own no wrap corridors and levels 1 to 9 are unchanged",
+          "The progression ladder assertion passes with every tuned maze priced inside its target window",
+          "Generation time stays under the worst-build budget at a 4x CPU throttle"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -6188,9 +6241,9 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Polish the Chip board: junction dots, player shape, start tile and goal alignment",
-        "description": "The owner asked to remove the dots at path splits, make the player a rounded square that matches the chip tile shape, line the goal tile up exactly with its tile edges at every pixel ratio, and redesign the start tile in the same chip language. PR #402 makes all four changes and is open for review; it has not been checked on a real phone.",
+        "description": "The owner asked to remove the dots at path splits, make the player a rounded square that matches the chip tile shape, line the goal tile up exactly with its tile edges at every pixel ratio, and redesign the start tile in the same chip language. PR #402 makes all four changes and is merged and deployed to mazer.fawxzzy.com on 2026-11-10; it has not been checked on a real phone.",
         "card_type": "feature",
-        "lifecycle": "review",
+        "lifecycle": "completed",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [
@@ -6200,7 +6253,7 @@
         "updated_at": "2026-11-10T00:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-002",
         "extensions": {
-          "owner_status": "review",
+          "owner_status": "completed",
           "public_safe": true
         }
       },
@@ -6211,8 +6264,8 @@
         "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "The owner asked to remove the dots at path splits, make the player a rounded square that matches the chip tile shape, line the goal tile up exactly with its tile edges at every pixel ratio, and redesign the start tile in the same chip language. PR #402 makes all four changes and is open for review; it has not been checked on a real phone.",
-        "objective": "The owner asked to remove the dots at path splits, make the player a rounded square that matches the chip tile shape, line the goal tile up exactly with its tile edges at every pixel ratio, and redesign the start tile in the same chip language. PR #402 makes all four changes and is open for review; it has not been checked on a real phone.",
+        "summary": "The owner asked to remove the dots at path splits, make the player a rounded square that matches the chip tile shape, line the goal tile up exactly with its tile edges at every pixel ratio, and redesign the start tile in the same chip language. PR #402 makes all four changes and is merged and deployed to mazer.fawxzzy.com on 2026-11-10; it has not been checked on a real phone.",
+        "objective": "The owner asked to remove the dots at path splits, make the player a rounded square that matches the chip tile shape, line the goal tile up exactly with its tile edges at every pixel ratio, and redesign the start tile in the same chip language. PR #402 makes all four changes and is merged and deployed to mazer.fawxzzy.com on 2026-11-10; it has not been checked on a real phone.",
         "acceptance_criteria": [
           "Split-path dots are gone from the Chip tile bake",
           "Goal and start tiles align pixel-exact to the baked tile at pixel ratios 1 to 3, proven by a raster test at several tile sizes",
@@ -6241,9 +6294,9 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Make the player trail iridescent with a gentle pulse",
-        "description": "The owner wants the trail to look like a midnight-sun shimmer that shifts colour along its length and over time, with a gentle pulse. PR #402 adds a back-and-forth sweep through cyan, violet, orchid and apricot that avoids the player's green, the goal's red and the start's gold, clears the contrast floor against the dark underlay, and freezes to a static gradient under reduced motion. It is open for review and not yet checked on a real phone.",
+        "description": "The owner wants the trail to look like a midnight-sun shimmer that shifts colour along its length and over time, with a gentle pulse. PR #402 adds a back-and-forth sweep through cyan, violet, orchid and apricot that avoids the player's green, the goal's red and the start's gold, clears the contrast floor against the dark underlay, and freezes to a static gradient under reduced motion. It is merged and deployed on 2026-11-10 and not yet checked on a real phone.",
         "card_type": "feature",
-        "lifecycle": "review",
+        "lifecycle": "completed",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
@@ -6253,7 +6306,7 @@
         "updated_at": "2026-11-10T00:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-003",
         "extensions": {
-          "owner_status": "review",
+          "owner_status": "completed",
           "public_safe": true
         }
       },
@@ -6264,8 +6317,8 @@
         "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "The owner wants the trail to look like a midnight-sun shimmer that shifts colour along its length and over time, with a gentle pulse. PR #402 adds a back-and-forth sweep through cyan, violet, orchid and apricot that avoids the player's green, the goal's red and the start's gold, clears the contrast floor against the dark underlay, and freezes to a static gradient under reduced motion. It is open for review and not yet checked on a real phone.",
-        "objective": "The owner wants the trail to look like a midnight-sun shimmer that shifts colour along its length and over time, with a gentle pulse. PR #402 adds a back-and-forth sweep through cyan, violet, orchid and apricot that avoids the player's green, the goal's red and the start's gold, clears the contrast floor against the dark underlay, and freezes to a static gradient under reduced motion. It is open for review and not yet checked on a real phone.",
+        "summary": "The owner wants the trail to look like a midnight-sun shimmer that shifts colour along its length and over time, with a gentle pulse. PR #402 adds a back-and-forth sweep through cyan, violet, orchid and apricot that avoids the player's green, the goal's red and the start's gold, clears the contrast floor against the dark underlay, and freezes to a static gradient under reduced motion. It is merged and deployed on 2026-11-10 and not yet checked on a real phone.",
+        "objective": "The owner wants the trail to look like a midnight-sun shimmer that shifts colour along its length and over time, with a gentle pulse. PR #402 adds a back-and-forth sweep through cyan, violet, orchid and apricot that avoids the player's green, the goal's red and the start's gold, clears the contrast floor against the dark underlay, and freezes to a static gradient under reduced motion. It is merged and deployed on 2026-11-10 and not yet checked on a real phone.",
         "acceptance_criteria": [
           "The trail colour sweeps along its length and drifts over time with a travelling brightness wave",
           "Worst-case trail colour keeps the contrast floor against the chip tile and the underlay",
@@ -6815,10 +6868,10 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 130,
-    "exported_public_card_count": 130,
-    "exported_open_card_count": 64,
-    "exported_completed_card_count": 51,
+    "stable_identity_count": 131,
+    "exported_public_card_count": 131,
+    "exported_open_card_count": 62,
+    "exported_completed_card_count": 54,
     "exported_deferred_card_count": 15,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
