@@ -7,6 +7,8 @@ import {
   GEOMETRY_BUDGET_MIN_STEP,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
   GEOMETRY_BUDGET_STYLE_BANDS,
+  GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL,
+  GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL,
   GEOMETRY_BUDGET_TOP_TARGET,
   GEOMETRY_BUDGET_TAIL_STEP,
   GEOMETRY_BUDGET_TAPE,
@@ -43,8 +45,13 @@ describe('geometry budget style bands', () => {
     expect(resolveGeometryBudgetRungCount(10)).toBe(1);
     expect(resolveGeometryBudgetRungCount(30)).toBe(2);
     expect(resolveGeometryBudgetRungCount(119)).toBe(2);
-    // The top of the ladder uses plain bases: the wrap corridors cost felt headroom.
-    expect(resolveGeometryBudgetRungCount(120)).toBe(0);
+    // The band is the MOST a level owns: it keeps both rungs through the fade (a seeded roll takes
+    // them away gradually, see legacy-wrap-fade.test.ts) and owns none from the fade end, because
+    // the top of the ladder uses plain bases: the wrap corridors cost felt headroom.
+    expect(resolveGeometryBudgetRungCount(GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL - 1)).toBe(2);
+    expect(resolveGeometryBudgetRungCount(GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL)).toBe(0);
+    expect(GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL).toBeLessThan(GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL);
+    expect(GEOMETRY_BUDGET_STYLE_BANDS[GEOMETRY_BUDGET_STYLE_BANDS.length - 1]).toEqual({ fromLevel: GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL, rungs: 0 });
     expect(resolveGeometryBudgetRungCount(LAST_BUDGET_LEVEL)).toBe(0);
     expect(resolveGeometryBudgetRungCount(1_000_000)).toBe(0);
   });

@@ -39,6 +39,7 @@ import {
   carveLegacyLoops,
   breakAccidentalCycles,
   createLoopSearch,
+  createPlanarNeighbors,
   createRouteMeter,
   legacyLoopPlanSize,
   type LegacyLoopCarveResult,
@@ -82,6 +83,11 @@ export interface FeltTuningOptions {
   // (legacyMazeLoops.ts). Omit or an empty plan: a single-route maze, byte-identical
   // to the pre-loop tuner. They use their own random stream.
   readonly loops?: LegacyLoopPlan;
+  // Wrap pricing (percent of the wrap saving, see FELT_WRAP_PRICE_PERCENT): the steps the
+  // maze's wrap corridors give back to a player who knows the map are added to the target
+  // like a loop saving. Omit or 0: wraps are not priced (the tuner of the first ladders,
+  // byte-identical); the ladder passes FELT_WRAP_PRICE_PERCENT.
+  readonly wrapPricePercent?: number;
 }
 
 export interface FeltTuningResult {
@@ -103,7 +109,11 @@ export interface FeltTuningResult {
   readonly loops: readonly LegacyLoopRecord[];
   // Steps the loops give back to a player who knows the map (priced into the target).
   readonly loopSaving: number;
-  // The schedule target before the priced loop saving; target is baseTarget + priced saving.
+  // Steps the wrap corridors give back to a player who knows the map: the shortest route
+  // with the wrap links severed (and loop connectors closed) minus the shortest route with
+  // them (loop connectors closed). Measured on every tune; priced only with wrapPricePercent.
+  readonly wrapSaving: number;
+  // The schedule target before the priced savings; target is baseTarget + priced savings.
   readonly baseTarget: number;
   readonly loopDiagnostics: { attempts: number; rejected: LegacyLoopCarveResult['rejected'] } | null;
   readonly loopTiles: { x: number; y: number }[];
@@ -141,6 +151,13 @@ export const FELT_TUNING_ATTEMPTS = 6;
 // loop connector closed, minus the shortest route as built), at this percent. At 100 each
 // step a loop saves must be paid for by one more explorer step elsewhere in the maze.
 export const FELT_LOOP_PRICE_PERCENT = 100;
+// Wrap pricing. A wrap corridor is a loop through the board edge: a free shortcut for
+// anyone who knows the map, and the explorer walks past it as easily as past a loop. Same
+// rule, same measure: the wrap saving (shortest route with the wrap links severed minus
+// the shortest route as built, loop connectors closed in both so the two savings add up
+// exactly) is paid for by explorer steps elsewhere. Measured by the paired experiment in
+// scripts/analysis/progression-wrap-pricing.ts; see the contract section 2026-11-10 wrap fade.
+export const FELT_WRAP_PRICE_PERCENT = 100;
 export const FELT_TIE_SAMPLES = 6;
 export const FELT_TIE_DEVIATION_LIMIT_PERCENT = 12;
 
@@ -277,7 +294,7 @@ const tuneOnce = (
   let bumps = 0;
   let run = evaluate();
   let routeLength = run.pathLength;
-  const hopeless = run.reachedGoal && run.pathLength > baseTarget + overshoot;
+  let hopeless = run.reachedGoal && run.pathLength > baseTarget + overshoot;
 
   // Try one switchback bump on a random straight stretch of the explorer's path,
   // `depthWanted` deep (shallower when it does not fit). It is kept only when
@@ -349,31 +366,47 @@ const tuneOnce = (
     run = evaluate();
   }
 
-  // ---- Loop pricing --------------------------------------------------------------
-  // The saving is fixed from here on (branches and tips never touch the shortest route).
-  // A level whose priced target would pass the ceiling gives its loops back one at a
-  // time, last first, so the ladder can always land.
+  // ---- Loop and wrap pricing -----------------------------------------------------
+  // The savings are fixed from here on (branches and tips never touch the shortest route).
+  // Two optional pieces of structure give steps back to a player who knows the map, and
+  // both are measured the same way, against one baseline (every optional piece closed):
+  //   loop saving  = shortest route with the loop connectors closed - as built, wraps open;
+  //   wrap saving  = shortest route with the wrap links severed (and connectors closed)
+  //                  - shortest route with the wrap links (connectors closed),
+  // so the two add up to the whole saving exactly and a maze with no wrap is priced
+  // byte-for-byte as before. A level whose priced target would pass the ceiling gives its
+  // loops back one at a time, last first, so the ladder can always land; a wrap cannot be
+  // given back from here (it is part of the base maze), so a base whose wrap alone passes
+  // the ceiling is marked hopeless and the selection tries the next base.
+  const wrapPercent = Math.max(0, Math.trunc(options.wrapPricePercent ?? 0));
   let loopSaving = 0;
-  if (loopRecords.length > 0) {
-    const meter = createRouteMeter(size, explorer.neighbors, startCell, goalCell);
-    const measureLoopSaving = (): number => {
-      const connectors: number[] = [];
-      loopRecords.forEach((record) => record.cells.forEach((cell) => { if (open[cell] === 1) { connectors.push(cell); } }));
-      if (connectors.length === 0) { return 0; }
-      const withLoops = meter(open);
-      connectors.forEach((cell) => { open[cell] = 0; });
-      const without = meter(open);
-      connectors.forEach((cell) => { open[cell] = 1; });
-      return withLoops > 0 && without > 0 ? Math.max(0, without - withLoops) : 0;
+  let wrapSaving = 0;
+  let overCeiling = false;
+  const meter = createRouteMeter(size, explorer.neighbors, startCell, goalCell);
+  const planarMeter = createRouteMeter(size, createPlanarNeighbors(width, height), startCell, goalCell);
+  const measureSavings = (): { loop: number; wrap: number } => {
+    const connectors: number[] = [];
+    loopRecords.forEach((record) => record.cells.forEach((cell) => { if (open[cell] === 1) { connectors.push(cell); } }));
+    const withLoops = meter(open);
+    connectors.forEach((cell) => { open[cell] = 0; });
+    const torusPlain = connectors.length > 0 ? meter(open) : withLoops;
+    const planarPlain = planarMeter(open);
+    connectors.forEach((cell) => { open[cell] = 1; });
+    return {
+      loop: connectors.length > 0 && withLoops > 0 && torusPlain > 0 ? Math.max(0, torusPlain - withLoops) : 0,
+      wrap: torusPlain > 0 && planarPlain > 0 ? Math.max(0, planarPlain - torusPlain) : 0
     };
-    const priced = (saving: number): number => Math.floor((saving * FELT_LOOP_PRICE_PERCENT) / 100);
-    loopSaving = measureLoopSaving();
+  };
+  const priced = (saving: number, percent: number): number => Math.floor((saving * percent) / 100);
+  const total = (): number => priced(loopSaving, FELT_LOOP_PRICE_PERCENT) + priced(wrapSaving, wrapPercent);
+  ({ loop: loopSaving, wrap: wrapSaving } = measureSavings());
+  {
     let dropped = false;
-    while (loopRecords.length > 0 && options.feltCeiling !== undefined && baseTarget + priced(loopSaving) > options.feltCeiling) {
+    while (loopRecords.length > 0 && options.feltCeiling !== undefined && baseTarget + total() > options.feltCeiling) {
       const last = loopRecords[loopRecords.length - 1]!;
       last.cells.forEach((cell) => { open[cell] = 0; });
       loopRecords = loopRecords.slice(0, -1);
-      loopSaving = measureLoopSaving();
+      ({ loop: loopSaving, wrap: wrapSaving } = measureSavings());
       dropped = true;
     }
     if (dropped) {
@@ -381,8 +414,21 @@ const tuneOnce = (
       loopRecords.forEach((record) => record.cells.forEach((cell) => { loopTiles.push(point(cell)); }));
       run = evaluate();
     }
-    target = baseTarget + priced(loopSaving);
+    overCeiling = options.feltCeiling !== undefined && priced(wrapSaving, wrapPercent) > 0 && baseTarget + total() > options.feltCeiling;
+    if (loopRecords.length > 0 || wrapPercent > 0) { target = baseTarget + total(); }
   }
+  // True while the maze's savings are still the ones the target was priced with. A switchback
+  // bump taken later (the no-tip fallback below) lengthens the explorer's path, which can
+  // lengthen the planar route more than the wrap route (or a loop's): it would leave the
+  // recorded saving, and so the priced value of the finished maze, wrong by the difference.
+  const pricedSavingsHold = (): boolean => {
+    if (loopRecords.length === 0 && wrapPercent <= 0) { return true; }
+    const now = measureSavings();
+    return now.loop === loopSaving && (wrapPercent <= 0 || now.wrap === wrapSaving);
+  };
+
+  // The wrap alone puts the priced target past what the tuner can build: nothing to try.
+  if (overCeiling) { hopeless = true; }
 
   // ---- Lever 2: deceptive branches, tips and trims --------------------------
   const addedTiles: { x: number; y: number }[] = [];
@@ -570,7 +616,7 @@ const tuneOnce = (
       // adds exactly the missing 2 per level of depth to the route instead.
       if (edited.length === 0 && mode === 'tip') {
         const gapBefore = windowGap(felt);
-        bumped = tryBump(Math.max(1, Math.min(wanted, maxBumpDepth)), (next) => windowGap(next.steps) < gapBefore);
+        bumped = tryBump(Math.max(1, Math.min(wanted, maxBumpDepth)), (next) => windowGap(next.steps) < gapBefore && pricedSavingsHold());
         if (bumped) { felt = run.steps; }
       }
     } else {
@@ -645,6 +691,7 @@ const tuneOnce = (
     cyclesBroken: brokenCells.length,
     loops: loopRecords,
     loopSaving,
+    wrapSaving,
     baseTarget,
     loopDiagnostics,
     // Connector cells still open at the end (a later switchback bump can close one).

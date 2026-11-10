@@ -45,6 +45,9 @@ export interface DumpedMaze {
   genMs: number;
   // Present only on trees that carve loops; steps the loops give back to a map-knower.
   loopStats: { shortcuts: number; alternates: number; decoys: number; cells: number; saved: number } | null;
+  // Present only on trees that price wraps; the wrap rungs the maze was built with and the
+  // steps they give back to a map-knower.
+  wrapStats: { rungs: number; saved: number } | null;
 }
 
 const levels = parseLevels(arg('levels', '1..300'));
@@ -70,7 +73,8 @@ for (const level of levels) {
         goal: { x: maze.goal.x, y: maze.goal.y },
         solutionLength: maze.solutionPath.length - 1,
         genMs,
-        loopStats: ((maze as { loopStats?: DumpedMaze['loopStats'] }).loopStats) ?? null
+        loopStats: ((maze as { loopStats?: DumpedMaze['loopStats'] }).loopStats) ?? null,
+        wrapStats: ((maze as { wrapStats?: DumpedMaze['wrapStats'] }).wrapStats) ?? null
       });
     }
   }

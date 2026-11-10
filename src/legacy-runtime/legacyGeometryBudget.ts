@@ -86,19 +86,39 @@ export const resolveGeometryBudgetSchedule = (level: number): number => {
   return last[1];
 };
 
-// Style bands: the number of wrap-corridor rungs of the base profile by level.
-// Rung 1 = vertical wrap corridor, rung 2 = horizontal as well. A wrap corridor
-// is a shortcut the explorer can take, so each one costs felt headroom (measured:
-// at the top of the ladder a base with both wraps reaches a given target on
-// roughly 0.3 fewer of the base mazes than a plain one); they are therefore
-// confined to the mid ladder, where T is far below capacity, and the top of the
-// ladder uses plain bases. Feeders and extra checkpoint branches are not used:
-// they only consume floor that deceptive branches need.
+// Style bands: the MOST wrap-corridor rungs the base profile of a level owns.
+// Rung 1 = vertical wrap corridor, rung 2 = horizontal as well. A wrap corridor is a
+// free shortcut for a player who knows the map, so it costs felt headroom (measured: at
+// the top of the ladder a base with both wraps reaches a given target on roughly 0.3
+// fewer of the base mazes than a plain one) and, since the wrap saving is priced like a
+// loop saving (legacyMazeFeltTuning.ts, FELT_WRAP_PRICE_PERCENT), the raw explorer target
+// rises by the saving. Wraps are therefore confined to the mid ladder, where T is far
+// below capacity, and the top of the ladder uses plain bases. They do not retire at a
+// level: from GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL the number of wrap rungs a maze owns
+// falls by a seeded roll (resolveGeometryBudgetWrapRungs) to none at
+// GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL, so no held-out gauge steps. Feeders and extra
+// checkpoint branches are not used: they only consume floor that deceptive branches need.
+//
+// The band of the fade is measured, not guessed (docs/research/MAZER_PROGRESSION_GAUGES_2026-11-10.md,
+// fade candidates 100->130/140/150/160 dumped at 40 seeds per level and board). It starts at
+// 100: the owner's start, and the last level where every maze still carries its band's wraps.
+// Removing a wrap hands its saving (about 85 steps of shortest route for both wraps) back to
+// the held-out gauges, and that cost is paid per level over the fade: the shortest route
+// gains 3.4, 2.7, 2.3 and 2.0 steps per level for an end at 130, 140, 150 and 160 (the plain
+// trend is 0.2 to 0.5), and the random walk 26, 22, 20 and 17 (plain 4 to 6), against ONE
+// level of +88 and +790 at the old level-120 cliff (94 to 182, 919 to 1709). Every candidate is a ramp (its largest
+// 7-level-smoothed step is 2 to 5 times the band's median step and within noise), so the end
+// is chosen on cost: past 140 each 10 more levels lower the slope by 0.3 to 0.7 steps while a
+// wrap keeps getting dearer (priced, a wrap maze needs T(N) + its saving explorer steps: the
+// share of bases that land with one wrap on the first try is 69 percent at level 140, 64 at
+// 150 and 50 at 160, for two wraps 33, 25 and 19). 140 is also the owner's "about 140".
+export const GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL = 100;
+export const GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL = 140;
 export const GEOMETRY_BUDGET_STYLE_BANDS: readonly { readonly fromLevel: number; readonly rungs: number }[] = [
   { fromLevel: 2, rungs: 0 },
   { fromLevel: 10, rungs: 1 },
   { fromLevel: 30, rungs: 2 },
-  { fromLevel: 120, rungs: 0 }
+  { fromLevel: GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL, rungs: 0 }
 ];
 export const GEOMETRY_BUDGET_TAPE: readonly string[] = ['wrap:v', 'wrap:h'];
 
@@ -282,6 +302,31 @@ export const resolveGeometryBudgetRungCount = (level: number): number => {
   }
   return rungs;
 };
+
+// Wrap rungs a maze of level N and play seed S actually owns (0..resolveGeometryBudgetRungCount).
+// Up to the fade start it is the band's count; from the fade end it is none; in between the
+// EXPECTED count falls linearly from the band's count to zero and a roll on (seed, level)
+// decides which side of the fraction this maze lands on, so level 120 owns exactly one
+// rung (the vertical corridor, which is also the last to go), level 110 one or two with
+// equal chances, level 130 none or one. Integer arithmetic, a pure function of
+// (level, seed): the same level and seed always give the same maze.
+export const resolveGeometryBudgetWrapRungs = (level: number, seed: number): number => {
+  const bounded = clampBudgetLevel(level);
+  const owned = resolveGeometryBudgetRungCount(bounded);
+  if (owned === 0 || bounded <= GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL) { return owned; }
+  if (bounded >= GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL) { return 0; }
+  const span = GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL - GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL;
+  const expectedPermille = Math.floor((owned * 1000 * (GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL - bounded)) / span);
+  const whole = Math.floor(expectedPermille / 1000);
+  const roll = mix32(seed >>> 0, Math.imul(bounded, 37) + 11) % 1000;
+  return Math.min(owned, whole + (roll < (expectedPermille % 1000) ? 1 : 0));
+};
+
+// Base mazes tried (at most) with the wrap corridors of the roll before a level falls back to
+// plain bases: the wrap saving is priced into the target, so a base whose wraps leave the
+// tuner too little capacity is retried, and the ladder's ordering guarantee outranks the wrap
+// (the same rule as GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS for loops).
+export const GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS = 6;
 
 // Route-length target of level N: the explorer's final path is stretched with
 // switchback bumps toward 38% of the felt target (a base maze whose route is

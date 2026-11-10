@@ -13,7 +13,12 @@ import {
   buildLegacyGuideSheetModel,
   type LegacyGuideRow
 } from '../../src/legacy-runtime/legacyGuideContent';
-import { resolveGeometryBudgetLoopPlan } from '../../src/legacy-runtime/legacyGeometryBudget';
+import {
+  GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL,
+  GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL,
+  resolveGeometryBudgetLoopPlan,
+  resolveGeometryBudgetWrapRungs
+} from '../../src/legacy-runtime/legacyGeometryBudget';
 import { resolveLegacyNavigationTarget } from '../../src/legacy-runtime/legacyMaze';
 import { legacyLoopPlanSize } from '../../src/legacy-runtime/legacyMazeLoops';
 import {
@@ -190,6 +195,24 @@ describe('guide copy only names things that exist', () => {
     const late = resolveLegacyProgressionDifficultyProfile(400);
     expect(late.expectedEdgeWraps.horizontal + late.expectedEdgeWraps.vertical).toBeGreaterThan(0);
     expect(row('wrap').text).toMatch(/^Some mazes wrap\./);
+  });
+
+  test('Wrap: the ladder really gives some mazes a wrap corridor (never early, fading out to none, never all of a level while it fades)', () => {
+    // "Some mazes wrap" is a claim about the ladder: wrap corridors from level 10, a seeded
+    // share of every level while they fade out, none once the fade is over.
+    const seeds = Array.from({ length: 200 }, (_, index) => 1337 + (index * 104729));
+    const rungs = (level: number) => seeds.map((seed) => resolveGeometryBudgetWrapRungs(level, seed));
+    expect(rungs(5).every((count) => count === 0)).toBe(true);
+    expect(rungs(60).every((count) => count === 2)).toBe(true);
+    // A quarter of the way into the fade the expected count is a fraction: some mazes of the level
+    // wrap and some do not. (At the midpoint it is exactly one rung, so every maze wraps once.)
+    const quarter = Math.floor((3 * GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL + GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL) / 4);
+    const lateQuarter = Math.floor((GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL + (3 * GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL)) / 4);
+    expect(rungs(quarter).some((count) => count > 0)).toBe(true);
+    expect(rungs(lateQuarter).some((count) => count > 0)).toBe(true);
+    expect(rungs(lateQuarter).some((count) => count === 0)).toBe(true);
+    expect(rungs(GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL).every((count) => count === 0)).toBe(true);
+    expect(rungs(198).every((count) => count === 0)).toBe(true);
   });
 
   test('Levels: a clear raises the level ordinal by one and later difficulty bands differ from the tutorial', () => {

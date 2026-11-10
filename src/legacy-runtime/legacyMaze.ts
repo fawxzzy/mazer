@@ -172,6 +172,13 @@ export interface LegacyMazeSnapshot {
     saved: number;
     shortcuts: number;
   };
+  // Wrap corridors a ladder maze was built with (its base profile's required opposite-border
+  // connections) and the steps they give back to a player who knows the map (priced into the
+  // felt target like a loop saving, legacyMazeFeltTuning.ts). Absent for a plain base.
+  wrapStats?: {
+    rungs: number;
+    saved: number;
+  };
   shortcutStats?: {
     requested: number;
     attempts: number;
