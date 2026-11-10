@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_40f42ea1ce70",
+  "export_id": "pbe_mazer_owner_registry_90e9635436a0",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:40f42ea1ce708d216e360ea709a8ebf03f7c736425da3a8147049cbc042649fd",
-  "generated_at": "2026-11-10T20:00:00.000Z",
+  "source_revision": "sha256:90e9635436a06c058fc41329eed77c189b1cd2187ee126e85d8847f58587f3d8",
+  "generated_at": "2026-11-10T22:00:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:cfc2ad4f2a81c3d28e17326c0bebdd805b28f6e061572a17a72e45be9f024c23",
-      "observed_at": "2026-11-10T20:00:00.000Z"
+      "revision": "sha256:e07a7798430eb4017d1a061870d6266a65edad25f7ebb1fbb7a849b36e6ed0c9",
+      "observed_at": "2026-11-10T22:00:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:c08b8d268f6417c89efe094fad042042c31f829588ce2370d64c913f8bced203",
-      "observed_at": "2026-11-10T20:00:00.000Z"
+      "observed_at": "2026-11-10T22:00:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-10T20:00:00.000Z"
+      "observed_at": "2026-11-10T22:00:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-10T20:00:00.000Z"
+      "observed_at": "2026-11-10T22:00:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-10T20:00:00.000Z"
+      "observed_at": "2026-11-10T22:00:00.000Z"
     }
   ],
   "cards": [
@@ -6923,6 +6923,60 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-vis-014_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-014",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Remove backdrop stars, centre the end markers, lighten the long trail draw",
+        "description": "After the previous polish went live the owner reported still stars behind the maze, a trail whose colour does not visibly move, and an end star and start arrow that are off centre and reach the tile edge. The coloured four-point stars are gone and no star is drawn while the background is not animating. The star and the arrow are now centred as a whole (outline included) and sit inside the lit rim at every tile size and pixel ratio, with new pixel tests. The trail colour does shift in real time in headless Chromium with default settings on the phone and desktop sizes, including on the live site; it is still when Trail Shine is Off or the device asks for reduced motion, and the long-trail draw was far too heavy for a slow phone, which is lightened here. The real cause on the owner phone is not proven. Open as a pull request; not merged, not deployed, not checked on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-VIS-013"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-10T22:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-014",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-014",
+        "source_status": "current",
+        "source_updated_at": "2026-11-10T22:00:00.000Z"
+      },
+      "content": {
+        "summary": "After the previous polish went live the owner reported still stars behind the maze, a trail whose colour does not visibly move, and an end star and start arrow that are off centre and reach the tile edge. The coloured four-point stars are gone and no star is drawn while the background is not animating. The star and the arrow are now centred as a whole (outline included) and sit inside the lit rim at every tile size and pixel ratio, with new pixel tests. The trail colour does shift in real time in headless Chromium with default settings on the phone and desktop sizes, including on the live site; it is still when Trail Shine is Off or the device asks for reduced motion, and the long-trail draw was far too heavy for a slow phone, which is lightened here. The real cause on the owner phone is not proven. Open as a pull request; not merged, not deployed, not checked on a real phone.",
+        "objective": "After the previous polish went live the owner reported still stars behind the maze, a trail whose colour does not visibly move, and an end star and start arrow that are off centre and reach the tile edge. The coloured four-point stars are gone and no star is drawn while the background is not animating. The star and the arrow are now centred as a whole (outline included) and sit inside the lit rim at every tile size and pixel ratio, with new pixel tests. The trail colour does shift in real time in headless Chromium with default settings on the phone and desktop sizes, including on the live site; it is still when Trail Shine is Off or the device asks for reduced motion, and the long-trail draw was far too heavy for a slow phone, which is lightened here. The real cause on the owner phone is not proven. Open as a pull request; not merged, not deployed, not checked on a real phone.",
+        "acceptance_criteria": [
+          "No coloured four-point star is drawn behind the board, and no star at all while the background is Still or reduced motion is on",
+          "The goal star and start arrow, outline included, are centred on their tile within half a device pixel and inside the lit rim at tile sizes 6.4 to 25.4 px and pixel ratios 1 to 3, proven on raster pixels",
+          "The trail colour is shown to change frame to frame while the player is idle, on phone and desktop sizes, and to be still under reduced motion and Trail Shine Off",
+          "Merged, deployed and checked on a real phone are NOT yet done; the cause of the still trail on the owner phone is still unproven"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-world-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -6978,9 +7032,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 133,
-    "exported_public_card_count": 133,
-    "exported_open_card_count": 59,
+    "stable_identity_count": 134,
+    "exported_public_card_count": 134,
+    "exported_open_card_count": 60,
     "exported_completed_card_count": 59,
     "exported_deferred_card_count": 15,
     "imported_research_candidate_count": 0,

@@ -41,6 +41,7 @@ import {
   resolveTrailWidthScale,
   sampleIridescentTrail
 } from '../render/trailIridescence';
+import { resolveBackdropStarDraw } from '../render/backdropStars';
 import { drawChipCell, resolveChipGridGeometry } from '../render/chipTileGraphics';
 import { PhaserGraphicsTileContext } from '../render/phaserTileContext';
 import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameToViewport } from '../boot/viewportGeometry';
@@ -7136,45 +7137,10 @@ export class MenuScene extends Phaser.Scene {
       const twinkleAlpha = star.alpha * (0.12 + (twinklePhase * 0.88));
       const sizeMultiplier = 0.55 + (twinklePhase * 0.65);
       const starColor = starSeed > 0.82 ? 0xbfe3ff : (starSeed < 0.16 ? 0xffe9c2 : 0xffffff);
-      // The nearest, biggest stars get the same rainbow four-point sparkle
-      // the orbit diamonds/level number/title use, replacing the old flat
-      // bloom-square treatment -- reported as "the starfield never got
-      // updated... replace the backdrop stars w the sparkles." Real bug
-      // found here: radius is 0.6 + (depth * 2.7) + jitter with
-      // depth = random() * random() (a product of two uniforms, so it
-      // clusters near 0 and never actually reaches 1) -- `coreSize > 3`
-      // required depth > ~1.07, which is mathematically unreachable. Every
-      // single star always fell through to the plain bloom-square path
-      // below, so this "already shipped" fix was invisible in practice --
-      // exactly what "why do you keep missing edits" was reporting. `>= 3`
-      // needs only depth above roughly 0.7 (about the brightest 5% of stars
-      // by this depth distribution's own math), which real stars actually
-      // reach.
-      if (coreSize >= 3) {
-        // Stable per-star hue (no animationTime term), not a continuous
-        // rainbow rotation -- with starSeed now genuinely fixed per star,
-        // rotating hue by animationTime here would still be a real,
-        // continuous full-spectrum cycle every LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS
-        // (5.2s) across every bright star in the field simultaneously, at a
-        // different phase each. The owner's own stated preference is
-        // explicit: "stable per-star color... over rapid cycling through
-        // unrelated hues." A background star twinkling brighter/dimmer at
-        // one fixed hue reads as an actual star; a field of them
-        // continuously rainbow-shifting reads as a light show even once
-        // the shift itself is smooth. The goal-ring/title sparkle call
-        // sites (the wordmark sparkles) are
-        // unaffected -- their own animated/per-cycle hues are a
-        // deliberate, different, attention-drawing design for those
-        // specific contexts and are not touched here.
-        const sparkleHue = Phaser.Display.Color.HSVToRGB(starSeed, 0.8, 1).color;
-        this.drawLegacyFourPointSparkle(
-          this.backdropGraphics,
-          pixelX,
-          pixelY,
-          coreSize * (1.3 + (twinklePhase * 1.1)) * sizeMultiplier,
-          sparkleHue,
-          twinkleAlpha * palette.starAlphaScale
-        );
+      // The coloured four-point sparkles that the nearest, biggest stars used to get are retired (owner, 2026-11-10:
+      // "no more stagnant stars in the background"); see src/render/backdropStars.ts. Nothing is drawn for those
+      // stars, and nothing at all while the backdrop is not animating (a frozen dot is a pretend star).
+      if (resolveBackdropStarDraw(coreSize, backdropMotionEnabled) === 'none') {
         continue;
       }
       // Round, not square: the vast majority of stars (every one below the

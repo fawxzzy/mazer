@@ -18,7 +18,7 @@ import { describe, expect, test } from 'vitest';
  * tested elsewhere.
  */
 describe('World Identity background-star render contract', () => {
-  test('drawBackdrop reads the stored per-star seed and keeps the bright-star hue stable', () => {
+  test('drawBackdrop reads the stored per-star seed and draws no coloured sparkle stars', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     // The active assignment must read the persisted field, not recompute a
@@ -29,14 +29,11 @@ describe('World Identity background-star render contract', () => {
     expect(menuSceneSource).toContain('const starSeed = star.seed;');
     expect(menuSceneSource).not.toContain('const starSeed = ((star.x * 9973) + (star.y * 6151)) % 1');
 
-    // The brightest-tier sparkle hue must stay a stable per-star hue (seed
-    // alone). The rejected form rotated it by scene time on top of the seed,
-    // which is exactly the "strobe" behavior the fix removed; this check is
-    // scoped to this one call site's exact old expression (`+ starSeed`) so
-    // it cannot false-positive on the title-wordmark/goal-star-ring sparkle
-    // call sites, which deliberately keep their own separate, unrelated
-    // animation-time-driven hues elsewhere in this same file.
-    expect(menuSceneSource).toContain('Phaser.Display.Color.HSVToRGB(starSeed, 0.8, 1).color');
-    expect(menuSceneSource).not.toContain('HSVToRGB((animationTime / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + starSeed');
+    // The coloured four-point sparkle tier was retired on 2026-11-10 (owner: "no more stagnant stars in the
+    // background", src/render/backdropStars.ts): its hue code must stay gone, and every star must be routed
+    // through the policy that also draws nothing while the backdrop is not animating.
+    expect(menuSceneSource).not.toContain('Phaser.Display.Color.HSVToRGB(starSeed');
+    expect(menuSceneSource).toContain('resolveBackdropStarDraw(coreSize, backdropMotionEnabled)');
+
   });
 });
