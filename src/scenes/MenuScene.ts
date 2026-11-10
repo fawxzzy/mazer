@@ -32,9 +32,15 @@ import {
   TRAIL_UNDERLAY_ALPHA,
   TRAIL_UNDERLAY_PAD_MIN_CSS,
   TRAIL_WIDTH_RATIO,
-  liftTrailColor,
   resolveTrailWidths
 } from '../render/trailLegibility';
+import {
+  resolveIridescentRestingCore,
+  resolveTrailBreath,
+  resolveTrailGlowAlphaScale,
+  resolveTrailWidthScale,
+  sampleIridescentTrail
+} from '../render/trailIridescence';
 import { drawChipCell, resolveChipGridGeometry } from '../render/chipTileGraphics';
 import { PhaserGraphicsTileContext } from '../render/phaserTileContext';
 import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameToViewport } from '../boot/viewportGeometry';
@@ -305,9 +311,7 @@ import {
 } from '../legacy-runtime/legacyMenuBackdrop';
 import {
   LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE,
-  LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS,
   mixLegacyIridescentColor,
-  resolveLegacyIridescentMidnightColor,
   resolveLegacyIridescentPlayerCoreColor,
   resolveLegacyIridescentPlayerAccentColor,
   resolveLegacyIridescentPlayerHaloColor,
@@ -1346,64 +1350,17 @@ const LEGACY_TRAIL_UNDERLAY_PAD_CSS = TRAIL_UNDERLAY_PAD_MIN_CSS;
 const LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO = TRAIL_GLOW_ALPHA_RATIO;
 const LEGACY_PLAY_TRAIL_CORNER_RADIUS_RATIO = 0.16;
 const LEGACY_PLAY_TRAIL_PLAYER_TRIM_RATIO = 0.3;
-// OWNER-AUTHORIZED VISUAL AMENDMENT (direct product-owner instruction,
-// 2026-09-09): the original Navigation Core ENERGY palette
-// (NAVIGATION_CORE_TRAIL_ENERGY_STOPS, from the frozen reference's own
-// generator) puts every stop at full saturation and runs THREE
-// consecutive fully-saturated warm stops (red/orange/yellow) -- ~37% of
-// the cycle. On the real in-game trail and the gameplay-transfer conduit
-// that reads as an abrasive full-spectrum rainbow ribbon filling the
-// corridor, which the owner explicitly asked to calm. This calmer set
-// keeps the recognizable cool "energy" identity and the exact 8-stop
-// cyclic structure, but: every stop pulled to medium luminance / moderate
-// saturation (no neon); the three-stop warm band collapsed to ONE dusty
-// mauve accent, bracketed by violet on both sides so it can never form a
-// broad warm band as the phase drifts; adjacent stops kept close in hue
-// so the RGB lerp between them stays a smooth blend rather than a muddy
-// jump between distant hues.
-//
-// Scoped deliberately to Wave 4D-B's own rendering: the shared 4D-A
-// module src/render/navigationCoreTrail.ts (NAVIGATION_CORE_TRAIL_ENERGY_STOPS,
-// sampleTrailEnergyColor) and the frozen reference file are BOTH left
-// untouched -- only this scene's own three consumers of that material
-// (the continuous play trail, the gameplay-transfer conduit, and the
-// on-board goal-star ring) sample this calmer set instead, via
-// sampleCalmTrailEnergyColor below. Recorded in docs/current-truth.md as
-// an owner-authorized amendment; the new palette is a candidate for the
-// owner's review, not automatically accepted.
-const LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS = [
-  0x45a4c0,
-  0x4d8ac0,
-  0x6576bb,
-  0x7f68b2,
-  0x9c60a4,
-  0x7a66b6,
-  0x5183c0,
-  0x48ab98
-] as const;
-// The exact math of navigationCoreTrail.ts's own sampleTrailEnergyColor
-// (a pure function of distance/time phase), but sampling the calmer
-// amendment palette above instead of the frozen module's own stops.
-const sampleCalmTrailEnergyColor = (
-  distance: number,
-  timeMs: number,
-  options: { distancePeriodPx: number; timePeriodMs: number }
-): number => {
-  const distancePhase = options.distancePeriodPx > 0 ? distance / options.distancePeriodPx : 0;
-  const timePhase = options.timePeriodMs > 0 ? timeMs / options.timePeriodMs : 0;
-  return resolveLegacyIridescentMidnightColor(distancePhase + timePhase, LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS);
-};
+// OWNER-AUTHORIZED VISUAL AMENDMENT (direct product-owner instruction, 2026-11-10: "the player trail
+// should be iridescent like midnight sun type color color shifting and it should have a pulse too").
+// Supersedes the 2026-09-09 calm blue/violet energy palette: the trail is now an oil-slick / aurora sweep
+// (cyan, sky blue, violet, orchid, apricot) that shifts along its length and slowly over time, with a
+// travelling brightness pulse and a gentle breath. The palette, the pulse and their contrast contract live
+// in src/render/trailIridescence.ts (pure, no allocation, reduced motion freezes it to a static gradient);
+// the shared 4D-A module src/render/navigationCoreTrail.ts and the frozen reference are untouched.
 // Fine resampling interval for color/alpha continuity -- see
 // resampleTrailVertices's own header for why Canvas-mode Phaser Graphics
 // needs this at all (no per-vertex gradient stroke).
 const LEGACY_PLAY_TRAIL_RESAMPLE_INTERVAL_PX = 4;
-// One full trip around the ENERGY palette spans this many tiles of trail --
-// slow enough to read as a flowing gradient rather than a rainbow banding
-// every step.
-const LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE = 6;
-// Reuses the same pacing as the player's own (retired) rainbow cycle for
-// consistency with the rest of this file's animation timing.
-const LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS = LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS;
 // The frozen reference's own numbers: shine body ~9.5% of visible path
 // length, whole-shine fade-in/fade-out over ~4% of the PATH'S TOTAL
 // length (travel envelope) -- not 4% of the shine's own ~9.5% body. That
@@ -1503,7 +1460,13 @@ const LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO = 0.85;
 // the real play marker (fillLegacyPlayerMarkerTile's showLocatorTicks
 // branch) uses these.
 const LEGACY_PLAY_PLAYER_MARKER_SQUARE_FILL_RATIO = 38.4 / 64;
-const LEGACY_PLAY_PLAYER_MARKER_CORNER_RADIUS_RATIO = 5 / 64;
+// OWNER-AUTHORIZED VISUAL AMENDMENT (2026-11-10, "change the tile shape to better match the player or the
+// player to better match the tile shape"): the reference's rx=5 on a 38.4 square (corner radius 13% of the
+// player's width) read as a near-sharp square sitting in rounded Chip tiles. The player is now a scaled-down
+// chip: its corner radius is the Chip tile's own corner proportion (radius / width = chipCornerRatio, 0.3)
+// applied to the player's width, so tile and player share one corner language and one source constant
+// (src/render/boardTileStyle.ts). The locator ring, glow and ping follow the same shape (playerLocator.ts).
+const LEGACY_PLAY_PLAYER_MARKER_CORNER_RADIUS_RATIO = BOARD_TILE_GEOMETRY.chipCornerRatio * LEGACY_PLAY_PLAYER_MARKER_SQUARE_FILL_RATIO;
 const LEGACY_PLAY_PLAYER_MARKER_STROKE_RATIO = 2.4 / 64;
 // The reference's two drop-shadow layers, as (extraSpreadRatio, alphaHex)
 // pairs -- "ee"/"99" alpha suffixes from the reference's own template
@@ -9790,11 +9753,17 @@ export class MenuScene extends Phaser.Scene {
       this.trailShineLapCycleLength = shineState.lapCycleLength;
     }
 
-    const colorOptions = {
-      distancePeriodPx: tileSize * LEGACY_PLAY_TRAIL_COLOR_TILES_PER_CYCLE,
-      timePeriodMs: LEGACY_PLAY_TRAIL_COLOR_TIME_PERIOD_MS
-    };
-    const { coreWidth, glowWidth, underlayWidth } = resolveTrailWidths(tileSize);
+    // Iridescent colour and pulse (src/render/trailIridescence.ts). The Trail Shine setting is the trail's
+    // animation switch: off, or reduced motion, freezes it to the static iridescent gradient (no time term,
+    // no wave, constant breath), which is exactly what shineEnabled already means.
+    const trailAnimated = shineEnabled;
+    const trailBreath = resolveTrailBreath(animationTime, !trailAnimated);
+    const widthScale = resolveTrailWidthScale(trailBreath);
+    const restingWidths = resolveTrailWidths(tileSize);
+    const coreWidth = restingWidths.coreWidth * widthScale;
+    const glowWidth = restingWidths.glowWidth * widthScale;
+    const underlayWidth = restingWidths.underlayWidth * widthScale;
+    const glowAlphaScale = resolveTrailGlowAlphaScale(trailBreath);
     // Trail Fade OFF: the full retained trail stays at one stable, uniform
     // base alpha (still subject to lifecycle/deconstruction alpha via
     // alphaMultiplier) -- no age gradient. Trail Fade ON: the existing
@@ -9840,14 +9809,12 @@ export class MenuScene extends Phaser.Scene {
       // the CURRENT window plus how far the window's own origin has already
       // advanced), not the raw window-relative midDistance ageAlpha above
       // uses -- otherwise a Trail-Fade-truncated cell's color would jump
-      // every time the origin slides forward. Color is periodic over
+      // every time the origin slides forward. The sweep is periodic over
       // distance, so this is a phase realignment, not a length change.
-      const colorPhaseDistance = midDistance + this.trailOriginAdvanceDistancePx;
-      // sampleCalmTrailEnergyColor: owner-authorized calmer palette (see
-      // LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS) -- the frozen 4D-A module
-      // and its own sampleTrailEnergyColor are left untouched.
-      const baseColor = liftTrailColor(sampleCalmTrailEnergyColor(colorPhaseDistance, animationTime, colorOptions));
-      let coreColor = baseColor;
+      const colorPhaseTiles = (midDistance + this.trailOriginAdvanceDistancePx) / tileSize;
+      const sample = sampleIridescentTrail(colorPhaseTiles, animationTime, !trailAnimated);
+      const baseColor = sample.glow;
+      let coreColor = sample.core;
       let coreAlpha = ageAlpha * alphaMultiplier;
 
       if (shineState && shineState.visible && shineState.halfLength > 0) {
@@ -9864,7 +9831,7 @@ export class MenuScene extends Phaser.Scene {
           // NAVIGATION_CORE_TRAIL_ENERGY_STOPS) a soft highlight reads
           // clearly; nudged the mix/alpha up slightly so it still lands
           // as a definite travelling light without becoming a hard flash.
-          coreColor = mixLegacyIridescentColor(baseColor, LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR, highlightStrength * 0.92);
+          coreColor = mixLegacyIridescentColor(coreColor, LEGACY_PLAY_TRAIL_SHINE_HIGHLIGHT_COLOR, highlightStrength * 0.92);
           coreAlpha = Math.min(1, coreAlpha + (highlightStrength * 0.58));
         }
       }
@@ -9887,7 +9854,7 @@ export class MenuScene extends Phaser.Scene {
       // The dark ground follows the lifecycle fade only, never the age fade (keeps the core's contrast).
       underlayAlpha: alphaMultiplier
     }));
-    this.drawTrailCanvasSegments(canvasSegments, coreWidth, glowWidth, underlayWidth);
+    this.drawTrailCanvasSegments(canvasSegments, coreWidth, glowWidth, underlayWidth, glowAlphaScale);
 
     const perfDrawEndedAtMs = performance.now();
     this.lastTrailPerfDiagnostics = {
@@ -9928,7 +9895,8 @@ export class MenuScene extends Phaser.Scene {
     segments: readonly TrailLayerSegment[],
     coreWidth: number,
     glowWidth: number,
-    underlayWidth: number
+    underlayWidth: number,
+    glowAlphaScale: number
   ): void {
     if (!this.trailCanvasTexture || !this.trailCanvasImage || segments.length === 0) {
       return;
@@ -9986,7 +9954,7 @@ export class MenuScene extends Phaser.Scene {
       originY: bounds.top,
       coreWidth,
       glowWidth,
-      glowAlphaRatio: LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO,
+      glowAlphaRatio: LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO * glowAlphaScale,
       glowBlurPx: Math.max(2, glowWidth * 0.5) * resolution
     };
     if (this.boardTileStyle === 'chip') {
@@ -10038,11 +10006,13 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  // Start and goal markers: the Chip marker draw code (drawBoardMarkers), painted through the Phaser
-  // graphics adapter into boardDynamicGraphics -- the exact function the in-app Guide icons call. Cells
-  // are located with the layer's device-snapped board origin so they land on the baked tiles. Start is
-  // hidden while the player stands on it (the player marker is the start). Reduced motion freezes the
-  // goal ring (phase 0); the marker is fully legible without motion.
+  // Start and goal END TILES: the Chip marker draw code (drawBoardMarkers), painted through the Phaser
+  // graphics adapter -- the exact function the in-app Guide icons call. The pad is the tile's own baked
+  // chip silhouette (boardTileLayer.endpointTiles, same device-snapped layout) so it meets the tile's
+  // edges exactly; both are placed from the layer's device-snapped board origin. The pads sit in
+  // goalBeaconGraphics, UNDER the trail canvas (the trail runs across the tinted tile); the badges are in
+  // boardDynamicGraphics, over it. Start is hidden while the player stands on it (the player marker is the
+  // start). Reduced motion freezes the goal ring (phase 0); the marker is fully legible without motion.
   private fillPlayDynamicMarkerTile(
     point: LegacyPoint,
     originX: number,
@@ -10056,15 +10026,17 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
     const origin = this.boardTileLayer.snappedOrigin ?? { x: originX, y: originY };
+    const underContext = new PhaserGraphicsTileContext(this.goalBeaconGraphics);
+    underContext.opacity = Math.min(1, alpha);
     const context = new PhaserGraphicsTileContext(this.boardDynamicGraphics);
     context.opacity = Math.min(1, alpha);
     const phase = time !== undefined ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2 : 0;
+    const backingScale = this.resolveBoardTileBackingScale();
     if (kind === 'goal') {
-      const beaconContext = new PhaserGraphicsTileContext(this.goalBeaconGraphics);
-      drawGoalBeacon(beaconContext, {
+      drawGoalBeacon(underContext, {
         goal: point,
         tileSize,
-        devicePixelRatio: this.resolveBoardTileBackingScale(),
+        devicePixelRatio: backingScale,
         originX: origin.x,
         originY: origin.y,
         timeMs: time ?? 0,
@@ -10073,18 +10045,31 @@ export class MenuScene extends Phaser.Scene {
         opacity: Math.min(1, alpha)
       });
     }
-    drawBoardMarkers(context, {
+    const endpointTiles = this.boardTileLayer.endpointTiles;
+    const markerInput = {
+      // Honoured by the Trace style only: the Chip end tile is drawn at exactly the tile's size.
       minimumMarkerSizes: BOARD_MARKER_MIN_CSS,
       style: this.boardTileStyle,
       tileSize,
-      devicePixelRatio: this.resolveBoardTileBackingScale(),
+      devicePixelRatio: backingScale,
       originX: origin.x,
       originY: origin.y,
       start: kind === 'start' ? point : undefined,
       goal: kind === 'goal' ? point : undefined,
+      startTile: endpointTiles.start,
+      goalTile: endpointTiles.goal,
       phase,
       reducedMotion: this.prefersLegacyReducedMotion()
-    });
+    };
+    if (this.boardTileStyle === 'chip') {
+      // Pad under the trail canvas, badge over it: the trail runs across the tinted tile and ends at (start) or
+      // begins at (goal side) the badge's edge instead of being drawn through it.
+      drawBoardMarkers(underContext, { ...markerInput, endpointLayer: 'pad' });
+      drawBoardMarkers(context, { ...markerInput, endpointLayer: 'badge' });
+      return;
+    }
+    // The Trace style's markers (no pad), as before.
+    drawBoardMarkers(context, markerInput);
   }
 
   // Retired: drawLegacyMarkerGemCatchlight used to draw a short diagonal
@@ -10178,7 +10163,15 @@ export class MenuScene extends Phaser.Scene {
           LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_COLOR,
           LEGACY_PLAY_PLAYER_MARKER_AMBIENT_HALO_PEAK_ALPHA * (1 - stepProgress) * alpha
         );
-        this.boardDynamicGraphics.fillCircle(centerX, centerY, haloRadiusPx * (0.55 + (stepProgress * 0.45)));
+        // Rounded squares in the chip's corner proportion (not circles): same family as the tile and the player.
+        const haloHalf = haloRadiusPx * (0.55 + (stepProgress * 0.45));
+        this.boardDynamicGraphics.fillRoundedRect(
+          centerX - haloHalf,
+          centerY - haloHalf,
+          haloHalf * 2,
+          haloHalf * 2,
+          haloHalf * 2 * BOARD_TILE_GEOMETRY.chipCornerRatio
+        );
       }
 
       const cornerRadius = tileSize * LEGACY_PLAY_PLAYER_MARKER_CORNER_RADIUS_RATIO;
@@ -11846,15 +11839,15 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // Trail legend: three chip tiles in an L (the board's own tile geometry) with a trail line in the
-  // player's trail colour over a dark underlay, the same layering the board trail uses.
+  // Trail legend: three chip tiles in an L (the board's own tile geometry) with a trail line over a dark
+  // underlay, the same layering the board trail uses, in the board trail's iridescent colours (resting
+  // sweep, frozen: no time term and no pulse, so the legend is static).
   private drawLegacyOptionsGuideTrailGlyph(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
     centerY: number,
     badgeRadius: number
   ): void {
-    const trailPalette = resolveLegacyProgressionPalette(this.progressionState.tracks.player, 'player');
     const cellSize = Math.max(6, Math.round(badgeRadius * 0.85));
     const left = Math.round(centerX - cellSize);
     const top = Math.round(centerY - cellSize);
@@ -11870,16 +11863,27 @@ export class MenuScene extends Phaser.Scene {
       { x: left + (cellSize * 1.5), y: top + (cellSize * 1.5) }
     ];
     const coreWidth = Math.max(2, cellSize * LEGACY_PLAY_TRAIL_WIDTH_RATIO);
-    for (const [width, color, alpha] of [
-      [coreWidth + (2 * LEGACY_TRAIL_UNDERLAY_PAD_CSS), boardMaterial.void, LEGACY_TRAIL_UNDERLAY_ALPHA],
-      [coreWidth, trailPalette.trailColor, 1]
-    ] as const) {
-      graphics.lineStyle(width, color, alpha);
-      graphics.beginPath();
-      graphics.moveTo(points[0]!.x, points[0]!.y);
-      graphics.lineTo(points[1]!.x, points[1]!.y);
-      graphics.lineTo(points[2]!.x, points[2]!.y);
-      graphics.strokePath();
+    // Four sub-strokes (two per leg) so the legend shows the colour shifting along the line.
+    const legs: Array<[{ x: number; y: number }, { x: number; y: number }, number]> = [];
+    for (let leg = 0; leg < 2; leg += 1) {
+      const from = points[leg]!;
+      const to = points[leg + 1]!;
+      const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+      legs.push([from, mid, (leg * 2) + 0.5], [mid, to, (leg * 2) + 1.5]);
+    }
+    const layers = [
+      { width: coreWidth + (2 * LEGACY_TRAIL_UNDERLAY_PAD_CSS), alpha: LEGACY_TRAIL_UNDERLAY_ALPHA, core: false },
+      { width: coreWidth, alpha: 1, core: true }
+    ] as const;
+    for (const layer of layers) {
+      for (const [from, to, distanceTiles] of legs) {
+        const color = layer.core ? resolveIridescentRestingCore(distanceTiles * 1.6, 0) : boardMaterial.void;
+        graphics.lineStyle(layer.width, color, layer.alpha);
+        graphics.beginPath();
+        graphics.moveTo(from.x, from.y);
+        graphics.lineTo(to.x, to.y);
+        graphics.strokePath();
+      }
     }
   }
 

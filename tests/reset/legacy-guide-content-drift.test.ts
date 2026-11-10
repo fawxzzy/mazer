@@ -81,7 +81,7 @@ describe('guide structure', () => {
       expect(shown.has(pending.id)).toBe(false);
       expect(pending.reasonId).toMatch(/^[a-z0-9]+(-[a-z0-9]+){2,}$/);
     }
-    // The Start row left the pending list when Chip was wired (the brackets are on the board now).
+    // The Start row left the pending list when Chip was wired (the start marker is on the board now).
     expect(LEGACY_GUIDE_PENDING_ROWS.map((p) => p.id)).toEqual(['ranks', 'first-run-coach', 'auto-pause']);
   });
 });
@@ -111,14 +111,28 @@ describe('guide copy only names things that exist', () => {
     expect(MENU_SCENE).not.toContain('createOverlayClosePill');
   });
 
-  test('Start row: Chip draws start corner brackets and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
+  test('Start row: Chip draws the start end tile (a ringed play marker on a tinted tile) and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
     expect(LEGACY_GUIDE_ROWS.some((r) => r.id === 'start')).toBe(true);
-    expect(row('start').text).toMatch(/Corner brackets/);
+    expect(row('start').text).toMatch(/play marker/);
+    expect(row('start').text).not.toMatch(/bracket/i);
     expect(row('start').icon.chipDraw?.marker).toBe('start');
     expect(row('start').icon.boardDraw).toEqual({ module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' });
     expect(boardTileBake.drawBoardMarkers).toBeTypeOf('function');
-    // The brackets are drawn by drawBoardMarkers' start branch (corner arms + centre dot).
-    expect(read('src/render/boardTileBake.ts')).toMatch(/startArm/);
+    // The start end tile is drawn by drawBoardMarkers' start branch: ring on a disc badge plus a play triangle.
+    expect(read('src/render/boardTileBake.ts')).toMatch(/spec\.play/);
+    expect(read('src/render/endpointTiles.ts')).toMatch(/startPlayHalfHeightOfBadge/);
+    expect(read('src/render/boardTileBake.ts')).not.toMatch(/startArm/);
+  });
+
+  test('You: the player is a rounded green block in the Chip tile corner proportion, inside a ring of the same shape', () => {
+    expect(row('you').text).toMatch(/rounded block inside a bright ring/);
+    expect(MENU_SCENE).toContain('BOARD_TILE_GEOMETRY.chipCornerRatio * LEGACY_PLAY_PLAYER_MARKER_SQUARE_FILL_RATIO');
+    expect(read('src/render/playerLocator.ts')).toContain('CHIP_CORNER_RATIO');
+  });
+
+  test('Trail row: the copy says the line pulses and shifts colour, and the legend draws the iridescent palette', () => {
+    expect(row('trail').text).toMatch(/pulsing, colour-shifting line/);
+    expect(read('src/render/trailIridescence.ts')).toMatch(/export const sampleIridescentTrail/);
   });
 
   test('Trail row names the Settings toggle by its live label', () => {

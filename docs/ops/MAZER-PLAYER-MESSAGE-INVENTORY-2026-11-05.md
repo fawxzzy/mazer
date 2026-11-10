@@ -338,10 +338,10 @@ Pure modules, not rendered until the Settings wiring lane lands (`docs/ui/MAZER-
 | file | String | Kind | Recommended routing |
 | --- | --- | --- | --- |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Reach the star to clear the maze.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
-| `src/legacy-runtime/legacyGuideContent.ts` | `Corner brackets mark the tile where each maze begins.` | static | Guide Start row copy (added with the Chip board wiring); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
-| `src/legacy-runtime/legacyGuideContent.ts` | `You are the green block inside a bright ring.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `A play marker on a ringed tile shows where each maze begins.` | static | Guide Start row copy (added with the Chip board wiring); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `You are the green rounded block inside a bright ring.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Touch and hold anywhere, then drag the way you want to go. Let go to stop.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
-| `src/legacy-runtime/legacyGuideContent.ts` | `A glowing line shows your route. Turn on {} in Settings to fade old trail.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `A pulsing, colour-shifting line shows your route. {} in Settings fades old trail.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Some mazes wrap. Leave an open edge and you come out on the opposite side.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Each cleared maze raises your level. Mazes get harder as you climb.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your level and leaderboard standing go back to Level 1. Your account, username and settings stay as they are. This can’t be undone.` | static | Reset progress confirm/status copy; rendered by the shared Settings reset card; fold into the message module later |
