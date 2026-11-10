@@ -17,50 +17,102 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 const bytes = readOwnerExportSources(repoRoot);
 const registry = JSON.parse(bytes["mazer-owner-work-registry"]);
 
-test("exports only the exact current public Mazer owner set", () => {
+test("exports every stable registry identity as one public card", () => {
   const output = buildProjectBoardOwnerExport(registry, bytes);
   assert.equal(output.contract_version, "atlas.project-board.owner-export.v1");
   assert.equal(output.project_id, "mazer");
   assert.equal(output.board_id, "discordos:project-feedback:mazer");
-  assert.equal(output.extensions.stable_identity_count, 13);
-  assert.equal(output.cards.length, 3);
-  assert.deepEqual(output.cards.map((card) => card.record.card_id), ["MAZER-2D-001", "MAZER-NATIVE-001", "MAZER-WORLD-001"]);
-  assert.equal(new Set(output.cards.map((card) => card.idempotency_key)).size, 3);
+  assert.equal(output.extensions.stable_identity_count, registry.workItems.length);
+  assert.equal(output.cards.length, registry.workItems.length);
+  assert.deepEqual(
+    output.cards.map((card) => card.record.card_id),
+    registry.workItems.map((item) => item.id).sort((left, right) => left.localeCompare(right)),
+  );
+  assert.equal(new Set(output.cards.map((card) => card.idempotency_key)).size, output.cards.length);
   assert.deepEqual(
     output.cards.find((card) => card.record.card_id === "MAZER-WORLD-001").record.dependencies,
     ["MAZER-2D-001", "MAZER-TELEPORT-001"],
   );
   assert.equal(
-    output.cards.length + output.extensions.excluded_completed_card_count + output.extensions.excluded_deferred_candidate_count,
+    output.extensions.exported_open_card_count
+      + output.extensions.exported_completed_card_count
+      + output.extensions.exported_deferred_card_count,
     output.extensions.stable_identity_count,
   );
 });
 
-test("retains completed truth in the registry and excludes it from public cards", () => {
+test("exports completed history as completed lifecycle cards", () => {
   const output = buildProjectBoardOwnerExport(registry, bytes);
   const completed = registry.workItems.filter((item) => item.status === "completed");
-  assert.equal(completed.length, 8);
-  assert.equal(output.extensions.excluded_completed_card_count, 8);
-  for (const item of completed) assert.equal(output.cards.some((card) => card.record.card_id === item.id), false);
+  assert.ok(completed.length >= 8);
+  assert.equal(output.extensions.exported_completed_card_count, completed.length);
+  for (const item of completed) {
+    const card = output.cards.find((candidate) => candidate.record.card_id === item.id);
+    assert.deepEqual([card.record_status, card.record.lifecycle, card.record.extensions.owner_status], ["active", "completed", "completed"]);
+  }
 });
 
-test("excludes deferred research candidates and imports no research inventory", () => {
+test("exports deferred work as candidate intake cards and imports no research inventory", () => {
   const output = buildProjectBoardOwnerExport(registry, bytes);
   const deferred = registry.workItems.filter((item) => item.status === "deferred_candidate");
-  assert.equal(deferred.length, 2);
-  assert.equal(output.extensions.excluded_deferred_candidate_count, 2);
+  assert.ok(deferred.length >= 2);
+  assert.equal(output.extensions.exported_deferred_card_count, deferred.length);
   assert.equal(output.extensions.imported_research_candidate_count, 0);
   assert.equal(output.extensions.research_candidate_exported_count, 0);
-  for (const item of deferred) assert.equal(output.cards.some((card) => card.record.card_id === item.id), false);
+  for (const item of deferred) {
+    const card = output.cards.find((candidate) => candidate.record.card_id === item.id);
+    assert.deepEqual([card.record_status, card.record.lifecycle], ["candidate", "intake"]);
+    assert.match(card.content.summary, /defer|parked|later|phase 2|not started/i, `${item.id} says it is deferred`);
+  }
 });
 
-test("maps active and planned lifecycle without inventing readiness", () => {
+test("maps every owner status to its atlas lifecycle without inventing readiness", () => {
   const output = buildProjectBoardOwnerExport(registry, bytes);
   const byId = new Map(output.cards.map((card) => [card.record.card_id, card]));
-  assert.deepEqual([byId.get("MAZER-2D-001").record_status, byId.get("MAZER-2D-001").record.lifecycle], ["active", "in-progress"]);
-  assert.deepEqual([byId.get("MAZER-WORLD-001").record_status, byId.get("MAZER-WORLD-001").record.lifecycle], ["active", "in-progress"]);
-  assert.deepEqual([byId.get("MAZER-NATIVE-001").record_status, byId.get("MAZER-NATIVE-001").record.lifecycle], ["candidate", "planning"]);
+  const expected = {
+    active: ["active", "in-progress"],
+    in_progress: ["active", "in-progress"],
+    review: ["active", "review"],
+    blocked: ["active", "blocked"],
+    planning: ["candidate", "planning"],
+    completed: ["active", "completed"],
+    deferred_candidate: ["candidate", "intake"],
+  };
+  for (const item of registry.workItems) {
+    const card = byId.get(item.id);
+    assert.deepEqual([card.record_status, card.record.lifecycle], expected[item.status], item.id);
+  }
+  for (const status of Object.keys(expected)) {
+    assert.ok(registry.workItems.some((item) => item.status === status) || status === "active", `registry exercises ${status}`);
+  }
   assert.ok(output.cards.every((card) => card.content.blockers.length === 0));
+});
+
+test("keeps published card text free of paths, links, file names, hashes and sensitive words", () => {
+  // Mirrors the screens FawxzzyWeb applies before publishing a card title or summary, so a bad card fails here first.
+  const screens = [
+    ["url", /\bhttps?:\/\//i],
+    ["drive or backslash path", /(?:\b[A-Za-z]:[\\/]|\\)/],
+    ["relative or home path", /(?:\b(?:repos|runtime|docs|handoff|secrets|packages|scripts|config|exports|planning|tmp|src|api|supabase)\/[\w.-]+|~\/|\/(?:Users|home|etc|var)\/)/i],
+    ["file name", /\b[\w-]+\.(?:env|dpapi|json|mjs|cjs|js|ts|tsx|md|zip|docx?|xlsx?|pem|key|log|sql|ps1|sh|ya?ml|toml|exe)\b/i],
+    ["long token-like run", /(?:[A-Za-z0-9+/]{32,}={0,2}|\b[a-f0-9]{32,}\b)/],
+    ["secret or credential word", /\b(?:passwords?|passwd|secrets?|credentials?|api[ -]?keys?|private[ -]keys?|access[ -]keys?|tokens?|cookies?|jwt|session id)\b/i],
+    ["security finding word", /\b(?:security|vulnerabilit\w*|advisor|dependabot|leak(?:ed|s)?|incident|exploit\w*|cve-\d+)\b/i],
+    ["money word", /\b(?:monetiz\w*|premium|paid|payments?|billing|invoices?|stripe|subscriptions?|pricing|revenue|paywall)\b/i],
+    ["personal data word", /\b(?:personal data|e-?mail|ssn|phone number|home address|career)\b/i],
+  ];
+  const output = buildProjectBoardOwnerExport(registry, bytes);
+  const titles = new Set();
+  for (const card of output.cards) {
+    for (const [field, text] of [["title", card.record.title], ["summary", card.content.summary]]) {
+      for (const [name, pattern] of screens) {
+        assert.doesNotMatch(text, pattern, `${card.record.card_id} ${field} must not match the ${name} screen`);
+      }
+    }
+    assert.ok(!titles.has(card.record.title), `${card.record.card_id} title is unique`);
+    titles.add(card.record.title);
+    assert.ok(card.record.title.length <= 90, `${card.record.card_id} title stays scannable`);
+  }
 });
 
 test("validates stable dependency relationships and preserves deterministic deduplication", () => {
@@ -1078,7 +1130,7 @@ test("passes the public-safety and FawxzzyWeb consumer contracts", () => {
   unsafe.cards[0].content.secret = "redacted";
   assert.throws(() => assertPublicSafety(unsafe), /forbidden key/);
   const terminal = structuredClone(output);
-  terminal.cards[0].record.lifecycle = "completed";
+  terminal.cards[0].record.lifecycle = "archived";
   assert.throws(() => assertFawxzzyWebConsumerAcceptance(terminal), /non-public lifecycle/);
 });
 
@@ -1141,7 +1193,7 @@ test("fails closed on denominator, identity, source, and stale-output drift", ()
   const unsupported = structuredClone(registry);
   const completed = unsupported.workItems.find((item) => item.status === "completed");
   completed.status = "complete_typo";
-  unsupported.provenance.completedExcludedCount -= 1;
+  unsupported.provenance.completedCardCount -= 1;
   assert.throws(
     () => buildProjectBoardOwnerExport(unsupported, { ...bytes, "mazer-owner-work-registry": JSON.stringify(unsupported) }),
     /unsupported lifecycle status/,

@@ -46,3 +46,20 @@ gates precede primary Cyberdeck implementation.
   4. later integration decision
 - The immediate near-term option remains the 2D readability upgrade in the current product, not a 3D reopen.
 - The current Phaser 2D build remains the shipping baseline until a future spike separately proves camera clarity, readability, and orientation on its own terms.
+
+## Phase order
+
+Owner direction, November 2026: finish Phase 1 before Phase 2.
+
+- Phase 1: visuals fully refurbished onto one component and motion system, progression logic finished (level 1 is a straight corridor, every later level harder, no zoom or board-size lever), animations synced, and the whole game flow set up.
+- Phase 2 (only after Phase 1): obstacles and enemies introduced one at a time and folded into the level ladder, each alone first with a visible telegraph. The hazard layer stays switched off until the hazard product contract is signed.
+- Deferred by direction: camera zoom and minimap, diagonals, the moving maze, multiplayer and social features, coins and the shop, and store entitlements.
+
+## Project board
+
+The public Mazer board is generated, not hand-edited: `config/mazer-owner-work-registry.json` is the owner registry, `npm run project-board:owner-export` writes `exports/mazer.project-board.owner-export.v1.json`, and the public web app consumes that export through its own reviewed allowlist.
+
+- Every registry card has a stable `MAZER-` id, a card type, a priority, at least three acceptance criteria and a source reference.
+- Status words map to the shared card lifecycle: `active` and `in_progress` to in-progress, `review` to review, `blocked` to blocked, `planning` to planning, `completed` to completed history, and `deferred_candidate` to intake (parked, with the card text saying so).
+- Card titles and summaries are published verbatim, so they must stay free of links, file names, paths, hashes and sensitive wording; `tests/project-board-owner-export.test.mjs` checks this before the public site does.
+- A merged change to the registry is not live on the website until the public web repository refreshes its pinned copy of the export.
