@@ -1,11 +1,11 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_9520eebfc5da",
+  "export_id": "pbe_mazer_owner_registry_40f42ea1ce70",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:9520eebfc5dab3eea31342089f0b4b9eb11d8670a5316fe19257d507bd0f3d10",
+  "source_revision": "sha256:40f42ea1ce708d216e360ea709a8ebf03f7c736425da3a8147049cbc042649fd",
   "generated_at": "2026-11-10T20:00:00.000Z",
   "sources": [
     {
@@ -13,7 +13,7 @@
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:c64652e9925ff3db482046f4a632abe8cdf095b79c88a86fc5982fc06f12493a",
+      "revision": "sha256:cfc2ad4f2a81c3d28e17326c0bebdd805b28f6e061572a17a72e45be9f024c23",
       "observed_at": "2026-11-10T20:00:00.000Z"
     },
     {
@@ -1413,17 +1413,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Add a level-complete moment",
-        "description": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion durations, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
+        "description": "Implemented: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion durations, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "review",
+        "lifecycle": "completed",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-10T20:00:00.000Z",
+        "updated_at": "2026-11-10T00:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-002",
         "extensions": {
-          "owner_status": "review",
+          "owner_status": "completed",
           "public_safe": true
         }
       },
@@ -1431,11 +1431,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-002",
         "source_status": "current",
-        "source_updated_at": "2026-11-10T20:00:00.000Z"
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion durations, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
-        "objective": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion durations, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
+        "summary": "Implemented: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion durations, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Implemented: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion durations, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "A caption appears from the goal-reached instant without lengthening the cadence",
           "Reduced motion uses a static caption for 400 ms",
@@ -1464,9 +1464,9 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Add a rank-up moment",
-        "description": "Implemented in a pull request, in review: when a clear moves the player to a stronger rank (levels 6, 11, 17, 23 and 31 on a normal ladder) the caption reads 'Rank D' style in that rank's colour for 1100 ms in place of the level caption; reduced motion shows it static for 400 ms. Rank letters come from the existing rank model; nothing is invented. Thresholds are pinned by a fixture. The Level/Rank chip, sound and haptics stay separate cards, and the Guide ranks row stays pending. On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
+        "description": "Implemented: when a clear moves the player to a stronger rank (levels 6, 11, 17, 23 and 31 on a normal ladder) the caption reads 'Rank D' style in that rank's colour for 1100 ms in place of the level caption; reduced motion shows it static for 400 ms. Rank letters come from the existing rank model; nothing is invented. Thresholds are pinned by a fixture. The Level/Rank chip, sound and haptics stay separate cards, and the Guide ranks row stays pending. On 2026-11-10 the owner delegated this design call to the build agent. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "review",
+        "lifecycle": "completed",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
@@ -1474,10 +1474,10 @@
           "MAZER-FLOW-004"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-10T20:00:00.000Z",
+        "updated_at": "2026-11-10T00:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-003",
         "extensions": {
-          "owner_status": "review",
+          "owner_status": "completed",
           "public_safe": true
         }
       },
@@ -1485,11 +1485,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-003",
         "source_status": "current",
-        "source_updated_at": "2026-11-10T20:00:00.000Z"
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "Implemented in a pull request, in review: when a clear moves the player to a stronger rank (levels 6, 11, 17, 23 and 31 on a normal ladder) the caption reads 'Rank D' style in that rank's colour for 1100 ms in place of the level caption; reduced motion shows it static for 400 ms. Rank letters come from the existing rank model; nothing is invented. Thresholds are pinned by a fixture. The Level/Rank chip, sound and haptics stay separate cards, and the Guide ranks row stays pending. On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
-        "objective": "Implemented in a pull request, in review: when a clear moves the player to a stronger rank (levels 6, 11, 17, 23 and 31 on a normal ladder) the caption reads 'Rank D' style in that rank's colour for 1100 ms in place of the level caption; reduced motion shows it static for 400 ms. Rank letters come from the existing rank model; nothing is invented. Thresholds are pinned by a fixture. The Level/Rank chip, sound and haptics stay separate cards, and the Guide ranks row stays pending. On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
+        "summary": "Implemented: when a clear moves the player to a stronger rank (levels 6, 11, 17, 23 and 31 on a normal ladder) the caption reads 'Rank D' style in that rank's colour for 1100 ms in place of the level caption; reduced motion shows it static for 400 ms. Rank letters come from the existing rank model; nothing is invented. Thresholds are pinned by a fixture. The Level/Rank chip, sound and haptics stay separate cards, and the Guide ranks row stays pending. On 2026-11-10 the owner delegated this design call to the build agent. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Implemented: when a clear moves the player to a stronger rank (levels 6, 11, 17, 23 and 31 on a normal ladder) the caption reads 'Rank D' style in that rank's colour for 1100 ms in place of the level caption; reduced motion shows it static for 400 ms. Rank letters come from the existing rank model; nothing is invented. Thresholds are pinned by a fixture. The Level/Rank chip, sound and haptics stay separate cards, and the Guide ranks row stays pending. On 2026-11-10 the owner delegated this design call to the build agent. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Rank change is detected at completion time",
           "The caption uses the rank letter and colour and has a static reduced-motion form",
@@ -1569,19 +1569,19 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Confirm before quitting a level",
-        "description": "Implemented in a pull request, in review: Quit to Menu quits at once when no move was made; after a move the first press (tap, click or the Q key) relabels the row 'Tap again to quit' for 3 s and the second press quits, with no browser dialog or modal. The Guide keyboard line names Q. The pause row keeps its 44 px target. On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium with real touch taps and keyboard, not checked on a real phone.",
+        "description": "Implemented: Quit to Menu quits at once when no move was made; after a move the first press (tap, click or the Q key) relabels the row 'Tap again to quit' for 3 s and the second press quits, with no browser dialog or modal. The Guide keyboard line names Q. The pause row keeps its 44 px target. On 2026-11-10 the owner delegated this design call to the build agent. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "review",
+        "lifecycle": "completed",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-UI-006"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-10T20:00:00.000Z",
+        "updated_at": "2026-11-10T00:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-005",
         "extensions": {
-          "owner_status": "review",
+          "owner_status": "completed",
           "public_safe": true
         }
       },
@@ -1589,11 +1589,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-005",
         "source_status": "current",
-        "source_updated_at": "2026-11-10T20:00:00.000Z"
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "Implemented in a pull request, in review: Quit to Menu quits at once when no move was made; after a move the first press (tap, click or the Q key) relabels the row 'Tap again to quit' for 3 s and the second press quits, with no browser dialog or modal. The Guide keyboard line names Q. The pause row keeps its 44 px target. On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium with real touch taps and keyboard, not checked on a real phone.",
-        "objective": "Implemented in a pull request, in review: Quit to Menu quits at once when no move was made; after a move the first press (tap, click or the Q key) relabels the row 'Tap again to quit' for 3 s and the second press quits, with no browser dialog or modal. The Guide keyboard line names Q. The pause row keeps its 44 px target. On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium with real touch taps and keyboard, not checked on a real phone.",
+        "summary": "Implemented: Quit to Menu quits at once when no move was made; after a move the first press (tap, click or the Q key) relabels the row 'Tap again to quit' for 3 s and the second press quits, with no browser dialog or modal. The Guide keyboard line names Q. The pause row keeps its 44 px target. On 2026-11-10 the owner delegated this design call to the build agent. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Implemented: Quit to Menu quits at once when no move was made; after a move the first press (tap, click or the Q key) relabels the row 'Tap again to quit' for 3 s and the second press quits, with no browser dialog or modal. The Guide keyboard line names Q. The pause row keeps its 44 px target. On 2026-11-10 the owner delegated this design call to the build agent. Merged and deployed to the live game on 2026-11-10. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Quit after at least one move asks for a second press",
           "Quit before moving does not",
@@ -6980,8 +6980,8 @@
   "extensions": {
     "stable_identity_count": 133,
     "exported_public_card_count": 133,
-    "exported_open_card_count": 62,
-    "exported_completed_card_count": 56,
+    "exported_open_card_count": 59,
+    "exported_completed_card_count": 59,
     "exported_deferred_card_count": 15,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
