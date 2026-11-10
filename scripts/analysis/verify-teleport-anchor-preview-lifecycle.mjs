@@ -12,7 +12,7 @@
  * the markers' real draw calls instead. It spies on the scene's own
  * edgeMarkerGraphics (clear / lineStyle / beginPath / moveTo / lineTo /
  * strokePath) and rebuilds, for every drawn frame, which of the 8 diamonds
- * are lit (mint, energized alpha) and where their vertices are, so it can
+ * are lit (energized alpha, player-coloured core) and where their vertices are, so it can
  * never pass by trusting the preview bookkeeping alone.
  *
  * This version asserts:
@@ -118,7 +118,7 @@ const stepToQuietSettled = (page, maxSteps = 4000) => page.evaluate((limit) => {
 
 // Spies on the scene's REAL edge-marker Graphics. Each clear() starts a new
 // frame; each strokePath() closes one diamond (drawEdgeMarker strokes the
-// outline last, after the optional mint core), so frame[i] is station i.
+// outline last, after the optional player-coloured core), so frame[i] is station i.
 const installMarkerRecorder = (page) => page.evaluate(() => {
   const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
   const graphics = scene.edgeMarkerGraphics;
@@ -161,10 +161,11 @@ const readMarkerFrame = (page) => page.evaluate(() => {
   };
 });
 
-// Which diamonds are lit in a frame: the stroke colour differs from the idle
-// colour (taken from a quiet baseline frame) AND the alpha is the energized one.
-const litIds = (frame, idleColor) => frame.markers
-  .map((marker, index) => (marker.color !== idleColor && marker.alpha >= ENERGIZED_ALPHA_FLOOR ? index : null))
+// Which diamonds are lit in a frame: the alpha is the energized one. (The stroke colour can no longer tell lit from
+// idle: every diamond's border is the live trail colour, trailPalette.ts, whether lit or not; a lit diamond is
+// distinguished by its energized alpha and its player-coloured core. `idleColor` is kept for the call sites.)
+const litIds = (frame, _idleColor) => frame.markers
+  .map((marker, index) => (marker.alpha >= ENERGIZED_ALPHA_FLOOR ? index : null))
   .filter((index) => index !== null);
 
 const idleColorOf = (frame) => {
