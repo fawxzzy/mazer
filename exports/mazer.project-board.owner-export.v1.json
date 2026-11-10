@@ -1,11 +1,11 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_90e9635436a0",
+  "export_id": "pbe_mazer_owner_registry_4050bde6a1f3",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:90e9635436a06c058fc41329eed77c189b1cd2187ee126e85d8847f58587f3d8",
+  "source_revision": "sha256:4050bde6a1f36305a117de9858f11b2e0c4a31c41b2e3bb8139592056fdc7bf9",
   "generated_at": "2026-11-10T22:00:00.000Z",
   "sources": [
     {
@@ -13,7 +13,7 @@
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:e07a7798430eb4017d1a061870d6266a65edad25f7ebb1fbb7a849b36e6ed0c9",
+      "revision": "sha256:c766912aad5cb1ad7c7635f8739a5dcdcd7220f81062fb88d427281d0bd50284",
       "observed_at": "2026-11-10T22:00:00.000Z"
     },
     {
@@ -6932,19 +6932,19 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Remove backdrop stars, centre the end markers, lighten the long trail draw",
-        "description": "After the previous polish went live the owner reported still stars behind the maze, a trail whose colour does not visibly move, and an end star and start arrow that are off centre and reach the tile edge. The coloured four-point stars are gone and no star is drawn while the background is not animating. The star and the arrow are now centred as a whole (outline included) and sit inside the lit rim at every tile size and pixel ratio, with new pixel tests. The trail colour does shift in real time in headless Chromium with default settings on the phone and desktop sizes, including on the live site; it is still when Trail Shine is Off or the device asks for reduced motion, and the long-trail draw was far too heavy for a slow phone, which is lightened here. The real cause on the owner phone is not proven. Open as a pull request; not merged, not deployed, not checked on a real phone.",
+        "description": "After the previous polish went live the owner reported still stars behind the maze, a trail whose colour does not visibly move, and an end star and start arrow that are off centre and reach the tile edge. Merged (pull request 411) and deployed to the live game on 2026-11-10. The coloured four-point stars are gone and no star is drawn while the background is not animating. The star and the arrow are now centred as a whole (outline included) and sit inside the lit rim at every tile size and pixel ratio, with new pixel tests. The trail glow is drawn on a downscaled scratch canvas, which lightens the long-trail draw. The corner flake was traced to unseeded random sparkles. Checked only in headless Chromium, not on a real phone: a touch-drag capture on the live game shows the trail colour changing frame to frame. The owner report that the trail looked static on his phone is not reproduced, and the real cause there is not proven. The trail is still when Trail Shine is Off or the device asks for reduced motion.",
         "card_type": "feature",
-        "lifecycle": "review",
+        "lifecycle": "completed",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [
           "MAZER-VIS-013"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-10T22:00:00.000Z",
+        "updated_at": "2026-11-10T19:25:42.634Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-014",
         "extensions": {
-          "owner_status": "review",
+          "owner_status": "completed",
           "public_safe": true
         }
       },
@@ -6952,16 +6952,16 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-014",
         "source_status": "current",
-        "source_updated_at": "2026-11-10T22:00:00.000Z"
+        "source_updated_at": "2026-11-10T19:25:42.634Z"
       },
       "content": {
-        "summary": "After the previous polish went live the owner reported still stars behind the maze, a trail whose colour does not visibly move, and an end star and start arrow that are off centre and reach the tile edge. The coloured four-point stars are gone and no star is drawn while the background is not animating. The star and the arrow are now centred as a whole (outline included) and sit inside the lit rim at every tile size and pixel ratio, with new pixel tests. The trail colour does shift in real time in headless Chromium with default settings on the phone and desktop sizes, including on the live site; it is still when Trail Shine is Off or the device asks for reduced motion, and the long-trail draw was far too heavy for a slow phone, which is lightened here. The real cause on the owner phone is not proven. Open as a pull request; not merged, not deployed, not checked on a real phone.",
-        "objective": "After the previous polish went live the owner reported still stars behind the maze, a trail whose colour does not visibly move, and an end star and start arrow that are off centre and reach the tile edge. The coloured four-point stars are gone and no star is drawn while the background is not animating. The star and the arrow are now centred as a whole (outline included) and sit inside the lit rim at every tile size and pixel ratio, with new pixel tests. The trail colour does shift in real time in headless Chromium with default settings on the phone and desktop sizes, including on the live site; it is still when Trail Shine is Off or the device asks for reduced motion, and the long-trail draw was far too heavy for a slow phone, which is lightened here. The real cause on the owner phone is not proven. Open as a pull request; not merged, not deployed, not checked on a real phone.",
+        "summary": "After the previous polish went live the owner reported still stars behind the maze, a trail whose colour does not visibly move, and an end star and start arrow that are off centre and reach the tile edge. Merged (pull request 411) and deployed to the live game on 2026-11-10. The coloured four-point stars are gone and no star is drawn while the background is not animating. The star and the arrow are now centred as a whole (outline included) and sit inside the lit rim at every tile size and pixel ratio, with new pixel tests. The trail glow is drawn on a downscaled scratch canvas, which lightens the long-trail draw. The corner flake was traced to unseeded random sparkles. Checked only in headless Chromium, not on a real phone: a touch-drag capture on the live game shows the trail colour changing frame to frame. The owner report that the trail looked static on his phone is not reproduced, and the real cause there is not proven. The trail is still when Trail Shine is Off or the device asks for reduced motion.",
+        "objective": "After the previous polish went live the owner reported still stars behind the maze, a trail whose colour does not visibly move, and an end star and start arrow that are off centre and reach the tile edge. Merged (pull request 411) and deployed to the live game on 2026-11-10. The coloured four-point stars are gone and no star is drawn while the background is not animating. The star and the arrow are now centred as a whole (outline included) and sit inside the lit rim at every tile size and pixel ratio, with new pixel tests. The trail glow is drawn on a downscaled scratch canvas, which lightens the long-trail draw. The corner flake was traced to unseeded random sparkles. Checked only in headless Chromium, not on a real phone: a touch-drag capture on the live game shows the trail colour changing frame to frame. The owner report that the trail looked static on his phone is not reproduced, and the real cause there is not proven. The trail is still when Trail Shine is Off or the device asks for reduced motion.",
         "acceptance_criteria": [
           "No coloured four-point star is drawn behind the board, and no star at all while the background is Still or reduced motion is on",
           "The goal star and start arrow, outline included, are centred on their tile within half a device pixel and inside the lit rim at tile sizes 6.4 to 25.4 px and pixel ratios 1 to 3, proven on raster pixels",
           "The trail colour is shown to change frame to frame while the player is idle, on phone and desktop sizes, and to be still under reduced motion and Trail Shine Off",
-          "Merged, deployed and checked on a real phone are NOT yet done; the cause of the still trail on the owner phone is still unproven"
+          "Merged and deployed; checked only in headless Chromium, not on a real phone; the still trail the owner saw on his phone is not reproduced and its cause is unproven"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -7034,8 +7034,8 @@
   "extensions": {
     "stable_identity_count": 134,
     "exported_public_card_count": 134,
-    "exported_open_card_count": 60,
-    "exported_completed_card_count": 59,
+    "exported_open_card_count": 59,
+    "exported_completed_card_count": 60,
     "exported_deferred_card_count": 15,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
