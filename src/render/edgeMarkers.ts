@@ -31,9 +31,13 @@
  *   and near-flush on the left/right sides, and never outside the viewport.
  * - Calm at rest: one slow breathing alpha (0.45-0.6 over 3.6 s), no per-marker
  *   sparkles. In reduced motion the markers are completely static (phase 0).
- * - Meaningful: a marker lights up (mint core) while it is a live wrap end or
+ * - Meaningful: a marker lights up (a core in the PLAYER's colour) while it is a live wrap end or
  *   the spawn laser's emitter, and flashes once (~120 ms) on a wrapped step,
  *   paired with the destination edge.
+ * - Colour contract (trailPalette.ts is the single source of truth): the diamond's BORDER is always the live
+ *   iridescent trail colour (the trail's own core colour at the trail head, same clock, same reduced-motion rule;
+ *   never a fixed colour), and everything INSIDE it or fired out of it (the lit core, the beams, the landing
+ *   sparkles) is the player's colour, `PLAYER_COLOR`.
  *
  * Lasers: on arrival ALL 8 diamonds (orbiting and lit through the whole build, parked on their
  * rest stations once it completes) fire a beam inward to the spawn tile; on
@@ -44,10 +48,10 @@
  *
  * Geometry and state are pure; the draw helpers only call the tiny Graphics
  * surface declared below (so they are testable without Phaser). Colours come
- * exclusively from cyberArcadeMaterial tokens.
+ * exclusively from the trail palette (trailPalette.ts) and cyberArcadeMaterial tokens.
  */
 import { isLegacyWrappedStepTransition } from '../legacy-runtime/legacyMaze';
-import { cyberArcadeMaterial } from './cyberArcadeMaterial';
+import { PLAYER_COLOR, resolveTrailPaletteBorderColor } from './trailPalette';
 import { INTRO_BEAM_STAGGER_MS, INTRO_LASER_MS } from './introTimeline';
 
 export type EdgeSide = 'top' | 'right' | 'bottom' | 'left';
@@ -326,6 +330,11 @@ export interface EdgeMarkerState {
   /** 1 at the instant of a wrap flash, falling to 0 over EDGE_MARKER_FLASH_MS. */
   readonly flash: number;
   readonly hidden: boolean;
+  /**
+   * The border colour: the live trail colour (`resolveTrailPaletteBorderColor`). Optional only so a standalone
+   * icon (the Guide legend) can omit it and get the static trail gradient's start colour; the board always sets it.
+   */
+  readonly borderColor?: number;
 }
 
 export interface EdgeWrapFlash {
@@ -344,7 +353,19 @@ export interface EdgeMarkerStateInput {
   readonly flash?: EdgeWrapFlash | null;
   /** Stations whose kite must not draw (e.g. the teleport shell is occupying it). */
   readonly hiddenIds?: ReadonlySet<number>;
+  /**
+   * Physical distance, in tiles, of the player's end of the trail along the trail (the same distance the trail's own
+   * colour phase uses). The border colour is the trail colour there. 0 when there is no trail (menu).
+   */
+  readonly trailHeadDistanceTiles?: number;
+  /** The trail's own (pausable) animation clock, so the border and the trail share one phase; defaults to `timeMs`. */
+  readonly trailTimeMs?: number;
+  /** False freezes the border to the static trail gradient (Trail Shine off); reduced motion always freezes it. */
+  readonly trailAnimated?: boolean;
 }
+
+/** Border colour of a marker with no explicit `borderColor`: the static trail palette at the trail's start. */
+const STATIC_BORDER_COLOR = resolveTrailPaletteBorderColor(0, 0, true);
 
 export const resolveEdgeMarkerIdleAlpha = (timeMs: number, reducedMotion: boolean): number => {
   const middle = (EDGE_MARKER_IDLE_ALPHA_MIN + EDGE_MARKER_IDLE_ALPHA_MAX) / 2;
@@ -361,6 +382,11 @@ const clampUnit = (value: number): number => (
 
 export const resolveEdgeMarkerStates = (input: EdgeMarkerStateInput): ReadonlyArray<EdgeMarkerState> => {
   const idleAlpha = resolveEdgeMarkerIdleAlpha(input.timeMs, input.reducedMotion);
+  const borderColor = resolveTrailPaletteBorderColor(
+    Number.isFinite(input.trailHeadDistanceTiles) ? (input.trailHeadDistanceTiles ?? 0) : 0,
+    Number.isFinite(input.trailTimeMs) ? (input.trailTimeMs ?? input.timeMs) : input.timeMs,
+    input.reducedMotion || input.trailAnimated === false
+  );
   const flashProgress = !input.reducedMotion && input.flash
     ? Math.max(0, Math.min(1, (input.timeMs - input.flash.startedAtMs) / EDGE_MARKER_FLASH_MS))
     : 1;
@@ -380,7 +406,8 @@ export const resolveEdgeMarkerStates = (input: EdgeMarkerStateInput): ReadonlyAr
       energy,
       spinRad: input.reducedMotion || !Number.isFinite(input.spinRad) ? 0 : (input.spinRad ?? 0),
       flash,
-      hidden: input.hiddenIds?.has(id) ?? false
+      hidden: input.hiddenIds?.has(id) ?? false,
+      borderColor
     };
   });
 };
@@ -476,10 +503,10 @@ export const drawEdgeMarker = (
   }
   const outline = resolveEdgeMarkerVertices(station, 1);
   if (state.energized || state.flash > 0) {
-    // Mint core: a smaller kite inside the outline.
+    // Player-coloured core: a smaller kite inside the outline.
     tracePolygon(graphics, resolveEdgeMarkerVertices(station, 0.5));
     graphics.fillStyle(
-      cyberArcadeMaterial.rail.mint,
+      PLAYER_COLOR,
       Math.max(state.flash, state.energized ? 0.7 * state.energy : 0) * state.alpha
     );
     graphics.fillPath();
@@ -487,7 +514,7 @@ export const drawEdgeMarker = (
   tracePolygon(graphics, outline);
   graphics.lineStyle(
     EDGE_MARKER_STROKE_PX,
-    state.energized || state.flash > 0 ? cyberArcadeMaterial.rail.mint : cyberArcadeMaterial.rail.cyan,
+    state.borderColor ?? STATIC_BORDER_COLOR,
     state.alpha
   );
   graphics.strokePath();
@@ -659,19 +686,15 @@ export const drawEdgeBeams = (graphics: EdgeGraphics, input: EdgeBeamsInput): Ed
     if (!beam.firing) {
       continue;
     }
-    graphics.lineStyle(SPAWN_LASER_GLOW_PX, cyberArcadeMaterial.signal.player, EDGE_BEAM_ALPHA * 0.35);
+    graphics.lineStyle(SPAWN_LASER_GLOW_PX, PLAYER_COLOR, EDGE_BEAM_ALPHA * 0.35);
     graphics.lineBetween(beam.from.x, beam.from.y, beam.tip.x, beam.tip.y);
-    graphics.lineStyle(SPAWN_LASER_CORE_PX, cyberArcadeMaterial.rail.mint, EDGE_BEAM_ALPHA);
+    graphics.lineStyle(SPAWN_LASER_CORE_PX, PLAYER_COLOR, EDGE_BEAM_ALPHA);
     graphics.lineBetween(beam.from.x, beam.from.y, beam.tip.x, beam.tip.y);
-    graphics.fillStyle(cyberArcadeMaterial.rail.mint, EDGE_BEAM_ALPHA);
+    graphics.fillStyle(PLAYER_COLOR, EDGE_BEAM_ALPHA);
     graphics.fillCircle(beam.tip.x, beam.tip.y, 2.5);
   }
-  geometry.sparkles.forEach((sparkle, index) => {
-    graphics.lineStyle(
-      1,
-      index % 2 === 0 ? cyberArcadeMaterial.rail.mint : cyberArcadeMaterial.signal.player,
-      sparkle.alpha
-    );
+  geometry.sparkles.forEach((sparkle) => {
+    graphics.lineStyle(1, PLAYER_COLOR, sparkle.alpha);
     graphics.lineBetween(sparkle.x - sparkle.size, sparkle.y, sparkle.x + sparkle.size, sparkle.y);
     graphics.lineBetween(sparkle.x, sparkle.y - sparkle.size, sparkle.x, sparkle.y + sparkle.size);
   });

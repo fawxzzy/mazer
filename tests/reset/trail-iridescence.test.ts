@@ -4,6 +4,11 @@ import { describe, expect, test } from 'vitest';
 import { BOARD_CHIP_FILL, boardMaterial } from '../../src/render/boardTileStyle';
 import {
   IRIDESCENT_TRAIL_CORE_STOPS,
+  TRAIL_SHEEN_CORE_LIFT_MAX,
+  TRAIL_SHEEN_PERIOD_MS,
+  TRAIL_SHEEN_SPACING_TILES,
+  resolveIridescentBaseCore,
+  resolveTrailSheen,
   IRIDESCENT_TRAIL_GLOW_STOPS,
   IRIDESCENT_TRAIL_SWEEP_PERIOD_MS,
   IRIDESCENT_TRAIL_TILES_PER_SWEEP,
@@ -84,7 +89,7 @@ describe('iridescent midnight-sun trail: palette and contrast', () => {
     let worst = Infinity;
     for (let d = 0; d < IRIDESCENT_TRAIL_TILES_PER_SWEEP * 2; d += 0.25) {
       for (let t = 0; t < IRIDESCENT_TRAIL_SWEEP_PERIOD_MS; t += 400) {
-        const sample = sampleIridescentTrail(d, t, false, { core: 0, glow: 0, wave: 0 });
+        const sample = sampleIridescentTrail(d, t, false, { core: 0, glow: 0, wave: 0, sheen: 0 });
         worst = Math.min(worst, contrastRatio(sample.core, BOARD_CHIP_FILL));
       }
     }
@@ -126,7 +131,8 @@ describe('iridescent midnight-sun trail: palette and contrast', () => {
 describe('iridescent trail: it shifts along the trail and over time, with no jumps', () => {
   test('colour differs along the trail and changes with time', () => {
     expect(resolveIridescentRestingCore(0, 0)).not.toBe(resolveIridescentRestingCore(IRIDESCENT_TRAIL_TILES_PER_SWEEP / 4, 0));
-    expect(resolveIridescentRestingCore(3, 0)).not.toBe(resolveIridescentRestingCore(3, IRIDESCENT_TRAIL_SWEEP_PERIOD_MS / 4));
+    // (the sweep is a triangle wave, so test a quarter period at a point that is not a mirror of itself)
+    expect(resolveIridescentRestingCore(1, 0)).not.toBe(resolveIridescentRestingCore(1, IRIDESCENT_TRAIL_SWEEP_PERIOD_MS / 4));
     // a full sweep period returns to the same colour
     expect(resolveIridescentRestingCore(3, 0)).toBe(resolveIridescentRestingCore(3, IRIDESCENT_TRAIL_SWEEP_PERIOD_MS));
   });
@@ -134,17 +140,91 @@ describe('iridescent trail: it shifts along the trail and over time, with no jum
   test('the hue goes out and back (triangle sweep): no wrap through the palette, no step larger than a gentle lerp', () => {
     let previous = resolveIridescentRestingCore(0, 0);
     let steps = 0;
-    for (let d = 0.05; d <= IRIDESCENT_TRAIL_TILES_PER_SWEEP * 2; d += 0.05) {
+    for (let d = 0.02; d <= IRIDESCENT_TRAIL_TILES_PER_SWEEP * 2; d += 0.02) {
       const next = resolveIridescentRestingCore(d, 0);
       expect(distance(previous, next), `at ${d.toFixed(2)} tiles`).toBeLessThan(10);
       previous = next;
       steps += 1;
     }
-    expect(steps).toBeGreaterThan(500);
+    expect(steps).toBeGreaterThan(700);
     // after one sweep (out and back) it is the colour it started as
     expect(resolveIridescentRestingCore(IRIDESCENT_TRAIL_TILES_PER_SWEEP, 0)).toBe(resolveIridescentRestingCore(0, 0));
     // and halfway it is the far end of the band
     expect(resolveIridescentRestingCore(IRIDESCENT_TRAIL_TILES_PER_SWEEP / 2, 0)).toBe(IRIDESCENT_TRAIL_CORE_STOPS[IRIDESCENT_TRAIL_CORE_STOPS.length - 1]);
+  });
+});
+
+describe('iridescent trail: the shift is clearly visible (owner feedback: too subtle)', () => {
+  const distance3 = (a: number, b: number): number => distance(a, b);
+
+  test('the hue gradient is short and quick: a full sweep spans at most 8 tiles and passes a fixed point in at most 4 s', () => {
+    expect(IRIDESCENT_TRAIL_TILES_PER_SWEEP).toBeLessThanOrEqual(8);
+    expect(IRIDESCENT_TRAIL_SWEEP_PERIOD_MS).toBeLessThanOrEqual(4000);
+  });
+
+  test('at a fixed point the colour visibly changes within half a second (a colour distance of at least 25 in RGB)', () => {
+    let best = 0;
+    for (let d = 0; d < 16; d += 1) {
+      const a = sampleIridescentTrail(d, 0, false, { core: 0, glow: 0, wave: 0, sheen: 0 }).core;
+      const b = sampleIridescentTrail(d, 500, false, { core: 0, glow: 0, wave: 0, sheen: 0 }).core;
+      best = Math.max(best, distance3(a, b));
+    }
+    expect(best).toBeGreaterThanOrEqual(25);
+  });
+
+  test('along a stretch of trail the colour changes by at least 60 (RGB distance) within 4 tiles, somewhere on every sweep', () => {
+    for (const t of [0, 900, 1800, 2700]) {
+      let best = 0;
+      for (let d = 0; d < IRIDESCENT_TRAIL_TILES_PER_SWEEP * 2; d += 0.25) {
+        const a = sampleIridescentTrail(d, t, false, { core: 0, glow: 0, wave: 0, sheen: 0 }).core;
+        const b = sampleIridescentTrail(d + 4, t, false, { core: 0, glow: 0, wave: 0, sheen: 0 }).core;
+        best = Math.max(best, distance3(a, b));
+      }
+      expect(best, `t ${t}`).toBeGreaterThanOrEqual(60);
+    }
+  });
+
+  test('a sheen band travels toward the player: a narrow bright ridge that moves +distance over time', () => {
+    const crestAt = (t: number): number => {
+      let best = 0; let bestSheen = -1;
+      for (let d = 0; d < TRAIL_SHEEN_SPACING_TILES; d += 0.01) {
+        const v = resolveTrailSheen(d, t);
+        if (v > bestSheen) { bestSheen = v; best = d; }
+      }
+      return best;
+    };
+    const quarter = TRAIL_SHEEN_PERIOD_MS / 4;
+    const moved = (crestAt(quarter) - crestAt(0) + TRAIL_SHEEN_SPACING_TILES) % TRAIL_SHEEN_SPACING_TILES;
+    expect(moved).toBeCloseTo(TRAIL_SHEEN_SPACING_TILES / 4, 1);
+    // narrow: more than 3/4 of the trail has less than 25% of the peak
+    let dim = 0; let total = 0;
+    for (let d = 0; d < TRAIL_SHEEN_SPACING_TILES; d += 0.05) { total += 1; if (resolveTrailSheen(d, 0) < 0.25) dim += 1; }
+    expect(dim / total).toBeGreaterThan(0.6);
+    // the band is a visible colour change: inside the band the core is much paler than just outside it
+    const out = { core: 0, glow: 0, wave: 0, sheen: 0 };
+    let peakD = 0;
+    for (let d = 0; d < TRAIL_SHEEN_SPACING_TILES; d += 0.01) if (resolveTrailSheen(d, 0) > resolveTrailSheen(peakD, 0)) peakD = d;
+    const inside = sampleIridescentTrail(peakD, 0, false, out).core;
+    const outside = sampleIridescentTrail(peakD + (TRAIL_SHEEN_SPACING_TILES / 2), 0, false, out).core;
+    const lum = (c: number): number => { const [r, g, b] = channels(c); return (0.299 * r) + (0.587 * g) + (0.114 * b); };
+    expect(lum(inside)).toBeGreaterThan(lum(outside) + 15);
+    expect(TRAIL_SHEEN_CORE_LIFT_MAX).toBeGreaterThanOrEqual(0.4);
+  });
+
+  test('reduced motion has no sheen at all (a static gradient)', () => {
+    const out = { core: 0, glow: 0, wave: 0, sheen: 0 };
+    for (let d = 0; d < 20; d += 0.7) {
+      expect(sampleIridescentTrail(d, 777, true, out).sheen).toBe(0);
+    }
+  });
+
+  test('frame cost: 60 000 samples (a 1000-segment trail for 60 frames) well inside the budget', () => {
+    const out = { core: 0, glow: 0, wave: 0, sheen: 0 };
+    const start = performance.now();
+    for (let i = 0; i < 60000; i += 1) sampleIridescentTrail(i / 16, i * 3, false, out);
+    const perFrameMs = (performance.now() - start) / 60;
+    console.info(`TRAIL_PALETTE_SAMPLE_COST ${perFrameMs.toFixed(4)} ms per 1000-segment frame`);
+    expect(perFrameMs).toBeLessThan(2);
   });
 });
 
@@ -174,13 +254,15 @@ describe('iridescent trail pulse', () => {
 
   test('the pulse only brightens the resting core (so the resting colour is the contrast floor) and stays gentle', () => {
     expect(TRAIL_PULSE_CORE_LIFT_MAX).toBeLessThanOrEqual(0.35);
+    expect(TRAIL_PULSE_CORE_LIFT_MAX + TRAIL_SHEEN_CORE_LIFT_MAX).toBeLessThanOrEqual(0.85);
     expect(TRAIL_PULSE_WIDTH_SWING).toBeLessThanOrEqual(0.12);
     expect(TRAIL_PULSE_GLOW_ALPHA_SWING).toBeLessThanOrEqual(0.35);
-    const out = { core: 0, glow: 0, wave: 0 };
+    const out = { core: 0, glow: 0, wave: 0, sheen: 0 };
     for (let d = 0; d < 30; d += 0.9) {
       for (let t = 0; t < 4000; t += 211) {
         sampleIridescentTrail(d, t, false, out);
-        const resting = channels(resolveIridescentRestingCore(d, t));
+        // the resting colour at the sample's own hue position (the sheen refracts the hue a little ahead)
+        const resting = channels(resolveIridescentBaseCore(d, t, false));
         const core = channels(out.core);
         for (let i = 0; i < 3; i += 1) expect(core[i]!).toBeGreaterThanOrEqual(resting[i]! - 1);
       }
@@ -206,7 +288,7 @@ describe('iridescent trail pulse', () => {
     const a = sampleIridescentTrail(1, 100, false);
     const b = sampleIridescentTrail(2, 200, false);
     expect(a).toBe(b);
-    const mine = { core: 0, glow: 0, wave: 0 };
+    const mine = { core: 0, glow: 0, wave: 0, sheen: 0 };
     expect(sampleIridescentTrail(1, 100, false, mine)).toBe(mine);
     // cheap: a long trail of 1000 resampled segments, redrawn 60 times, is 60k samples
     const start = performance.now();
@@ -218,8 +300,8 @@ describe('iridescent trail pulse', () => {
 describe('iridescent trail with reduced motion (and Trail Shine off): a static gradient', () => {
   test('no time term and a constant pulse level: any two times give the same colours', () => {
     for (let d = 0; d < 20; d += 0.7) {
-      const t0 = { ...sampleIridescentTrail(d, 0, true, { core: 0, glow: 0, wave: 0 }) };
-      const t1 = { ...sampleIridescentTrail(d, 12345, true, { core: 0, glow: 0, wave: 0 }) };
+      const t0 = { ...sampleIridescentTrail(d, 0, true, { core: 0, glow: 0, wave: 0, sheen: 0 }) };
+      const t1 = { ...sampleIridescentTrail(d, 12345, true, { core: 0, glow: 0, wave: 0, sheen: 0 }) };
       expect(t1).toEqual(t0);
       expect(t0.wave).toBe(TRAIL_PULSE_REDUCED_LEVEL);
     }
@@ -229,10 +311,10 @@ describe('iridescent trail with reduced motion (and Trail Shine off): a static g
 
   test('it is still iridescent: the static gradient shifts along the trail (no banding from a frozen wave)', () => {
     const cores = new Set<number>();
-    for (let d = 0; d < IRIDESCENT_TRAIL_TILES_PER_SWEEP; d += 0.5) {
-      cores.add(sampleIridescentTrail(d, 5000, true, { core: 0, glow: 0, wave: 0 }).core);
+    for (let d = 0; d < IRIDESCENT_TRAIL_TILES_PER_SWEEP; d += 0.25) {
+      cores.add(sampleIridescentTrail(d, 5000, true, { core: 0, glow: 0, wave: 0, sheen: 0 }).core);
     }
-    // out and back: the triangle sweep revisits each colour once, so 28 samples show 15 distinct ones
+    // out and back: the triangle sweep revisits each colour once, so 32 samples show 17 distinct ones
     expect(cores.size).toBeGreaterThanOrEqual(14);
   });
 

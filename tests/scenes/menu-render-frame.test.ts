@@ -804,8 +804,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('drawEdgeBeams(this.spawnLaserGraphics, {');
     expect(menuSceneSource).not.toContain('const beamColor = resolveLegacyIridescentTrailColor(index, origins.length, time);');
     const edgeMarkersSource = readFileSync(resolve(process.cwd(), 'src/render/edgeMarkers.ts'), 'utf8');
-    expect(edgeMarkersSource).toContain('cyberArcadeMaterial.rail.mint');
-    expect(edgeMarkersSource).toContain('cyberArcadeMaterial.signal.player');
+    // colour contract: the border is the live trail colour and the inside / the beams are the player colour,
+    // both from the single trail-palette module (no fixed mint / cyan any more)
+    expect(edgeMarkersSource).toContain('PLAYER_COLOR');
+    expect(edgeMarkersSource).toContain('resolveTrailPaletteBorderColor');
+    expect(edgeMarkersSource).not.toContain('rail.mint');
+    expect(edgeMarkersSource).not.toContain('rail.cyan');
     expect(edgeMarkersSource).not.toMatch(/0x[0-9a-fA-F]{6}/);
     expect(menuSceneSource).toContain('private drawLegacyBackdropSigils(width: number, height: number, time: number): void');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropGlassShards(');
@@ -2611,7 +2615,7 @@ describe('Chip wiring: start/goal markers, trail underlay, board layer', () => {
     expect(fnStart).toBeGreaterThan(-1);
     const body = menuSceneSource.slice(fnStart, menuSceneSource.indexOf('\n  }\n', fnStart));
     expect(body).toContain('new PhaserGraphicsTileContext(this.boardDynamicGraphics)');
-    expect(body).toContain('drawBoardMarkers(context, {');
+    expect(body).toContain('drawBoardMarkers(context, markerInput);');
     expect(body).toContain('this.boardTileLayer.snappedOrigin');
     expect(body).toContain('reducedMotion: this.prefersLegacyReducedMotion()');
     expect(body).toContain("start: kind === 'start' ? point : undefined");

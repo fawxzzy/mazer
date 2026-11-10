@@ -64,6 +64,9 @@ jobs:
           tests/render/edgeMarkers.test.ts
           tests/render/boardTileBake.test.ts
           tests/render/boardTileStyle.test.ts
+          tests/render/endpointTilePixels.test.ts
+          tests/reset/start-arrow-direction.test.ts
+          tests/reset/trail-iridescence.test.ts
           tests/render/palette.test.ts
           tests/reset/board-tile-layer.test.ts
           tests/visual/maze-lifecycle-analysis.test.mjs

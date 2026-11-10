@@ -2,10 +2,9 @@
  * Goal beacon: a soft goal-coloured halo with a slow pulse and an occasional expanding ping ring around the
  * goal, sized in CSS PIXELS (not tiles) so the goal can be found at a glance on any board size.
  *
- * It never changes the goal artwork (that is `drawBoardMarkers`' red star in a dark badge with a lit ring on a
- * goal pad). It is drawn into its own Graphics layer UNDER the trail canvas, so the trail (and its dark
+ * It never changes the goal artwork (that is `drawBoardMarkers`' red star with its dark keyline, directly on the tile). It is drawn into its own Graphics layer UNDER the trail canvas, so the trail (and its dark
  * underlay) always sits on top of it and keeps its contrast. Halo and ping are low-alpha and stay outside the
- * badge, so they only ever add a goal-coloured glow around the marker.
+ * marker, so they only ever add a goal-coloured glow around the marker.
  *
  * Reduced motion: the halo is static (no pulse) and the ping is not drawn. Pure functions: the draw is a
  * function of (geometry, timeMs, reducedMotion) only, no Date/Math.random.
