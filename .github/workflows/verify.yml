@@ -2,6 +2,11 @@ name: Verify
 
 on:
   pull_request:
+    # A pull request that changes only the board registry and its export is covered by the
+    # "Owner export" workflow; the full build and AI shards add ~7 minutes and prove nothing about it.
+    paths-ignore:
+      - "config/mazer-owner-work-registry.json"
+      - "exports/mazer.project-board.owner-export.v1.json"
   push:
     branches:
       - main
