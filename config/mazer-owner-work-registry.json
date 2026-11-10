@@ -4,16 +4,17 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-10-13T06:54:57.592Z",
+  "updatedAt": "2026-11-10T14:20:02.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 13,
-    "publicCardCount": 3,
-    "completedExcludedCount": 8,
-    "candidateExcludedCount": 2,
+    "stableIdentityCount": 131,
     "researchCandidateImportCount": 0,
-    "discordosRole": "provenance-and-board-identity-only"
+    "discordosRole": "provenance-and-board-identity-only",
+    "openCardCount": 62,
+    "completedCardCount": 54,
+    "deferredCardCount": 15,
+    "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out."
   },
   "workItems": [
     {
@@ -43,7 +44,10 @@
       "description": "Finish bounded World Identity fixes while preserving the accepted Navigation Core, Teleport System, and gameplay contracts.",
       "cardType": "feature",
       "priority": "medium",
-      "dependencies": ["MAZER-2D-001", "MAZER-TELEPORT-001"],
+      "dependencies": [
+        "MAZER-2D-001",
+        "MAZER-TELEPORT-001"
+      ],
       "acceptanceCriteria": [
         "World Identity changes remain isolated from accepted navigation and teleport ownership.",
         "Motion, reduced-motion, layout, and render contracts remain deterministic and test-backed.",
@@ -60,7 +64,9 @@
       "description": "Prepare a Capacitor-based native wrapper only after the web gameplay and UI baseline is stable and independently verified.",
       "cardType": "feature",
       "priority": "low",
-      "dependencies": ["MAZER-2D-001"],
+      "dependencies": [
+        "MAZER-2D-001"
+      ],
       "acceptanceCriteria": [
         "System back behavior maps to the existing one-overlay-at-a-time contract.",
         "Safe-area, orientation, and device input behavior match the verified web baseline.",
@@ -78,7 +84,11 @@
       "cardType": "migration",
       "priority": "critical",
       "dependencies": [],
-      "acceptanceCriteria": ["Master binding is exact.", "Progression and receipt conservation are proven.", "Encrypted legacy recovery material remains retained and protected."]
+      "acceptanceCriteria": [
+        "Master binding is exact.",
+        "Progression and receipt conservation are proven.",
+        "Encrypted legacy recovery material remains retained and protected."
+      ]
     },
     {
       "id": "MAZER-ACCOUNT-001",
@@ -87,11 +97,17 @@
       "sourceId": "mazer-current-truth",
       "sourceRef": "docs/current-truth.md#shared-account-consumer-contract--2026-09-13",
       "title": "Adopt the shared account consumer contract",
-      "description": "Use the canonical public-client authorization flow and shared account routes without embedding credentials or competing account screens.",
+      "description": "Use the canonical public-client authorization flow and shared account routes, keeping sensitive values out of the client and avoiding competing account screens.",
       "cardType": "architecture",
       "priority": "critical",
-      "dependencies": ["MAZER-DATA-001"],
-      "acceptanceCriteria": ["Authorization uses PKCE and an exact redirect.", "Account and recovery routes use fixed safe return context.", "Session validation fails closed on claim or readback mismatch."]
+      "dependencies": [
+        "MAZER-DATA-001"
+      ],
+      "acceptanceCriteria": [
+        "Authorization uses PKCE and an exact redirect.",
+        "Account and recovery routes use fixed safe return context.",
+        "Session validation fails closed on claim or readback mismatch."
+      ]
     },
     {
       "id": "MAZER-ICON-001",
@@ -104,7 +120,11 @@
       "cardType": "architecture",
       "priority": "medium",
       "dependencies": [],
-      "acceptanceCriteria": ["One master artwork remains authoritative.", "Generated derivatives are deterministic.", "Maskable assets preserve the complete safe geometry."]
+      "acceptanceCriteria": [
+        "One master artwork remains authoritative.",
+        "Generated derivatives are deterministic.",
+        "Maskable assets preserve the complete safe geometry."
+      ]
     },
     {
       "id": "MAZER-PWA-001",
@@ -116,8 +136,14 @@
       "description": "Keep manifest, service-worker, icon, and install guidance truthful and reproducible without stale localhost service workers.",
       "cardType": "reliability",
       "priority": "high",
-      "dependencies": ["MAZER-ICON-001"],
-      "acceptanceCriteria": ["Manifest and metadata reference generated assets.", "Production builds include the intended service worker.", "Local development does not register a stale service worker."]
+      "dependencies": [
+        "MAZER-ICON-001"
+      ],
+      "acceptanceCriteria": [
+        "Manifest and metadata reference generated assets.",
+        "Production builds include the intended service worker.",
+        "Local development does not register a stale service worker."
+      ]
     },
     {
       "id": "MAZER-NAV-001",
@@ -129,8 +155,14 @@
       "description": "Ship the accepted floor, player, goal, and continuous trail rendering baseline with deterministic visual and lifecycle proof.",
       "cardType": "feature",
       "priority": "high",
-      "dependencies": ["MAZER-2D-001"],
-      "acceptanceCriteria": ["Floor, player, goal, and trail share the accepted visual authority.", "Movement and lifecycle evidence use real commands.", "Raster and performance regressions remain bounded and reproducible."]
+      "dependencies": [
+        "MAZER-2D-001"
+      ],
+      "acceptanceCriteria": [
+        "Floor, player, goal, and trail share the accepted visual authority.",
+        "Movement and lifecycle evidence use real commands.",
+        "Raster and performance regressions remain bounded and reproducible."
+      ]
     },
     {
       "id": "MAZER-TELEPORT-001",
@@ -142,8 +174,14 @@
       "description": "Ship the single-primary gameplay transfer contract with pause-safe timing, deterministic anchor selection, and real lifecycle verification.",
       "cardType": "feature",
       "priority": "high",
-      "dependencies": ["MAZER-NAV-001"],
-      "acceptanceCriteria": ["Transfer timing is phase-aware and pause-safe.", "Anchor selection fails closed when geometry is unavailable.", "Real solver-driven gameplay exercises the full transfer lifecycle."]
+      "dependencies": [
+        "MAZER-NAV-001"
+      ],
+      "acceptanceCriteria": [
+        "Transfer timing is phase-aware and pause-safe.",
+        "Anchor selection fails closed when geometry is unavailable.",
+        "Real solver-driven gameplay exercises the full transfer lifecycle."
+      ]
     },
     {
       "id": "MAZER-MAZEV2-001",
@@ -155,8 +193,14 @@
       "description": "Provide deterministic canonical maze comparison, adapter, corpus, timeout, provenance, and nullable metric semantics.",
       "cardType": "architecture",
       "priority": "medium",
-      "dependencies": ["MAZER-2D-001"],
-      "acceptanceCriteria": ["Domain and legacy adapters preserve their declared topology semantics.", "Corpus work is interruptible and source-proven.", "Metrics distinguish zero from genuinely unavailable values."]
+      "dependencies": [
+        "MAZER-2D-001"
+      ],
+      "acceptanceCriteria": [
+        "Domain and legacy adapters preserve their declared topology semantics.",
+        "Corpus work is interruptible and source-proven.",
+        "Metrics distinguish zero from genuinely unavailable values."
+      ]
     },
     {
       "id": "MAZER-AUTH-QA-001",
@@ -168,8 +212,14 @@
       "description": "Verify the current signed-out account gate and diagnostics-only authenticated setting persistence without touching real accounts or data.",
       "cardType": "reliability",
       "priority": "high",
-      "dependencies": ["MAZER-ACCOUNT-001"],
-      "acceptanceCriteria": ["Signed-out controls match the current account gate.", "Changed diagnostics-fixture state must persist across reload.", "Cleanup restores only fixture-local state and preserves failure evidence."]
+      "dependencies": [
+        "MAZER-ACCOUNT-001"
+      ],
+      "acceptanceCriteria": [
+        "Signed-out controls match the current account gate.",
+        "Changed diagnostics-fixture state must persist across reload.",
+        "Cleanup restores only fixture-local state and preserves failure evidence."
+      ]
     },
     {
       "id": "MAZER-PLANET-001",
@@ -178,11 +228,17 @@
       "sourceId": "mazer-roadmap",
       "sourceRef": "docs/roadmap.md#parked-future-lane",
       "title": "Research a rotating planet maze",
-      "description": "Retain the parked planet-maze research sequence without presenting it as current product work.",
+      "description": "Deferred: retain the parked planet-maze research sequence without presenting it as current product work.",
       "cardType": "research",
       "priority": null,
-      "dependencies": ["MAZER-2D-001"],
-      "acceptanceCriteria": ["A separate spike proves clarity.", "A separate spike proves orientation.", "Integration requires a future owner decision."]
+      "dependencies": [
+        "MAZER-2D-001"
+      ],
+      "acceptanceCriteria": [
+        "A separate spike proves clarity.",
+        "A separate spike proves orientation.",
+        "Integration requires a future owner decision."
+      ]
     },
     {
       "id": "MAZER-CYBERDECK-001",
@@ -191,11 +247,2137 @@
       "sourceId": "mazer-roadmap",
       "sourceRef": "docs/roadmap.md#deep-research-ingestion",
       "title": "Retain Cyberdeck research as planning evidence",
-      "description": "Keep the merged research synthesis available without claiming primary Cyberdeck implementation is active or approved.",
+      "description": "Deferred: keep the merged research synthesis available as planning evidence without claiming primary Cyberdeck implementation is active or approved.",
       "cardType": "research",
       "priority": null,
-      "dependencies": ["MAZER-2D-001"],
-      "acceptanceCriteria": ["Research stays clearly labeled as planning truth.", "The shipping 2D lane remains primary.", "Implementation requires a separate admitted packet."]
+      "dependencies": [
+        "MAZER-2D-001"
+      ],
+      "acceptanceCriteria": [
+        "Research stays clearly labeled as planning truth.",
+        "The shipping 2D lane remains primary.",
+        "Implementation requires a separate admitted packet."
+      ]
+    },
+    {
+      "id": "MAZER-VIS-001",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-001",
+      "title": "Ship the Chip board tile style as the default",
+      "description": "The owner picked the Chip style for board tiles. The tile bake was added in the second integration and the Chip tiles, markers, wordmarks and Guide icons were wired in PR #387, with the Trace style kept as an alternate switch. Merged to main.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Chip tiles are the default board material on main",
+        "Trace style remains selectable as an alternate",
+        "Guide icons use the same draw functions as the board"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-002",
+      "status": "completed",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-002",
+      "title": "Polish the Chip board: junction dots, player shape, start tile and goal alignment",
+      "description": "The owner asked to remove the dots at path splits, make the player a rounded square that matches the chip tile shape, line the goal tile up exactly with its tile edges at every pixel ratio, and redesign the start tile in the same chip language. PR #402 makes all four changes and is merged and deployed to mazer.fawxzzy.com on 2026-11-10; it has not been checked on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-VIS-001"
+      ],
+      "acceptanceCriteria": [
+        "Split-path dots are gone from the Chip tile bake",
+        "Goal and start tiles align pixel-exact to the baked tile at pixel ratios 1 to 3, proven by a raster test at several tile sizes",
+        "The in-app Guide copy and icons are updated in the same change"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-003",
+      "status": "completed",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-003",
+      "title": "Make the player trail iridescent with a gentle pulse",
+      "description": "The owner wants the trail to look like a midnight-sun shimmer that shifts colour along its length and over time, with a gentle pulse. PR #402 adds a back-and-forth sweep through cyan, violet, orchid and apricot that avoids the player's green, the goal's red and the start's gold, clears the contrast floor against the dark underlay, and freezes to a static gradient under reduced motion. It is merged and deployed on 2026-11-10 and not yet checked on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-VIS-001"
+      ],
+      "acceptanceCriteria": [
+        "The trail colour sweeps along its length and drifts over time with a travelling brightness wave",
+        "Worst-case trail colour keeps the contrast floor against the chip tile and the underlay",
+        "Reduced motion or the Trail Shine setting off freezes the trail to a static gradient"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-004",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-004",
+      "title": "Replace the edge diamonds with one new set that fires beams to and from all eight",
+      "description": "The owner asked for one diamond set everywhere: sitting behind the title and menu UI, evenly spread along the screen edge with the bottom row flush to it, mirror-symmetric, and with lasers from the player out to all eight diamonds and from all eight out to the maze. The old diamond art and its image files were retired (PR #374, PR #375) and the layout and beam timeline were corrected (PR #384). Checked on test frames and the capture harness; not yet checked on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Diamonds render below the title and menu UI at fixed, symmetric edge positions with the bottom row flush to the screen edge",
+        "All eight diamonds fire beams outward from the player and inward to the maze, and each lights when a beam reaches it",
+        "No source file references the retired diamond art and the boot scene loads none of it"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-005",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-005",
+      "title": "Make the edge diamonds orbit the screen during build and deconstruct",
+      "description": "The owner wanted the eight edge diamonds to travel around the screen edge while a maze generates or deconstructs, not just spin in place. PR #388 adds one lap clockwise on build and one counter-clockwise on deconstruct, with the ring parked until the beams land. Merged and deployed; not yet checked on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-VIS-004"
+      ],
+      "acceptanceCriteria": [
+        "Build runs one clockwise lap along the viewport perimeter",
+        "Deconstruct runs one counter-clockwise lap",
+        "Merged with tests on main"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-006",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-006",
+      "title": "Remove the leftover tile after deconstruct and the red square on the AI player",
+      "description": "After a maze deconstructed a single tile could remain, and a red square followed the AI player when it moved. The deconstruct now switches the docks atomically (all at once or not at all) and the red marker was removed (PR #374). The lifecycle capture and analyzer found four causes of the leftover tile; two partial-strip findings are still unconfirmed.",
+      "cardType": "bug",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-VIS-004"
+      ],
+      "acceptanceCriteria": [
+        "Residual tiles after deconstruct measure zero in the lifecycle capture",
+        "No red marker is drawn in front of the AI player in idle or moving frames",
+        "Two analyzer partial-strip findings are still to be inspected and are tracked as unconfirmed"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-007",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-007",
+      "title": "Restore the slower tile-by-tile maze build and deconstruct pacing",
+      "description": "A timeline change made maze build and deconstruct almost instant, and the owner asked twice for the earlier pace back. PR #384 restored per-tile pacing: roughly two seconds to build level 1 and three to build level 20, with deconstruct somewhat faster than before. Whether it reads as smooth is the owner's call on a phone.",
+      "cardType": "bug",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-VIS-004"
+      ],
+      "acceptanceCriteria": [
+        "Measured build and deconstruct durations on the capture harness are in the old per-tile range",
+        "Input unlock follows the reveal window",
+        "Smoothness on a real phone is not yet confirmed"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-008",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-008",
+      "title": "Fix the missing maze deconstruction and fire the spawn beams after the build",
+      "description": "The owner reported that the maze did not dissolve after reaching the goal and that the spawn beams fired before generation finished. Root cause was the Chip floor reveal mask treating an empty row limit as show-everything, so the full floor stayed drawn. Fixed in PR #393 with one shared reveal check; the intro now builds first, then the 8 beams fire, then the player appears. Merged and deployed; proven in a headless browser with a real key press, not yet on a real device.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-VIS-007"
+      ],
+      "acceptanceCriteria": [
+        "A real-clock browser check with a held key shows the corridor dissolving tile by tile at phone and desktop sizes",
+        "A CI regression check fails when the old reveal logic is restored",
+        "Intro order is build, beams, then player appears and input unlocks; build pace unchanged"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-009",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-009",
+      "title": "Add a goal beacon, minimum-size goal marker and legible trail on dense boards",
+      "description": "On small Chip tiles the goal and trail were hard to read. PR #394 adds a goal beacon, a minimum-size goal marker and a more legible trail. Earlier goal-star work landed in PRs #321, #330 and #331. Merged to main.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-VIS-001"
+      ],
+      "acceptanceCriteria": [
+        "Goal marker has a minimum drawn size",
+        "Trail raster baselines updated",
+        "Merged on main"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-010",
+      "status": "completed",
+      "updatedAt": "2026-11-09T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-010",
+      "title": "Make the player easy to find and fix readability checkpoints",
+      "description": "The player was hard to find on dense boards and four palette readability checks failed on the Chip tiles with nothing asserting them. PR #399 adds a locator ring and soft glow in the player's own green with a find-me pulse on spawn, unpause and idle, and raises the model floor luminance so all 20 readability checkpoints pass. Real-phone cost and feel are not measured.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-VIS-001"
+      ],
+      "acceptanceCriteria": [
+        "All 20 readability checkpoints pass in the repo tests",
+        "Locator respects reduced motion",
+        "Not checked on a real phone"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-011",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-011",
+      "title": "Regenerate the HUD icons as one matched set and atlas",
+      "description": "The three header icons are 1254 px AI-style PNGs in three different styles and glow treatments, shown at under 25 px, 1.5 MB in total. Plan: redraw as one outline icon family from scripted SVG, bake a single small atlas, and add the missing glyphs (close, check, info, share, install). Not started.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-020"
+      ],
+      "acceptanceCriteria": [
+        "Profile, leaderboard and settings icons share one stroke style and optical size",
+        "One small icon atlas replaces the three large PNGs",
+        "Asset manifest validation passes"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-012",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-012",
+      "title": "Unify the backdrop across boot, install gate and sign-in",
+      "description": "Three visual dialects exist: the game (black space, dot matrix), the teal-black install and sign-in pages, and the account portal. Plan: one near-black canvas color, calmer starfield on gates, the app icon on the install screen, and a dot-matrix wordmark on boot. Portal alignment is in a separate repo. Not started.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-020"
+      ],
+      "acceptanceCriteria": [
+        "Boot, install gate and in-game sign-in share the game's background color",
+        "Install screen shows the app icon and a share illustration on iOS",
+        "Cross-repo portal alignment tracked separately"
+      ]
+    },
+    {
+      "id": "MAZER-UI-001",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-001",
+      "title": "Unify Settings into one sheet for menu and pause",
+      "description": "The owner decided the in-game Settings layout is canonical and the main-menu Settings must match it fully, with the same structure. A shared Settings sheet now serves both menu and pause (PR #383 planned it, PR #386 wired it), and PR #390 removed the Close pill in favor of Back to Menu on the menu version and reclaimed the space. Checked on capture frames; not yet seen on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Menu and pause render Settings through one shared painter with the same rows",
+        "Closing uses Resume or Back to Menu rather than a separate Close pill",
+        "UI-surface capture shows the same structure in both contexts"
+      ]
+    },
+    {
+      "id": "MAZER-UI-002",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-002",
+      "title": "Add a server-first Reset progress action to Settings",
+      "description": "The owner asked for a Reset progress button in the main-menu Settings that clears full account maze progression only, not the account or profile. PR #386 resets the server first and then local data, and the leaderboard level drops back to 1. The signed-in server reset has not been verified against the live database.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-UI-001"
+      ],
+      "acceptanceCriteria": [
+        "Reset progress clears maze progression and leaves the account and profile intact",
+        "The server step runs before the local reset and a failure leaves local data untouched",
+        "Live signed-in verification against the real database is still outstanding"
+      ]
+    },
+    {
+      "id": "MAZER-UI-003",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-003",
+      "title": "Redo the in-app Guide as a shared sheet with matching icons",
+      "description": "The owner asked to redo the Guide in both menu Settings and in-game Settings so it reflects the new look. A data-driven Guide sheet with icons drawn by the same functions as the board landed with the shared Settings sheet (PR #383, PR #386), and a drift test pins its claims to live game constants. It is kept current by the standing guide-sync rule.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-001"
+      ],
+      "acceptanceCriteria": [
+        "The Guide is one shared sheet reachable from menu and pause Settings",
+        "Guide icons use the same draw functions as the board",
+        "A drift test fails when a Guide claim disagrees with a live constant"
+      ]
+    },
+    {
+      "id": "MAZER-UI-004",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-004",
+      "title": "Redo the Leaderboard as a Settings-style sheet",
+      "description": "The owner asked for the leaderboard to be redone entirely while keeping its icon. A first redesign shipped with the header and pause integration (PR #376), and PR #396 rebuilt it as a Settings-style sheet with a Back to Menu row, a pinned You row and seven states. Real leaderboard data on a phone has not been checked, and whether the column is called Rank or Place is an open naming call.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-001"
+      ],
+      "acceptanceCriteria": [
+        "The leaderboard uses the Settings-style sheet with a Back to Menu row",
+        "The signed-in player's own row stays pinned and all seven states render in capture",
+        "Real-data states and the Rank versus Place naming are still to be confirmed"
+      ]
+    },
+    {
+      "id": "MAZER-UI-005",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-005",
+      "title": "Remove the Board Zoom setting",
+      "description": "Board Zoom was a difficulty and framing lever the owner wanted kept out of play until obstacles and enemies are right. PR #396 removed it from Settings together with the leaderboard redesign, and the stored zoom value is scrubbed. Camera zoom stays deferred.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Settings no longer shows Board Zoom",
+        "Zoom stays deferred by owner direction",
+        "Merged to main"
+      ]
+    },
+    {
+      "id": "MAZER-UI-006",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-006",
+      "title": "Redo the Pause menu and remove the profile icon from it",
+      "description": "The owner asked to redo the whole pause menu while keeping its icon and to remove the profile icon from it. The pause card is now Resume, Settings (collapsed) and Quit to Menu, and the profile icon is gone from Pause and Options (PR #376). Quit has no confirmation yet.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-001"
+      ],
+      "acceptanceCriteria": [
+        "Pause shows Resume, Settings and Quit to Menu with no profile icon",
+        "UI-surface capture passes for the redesigned Pause card",
+        "Quit confirmation is tracked as a separate card"
+      ]
+    },
+    {
+      "id": "MAZER-UI-007",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-007",
+      "title": "Show the username beside the profile icon and drop the bottom Welcome line",
+      "description": "The owner asked to remove the Welcome line and username at the bottom and show the username at the top left beside the profile icon, with no text background and some padding from the screen edge. This shipped in PR #376, with header edge padding in PR #382 and a clean label in PR #384. A CI check for the 320px label had to be loosened, and the label has not been seen on a high-density phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The username renders beside the profile icon with no text stroke or background",
+        "The header keeps edge padding at phone widths",
+        "Legibility of the 320px label on real fonts and screens remains to be re-verified"
+      ]
+    },
+    {
+      "id": "MAZER-UI-008",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-008",
+      "title": "Ship the Welcome sign-in screen and bound the sign-in loading state",
+      "description": "A Welcome screen with one sign-in action, Create Account and account-recovery links and the legal row replaced the confusing pre-login screen, and the in-game Signing you in text now appears only for a real stored session (PR #376, building on the install gate and boot splash in PR #372). Real signed-in end-to-end testing is still outstanding.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-PWA-003"
+      ],
+      "acceptanceCriteria": [
+        "Signed-out boot shows the Welcome screen with sign-in, create-account and recovery entries",
+        "The Signing you in text shows only when a stored session exists",
+        "A real signed-in end-to-end run is tracked as a separate card"
+      ]
+    },
+    {
+      "id": "MAZER-UI-009",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-009",
+      "title": "Fix menu accessibility: 320px clipping, 44px hit zones, Start tap recovery",
+      "description": "Menu accessibility fixes: no clipping at 320px width, 44px minimum hit zones in the header, Start tap recovery and header edge padding. Merged in PR #382. The in-play pause control and the Guide header were not re-measured afterwards.",
+      "cardType": "bug",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "44px hit zones",
+        "No clipping at 320px width",
+        "Merged with tests"
+      ]
+    },
+    {
+      "id": "MAZER-UI-010",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-010",
+      "title": "Define one type scale and a second display typeface",
+      "description": "The audit found 7 font stacks, 11 text sizes, text that shrinks to 8 px at 320 wide, and label formats that change with width. Proposal: keep Space Grotesk for body, add one squared techno display face for short uppercase labels, and set a fixed scale with a floor of 12 px for body copy. Not started beyond the font file itself.",
+      "cardType": "architecture",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-020"
+      ],
+      "acceptanceCriteria": [
+        "A written type scale (roles, sizes, weights) is adopted",
+        "Body text never shrinks below 12 px at 320 wide",
+        "State text (On/Off) is always its own element, never merged into a label"
+      ]
+    },
+    {
+      "id": "MAZER-UI-011",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-011",
+      "title": "Ship a self-hosted Space Grotesk and wait for it before Phaser text",
+      "description": "The declared brand font never actually loaded, so every device drew its own system font. PR #379 bundles Space Grotesk with the app and holds Phaser text until the font is ready, and PR #397 makes the capture harness ignore a harmless warm-reload preload hint. Merged; not yet checked on a real device.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Font is served from the app itself",
+        "Phaser text waits for the font",
+        "Harness ignores the warm-navigation font hint"
+      ]
+    },
+    {
+      "id": "MAZER-UI-012",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-012",
+      "title": "Add tone, scrim and motion values to the shared theme",
+      "description": "Added the missing theme values the audit named (message tone colors, on-accent text, overlay scrim, motion durations) with a sync test and an off-theme color meter, with zero visual change. This only supplies the values; moving screens onto them is a separate card.",
+      "cardType": "architecture",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "New theme values exist and a sync test pins them",
+        "An off-theme color meter reports the count",
+        "No visible change in captured frames (as stated by the PR)"
+      ]
+    },
+    {
+      "id": "MAZER-UI-013",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-013",
+      "title": "Move scene colors onto the shared theme values",
+      "description": "About 290 hard-coded color values exist in the game code and only 5 match the theme; there are 5 different near-black backgrounds, 3 greens for energy and 2 mints. The plan is to map each to a theme value or a named material extension and add a lint so new stray colors fail. Not started; large because the menu scene file is huge.",
+      "cardType": "technical-debt",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-012"
+      ],
+      "acceptanceCriteria": [
+        "Hard-coded visible colors are mapped to theme values or named extensions",
+        "A lint check flags new off-theme color literals",
+        "Page, manifest and boot colors share one near-black"
+      ]
+    },
+    {
+      "id": "MAZER-UI-014",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-014",
+      "title": "Make the in-play pause control a 44px target",
+      "description": "The pause gear is the only control during play and its hit area was 36 px in the top-right, hard to reach. The audit recommends at least 44 px with a 24 px glyph, ideally 48. Whether the menu wave also changed the play gear is unconfirmed.",
+      "cardType": "bug",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-UI-009"
+      ],
+      "acceptanceCriteria": [
+        "Play gear hit area measures at least 44 px at 390 and 320 wide",
+        "Glyph size unchanged",
+        "Header layout tests updated to the new floor"
+      ]
+    },
+    {
+      "id": "MAZER-UI-015",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-015",
+      "title": "Build one shared button kit",
+      "description": "There are 10 distinct button looks across 5 surfaces and no shared primary, secondary or destructive convention; START is a bare wordmark with a full-screen hit area. Proposal: 5 variants plus a toggle row and an explicit START hit zone. Not started.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-020"
+      ],
+      "acceptanceCriteria": [
+        "Primary, secondary, ghost, danger and icon variants exist with a 44 px minimum",
+        "START has an explicit hit zone instead of the full screen",
+        "Sign out, Guide, auth and install buttons use the kit"
+      ]
+    },
+    {
+      "id": "MAZER-UI-016",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-016",
+      "title": "Frame the game on desktop instead of stretching the phone layout",
+      "description": "At 1280x720 the menu is the phone layout stretched: tiny wordmarks and a 1100 px horizontal corridor. Proposal: a centered column or a scaled UI. Low priority because the game is phone-first.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Desktop shows a framed or scaled layout",
+        "Menu render-frame tests updated",
+        "Captured at 1280x720"
+      ]
+    },
+    {
+      "id": "MAZER-UI-017",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-017",
+      "title": "Define empty, loading and error states for the leaderboard",
+      "description": "The empty leaderboard is a bare gray line; loading, error and username-gate states were never captured with real data. Plan: an icon, heading, one line and one action pattern. The leaderboard redesign shipped, but real-data states are unverified.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-UI-004"
+      ],
+      "acceptanceCriteria": [
+        "Empty, loading, error and offline states each render with a clear action",
+        "Populated state captured with real or fixture data",
+        "Copy uses existing friendly error strings"
+      ]
+    },
+    {
+      "id": "MAZER-UI-018",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-018",
+      "title": "Draw a player message surface and fix stale guest copy",
+      "description": "A unified player message module exists, but auth errors, sync failures, username errors and boot errors are typed and never drawn, and six auth messages still promise guest play although guests cannot play. Plan: a bottom or top toast for the existing four tones with a fade, plus the copy fix. Not started.",
+      "cardType": "bug",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Messages from the queue render as a toast for all four tones",
+        "No message promises guest play while guests cannot play",
+        "An inventory test pins the message rows to live copy"
+      ]
+    },
+    {
+      "id": "MAZER-UI-019",
+      "status": "in_progress",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-019",
+      "title": "Complete the full UI rework migration on the new standards",
+      "description": "UI component and layout standards are on main as registries. The full migration is under separately owned wave governance and remains open.",
+      "cardType": "migration",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-GOV-002"
+      ],
+      "acceptanceCriteria": [
+        "Registries exist on main",
+        "Remaining waves are tracked by their owner",
+        "Each wave carries visual proof"
+      ]
+    },
+    {
+      "id": "MAZER-UI-020",
+      "status": "planning",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-020",
+      "title": "Decide the six design-board picks: font, quit confirm, start style, icons, backdrop, HUD",
+      "description": "Remaining graphics work (icon atlas, button kit, backdrop unification, play HUD) waits on picks for the display font, Quit-to-Menu confirmation, START style, icon construction, backdrop and play HUD. The owner first asked to walk through them one at a time, then on 2026-11-10 said to stop asking and make the judgement calls. No pick has been recorded yet.",
+      "cardType": "architecture",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Each pick is recorded with the chosen option and the reason",
+        "The dependent graphics cards are unblocked and scheduled",
+        "Guide icons are updated for any new icon set"
+      ]
+    },
+    {
+      "id": "MAZER-MOTION-001",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-001",
+      "title": "Adopt one motion scale for durations, loops and easing",
+      "description": "The game has about 18 unrelated loop periods, 6 easings and 30 durations, and dead motion definitions that drive nothing. Proposal: a pure motion module with a 120/200/320/480/720 ms ladder, loops as harmonics of 1200 ms and one reduced-motion crossfade. Values were added to the theme in PR #381; consuming them in the scene is not started.",
+      "cardType": "architecture",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-012"
+      ],
+      "acceptanceCriteria": [
+        "A pure motion module exists with unit tests",
+        "Existing intro and edge constants re-export from it with no value change",
+        "Dead tuning and unused DOM motion code removed after it lands"
+      ]
+    },
+    {
+      "id": "MAZER-MOTION-002",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-002",
+      "title": "Animate overlays, controls and the Start and splash transitions",
+      "description": "Overlay open and close, hover, press, toggles and toasts are instant while maze transitions get eased motion, and pressing Start removes the title, icons and corridor in one frame while the HTML splash hard-cuts to the game. The plan is a 200 ms panel rise with staggered rows, 120 ms state changes, a short exit of menu chrome and a splash fade with a shared loader period. Not started.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-MOTION-001"
+      ],
+      "acceptanceCriteria": [
+        "Panels rise and fade using the shared motion scale",
+        "Start and splash transitions no longer cut in a single frame",
+        "Reduced-motion users get a crossfade form"
+      ]
+    },
+    {
+      "id": "MAZER-MOTION-003",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-003",
+      "title": "Fix step glide overlap and add wall-bump feedback",
+      "description": "The player glide floor (90 ms) can exceed the repeat interval at max speed or with the touch stick, so held movement pulses; and a blocked move gives no visual or haptic feedback. Plan: derive glide from repeat with a stick cap, and add a 2 px nudge plus a light buzz.",
+      "cardType": "bug",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Glide never exceeds the repeat interval",
+        "Blocked moves show a short nudge and haptic; none in reduced motion",
+        "Existing glide call shape stays valid for tests"
+      ]
+    },
+    {
+      "id": "MAZER-MOTION-004",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-004",
+      "title": "Add an in-game reduced-motion setting and finish the gating",
+      "description": "Reduced motion follows only the OS setting; under it the title freezes mid-phase while the START color cycle and button blinks keep running. Plan: gate those animations, set a defined static alpha, add a persisted toggle in Settings and use one crossfade length.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-MOTION-001"
+      ],
+      "acceptanceCriteria": [
+        "A Settings toggle persists reduced motion",
+        "START and button blinks stop under reduced motion",
+        "Crossfades use one shared length"
+      ]
+    },
+    {
+      "id": "MAZER-PERF-001",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PERF-001",
+      "title": "Cut the cold-boot payload from about 5.7 MB to about 1.6 MB",
+      "description": "Cold boot preloaded several large images that nothing drew. PR #391 deleted them and shipped lossless HUD icons, and PR #375 retired unused diamond and teleport-beam art. A budget test now pins the preload list and byte sizes. The icon set precache and HUD texture size are still open follow-ups.",
+      "cardType": "reliability",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Measured cold load fell from 5,664,435 to 1,609,825 bytes at phone size",
+        "A budget test pins preload and byte limits",
+        "Icon set precache reduction remains open"
+      ]
+    },
+    {
+      "id": "MAZER-PERF-002",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PERF-002",
+      "title": "Reduce canvas redraw cost and soften the throttle floor",
+      "description": "Canvas replay of thousands of star and tile drawing commands costs 2.6-4.9 ms per frame even on a static overlay, and the frame governor drops ambient motion to 4 fps when frames average over 19 ms. Plan: bake the backdrop, stop forcing redraws, and floor the throttle at about 15 fps. Needs a real-device trace.",
+      "cardType": "reliability",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Backdrop is baked or cached and static screens stop reallocating",
+        "Throttle floor raised from 250 ms to about 66 ms",
+        "Real-device frame trace attached"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-001",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-001",
+      "title": "Make level 1 a straight corridor",
+      "description": "Level 1 became a straight corridor along the longer board axis, a difficulty change that the integration record flags as needing the owner sign-off. Merged in integration 1 (PR #373).",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Level 1 generates a straight corridor",
+        "Merged on main",
+        "Owner sign-off on felt difficulty still flagged in the PR"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-002",
+      "status": "completed",
+      "updatedAt": "2026-11-09T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-002",
+      "title": "Replace the difficulty ladder with a felt-difficulty ladder to level 198",
+      "description": "Level 1 is the straight corridor and levels 2 to 198 take their geometry from one strictly rising target on a fixed board, measured by a deterministic goal-seeking explorer, with longer routes and deep deceptive branches and no zoom or size lever. The ladder (PR #395, replacing the draft in PR #385) merged on 2026-11-06 and was reported deployed on 2026-11-09. Felt difficulty is modelled, not player-tested, and the owner's difficulty sign-off is not recorded.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-PROG-001"
+      ],
+      "acceptanceCriteria": [
+        "Every level from 2 to 198 is harder than the previous one for any two seeds, asserted by a check over consecutive pairs",
+        "Hazards stay off and the board size is not a difficulty lever",
+        "Felt difficulty with real players and on a real phone is still to be confirmed"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-003",
+      "status": "completed",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-003",
+      "title": "Make maze geometry follow the displayed level",
+      "description": "The owner saw a level label near 18000 on a maze that read like level 20 to 30. Geometry level came from a bounded stored target, so a high ordinal with a low target kept easy geometry. PR #400 makes geometry follow the displayed level and merged on 2026-11-10; deployment is not confirmed.",
+      "cardType": "bug",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-PROG-002"
+      ],
+      "acceptanceCriteria": [
+        "Synthetic saves with a very high ordinal and a low target map to the matching geometry level",
+        "The fix is independent of the multiple-routes work",
+        "Deployment and a phone check are still to be confirmed"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-004",
+      "status": "completed",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-004",
+      "title": "Add shortcuts, alternate routes and decoy loops plus progression gauges",
+      "description": "The owner asked for occasional shortcuts or multiple routes (sometimes only one way, perhaps scaling with maze size) and for ways to gauge progression scaling. PR #401 adds three loop kinds that keep the long route, priced felt difficulty and a gauge suite (shortest route, walker steps, random solver, human-like explorer), with level 1 staying a straight corridor. Merged on 2026-11-10; deployment and a real-phone check are not confirmed.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-PROG-002"
+      ],
+      "acceptanceCriteria": [
+        "Loops keep the long route distance so the maze is not trivially shortened",
+        "Level 1 stays a straight corridor",
+        "The gauge report documents progression scaling and was reviewed before merge"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-005",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-roadmap",
+      "sourceRef": "docs/roadmap.md#phase-order",
+      "title": "Decide what happens past level 198 so levels keep getting harder",
+      "description": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever; past that every level is one difficulty class. The owner wants levels to keep getting harder forever, so the next step is to choose between a bounded variation grammar, a declared plateau, or handing off to the deferred size and zoom levers once hazards exist.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-HAZ-003"
+      ],
+      "acceptanceCriteria": [
+        "The behaviour past level 198 is chosen and written down",
+        "A deterministic check proves the chosen behaviour is never easier than the level before",
+        "The choice is reflected in the progression contract and the in-app Guide"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-006",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-006",
+      "title": "Decide a minimum tile size for very large boards",
+      "description": "On a 390 phone at level 99 the tile is about 6.5 px, so the player and goal are tiny whatever the tile style; the Chip bake also costs 58-69 ms on the largest boards. Needs a product call on minimum tile size or zoom, which the owner deferred. On 2026-11-10 the owner delegated judgement calls on open design and flow picks to the build agent; no decision is recorded yet.",
+      "cardType": "governance",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner sets a minimum tile size or defers zoom explicitly",
+        "Bake cost mitigation chosen for the largest boards",
+        "Captured at the largest board on a phone viewport"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-007",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-007",
+      "title": "Add milestone moments for levels past rank S",
+      "description": "Deferred: From level 31 rank stays S, so nothing marks progress. Plan: every fifth level shows the level and a hazard-tier pip with a short chime. Depends on the ladder and hazard work.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-FLOW-003"
+      ],
+      "acceptanceCriteria": [
+        "Milestones fire every 5th level including very large ordinals",
+        "Reduced-motion form exists",
+        "Fixture tests at 35, 40, 100 and 101"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-008",
+      "status": "blocked",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-008",
+      "title": "Decide which maze features unlock at which level and content band",
+      "description": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision.",
+      "cardType": "architecture",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-PROG-002"
+      ],
+      "acceptanceCriteria": [
+        "Owner decides the feature unlock schedule",
+        "A versioned content band manifest format is specified",
+        "Manifest consumers are listed before any code lands"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-009",
+      "status": "completed",
+      "updatedAt": "2026-10-13T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-009",
+      "title": "Preserve authoritative progression and fix level/target desync",
+      "description": "Several fixes keep a player progress safe: monotonic completion replay (PR #282), authoritative historical hydration (PR #293), a production fix for level versus target complexity desync (PR #308), wider seed storage (PR #311) and AI hydration after the master consolidation (PR #368). Merged to main.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Completion replay is monotonic",
+        "Authoritative progression is hydrated",
+        "Desync fix applied on main"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-010",
+      "status": "completed",
+      "updatedAt": "2026-08-28T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-010",
+      "title": "Make board scale ceiling and feeder count device-relative",
+      "description": "Difficulty-driven board scale and feeder count were raised and then made relative to the device so phones and desktop scale sensibly. PRs #301 and #304. Board size is now frozen again for the ladder, so no zoom lever is planned.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Scale ceiling depends on the device",
+        "Merged on main",
+        "Zoom lever intentionally absent"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-011",
+      "status": "completed",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-011",
+      "title": "Ship the perpetual play loop",
+      "description": "Play mode loops from level to level without returning to a dead end. A packet and a lifecycle test referencing the loop exist on main (verified by reading).",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Loop packet exists on main",
+        "Lifecycle test references the loop",
+        "Tests were read, not executed in this pass"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-012",
+      "status": "completed",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-012",
+      "title": "Show rank-only progression to the player",
+      "description": "The progression display shows rank only, as recorded in the current-truth document. Delivered at source level.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Rank is the only progression figure shown",
+        "The current-truth document states it",
+        "No device check claimed"
+      ]
+    },
+    {
+      "id": "MAZER-GEN-001",
+      "status": "completed",
+      "updatedAt": "2026-08-28T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-001",
+      "title": "Smooth maze generation, reveal and menu-demo pacing",
+      "description": "Players saw freezes and unsynced beams around goal reach. A series of PRs precomputed the next maze during a hold, synced the delivery beam to the build, fixed reveal order and corrected menu-demo state carry-over across mode switches, including PRs #298, #302, #307, #310, #315, #316 and #317. Merged to main.",
+      "cardType": "reliability",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Next maze is precomputed outside goal reach",
+        "Pending transitions invalidate at the maze-install boundary",
+        "Merged on main"
+      ]
+    },
+    {
+      "id": "MAZER-GEN-002",
+      "status": "completed",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-002",
+      "title": "Deliver edge-wrap topology and notch fill",
+      "description": "Edge-wrap topology diagnostics, a contract and an architecture test exist on main. The board card is complete at source level; no deployed or device claim is made.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Wrap topology diagnostics exist in the legacy maze runtime",
+        "A topology contract document exists",
+        "An architecture test pins the contract (read, not re-run)"
+      ]
+    },
+    {
+      "id": "MAZER-GEN-004",
+      "status": "completed",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-004",
+      "title": "Fade wrap corridors out between levels 100 and 140 and price them",
+      "description": "Wrap corridors used to switch off at level 120 and make level 120 about 88 steps longer than level 119. PR #404 fades them out from level 100 to 140 and prices each wrap's saving the way loops are priced, so a wrap cannot make a level easier than its target. The largest smoothed single-level step in levels 100 to 150 dropped from 19.4 times the median step to 2.3 times. It is merged and deployed on 2026-11-10. The numbers are modelled walker difficulty, not player-tested, and no wrap level was checked on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-GEN-002"
+      ],
+      "acceptanceCriteria": [
+        "Levels 140 and above own no wrap corridors and levels 1 to 9 are unchanged",
+        "The progression ladder assertion passes with every tuned maze priced inside its target window",
+        "Generation time stays under the worst-build budget at a 4x CPU throttle"
+      ]
+    },
+    {
+      "id": "MAZER-GEN-003",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-04-11T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-003",
+      "title": "Extract the maze pattern engine and batch generator as contracts",
+      "description": "Deferred: Two maze modules, the pattern engine and the batch generator, were documented as extraction candidates with inputs, outputs and lifecycle rules. Both still depend on the oversized shared maze core. The doc's own readiness verdict is refactor first: give each a dedicated source boundary and contract tests before promoting either.",
+      "cardType": "architecture",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Each module has its own source boundary",
+        "Each module has dedicated contract tests independent of the shared core",
+        "Descendants stay framed as modern extractions, not legacy recoveries"
+      ]
+    },
+    {
+      "id": "MAZER-HAZ-001",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-HAZ-001",
+      "title": "Land the hazard foundations as dormant source",
+      "description": "The hazard graph and solvability validator, hazard placement and loadout, practice bots, and a chaser and interceptor engine with a joint solver were merged in PR #373. They are switched off by design and no scene imports them. One chaser solves fine; two or more hit the solver cap and are treated as unsolved.",
+      "cardType": "architecture",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Hazard graph, validator, placement and engine modules are merged with tests",
+        "The hazard layer flag stays off and no scene imports the modules",
+        "The two-chaser solver cap is documented so unknown results are treated as failures"
+      ]
+    },
+    {
+      "id": "MAZER-HAZ-002",
+      "status": "blocked",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-HAZ-002",
+      "title": "Sign or reject the endless hazard product contract",
+      "description": "A draft contract describes how obstacles, enemies and items enter the endless ladder in phases. It is unsigned, and five board cards (difficulty shaping, obstacles, enemies, items, cloak) are covered by it rather than standing alone. Awaiting the owner sign-off.",
+      "cardType": "governance",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner signs or rejects the contract in writing",
+        "Covered cards are re-statused from the decision",
+        "Graph and placement drafts stay pinned by tests regardless of the decision"
+      ]
+    },
+    {
+      "id": "MAZER-HAZ-003",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-roadmap",
+      "sourceRef": "docs/roadmap.md#phase-order",
+      "title": "Phase 2: introduce obstacles and enemies one at a time",
+      "description": "Deferred: The owner wants difficulty to come from obstacles and enemies rather than from zooming or shrinking the board, but only after Phase 1 (visuals, progression, animation sync and game flow) is finished. Each hazard type is to be introduced alone, then developed, then combined, folded into the level ladder. The hazard layer stays dormant until the product contract is signed.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-HAZ-002"
+      ],
+      "acceptanceCriteria": [
+        "Each hazard type ships alone with a visible telegraph before it is combined with others",
+        "Every generated level stays solvable with hazards present and with items absent",
+        "Level 1 of any save never contains a hazard"
+      ]
+    },
+    {
+      "id": "MAZER-HAZ-004",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-HAZ-004",
+      "title": "Add obstacles, traps and puzzles (covered by the hazard phases)",
+      "description": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-HAZ-002"
+      ],
+      "acceptanceCriteria": [
+        "Obstacles appear in generated levels without breaking solvability",
+        "Trap behaviour is deterministic and tested",
+        "The owner signs the hazard contract first"
+      ]
+    },
+    {
+      "id": "MAZER-HAZ-005",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-HAZ-005",
+      "title": "Make the pursuing enemy playable (covered by the hazard phases)",
+      "description": "The board card for an enemy that pursues the player is now handled by hazard phases rather than as a standalone card. A graph-based enemy agent exists in the core library but no scene imports it, so it is a design reference, not a playable feature. Deferred to the hazard contract.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-HAZ-002"
+      ],
+      "acceptanceCriteria": [
+        "An enemy appears and pursues in a real run",
+        "The enemy obeys the turn contract and solvability checks",
+        "Behaviour is covered by deterministic tests"
+      ]
+    },
+    {
+      "id": "MAZER-HAZ-006",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-HAZ-006",
+      "title": "Add usable items and the invisibility cloak (covered by the hazard phases)",
+      "description": "Deferred: The board listed a mystery-box usable item system and an invisibility cloak. Both are folded into the item phase of the hazard contract; the item library is not live in any scene. Cloak scope is an owner decision.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-HAZ-002"
+      ],
+      "acceptanceCriteria": [
+        "Items can be collected and used in a real run",
+        "Cloak scope is decided by the owner",
+        "Item effects are deterministic and tested"
+      ]
+    },
+    {
+      "id": "MAZER-HAZ-007",
+      "status": "in_progress",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-HAZ-007",
+      "title": "Complete the turn-synchronous world simulation beyond the player phase",
+      "description": "A world turn host and contract exist on main with tests, and the board marked the card completed. In truth only the host and player movement phase are done; enemy, projectile, item, duration and collision handlers are intentionally unintegrated. Status kept honest as in progress.",
+      "cardType": "architecture",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Host and player phase tests exist (read, not re-run)",
+        "Each remaining handler is integrated or explicitly deferred",
+        "The contract lists which phases are live"
+      ]
+    },
+    {
+      "id": "MAZER-HAZ-008",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-HAZ-008",
+      "title": "Plan hazard introduction and contact moments",
+      "description": "When hazards land, each new type needs a skippable pre-level card and telegraph, and contact needs a one-time message, a flash and a pushback with brief invulnerability. This is phase 2 and depends on the unsigned hazard contract.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-HAZ-002"
+      ],
+      "acceptanceCriteria": [
+        "Each hazard type is introduced safely before it can block",
+        "Contact never ends a run",
+        "Accessibility checks: shape not color only, reduced motion form"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-001",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-001",
+      "title": "Teach the controls and the goal on level 1",
+      "description": "Nothing teaches movement today: the only legend is in a collapsed Guide inside Settings, and the touch stick appears only while touching. A tutorial module exists in source but no app code imports it, and level 1 is now a straight corridor so its content needs refreshing. Plan: a non-blocking ghost stick and one line (drag anywhere, or arrow keys) that fades on the first move, reusing the tutorial store.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "A new player sees a one-line control hint on level 1 that fades on the first move",
+        "The hint never blocks input and respects reduced motion",
+        "The tutorial module is wired or retired so no dead tutorial code remains"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-002",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-002",
+      "title": "Add a level-complete moment",
+      "description": "Clearing a level shows only a bare digit and lasers; there is no text, score or sound. Plan: inside the existing 2.6 s cadence, show Level N with a small CLEARED line, a halo burst and haptic, with a reduced-motion form. Not started.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "A caption appears during goal hold and outro without lengthening the cadence",
+        "Reduced motion uses a short static crossfade",
+        "Intro timeline tests cover the caption channel"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-003",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-003",
+      "title": "Add a rank-up moment",
+      "description": "Rank changes silently at levels 6, 11, 17, 23 and 31. Plan: a tier-colored ring and letter for about 700 ms with a short sound and haptic, skippable. Depends on the chip decision and the level-complete beat.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-FLOW-002",
+        "MAZER-FLOW-004"
+      ],
+      "acceptanceCriteria": [
+        "Rank change is detected at completion time",
+        "Beat is skippable and has a reduced-motion form",
+        "Thresholds pinned by a fixture"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-004",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-004",
+      "title": "Decide whether to show a Level/Rank chip",
+      "description": "Level and rank are invisible everywhere in play and menu, and the earlier no-score-panel stance blocks fixing it. The audit proposes a compact chip beside the pause control and a single vocabulary: Level, Rank (letter), Place (#N). It waits on the owner lifting that stance. On 2026-11-10 the owner delegated judgement calls on open design and flow picks to the build agent; no decision is recorded yet.",
+      "cardType": "governance",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner approves or rejects a compact chip",
+        "Vocabulary fixed as Level, Rank, Place",
+        "If approved, tests and viewport fit proofs updated at 390 and 1280"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-005",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-005",
+      "title": "Confirm before quitting a level",
+      "description": "Quit to Menu has no confirmation and is styled like a neutral action, so a mid-level attempt is discarded with one tap. Plan: a leave-this-maze confirmation after the first move using the existing confirm dialog.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-006"
+      ],
+      "acceptanceCriteria": [
+        "Quit after at least one move asks for confirmation",
+        "Quit before moving does not",
+        "Pause view tests updated"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-006",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-006",
+      "title": "Decide: resume the same maze after quit or reload",
+      "description": "Today quitting or reloading discards the attempt and the next Start rolls a new maze, which is a free re-roll for a stuck player. The proposal persists the maze seed so the same maze resumes, which needs seed plumbing. The owner has not chosen. On 2026-11-10 the owner delegated judgement calls on open design and flow picks to the build agent; no decision is recorded yet.",
+      "cardType": "governance",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner chooses resume-same-maze or free re-roll",
+        "If resume, an attempt checkpoint persists at level start",
+        "Reload integration test added"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-007",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-007",
+      "title": "Decide what the menu demo maze shows",
+      "description": "The menu demo follows the player's own track, so a new player sees the same corridor seven times while a level-40 player sees their own maze as wallpaper. Options: an independent attract loop or keep it. The audit notes the label split between player and AI skill is diagnostics-only. On 2026-11-10 the owner delegated judgement calls on open design and flow picks to the build agent; no decision is recorded yet.",
+      "cardType": "governance",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner picks attract loop or player-level demo",
+        "If changed, menu captured at level 1 and level 30",
+        "Menu render tests updated"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-008",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-008",
+      "title": "Handle orientation flips mid-run",
+      "description": "Rotating mid-run keeps the same maze, so the portrait corridor becomes about 8 px wide in landscape. Plan: auto-pause and refit, with a rotate-back prompt only if the corridor falls under 24 px, regenerating only at the next level.",
+      "cardType": "bug",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Aspect flip pauses and refits",
+        "Prompt shows only below the corridor width threshold",
+        "Viewport geometry test covers the flip"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-009",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-009",
+      "title": "Flush the completion queue when back online and say so",
+      "description": "Offline completions are queued and retried only at boot and on the next completion, with no online listener and no player-visible notice. Plan: an online listener and a once-per-outage notice that progress is saved.",
+      "cardType": "reliability",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Outbox flushes on the online event",
+        "Player sees one offline-saved notice per outage",
+        "Replay test added in remote progression tests"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-010",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-010",
+      "title": "Polish the install gate copy and feedback",
+      "description": "The install gate blocks every browser tab by design but gives a generic title, no value line, and no feedback after Copy link or a dismissed prompt. Plan: a short value line, a Link copied confirmation and a mini-maze graphic.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-PWA-003"
+      ],
+      "acceptanceCriteria": [
+        "Gate shows a one-line value statement",
+        "Copy link gives visible confirmation",
+        "Install gate copy tests updated"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-011",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-011",
+      "title": "Decide when input unlocks during the level intro",
+      "description": "After a goal, input is locked about 2.5 s while the player marker is visible from 0.5 s. Unlocking earlier would speed play but touches timer, progression pacing and AI scoring, so it needs a product call. The owner also complained twice that build and deconstruct felt too fast, so pacing is sensitive. On 2026-11-10 the owner delegated judgement calls on open design and flow picks to the build agent; no decision is recorded yet.",
+      "cardType": "governance",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner decides the unlock point (current, reveal 75 percent, or beams landed plus a margin)",
+        "Timer excluded until unlock stays true",
+        "Lifecycle tests updated deliberately"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-012",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-012",
+      "title": "Auto-pause when the page is hidden and fix lifecycle timing",
+      "description": "A flow audit found that leaving the page did not pause a live run and that hidden time counted as run time. PR #392 opens Pause on hidden, page-hide and blur, excludes hidden time from the run timer and holds the intro and outro, and unblocks keyboard resume from the goal hold. Merged and deployed; real-device backgrounding is not yet verified.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Hidden page opens Pause and never auto-resumes",
+        "Hidden time is not counted as run time",
+        "Keyboard resume works from the goal hold"
+      ]
+    },
+    {
+      "id": "MAZER-AUDIO-001",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-AUDIO-001",
+      "title": "Decide whether the game has sound",
+      "description": "There is no audio anywhere in the game and no sound setting. The audit proposes small synthesized effects unlocked on the first tap, with a Settings toggle. The owner must say if sound is allowed and whether it defaults on or off. On 2026-11-10 the owner delegated judgement calls on open design and flow picks to the build agent; no decision is recorded yet.",
+      "cardType": "governance",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner decides allowed or not, and default state",
+        "If allowed, a Settings toggle is specified",
+        "iOS audio unlock verified on a device"
+      ]
+    },
+    {
+      "id": "MAZER-AUDIO-002",
+      "status": "planning",
+      "updatedAt": "2026-04-11T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-AUDIO-002",
+      "title": "Compose and wire original Mazer music from the music-language brief",
+      "description": "A research pass defined an original music language: restrained, weather-touched and ancient, with small modal motifs, and explicitly no lifted melodies from existing game scores. It recommends prototyping one title sting, one ambient loop and one storm cue first. Nothing is wired at runtime, and wiring waits until the shell audio setting is deliberately re-enabled.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-AUDIO-001"
+      ],
+      "acceptanceCriteria": [
+        "Three prototype cues exist: title sting, ambient loop, storm cue",
+        "None of the cues copies a known melody, contour or hook",
+        "Audio is wired only behind the audio setting"
+      ]
+    },
+    {
+      "id": "MAZER-CTRL-001",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-CTRL-001",
+      "title": "Add a haptics setting and test the vibration helper",
+      "description": "Vibration is one hard-coded pattern with no setting, no reduced-motion gating and no test; iOS support is unverified. Plan: a Settings toggle and a pin test.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Haptics can be turned off in Settings",
+        "Helper has a unit test",
+        "iOS behavior checked on a device or documented as unsupported"
+      ]
+    },
+    {
+      "id": "MAZER-CTRL-002",
+      "status": "completed",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-CTRL-002",
+      "title": "Make controls fluid and input movement correct",
+      "description": "Two board cards covered fluid controls and motion, and correct player input and movement. Directional-intent and movement-pace contracts and active-play packets exist on main. Source-level verdict only.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Directional-intent contract exists",
+        "Movement-pace contract exists",
+        "Real-device feel not re-verified here"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-001",
+      "status": "completed",
+      "updatedAt": "2026-10-13T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-001",
+      "title": "Harden sign-in: shared portal, refresh handling and retired-target rejection",
+      "description": "Mazer replaced its own sign-in UI with the shared account portal (PR #350), restored the signed-out boot gate (PR #361), rejected retired provider targets (PR #364), fixed refresh and transient-failure handling (PR #370) and paused the menu AI until account access resolves (PR #369). Merged to main; live end-to-end acceptance is tracked separately.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-ACCOUNT-001"
+      ],
+      "acceptanceCriteria": [
+        "The shared account portal is the only sign-in consumer",
+        "Signed-out boot opens the sign-in overlay and transient failures keep the stored session",
+        "Retired provider targets are rejected"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-002",
+      "status": "blocked",
+      "updatedAt": "2026-08-25T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-002",
+      "title": "Finish the atomic sign-up username flow (blocked on provider)",
+      "description": "Sign-up should claim the chosen username in the same step as account creation. The server-side contract merged (PR #280), but the client consumer in PR #281 is still open, conflicts with main and must not ship until the matching provider-side hook is confirmed live and proven. It has been open since 2026-08-25.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Client drops anonymous availability preflight",
+        "Merge waits for provider proof",
+        "Open PR #281 is not merged"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-003",
+      "status": "blocked",
+      "updatedAt": "2026-11-09T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-003",
+      "title": "Prove installed-app sign-in and progress end to end",
+      "description": "Code fixes for retired-target rejection, AI progression hydration, menu-AI pause, session refresh and callback-error visibility are merged (PR #364, #367, #368, #369, #370). No end-to-end acceptance run exists yet: installed-app proof, natural session refresh, account recovery, cross-user isolation, authenticated progress hydration and whether the account handoff keeps an installed app standalone. It needs a real phone and a throwaway test account.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-ACCT-001",
+        "MAZER-UI-008"
+      ],
+      "acceptanceCriteria": [
+        "A signed-in run on an installed app proves sign-in, refresh and progress hydration",
+        "Cross-user isolation and account recovery are exercised without touching real player data",
+        "The account handoff is confirmed to keep the installed app standalone or the gap is documented"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-004",
+      "status": "blocked",
+      "updatedAt": "2026-11-09T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-004",
+      "title": "Harden progress reset across devices with a reset epoch",
+      "description": "Reset progress works server-first for one device, but a second device holding higher local progress would show the old level after a merge. The complete fix adds a reset counter on the server and makes both merge paths discard local data when it advances, which needs an approved database change. It has been held since 2026-11-06; version one may accept the residual risk. The owner delegated judgement calls on 2026-11-10 but a database change still needs explicit approval.",
+      "cardType": "migration",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-002"
+      ],
+      "acceptanceCriteria": [
+        "A reset on one device cannot be undone by another device's older local progress",
+        "The server change ships as a separately approved database step with a rollback plan",
+        "Both merge paths are covered by tests"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-005",
+      "status": "completed",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-005",
+      "title": "Persist settings per account",
+      "description": "Game settings are stored per signed-in account, with a remote profile row for sync. Delivered at source level per the storage doc.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Settings storage is scoped to the account",
+        "A remote settings row is documented",
+        "Live provider state not checked"
+      ]
+    },
+    {
+      "id": "MAZER-DATA-002",
+      "status": "blocked",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-DATA-002",
+      "title": "Decide whether to raise the server-side difficulty cap and rank steps",
+      "description": "The server keeps its own copy of the older difficulty ladder (a fixed cap and fixed rank thresholds), and the client ladder to level 198 deliberately stays inside it so no database change was needed. Raising the cap, changing the rank steps or adding a new ruleset needs an approved database change and is on hold.",
+      "cardType": "migration",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-PROG-002"
+      ],
+      "acceptanceCriteria": [
+        "The owner decides whether any server-side cap or rank change is wanted",
+        "Any change is a separately approved database step with a preimage and rollback plan",
+        "The client keeps working unchanged if the server stays as it is"
+      ]
+    },
+    {
+      "id": "MAZER-DATA-003",
+      "status": "blocked",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-DATA-003",
+      "title": "Finish the remote run receipt and playbook sync bridge",
+      "description": "Remote receipts go through the completion outbox. The ATLAS and playbook sync parts still need provider or ATLAS steps with explicit owner approval.",
+      "cardType": "architecture",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Receipts reach the server through the outbox",
+        "Sync parts have approved provider steps",
+        "Failures are visible to the owner"
+      ]
+    },
+    {
+      "id": "MAZER-DATA-004",
+      "status": "in_progress",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-DATA-004",
+      "title": "Finish the offline-first play, sync and conflict contract",
+      "description": "A completion outbox and monotonic merge exist on main. The proposal for coins, inventory and checkpoint hierarchy is unsigned, and server parts are provider-gated.",
+      "cardType": "architecture",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Outbox and merge are documented and tested",
+        "Owner signs or amends the proposal",
+        "Server parts have approval"
+      ]
+    },
+    {
+      "id": "MAZER-PWA-002",
+      "status": "planning",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PWA-002",
+      "title": "Add PWA screenshots, iOS launch art and icon cleanup",
+      "description": "The manifest has no screenshots, there is no iOS launch splash, the favicon is 221 KB, the manifest description is internal jargon, and the any-purpose icon shows baked black corners. Fix these plus the off-brand emblem. Large launch art files are frozen by provenance rules, so some need owner OK.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-PWA-001"
+      ],
+      "acceptanceCriteria": [
+        "Manifest includes screenshots and a plain-language description",
+        "iOS startup images exist for common devices",
+        "Favicon trimmed to small sizes; icon hash verifier updated"
+      ]
+    },
+    {
+      "id": "MAZER-PWA-003",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PWA-003",
+      "title": "Make the install gate deterministic and bound the account bootstrap",
+      "description": "The install gate never appeared in a normal browser tab and sign-in could leave a blank page. PR #372 blocks every non-installed visit (with listed exemptions), adds a static boot splash and bounds account startup; PR #367 keeps OAuth callback errors visible past the gate. Merged to main.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-PWA-001"
+      ],
+      "acceptanceCriteria": [
+        "Non-installed visits are gated except documented exemptions",
+        "Boot splash paints before scripts",
+        "Not checked on a real device in sources"
+      ]
+    },
+    {
+      "id": "MAZER-PWA-004",
+      "status": "in_progress",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PWA-004",
+      "title": "Settle the install gate policy and prove the offline shell",
+      "description": "The manifest, offline shell, lifecycle handling and the install gate (PR #372) exist. Open points: the boot-time install gate blocks boot in some install modes without a skip, which clashes with the plan that access is enforced by entitlement, and offline reload after a warm install has no real-device proof.",
+      "cardType": "reliability",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-PWA-003"
+      ],
+      "acceptanceCriteria": [
+        "Owner decides the install gate policy",
+        "The shell works offline on a real device",
+        "Gate and entitlement rules agree"
+      ]
+    },
+    {
+      "id": "MAZER-SHARE-001",
+      "status": "in_progress",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-SHARE-001",
+      "title": "Finish web share metadata, the preview image and external verification",
+      "description": "Canonical and share tags exist and are pinned by a test, but the preview image is still the app icon and a dedicated preview asset is not confirmed. Verifying the preview on external platforms needs a deployed URL and checks outside the repository, so that part is gated.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "A dedicated preview image is chosen and referenced by the share tags",
+        "A test pins the canonical and share tags",
+        "The preview is checked on external platforms after deployment"
+      ]
+    },
+    {
+      "id": "MAZER-QA-001",
+      "status": "blocked",
+      "updatedAt": "2026-11-09T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-001",
+      "title": "Verify deployed Mazer changes on a real phone and installed app",
+      "description": "Everything shipped since 2026-11-06 was checked against bundles, tests and harness frames only. Real phone frame rate, touch feel, pixel density, iOS home-screen behaviour, hardware back, real backgrounding and felt difficulty at levels 60, 100 and 190 remain unchecked. The owner has not reported a phone pass in the late transcript.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner plays the level preview at levels 60, 100, 190 and reports easier, same or harder",
+        "Installed app checked for orbit, deconstruct, goal star, trail, locator and Settings sheets",
+        "Findings logged as follow-up cards"
+      ]
+    },
+    {
+      "id": "MAZER-QA-002",
+      "status": "in_progress",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-002",
+      "title": "Close the mobile shell device harness with real-device proof",
+      "description": "The harness exists but closure needs real-device proof, which has not happened.",
+      "cardType": "reliability",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-QA-001"
+      ],
+      "acceptanceCriteria": [
+        "Harness runs on a real phone",
+        "Results are recorded with the device model",
+        "Gaps are filed as cards"
+      ]
+    },
+    {
+      "id": "MAZER-QA-003",
+      "status": "completed",
+      "updatedAt": "2026-11-09T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-003",
+      "title": "Keep the UI-surface capture and verification harness green",
+      "description": "Harness repairs and verifiers: ui-surfaces capture restored (PR #362), stale label expectation fixed (PR #363), CI pinned to a supported Linux image (PR #371), render and visual tests added to the main test run (PR #380), Settings sheet capture and stale tests fixed (PR #389), and a harmless font-preload console hint ignored (PR #397). Merged to main; tooling only.",
+      "cardType": "automation",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "UI-surface capture completes in both viewport modes",
+        "Render and visual tests run in the main test run",
+        "CI uses a supported runner image"
+      ]
+    },
+    {
+      "id": "MAZER-QA-004",
+      "status": "completed",
+      "updatedAt": "2026-11-09T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-004",
+      "title": "Add a hidden Level Preview route for dev and QA",
+      "description": "A hidden route starts play at a chosen level on the real generation path and real board without touching a real account: sandbox storage, no remote calls, a preview tag and a pause section to jump levels. Merged in PR #398 and kept out of the in-app Guide.",
+      "cardType": "automation",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Invalid values ignore preview and values above 999 clamp",
+        "No account or remote calls in preview",
+        "Documented in the UI docs"
+      ]
+    },
+    {
+      "id": "MAZER-QA-005",
+      "status": "completed",
+      "updatedAt": "2026-08-28T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-005",
+      "title": "Build a 1-500 level progression gallery for review",
+      "description": "A capture tool renders one sample per level for levels 1 to 500 in parallel so difficulty progression can be reviewed visually. Built across PRs #290, #296, #299 and #300 with a rebuild document. Merged to main.",
+      "cardType": "automation",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Gallery covers levels 1 to 500",
+        "Capture tolerates a transient case failure",
+        "Rebuild is documented"
+      ]
+    },
+    {
+      "id": "MAZER-QA-006",
+      "status": "in_progress",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-006",
+      "title": "Finish cross-viewport UI reliability and layout persistence",
+      "description": "Two board cards cover UI reliability across viewports and browser layout persistence; packets from July exist. Both are partly done and remain open.",
+      "cardType": "reliability",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "UI holds across the supported viewport matrix",
+        "Layout state survives reload",
+        "Real-device checks are recorded"
+      ]
+    },
+    {
+      "id": "MAZER-GOV-001",
+      "status": "completed",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GOV-001",
+      "title": "Keep the in-app Guide in sync with game and UI changes",
+      "description": "Standing owner rule: any PR that changes controls, tiles, markers, wrap, levels or settings rows must update the Guide and its icons in the same PR, enforced by a drift test and a PR template checklist item.",
+      "cardType": "governance",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Rule is documented in the ops docs",
+        "Drift test asserts Guide claims against live constants",
+        "PR template carries a checklist line"
+      ]
+    },
+    {
+      "id": "MAZER-GOV-002",
+      "status": "completed",
+      "updatedAt": "2026-08-30T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GOV-002",
+      "title": "Govern the UI rework as single-owner integrator waves with a decision registry",
+      "description": "The UI redesign is split into dependency-ordered waves, and a decision registry plus an architecture test allow only one active wave to own a shared UI path at a time. A change set that spans two waves fails a guard, so redesign work lands in small, separately reviewable pull requests. Completed waves hand paths off explicitly.",
+      "cardType": "governance",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The decision registry names the active owner wave for each shared UI path",
+        "The guard fails a change set that spans more than one registered wave",
+        "Completed waves keep history without keeping active ownership"
+      ]
+    },
+    {
+      "id": "MAZER-GOV-003",
+      "status": "completed",
+      "updatedAt": "2026-10-13T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GOV-003",
+      "title": "Add the Mazer owner project-board export",
+      "description": "A governance export of the Mazer project board for the owner, merged in PR #360 on 2026-10-13. This board refresh builds on it.",
+      "cardType": "governance",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Export merged on main",
+        "Used as the board source",
+        "Board refresh adds new cards"
+      ]
+    },
+    {
+      "id": "MAZER-GOV-004",
+      "status": "review",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "sourceId": "mazer-roadmap",
+      "sourceRef": "docs/roadmap.md#project-board",
+      "title": "Retire the previous project board and refresh this one from all prior discussion",
+      "description": "The earlier Mazer board lived on a system that is now archived; its 66 cards were reconciled against the repository but never synced here. On 2026-11-10 the owner asked for this board to be filled from every earlier chat and project note, with completed work as history. The cards come from the tracker, audit ledger, reconciliation, chat closeouts and merged pull requests, and the public site still needs both refresh pull requests merged.",
+      "cardType": "governance",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-GOV-003"
+      ],
+      "acceptanceCriteria": [
+        "Every card has a stable id, a status that matches its source and a traceable origin",
+        "Stale statuses are corrected on this board rather than in the archive",
+        "The public site shows the refreshed cards after the web repository refresh merges"
+      ]
+    },
+    {
+      "id": "MAZER-GOV-005",
+      "status": "in_progress",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GOV-005",
+      "title": "Keep the visual proof discipline current",
+      "description": "The board tracked the practice of proving visual changes with captured evidence. It is near complete; the rule is ongoing governance.",
+      "cardType": "governance",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Visual changes ship with captured evidence",
+        "Baselines are regenerated when visuals change",
+        "The rule is stated in the repo docs"
+      ]
+    },
+    {
+      "id": "MAZER-DOCS-001",
+      "status": "blocked",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-DOCS-001",
+      "title": "Land the multi-target deployment architecture doc",
+      "description": "A long architecture note describes running Mazer as a browser game, an installable app and a dedicated hardware display target, with proof gates for each. It exists only as an untracked document in an old checkout and was saved as a patch, not committed. The owner needs to approve a docs-only PR with the stale status text refreshed.",
+      "cardType": "documentation",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-CYBERDECK-001"
+      ],
+      "acceptanceCriteria": [
+        "Doc is added through a docs-only PR off current main",
+        "Stale PR status lines are refreshed before commit",
+        "Doc is reconciled with the Cyberdeck research card"
+      ]
+    },
+    {
+      "id": "MAZER-AI-001",
+      "status": "in_progress",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-AI-001",
+      "title": "Finish the configurable AI runner and run-corpus calibration",
+      "description": "The previous project board tracked an AI runner that a human can configure, plus a corpus of recorded runs used to calibrate run quality. The runner is nearly done and a first corpus packet exists on main. Remaining gap: calibration is unfinished, and any remote retention of runs would need a provider-side step.",
+      "cardType": "research",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "A configurable AI runner can play a generated level end to end",
+        "Run corpus calibration thresholds are documented and reproducible",
+        "Any remote run retention is explicitly approved before it is built"
+      ]
+    },
+    {
+      "id": "MAZER-AI-002",
+      "status": "planning",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-AI-002",
+      "title": "Add AI-assisted maze completion with spendable hints",
+      "description": "The board wanted a way for a player to spend an allowance to have AI help finish a maze. Not started; depends on the economy contract.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-ECON-001"
+      ],
+      "acceptanceCriteria": [
+        "Allowance rules are decided by the owner",
+        "The assist is deterministic and tested",
+        "The economy contract is signed first"
+      ]
+    },
+    {
+      "id": "MAZER-RUN-001",
+      "status": "completed",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-RUN-001",
+      "title": "Score run quality and store it on local receipts",
+      "description": "The run quality metric contract v2 scorer, its test and local telemetry fields exist on main, although the board still showed them open at 0 percent. This is local only; remote versioned capture is not included.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Scorer and test exist",
+        "Receipts carry quality fields locally",
+        "Remote capture is excluded"
+      ]
+    },
+    {
+      "id": "MAZER-RUN-002",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-RUN-002",
+      "title": "Show run quality to the player after a run (deferred)",
+      "description": "A player-facing results display for run quality was deferred by the owner.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-RUN-001"
+      ],
+      "acceptanceCriteria": [
+        "Owner reopens the item",
+        "Results display uses the shared status panel",
+        "No ranking is implied without a decision"
+      ]
+    },
+    {
+      "id": "MAZER-RUN-003",
+      "status": "blocked",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-RUN-003",
+      "title": "Decide how run quality gates leaderboard and achievement entries",
+      "description": "Two board cards cover admitting runs to the leaderboard and to achievements by quality. Leaderboard authority is server-side, so a change is provider-gated; the achievement rule is an owner decision. Neither started.",
+      "cardType": "architecture",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-RUN-001"
+      ],
+      "acceptanceCriteria": [
+        "Owner decides admission rules",
+        "Any server change has explicit approval",
+        "Existing entries are not silently dropped"
+      ]
+    },
+    {
+      "id": "MAZER-RUN-004",
+      "status": "in_progress",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-RUN-004",
+      "title": "Build the shared run status panel",
+      "description": "A panel showing run status across surfaces was started and is early.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "One panel shows run status on all surfaces",
+        "The panel respects the UI standards",
+        "Visual proof is recorded"
+      ]
+    },
+    {
+      "id": "MAZER-ECON-001",
+      "status": "review",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ECON-001",
+      "title": "Sign the shop and random item economy contract",
+      "description": "A draft contract for the coins, shop and random items is written but unsigned. Awaiting the owner sign-off; most NOT-STARTED cards depend on it.",
+      "cardType": "architecture",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The owner signs or rejects the draft",
+        "Dependent cards are re-statused",
+        "The draft states what is not decided"
+      ]
+    },
+    {
+      "id": "MAZER-ECON-002",
+      "status": "blocked",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ECON-002",
+      "title": "Add coin pickups, inventory and a data-driven cosmetic catalog",
+      "description": "Three board cards cover maze coin pickups as cosmetic currency, an inventory with cosmetic unlocks, and a data-driven theme catalog. No code exists for coins or inventory at base. Awaiting the economy contract decision.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-ECON-001"
+      ],
+      "acceptanceCriteria": [
+        "The owner signs the economy contract",
+        "Coins never block core play",
+        "The catalog is data driven"
+      ]
+    },
+    {
+      "id": "MAZER-ECON-003",
+      "status": "blocked",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ECON-003",
+      "title": "Define account entitlements and store checkout",
+      "description": "A draft entitlement contract exists, unsigned, and no entitlement objects exist in source. Store checkout is blocked on that contract plus provider and policy decisions; no checkout library is installed.",
+      "cardType": "architecture",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-ECON-001"
+      ],
+      "acceptanceCriteria": [
+        "The owner signs the entitlement contract",
+        "Provider and policy decisions are recorded",
+        "No checkout code before approval"
+      ]
+    },
+    {
+      "id": "MAZER-CAM-001",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-CAM-001",
+      "title": "Add a play camera zoom and minimap (deferred)",
+      "description": "The board asked for a play camera zoom with a minimap. The owner deferred the zoom lever; a zoom option normaliser existed at base, and the Board Zoom setting was later removed because board size is frozen. No minimap exists.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner reopens the item explicitly",
+        "Any zoom keeps the board readable on small screens",
+        "A minimap decision is recorded separately"
+      ]
+    },
+    {
+      "id": "MAZER-PATH-001",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PATH-001",
+      "title": "Define a diagonal path graph contract (deferred)",
+      "description": "The board held a card for allowing diagonal movement in the path graph, barely started. The owner deferred it.",
+      "cardType": "architecture",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner reopens the item",
+        "A contract specifies solvability with diagonals",
+        "Existing levels are unaffected"
+      ]
+    },
+    {
+      "id": "MAZER-MODE-001",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MODE-001",
+      "title": "Build the moving procedural maze mode (deferred)",
+      "description": "Four board cards covered a moving maze mode: the mode itself, lane correction, one-tile lane snap and assisted-motion proof. No moving-maze code exists and the owner deferred the whole set; they are merged here as one deliverable.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner reopens the item",
+        "Lane correction contract is written before code",
+        "Assisted motion is proven on a real device"
+      ]
+    },
+    {
+      "id": "MAZER-MODE-002",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MODE-002",
+      "title": "Plan multiplayer and endless survival mode (deferred)",
+      "description": "Two board cards covered a multiplayer foundation and an endless multiplayer survival mode. Neither is started; the owner deferred both and they are merged into one card.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner reopens the item",
+        "A multiplayer foundation contract exists before code",
+        "Single-player progression is unaffected"
+      ]
+    },
+    {
+      "id": "MAZER-SOCIAL-001",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-SOCIAL-001",
+      "title": "Define social profiles, friends and events (deferred)",
+      "description": "The board had a contract card for social profiles, friends and events. Not started; deferred by the owner.",
+      "cardType": "architecture",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Owner reopens the item",
+        "A contract defines profile visibility rules",
+        "Server parts get explicit provider approval"
+      ]
+    },
+    {
+      "id": "MAZER-CHAL-001",
+      "status": "planning",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-CHAL-001",
+      "title": "Add shared-seed daily and weekly challenges",
+      "description": "Daily and weekly challenges from a shared seed. Not started; server seed and leaderboard parts would be provider-gated, and the design needs an owner decision.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-PROG-002"
+      ],
+      "acceptanceCriteria": [
+        "The same seed gives the same maze for everyone",
+        "The owner decides cadence",
+        "Server parts are approved first"
+      ]
+    },
+    {
+      "id": "MAZER-TOOLS-001",
+      "status": "planning",
+      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-TOOLS-001",
+      "title": "Define a handcrafted asset authoring and import workflow",
+      "description": "The board wanted a workflow for authoring and importing handcrafted art assets. Not started and awaiting an owner decision.",
+      "cardType": "automation",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The import path is documented",
+        "Assets are validated on import",
+        "The owner approves the format"
+      ]
     }
   ]
 }

@@ -16,18 +16,25 @@ const PROJECT_ID = "mazer";
 const BOARD_ID = "discordos:project-feedback:mazer";
 const OWNER = "mazer";
 const ATLAS_PREFIX = "repos/mazer/";
-const PUBLIC_STATUSES = new Map([
+// Owner statuses admitted by the Mazer registry and the atlas.card-record.v2 lifecycle each one maps to.
+// Every admitted status is exported: open work (active, in_progress, review, blocked, planning), completed
+// history (completed) and parked work (deferred_candidate maps to the candidate "intake" lifecycle, so the
+// board shows it in the Plan stage and the card text says it is deferred).
+const OPEN_STATUSES = new Map([
   ["active", { recordStatus: "active", lifecycle: "in-progress" }],
   ["in_progress", { recordStatus: "active", lifecycle: "in-progress" }],
+  ["review", { recordStatus: "active", lifecycle: "review" }],
+  ["blocked", { recordStatus: "active", lifecycle: "blocked" }],
   ["planning", { recordStatus: "candidate", lifecycle: "planning" }],
 ]);
 const COMPLETED_STATUS = "completed";
 const DEFERRED_CANDIDATE_STATUS = "deferred_candidate";
-const ADMITTED_STATUSES = new Set([
-  ...PUBLIC_STATUSES.keys(),
-  COMPLETED_STATUS,
-  DEFERRED_CANDIDATE_STATUS,
+const PUBLIC_STATUSES = new Map([
+  ...OPEN_STATUSES,
+  [COMPLETED_STATUS, { recordStatus: "active", lifecycle: "completed" }],
+  [DEFERRED_CANDIDATE_STATUS, { recordStatus: "candidate", lifecycle: "intake" }],
 ]);
+const ADMITTED_STATUSES = new Set(PUBLIC_STATUSES.keys());
 const SUPPORTED_CARD_TYPES = new Set([
   "feature",
   "bug",
@@ -1452,13 +1459,13 @@ function validateRegistry(registry, sourceBytes) {
     visited.add(id);
   };
   for (const id of stableIds) visit(id);
-  const publicCount = registry.workItems.filter((item) => PUBLIC_STATUSES.has(item.status)).length;
+  const openCount = registry.workItems.filter((item) => OPEN_STATUSES.has(item.status)).length;
   const completedCount = registry.workItems.filter((item) => item.status === COMPLETED_STATUS).length;
-  const candidateCount = registry.workItems.filter((item) => item.status === DEFERRED_CANDIDATE_STATUS).length;
-  if (publicCount !== registry.provenance.publicCardCount || completedCount !== registry.provenance.completedExcludedCount
-    || candidateCount !== registry.provenance.candidateExcludedCount
-    || publicCount + completedCount + candidateCount !== registry.workItems.length
-    || publicCount + completedCount + candidateCount !== registry.provenance.stableIdentityCount
+  const deferredCount = registry.workItems.filter((item) => item.status === DEFERRED_CANDIDATE_STATUS).length;
+  if (openCount !== registry.provenance.openCardCount || completedCount !== registry.provenance.completedCardCount
+    || deferredCount !== registry.provenance.deferredCardCount
+    || openCount + completedCount + deferredCount !== registry.workItems.length
+    || openCount + completedCount + deferredCount !== registry.provenance.stableIdentityCount
     || registry.provenance.researchCandidateImportCount !== 0
     || registry.provenance.discordosRole !== "provenance-and-board-identity-only") {
     throw new Error("Mazer owner reconciliation counts are inconsistent");
@@ -1545,7 +1552,7 @@ export function assertFawxzzyWebConsumerAcceptance(exported) {
     if (!card.record.card_id || !card.record.title || !card.content.summary || !card.record.lifecycle) {
       throw new Error("FawxzzyWeb public card fields are incomplete");
     }
-    if (!["active", "candidate"].includes(card.record_status) || ["completed", "archived", "blocked"].includes(card.record.lifecycle)) {
+    if (!["active", "candidate"].includes(card.record_status) || card.record.lifecycle === "archived") {
       throw new Error("FawxzzyWeb received a non-public lifecycle");
     }
     if (card.record.extensions?.public_safe !== true || card.content.acceptance_criteria.length < 3) {
@@ -1571,7 +1578,7 @@ export function buildProjectBoardOwnerExport(registry, sourceBytes) {
   validateRegistry(registry, sourceBytes);
   const sourceRevision = `sha256:${digest(Object.keys(SOURCE_PATHS).map((sourceId) => normalize(sourceBytes[sourceId])).join("\n--MAZER-OWNER-SOURCE--\n"))}`;
   const generatedAt = normalizeTimestamp(registry.updatedAt, "registry.updatedAt");
-  const cards = registry.workItems.filter((item) => PUBLIC_STATUSES.has(item.status)).map(mapCard)
+  const cards = registry.workItems.map(mapCard)
     .sort((left, right) => left.record.card_id.localeCompare(right.record.card_id));
   const exported = {
     contract_version: "atlas.project-board.owner-export.v1",
@@ -1594,8 +1601,9 @@ export function buildProjectBoardOwnerExport(registry, sourceBytes) {
     extensions: {
       stable_identity_count: registry.provenance.stableIdentityCount,
       exported_public_card_count: cards.length,
-      excluded_completed_card_count: registry.provenance.completedExcludedCount,
-      excluded_deferred_candidate_count: registry.provenance.candidateExcludedCount,
+      exported_open_card_count: registry.provenance.openCardCount,
+      exported_completed_card_count: registry.provenance.completedCardCount,
+      exported_deferred_card_count: registry.provenance.deferredCardCount,
       imported_research_candidate_count: registry.provenance.researchCandidateImportCount,
       research_candidate_exported_count: 0,
       discordos_role: registry.provenance.discordosRole,
@@ -1603,7 +1611,7 @@ export function buildProjectBoardOwnerExport(registry, sourceBytes) {
       external_system_identifiers_included: false,
     },
   };
-  if (cards.length !== registry.provenance.publicCardCount) throw new Error("Mazer public-card denominator is incomplete");
+  if (cards.length !== registry.provenance.stableIdentityCount) throw new Error("Mazer public-card denominator is incomplete");
   assertPublicSafety(exported);
   assertFawxzzyWebConsumerAcceptance(exported);
   return exported;
