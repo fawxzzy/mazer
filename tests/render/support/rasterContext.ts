@@ -6,8 +6,9 @@ import type { TileBakeContext2D } from '../../../src/render/boardTileBake';
  *
  * Fill only: `fill()` / `fillRect()` rasterise the current path with the non-zero winding rule, sampling each
  * device pixel at its centre (no anti-aliasing: a pixel is either inside or outside, which is exactly what an
- * edge-coincidence test wants). `stroke()`, shadows and `clearRect` of partial areas are not needed by these
- * tests and are inert. Colours are `rgb()` / `rgba()` strings, as boardTileBake emits; alpha blends source-over.
+ * edge-coincidence test wants). `stroke()` paints every pixel whose centre is within half the line width of any
+ * path segment (round caps and joins, which is what the marker keyline uses); shadows and `clearRect` of partial
+ * areas are not needed by these tests and are inert. Strokes only paint when `paintStrokes` is set. Colours are `rgb()` / `rgba()` strings, as boardTileBake emits; alpha blends source-over.
  */
 export type Rgba = readonly [number, number, number, number];
 
@@ -39,6 +40,8 @@ export class RasterContext implements TileBakeContext2D {
   lineCap: 'butt' | 'round' | 'square' = 'butt';
   lineJoin: 'round' | 'bevel' | 'miter' = 'miter';
   globalAlpha = 1;
+  /** Strokes are inert unless this is set (the bake's own strokes stay out of fill-only edge tests). */
+  paintStrokes = false;
   shadowBlur = 0;
   shadowColor = '';
 
@@ -176,7 +179,28 @@ export class RasterContext implements TileBakeContext2D {
   }
 
   stroke(): void {
-    /* inert: the edge tests are about fills */
+    if (!this.paintStrokes) return;
+    const color = parseRgba(this.strokeStyle);
+    const half = (this.lineWidth * Math.abs(this.a)) / 2;
+    for (const path of this.subpaths) {
+      for (let i = 0; i < path.length; i += 1) {
+        const p = path[i]!;
+        const q = path[Math.min(path.length - 1, i + 1)]!;
+        const minX = Math.max(0, Math.floor(Math.min(p[0], q[0]) - half));
+        const maxX = Math.min(this.width - 1, Math.ceil(Math.max(p[0], q[0]) + half));
+        const minY = Math.max(0, Math.floor(Math.min(p[1], q[1]) - half));
+        const maxY = Math.min(this.height - 1, Math.ceil(Math.max(p[1], q[1]) + half));
+        const dx = q[0] - p[0]; const dy = q[1] - p[1];
+        const len2 = (dx * dx) + (dy * dy);
+        for (let py = minY; py <= maxY; py += 1) {
+          for (let px = minX; px <= maxX; px += 1) {
+            const cx = px + 0.5; const cy = py + 0.5;
+            const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, (((cx - p[0]) * dx) + ((cy - p[1]) * dy)) / len2));
+            if (Math.hypot(cx - (p[0] + (t * dx)), cy - (p[1] + (t * dy))) <= half) this.blend(px, py, color);
+          }
+        }
+      }
+    }
   }
 
   fillRect(x: number, y: number, w: number, h: number): void {

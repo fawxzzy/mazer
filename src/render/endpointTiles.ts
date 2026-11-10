@@ -1,28 +1,30 @@
 /**
- * Start and goal END TILES on the Chip board: pure geometry and colour, no drawing.
+ * Start and goal END MARKERS on the Chip board: pure geometry, no drawing.
  *
- * Before: the end markers were drawn at a css-px floor (a 22 px goal badge on a 14.7 px tile) and the goal's
- * pad was the cell's inscribed circle, so the end tile spilled over its neighbours and did not meet the edges
- * of the chip it sits on.
+ * History: 2026-11-10 (PR #402) drew each end tile as a tinted pad (the chip's own fill silhouette in a dark
+ * endpoint colour) with a dark disc badge and a lit ring on top. On the live board the pad read as a visible
+ * square / rounded-square box behind the star and the play marker, and the owner asked for it gone.
  *
- * Now the end tile IS the tile:
- *  - the pad is the chip's own inner fill silhouette (`tile.fill` / `tile.fillRadii` from computeChipGeometry),
- *    in the endpoint colour. Those numbers are device-snapped by the bake's layout, and the markers are placed
- *    from the same snapped board origin, so the pad's edges are the baked tile's edges to the device pixel at
- *    every tile size and DPR (tests/render/endpointTilePixels.test.ts rasterises this to prove it);
- *  - the badge is a circle inscribed in the whole cell: its radius is half the snapped tile, so its ring is
- *    tangent to all four tile edges (the ring colour is the rim colour, so it joins the rim where they touch);
- *  - the goal keeps its shipped badge proportions (dark disc, lit ring, red star); the start is the same badge
- *    with a gold ring and a play glyph.
+ * Now there is no box. The star and the play arrow sit directly on the board tile (the baked Chip fill is the only
+ * thing behind them), centred on the device-snapped tile. What keeps them legible without a backdrop is a thin
+ * dark KEYLINE traced around the glyph itself (the board void colour, 1+ device px): the goal red (#FF405D) is only
+ * about 1.8:1 against the mid-tone chip, but red on the keyline is far above 3:1, and the outline hugs the shape, so
+ * it reads as a crisp edge, not a plate. The start's gold clears 3:1 on the chip on its own and gets the same keyline
+ * for one consistent look.
  *
- * The functions return plain numbers and never touch a canvas; `drawBoardMarkers` (boardTileBake.ts) paints
- * them. No css-px floor: on a dense board the glyph is as small as the tile, and the goal is found through
- * the beacon (goalBeacon.ts), which has its own css-px sizing.
+ *  - Goal: a goal-red star, outer radius 0.70 of the half-tile.
+ *  - Start: a gold play triangle that POINTS THE WAY THE PLAYER WILL FIRST MOVE (`direction`, resolved from the maze
+ *    by startDirection.ts; right when there is no board, e.g. the Guide icon), so it reads as the player emerging
+ *    from it. The triangle is optically centred on its centroid: the flat side sits 0.42 of the glyph length behind
+ *    the cell centre along the direction of travel.
+ *
+ * The functions return plain numbers and never touch a canvas; `drawBoardMarkers` (boardTileBake.ts) paints them.
+ * No css-px floor: on a dense board the glyph is as small as the tile, and the goal is found through the beacon
+ * (goalBeacon.ts), which has its own css-px sizing.
  */
+import { DEFAULT_START_DIRECTION, type StartDirection } from './startDirection';
 import {
   BOARD_TILE_GEOMETRY,
-  boardMaterial,
-  mixColor,
   snapLineWidth
 } from './boardTileStyle';
 
@@ -30,7 +32,7 @@ export type EndpointKind = 'start' | 'goal';
 
 export type EndpointRadii = readonly [number, number, number, number];
 
-/** Board-local chip tile geometry (the subset of `ChipTileGeometry` the end tiles use). */
+/** Board-local chip tile geometry (the subset of `ChipTileGeometry` the end markers use). */
 export interface EndpointTileRect {
   left: number;
   top: number;
@@ -40,116 +42,102 @@ export interface EndpointTileRect {
   /** The inner fill rect: inset by the rim on closed sides only. */
   fill: { left: number; top: number; width: number; height: number };
   fillRadii: EndpointRadii;
-  /**
-   * Concave corners (both neighbours open, diagonal wall): the bake paints a rim-coloured patch there that
-   * lies inside the fill rect. The pad must not overwrite it, so the patches are repainted over the pad.
-   */
+  /** Concave corners (both neighbours open, diagonal wall). Carried with the tile geometry; the marker ignores it. */
   concave?: { tl: boolean; tr: boolean; br: boolean; bl: boolean };
+  /** Start only: the direction of the first step of the solution path (BoardTileLayer sets it). Default: right. */
+  direction?: StartDirection;
 }
 
-export interface EndpointPad {
-  /** Board-local fill rect, identical to the baked chip fill of this tile. */
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  radii: EndpointRadii;
-  /** Opaque colour: the board void mixed toward the endpoint colour (a dark, tinted tile behind the badge). */
-  color: number;
-  /** Rim patches to repaint over the pad: board-local top-left corners of rim x rim squares (the bake's own). */
-  patches: ReadonlyArray<readonly [number, number]>;
-}
-
-export interface EndpointBadge {
+export interface EndpointGlyphFrame {
   /** Board-local cell centre. */
   cx: number;
   cy: number;
-  /** Half the (device-snapped) tile: the circle is tangent to the four tile edges. */
+  /** Half the (device-snapped) tile. */
   radius: number;
-  /** Ring width, snapped to whole device pixels, never below one. */
-  ringWidth: number;
+  /** Keyline width: the dark outline traced around the glyph, snapped to whole device pixels, never below one. */
+  keyline: number;
+}
+
+export interface EndpointPlay {
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+  cx: number;
+  cy: number;
+  /** Round-join stroke width of the gold fill's own edge. */
+  stroke: number;
+  direction: StartDirection;
 }
 
 export interface EndpointTileSpec {
   kind: EndpointKind;
-  pad: EndpointPad;
-  badge: EndpointBadge;
+  frame: EndpointGlyphFrame;
   /** Goal only: star radii. */
   star: { outer: number; inner: number } | null;
-  /** Start only: the play triangle (board-local vertices) and its round-join stroke width. */
-  play: { ax: number; ay: number; bx: number; by: number; cx: number; cy: number; stroke: number } | null;
+  /** Start only: the play triangle (board-local vertices) pointing along `direction`. */
+  play: EndpointPlay | null;
 }
 
-export const resolveEndpointPadColor = (kind: EndpointKind): number => {
-  const k = BOARD_TILE_GEOMETRY.endpoint;
-  return kind === 'goal'
-    ? mixColor(boardMaterial.void, boardMaterial.goal, k.goalPadMix)
-    : mixColor(boardMaterial.void, boardMaterial.start, k.startPadMix);
+/**
+ * The triangle in glyph space (u along the direction of travel, v across it) mapped to board-local x/y:
+ * right = (u, v), down = (-v, u), left = (-u, -v), up = (v, -u). A rotation, so the triangle stays the same shape.
+ */
+const rotate = (direction: StartDirection, u: number, v: number): readonly [number, number] => {
+  switch (direction) {
+    case 'right': return [u, v];
+    case 'down': return [-v, u];
+    case 'left': return [-u, -v];
+    case 'up': return [v, -u];
+  }
 };
 
-/** Everything needed to paint one end tile, from the tile's own chip geometry. Pure. */
+/** Everything needed to paint one end marker, from the tile's own chip geometry. Pure. */
 export const resolveEndpointTile = (
   kind: EndpointKind,
   tile: EndpointTileRect,
-  devicePixelRatio: number,
-  rimWidth = 0
+  devicePixelRatio: number
 ): EndpointTileSpec => {
   const k = BOARD_TILE_GEOMETRY.endpoint;
   const cx = tile.left + (tile.width / 2);
   const cy = tile.top + (tile.height / 2);
   const radius = Math.min(tile.width, tile.height) / 2;
-  const badge: EndpointBadge = {
+  const frame: EndpointGlyphFrame = {
     cx,
     cy,
     radius,
-    ringWidth: snapLineWidth(radius * k.ringOfBadge, devicePixelRatio)
-  };
-  const patches: Array<readonly [number, number]> = [];
-  if (tile.concave && rimWidth > 0) {
-    // The same squares the bake paints (boardTileBake.ts, "concave rim patches").
-    const right = tile.left + tile.width - rimWidth;
-    const bottom = tile.top + tile.height - rimWidth;
-    if (tile.concave.tl) patches.push([tile.left, tile.top]);
-    if (tile.concave.tr) patches.push([right, tile.top]);
-    if (tile.concave.br) patches.push([right, bottom]);
-    if (tile.concave.bl) patches.push([tile.left, bottom]);
-  }
-  const pad: EndpointPad = {
-    left: tile.fill.left,
-    top: tile.fill.top,
-    width: tile.fill.width,
-    height: tile.fill.height,
-    radii: tile.fillRadii,
-    color: resolveEndpointPadColor(kind),
-    patches
+    keyline: snapLineWidth(radius * k.keylineOfRadius, devicePixelRatio)
   };
   if (kind === 'goal') {
     return {
       kind,
-      pad,
-      badge,
-      star: { outer: radius * k.goalStarOuterOfBadge, inner: radius * k.goalStarInnerOfBadge },
+      frame,
+      star: { outer: radius * k.goalStarOuterOfRadius, inner: radius * k.goalStarInnerOfRadius },
       play: null
     };
   }
-  const halfHeight = radius * k.startPlayHalfHeightOfBadge;
-  const width = radius * k.startPlayWidthOfBadge;
-  // Optical centring: the flat side sits 0.42 of the glyph width left of the cell centre (a play triangle's
-  // visual centre is its centroid, a third of the way from the flat side, not the middle of its box).
-  const left = cx - (width * 0.42);
+  const direction = tile.direction ?? DEFAULT_START_DIRECTION;
+  const halfHeight = radius * k.startPlayHalfHeightOfRadius;
+  const length = radius * k.startPlayLengthOfRadius;
+  // Optical centring: the flat side sits 0.42 of the glyph length behind the cell centre (a triangle's visual centre
+  // is its centroid, a third of the way from the flat side, not the middle of its box).
+  const back = -(length * 0.42);
+  const [ax, ay] = rotate(direction, back, -halfHeight);
+  const [bx, by] = rotate(direction, back, halfHeight);
+  const [px, py] = rotate(direction, back + length, 0);
   return {
     kind,
-    pad,
-    badge,
+    frame,
     star: null,
     play: {
-      ax: left,
-      ay: cy - halfHeight,
-      bx: left,
-      by: cy + halfHeight,
-      cx: left + width,
-      cy,
-      stroke: snapLineWidth(radius * k.startPlayStrokeOfBadge, devicePixelRatio)
+      ax: cx + ax,
+      ay: cy + ay,
+      bx: cx + bx,
+      by: cy + by,
+      cx: cx + px,
+      cy: cy + py,
+      stroke: snapLineWidth(radius * k.startPlayStrokeOfRadius, devicePixelRatio),
+      direction
     }
   };
 };

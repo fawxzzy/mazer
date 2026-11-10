@@ -118,16 +118,18 @@ describe('guide copy only names things that exist', () => {
     expect(MENU_SCENE).not.toContain('createOverlayClosePill');
   });
 
-  test('Start row: Chip draws the start end tile (a ringed play marker on a tinted tile) and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
+  test('Start row: Chip draws the start end marker (a play arrow straight on the tile, pointing the way you set off) and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
     expect(LEGACY_GUIDE_ROWS.some((r) => r.id === 'start')).toBe(true);
-    expect(row('start').text).toMatch(/play marker/);
+    expect(row('start').text).toMatch(/arrow on the first tile points the way you set off/);
+    expect(row('start').text).not.toMatch(/ring|tile pad|tinted/i);
     expect(row('start').text).not.toMatch(/bracket/i);
     expect(row('start').icon.chipDraw?.marker).toBe('start');
     expect(row('start').icon.boardDraw).toEqual({ module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' });
     expect(boardTileBake.drawBoardMarkers).toBeTypeOf('function');
-    // The start end tile is drawn by drawBoardMarkers' start branch: ring on a disc badge plus a play triangle.
+    // The start end marker is drawn by drawBoardMarkers' start branch: a play triangle on the tile, rotated to the first step.
     expect(read('src/render/boardTileBake.ts')).toMatch(/spec\.play/);
-    expect(read('src/render/endpointTiles.ts')).toMatch(/startPlayHalfHeightOfBadge/);
+    expect(read('src/render/endpointTiles.ts')).toMatch(/startPlayHalfHeightOfRadius/);
+    expect(read('src/render/endpointTiles.ts')).toMatch(/direction/);
     expect(read('src/render/boardTileBake.ts')).not.toMatch(/startArm/);
   });
 
@@ -137,9 +139,9 @@ describe('guide copy only names things that exist', () => {
     expect(read('src/render/playerLocator.ts')).toContain('CHIP_CORNER_RATIO');
   });
 
-  test('Trail row: the copy says the line pulses and shifts colour, and the legend draws the iridescent palette', () => {
-    expect(row('trail').text).toMatch(/pulsing, colour-shifting line/);
-    expect(read('src/render/trailIridescence.ts')).toMatch(/export const sampleIridescentTrail/);
+  test('Trail row: the copy says the line shimmers and shifts colour, and the legend draws the iridescent palette', () => {
+    expect(row('trail').text).toMatch(/shimmering, colour-shifting line is your route/);
+    expect(read('src/render/trailPalette.ts')).toMatch(/export const sampleIridescentTrail/);
   });
 
   test('Trail row names the Settings toggle by its live label', () => {
@@ -194,7 +196,8 @@ describe('guide copy only names things that exist', () => {
     expect(tutorial.expectedEdgeWraps).toEqual({ horizontal: 0, vertical: 0 });
     const late = resolveLegacyProgressionDifficultyProfile(400);
     expect(late.expectedEdgeWraps.horizontal + late.expectedEdgeWraps.vertical).toBeGreaterThan(0);
-    expect(row('wrap').text).toMatch(/^Some mazes wrap\./);
+    expect(row('wrap').text).toMatch(/^Some mazes wrap /);
+    expect(row('wrap').text).toMatch(/edge diamonds glow in your trail colours/);
   });
 
   test('Wrap: the ladder really gives some mazes a wrap corridor (never early, fading out to none, never all of a level while it fades)', () => {

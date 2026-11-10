@@ -10,6 +10,7 @@ import {
   EDGE_MARKER_MIN_INSET_PX,
   EDGE_MIDPOINT_STATION_ID,
   EDGE_STATION_COUNT,
+  drawEdgeMarker,
   drawEdgeMarkers,
   drawEdgeBeams,
   resolveEdgeMarkerIdleAlpha,
@@ -27,6 +28,8 @@ import {
   resolveWrapFlashStationIds,
   type EdgeGraphics
 } from '../../src/render/edgeMarkers';
+import { PLAYER_COLOR, resolveTrailPaletteBorderColor, sampleIridescentTrail } from '../../src/render/trailPalette';
+import { boardMaterial } from '../../src/render/boardTileStyle';
 import { cyberArcadeMaterial } from '../../src/render/cyberArcadeMaterial';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -451,7 +454,9 @@ describe('all-8 beams (arrival and departure)', () => {
     const recorder = makeRecorder();
     drawEdgeBeams(recorder, { direction: 'inward', focus, laserProgress: 0.5, spawnPop: 0, stations });
     expect(recorder.lineWidths).toEqual(Array.from({ length: 8 }, () => [3, 1]).flat());
-    expect(recorder.lineColors).toEqual(Array.from({ length: 8 }, () => [cyberArcadeMaterial.signal.player, cyberArcadeMaterial.rail.mint]).flat());
+    // everything that shoots out of the player is the player colour (one token, trailPalette.PLAYER_COLOR)
+    expect(recorder.lineColors).toEqual(Array.from({ length: 8 }, () => [PLAYER_COLOR, PLAYER_COLOR]).flat());
+    expect(recorder.fillColors.every((color) => color === PLAYER_COLOR)).toBe(true);
     expect(recorder.circles).toHaveLength(8);
     expect(recorder.lineBetweenCount).toBe(16);
   });
@@ -584,7 +589,7 @@ describe('ring lighting and spin over the intro / outro timelines (per frame)', 
     }
   });
 
-  test('the markers actually draw all 8 mint cores while the ring is lit and none at rest', () => {
+  test('the markers draw all 8 player-coloured cores while the ring is lit and none at rest; the border is the live trail colour either way', () => {
     const stations = resolveEdgeStations({ width: 390, height: 844 });
     const lit = resolveEdgeMarkerStates({
       reducedMotion: false,
@@ -594,12 +599,15 @@ describe('ring lighting and spin over the intro / outro timelines (per frame)', 
     const litRecorder = makeRecorder();
     drawEdgeMarkers(litRecorder, stations, lit);
     expect(litRecorder.calls.filter((call) => call === 'fillPath')).toHaveLength(8);
-    expect(litRecorder.lineColors.filter((color) => color === cyberArcadeMaterial.rail.mint)).toHaveLength(8);
+    expect(litRecorder.fillColors).toEqual(Array.from({ length: 8 }, () => PLAYER_COLOR));
+    // the border never goes mint when lit: it is the trail palette's colour at the trail head (here no trail: distance 0, t 0)
+    const border = resolveTrailPaletteBorderColor(0, 0, false);
+    expect(litRecorder.lineColors).toEqual(Array.from({ length: 8 }, () => border));
     const rest = resolveEdgeMarkerStates({ reducedMotion: false, ringEnergies: resolveEdgeRingEnergies(null), timeMs: 0 });
     const restRecorder = makeRecorder();
     drawEdgeMarkers(restRecorder, stations, rest);
     expect(restRecorder.calls.filter((call) => call === 'fillPath')).toHaveLength(0);
-    expect(restRecorder.lineColors.every((color) => color === cyberArcadeMaterial.rail.cyan)).toBe(true);
+    expect(restRecorder.lineColors).toEqual(Array.from({ length: 8 }, () => border));
   });
 
   test('orbit phase: parked while the beams fly, then one full lap (build clockwise, deconstruct counter-clockwise), exactly 0 at both ends', () => {
@@ -810,6 +818,7 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
 
 interface Recorder extends EdgeGraphics {
   calls: string[];
+  fillColors: number[];
   lineWidths: number[];
   lineColors: number[];
   circles: Array<{ x: number; y: number; radius: number }>;
@@ -820,12 +829,13 @@ interface Recorder extends EdgeGraphics {
 function makeRecorder(): Recorder {
   const recorder: Recorder = {
     calls: [],
+    fillColors: [],
     lineWidths: [],
     lineColors: [],
     circles: [],
     lineBetweenCount: 0,
     points: [],
-    fillStyle() { recorder.calls.push('fillStyle'); },
+    fillStyle(color: number) { recorder.calls.push('fillStyle'); recorder.fillColors.push(color); },
     lineStyle(width: number, color: number) { recorder.calls.push('lineStyle'); recorder.lineWidths.push(width); recorder.lineColors.push(color); },
     beginPath() { recorder.calls.push('beginPath'); },
     moveTo(x: number, y: number) { recorder.calls.push('moveTo'); recorder.points.push({ x, y }); },
@@ -838,3 +848,63 @@ function makeRecorder(): Recorder {
   };
   return recorder;
 }
+
+describe('colour contract: border = live trail colour, inside = player colour (one source, trailPalette.ts)', () => {
+  const stations = resolveEdgeStations({ width: 390, height: 844 });
+
+  test('the player colour is one token: the player marker, the diamonds core and the beams all read PLAYER_COLOR', () => {
+    expect(PLAYER_COLOR).toBe(cyberArcadeMaterial.signal.player);
+    expect(boardMaterial.player).toBe(PLAYER_COLOR);
+  });
+
+  test('every diamond border equals the trail colour at the trail head, at every time and head distance (they cannot drift)', () => {
+    for (const timeMs of [0, 137, 900, 2500, 8000]) {
+      for (const head of [0, 3.5, 12, 40.25]) {
+        const states = resolveEdgeMarkerStates({ reducedMotion: false, timeMs, trailHeadDistanceTiles: head });
+        const recorder = makeRecorder();
+        drawEdgeMarkers(recorder, stations, states);
+        const trail = sampleIridescentTrail(head, timeMs, false, { core: 0, glow: 0, wave: 0, sheen: 0 }).core;
+        expect(recorder.lineColors, `t ${timeMs} head ${head}`).toEqual(Array.from({ length: 8 }, () => trail));
+        expect(trail).toBe(resolveTrailPaletteBorderColor(head, timeMs, false));
+      }
+    }
+  });
+
+  test('the border uses the trail clock when given (the scene passes the trail animation clock, so a paused trail pauses it)', () => {
+    const a = resolveEdgeMarkerStates({ reducedMotion: false, timeMs: 5000, trailTimeMs: 100, trailHeadDistanceTiles: 5 });
+    expect(a[0]?.borderColor).toBe(resolveTrailPaletteBorderColor(5, 100, false));
+  });
+
+  test('the border moves with time (the trail colour shifts) and is frozen in reduced motion and with Trail Shine off', () => {
+    const at = (timeMs: number, extra: { reducedMotion?: boolean; trailAnimated?: boolean } = {}) => (
+      resolveEdgeMarkerStates({ reducedMotion: extra.reducedMotion ?? false, trailAnimated: extra.trailAnimated, timeMs, trailHeadDistanceTiles: 6 })[0]!.borderColor
+    );
+    expect(at(0)).not.toBe(at(600));
+    expect(at(0, { reducedMotion: true })).toBe(at(9999, { reducedMotion: true }));
+    expect(at(0, { trailAnimated: false })).toBe(at(9999, { trailAnimated: false }));
+    expect(at(0, { reducedMotion: true })).toBe(resolveTrailPaletteBorderColor(6, 0, true));
+  });
+
+  test('an icon with no explicit border colour (the Guide legend) draws the static trail gradient colour, never a fixed cyan or mint', () => {
+    const recorder = makeRecorder();
+    drawEdgeMarker(recorder, stations[1]!, { alpha: 0.95, energized: false, energy: 0, flash: 0, hidden: false, id: 1, spinRad: 0 });
+    expect(recorder.lineColors).toEqual([resolveTrailPaletteBorderColor(0, 0, true)]);
+    expect(recorder.lineColors[0]).not.toBe(cyberArcadeMaterial.rail.cyan);
+    expect(recorder.lineColors[0]).not.toBe(cyberArcadeMaterial.rail.mint);
+  });
+
+  test('the module has no fixed colour literals and does not import the mint / cyan rail tokens', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/render/edgeMarkers.ts'), 'utf8');
+    expect(source).not.toMatch(/rail\.(mint|cyan)/);
+    expect(source).not.toMatch(/0x[0-9a-fA-F]{6}/);
+    expect(source).toContain("from './trailPalette'");
+  });
+
+  test('the scene feeds the diamonds the trail head sample the trail itself recorded (same palette, same clock)', () => {
+    const scene = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+    expect(scene).toContain('this.trailPaletteHead = {');
+    expect(scene).toContain('trailHeadDistanceTiles: this.trailPaletteHead.distanceTiles');
+    expect(scene).toContain('trailTimeMs: this.trailPaletteHead.timeMs');
+    expect(scene).toContain('trailAnimated: this.trailPaletteHead.animated');
+  });
+});

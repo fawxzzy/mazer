@@ -155,37 +155,35 @@ const starArea = (calls: Recorded[]): number => {
 
 const largestRadius = (calls: Recorded[]): number => Math.max(...calls.filter((c) => c.op === 'arc').map((c) => c.args[2] as number));
 
-describe('goal end tile (Chip): exactly the tile, at every size', () => {
-  test('the badge is never larger than the tile and, when it is drawn, spans it: from a 4 px tile to an 80 px tile', () => {
+describe('goal end marker (Chip): a star on the tile, at every size', () => {
+  test('the star is never larger than the tile and there is no disc, ring or pad: from a 4 px tile to an 80 px tile', () => {
     for (let tile = 4; tile <= 80; tile += 0.5) {
-      // opting in to the css-px floors changes nothing: the Chip end tile ignores them
+      // opting in to the css-px floors changes nothing: the Chip end marker ignores them
       const floored = drawGoal(tile, BOARD_MARKER_MIN_CSS);
       const plain = drawGoal(tile);
       expect(JSON.stringify(floored), `tile ${tile}`).toBe(JSON.stringify(plain));
-      const radii = plain.filter((c) => c.op === 'arc').map((c) => c.args[2] as number);
-      // arc order: the pad's corner arcs (a standalone cell is a disc), then the badge disc, then the ring. The badge
-      // and the ring fit inside the tile's inscribed circle; the badge IS that circle (to the device pixel).
-      const badge = radii[radii.length - 2]!;
-      const ring = radii[radii.length - 1]!;
-      expect(badge, `tile ${tile}`).toBeLessThanOrEqual((tile / 2) + 1e-6);
-      expect(badge, `tile ${tile}`).toBeGreaterThanOrEqual((tile / 2) - 0.5 - 1e-6);
-      expect(ring).toBeLessThanOrEqual(badge);
-      for (const r of radii) expect(r, `tile ${tile}`).toBeLessThanOrEqual((tile / 2) + 1e-6);
+      expect(plain.filter((c) => c.op === 'arc'), `tile ${tile} draws no circle`).toHaveLength(0);
+      // the cell is (3, 4): centre at (3.5 tile, 4.5 tile); every vertex is inside the inscribed circle
+      const cx = 3.5 * tile;
+      const cy = 4.5 * tile;
+      for (const c of plain.filter((p) => p.op === 'moveTo' || p.op === 'lineTo')) {
+        const d = Math.hypot((c.args[0] as number) - cx, (c.args[1] as number) - cy);
+        expect(d, `tile ${tile}`).toBeLessThanOrEqual((tile / 2) + 1e-6);
+      }
     }
   });
 
-  test('the red star keeps the shipped badge proportions and scales with the tile (no css-px floor)', () => {
+  test('the red star keeps its proportions and scales with the tile (no css-px floor)', () => {
     let previous = 0;
     for (const tile of [6.45, 9.95, 10.77, 12.48, 14.72, 16.66, 20.58, 25.48, 40, 80]) {
       const area = starArea(drawGoal(tile));
       expect(area, `tile ${tile}`).toBeGreaterThan(previous);
       previous = area;
-      // star outer radius / badge radius = 0.37 / 0.47 (the shipped goal badge)
       const k = BOARD_TILE_GEOMETRY.endpoint;
-      const badge = (tile / 2);
-      const outerR = badge * k.goalStarOuterOfBadge;
-      // a regular 5-point star with inner/outer = 0.17/0.37 has area ~ 5 * outer * inner * sin(36 deg)
-      const expected = 5 * outerR * (badge * k.goalStarInnerOfBadge) * Math.sin(Math.PI / 5);
+      const half = (tile / 2);
+      const outerR = half * k.goalStarOuterOfRadius;
+      // a regular 5-point star has area ~ 5 * outer * inner * sin(36 deg)
+      const expected = 5 * outerR * (half * k.goalStarInnerOfRadius) * Math.sin(Math.PI / 5);
       expect(area / expected, `tile ${tile}`).toBeGreaterThan(0.9);
       expect(area / expected, `tile ${tile}`).toBeLessThan(1.1);
     }
