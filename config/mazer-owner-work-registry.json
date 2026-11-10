@@ -4,14 +4,14 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-10T14:20:02.000Z",
+  "updatedAt": "2026-11-10T16:00:00.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 131,
+    "stableIdentityCount": 132,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 62,
+    "openCardCount": 63,
     "completedCardCount": 54,
     "deferredCardCount": 15,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out."
@@ -1030,11 +1030,11 @@
     {
       "id": "MAZER-PROG-005",
       "status": "planning",
-      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
       "sourceId": "mazer-roadmap",
       "sourceRef": "docs/roadmap.md#phase-order",
       "title": "Decide what happens past level 198 so levels keep getting harder",
-      "description": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever; past that every level is one difficulty class. The owner wants levels to keep getting harder forever, so the next step is to choose between a bounded variation grammar, a declared plateau, or handing off to the deferred size and zoom levers once hazards exist.",
+      "description": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever. Measured 2026-11-10: the explorer number cannot rise further because the board is at its 50 percent floor limit, so MAZER-PROG-013 (review) extends the ladder to level 268 with zero-felt-cost side stubs and declares the plateau there. What stays open is the lever after level 268: sign the hazard contract (MAZER-HAZ-002, hazardBudgetLevels starts at 268) or, only if hazards are rejected, a bigger board past a level, which is the zoom lever the owner ruled out. The owner wants levels to keep getting harder forever, so this decision cannot be settled by generation alone.",
       "cardType": "feature",
       "priority": "high",
       "dependencies": [
@@ -1043,7 +1043,27 @@
       "acceptanceCriteria": [
         "The behaviour past level 198 is chosen and written down",
         "A deterministic check proves the chosen behaviour is never easier than the level before",
-        "The choice is reflected in the progression contract and the in-app Guide"
+        "The choice is reflected in the progression contract and the in-app Guide",
+        "The lever after level 268 (hazards or a bigger board) is chosen by the owner"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-013",
+      "status": "review",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-013",
+      "title": "Extend the ladder past level 198 to level 268 with side stubs the explorer does not pay for",
+      "description": "The owner saw that the menu maze for level 18000 looks like a level 30 maze. Every level from 198 was the same maze class because the ladder steers on one explorer number and the board is full at level 198. Shrinking the route to raise that number made the other walkers 40 to 57 percent easier, so it was rejected. The new pull request adds exactly one more cell of short side stubs per level (the explorer does not enter stubs of 3 cells or fewer), which keeps the explorer number fixed and strictly orders levels 199 to 268 by cell count. At level 268 against 198 the maze has 38 route junctions instead of 12, 87 dead ends instead of 27 and the random walk takes 3.6 times as many steps. Levels 1 to 198 are byte-identical and levels 268 and above are one class again; the hazard hand-off now starts at 268. This is an open pull request, not merged and not deployed. The numbers are modelled walker difficulty, not player-tested, and the stubs are visible at a glance to a person.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-PROG-004"
+      ],
+      "acceptanceCriteria": [
+        "Levels 1 to 198 generate the same mazes as before and the golden fixture changes only for levels 199 and above",
+        "For any two seeds level N + 1 beats level N as the pair of felt value and fringe cells, up to level 268",
+        "Menu AI clears every level on both boards and generation stays under the 400 ms worst build at a 4x CPU throttle"
       ]
     },
     {

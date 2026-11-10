@@ -20,7 +20,7 @@ const arg = (name, fallback) => {
   const hit = process.argv.find((value) => value.startsWith(`--${name}=`));
   return hit ? hit.slice(name.length + 3) : fallback;
 };
-const levels = arg('levels', '2,3,5,10,20,40,60,80,100,120,140,160,185,198,220,250,1000').split(',').map(Number);
+const levels = arg('levels', '2,3,5,10,20,40,60,80,100,120,140,160,185,198,220,240,268,1000').split(',').map(Number);
 const seeds = Number(arg('seeds', '30'));
 const throttles = arg('throttle', '1,4').split(',').map(Number);
 const outDir = arg('out', '');

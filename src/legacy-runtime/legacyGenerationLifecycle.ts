@@ -16,7 +16,9 @@ import {
   GEOMETRY_BUDGET_TIE_RETRY_BASES,
   GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS,
   resolveGeometryBudgetCandidateSeed,
+  resolveGeometryBudgetFeltLevel,
   resolveGeometryBudgetForks,
+  resolveGeometryBudgetFringeCells,
   resolveGeometryBudgetLoopPlan,
   resolveGeometryBudgetMaxBranch,
   resolveGeometryBudgetRouteBranch,
@@ -618,11 +620,15 @@ const selectLegacyGeometryBudgetMaze = (
   profile: LegacyMazeGenerationProfile;
   review: LegacyGenerationSelectionReview;
 } => {
-  const gateTarget = resolveGeometryBudgetTarget(budgetLevel);
-  const routeTarget = resolveGeometryBudgetRouteTarget(budgetLevel);
-  const maxBranch = resolveGeometryBudgetMaxBranch(budgetLevel);
-  const routeBranch = resolveGeometryBudgetRouteBranch(budgetLevel);
-  const forks = resolveGeometryBudgetForks(budgetLevel);
+  // The felt ladder stops at the felt saturation; the levels past it are the same felt maze
+  // plus the fringe (legacyGeometryBudget.ts), so every felt rule reads the felt level.
+  const feltLevel = resolveGeometryBudgetFeltLevel(budgetLevel);
+  const fringeCells = resolveGeometryBudgetFringeCells(budgetLevel);
+  const gateTarget = resolveGeometryBudgetTarget(feltLevel);
+  const routeTarget = resolveGeometryBudgetRouteTarget(feltLevel);
+  const maxBranch = resolveGeometryBudgetMaxBranch(feltLevel);
+  const routeBranch = resolveGeometryBudgetRouteBranch(feltLevel);
+  const forks = resolveGeometryBudgetForks(feltLevel);
   // Wrap corridors fade out over levels 100..140 (legacyGeometryBudget.ts): this maze's
   // rung count is a seeded roll on (level, seed), never more than the profile asks for.
   const profileRungs = generationProfile.requiredOppositeBorderConnections.horizontal
@@ -630,7 +636,7 @@ const selectLegacyGeometryBudgetMaze = (
     : (generationProfile.requiredOppositeBorderConnections.vertical ? 1 : 0);
   const wrapRungs = Math.min(
     profileRungs,
-    Math.max(0, Math.trunc(selectionOptions.wrapRungs ?? resolveGeometryBudgetWrapRungs(budgetLevel, seed)))
+    Math.max(0, Math.trunc(selectionOptions.wrapRungs ?? resolveGeometryBudgetWrapRungs(feltLevel, seed)))
   );
   const wrapPricePercent = selectionOptions.wrapPricePercent ?? FELT_WRAP_PRICE_PERCENT;
   const profileWithRungs = (rungs: number): LegacyMazeGenerationProfile => (
@@ -651,7 +657,7 @@ const selectLegacyGeometryBudgetMaze = (
   // the tuner cannot lengthen enough (its capacity is below the target), so the
   // next mixed-seed base is tried, up to GEOMETRY_BUDGET_BASE_CANDIDATES.
   for (let index = 0; index < GEOMETRY_BUDGET_BASE_CANDIDATES; index += 1) {
-    const candidateSeed = resolveGeometryBudgetCandidateSeed(seed, budgetLevel, index);
+    const candidateSeed = resolveGeometryBudgetCandidateSeed(seed, feltLevel, index);
     // The rolled wraps are tried on the first few bases only; a base that cannot land
     // with them (priced, they raise the raw target) is retried plain.
     const baseProfile = profileWithRungs(index < GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS ? wrapRungs : 0);
@@ -665,19 +671,19 @@ const selectLegacyGeometryBudgetMaze = (
       // base that cannot land with loops is retried without them, so the ladder's
       // ordering guarantee always outranks the loop.
       const loops = index < GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS
-        ? (selectionOptions.loopPlan ?? resolveGeometryBudgetLoopPlan(budgetLevel, seed, base.width * base.height))
+        ? (selectionOptions.loopPlan ?? resolveGeometryBudgetLoopPlan(feltLevel, seed, base.width * base.height))
         : LEGACY_EMPTY_LOOP_PLAN;
       const tuned = tuneMazeFeltToTarget(
         base,
         gateTarget,
-        resolveGeometryBudgetCandidateSeed(seed, budgetLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
-        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent }
+        resolveGeometryBudgetCandidateSeed(seed, feltLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
+        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, fringeCells }
       );
       distance = tuned.windowDistance;
       // A landed maze whose number is a coin flip for the explorer (a looped maze that
       // disagrees with its tie-averaged value) is accepted only after a few more bases.
       tieBiased = distance === 0 && tuned.tieDeviationPercent > FELT_TIE_DEVIATION_LIMIT_PERCENT;
-      if (tuned.addedTiles.length > 0 || tuned.trimmedTiles.length > 0 || tuned.bumps > 0 || tuned.loops.length > 0 || tuned.cyclesBroken > 0 || tuned.wrapSaving > 0) {
+      if (tuned.addedTiles.length > 0 || tuned.trimmedTiles.length > 0 || tuned.bumps > 0 || tuned.loops.length > 0 || tuned.cyclesBroken > 0 || tuned.wrapSaving > 0 || tuned.fringeTiles.length > 0) {
         candidate = assembleTunedMaze(base, tuned, baseProfile);
       }
     }
@@ -758,6 +764,10 @@ const assembleTunedMaze = (
   if (wraps > 0 || tuned.wrapSaving > 0) {
     next.wrapStats = { rungs: wraps, saved: tuned.wrapSaving };
   }
+  // Zero-felt-cost side stubs of the levels past the felt saturation (legacyMazeFeltTuning.ts, lever 3).
+  if (tuned.fringeTiles.length > 0) {
+    next.fringeStats = { cells: tuned.fringeTiles.length };
+  }
   if (routed !== null && routed.found) {
     next.wrapTopologyDiagnostics = resolveLegacyWrapTopologyDiagnostics(
       next,
@@ -773,7 +783,7 @@ const assembleTunedMaze = (
   if (base.generationBuildTrace) {
     next.generationBuildTrace = {
       ...base.generationBuildTrace,
-      decoyTiles: [...tuned.loopTiles, ...tuned.stretchTiles, ...tuned.addedTiles].map((point) => ({ ...point })),
+      decoyTiles: [...tuned.loopTiles, ...tuned.stretchTiles, ...tuned.addedTiles, ...tuned.fringeTiles].map((point) => ({ ...point })),
       decoyPrunedTiles: [...tuned.stretchRemovedTiles, ...tuned.trimmedTiles].map((point) => ({ ...point }))
     };
   }

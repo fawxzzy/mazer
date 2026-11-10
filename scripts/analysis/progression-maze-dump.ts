@@ -48,6 +48,9 @@ export interface DumpedMaze {
   // Present only on trees that price wraps; the wrap rungs the maze was built with and the
   // steps they give back to a map-knower.
   wrapStats: { rungs: number; saved: number } | null;
+  // Present only on trees that carry the fringe (levels past the felt saturation): the
+  // zero-felt-cost side-stub cells of the maze.
+  fringeCells?: number;
 }
 
 const levels = parseLevels(arg('levels', '1..300'));
@@ -74,7 +77,8 @@ for (const level of levels) {
         solutionLength: maze.solutionPath.length - 1,
         genMs,
         loopStats: ((maze as { loopStats?: DumpedMaze['loopStats'] }).loopStats) ?? null,
-        wrapStats: ((maze as { wrapStats?: DumpedMaze['wrapStats'] }).wrapStats) ?? null
+        wrapStats: ((maze as { wrapStats?: DumpedMaze['wrapStats'] }).wrapStats) ?? null,
+        fringeCells: (maze as { fringeStats?: { cells: number } }).fringeStats?.cells ?? 0
       });
     }
   }

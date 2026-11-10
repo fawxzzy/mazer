@@ -16,10 +16,13 @@
 //   npx vite-node scripts/analysis/progression-ladder-report.ts \
 //     [--levels=1..100,150,185,200,300,500,1000] [--seeds=8] [--out=<dir>] [--assert]
 //   --assert  exit 1 unless, for every board and every pair of consecutive levels
-//             in the request (both below the ceiling), the WORST seed of level N+1
+//             in the request (both below the felt saturation), the WORST seed of level N+1
 //             beats the BEST seed of level N on the primary metric (so ordering
 //             holds for any two seeds, not on average), every tuned maze landed in
-//             [T, T + window], levels at/after the ceiling are one difficulty class,
+//             [T, T + window], from the felt saturation the felt value holds the top window
+//             and the level's exact fringe count is delivered and rises by one step per
+//             level (worst seed of N+1 above best seed of N), levels at/after the
+//             saturation level are one difficulty class,
 //             and the independent metrics rise across the ladder (40-level window
 //             means of route length, A* effort, greedy effort and decoy depth never
 //             fall by more than 10%, and rise overall).
@@ -29,9 +32,12 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import {
   GEOMETRY_BUDGET_CEILING,
+  GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
+  GEOMETRY_BUDGET_FRINGE_CAP,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
   GEOMETRY_BUDGET_TOP_TARGET,
   GEOMETRY_BUDGET_WINDOW,
+  resolveGeometryBudgetFringeCells,
   resolveGeometryBudgetTarget
 } from '../../src/legacy-runtime/legacyGeometryBudget';
 import {
@@ -91,6 +97,7 @@ const main = (): void => {
         level,
         board: board.name,
         target: resolveGeometryBudgetTarget(Math.min(Math.max(level, 2), GEOMETRY_BUDGET_SATURATION_LEVEL)),
+        fringeCells: mean(samples.map((s) => s.fringeCells)),
         feltMean: mean(samples.map((s) => s.felt)),
         feltMin: Math.min(...samples.map((s) => s.felt)),
         feltMax: Math.max(...samples.map((s) => s.felt)),
@@ -134,8 +141,16 @@ const main = (): void => {
       const worstGap = Math.min(...high.map((s) => s.felt)) - Math.max(...low.map((s) => s.felt));
       deltas.push({ board: board.name, from, to, worstGap, meanDelta: mean(high.map((s) => s.felt)) - mean(low.map((s) => s.felt)) });
       const consecutive = to === from + 1;
-      if (to < GEOMETRY_BUDGET_SATURATION_LEVEL && consecutive && from >= 2 && worstGap <= 0) {
+      if (to < GEOMETRY_BUDGET_FELT_SATURATION_LEVEL && consecutive && from >= 2 && worstGap <= 0) {
         failures.push(`${board.name} level ${from}->${to}: worst seed of ${to} does not beat best seed of ${from} (gap ${worstGap})`);
+      }
+      // The fringe carries the ladder from the felt saturation to the saturation level: the pair
+      // (felt, fringe cells) is compared lexicographically, so the fringe must rise for any two seeds.
+      if (consecutive && from >= GEOMETRY_BUDGET_FELT_SATURATION_LEVEL && to <= GEOMETRY_BUDGET_SATURATION_LEVEL) {
+        const fringeGap = Math.min(...high.map((s) => s.fringeCells)) - Math.max(...low.map((s) => s.fringeCells));
+        if (fringeGap <= 0) {
+          failures.push(`${board.name} level ${from}->${to}: worst seed of ${to} does not carry more fringe cells than the best seed of ${from} (gap ${fringeGap})`);
+        }
       }
     }
     for (const level of levels) {
@@ -143,10 +158,17 @@ const main = (): void => {
       if (level >= 2 && samples.some((s) => !s.onTarget)) {
         failures.push(`${board.name} level ${level}: ${samples.filter((s) => !s.onTarget).length} maze(s) missed the target window`);
       }
-      if (level >= GEOMETRY_BUDGET_SATURATION_LEVEL) {
+      if (level >= GEOMETRY_BUDGET_FELT_SATURATION_LEVEL) {
+        for (const s of samples) {
+          if (s.fringeCells !== resolveGeometryBudgetFringeCells(level)) {
+            failures.push(`${board.name} level ${level}: maze carries ${s.fringeCells} fringe cells, the level owes ${resolveGeometryBudgetFringeCells(level)}`);
+          }
+        }
+      }
+      if (level >= GEOMETRY_BUDGET_FELT_SATURATION_LEVEL) {
         for (const s of samples) {
           if (s.felt < GEOMETRY_BUDGET_TOP_TARGET || s.felt > GEOMETRY_BUDGET_TOP_TARGET + GEOMETRY_BUDGET_WINDOW) {
-            failures.push(`${board.name} level ${level}: ceiling-class maze felt ${s.felt} is off the top target ${GEOMETRY_BUDGET_TOP_TARGET}`);
+            failures.push(`${board.name} level ${level}: top-class maze felt ${s.felt} is off the top target ${GEOMETRY_BUDGET_TOP_TARGET}`);
           }
         }
       }
@@ -185,11 +207,11 @@ const main = (): void => {
     mkdirSync(outDir, { recursive: true });
     writeFileSync(`${outDir}/ladder-report.csv`, `${csv}\n`);
     writeFileSync(`${outDir}/ladder-report.json`, JSON.stringify({
-      levels, seeds: seedCount, saturationLevel: GEOMETRY_BUDGET_SATURATION_LEVEL, ceiling: GEOMETRY_BUDGET_CEILING, topTarget: GEOMETRY_BUDGET_TOP_TARGET, rows, deltas, trendLines, failures
+      levels, seeds: seedCount, saturationLevel: GEOMETRY_BUDGET_SATURATION_LEVEL, feltSaturationLevel: GEOMETRY_BUDGET_FELT_SATURATION_LEVEL, fringeCap: GEOMETRY_BUDGET_FRINGE_CAP, ceiling: GEOMETRY_BUDGET_CEILING, topTarget: GEOMETRY_BUDGET_TOP_TARGET, rows, deltas, trendLines, failures
     }, null, 2));
   }
-  const worst = deltas.filter((d) => d.to === d.from + 1 && d.to < GEOMETRY_BUDGET_SATURATION_LEVEL && d.from >= 2);
-  console.log(`levels ${levels.length}, seeds ${seedCount}, boards ${BOARDS.length}, saturation level ${GEOMETRY_BUDGET_SATURATION_LEVEL}, capacity ceiling ${GEOMETRY_BUDGET_CEILING}, top target ${GEOMETRY_BUDGET_TOP_TARGET}`);
+  const worst = deltas.filter((d) => d.to === d.from + 1 && d.to < GEOMETRY_BUDGET_FELT_SATURATION_LEVEL && d.from >= 2);
+  console.log(`levels ${levels.length}, seeds ${seedCount}, boards ${BOARDS.length}, felt saturation level ${GEOMETRY_BUDGET_FELT_SATURATION_LEVEL}, fringe cap ${GEOMETRY_BUDGET_FRINGE_CAP}, saturation level ${GEOMETRY_BUDGET_SATURATION_LEVEL}, capacity ceiling ${GEOMETRY_BUDGET_CEILING}, top target ${GEOMETRY_BUDGET_TOP_TARGET}`);
   if (worst.length > 0) {
     console.log(`consecutive ramp pairs ${worst.length}: min worst-seed gap ${Math.min(...worst.map((d) => d.worstGap))}, min mean delta ${Math.min(...worst.map((d) => d.meanDelta)).toFixed(2)}, max mean delta ${Math.max(...worst.map((d) => d.meanDelta)).toFixed(2)}`);
   }

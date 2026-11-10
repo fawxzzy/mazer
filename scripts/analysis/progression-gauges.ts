@@ -69,7 +69,9 @@ export const BANDS: readonly { readonly name: string; readonly from: number; rea
   { name: 'L50-99', from: 50, to: 99 },
   { name: 'L100-149', from: 100, to: 149 },
   { name: 'L150-197', from: 150, to: 197 },
-  { name: 'L198+', from: 198, to: 10_000 }
+  { name: 'L198-229', from: 198, to: 229 },
+  { name: 'L230-267', from: 230, to: 267 },
+  { name: 'L268+', from: 268, to: 10_000 }
 ];
 
 interface GaugedRecord {

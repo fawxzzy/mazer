@@ -2,7 +2,96 @@
 
 Scope: how difficulty scales across levels 1..300 on the two frozen boards (phone 25 x 51, desktop 45 x 27), measured before (main `8cf9bd67`) and after the multiple-routes change, with several independent gauges instead of the one number the generator steers on. Source of truth for the design is the "2026-11-10 Multiple routes" section of `docs/research/MAZER_LEVEL_RANK_COMPLEXITY_CONTRACT.md`. Everything here is modelled difficulty (walkers), not player-tested.
 
-## Update: wrap corridors are priced and fade out over levels 100-140 (this change)
+## Update: past level 198, the fringe (this change)
+
+Owner report (from the installed app): the menu maze labelled level 18000 is not as complex as it should be. Cause, measured: every level from 198 on generated a maze of the same class (priced felt 759, about 530 floor cells of 1275, 30 junctions and 30 dead ends on both boards, the same numbers as level 30 to 40 in the shape of the maze), because the ladder is defined on one number, the pull-to-goal explorer's steps, and that number had reached what the frozen board holds. Everything below is modelled difficulty (walkers), not player-tested. Design and contract: "2026-11-10 Past level 198: the fringe" in `docs/research/MAZER_LEVEL_RANK_COMPLEXITY_CONTRACT.md`.
+
+### Why the explorer number cannot rise further (the wall)
+
+A finished top maze is route + wrong ground. The explorer pays one step per route cell and two per wrong cell, so a maze with F floor cells and a route of R cells reaches about 2F - R steps (checked on tuned mazes with an unreachable target: floor 546-584, route 222-301, steps 724-865 on 11 of 12, every visited floor cell). F is bounded: a maze of 1-wide corridors with 1-wide walls holds at most about half of the interior as floor (interior 1127 phone, 1075 desktop; the tuner is at 569 and 540, 50.5 and 50.2 percent). So the capacity is spent at level 198, and what is left is the route share: capacity pass over 320 base mazes, unreachable target, pooled quartile and median of the steps reached by route target 300 / 200 / 120: 781 / 807, 864 / 884, 935 / 956. Each 100 steps of route target costs 75-85 steps of capacity.
+
+Levers evaluated with data:
+
+| Lever | Result | Verdict |
+|---|---|---|
+| (a) raise the tuner caps (branch cap 40 to 80, forks 30 to 60, branch length) | capacity unchanged within noise (p25 827 to 830 phone, 773 to 778 desktop; median 838 to 839, 783 to 792): the floor is full, a longer branch only trades against a shorter one | no gain |
+| (a) re-calibrate the ceiling at the old route target | pooled p25 781 against 760: +20 steps, ten levels | not worth a plateau move |
+| (c) lower CAPACITY_SHARE | the first pass of this ladder already measured it: a pooled 780 ceiling made one in two desktop bases fail and the 4x worst case 645 ms; a higher share only moves the same wall by a few steps | rejected |
+| (a) shrink the route to make room (taper) | works on the steered number: ceiling 930, saturation level 283, route target down to 117. But the held-out gauges fall: at level 283 against 198 the human-like explorer 1362 against 2275 (-40 percent), the random walk 888 against 2085 (-57), route junctions 7.7 against 13.4, shortest route 111 against 232, A* expansions 377 against 471 (6 seeds per level, both boards). It makes the maze easier by every walker except the steered one | rejected: it games the number |
+| (b) more and shorter forks, denser junction growth in the tuner | at the level-198 target and route, dead ends 25-37 and route junctions 11-14 for every shape tried (forks 30 to 150, branch cap 40 to 8): the tuner's own sites do not make junction density | no gain |
+| (b) more loops | loops compete for the same floor and are priced against the felt number; level 198 is already alternates and decoys, and the loop count is capped by the board share | no headroom |
+
+### The lever that works: the fringe
+
+The explorer does not enter a side stub of at most 3 cells at a junction (`FELT_VISION_CELLS`, "a person sees a stub for what it is"), so such a stub costs it nothing, and a finished top maze still has wall pockets in which one fits. Probe on finished level-198 ladder mazes (8 seeds per board), stubs of 1-3 cells added greedily and kept only when the re-run explorer's step count is exactly unchanged: 113 stub cells fit on the phone board and 88 on desktop, with the priced felt unchanged by construction and the shortest route untouched:
+
+| Gauge (mean of 8 mazes) | Phone before | after | Desktop before | after |
+|---|---:|---:|---:|---:|
+| Route junctions (decision points) | 12.3 | 50.8 | 11.5 | 39.3 |
+| Dead ends | 31.4 | 110.5 | 26.5 | 96.3 |
+| Board fill | 0.415 | 0.504 | 0.433 | 0.506 |
+| Random-walk steps | 1997 | 10661 | 1977 | 8066 |
+| Human-like explorer steps | 1894 | 3984 | 2192 | 2384 |
+
+So the fringe is real structure (a junction and a dead end per stub, the board filled to its 50 percent limit) that the steered number cannot see. Implemented as lever 3 of the felt tuner (`legacyMazeFeltTuning.ts`, option `fringeCells`) and wired to the ladder as a second, strictly ordered number: from the felt saturation level (198) on, level N carries exactly `N - 198` fringe cells (`GEOMETRY_BUDGET_FRINGE_STEP = 1`), the felt value stays in the top window `[759, 760]`, and the pair is compared lexicographically, so level N + 1 is strictly harder than level N for any two seeds (asserted). A base that cannot hold the count is replaced by the next base, like a base that cannot reach the felt number.
+
+### The cap (calibration)
+
+`scripts/analysis/generate-geometry-budget-targets.ts` now has a second pass: at the felt saturation level, with that level's loop plan and caps, land the top target and ask for more stub cells than any maze holds. Over 320 bases, 299 landed (93 percent); cells placed: min 70, median 99. The cap is the lowest per-board quantile at `fringeShare = 0.95`, rounded down to a multiple of 5: phone p5 87, desktop p5 73, so `GEOMETRY_BUDGET_FRINGE_CAP = 70` and `GEOMETRY_BUDGET_SATURATION_LEVEL = 198 + 70 = 268`. The share is tighter than the felt ceiling's 0.75 on purpose: at share 0.75 the cap was 80, and on desktop level 278 only 76 of 100 seeds landed on the first base (mean 23.6 ms, worst 120 ms in node at 1x, against 9 and 39 at level 198), which the 400 ms worst-build budget at 4x would not survive; at 0.95 it is 92 percent (200 seeds, mean 13.5, worst 74 ms). Ten levels were given up for that.
+
+### Result: levels 198 to 268, before and after
+
+40 seeds per level and board (80 mazes per level, `progression-maze-dump.ts --levels=190..290 --seeds=40`, gauged by `progression-gauges.ts compute`). Before = main (every level from 198 is the same class: priced 759, shortest 232, route junctions 13.4, dead ends 29.8, board fill 0.425, human-like 2275, random walk 2085, A* 471, greedy 517 in the 6-seed band means).
+
+| Level | Priced felt | Shortest route | Route junctions | Dead ends | Board fill | Human-like | Random walk | A* expansions | Greedy cells |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 198 | 759.4 | 221 | 11.8 | 26.8 | 0.419 | 1723 | 1885 | 448 | 503 |
+| 210 | 759.4 | 221 | 16.5 | 37.1 | 0.429 | 1848 | 2815 | 458 | 511 |
+| 220 | 759.4 | 221 | 20.4 | 45.7 | 0.437 | 1987 | 3397 | 466 | 518 |
+| 230 | 759.4 | 221 | 24.1 | 54.1 | 0.445 | 2533 | 3745 | 475 | 525 |
+| 240 | 759.4 | 221 | 27.9 | 62.9 | 0.453 | 2493 | 4508 | 483 | 531 |
+| 250 | 759.4 | 221 | 31.9 | 71.7 | 0.461 | 2490 | 5762 | 491 | 538 |
+| 260 | 759.4 | 221 | 35.7 | 80.7 | 0.469 | 2684 | 6101 | 499 | 544 |
+| 268 | 759.4 | 219 | 38.3 | 87.4 | 0.475 | 2591 | 6715 | 505 | 548 |
+
+Per level over 199-268 (least-squares slope, rank correlation with level, share of adjacent levels that rise): route junctions +0.38 / 1.00 / 99 percent, dead ends +0.87 / 1.00 / 100, A* expansions +0.82 / 1.00 / 99, greedy cells +0.65 / 1.00 / 100, random walk +72 / 0.99 / 59, human-like +13.5 / 0.86 / 51 (the two walkers are noisy at 80 mazes per level, judge them over bands), priced felt and shortest route flat on purpose. Levels 268 and above are the same class again (level 300 equals level 268 in every gauge). Levels 1-198 are byte-identical: the gauges for levels 30, 100, 150 and 198 are equal to the digit on main and on this change, and the golden fixture changed only for levels 199-300.
+
+Contact sheets (`progression-contact-sheets.ts`, seed index 0, levels 30, 198, 233, 268, 400, 600, both boards; local files, not committed): the level-30 maze fills half the board, the level-198 maze fills it with long corridors, and from 233 a comb of side stubs appears along the corridors and in the pockets, thicker at 268; 400 and 600 are the same class as 268 (the same maze at the same seed, since geometry is clamped).
+
+### Checks
+
+- Ladder (`progression-ladder-report.ts --levels=2..300 --seeds=8 --assert`): PASS. 390 consecutive-level pairs below the felt saturation with a minimum worst-seed gap of 1 (the worst maze of level N + 1 beats the best maze of level N for any two seeds), every maze landed in its window, and from 198 the felt value holds `[759, 760]`, every maze carries exactly its level's fringe and the worst seed of level N + 1 carries more fringe cells than the best seed of level N.
+- Menu AI (`progression-ai-solvability.ts --levels=1..300 --seeds=2`, ranks E and S, both boards): 2400 of 2400 runs cleared.
+- Golden fixture (`tests/fixtures/progression-ladder-golden.v1.json`): 204 hashes changed, 102 per board, exactly levels 199 to 300 on both boards; levels 1 to 198 are unchanged on both boards.
+- Generation time (real Chromium, `progression-generation-timing.mjs`, 30 seeds, 18 levels (240 and 268 added), both boards; this change two runs, origin/main `ccb59428` one run): 4x throttle median 39 / 39 ms (main 39), worst per-level mean 66 / 64 (61), worst p95 176 / 184 (176), worst single build 246 / 242 (248); 1x median 7-8 (8), worst single 51-54 (47). Targets 150 and 400. The fringe costs about 4-8 ms more per build in node at 1x (level 268 mean 12-17 ms against 8-11 at level 198) and nothing in the browser worst case.
+
+### Honest limit, and the next lever
+
+The new plateau is level 268, and the reason is the board: the fringe fills the pockets the other levers left, and the finished maze is then at 47.5 percent floor against about 50 percent that corridors with walls allow (the cap stops at the 5th percentile of capacity, 70 cells, on purpose; the median base holds 99). One more cell per level is the finest strictly ordered step (a stub cell is the smallest unit; the felt number cannot step by less than 2 because its parity is fixed by the board), so 70 cells are 70 levels. The aim of a real rise to level 400-600 is not reachable on this board by generation alone: it would need 200-400 more cells of room, and a 25 x 51 board has none.
+
+What is not claimed: the fringe makes the maze busier and costs the walkers that do not see through a stub (random walk x3, human-like +38 percent at level 268 on the 6-seed band means), but a stub of three cells or fewer is visible at a glance to a person, so it is a texture and a small decision tax, not a deep wrong turn; no player was tested. The steered number (felt 759) does not move for 70 levels by construction.
+
+The next lever, after level 268, in order: (1) the hazard layer (obstacles, then enemies), which is what the saturation hand-off was built for; `hazardBudgetLevels = level - 268` from here (`legacyHazardHandoff.ts`, still dormant); it needs the unsigned contract (MAZER-HAZ-002). (2) A bigger board past a level: the only generation lever left, it scales the capacity with the area (and the ladder with the calibration run per board size), but it is the zoom lever the owner ruled out (tiles shrink on a phone), so it should come only if hazards are rejected. Recommendation: sign the hazard contract and let hazards start at level 268; do not spend more on this board's geometry (the three alternatives above were measured and none is a lever).
+
+### Reproduce
+
+```
+npx vite-node scripts/analysis/generate-geometry-budget-targets.ts --check
+npx vite-node --script scripts/analysis/progression-maze-dump.ts --out=tmp/new.json --levels=1..320 --seeds=6
+npx vite-node --script scripts/analysis/progression-gauges.ts compute --dump=tmp/new.json --out=tmp/new.gauges.json
+npx vite-node scripts/analysis/progression-ladder-report.ts --levels=2..300 --seeds=8 --assert
+npx vite-node scripts/analysis/progression-ai-solvability.ts --levels=1..300 --seeds=2
+npx vite-node --script scripts/analysis/progression-contact-sheets.ts --dump=tmp/sheet-levels.json --out=tmp/sheets --tag=after --levels=30,198,233,268,400,600 --seed=0 --tile=8
+node scripts/analysis/progression-generation-timing.mjs --seeds=30 --throttle=1,4
+```
+
+### Limits
+
+Modelled walkers only; 80 mazes per level for the table (6 seeds for the band means, 8 per board for the probe, 320 bases for the calibration, 100-200 seeds for the base-count checks); the human-like and random-walk means are noisy per level; the timing is two runs on one machine against one baseline run; no device was measured. The taper trial used 6 seeds per level and was run in a scratch tree before this design replaced it, so its numbers are not reproducible from this commit (the code is not kept).
+
+---
+
+## Update: wrap corridors are priced and fade out over levels 100-140 (PR #404, merged)
 
 The suite below measured the multiple-routes change (PR #401) against the old main and found one cliff the steered number could not see: wrap corridors are in play at levels 10-29 (vertical) and 30-119 (both axes) and retired at level 120. This update closes it. Decision (owner delegated product judgement): retire the wraps gradually instead of at a level, and price them in the felt metric like a loop. Before = main `40cca7e9` (after #401), after = this change. Everything is modelled difficulty (walkers), not player-tested. Design and contract: "2026-11-10 Wrap corridors faded out and priced" in `docs/research/MAZER_LEVEL_RANK_COMPLEXITY_CONTRACT.md`.
 

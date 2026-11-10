@@ -23,6 +23,12 @@
 //     trimming one give the fine control (+-2 per cell), so any integer target is
 //     reachable to within the tolerance.
 //
+//  3. FRINGE (only past the felt saturation, legacyGeometryBudget.ts). After the number has
+//     landed, short side stubs of 1..FELT_VISION_CELLS cells are carved into the wall pockets
+//     the other levers left, one explorer re-run each, kept only when the step count is
+//     exactly unchanged. The explorer does not enter a stub that short at a junction, so the
+//     felt value does not move while the maze gains junctions and dead ends.
+//
 // Every move is verified by re-running the explorer on the edited grid (about
 // 20 microseconds), so the landing is exact for the real final grid, wrap loops
 // included -- there is no model between the edit and the number. A move that does
@@ -32,7 +38,7 @@
 //
 // Pure: no ambient randomness or clock, no floats, no I/O.
 
-import { createFeltExplorer, type FeltRun } from './legacyMazeFeltDifficulty';
+import { FELT_VISION_CELLS, createFeltExplorer, type FeltRun } from './legacyMazeFeltDifficulty';
 import {
   LOOP_DECOY_MIN_CELLS,
   LOOP_FELT_HEADROOM,
@@ -88,6 +94,12 @@ export interface FeltTuningOptions {
   // like a loop saving. Omit or 0: wraps are not priced (the tuner of the first ladders,
   // byte-identical); the ladder passes FELT_WRAP_PRICE_PERCENT.
   readonly wrapPricePercent?: number;
+  // Fringe (lever 3): exactly this many cells of zero-felt-cost side stubs (1..FELT_VISION_CELLS
+  // cells, hanging off corridor or junction cells) are added AFTER the felt value has landed,
+  // each kept only when the re-run explorer's step count is unchanged. A maze that cannot hold
+  // the full count reports it in fringeShortfall (and a window distance of at least that), so
+  // the selection tries the next base. Omit or 0: byte-identical to the tuner without the lever.
+  readonly fringeCells?: number;
 }
 
 export interface FeltTuningResult {
@@ -117,13 +129,17 @@ export interface FeltTuningResult {
   readonly baseTarget: number;
   readonly loopDiagnostics: { attempts: number; rejected: LegacyLoopCarveResult['rejected'] } | null;
   readonly loopTiles: { x: number; y: number }[];
+  // Fringe stub cells added (lever 3) and the cells the request fell short by.
+  readonly fringeTiles: { x: number; y: number }[];
+  readonly fringeShortfall: number;
   // Cells the stretch lever carved / removed.
   readonly stretchTiles: { x: number; y: number }[];
   readonly stretchRemovedTiles: { x: number; y: number }[];
   // True when an add was needed and no site brought the number closer.
   readonly capacityExhausted: boolean;
   readonly evals: number;
-  // Distance of felt from the accept window (0 when onTarget).
+  // Distance of felt from the accept window (0 when onTarget), plus the fringe shortfall: a
+  // maze that missed its fringe count is as far from landing as one that missed its number.
   readonly windowDistance: number;
   // |felt - mean over FELT_TIE_SAMPLES other tie-breaks| as an integer percent of felt.
   readonly tieDeviationPercent: number;
@@ -671,6 +687,65 @@ const tuneOnce = (
     }
   }
 
+  // ---- Lever 3: fringe (zero-felt-cost side stubs) ------------------------------------
+  // Only on a landed maze. Candidates are (host, direction) pairs: a corridor or junction cell
+  // (never a tip, the start or the goal) and an interior wall cell next to it whose only open
+  // neighbour is the host. Visited in a seeded shuffle, three passes (stubs of up to 3, 2 and 1
+  // cells) so the pockets the longer stubs left are still filled. A stub is kept only when the
+  // explorer reaches the goal in exactly the same number of steps, so the landed felt value is
+  // untouched; the last stub is cut to the cells still owed, so the count is exact.
+  const fringeWanted = Math.max(0, Math.trunc(options.fringeCells ?? 0));
+  const fringeTiles: { x: number; y: number }[] = [];
+  let fringePlaced = 0;
+  if (fringeWanted > 0 && !hopeless && windowGap(felt) === 0) {
+    const fringeRand = createStream((seed ^ 0x2f6b1d93) >>> 0);
+    const landedSteps = felt;
+    for (let pass = 0; pass < FELT_VISION_CELLS && fringePlaced < fringeWanted; pass += 1) {
+      const longest = FELT_VISION_CELLS - pass;
+      const candidates: number[] = [];
+      for (let cell = 0; cell < size; cell += 1) {
+        if (open[cell] !== 1 || cell === startCell || cell === goalCell || !interior(cell) || openCount(cell) < 2) { continue; }
+        for (let d = 0; d < 4; d += 1) {
+          const entry = cell + step[d]!;
+          if (interior(entry) && open[entry] !== 1 && openCount(entry) === 1) { candidates.push((cell * 4) + d); }
+        }
+      }
+      for (let index = candidates.length - 1; index > 0; index -= 1) {
+        const other = fringeRand() % (index + 1);
+        const held = candidates[index]!;
+        candidates[index] = candidates[other]!;
+        candidates[other] = held;
+      }
+      for (const candidate of candidates) {
+        if (fringePlaced >= fringeWanted) { break; }
+        const host = candidate >> 2;
+        const dir = candidate & 3;
+        const entry = host + step[dir]!;
+        // An earlier stub of this pass may have used the pocket.
+        if (!interior(entry) || open[entry] === 1 || openCount(entry) !== 1 || openCount(host) < 2) { continue; }
+        const wanted = Math.min(fringeWanted - fringePlaced, 1 + (fringeRand() % longest));
+        const chain: number[] = [entry];
+        open[entry] = 1;
+        while (chain.length < wanted) {
+          const next = chain[chain.length - 1]! + step[dir]!;
+          if (!interior(next) || open[next] === 1 || openCount(next) !== 1) { break; }
+          open[next] = 1;
+          chain.push(next);
+        }
+        const after = evaluate();
+        if (after.reachedGoal && after.steps === landedSteps) {
+          fringePlaced += chain.length;
+          chain.forEach((cell) => fringeTiles.push(point(cell)));
+        } else {
+          chain.forEach((cell) => { open[cell] = 0; });
+        }
+      }
+    }
+    run = evaluate();
+    felt = run.steps;
+  }
+  const fringeShortfall = fringeWanted > 0 ? fringeWanted - fringePlaced : 0;
+
   const grid: boolean[][] = [];
   for (let y = 0; y < height; y += 1) {
     const row: boolean[] = [];
@@ -681,7 +756,7 @@ const tuneOnce = (
     grid,
     felt,
     target,
-    onTarget: windowGap(felt) === 0,
+    onTarget: windowGap(felt) === 0 && fringeShortfall === 0,
     routeLength,
     bumps,
     branchesAdded,
@@ -696,11 +771,13 @@ const tuneOnce = (
     loopDiagnostics,
     // Connector cells still open at the end (a later switchback bump can close one).
     loopTiles: loopTiles.filter((tile) => open[(tile.y * width) + tile.x] === 1),
+    fringeTiles,
+    fringeShortfall,
     stretchTiles,
     stretchRemovedTiles,
     capacityExhausted,
     evals,
-    windowDistance: windowGap(felt),
+    windowDistance: windowGap(felt) + fringeShortfall,
     tieDeviationPercent: run.reachedGoal ? measureTieDeviationPercent(explorer, open, startCell, goalCell, felt) : 0,
     hopeless
   };

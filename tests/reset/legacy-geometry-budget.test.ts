@@ -4,6 +4,9 @@ import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyG
 import {
   GEOMETRY_BUDGET_BASE_CANDIDATES,
   GEOMETRY_BUDGET_CEILING,
+  GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
+  GEOMETRY_BUDGET_FRINGE_CAP,
+  GEOMETRY_BUDGET_FRINGE_STEP,
   GEOMETRY_BUDGET_MIN_STEP,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
   GEOMETRY_BUDGET_STYLE_BANDS,
@@ -17,7 +20,9 @@ import {
   measureGeometryBudgetProxy,
   resolveContinuousDifficulty,
   resolveGeometryBudgetCandidateSeed,
+  resolveGeometryBudgetFeltLevel,
   resolveGeometryBudgetForks,
+  resolveGeometryBudgetFringeCells,
   resolveGeometryBudgetMaxBranch,
   resolveGeometryBudgetRouteBranch,
   resolveGeometryBudgetProfile,
@@ -179,15 +184,19 @@ describe('continuous difficulty function D(level)', () => {
     let maxStep = 0;
     for (let level = 3; level <= LAST_BUDGET_LEVEL; level += 1) {
       const step = resolveGeometryBudgetTarget(level)! - resolveGeometryBudgetTarget(level - 1)!;
-      if (level < GEOMETRY_BUDGET_SATURATION_LEVEL) {
+      if (level <= GEOMETRY_BUDGET_FELT_SATURATION_LEVEL) {
         expect(step).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_MIN_STEP);
+      } else {
+        // Past the felt saturation the felt target is flat; the fringe carries the ladder.
+        expect(step).toBe(0);
       }
       maxStep = Math.max(maxStep, step);
     }
     // The early steep part is the largest step anywhere; the tail is the minimum step.
     expect(maxStep).toBeLessThanOrEqual(27);
     expect(resolveGeometryBudgetTarget(GEOMETRY_BUDGET_SATURATION_LEVEL)).toBe(GEOMETRY_BUDGET_TOP_TARGET);
-    expect(resolveGeometryBudgetTarget(GEOMETRY_BUDGET_SATURATION_LEVEL - 1)).toBeLessThan(GEOMETRY_BUDGET_TOP_TARGET);
+    expect(resolveGeometryBudgetTarget(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL)).toBe(GEOMETRY_BUDGET_TOP_TARGET);
+    expect(resolveGeometryBudgetTarget(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL - 1)).toBeLessThan(GEOMETRY_BUDGET_TOP_TARGET);
     expect(resolveGeometryBudgetTarget(1)).toBeNull();
     expect(resolveGeometryBudgetTarget(LAST_BUDGET_LEVEL + 1)).toBeNull();
     expect(resolveGeometryBudgetTarget(Number.NaN)).toBeNull();
@@ -196,15 +205,38 @@ describe('continuous difficulty function D(level)', () => {
     expect(resolveGeometryBudgetSchedule(36)).toBe(435);
   });
 
-  test('the saturation level is derived from the data and is the last bounded level', () => {
-    expect(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_SATURATION_LEVEL)).toBeLessThanOrEqual(GEOMETRY_BUDGET_CEILING);
-    expect(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_SATURATION_LEVEL + 1)).toBeGreaterThan(GEOMETRY_BUDGET_CEILING);
-    expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_SATURATION_LEVEL));
+  test('the felt saturation level is derived from the data; the saturation level adds the fringe and is the last bounded level', () => {
+    expect(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL)).toBeLessThanOrEqual(GEOMETRY_BUDGET_CEILING);
+    expect(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 1)).toBeGreaterThan(GEOMETRY_BUDGET_CEILING);
+    expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL));
+    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + Math.floor(GEOMETRY_BUDGET_FRINGE_CAP / GEOMETRY_BUDGET_FRINGE_STEP));
     expect(LAST_BUDGET_LEVEL).toBe(GEOMETRY_BUDGET_SATURATION_LEVEL);
     // Measured hard ceiling of the frozen board (see scripts/analysis/generate-geometry-budget-targets.ts).
     expect(GEOMETRY_BUDGET_CEILING).toBe(760);
-    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(198);
+    expect(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL).toBe(198);
     expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(759);
+    // Fringe capacity of the finished top maze (same script): 70 cells, one more per level.
+    expect(GEOMETRY_BUDGET_FRINGE_CAP).toBe(70);
+    expect(GEOMETRY_BUDGET_FRINGE_STEP).toBe(1);
+    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(268);
+  });
+
+  test('the fringe is exactly one step more per level from the felt saturation to the saturation level', () => {
+    expect(resolveGeometryBudgetFringeCells(2)).toBe(0);
+    expect(resolveGeometryBudgetFringeCells(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL)).toBe(0);
+    for (let level = GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 1; level <= GEOMETRY_BUDGET_SATURATION_LEVEL; level += 1) {
+      expect(resolveGeometryBudgetFringeCells(level) - resolveGeometryBudgetFringeCells(level - 1)).toBe(GEOMETRY_BUDGET_FRINGE_STEP);
+    }
+    expect(resolveGeometryBudgetFringeCells(GEOMETRY_BUDGET_SATURATION_LEVEL)).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
+    for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL + 1, 500, 1_000_000, Number.NaN]) {
+      expect(resolveGeometryBudgetFringeCells(level)).toBe(Number.isNaN(level) ? 0 : GEOMETRY_BUDGET_FRINGE_CAP);
+    }
+    // The felt rules of a level past the felt saturation are the felt saturation level's own.
+    for (const level of [GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 1, GEOMETRY_BUDGET_SATURATION_LEVEL, 1_000_000]) {
+      expect(resolveGeometryBudgetFeltLevel(level)).toBe(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL);
+      expect(resolveGeometryBudgetRouteTarget(level)).toBe(resolveGeometryBudgetRouteTarget(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL));
+      expect(resolveGeometryBudgetForks(level)).toBe(resolveGeometryBudgetForks(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL));
+    }
   });
 
   test('route target and branch cap rise with the level and stay inside their budgets', () => {
@@ -249,13 +281,16 @@ describe('continuous difficulty function D(level)', () => {
 
   test('past the ceiling difficulty is handed to the hazard budget, never silently flat', () => {
     expect(resolveContinuousDifficulty(1)).toEqual({
-      level: 1, regime: 'corridor', geometryTarget: null, geometryRungs: 0, geometrySaturated: false, hazardBudgetLevels: 0
+      level: 1, regime: 'corridor', geometryTarget: null, geometryRungs: 0, fringeCells: 0, geometrySaturated: false, hazardBudgetLevels: 0
     });
-    const ramp = resolveContinuousDifficulty(GEOMETRY_BUDGET_SATURATION_LEVEL - 1);
-    expect(ramp).toMatchObject({ regime: 'ramp', geometrySaturated: false, hazardBudgetLevels: 0 });
+    const ramp = resolveContinuousDifficulty(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL - 1);
+    expect(ramp).toMatchObject({ regime: 'ramp', geometrySaturated: false, hazardBudgetLevels: 0, fringeCells: 0 });
+    // Between the felt saturation and the saturation level the fringe rises and nothing is owed to hazards.
+    const fringe = resolveContinuousDifficulty(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 10);
+    expect(fringe).toMatchObject({ regime: 'fringe', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: false, hazardBudgetLevels: 0, fringeCells: 10 * GEOMETRY_BUDGET_FRINGE_STEP });
     const atCeiling = resolveContinuousDifficulty(GEOMETRY_BUDGET_SATURATION_LEVEL);
     expect(atCeiling).toMatchObject({
-      regime: 'plateau', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: true, hazardBudgetLevels: 0
+      regime: 'plateau', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: true, hazardBudgetLevels: 0, fringeCells: GEOMETRY_BUDGET_FRINGE_CAP
     });
     let previousHazard = -1;
     for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, GEOMETRY_BUDGET_SATURATION_LEVEL + 1, 300, 500, 1_000_000]) {
@@ -268,19 +303,23 @@ describe('continuous difficulty function D(level)', () => {
     }
     expect(resolveContinuousDifficulty(301).hazardBudgetLevels - resolveContinuousDifficulty(300).hazardBudgetLevels).toBe(1);
     let previousTarget = 0;
-    for (let level = 2; level < GEOMETRY_BUDGET_SATURATION_LEVEL; level += 1) {
+    for (let level = 2; level < GEOMETRY_BUDGET_FELT_SATURATION_LEVEL; level += 1) {
       const difficulty = resolveContinuousDifficulty(level);
       expect(difficulty.regime).toBe('ramp');
       expect(difficulty.hazardBudgetLevels).toBe(0);
       expect(difficulty.geometryTarget!).toBeGreaterThan(previousTarget);
       previousTarget = difficulty.geometryTarget!;
     }
+    // Hazards owe nothing until the saturation level, and exactly one more per level from it.
+    for (let level = GEOMETRY_BUDGET_FELT_SATURATION_LEVEL; level < GEOMETRY_BUDGET_SATURATION_LEVEL; level += 1) {
+      expect(resolveContinuousDifficulty(level).hazardBudgetLevels).toBe(0);
+    }
     expect(resolveContinuousDifficulty(Number.NaN).regime).toBe('corridor');
     expect(resolveContinuousDifficulty(-5).regime).toBe('corridor');
   });
 
   test('freshly generated mazes land in [T, T + window] (spot check; the ladder tests sweep every level)', () => {
-    for (const level of [2, 14, 27, 44, 100, 180, GEOMETRY_BUDGET_SATURATION_LEVEL]) {
+    for (const level of [2, 14, 27, 44, 100, 180, GEOMETRY_BUDGET_FELT_SATURATION_LEVEL, GEOMETRY_BUDGET_SATURATION_LEVEL]) {
       const profile = resolveGeometryBudgetProfile(level);
       [23 / 51, 45 / 27].forEach((aspectRatio, boardIndex) => {
         for (let index = 0; index < 4; index += 1) {
@@ -290,6 +329,7 @@ describe('continuous difficulty function D(level)', () => {
           const target = resolveGeometryBudgetTarget(level)!;
           expect(felt).toBeGreaterThanOrEqual(target);
           expect(felt).toBeLessThanOrEqual(target + GEOMETRY_BUDGET_WINDOW);
+          expect((maze as { fringeStats?: { cells: number } }).fringeStats?.cells ?? 0).toBe(resolveGeometryBudgetFringeCells(level));
         }
       });
     }

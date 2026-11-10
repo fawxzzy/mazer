@@ -3,7 +3,10 @@ import { describe, expect, test } from 'vitest';
 import {
   GEOMETRY_BUDGET_TOP_TARGET,
   GEOMETRY_BUDGET_MIN_STEP,
+  GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
+  GEOMETRY_BUDGET_FRINGE_CAP,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
+  resolveGeometryBudgetFringeCells,
   GEOMETRY_BUDGET_WINDOW,
   resolveGeometryBudgetTarget
 } from '../../src/legacy-runtime/legacyGeometryBudget';
@@ -37,13 +40,14 @@ class MemoryStorage {
 }
 
 const SAT = GEOMETRY_BUDGET_SATURATION_LEVEL;
+const FELT_SAT = GEOMETRY_BUDGET_FELT_SATURATION_LEVEL;
 
-describe('progression ladder: strictly harder every level up to the geometry ceiling', () => {
+describe('progression ladder: strictly harder every level up to the felt saturation', () => {
   test('for ANY two seeds the worst maze of level N+1 beats the best maze of level N (every level, reduced sample)', () => {
     // Full-scale version: scripts/analysis/progression-ladder-report.ts --assert.
     for (const board of LADDER_BOARDS) {
       let previousBest = -Infinity;
-      for (let level = 2; level < SAT; level += 1) {
+      for (let level = 2; level < FELT_SAT; level += 1) {
         const samples = [0, 1].map((index) => sampleLevel(level, board, seedForIndex(index)));
         samples.forEach((sample) => {
           expect(sample.onTarget).toBe(true);
@@ -58,7 +62,7 @@ describe('progression ladder: strictly harder every level up to the geometry cei
   }, 300_000);
 
   test('a denser seed sweep on sampled levels keeps the ordering guarantee', () => {
-    const levels = [2, 3, 9, 27, 40, 60, 99, 100, 140, SAT - 2, SAT - 1];
+    const levels = [2, 3, 9, 27, 40, 60, 99, 100, 140, FELT_SAT - 2, FELT_SAT - 1];
     for (const board of LADDER_BOARDS) {
       for (const level of levels) {
         const low = Array.from({ length: 10 }, (_, index) => sampleLevel(level, board, seedForIndex(index + 7)).felt);
@@ -79,6 +83,27 @@ describe('progression ladder: strictly harder every level up to the geometry cei
     )).toBe(1);
     expect(resolveGeometryBudgetTarget(2)).toBeLessThan(resolveGeometryBudgetTarget(3)!);
   });
+});
+
+describe('progression ladder: the fringe carries the ladder from the felt saturation to the saturation level', () => {
+  test('for ANY two seeds level N + 1 is strictly harder than level N as the pair (felt, fringe cells): the felt value holds the top window and the fringe is exactly one cell more per level', () => {
+    for (const board of LADDER_BOARDS) {
+      let previousMaxFringe = -1;
+      for (let level = FELT_SAT; level <= SAT; level += 1) {
+        const samples = [0, 1].map((index) => sampleLevel(level, board, seedForIndex(index)));
+        samples.forEach((sample) => {
+          expect(sample.onTarget).toBe(true);
+          expect(sample.felt).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_TOP_TARGET);
+          expect(sample.felt).toBeLessThanOrEqual(GEOMETRY_BUDGET_TOP_TARGET + GEOMETRY_BUDGET_WINDOW);
+          // Exact, not "at least": a maze either holds the level's count or the next base is tried.
+          expect(sample.fringeCells).toBe(resolveGeometryBudgetFringeCells(level));
+        });
+        expect(Math.min(...samples.map((sample) => sample.fringeCells))).toBeGreaterThan(previousMaxFringe);
+        previousMaxFringe = Math.max(...samples.map((sample) => sample.fringeCells));
+      }
+      expect(previousMaxFringe).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
+    }
+  }, 300_000);
 });
 
 describe('progression ladder: beyond the hard ceiling', () => {
