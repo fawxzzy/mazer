@@ -188,7 +188,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'levels',
-    text: 'Each cleared maze raises your level. Mazes get harder as you climb.'
+    text: 'Each cleared maze raises your level. Harder mazes can have shortcuts and loops.'
   }
 ]);
 

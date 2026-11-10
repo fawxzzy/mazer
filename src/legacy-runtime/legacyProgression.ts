@@ -564,30 +564,38 @@ export const resolveLegacyProgressionLevel = (targetComplexity: number): number 
 // continuous geometry difficulty function (every level 2..LAST_BUDGET_LEVEL) or
 // from the level-1 corridor / legacy band path (null).
 //
-// The base level is the BOUNDED level derived from the target complexity, so an
-// out-of-range or migrated save can never reach a budget rung its target
-// complexity has not earned (levels 1..99; level 1 is the corridor and returns
-// null). Target complexity saturates at 400 (level 99), so ABOVE that the
-// geometry reads the player-facing completion ordinal (track.level) instead --
-// but only when the track already sits at the bounded top, and clamped to
-// LAST_BUDGET_LEVEL (the hard geometry ceiling). A bare target-complexity number
-// (no ordinal available) stays bounded at 99. The ordinal itself is never
-// rewritten: a player at level N keeps level N.
+// The geometry level is the HIGHER of two readings of the same track:
+//  1. the bounded level its target complexity earns (levels 1..99), and
+//  2. the player-facing completion ordinal (`track.level`), clamped to
+//     LAST_BUDGET_LEVEL (the hard geometry ceiling).
+// Normal play keeps the two equal below level 99 (+4 target and +1 ordinal per
+// clear), and above 99 the target saturates at 400 so the ordinal alone drives
+// geometry. The max is what keeps the label honest when the stored track has
+// DRIFTED: a long-lived account whose ordinal outran its target (older formulas
+// tapered the per-clear target gain; the 2026-08 ordinal closure raised the
+// ordinal without raising the target) used to show "Lv 18000" while the maze
+// was generated at the lower level its target implied (a level-29 maze under a
+// 18000 label). A target that is HIGHER than the ordinal still wins, so a
+// migrated or edited save can never reach a rung lower than its target earned.
+// A bare target-complexity number (no ordinal available) stays bounded at 99, and
+// an unreadable ordinal (empty, negative, not finite) is ignored. Nothing is
+// rewritten: the stored ordinal, target, rank and schema (`version: 1`) are
+// unchanged; only the geometry the reading selects differs.
 export const resolveGeometryBudgetLevel = (
   trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number
 ): number | null => {
   const targetComplexity = typeof trackOrTargetComplexity === 'number'
     ? trackOrTargetComplexity
     : trackOrTargetComplexity.targetComplexity;
-  const level = resolveLegacyProgressionLevel(targetComplexity);
-  if (level < 2) {
-    return null;
-  }
-  if (typeof trackOrTargetComplexity !== 'number' && level >= 99) {
+  let level = resolveLegacyProgressionLevel(targetComplexity);
+  if (typeof trackOrTargetComplexity !== 'number') {
     const ordinal = Number(trackOrTargetComplexity.level);
     if (Number.isFinite(ordinal) && ordinal > level) {
-      return Math.min(LAST_BUDGET_LEVEL, Math.trunc(ordinal));
+      level = Math.min(LAST_BUDGET_LEVEL, Math.trunc(ordinal));
     }
+  }
+  if (level < 2) {
+    return null;
   }
   return Math.min(level, LAST_BUDGET_LEVEL);
 };
