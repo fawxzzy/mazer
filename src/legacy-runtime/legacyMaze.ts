@@ -162,6 +162,16 @@ export interface LegacyMazeSnapshot {
     sampledSolutionEdges: number;
   };
   shortcutsCreated?: number;
+  // Loops (multiple routes) the felt tuner carved: absent for a single-route maze.
+  // Counts by kind and the connector cells they added (legacyMazeLoops.ts).
+  loopStats?: {
+    alternates: number;
+    cells: number;
+    decoys: number;
+    // Steps the loops give back to a player who knows the map (priced into the felt target).
+    saved: number;
+    shortcuts: number;
+  };
   shortcutStats?: {
     requested: number;
     attempts: number;

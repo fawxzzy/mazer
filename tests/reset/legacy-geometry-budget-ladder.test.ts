@@ -11,7 +11,7 @@ import {
   resolveGeometryBudgetRungCount,
   resolveGeometryBudgetTarget
 } from '../../src/legacy-runtime/legacyGeometryBudget';
-import { measureFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
+import { measurePricedFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import { createLegacyMaze } from '../../src/legacy-runtime/legacyMaze';
 import {
   createEmptyLegacyProgressionState,
@@ -286,7 +286,7 @@ describe('geometry budget felt tuning (realized felt difficulty)', () => {
           { targetComplexity: track.targetComplexity },
           viewport.aspectRatio
         );
-        const felt = measureFeltSteps(maze);
+        const felt = measurePricedFeltSteps(maze);
         // No pressure/adaptive retry and no resize on budget levels.
         expect(maze.generation?.selection?.pressureRetryUsed).toBe(false);
         expect(maze.generation?.selection?.adaptiveRetryUsed).toBe(false);

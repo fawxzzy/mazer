@@ -11,14 +11,19 @@ import {
 import {
   GEOMETRY_BUDGET_BASE_CANDIDATES,
   GEOMETRY_BUDGET_WINDOW,
+  GEOMETRY_BUDGET_CEILING,
+  GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS,
+  GEOMETRY_BUDGET_TIE_RETRY_BASES,
   resolveGeometryBudgetCandidateSeed,
   resolveGeometryBudgetForks,
+  resolveGeometryBudgetLoopPlan,
   resolveGeometryBudgetMaxBranch,
   resolveGeometryBudgetRouteBranch,
   resolveGeometryBudgetRouteTarget,
   resolveGeometryBudgetTarget
 } from './legacyGeometryBudget';
-import { tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
+import { LEGACY_EMPTY_LOOP_PLAN, type LegacyLoopPlan } from './legacyMazeLoops';
+import { FELT_TIE_DEVIATION_LIMIT_PERCENT, tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
 import { resolveLegacyMazeComplexity } from './legacyProgression';
@@ -136,6 +141,10 @@ export interface LegacyGenerationConsumption {
 
 export interface LegacyGenerationSelectionOptions {
   candidateCount?: number;
+  // Analysis and tests only: replaces a ladder level's own loop plan (multiple
+  // routes). LEGACY_EMPTY_LOOP_PLAN forces a single-route maze. Production callers
+  // leave it undefined so the level's plan applies.
+  loopPlan?: LegacyLoopPlan;
   targetComplexity?: number | null;
   tolerance?: number;
 }
@@ -605,6 +614,7 @@ const selectLegacyGeometryBudgetMaze = (
   const forks = resolveGeometryBudgetForks(budgetLevel);
   let selectedMaze: Omit<LegacyMazeSnapshot, 'generation'> | null = null;
   let selectedDistance = Number.POSITIVE_INFINITY;
+  let selectedRank = Number.POSITIVE_INFINITY;
   let searched = 0;
   // Usually the first base maze tunes into the window and the loop ends after one
   // build. A base can miss when its wrap corridors give the explorer a shortcut
@@ -616,23 +626,36 @@ const selectLegacyGeometryBudgetMaze = (
     searched += 1;
     let candidate: Omit<LegacyMazeSnapshot, 'generation'> = base;
     let distance = 0;
+    let tieBiased = false;
     if (gateTarget !== null) {
+      // The looped plan (multiple routes) is tried on the first few bases only; a
+      // base that cannot land with loops is retried without them, so the ladder's
+      // ordering guarantee always outranks the loop.
+      const loops = index < GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS
+        ? (selectionOptions.loopPlan ?? resolveGeometryBudgetLoopPlan(budgetLevel, seed, base.width * base.height))
+        : LEGACY_EMPTY_LOOP_PLAN;
       const tuned = tuneMazeFeltToTarget(
         base,
         gateTarget,
         resolveGeometryBudgetCandidateSeed(seed, budgetLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
-        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks }
+        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING }
       );
       distance = tuned.windowDistance;
-      if (tuned.addedTiles.length > 0 || tuned.trimmedTiles.length > 0 || tuned.bumps > 0) {
+      // A landed maze whose number is a coin flip for the explorer (a looped maze that
+      // disagrees with its tie-averaged value) is accepted only after a few more bases.
+      tieBiased = distance === 0 && tuned.tieDeviationPercent > FELT_TIE_DEVIATION_LIMIT_PERCENT;
+      if (tuned.addedTiles.length > 0 || tuned.trimmedTiles.length > 0 || tuned.bumps > 0 || tuned.loops.length > 0 || tuned.cyclesBroken > 0) {
         candidate = assembleTunedMaze(base, tuned, generationProfile);
       }
     }
-    if (selectedMaze === null || distance < selectedDistance) {
+    // Rank: off-window by its distance; a coin-flip landing just behind a clean one.
+    const rank = tieBiased ? distance + 0.5 : distance;
+    if (selectedMaze === null || rank < selectedRank) {
       selectedMaze = candidate;
       selectedDistance = distance;
+      selectedRank = rank;
     }
-    if (distance === 0) {
+    if (distance === 0 && (!tieBiased || index >= GEOMETRY_BUDGET_TIE_RETRY_BASES - 1)) {
       break;
     }
   }
@@ -679,11 +702,20 @@ const assembleTunedMaze = (
   tuned: ReturnType<typeof tuneMazeFeltToTarget>,
   generationProfile: LegacyMazeGenerationProfile
 ): Omit<LegacyMazeSnapshot, 'generation'> => {
-  const routed = tuned.bumps > 0
+  const routed = tuned.bumps > 0 || tuned.loops.length > 0 || tuned.cyclesBroken > 0
     ? resolveLegacyShortestPath(tuned.grid, base.start, base.goal, 'direct-floor')
     : null;
   const solutionPath = routed !== null && routed.found ? routed.path : base.solutionPath;
   const next: Omit<LegacyMazeSnapshot, 'generation'> = { ...base, grid: tuned.grid, solutionPath };
+  if (tuned.loops.length > 0) {
+    next.loopStats = {
+      alternates: tuned.loops.filter((loop) => loop.kind === 'alternate').length,
+      cells: tuned.loopTiles.length,
+      decoys: tuned.loops.filter((loop) => loop.kind === 'decoy').length,
+      saved: tuned.loopSaving,
+      shortcuts: tuned.loops.filter((loop) => loop.kind === 'shortcut').length
+    };
+  }
   if (routed !== null && routed.found) {
     next.wrapTopologyDiagnostics = resolveLegacyWrapTopologyDiagnostics(
       next,
@@ -699,7 +731,7 @@ const assembleTunedMaze = (
   if (base.generationBuildTrace) {
     next.generationBuildTrace = {
       ...base.generationBuildTrace,
-      decoyTiles: [...tuned.stretchTiles, ...tuned.addedTiles].map((point) => ({ ...point })),
+      decoyTiles: [...tuned.loopTiles, ...tuned.stretchTiles, ...tuned.addedTiles].map((point) => ({ ...point })),
       decoyPrunedTiles: [...tuned.stretchRemovedTiles, ...tuned.trimmedTiles].map((point) => ({ ...point }))
     };
   }

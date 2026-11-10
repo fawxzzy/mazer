@@ -44,6 +44,7 @@
 // into a budget level (`resolveGeometryBudgetLevel`).
 
 import type { LegacyMazeGenerationProfile } from './legacyMaze';
+import { LEGACY_EMPTY_LOOP_PLAN, type LegacyLoopPlan } from './legacyMazeLoops';
 
 // Width of the accept window above the target: the realized felt value of a level
 // is in [T, T + WINDOW]. The schedule's per-level step must stay >= WINDOW + 1.
@@ -311,6 +312,77 @@ export const resolveGeometryBudgetRouteBranch = (level: number): number => (
 export const resolveGeometryBudgetForks = (level: number): number => (
   Math.min(30, 2 + Math.floor(clampBudgetLevel(level) / 5))
 );
+
+// ---------------------------------------------------------------------------
+// Multiple routes (loops). Deterministic per (play seed, level) and scaled by the
+// maze's cell count, so some levels stay a single route even late and a bigger
+// board would carry proportionally more loops.
+//
+//  * Levels below GEOMETRY_BUDGET_LOOP_FIRST_LEVEL are always a single route
+//    (level 1 is the corridor; 2..11 teach the plain maze and the wrap corridor).
+//  * Above it a per-seed roll decides whether the maze is a single route: the
+//    chance falls from 100 percent at the first level to
+//    GEOMETRY_BUDGET_LOOP_PURE_FLOOR_PERCENT at level GEOMETRY_BUDGET_LOOP_FULL_LEVEL
+//    and stays there, so even at the top about a third of the mazes have one way.
+//  * A looped maze carries 1 loop at the first level, one more every 36 levels
+//    (scaled by cells / reference cells, +-1 by seed, at most 8).
+//  * Each loop's kind is rolled: decoys (false ways on: loops inside dead-end ground)
+//    arrive at level 30 and grow to 40 percent, alternates (equal-length second
+//    routes) grow from 10 to 45 percent, the rest are shortcuts, so shortcuts are the
+//    mid-ladder feature (they cost priced headroom, see legacyMazeFeltTuning.ts) and the
+//    top of the ladder is alternates and decoys.
+//  * Connectors lengthen with the level (10 + level / 6 cells, at most 36) and the
+//    whole set is capped at a share of the board so deceptive branches keep room.
+// ---------------------------------------------------------------------------
+export const GEOMETRY_BUDGET_LOOP_FIRST_LEVEL = 12;
+export const GEOMETRY_BUDGET_LOOP_FULL_LEVEL = 120;
+export const GEOMETRY_BUDGET_LOOP_PURE_FLOOR_PERCENT = 30;
+export const GEOMETRY_BUDGET_LOOP_REFERENCE_CELLS = 1275;
+export const GEOMETRY_BUDGET_LOOP_MAX_COUNT = 8;
+// Tries on the looped plan before a level falls back to a single-route maze (the
+// ladder's ordering guarantee outranks the loop: a base that cannot land with loops
+// is retried without them).
+export const GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS = 6;
+// Base mazes tried (at most) to find a landing whose felt number is not a coin flip for
+// the explorer before a biased landing is accepted (legacyMazeFeltTuning.ts, tie pricing).
+export const GEOMETRY_BUDGET_TIE_RETRY_BASES = 5;
+
+export const resolveGeometryBudgetLoopPurePercent = (level: number): number => {
+  const bounded = clampBudgetLevel(level);
+  if (bounded < GEOMETRY_BUDGET_LOOP_FIRST_LEVEL) { return 100; }
+  const span = GEOMETRY_BUDGET_LOOP_FULL_LEVEL - (GEOMETRY_BUDGET_LOOP_FIRST_LEVEL - 1);
+  const drop = Math.floor(((bounded - (GEOMETRY_BUDGET_LOOP_FIRST_LEVEL - 1)) * (100 - GEOMETRY_BUDGET_LOOP_PURE_FLOOR_PERCENT)) / span);
+  return 100 - Math.min(100 - GEOMETRY_BUDGET_LOOP_PURE_FLOOR_PERCENT, drop);
+};
+
+export const resolveGeometryBudgetLoopPlan = (level: number, seed: number, cells: number): LegacyLoopPlan => {
+  const bounded = clampBudgetLevel(level);
+  if (bounded < GEOMETRY_BUDGET_LOOP_FIRST_LEVEL) { return LEGACY_EMPTY_LOOP_PLAN; }
+  const salt = Math.imul(bounded, 31) >>> 0;
+  if ((mix32(seed >>> 0, salt + 1) % 100) < resolveGeometryBudgetLoopPurePercent(bounded)) {
+    return LEGACY_EMPTY_LOOP_PLAN;
+  }
+  const areaScale = Math.max(1, cells) / GEOMETRY_BUDGET_LOOP_REFERENCE_CELLS;
+  const base = 1 + Math.floor((bounded - GEOMETRY_BUDGET_LOOP_FIRST_LEVEL) / 36);
+  const jitter = (mix32(seed >>> 0, salt + 2) % 3) - 1;
+  const count = Math.min(GEOMETRY_BUDGET_LOOP_MAX_COUNT, Math.max(1, Math.round(base * areaScale) + jitter));
+  const decoyPercent = Math.min(40, Math.max(0, Math.floor((bounded - 30) / 2)));
+  const alternatePercent = Math.min(45, 10 + Math.floor((bounded - GEOMETRY_BUDGET_LOOP_FIRST_LEVEL) / 2));
+  let shortcuts = 0;
+  let alternates = 0;
+  let decoys = 0;
+  for (let index = 0; index < count; index += 1) {
+    const roll = mix32(seed >>> 0, salt + 3 + index) % 100;
+    if (roll < decoyPercent) { decoys += 1; } else if (roll < decoyPercent + alternatePercent) { alternates += 1; } else { shortcuts += 1; }
+  }
+  return {
+    shortcuts,
+    alternates,
+    decoys,
+    maxConnector: Math.min(36, 10 + Math.floor(bounded / 6)),
+    cellBudget: Math.round(Math.max(1, cells) * 0.06)
+  };
+};
 
 // The generation profile for budget level N. Level 1 is NOT served by this
 // module: it is the corridor layout, owned by the progression module. The

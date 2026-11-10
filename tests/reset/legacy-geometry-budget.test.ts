@@ -25,7 +25,7 @@ import {
   resolveGeometryBudgetSchedule,
   resolveGeometryBudgetTarget
 } from '../../src/legacy-runtime/legacyGeometryBudget';
-import { measureFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
+import { measurePricedFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import { normalizeLegacyMazeGenerationProfile } from '../../src/legacy-runtime/legacyMaze';
 
 describe('geometry budget style bands', () => {
@@ -279,7 +279,7 @@ describe('continuous difficulty function D(level)', () => {
         for (let index = 0; index < 4; index += 1) {
           const seed = resolveGeometryBudgetCandidateSeed(910 + index, 1000 + level, boardIndex);
           const maze = createLegacyRuntimeMazeForMode('play', 35, seed, profile, {}, aspectRatio);
-          const felt = measureFeltSteps(maze);
+          const felt = measurePricedFeltSteps(maze);
           const target = resolveGeometryBudgetTarget(level)!;
           expect(felt).toBeGreaterThanOrEqual(target);
           expect(felt).toBeLessThanOrEqual(target + GEOMETRY_BUDGET_WINDOW);
