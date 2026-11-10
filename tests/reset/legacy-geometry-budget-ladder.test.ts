@@ -3,7 +3,9 @@ import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyG
 import {
   GEOMETRY_BUDGET_TOP_TARGET,
   GEOMETRY_BUDGET_BASE_CANDIDATES,
+  GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
+  resolveGeometryBudgetFringeCells,
   GEOMETRY_BUDGET_WINDOW,
   LAST_BUDGET_LEVEL,
   measureGeometryBudgetProxy,
@@ -268,11 +270,11 @@ describe('geometry budget felt tuning (realized felt difficulty)', () => {
   const SEEDS: Record<keyof typeof VIEWPORTS, number> = { phone: 3000, desktop: 1000, square: 4000 };
 
   for (const [name, viewport] of Object.entries(VIEWPORTS) as [keyof typeof VIEWPORTS, (typeof VIEWPORTS)[keyof typeof VIEWPORTS]][]) {
-    test(`realized felt difficulty is strictly increasing for levels 2..${GEOMETRY_BUDGET_SATURATION_LEVEL} and holds the ceiling after (${name})`, () => {
+    test(`realized felt difficulty is strictly increasing for levels 2..${GEOMETRY_BUDGET_FELT_SATURATION_LEVEL}, holds the top target with an exact rising fringe up to ${GEOMETRY_BUDGET_SATURATION_LEVEL} and after (${name})`, () => {
       const realized: number[] = [];
       const proxies: number[] = [];
       const dimensions = new Set<string>();
-      for (const level of [...Array.from({ length: GEOMETRY_BUDGET_SATURATION_LEVEL - 1 }, (_, index) => index + 2), 250, 1000]) {
+      for (const level of [...Array.from({ length: GEOMETRY_BUDGET_SATURATION_LEVEL - 1 }, (_, index) => index + 2), 1000]) {
         const track = trackForLevel(level);
         const scale = resolveLegacyProgressionGenerationScale(50, track, {
           surface: 'play',
@@ -296,17 +298,19 @@ describe('geometry budget felt tuning (realized felt difficulty)', () => {
         const target = resolveGeometryBudgetTarget(Math.min(level, LAST_BUDGET_LEVEL))!;
         expect(felt).toBeGreaterThanOrEqual(target);
         expect(felt).toBeLessThanOrEqual(target + GEOMETRY_BUDGET_WINDOW);
-        if (level <= GEOMETRY_BUDGET_SATURATION_LEVEL) {
+        // The fringe (zero-felt-cost stubs) is exact for the level, and absent up to the felt saturation.
+        expect((maze as { fringeStats?: { cells: number } }).fringeStats?.cells ?? 0).toBe(resolveGeometryBudgetFringeCells(level));
+        if (level <= GEOMETRY_BUDGET_FELT_SATURATION_LEVEL) {
           realized.push(felt);
           proxies.push(measureGeometryBudgetProxy(maze, resolveLegacyMazeComplexity(maze)).total);
         } else {
-          // Beyond the hard ceiling every level steers to the same ceiling target.
+          // Beyond the felt saturation every level steers to the same top target.
           expect(target).toBe(GEOMETRY_BUDGET_TOP_TARGET);
         }
       }
       // Frozen board: every level realizes the same grid dimensions.
       expect(dimensions.size).toBe(1);
-      expect(realized.length).toBe(GEOMETRY_BUDGET_SATURATION_LEVEL - 1);
+      expect(realized.length).toBe(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL - 1);
       for (let index = 1; index < realized.length; index += 1) {
         expect(realized[index]).toBeGreaterThan(realized[index - 1]!);
       }

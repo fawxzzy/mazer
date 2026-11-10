@@ -4,7 +4,8 @@
 // generation against it, so a change to the generators, the tape, the tuner or the
 // calibration cannot silently reshuffle the ladder. (Regenerated for the felt-difficulty ladder:
 // every level 2+ changed because the tuner, the schedule, the style bands and the
-// ceiling all changed; level 1, the corridor, is unchanged.)
+// ceiling all changed; level 1, the corridor, is unchanged. Regenerated again for the fringe past
+// level 198: exactly levels 199-300 changed on both boards, levels 1-198 did not.)
 //
 //   npx vite-node scripts/analysis/progression-ladder-golden.ts --write
 //   (omit --write to print a diff summary instead)

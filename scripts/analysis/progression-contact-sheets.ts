@@ -4,7 +4,7 @@
 // explorer wanders into in grey, the start in green and the goal in gold.
 //
 //   npx vite-node --script scripts/analysis/progression-contact-sheets.ts \
-//     --dump=<dump.json> --out=<dir> --tag=before [--levels=2,10,25,50,100,150,198] [--seed=auto|0..]
+//     --dump=<dump.json> --out=<dir> --tag=before [--levels=2,10,25,50,100,150,198,268] [--seed=auto|0..]
 //
 // --seed=auto (default) picks, per level and board, the first seed index whose maze
 // has a loop when the build carves any (so the sheet shows what loops look like),
@@ -22,7 +22,7 @@ const arg = (name: string, fallback: string): string => {
 const dump = JSON.parse(readFileSync(arg('dump', ''), 'utf8')) as { records: DumpedMaze[] };
 const outDir = arg('out', 'tmp/out');
 const tag = arg('tag', 'build');
-const levels = arg('levels', '2,10,25,50,100,150,198').split(',').map(Number);
+const levels = arg('levels', '2,10,25,50,100,150,198,268').split(',').map(Number);
 const seedArg = arg('seed', 'auto');
 const tile = Number(arg('tile', '6'));
 mkdirSync(outDir, { recursive: true });

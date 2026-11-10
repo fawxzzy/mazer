@@ -179,6 +179,11 @@ export interface LegacyMazeSnapshot {
     rungs: number;
     saved: number;
   };
+  // Zero-felt-cost side-stub cells of a level past the felt saturation (legacyGeometryBudget.ts,
+  // fringe): the second, strictly ordered half of the ladder there. Absent below it.
+  fringeStats?: {
+    cells: number;
+  };
   shortcutStats?: {
     requested: number;
     attempts: number;

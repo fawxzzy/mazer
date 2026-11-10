@@ -50,6 +50,8 @@ export interface LadderLevelSample {
   feltMonteCarlo: number;
   // Length of the path the explorer finally walks (backtracks excluded).
   explorerPath: number;
+  // Zero-felt-cost fringe stub cells the maze carries (levels past the felt saturation, else 0).
+  fringeCells: number;
   // SECONDARY: the H1 structure proxy.
   proxy: number;
   ms: number;
@@ -115,6 +117,7 @@ export const sampleLevel = (level: number, board: typeof LADDER_BOARDS[number], 
     wrapSaving,
     feltMonteCarlo: monteCarlo / 8,
     explorerPath: measured.pathLength,
+    fringeCells: (maze as LegacyMazeSnapshot).fringeStats?.cells ?? 0,
     proxy: measureGeometryBudgetProxy(maze, resolveLegacyMazeComplexity(maze)).total,
     ms,
     onTarget: level < 2 || target === null || (felt >= target && felt <= target + GEOMETRY_BUDGET_WINDOW),

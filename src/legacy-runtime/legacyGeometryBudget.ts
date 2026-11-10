@@ -30,11 +30,14 @@
 // base mazes on the sampled boards (measured by the calibration script, see the
 // GENERATED block); the selection simply tries the next base maze when one falls
 // short, so a build still lands. GEOMETRY_BUDGET_SATURATION_LEVEL is the last level
-// whose scheduled target fits under it. From there the ladder is a declared plateau: levels beyond
-// keep the ceiling target, stay valid and deterministic (the play seed still
-// advances every level, so the mazes differ) but are the same difficulty class,
-// and the hazard budget (Phase 2, unsigned contract, dormant) is what must take
-// over. See `resolveContinuousDifficulty` and the hazard hand-off module.
+// whose scheduled target fits under it (the FELT saturation level). Past it the felt number
+// cannot rise, but the board still has room for structure that costs the explorer nothing: the
+// FRINGE (below) keeps the ladder rising, strictly, for GEOMETRY_BUDGET_FRINGE_CAP more levels.
+// From the SATURATION level (felt saturation + fringe cap) the ladder is a declared plateau:
+// levels beyond keep the top maze class, stay valid and deterministic (the play seed still
+// advances every level, so the mazes differ), and the hazard budget (Phase 2, unsigned
+// contract, dormant) is what must take over. See `resolveContinuousDifficulty` and the hazard
+// hand-off module.
 //
 // This module is pure: it imports only TYPES, so legacyMaze.ts (profile
 // normalization) and legacyProgression.ts (the hook) can both depend on it
@@ -257,24 +260,49 @@ export const resolveGeometryBudgetCandidateSeed = (
 
 // GENERATED:GEOMETRY_BUDGET_CALIBRATION:BEGIN
 export const GEOMETRY_BUDGET_CEILING = 760;
+export const GEOMETRY_BUDGET_FRINGE_CAP = 70;
 // GENERATED:GEOMETRY_BUDGET_CALIBRATION:END
 
 // The last level whose scheduled target does not exceed the ceiling: the HARD
 // CEILING of felt difficulty on the frozen board. Levels at or beyond it share
 // the top target (the schedule value there, at most CEILING and never clipped, so
 // the last ramp step is a full step too).
-export const GEOMETRY_BUDGET_SATURATION_LEVEL = ((): number => {
+export const GEOMETRY_BUDGET_FELT_SATURATION_LEVEL = ((): number => {
   let level = 2;
   while (resolveGeometryBudgetSchedule(level + 1) <= GEOMETRY_BUDGET_CEILING) { level += 1; }
   return level;
 })();
 
-// The felt target every level at or past saturation steers to.
-export const GEOMETRY_BUDGET_TOP_TARGET = resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_SATURATION_LEVEL);
+// The felt target every level at or past the felt saturation steers to.
+export const GEOMETRY_BUDGET_TOP_TARGET = resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL);
+
+// THE FRINGE (levels past the felt saturation). The felt number is route + 2 * (wrong cells the
+// explorer enters), and the frozen board holds at most about half of its interior as floor, so
+// at the felt saturation the generator is out of room for anything the explorer pays for
+// (docs/research/MAZER_PROGRESSION_GAUGES_2026-11-10.md, "Past level 198"). But the felt
+// explorer does not enter a side stub of at most FELT_VISION_CELLS cells at a junction (a person
+// sees a stub for what it is), so such a stub costs it nothing and the remaining wall pockets
+// (about 100 cells on a finished top maze) can be filled with them WITHOUT moving the felt value
+// at all. They are not free for anyone else: every stub is a junction and a dead end, and the
+// held-out walkers (human-like explorer, random walk) pay for them (measured: decision points
+// 12 -> 39-51, dead ends 30 -> 96-110, random walk 2000 -> 8000-10600 for 88-113 stub cells).
+// So past the felt saturation the ladder is a PAIR, compared lexicographically: the felt value
+// (held at the top target, window [T, T + 1]) and the number of fringe cells, which is exactly
+// GEOMETRY_BUDGET_FRINGE_STEP more per level for GEOMETRY_BUDGET_FRINGE_CAP levels. Level N + 1
+// is therefore still strictly harder than level N for any two seeds, by construction: the cell
+// count is exact (a base that cannot hold the count is replaced by the next base, like a base
+// that cannot reach the felt target). The cap is the calibration's (GENERATED block above):
+// the fringe capacity at the felt saturation, as the CAPACITY_SHARE quantile over base mazes.
+export const GEOMETRY_BUDGET_FRINGE_STEP = 1;
+
+// The last level whose geometry rises: the FELT saturation level plus the levels the fringe
+// carries. From here the ladder is a declared plateau (the hazard budget takes over).
+export const GEOMETRY_BUDGET_SATURATION_LEVEL = GEOMETRY_BUDGET_FELT_SATURATION_LEVEL
+  + Math.floor(GEOMETRY_BUDGET_FRINGE_CAP / GEOMETRY_BUDGET_FRINGE_STEP);
 
 // The last BOUNDED progression level whose geometry comes from this function:
-// the saturation level. Every level >= 2 up to it has its own target; completion
-// ordinals above it map to this level for geometry (plateau) and keep counting in
+// the saturation level. Every level >= 2 up to it has its own target (and fringe);
+// completion ordinals above it map to this level for geometry (plateau) and keep counting in
 // `resolveContinuousDifficulty`. Also the upper bound of the profile's
 // `geometryBudgetLevel` field.
 export const LAST_BUDGET_LEVEL = GEOMETRY_BUDGET_SATURATION_LEVEL;
@@ -284,18 +312,32 @@ const clampBudgetLevel = (level: number): number => Math.min(
   Math.max(2, Math.trunc(Number.isFinite(level) ? level : 2))
 );
 
+// The level whose felt-ladder rules (target, route target, branch caps, loop plan, wrap rolls)
+// apply: the felt ladder stops at the felt saturation, the levels past it add only the fringe.
+export const resolveGeometryBudgetFeltLevel = (level: number): number => Math.min(
+  GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
+  clampBudgetLevel(level)
+);
+
+// Fringe cells (zero-felt-cost side stubs) a maze of level N carries: nothing up to the felt
+// saturation, then GEOMETRY_BUDGET_FRINGE_STEP more per level up to the cap.
+export const resolveGeometryBudgetFringeCells = (level: number): number => {
+  const past = clampBudgetLevel(level) - GEOMETRY_BUDGET_FELT_SATURATION_LEVEL;
+  return past <= 0 ? 0 : Math.min(GEOMETRY_BUDGET_FRINGE_CAP, past * GEOMETRY_BUDGET_FRINGE_STEP);
+};
+
 // T(N): the felt target for budget level N (2..LAST_BUDGET_LEVEL); null outside.
 export const resolveGeometryBudgetTarget = (level: number): number | null => {
   const normalized = Math.trunc(level);
   if (!Number.isFinite(normalized) || normalized < 2 || normalized > LAST_BUDGET_LEVEL) {
     return null;
   }
-  return resolveGeometryBudgetSchedule(normalized);
+  return resolveGeometryBudgetSchedule(Math.min(normalized, GEOMETRY_BUDGET_FELT_SATURATION_LEVEL));
 };
 
 // Wrap rungs level N's base profile owns (see GEOMETRY_BUDGET_STYLE_BANDS).
 export const resolveGeometryBudgetRungCount = (level: number): number => {
-  const normalized = clampBudgetLevel(level);
+  const normalized = resolveGeometryBudgetFeltLevel(level);
   let rungs = 0;
   for (const band of GEOMETRY_BUDGET_STYLE_BANDS) {
     if (normalized >= band.fromLevel) { rungs = band.rungs; }
@@ -311,7 +353,7 @@ export const resolveGeometryBudgetRungCount = (level: number): number => {
 // equal chances, level 130 none or one. Integer arithmetic, a pure function of
 // (level, seed): the same level and seed always give the same maze.
 export const resolveGeometryBudgetWrapRungs = (level: number, seed: number): number => {
-  const bounded = clampBudgetLevel(level);
+  const bounded = resolveGeometryBudgetFeltLevel(level);
   const owned = resolveGeometryBudgetRungCount(bounded);
   if (owned === 0 || bounded <= GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL) { return owned; }
   if (bounded >= GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL) { return 0; }
@@ -334,28 +376,28 @@ export const GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS = 6;
 // deceptive branches keep the room to pay for the rest.
 export const GEOMETRY_BUDGET_ROUTE_SHARE_PERCENT = 38;
 export const resolveGeometryBudgetRouteTarget = (level: number): number => {
-  const target = resolveGeometryBudgetTarget(clampBudgetLevel(level)) ?? GEOMETRY_BUDGET_TOP_TARGET;
+  const target = resolveGeometryBudgetTarget(resolveGeometryBudgetFeltLevel(level)) ?? GEOMETRY_BUDGET_TOP_TARGET;
   return Math.floor((target * GEOMETRY_BUDGET_ROUTE_SHARE_PERCENT) / 100);
 };
 
 // Longest deceptive branch the tuner carves in one move at level N: depth rises
 // with the level (8 cells at level 2 up to 40).
 export const resolveGeometryBudgetMaxBranch = (level: number): number => (
-  Math.min(40, 8 + Math.floor(clampBudgetLevel(level) / 6))
+  Math.min(40, 8 + Math.floor(resolveGeometryBudgetFeltLevel(level) / 6))
 );
 
 // Longest fork carved straight off the route at level N (a wrong turn the player
 // meets on the way); deeper wrong ground grows from those forks up to the branch
 // cap. Kept short so a level has many forks to choose between, not a few long ones.
 export const resolveGeometryBudgetRouteBranch = (level: number): number => (
-  Math.min(16, 6 + Math.floor(clampBudgetLevel(level) / 10))
+  Math.min(16, 6 + Math.floor(resolveGeometryBudgetFeltLevel(level) / 10))
 );
 
 // Forks the tuner puts on the route first at level N (route-hosted lure branches of
 // 4..routeBranch cells, as many as the felt budget affords): more choices for the
 // player on the way as the ladder climbs.
 export const resolveGeometryBudgetForks = (level: number): number => (
-  Math.min(30, 2 + Math.floor(clampBudgetLevel(level) / 5))
+  Math.min(30, 2 + Math.floor(resolveGeometryBudgetFeltLevel(level) / 5))
 );
 
 // ---------------------------------------------------------------------------
@@ -393,7 +435,7 @@ export const GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS = 6;
 export const GEOMETRY_BUDGET_TIE_RETRY_BASES = 5;
 
 export const resolveGeometryBudgetLoopPurePercent = (level: number): number => {
-  const bounded = clampBudgetLevel(level);
+  const bounded = resolveGeometryBudgetFeltLevel(level);
   if (bounded < GEOMETRY_BUDGET_LOOP_FIRST_LEVEL) { return 100; }
   const span = GEOMETRY_BUDGET_LOOP_FULL_LEVEL - (GEOMETRY_BUDGET_LOOP_FIRST_LEVEL - 1);
   const drop = Math.floor(((bounded - (GEOMETRY_BUDGET_LOOP_FIRST_LEVEL - 1)) * (100 - GEOMETRY_BUDGET_LOOP_PURE_FLOOR_PERCENT)) / span);
@@ -401,7 +443,7 @@ export const resolveGeometryBudgetLoopPurePercent = (level: number): number => {
 };
 
 export const resolveGeometryBudgetLoopPlan = (level: number, seed: number, cells: number): LegacyLoopPlan => {
-  const bounded = clampBudgetLevel(level);
+  const bounded = resolveGeometryBudgetFeltLevel(level);
   if (bounded < GEOMETRY_BUDGET_LOOP_FIRST_LEVEL) { return LEGACY_EMPTY_LOOP_PLAN; }
   const salt = Math.imul(bounded, 31) >>> 0;
   if ((mix32(seed >>> 0, salt + 1) % 100) < resolveGeometryBudgetLoopPurePercent(bounded)) {
@@ -437,7 +479,9 @@ export const resolveGeometryBudgetProfile = (level: number): LegacyMazeGeneratio
   resolveGeometryBudgetProfileForRungs(resolveGeometryBudgetRungCount(level), clampBudgetLevel(level))
 );
 
-export type ContinuousDifficultyRegime = 'corridor' | 'ramp' | 'plateau';
+// 'ramp': the felt target still rises; 'fringe': the felt target is at its top and the fringe
+// rises (past GEOMETRY_BUDGET_FELT_SATURATION_LEVEL); 'plateau': geometry can no longer rise.
+export type ContinuousDifficultyRegime = 'corridor' | 'ramp' | 'fringe' | 'plateau';
 
 export interface ContinuousDifficulty {
   readonly level: number;
@@ -445,6 +489,8 @@ export interface ContinuousDifficulty {
   // Geometry proxy target; null for the corridor level (not tuned on the proxy).
   readonly geometryTarget: number | null;
   readonly geometryRungs: number;
+  // Zero-felt-cost side-stub cells the maze carries (GEOMETRY_BUDGET_FRINGE_CAP at most).
+  readonly fringeCells: number;
   // True from GEOMETRY_BUDGET_SATURATION_LEVEL on: geometry difficulty can no
   // longer rise on the frozen board.
   readonly geometrySaturated: boolean;
@@ -461,15 +507,16 @@ export interface ContinuousDifficulty {
 export const resolveContinuousDifficulty = (level: number): ContinuousDifficulty => {
   const normalized = Math.max(1, Math.trunc(Number.isFinite(level) ? level : 1));
   if (normalized <= 1) {
-    return { level: 1, regime: 'corridor', geometryTarget: null, geometryRungs: 0, geometrySaturated: false, hazardBudgetLevels: 0 };
+    return { level: 1, regime: 'corridor', geometryTarget: null, geometryRungs: 0, fringeCells: 0, geometrySaturated: false, hazardBudgetLevels: 0 };
   }
   const bounded = Math.min(LAST_BUDGET_LEVEL, normalized);
   const saturated = normalized >= GEOMETRY_BUDGET_SATURATION_LEVEL;
   return {
     level: normalized,
-    regime: saturated ? 'plateau' : 'ramp',
+    regime: saturated ? 'plateau' : (normalized > GEOMETRY_BUDGET_FELT_SATURATION_LEVEL ? 'fringe' : 'ramp'),
     geometryTarget: resolveGeometryBudgetTarget(bounded),
     geometryRungs: resolveGeometryBudgetRungCount(bounded),
+    fringeCells: resolveGeometryBudgetFringeCells(bounded),
     geometrySaturated: saturated,
     hazardBudgetLevels: saturated ? normalized - GEOMETRY_BUDGET_SATURATION_LEVEL : 0
   };
