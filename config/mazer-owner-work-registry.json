@@ -1053,7 +1053,7 @@
       "updatedAt": "2026-11-10T00:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-013",
-      "title": "Extend the ladder past level 198 to level 268 with side stubs the explorer does not pay for",
+      "title": "Extend the ladder to level 268 with side stubs the explorer does not pay for",
       "description": "The owner saw that the menu maze for level 18000 looks like a level 30 maze. Every level from 198 was the same maze class because the ladder steers on one explorer number and the board is full at level 198. Shrinking the route to raise that number made the other walkers 40 to 57 percent easier, so it was rejected. The new pull request adds exactly one more cell of short side stubs per level (the explorer does not enter stubs of 3 cells or fewer), which keeps the explorer number fixed and strictly orders levels 199 to 268 by cell count. At level 268 against 198 the maze has 38 route junctions instead of 12, 87 dead ends instead of 27 and the random walk takes 3.6 times as many steps. Levels 1 to 198 are byte-identical and levels 268 and above are one class again; the hazard hand-off now starts at 268. This is an open pull request, not merged and not deployed. The numbers are modelled walker difficulty, not player-tested, and the stubs are visible at a glance to a person.",
       "cardType": "feature",
       "priority": "high",
