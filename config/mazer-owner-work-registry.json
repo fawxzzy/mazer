@@ -4,14 +4,14 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-10T20:00:00.000Z",
+  "updatedAt": "2026-11-10T22:00:00.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 133,
+    "stableIdentityCount": 134,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 59,
+    "openCardCount": 60,
     "completedCardCount": 59,
     "deferredCardCount": 15,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out."
@@ -334,6 +334,26 @@
         "The trail shift is visible in a real frame strip, worst hue stays at least 3:1 on the chip, reduced motion is a static gradient",
         "Diamond border equals the trail colour and diamond fill and beams equal the player colour, both read from one module",
         "Merged, deployed and checked on a real phone are NOT yet done"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-014",
+      "status": "review",
+      "updatedAt": "2026-11-10T22:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-014",
+      "title": "Remove backdrop stars, centre the end markers, lighten the long trail draw",
+      "description": "After the previous polish went live the owner reported still stars behind the maze, a trail whose colour does not visibly move, and an end star and start arrow that are off centre and reach the tile edge. The coloured four-point stars are gone and no star is drawn while the background is not animating. The star and the arrow are now centred as a whole (outline included) and sit inside the lit rim at every tile size and pixel ratio, with new pixel tests. The trail colour does shift in real time in headless Chromium with default settings on the phone and desktop sizes, including on the live site; it is still when Trail Shine is Off or the device asks for reduced motion, and the long-trail draw was far too heavy for a slow phone, which is lightened here. The real cause on the owner phone is not proven. Open as a pull request; not merged, not deployed, not checked on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-VIS-013"
+      ],
+      "acceptanceCriteria": [
+        "No coloured four-point star is drawn behind the board, and no star at all while the background is Still or reduced motion is on",
+        "The goal star and start arrow, outline included, are centred on their tile within half a device pixel and inside the lit rim at tile sizes 6.4 to 25.4 px and pixel ratios 1 to 3, proven on raster pixels",
+        "The trail colour is shown to change frame to frame while the player is idle, on phone and desktop sizes, and to be still under reduced motion and Trail Shine Off",
+        "Merged, deployed and checked on a real phone are NOT yet done; the cause of the still trail on the owner phone is still unproven"
       ]
     },
     {

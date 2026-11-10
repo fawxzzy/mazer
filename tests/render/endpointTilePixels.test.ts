@@ -57,6 +57,16 @@ const representativeCells = (): BoardCell[] => {
   return [...seen.values()];
 };
 
+/** One representative cell per tile kind, plus the first cell with a concave corner. */
+const wholeGlyphCells = (): BoardCell[] => {
+  const picked = new Map<string, BoardCell>();
+  for (const t of computeChipGeometry(inputFor(14.72, 2, { x: 1, y: 1 }))) {
+    const key = Object.values(t.concave).some(Boolean) ? 'concave' : t.kind;
+    if (!picked.has(key)) picked.set(key, { x: t.x, y: t.y });
+  }
+  return [...picked.values()];
+};
+
 interface Rendered { base: RasterContext; marked: RasterContext; rect: { x0: number; y0: number; x1: number; y1: number }; }
 
 const render = (tileSize: number, dpr: number, cell: BoardCell, kind: 'goal' | 'start', direction: StartDirection = 'right'): Rendered => {
@@ -163,13 +173,74 @@ describe.each(TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, dpr] as cons
   }
 );
 
+
+/**
+ * Centring and containment of the WHOLE visible glyph (fill plus its dark keyline), on real pixels, at every tile size
+ * the board can produce (6.4 .. 25.44 css px) and DPR 1..3. Owner report (2026-11-10, live phone): "the star ... isn't
+ * centered in the middle of its tile, same with the start arrow, and its size should not be making it bleed over the
+ * tile edges". Measured then: a five-point star's bounding box sat about 0.1 of its radius above the tile centre
+ * (it was centred on its circumcentre), the play arrow was centred on its centroid, and the keyline touched the
+ * chip's rim.
+ *  - CENTRED: the bounding box of every painted pixel (glyph + keyline) is centred on the tile within 0.5 device px;
+ *  - INSIDE: every painted pixel lies strictly inside the tile's fill (the area inside the lit rim) with at least
+ *    a device pixel to spare on every side that has a rim, so the keyline never reaches the rim or the tile edge.
+ */
+const WHOLE_GLYPH_TILE_SIZES = [6.4, 8, 10, 12.48, 14.72, 18, 25.44];
+describe.each(WHOLE_GLYPH_TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, dpr] as const)))(
+  'whole glyph (fill + keyline) is centred and inside its tile: tile %f css px at DPR %i',
+  (tileSize, dpr) => {
+    // one cell per tile kind (cap, straight, corner, junction) plus one with a concave corner keeps this fast
+    const cells = wholeGlyphCells();
+    const cases = [
+      ...(['goal'] as const).map((kind) => ({ kind, direction: 'right' as StartDirection })),
+      ...START_DIRECTIONS.map((direction) => ({ kind: 'start' as const, direction }))
+    ];
+
+    test.each(cases)('$kind ($direction): bbox centre within 0.5 device px of the tile centre', ({ kind, direction }) => {
+      for (const cell of cells) {
+        const r = render(tileSize, dpr, cell, kind, direction);
+        const changed = changedPixels(r);
+        expect(changed.length).toBeGreaterThan(0);
+        const xs = changed.map((px) => px.x);
+        const ys = changed.map((px) => px.y);
+        const bx = (Math.min(...xs) + Math.max(...xs) + 1) / 2;
+        const by = (Math.min(...ys) + Math.max(...ys) + 1) / 2;
+        const tx = (r.rect.x0 + r.rect.x1 + 1) / 2;
+        const ty = (r.rect.y0 + r.rect.y1 + 1) / 2;
+        expect(Math.abs(bx - tx), `x centre offset, ${kind} ${direction} cell ${cell.x},${cell.y}`).toBeLessThanOrEqual(0.5);
+        expect(Math.abs(by - ty), `y centre offset, ${kind} ${direction} cell ${cell.x},${cell.y}`).toBeLessThanOrEqual(0.5);
+      }
+    });
+
+    test.each(cases)('$kind ($direction): nothing reaches the tile edge or its rim', ({ kind, direction }) => {
+      for (const cell of cells) {
+        const input = inputFor(tileSize, dpr, cell);
+        const tile = computeChipTileAt(input, cell)!;
+        const r = render(tileSize, dpr, cell, kind, direction);
+        const layout = computeBoardTileLayout(input);
+        const f = {
+          x0: Math.round((layout.originX + tile.fill.left) * dpr),
+          y0: Math.round((layout.originY + tile.fill.top) * dpr),
+          x1: Math.round((layout.originX + tile.fill.left + tile.fill.width) * dpr) - 1,
+          y1: Math.round((layout.originY + tile.fill.top + tile.fill.height) * dpr) - 1
+        };
+        for (const px of changedPixels(r)) {
+          // strictly inside the fill (the lit rim lives outside it), and inside the tile rect with a pixel to spare
+          expect(px.x >= f.x0 && px.x <= f.x1 && px.y >= f.y0 && px.y <= f.y1, `outside the fill (${px.x},${px.y}) ${kind} ${direction} cell ${cell.x},${cell.y}`).toBe(true);
+          expect(px.x > r.rect.x0 && px.x < r.rect.x1 && px.y > r.rect.y0 && px.y < r.rect.y1, `touches the tile edge (${px.x},${px.y})`).toBe(true);
+        }
+      }
+    });
+  }
+);
+
 describe.each([[14.72, 3], [25.44, 2], [10, 3]] as const)('start arrow direction: tile %f css px at DPR %i', (tileSize, dpr) => {
   const cell = { x: 5, y: 3 };
   const along = (direction: StartDirection, px: { dx: number; dy: number }): number => (
     direction === 'right' ? px.dx : direction === 'left' ? -px.dx : direction === 'down' ? px.dy : -px.dy
   );
 
-  test.each(START_DIRECTIONS)('the arrow points %s: its apex is ahead of the centre and its flat back is behind it', (direction) => {
+  test.each(START_DIRECTIONS)('the arrow points %s: its apex is ahead of the centre, its flat back behind it, and the box is centred', (direction) => {
     const r = render(tileSize, dpr, cell, 'start', direction);
     const gold = changedPixels(r).filter((px) => same(px.color, GLYPH_COLORS.start));
     expect(gold.length).toBeGreaterThan(4);
@@ -177,8 +248,9 @@ describe.each([[14.72, 3], [25.44, 2], [10, 3]] as const)('start arrow direction
     const behind = gold.filter((px) => along(direction, px) < 0).length;
     const maxAhead = Math.max(...gold.map((px) => along(direction, px)));
     const maxBehind = -Math.min(...gold.map((px) => along(direction, px)));
-    // optical centring: the apex reaches further from the centre than the flat back does (0.58 vs 0.42 of the length)
-    expect(maxAhead).toBeGreaterThan(maxBehind);
+    // the glyph's BOUNDING BOX is centred (not its centroid): apex and flat back are the same distance from the
+    // centre, within a device pixel of rasterisation
+    expect(Math.abs(maxAhead - maxBehind)).toBeLessThanOrEqual(1);
     // the apex is a point, the back is the full base: more filled mass behind the centre than ahead of it
     expect(behind).toBeGreaterThan(ahead);
   });

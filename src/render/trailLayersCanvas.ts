@@ -34,6 +34,44 @@ const rgba = (color: number, alpha: number): string => (
   `rgba(${(color >> 16) & 0xff},${(color >> 8) & 0xff},${color & 0xff},${Math.max(0, Math.min(1, alpha))})`
 );
 
+/** Largest bloom downscale: the blur radius is divided by it, so the halo stays soft but never blocky. */
+const MAX_BLOOM_DOWNSCALE = 4;
+/** One blur radius (device px) per downscale step: about 3 px of blur survives each step. */
+const BLOOM_BLUR_PX_PER_STEP = 3;
+
+type ScratchCanvas = HTMLCanvasElement | OffscreenCanvas;
+type ScratchContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
+let bloomScratch: { canvas: ScratchCanvas; ctx: ScratchContext } | null = null;
+
+/** The bloom's downscale factor for a blur radius in device px (1 means: blur in place, no scratch canvas). */
+export const resolveBloomDownscale = (glowBlurPx: number): number => (
+  Math.max(1, Math.min(MAX_BLOOM_DOWNSCALE, Math.round(glowBlurPx / BLOOM_BLUR_PX_PER_STEP)))
+);
+
+const acquireBloomScratch = (width: number, height: number): { canvas: ScratchCanvas; ctx: ScratchContext } | null => {
+  try {
+    if (!bloomScratch) {
+      if (typeof document === 'undefined') {
+        return null;
+      }
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        return null;
+      }
+      bloomScratch = { canvas, ctx };
+    }
+    if (bloomScratch.canvas.width !== width || bloomScratch.canvas.height !== height) {
+      bloomScratch.canvas.width = width;
+      bloomScratch.canvas.height = height;
+    }
+    return bloomScratch;
+  } catch {
+    return null;
+  }
+};
+
 const strokeChunk = (
   ctx: CanvasRenderingContext2D,
   chunk: readonly TrailCanvasSegment[],
@@ -53,6 +91,49 @@ const strokeChunk = (
   ctx.stroke();
 };
 
+/**
+ * The bloom on a 1/f scratch canvas, scaled back up onto `ctx` (see the COST note in the file header). Returns false,
+ * having drawn nothing, when it cannot (no DOM or canvas size, or a blur too small to be worth it).
+ */
+const drawBloomDownscaled = (
+  ctx: CanvasRenderingContext2D,
+  chunks: readonly (readonly TrailCanvasSegment[])[],
+  options: TrailLayersOptions
+): boolean => {
+  const factor = options.glowBlurPx > 0 ? resolveBloomDownscale(options.glowBlurPx) : 1;
+  const target = ctx.canvas as { width?: number; height?: number } | undefined;
+  if (factor < 2 || !target || !(target.width! > 0) || !(target.height! > 0) || typeof ctx.getTransform !== 'function') {
+    return false;
+  }
+  const scratch = acquireBloomScratch(Math.ceil(target.width! / factor), Math.ceil(target.height! / factor));
+  if (!scratch) {
+    return false;
+  }
+  const scale = ctx.getTransform().a / factor;
+  const sctx = scratch.ctx;
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.clearRect(0, 0, scratch.canvas.width, scratch.canvas.height);
+  sctx.setTransform(scale, 0, 0, scale, 0, 0);
+  sctx.lineJoin = 'round';
+  sctx.lineCap = 'round';
+  sctx.shadowBlur = options.glowBlurPx / factor;
+  for (const chunk of chunks) {
+    const first = chunk[0]!;
+    const style = rgba(first.glowColor, first.alpha * options.glowAlphaRatio);
+    sctx.shadowColor = style;
+    strokeChunk(sctx as CanvasRenderingContext2D, chunk, options.glowWidth, style, options.originX, options.originY);
+  }
+  sctx.shadowBlur = 0;
+  sctx.shadowColor = 'transparent';
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(scratch.canvas as CanvasImageSource, 0, 0, scratch.canvas.width, scratch.canvas.height, 0, 0, target.width!, target.height!);
+  ctx.restore();
+  return true;
+};
+
 export const drawTrailLayersToCanvasContext = (
   ctx: CanvasRenderingContext2D,
   segments: readonly TrailLayerSegment[],
@@ -67,19 +148,21 @@ export const drawTrailLayersToCanvasContext = (
 
   // 1. Bloom: blurred glow in each segment's own base colour.
   const chunks = chunkTrailSegments(segments);
-  if (options.glowBlurPx > 0) {
-    ctx.shadowBlur = options.glowBlurPx;
-  }
-  for (const chunk of chunks) {
-    const first = chunk[0]!;
-    const style = rgba(first.glowColor, first.alpha * options.glowAlphaRatio);
+  if (!drawBloomDownscaled(ctx, chunks, options)) {
     if (options.glowBlurPx > 0) {
-      ctx.shadowColor = style;
+      ctx.shadowBlur = options.glowBlurPx;
     }
-    strokeChunk(ctx, chunk, options.glowWidth, style, options.originX, options.originY);
+    for (const chunk of chunks) {
+      const first = chunk[0]!;
+      const style = rgba(first.glowColor, first.alpha * options.glowAlphaRatio);
+      if (options.glowBlurPx > 0) {
+        ctx.shadowColor = style;
+      }
+      strokeChunk(ctx, chunk, options.glowWidth, style, options.originX, options.originY);
+    }
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
   }
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = 'transparent';
 
   // 2. Dark underlay: one colour, so it chunks into few strokes.
   const underlaySegments = segments.map((segment) => ({
