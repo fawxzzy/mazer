@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'vitest';
-import { BOARD_CHIP_FILL, boardMaterial } from '../../src/render/boardTileStyle';
+import { BOARD_CHIP_FILL, CHIP_CORNER_RATIO, boardMaterial } from '../../src/render/boardTileStyle';
 import { getContrastRatio } from '../../src/render/palette';
 import {
   PLAYER_LOCATOR,
   PLAYER_LOCATOR_PING_TOTAL_MS,
   PlayerLocatorState,
   drawPlayerLocator,
+  resolveLocatorCornerRadius,
   resolvePingRingProgress,
   resolvePlayerLocatorMetrics,
   type LocatorGraphics,
@@ -21,9 +22,8 @@ const recorder = (): { g: LocatorGraphics; calls: Call[] } => {
     calls,
     g: {
       fillStyle: rec('fillStyle'),
-      fillCircle: rec('fillCircle'),
+      fillRoundedRect: rec('fillRoundedRect'),
       lineStyle: rec('lineStyle'),
-      strokeCircle: rec('strokeCircle'),
       strokeRoundedRect: rec('strokeRoundedRect')
     }
   };
@@ -43,7 +43,9 @@ const baseInput = (over: Partial<PlayerLocatorDrawInput> = {}): PlayerLocatorDra
   ...over
 });
 
-const circles = (calls: Call[]): number => calls.filter((c) => c.fn === 'strokeCircle').length;
+/** Ring strokes (ring keyline, ring, then 2 per live ping ring): every strokeRoundedRect except the final core keyline. */
+const circles = (calls: Call[]): number => calls.filter((c) => c.fn === 'strokeRoundedRect').length - 1;
+const ringSquares = (calls: Call[]): Call[] => calls.filter((c) => c.fn === 'strokeRoundedRect').slice(0, -1);
 
 describe('player locator geometry', () => {
   test('ring radius scales with the tile but is floored and capped in css px', () => {
@@ -73,12 +75,12 @@ describe('player locator geometry', () => {
 });
 
 describe('player locator draw', () => {
-  test('static treatment: glow discs, dark-keylined ring, core keyline, and no ping', () => {
+  test('static treatment: glow squares, dark-keylined ring, core keyline, and no ping', () => {
     const { g, calls } = recorder();
     drawPlayerLocator(g, baseInput());
-    expect(calls.filter((c) => c.fn === 'fillCircle')).toHaveLength(PLAYER_LOCATOR.glowSteps);
+    expect(calls.filter((c) => c.fn === 'fillRoundedRect')).toHaveLength(PLAYER_LOCATOR.glowSteps);
     expect(circles(calls)).toBe(2);
-    expect(calls.filter((c) => c.fn === 'strokeRoundedRect')).toHaveLength(1);
+    expect(calls.filter((c) => c.fn === 'strokeRoundedRect')).toHaveLength(3);
     const widths = calls.filter((c) => c.fn === 'lineStyle').map((c) => c.args[0]!);
     expect(widths[0]).toBeGreaterThan(widths[1]!);
   });
@@ -119,14 +121,39 @@ describe('player locator draw', () => {
     for (const t of [50, 300, 600, 900, 1050]) {
       const { g, calls } = recorder();
       drawPlayerLocator(g, baseInput({ pingStartMs: 0, timeMs: t }));
-      const rings = calls.filter((c) => c.fn === 'strokeCircle').map((c) => c.args[2]!);
-      radii.push(rings[2]!);
+      // strokeRoundedRect args: x, y, width, height, radius; the half-extent is width / 2
+      radii.push(ringSquares(calls)[2]!.args[2]! / 2);
     }
     for (let i = 1; i < radii.length; i += 1) {
       expect(radii[i]).toBeGreaterThan(radii[i - 1]!);
     }
     expect(radii[0]).toBeGreaterThanOrEqual(m.ringRadiusCss);
     expect(radii[radii.length - 1]).toBeLessThanOrEqual(m.pingTravelRadiusCss);
+  });
+
+  test('the ring, glow and ping are chip-family rounded squares: concentric with the player, corner = chip proportion', () => {
+    const { g, calls } = recorder();
+    drawPlayerLocator(g, baseInput({ pingStartMs: 1000, timeMs: 1400 }));
+    const squares = [
+      ...calls.filter((c) => c.fn === 'fillRoundedRect'),
+      ...ringSquares(calls)
+    ];
+    expect(squares.length).toBeGreaterThan(PLAYER_LOCATOR.glowSteps + 4);
+    for (const call of squares) {
+      const [x, y, w, h, r] = call.args as [number, number, number, number, number];
+      expect(w, call.fn).toBeCloseTo(h, 9);
+      expect(x + (w / 2), call.fn).toBeCloseTo(100, 9);
+      expect(y + (h / 2), call.fn).toBeCloseTo(80, 9);
+      // radius / width equals the chip tile's corner ratio (the same constant the tile and the player use)
+      expect(r / w, call.fn).toBeCloseTo(CHIP_CORNER_RATIO, 9);
+    }
+    expect(resolveLocatorCornerRadius(10)).toBeCloseTo(10 * 2 * CHIP_CORNER_RATIO, 9);
+  });
+
+  test('no circle is drawn any more (the interface has no circle methods)', () => {
+    const { g } = recorder();
+    expect(Object.keys(g)).not.toContain('fillCircle');
+    expect(Object.keys(g)).not.toContain('strokeCircle');
   });
 
   test('draws nothing at zero alpha and respects the lifecycle fade', () => {

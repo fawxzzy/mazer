@@ -57,7 +57,7 @@ describe('MenuScene wiring: one shared Settings sheet', () => {
     expect(guide).toContain('model.closeLabel,');
     expect(guide).toContain('() => this.closeLegacyGuideSheet(),\n      \'primary\'');
     // no guide copy is hard-coded in the scene: it lives in legacyGuideContent.ts only.
-    expect(guide).not.toMatch(/Reach the star|green block|Touch and hold|glowing line|Some mazes wrap|Each cleared maze/);
+    expect(guide).not.toMatch(/Reach the star|green block|green rounded block|Touch and hold|glowing line|colour-shifting line|play marker on a ringed tile|Some mazes wrap|Each cleared maze/);
   });
 });
 

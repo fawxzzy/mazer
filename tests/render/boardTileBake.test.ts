@@ -5,6 +5,7 @@ import {
   computeBoardTileBakeHash,
   computeBoardTileLayout,
   computeChipGeometry,
+  computeChipTileAt,
   computeWallSockets,
   createBoardTileBakeCache,
   drawBoardMarkers,
@@ -21,6 +22,7 @@ import {
   cssRgba,
   resolveBoardTileStyle
 } from '../../src/render/boardTileStyle';
+import { resolveEndpointPadColor } from '../../src/render/endpointTiles';
 import {
   braidedMazeGrid,
   contrast,
@@ -226,16 +228,38 @@ describe('dead-end caps, junction nodes, dots', () => {
     expect(t!.radii.every((r) => r === 8)).toBe(true);
   });
 
-  test('junction nodes sit in their own pass; one circle per floor tile (tiles under 10 px have no sockets)', () => {
+  test('there is no junction marker: split tiles get the same faint pad dot as every other tile, one circle per floor tile', () => {
     const input = inputFor(maze, { tileSize: 8, start: { x: 1, y: 1 }, goal: { x: 23, y: 49 } });
     const { rec, result } = bake(input);
     const tiles = computeChipGeometry(input);
     const rest = tiles.filter((t) => !(t.x === 1 && t.y === 1) && !(t.x === 23 && t.y === 49));
     expect(rest.filter((t) => t.degree >= 3).length).toBeGreaterThan(10);
     expect(result.stats.sockets).toBe(0);
+    // one pad dot per remaining floor tile, junctions included (previously junctions drew a separate, brighter node)
     expect(rec.count('arc(')).toBe(rest.length);
-    expect(rec.log).toContain(`set fillStyle=${cssRgba(boardMaterial.rim, BOARD_TILE_GEOMETRY.junctionNodeAlpha)}`);
     expect(rec.log).toContain(`set fillStyle=${cssRgba(boardMaterial.rim, BOARD_TILE_GEOMETRY.padDotAlpha)}`);
+    // ...and nothing is drawn at the old bright junction-node alpha
+    expect(rec.log.filter((e) => e.startsWith('set fillStyle=') && e.includes(',0.85)'))).toEqual([]);
+    expect(Object.keys(BOARD_TILE_GEOMETRY)).not.toContain('junctionNodeAlpha');
+    expect(Object.keys(resolveBoardTileStyle('chip', 8, 2))).not.toContain('junctionNodeRadius');
+  });
+
+  test('a junction tile and a straight tile paint the same single dot, at the same radius', () => {
+    const g = emptyGrid(3, 3);
+    g[1]![0] = true; g[1]![1] = true; g[1]![2] = true; g[2]![1] = true;
+    // tiles under 10 px have no wall sockets, so the only arcs are the pad dots
+    const { rec } = bake(inputFor(g, { tileSize: 8, devicePixelRatio: 2, start: undefined, goal: undefined }));
+    const style = resolveBoardTileStyle('chip', 8, 2);
+    // four floor tiles (one junction, three caps): four pad dots, all at one radius
+    const radii = rec.log.filter((e) => e.startsWith('arc(')).map((e) => Number(e.slice(4, -1).split(',')[2]));
+    expect(radii).toHaveLength(4);
+    for (const r of radii) expect(r).toBe(style.padDotRadius);
+  });
+
+  test('the bake hash version moved when the junction nodes went (a stale cached bake can never survive)', () => {
+    expect(BOARD_TILE_BAKE_VERSION).toBe('mazer-board-tile-bake-v2');
+    const input = inputFor(maze);
+    expect(computeBoardTileBakeHash(input)).not.toBe(computeBoardTileBakeHash({ ...input, tileSize: input.tileSize + 1 }));
   });
 
   test('start and goal cells get no pad dot or node so the markers stay clean', () => {
@@ -430,21 +454,67 @@ describe('markers', () => {
     ]);
   });
 
-  test('chip goal: goal-coloured end pad, dark disc badge, lit ring and a star in the danger colour', () => {
+  test('chip goal: dark tinted end pad, dark disc badge, lit ring and a star in the danger colour', () => {
     const { rec } = draw({ start: undefined, player: undefined });
     expect(rec.log).toContain(`set fillStyle=${cssRgb(boardMaterial.void)}`);
     expect(rec.log).toContain(`set fillStyle=${cssRgb(boardMaterial.goal)}`);
-    // Chip wiring (2026-11-06) added the end pad (the cell's inscribed circle, goal colour at goalWashAlpha)
-    // under the badge so the goal cell reads at board scale: three arcs now (pad, badge, ring), was two.
-    expect(rec.log).toContain(`set fillStyle=${cssRgba(boardMaterial.goal, BOARD_TILE_GEOMETRY.marker.goalWashAlpha)}`);
-    expect(rec.count('arc(')).toBe(3);
+    // The end tile's pad is the chip's own fill silhouette in the endpoint colour (opaque), then the badge.
+    expect(rec.log).toContain(`set fillStyle=${cssRgb(resolveEndpointPadColor('goal'))}`);
+    expect(rec.log).toContain(`set strokeStyle=${cssRgba(boardMaterial.rim, BOARD_TILE_GEOMETRY.marker.goalRingAlphaBase)}`);
+    // badge disc + ring: two full circles (the standalone pad is four corner arcs through arcTo, not arc)
+    expect(rec.count('arc(')).toBe(2);
   });
 
-  test('chip start: gold corner brackets in one stroked path', () => {
+  test('chip start: gold ring on a dark disc badge and a gold play triangle, on a tinted tile pad', () => {
     const { rec } = draw({ goal: undefined, player: undefined });
     expect(rec.log).toContain(`set strokeStyle=${cssRgb(boardMaterial.start)}`);
-    expect(rec.count('stroke(')).toBe(1);
-    expect(rec.count('moveTo(')).toBe(4 + 1);
+    expect(rec.log).toContain(`set fillStyle=${cssRgb(boardMaterial.start)}`);
+    expect(rec.log).toContain(`set fillStyle=${cssRgb(resolveEndpointPadColor('start'))}`);
+    // no corner brackets any more: the ring and the triangle's round-join outline are the only strokes
+    expect(rec.count('stroke(')).toBe(2);
+    expect(rec.count('arc(')).toBe(2);
+  });
+
+  test('endpointLayer splits the tile pad from the badge so the scene can paint the pad under the trail', () => {
+    const pad = draw({ start: undefined, player: undefined, endpointLayer: 'pad' });
+    const badge = draw({ start: undefined, player: undefined, endpointLayer: 'badge' });
+    const all = draw({ start: undefined, player: undefined, endpointLayer: 'all' });
+    expect(pad.rec.count('arc(')).toBe(0);
+    expect(pad.rec.count('stroke(')).toBe(0);
+    expect(pad.rec.count('fill(')).toBe(1);
+    expect(badge.rec.count('arc(')).toBe(2);
+    expect(badge.rec.log.some((e) => e.includes(cssRgb(resolveEndpointPadColor('goal'))))).toBe(false);
+    expect(all.rec.count('fill(')).toBe(pad.rec.count('fill(') + badge.rec.count('fill('));
+    expect(all.rec.count('stroke(')).toBe(badge.rec.count('stroke('));
+  });
+
+  test('the pad is the baked tile: given the tile geometry it paints that tile fill rect, nothing larger', () => {
+    const input = inputFor(corridorGrid(), { tileSize: 14.72, devicePixelRatio: 3, goal: { x: 12, y: 50 } });
+    const tile = computeChipTileAt(input, { x: 12, y: 50 })!;
+    const rec = createRecordingContext();
+    drawBoardMarkers(rec.ctx, {
+      style: 'chip', tileSize: 14.72, devicePixelRatio: 3, originX: 40, originY: 20, goal: { x: 12, y: 50 }, goalTile: tile, endpointLayer: 'pad'
+    });
+    const points = rec.log
+      .filter((e) => e.startsWith('moveTo(') || e.startsWith('lineTo('))
+      .map((e) => e.slice(e.indexOf('(') + 1, -1).split(',').map(Number) as [number, number]);
+    expect(points.length).toBeGreaterThan(3);
+    for (const [x, y] of points) {
+      expect(x).toBeGreaterThanOrEqual(40 + tile.fill.left - 1e-9);
+      expect(x).toBeLessThanOrEqual(40 + tile.fill.left + tile.fill.width + 1e-9);
+      expect(y).toBeGreaterThanOrEqual(20 + tile.fill.top - 1e-9);
+      expect(y).toBeLessThanOrEqual(20 + tile.fill.top + tile.fill.height + 1e-9);
+    }
+  });
+
+  test('trace keeps its own start and goal artwork (and still honours the css-px floors)', () => {
+    const rec = createRecordingContext();
+    drawBoardMarkers(rec.ctx, {
+      style: 'trace', tileSize: 8, devicePixelRatio: 2, goal: { x: 2, y: 2 }, start: { x: 1, y: 1 },
+      minimumMarkerSizes: { goalBadgeDiameterCss: 22, startTileCss: 15 }
+    });
+    expect(rec.log).toContain(`set fillStyle=${cssRgba(boardMaterial.void, 0.9)}`);
+    expect(rec.log.some((e) => e.includes(cssRgb(resolveEndpointPadColor('goal'))))).toBe(false);
   });
 
   test('start marker is skipped while the player stands on it', () => {

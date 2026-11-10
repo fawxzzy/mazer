@@ -3,13 +3,17 @@
  * scales with the board and never shrinks to a dot on dense boards (tiles of 5..8 css px).
  *
  * What it adds (the player's own shape, colour and glow are untouched; this only surrounds them):
- *   1. a soft player-green glow disc (a few equal-alpha concentric discs: Phaser Graphics has no gradients),
+ *   1. a soft player-green glow (a few equal-alpha concentric rounded squares: Phaser Graphics has no gradients),
  *   2. a crisp ring around the player: a dark keyline stroke under a bright player-green stroke, so it reads
- *      against both the teal chips and the rainbow trail,
+ *      against both the teal chips and the trail,
  *   3. a dark keyline hugging the player's rounded square (drawn before the core fill), which separates the
  *      bright core from the trail running through the same tile,
  *   4. a brief "find me" ping (two staggered expanding rings) on spawn, after unpause / level change, and
  *      whenever the player has stood still for `idleMs`. A ping is cancelled the moment the player moves.
+ *
+ * Shape: the ring, glow and ping are rounded squares with the Chip tile's own corner proportion (radius is
+ * CHIP_CORNER_RATIO of the side), concentric with the player's rounded square, so the locator reads as
+ * the same chip family as the tile and the player instead of a circle around a square.
  *
  * Reduced motion: the glow, ring and keyline are static and the ping is never started.
  *
@@ -19,10 +23,10 @@
  *
  * Pure: no Date, no Math.random. The draw is a function of (geometry, timeMs, pingStartMs, reducedMotion).
  */
-import { boardMaterial } from './boardTileStyle';
+import { CHIP_CORNER_RATIO, boardMaterial } from './boardTileStyle';
 
 export const PLAYER_LOCATOR = Object.freeze({
-  /** Ring radius as a share of the tile, floored and capped in css px so it reads on every board size. */
+  /** Ring half-extent as a share of the tile, floored and capped in css px so it reads on every board size. */
   ringRadiusTileRatio: 0.7,
   minRingRadiusCss: 11,
   maxRingRadiusCss: 30,
@@ -55,11 +59,21 @@ export const PLAYER_LOCATOR = Object.freeze({
 /** The subset of Phaser.GameObjects.Graphics the locator paints with (a fake in tests). */
 export interface LocatorGraphics {
   fillStyle(color: number, alpha?: number): unknown;
-  fillCircle(x: number, y: number, radius: number): unknown;
+  fillRoundedRect(x: number, y: number, width: number, height: number, radius: number): unknown;
   lineStyle(width: number, color: number, alpha?: number): unknown;
-  strokeCircle(x: number, y: number, radius: number): unknown;
   strokeRoundedRect(x: number, y: number, width: number, height: number, radius: number): unknown;
 }
+
+/** Corner radius of a chip-family rounded square of the given half-extent (the Chip tile's corner proportion). */
+export const resolveLocatorCornerRadius = (halfExtent: number): number => halfExtent * 2 * CHIP_CORNER_RATIO;
+
+const fillSquare = (g: LocatorGraphics, cx: number, cy: number, half: number): void => {
+  g.fillRoundedRect(cx - half, cy - half, half * 2, half * 2, resolveLocatorCornerRadius(half));
+};
+
+const strokeSquare = (g: LocatorGraphics, cx: number, cy: number, half: number): void => {
+  g.strokeRoundedRect(cx - half, cy - half, half * 2, half * 2, resolveLocatorCornerRadius(half));
+};
 
 export interface PlayerLocatorMetrics {
   ringRadiusCss: number;
@@ -122,19 +136,19 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
   const m = resolvePlayerLocatorMetrics(input.tileSize, SCRATCH);
   const { centerX: cx, centerY: cy } = input;
 
-  // 1. soft glow: equal-alpha concentric discs, stacked so the cumulative alpha at the ring is glowPeakAlpha.
+  // 1. soft glow: equal-alpha concentric rounded squares, stacked so the cumulative alpha at the ring is glowPeakAlpha.
   const perStep = 1 - ((1 - k.glowPeakAlpha) ** (1 / k.glowSteps));
   g.fillStyle(boardMaterial.player, perStep * alpha);
   for (let i = 0; i < k.glowSteps; i += 1) {
     const r = m.ringRadiusCss + ((m.glowRadiusCss - m.ringRadiusCss) * (1 - (i / k.glowSteps)));
-    g.fillCircle(cx, cy, r);
+    fillSquare(g, cx, cy, r);
   }
 
   // 2. crisp ring: dark keyline under the bright stroke.
   g.lineStyle(k.ringStrokeCss + k.ringKeylineExtraCss, boardMaterial.void, k.keylineAlpha * alpha);
-  g.strokeCircle(cx, cy, m.ringRadiusCss);
+  strokeSquare(g, cx, cy, m.ringRadiusCss);
   g.lineStyle(k.ringStrokeCss, boardMaterial.player, k.ringAlpha * alpha);
-  g.strokeCircle(cx, cy, m.ringRadiusCss);
+  strokeSquare(g, cx, cy, m.ringRadiusCss);
 
   // 3. find-me ping: expanding rings (never in reduced motion; the caller also never starts one).
   if (!input.reducedMotion && input.pingStartMs >= 0) {
@@ -148,9 +162,9 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
       const radius = m.ringRadiusCss + ((m.pingTravelRadiusCss - m.ringRadiusCss) * eased);
       const fade = k.pingPeakAlpha * (1 - t) * alpha;
       g.lineStyle(k.pingStrokeCss + k.pingKeylineExtraCss, boardMaterial.void, fade * 0.7);
-      g.strokeCircle(cx, cy, radius);
+      strokeSquare(g, cx, cy, radius);
       g.lineStyle(k.pingStrokeCss, boardMaterial.playerEdge, fade);
-      g.strokeCircle(cx, cy, radius);
+      strokeSquare(g, cx, cy, radius);
     }
   }
 
