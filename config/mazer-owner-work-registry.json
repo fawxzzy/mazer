@@ -4,7 +4,7 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-10T16:00:00.000Z",
+  "updatedAt": "2026-11-10T20:00:00.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
@@ -1446,29 +1446,29 @@
     },
     {
       "id": "MAZER-FLOW-002",
-      "status": "planning",
-      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-10T20:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-002",
       "title": "Add a level-complete moment",
-      "description": "Clearing a level shows only a bare digit and lasers; there is no text, score or sound. Plan: inside the existing 2.6 s cadence, show Level N with a small CLEARED line, a halo burst and haptic, with a reduced-motion form. Not started.",
+      "description": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion durations, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
       "cardType": "feature",
       "priority": "high",
       "dependencies": [],
       "acceptanceCriteria": [
-        "A caption appears during goal hold and outro without lengthening the cadence",
-        "Reduced motion uses a short static crossfade",
-        "Intro timeline tests cover the caption channel"
+        "A caption appears from the goal-reached instant without lengthening the cadence",
+        "Reduced motion uses a static caption for 400 ms",
+        "Timeline and wiring tests cover the caption, and the menu demo shows none"
       ]
     },
     {
       "id": "MAZER-FLOW-003",
-      "status": "planning",
-      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-10T20:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-003",
       "title": "Add a rank-up moment",
-      "description": "Rank changes silently at levels 6, 11, 17, 23 and 31. Plan: a tier-colored ring and letter for about 700 ms with a short sound and haptic, skippable. Depends on the chip decision and the level-complete beat.",
+      "description": "Implemented in a pull request, in review: when a clear moves the player to a stronger rank (levels 6, 11, 17, 23 and 31 on a normal ladder) the caption reads 'Rank D' style in that rank's colour for 1100 ms in place of the level caption; reduced motion shows it static for 400 ms. Rank letters come from the existing rank model; nothing is invented. Thresholds are pinned by a fixture. The Level/Rank chip, sound and haptics stay separate cards, and the Guide ranks row stays pending. On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [
@@ -1477,7 +1477,7 @@
       ],
       "acceptanceCriteria": [
         "Rank change is detected at completion time",
-        "Beat is skippable and has a reduced-motion form",
+        "The caption uses the rank letter and colour and has a static reduced-motion form",
         "Thresholds pinned by a fixture"
       ]
     },
@@ -1500,21 +1500,21 @@
     },
     {
       "id": "MAZER-FLOW-005",
-      "status": "planning",
-      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-10T20:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-005",
       "title": "Confirm before quitting a level",
-      "description": "Quit to Menu has no confirmation and is styled like a neutral action, so a mid-level attempt is discarded with one tap. Plan: a leave-this-maze confirmation after the first move using the existing confirm dialog.",
+      "description": "Implemented in a pull request, in review: Quit to Menu quits at once when no move was made; after a move the first press (tap, click or the Q key) relabels the row 'Tap again to quit' for 3 s and the second press quits, with no browser dialog or modal. The Guide keyboard line names Q. The pause row keeps its 44 px target. On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium with real touch taps and keyboard, not checked on a real phone.",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
         "MAZER-UI-006"
       ],
       "acceptanceCriteria": [
-        "Quit after at least one move asks for confirmation",
+        "Quit after at least one move asks for a second press",
         "Quit before moving does not",
-        "Pause view tests updated"
+        "Settings sheet plan, confirm state and guide tests updated"
       ]
     },
     {

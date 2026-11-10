@@ -40,7 +40,7 @@ export interface LegacyPauseActionModel {
   command: LegacyPauseMenuCommand | null;
   /** Existing UI bridge command dispatched first (scene falls back to `command`), or null. */
   bridgeCommand: LegacyPauseMenuBridgeCommand | null;
-  /** Whether the action asks for confirmation first. Quit to Menu does not (owner decision pending). */
+  /** Legacy model only. The live Pause sheet confirms Quit to Menu after the first move via legacyQuitConfirm.ts (settings sheet plan). */
   requiresConfirmation: false;
   /** Settings only: toggles an inline section instead of leaving the card. */
   togglesSection: boolean;

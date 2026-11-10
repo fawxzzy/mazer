@@ -82,8 +82,8 @@ export interface LegacyGuideKeyBinding {
   does: string;
   /** KeyboardEvent.key values the drift test resolves against the live input maps. */
   keys: readonly string[];
-  /** What the live input map must resolve each key to ('move_*' kinds or 'pause'), or null for Escape. */
-  expectedAction: 'move' | 'pause' | null;
+  /** What the live input map must resolve each key to ('move_*' kinds or 'pause'); 'quit' and Escape are scene-level keys (null for Escape). */
+  expectedAction: 'move' | 'pause' | 'quit' | null;
 }
 
 const TRAIL_FADE_LABEL = LEGACY_SETTINGS_GROUP_ROWS.find((row) => row.id === 'trail-fade')?.label ?? 'Trail Fade';
@@ -188,7 +188,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'levels',
-    text: 'Each cleared maze raises your level. Harder mazes can have shortcuts and loops.'
+    text: 'Clears show your level, new ranks flash a letter. Harder mazes add shortcuts and loops.'
   }
 ]);
 
@@ -229,12 +229,13 @@ export const LEGACY_GUIDE_KEY_BINDINGS: readonly LegacyGuideKeyBinding[] = Objec
   { does: 'to move', expectedAction: 'move', keys: ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'], label: 'Arrow keys' },
   { does: 'to move', expectedAction: 'move', keys: ['w', 'a', 's', 'd'], label: 'WASD' },
   { does: 'pauses', expectedAction: 'pause', keys: ['p'], label: 'P' },
-  { does: 'goes back', expectedAction: null, keys: ['Escape'], label: 'Esc' }
+  { does: 'goes back', expectedAction: null, keys: ['Escape'], label: 'Esc' },
+  { does: 'twice quits from Pause', expectedAction: 'quit', keys: ['q'], label: 'Q' }
 ]);
 
 export const buildLegacyGuideKeyboardLine = (): string => {
-  const [arrows, wasd, pause, back] = LEGACY_GUIDE_KEY_BINDINGS;
-  return `${arrows!.label} or ${wasd!.label} ${wasd!.does}. ${pause!.label} ${pause!.does}. ${back!.label} ${back!.does}.`;
+  const [arrows, wasd, pause, back, quit] = LEGACY_GUIDE_KEY_BINDINGS;
+  return `${arrows!.label} or ${wasd!.label} ${wasd!.does}. ${pause!.label} ${pause!.does}. ${back!.label} ${back!.does}. ${quit!.label} ${quit!.does}.`;
 };
 
 export interface LegacyGuideSheetModel {

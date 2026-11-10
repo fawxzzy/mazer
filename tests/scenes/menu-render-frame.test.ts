@@ -1351,8 +1351,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // Wiring lane: Quit to Menu is the pause-bottom row of the shared settings plan; its command runs here.
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
       "      case 'RETURN_HOME':\n"
-      + '        this.dispatchUiBridgeCommand({ type: \'RETURN_HOME\' }, () => this.applyLegacyPauseCommand(\'return-menu\'));\n'
+      + '        this.pressLegacyQuitToMenu();\n'
     );
+    // Quit to Menu is a two-step confirm after the first move (legacyQuitConfirm.ts); the second press dispatches the bridge command.
+    expect(menuSceneSource).toContain("this.dispatchUiBridgeCommand({ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu'));");
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
     expect(menuSceneSource).toContain('this.playDirectionalIntent.step(this.maze, this.player, {');
@@ -2707,7 +2709,7 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
   const noops = [
     'syncLegacyAuthGateLoadingScreen', 'syncLegacyAuthOpeningTimeout', 'recordRuntimeFrame',
     'expireLegacyPlayerMessages', 'updateStars', 'advanceLegacyOverlayScrollMomentum',
-    'holdLegacyPlayMazeLifecycleDuringPause', 'advanceLegacyMenuStaticDrawStage',
+    'holdLegacyPlayMazeLifecycleDuringPause', 'updateLegacyFlowFeedback', 'advanceLegacyMenuStaticDrawStage',
     'isLegacyMenuBuildPrerollActive', 'hasLegacyPlayTrailPulsePendingFrame',
     'hasLegacyBleedOffGlowPendingFrame', 'hasLegacyPlayerVisualMotionPendingFrame', 'updateLegacyPlayerLocator',
     'settleLegacyPlayerTransferEnergy', 'isLegacyMenuHandoffAnimationActive',

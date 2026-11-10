@@ -32,6 +32,7 @@
  * `body` token for labels; the plan wraps instead of shrinking.
  */
 import { designTokens } from '../theme/tokens';
+import { LEGACY_QUIT_CONFIRM_ARMED_LABEL } from './legacyQuitConfirm';
 import {
   LEGACY_UI_COMPACT_BREAKPOINT,
   LEGACY_UI_MIN_TOUCH_TARGET,
@@ -132,6 +133,12 @@ export interface LegacySettingsModelOptions {
   signedIn?: boolean;
   /** Pause only: adds the Level Preview section (dev/QA route). Absent = default sheet, unchanged. */
   levelPreview?: LegacySettingsLevelPreviewOptions;
+  /**
+   * Pause only: the Quit to Menu row is armed (a move was made and the first
+   * press already happened), so it reads "Tap again to quit". Absent/false =
+   * the default "Quit to Menu" row. See legacyQuitConfirm.ts.
+   */
+  quitConfirmArmed?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -234,10 +241,15 @@ export const buildLegacySettingsSheetModel = (
           collapsedByDefault: false,
           collapsible: false,
           id: 'pause-bottom',
-          rows: [row('quit-to-menu', 'action', 'Quit to Menu', {
-            command: { type: 'RETURN_HOME' },
-            emphasis: 'tertiary'
-          })],
+          rows: [options.quitConfirmArmed === true
+            ? row('quit-to-menu', 'action', LEGACY_QUIT_CONFIRM_ARMED_LABEL, {
+              command: { type: 'RETURN_HOME' },
+              emphasis: 'danger-outline'
+            })
+            : row('quit-to-menu', 'action', 'Quit to Menu', {
+              command: { type: 'RETURN_HOME' },
+              emphasis: 'tertiary'
+            })],
           title: null
         }
       ],
@@ -411,6 +423,8 @@ export interface LegacySettingsPlanInput {
   levelPreview?: LegacySettingsLevelPreviewOptions;
   /** Pause + levelPreview only: whether the Jump to level disclosure is open. */
   previewLevelsExpanded?: boolean;
+  /** Pause only: the Quit to Menu row is armed and reads "Tap again to quit". */
+  quitConfirmArmed?: boolean;
 }
 
 const rectOf = (left: number, top: number, width: number, height: number): LegacySettingsRect => ({
@@ -521,6 +535,7 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
   const s = LEGACY_SETTINGS_SIZES;
   const model = buildLegacySettingsSheetModel(input.context, {
     levelPreview: input.context === 'pause' ? input.levelPreview : undefined,
+    quitConfirmArmed: input.context === 'pause' ? input.quitConfirmArmed : undefined,
     signedIn: input.signedIn
   });
   const panel = resolveLegacyOverlayPanelLayout(input.width, input.height, input.safeArea ?? {});
