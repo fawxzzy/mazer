@@ -13,7 +13,9 @@ import {
   buildLegacyGuideSheetModel,
   type LegacyGuideRow
 } from '../../src/legacy-runtime/legacyGuideContent';
+import { resolveGeometryBudgetLoopPlan } from '../../src/legacy-runtime/legacyGeometryBudget';
 import { resolveLegacyNavigationTarget } from '../../src/legacy-runtime/legacyMaze';
+import { legacyLoopPlanSize } from '../../src/legacy-runtime/legacyMazeLoops';
 import {
   incrementLegacyProgressionOrdinal,
   resolveLegacyProgressionDifficultyProfile
@@ -180,6 +182,15 @@ describe('guide copy only names things that exist', () => {
     expect(incrementLegacyProgressionOrdinal('1')).toBe('2');
     expect(incrementLegacyProgressionOrdinal('9')).toBe('10');
     expect(resolveLegacyProgressionDifficultyProfile(400).band).not.toBe(resolveLegacyProgressionDifficultyProfile(1).band);
+    // The copy says harder mazes can have shortcuts and loops: generation really plans them
+    // (never in the early levels, for some seeds late, and never for every seed).
+    expect(row('levels').text).toMatch(/shortcuts and loops/);
+    const seeds = Array.from({ length: 200 }, (_, index) => 1337 + (index * 104729));
+    const plans = (level: number) => seeds.map((seed) => resolveGeometryBudgetLoopPlan(level, seed, 1275));
+    expect(plans(5).every((plan) => legacyLoopPlanSize(plan) === 0)).toBe(true);
+    expect(plans(60).some((plan) => plan.shortcuts > 0)).toBe(true);
+    expect(plans(198).some((plan) => legacyLoopPlanSize(plan) > 0)).toBe(true);
+    expect(plans(198).some((plan) => legacyLoopPlanSize(plan) === 0)).toBe(true);
     // Ranks are not player-visible, so the copy says levels only.
     expect(MENU_SCENE).toMatch(/private drawLegacyProgressionBadge\(\): VisualRect \| null \{\s*this\.clearLegacyPlayerProgressionBadge\(\);\s*this\.clearLegacyMenuAiProgressionBadge\(\);\s*return null;\s*\}/);
   });

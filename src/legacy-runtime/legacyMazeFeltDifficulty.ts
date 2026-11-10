@@ -239,6 +239,13 @@ export const measureFelt = (maze: FeltMaze): { steps: number; pathLength: number
 
 export const measureFeltSteps = (maze: FeltMaze): number => measureFelt(maze).steps;
 
+// The PRICED felt value the ladder lands on: explorer steps minus the steps the maze's
+// loops give back to a player who knows the map (maze.loopStats.saved, set by the felt
+// tuner; 0 for a single-route maze, so the two numbers are then identical).
+export const measurePricedFeltSteps = (maze: FeltMaze & { readonly loopStats?: { readonly saved: number } }): number => (
+  measureFeltSteps(maze) - (maze.loopStats?.saved ?? 0)
+);
+
 // Monte-Carlo sample: same explorer with a different tie seed (validation).
 export const simulatePullToGoalWalker = (maze: FeltMaze, tieSeed: number): number => {
   const explorer = createFeltExplorer(maze.width, maze.height);

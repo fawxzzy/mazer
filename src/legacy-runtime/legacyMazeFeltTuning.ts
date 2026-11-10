@@ -33,6 +33,18 @@
 // Pure: no ambient randomness or clock, no floats, no I/O.
 
 import { createFeltExplorer, type FeltRun } from './legacyMazeFeltDifficulty';
+import {
+  LOOP_DECOY_MIN_CELLS,
+  LOOP_FELT_HEADROOM,
+  carveLegacyLoops,
+  breakAccidentalCycles,
+  createLoopSearch,
+  createRouteMeter,
+  legacyLoopPlanSize,
+  type LegacyLoopCarveResult,
+  type LegacyLoopPlan,
+  type LegacyLoopRecord
+} from './legacyMazeLoops';
 
 export interface FeltTuningMaze {
   readonly width: number;
@@ -63,6 +75,13 @@ export interface FeltTuningOptions {
   readonly forks?: number;
   // Hard cap on explorer evaluations per attempt (safety bound).
   readonly maxEvals?: number;
+  // Highest PRICED target a looped maze may ask for (the ladder's capacity ceiling):
+  // loops whose priced saving would pass it are given back.
+  readonly feltCeiling?: number;
+  // Loops (multiple routes) carved before the route stretch and the branches
+  // (legacyMazeLoops.ts). Omit or an empty plan: a single-route maze, byte-identical
+  // to the pre-loop tuner. They use their own random stream.
+  readonly loops?: LegacyLoopPlan;
 }
 
 export interface FeltTuningResult {
@@ -78,6 +97,16 @@ export interface FeltTuningResult {
   readonly cellsTrimmed: number;
   readonly addedTiles: { x: number; y: number }[];
   readonly trimmedTiles: { x: number; y: number }[];
+  // Loops carved (empty for a single-route maze) and their cells.
+  // Accidental base-maze cycles that were broken (one closed cell each).
+  readonly cyclesBroken: number;
+  readonly loops: readonly LegacyLoopRecord[];
+  // Steps the loops give back to a player who knows the map (priced into the target).
+  readonly loopSaving: number;
+  // The schedule target before the priced loop saving; target is baseTarget + priced saving.
+  readonly baseTarget: number;
+  readonly loopDiagnostics: { attempts: number; rejected: LegacyLoopCarveResult['rejected'] } | null;
+  readonly loopTiles: { x: number; y: number }[];
   // Cells the stretch lever carved / removed.
   readonly stretchTiles: { x: number; y: number }[];
   readonly stretchRemovedTiles: { x: number; y: number }[];
@@ -86,6 +115,8 @@ export interface FeltTuningResult {
   readonly evals: number;
   // Distance of felt from the accept window (0 when onTarget).
   readonly windowDistance: number;
+  // |felt - mean over FELT_TIE_SAMPLES other tie-breaks| as an integer percent of felt.
+  readonly tieDeviationPercent: number;
   // The base's own route is already longer than the target allows (route cells
   // are never removed), so no edit can land; nothing was tried.
   readonly hopeless: boolean;
@@ -96,6 +127,22 @@ export const FELT_TUNING_DEFAULT_MAX_BRANCH = 24;
 export const FELT_TUNING_DEFAULT_MAX_BUMP_DEPTH = 12;
 export const FELT_TUNING_DEFAULT_MAX_EVALS = 700;
 export const FELT_TUNING_ATTEMPTS = 6;
+// Ambiguity pricing. A loop can be a coin flip for the explorer: at a fork whose ways look
+// equally promising the deterministic tie-break picks ONE way, and the realized number can
+// sit far from what the same walker pays on average over the other tie-breaks. The
+// ladder's ordering guarantee is on the deterministic number, so a landed maze is only
+// preferred while that number agrees with the average of FELT_TIE_SAMPLES other tie-breaks
+// within FELT_TIE_DEVIATION_LIMIT_PERCENT (integer percent). Plain mazes agree exactly;
+// a looped maze that does not is retried (another stream, then another base maze).
+// Loop pricing. A shortcut or alternate that shortens the route is easier for anyone who
+// finds it, and the explorer walks past part of that ease, so the raw explorer number
+// understates it. The felt value the ladder lands is PRICED: explorer steps minus the
+// steps the loops give back to a player who knows the map (the shortest route with every
+// loop connector closed, minus the shortest route as built), at this percent. At 100 each
+// step a loop saves must be paid for by one more explorer step elsewhere in the maze.
+export const FELT_LOOP_PRICE_PERCENT = 100;
+export const FELT_TIE_SAMPLES = 6;
+export const FELT_TIE_DEVIATION_LIMIT_PERCENT = 12;
 
 const createStream = (seed: number): (() => number) => {
   let state = (Math.imul(seed >>> 0, 0x9e3779b1) ^ 0x85ebca6b) >>> 0 || 1;
@@ -105,12 +152,31 @@ const createStream = (seed: number): (() => number) => {
   };
 };
 
+// Integer percent distance between the deterministic explorer steps and the mean of the
+// same explorer over FELT_TIE_SAMPLES other tie-breaks.
+const measureTieDeviationPercent = (
+  explorer: ReturnType<typeof createFeltExplorer>,
+  open: Uint8Array,
+  startCell: number,
+  goalCell: number,
+  felt: number
+): number => {
+  if (felt <= 0) { return 0; }
+  let sum = 0;
+  for (let sample = 1; sample <= FELT_TIE_SAMPLES; sample += 1) {
+    sum += explorer.run(open, startCell, goalCell, ((sample * 7919) | 1)).steps;
+  }
+  return Math.floor((100 * Math.abs((FELT_TIE_SAMPLES * felt) - sum)) / (FELT_TIE_SAMPLES * felt));
+};
+
 const tuneOnce = (
   maze: FeltTuningMaze,
-  target: number,
+  baseTarget: number,
   seed: number,
   options: FeltTuningOptions
 ): FeltTuningResult => {
+  // The effective target: the schedule target plus the priced loop saving (below).
+  let target = baseTarget;
   const overshoot = options.overshoot ?? FELT_TUNING_OVERSHOOT;
   // Distance of a felt value from the accept window [target, target + overshoot].
   const windowGap = (value: number): number => (value < target ? target - value : (value > target + overshoot ? value - target - overshoot : 0));
@@ -161,6 +227,47 @@ const tuneOnce = (
   let evals = 0;
   const evaluate = (): FeltRun => { evals += 1; return explorer.run(open, startCell, goalCell); };
 
+  // ---- Lever -1: accidental cycles ------------------------------------------------
+  // The base generator closes a loop by accident now and then. Every loop of a ladder
+  // maze is designed (lever 0), so an accidental one is broken first: the cycle becomes
+  // two dead-end tails (legacyMazeLoops.ts, breakAccidentalCycles).
+  const brokenCells = breakAccidentalCycles(width, height, open, startCell, goalCell, new Set(maze.solutionPath.map((p) => (p.y * width) + p.x)));
+
+  // ---- Lever 0: loops (multiple routes) --------------------------------------
+  // Carved first so the stretch and the branches are tuned on the maze the player
+  // will actually see: a shortcut changes the explorer's route, a decoy changes its
+  // cost, and the levers below land the exact target on top of them. The loops use
+  // their own stream, so a plan-less maze draws exactly what it always did.
+  let loopRecords: readonly LegacyLoopRecord[] = [];
+  let loopDiagnostics: { attempts: number; rejected: LegacyLoopCarveResult['rejected'] } | null = null;
+  const loopTiles: { x: number; y: number }[] = [];
+  const loopPlan = options.loops;
+  const loopSearch = createLoopSearch(width, height, open);
+  if (loopPlan !== undefined && legacyLoopPlanSize(loopPlan) > 0) {
+    const first = evaluate();
+    if (first.reachedGoal) {
+      const carved = carveLegacyLoops({
+        width,
+        height,
+        open,
+        neighbors: explorer.neighbors,
+        startCell,
+        goalCell,
+        plan: loopPlan,
+        rand: createStream((seed ^ 0x51ed270b) >>> 0),
+        evaluate,
+        feltLimit: baseTarget - LOOP_FELT_HEADROOM,
+        search: loopSearch
+      });
+      loopRecords = carved.records;
+      loopDiagnostics = { attempts: carved.attempts, rejected: carved.rejected };
+      carved.records.forEach((record) => record.cells.forEach((cell) => {
+        onRoute[cell] = 1;
+        loopTiles.push({ x: cell % width, y: (cell - (cell % width)) / width });
+      }));
+    }
+  }
+
   // ---- Lever 1: route stretch ------------------------------------------------
   // The route that is stretched is the explorer's final path: the way a player
   // actually walks, which on a maze with wrap corridors can be much shorter than
@@ -170,7 +277,7 @@ const tuneOnce = (
   let bumps = 0;
   let run = evaluate();
   let routeLength = run.pathLength;
-  const hopeless = run.reachedGoal && run.pathLength > target + overshoot;
+  const hopeless = run.reachedGoal && run.pathLength > baseTarget + overshoot;
 
   // Try one switchback bump on a random straight stretch of the explorer's path,
   // `depthWanted` deep (shallower when it does not fit). It is kept only when
@@ -231,7 +338,7 @@ const tuneOnce = (
   };
 
   // Never stretch the route past the felt target itself (the route is part of it).
-  const routeTarget = Math.min(options.routeTarget ?? 0, target - 8);
+  const routeTarget = Math.min(options.routeTarget ?? 0, baseTarget - 8);
   if (routeTarget > routeLength && run.reachedGoal && !hopeless) {
     let failures = 0;
     while (routeLength < routeTarget && failures < 160) {
@@ -240,6 +347,41 @@ const tuneOnce = (
       if (!tryBump(1 + (rand() % wanted), (next) => next.pathLength > before && next.pathLength <= routeTarget + 1)) { failures += 1; }
     }
     run = evaluate();
+  }
+
+  // ---- Loop pricing --------------------------------------------------------------
+  // The saving is fixed from here on (branches and tips never touch the shortest route).
+  // A level whose priced target would pass the ceiling gives its loops back one at a
+  // time, last first, so the ladder can always land.
+  let loopSaving = 0;
+  if (loopRecords.length > 0) {
+    const meter = createRouteMeter(size, explorer.neighbors, startCell, goalCell);
+    const measureLoopSaving = (): number => {
+      const connectors: number[] = [];
+      loopRecords.forEach((record) => record.cells.forEach((cell) => { if (open[cell] === 1) { connectors.push(cell); } }));
+      if (connectors.length === 0) { return 0; }
+      const withLoops = meter(open);
+      connectors.forEach((cell) => { open[cell] = 0; });
+      const without = meter(open);
+      connectors.forEach((cell) => { open[cell] = 1; });
+      return withLoops > 0 && without > 0 ? Math.max(0, without - withLoops) : 0;
+    };
+    const priced = (saving: number): number => Math.floor((saving * FELT_LOOP_PRICE_PERCENT) / 100);
+    loopSaving = measureLoopSaving();
+    let dropped = false;
+    while (loopRecords.length > 0 && options.feltCeiling !== undefined && baseTarget + priced(loopSaving) > options.feltCeiling) {
+      const last = loopRecords[loopRecords.length - 1]!;
+      last.cells.forEach((cell) => { open[cell] = 0; });
+      loopRecords = loopRecords.slice(0, -1);
+      loopSaving = measureLoopSaving();
+      dropped = true;
+    }
+    if (dropped) {
+      loopTiles.length = 0;
+      loopRecords.forEach((record) => record.cells.forEach((cell) => { loopTiles.push(point(cell)); }));
+      run = evaluate();
+    }
+    target = baseTarget + priced(loopSaving);
   }
 
   // ---- Lever 2: deceptive branches, tips and trims --------------------------
@@ -304,8 +446,70 @@ const tuneOnce = (
   let branchLimit = maxBranch;
   let forksRemaining = forkTarget;
   let forkFailures = 0;
+
+  // ---- Decoy loops (false ways on) ----------------------------------------------
+  // A connector joining two cells of the same WRONG region (cells the explorer visits
+  // that are not on its final path): the dead-end region becomes a tangle with a cycle.
+  // The explorer pays about two steps per carved cell, exactly like a dead-end branch
+  // (so the board is spent as efficiently), and a person finds a loop that looks like
+  // progress and returns to ground they have crossed. Kept only when the re-run explorer
+  // brings the number closer to the target, like every other move.
+  let decoysRemaining = loopPlan?.decoys ?? 0;
+  let decoyFailures = 0;
+  const decoyMaxCells = Math.max(LOOP_DECOY_MIN_CELLS, loopPlan?.maxConnector ?? 0);
+  const regionIdx = new Int32Array(size);
+  const regionQueue = new Int32Array(size);
+  const tryDecoyLoop = (): boolean => {
+    for (let probe = 0; probe < 24; probe += 1) {
+      const host = rand() % size;
+      if (open[host] !== 1 || run.visited[host] !== 1 || run.onPath[host] === 1 || onRoute[host] === 1
+        || host === startCell || host === goalCell || !interior(host)) { continue; }
+      // Tree distance from the host inside the wrong region (never through the final path).
+      regionIdx.fill(-1);
+      let head = 0;
+      let tail = 0;
+      regionIdx[host] = 0;
+      regionQueue[tail] = host; tail += 1;
+      while (head < tail) {
+        const cell = regionQueue[head]!; head += 1;
+        for (let d = 0; d < 4; d += 1) {
+          const next = explorer.neighbors[(cell * 4) + d]!;
+          if (open[next] !== 1 || regionIdx[next] !== -1 || run.onPath[next] === 1 || run.visited[next] !== 1) { continue; }
+          regionIdx[next] = regionIdx[cell]! + 1;
+          regionQueue[tail] = next; tail += 1;
+        }
+      }
+      if (tail < 12) { continue; }
+      const found = loopSearch.collect(host, 0, decoyMaxCells, regionIdx)
+        .filter((candidate) => candidate.path.length >= LOOP_DECOY_MIN_CELLS);
+      if (found.length === 0) { continue; }
+      const chosen = found[rand() % found.length]!;
+      if (!loopSearch.carve(chosen.path)) { continue; }
+      const next = evaluate();
+      if (next.reachedGoal && windowGap(next.steps) < windowGap(felt)) {
+        run = next;
+        felt = next.steps;
+        decoysRemaining -= 1;
+        chosen.path.forEach((cell) => {
+          onRoute[cell] = 1;
+          loopTiles.push(point(cell));
+        });
+        loopRecords = [...loopRecords, { kind: 'decoy', cells: chosen.path, from: 0, to: 0, saving: 0 }];
+        return true;
+      }
+      chosen.path.forEach((cell) => { open[cell] = 0; });
+      run = evaluate();
+      return false;
+    }
+    return false;
+  };
+
   while (evals < maxEvals && !hopeless && windowGap(felt) > 0) {
     const gap = target - felt;
+    if (decoysRemaining > 0 && gap >= 12 && decoyFailures < 16 && (rand() % 3) === 0) {
+      if (tryDecoyLoop()) { failures = 0; continue; }
+      decoyFailures += 1;
+    }
     let edited: number[] = [];
     let trimmed: number[] = [];
     let bumped = false;
@@ -438,11 +642,19 @@ const tuneOnce = (
     cellsTrimmed,
     addedTiles,
     trimmedTiles,
+    cyclesBroken: brokenCells.length,
+    loops: loopRecords,
+    loopSaving,
+    baseTarget,
+    loopDiagnostics,
+    // Connector cells still open at the end (a later switchback bump can close one).
+    loopTiles: loopTiles.filter((tile) => open[(tile.y * width) + tile.x] === 1),
     stretchTiles,
     stretchRemovedTiles,
     capacityExhausted,
     evals,
     windowDistance: windowGap(felt),
+    tieDeviationPercent: run.reachedGoal ? measureTieDeviationPercent(explorer, open, startCell, goalCell, felt) : 0,
     hopeless
   };
 };
@@ -459,8 +671,16 @@ export const tuneMazeFeltToTarget = (
   let best: FeltTuningResult | null = null;
   for (let attempt = 0; attempt < FELT_TUNING_ATTEMPTS; attempt += 1) {
     const result = tuneOnce(maze, target, (Math.imul(seed >>> 0, 0x2545f491) + Math.imul(attempt, 0x9e3779b1)) >>> 0, options);
-    if (best === null || result.windowDistance < best.windowDistance) { best = result; }
-    if (result.onTarget || result.hopeless) { break; }
+    // Closer to the window wins; among landed mazes the one whose number is least a coin flip.
+    if (best === null
+      || result.windowDistance < best.windowDistance
+      || (result.windowDistance === best.windowDistance && result.tieDeviationPercent < best.tieDeviationPercent)) {
+      best = result;
+    }
+    if (result.hopeless) { break; }
+    if (result.onTarget && result.tieDeviationPercent <= FELT_TIE_DEVIATION_LIMIT_PERCENT) { break; }
+    // A plain maze has no tie to flip: do not spend restarts on it.
+    if (result.onTarget && result.loops.length === 0) { break; }
     if (result.capacityExhausted && attempt >= 5) { break; }
   }
   return best!;
