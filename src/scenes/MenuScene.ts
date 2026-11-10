@@ -2125,6 +2125,11 @@ export class MenuScene extends Phaser.Scene {
   // detect an origin change frame-to-frame. Both reset alongside
   // trailShineLapStartedAtMs at the same fresh-run sites.
   private trailOriginAdvanceDistancePx = 0;
+  // The trail head's colour clock, recorded by the trail draw so the edge diamonds' border reads the SAME palette
+  // sample (trailPalette.ts): physical distance of the player's end of the trail in tiles, the trail's pausable
+  // animation time, and whether the trail is animated (Trail Shine on, no reduced motion). Null when no trail was
+  // drawn this frame; the diamonds then use distance 0 on the scene clock.
+  private trailPaletteHead: { distanceTiles: number; timeMs: number; animated: boolean } | null = null;
   private lastTrailOriginPoint: LegacyPoint | null = null;
   // See LegacyTrailPerfDiagnostics's own header comment. Overwritten every
   // drawLegacyContinuousPlayTrail call in play mode; null until the first
@@ -8745,7 +8750,15 @@ export class MenuScene extends Phaser.Scene {
         reducedMotion,
         ringEnergies: resolveEdgeRingEnergies(this.edgeRing.lifecycle),
         spinRad: this.edgeRing.spinRad,
-        timeMs: time
+        timeMs: time,
+        // The border is the live trail colour: the trail head's own palette sample (trailPalette.ts).
+        ...(this.trailPaletteHead
+          ? {
+            trailHeadDistanceTiles: this.trailPaletteHead.distanceTiles,
+            trailTimeMs: this.trailPaletteHead.timeMs,
+            trailAnimated: this.trailPaletteHead.animated
+          }
+          : {})
       })
     );
   }
@@ -9669,6 +9682,7 @@ export class MenuScene extends Phaser.Scene {
     alphaMultiplier: number
   ): void {
     const animationTime = this.advanceLegacyTrailAnimationClock(time);
+    this.trailPaletteHead = null;
     // Hidden by default -- every early return below (nothing to draw this
     // frame) must leave the canvas image hidden, not showing stale pixels
     // from the last frame that actually had a trail. Only re-shown once a
@@ -9757,6 +9771,11 @@ export class MenuScene extends Phaser.Scene {
     // animation switch: off, or reduced motion, freezes it to the static iridescent gradient (no time term,
     // no wave, constant breath), which is exactly what shineEnabled already means.
     const trailAnimated = shineEnabled;
+    this.trailPaletteHead = {
+      distanceTiles: (geometry.totalLength + this.trailOriginAdvanceDistancePx) / tileSize,
+      timeMs: animationTime,
+      animated: trailAnimated
+    };
     const trailBreath = resolveTrailBreath(animationTime, !trailAnimated);
     const widthScale = resolveTrailWidthScale(trailBreath);
     const restingWidths = resolveTrailWidths(tileSize);
@@ -10006,13 +10025,12 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  // Start and goal END TILES: the Chip marker draw code (drawBoardMarkers), painted through the Phaser
-  // graphics adapter -- the exact function the in-app Guide icons call. The pad is the tile's own baked
-  // chip silhouette (boardTileLayer.endpointTiles, same device-snapped layout) so it meets the tile's
-  // edges exactly; both are placed from the layer's device-snapped board origin. The pads sit in
-  // goalBeaconGraphics, UNDER the trail canvas (the trail runs across the tinted tile); the badges are in
-  // boardDynamicGraphics, over it. Start is hidden while the player stands on it (the player marker is the
-  // start). Reduced motion freezes the goal ring (phase 0); the marker is fully legible without motion.
+  // Start and goal END MARKERS: the Chip marker draw code (drawBoardMarkers), painted through the Phaser
+  // graphics adapter -- the exact function the in-app Guide icons call. The glyph (goal star / start play arrow)
+  // sits directly on the baked tile with no box behind it, centred from the layer's device-snapped board origin
+  // and tile geometry (boardTileLayer.endpointTiles; the start tile carries the arrow's direction, the first step
+  // of the solution path). They are drawn in boardDynamicGraphics, over the trail. Start is hidden while the player
+  // stands on it (the player marker is the start). The goal beacon (a halo, goalBeaconGraphics) is separate.
   private fillPlayDynamicMarkerTile(
     point: LegacyPoint,
     originX: number,
@@ -10061,14 +10079,13 @@ export class MenuScene extends Phaser.Scene {
       phase,
       reducedMotion: this.prefersLegacyReducedMotion()
     };
-    if (this.boardTileStyle === 'chip') {
-      // Pad under the trail canvas, badge over it: the trail runs across the tinted tile and ends at (start) or
-      // begins at (goal side) the badge's edge instead of being drawn through it.
-      drawBoardMarkers(underContext, { ...markerInput, endpointLayer: 'pad' });
-      drawBoardMarkers(context, { ...markerInput, endpointLayer: 'badge' });
+    // The player standing on the goal covers the star; the star's keyline would poke out around the player's rounded
+    // square as dark spikes, so (like the start marker) the goal glyph yields to the player. The beacon stays.
+    if (kind === 'goal' && this.player.x === point.x && this.player.y === point.y) {
       return;
     }
-    // The Trace style's markers (no pad), as before.
+    // Chip: the star / play arrow straight onto the baked tile (no pad, no badge: nothing is painted under the trail
+    // any more); Trace: its own marker artwork. Both go through the same call.
     drawBoardMarkers(context, markerInput);
   }
 

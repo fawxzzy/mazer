@@ -12,7 +12,6 @@ import {
 } from '../../src/render/boardTileLayer';
 import { boardMaterial, DEFAULT_BOARD_TILE_STYLE } from '../../src/render/boardTileStyle';
 import { PhaserGraphicsTileContext, parseCssRgba } from '../../src/render/phaserTileContext';
-import { resolveEndpointPadColor } from '../../src/render/endpointTiles';
 import { IRIDESCENT_TRAIL_CORE_STOPS } from '../../src/render/trailIridescence';
 import { compositeTrailUnderlay } from '../../src/render/trailLegibility';
 import { braidedMazeGrid, contrast, inputFor, wrapDockMaze } from '../render/support/boardTileFixtures';
@@ -288,16 +287,17 @@ describe('trail on the Chip floor (amendment open item A8)', () => {
   });
 });
 
-describe('end (goal) tile', () => {
-  test('the badge ring and the goal star keep their contrast on the goal pad', () => {
-    const pad = resolveEndpointPadColor('goal');
+describe('end (goal) marker', () => {
+  test('the goal star keeps its contrast on its dark keyline (it is only ~1.8:1 on the bare chip, so there is no backdrop and the keyline carries it)', () => {
     expect(contrast(boardMaterial.goal, boardMaterial.void)).toBeGreaterThanOrEqual(3);
-    // the lit ring (rim colour) separates the dark badge from the tinted pad and the chip around it
-    expect(contrast(boardMaterial.rim, pad)).toBeGreaterThanOrEqual(3);
-    expect(contrast(boardMaterial.rim, boardMaterial.void)).toBeGreaterThanOrEqual(3);
+    expect(contrast(boardMaterial.void, boardMaterial.chip)).toBeGreaterThanOrEqual(3);
+    expect(contrast(boardMaterial.start, boardMaterial.void)).toBeGreaterThanOrEqual(3);
+    // the start's gold also clears 3:1 on the chip by itself
+    expect(contrast(boardMaterial.start, boardMaterial.chip)).toBeGreaterThanOrEqual(3);
+    console.info(`END_MARKER_CONTRAST goal on chip ${contrast(boardMaterial.goal, boardMaterial.chip).toFixed(2)}, goal on keyline ${contrast(boardMaterial.goal, boardMaterial.void).toFixed(2)}, start on chip ${contrast(boardMaterial.start, boardMaterial.chip).toFixed(2)}, start on keyline ${contrast(boardMaterial.start, boardMaterial.void).toFixed(2)}`);
   });
 
-  test('the pad and badge stay inside the one-cell footprint (a standalone cell is an isolated chip: a disc)', () => {
+  test('the glyph stays inside the one-cell footprint (a standalone cell is an isolated chip: a disc)', () => {
     const calls: Array<{ op: string; args: number[] }> = [];
     const rec = (op: string) => (...args: number[]) => { calls.push({ op, args }); };
     const graphics = {
@@ -307,14 +307,9 @@ describe('end (goal) tile', () => {
     } as unknown as import('phaser').GameObjects.Graphics;
     drawBoardMarkers(new PhaserGraphicsTileContext(graphics), { style: 'chip', tileSize: 14, devicePixelRatio: 2, goal: { x: 2, y: 3 } });
     const pathPoints = calls.filter((c) => c.op === 'moveTo' || c.op === 'lineTo');
-    const arcs = calls.filter((c) => c.op === 'arc');
-    expect(arcs.length).toBeGreaterThanOrEqual(2);
-    // every arc (pad corner, badge, ring) is centred on the cell centre and no larger than the inscribed circle
-    for (const arc of arcs) {
-      expect(arc.args[0]!).toBeCloseTo(2.5 * 14, 0);
-      expect(arc.args[1]!).toBeCloseTo(3.5 * 14, 0);
-      expect(arc.args[2]!).toBeLessThanOrEqual(14 / 2 + 1e-6);
-    }
+    // no disc, no ring, no pad: the star is the only path
+    expect(calls.filter((c) => c.op === 'arc')).toHaveLength(0);
+    expect(pathPoints.length).toBeGreaterThanOrEqual(10);
     for (const p of pathPoints) {
       expect(p.args[0]!).toBeGreaterThanOrEqual(2 * 14 - 1e-6);
       expect(p.args[0]!).toBeLessThanOrEqual(3 * 14 + 1e-6);
@@ -323,23 +318,24 @@ describe('end (goal) tile', () => {
     }
   });
 
-  test('the layer hands the scene the start and goal tiles of its own bake (board-local, same layout as the floor)', () => {
+  test('the layer hands the scene the start and goal tiles of its own bake, and the start arrow direction (the first step of the solution path)', () => {
     const layerSource = readFileSync(resolve(process.cwd(), 'src/render/boardTileLayer.ts'), 'utf8');
     expect(layerSource).toContain('computeChipTileAt(input, frame.start)');
     expect(layerSource).toContain('computeChipTileAt(input, frame.goal)');
+    expect(layerSource).toContain('resolveStartDirection(frame.grid, frame.start, frame.goal)');
     expect(layerSource).toContain('get endpointTiles()');
   });
 
-  test('the scene paints the end tiles from those tiles: pads under the trail, badges above it (start and goal alike)', () => {
+  test('the scene paints the end markers from those tiles, in one pass over the trail (no pad under it)', () => {
     const fn = MENU_SCENE.slice(MENU_SCENE.indexOf('private fillPlayDynamicMarkerTile('));
     const body = fn.slice(0, fn.indexOf('// Retired: drawLegacyMarkerGemCatchlight'));
     expect(body).toContain('this.boardTileLayer.endpointTiles');
     expect(body).toContain('startTile: endpointTiles.start');
     expect(body).toContain('goalTile: endpointTiles.goal');
-    expect(body).toContain("drawBoardMarkers(underContext, { ...markerInput, endpointLayer: 'pad' });");
-    expect(body).toContain("drawBoardMarkers(context, { ...markerInput, endpointLayer: 'badge' });");
-    expect(body).not.toContain("endpointLayer: 'all'");
-    // underContext is the goalBeaconGraphics layer, which sits below the trail canvas
-    expect(body).toContain('new PhaserGraphicsTileContext(this.goalBeaconGraphics)');
+    expect(body).toContain('drawBoardMarkers(context, markerInput);');
+    expect(body).not.toContain('endpointLayer');
+    // the goal glyph yields to the player standing on it (the keyline would otherwise poke out as dark spikes)
+    expect(body).toContain("kind === 'goal' && this.player.x === point.x && this.player.y === point.y");
+    expect(body).not.toContain("drawBoardMarkers(underContext");
   });
 });

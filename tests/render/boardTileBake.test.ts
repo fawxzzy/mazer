@@ -22,7 +22,7 @@ import {
   cssRgba,
   resolveBoardTileStyle
 } from '../../src/render/boardTileStyle';
-import { resolveEndpointPadColor } from '../../src/render/endpointTiles';
+import type { StartDirection } from '../../src/render/startDirection';
 import {
   braidedMazeGrid,
   contrast,
@@ -454,57 +454,80 @@ describe('markers', () => {
     ]);
   });
 
-  test('chip goal: dark tinted end pad, dark disc badge, lit ring and a star in the danger colour', () => {
+  test('chip goal: a keyline then a star in the danger colour, directly on the tile (no pad, no disc, no ring)', () => {
     const { rec } = draw({ start: undefined, player: undefined });
-    expect(rec.log).toContain(`set fillStyle=${cssRgb(boardMaterial.void)}`);
-    expect(rec.log).toContain(`set fillStyle=${cssRgb(boardMaterial.goal)}`);
-    // The end tile's pad is the chip's own fill silhouette in the endpoint colour (opaque), then the badge.
-    expect(rec.log).toContain(`set fillStyle=${cssRgb(resolveEndpointPadColor('goal'))}`);
-    expect(rec.log).toContain(`set strokeStyle=${cssRgba(boardMaterial.rim, BOARD_TILE_GEOMETRY.marker.goalRingAlphaBase)}`);
-    // badge disc + ring: two full circles (the standalone pad is four corner arcs through arcTo, not arc)
-    expect(rec.count('arc(')).toBe(2);
+    expect(rec.log.filter((e) => e.startsWith('set fillStyle='))).toEqual([
+      `set fillStyle=${cssRgb(boardMaterial.void)}`,
+      `set fillStyle=${cssRgb(boardMaterial.goal)}`
+    ]);
+    expect(rec.log).toContain(`set strokeStyle=${cssRgb(boardMaterial.void)}`);
+    // the keyline is the star's own outline: no circle (disc / ring) and no rounded-rect pad is drawn
+    expect(rec.count('arc(')).toBe(0);
+    expect(rec.count('arcTo(')).toBe(0);
+    expect(rec.count('stroke(')).toBe(1);
   });
 
-  test('chip start: gold ring on a dark disc badge and a gold play triangle, on a tinted tile pad', () => {
+  test('chip start: a keyline then a gold play arrow, directly on the tile (no pad, no disc, no ring)', () => {
     const { rec } = draw({ goal: undefined, player: undefined });
+    expect(rec.log.filter((e) => e.startsWith('set fillStyle='))).toEqual([
+      `set fillStyle=${cssRgb(boardMaterial.void)}`,
+      `set fillStyle=${cssRgb(boardMaterial.start)}`
+    ]);
+    expect(rec.log).toContain(`set strokeStyle=${cssRgb(boardMaterial.void)}`);
     expect(rec.log).toContain(`set strokeStyle=${cssRgb(boardMaterial.start)}`);
-    expect(rec.log).toContain(`set fillStyle=${cssRgb(boardMaterial.start)}`);
-    expect(rec.log).toContain(`set fillStyle=${cssRgb(resolveEndpointPadColor('start'))}`);
-    // no corner brackets any more: the ring and the triangle's round-join outline are the only strokes
+    // the keyline stroke and the gold arrow's own round-join outline are the only strokes; nothing is circular
     expect(rec.count('stroke(')).toBe(2);
-    expect(rec.count('arc(')).toBe(2);
+    expect(rec.count('arc(')).toBe(0);
+    expect(rec.count('arcTo(')).toBe(0);
   });
 
-  test('endpointLayer splits the tile pad from the badge so the scene can paint the pad under the trail', () => {
-    const pad = draw({ start: undefined, player: undefined, endpointLayer: 'pad' });
-    const badge = draw({ start: undefined, player: undefined, endpointLayer: 'badge' });
-    const all = draw({ start: undefined, player: undefined, endpointLayer: 'all' });
-    expect(pad.rec.count('arc(')).toBe(0);
-    expect(pad.rec.count('stroke(')).toBe(0);
-    expect(pad.rec.count('fill(')).toBe(1);
-    expect(badge.rec.count('arc(')).toBe(2);
-    expect(badge.rec.log.some((e) => e.includes(cssRgb(resolveEndpointPadColor('goal'))))).toBe(false);
-    expect(all.rec.count('fill(')).toBe(pad.rec.count('fill(') + badge.rec.count('fill('));
-    expect(all.rec.count('stroke(')).toBe(badge.rec.count('stroke('));
+  test('the old end-tile pad and badge constants are gone', () => {
+    expect(Object.keys(BOARD_TILE_GEOMETRY.endpoint)).not.toContain('goalPadMix');
+    expect(Object.keys(BOARD_TILE_GEOMETRY.endpoint)).not.toContain('startPadMix');
+    expect(Object.keys(BOARD_TILE_GEOMETRY.endpoint)).not.toContain('ringOfBadge');
   });
 
-  test('the pad is the baked tile: given the tile geometry it paints that tile fill rect, nothing larger', () => {
+  test('the glyph stays inside the baked tile: every path point of a goal placed on a tile is within its rect', () => {
     const input = inputFor(corridorGrid(), { tileSize: 14.72, devicePixelRatio: 3, goal: { x: 12, y: 50 } });
     const tile = computeChipTileAt(input, { x: 12, y: 50 })!;
     const rec = createRecordingContext();
     drawBoardMarkers(rec.ctx, {
-      style: 'chip', tileSize: 14.72, devicePixelRatio: 3, originX: 40, originY: 20, goal: { x: 12, y: 50 }, goalTile: tile, endpointLayer: 'pad'
+      style: 'chip', tileSize: 14.72, devicePixelRatio: 3, originX: 40, originY: 20, goal: { x: 12, y: 50 }, goalTile: tile
     });
     const points = rec.log
       .filter((e) => e.startsWith('moveTo(') || e.startsWith('lineTo('))
       .map((e) => e.slice(e.indexOf('(') + 1, -1).split(',').map(Number) as [number, number]);
     expect(points.length).toBeGreaterThan(3);
     for (const [x, y] of points) {
-      expect(x).toBeGreaterThanOrEqual(40 + tile.fill.left - 1e-9);
-      expect(x).toBeLessThanOrEqual(40 + tile.fill.left + tile.fill.width + 1e-9);
-      expect(y).toBeGreaterThanOrEqual(20 + tile.fill.top - 1e-9);
-      expect(y).toBeLessThanOrEqual(20 + tile.fill.top + tile.fill.height + 1e-9);
+      expect(x).toBeGreaterThanOrEqual(40 + tile.left - 1e-9);
+      expect(x).toBeLessThanOrEqual(40 + tile.left + tile.width + 1e-9);
+      expect(y).toBeGreaterThanOrEqual(20 + tile.top - 1e-9);
+      expect(y).toBeLessThanOrEqual(20 + tile.top + tile.height + 1e-9);
     }
+  });
+
+  test('the start arrow follows the direction on the start tile (and points right with none)', () => {
+    const input = inputFor(corridorGrid(), { tileSize: 14.72, devicePixelRatio: 3, start: { x: 12, y: 0 } });
+    const tile = computeChipTileAt(input, { x: 12, y: 0 })!;
+    const apexOf = (direction?: StartDirection): [number, number] => {
+      const rec = createRecordingContext();
+      drawBoardMarkers(rec.ctx, {
+        style: 'chip', tileSize: 14.72, devicePixelRatio: 3, start: { x: 12, y: 0 }, startTile: direction ? { ...tile, direction } : tile
+      });
+      const pts = rec.log
+        .filter((e) => e.startsWith('moveTo(') || e.startsWith('lineTo('))
+        .map((e) => e.slice(e.indexOf('(') + 1, -1).split(',').map(Number) as [number, number]);
+      return pts[2]!;
+    };
+    const cx = tile.left + (tile.width / 2);
+    const cy = tile.top + (tile.height / 2);
+    const right = apexOf('right');
+    expect(apexOf()).toEqual(right);
+    expect(right[0]).toBeGreaterThan(cx);
+    expect(right[1]).toBeCloseTo(cy, 6);
+    expect(apexOf('left')[0]).toBeLessThan(cx);
+    expect(apexOf('down')[1]).toBeGreaterThan(cy);
+    expect(apexOf('up')[1]).toBeLessThan(cy);
   });
 
   test('trace keeps its own start and goal artwork (and still honours the css-px floors)', () => {
@@ -514,7 +537,6 @@ describe('markers', () => {
       minimumMarkerSizes: { goalBadgeDiameterCss: 22, startTileCss: 15 }
     });
     expect(rec.log).toContain(`set fillStyle=${cssRgba(boardMaterial.void, 0.9)}`);
-    expect(rec.log.some((e) => e.includes(cssRgb(resolveEndpointPadColor('goal'))))).toBe(false);
   });
 
   test('start marker is skipped while the player stands on it', () => {
@@ -524,10 +546,11 @@ describe('markers', () => {
     expect(off.rec.log.some((e) => e.includes(cssRgb(boardMaterial.start)))).toBe(true);
   });
 
-  test('reduced motion pins the phase: it is a no-op, while otherwise phase modulates the goal ring', () => {
-    const still = draw({ phase: 0 });
-    expect(draw({ phase: 0.8, reducedMotion: true }).rec.log).toEqual(still.rec.log);
-    expect(draw({ phase: 0.8 }).rec.log).not.toEqual(still.rec.log);
+  test('reduced motion pins the phase: it is a no-op, while otherwise phase modulates the Trace goal ring (the Chip end markers are static)', () => {
+    const still = draw({ style: 'trace', phase: 0 });
+    expect(draw({ style: 'trace', phase: 0.8, reducedMotion: true }).rec.log).toEqual(still.rec.log);
+    expect(draw({ style: 'trace', phase: 0.8 }).rec.log).not.toEqual(still.rec.log);
+    expect(draw({ phase: 0.8 }).rec.log).toEqual(draw({ phase: 0 }).rec.log);
   });
 
   test('is deterministic', () => {
@@ -542,9 +565,11 @@ describe('markers', () => {
       ['player', boardMaterial.player, chip],
       ['start', boardMaterial.start, chip],
       ['trail', boardMaterial.trailReference, chip],
-      ['goal badge', boardMaterial.void, chip],
-      ['goal star on badge', boardMaterial.goal, boardMaterial.void],
-      ['goal ring', boardMaterial.rim, chip]
+      // The goal red is only ~1.8:1 on the bare chip (no backdrop any more); the star's dark keyline carries it.
+      ['goal keyline', boardMaterial.void, chip],
+      ['goal star on keyline', boardMaterial.goal, boardMaterial.void],
+      ['start arrow keyline', boardMaterial.void, chip],
+      ['start arrow on keyline', boardMaterial.start, boardMaterial.void]
     ];
     console.info(`BOARD_TILE_CONTRAST ${rows.map(([n, f, b]) => `${n}: ${contrast(f, b).toFixed(2)}`).join(' | ')}`);
     for (const [name, fg, bg] of rows) {

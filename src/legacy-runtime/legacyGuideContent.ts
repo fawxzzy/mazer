@@ -118,7 +118,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'start',
-    text: 'A play marker on a ringed tile shows where each maze begins.'
+    text: 'An arrow on the first tile points the way you set off.'
   },
   {
     heading: 'You',
@@ -160,7 +160,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'trail',
-    text: `A pulsing, colour-shifting line shows your route. ${TRAIL_FADE_LABEL} in Settings fades old trail.`
+    text: `A shimmering, colour-shifting line is your route. ${TRAIL_FADE_LABEL} in Settings fades old trail.`
   },
   {
     heading: 'Wrap',
@@ -174,7 +174,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'wrap',
-    text: 'Some mazes wrap. Leave an open edge and you come out on the opposite side.'
+    text: 'Some mazes wrap around open edges. The edge diamonds glow in your trail colours.'
   },
   {
     heading: 'Levels',

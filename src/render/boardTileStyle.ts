@@ -17,6 +17,7 @@
  * (docs/assets/reference/navigation-core-v2/README.md).
  */
 import { cyberArcadeMaterial } from './cyberArcadeMaterial';
+import { PLAYER_COLOR } from './trailPalette';
 import { designTokens, phaserMaterialAliases } from '../theme/tokens';
 
 export type BoardTileStyleId = 'chip' | 'trace';
@@ -128,7 +129,8 @@ export const boardMaterial = Object.freeze({
   start: cyberArcadeMaterial.signal.start,
   goal: cyberArcadeMaterial.signal.goal,
   goalHalo: cyberArcadeMaterial.signal.violet,
-  player: cyberArcadeMaterial.signal.player,
+  /** The player's colour: the trail palette module's PLAYER_COLOR, the one source the diamonds' fill also uses. */
+  player: PLAYER_COLOR,
   playerEdge: cyberArcadeMaterial.signal.playerAccent,
   /** Trail reference colour used for the 3:1 contrast check (the real trail keeps its energy stops). */
   trailReference: cyberArcadeMaterial.rail.cyan,
@@ -238,26 +240,22 @@ export const BOARD_TILE_GEOMETRY = Object.freeze({
     goalRingAlphaSwing: 0.15
   }),
   /**
-   * Start and goal END TILES (chip style). The tile itself is recoloured: the pad is the chip's own inner
-   * fill silhouette, so its edges are the baked tile's edges to the device pixel at every tile size, and a
-   * circular badge is inscribed in the cell (radius = half the device-snapped tile, so its ring is tangent
-   * to the four tile edges). The goal keeps its shipped badge proportions (ring, star); the start reuses
-   * the badge with a gold ring and a play glyph. Nothing here is floored in css px: on a dense board the
-   * glyph is as small as the tile, and the goal is found through the beacon (src/render/goalBeacon.ts).
+   * Start and goal END MARKERS (chip style). There is no pad or badge: the glyph sits directly on the baked tile
+   * (the owner asked for the visible box behind the star and play marker to go). A thin dark keyline traced around
+   * the glyph keeps it legible on the mid-tone chip fill. Shares are of the half-tile (the cell's inscribed radius),
+   * so the glyph and its keyline always stay inside the tile; nothing is floored in css px (on a dense board the glyph
+   * is as small as the tile, and the goal is found through the beacon, src/render/goalBeacon.ts).
    */
   endpoint: Object.freeze({
-    /** Badge ring width as a share of the badge radius (the shipped goal badge: 0.09 / 0.47). */
-    ringOfBadge: 0.09 / 0.47,
-    /** Goal star radii as a share of the badge radius (the shipped goal badge: 0.37 / 0.47 and 0.17 / 0.47). */
-    goalStarOuterOfBadge: 0.37 / 0.47,
-    goalStarInnerOfBadge: 0.17 / 0.47,
-    /** Pad colour: the board void mixed this far toward the endpoint colour (opaque, so it hides the bake under it). */
-    goalPadMix: 0.34,
-    startPadMix: 0.22,
-    /** Start play glyph, as shares of the badge radius: half height, width, and its round-join stroke. */
-    startPlayHalfHeightOfBadge: 0.5,
-    startPlayWidthOfBadge: 0.86,
-    startPlayStrokeOfBadge: 0.12
+    /** Keyline (dark outline around the glyph) width, as a share of the half-tile; snapped to whole device px. */
+    keylineOfRadius: 0.12,
+    /** Goal star radii as a share of the half-tile. */
+    goalStarOuterOfRadius: 0.7,
+    goalStarInnerOfRadius: 0.32,
+    /** Start play arrow, as shares of the half-tile: half height, length along the direction of travel, round-join stroke. */
+    startPlayHalfHeightOfRadius: 0.5,
+    startPlayLengthOfRadius: 0.95,
+    startPlayStrokeOfRadius: 0.12
   })
 } as const);
 

@@ -17,7 +17,7 @@
  * painted through `PhaserGraphicsTileContext` into the scene's dynamic graphics and the Guide sheet,
  * so the board and the Guide icons run the same draw function. What this layer does provide is the start and
  * goal tiles' own chip geometry (`endpointTiles`, recomputed on each rebake from the bake's layout), so the end
- * tiles are painted on the baked tile's exact edges.
+ * markers are centred on the baked tile, and the start arrow's direction (the first step of the solution path).
  *
  * Everything pure (rank grid, run merging, composite) takes an injected 2D context so it is unit
  * tested without a browser. Colours/geometry come from boardTileStyle (registry-derived).
@@ -36,6 +36,7 @@ import {
   type TileBakeContext2D,
   type TileBakeSurface
 } from './boardTileBake';
+import { resolveStartDirection, type StartDirection } from './startDirection';
 import {
   clampBoardDevicePixelRatio,
   resolveBoardTileStyleId,
@@ -275,7 +276,8 @@ const createDocumentSurface = (pixelWidth: number, pixelHeight: number): TileBak
 
 /** The start and goal cells' chip geometry, board-local css px (null when absent or not a floor cell). */
 export interface BoardTileEndpoints {
-  start: ChipTileGeometry | null;
+  /** The start tile, plus the direction its play arrow points: the first step of the solution path (startDirection.ts). */
+  start: (ChipTileGeometry & { direction: StartDirection }) | null;
   goal: ChipTileGeometry | null;
 }
 
@@ -342,8 +344,11 @@ export class BoardTileLayer {
       this.bakeCount += 1;
       this.lastBakeMs = bakeMs;
       this.layout = computeBoardTileLayout(input);
+      const startTile = frame.start ? computeChipTileAt(input, frame.start) : null;
       this.endpoints = {
-        start: frame.start ? computeChipTileAt(input, frame.start) : null,
+        start: startTile && frame.start
+          ? { ...startTile, direction: resolveStartDirection(frame.grid, frame.start, frame.goal) }
+          : null,
         goal: frame.goal ? computeChipTileAt(input, frame.goal) : null
       };
       this.composedKey = null;

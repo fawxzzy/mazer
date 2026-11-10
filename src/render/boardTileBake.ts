@@ -1027,17 +1027,11 @@ export interface BoardMarkerInput {
   reducedMotion?: boolean;
   /**
    * Chip style: the start / goal cell's own chip geometry in BOARD-LOCAL css px (`computeChipTileAt`, from the
-   * same bake layout), so the end tile is painted on the baked tile's exact edges, including its real corner
-   * radii. Omit for a standalone cell (Guide icons): it is then an isolated chip, which is a disc.
+   * same bake layout), so the end marker is centred on the baked tile's device-snapped cell. `startTile.direction` is
+   * the way the start arrow points. Omit for a standalone cell (Guide icons): an isolated chip, arrow pointing right.
    */
   startTile?: EndpointTileRect | null;
   goalTile?: EndpointTileRect | null;
-  /**
-   * Chip style: which parts of the start / goal to paint. `pad` is the recoloured tile (the scene paints it
-   * under the trail canvas), `badge` is the glyph on it; `all` (default) paints both. The player is always
-   * painted. Ignored by the trace style.
-   */
-  endpointLayer?: 'all' | 'pad' | 'badge';
   /**
    * TRACE style only (the alternate): on-screen floors (css px) so the start/goal stay findable when tiles
    * are tiny. The chip style draws the end tile at exactly the tile's size and ignores this: its goal is
@@ -1122,53 +1116,30 @@ const drawTraceGoalMarker = (
   painter.fill();
 };
 
-/** The recoloured tile: the chip's own inner fill silhouette, opaque, on the baked tile's exact edges. */
-const drawEndpointPad = (
+/**
+ * The end marker: the glyph (goal star / start play arrow) directly on the baked tile, no pad, no disc, no ring. A
+ * dark keyline is traced around the glyph (board void colour, round joins) and the glyph is filled over it, so it
+ * stays legible on the mid-tone chip without any backdrop shape.
+ */
+const drawEndpointGlyph = (
   painter: Painter,
   style: ResolvedBoardTileStyle,
   spec: EndpointTileSpec,
   ox: number,
   oy: number
 ): void => {
-  const { pad } = spec;
-  painter.fillStyle(cssRgb(pad.color));
-  painter.begin();
-  painter.roundedRect(ox + pad.left, oy + pad.top, pad.width, pad.height, pad.radii as CornerRadii);
-  painter.fill();
-  if (pad.patches.length > 0) {
-    // The bake's concave rim patches sit inside the fill rect; put them back over the pad so the rim stays continuous.
-    painter.fillStyle(cssRgb(style.material.rim));
-    painter.begin();
-    for (const [px, py] of pad.patches) {
-      painter.rect(ox + px, oy + py, style.rimWidth, style.rimWidth);
-    }
-    painter.fill();
-  }
-};
-
-/** The badge on the end tile: dark disc inscribed in the cell, lit ring, then the glyph (goal star / start play). */
-const drawEndpointBadge = (
-  painter: Painter,
-  style: ResolvedBoardTileStyle,
-  spec: EndpointTileSpec,
-  ox: number,
-  oy: number,
-  ringAlpha: number
-): void => {
   const m = style.material;
-  const { badge } = spec;
-  const cx = ox + badge.cx;
-  const cy = oy + badge.cy;
-  painter.fillStyle(cssRgb(m.void));
-  painter.begin();
-  painter.circle(cx, cy, badge.radius);
-  painter.fill();
-  painter.strokeStyle(spec.kind === 'goal' ? cssRgba(m.rim, ringAlpha) : cssRgb(m.start));
-  painter.lineWidth(badge.ringWidth);
-  painter.begin();
-  painter.circle(cx, cy, badge.radius - (badge.ringWidth / 2));
-  painter.stroke();
+  const { frame } = spec;
+  const cx = ox + frame.cx;
+  const cy = oy + frame.cy;
   if (spec.star) {
+    // keyline: the star's outline, stroked wide in the void colour (half of it falls inside, under the fill)
+    starPath(painter, cx, cy, spec.star.outer, spec.star.inner);
+    painter.fillStyle(cssRgb(m.void));
+    painter.strokeStyle(cssRgb(m.void));
+    painter.lineWidth(frame.keyline * 2);
+    painter.fill();
+    painter.stroke();
     starPath(painter, cx, cy, spec.star.outer, spec.star.inner);
     painter.fillStyle(cssRgb(m.goal));
     painter.fill();
@@ -1176,14 +1147,23 @@ const drawEndpointBadge = (
   }
   if (spec.play) {
     const { play } = spec;
+    const trace = (): void => {
+      painter.begin();
+      painter.move(ox + play.ax, oy + play.ay);
+      painter.line(ox + play.bx, oy + play.by);
+      painter.line(ox + play.cx, oy + play.cy);
+      painter.close();
+    };
+    trace();
+    painter.fillStyle(cssRgb(m.void));
+    painter.strokeStyle(cssRgb(m.void));
+    painter.lineWidth(play.stroke + (frame.keyline * 2));
+    painter.fill();
+    painter.stroke();
+    trace();
     painter.fillStyle(cssRgb(m.start));
     painter.strokeStyle(cssRgb(m.start));
     painter.lineWidth(play.stroke);
-    painter.begin();
-    painter.move(ox + play.ax, oy + play.ay);
-    painter.line(ox + play.bx, oy + play.by);
-    painter.line(ox + play.cx, oy + play.cy);
-    painter.close();
     painter.fill();
     painter.stroke();
   }
@@ -1254,10 +1234,9 @@ const standaloneEndpointRect = (
  * Draws start, goal and player for the chosen style onto `ctx`. Only the markers present in the
  * input are drawn. Start is skipped while the player stands on it. Order: start, goal, player.
  *
- * Chip style: start and goal are END TILES (see endpointTiles.ts): the pad is the tile's own fill silhouette
- * and the badge is inscribed in the cell, both from `startTile` / `goalTile` (the baked tile's geometry), so
- * they sit on the tile's edges exactly. `endpointLayer` splits pad and badge so the scene can paint the pad
- * under the trail. Trace style: the alternate marker artwork, unchanged.
+ * Chip style: start and goal are END MARKERS (see endpointTiles.ts): a star / a play arrow centred directly on
+ * the baked tile (no box behind them), placed from `startTile` / `goalTile` (the baked tile's geometry). The start
+ * arrow points along `startTile.direction`. Trace style: the alternate marker artwork, unchanged.
  */
 export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput): BoardMarkerStats => {
   const scale = clampBoardDevicePixelRatio(input.devicePixelRatio);
@@ -1267,7 +1246,6 @@ export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput
   const oy = input.originY ?? 0;
   const painter = new Painter(ctx);
   const phase = input.reducedMotion ? 0 : (input.phase ?? 0);
-  const layer = input.endpointLayer ?? 'all';
   const ringAlpha = BOARD_TILE_GEOMETRY.marker.goalRingAlphaBase
     + (BOARD_TILE_GEOMETRY.marker.goalRingAlphaSwing * Math.max(0, Math.min(1, phase)));
 
@@ -1278,13 +1256,7 @@ export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput
     && input.player.x === input.start.x && input.player.y === input.start.y;
   const paintEndpoint = (kind: EndpointKind, cell: BoardCell, tile: EndpointTileRect | null | undefined): void => {
     const rect = tile ?? standaloneEndpointRect(cell, input.tileSize, scale, style);
-    const spec = resolveEndpointTile(kind, rect, scale, style.rimWidth);
-    if (layer !== 'badge') {
-      drawEndpointPad(painter, style, spec, ox, oy);
-    }
-    if (layer !== 'pad') {
-      drawEndpointBadge(painter, style, spec, ox, oy, ringAlpha);
-    }
+    drawEndpointGlyph(painter, style, resolveEndpointTile(kind, rect, scale), ox, oy);
   };
   if (input.start && !onStart) {
     if (styleId === 'trace') {

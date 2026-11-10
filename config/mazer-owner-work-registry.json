@@ -4,14 +4,14 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-10T14:20:02.000Z",
+  "updatedAt": "2026-11-10T16:00:00.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 131,
+    "stableIdentityCount": 132,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 62,
+    "openCardCount": 63,
     "completedCardCount": 54,
     "deferredCardCount": 15,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out."
@@ -283,7 +283,7 @@
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-002",
       "title": "Polish the Chip board: junction dots, player shape, start tile and goal alignment",
-      "description": "The owner asked to remove the dots at path splits, make the player a rounded square that matches the chip tile shape, line the goal tile up exactly with its tile edges at every pixel ratio, and redesign the start tile in the same chip language. PR #402 makes all four changes and is merged and deployed to mazer.fawxzzy.com on 2026-11-10; it has not been checked on a real phone.",
+      "description": "The owner asked to remove the dots at path splits, make the player a rounded square that matches the chip tile shape, line the goal tile up exactly with its tile edges at every pixel ratio, and redesign the start tile in the same chip language. PR #402 makes all four changes and is merged and deployed to mazer.fawxzzy.com on 2026-11-10; it has not been checked on a real phone. The pad and ring on the end tiles were later removed at the owner's request (MAZER-VIS-013).",
       "cardType": "feature",
       "priority": "high",
       "dependencies": [
@@ -302,7 +302,7 @@
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-003",
       "title": "Make the player trail iridescent with a gentle pulse",
-      "description": "The owner wants the trail to look like a midnight-sun shimmer that shifts colour along its length and over time, with a gentle pulse. PR #402 adds a back-and-forth sweep through cyan, violet, orchid and apricot that avoids the player's green, the goal's red and the start's gold, clears the contrast floor against the dark underlay, and freezes to a static gradient under reduced motion. It is merged and deployed on 2026-11-10 and not yet checked on a real phone.",
+      "description": "The owner wants the trail to look like a midnight-sun shimmer that shifts colour along its length and over time, with a gentle pulse. PR #402 adds a back-and-forth sweep through cyan, violet, orchid and apricot that avoids the player's green, the goal's red and the start's gold, clears the contrast floor against the dark underlay, and freezes to a static gradient under reduced motion. It is merged and deployed on 2026-11-10 and not yet checked on a real phone. The sweep was later made faster and a travelling sheen band added because the shift was too subtle (MAZER-VIS-013).",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
@@ -312,6 +312,28 @@
         "The trail colour sweeps along its length and drifts over time with a travelling brightness wave",
         "Worst-case trail colour keeps the contrast floor against the chip tile and the underlay",
         "Reduced motion or the Trail Shine setting off freezes the trail to a static gradient"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-013",
+      "status": "review",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-013",
+      "title": "End markers without a box, start arrow, visible trail shift, matched diamonds",
+      "description": "After PR #402 went live the owner asked for five changes. (1) The square pad behind the goal star and start marker is gone: the star and play arrow sit directly on the board tile with a thin dark outline for legibility. (2) The start arrow points the way the player will first move (the first step of the solution path; down on the portrait level 1, right on landscape). (3) The trail colour shift is now clearly visible: a shorter, faster hue sweep plus a travelling white sheen band that also shifts the hue, still at least 3:1 against the chip tile and static under reduced motion. (4) The edge diamond border is always the live trail colour and (5) the colour inside the diamonds and the beams is always the player's green, both from one shared palette module. The Guide copy and icons were updated. Open as a pull request; not merged, not deployed, not checked on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-VIS-002",
+        "MAZER-VIS-003"
+      ],
+      "acceptanceCriteria": [
+        "No pad or disc is painted behind the start or goal marker, proven on raster pixels at tile sizes 6 to 25 px and pixel ratios 1 to 3",
+        "The start arrow points along the first step of the solution path in all four directions, proven by tests and real-game captures",
+        "The trail shift is visible in a real frame strip, worst hue stays at least 3:1 on the chip, reduced motion is a static gradient",
+        "Diamond border equals the trail colour and diamond fill and beams equal the player colour, both read from one module",
+        "Merged, deployed and checked on a real phone are NOT yet done"
       ]
     },
     {
