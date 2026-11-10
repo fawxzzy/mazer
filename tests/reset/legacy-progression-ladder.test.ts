@@ -10,6 +10,7 @@ import {
 import {
   createEmptyLegacyProgressionState,
   LEGACY_PROGRESSION_STORAGE_KEY,
+  normalizeLegacyAuthoritativeProgressionState,
   readLegacyProgressionState,
   resolveGeometryBudgetLevel,
   resolveLegacyMazeGenerationProfileForProgression
@@ -111,6 +112,30 @@ describe('progression ladder: beyond the hard ceiling', () => {
     // Garbage ordinals fall back to the bounded level.
     for (const level of ['', 'abc', '-5', '0']) {
       expect(resolveGeometryBudgetLevel({ ...base, level, targetComplexity: 400 })).toBe(99);
+    }
+  });
+
+  test('a drifted saved state (ordinal 18000, target of a level-25 or level-1 player) generates at the displayed level, through the real reader and the authoritative path', () => {
+    const empty = createEmptyLegacyProgressionState();
+    for (const targetComplexity of [8, 8 + (24 * 4), 8 + (97 * 4), 400]) {
+      const saved = {
+        ...empty,
+        tracks: {
+          ...empty.tracks,
+          player: { ...empty.tracks.player, completedCycles: '17999', level: '18000', peakComplexity: targetComplexity, targetComplexity }
+        }
+      };
+      const storage = new MemoryStorage();
+      storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify(saved));
+      const local = readLegacyProgressionState(storage).tracks.player;
+      const remote = normalizeLegacyAuthoritativeProgressionState(saved).tracks.player;
+      for (const track of [local, remote]) {
+        // The label is untouched (nothing is rewritten) ...
+        expect(track.level).toBe('18000');
+        // ... and the maze is the ceiling class, whatever the stored target was.
+        expect(resolveGeometryBudgetLevel(track)).toBe(SAT);
+        expect(resolveLegacyMazeGenerationProfileForProgression(track).geometryBudgetLevel).toBe(SAT);
+      }
     }
   });
 });
