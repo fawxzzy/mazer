@@ -49,13 +49,23 @@ export interface GaugeMaze {
   readonly rows: readonly string[];
   // Steps loops give back to a map-knower, when the generator reports it.
   readonly loopStats?: { readonly saved: number } | null;
+  // Steps the wrap corridors give back to a map-knower, when the generator reports it.
+  readonly wrapStats?: { readonly saved: number } | null;
   readonly start: { readonly x: number; readonly y: number };
   readonly goal: { readonly x: number; readonly y: number };
 }
 
 export interface MazeGauges {
-  // Explorer steps minus the steps loops give back to a map-knower (the ladder's priced felt).
+  // Explorer steps minus the steps loops and wrap corridors give back to a map-knower (the
+  // ladder's priced felt, as the generator reports its savings).
   pricedSteps: number;
+  // Shortest route with the wrap links severed minus the shortest route as built, measured
+  // here from the floor grid alone (any tree): what the wrap corridors save a map-knower.
+  wrapSaving: number;
+  // Explorer steps minus the generator's loop saving minus `wrapSaving`: the priced felt with
+  // wraps priced, estimated the same way for every tree (a tree that does not price wraps
+  // shows its cliff here).
+  pricedStepsWithWraps: number;
   floorCells: number;
   boardFill: number;
   shortest: number;
@@ -580,14 +590,18 @@ export const computeMazeGauges = (maze: GaugeMaze): MazeGauges => {
     i = j;
   }
 
-  const saved = (maze as { loopStats?: { saved: number } | null }).loopStats?.saved ?? 0;
+  const loopSaved = (maze as { loopStats?: { saved: number } | null }).loopStats?.saved ?? 0;
+  const wrapSaved = (maze as { wrapStats?: { saved: number } | null }).wrapStats?.saved ?? 0;
+  const wrapSaving = Math.max(0, dDirect[goal]! - shortest);
   const analysis: MazeDifficultyMetrics = analyzeMazeDifficulty({
     ...feltMaze,
     solutionPath: feltMaze.solutionPath
   });
 
   return {
-    pricedSteps: pullSteps - saved,
+    pricedSteps: pullSteps - loopSaved - wrapSaved,
+    wrapSaving,
+    pricedStepsWithWraps: pullSteps - loopSaved - wrapSaving,
     floorCells,
     boardFill: floorCells / g.size,
     shortest,

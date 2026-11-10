@@ -36,13 +36,16 @@ export interface LadderLevelSample {
   board: string;
   seed: number;
   // PRIMARY: the PRICED felt difficulty: deterministic pull-to-goal explorer steps minus
-  // the steps loops give back to a player who knows the map (identical to the raw
-  // explorer steps for a single-route maze). This is what the ladder lands in [T, T + window].
+  // the steps loops and wrap corridors give back to a player who knows the map (identical
+  // to the raw explorer steps for a plain single-route maze). This is what the ladder
+  // lands in [T, T + window].
   felt: number;
-  // The raw explorer steps (felt + loop saving).
+  // The raw explorer steps (felt + loop saving + wrap saving).
   feltRaw: number;
   // Steps the maze's loops give back (0 for a single-route maze).
   loopSaving: number;
+  // Steps the maze's wrap corridors give back (0 for a plain base).
+  wrapSaving: number;
   // Mean PRICED steps over 8 other tie seeds (Monte-Carlo validation of `felt`).
   feltMonteCarlo: number;
   // Length of the path the explorer finally walks (backtracks excluded).
@@ -97,9 +100,10 @@ export const sampleLevel = (level: number, board: typeof LADDER_BOARDS[number], 
   const ms = performance.now() - started;
   const measured = measureFelt(maze);
   const loopSaving = (maze as LegacyMazeSnapshot).loopStats?.saved ?? 0;
-  const felt = measured.steps - loopSaving;
+  const wrapSaving = (maze as LegacyMazeSnapshot).wrapStats?.saved ?? 0;
+  const felt = measured.steps - loopSaving - wrapSaving;
   let monteCarlo = 0;
-  for (let tie = 1; tie <= 8; tie += 1) { monteCarlo += simulatePullToGoalWalker(maze, tie * 7919) - loopSaving; }
+  for (let tie = 1; tie <= 8; tie += 1) { monteCarlo += simulatePullToGoalWalker(maze, tie * 7919) - loopSaving - wrapSaving; }
   const target = resolveGeometryBudgetTarget(Math.min(Math.max(level, 2), GEOMETRY_BUDGET_SATURATION_LEVEL));
   return {
     level,
@@ -108,6 +112,7 @@ export const sampleLevel = (level: number, board: typeof LADDER_BOARDS[number], 
     felt,
     feltRaw: measured.steps,
     loopSaving,
+    wrapSaving,
     feltMonteCarlo: monteCarlo / 8,
     explorerPath: measured.pathLength,
     proxy: measureGeometryBudgetProxy(maze, resolveLegacyMazeComplexity(maze)).total,

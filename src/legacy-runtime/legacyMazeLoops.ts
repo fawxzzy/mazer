@@ -35,6 +35,17 @@
 //    felt value stays at or below `feltLimit`, so the tuner always has headroom
 //    left to land the level's exact target afterwards.
 //
+// Wraps and loops are one family of optional structure. A wrap corridor is a loop through
+// the board edge; the loops here are interior only (the border ring is never carved), so
+// the two never touch. The loop search runs on the torus, so every shortcut is measured
+// against the route a wrap-using player really has (a connector must still save at least
+// LOOP_SHORTCUT_MIN_SAVE and 5 percent of THAT route, and the total cap is a share of that
+// original route), and a wrap never makes a loop redundant or a loop a wrap. Both are
+// priced against one baseline by the tuner (legacyMazeFeltTuning.ts): the wrap saving is the
+// planar route (wrap links severed, connectors closed) minus the torus route (connectors
+// closed), the loop saving is the torus route (connectors closed) minus the route as built,
+// so the two add up to the whole saving exactly and nothing is counted twice.
+//
 // Pure and deterministic: integer arithmetic, a caller-supplied random stream, no
 // clock, no ambient randomness.
 
@@ -315,6 +326,29 @@ export const createRouteMeter = (
     }
     return -1;
   };
+};
+
+// The neighbour table of the board WITHOUT its wrap links: the same layout as the torus
+// table of the felt explorer (cell * 4 + direction: right, left, down, up), with -1 where
+// a step would cross the board edge. `createRouteMeter` run on it measures the route a
+// player has when every wrap corridor is closed (`open[-1]` is undefined, never 1).
+// Memoized per board size; the table is read-only.
+const planarNeighborCache = new Map<number, Int32Array>();
+export const createPlanarNeighbors = (width: number, height: number): Int32Array => {
+  const key = (width * 4096) + height;
+  const cached = planarNeighborCache.get(key);
+  if (cached !== undefined) { return cached; }
+  const table = new Int32Array(width * height * 4);
+  for (let cell = 0; cell < width * height; cell += 1) {
+    const x = cell % width;
+    const y = (cell - x) / width;
+    table[(cell * 4)] = x < width - 1 ? cell + 1 : -1;
+    table[(cell * 4) + 1] = x > 0 ? cell - 1 : -1;
+    table[(cell * 4) + 2] = y < height - 1 ? cell + width : -1;
+    table[(cell * 4) + 3] = y > 0 ? cell - width : -1;
+  }
+  planarNeighborCache.set(key, table);
+  return table;
 };
 
 export interface LegacyLoopCarveInput {

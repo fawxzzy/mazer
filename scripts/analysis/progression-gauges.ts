@@ -38,7 +38,8 @@ export const GAUGES: readonly GaugeSpec[] = [
   { key: 'shortest', label: 'Shortest route (A*)', group: 'route', question: 'How far is the goal for a solver who knows the map?', direction: 1 },
   { key: 'explorerPath', label: 'Explorer route', group: 'route', question: 'How long is the route a goal-pulled explorer finally walks?', direction: 1 },
   { key: 'pullSteps', label: 'Pull-to-goal steps', group: 'walker', question: 'How many moves does a goal-pulled explorer need, dead ends included? (the generator steers on this)', direction: 1 },
-  { key: 'pricedSteps', label: 'Priced felt (steps - loop saving)', group: 'walker', question: 'The ladder\'s steered number: explorer steps minus what loops give back to a player who knows the map', direction: 1 },
+  { key: 'pricedSteps', label: 'Priced felt (steered)', group: 'walker', question: 'The steered number of the ladder: explorer steps minus what loops and wrap corridors give back to a player who knows the map (as the generator reports them)', direction: 1 },
+  { key: 'pricedStepsWithWraps', label: 'Priced felt, wraps priced', group: 'walker', question: 'Explorer steps minus the loop saving and the wrap saving measured from the grid, the same estimate for every tree (shows the wrap cliff on a tree that does not price wraps)', direction: 1 },
   { key: 'pullStepsMc', label: 'Pull steps, tie-averaged', group: 'walker', question: 'The same explorer averaged over 8 other tie-breaks (the unbiased price)', direction: 1 },
   { key: 'humanSteps', label: 'Human-like explorer steps', group: 'walker', question: 'Moves for an explorer that keeps straight, leans to the goal and forgets after 48 cells (median of 8)', direction: 1 },
   { key: 'randomWalkSteps', label: 'Random-walk steps', group: 'walker', question: 'Moves for a non-backtracking random walk (median of 5)', direction: 1 },
@@ -54,6 +55,7 @@ export const GAUGES: readonly GaugeSpec[] = [
   { key: 'loopStretches', label: 'Loop stretches on route', group: 'loops', question: 'Places on the shortest route with a real choice of ways', direction: 1 },
   { key: 'choiceStakes', label: 'Choice stakes', group: 'loops', question: 'Steps a wrong pick costs, summed over route choices', direction: 1 },
   { key: 'tieStretches', label: 'Tied alternates', group: 'loops', question: 'Route choices whose two ways are within 12 percent of each other', direction: 1 },
+  { key: 'wrapSaving', label: 'Wrap shortcut value', group: 'loops', question: 'Shortest route with the wrap links severed minus the shortest route as built: what the wrap corridors save a player who knows the map', direction: 1 },
   { key: 'slack', label: 'Shortcut value (slack)', group: 'loops', question: 'Explorer route minus shortest route: what knowing the map saves', direction: 1 },
   { key: 'astarExpansions', label: 'A* expansions', group: 'cost', question: 'Nodes an ideal solver expands', direction: 1 },
   { key: 'greedySearchCells', label: 'Greedy-solver cells', group: 'cost', question: 'Cells a greedy goal-first walker visits', direction: 1 }
