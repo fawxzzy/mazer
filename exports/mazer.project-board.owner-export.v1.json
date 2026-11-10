@@ -1,11 +1,11 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_7b49fba966a8",
+  "export_id": "pbe_mazer_owner_registry_d8713ab4ea2e",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:7b49fba966a87cca3ee161c87e65f20c386e66ce80140b7f96dfd9114cff5b82",
+  "source_revision": "sha256:d8713ab4ea2ee6f58f63313c2a00a0ec6c277baeff186b03374b5b4fdf93d5bf",
   "generated_at": "2026-11-10T22:00:00.000Z",
   "sources": [
     {
@@ -13,7 +13,7 @@
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:95ac0b8bffba0778e52cd38220cc420c09aad897fd9cfbe0c746dc5e43460dc9",
+      "revision": "sha256:3ab0a4e616c2137cd7e25211feb5dc6ebf1277e0790b36f2256dff2a50ab069f",
       "observed_at": "2026-11-10T22:00:00.000Z"
     },
     {
@@ -21,7 +21,7 @@
       "kind": "markdown",
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
-      "revision": "sha256:cc8c8ecca0e357cf39e8931906a1cbd63e0ff426dac4a8d9c3886fe3079df8dd",
+      "revision": "sha256:cf449f029f222cb43fa0f57015bfac1db6d3f7b3bb9b74665ee35759cfb1afdd",
       "observed_at": "2026-11-10T22:00:00.000Z"
     },
     {
@@ -4268,7 +4268,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Mastery tier to level 388: mazes also hard to solve from the goal end",
-        "description": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). The open pull request adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Measured honestly: the ramp is statistical, not ordered for any two seeds; generation costs about 1.5 times the plateau class and one desktop build in forty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier. Not merged, not deployed, not player-tested, not checked on a device. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
+        "description": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). The open pull request adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Measured honestly: the ramp is statistical, not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier. Not merged, not deployed, not player-tested, not checked on a device. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "high",
@@ -4291,8 +4291,8 @@
         "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). The open pull request adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Measured honestly: the ramp is statistical, not ordered for any two seeds; generation costs about 1.5 times the plateau class and one desktop build in forty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier. Not merged, not deployed, not player-tested, not checked on a device. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
-        "objective": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). The open pull request adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Measured honestly: the ramp is statistical, not ordered for any two seeds; generation costs about 1.5 times the plateau class and one desktop build in forty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier. Not merged, not deployed, not player-tested, not checked on a device. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
+        "summary": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). The open pull request adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Measured honestly: the ramp is statistical, not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier. Not merged, not deployed, not player-tested, not checked on a device. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
+        "objective": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). The open pull request adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Measured honestly: the ramp is statistical, not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier. Not merged, not deployed, not player-tested, not checked on a device. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
         "acceptance_criteria": [
           "Levels 1 to 268 generate the same mazes as before and the golden fixture changes only above level 268",
           "Every mastery maze keeps the forward window and 70 side stubs and takes at least 740 steps from the goal end",

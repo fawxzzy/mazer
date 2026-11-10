@@ -46,7 +46,7 @@ Not a bug: levels from 268 reuse one geometry, but the play seed is `createLegac
 | 388 phone (all mastery) | 167 / 200 | 28 | 3 | 2 | 0 | 20 / 49 / 129 |
 | 388 desktop (all mastery) | 137 / 200 | 36 | 13 | 14 | 0 | 31 / 89 / 138 |
 
-Real Chromium, dev-server modules, 40 seeds, CPU throttle 4x (one run; the machine was noisier than the earlier runs of this lane: level 198 itself read 63 / 350 ms mean / worst, against 39 / 248 recorded earlier): level 268 mean 78-106, worst single 256-333 ms; mastery levels 300-1000 mean 80-156, p95 264-467, worst single 266-529 ms. Honest reading: the mastery tier costs about 1.5 times the plateau class, desktop mastery builds can exceed the 400 ms worst-build target at a 4x throttle once in forty builds (529 and 503 ms seen), and the cause is measured (below), not fixed.
+Real Chromium, dev-server modules, 40 seeds, CPU throttle 4x (one run; the machine was noisier than the earlier runs of this lane: level 198 itself read 63 / 350 ms mean / worst, against 39 / 248 recorded earlier): level 268 mean 78-106, worst single 256-333 ms; mastery levels 300-1000 mean 80-156, p95 264-467, worst single 266-529 ms. Honest reading: the mastery tier costs about 1.5 times the plateau class, the 95th percentile of desktop mastery builds reached 336-467 ms and the worst single build 450-529 ms at a 4x throttle (level 268 desktop in the same run: p95 316, worst 333), so about one desktop mastery build in twenty passes the 400 ms worst-build target; the cause is measured (below), not fixed.
 
 ## Levers evaluated past level 268
 
