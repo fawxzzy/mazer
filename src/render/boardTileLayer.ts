@@ -15,7 +15,9 @@
  *
  * Start/goal markers are NOT drawn here: they are the Chip marker draw code (`drawBoardMarkers`),
  * painted through `PhaserGraphicsTileContext` into the scene's dynamic graphics and the Guide sheet,
- * so the board and the Guide icons run the same draw function.
+ * so the board and the Guide icons run the same draw function. What this layer does provide is the start and
+ * goal tiles' own chip geometry (`endpointTiles`, recomputed on each rebake from the bake's layout), so the end
+ * tiles are painted on the baked tile's exact edges.
  *
  * Everything pure (rank grid, run merging, composite) takes an injected 2D context so it is unit
  * tested without a browser. Colours/geometry come from boardTileStyle (registry-derived).
@@ -23,8 +25,10 @@
 import type Phaser from 'phaser';
 import {
   computeBoardTileLayout,
+  computeChipTileAt,
   createBoardTileBakeCache,
   type BoardCell,
+  type ChipTileGeometry,
   type BoardTileBakeInput,
   type BoardTileBakeResult,
   type BoardTileDock,
@@ -269,6 +273,12 @@ const createDocumentSurface = (pixelWidth: number, pixelHeight: number): TileBak
   return { canvas, ctx: ctx as unknown as TileBakeContext2D };
 };
 
+/** The start and goal cells' chip geometry, board-local css px (null when absent or not a floor cell). */
+export interface BoardTileEndpoints {
+  start: ChipTileGeometry | null;
+  goal: ChipTileGeometry | null;
+}
+
 export class BoardTileLayer {
   readonly image: Phaser.GameObjects.Image;
   private readonly texture: Phaser.Textures.CanvasTexture;
@@ -276,6 +286,7 @@ export class BoardTileLayer {
   private layout: BoardTileLayout | null = null;
   private composedKey: string | null = null;
   private composedHash: string | null = null;
+  private endpoints: BoardTileEndpoints = { start: null, goal: null };
   private textureWidth = 0;
   private textureHeight = 0;
   /** Cumulative diagnostics (read by tests and the runtime diagnostics hook). */
@@ -295,6 +306,11 @@ export class BoardTileLayer {
 
   get currentBake(): BoardTileBakeResult<HTMLCanvasElement> | null {
     return this.cache.current;
+  }
+
+  /** Start/goal chip geometry of the current bake (board-local css px, origin = `snappedOrigin`). */
+  get endpointTiles(): BoardTileEndpoints {
+    return this.endpoints;
   }
 
   hide(): void {
@@ -326,6 +342,10 @@ export class BoardTileLayer {
       this.bakeCount += 1;
       this.lastBakeMs = bakeMs;
       this.layout = computeBoardTileLayout(input);
+      this.endpoints = {
+        start: frame.start ? computeChipTileAt(input, frame.start) : null,
+        goal: frame.goal ? computeChipTileAt(input, frame.goal) : null
+      };
       this.composedKey = null;
     }
     const layout = this.layout!;

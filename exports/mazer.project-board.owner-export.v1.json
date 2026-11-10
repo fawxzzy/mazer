@@ -1,28 +1,28 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_5d3d15488db8",
+  "export_id": "pbe_mazer_owner_registry_ce0619345a21",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:5d3d15488db8c1bc959cf6c179705621c9cc1badaba5ad91b3e58edd1696c3a1",
-  "generated_at": "2026-11-10T09:56:14.000Z",
+  "source_revision": "sha256:ce0619345a21a14fdcf7e3c32762ed7cc8e57584a77e4481f5e7adcfc4f5b421",
+  "generated_at": "2026-11-10T14:20:02.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:3ebe46accca2f3e27d56f3009d80bb41551be6fd5f30246e7e886c2daebb4936",
-      "observed_at": "2026-11-10T09:56:14.000Z"
+      "revision": "sha256:6a913cbff191ec8027cd3ae3efbc923a036d8f512fedb097eb25db17e032ca81",
+      "observed_at": "2026-11-10T14:20:02.000Z"
     },
     {
       "source_id": "mazer-current-truth",
       "kind": "markdown",
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
-      "revision": "sha256:060d9b83cca57730f9b87ba85f64353fef2051233d851ff7282dda97cec1bea7",
-      "observed_at": "2026-11-10T09:56:14.000Z"
+      "revision": "sha256:31f9a2b6e16f28bf3431a605566ac7b8eb81325cd0382c7dddea7e1d74066039",
+      "observed_at": "2026-11-10T14:20:02.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-10T09:56:14.000Z"
+      "observed_at": "2026-11-10T14:20:02.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-10T09:56:14.000Z"
+      "observed_at": "2026-11-10T14:20:02.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-10T09:56:14.000Z"
+      "observed_at": "2026-11-10T14:20:02.000Z"
     }
   ],
   "cards": [
@@ -3694,9 +3694,9 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Add shortcuts, alternate routes and decoy loops plus progression gauges",
-        "description": "The owner asked for occasional shortcuts or multiple routes (sometimes only one way, perhaps scaling with maze size) and for ways to gauge progression scaling. PR #401 adds three loop kinds that keep the long route, priced felt difficulty and a gauge suite (shortest route, walker steps, random solver, human-like explorer), with level 1 staying a straight corridor. It is open and not merged or deployed.",
+        "description": "The owner asked for occasional shortcuts or multiple routes (sometimes only one way, perhaps scaling with maze size) and for ways to gauge progression scaling. PR #401 adds three loop kinds that keep the long route, priced felt difficulty and a gauge suite (shortest route, walker steps, random solver, human-like explorer), with level 1 staying a straight corridor. Merged on 2026-11-10; deployment and a real-phone check are not confirmed.",
         "card_type": "feature",
-        "lifecycle": "review",
+        "lifecycle": "completed",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [
@@ -3706,7 +3706,7 @@
         "updated_at": "2026-11-10T00:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-004",
         "extensions": {
-          "owner_status": "review",
+          "owner_status": "completed",
           "public_safe": true
         }
       },
@@ -3717,12 +3717,12 @@
         "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "The owner asked for occasional shortcuts or multiple routes (sometimes only one way, perhaps scaling with maze size) and for ways to gauge progression scaling. PR #401 adds three loop kinds that keep the long route, priced felt difficulty and a gauge suite (shortest route, walker steps, random solver, human-like explorer), with level 1 staying a straight corridor. It is open and not merged or deployed.",
-        "objective": "The owner asked for occasional shortcuts or multiple routes (sometimes only one way, perhaps scaling with maze size) and for ways to gauge progression scaling. PR #401 adds three loop kinds that keep the long route, priced felt difficulty and a gauge suite (shortest route, walker steps, random solver, human-like explorer), with level 1 staying a straight corridor. It is open and not merged or deployed.",
+        "summary": "The owner asked for occasional shortcuts or multiple routes (sometimes only one way, perhaps scaling with maze size) and for ways to gauge progression scaling. PR #401 adds three loop kinds that keep the long route, priced felt difficulty and a gauge suite (shortest route, walker steps, random solver, human-like explorer), with level 1 staying a straight corridor. Merged on 2026-11-10; deployment and a real-phone check are not confirmed.",
+        "objective": "The owner asked for occasional shortcuts or multiple routes (sometimes only one way, perhaps scaling with maze size) and for ways to gauge progression scaling. PR #401 adds three loop kinds that keep the long route, priced felt difficulty and a gauge suite (shortest route, walker steps, random solver, human-like explorer), with level 1 staying a straight corridor. Merged on 2026-11-10; deployment and a real-phone check are not confirmed.",
         "acceptance_criteria": [
           "Loops keep the long route distance so the maze is not trivially shortened",
           "Level 1 stays a straight corridor",
-          "The gauge report documents scaling for review before merge"
+          "The gauge report documents progression scaling and was reviewed before merge"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -6817,8 +6817,8 @@
   "extensions": {
     "stable_identity_count": 130,
     "exported_public_card_count": 130,
-    "exported_open_card_count": 65,
-    "exported_completed_card_count": 50,
+    "exported_open_card_count": 64,
+    "exported_completed_card_count": 51,
     "exported_deferred_card_count": 15,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,

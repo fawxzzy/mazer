@@ -141,9 +141,14 @@ export type BoardMaterial = typeof boardMaterial;
 /* geometry ratios (named, tile-relative unless suffixed Css/Px)                              */
 /* ------------------------------------------------------------------------------------------ */
 
+/** Convex corner radius of a chip, as a share of the tile (and, scaled, the corner of every chip-family shape). */
+export const CHIP_CORNER_RATIO = 0.3;
+/** The player's rounded square is this share of the tile across. */
+export const PLAYER_SIZE_RATIO = 0.6;
+
 export const BOARD_TILE_GEOMETRY = Object.freeze({
   /** Convex corner radius of a chip, as a share of the tile. */
-  chipCornerRatio: 0.3,
+  chipCornerRatio: CHIP_CORNER_RATIO,
   /** Dead-end cap radius: fully round. */
   capRadiusRatio: 0.5,
   /** Rim (lit edge) width: 10% of the tile, clamped to the CSS range below (about 1.4 css px at 14 px). */
@@ -155,9 +160,6 @@ export const BOARD_TILE_GEOMETRY = Object.freeze({
   padDotRatio: 0.06,
   padDotMinCss: 0.8,
   padDotAlpha: 0.24,
-  junctionNodeRatio: 0.12,
-  junctionNodeMinCss: 1,
-  junctionNodeAlpha: 0.85,
   /** Wall sockets: faint dots on wall cells within one cell (8-neighbourhood) of the path. */
   socketRatio: 0.05,
   socketMinCss: 0.6,
@@ -214,9 +216,12 @@ export const BOARD_TILE_GEOMETRY = Object.freeze({
     goalStarInnerRatio: 0.17,
     /** The end tile itself is lit: a goal-coloured pad in the cell's inscribed circle, so the cell reads at board scale. */
     goalWashAlpha: 0.34,
-    /** Player: rounded square, mint edge, dark keyline. */
-    playerSizeRatio: 0.6,
-    playerRadiusRatio: 0.2,
+    /**
+     * Player: rounded square, mint edge, dark keyline. Its corner radius is the chip's own corner
+     * proportion (radius / width = CHIP_CORNER_RATIO) so the player reads as a scaled-down chip tile.
+     */
+    playerSizeRatio: PLAYER_SIZE_RATIO,
+    playerRadiusRatio: CHIP_CORNER_RATIO * PLAYER_SIZE_RATIO,
     playerEdgeCss: 1,
     playerKeylineCss: 1.25,
     /** Trace-style marker variants. */
@@ -231,6 +236,28 @@ export const BOARD_TILE_GEOMETRY = Object.freeze({
     /** Goal ring alpha swing driven by the (reduced-motion-gated) phase input. */
     goalRingAlphaBase: 0.85,
     goalRingAlphaSwing: 0.15
+  }),
+  /**
+   * Start and goal END TILES (chip style). The tile itself is recoloured: the pad is the chip's own inner
+   * fill silhouette, so its edges are the baked tile's edges to the device pixel at every tile size, and a
+   * circular badge is inscribed in the cell (radius = half the device-snapped tile, so its ring is tangent
+   * to the four tile edges). The goal keeps its shipped badge proportions (ring, star); the start reuses
+   * the badge with a gold ring and a play glyph. Nothing here is floored in css px: on a dense board the
+   * glyph is as small as the tile, and the goal is found through the beacon (src/render/goalBeacon.ts).
+   */
+  endpoint: Object.freeze({
+    /** Badge ring width as a share of the badge radius (the shipped goal badge: 0.09 / 0.47). */
+    ringOfBadge: 0.09 / 0.47,
+    /** Goal star radii as a share of the badge radius (the shipped goal badge: 0.37 / 0.47 and 0.17 / 0.47). */
+    goalStarOuterOfBadge: 0.37 / 0.47,
+    goalStarInnerOfBadge: 0.17 / 0.47,
+    /** Pad colour: the board void mixed this far toward the endpoint colour (opaque, so it hides the bake under it). */
+    goalPadMix: 0.34,
+    startPadMix: 0.22,
+    /** Start play glyph, as shares of the badge radius: half height, width, and its round-join stroke. */
+    startPlayHalfHeightOfBadge: 0.5,
+    startPlayWidthOfBadge: 0.86,
+    startPlayStrokeOfBadge: 0.12
   })
 } as const);
 
@@ -297,7 +324,6 @@ export interface ResolvedBoardTileStyle {
   readonly cornerRadius: number;
   readonly capRadius: number;
   readonly padDotRadius: number;
-  readonly junctionNodeRadius: number;
   readonly socketRadius: number;
   readonly dock: {
     readonly sliceCount: number;
@@ -382,7 +408,6 @@ export const resolveBoardTileStyle = (
     cornerRadius: radius(T * g.chipCornerRatio),
     capRadius: radius(T * g.capRadiusRatio),
     padDotRadius: radius(Math.max(g.padDotMinCss, T * g.padDotRatio)),
-    junctionNodeRadius: radius(Math.max(g.junctionNodeMinCss, T * g.junctionNodeRatio)),
     socketRadius: radius(Math.max(g.socketMinCss, T * g.socketRatio)),
     dock: Object.freeze({
       sliceCount: g.dockSliceCount,

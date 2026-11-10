@@ -11,14 +11,21 @@ import {
 import {
   GEOMETRY_BUDGET_BASE_CANDIDATES,
   GEOMETRY_BUDGET_WINDOW,
+  GEOMETRY_BUDGET_CEILING,
+  GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS,
+  GEOMETRY_BUDGET_TIE_RETRY_BASES,
+  GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS,
   resolveGeometryBudgetCandidateSeed,
   resolveGeometryBudgetForks,
+  resolveGeometryBudgetLoopPlan,
   resolveGeometryBudgetMaxBranch,
   resolveGeometryBudgetRouteBranch,
   resolveGeometryBudgetRouteTarget,
-  resolveGeometryBudgetTarget
+  resolveGeometryBudgetTarget,
+  resolveGeometryBudgetWrapRungs
 } from './legacyGeometryBudget';
-import { tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
+import { LEGACY_EMPTY_LOOP_PLAN, type LegacyLoopPlan } from './legacyMazeLoops';
+import { FELT_TIE_DEVIATION_LIMIT_PERCENT, FELT_WRAP_PRICE_PERCENT, tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
 import { resolveLegacyMazeComplexity } from './legacyProgression';
@@ -136,6 +143,16 @@ export interface LegacyGenerationConsumption {
 
 export interface LegacyGenerationSelectionOptions {
   candidateCount?: number;
+  // Analysis and tests only: replaces a ladder level's own loop plan (multiple
+  // routes). LEGACY_EMPTY_LOOP_PLAN forces a single-route maze. Production callers
+  // leave it undefined so the level's plan applies.
+  loopPlan?: LegacyLoopPlan;
+  // Analysis and tests only: replaces the wrap rungs a ladder maze owns (0 = plain base,
+  // 1 = vertical wrap corridor, 2 = both) and the percent of the wrap saving priced into
+  // the target. Production callers leave both undefined so the level's fade and
+  // FELT_WRAP_PRICE_PERCENT apply.
+  wrapPricePercent?: number;
+  wrapRungs?: number;
   targetComplexity?: number | null;
   tolerance?: number;
 }
@@ -596,6 +613,9 @@ const selectLegacyGeometryBudgetMaze = (
   aspectRatio: number
 ): {
   maze: Omit<LegacyMazeSnapshot, 'generation'>;
+  // The profile the selected maze was actually built from (its wrap rungs follow the
+  // level's fade and the retry fallback, so it can differ from the level's own profile).
+  profile: LegacyMazeGenerationProfile;
   review: LegacyGenerationSelectionReview;
 } => {
   const gateTarget = resolveGeometryBudgetTarget(budgetLevel);
@@ -603,8 +623,28 @@ const selectLegacyGeometryBudgetMaze = (
   const maxBranch = resolveGeometryBudgetMaxBranch(budgetLevel);
   const routeBranch = resolveGeometryBudgetRouteBranch(budgetLevel);
   const forks = resolveGeometryBudgetForks(budgetLevel);
+  // Wrap corridors fade out over levels 100..140 (legacyGeometryBudget.ts): this maze's
+  // rung count is a seeded roll on (level, seed), never more than the profile asks for.
+  const profileRungs = generationProfile.requiredOppositeBorderConnections.horizontal
+    ? 2
+    : (generationProfile.requiredOppositeBorderConnections.vertical ? 1 : 0);
+  const wrapRungs = Math.min(
+    profileRungs,
+    Math.max(0, Math.trunc(selectionOptions.wrapRungs ?? resolveGeometryBudgetWrapRungs(budgetLevel, seed)))
+  );
+  const wrapPricePercent = selectionOptions.wrapPricePercent ?? FELT_WRAP_PRICE_PERCENT;
+  const profileWithRungs = (rungs: number): LegacyMazeGenerationProfile => (
+    rungs === profileRungs
+      ? generationProfile
+      : {
+        ...generationProfile,
+        requiredOppositeBorderConnections: { horizontal: rungs >= 2, vertical: rungs >= 1 }
+      }
+  );
   let selectedMaze: Omit<LegacyMazeSnapshot, 'generation'> | null = null;
+  let selectedProfile: LegacyMazeGenerationProfile = generationProfile;
   let selectedDistance = Number.POSITIVE_INFINITY;
+  let selectedRank = Number.POSITIVE_INFINITY;
   let searched = 0;
   // Usually the first base maze tunes into the window and the loop ends after one
   // build. A base can miss when its wrap corridors give the explorer a shortcut
@@ -612,27 +652,44 @@ const selectLegacyGeometryBudgetMaze = (
   // next mixed-seed base is tried, up to GEOMETRY_BUDGET_BASE_CANDIDATES.
   for (let index = 0; index < GEOMETRY_BUDGET_BASE_CANDIDATES; index += 1) {
     const candidateSeed = resolveGeometryBudgetCandidateSeed(seed, budgetLevel, index);
-    const base = buildLegacyRuntimeMazeForMode(mode, scale, candidateSeed, generationProfile, aspectRatio);
+    // The rolled wraps are tried on the first few bases only; a base that cannot land
+    // with them (priced, they raise the raw target) is retried plain.
+    const baseProfile = profileWithRungs(index < GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS ? wrapRungs : 0);
+    const base = buildLegacyRuntimeMazeForMode(mode, scale, candidateSeed, baseProfile, aspectRatio);
     searched += 1;
     let candidate: Omit<LegacyMazeSnapshot, 'generation'> = base;
     let distance = 0;
+    let tieBiased = false;
     if (gateTarget !== null) {
+      // The looped plan (multiple routes) is tried on the first few bases only; a
+      // base that cannot land with loops is retried without them, so the ladder's
+      // ordering guarantee always outranks the loop.
+      const loops = index < GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS
+        ? (selectionOptions.loopPlan ?? resolveGeometryBudgetLoopPlan(budgetLevel, seed, base.width * base.height))
+        : LEGACY_EMPTY_LOOP_PLAN;
       const tuned = tuneMazeFeltToTarget(
         base,
         gateTarget,
         resolveGeometryBudgetCandidateSeed(seed, budgetLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
-        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks }
+        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent }
       );
       distance = tuned.windowDistance;
-      if (tuned.addedTiles.length > 0 || tuned.trimmedTiles.length > 0 || tuned.bumps > 0) {
-        candidate = assembleTunedMaze(base, tuned, generationProfile);
+      // A landed maze whose number is a coin flip for the explorer (a looped maze that
+      // disagrees with its tie-averaged value) is accepted only after a few more bases.
+      tieBiased = distance === 0 && tuned.tieDeviationPercent > FELT_TIE_DEVIATION_LIMIT_PERCENT;
+      if (tuned.addedTiles.length > 0 || tuned.trimmedTiles.length > 0 || tuned.bumps > 0 || tuned.loops.length > 0 || tuned.cyclesBroken > 0 || tuned.wrapSaving > 0) {
+        candidate = assembleTunedMaze(base, tuned, baseProfile);
       }
     }
-    if (selectedMaze === null || distance < selectedDistance) {
+    // Rank: off-window by its distance; a coin-flip landing just behind a clean one.
+    const rank = tieBiased ? distance + 0.5 : distance;
+    if (selectedMaze === null || rank < selectedRank) {
       selectedMaze = candidate;
+      selectedProfile = baseProfile;
       selectedDistance = distance;
+      selectedRank = rank;
     }
-    if (distance === 0) {
+    if (distance === 0 && (!tieBiased || index >= GEOMETRY_BUDGET_TIE_RETRY_BASES - 1)) {
       break;
     }
   }
@@ -643,6 +700,7 @@ const selectLegacyGeometryBudgetMaze = (
   const reviewTarget = clampInteger(selectionOptions.targetComplexity ?? complexity.total, 0, 999);
   return {
     maze: selectedMaze,
+    profile: selectedProfile,
     review: {
       adaptiveRetryCandidateCount: 0,
       adaptiveRetryScale: null,
@@ -679,11 +737,27 @@ const assembleTunedMaze = (
   tuned: ReturnType<typeof tuneMazeFeltToTarget>,
   generationProfile: LegacyMazeGenerationProfile
 ): Omit<LegacyMazeSnapshot, 'generation'> => {
-  const routed = tuned.bumps > 0
+  const routed = tuned.bumps > 0 || tuned.loops.length > 0 || tuned.cyclesBroken > 0
     ? resolveLegacyShortestPath(tuned.grid, base.start, base.goal, 'direct-floor')
     : null;
   const solutionPath = routed !== null && routed.found ? routed.path : base.solutionPath;
   const next: Omit<LegacyMazeSnapshot, 'generation'> = { ...base, grid: tuned.grid, solutionPath };
+  if (tuned.loops.length > 0) {
+    next.loopStats = {
+      alternates: tuned.loops.filter((loop) => loop.kind === 'alternate').length,
+      cells: tuned.loopTiles.length,
+      decoys: tuned.loops.filter((loop) => loop.kind === 'decoy').length,
+      saved: tuned.loopSaving,
+      shortcuts: tuned.loops.filter((loop) => loop.kind === 'shortcut').length
+    };
+  }
+  // The wrap corridors the base was built with, and the steps they give back to a player
+  // who knows the map (priced into the felt target like a loop saving).
+  const wraps = (generationProfile.requiredOppositeBorderConnections.vertical ? 1 : 0)
+    + (generationProfile.requiredOppositeBorderConnections.horizontal ? 1 : 0);
+  if (wraps > 0 || tuned.wrapSaving > 0) {
+    next.wrapStats = { rungs: wraps, saved: tuned.wrapSaving };
+  }
   if (routed !== null && routed.found) {
     next.wrapTopologyDiagnostics = resolveLegacyWrapTopologyDiagnostics(
       next,
@@ -699,7 +773,7 @@ const assembleTunedMaze = (
   if (base.generationBuildTrace) {
     next.generationBuildTrace = {
       ...base.generationBuildTrace,
-      decoyTiles: [...tuned.stretchTiles, ...tuned.addedTiles].map((point) => ({ ...point })),
+      decoyTiles: [...tuned.loopTiles, ...tuned.stretchTiles, ...tuned.addedTiles].map((point) => ({ ...point })),
       decoyPrunedTiles: [...tuned.stretchRemovedTiles, ...tuned.trimmedTiles].map((point) => ({ ...point }))
     };
   }
@@ -715,6 +789,9 @@ const selectLegacyRuntimeMazeForMode = (
   aspectRatio = 1
 ): {
   maze: Omit<LegacyMazeSnapshot, 'generation'>;
+  // Set only when the maze was built from a profile other than the one passed in
+  // (a ladder level's wrap rungs follow its fade).
+  profile?: LegacyMazeGenerationProfile;
   review?: LegacyGenerationSelectionReview;
 } => {
   const budgetProfile = normalizeLegacyMazeGenerationProfile(generationProfile);
@@ -865,7 +942,7 @@ export const createLegacyRuntimeMazeForMode = (
   const executionPlan = resolveLegacyGenerationExecutionPlan(mode, scale, profile);
   const budget = resolveLegacyGenerationBudgetContract(mode, scale, profile);
   const gate = resolveLegacyGenerationTickGateContract();
-  const { maze, review } = selectLegacyRuntimeMazeForMode(mode, scale, seed, profile, selectionOptions, aspectRatio);
+  const { maze, profile: builtProfile, review } = selectLegacyRuntimeMazeForMode(mode, scale, seed, profile, selectionOptions, aspectRatio);
 
   return {
     ...maze,
@@ -874,7 +951,7 @@ export const createLegacyRuntimeMazeForMode = (
       buildKind,
       executionPlan,
       gate,
-      profile,
+      profile: builtProfile ?? profile,
       processStageIds: resolveLegacyGenerationProcessStageIds(scale, profile, mode),
       ...(review ? { selection: review } : {}),
       stageCursor: resolveLegacyGenerationStageCursor(executionPlan, 'consumed-finalized')

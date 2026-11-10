@@ -11,6 +11,7 @@ import {
 import { GOAL_BEACON, drawGoalBeacon, resolveGoalBeacon } from '../../src/render/goalBeacon';
 import { PhaserGraphicsTileContext } from '../../src/render/phaserTileContext';
 import { drawTrailLayersToCanvasContext } from '../../src/render/trailLayersCanvas';
+import { IRIDESCENT_TRAIL_CORE_STOPS } from '../../src/render/trailIridescence';
 import {
   TRAIL_FADE_ALPHA_MIN,
   TRAIL_FLOOR_COLORS,
@@ -19,7 +20,6 @@ import {
   TRAIL_UNDERLAY_ALPHA,
   compositeTrailUnderlay,
   contrastRatio,
-  liftTrailColor,
   mixRgb,
   resolveTrailWidths,
   trailCoreContrast
@@ -27,17 +27,13 @@ import {
 
 const MENU_SCENE = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n?/g, '\n');
 
-const energyStops = [...MENU_SCENE.matchAll(/const LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS = \[([^\]]+)\]/g)][0]![1]!
-  .match(/0x[0-9a-f]{6}/gi)!.map((hex) => parseInt(hex, 16));
-
-/** Every stop plus 15 in-between samples of each cyclic pair (the trail lerps between stops). */
-const energySamples = (): number[] => {
+/** Every resting stop plus 63 in-between samples of each neighbouring pair (the trail lerps between stops). */
+const restingSamples = (): number[] => {
   const samples: number[] = [];
-  for (let i = 0; i < energyStops.length; i += 1) {
-    const a = energyStops[i]!;
-    const b = energyStops[(i + 1) % energyStops.length]!;
-    for (let s = 0; s < 16; s += 1) {
-      samples.push(mixRgb(a, b, s / 16));
+  const stops = IRIDESCENT_TRAIL_CORE_STOPS;
+  for (let i = 0; i < stops.length - 1; i += 1) {
+    for (let s = 0; s <= 64; s += 1) {
+      samples.push(mixRgb(stops[i]!, stops[i + 1]!, s / 64));
     }
   }
   return samples;
@@ -77,22 +73,20 @@ describe('trail contrast against the real Chip floor (chip fill, lit rim, gap)',
     expect(TRAIL_FLOOR_COLORS.gap).toBe(boardMaterial.void);
   });
 
-  test('every calm energy stop (and every in-between colour) clears 4.5:1 against its underlay on every floor', () => {
-    expect(energyStops.length).toBe(8);
-    for (const sample of energySamples()) {
-      const lifted = liftTrailColor(sample);
+  test('every iridescent resting hue (stops and every in-between colour) clears 4.5:1 against its underlay on every floor', () => {
+    expect(IRIDESCENT_TRAIL_CORE_STOPS.length).toBe(5);
+    for (const sample of restingSamples()) {
       for (const [name, floor] of floors) {
-        expect(trailCoreContrast(lifted, floor, 1), `0x${sample.toString(16)} on ${name}`).toBeGreaterThanOrEqual(4.5);
+        expect(trailCoreContrast(sample, floor, 1), `0x${sample.toString(16)} on ${name}`).toBeGreaterThanOrEqual(4.5);
       }
     }
   });
 
-  test('the faded tail (Trail Fade floor alpha) still clears 3:1 for every stop on every floor, so it holds until it expires', () => {
+  test('the faded tail (Trail Fade floor alpha) still clears 3:1 for every hue on every floor, so it holds until it expires', () => {
     expect(TRAIL_FADE_ALPHA_MIN).toBeGreaterThanOrEqual(0.7);
-    for (const sample of energySamples()) {
-      const lifted = liftTrailColor(sample);
+    for (const sample of restingSamples()) {
       for (const [name, floor] of floors) {
-        expect(trailCoreContrast(lifted, floor, TRAIL_FADE_ALPHA_MIN), `0x${sample.toString(16)} on ${name}`).toBeGreaterThanOrEqual(3);
+        expect(trailCoreContrast(sample, floor, TRAIL_FADE_ALPHA_MIN), `0x${sample.toString(16)} on ${name}`).toBeGreaterThanOrEqual(3);
       }
     }
   });
@@ -102,33 +96,26 @@ describe('trail contrast against the real Chip floor (chip fill, lit rim, gap)',
     expect(contrastRatio(compositeTrailUnderlay(boardMaterial.rim), boardMaterial.rim)).toBeGreaterThanOrEqual(10);
   });
 
-  test('the lift keeps the hues (it only mixes toward white) and the underlay is near-opaque', () => {
-    for (const stop of energyStops) {
-      const lifted = liftTrailColor(stop);
-      for (const shift of [16, 8, 0]) {
-        expect((lifted >> shift) & 255).toBeGreaterThanOrEqual((stop >> shift) & 255);
-      }
-    }
+  test('the underlay is near-opaque', () => {
     expect(TRAIL_UNDERLAY_ALPHA).toBeGreaterThanOrEqual(0.9);
-  });
-
-  test('the underlay is what earns it: the bare stops are under 3:1 on the bare chip', () => {
-    expect(energyStops.every((stop) => contrastRatio(stop, boardMaterial.chip) < 3)).toBe(true);
   });
 });
 
 describe('trail wiring in the scene', () => {
-  test('widths, lift, fade floor and underlay come from trailLegibility, and the underlay ignores the age fade', () => {
+  test('widths, fade floor and underlay come from trailLegibility; colour, pulse and breath from trailIridescence; the underlay ignores the age fade', () => {
     expect(MENU_SCENE).toContain("from '../render/trailLegibility'");
-    expect(MENU_SCENE).toContain('const { coreWidth, glowWidth, underlayWidth } = resolveTrailWidths(tileSize);');
-    expect(MENU_SCENE).toContain('liftTrailColor(sampleCalmTrailEnergyColor(');
+    expect(MENU_SCENE).toContain("from '../render/trailIridescence'");
+    expect(MENU_SCENE).toContain('const restingWidths = resolveTrailWidths(tileSize);');
+    expect(MENU_SCENE).toContain('sampleIridescentTrail(colorPhaseTiles, animationTime, !trailAnimated)');
     expect(MENU_SCENE).toContain('const LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN = TRAIL_FADE_ALPHA_MIN;');
     expect(MENU_SCENE).toContain('underlayAlpha: alphaMultiplier');
+    expect(MENU_SCENE).not.toContain('LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS');
   });
 
-  test('the Trail Fade and Trail Shine switches still gate the age fade and the shine', () => {
+  test('the Trail Fade and Trail Shine switches still gate the age fade and the shine (Trail Shine is also the pulse switch)', () => {
     expect(MENU_SCENE).toContain('const trailFadeEnabled = this.settings.toggleTrailFade;');
     expect(MENU_SCENE).toContain('const shineEnabled = this.isLegacyTrailShineVisible();');
+    expect(MENU_SCENE).toContain('const trailAnimated = shineEnabled;');
   });
 });
 
@@ -145,10 +132,10 @@ const recordGraphics = (): { calls: Recorded[]; graphics: import('phaser').GameO
   return { calls, graphics };
 };
 
-const drawGoal = (tileSize: number, minimum?: { goalBadgeDiameterCss?: number; startTileCss?: number }): Recorded[] => {
+const drawGoal = (tileSize: number, minimum?: { goalBadgeDiameterCss?: number; startTileCss?: number }, style: 'chip' | 'trace' = 'chip'): Recorded[] => {
   const { calls, graphics } = recordGraphics();
   drawBoardMarkers(new PhaserGraphicsTileContext(graphics), {
-    style: 'chip', tileSize, devicePixelRatio: 2, goal: { x: 3, y: 4 }, minimumMarkerSizes: minimum
+    style, tileSize, devicePixelRatio: 2, goal: { x: 3, y: 4 }, minimumMarkerSizes: minimum
   });
   return calls;
 };
@@ -168,40 +155,58 @@ const starArea = (calls: Recorded[]): number => {
 
 const largestRadius = (calls: Recorded[]): number => Math.max(...calls.filter((c) => c.op === 'arc').map((c) => c.args[2] as number));
 
-describe('goal marker salience floor (independent of tile size)', () => {
-  test('the badge is at least 22 css px across and the pad at least as large, from a 4 px tile to an 80 px tile', () => {
+describe('goal end tile (Chip): exactly the tile, at every size', () => {
+  test('the badge is never larger than the tile and, when it is drawn, spans it: from a 4 px tile to an 80 px tile', () => {
+    for (let tile = 4; tile <= 80; tile += 0.5) {
+      // opting in to the css-px floors changes nothing: the Chip end tile ignores them
+      const floored = drawGoal(tile, BOARD_MARKER_MIN_CSS);
+      const plain = drawGoal(tile);
+      expect(JSON.stringify(floored), `tile ${tile}`).toBe(JSON.stringify(plain));
+      const radii = plain.filter((c) => c.op === 'arc').map((c) => c.args[2] as number);
+      // arc order: the pad's corner arcs (a standalone cell is a disc), then the badge disc, then the ring. The badge
+      // and the ring fit inside the tile's inscribed circle; the badge IS that circle (to the device pixel).
+      const badge = radii[radii.length - 2]!;
+      const ring = radii[radii.length - 1]!;
+      expect(badge, `tile ${tile}`).toBeLessThanOrEqual((tile / 2) + 1e-6);
+      expect(badge, `tile ${tile}`).toBeGreaterThanOrEqual((tile / 2) - 0.5 - 1e-6);
+      expect(ring).toBeLessThanOrEqual(badge);
+      for (const r of radii) expect(r, `tile ${tile}`).toBeLessThanOrEqual((tile / 2) + 1e-6);
+    }
+  });
+
+  test('the red star keeps the shipped badge proportions and scales with the tile (no css-px floor)', () => {
+    let previous = 0;
+    for (const tile of [6.45, 9.95, 10.77, 12.48, 14.72, 16.66, 20.58, 25.48, 40, 80]) {
+      const area = starArea(drawGoal(tile));
+      expect(area, `tile ${tile}`).toBeGreaterThan(previous);
+      previous = area;
+      // star outer radius / badge radius = 0.37 / 0.47 (the shipped goal badge)
+      const k = BOARD_TILE_GEOMETRY.endpoint;
+      const badge = (tile / 2);
+      const outerR = badge * k.goalStarOuterOfBadge;
+      // a regular 5-point star with inner/outer = 0.17/0.37 has area ~ 5 * outer * inner * sin(36 deg)
+      const expected = 5 * outerR * (badge * k.goalStarInnerOfBadge) * Math.sin(Math.PI / 5);
+      expect(area / expected, `tile ${tile}`).toBeGreaterThan(0.9);
+      expect(area / expected, `tile ${tile}`).toBeLessThan(1.1);
+    }
+  });
+
+  test('same artwork on every size: only the scale changes (colours and order of the calls are the same)', () => {
+    const shape = (calls: Recorded[]): string => calls.map((c) => c.op).join(',');
+    const fills = (calls: Recorded[]): unknown[] => calls.filter((c) => c.op === 'fillStyle').map((c) => c.args[0]);
+    expect(shape(drawGoal(6.45))).toBe(shape(drawGoal(40)));
+    expect(fills(drawGoal(6.45))).toEqual(fills(drawGoal(40)));
+    expect(fills(drawGoal(6.45))).toContain(boardMaterial.goal);
+  });
+
+  test('the Trace style (the alternate) keeps its css-px floors, as before', () => {
     expect(BOARD_MARKER_MIN_CSS.goalBadgeDiameterCss).toBeGreaterThanOrEqual(22);
     for (let tile = 4; tile <= 80; tile += 0.5) {
-      const calls = drawGoal(tile, BOARD_MARKER_MIN_CSS);
-      const radii = calls.filter((c) => c.op === 'arc').map((c) => c.args[2] as number);
-      // arc order: pad (tile/2), badge, ring (badge - ring/2)
-      const badgeDiameter = radii[1]! * 2;
-      expect(badgeDiameter, `tile ${tile}`).toBeGreaterThanOrEqual(BOARD_MARKER_MIN_CSS.goalBadgeDiameterCss - 0.6);
-      expect(radii[0]!, `tile ${tile}`).toBeGreaterThanOrEqual(radii[1]! - 1);
+      const radius = largestRadius(drawGoal(tile, BOARD_MARKER_MIN_CSS, 'trace'));
+      expect(radius * 2, `tile ${tile}`).toBeGreaterThanOrEqual(BOARD_MARKER_MIN_CSS.goalBadgeDiameterCss - 0.6);
     }
-  });
-
-  test('the red star keeps a floor area (css px^2) on every board size: this is what read as a dot before', () => {
-    const before = starArea(drawGoal(6.45));
-    const after = starArea(drawGoal(6.45, BOARD_MARKER_MIN_CSS));
-    expect(before).toBeLessThan(10);
-    expect(after).toBeGreaterThanOrEqual(80);
-    for (const tile of [6.45, 9.95, 10.77, 12.48, 14.72, 16.66, 20.58, 25.48, 40, 80]) {
-      expect(starArea(drawGoal(tile, BOARD_MARKER_MIN_CSS)), `tile ${tile}`).toBeGreaterThanOrEqual(80);
-    }
-  });
-
-  test('big tiles are untouched: with or without the floor the draw calls are identical', () => {
-    expect(JSON.stringify(drawGoal(40, BOARD_MARKER_MIN_CSS))).toBe(JSON.stringify(drawGoal(40)));
+    expect(JSON.stringify(drawGoal(40, BOARD_MARKER_MIN_CSS, 'trace'))).toBe(JSON.stringify(drawGoal(40, undefined, 'trace')));
     expect(resolveGoalEffectiveTile(40, 22)).toBe(40);
-  });
-
-  test('same artwork: only the scale changes (colours, order and shape of the calls are the same)', () => {
-    const shape = (calls: Recorded[]): string => calls.map((c) => c.op).join(',');
-    expect(shape(drawGoal(6.45, BOARD_MARKER_MIN_CSS))).toBe(shape(drawGoal(6.45)));
-    const fills = (calls: Recorded[]): unknown[] => calls.filter((c) => c.op === 'fillStyle').map((c) => c.args[0]);
-    expect(fills(drawGoal(6.45, BOARD_MARKER_MIN_CSS))).toEqual(fills(drawGoal(6.45)));
-    expect(fills(drawGoal(6.45, BOARD_MARKER_MIN_CSS))).toContain(boardMaterial.goal);
   });
 
   test('the Guide icons do not opt in, so they are exactly as drawn before', () => {
@@ -209,15 +214,12 @@ describe('goal marker salience floor (independent of tile size)', () => {
       .not.toMatch(/^[\s\S]{0,1500}minimumMarkerSizes/);
   });
 
-  test('the play board opts in for both markers, and the start stays smaller than the goal', () => {
+  test('the play board still passes the floors (the Trace style honours them), and the beacon keeps its own css-px sizing', () => {
     const fn = MENU_SCENE.slice(MENU_SCENE.indexOf('private fillPlayDynamicMarkerTile('));
-    expect(fn.slice(0, 2500)).toContain('minimumMarkerSizes: BOARD_MARKER_MIN_CSS');
-    const startTile = BOARD_MARKER_MIN_CSS.startTileCss;
-    const goalTile = resolveGoalEffectiveTile(0, BOARD_MARKER_MIN_CSS.goalBadgeDiameterCss);
-    expect(startTile).toBeLessThan(goalTile);
-    // the start bracket's outer extent stays inside the goal badge's size class
-    const startOuter = (startTile * BOARD_TILE_GEOMETRY.marker.startHalfRatio) + (BOARD_TILE_GEOMETRY.marker.startWidthMinCss / 2);
-    expect(startOuter).toBeLessThan(BOARD_MARKER_MIN_CSS.goalBadgeDiameterCss / 2);
+    expect(fn.slice(0, 4500)).toContain('minimumMarkerSizes: BOARD_MARKER_MIN_CSS');
+    expect(fn.slice(0, 4500)).toContain('minBadgeDiameterCss: BOARD_MARKER_MIN_CSS.goalBadgeDiameterCss');
+    // the start's floor stays below the goal's, as before
+    expect(BOARD_MARKER_MIN_CSS.startTileCss).toBeLessThan(resolveGoalEffectiveTile(0, BOARD_MARKER_MIN_CSS.goalBadgeDiameterCss));
   });
 });
 

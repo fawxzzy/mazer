@@ -4,15 +4,15 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-10T09:56:14.000Z",
+  "updatedAt": "2026-11-10T14:20:02.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
     "stableIdentityCount": 130,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 65,
-    "completedCardCount": 50,
+    "openCardCount": 64,
+    "completedCardCount": 51,
     "deferredCardCount": 15,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out."
   },
@@ -1010,12 +1010,12 @@
     },
     {
       "id": "MAZER-PROG-004",
-      "status": "review",
+      "status": "completed",
       "updatedAt": "2026-11-10T00:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-004",
       "title": "Add shortcuts, alternate routes and decoy loops plus progression gauges",
-      "description": "The owner asked for occasional shortcuts or multiple routes (sometimes only one way, perhaps scaling with maze size) and for ways to gauge progression scaling. PR #401 adds three loop kinds that keep the long route, priced felt difficulty and a gauge suite (shortest route, walker steps, random solver, human-like explorer), with level 1 staying a straight corridor. It is open and not merged or deployed.",
+      "description": "The owner asked for occasional shortcuts or multiple routes (sometimes only one way, perhaps scaling with maze size) and for ways to gauge progression scaling. PR #401 adds three loop kinds that keep the long route, priced felt difficulty and a gauge suite (shortest route, walker steps, random solver, human-like explorer), with level 1 staying a straight corridor. Merged on 2026-11-10; deployment and a real-phone check are not confirmed.",
       "cardType": "feature",
       "priority": "high",
       "dependencies": [
@@ -1024,7 +1024,7 @@
       "acceptanceCriteria": [
         "Loops keep the long route distance so the maze is not trivially shortened",
         "Level 1 stays a straight corridor",
-        "The gauge report documents scaling for review before merge"
+        "The gauge report documents progression scaling and was reviewed before merge"
       ]
     },
     {

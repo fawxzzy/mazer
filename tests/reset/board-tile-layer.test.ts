@@ -10,9 +10,11 @@ import {
   resolveBoardTileStyleFromSearch,
   type BoardRevealContext2D
 } from '../../src/render/boardTileLayer';
-import { BOARD_TILE_GEOMETRY, boardMaterial, DEFAULT_BOARD_TILE_STYLE } from '../../src/render/boardTileStyle';
+import { boardMaterial, DEFAULT_BOARD_TILE_STYLE } from '../../src/render/boardTileStyle';
 import { PhaserGraphicsTileContext, parseCssRgba } from '../../src/render/phaserTileContext';
-import { compositeTrailUnderlay, liftTrailColor } from '../../src/render/trailLegibility';
+import { resolveEndpointPadColor } from '../../src/render/endpointTiles';
+import { IRIDESCENT_TRAIL_CORE_STOPS } from '../../src/render/trailIridescence';
+import { compositeTrailUnderlay } from '../../src/render/trailLegibility';
 import { braidedMazeGrid, contrast, inputFor, wrapDockMaze } from '../render/support/boardTileFixtures';
 
 const MENU_SCENE = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n?/g, '\n');
@@ -274,36 +276,28 @@ describe('Phaser graphics adapter for the Chip marker draw code', () => {
 });
 
 describe('trail on the Chip floor (amendment open item A8)', () => {
-  // The full contrast pins (every energy stop and in-between, against chip / rim / gap, width floors) live in
-  // tests/reset/marker-trail-legibility.test.ts; this keeps the original A8 intent: the underlay is what earns it.
-  const stops = [...MENU_SCENE.matchAll(/const LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS = \[([^\]]+)\]/g)][0]![1]!
-    .match(/0x[0-9a-f]{6}/gi)!.map((hex) => parseInt(hex, 16));
-
-  test('every calm trail energy stop clears 3:1 against the chip under the dark underlay', () => {
-    expect(stops.length).toBe(8);
+  // The full contrast pins (every iridescent hue against chip / rim / gap, width floors) live in
+  // tests/reset/trail-iridescence.test.ts and tests/reset/marker-trail-legibility.test.ts; this keeps the
+  // original A8 intent: the dark underlay is what holds the contrast, on every floor.
+  test('every resting trail core stop clears 3:1 against the chip, and 4.5:1 under the dark underlay', () => {
     const underlaid = compositeTrailUnderlay(boardMaterial.chip);
-    for (const stop of stops) {
-      expect(contrast(liftTrailColor(stop), underlaid), `0x${stop.toString(16)}`).toBeGreaterThanOrEqual(3);
+    for (const stop of IRIDESCENT_TRAIL_CORE_STOPS) {
+      expect(contrast(stop, boardMaterial.chip), `0x${stop.toString(16)} bare`).toBeGreaterThanOrEqual(3);
+      expect(contrast(stop, underlaid), `0x${stop.toString(16)}`).toBeGreaterThanOrEqual(4.5);
     }
-  });
-
-  test('the underlay is what earns that: at least one stop is under 3:1 on the bare chip', () => {
-    expect(stops.some((stop) => contrast(stop, boardMaterial.chip) < 3)).toBe(true);
   });
 });
 
 describe('end (goal) tile', () => {
-  test('the dark badge and the goal star keep their contrast on the goal pad', () => {
-    const channel = (shift: number): number => Math.round(
-      ((boardMaterial.chip >> shift) & 255) * (1 - BOARD_TILE_GEOMETRY.marker.goalWashAlpha)
-      + ((boardMaterial.goal >> shift) & 255) * BOARD_TILE_GEOMETRY.marker.goalWashAlpha
-    );
-    const washed = (channel(16) << 16) | (channel(8) << 8) | channel(0);
-    expect(contrast(boardMaterial.void, washed)).toBeGreaterThanOrEqual(3);
+  test('the badge ring and the goal star keep their contrast on the goal pad', () => {
+    const pad = resolveEndpointPadColor('goal');
     expect(contrast(boardMaterial.goal, boardMaterial.void)).toBeGreaterThanOrEqual(3);
+    // the lit ring (rim colour) separates the dark badge from the tinted pad and the chip around it
+    expect(contrast(boardMaterial.rim, pad)).toBeGreaterThanOrEqual(3);
+    expect(contrast(boardMaterial.rim, boardMaterial.void)).toBeGreaterThanOrEqual(3);
   });
 
-  test('the pad and badge stay inside the one-cell footprint (the pad is the inscribed circle of the cell)', () => {
+  test('the pad and badge stay inside the one-cell footprint (a standalone cell is an isolated chip: a disc)', () => {
     const calls: Array<{ op: string; args: number[] }> = [];
     const rec = (op: string) => (...args: number[]) => { calls.push({ op, args }); };
     const graphics = {
@@ -315,7 +309,7 @@ describe('end (goal) tile', () => {
     const pathPoints = calls.filter((c) => c.op === 'moveTo' || c.op === 'lineTo');
     const arcs = calls.filter((c) => c.op === 'arc');
     expect(arcs.length).toBeGreaterThanOrEqual(2);
-    // every arc (pad, badge, ring) is centred on the cell centre and no larger than the inscribed circle
+    // every arc (pad corner, badge, ring) is centred on the cell centre and no larger than the inscribed circle
     for (const arc of arcs) {
       expect(arc.args[0]!).toBeCloseTo(2.5 * 14, 0);
       expect(arc.args[1]!).toBeCloseTo(3.5 * 14, 0);
@@ -327,5 +321,25 @@ describe('end (goal) tile', () => {
       expect(p.args[1]!).toBeGreaterThanOrEqual(3 * 14 - 1e-6);
       expect(p.args[1]!).toBeLessThanOrEqual(4 * 14 + 1e-6);
     }
+  });
+
+  test('the layer hands the scene the start and goal tiles of its own bake (board-local, same layout as the floor)', () => {
+    const layerSource = readFileSync(resolve(process.cwd(), 'src/render/boardTileLayer.ts'), 'utf8');
+    expect(layerSource).toContain('computeChipTileAt(input, frame.start)');
+    expect(layerSource).toContain('computeChipTileAt(input, frame.goal)');
+    expect(layerSource).toContain('get endpointTiles()');
+  });
+
+  test('the scene paints the end tiles from those tiles: pads under the trail, badges above it (start and goal alike)', () => {
+    const fn = MENU_SCENE.slice(MENU_SCENE.indexOf('private fillPlayDynamicMarkerTile('));
+    const body = fn.slice(0, fn.indexOf('// Retired: drawLegacyMarkerGemCatchlight'));
+    expect(body).toContain('this.boardTileLayer.endpointTiles');
+    expect(body).toContain('startTile: endpointTiles.start');
+    expect(body).toContain('goalTile: endpointTiles.goal');
+    expect(body).toContain("drawBoardMarkers(underContext, { ...markerInput, endpointLayer: 'pad' });");
+    expect(body).toContain("drawBoardMarkers(context, { ...markerInput, endpointLayer: 'badge' });");
+    expect(body).not.toContain("endpointLayer: 'all'");
+    // underContext is the goalBeaconGraphics layer, which sits below the trail canvas
+    expect(body).toContain('new PhaserGraphicsTileContext(this.goalBeaconGraphics)');
   });
 });

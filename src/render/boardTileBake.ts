@@ -1,8 +1,8 @@
 /**
  * Baked board tile renderer (DRAFT, pure drawing module, not wired into any scene).
  *
- * `bakeBoardTiles(input, factory)` paints the whole static board layer -- floor, rim, junction and
- * dead-end details, wall sockets and bleed/wrap docks -- ONCE into an offscreen surface created by
+ * `bakeBoardTiles(input, factory)` paints the whole static board layer -- floor, rim, dead-end
+ * details, wall sockets and bleed/wrap docks -- ONCE into an offscreen surface created by
  * the injected `factory`. The scene then blits that one canvas; nothing here runs per frame and no
  * gradient is created per tile. Two styles share the same layout analysis:
  *
@@ -28,8 +28,19 @@ import {
   type BoardTileStyleId,
   type ResolvedBoardTileStyle
 } from './boardTileStyle';
+import {
+  resolveEndpointTile,
+  resolveIsolatedEndpointRect,
+  type EndpointKind,
+  type EndpointTileRect,
+  type EndpointTileSpec
+} from './endpointTiles';
 
-export const BOARD_TILE_BAKE_VERSION = 'mazer-board-tile-bake-v1' as const;
+/**
+ * Part of every bake hash: bump it whenever the baked pixels change. v2: the bright junction nodes are gone
+ * (split tiles are plain chips with the same faint pad dot as every other tile).
+ */
+export const BOARD_TILE_BAKE_VERSION = 'mazer-board-tile-bake-v2' as const;
 
 /* ------------------------------------------------------------------------------------------ */
 /* injected 2D surface contract                                                               */
@@ -375,36 +386,43 @@ const kindOf = (open: BoardTileOpen, degree: number): BoardTileKind => {
   return (open.u && open.d) || (open.l && open.r) ? 'straight' : 'corner';
 };
 
+const analyzeTileAt = (n: NormalizedInput, layout: BoardTileLayout, x: number, y: number): BoardTileInfo | null => {
+  if (!isFloor(n.grid, x, y)) {
+    return null;
+  }
+  const dockOpen = (side: BoardDockSide): boolean => layout.docks.some(
+    (d) => d.x === x && d.y === y && d.side === side
+  );
+  const open: BoardTileOpen = {
+    u: isFloor(n.grid, x, y - 1) || dockOpen('top'),
+    d: isFloor(n.grid, x, y + 1) || dockOpen('bottom'),
+    l: isFloor(n.grid, x - 1, y) || dockOpen('left'),
+    r: isFloor(n.grid, x + 1, y) || dockOpen('right')
+  };
+  const degree = (open.u ? 1 : 0) + (open.d ? 1 : 0) + (open.l ? 1 : 0) + (open.r ? 1 : 0);
+  const left = layout.xs[x]!;
+  const top = layout.ys[y]!;
+  return {
+    x,
+    y,
+    left,
+    top,
+    width: layout.xs[x + 1]! - left,
+    height: layout.ys[y + 1]! - top,
+    open,
+    degree,
+    kind: kindOf(open, degree)
+  };
+};
+
 const analyzeTiles = (n: NormalizedInput, layout: BoardTileLayout): BoardTileInfo[] => {
   const tiles: BoardTileInfo[] = [];
   for (let y = 0; y < n.rows; y += 1) {
     for (let x = 0; x < n.cols; x += 1) {
-      if (!isFloor(n.grid, x, y)) {
-        continue;
+      const tile = analyzeTileAt(n, layout, x, y);
+      if (tile) {
+        tiles.push(tile);
       }
-      const dockOpen = (side: BoardDockSide): boolean => layout.docks.some(
-        (d) => d.x === x && d.y === y && d.side === side
-      );
-      const open: BoardTileOpen = {
-        u: isFloor(n.grid, x, y - 1) || dockOpen('top'),
-        d: isFloor(n.grid, x, y + 1) || dockOpen('bottom'),
-        l: isFloor(n.grid, x - 1, y) || dockOpen('left'),
-        r: isFloor(n.grid, x + 1, y) || dockOpen('right')
-      };
-      const degree = (open.u ? 1 : 0) + (open.d ? 1 : 0) + (open.l ? 1 : 0) + (open.r ? 1 : 0);
-      const left = layout.xs[x]!;
-      const top = layout.ys[y]!;
-      tiles.push({
-        x,
-        y,
-        left,
-        top,
-        width: layout.xs[x + 1]! - left,
-        height: layout.ys[y + 1]! - top,
-        open,
-        degree,
-        kind: kindOf(open, degree)
-      });
     }
   }
   return tiles;
@@ -471,6 +489,23 @@ const chipGeometryOf = (
       bl: open.d && open.l && !isFloor(n.grid, x - 1, y + 1)
     }
   };
+};
+
+/**
+ * Chip geometry of ONE floor cell, in board-local css px (the same numbers `computeChipGeometry` returns for
+ * that cell, from the same device-snapped layout), or null when the cell is not floor. The scene asks for the
+ * start and goal tiles only, after a rebake, so the end tiles can be painted on the baked tile's own edges.
+ */
+export const computeChipTileAt = (
+  input: BoardTileBakeInput,
+  cell: BoardCell,
+  style?: ResolvedBoardTileStyle
+): ChipTileGeometry | null => {
+  const n = normalizeInput(input);
+  const resolved = style ?? resolveBoardTileStyle('chip', n.tileSize, n.scale);
+  const layout = buildLayout(n, resolved);
+  const tile = analyzeTileAt(n, layout, cell.x, cell.y);
+  return tile ? chipGeometryOf(n, tile, resolved) : null;
 };
 
 /** Cheap, capped set of wall cells within one cell of the path that get a faint socket dot. */
@@ -708,27 +743,11 @@ const paintChipFloor = (
     p.fill();
   }
 
-  // pass 4: junction nodes and faint pad dots (not under the start/goal markers)
-  let nodeOpen = false;
+  // pass 4: one faint pad dot per floor tile, the same on every tile (junctions included: there is no
+  // separate split-path marker), skipped only under the start/goal end tiles
   let dotOpen = false;
   for (const t of tiles) {
     if (sameCell(n.start, t.x, t.y) || sameCell(n.goal, t.x, t.y)) {
-      continue;
-    }
-    if (t.degree >= 3) {
-      if (!nodeOpen) {
-        p.fillStyle(cssRgba(m.rim, BOARD_TILE_GEOMETRY.junctionNodeAlpha));
-        p.begin();
-        nodeOpen = true;
-      }
-      p.circle(t.left + t.width / 2, t.top + t.height / 2, style.junctionNodeRadius);
-    }
-  }
-  if (nodeOpen) {
-    p.fill();
-  }
-  for (const t of tiles) {
-    if (sameCell(n.start, t.x, t.y) || sameCell(n.goal, t.x, t.y) || t.degree >= 3) {
       continue;
     }
     if (!dotOpen) {
@@ -1007,9 +1026,22 @@ export interface BoardMarkerInput {
   phase?: number;
   reducedMotion?: boolean;
   /**
-   * Opt-in on-screen floors (css px) so the start/goal stay findable when tiles are tiny. The goal is drawn
-   * (same artwork, same colours) as if its badge were at least `goalBadgeDiameterCss` across; the start as
-   * if the tile were at least `startTileCss`. Omit for the plain tile-fraction size (Guide icons).
+   * Chip style: the start / goal cell's own chip geometry in BOARD-LOCAL css px (`computeChipTileAt`, from the
+   * same bake layout), so the end tile is painted on the baked tile's exact edges, including its real corner
+   * radii. Omit for a standalone cell (Guide icons): it is then an isolated chip, which is a disc.
+   */
+  startTile?: EndpointTileRect | null;
+  goalTile?: EndpointTileRect | null;
+  /**
+   * Chip style: which parts of the start / goal to paint. `pad` is the recoloured tile (the scene paints it
+   * under the trail canvas), `badge` is the glyph on it; `all` (default) paints both. The player is always
+   * painted. Ignored by the trace style.
+   */
+  endpointLayer?: 'all' | 'pad' | 'badge';
+  /**
+   * TRACE style only (the alternate): on-screen floors (css px) so the start/goal stay findable when tiles
+   * are tiny. The chip style draws the end tile at exactly the tile's size and ignores this: its goal is
+   * found through the beacon (goalBeacon.ts).
    */
   minimumMarkerSizes?: { goalBadgeDiameterCss?: number; startTileCss?: number };
 }
@@ -1037,39 +1069,20 @@ export const centerOfCell = (cell: BoardCell, size: number, scale: number, ox: n
   oy + (Math.round(cell.y * size * scale) + Math.round((cell.y + 1) * size * scale)) / 2 / scale
 ];
 
-const drawStartMarker = (painter: Painter, style: ResolvedBoardTileStyle, cx: number, cy: number): void => {
+const drawTraceStartMarker = (painter: Painter, style: ResolvedBoardTileStyle, cx: number, cy: number): void => {
   const m = style.material;
   const k = style.marker;
-  if (style.style === 'trace') {
-    painter.fillStyle(cssRgb(m.void));
-    painter.begin();
-    painter.circle(cx, cy, k.traceStartDiscRadius);
-    painter.fill();
-    painter.strokeStyle(cssRgb(m.start));
-    painter.lineWidth(k.startWidth);
-    painter.stroke();
-    painter.strokeStyle(cssRgba(m.start, 0.5));
-    painter.lineWidth(k.hairline);
-    painter.begin();
-    painter.circle(cx, cy, k.traceStartOuterRadius);
-    painter.stroke();
-    painter.fillStyle(cssRgb(m.start));
-    painter.begin();
-    painter.circle(cx, cy, k.startDotRadius);
-    painter.fill();
-    return;
-  }
-  const h = k.startHalf;
-  const a = k.startArm;
+  painter.fillStyle(cssRgb(m.void));
+  painter.begin();
+  painter.circle(cx, cy, k.traceStartDiscRadius);
+  painter.fill();
   painter.strokeStyle(cssRgb(m.start));
   painter.lineWidth(k.startWidth);
-  painter.caps('square', 'miter');
+  painter.stroke();
+  painter.strokeStyle(cssRgba(m.start, 0.5));
+  painter.lineWidth(k.hairline);
   painter.begin();
-  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
-    painter.move(cx + sx * h, cy + sy * (h - a));
-    painter.line(cx + sx * h, cy + sy * h);
-    painter.line(cx + sx * (h - a), cy + sy * h);
-  }
+  painter.circle(cx, cy, k.traceStartOuterRadius);
   painter.stroke();
   painter.fillStyle(cssRgb(m.start));
   painter.begin();
@@ -1077,60 +1090,103 @@ const drawStartMarker = (painter: Painter, style: ResolvedBoardTileStyle, cx: nu
   painter.fill();
 };
 
-const drawGoalMarker = (
+const drawTraceGoalMarker = (
   painter: Painter,
   style: ResolvedBoardTileStyle,
   cx: number,
   cy: number,
-  phase = 0
+  ringAlpha: number
 ): void => {
   const m = style.material;
   const k = style.marker;
-  const g = BOARD_TILE_GEOMETRY.marker;
-  const p01 = Math.max(0, Math.min(1, phase));
-  const ringAlpha = g.goalRingAlphaBase + g.goalRingAlphaSwing * p01;
-  if (style.style === 'trace') {
-    painter.strokeStyle(cssRgba(m.goalHalo, 0.35 * ringAlpha));
-    painter.lineWidth(k.hairline * 3);
+  painter.strokeStyle(cssRgba(m.goalHalo, 0.35 * ringAlpha));
+  painter.lineWidth(k.hairline * 3);
+  painter.begin();
+  painter.circle(cx, cy, k.traceGoalHaloRadius - k.hairline);
+  painter.stroke();
+  painter.strokeStyle(cssRgba(m.goalHalo, 0.7 * ringAlpha));
+  painter.lineWidth(k.hairline);
+  painter.begin();
+  painter.circle(cx, cy, k.traceGoalHaloRadius);
+  painter.stroke();
+  painter.fillStyle(cssRgba(m.void, 0.9));
+  painter.begin();
+  painter.circle(cx, cy, k.traceGoalDiscRadius);
+  painter.fill();
+  starPath(painter, cx, cy, k.traceGoalStarOuter, k.traceGoalStarInner);
+  painter.caps('round', 'round');
+  painter.strokeStyle(cssRgb(m.void));
+  painter.lineWidth(k.hairline * 2);
+  painter.stroke();
+  painter.fillStyle(cssRgb(m.goal));
+  painter.fill();
+};
+
+/** The recoloured tile: the chip's own inner fill silhouette, opaque, on the baked tile's exact edges. */
+const drawEndpointPad = (
+  painter: Painter,
+  style: ResolvedBoardTileStyle,
+  spec: EndpointTileSpec,
+  ox: number,
+  oy: number
+): void => {
+  const { pad } = spec;
+  painter.fillStyle(cssRgb(pad.color));
+  painter.begin();
+  painter.roundedRect(ox + pad.left, oy + pad.top, pad.width, pad.height, pad.radii as CornerRadii);
+  painter.fill();
+  if (pad.patches.length > 0) {
+    // The bake's concave rim patches sit inside the fill rect; put them back over the pad so the rim stays continuous.
+    painter.fillStyle(cssRgb(style.material.rim));
     painter.begin();
-    painter.circle(cx, cy, k.traceGoalHaloRadius - k.hairline);
-    painter.stroke();
-    painter.strokeStyle(cssRgba(m.goalHalo, 0.7 * ringAlpha));
-    painter.lineWidth(k.hairline);
-    painter.begin();
-    painter.circle(cx, cy, k.traceGoalHaloRadius);
-    painter.stroke();
-    painter.fillStyle(cssRgba(m.void, 0.9));
-    painter.begin();
-    painter.circle(cx, cy, k.traceGoalDiscRadius);
+    for (const [px, py] of pad.patches) {
+      painter.rect(ox + px, oy + py, style.rimWidth, style.rimWidth);
+    }
     painter.fill();
-    starPath(painter, cx, cy, k.traceGoalStarOuter, k.traceGoalStarInner);
-    painter.caps('round', 'round');
-    painter.strokeStyle(cssRgb(m.void));
-    painter.lineWidth(k.hairline * 2);
-    painter.stroke();
+  }
+};
+
+/** The badge on the end tile: dark disc inscribed in the cell, lit ring, then the glyph (goal star / start play). */
+const drawEndpointBadge = (
+  painter: Painter,
+  style: ResolvedBoardTileStyle,
+  spec: EndpointTileSpec,
+  ox: number,
+  oy: number,
+  ringAlpha: number
+): void => {
+  const m = style.material;
+  const { badge } = spec;
+  const cx = ox + badge.cx;
+  const cy = oy + badge.cy;
+  painter.fillStyle(cssRgb(m.void));
+  painter.begin();
+  painter.circle(cx, cy, badge.radius);
+  painter.fill();
+  painter.strokeStyle(spec.kind === 'goal' ? cssRgba(m.rim, ringAlpha) : cssRgb(m.start));
+  painter.lineWidth(badge.ringWidth);
+  painter.begin();
+  painter.circle(cx, cy, badge.radius - (badge.ringWidth / 2));
+  painter.stroke();
+  if (spec.star) {
+    starPath(painter, cx, cy, spec.star.outer, spec.star.inner);
     painter.fillStyle(cssRgb(m.goal));
     painter.fill();
     return;
   }
-  // End tile: a goal-coloured round pad fills the cell's inscribed circle (so it never spills past a
-  // rounded dead-end chip), then the dark badge and lit ring sit on it.
-  painter.fillStyle(cssRgba(m.goal, g.goalWashAlpha));
-  painter.begin();
-  painter.circle(cx, cy, style.tileSize / 2);
-  painter.fill();
-  painter.fillStyle(cssRgb(m.void));
-  painter.begin();
-  painter.circle(cx, cy, k.goalBadgeRadius);
-  painter.fill();
-  painter.strokeStyle(cssRgba(m.rim, ringAlpha));
-  painter.lineWidth(k.goalRingWidth);
-  painter.begin();
-  painter.circle(cx, cy, k.goalBadgeRadius - k.goalRingWidth / 2);
-  painter.stroke();
-  starPath(painter, cx, cy, k.goalStarOuter, k.goalStarInner);
-  painter.fillStyle(cssRgb(m.goal));
-  painter.fill();
+  if (spec.play) {
+    const { play } = spec;
+    painter.fillStyle(cssRgb(m.start));
+    painter.strokeStyle(cssRgb(m.start));
+    painter.lineWidth(play.stroke);
+    painter.begin();
+    painter.move(ox + play.ax, oy + play.ay);
+    painter.line(ox + play.bx, oy + play.by);
+    painter.line(ox + play.cx, oy + play.cy);
+    painter.close();
+    painter.fill();
+    painter.stroke();
+  }
 };
 
 const drawPlayerMarker = (painter: Painter, style: ResolvedBoardTileStyle, cx: number, cy: number): void => {
@@ -1173,9 +1229,35 @@ const drawPlayerMarker = (painter: Painter, style: ResolvedBoardTileStyle, cx: n
   painter.fill();
 };
 
+const snapEdge = (cells: number, size: number, scale: number): number => Math.round(cells * size * scale) / scale;
+
+/** Board-local isolated-chip rect of one cell (a disc), from the same device-snapped grid lines the bake uses. */
+const standaloneEndpointRect = (
+  cell: BoardCell,
+  size: number,
+  scale: number,
+  style: ResolvedBoardTileStyle
+): EndpointTileRect => {
+  const left = snapEdge(cell.x, size, scale);
+  const top = snapEdge(cell.y, size, scale);
+  return resolveIsolatedEndpointRect(
+    left,
+    top,
+    snapEdge(cell.x + 1, size, scale) - left,
+    snapEdge(cell.y + 1, size, scale) - top,
+    style.rimWidth,
+    style.capRadius
+  );
+};
+
 /**
  * Draws start, goal and player for the chosen style onto `ctx`. Only the markers present in the
  * input are drawn. Start is skipped while the player stands on it. Order: start, goal, player.
+ *
+ * Chip style: start and goal are END TILES (see endpointTiles.ts): the pad is the tile's own fill silhouette
+ * and the badge is inscribed in the cell, both from `startTile` / `goalTile` (the baked tile's geometry), so
+ * they sit on the tile's edges exactly. `endpointLayer` splits pad and badge so the scene can paint the pad
+ * under the trail. Trace style: the alternate marker artwork, unchanged.
  */
 export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput): BoardMarkerStats => {
   const scale = clampBoardDevicePixelRatio(input.devicePixelRatio);
@@ -1185,23 +1267,44 @@ export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput
   const oy = input.originY ?? 0;
   const painter = new Painter(ctx);
   const phase = input.reducedMotion ? 0 : (input.phase ?? 0);
+  const layer = input.endpointLayer ?? 'all';
+  const ringAlpha = BOARD_TILE_GEOMETRY.marker.goalRingAlphaBase
+    + (BOARD_TILE_GEOMETRY.marker.goalRingAlphaSwing * Math.max(0, Math.min(1, phase)));
 
   painter.save();
   painter.alpha(1);
   painter.caps('round', 'round');
   const onStart = input.start && input.player
     && input.player.x === input.start.x && input.player.y === input.start.y;
+  const paintEndpoint = (kind: EndpointKind, cell: BoardCell, tile: EndpointTileRect | null | undefined): void => {
+    const rect = tile ?? standaloneEndpointRect(cell, input.tileSize, scale, style);
+    const spec = resolveEndpointTile(kind, rect, scale, style.rimWidth);
+    if (layer !== 'badge') {
+      drawEndpointPad(painter, style, spec, ox, oy);
+    }
+    if (layer !== 'pad') {
+      drawEndpointBadge(painter, style, spec, ox, oy, ringAlpha);
+    }
+  };
   if (input.start && !onStart) {
-    const [cx, cy] = centerOfCell(input.start, input.tileSize, scale, ox, oy);
-    const startTile = Math.max(input.tileSize, input.minimumMarkerSizes?.startTileCss ?? 0);
-    const startStyle = startTile > input.tileSize ? resolveBoardTileStyle(styleId, startTile, scale) : style;
-    drawStartMarker(painter, startStyle, cx, cy);
+    if (styleId === 'trace') {
+      const [cx, cy] = centerOfCell(input.start, input.tileSize, scale, ox, oy);
+      const startTile = Math.max(input.tileSize, input.minimumMarkerSizes?.startTileCss ?? 0);
+      const startStyle = startTile > input.tileSize ? resolveBoardTileStyle(styleId, startTile, scale) : style;
+      drawTraceStartMarker(painter, startStyle, cx, cy);
+    } else {
+      paintEndpoint('start', input.start, input.startTile);
+    }
   }
   if (input.goal) {
-    const [cx, cy] = centerOfCell(input.goal, input.tileSize, scale, ox, oy);
-    const goalTile = resolveGoalEffectiveTile(input.tileSize, input.minimumMarkerSizes?.goalBadgeDiameterCss ?? 0);
-    const goalStyle = goalTile > input.tileSize ? resolveBoardTileStyle(styleId, goalTile, scale) : style;
-    drawGoalMarker(painter, goalStyle, cx, cy, phase);
+    if (styleId === 'trace') {
+      const [cx, cy] = centerOfCell(input.goal, input.tileSize, scale, ox, oy);
+      const goalTile = resolveGoalEffectiveTile(input.tileSize, input.minimumMarkerSizes?.goalBadgeDiameterCss ?? 0);
+      const goalStyle = goalTile > input.tileSize ? resolveBoardTileStyle(styleId, goalTile, scale) : style;
+      drawTraceGoalMarker(painter, goalStyle, cx, cy, ringAlpha);
+    } else {
+      paintEndpoint('goal', input.goal, input.goalTile);
+    }
   }
   if (input.player) {
     const cx = ox + (input.player.x + 0.5) * input.tileSize;

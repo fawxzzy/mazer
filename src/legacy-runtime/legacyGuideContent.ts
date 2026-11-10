@@ -118,7 +118,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'start',
-    text: 'Corner brackets mark the tile where each maze begins.'
+    text: 'A play marker on a ringed tile shows where each maze begins.'
   },
   {
     heading: 'You',
@@ -132,7 +132,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'guide-local'
     },
     id: 'you',
-    text: 'You are the green block inside a bright ring.'
+    text: 'You are the green rounded block inside a bright ring.'
   },
   {
     heading: 'Move',
@@ -160,7 +160,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'trail',
-    text: `A glowing line shows your route. Turn on ${TRAIL_FADE_LABEL} in Settings to fade old trail.`
+    text: `A pulsing, colour-shifting line shows your route. ${TRAIL_FADE_LABEL} in Settings fades old trail.`
   },
   {
     heading: 'Wrap',
@@ -188,14 +188,14 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'levels',
-    text: 'Each cleared maze raises your level. Mazes get harder as you climb.'
+    text: 'Each cleared maze raises your level. Harder mazes can have shortcuts and loops.'
   }
 ]);
 
 /**
  * Rows deliberately NOT shown yet. Each names what must land first; the
  * drift test pins that none of them is in LEGACY_GUIDE_ROWS. (The Start row
- * left this list when Chip landed: the start brackets are now on the board.)
+ * left this list when Chip landed: the start marker is now on the board.)
  */
 export const LEGACY_GUIDE_PENDING_ROWS: readonly LegacyGuidePendingRow[] = Object.freeze([
   {

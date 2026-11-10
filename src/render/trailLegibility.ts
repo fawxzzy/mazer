@@ -1,15 +1,15 @@
 /**
- * Play-trail legibility on the Chip floor: width, underlay, core lift and fade floor, as pure functions so the
- * numbers are testable against the real chip colours (tests/render/trailLegibility.test.ts).
+ * Play-trail legibility on the Chip floor: width, underlay and fade floor, as pure functions so the numbers
+ * are testable against the real chip colours (tests/reset/marker-trail-legibility.test.ts).
  *
- * Why: the trail width was `tile * 0.16`, which is ~1.5 css px on dense boards (tiles of 6..12 css px), and the
- * calm energy stops are mid-luminance on a mid-tone mint chip (1.3..2.2:1 on the bare chip). Fixes, each keeping
- * the Navigation Core trail identity (one continuous path, calm energy palette, shine, Trail Fade, AI = player):
+ * Why: the trail width was `tile * 0.16`, which is ~1.5 css px on dense boards (tiles of 6..12 css px), and a
+ * mid-luminance trail colour on a mid-tone mint chip is hard to read (1.3..2.2:1 on the bare chip). Fixes, each
+ * keeping the Navigation Core trail identity (one continuous path, shine, Trail Fade, AI = player):
  *  - a minimum core width in css px, capped so it never swallows a tiny tile;
  *  - the dark underlay (bg.canvas) widens with the core and is nearly opaque, and it does NOT fade with trail
  *    age, only with the lifecycle fade, so the core always sits on a dark ground;
- *  - the core colour is lifted toward white (same hues) so every energy stop clears 4.5:1 on that ground;
- *  - Trail Fade keeps an alpha floor at which every stop still clears 3:1 until the tail actually expires.
+ *  - Trail Fade keeps an alpha floor at which every hue still clears 3:1 until the tail actually expires.
+ * The colour itself (iridescent sweep, pulse, and its own 3:1-on-the-chip floor) is trailIridescence.ts.
  */
 import { boardMaterial } from './boardTileStyle';
 
@@ -23,14 +23,13 @@ export const TRAIL_UNDERLAY_PAD_MIN_CSS = 1.5;
 export const TRAIL_UNDERLAY_PAD_CORE_RATIO = 0.35;
 /** bg.canvas over the floor at this alpha: near-opaque, so the ground under the core is dark on chip, rim or gap. */
 export const TRAIL_UNDERLAY_ALPHA = 0.94;
-/** Energy stop mixed toward white by this share (hue preserved; lerps between lifted stops stay exact). */
-export const TRAIL_CORE_LIFT = 0.15;
 /** Trail Fade alpha floor: at this alpha every lifted stop still clears 3:1 against the dark ground. */
 export const TRAIL_FADE_ALPHA_MIN = 0.7;
 export const TRAIL_GLOW_TILE_RATIO = 0.3;
 /** Glow (neon bloom) is at least this multiple of the core so it reads on dense boards too. */
 export const TRAIL_GLOW_MIN_CORE_MULTIPLE = 2.2;
-export const TRAIL_GLOW_ALPHA_RATIO = 0.2;
+/** Bloom alpha as a share of the core alpha: 0.2 with the calm palette, 0.32 for the iridescent trail so the deep hues read around it. */
+export const TRAIL_GLOW_ALPHA_RATIO = 0.32;
 
 export interface TrailWidths {
   coreWidth: number;
@@ -57,9 +56,6 @@ export const mixRgb = (a: number, b: number, t: number): number => (
   | (mixChannel((a >> 8) & 255, (b >> 8) & 255, t) << 8)
   | mixChannel(a & 255, b & 255, t)
 );
-
-/** The trail's drawn colour for a sampled energy colour: lifted toward white. */
-export const liftTrailColor = (color: number): number => mixRgb(color, boardMaterial.white, TRAIL_CORE_LIFT);
 
 /** Underlay colour as composited over a given floor colour. */
 export const compositeTrailUnderlay = (floor: number): number => mixRgb(floor, boardMaterial.void, TRAIL_UNDERLAY_ALPHA);
