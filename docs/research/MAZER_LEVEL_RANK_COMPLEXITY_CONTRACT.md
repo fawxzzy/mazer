@@ -12,6 +12,18 @@ This document defines how Mazer should connect player performance, AI-runner per
 - Naturally open floor geometry remains valid maze topology; this is not a no-`2x2` generation rule.
 - Older room-off and future-room passages below are retained as design history and are superseded by this section.
 
+## 2026-11-10 Mastery tier (levels 269..388): reverse-solve resistance, saturation moves to 388
+
+Product direction unchanged: board and tile size frozen, difficulty from maze structure, hazards (Phase 2, MAZER-HAZ-002) not built. Source change; modelled difficulty, not player-tested. Evidence, audit and lever table: `docs/research/MAZER_PROGRESSION_FINAL_AUDIT_2026-11-10.md` (+ `.json`).
+
+- **Finding.** The ladder steers on the pull-to-goal explorer run from the start. The board is fully visible, so the same explorer run from the goal pays 0.3-0.6 of that on every level (phone, reverse against forward: 120 / 215 at level 10, 190 / 564 at 100, 475 / 759 at 198 and 268), because every deceptive fork the tuner carves points toward the goal only.
+- **Lever.** Tuner lever 4, option `doubleLure`: a fork carved straight off the route must also look closer to the start than the previous route cell. No extra floor, forward number untouched, reverse felt 430-475 to at least 740 (mean about 760, both boards). All or nothing per maze (a fork's subtree is entered as a unit), so a partial lure barely moves it.
+- **Ramp.** `resolveGeometryBudgetMastery(level, seed)`: a seeded roll on (level, play seed) against `resolveGeometryBudgetMasteryPermille(level)`, zero up to level 268 (`GEOMETRY_BUDGET_FRINGE_END_LEVEL`), +1000/120 per level (`GEOMETRY_BUDGET_MASTERY_SPAN = 120`), all mazes from level 388. A mastery maze keeps forward felt `[759, 760]` and the full 70 fringe cells and is held to `GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR = 740` reverse felt (`reverseFloor`; shortfall goes into `windowDistance`, so the restarts and then the next base are tried). `maze.masteryStats` records `{ mastery, reverseFelt }` for every maze past level 198.
+- **Guarantee and its limit.** Up to level 268 the ladder is ordered for ANY two seeds by construction (felt, then fringe). The mastery tier is ordered statistically: the share of mastery mazes, hence the mean reverse felt, rises with the level; two single mazes of adjacent levels can invert. Tests assert the mean rises across the tier and the floor on every mastery maze.
+- **Hand-off.** `GEOMETRY_BUDGET_SATURATION_LEVEL` and `LAST_BUDGET_LEVEL` are 388; `hazardBudgetLevels = level - 388`; `resolveContinuousDifficulty` adds the regime `mastery` and the field `masteryPermille`. Hazards stay dormant.
+- **Unchanged.** Levels 1-268 byte-identical (golden fixture: levels 281, 282, 288, 289 and 299 changed on both boards). Not applied, owner decision: the lure for levels 2-268 (what-if: reverse felt about 1.6-2 times, 188 hashes reshuffled).
+- **Guide.** No wording changes; the Levels row stays true.
+
 ## 2026-11-10 Past level 198: the fringe (levels 199..268), saturation moves to 268
 
 Owner report (2026-11-10, from the installed app): the main-menu maze labelled level 18000+ is not as complex or difficult as it should be. Product direction unchanged: board size frozen (25 x 51 phone, 45 x 27 desktop) and not a zoom lever; difficulty must come from maze structure; hazards and enemies (Phase 2) wait. Product judgement was delegated, so the choice is made and justified here. Source change; modelled difficulty, not player-tested. Evidence and numbers: `docs/research/MAZER_PROGRESSION_GAUGES_2026-11-10.md` (update at the top).

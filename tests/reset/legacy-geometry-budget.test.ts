@@ -6,7 +6,10 @@ import {
   GEOMETRY_BUDGET_CEILING,
   GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
   GEOMETRY_BUDGET_FRINGE_CAP,
+  GEOMETRY_BUDGET_FRINGE_END_LEVEL,
   GEOMETRY_BUDGET_FRINGE_STEP,
+  GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR,
+  GEOMETRY_BUDGET_MASTERY_SPAN,
   GEOMETRY_BUDGET_MIN_STEP,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
   GEOMETRY_BUDGET_STYLE_BANDS,
@@ -23,6 +26,8 @@ import {
   resolveGeometryBudgetFeltLevel,
   resolveGeometryBudgetForks,
   resolveGeometryBudgetFringeCells,
+  resolveGeometryBudgetMastery,
+  resolveGeometryBudgetMasteryPermille,
   resolveGeometryBudgetMaxBranch,
   resolveGeometryBudgetRouteBranch,
   resolveGeometryBudgetProfile,
@@ -209,7 +214,8 @@ describe('continuous difficulty function D(level)', () => {
     expect(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL)).toBeLessThanOrEqual(GEOMETRY_BUDGET_CEILING);
     expect(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 1)).toBeGreaterThan(GEOMETRY_BUDGET_CEILING);
     expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(resolveGeometryBudgetSchedule(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL));
-    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + Math.floor(GEOMETRY_BUDGET_FRINGE_CAP / GEOMETRY_BUDGET_FRINGE_STEP));
+    expect(GEOMETRY_BUDGET_FRINGE_END_LEVEL).toBe(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + Math.floor(GEOMETRY_BUDGET_FRINGE_CAP / GEOMETRY_BUDGET_FRINGE_STEP));
+    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(GEOMETRY_BUDGET_FRINGE_END_LEVEL + GEOMETRY_BUDGET_MASTERY_SPAN);
     expect(LAST_BUDGET_LEVEL).toBe(GEOMETRY_BUDGET_SATURATION_LEVEL);
     // Measured hard ceiling of the frozen board (see scripts/analysis/generate-geometry-budget-targets.ts).
     expect(GEOMETRY_BUDGET_CEILING).toBe(760);
@@ -218,16 +224,20 @@ describe('continuous difficulty function D(level)', () => {
     // Fringe capacity of the finished top maze (same script): 70 cells, one more per level.
     expect(GEOMETRY_BUDGET_FRINGE_CAP).toBe(70);
     expect(GEOMETRY_BUDGET_FRINGE_STEP).toBe(1);
-    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(268);
+    expect(GEOMETRY_BUDGET_FRINGE_END_LEVEL).toBe(268);
+    // The mastery tier (reverse-solve resistant mazes): 120 levels, floor of 600 reverse steps.
+    expect(GEOMETRY_BUDGET_MASTERY_SPAN).toBe(120);
+    expect(GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR).toBe(740);
+    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(388);
   });
 
-  test('the fringe is exactly one step more per level from the felt saturation to the saturation level', () => {
+  test('the fringe is exactly one step more per level from the felt saturation to the end of the fringe', () => {
     expect(resolveGeometryBudgetFringeCells(2)).toBe(0);
     expect(resolveGeometryBudgetFringeCells(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL)).toBe(0);
-    for (let level = GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 1; level <= GEOMETRY_BUDGET_SATURATION_LEVEL; level += 1) {
+    for (let level = GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 1; level <= GEOMETRY_BUDGET_FRINGE_END_LEVEL; level += 1) {
       expect(resolveGeometryBudgetFringeCells(level) - resolveGeometryBudgetFringeCells(level - 1)).toBe(GEOMETRY_BUDGET_FRINGE_STEP);
     }
-    expect(resolveGeometryBudgetFringeCells(GEOMETRY_BUDGET_SATURATION_LEVEL)).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
+    expect(resolveGeometryBudgetFringeCells(GEOMETRY_BUDGET_FRINGE_END_LEVEL)).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
     for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL + 1, 500, 1_000_000, Number.NaN]) {
       expect(resolveGeometryBudgetFringeCells(level)).toBe(Number.isNaN(level) ? 0 : GEOMETRY_BUDGET_FRINGE_CAP);
     }
@@ -236,6 +246,40 @@ describe('continuous difficulty function D(level)', () => {
       expect(resolveGeometryBudgetFeltLevel(level)).toBe(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL);
       expect(resolveGeometryBudgetRouteTarget(level)).toBe(resolveGeometryBudgetRouteTarget(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL));
       expect(resolveGeometryBudgetForks(level)).toBe(resolveGeometryBudgetForks(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL));
+    }
+  });
+
+  test('the mastery share is zero up to the end of the fringe, rises by 1000 / span per level, and is all from the saturation level', () => {
+    for (const level of [2, 100, GEOMETRY_BUDGET_FELT_SATURATION_LEVEL, GEOMETRY_BUDGET_FRINGE_END_LEVEL, Number.NaN]) {
+      expect(resolveGeometryBudgetMasteryPermille(level)).toBe(0);
+    }
+    let previous = 0;
+    for (let level = GEOMETRY_BUDGET_FRINGE_END_LEVEL + 1; level <= GEOMETRY_BUDGET_SATURATION_LEVEL; level += 1) {
+      const permille = resolveGeometryBudgetMasteryPermille(level);
+      expect(permille).toBeGreaterThan(previous);
+      expect(permille - previous).toBeLessThanOrEqual(Math.ceil(1000 / GEOMETRY_BUDGET_MASTERY_SPAN));
+      previous = permille;
+    }
+    expect(resolveGeometryBudgetMasteryPermille(GEOMETRY_BUDGET_SATURATION_LEVEL)).toBe(1000);
+    for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL + 1, 1000, 1_000_000]) {
+      expect(resolveGeometryBudgetMasteryPermille(level)).toBe(1000);
+    }
+  });
+
+  test('the mastery roll is a pure function of (level, seed) whose frequency follows the share', () => {
+    for (let seed = 1; seed <= 50; seed += 1) {
+      expect(resolveGeometryBudgetMastery(GEOMETRY_BUDGET_FRINGE_END_LEVEL, seed)).toBe(false);
+      expect(resolveGeometryBudgetMastery(GEOMETRY_BUDGET_SATURATION_LEVEL, seed)).toBe(true);
+      expect(resolveGeometryBudgetMastery(77_777, seed)).toBe(true);
+      expect(resolveGeometryBudgetMastery(GEOMETRY_BUDGET_FRINGE_END_LEVEL + 40, seed))
+        .toBe(resolveGeometryBudgetMastery(GEOMETRY_BUDGET_FRINGE_END_LEVEL + 40, seed));
+    }
+    // Over 2000 seeds the observed share is within 6 percentage points of the level's share.
+    for (const offset of [12, 40, 60, 90, 110]) {
+      const level = GEOMETRY_BUDGET_FRINGE_END_LEVEL + offset;
+      let hits = 0;
+      for (let seed = 1; seed <= 2000; seed += 1) { if (resolveGeometryBudgetMastery(level, seed * 7919)) { hits += 1; } }
+      expect(Math.abs((hits / 2000) - (resolveGeometryBudgetMasteryPermille(level) / 1000))).toBeLessThan(0.06);
     }
   });
 
@@ -281,19 +325,24 @@ describe('continuous difficulty function D(level)', () => {
 
   test('past the ceiling difficulty is handed to the hazard budget, never silently flat', () => {
     expect(resolveContinuousDifficulty(1)).toEqual({
-      level: 1, regime: 'corridor', geometryTarget: null, geometryRungs: 0, fringeCells: 0, geometrySaturated: false, hazardBudgetLevels: 0
+      level: 1, regime: 'corridor', geometryTarget: null, geometryRungs: 0, fringeCells: 0, masteryPermille: 0, geometrySaturated: false, hazardBudgetLevels: 0
     });
     const ramp = resolveContinuousDifficulty(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL - 1);
     expect(ramp).toMatchObject({ regime: 'ramp', geometrySaturated: false, hazardBudgetLevels: 0, fringeCells: 0 });
     // Between the felt saturation and the saturation level the fringe rises and nothing is owed to hazards.
     const fringe = resolveContinuousDifficulty(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 10);
     expect(fringe).toMatchObject({ regime: 'fringe', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: false, hazardBudgetLevels: 0, fringeCells: 10 * GEOMETRY_BUDGET_FRINGE_STEP });
+    // Past the fringe the share of reverse-solve resistant mazes rises; still nothing owed to hazards.
+    const mastery = resolveContinuousDifficulty(GEOMETRY_BUDGET_FRINGE_END_LEVEL + 30);
+    expect(mastery).toMatchObject({
+      regime: 'mastery', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: false, hazardBudgetLevels: 0, fringeCells: GEOMETRY_BUDGET_FRINGE_CAP, masteryPermille: 250
+    });
     const atCeiling = resolveContinuousDifficulty(GEOMETRY_BUDGET_SATURATION_LEVEL);
     expect(atCeiling).toMatchObject({
-      regime: 'plateau', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: true, hazardBudgetLevels: 0, fringeCells: GEOMETRY_BUDGET_FRINGE_CAP
+      regime: 'plateau', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: true, hazardBudgetLevels: 0, fringeCells: GEOMETRY_BUDGET_FRINGE_CAP, masteryPermille: 1000
     });
     let previousHazard = -1;
-    for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, GEOMETRY_BUDGET_SATURATION_LEVEL + 1, 300, 500, 1_000_000]) {
+    for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, GEOMETRY_BUDGET_SATURATION_LEVEL + 1, 500, 1_000_000]) {
       const difficulty = resolveContinuousDifficulty(level);
       expect(difficulty.geometryTarget).toBe(GEOMETRY_BUDGET_TOP_TARGET);
       expect(difficulty.geometryRungs).toBe(atCeiling.geometryRungs);
@@ -301,7 +350,7 @@ describe('continuous difficulty function D(level)', () => {
       expect(difficulty.hazardBudgetLevels).toBeGreaterThan(previousHazard);
       previousHazard = difficulty.hazardBudgetLevels;
     }
-    expect(resolveContinuousDifficulty(301).hazardBudgetLevels - resolveContinuousDifficulty(300).hazardBudgetLevels).toBe(1);
+    expect(resolveContinuousDifficulty(401).hazardBudgetLevels - resolveContinuousDifficulty(400).hazardBudgetLevels).toBe(1);
     let previousTarget = 0;
     for (let level = 2; level < GEOMETRY_BUDGET_FELT_SATURATION_LEVEL; level += 1) {
       const difficulty = resolveContinuousDifficulty(level);

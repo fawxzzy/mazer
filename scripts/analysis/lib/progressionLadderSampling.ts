@@ -52,6 +52,11 @@ export interface LadderLevelSample {
   explorerPath: number;
   // Zero-felt-cost fringe stub cells the maze carries (levels past the felt saturation, else 0).
   fringeCells: number;
+  // The REVERSE felt value: the same explorer run from the goal to the start, minus the same
+  // priced savings. What a player who solves the (fully visible) maze backwards pays.
+  reverseFelt: number;
+  // True when the maze is a mastery maze (reverse-solve resistant, levels past the fringe).
+  mastery: boolean;
   // SECONDARY: the H1 structure proxy.
   proxy: number;
   ms: number;
@@ -118,6 +123,8 @@ export const sampleLevel = (level: number, board: typeof LADDER_BOARDS[number], 
     feltMonteCarlo: monteCarlo / 8,
     explorerPath: measured.pathLength,
     fringeCells: (maze as LegacyMazeSnapshot).fringeStats?.cells ?? 0,
+    reverseFelt: measureFelt({ ...maze, start: maze.goal, goal: maze.start }).steps - loopSaving - wrapSaving,
+    mastery: (maze as LegacyMazeSnapshot).masteryStats?.mastery ?? false,
     proxy: measureGeometryBudgetProxy(maze, resolveLegacyMazeComplexity(maze)).total,
     ms,
     onTarget: level < 2 || target === null || (felt >= target && felt <= target + GEOMETRY_BUDGET_WINDOW),

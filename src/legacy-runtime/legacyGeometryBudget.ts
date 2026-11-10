@@ -295,10 +295,37 @@ export const GEOMETRY_BUDGET_TOP_TARGET = resolveGeometryBudgetSchedule(GEOMETRY
 // the fringe capacity at the felt saturation, as the CAPACITY_SHARE quantile over base mazes.
 export const GEOMETRY_BUDGET_FRINGE_STEP = 1;
 
-// The last level whose geometry rises: the FELT saturation level plus the levels the fringe
-// carries. From here the ladder is a declared plateau (the hazard budget takes over).
-export const GEOMETRY_BUDGET_SATURATION_LEVEL = GEOMETRY_BUDGET_FELT_SATURATION_LEVEL
+// The last level of the fringe: the FELT saturation level plus the levels the fringe carries.
+export const GEOMETRY_BUDGET_FRINGE_END_LEVEL = GEOMETRY_BUDGET_FELT_SATURATION_LEVEL
   + Math.floor(GEOMETRY_BUDGET_FRINGE_CAP / GEOMETRY_BUDGET_FRINGE_STEP);
+
+// THE MASTERY TIER (levels past the fringe). The felt number is the explorer pulled from the
+// START toward the goal. The board is fully visible, so a player can as well work back from the
+// goal, and the ladder's mazes are about half as hard that way: measured on levels 198 to 268
+// (24 to 240 seeds per board), the same explorer run goal to start pays 430-475 steps on the
+// phone board and 415-445 on desktop against 759 (and a tenth of the mazes pay under 200),
+// because every deceptive fork the tuner carves points toward the goal only. The tuner's lever
+// 4 (`doubleLure`, legacyMazeFeltTuning.ts) makes the route forks of a maze point toward the
+// start as well, with no more floor and no change to the forward number: the reverse number
+// rises to at least 740 on every such maze (the floor below; the mean is about 760 on both boards).
+//
+// The lever is all or nothing per maze (a fork's whole subtree is entered or skipped as a unit,
+// so a half-lured maze barely moves: measured mean reverse steps 444 / 445 / 461 / 498 / 582 /
+// 697 for a lure on 0 / 25 / 50 / 75 / 90 / 100 percent of the forks), so the ramp is made of
+// MAZES, like the wrap fade: from the first level past the fringe, a seeded roll on (level, play
+// seed) decides whether a maze is a mastery maze, with a share that rises by
+// 1 / GEOMETRY_BUDGET_MASTERY_SPAN per level from zero (level 268) to all (level 268 + SPAN).
+// The mean reverse felt then rises linearly with the level, and a mastery maze is held to a
+// floor of GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR reverse steps (a base that cannot land it is
+// retried, like a base that cannot hold the fringe). This is a statistical ramp, not the
+// strict by-construction ordering of the felt ladder: two single mazes of adjacent levels can
+// still invert.
+export const GEOMETRY_BUDGET_MASTERY_SPAN = 120;
+export const GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR = 740;
+
+// The last level whose geometry rises: the end of the mastery tier. From here the ladder is a
+// declared plateau (the hazard budget takes over).
+export const GEOMETRY_BUDGET_SATURATION_LEVEL = GEOMETRY_BUDGET_FRINGE_END_LEVEL + GEOMETRY_BUDGET_MASTERY_SPAN;
 
 // The last BOUNDED progression level whose geometry comes from this function:
 // the saturation level. Every level >= 2 up to it has its own target (and fringe);
@@ -324,6 +351,22 @@ export const resolveGeometryBudgetFeltLevel = (level: number): number => Math.mi
 export const resolveGeometryBudgetFringeCells = (level: number): number => {
   const past = clampBudgetLevel(level) - GEOMETRY_BUDGET_FELT_SATURATION_LEVEL;
   return past <= 0 ? 0 : Math.min(GEOMETRY_BUDGET_FRINGE_CAP, past * GEOMETRY_BUDGET_FRINGE_STEP);
+};
+
+// Share (permille) of the mazes of level N that are mastery mazes: nothing up to the end of the
+// fringe, then 1000 / GEOMETRY_BUDGET_MASTERY_SPAN more per level, all of them from the last level.
+export const resolveGeometryBudgetMasteryPermille = (level: number): number => {
+  const past = clampBudgetLevel(level) - GEOMETRY_BUDGET_FRINGE_END_LEVEL;
+  return past <= 0 ? 0 : Math.min(1000, Math.floor((1000 * past) / GEOMETRY_BUDGET_MASTERY_SPAN));
+};
+
+// Whether the maze of level N and play seed S is a mastery maze: a seeded roll on (level, seed)
+// against the level's share, so the same level and seed always give the same maze.
+export const resolveGeometryBudgetMastery = (level: number, seed: number): boolean => {
+  const permille = resolveGeometryBudgetMasteryPermille(level);
+  if (permille <= 0) { return false; }
+  if (permille >= 1000) { return true; }
+  return (mix32(seed >>> 0, Math.imul(clampBudgetLevel(level), 53) + 29) % 1000) < permille;
 };
 
 // T(N): the felt target for budget level N (2..LAST_BUDGET_LEVEL); null outside.
@@ -480,8 +523,10 @@ export const resolveGeometryBudgetProfile = (level: number): LegacyMazeGeneratio
 );
 
 // 'ramp': the felt target still rises; 'fringe': the felt target is at its top and the fringe
-// rises (past GEOMETRY_BUDGET_FELT_SATURATION_LEVEL); 'plateau': geometry can no longer rise.
-export type ContinuousDifficultyRegime = 'corridor' | 'ramp' | 'fringe' | 'plateau';
+// rises (past GEOMETRY_BUDGET_FELT_SATURATION_LEVEL); 'mastery': the fringe is full and the share
+// of reverse-solve resistant mazes rises (past GEOMETRY_BUDGET_FRINGE_END_LEVEL); 'plateau':
+// geometry can no longer rise.
+export type ContinuousDifficultyRegime = 'corridor' | 'ramp' | 'fringe' | 'mastery' | 'plateau';
 
 export interface ContinuousDifficulty {
   readonly level: number;
@@ -491,6 +536,9 @@ export interface ContinuousDifficulty {
   readonly geometryRungs: number;
   // Zero-felt-cost side-stub cells the maze carries (GEOMETRY_BUDGET_FRINGE_CAP at most).
   readonly fringeCells: number;
+  // Share (permille) of the level's mazes that are mastery mazes (reverse-solve resistant);
+  // 0 up to GEOMETRY_BUDGET_FRINGE_END_LEVEL, 1000 from GEOMETRY_BUDGET_SATURATION_LEVEL.
+  readonly masteryPermille: number;
   // True from GEOMETRY_BUDGET_SATURATION_LEVEL on: geometry difficulty can no
   // longer rise on the frozen board.
   readonly geometrySaturated: boolean;
@@ -507,16 +555,21 @@ export interface ContinuousDifficulty {
 export const resolveContinuousDifficulty = (level: number): ContinuousDifficulty => {
   const normalized = Math.max(1, Math.trunc(Number.isFinite(level) ? level : 1));
   if (normalized <= 1) {
-    return { level: 1, regime: 'corridor', geometryTarget: null, geometryRungs: 0, fringeCells: 0, geometrySaturated: false, hazardBudgetLevels: 0 };
+    return { level: 1, regime: 'corridor', geometryTarget: null, geometryRungs: 0, fringeCells: 0, masteryPermille: 0, geometrySaturated: false, hazardBudgetLevels: 0 };
   }
   const bounded = Math.min(LAST_BUDGET_LEVEL, normalized);
   const saturated = normalized >= GEOMETRY_BUDGET_SATURATION_LEVEL;
   return {
     level: normalized,
-    regime: saturated ? 'plateau' : (normalized > GEOMETRY_BUDGET_FELT_SATURATION_LEVEL ? 'fringe' : 'ramp'),
+    regime: saturated
+      ? 'plateau'
+      : (normalized > GEOMETRY_BUDGET_FRINGE_END_LEVEL
+        ? 'mastery'
+        : (normalized > GEOMETRY_BUDGET_FELT_SATURATION_LEVEL ? 'fringe' : 'ramp')),
     geometryTarget: resolveGeometryBudgetTarget(bounded),
     geometryRungs: resolveGeometryBudgetRungCount(bounded),
     fringeCells: resolveGeometryBudgetFringeCells(bounded),
+    masteryPermille: resolveGeometryBudgetMasteryPermille(bounded),
     geometrySaturated: saturated,
     hazardBudgetLevels: saturated ? normalized - GEOMETRY_BUDGET_SATURATION_LEVEL : 0
   };

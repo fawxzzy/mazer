@@ -5,7 +5,10 @@ import {
   GEOMETRY_BUDGET_MIN_STEP,
   GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
   GEOMETRY_BUDGET_FRINGE_CAP,
+  GEOMETRY_BUDGET_FRINGE_END_LEVEL,
+  GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
+  resolveGeometryBudgetMastery,
   resolveGeometryBudgetFringeCells,
   GEOMETRY_BUDGET_WINDOW,
   resolveGeometryBudgetTarget
@@ -18,6 +21,8 @@ import {
   resolveGeometryBudgetLevel,
   resolveLegacyMazeGenerationProfileForProgression
 } from '../../src/legacy-runtime/legacyProgression';
+import { measureFelt } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
+import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 import {
   generateLadderMaze,
   hashLadderMaze,
@@ -85,11 +90,11 @@ describe('progression ladder: strictly harder every level up to the felt saturat
   });
 });
 
-describe('progression ladder: the fringe carries the ladder from the felt saturation to the saturation level', () => {
+describe('progression ladder: the fringe carries the ladder from the felt saturation to the end of the fringe', () => {
   test('for ANY two seeds level N + 1 is strictly harder than level N as the pair (felt, fringe cells): the felt value holds the top window and the fringe is exactly one cell more per level', () => {
     for (const board of LADDER_BOARDS) {
       let previousMaxFringe = -1;
-      for (let level = FELT_SAT; level <= SAT; level += 1) {
+      for (let level = FELT_SAT; level <= GEOMETRY_BUDGET_FRINGE_END_LEVEL; level += 1) {
         const samples = [0, 1].map((index) => sampleLevel(level, board, seedForIndex(index)));
         samples.forEach((sample) => {
           expect(sample.onTarget).toBe(true);
@@ -104,6 +109,75 @@ describe('progression ladder: the fringe carries the ladder from the felt satura
       expect(previousMaxFringe).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
     }
   }, 300_000);
+});
+
+// What a solver who works from the goal end pays: the felt explorer run goal -> start, minus the
+// priced savings (loops and wraps give back the same steps in either direction).
+const reverseFeltOf = (maze: ReturnType<typeof generateLadderMaze>): number => {
+  const saved = ((maze as LegacyMazeSnapshot).loopStats?.saved ?? 0) + ((maze as LegacyMazeSnapshot).wrapStats?.saved ?? 0);
+  return measureFelt({ ...maze, start: maze.goal, goal: maze.start }).steps - saved;
+};
+
+describe('progression ladder: the mastery tier raises the reverse-solve cost from the end of the fringe to the saturation level', () => {
+  const sampleSeeds = Array.from({ length: 24 }, (_, index) => seedForIndex(index + 3));
+
+  test('levels up to the end of the fringe have no mastery maze and carry no mastery stats; mastery mazes keep the felt window and the full fringe', () => {
+    for (const board of LADDER_BOARDS) {
+      const plain = generateLadderMaze(GEOMETRY_BUDGET_FRINGE_END_LEVEL, board, seedForIndex(0));
+      expect((plain as LegacyMazeSnapshot).masteryStats).toEqual(expect.objectContaining({ mastery: false }));
+      const early = generateLadderMaze(FELT_SAT + 5, board, seedForIndex(0));
+      expect((early as LegacyMazeSnapshot).masteryStats).toEqual(expect.objectContaining({ mastery: false }));
+      const below = generateLadderMaze(FELT_SAT - 1, board, seedForIndex(0));
+      expect((below as LegacyMazeSnapshot).masteryStats).toBeUndefined();
+      for (const level of [GEOMETRY_BUDGET_FRINGE_END_LEVEL + 40, SAT]) {
+        for (const seed of sampleSeeds.slice(0, 8)) {
+          const sample = sampleLevel(level, board, seed);
+          expect(sample.onTarget).toBe(true);
+          expect(sample.felt).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_TOP_TARGET);
+          expect(sample.felt).toBeLessThanOrEqual(GEOMETRY_BUDGET_TOP_TARGET + GEOMETRY_BUDGET_WINDOW);
+          expect(sample.fringeCells).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
+        }
+      }
+    }
+  }, 120_000);
+
+  test('every mastery maze is held to the reverse floor, and from the saturation level every maze is one', () => {
+    for (const board of LADDER_BOARDS) {
+      for (const level of [GEOMETRY_BUDGET_FRINGE_END_LEVEL + 60, SAT, 1_000]) {
+        for (const seed of sampleSeeds) {
+          const maze = generateLadderMaze(level, board, seed);
+          const stats = (maze as LegacyMazeSnapshot).masteryStats!;
+          expect(stats.mastery).toBe(resolveGeometryBudgetMastery(level, seed));
+          if (level >= SAT) { expect(stats.mastery).toBe(true); }
+          if (stats.mastery) {
+            expect(stats.reverseFelt).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR);
+            // The recorded number is the real one, measured again from the finished grid.
+            expect(reverseFeltOf(maze)).toBe(stats.reverseFelt);
+          }
+        }
+      }
+    }
+  }, 120_000);
+
+  test('the mean reverse-solve cost rises across the tier, and the worst reverse-solve rises once every maze is a mastery maze', () => {
+    for (const board of LADDER_BOARDS) {
+      const means: number[] = [];
+      const levels = [GEOMETRY_BUDGET_FRINGE_END_LEVEL, GEOMETRY_BUDGET_FRINGE_END_LEVEL + 30, GEOMETRY_BUDGET_FRINGE_END_LEVEL + 60, GEOMETRY_BUDGET_FRINGE_END_LEVEL + 90, SAT];
+      for (const level of levels) {
+        const values = sampleSeeds.map((seed) => reverseFeltOf(generateLadderMaze(level, board, seed)));
+        means.push(values.reduce((sum, value) => sum + value, 0) / values.length);
+        if (level === SAT) {
+          // Every maze is a mastery maze there: the worst one still pays the floor, the plain class's worst does not.
+          expect(Math.min(...values)).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR);
+        }
+      }
+      for (let index = 1; index < means.length; index += 1) {
+        expect(means[index]!).toBeGreaterThan(means[index - 1]!);
+      }
+      // Measured: about 430-445 at the end of the fringe and 750+ at the saturation level.
+      expect(means[means.length - 1]! - means[0]!).toBeGreaterThan(200);
+    }
+  }, 180_000);
 });
 
 describe('progression ladder: beyond the hard ceiling', () => {
