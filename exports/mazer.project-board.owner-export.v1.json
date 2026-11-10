@@ -1,11 +1,11 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_cfa60c405331",
+  "export_id": "pbe_mazer_owner_registry_9520eebfc5da",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:cfa60c405331f35928ddce95068342a50fff2b2cd303431249bb1d7ba1d4474f",
+  "source_revision": "sha256:9520eebfc5dab3eea31342089f0b4b9eb11d8670a5316fe19257d507bd0f3d10",
   "generated_at": "2026-11-10T20:00:00.000Z",
   "sources": [
     {
@@ -13,7 +13,7 @@
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:2e4d597db38fd69b5106eafb7944060368e6cabb809a74166312c05717781082",
+      "revision": "sha256:c64652e9925ff3db482046f4a632abe8cdf095b79c88a86fc5982fc06f12493a",
       "observed_at": "2026-11-10T20:00:00.000Z"
     },
     {
@@ -1413,7 +1413,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Add a level-complete moment",
-        "description": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion tokens, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
+        "description": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion durations, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "high",
@@ -1434,8 +1434,8 @@
         "source_updated_at": "2026-11-10T20:00:00.000Z"
       },
       "content": {
-        "summary": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion tokens, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
-        "objective": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion tokens, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
+        "summary": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion durations, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
+        "objective": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion durations, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
         "acceptance_criteria": [
           "A caption appears from the goal-reached instant without lengthening the cadence",
           "Reduced motion uses a static caption for 400 ms",

@@ -1451,7 +1451,7 @@
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-002",
       "title": "Add a level-complete moment",
-      "description": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion tokens, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
+      "description": "Implemented in a pull request, in review: a PLAY clear shows the caption 'Level N' (the new displayed level) over the board for 700 ms using the existing motion durations, fading out; under reduced motion it is static for 400 ms. It runs beside the goal hold and deconstruct, so it adds no delay to input unlock or the play loop, and the menu demo shows no caption. No sound or haptics (separate cards). On 2026-11-10 the owner delegated this design call to the build agent. Merged-not-deployed until deployed; headless Chromium only, not checked on a real phone.",
       "cardType": "feature",
       "priority": "high",
       "dependencies": [],
