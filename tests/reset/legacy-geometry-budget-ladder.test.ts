@@ -110,17 +110,35 @@ describe('geometry budget wiring (every bounded progression level 2..99)', () =>
     expect(resolveGeometryBudgetLevel(trackForLevel(LAST_BUDGET_LEVEL))).toBe(LAST_BUDGET_LEVEL);
     expect(resolveGeometryBudgetLevel(trackForLevel(LAST_BUDGET_LEVEL + 1))).toBe(LAST_BUDGET_LEVEL);
     expect(resolveGeometryBudgetLevel({ ...baselineTrack, level: '9'.repeat(40), targetComplexity: 400 })).toBe(LAST_BUDGET_LEVEL);
-    // ...but never below the top: an ordinal cannot lift a track whose target is lower.
-    expect(resolveGeometryBudgetLevel({ ...baselineTrack, level: '150', targetComplexity: 120 })).toBe(29);
+    // A DRIFTED track (the ordinal outran its target) follows the displayed level,
+    // clamped at the hard ceiling: "Lv 150" is never a level-29 maze.
+    expect(resolveGeometryBudgetLevel({ ...baselineTrack, level: '150', targetComplexity: 120 })).toBe(150);
+    expect(resolveGeometryBudgetLevel({ ...baselineTrack, level: '18000', targetComplexity: 120 })).toBe(LAST_BUDGET_LEVEL);
+    expect(resolveGeometryBudgetLevel({ ...baselineTrack, level: '18000', targetComplexity: 396 })).toBe(LAST_BUDGET_LEVEL);
+    // A target above the ordinal still wins (an edited or migrated save never lands below what its target earned).
+    expect(resolveGeometryBudgetLevel({ ...baselineTrack, level: '5', targetComplexity: 120 })).toBe(29);
   });
 
-  // Ordinal guards (the repo spent 2026-08 decoupling the visible completion
-  // ordinal from geometry; the budget ladder must not re-couple them).
-  test('guard (a): a huge ordinal at the minimum target complexity is still the level-1 corridor', () => {
+  // Ordinal guards. The displayed completion ordinal and the geometry level are
+  // the same number up to the hard ceiling; the ordinal never LOWERS geometry
+  // below what the target earned, and never lifts it past LAST_BUDGET_LEVEL.
+  test('guard (a): a huge ordinal at the minimum target complexity (drifted save) is the ceiling class, never the corridor', () => {
     const track = { ...baselineTrack, level: '1000000', completedCycles: '999999', targetComplexity: 8 };
     expect(resolveLegacyMazeGenerationProfileForProgression(track))
-      .toEqual(resolveLegacyMazeGenerationProfileForProgression(trackForLevel(1)));
-    expect(resolveLegacyMazeGenerationProfileForProgression(track).layout).toBe('corridor');
+      .toEqual(resolveGeometryBudgetProfile(LAST_BUDGET_LEVEL));
+    expect(resolveLegacyMazeGenerationProfileForProgression(track).layout).toBeUndefined();
+    // Level 1 itself (ordinal 1, target 8) stays the corridor.
+    expect(resolveLegacyMazeGenerationProfileForProgression(trackForLevel(1)).layout).toBe('corridor');
+  });
+
+  test('guard (a2): a drifted save (ordinal 18000, target of a level-25 player) is generated at the displayed level', () => {
+    const drifted = { ...baselineTrack, level: '18000', completedCycles: '17999', targetComplexity: 8 + (24 * 4) };
+    const coherent = { ...baselineTrack, level: '18000', completedCycles: '17999', targetComplexity: 400 };
+    expect(resolveLegacyMazeGenerationProfileForProgression(drifted).geometryBudgetLevel).toBe(LAST_BUDGET_LEVEL);
+    expect(resolveLegacyMazeGenerationProfileForProgression(drifted))
+      .toEqual(resolveLegacyMazeGenerationProfileForProgression(coherent));
+    // A save that is coherent below the top is untouched (ordinal == bounded level).
+    expect(resolveLegacyMazeGenerationProfileForProgression(trackForLevel(25)).geometryBudgetLevel).toBe(25);
   });
 
   test('guard (b): a low ordinal at a high target complexity reads the target, and clamps at the bounded top', () => {
