@@ -841,7 +841,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(backdropSource).toContain('fieldColor: cyberArcadeMaterial.substrate.fieldRaised');
     expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
     expect(menuSceneSource).not.toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
-    expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars().slice(0, LEGACY_MENU_STAR_COUNT);');
+    expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars(createBackdropStarRandom()).slice(0, LEGACY_MENU_STAR_COUNT);');
     expect(menuSceneSource).toContain('const backdropMotionEnabled = this.settings.toggleAnimatedBackdrop && !this.prefersLegacyReducedMotion();');
     expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_SHARD_COUNT');
     expect(backdropSource).toContain('LEGACY_MENU_GLASS_SHARD_COUNT');
@@ -1568,7 +1568,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.publishVisualDiagnostics(time, uiRebuilt);');
     expect(tuningSource).toContain('diagnosticsPublishIntervalMs: 1500,');
     expect(tuningSource).toContain('full: 16,');
-    expect(tuningSource).toContain('throttled: 250,');
+    expect(tuningSource).toContain('throttled: 100,');
   });
 
   test('caches OS reduced motion and settles only visual state when it changes', () => {

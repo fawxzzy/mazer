@@ -335,6 +335,10 @@ const buildLayout = (n: NormalizedInput, style: ResolvedBoardTileStyle): BoardTi
     const need = ceilToDevice(dock.length, scale);
     margin[dock.side] = Math.max(margin[dock.side], need);
   }
+  // The origin margins are whole css px so the layer can place the image on a whole css px (Phaser floors an
+  // Image's position under roundPixels; src/render/pixelAlignment.ts) without moving the board inside it.
+  margin.left = Math.ceil(margin.left - 1e-9);
+  margin.top = Math.ceil(margin.top - 1e-9);
   const width = margin.left + boardWidth + margin.right;
   const height = margin.top + boardHeight + margin.bottom;
   return {

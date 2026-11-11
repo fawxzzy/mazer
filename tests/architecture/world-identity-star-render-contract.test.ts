@@ -31,9 +31,9 @@ describe('World Identity background-star render contract', () => {
 
     // The coloured four-point sparkle tier was retired on 2026-11-10 (owner: "no more stagnant stars in the
     // background", src/render/backdropStars.ts): its hue code must stay gone, and every star must be routed
-    // through the policy that also draws nothing while the backdrop is not animating.
+    // through the policy that draws every star (never hidden, never a cross).
     expect(menuSceneSource).not.toContain('Phaser.Display.Color.HSVToRGB(starSeed');
-    expect(menuSceneSource).toContain('resolveBackdropStarDraw(coreSize, backdropMotionEnabled)');
+    expect(menuSceneSource).toContain('resolveBackdropStarDraw(coreSize)');
 
   });
 });
