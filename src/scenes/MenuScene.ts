@@ -10155,8 +10155,8 @@ export class MenuScene extends Phaser.Scene {
 
   private fillLegacyPlayerMarkerTile(
     point: LegacyPoint,
-    originX: number,
-    originY: number,
+    baseOriginX: number,
+    baseOriginY: number,
     tileSize: number,
     alpha: number,
     showLocatorTicks: boolean,
@@ -10164,8 +10164,10 @@ export class MenuScene extends Phaser.Scene {
     time: number
   ): void {
     const bumpNudge = this.resolveLegacyWallBumpNudge(time);
-    const centerX = originX + ((point.x + 0.5) * tileSize) + bumpNudge.x;
-    const centerY = originY + ((point.y + 0.5) * tileSize) + bumpNudge.y;
+    const originX = baseOriginX + bumpNudge.x;
+    const originY = baseOriginY + bumpNudge.y;
+    const centerX = originX + ((point.x + 0.5) * tileSize);
+    const centerY = originY + ((point.y + 0.5) * tileSize);
     const playerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
       tileSize,
       showLocatorTicks ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : LEGACY_PLAYER_MARKER_RADIUS_RATIO,
