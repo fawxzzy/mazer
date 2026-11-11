@@ -101,13 +101,13 @@ describe('guide copy only names things that exist', () => {
     LEGACY_GUIDE_CLOSE_LABEL
   ].join(' \n ');
 
-  test('retired or non-visible vocabulary is absent: gold start, compass, Teleport, Skill, Exit; rank wording is only the level-row beat', () => {
+  test('retired or non-visible vocabulary is absent: gold start, compass, Teleport, Skill, Exit; no rank wording at all (the rank caption is retired)', () => {
     expect(allText).not.toMatch(/\bgold\b/i);
-    // Rank letters are visible ONLY as the rank-up caption (legacyFlowBeat.ts); there is no rank chip or rank surface yet.
-    expect(allText.match(/\brank/gi)?.length).toBe(1);
-    expect(row('levels').text).toMatch(/new ranks flash a letter/);
-    expect(MENU_SCENE).toContain('resolveLegacyFlowBeat({');
-    expect(MENU_SCENE).toContain('this.startLegacyFlowBeat(previousProgressionState.tracks.player, this.progressionState.tracks.player);');
+    // Owner, 2026-11-11: the "Level N" caption above the level numeral and the rank-up caption are removed, so no
+    // rank letter is shown anywhere and the Guide must not mention ranks.
+    expect(allText).not.toMatch(/rank/i);
+    expect(row('levels').text).not.toMatch(/ranks? flash/);
+    expect(MENU_SCENE).not.toContain('FlowBeat');
     expect(allText).not.toMatch(/compass/i);
     expect(allText).not.toMatch(/teleport/i);
     expect(allText).not.toMatch(/skill/i);

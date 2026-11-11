@@ -65,6 +65,7 @@ import {
   buildContinuousTrailPath,
   resampleTrailVertices
 } from '../render/navigationCoreTrail';
+import { resolveTrailGridPathWithHead } from '../render/trailHeadPath';
 import {
   computeTrailCanvasBounds,
   drawTrailToCanvasContext
@@ -272,13 +273,6 @@ import {
   type LegacySettingsSheetPlan
 } from '../legacy-runtime/legacySettingsSheetPlan';
 import {
-  LEGACY_FLOW_BEAT_LEVEL_COLOR,
-  formatLegacyFlowBeatColor,
-  resolveLegacyFlowBeat,
-  resolveLegacyFlowBeatFrame,
-  type LegacyFlowBeat
-} from '../legacy-runtime/legacyFlowBeat';
-import {
   IDLE_LEGACY_QUIT_CONFIRM_STATE,
   hasLegacyQuitConfirmExpired,
   isLegacyQuitConfirmArmed,
@@ -402,7 +396,6 @@ import {
   type LegacyProgressionGenerationScaleOptions,
   type LegacyProgressionPalette,
   type LegacyProgressionState,
-  type LegacyProgressionTrack,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
 import {
@@ -1860,11 +1853,6 @@ export class MenuScene extends Phaser.Scene {
   // loaded.
   private titleTileFontImagePool: Phaser.GameObjects.Image[] = [];
   private levelAnnouncerLabelText!: Phaser.GameObjects.Text;
-  // Level-complete / rank-up caption (legacyFlowBeat.ts): painted over the board
-  // from the goal-reached instant, concurrent with the goal hold and deconstruct.
-  private flowBeatCaptionText!: Phaser.GameObjects.Text;
-  private flowBeatActive: { beat: LegacyFlowBeat; color: string; startedAtMs: number } | null = null;
-  private flowBeatLastFrameMs: number | null = null;
   // Pause > Quit to Menu two-step confirm (legacyQuitConfirm.ts).
   private quitConfirmState: LegacyQuitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
   private levelAnnouncerWasVisible = false;
@@ -2444,15 +2432,6 @@ export class MenuScene extends Phaser.Scene {
       color: '#36ff7d',
       align: 'center'
     })).setOrigin(0.5).setVisible(false);
-    this.flowBeatCaptionText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '32px',
-      fontStyle: 'bold',
-      color: LEGACY_FLOW_BEAT_LEVEL_COLOR,
-      align: 'center',
-      stroke: '#04100c',
-      strokeThickness: 6
-    })).setOrigin(0.5).setDepth(900).setVisible(false);
     this.levelAnnouncerNumberGraphics = this.add.graphics().setVisible(false);
     this.levelAnnouncerNumberGlyphPool = Array.from(
       { length: LEGACY_TILE_FONT_GLYPH_POOL_SIZE * LEGACY_TILE_FONT_TILES_PER_GLYPH },
@@ -9705,9 +9684,10 @@ export class MenuScene extends Phaser.Scene {
     // during a glide instead of popping to full length the instant a move
     // commits. See navigationCoreTrail.ts's BuildContinuousTrailPathOptions
     // for why this must be the interpolated point, not the logical one.
-    const gridPath = perfectPath.length > 1
-      ? [...perfectPath.slice(0, -1), renderedPlayerPoint]
-      : [copyPoint(perfectPath[0]!), renderedPlayerPoint];
+    // The tile the player just left (the trail array appends one point per accepted move): tells a forward step
+    // from a step back over the trail, which must keep the arrival tile in the drawn path (trailHeadPath.ts).
+    const previousTrailTile = this.trail.length > 1 ? this.trail[this.trail.length - 2]! : null;
+    const gridPath = resolveTrailGridPathWithHead(perfectPath, previousTrailTile, renderedPlayerPoint);
 
     // Real, measured frame-time evidence (Wave 4D-A's own frame-time
     // measurement requirement) -- geometryBuildMs covers path building +
@@ -10542,74 +10522,12 @@ export class MenuScene extends Phaser.Scene {
     return resolveHudTextResolution({ width, height });
   }
 
-  // Starts the caption for a cleared PLAY maze (never the menu demo): "Level N",
-  // or "Rank X" in that rank's colour when this clear crossed into a new rank.
-  // Runs concurrently with the goal hold and deconstruct; it gates nothing.
-  private startLegacyFlowBeat(
-    previousTrack: LegacyProgressionTrack,
-    nextTrack: LegacyProgressionTrack
-  ): void {
-    const beat = resolveLegacyFlowBeat({
-      nextTrack,
-      previousTrack,
-      reducedMotion: this.prefersLegacyReducedMotion()
-    });
-    this.flowBeatActive = {
-      beat,
-      color: beat.kind === 'rank'
-        ? formatLegacyFlowBeatColor(resolveLegacyProgressionPalette(nextTrack, 'player').rankColor)
-        : LEGACY_FLOW_BEAT_LEVEL_COLOR,
-      startedAtMs: this.time.now
-    };
-    this.flowBeatLastFrameMs = this.time.now;
-  }
-
-  // Per-frame flow feedback: reverts an expired "Tap again to quit" row and
-  // paints the level/rank caption.
+  // Per-frame flow feedback: reverts an expired "Tap again to quit" row.
   private updateLegacyFlowFeedback(time: number): void {
     if (hasLegacyQuitConfirmExpired(this.quitConfirmState, time)) {
       this.quitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
       this.uiDirty = true;
     }
-    this.updateLegacyFlowBeatCaption(time);
-  }
-
-  private updateLegacyFlowBeatCaption(time: number): void {
-    const active = this.flowBeatActive;
-    const previousFrameMs = this.flowBeatLastFrameMs;
-    this.flowBeatLastFrameMs = time;
-    if (active === null) {
-      return;
-    }
-    if (this.mode !== 'play') {
-      this.flowBeatActive = null;
-      this.flowBeatCaptionText.setVisible(false);
-      return;
-    }
-    if (this.overlay !== 'none') {
-      // A pause holds the caption (hidden under the sheet) so it is not eaten while paused.
-      if (previousFrameMs !== null) {
-        active.startedAtMs += Math.max(0, time - previousFrameMs);
-      }
-      this.flowBeatCaptionText.setVisible(false);
-      return;
-    }
-    const frame = resolveLegacyFlowBeatFrame(active.beat, time - active.startedAtMs);
-    if (frame.done) {
-      this.flowBeatActive = null;
-      this.flowBeatCaptionText.setVisible(false);
-      return;
-    }
-    const minSide = Math.min(this.layout.width, this.layout.height);
-    // Above the centered level numeral (which spans about +-0.06 * minSide around the middle).
-    this.flowBeatCaptionText
-      .setText(active.beat.text)
-      .setFontSize(`${Math.max(24, Math.min(44, Math.round(minSide * 0.075)))}px`)
-      .setColor(active.color)
-      .setPosition(this.layout.width / 2, (this.layout.height / 2) - (minSide * 0.15))
-      .setScale(frame.scale)
-      .setAlpha(frame.alpha)
-      .setVisible(frame.visible);
   }
 
   private applyLegacyUiTextCrispness<T extends Phaser.GameObjects.Text>(text: T): T {
@@ -15576,9 +15494,6 @@ export class MenuScene extends Phaser.Scene {
         latestReceipt,
         this.maze
       );
-      if (surface === 'play') {
-        this.startLegacyFlowBeat(previousProgressionState.tracks.player, this.progressionState.tracks.player);
-      }
       void writeLegacyRemoteCompletion(
         completionAuthSnapshot,
         previousProgressionState,
