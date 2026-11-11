@@ -142,6 +142,7 @@ import {
   type LegacyPlayerTransferVisualInput
 } from '../legacy-runtime/legacyPlayerTransfer';
 import type { TeleportAnchorPose } from './teleportAnchorPose';
+import { MOTION_REDUCED_MS } from './motionScale';
 
 export type TeleportTransferDirection = 'extraction' | 'delivery';
 
@@ -164,7 +165,7 @@ export const TELEPORT_TRANSFER_EXTRACTION_ABSORPTION_MS = 160;
 // long, from the start of the (effectively instant, under reduced
 // motion) outbound clock, a stable open conduit is shown before settling
 // into the ordinary closed 'stored' presentation.
-export const TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS = 140;
+export const TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS = MOTION_REDUCED_MS.teleportCrossfade;
 
 // The fade-in/fade-out edges within a reduced-motion window (the
 // extraction crossfade above, and delivery's own reduced-motion window
@@ -173,7 +174,7 @@ export const TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS = 140;
 // window with a genuinely stable (flat, non-ramping) hold in between,
 // not an instant on/off step. Kept short relative to the windows above
 // so the hold in the middle stays the dominant, "stable" impression.
-export const TELEPORT_TRANSFER_REDUCED_MOTION_FADE_EDGE_MS = 45;
+export const TELEPORT_TRANSFER_REDUCED_MOTION_FADE_EDGE_MS = MOTION_REDUCED_MS.teleportFadeEdge;
 
 export interface TeleportTransferPresentationInput extends LegacyPlayerTransferVisualInput {
   /**

@@ -5,6 +5,7 @@ import { legacyTuning } from '../config/tuning';
 import { getNeighborIndex, isTileFloor, isTilePath, resolveDirectionBetween, xFromIndex, yFromIndex } from '../domain/maze';
 import { getRelativeLuminance, palette, resolveLocalBoardSupportColors, type LocalBoardContrastMode } from './palette';
 import { resolveSceneViewport } from './viewport';
+import { MOTION_PHASER_EASE_SINE_IN_OUT } from './motionScale';
 
 export interface BoardLayout {
   boardX: number;
@@ -2479,7 +2480,7 @@ export class BoardRenderer {
       duration: safeDuration,
       yoyo: true,
       repeat: -1,
-      ease: 'Sine.easeInOut'
+      ease: MOTION_PHASER_EASE_SINE_IN_OUT
     });
   }
 

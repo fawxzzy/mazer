@@ -1,3 +1,5 @@
+import { MOTION_LOOP_MS } from '../render/motionScale';
+
 export type LegacyPlayerTransferPhase = 'idle' | 'pending' | 'outbound' | 'stored' | 'delivering' | 'complete';
 
 export interface LegacyPlayerTransferVisualState {
@@ -26,7 +28,7 @@ export interface LegacyPlayerTransferVisualInput {
 // of this whole duration, so even the beam's actual travel window was
 // roughly half what this constant suggests -- both are fixed together.
 export const LEGACY_PLAYER_TRANSFER_OUTBOUND_MS = 450;
-export const LEGACY_PLAYER_TRANSFER_SWIRL_PERIOD_MS = 1200;
+export const LEGACY_PLAYER_TRANSFER_SWIRL_PERIOD_MS = MOTION_LOOP_MS.beat;
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 

@@ -30,6 +30,7 @@
  * Cost: no allocation per call (one module-level scratch record), no gradients, two cosines per sample.
  */
 import { cyberArcadeMaterial } from './cyberArcadeMaterial';
+import { MOTION_LOOP_MS } from './motionScale';
 
 /** The player's colour: token semantic.energy. The player marker, and everything that "shoots out" of it, uses this. */
 export const PLAYER_COLOR: number = cyberArcadeMaterial.signal.player;
@@ -58,7 +59,7 @@ export const IRIDESCENT_TRAIL_GLOW_STOPS = Object.freeze([
 /** One full sweep (stop 0 out to the last stop and back) spans this many tiles of trail. */
 export const IRIDESCENT_TRAIL_TILES_PER_SWEEP = 8;
 /** ...and one full sweep drifts past a fixed point on the trail in this many ms. */
-export const IRIDESCENT_TRAIL_SWEEP_PERIOD_MS = 3600;
+export const IRIDESCENT_TRAIL_SWEEP_PERIOD_MS = MOTION_LOOP_MS.drift;
 
 /** Slow swell: crest-to-crest length in tiles, and the time one crest takes to travel one wavelength. */
 export const TRAIL_PULSE_WAVELENGTH_TILES = 8;

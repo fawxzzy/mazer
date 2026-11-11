@@ -53,6 +53,7 @@
 import { isLegacyWrappedStepTransition } from '../legacy-runtime/legacyMaze';
 import { PLAYER_COLOR, resolveTrailPaletteBorderColor } from './trailPalette';
 import { INTRO_BEAM_STAGGER_MS, INTRO_LASER_MS } from './introTimeline';
+import { MOTION_DURATION_MS, MOTION_LOOP_MS } from './motionScale';
 
 export type EdgeSide = 'top' | 'right' | 'bottom' | 'left';
 export type EdgeStationId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -78,11 +79,11 @@ export const EDGE_MARKER_HALF_WIDTH = 7;
 export const EDGE_MARKER_HALF_HEIGHT = 10;
 export const EDGE_MARKER_STROKE_PX = 1;
 export const EDGE_MARKER_MIN_INSET_PX = 12;
-export const EDGE_MARKER_IDLE_PERIOD_MS = 3600;
+export const EDGE_MARKER_IDLE_PERIOD_MS = MOTION_LOOP_MS.drift;
 export const EDGE_MARKER_IDLE_ALPHA_MIN = 0.45;
 export const EDGE_MARKER_IDLE_ALPHA_MAX = 0.6;
 export const EDGE_MARKER_ENERGIZED_ALPHA = 0.95;
-export const EDGE_MARKER_FLASH_MS = 120;
+export const EDGE_MARKER_FLASH_MS = MOTION_DURATION_MS.fast;
 export const SPAWN_LASER_GLOW_PX = 3;
 export const SPAWN_LASER_CORE_PX = 1;
 export const SPAWN_LASER_POOF_SPARKLES = 6;
