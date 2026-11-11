@@ -13,6 +13,7 @@ import {
   GEOMETRY_BUDGET_WINDOW,
   GEOMETRY_BUDGET_CEILING,
   GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS,
+  GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR,
   GEOMETRY_BUDGET_TIE_RETRY_BASES,
   GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS,
   resolveGeometryBudgetCandidateSeed,
@@ -20,6 +21,7 @@ import {
   resolveGeometryBudgetForks,
   resolveGeometryBudgetFringeCells,
   resolveGeometryBudgetLoopPlan,
+  resolveGeometryBudgetMastery,
   resolveGeometryBudgetMaxBranch,
   resolveGeometryBudgetRouteBranch,
   resolveGeometryBudgetRouteTarget,
@@ -624,6 +626,9 @@ const selectLegacyGeometryBudgetMaze = (
   // plus the fringe (legacyGeometryBudget.ts), so every felt rule reads the felt level.
   const feltLevel = resolveGeometryBudgetFeltLevel(budgetLevel);
   const fringeCells = resolveGeometryBudgetFringeCells(budgetLevel);
+  // Past the fringe a seeded share of the mazes are mastery mazes (reverse-solve resistant).
+  const mastery = resolveGeometryBudgetMastery(budgetLevel, seed);
+  const pastFelt = budgetLevel > feltLevel;
   const gateTarget = resolveGeometryBudgetTarget(feltLevel);
   const routeTarget = resolveGeometryBudgetRouteTarget(feltLevel);
   const maxBranch = resolveGeometryBudgetMaxBranch(feltLevel);
@@ -677,14 +682,14 @@ const selectLegacyGeometryBudgetMaze = (
         base,
         gateTarget,
         resolveGeometryBudgetCandidateSeed(seed, feltLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
-        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, fringeCells }
+        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, fringeCells, doubleLure: mastery, reverseFloor: mastery ? GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR : 0 }
       );
       distance = tuned.windowDistance;
       // A landed maze whose number is a coin flip for the explorer (a looped maze that
       // disagrees with its tie-averaged value) is accepted only after a few more bases.
       tieBiased = distance === 0 && tuned.tieDeviationPercent > FELT_TIE_DEVIATION_LIMIT_PERCENT;
       if (tuned.addedTiles.length > 0 || tuned.trimmedTiles.length > 0 || tuned.bumps > 0 || tuned.loops.length > 0 || tuned.cyclesBroken > 0 || tuned.wrapSaving > 0 || tuned.fringeTiles.length > 0) {
-        candidate = assembleTunedMaze(base, tuned, baseProfile);
+        candidate = assembleTunedMaze(base, tuned, baseProfile, pastFelt ? mastery : null);
       }
     }
     // Rank: off-window by its distance; a coin-flip landing just behind a clean one.
@@ -741,7 +746,8 @@ const selectLegacyGeometryBudgetMaze = (
 const assembleTunedMaze = (
   base: Omit<LegacyMazeSnapshot, 'generation'>,
   tuned: ReturnType<typeof tuneMazeFeltToTarget>,
-  generationProfile: LegacyMazeGenerationProfile
+  generationProfile: LegacyMazeGenerationProfile,
+  mastery: boolean | null = null
 ): Omit<LegacyMazeSnapshot, 'generation'> => {
   const routed = tuned.bumps > 0 || tuned.loops.length > 0 || tuned.cyclesBroken > 0
     ? resolveLegacyShortestPath(tuned.grid, base.start, base.goal, 'direct-floor')
@@ -767,6 +773,10 @@ const assembleTunedMaze = (
   // Zero-felt-cost side stubs of the levels past the felt saturation (legacyMazeFeltTuning.ts, lever 3).
   if (tuned.fringeTiles.length > 0) {
     next.fringeStats = { cells: tuned.fringeTiles.length };
+  }
+  // Past the felt saturation: what the maze costs a solver working from the goal end.
+  if (mastery !== null) {
+    next.masteryStats = { mastery, reverseFelt: tuned.reverseFelt };
   }
   if (routed !== null && routed.found) {
     next.wrapTopologyDiagnostics = resolveLegacyWrapTopologyDiagnostics(

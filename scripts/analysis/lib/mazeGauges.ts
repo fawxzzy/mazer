@@ -77,6 +77,12 @@ export interface MazeGauges {
   randomWalkSteps: number;
   randomWalkCensored: number;
   humanSteps: number;
+  // The pull-to-goal explorer / human-like explorer worked from the goal end to the start, and
+  // the easier of the two directions (what a player who solves the maze backwards pays).
+  reversePricedSteps: number;
+  twoWayPricedSteps: number;
+  reverseHumanSteps: number;
+  twoWayHumanSteps: number;
   humanCensored: number;
   decisionPoints: number;
   junctions: number;
@@ -473,6 +479,12 @@ export const computeMazeGauges = (maze: GaugeMaze): MazeGauges => {
   for (let k = 0; k < 5; k += 1) { walks.push(randomWalk(g, start, goal, 1000 + k, RANDOM_WALK_CAP)); }
   const humans: number[] = [];
   for (let k = 0; k < 8; k += 1) { humans.push(humanWalk(g, start, goal, goalX, goalY, 2000 + k, HUMAN_WALK_CAP)); }
+  // The same two walkers worked from the GOAL end toward the start (the board is fully visible,
+  // so a player can solve a maze backwards): what a reverse-solve costs.
+  const reverseRun = explorer.run(g.open, goal, start);
+  const reversePull = reverseRun.reachedGoal ? reverseRun.steps : pullSteps;
+  const reverseHumans: number[] = [];
+  for (let k = 0; k < 8; k += 1) { reverseHumans.push(humanWalk(g, goal, start, maze.start.x, maze.start.y, 2000 + k, HUMAN_WALK_CAP)); }
 
   // Junction structure.
   let junctions = 0;
@@ -613,6 +625,10 @@ export const computeMazeGauges = (maze: GaugeMaze): MazeGauges => {
     randomWalkSteps: median(walks),
     randomWalkCensored: walks.filter((value) => value >= RANDOM_WALK_CAP).length / walks.length,
     humanSteps: median(humans),
+    reversePricedSteps: reversePull - loopSaved - wrapSaved,
+    twoWayPricedSteps: Math.min(pullSteps, reversePull) - loopSaved - wrapSaved,
+    reverseHumanSteps: median(reverseHumans),
+    twoWayHumanSteps: Math.min(median(humans), median(reverseHumans)),
     humanCensored: humans.filter((value) => value >= HUMAN_WALK_CAP).length / humans.length,
     decisionPoints,
     junctions,

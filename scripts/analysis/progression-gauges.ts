@@ -42,6 +42,10 @@ export const GAUGES: readonly GaugeSpec[] = [
   { key: 'pricedStepsWithWraps', label: 'Priced felt, wraps priced', group: 'walker', question: 'Explorer steps minus the loop saving and the wrap saving measured from the grid, the same estimate for every tree (shows the wrap cliff on a tree that does not price wraps)', direction: 1 },
   { key: 'pullStepsMc', label: 'Pull steps, tie-averaged', group: 'walker', question: 'The same explorer averaged over 8 other tie-breaks (the unbiased price)', direction: 1 },
   { key: 'humanSteps', label: 'Human-like explorer steps', group: 'walker', question: 'Moves for an explorer that keeps straight, leans to the goal and forgets after 48 cells (median of 8)', direction: 1 },
+  { key: 'reversePricedSteps', label: 'Reverse pull steps (priced)', group: 'walker', question: 'The pull-to-goal explorer run from the goal end to the start, minus the same priced savings: what a player who solves the maze backwards pays', direction: 1 },
+  { key: 'twoWayPricedSteps', label: 'Two-way pull steps (priced)', group: 'walker', question: 'The easier of the forward and the reverse pull-to-goal explorer (a player may start from either end)', direction: 1 },
+  { key: 'reverseHumanSteps', label: 'Reverse human-like steps', group: 'walker', question: 'The human-like explorer run from the goal end to the start', direction: 1 },
+  { key: 'twoWayHumanSteps', label: 'Two-way human-like steps', group: 'walker', question: 'The easier of the forward and the reverse human-like explorer', direction: 1 },
   { key: 'randomWalkSteps', label: 'Random-walk steps', group: 'walker', question: 'Moves for a non-backtracking random walk (median of 5)', direction: 1 },
   { key: 'decisionPoints', label: 'Decision points on route', group: 'structure', question: 'Junctions the shortest route passes through', direction: 1 },
   { key: 'misleadingJunctions', label: 'Misleading junctions', group: 'structure', question: 'Route junctions where the cell nearest the goal is the wrong way', direction: 1 },
@@ -71,7 +75,9 @@ export const BANDS: readonly { readonly name: string; readonly from: number; rea
   { name: 'L150-197', from: 150, to: 197 },
   { name: 'L198-229', from: 198, to: 229 },
   { name: 'L230-267', from: 230, to: 267 },
-  { name: 'L268+', from: 268, to: 10_000 }
+  { name: 'L268-327', from: 268, to: 327 },
+  { name: 'L328-387', from: 328, to: 387 },
+  { name: 'L388+', from: 388, to: 10_000 }
 ];
 
 interface GaugedRecord {

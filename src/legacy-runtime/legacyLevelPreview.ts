@@ -37,7 +37,7 @@ export const LEGACY_LEVEL_PREVIEW_MIN_LEVEL = 1;
 export const LEGACY_LEVEL_PREVIEW_MAX_LEVEL = 999;
 /** The jump list in the pause sheet. */
 export const LEGACY_LEVEL_PREVIEW_CHECKPOINTS: readonly number[] = Object.freeze([
-  1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 268
+  1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 268, 330, 388
 ]);
 
 const POSITIVE_INTEGER_PATTERN = /^\d{1,9}$/;

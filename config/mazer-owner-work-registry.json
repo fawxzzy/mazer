@@ -8,10 +8,10 @@
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 134,
+    "stableIdentityCount": 135,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 59,
+    "openCardCount": 60,
     "completedCardCount": 60,
     "deferredCardCount": 15,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out."
@@ -1076,7 +1076,7 @@
       "sourceId": "mazer-roadmap",
       "sourceRef": "docs/roadmap.md#phase-order",
       "title": "Decide what happens past level 198 so levels keep getting harder",
-      "description": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever. Measured 2026-11-10: the explorer number cannot rise further because the board is at its 50 percent floor limit, so MAZER-PROG-013 (review) extends the ladder to level 268 with zero-felt-cost side stubs and declares the plateau there. What stays open is the lever after level 268: sign the hazard contract (MAZER-HAZ-002, hazardBudgetLevels starts at 268) or, only if hazards are rejected, a bigger board past a level, which is the zoom lever the owner ruled out. The owner wants levels to keep getting harder forever, so this decision cannot be settled by generation alone.",
+      "description": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever. Measured 2026-11-10: the explorer number cannot rise further because the board is at its 50 percent floor limit, so MAZER-PROG-013 (completed) extended the ladder to level 268 with zero-felt-cost side stubs and MAZER-PROG-014 (review) extends it to level 388 with mazes that are also hard to solve from the goal end, then declares the plateau there. What stays open is the lever after level 388: sign the hazard contract (MAZER-HAZ-002, hazardBudgetLevels starts at 388) or, only if hazards are rejected, a bigger board past a level, which is the zoom lever the owner ruled out. The owner wants levels to keep getting harder forever, so this decision cannot be settled by generation alone.",
       "cardType": "feature",
       "priority": "high",
       "dependencies": [
@@ -1086,7 +1086,7 @@
         "The behaviour past level 198 is chosen and written down",
         "A deterministic check proves the chosen behaviour is never easier than the level before",
         "The choice is reflected in the progression contract and the in-app Guide",
-        "The lever after level 268 (hazards or a bigger board) is chosen by the owner"
+        "The lever after level 388 (hazards or a bigger board) is chosen by the owner"
       ]
     },
     {
@@ -1106,6 +1106,26 @@
         "Levels 1 to 198 generate the same mazes as before and the golden fixture changes only for levels 199 and above",
         "For any two seeds level N + 1 beats level N as the pair of felt value and fringe cells, up to level 268",
         "Menu AI clears every level on both boards and generation stays under the 400 ms worst build at a 4x CPU throttle"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-014",
+      "status": "review",
+      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-014",
+      "title": "Mastery tier to level 388: mazes also hard to solve from the goal end",
+      "description": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). The open pull request adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Measured honestly: the ramp is statistical, not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier. Not merged, not deployed, not player-tested, not checked on a device. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-PROG-013"
+      ],
+      "acceptanceCriteria": [
+        "Levels 1 to 268 generate the same mazes as before and the golden fixture changes only above level 268",
+        "Every mastery maze keeps the forward window and 70 side stubs and takes at least 740 steps from the goal end",
+        "The mean cost from the goal end rises across levels 268 to 388 and the ceiling at level 388 is documented",
+        "Menu AI clears every level on both boards"
       ]
     },
     {
