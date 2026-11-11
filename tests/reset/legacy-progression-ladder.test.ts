@@ -170,8 +170,8 @@ describe('progression ladder v2: the double lure on every level from 2, and the 
             expect(forward).toBeGreaterThanOrEqual(target);
             expect(forward).toBeLessThanOrEqual(target + GEOMETRY_BUDGET_WINDOW);
           }
-          // Levels 10..99 keep their band's wrap corridors (measured: 97 percent of the mazes of 10..99
-          // after the lure, the rest fell back to plain bases; all of them before).
+          // Levels 10..99 keep their band's wrap corridors (measured: 99.5 to 100 percent up to level 60,
+          // 94 to 97 at level 100 after the lure, the rest fell back to plain bases; all of them before).
           if (band.wrapped && level <= 99) { expect(wrappedCount).toBeGreaterThanOrEqual(5); }
         }
       }
