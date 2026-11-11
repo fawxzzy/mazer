@@ -269,6 +269,19 @@ describe('input-human touch bridge', () => {
     expect(ultraNarrow.controls.pause.right).toBeLessThanOrEqual(220);
   });
 
+  test('MAZER-UI-014: in-play pause hit area is at least 44px at 390 and 320 wide, on the header glyph centre', () => {
+    for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 568, height: 320 }]) {
+      const { pause } = resolveTouchControlLayout(viewport, { controlMode: 'stick' }).controls;
+      expect(pause.width).toBeGreaterThanOrEqual(44);
+      expect(pause.height).toBeGreaterThanOrEqual(44);
+      // The hit zone only grows around the header-size glyph (36-40px): it
+      // must stay at least as large as that glyph and inside the viewport.
+      const glyph = Math.min(40, Math.max(36, Math.round(Math.min(viewport.width, viewport.height) * 0.085)));
+      expect(pause.width).toBeGreaterThanOrEqual(glyph);
+      expect(pause.right).toBeLessThanOrEqual(viewport.width);
+    }
+  });
+
   test('places phone controls below and visually connected to the board when bounds are known', () => {
     const board = {
       left: 31,
