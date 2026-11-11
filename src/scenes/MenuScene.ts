@@ -204,6 +204,11 @@ import {
   type LegacyPageVisibilityState
 } from '../legacy-runtime/legacyLifecycleHold';
 import {
+  isLegacyLandscapeViewport,
+  resolveLegacyOrientationFlip,
+  shouldShowLegacyRotateNotice
+} from '../legacy-runtime/legacyOrientationFlip';
+import {
   resolveLegacyPauseCommand,
   type LegacyPauseCommand
 } from '../legacy-runtime/legacyPauseLifecycle';
@@ -2257,6 +2262,11 @@ export class MenuScene extends Phaser.Scene {
   // (set in holdLegacyPlayMazeLifecycleDuringPause) the transfer pause
   // tracker reads so both clocks agree.
   private legacyPageVisibility: LegacyPageVisibilityState = INITIAL_LEGACY_PAGE_VISIBILITY_STATE;
+  // MAZER-FLOW-008: last seen viewport aspect, and whether the open Pause sheet
+  // came from an aspect flip (drives the "rotate back" notice). The origin is
+  // the aspect the run was in before the flip; null = no flip pause.
+  private legacyViewportLandscape: boolean | null = null;
+  private orientationFlipOriginLandscape: boolean | null = null;
   private legacyLifecycleHeldThisFrame = false;
   private legacyPlayDocumentKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
   private legacyPlayDocumentKeyUpHandler: ((event: KeyboardEvent) => void) | null = null;
@@ -5540,6 +5550,20 @@ export class MenuScene extends Phaser.Scene {
         useFloatingTouchControls: true
       }
     );
+    // MAZER-FLOW-008: the layout above is the refit of the unchanged maze. An
+    // aspect flip mid-run pauses; the sheet then asks to rotate back if the
+    // refit corridor (one tile) is too thin. The maze regenerates next level.
+    const orientationFlip = resolveLegacyOrientationFlip({
+      mode: this.mode,
+      nextLandscape: isLegacyLandscapeViewport(width, height),
+      overlay: this.overlay,
+      previousLandscape: this.legacyViewportLandscape
+    });
+    this.legacyViewportLandscape = isLegacyLandscapeViewport(width, height);
+    if (orientationFlip.autoPause) {
+      this.openOverlay('pause');
+      this.orientationFlipOriginLandscape = !isLegacyLandscapeViewport(width, height);
+    }
     this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
 
     this.boardStaticDirty = true;
@@ -11058,6 +11082,11 @@ export class MenuScene extends Phaser.Scene {
         : undefined,
       previewLevelsExpanded: this.previewLevelsExpanded,
       quitConfirmArmed: context === 'pause' && isLegacyQuitConfirmArmed(this.quitConfirmState, this.time.now),
+      rotatePrompt: context === 'pause' && shouldShowLegacyRotateNotice({
+        corridorPx: this.layout.tileSize,
+        currentLandscape: isLegacyLandscapeViewport(this.layout.width, this.layout.height),
+        originLandscape: this.orientationFlipOriginLandscape
+      }),
       settingsExpanded: this.pauseSettingsExpanded,
       signedIn: this.authSnapshot.status === 'authenticated',
       width: this.layout.width
@@ -14728,6 +14757,7 @@ export class MenuScene extends Phaser.Scene {
 
   private openOverlay(kind: OverlayKind): void {
     const previousOverlay = this.overlay;
+    this.orientationFlipOriginLandscape = null;
     this.settingsGuideOpen = false;
     this.overlayGuideBounds = null;
     if (previousOverlay === 'confirm-progression-reset' && kind !== 'confirm-progression-reset') {
@@ -14798,6 +14828,7 @@ export class MenuScene extends Phaser.Scene {
 
   private closeOverlay(): void {
     this.quitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
+    this.orientationFlipOriginLandscape = null;
     this.settingsGuideOpen = false;
     this.overlayGuideBounds = null;
     if (this.overlay === 'confirm-progression-reset') {

@@ -32,6 +32,7 @@
  * `body` token for labels; the plan wraps instead of shrinking.
  */
 import { designTokens } from '../theme/tokens';
+import { LEGACY_ROTATE_PROMPT_LABEL } from './legacyOrientationFlip';
 import { LEGACY_QUIT_CONFIRM_ARMED_LABEL } from './legacyQuitConfirm';
 import {
   LEGACY_UI_COMPACT_BREAKPOINT,
@@ -46,6 +47,7 @@ export type LegacySettingsContext = 'menu' | 'pause';
 export type LegacySettingsToggleKey = 'toggleTrailFade' | 'toggleTrailPulse' | 'toggleAnimatedBackdrop';
 
 export type LegacySettingsRowId =
+  | 'rotate-notice'
   | 'resume'
   | 'back-to-menu'
   | 'settings-disclosure'
@@ -102,7 +104,7 @@ export interface LegacySettingsRowModel {
 }
 
 export interface LegacySettingsSectionModel {
-  id: 'pause-top' | 'menu-top' | 'settings' | 'account' | 'pause-bottom' | 'preview' | 'preview-jump';
+  id: 'pause-notice' | 'pause-top' | 'menu-top' | 'settings' | 'account' | 'pause-bottom' | 'preview' | 'preview-jump';
   /** Disclosure label (collapsible) or heading text. Null = no header. */
   title: string | null;
   collapsible: boolean;
@@ -139,6 +141,12 @@ export interface LegacySettingsModelOptions {
    * the default "Quit to Menu" row. See legacyQuitConfirm.ts.
    */
   quitConfirmArmed?: boolean;
+  /**
+   * Pause only: an orientation flip paused the run and the refit corridor is
+   * too thin, so a non-interactive "Rotate back" notice leads the sheet
+   * (legacyOrientationFlip.ts). Absent/false = default sheet, unchanged.
+   */
+  rotatePrompt?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -222,6 +230,15 @@ export const buildLegacySettingsSheetModel = (
       context,
       overlayId: 'pause',
       sections: [
+        ...(options.rotatePrompt === true
+          ? [{
+            collapsedByDefault: false,
+            collapsible: false,
+            id: 'pause-notice' as const,
+            rows: [row('rotate-notice', 'heading', LEGACY_ROTATE_PROMPT_LABEL)],
+            title: null
+          }]
+          : []),
         {
           collapsedByDefault: false,
           collapsible: false,
@@ -425,6 +442,8 @@ export interface LegacySettingsPlanInput {
   previewLevelsExpanded?: boolean;
   /** Pause only: the Quit to Menu row is armed and reads "Tap again to quit". */
   quitConfirmArmed?: boolean;
+  /** Pause only: lead with the "Rotate back" notice (orientation flip + thin corridor). */
+  rotatePrompt?: boolean;
 }
 
 const rectOf = (left: number, top: number, width: number, height: number): LegacySettingsRect => ({
@@ -536,6 +555,7 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
   const model = buildLegacySettingsSheetModel(input.context, {
     levelPreview: input.context === 'pause' ? input.levelPreview : undefined,
     quitConfirmArmed: input.context === 'pause' ? input.quitConfirmArmed : undefined,
+    rotatePrompt: input.context === 'pause' ? input.rotatePrompt : undefined,
     signedIn: input.signedIn
   });
   const panel = resolveLegacyOverlayPanelLayout(input.width, input.height, input.safeArea ?? {});
