@@ -841,7 +841,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(backdropSource).toContain('fieldColor: cyberArcadeMaterial.substrate.fieldRaised');
     expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
     expect(menuSceneSource).not.toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
-    expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars().slice(0, LEGACY_MENU_STAR_COUNT);');
+    expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars(createBackdropStarRandom()).slice(0, LEGACY_MENU_STAR_COUNT);');
     expect(menuSceneSource).toContain('const backdropMotionEnabled = this.settings.toggleAnimatedBackdrop && !this.prefersLegacyReducedMotion();');
     expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_SHARD_COUNT');
     expect(backdropSource).toContain('LEGACY_MENU_GLASS_SHARD_COUNT');

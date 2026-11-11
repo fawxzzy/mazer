@@ -52,6 +52,7 @@ import {
 import {
   BACKDROP_DECORATIVE_GLYPHS_ENABLED,
   BACKDROP_STAR_TAILS_ENABLED,
+  createBackdropStarRandom,
   resolveBackdropStarDraw,
   resolveBackdropTwinkleAlpha,
   resolveBackdropTwinkleSize
@@ -7054,7 +7055,7 @@ export class MenuScene extends Phaser.Scene {
     // The backdrop stays present as a quiet depth layer. The player's motion
     // preference controls movement, not whether the menu falls back to a blank
     // field.
-    this.stars = createLegacyMenuBackdropStars().slice(0, LEGACY_MENU_STAR_COUNT);
+    this.stars = createLegacyMenuBackdropStars(createBackdropStarRandom()).slice(0, LEGACY_MENU_STAR_COUNT);
   }
 
   private updateStars(time: number, delta: number): void {

@@ -40,6 +40,26 @@ export const BACKDROP_STAR_TWINKLE_FLOOR = 0.34;
 export const BACKDROP_STAR_SIZE_MIN = 0.72;
 export const BACKDROP_STAR_SIZE_MAX = 1.18;
 
+/**
+ * The star field's initial layout is deterministic. Stars are now drawn even when the backdrop is still (reduced
+ * motion, Animated Background off), so an unseeded layout would put different random specks behind the board on every
+ * load, which is exactly what made the pixel gates (tests: verify-trail-corner-raster) flaky once before. The stars
+ * still drift and respawn at random while animating; only where they START is fixed.
+ */
+export const BACKDROP_STAR_FIELD_SEED = 0x5eed1e55;
+
+/** mulberry32: a tiny seeded generator returning floats in [0, 1). */
+export const createBackdropStarRandom = (seed: number = BACKDROP_STAR_FIELD_SEED): (() => number) => {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
 /** What to draw for one backdrop star: `coreSize` is its rounded core width in px. Never 'none': no star is hidden. */
 export const resolveBackdropStarDraw = (coreSize: number): BackdropStarDraw => (
   coreSize >= BACKDROP_HERO_STAR_CORE_PX ? 'hero' : 'dot'

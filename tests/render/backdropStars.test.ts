@@ -3,10 +3,12 @@ import { describe, expect, test } from 'vitest';
 import {
   BACKDROP_DECORATIVE_GLYPHS_ENABLED,
   BACKDROP_HERO_STAR_CORE_PX,
+  BACKDROP_STAR_FIELD_SEED,
   BACKDROP_STAR_SIZE_MAX,
   BACKDROP_STAR_SIZE_MIN,
   BACKDROP_STAR_TAILS_ENABLED,
   BACKDROP_STAR_TWINKLE_FLOOR,
+  createBackdropStarRandom,
   resolveBackdropStarDraw,
   resolveBackdropTwinkleAlpha,
   resolveBackdropTwinkleSize
@@ -43,6 +45,17 @@ describe('backdrop stars: every star is drawn as a round point of light, nothing
     }
     expect(resolveBackdropTwinkleAlpha(-3)).toBe(BACKDROP_STAR_TWINKLE_FLOOR);
     expect(resolveBackdropTwinkleAlpha(7)).toBe(1);
+  });
+
+  test('the initial star layout is deterministic (so pixel gates are not flaky) and well spread', () => {
+    const a = createLegacyMenuBackdropStars(createBackdropStarRandom());
+    const b = createLegacyMenuBackdropStars(createBackdropStarRandom());
+    expect(a).toEqual(b);
+    expect(createBackdropStarRandom(BACKDROP_STAR_FIELD_SEED + 1)()).not.toBe(createBackdropStarRandom()());
+    for (const star of a) {
+      expect(star.x).toBeGreaterThanOrEqual(0);
+      expect(star.x).toBeLessThan(1);
+    }
   });
 
   test('the glyph decorations and the one-pixel warp tails stay switched off', () => {
