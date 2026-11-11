@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   MAZER_INSTALL_GATE_COPY,
+  MAZER_INSTALL_GATE_COPY_FEEDBACK,
   MAZER_INSTALL_GATE_OVERLAY_ID,
   installMazerInstallGate,
   resolveMazerInstallGateCopy,
@@ -173,6 +174,14 @@ describe('Mazer install gate', () => {
         expect(copy.title).toBe('Install Mazer');
         expect(copy.subtitle).toMatch(/only runs/i);
       }
+      // MAZER-FLOW-010: every install card carries one short value line; the post-install card has none.
+      if (mode === 'installed-open-app') {
+        expect(copy.valueLine).toBe('');
+      } else {
+        expect(copy.valueLine.length).toBeGreaterThan(0);
+        expect(copy.valueLine.length).toBeLessThanOrEqual(80);
+        expect(copy.valueLine).not.toMatch(/skip|continue without|dismiss/i);
+      }
       expect(copy.primaryAction === 'install').toBe(mode === 'prompt-available');
       expect(copy.primaryLabel === 'Install').toBe(mode === 'prompt-available');
     }
@@ -204,6 +213,62 @@ describe('Mazer install gate', () => {
     expect(overlay.attributes.get('data-mazer-install-gate-mode')).toBe('installed-open-app');
     expect(overlay.innerHTML).toContain('Mazer is installed');
     expect(overlay.innerHTML).not.toContain('data-mazer-install-gate-action="install"');
+  });
+
+  test('renders the value line with the static mini-maze mark, and none on the post-install card', () => {
+    const documentRef = new FakeDocument();
+    const handle = installMazerInstallGate(documentRef, browserTabState, { onCopyLink: () => {}, onInstall: () => {} });
+    const overlay = documentRef.appended[0];
+    const valueLine = resolveMazerInstallGateCopy('manual-desktop-chromium').valueLine;
+
+    expect(overlay.innerHTML).toContain('class="mazer-install-gate-value"');
+    expect(overlay.innerHTML).toContain(valueLine);
+    expect(overlay.innerHTML).toContain('class="mazer-install-gate-mini-maze"');
+    expect(overlay.innerHTML).toContain('aria-hidden="true"');
+    expect(overlay.innerHTML).toContain('role="status"');
+
+    handle.update({ ...browserTabState, mode: 'hidden', installed: true });
+    expect(overlay.innerHTML).not.toContain('mazer-install-gate-value');
+    expect(overlay.innerHTML).not.toContain('mazer-install-gate-mini-maze');
+  });
+
+  test('Copy link confirms visibly on success and reports failure instead of staying silent', async () => {
+    const feedback = { textContent: '' };
+    let copyHandler: (() => void) | null = null;
+    const overlay = {
+      id: '',
+      innerHTML: '',
+      removed: false,
+      setAttribute: () => {},
+      remove() { this.removed = true; },
+      querySelector: () => feedback,
+      querySelectorAll: () => [{
+        dataset: { mazerInstallGateAction: 'copy' },
+        addEventListener: (_type: string, listener: () => void) => { copyHandler = listener; }
+      }]
+    };
+    const documentRef = {
+      createElement: () => overlay as unknown as HTMLElement,
+      getElementById: () => null,
+      body: { append: () => {} }
+    };
+    const copyState = { ...browserTabState, platform: 'ios-in-app' as const };
+    let result = true;
+    installMazerInstallGate(documentRef as never, copyState, { onCopyLink: async () => result, onInstall: () => {} });
+    expect(overlay.innerHTML).toContain('data-mazer-install-gate-action="copy"');
+    expect(feedback.textContent).toBe('');
+
+    copyHandler!();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(feedback.textContent).toBe(MAZER_INSTALL_GATE_COPY_FEEDBACK.copied);
+    expect(MAZER_INSTALL_GATE_COPY_FEEDBACK.copied).toMatch(/^Link copied/);
+
+    result = false;
+    copyHandler!();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(feedback.textContent).toBe(MAZER_INSTALL_GATE_COPY_FEEDBACK.failed);
   });
 
   test('runMazerInstallGate resolves immediately when standalone and otherwise stays up with no skip, upgrading on events', async () => {
