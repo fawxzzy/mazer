@@ -44,7 +44,7 @@ import {
 export type LegacySettingsContext = 'menu' | 'pause';
 
 /** Setting keys the scene already persists (legacyOverlayToggleFields). */
-export type LegacySettingsToggleKey = 'toggleTrailFade' | 'toggleTrailPulse' | 'toggleAnimatedBackdrop';
+export type LegacySettingsToggleKey = 'toggleTrailFade' | 'toggleTrailPulse' | 'toggleAnimatedBackdrop' | 'hapticsEnabled';
 
 export type LegacySettingsRowId =
   | 'rotate-notice'
@@ -56,6 +56,7 @@ export type LegacySettingsRowId =
   | 'trail-fade'
   | 'trail-shine'
   | 'animated-background'
+  | 'haptics'
   | 'account-heading'
   | 'reset-progress'
   | 'sign-out'
@@ -184,7 +185,9 @@ export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsRowModel[] = Obj
     offLabel: 'Still',
     onLabel: 'Animated',
     settingKey: 'toggleAnimatedBackdrop'
-  })
+  }),
+  // Vibration on phones that support it (not iOS Safari: no navigator.vibrate there, so the row changes nothing).
+  row('haptics', 'toggle', 'Haptics', { offLabel: 'Off', onLabel: 'On', settingKey: 'hapticsEnabled' })
 ]);
 
 /** Separation between Reset progress and Sign out (spacing token 24). */

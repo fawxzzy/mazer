@@ -54,7 +54,8 @@ describe('settings sheet model', () => {
       'display-heading',
       'trail-fade',
       'trail-shine',
-      'animated-background'
+      'animated-background',
+      'haptics'
     ]);
   });
 
@@ -137,7 +138,8 @@ describe('settings sheet model', () => {
     expect(toggles.map((r) => [r.label, r.onLabel, r.offLabel])).toEqual([
       ['Trail Fade', 'On', 'Off'],
       ['Trail Shine', 'On', 'Off'],
-      ['Animated Background', 'Animated', 'Still']
+      ['Animated Background', 'Animated', 'Still'],
+      ['Haptics', 'On', 'Off']
     ]);
     for (const toggle of toggles) {
       expect(toggle.label).not.toContain(':');
@@ -286,6 +288,7 @@ describe('settings sheet plan specifics', () => {
       'trail-fade',
       'trail-shine',
       'animated-background',
+      'haptics',
       'quit-to-menu'
     ]);
   });
@@ -300,6 +303,7 @@ describe('settings sheet plan specifics', () => {
       'trail-fade',
       'trail-shine',
       'animated-background',
+      'haptics',
       'account-heading',
       'reset-progress',
       'sign-out'
@@ -374,16 +378,15 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
     }
   });
 
-  test('the freed header reserve gives the panel its full height at 320x568; Board Zoom removal lets Pause fit without a rail', () => {
+  test('at 320x568 the expanded Pause card (now with the Haptics row) overflows the 552 panel and uses the scroll rail', () => {
     const plan = buildLegacySettingsSheetPlan({ context: 'pause', height: 568, settingsExpanded: true, signedIn: true, width: 320 });
     // Before the header reserve was freed: panel.height 552 minus 52 = 500 available. Now: all 552.
     expect(plan.panel.height).toBe(552);
-    // Board Zoom (a 68 px slider row plus its 8 px gap) is gone, so the expanded pause card (538) fits
-    // inside the 552 panel at its natural height, centred, with no scroll rail.
-    expect(plan.naturalCardHeight).toBe(538);
-    expect(plan.card.height).toBe(538);
-    expect(plan.scrollable).toBe(false);
-    expect(Math.abs((plan.card.top - plan.panel.top) - ((plan.panel.top + plan.panel.height) - (plan.card.top + plan.card.height)))).toBeLessThanOrEqual(1);
+    // Board Zoom's removal had let the expanded pause card fit at 538. The Haptics toggle row (MAZER-CTRL-001)
+    // adds 60 px, so the natural card is 598: taller than the panel, so the card fills the panel and scrolls.
+    expect(plan.naturalCardHeight).toBe(598);
+    expect(plan.card.height).toBe(plan.panel.height);
+    expect(plan.scrollable).toBe(true);
     // The signed-in menu sheet is still 590 tall at 320x568: it genuinely overflows and keeps the rail.
     const menu = buildLegacySettingsSheetPlan({ context: 'menu', height: 568, signedIn: true, width: 320 });
     expect(menu.card.height).toBe(menu.panel.height);

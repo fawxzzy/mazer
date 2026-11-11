@@ -16,6 +16,7 @@ export const LEGACY_GAME_TOGGLE_STORAGE_KEY = 'mazer.game-toggles.v1';
 export interface LegacyGameTogglePreferences {
   controlMode: LegacyControlMode;
   darkMode: boolean;
+  hapticsEnabled: boolean;
   movementSpeed: number;
   toggleAnimatedBackdrop: boolean;
   toggleTrailFade: boolean;
@@ -69,6 +70,7 @@ const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Parti
   const presentKeys = [
     'controlMode',
     'darkMode',
+    'hapticsEnabled',
     'movementSpeed',
     'toggleAnimatedBackdrop',
     'toggleTrailFade',
@@ -95,6 +97,7 @@ export const pickLegacyGameTogglePreferences = (
 ): LegacyGameTogglePreferences => ({
   controlMode: settings.controlMode,
   darkMode: settings.darkMode,
+  hapticsEnabled: settings.hapticsEnabled,
   movementSpeed: normalizeLegacyMovementSpeed(settings.movementSpeed),
   toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop,
   toggleTrailFade: settings.toggleTrailFade,
@@ -107,6 +110,7 @@ export const normalizeLegacyGameTogglePreferences = (
 ): LegacyGameTogglePreferences => ({
   controlMode: isControlMode(value?.controlMode) ? value.controlMode : fallback.controlMode,
   darkMode: normalizeBoolean(value?.darkMode, fallback.darkMode),
+  hapticsEnabled: normalizeBoolean(value?.hapticsEnabled, fallback.hapticsEnabled),
   movementSpeed: normalizeLegacyMovementSpeed(
     typeof value?.movementSpeed === 'number'
       ? value.movementSpeed
