@@ -101,7 +101,6 @@ interface PlayerProgressionSceneHarness {
   resolveRuntimeAverageFrameMs: () => number;
   runtimeDiagnosticsLastPublishedAtMs: number;
   settings: { controlMode: 'stick' };
-  startLegacyFlowBeat: ReturnType<typeof vi.fn>;
   syncLegacyRemoteProgressionState: ReturnType<typeof vi.fn>;
   time: { now: number };
   visualDiagnosticsLastPublishedAtMs: number;
@@ -214,7 +213,6 @@ const createScene = (): { scene: PlayerProgressionSceneHarness; storage: MemoryS
     resolveRuntimeAverageFrameMs: () => 16,
     runtimeDiagnosticsLastPublishedAtMs: 1,
     settings: { controlMode: 'stick' },
-    startLegacyFlowBeat: vi.fn(),
     syncLegacyRemoteProgressionState: vi.fn(),
     time: { now: 8_000 },
     visualDiagnosticsLastPublishedAtMs: 1,
@@ -240,12 +238,6 @@ describe('player progression completion flow', () => {
     expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}').tracks.player.completedCycles).toBe('1');
     expect(scene.pushLegacyPlayerMessage).not.toHaveBeenCalled();
     expect(scene.syncLegacyRemoteProgressionState).not.toHaveBeenCalled();
-    // The level-complete beat gets the player track from before and after the recorded clear (play surface only).
-    expect(scene.startLegacyFlowBeat).toHaveBeenCalledTimes(1);
-    const [beatPrevious, beatNext] = scene.startLegacyFlowBeat.mock.calls[0] as [{ level: string }, { level: string }];
-    expect(beatPrevious.level).toBe('1');
-    expect(beatNext.level).toBe('2');
-
     armLegacyMenuStaticDeconstructStage.call(scene, scene.time.now);
 
     expect(scene.pendingGenerationRequest).toMatchObject({
