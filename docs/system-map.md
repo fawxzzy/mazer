@@ -4,6 +4,8 @@ This is the practical edit map for the current Mazer repo.
 
 Use it when you want to change behavior without losing track of the whole application.
 
+Work status (what is done, blocked, or needs a phone check) is in the generated `docs/ops/MAZER-WORK-REPORT.md`; its schema is `docs/ops/MAZER-WORK-LEDGER-SCHEMA.md`.
+
 ## Truth order
 
 When sources disagree, read in this order:
