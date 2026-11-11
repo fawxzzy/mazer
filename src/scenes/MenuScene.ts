@@ -9612,10 +9612,14 @@ export class MenuScene extends Phaser.Scene {
   // advanced by whatever time passed while the player couldn't see or
   // control it.
   private advanceLegacyTrailAnimationClock(time: number): number {
-    const isActivePlayVisible = this.mode === 'play'
+    // BOTH surfaces run this clock. It used to be play-only, so on the main menu (the AI demo) the trail's time
+    // term sat at 0 forever: its colour changed only with distance walked and never with time, while the title,
+    // the level numeral and the stars all shift. Owner, 2026-11-11: "why is the color of the trail not color
+    // shifting like everything else we have ... the colors is still and not changing".
+    const isTrailVisibleAndLive = (this.mode === 'play' || this.mode === 'menu')
       && this.overlay === 'none'
       && !this.isLegacyPlayLifecycleInputLocked();
-    if (isActivePlayVisible && !this.prefersLegacyReducedMotion()) {
+    if (isTrailVisibleAndLive && !this.prefersLegacyReducedMotion()) {
       if (this.trailAnimationLastRealMs !== null) {
         this.trailAnimationElapsedMs += Math.max(0, time - this.trailAnimationLastRealMs);
       }
