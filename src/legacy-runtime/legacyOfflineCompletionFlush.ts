@@ -1,5 +1,6 @@
 import {
-  createLegacyPlayerMessage,
+  resolveLegacyOfflineSavedMessage,
+  resolveLegacyOfflineSyncedMessage,
   type LegacyPlayerMessage
 } from './legacyPlayerMessage';
 
@@ -10,11 +11,6 @@ import {
  * Pure of Phaser and Supabase: the scene injects the event target, the online
  * probe, the flush call and the notifier, so tests drive it with fakes.
  */
-export const LEGACY_OFFLINE_COMPLETION_COPY = {
-  saved: 'You are offline. Progress is saved on this device and will sync when you reconnect.',
-  synced: 'Back online. Saved progress synced.'
-} as const;
-
 export interface LegacyOfflineFlushEventTarget {
   addEventListener(type: 'online', listener: () => void): void;
   removeEventListener(type: 'online', listener: () => void): void;
@@ -69,15 +65,7 @@ export const createLegacyOfflineCompletionFlush = (
         }
         if (result?.synced && result.pendingCompletionCount === 0 && outageNoticeShown) {
           outageNoticeShown = false;
-          const message = createLegacyPlayerMessage({
-            copy: LEGACY_OFFLINE_COMPLETION_COPY.synced,
-            id: 'remote.outbox.synced',
-            source: 'progression',
-            tone: 'success'
-          });
-          if (message) {
-            options.notify(message);
-          }
+          options.notify(resolveLegacyOfflineSyncedMessage());
         }
       } while (rerun && !disposed);
     } finally {
@@ -103,15 +91,7 @@ export const createLegacyOfflineCompletionFlush = (
         return;
       }
       outageNoticeShown = true;
-      const message = createLegacyPlayerMessage({
-        copy: LEGACY_OFFLINE_COMPLETION_COPY.saved,
-        id: 'remote.outbox.offline-saved',
-        source: 'progression',
-        tone: 'info'
-      });
-      if (message) {
-        options.notify(message);
-      }
+      options.notify(resolveLegacyOfflineSavedMessage());
     }
   };
 };

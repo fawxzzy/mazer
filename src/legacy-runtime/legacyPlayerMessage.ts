@@ -88,6 +88,11 @@ export const LEGACY_REMOTE_MESSAGE_COPY = {
   settingsFailed: 'Settings saved locally. Cloud sync will retry later.'
 } as const;
 
+export const LEGACY_OFFLINE_MESSAGE_COPY = {
+  saved: 'You are offline. Progress is saved on this device and will sync when you reconnect.',
+  synced: 'Back online. Saved progress synced.'
+} as const;
+
 export const LEGACY_OVERLAY_MESSAGE_COPY = {
   fieldUpdated: 'Setting updated.',
   movementSpeedUpdated: 'Move speed updated.',
@@ -114,6 +119,20 @@ export const createLegacyPlayerMessage = (
     tone: input.tone
   };
 };
+
+export const resolveLegacyOfflineSavedMessage = (): LegacyPlayerMessage => createLegacyPlayerMessage({
+  copy: LEGACY_OFFLINE_MESSAGE_COPY.saved,
+  id: 'remote.outbox.offline-saved',
+  source: 'progression',
+  tone: 'info'
+})!;
+
+export const resolveLegacyOfflineSyncedMessage = (): LegacyPlayerMessage => createLegacyPlayerMessage({
+  copy: LEGACY_OFFLINE_MESSAGE_COPY.synced,
+  id: 'remote.outbox.synced',
+  source: 'progression',
+  tone: 'success'
+})!;
 
 export const enqueueLegacyPlayerMessage = (
   queue: readonly LegacyQueuedPlayerMessage[],

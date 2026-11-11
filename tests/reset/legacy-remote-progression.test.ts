@@ -40,11 +40,11 @@ import {
   writeMazeCycleTelemetryHistory,
   type MazeCycleTelemetryReceipt
 } from '../../src/legacy-runtime/mazeCycleTelemetry';
+import { createLegacyOfflineCompletionFlush } from '../../src/legacy-runtime/legacyOfflineCompletionFlush';
 import {
-  createLegacyOfflineCompletionFlush,
-  LEGACY_OFFLINE_COMPLETION_COPY
-} from '../../src/legacy-runtime/legacyOfflineCompletionFlush';
-import { LEGACY_REMOTE_MESSAGE_COPY } from '../../src/legacy-runtime/legacyPlayerMessage';
+  LEGACY_OFFLINE_MESSAGE_COPY as LEGACY_OFFLINE_COMPLETION_COPY,
+  LEGACY_REMOTE_MESSAGE_COPY
+} from '../../src/legacy-runtime/legacyPlayerMessage';
 import { scoreMazeCycleRunQuality } from '../../src/legacy-runtime/mazeCycleRunQualityScorer.mjs';
 
 const storedRunQualityScore = scoreMazeCycleRunQuality({

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_BOOT_MESSAGE_COPY,
+  LEGACY_OFFLINE_MESSAGE_COPY,
   LEGACY_OVERLAY_MESSAGE_COPY,
   LEGACY_REMOTE_MESSAGE_COPY
 } from '../../src/legacy-runtime/legacyPlayerMessage';
@@ -15,6 +16,7 @@ describe('player message copy rows', () => {
     const tables = {
       LEGACY_AUTH_MESSAGE_COPY,
       LEGACY_BOOT_MESSAGE_COPY,
+      LEGACY_OFFLINE_MESSAGE_COPY,
       LEGACY_OVERLAY_MESSAGE_COPY,
       LEGACY_REMOTE_MESSAGE_COPY
     } as const;
@@ -29,6 +31,7 @@ describe('player message copy rows', () => {
     expect({
       auth: LEGACY_AUTH_MESSAGE_COPY,
       boot: LEGACY_BOOT_MESSAGE_COPY,
+      offline: LEGACY_OFFLINE_MESSAGE_COPY,
       overlay: LEGACY_OVERLAY_MESSAGE_COPY,
       remote: LEGACY_REMOTE_MESSAGE_COPY
     }).toMatchInlineSnapshot(`
@@ -63,6 +66,10 @@ describe('player message copy rows', () => {
         "boot": {
           "bootError": "The maze did not finish loading. Try refreshing once.",
           "serviceWorkerError": "The offline cache could not update. The game can still run online.",
+        },
+        "offline": {
+          "saved": "You are offline. Progress is saved on this device and will sync when you reconnect.",
+          "synced": "Back online. Saved progress synced.",
         },
         "overlay": {
           "fieldUpdated": "Setting updated.",

@@ -102,8 +102,11 @@ All are typed `LegacyPlayerMessage` (`copy`, `durationMs` default 2400 ms, `id`,
 | `resolveLegacyOverlay*Message` (3 resolvers) | `overlay.*` | overlay | success / info | none | dormant (F5) |
 
 Copy tables in `legacyPlayerMessage.ts`: `LEGACY_AUTH_MESSAGE_COPY` (25 strings),
-`LEGACY_BOOT_MESSAGE_COPY` (2), `LEGACY_REMOTE_MESSAGE_COPY` (5), `LEGACY_OVERLAY_MESSAGE_COPY` (3) = 35
-routed strings, plus 3 inline in the resolver and 1 inline at a call site (F8) = 39 routed strings.
+`LEGACY_BOOT_MESSAGE_COPY` (2), `LEGACY_REMOTE_MESSAGE_COPY` (5), `LEGACY_OFFLINE_MESSAGE_COPY` (2, MAZER-UI-022),
+`LEGACY_OVERLAY_MESSAGE_COPY` (3) = 37 routed strings, plus 3 inline in the resolver and 1 inline at a call site (F8) = 41 routed strings.
+The two offline notices (`remote.outbox.offline-saved`, `remote.outbox.synced`) moved from `legacyOfflineCompletionFlush.ts` into
+`LEGACY_OFFLINE_MESSAGE_COPY` with `resolveLegacyOfflineSavedMessage` / `resolveLegacyOfflineSyncedMessage` (MAZER-UI-022); copy unchanged.
+Section 5 counts are the audit-base snapshot and are not recomputed.
 Guard: every table value must be a sentence with no provider or internal wording.
 
 ## 4. Pinned literal inventory (player-facing strings outside the message module)
@@ -117,8 +120,6 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | `src/scenes/MenuScene.ts:14171` | `{account}\nManage your profile and account from the shared Fawxzzy account portal.` | no | n/a (helper) | raw-static | Keep as screen helper |
 | `src/scenes/MenuScene.ts:16054` | `Request timed out.` | no (diverges, F9) | error / auth | raw-status | Auth table key `requestTimedOut`; render the resolved message |
 | `src/scenes/MenuScene.ts:17346` | `Progression reset.` | yes (inline copy) | success / progression | routed-inline | Move copy into a progression copy table; add a render surface |
-| `src/legacy-runtime/legacyOfflineCompletionFlush.ts` | `You are offline. Progress is saved on this device and will sync when you reconnect.` | yes (own table) | info / system | routed-inline | Drawn by the toast (MAZER-UI-018) |
-| `src/legacy-runtime/legacyOfflineCompletionFlush.ts` | `Back online. Saved progress synced.` | yes (own table) | success / system | routed-inline | Drawn by the toast (MAZER-UI-018) |
 | `src/scenes/MenuScene.ts:17547` | `Runtime diagnostics authenticated fixture.` | no | n/a | fixture | None (QA fixture) |
 | `src/boot/accessibilitySurface.ts:100` | `Use Arrow keys or WASD to move through the maze. Press Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.` | no | n/a | static | None (a11y description) |
 | `src/boot/accessibilitySurface.ts:109` | `Mazer is ready.` | no | info | static | Live region never updated; candidate sink for the message surface announcements |
@@ -349,8 +350,6 @@ Pure modules, not rendered until the Settings wiring lane lands (`docs/ui/MAZER-
 | `src/legacy-runtime/legacyGuideContent.ts` | `A shimmering, colour-shifting line is your route. {} in Settings fades old trail.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Some mazes wrap around open edges. The edge diamonds glow in your trail colours.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Clears show your level. Harder mazes add shortcuts and loops.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
-| `src/legacy-runtime/legacyOfflineCompletionFlush.ts` | `You are offline. Progress is saved on this device and will sync when you reconnect.` | static | Offline-saved notice, once per outage (MAZER-FLOW-009); copy table feeding `createLegacyPlayerMessage` |
-| `src/legacy-runtime/legacyOfflineCompletionFlush.ts` | `Back online. Saved progress synced.` | static | Back-online synced notice after a drained outbox flush (MAZER-FLOW-009); copy table feeding `createLegacyPlayerMessage` |
 | `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your level and leaderboard standing go back to Level 1. Your account, username and settings stay as they are. This can’t be undone.` | static | Reset progress confirm/status copy; rendered by the shared Settings reset card; fold into the message module later |
 | `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Connect to the internet to reset your account progress.` | static | Reset progress confirm/status copy; rendered by the shared Settings reset card; fold into the message module later |
 | `src/legacy-runtime/legacyProgressionResetFlow.ts` | `Your account is still loading. Try again in a moment.` | static | Reset progress confirm/status copy; rendered by the shared Settings reset card; fold into the message module later |
