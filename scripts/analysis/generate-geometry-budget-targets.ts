@@ -20,6 +20,11 @@
 // GEOMETRY_BUDGET_FRINGE_STEP more of these cells each, so the cap is also how many levels the
 // fringe adds.
 //
+// The capacity pass tunes a LURE-FREE base (no `doubleLure`): the ceiling is the forward number a base can reach, and the
+// ladder v2 lure (2026-11-11) leaves that number alone (it is paid in extra bases, not in a lower ceiling). With the
+// lure the same pass reads a 25th percentile of 753 (ceiling 750 if it were calibrated that way), so about one base in
+// four misses 760 and the selection tries the next one; the ceiling stays 760 so the forward windows stay as they were.
+//
 // Usage (from the repo root):
 //   npx vite-node scripts/analysis/generate-geometry-budget-targets.ts
 //     print the capacity pass and the resulting ceiling / saturation level

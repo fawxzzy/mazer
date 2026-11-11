@@ -1,28 +1,28 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_2397dca595da",
+  "export_id": "pbe_mazer_owner_registry_7d2e5a5e0c9c",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:2397dca595da193a5bc5ae582f1863679817b9e0909516fc7815916d0bee9f5a",
-  "generated_at": "2026-11-10T23:30:00.000Z",
+  "source_revision": "sha256:7d2e5a5e0c9c2c9f2ba9b0b901b618e09f45a427dd0a277ece0eccfd8c3ea7dd",
+  "generated_at": "2026-11-11T01:00:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:6c2ed5a644e7049522ae6fef8ed42ac8cbbb469c3c4fbbcd9df93a5201d1d8b7",
-      "observed_at": "2026-11-10T23:30:00.000Z"
+      "revision": "sha256:e3775cea41b117e2dbe7ef708ca4d5204f1a36ff80491ed0961c7afa2e7bcd20",
+      "observed_at": "2026-11-11T01:00:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
       "kind": "markdown",
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
-      "revision": "sha256:b92850bfdacc1e12e65341ae16b2af7f83ec76034cf9f16be3d38a7f267e08d8",
-      "observed_at": "2026-11-10T23:30:00.000Z"
+      "revision": "sha256:02c46782c14f59800cd038ad801f7e56b46fff5e2ee869b63f62910e7c2c1b41",
+      "observed_at": "2026-11-11T01:00:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-10T23:30:00.000Z"
+      "observed_at": "2026-11-11T01:00:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-10T23:30:00.000Z"
+      "observed_at": "2026-11-11T01:00:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-10T23:30:00.000Z"
+      "observed_at": "2026-11-11T01:00:00.000Z"
     }
   ],
   "cards": [
@@ -4372,7 +4372,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Mastery tier to level 388: mazes also hard to solve from the goal end",
-        "description": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). PR #415 adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Merged (merge 0a69f679) and deployed to production (main a983f2de, Ready). Honest limits: the ceiling is level 388, the ramp is statistical and not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier; no human play-test. Checked only in headless Chromium, not on a real phone or an installed app. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
+        "description": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). PR #415 adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Merged (merge 0a69f679) and deployed to production (main a983f2de, Ready). Honest limits: the ceiling is level 388, the ramp is statistical and not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier; no human play-test. Checked only in headless Chromium, not on a real phone or an installed app. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board. Superseded in part by MAZER-PROG-015: the tier is removed in the ladder v2 pull request (open for review) and the plateau returns to level 268.",
         "card_type": "feature",
         "lifecycle": "completed",
         "priority": "high",
@@ -4395,8 +4395,8 @@
         "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). PR #415 adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Merged (merge 0a69f679) and deployed to production (main a983f2de, Ready). Honest limits: the ceiling is level 388, the ramp is statistical and not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier; no human play-test. Checked only in headless Chromium, not on a real phone or an installed app. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
-        "objective": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). PR #415 adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Merged (merge 0a69f679) and deployed to production (main a983f2de, Ready). Honest limits: the ceiling is level 388, the ramp is statistical and not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier; no human play-test. Checked only in headless Chromium, not on a real phone or an installed app. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
+        "summary": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). PR #415 adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Merged (merge 0a69f679) and deployed to production (main a983f2de, Ready). Honest limits: the ceiling is level 388, the ramp is statistical and not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier; no human play-test. Checked only in headless Chromium, not on a real phone or an installed app. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board. Superseded in part by MAZER-PROG-015: the tier is removed in the ladder v2 pull request (open for review) and the plateau returns to level 268.",
+        "objective": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). PR #415 adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Merged (merge 0a69f679) and deployed to production (main a983f2de, Ready). Honest limits: the ceiling is level 388, the ramp is statistical and not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier; no human play-test. Checked only in headless Chromium, not on a real phone or an installed app. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board. Superseded in part by MAZER-PROG-015: the tier is removed in the ladder v2 pull request (open for review) and the plateau returns to level 268.",
         "acceptance_criteria": [
           "Levels 1 to 268 generate the same mazes as before and the golden fixture changes only above level 268",
           "Every mastery maze keeps the forward window and 70 side stubs and takes at least 740 steps from the goal end",
@@ -4419,26 +4419,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-prog-015_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PROG-015",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Apply the double-lure lever to levels 2-268 (owner decision needed)",
-        "description": "Option: apply the double-lure lever from the mastery tier to levels 2 to 268. Reverse difficulty would roughly double, no new levels are added, and every existing level hash for those levels is reshuffled. Not started; needs an owner decision because it changes every existing level.",
+        "title": "Double lure on levels 2-268 and the mastery tier removed (ladder v2): open for review",
+        "description": "Owner decision given (apply the double lure to levels 2 to 268). Open for review in a pull request, not merged and not deployed. Every maze from level 2 now has route forks that also point toward the start, and every maze is held to a reverse floor (975 permille of its forward target, 740 at the top, 400 for a maze with a wrap corridor). Measured on 48 seeds per level and board (modelled walkers): the cost from the goal end rises from 120 to 219 at level 10, 124 to 374 at 30, 190 to 484 at 100 and 475 to 767 at 198 (phone), with the forward number unchanged. The mastery tier of levels 269 to 388 is removed because nothing is left to ramp, so the plateau and the hazard hand-off are back at level 268. Level 1 is identical; 592 of the 598 other fixture hashes changed (every existing level 2 to 300 maze is reshuffled at the same difficulty). Honest limits: generation costs 1.2 to 1.8 times the mean and the worst build stays at or under 393 ms at a 4x CPU throttle (two headless Chromium runs, one noisy machine); about 3 to 6 percent fewer mazes of the wrap band at level 100 keep their wraps and fewer looped mazes land there; the held-out random walk reads 4 to 34 percent easier at 10 of 12 sampled cells; no human play-test and nothing checked on a device.",
         "card_type": "feature",
-        "lifecycle": "planning",
-        "priority": "low",
+        "lifecycle": "review",
+        "priority": "high",
         "owner": "mazer",
         "dependencies": [
           "MAZER-PROG-014"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-10T00:00:00.000Z",
+        "updated_at": "2026-11-11T01:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-015",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -4446,15 +4446,16 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-015",
         "source_status": "current",
-        "source_updated_at": "2026-11-10T00:00:00.000Z"
+        "source_updated_at": "2026-11-11T01:00:00.000Z"
       },
       "content": {
-        "summary": "Option: apply the double-lure lever from the mastery tier to levels 2 to 268. Reverse difficulty would roughly double, no new levels are added, and every existing level hash for those levels is reshuffled. Not started; needs an owner decision because it changes every existing level.",
-        "objective": "Option: apply the double-lure lever from the mastery tier to levels 2 to 268. Reverse difficulty would roughly double, no new levels are added, and every existing level hash for those levels is reshuffled. Not started; needs an owner decision because it changes every existing level.",
+        "summary": "Owner decision given (apply the double lure to levels 2 to 268). Open for review in a pull request, not merged and not deployed. Every maze from level 2 now has route forks that also point toward the start, and every maze is held to a reverse floor (975 permille of its forward target, 740 at the top, 400 for a maze with a wrap corridor). Measured on 48 seeds per level and board (modelled walkers): the cost from the goal end rises from 120 to 219 at level 10, 124 to 374 at 30, 190 to 484 at 100 and 475 to 767 at 198 (phone), with the forward number unchanged. The mastery tier of levels 269 to 388 is removed because nothing is left to ramp, so the plateau and the hazard hand-off are back at level 268. Level 1 is identical; 592 of the 598 other fixture hashes changed (every existing level 2 to 300 maze is reshuffled at the same difficulty). Honest limits: generation costs 1.2 to 1.8 times the mean and the worst build stays at or under 393 ms at a 4x CPU throttle (two headless Chromium runs, one noisy machine); about 3 to 6 percent fewer mazes of the wrap band at level 100 keep their wraps and fewer looped mazes land there; the held-out random walk reads 4 to 34 percent easier at 10 of 12 sampled cells; no human play-test and nothing checked on a device.",
+        "objective": "Owner decision given (apply the double lure to levels 2 to 268). Open for review in a pull request, not merged and not deployed. Every maze from level 2 now has route forks that also point toward the start, and every maze is held to a reverse floor (975 permille of its forward target, 740 at the top, 400 for a maze with a wrap corridor). Measured on 48 seeds per level and board (modelled walkers): the cost from the goal end rises from 120 to 219 at level 10, 124 to 374 at 30, 190 to 484 at 100 and 475 to 767 at 198 (phone), with the forward number unchanged. The mastery tier of levels 269 to 388 is removed because nothing is left to ramp, so the plateau and the hazard hand-off are back at level 268. Level 1 is identical; 592 of the 598 other fixture hashes changed (every existing level 2 to 300 maze is reshuffled at the same difficulty). Honest limits: generation costs 1.2 to 1.8 times the mean and the worst build stays at or under 393 ms at a 4x CPU throttle (two headless Chromium runs, one noisy machine); about 3 to 6 percent fewer mazes of the wrap band at level 100 keep their wraps and fewer looped mazes land there; the held-out random walk reads 4 to 34 percent easier at 10 of 12 sampled cells; no human play-test and nothing checked on a device.",
         "acceptance_criteria": [
-          "Owner decision recorded",
-          "If approved: levels 2 to 268 gain reverse-solve resistance and the golden fixture is regenerated",
-          "If rejected: card is closed with the reason"
+          "Owner decision recorded: apply the double lure to levels 2 to 268",
+          "Levels 2 to 268 gain reverse-solve resistance with a reverse floor on every maze, level 1 and every forward window stay as before, and the golden fixture is regenerated with level 1 identical",
+          "The mastery tier is removed and the plateau and hazard hand-off are back at level 268",
+          "Pull request merged and deployed before this card is marked completed"
         ],
         "discoveries": [],
         "next_actions": [],

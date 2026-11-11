@@ -1,0 +1,807 @@
+{
+  "method": "Two gauged dumps, same seeds and boards (seeds per level and board: 48): before = the baseline checkout (main with the mastery tier, PR #415), after = this tree (the double lure on every level from 2, ladder v2). Modelled walkers, not player-tested.",
+  "plateau": 268,
+  "columns": {
+    "pricedSteps": "felt (fwd, priced)",
+    "reversePricedSteps": "reverse felt",
+    "twoWayPricedSteps": "two-way felt",
+    "humanSteps": "human-like fwd",
+    "reverseHumanSteps": "human-like rev",
+    "twoWayHumanSteps": "two-way human",
+    "randomWalkSteps": "random walk",
+    "decisionPoints": "route junctions",
+    "deadEnds": "dead ends",
+    "boardFill": "board fill",
+    "shortest": "shortest route",
+    "routeTurns": "route turns",
+    "maxDecoyDepth": "max decoy depth",
+    "astarExpansions": "A* expansions",
+    "greedySearchCells": "greedy cells"
+  },
+  "samples": [
+    {
+      "level": 1,
+      "board": "phone",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 48,
+        "reversePricedSteps": 48,
+        "twoWayPricedSteps": 48,
+        "humanSteps": 48,
+        "reverseHumanSteps": 48,
+        "twoWayHumanSteps": 48,
+        "randomWalkSteps": 48,
+        "decisionPoints": 0,
+        "deadEnds": 0,
+        "boardFill": 0.038,
+        "shortest": 48,
+        "routeTurns": 0,
+        "maxDecoyDepth": 0,
+        "astarExpansions": 49,
+        "greedySearchCells": 49
+      },
+      "after": {
+        "pricedSteps": 48,
+        "reversePricedSteps": 48,
+        "twoWayPricedSteps": 48,
+        "humanSteps": 48,
+        "reverseHumanSteps": 48,
+        "twoWayHumanSteps": 48,
+        "randomWalkSteps": 48,
+        "decisionPoints": 0,
+        "deadEnds": 0,
+        "boardFill": 0.038,
+        "shortest": 48,
+        "routeTurns": 0,
+        "maxDecoyDepth": 0,
+        "astarExpansions": 49,
+        "greedySearchCells": 49
+      },
+      "reverseFeltAfter": {
+        "p5": 48,
+        "p50": 48,
+        "p95": 48
+      },
+      "reverseFeltBefore": {
+        "p5": 48,
+        "p50": 48,
+        "p95": 48
+      }
+    },
+    {
+      "level": 1,
+      "board": "desktop",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 42,
+        "reversePricedSteps": 42,
+        "twoWayPricedSteps": 42,
+        "humanSteps": 42,
+        "reverseHumanSteps": 42,
+        "twoWayHumanSteps": 42,
+        "randomWalkSteps": 42,
+        "decisionPoints": 0,
+        "deadEnds": 0,
+        "boardFill": 0.035,
+        "shortest": 42,
+        "routeTurns": 0,
+        "maxDecoyDepth": 0,
+        "astarExpansions": 43,
+        "greedySearchCells": 43
+      },
+      "after": {
+        "pricedSteps": 42,
+        "reversePricedSteps": 42,
+        "twoWayPricedSteps": 42,
+        "humanSteps": 42,
+        "reverseHumanSteps": 42,
+        "twoWayHumanSteps": 42,
+        "randomWalkSteps": 42,
+        "decisionPoints": 0,
+        "deadEnds": 0,
+        "boardFill": 0.035,
+        "shortest": 42,
+        "routeTurns": 0,
+        "maxDecoyDepth": 0,
+        "astarExpansions": 43,
+        "greedySearchCells": 43
+      },
+      "reverseFeltAfter": {
+        "p5": 42,
+        "p50": 42,
+        "p95": 42
+      },
+      "reverseFeltBefore": {
+        "p5": 42,
+        "p50": 42,
+        "p95": 42
+      }
+    },
+    {
+      "level": 10,
+      "board": "phone",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 215.438,
+        "reversePricedSteps": 120.25,
+        "twoWayPricedSteps": 117.292,
+        "humanSteps": 279.417,
+        "reverseHumanSteps": 220.396,
+        "twoWayHumanSteps": 161.521,
+        "randomWalkSteps": 365.396,
+        "decisionPoints": 5.271,
+        "deadEnds": 10.563,
+        "boardFill": 0.156,
+        "shortest": 72.208,
+        "routeTurns": 16.063,
+        "maxDecoyDepth": 31.125,
+        "astarExpansions": 157.854,
+        "greedySearchCells": 165.042
+      },
+      "after": {
+        "pricedSteps": 215.521,
+        "reversePricedSteps": 218.854,
+        "twoWayPricedSteps": 198,
+        "humanSteps": 305.104,
+        "reverseHumanSteps": 582.063,
+        "twoWayHumanSteps": 200.083,
+        "randomWalkSteps": 303.375,
+        "decisionPoints": 4.271,
+        "deadEnds": 11.563,
+        "boardFill": 0.158,
+        "shortest": 75.542,
+        "routeTurns": 16.167,
+        "maxDecoyDepth": 32.958,
+        "astarExpansions": 159.458,
+        "greedySearchCells": 168.813
+      },
+      "reverseFeltAfter": {
+        "p5": 107,
+        "p50": 216,
+        "p95": 316
+      },
+      "reverseFeltBefore": {
+        "p5": 31,
+        "p50": 117,
+        "p95": 239
+      }
+    },
+    {
+      "level": 10,
+      "board": "desktop",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 215.458,
+        "reversePricedSteps": 111.958,
+        "twoWayPricedSteps": 110.563,
+        "humanSteps": 259.75,
+        "reverseHumanSteps": 203.063,
+        "twoWayHumanSteps": 163.729,
+        "randomWalkSteps": 341.354,
+        "decisionPoints": 5.604,
+        "deadEnds": 10.125,
+        "boardFill": 0.153,
+        "shortest": 71.146,
+        "routeTurns": 16.833,
+        "maxDecoyDepth": 26.708,
+        "astarExpansions": 145.979,
+        "greedySearchCells": 168.104
+      },
+      "after": {
+        "pricedSteps": 215.542,
+        "reversePricedSteps": 198.5,
+        "twoWayPricedSteps": 189.625,
+        "humanSteps": 268.063,
+        "reverseHumanSteps": 257.625,
+        "twoWayHumanSteps": 159.938,
+        "randomWalkSteps": 294.75,
+        "decisionPoints": 4.229,
+        "deadEnds": 11.625,
+        "boardFill": 0.155,
+        "shortest": 77.479,
+        "routeTurns": 18.938,
+        "maxDecoyDepth": 31.313,
+        "astarExpansions": 148.042,
+        "greedySearchCells": 170.396
+      },
+      "reverseFeltAfter": {
+        "p5": 104,
+        "p50": 216,
+        "p95": 258
+      },
+      "reverseFeltBefore": {
+        "p5": -4,
+        "p50": 110,
+        "p95": 204
+      }
+    },
+    {
+      "level": 30,
+      "board": "phone",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 416.479,
+        "reversePricedSteps": 124.188,
+        "twoWayPricedSteps": 124.188,
+        "humanSteps": 694.146,
+        "reverseHumanSteps": 436.688,
+        "twoWayHumanSteps": 314.292,
+        "randomWalkSteps": 643.896,
+        "decisionPoints": 4.938,
+        "deadEnds": 20.313,
+        "boardFill": 0.293,
+        "shortest": 79.125,
+        "routeTurns": 18.604,
+        "maxDecoyDepth": 61.438,
+        "astarExpansions": 217.458,
+        "greedySearchCells": 325.333
+      },
+      "after": {
+        "pricedSteps": 416.458,
+        "reversePricedSteps": 374.333,
+        "twoWayPricedSteps": 363.083,
+        "humanSteps": 850.708,
+        "reverseHumanSteps": 592.313,
+        "twoWayHumanSteps": 432.479,
+        "randomWalkSteps": 619.021,
+        "decisionPoints": 4.729,
+        "deadEnds": 22.708,
+        "boardFill": 0.296,
+        "shortest": 89,
+        "routeTurns": 19.896,
+        "maxDecoyDepth": 60.667,
+        "astarExpansions": 228.979,
+        "greedySearchCells": 327.542
+      },
+      "reverseFeltAfter": {
+        "p5": 186,
+        "p50": 416,
+        "p95": 478
+      },
+      "reverseFeltBefore": {
+        "p5": -70,
+        "p50": 102,
+        "p95": 384
+      }
+    },
+    {
+      "level": 30,
+      "board": "desktop",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 416.708,
+        "reversePricedSteps": 147.75,
+        "twoWayPricedSteps": 143.542,
+        "humanSteps": 573,
+        "reverseHumanSteps": 397.583,
+        "twoWayHumanSteps": 311.521,
+        "randomWalkSteps": 802.104,
+        "decisionPoints": 5.25,
+        "deadEnds": 21.021,
+        "boardFill": 0.314,
+        "shortest": 72.979,
+        "routeTurns": 17.146,
+        "maxDecoyDepth": 65.417,
+        "astarExpansions": 199.167,
+        "greedySearchCells": 335.813
+      },
+      "after": {
+        "pricedSteps": 416.625,
+        "reversePricedSteps": 383.396,
+        "twoWayPricedSteps": 374.167,
+        "humanSteps": 796.229,
+        "reverseHumanSteps": 464.104,
+        "twoWayHumanSteps": 394.646,
+        "randomWalkSteps": 651,
+        "decisionPoints": 4.708,
+        "deadEnds": 24.354,
+        "boardFill": 0.318,
+        "shortest": 89.583,
+        "routeTurns": 22.563,
+        "maxDecoyDepth": 64.167,
+        "astarExpansions": 234.104,
+        "greedySearchCells": 336.75
+      },
+      "reverseFeltAfter": {
+        "p5": 243,
+        "p50": 416,
+        "p95": 464
+      },
+      "reverseFeltBefore": {
+        "p5": -64,
+        "p50": 110,
+        "p95": 420
+      }
+    },
+    {
+      "level": 50,
+      "board": "phone",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 463.646,
+        "reversePricedSteps": 167.708,
+        "twoWayPricedSteps": 166.458,
+        "humanSteps": 862.958,
+        "reverseHumanSteps": 509.792,
+        "twoWayHumanSteps": 366.625,
+        "randomWalkSteps": 963.188,
+        "decisionPoints": 6.229,
+        "deadEnds": 21.125,
+        "boardFill": 0.318,
+        "shortest": 88.646,
+        "routeTurns": 22.063,
+        "maxDecoyDepth": 65.125,
+        "astarExpansions": 236.833,
+        "greedySearchCells": 353.396
+      },
+      "after": {
+        "pricedSteps": 463.729,
+        "reversePricedSteps": 421.333,
+        "twoWayPricedSteps": 403.979,
+        "humanSteps": 694.604,
+        "reverseHumanSteps": 600.667,
+        "twoWayHumanSteps": 460.646,
+        "randomWalkSteps": 714.146,
+        "decisionPoints": 5.188,
+        "deadEnds": 23.063,
+        "boardFill": 0.325,
+        "shortest": 89.896,
+        "routeTurns": 21.813,
+        "maxDecoyDepth": 67.958,
+        "astarExpansions": 227.958,
+        "greedySearchCells": 356.271
+      },
+      "reverseFeltAfter": {
+        "p5": 215,
+        "p50": 463,
+        "p95": 616
+      },
+      "reverseFeltBefore": {
+        "p5": -31,
+        "p50": 152,
+        "p95": 433
+      }
+    },
+    {
+      "level": 50,
+      "board": "desktop",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 463.479,
+        "reversePricedSteps": 202.146,
+        "twoWayPricedSteps": 189.021,
+        "humanSteps": 678.813,
+        "reverseHumanSteps": 511.667,
+        "twoWayHumanSteps": 415.042,
+        "randomWalkSteps": 825.104,
+        "decisionPoints": 5.771,
+        "deadEnds": 21.208,
+        "boardFill": 0.333,
+        "shortest": 82.188,
+        "routeTurns": 19,
+        "maxDecoyDepth": 65.542,
+        "astarExpansions": 224.583,
+        "greedySearchCells": 358.5
+      },
+      "after": {
+        "pricedSteps": 463.542,
+        "reversePricedSteps": 425.792,
+        "twoWayPricedSteps": 401.125,
+        "humanSteps": 574.896,
+        "reverseHumanSteps": 560.646,
+        "twoWayHumanSteps": 376.042,
+        "randomWalkSteps": 712.521,
+        "decisionPoints": 5.146,
+        "deadEnds": 21.833,
+        "boardFill": 0.337,
+        "shortest": 98.604,
+        "routeTurns": 24.521,
+        "maxDecoyDepth": 66.042,
+        "astarExpansions": 245.917,
+        "greedySearchCells": 355.875
+      },
+      "reverseFeltAfter": {
+        "p5": 210,
+        "p50": 463,
+        "p95": 628
+      },
+      "reverseFeltBefore": {
+        "p5": -79,
+        "p50": 201,
+        "p95": 603
+      }
+    },
+    {
+      "level": 100,
+      "board": "phone",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 563.625,
+        "reversePricedSteps": 190.313,
+        "twoWayPricedSteps": 185.583,
+        "humanSteps": 933.375,
+        "reverseHumanSteps": 473.708,
+        "twoWayHumanSteps": 405.771,
+        "randomWalkSteps": 1304.021,
+        "decisionPoints": 7.542,
+        "deadEnds": 22.542,
+        "boardFill": 0.379,
+        "shortest": 106.625,
+        "routeTurns": 26.583,
+        "maxDecoyDepth": 74.083,
+        "astarExpansions": 312.229,
+        "greedySearchCells": 429.271
+      },
+      "after": {
+        "pricedSteps": 563.604,
+        "reversePricedSteps": 483.979,
+        "twoWayPricedSteps": 461.438,
+        "humanSteps": 903.917,
+        "reverseHumanSteps": 852.833,
+        "twoWayHumanSteps": 544.604,
+        "randomWalkSteps": 1115.521,
+        "decisionPoints": 6.5,
+        "deadEnds": 20.833,
+        "boardFill": 0.368,
+        "shortest": 117.521,
+        "routeTurns": 30.292,
+        "maxDecoyDepth": 75.229,
+        "astarExpansions": 288.75,
+        "greedySearchCells": 416.917
+      },
+      "reverseFeltAfter": {
+        "p5": 238,
+        "p50": 556,
+        "p95": 735
+      },
+      "reverseFeltBefore": {
+        "p5": -27,
+        "p50": 153,
+        "p95": 598
+      }
+    },
+    {
+      "level": 100,
+      "board": "desktop",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 563.583,
+        "reversePricedSteps": 208.542,
+        "twoWayPricedSteps": 199.292,
+        "humanSteps": 893.479,
+        "reverseHumanSteps": 544.083,
+        "twoWayHumanSteps": 474.458,
+        "randomWalkSteps": 930.313,
+        "decisionPoints": 7.083,
+        "deadEnds": 22.479,
+        "boardFill": 0.389,
+        "shortest": 96.5,
+        "routeTurns": 24.521,
+        "maxDecoyDepth": 69.646,
+        "astarExpansions": 292.313,
+        "greedySearchCells": 424.208
+      },
+      "after": {
+        "pricedSteps": 563.542,
+        "reversePricedSteps": 492.896,
+        "twoWayPricedSteps": 473.563,
+        "humanSteps": 1036.354,
+        "reverseHumanSteps": 594.521,
+        "twoWayHumanSteps": 447.542,
+        "randomWalkSteps": 939.188,
+        "decisionPoints": 6.104,
+        "deadEnds": 19.729,
+        "boardFill": 0.371,
+        "shortest": 119.146,
+        "routeTurns": 32.729,
+        "maxDecoyDepth": 68.75,
+        "astarExpansions": 303.188,
+        "greedySearchCells": 401.979
+      },
+      "reverseFeltAfter": {
+        "p5": 242,
+        "p50": 563,
+        "p95": 691
+      },
+      "reverseFeltBefore": {
+        "p5": -46,
+        "p50": 129,
+        "p95": 644
+      }
+    },
+    {
+      "level": 198,
+      "board": "phone",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 759.458,
+        "reversePricedSteps": 475.167,
+        "twoWayPricedSteps": 472.708,
+        "humanSteps": 1754.875,
+        "reverseHumanSteps": 1138.625,
+        "twoWayHumanSteps": 900.083,
+        "randomWalkSteps": 2087.5,
+        "decisionPoints": 12.396,
+        "deadEnds": 27.104,
+        "boardFill": 0.411,
+        "shortest": 231.833,
+        "routeTurns": 74.083,
+        "maxDecoyDepth": 54.833,
+        "astarExpansions": 457.417,
+        "greedySearchCells": 510.563
+      },
+      "after": {
+        "pricedSteps": 759.563,
+        "reversePricedSteps": 767.021,
+        "twoWayPricedSteps": 759.188,
+        "humanSteps": 1410.688,
+        "reverseHumanSteps": 1915.146,
+        "twoWayHumanSteps": 881.438,
+        "randomWalkSteps": 1369.521,
+        "decisionPoints": 7.958,
+        "deadEnds": 24.208,
+        "boardFill": 0.411,
+        "shortest": 232.646,
+        "routeTurns": 75.854,
+        "maxDecoyDepth": 66.979,
+        "astarExpansions": 427.063,
+        "greedySearchCells": 512.146
+      },
+      "reverseFeltAfter": {
+        "p5": 759,
+        "p50": 760,
+        "p95": 804
+      },
+      "reverseFeltBefore": {
+        "p5": 182,
+        "p50": 467,
+        "p95": 768
+      }
+    },
+    {
+      "level": 198,
+      "board": "desktop",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 759.458,
+        "reversePricedSteps": 450.708,
+        "twoWayPricedSteps": 450.708,
+        "humanSteps": 1949.625,
+        "reverseHumanSteps": 1036.417,
+        "twoWayHumanSteps": 791.167,
+        "randomWalkSteps": 1865.083,
+        "decisionPoints": 11.875,
+        "deadEnds": 26.396,
+        "boardFill": 0.43,
+        "shortest": 228.333,
+        "routeTurns": 73.354,
+        "maxDecoyDepth": 56.417,
+        "astarExpansions": 455.042,
+        "greedySearchCells": 503.417
+      },
+      "after": {
+        "pricedSteps": 759.5,
+        "reversePricedSteps": 759.375,
+        "twoWayPricedSteps": 759.208,
+        "humanSteps": 1857.75,
+        "reverseHumanSteps": 1820.333,
+        "twoWayHumanSteps": 1143.167,
+        "randomWalkSteps": 1560.042,
+        "decisionPoints": 8.083,
+        "deadEnds": 24.188,
+        "boardFill": 0.429,
+        "shortest": 256.083,
+        "routeTurns": 83.104,
+        "maxDecoyDepth": 59.146,
+        "astarExpansions": 496.604,
+        "greedySearchCells": 517.104
+      },
+      "reverseFeltAfter": {
+        "p5": 759,
+        "p50": 759,
+        "p95": 760
+      },
+      "reverseFeltBefore": {
+        "p5": 82,
+        "p50": 489,
+        "p95": 739
+      }
+    },
+    {
+      "level": 268,
+      "board": "phone",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 759.458,
+        "reversePricedSteps": 474.792,
+        "twoWayPricedSteps": 472.458,
+        "humanSteps": 2816.125,
+        "reverseHumanSteps": 2181.333,
+        "twoWayHumanSteps": 1496.125,
+        "randomWalkSteps": 7174,
+        "decisionPoints": 39.833,
+        "deadEnds": 86.896,
+        "boardFill": 0.466,
+        "shortest": 231.833,
+        "routeTurns": 74.083,
+        "maxDecoyDepth": 54.833,
+        "astarExpansions": 515.958,
+        "greedySearchCells": 556.5
+      },
+      "after": {
+        "pricedSteps": 759.563,
+        "reversePricedSteps": 766.813,
+        "twoWayPricedSteps": 759.188,
+        "humanSteps": 2484.896,
+        "reverseHumanSteps": 3573.271,
+        "twoWayHumanSteps": 1681.313,
+        "randomWalkSteps": 6019.479,
+        "decisionPoints": 35.313,
+        "deadEnds": 81.646,
+        "boardFill": 0.464,
+        "shortest": 233.021,
+        "routeTurns": 75.979,
+        "maxDecoyDepth": 66.896,
+        "astarExpansions": 481.667,
+        "greedySearchCells": 558.083
+      },
+      "reverseFeltAfter": {
+        "p5": 759,
+        "p50": 760,
+        "p95": 798
+      },
+      "reverseFeltBefore": {
+        "p5": 182,
+        "p50": 467,
+        "p95": 766
+      }
+    },
+    {
+      "level": 268,
+      "board": "desktop",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 759.417,
+        "reversePricedSteps": 439.167,
+        "twoWayPricedSteps": 439.167,
+        "humanSteps": 2546.833,
+        "reverseHumanSteps": 1783.25,
+        "twoWayHumanSteps": 1487.375,
+        "randomWalkSteps": 6754.167,
+        "decisionPoints": 40.667,
+        "deadEnds": 88.25,
+        "boardFill": 0.486,
+        "shortest": 228.458,
+        "routeTurns": 74.146,
+        "maxDecoyDepth": 57.313,
+        "astarExpansions": 512.063,
+        "greedySearchCells": 548.104
+      },
+      "after": {
+        "pricedSteps": 759.542,
+        "reversePricedSteps": 759.375,
+        "twoWayPricedSteps": 759.25,
+        "humanSteps": 3214.958,
+        "reverseHumanSteps": 3367.542,
+        "twoWayHumanSteps": 2146.292,
+        "randomWalkSteps": 7443.542,
+        "decisionPoints": 39.854,
+        "deadEnds": 85.688,
+        "boardFill": 0.485,
+        "shortest": 252.917,
+        "routeTurns": 83,
+        "maxDecoyDepth": 60.479,
+        "astarExpansions": 558.958,
+        "greedySearchCells": 562.729
+      },
+      "reverseFeltAfter": {
+        "p5": 759,
+        "p50": 760,
+        "p95": 760
+      },
+      "reverseFeltBefore": {
+        "p5": 82,
+        "p50": 423,
+        "p95": 739
+      }
+    },
+    {
+      "level": 388,
+      "board": "phone",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 759.5,
+        "reversePricedSteps": 767.417,
+        "twoWayPricedSteps": 759.5,
+        "humanSteps": 3005.625,
+        "reverseHumanSteps": 3626.167,
+        "twoWayHumanSteps": 1958.792,
+        "randomWalkSteps": 5456.542,
+        "decisionPoints": 36.813,
+        "deadEnds": 81.5,
+        "boardFill": 0.467,
+        "shortest": 243.958,
+        "routeTurns": 78.292,
+        "maxDecoyDepth": 62.625,
+        "astarExpansions": 503.583,
+        "greedySearchCells": 559.896
+      },
+      "after": {
+        "pricedSteps": 759.563,
+        "reversePricedSteps": 766.813,
+        "twoWayPricedSteps": 759.188,
+        "humanSteps": 2484.896,
+        "reverseHumanSteps": 3573.271,
+        "twoWayHumanSteps": 1681.313,
+        "randomWalkSteps": 6019.479,
+        "decisionPoints": 35.313,
+        "deadEnds": 81.646,
+        "boardFill": 0.464,
+        "shortest": 233.021,
+        "routeTurns": 75.979,
+        "maxDecoyDepth": 66.896,
+        "astarExpansions": 481.667,
+        "greedySearchCells": 558.083
+      },
+      "reverseFeltAfter": {
+        "p5": 759,
+        "p50": 760,
+        "p95": 798
+      },
+      "reverseFeltBefore": {
+        "p5": 759,
+        "p50": 760,
+        "p95": 798
+      }
+    },
+    {
+      "level": 388,
+      "board": "desktop",
+      "seeds": 48,
+      "before": {
+        "pricedSteps": 759.521,
+        "reversePricedSteps": 760.104,
+        "twoWayPricedSteps": 759.313,
+        "humanSteps": 3001.146,
+        "reverseHumanSteps": 3598.479,
+        "twoWayHumanSteps": 2161.646,
+        "randomWalkSteps": 7389.063,
+        "decisionPoints": 39.667,
+        "deadEnds": 84.458,
+        "boardFill": 0.485,
+        "shortest": 251.313,
+        "routeTurns": 82.792,
+        "maxDecoyDepth": 60.042,
+        "astarExpansions": 551.417,
+        "greedySearchCells": 561
+      },
+      "after": {
+        "pricedSteps": 759.542,
+        "reversePricedSteps": 759.375,
+        "twoWayPricedSteps": 759.25,
+        "humanSteps": 3214.958,
+        "reverseHumanSteps": 3367.542,
+        "twoWayHumanSteps": 2146.292,
+        "randomWalkSteps": 7443.542,
+        "decisionPoints": 39.854,
+        "deadEnds": 85.688,
+        "boardFill": 0.485,
+        "shortest": 252.917,
+        "routeTurns": 83,
+        "maxDecoyDepth": 60.479,
+        "astarExpansions": 558.958,
+        "greedySearchCells": 562.729
+      },
+      "reverseFeltAfter": {
+        "p5": 759,
+        "p50": 760,
+        "p95": 760
+      },
+      "reverseFeltBefore": {
+        "p5": 759,
+        "p50": 760,
+        "p95": 765
+      }
+    }
+  ]
+}

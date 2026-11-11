@@ -184,12 +184,12 @@ export interface LegacyMazeSnapshot {
   fringeStats?: {
     cells: number;
   };
-  // Reverse-solve resistance of a level in the mastery tier (legacyGeometryBudget.ts): the explorer
-  // run from the goal to the start, minus the priced savings, and whether the maze is a mastery maze
-  // (its route forks point toward the start as well). Present on every maze past the felt saturation.
-  masteryStats?: {
-    mastery: boolean;
+  // Reverse-solve resistance of a ladder maze (legacyGeometryBudget.ts, the double lure): the felt
+  // explorer run from the goal to the start, minus the priced savings, and the floor of the level
+  // it was held to (reverseFelt >= floor). Present on every budget-ladder maze (levels 2 and up).
+  reverseStats?: {
     reverseFelt: number;
+    floor: number;
   };
   shortcutStats?: {
     requested: number;

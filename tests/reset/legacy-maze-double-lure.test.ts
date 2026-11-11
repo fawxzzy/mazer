@@ -37,7 +37,7 @@ const reverseSteps = (base: ReturnType<typeof tune>['base'], grid: boolean[][]):
   goal: base.start
 }).steps;
 
-describe('mastery: reverse-solve resistance (tuner lever 4)', () => {
+describe('double lure: reverse-solve resistance (tuner lever 4)', () => {
   test('without the option the tuner is byte-identical and only reports the reverse number', () => {
     for (const board of LADDER_BOARDS) {
       const plain = tune(board.aspectRatio, 0, {});

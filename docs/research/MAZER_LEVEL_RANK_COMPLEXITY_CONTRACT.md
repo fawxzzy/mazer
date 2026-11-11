@@ -1,6 +1,6 @@
 # Mazer Level, Rank, Complexity, And AI Progression Contract
 
-Last updated: 2026-11-10 (fringe past level 198, wrap fade and wrap pricing)
+Last updated: 2026-11-11 (ladder v2: the double lure on levels 2 to 268, mastery tier removed)
 
 Status: implemented source contract; provider migration and server-owned cutover remain separately gated.
 
@@ -12,7 +12,22 @@ This document defines how Mazer should connect player performance, AI-runner per
 - Naturally open floor geometry remains valid maze topology; this is not a no-`2x2` generation rule.
 - Older room-off and future-room passages below are retained as design history and are superseded by this section.
 
-## 2026-11-10 Mastery tier (levels 269..388): reverse-solve resistance, saturation moves to 388
+## 2026-11-11 Ladder v2: the double lure on every level from 2, a reverse floor, the mastery tier removed (saturation back to 268)
+
+Owner decision on MAZER-PROG-015 ("apply the double lure to levels 2-268"). Product direction unchanged: board and tile size frozen, difficulty from maze structure, hazards (Phase 2, MAZER-HAZ-002) not built. Source change; modelled difficulty, not player-tested. Evidence, before/after table, timing and hash review: "Ladder v2" in `docs/research/MAZER_PROGRESSION_FINAL_AUDIT_2026-11-10.md` and `docs/research/MAZER_PROGRESSION_LADDER_V2_2026-11-11.json`.
+
+- **Finding (2026-11-10, unchanged).** The ladder steers on the pull-to-goal explorer run from the start. The board is fully visible, so the same explorer run from the goal paid 0.3-0.6 of that on every level (phone, reverse against forward: 118 / 416 at level 30, 188 / 564 at 100, 475 / 759 at 198 and 268).
+- **Lever.** Tuner lever 4, option `doubleLure`: a fork carved straight off the route must also look closer to the start than the previous route cell. The forward number is untouched. It now applies to every maze of every level 2 and up (level 1 is the corridor, byte-identical).
+- **Reverse floor (replaces the mastery share).** Every maze is held to `resolveGeometryBudgetReverseFloor(level, wrapRungs)` reverse steps: `GEOMETRY_BUDGET_REVERSE_FLOOR_PERMILLE = 975` of the level's forward target (740 at the top class, 86 at level 2), or `GEOMETRY_BUDGET_REVERSE_FLOOR_WRAP_PERMILLE = 400` for a maze that owns a wrap corridor (the reverse explorer takes the corridor more directly than the forward one, so a wrapped maze cannot mirror; measured level 100: plain 565 against a forward 564, wrapped 290 without a floor). Shortfall goes into `windowDistance`, so the next base is tried. `maze.reverseStats = { reverseFelt, floor }` on every ladder maze; `reverseFelt >= floor` always.
+- **Mastery tier removed.** The 2026-11-10 tier (levels 269 to 388, a seeded share of lured mazes rising 1/120 per level, `GEOMETRY_BUDGET_MASTERY_SPAN`, `GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR`, `resolveGeometryBudgetMastery`, `resolveGeometryBudgetMasteryPermille`, `maze.masteryStats`, the `mastery` regime, `masteryPermille`) existed to phase the lever in. With the lure on every level the share would be 100 percent everywhere, and the reverse number is already at the board's capacity at the plateau (reverse 759-767 against forward 760), so nothing is left to ramp. `GEOMETRY_BUDGET_SATURATION_LEVEL` and `LAST_BUDGET_LEVEL` are 268 again; `hazardBudgetLevels = level - 268`; `resolveContinuousDifficulty` reports `reverseFloor` (steps) in place of `masteryPermille` and its regimes are corridor, ramp, fringe, plateau. Levels 269 and up are the level-268 class (same target, 70 fringe cells, floor 740, mazes differ by seed). The level-preview jump list is `1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 268, 300`.
+- **Guarantees.** Forward felt window per level `[T, T + 1]`, the exact fringe, the strict ordering of levels 2 to 198 for any two seeds, the wrap bands and the board are unchanged. New: reverse felt at least the floor on every maze. Wrap corridors: the number of base mazes tried with the rolled wraps before the fallback to plain went from 6 to 12 (`GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS`); 99.5 to 100 percent of levels 10 to 60 keep their wraps, 94 to 97 percent at level 100 (main: 100). The tuner takes an `attempts` option (`GEOMETRY_BUDGET_TUNE_ATTEMPTS = 2` for the ladder).
+- **Cost.** Generation about 1.2 to 1.8 times the mean and a worst build of at most 393 ms at a 4x CPU throttle (headless Chromium, two interleaved runs; before at most 369 apart from two outlier readings of 587 and 1727). The calibration script (ceiling 760, fringe cap 70) still measures a lure-free base and is unchanged.
+- **Reshuffle.** Golden fixture: level 1 identical; 592 of the 598 other hashes changed (the 6 unchanged are levels that were already lured mazes on main: phone 281, 282, 289, 299; desktop 281, 299). Every player's mazes at levels 2 to 300 are different mazes at the same difficulty.
+- **Guide.** No wording changes; the Levels and Wrap rows stay true.
+
+<details><summary>Superseded: 2026-11-10 mastery tier (levels 269..388), as it stood</summary>
+
+### 2026-11-10 Mastery tier (levels 269..388): reverse-solve resistance, saturation moves to 388
 
 Product direction unchanged: board and tile size frozen, difficulty from maze structure, hazards (Phase 2, MAZER-HAZ-002) not built. Source change; modelled difficulty, not player-tested. Evidence, audit and lever table: `docs/research/MAZER_PROGRESSION_FINAL_AUDIT_2026-11-10.md` (+ `.json`).
 
@@ -23,6 +38,9 @@ Product direction unchanged: board and tile size frozen, difficulty from maze st
 - **Hand-off.** `GEOMETRY_BUDGET_SATURATION_LEVEL` and `LAST_BUDGET_LEVEL` are 388; `hazardBudgetLevels = level - 388`; `resolveContinuousDifficulty` adds the regime `mastery` and the field `masteryPermille`. Hazards stay dormant.
 - **Unchanged.** Levels 1-268 byte-identical (golden fixture: levels 281, 282, 288, 289 and 299 changed on both boards). Not applied, owner decision: the lure for levels 2-268 (what-if: reverse felt about 1.6-2 times, 188 hashes reshuffled).
 - **Guide.** No wording changes; the Levels row stays true.
+
+
+</details>
 
 ## 2026-11-10 Past level 198: the fringe (levels 199..268), saturation moves to 268
 

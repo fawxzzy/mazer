@@ -29,14 +29,13 @@
 //     exactly unchanged. The explorer does not enter a stub that short at a junction, so the
 //     felt value does not move while the maze gains junctions and dead ends.
 //
-//  4. MASTERY LURE (only on mastery mazes, levels past the fringe, legacyGeometryBudget.ts). Not an
-//     extra edit but a rule on lever 2: every fork carved straight off the route must also look
-//     closer to the START than the way back along the route (`doubleLure`), so the same explorer
-//     run from the goal end pays for the fork too. The board is fully visible, so a player can
-//     work back from the goal; the forks of the other levels point toward the goal only and cost
-//     that player about half (reverse 430-475 against 759). The lure needs no floor and does not
-//     move the forward number; the finished maze reports its reverse felt value and may be held to
-//     a floor (`reverseFloor`).
+//  4. DOUBLE LURE (every ladder maze from level 2, legacyGeometryBudget.ts). Not an extra edit but a
+//     rule on lever 2: every fork carved straight off the route must also look closer to the START
+//     than the way back along the route (`doubleLure`), so the same explorer run from the goal end
+//     pays for the fork too. The board is fully visible, so a player can work back from the goal;
+//     forks that point toward the goal only cost that player about half (reverse 0.3-0.6 of the
+//     forward number). The lure needs no floor and does not move the forward number; the finished
+//     maze reports its reverse felt value and may be held to a floor (`reverseFloor`).
 //
 // Every move is verified by re-running the explorer on the edited grid (about
 // 20 microseconds), so the landing is exact for the real final grid, wrap loops
@@ -109,7 +108,7 @@ export interface FeltTuningOptions {
   // the full count reports it in fringeShortfall (and a window distance of at least that), so
   // the selection tries the next base. Omit or 0: byte-identical to the tuner without the lever.
   readonly fringeCells?: number;
-  // Mastery maze (lever 4, levels past the fringe, legacyGeometryBudget.ts): every fork carved
+  // Double lure (lever 4, every ladder maze, legacyGeometryBudget.ts): every fork carved
   // straight off the route must also point toward the START (it has to look closer to the start
   // than the way back along the route), on top of the goal-ward lure every route fork already
   // has. A solver who works from the goal end then pays for those forks too, which the forward
@@ -120,6 +119,11 @@ export interface FeltTuningOptions {
   // same priced savings). A maze below it reports the shortfall in `windowDistance` (so the
   // restarts and then the next base are tried). 0 or omitted: no floor.
   readonly reverseFloor?: number;
+  // Restarts from the untouched base with another stream (default FELT_TUNING_ATTEMPTS). A caller
+  // that has another base to try (the ladder selection) passes fewer: a restart of a base that
+  // missed its window or its floor rescues it only about one time in ten, a new base more often
+  // and for the same cost.
+  readonly attempts?: number;
 }
 
 export interface FeltTuningResult {
@@ -283,7 +287,7 @@ const tuneOnce = (
     const dy = Math.min(Math.abs(y - maze.start.y), height - Math.abs(y - maze.start.y));
     return (dx * dx) + (dy * dy);
   };
-  // Mastery maze (lever 4): every fork carved straight off the route points toward the goal AND
+  // Double lure (lever 4): every fork carved straight off the route points toward the goal AND
   // toward the start, so the explorer pulled from the goal end pays for it too.
   const doubleLure = options.doubleLure === true;
   const reverseFloor = Math.max(0, Math.trunc(options.reverseFloor ?? 0));
@@ -654,7 +658,7 @@ const tuneOnce = (
           if (run.onPath[chosen] === 1) {
             const next = run.pathNext[chosen]!;
             if (next < 0 || dist2(entry) >= dist2(next)) { continue; }
-            // Mastery lure: the fork must also look closer to the START than the way back along
+            // Double lure: the fork must also look closer to the START than the way back along
             // the route, so a solver working from the goal end is drawn into it as well.
             if (doubleLure) {
               let prev = -1;
@@ -852,7 +856,8 @@ export const tuneMazeFeltToTarget = (
   options: FeltTuningOptions = {}
 ): FeltTuningResult => {
   let best: FeltTuningResult | null = null;
-  for (let attempt = 0; attempt < FELT_TUNING_ATTEMPTS; attempt += 1) {
+  const attempts = Math.max(1, Math.trunc(options.attempts ?? FELT_TUNING_ATTEMPTS));
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     const result = tuneOnce(maze, target, (Math.imul(seed >>> 0, 0x2545f491) + Math.imul(attempt, 0x9e3779b1)) >>> 0, options);
     // Closer to the window wins; among landed mazes the one whose number is least a coin flip.
     if (best === null
@@ -864,7 +869,6 @@ export const tuneMazeFeltToTarget = (
     if (result.onTarget && result.tieDeviationPercent <= FELT_TIE_DEVIATION_LIMIT_PERCENT) { break; }
     // A plain maze has no tie to flip: do not spend restarts on it.
     if (result.onTarget && result.loops.length === 0) { break; }
-    if (result.capacityExhausted && attempt >= 5) { break; }
   }
   return best!;
 };

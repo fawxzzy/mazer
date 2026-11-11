@@ -6,11 +6,13 @@ import {
   GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
   GEOMETRY_BUDGET_FRINGE_CAP,
   GEOMETRY_BUDGET_FRINGE_END_LEVEL,
-  GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR,
+  GEOMETRY_BUDGET_REVERSE_FLOOR_PERMILLE,
+  GEOMETRY_BUDGET_REVERSE_FLOOR_WRAP_PERMILLE,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
-  resolveGeometryBudgetMastery,
   resolveGeometryBudgetFringeCells,
+  resolveGeometryBudgetReverseFloor,
   GEOMETRY_BUDGET_WINDOW,
+  GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL,
   resolveGeometryBudgetTarget
 } from '../../src/legacy-runtime/legacyGeometryBudget';
 import {
@@ -21,7 +23,7 @@ import {
   resolveGeometryBudgetLevel,
   resolveLegacyMazeGenerationProfileForProgression
 } from '../../src/legacy-runtime/legacyProgression';
-import { measureFelt } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
+import { measureFelt, measurePricedFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 import {
   generateLadderMaze,
@@ -118,66 +120,90 @@ const reverseFeltOf = (maze: ReturnType<typeof generateLadderMaze>): number => {
   return measureFelt({ ...maze, start: maze.goal, goal: maze.start }).steps - saved;
 };
 
-describe('progression ladder: the mastery tier raises the reverse-solve cost from the end of the fringe to the saturation level', () => {
-  const sampleSeeds = Array.from({ length: 24 }, (_, index) => seedForIndex(index + 3));
+// Ladder v2 (2026-11-11): the double lure applies to every maze of every level from 2 (it was a
+// mastery tier past level 268), and every maze is held to a reverse floor. The documented floor
+// per band, as a permille of the level's forward target (legacyGeometryBudget.ts):
+//   levels 2..9 and 140..268, a maze with no wrap corridor: 975 (740 at the top class)
+//   levels 10..139, a maze that owns a wrap corridor:        400
+const FLOOR_BANDS = [
+  { name: 'plain 2-9', levels: [2, 3, 5, 9], wrapped: false, permille: 975 },
+  { name: 'wrapped 10-139', levels: [10, 12, 20, 30, 50, 100, 120, 139], wrapped: true, permille: 400 },
+  { name: 'plain 140-268', levels: [140, 160, 198, 220, 268], wrapped: false, permille: 975 }
+] as const;
+// Mean reverse felt of the ladder before the lure (docs/research/MAZER_PROGRESSION_FINAL_AUDIT_2026-11-10.md,
+// "What if the lure covered levels 2 to 268", forced-off column), phone / desktop, 40 seeds.
+const REVERSE_FELT_BEFORE_THE_LURE: Record<number, readonly [number, number]> = {
+  30: [118, 157], 100: [188, 195], 150: [372, 394], 198: [461, 437]
+};
 
-  test('levels up to the end of the fringe have no mastery maze and carry no mastery stats; mastery mazes keep the felt window and the full fringe', () => {
-    for (const board of LADDER_BOARDS) {
-      const plain = generateLadderMaze(GEOMETRY_BUDGET_FRINGE_END_LEVEL, board, seedForIndex(0));
-      expect((plain as LegacyMazeSnapshot).masteryStats).toEqual(expect.objectContaining({ mastery: false }));
-      const early = generateLadderMaze(FELT_SAT + 5, board, seedForIndex(0));
-      expect((early as LegacyMazeSnapshot).masteryStats).toEqual(expect.objectContaining({ mastery: false }));
-      const below = generateLadderMaze(FELT_SAT - 1, board, seedForIndex(0));
-      expect((below as LegacyMazeSnapshot).masteryStats).toBeUndefined();
-      for (const level of [GEOMETRY_BUDGET_FRINGE_END_LEVEL + 40, SAT]) {
-        for (const seed of sampleSeeds.slice(0, 8)) {
-          const sample = sampleLevel(level, board, seed);
-          expect(sample.onTarget).toBe(true);
-          expect(sample.felt).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_TOP_TARGET);
-          expect(sample.felt).toBeLessThanOrEqual(GEOMETRY_BUDGET_TOP_TARGET + GEOMETRY_BUDGET_WINDOW);
-          expect(sample.fringeCells).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
-        }
-      }
-    }
-  }, 120_000);
+describe('progression ladder v2: the double lure on every level from 2, and the reverse floor', () => {
+  const sampleSeeds = Array.from({ length: 12 }, (_, index) => seedForIndex(index + 3));
 
-  test('every mastery maze is held to the reverse floor, and from the saturation level every maze is one', () => {
+  test('every sampled level 2..268 on both boards: lured, forward felt in its window, reverse felt at or above the documented floor of its band', () => {
     for (const board of LADDER_BOARDS) {
-      for (const level of [GEOMETRY_BUDGET_FRINGE_END_LEVEL + 60, SAT, 1_000]) {
-        for (const seed of sampleSeeds) {
-          const maze = generateLadderMaze(level, board, seed);
-          const stats = (maze as LegacyMazeSnapshot).masteryStats!;
-          expect(stats.mastery).toBe(resolveGeometryBudgetMastery(level, seed));
-          if (level >= SAT) { expect(stats.mastery).toBe(true); }
-          if (stats.mastery) {
-            expect(stats.reverseFelt).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR);
+      for (const band of FLOOR_BANDS) {
+        for (const level of band.levels) {
+          let wrappedCount = 0;
+          for (const seed of sampleSeeds.slice(0, 6)) {
+            const maze = generateLadderMaze(level, board, seed);
+            const stats = (maze as LegacyMazeSnapshot).reverseStats;
+            // Every ladder maze carries the stats: nothing generates through the old, un-lured path.
+            expect(stats).toBeDefined();
+            const rungs = (maze as LegacyMazeSnapshot).wrapStats?.rungs ?? 0;
+            // Wrap rules are unchanged: no wrap corridor below level 10 or from level 140 on.
+            if (level < 10 || level >= GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL) { expect(rungs).toBe(0); }
+            const wrapped = rungs > 0;
+            wrappedCount += wrapped ? 1 : 0;
+            // A maze is held to the floor of the wrap corridors it actually owns (the rare maze of a
+            // wrapped band that fell back to a plain base is held to the plain floor).
+            const target = resolveGeometryBudgetTarget(level)!;
+            expect(stats!.floor).toBe(resolveGeometryBudgetReverseFloor(level, rungs));
+            const permille = wrapped ? GEOMETRY_BUDGET_REVERSE_FLOOR_WRAP_PERMILLE : GEOMETRY_BUDGET_REVERSE_FLOOR_PERMILLE;
+            expect(stats!.floor).toBe(Math.floor((target * permille) / 1000));
+            // The documented floor of the band (permille of the target), as a minimum.
+            expect(stats!.floor).toBeGreaterThanOrEqual(Math.floor((target * Math.min(band.permille, permille)) / 1000));
+            expect(stats!.reverseFelt).toBeGreaterThanOrEqual(stats!.floor);
             // The recorded number is the real one, measured again from the finished grid.
-            expect(reverseFeltOf(maze)).toBe(stats.reverseFelt);
+            expect(reverseFeltOf(maze)).toBe(stats!.reverseFelt);
+            // The lure does not move the forward number.
+            const forward = measurePricedFeltSteps(maze);
+            expect(forward).toBeGreaterThanOrEqual(target);
+            expect(forward).toBeLessThanOrEqual(target + GEOMETRY_BUDGET_WINDOW);
           }
+          // Levels 10..99 keep their band's wrap corridors (measured: 99.5 to 100 percent up to level 60,
+          // 94 to 97 at level 100 after the lure, the rest fell back to plain bases; all of them before).
+          if (band.wrapped && level <= 99) { expect(wrappedCount).toBeGreaterThanOrEqual(5); }
+        }
+      }
+    }
+  }, 240_000);
+
+  test('the old behaviour is gone: mean reverse felt is at least 1.5 times the un-lured ladder\'s at the levels the audit measured', () => {
+    for (const board of LADDER_BOARDS) {
+      const boardIndex = board.name === 'phone' ? 0 : 1;
+      for (const [levelText, before] of Object.entries(REVERSE_FELT_BEFORE_THE_LURE)) {
+        const level = Number(levelText);
+        const values = sampleSeeds.map((seed) => reverseFeltOf(generateLadderMaze(level, board, seed)));
+        const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+        expect(mean).toBeGreaterThanOrEqual(1.5 * before[boardIndex]!);
+      }
+    }
+  }, 240_000);
+
+  test('the plateau class: a level from the end of the fringe on is the same lured class, held to 740 reverse steps (no mastery share, no level past 268 adds one)', () => {
+    for (const board of LADDER_BOARDS) {
+      for (const level of [GEOMETRY_BUDGET_FRINGE_END_LEVEL, 300, 388, 1_000]) {
+        for (const seed of sampleSeeds.slice(0, 6)) {
+          const maze = generateLadderMaze(level, board, seed);
+          const stats = (maze as LegacyMazeSnapshot).reverseStats!;
+          expect(stats.floor).toBe(740);
+          expect(stats.reverseFelt).toBeGreaterThanOrEqual(740);
+          expect((maze as LegacyMazeSnapshot).fringeStats?.cells).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
+          expect((maze as unknown as { masteryStats?: unknown }).masteryStats).toBeUndefined();
         }
       }
     }
   }, 120_000);
-
-  test('the mean reverse-solve cost rises across the tier, and the worst reverse-solve rises once every maze is a mastery maze', () => {
-    for (const board of LADDER_BOARDS) {
-      const means: number[] = [];
-      const levels = [GEOMETRY_BUDGET_FRINGE_END_LEVEL, GEOMETRY_BUDGET_FRINGE_END_LEVEL + 30, GEOMETRY_BUDGET_FRINGE_END_LEVEL + 60, GEOMETRY_BUDGET_FRINGE_END_LEVEL + 90, SAT];
-      for (const level of levels) {
-        const values = sampleSeeds.map((seed) => reverseFeltOf(generateLadderMaze(level, board, seed)));
-        means.push(values.reduce((sum, value) => sum + value, 0) / values.length);
-        if (level === SAT) {
-          // Every maze is a mastery maze there: the worst one still pays the floor, the plain class's worst does not.
-          expect(Math.min(...values)).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR);
-        }
-      }
-      for (let index = 1; index < means.length; index += 1) {
-        expect(means[index]!).toBeGreaterThan(means[index - 1]!);
-      }
-      // Measured: about 430-445 at the end of the fringe and 750+ at the saturation level.
-      expect(means[means.length - 1]! - means[0]!).toBeGreaterThan(200);
-    }
-  }, 180_000);
 });
 
 describe('progression ladder: beyond the hard ceiling', () => {

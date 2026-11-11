@@ -2,6 +2,10 @@
 
 Scope: how difficulty scales across levels 1..300 on the two frozen boards (phone 25 x 51, desktop 45 x 27), measured before (main `8cf9bd67`) and after the multiple-routes change, with several independent gauges instead of the one number the generator steers on. Source of truth for the design is the "2026-11-10 Multiple routes" section of `docs/research/MAZER_LEVEL_RANK_COMPLEXITY_CONTRACT.md`. Everything here is modelled difficulty (walkers), not player-tested.
 
+## Update 2026-11-11: ladder v2 (the lure on levels 2 to 268, the mastery tier removed)
+
+Superseded again: the double lure applies to every level from 2 and the plateau is level 268 again (the mastery tier below is gone). Before/after gauges (forward, reverse, two-way human-like, random walk at levels 1 to 388) are in "Ladder v2" of `docs/research/MAZER_PROGRESSION_FINAL_AUDIT_2026-11-10.md`; `progression-gauges.ts` bands end with `L268+`.
+
 ## Update: mastery tier (levels 269..388) and the reverse-solve audit
 
 Superseded in part by `docs/research/MAZER_PROGRESSION_FINAL_AUDIT_2026-11-10.md`: the plateau described below as level 268 is now level 388, because the maze is also measured from the goal end (reverse felt) and the last 120 levels raise it; new gauges `reversePricedSteps`, `twoWayPricedSteps`, `reverseHumanSteps` and `twoWayHumanSteps` are in `lib/mazeGauges.ts`.
