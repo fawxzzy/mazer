@@ -1,12 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
-  BACKDROP_DECORATIVE_GLYPHS_ENABLED,
   BACKDROP_HERO_STAR_CORE_PX,
   BACKDROP_STAR_FIELD_SEED,
   BACKDROP_STAR_SIZE_MAX,
   BACKDROP_STAR_SIZE_MIN,
-  BACKDROP_STAR_TAILS_ENABLED,
   BACKDROP_STAR_TWINKLE_FLOOR,
   createBackdropStarRandom,
   resolveBackdropStarDraw,
@@ -14,6 +11,16 @@ import {
   resolveBackdropTwinkleSize
 } from '../../src/render/backdropStars';
 import { createLegacyMenuBackdropStars } from '../../src/legacy-runtime/legacyMenuBackdrop';
+import { MenuScene } from '../../src/scenes/MenuScene';
+
+vi.mock('phaser', () => ({
+  default: {
+    AUTO: 'AUTO',
+    Math: { Clamp: (v: number, a: number, b: number) => Math.max(a, Math.min(b, v)), Linear: (a: number, b: number, t: number) => a + ((b - a) * t) },
+    Scale: { RESIZE: 'RESIZE', CENTER_BOTH: 'CENTER_BOTH' },
+    Scene: class {}
+  }
+}));
 
 /**
  * Owner, 2026-11-10 (live phone board): "no more stagnant stars in the background" (the coloured four-point sparkles
@@ -58,29 +65,31 @@ describe('backdrop stars: every star is drawn as a round point of light, nothing
     }
   });
 
-  test('the glyph decorations and the one-pixel warp tails stay switched off', () => {
-    expect(BACKDROP_DECORATIVE_GLYPHS_ENABLED).toBe(false);
-    expect(BACKDROP_STAR_TAILS_ENABLED).toBe(false);
-  });
+  test.each([true, false])('MenuScene.drawBackdrop draws only the field, round dots and hero halos (motion %s)', (motion) => {
+    const calls: string[] = [];
+    const graphics = new Proxy({}, {
+      get: (_target, name: string) => (...args: unknown[]) => {
+        calls.push(name);
+        return args[0];
+      }
+    });
+    const fakeScene = {
+      layout: { width: 390, height: 844 },
+      backdropGraphics: graphics,
+      settings: { darkMode: true, toggleAnimatedBackdrop: motion },
+      prefersLegacyReducedMotion: () => false,
+      time: { now: 1234 },
+      stars: createLegacyMenuBackdropStars(createBackdropStarRandom()),
+      backdropDirty: true
+    };
 
-  test('MenuScene.drawBackdrop gates every glyph decoration and routes every star through the policy', () => {
-    const source = readFileSync('src/scenes/MenuScene.ts', 'utf8');
-    const start = source.indexOf('private drawBackdrop(): void {');
-    const end = source.indexOf('private installLegacyReducedMotionPreference', start);
-    expect(start).toBeGreaterThan(0);
-    const body = source.slice(start, end);
-    const gate = body.indexOf('if (BACKDROP_DECORATIVE_GLYPHS_ENABLED) {');
-    expect(gate).toBeGreaterThan(0);
-    for (const call of ['drawLegacyBackdropShard(', 'drawLegacyBackdropRune(', 'drawLegacyBackdropSigils(']) {
-      const at = body.indexOf(call);
-      expect(at, call).toBeGreaterThan(gate);
-      expect(at, call).toBeLessThan(body.indexOf('for (const star of this.stars)'));
-    }
-    expect(body).toContain('resolveBackdropStarDraw(coreSize)');
-    expect(body).not.toContain("=== 'none'");
-    const starLoop = body.slice(body.indexOf('for (const star of this.stars)'));
-    expect(starLoop).not.toContain('drawLegacyFourPointSparkle');
-    expect(starLoop).not.toContain('HSVToRGB');
-    expect(starLoop).toContain('BACKDROP_STAR_TAILS_ENABLED &&');
+    (MenuScene.prototype as unknown as { drawBackdrop(): void }).drawBackdrop.call(fakeScene);
+
+    const allowed = new Set(['clear', 'fillStyle', 'fillRect', 'fillCircle']);
+    expect(calls.filter((name) => !allowed.has(name))).toEqual([]);
+    // One field rect only: no tail pixels, no shard/rune/sigil strokes (those were lineStyle + paths).
+    expect(calls.filter((name) => name === 'fillRect')).toHaveLength(1);
+    expect(calls.filter((name) => name === 'fillCircle').length).toBeGreaterThanOrEqual(fakeScene.stars.length);
+    expect(fakeScene.backdropDirty).toBe(false);
   });
 });

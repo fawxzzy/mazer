@@ -17,22 +17,15 @@
  *    level: the player's own setting asked for stillness, and a dark empty field is the wrong answer to it.
  *  - The star's little one-pixel "warp tail" is gone: at phone pixel density it was a separate stray mark beside every
  *    dot and read as a speck or a symbol, not as speed. Motion is carried by the drift itself.
- *  - The decorative glyphs in the backdrop (angular glass shards with notched rails, the drifting rune strokes and
- *    the four corner sigils) are not drawn any more. Owner, 2026-11-10: "there's weird symbols in the background that
- *    need removed". The pure generators stay in legacyMenuBackdrop.ts (they are tested and a future theme could use
- *    them); only the scene's drawing of them is switched off here, in one place.
+ *  - The decorative glyphs (angular glass shards, drifting rune strokes, corner sigils) were removed outright (owner,
+ *    2026-11-10: "there's weird symbols in the background that need removed"; MAZER-VIS-017 deleted the dead drawing
+ *    code and generators). The backdrop draws only dots and hero stars.
  */
 
 /** A star whose rounded core is at least this many px wide is a "hero" star (soft halo). */
 export const BACKDROP_HERO_STAR_CORE_PX = 3;
 
 export type BackdropStarDraw = 'dot' | 'hero';
-
-/** The scene draws the shards, the drift runes and the corner sigils only when this is true. It is not. */
-export const BACKDROP_DECORATIVE_GLYPHS_ENABLED = false;
-
-/** The scene draws the one-pixel warp tail behind a star only when this is true. It is not. */
-export const BACKDROP_STAR_TAILS_ENABLED = false;
 
 /** Twinkle floor: a star at the dim end of its cycle keeps this share of its alpha, so none ever vanishes. */
 export const BACKDROP_STAR_TWINKLE_FLOOR = 0.34;
