@@ -770,7 +770,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('createLegacyMenuBackdropStars');
     expect(menuSceneSource).toContain('advanceLegacyMenuBackdropStars');
     expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
-    expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars().slice(0, LEGACY_MENU_STAR_COUNT);');
+    expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars(createBackdropStarRandom()).slice(0, LEGACY_MENU_STAR_COUNT);');
     expect(menuSceneSource).not.toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
     expect(menuSceneSource).toContain('if (this.stars.length === 0 || !this.settings.toggleAnimatedBackdrop || this.prefersLegacyReducedMotion()) {');
     expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(cyberArcadeMaterial.substrate.field, 1);');
