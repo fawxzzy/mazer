@@ -54,9 +54,11 @@ readback):
   file itself exists on `origin/main` and is part of `npm test`.
 - Board: `config/mazer-owner-work-registry.json` records
   `MAZER-CYBERDECK-001` as `deferred_candidate` (research retained as planning
-  evidence) and `MAZER-DOCS-001` (land this document) as `blocked` on it. The
-  registry entry is not modified by this document. No implementation board card
-  is activated by this planning packet.
+  evidence) and `MAZER-DOCS-001` (land this document) as `review`: this document
+  is merged (PR #405) but not deployed, and one acceptance item is still open
+  (reconcile it with the Cyberdeck research card; `MAZER-CYBERDECK-001` stays a
+  dependency). The registry entry is not modified by this document. No
+  implementation board card is activated by this planning packet.
 - Web v1 is not released: `package.json` is still `"version": "0.1.0"`, and
   `docs/roadmap.md` (Phase order, November 2026) puts finishing Phase 1
   (visuals, progression, flow) before Phase 2 (obstacles and enemies); coins,
