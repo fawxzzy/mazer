@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_d8713ab4ea2e",
+  "export_id": "pbe_mazer_owner_registry_616f89f64065",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:d8713ab4ea2ee6f58f63313c2a00a0ec6c277baeff186b03374b5b4fdf93d5bf",
-  "generated_at": "2026-11-10T22:00:00.000Z",
+  "source_revision": "sha256:616f89f64065018874d5d334ce477562628afdae45f0515db83453be3aeba58a",
+  "generated_at": "2026-11-10T23:00:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:3ab0a4e616c2137cd7e25211feb5dc6ebf1277e0790b36f2256dff2a50ab069f",
-      "observed_at": "2026-11-10T22:00:00.000Z"
+      "revision": "sha256:49cf0a42d818439d230ed2ab1f5cba14a891b48af55c73f84c86c2f92afb3847",
+      "observed_at": "2026-11-10T23:00:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:cf449f029f222cb43fa0f57015bfac1db6d3f7b3bb9b74665ee35759cfb1afdd",
-      "observed_at": "2026-11-10T22:00:00.000Z"
+      "observed_at": "2026-11-10T23:00:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-10T22:00:00.000Z"
+      "observed_at": "2026-11-10T23:00:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-10T22:00:00.000Z"
+      "observed_at": "2026-11-10T23:00:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-10T22:00:00.000Z"
+      "observed_at": "2026-11-10T23:00:00.000Z"
     }
   ],
   "cards": [
@@ -1972,6 +1972,57 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-flow-013_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-FLOW-013",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "AI and play marker glide at steady speed instead of per-step eased tweens",
+        "description": "The AI and play marker used a separate eased tween per step, so speed pulsed along a straight run. PR #414 (merge e35e814e) replaces them with continuous steady-speed motion; the menu demo walker speed variation went from 0.69 to 0.12 in headless measurement. Merged and deployed to production (main a983f2de, Ready). Checked only in headless Chromium, not on a real phone or an installed app.",
+        "card_type": "feature",
+        "lifecycle": "completed",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-10T00:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-013",
+        "extensions": {
+          "owner_status": "completed",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-013",
+        "source_status": "current",
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
+      },
+      "content": {
+        "summary": "The AI and play marker used a separate eased tween per step, so speed pulsed along a straight run. PR #414 (merge e35e814e) replaces them with continuous steady-speed motion; the menu demo walker speed variation went from 0.69 to 0.12 in headless measurement. Merged and deployed to production (main a983f2de, Ready). Checked only in headless Chromium, not on a real phone or an installed app.",
+        "objective": "The AI and play marker used a separate eased tween per step, so speed pulsed along a straight run. PR #414 (merge e35e814e) replaces them with continuous steady-speed motion; the menu demo walker speed variation went from 0.69 to 0.12 in headless measurement. Merged and deployed to production (main a983f2de, Ready). Checked only in headless Chromium, not on a real phone or an installed app.",
+        "acceptance_criteria": [
+          "Marker speed is steady along a run",
+          "Menu demo walker speed variation is measured and recorded (0.69 to 0.12 headless)",
+          "Real-device smoothness is not yet verified"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-gen-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -3800,7 +3851,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Decide what happens past level 198 so levels keep getting harder",
-        "description": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever. Measured 2026-11-10: the explorer number cannot rise further because the board is at its 50 percent floor limit, so MAZER-PROG-013 (completed) extended the ladder to level 268 with zero-felt-cost side stubs and MAZER-PROG-014 (review) extends it to level 388 with mazes that are also hard to solve from the goal end, then declares the plateau there. What stays open is the lever after level 388: sign the hazard contract (MAZER-HAZ-002, hazardBudgetLevels starts at 388) or, only if hazards are rejected, a bigger board past a level, which is the zoom lever the owner ruled out. The owner wants levels to keep getting harder forever, so this decision cannot be settled by generation alone.",
+        "description": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever. Measured 2026-11-10: the explorer number cannot rise further because the board is at its 50 percent floor limit, so MAZER-PROG-013 (completed) extended the ladder to level 268 with zero-felt-cost side stubs and MAZER-PROG-014 (completed) extended it to level 388 with mazes that are also hard to solve from the goal end, then declares the plateau there. What stays open is the lever after level 388: sign the hazard contract (MAZER-HAZ-002, hazardBudgetLevels starts at 388) or, only if hazards are rejected, a bigger board past a level, which is the zoom lever the owner ruled out. The owner wants levels to keep getting harder forever, so this decision cannot be settled by generation alone.",
         "card_type": "feature",
         "lifecycle": "planning",
         "priority": "high",
@@ -3823,8 +3874,8 @@
         "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever. Measured 2026-11-10: the explorer number cannot rise further because the board is at its 50 percent floor limit, so MAZER-PROG-013 (completed) extended the ladder to level 268 with zero-felt-cost side stubs and MAZER-PROG-014 (review) extends it to level 388 with mazes that are also hard to solve from the goal end, then declares the plateau there. What stays open is the lever after level 388: sign the hazard contract (MAZER-HAZ-002, hazardBudgetLevels starts at 388) or, only if hazards are rejected, a bigger board past a level, which is the zoom lever the owner ruled out. The owner wants levels to keep getting harder forever, so this decision cannot be settled by generation alone.",
-        "objective": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever. Measured 2026-11-10: the explorer number cannot rise further because the board is at its 50 percent floor limit, so MAZER-PROG-013 (completed) extended the ladder to level 268 with zero-felt-cost side stubs and MAZER-PROG-014 (review) extends it to level 388 with mazes that are also hard to solve from the goal end, then declares the plateau there. What stays open is the lever after level 388: sign the hazard contract (MAZER-HAZ-002, hazardBudgetLevels starts at 388) or, only if hazards are rejected, a bigger board past a level, which is the zoom lever the owner ruled out. The owner wants levels to keep getting harder forever, so this decision cannot be settled by generation alone.",
+        "summary": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever. Measured 2026-11-10: the explorer number cannot rise further because the board is at its 50 percent floor limit, so MAZER-PROG-013 (completed) extended the ladder to level 268 with zero-felt-cost side stubs and MAZER-PROG-014 (completed) extended it to level 388 with mazes that are also hard to solve from the goal end, then declares the plateau there. What stays open is the lever after level 388: sign the hazard contract (MAZER-HAZ-002, hazardBudgetLevels starts at 388) or, only if hazards are rejected, a bigger board past a level, which is the zoom lever the owner ruled out. The owner wants levels to keep getting harder forever, so this decision cannot be settled by generation alone.",
+        "objective": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever. Measured 2026-11-10: the explorer number cannot rise further because the board is at its 50 percent floor limit, so MAZER-PROG-013 (completed) extended the ladder to level 268 with zero-felt-cost side stubs and MAZER-PROG-014 (completed) extended it to level 388 with mazes that are also hard to solve from the goal end, then declares the plateau there. What stays open is the lever after level 388: sign the hazard contract (MAZER-HAZ-002, hazardBudgetLevels starts at 388) or, only if hazards are rejected, a bigger board past a level, which is the zoom lever the owner ruled out. The owner wants levels to keep getting harder forever, so this decision cannot be settled by generation alone.",
         "acceptance_criteria": [
           "The behaviour past level 198 is chosen and written down",
           "A deterministic check proves the chosen behaviour is never easier than the level before",
@@ -4268,9 +4319,9 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Mastery tier to level 388: mazes also hard to solve from the goal end",
-        "description": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). The open pull request adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Measured honestly: the ramp is statistical, not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier. Not merged, not deployed, not player-tested, not checked on a device. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
+        "description": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). PR #415 adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Merged (merge 0a69f679) and deployed to production (main a983f2de, Ready). Honest limits: the ceiling is level 388, the ramp is statistical and not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier; no human play-test. Checked only in headless Chromium, not on a real phone or an installed app. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
         "card_type": "feature",
-        "lifecycle": "review",
+        "lifecycle": "completed",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [
@@ -4280,7 +4331,7 @@
         "updated_at": "2026-11-10T00:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-014",
         "extensions": {
-          "owner_status": "review",
+          "owner_status": "completed",
           "public_safe": true
         }
       },
@@ -4291,13 +4342,66 @@
         "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). The open pull request adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Measured honestly: the ramp is statistical, not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier. Not merged, not deployed, not player-tested, not checked on a device. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
-        "objective": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). The open pull request adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Measured honestly: the ramp is statistical, not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier. Not merged, not deployed, not player-tested, not checked on a device. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
+        "summary": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). PR #415 adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Merged (merge 0a69f679) and deployed to production (main a983f2de, Ready). Honest limits: the ceiling is level 388, the ramp is statistical and not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier; no human play-test. Checked only in headless Chromium, not on a real phone or an installed app. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
+        "objective": "Final audit of the progression engine on the frozen boards, without hazards. Finding: the ladder number is an explorer walking from the start, but the board is fully visible, so the same explorer walking from the goal pays only 0.3 to 0.6 of it on every level (475 against 759 at level 198 on the phone board). PR #415 adds a mastery tier for levels 269 to 388: route forks also point toward the start, so the goal end is just as deceptive, with no extra floor and the forward number unchanged. The share of such mazes rises by 1/120 per level to all mazes at level 388, each held to at least 740 steps from the goal end (measured 430 to 475 before, about 760 after). Levels 1 to 268 are byte-identical; the plateau and the hazard hand-off move from 268 to 388. Merged (merge 0a69f679) and deployed to production (main a983f2de, Ready). Honest limits: the ceiling is level 388, the ramp is statistical and not ordered for any two seeds; generation costs about 1.5 times the plateau class and about one desktop mastery build in twenty passed the 400 ms target at a 4x CPU throttle; the phone random walk reads 24 percent easier; no human play-test. Checked only in headless Chromium, not on a real phone or an installed app. Past 388 nothing on this board gets harder without hazards (MAZER-HAZ-002) or a bigger board.",
         "acceptance_criteria": [
           "Levels 1 to 268 generate the same mazes as before and the golden fixture changes only above level 268",
           "Every mastery maze keeps the forward window and 70 side stubs and takes at least 740 steps from the goal end",
           "The mean cost from the goal end rises across levels 268 to 388 and the ceiling at level 388 is documented",
           "Menu AI clears every level on both boards"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-prog-015_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PROG-015",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Apply the double-lure lever to levels 2-268 (owner decision needed)",
+        "description": "Option: apply the double-lure lever from the mastery tier to levels 2 to 268. Reverse difficulty would roughly double, no new levels are added, and every existing level hash for those levels is reshuffled. Not started; needs an owner decision because it changes every existing level.",
+        "card_type": "feature",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-PROG-014"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-10T00:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-015",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-015",
+        "source_status": "current",
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
+      },
+      "content": {
+        "summary": "Option: apply the double-lure lever from the mastery tier to levels 2 to 268. Reverse difficulty would roughly double, no new levels are added, and every existing level hash for those levels is reshuffled. Not started; needs an owner decision because it changes every existing level.",
+        "objective": "Option: apply the double-lure lever from the mastery tier to levels 2 to 268. Reverse difficulty would roughly double, no new levels are added, and every existing level hash for those levels is reshuffled. Not started; needs an owner decision because it changes every existing level.",
+        "acceptance_criteria": [
+          "Owner decision recorded",
+          "If approved: levels 2 to 268 gain reverse-solve resistance and the golden fixture is regenerated",
+          "If rejected: card is closed with the reason"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -7031,6 +7135,215 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-vis-015_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-015",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Fix image and vector misalignment: whole-pixel placement and camera origin",
+        "description": "Reported: the end star sat off centre and the trail and player glow jumped as they moved. Root cause: Phaser rounds image positions to whole pixels but not vector graphics, plus a half-pixel camera offset on odd-width viewports; the end star was 2 device pixels off centre at 2.625 and 2.75 pixel ratios and the trail and player glow jumped a CSS pixel as they moved. PR #416 (merge a983f2de) places images on whole pixels, sets the camera origin to 0,0 and snaps the bake margins and maze origin to whole pixels. Merged and deployed to production (Ready, live bundle verified to contain the new code). Checked only in headless Chromium at several viewport sizes and pixel ratios, not on a real phone or an installed app.",
+        "card_type": "bug",
+        "lifecycle": "completed",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-10T00:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-015",
+        "extensions": {
+          "owner_status": "completed",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-015",
+        "source_status": "current",
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
+      },
+      "content": {
+        "summary": "Reported: the end star sat off centre and the trail and player glow jumped as they moved. Root cause: Phaser rounds image positions to whole pixels but not vector graphics, plus a half-pixel camera offset on odd-width viewports; the end star was 2 device pixels off centre at 2.625 and 2.75 pixel ratios and the trail and player glow jumped a CSS pixel as they moved. PR #416 (merge a983f2de) places images on whole pixels, sets the camera origin to 0,0 and snaps the bake margins and maze origin to whole pixels. Merged and deployed to production (Ready, live bundle verified to contain the new code). Checked only in headless Chromium at several viewport sizes and pixel ratios, not on a real phone or an installed app.",
+        "objective": "Reported: the end star sat off centre and the trail and player glow jumped as they moved. Root cause: Phaser rounds image positions to whole pixels but not vector graphics, plus a half-pixel camera offset on odd-width viewports; the end star was 2 device pixels off centre at 2.625 and 2.75 pixel ratios and the trail and player glow jumped a CSS pixel as they moved. PR #416 (merge a983f2de) places images on whole pixels, sets the camera origin to 0,0 and snaps the bake margins and maze origin to whole pixels. Merged and deployed to production (Ready, live bundle verified to contain the new code). Checked only in headless Chromium at several viewport sizes and pixel ratios, not on a real phone or an installed app.",
+        "acceptance_criteria": [
+          "Image and vector layers share the same whole-pixel grid at fractional pixel ratios",
+          "The end star is centred on its cell at 2.625 and 2.75 pixel ratios",
+          "Trail and player glow no longer jump while moving",
+          "Raster baselines refreshed"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-016_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-016",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Dock pulse takes trail head colour; backdrop stars restored, shards and runes off",
+        "description": "Visual cleanup in PR #416 (merge a983f2de). The bleed-off dock pulse now uses the trail head colour (the same function as the edge diamonds) and is centred on the cell. Backdrop stars are restored: every star is drawn as a round point of light with a deterministic start layout and no tails. Backdrop shards, drift runes and corner sigils are no longer drawn (the drawing code is still in the source, see MAZER-VIS-017). Merged and deployed to production (Ready). Checked only in headless Chromium, not on a real phone or an installed app.",
+        "card_type": "feature",
+        "lifecycle": "completed",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-VIS-015"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-10T00:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-016",
+        "extensions": {
+          "owner_status": "completed",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-016",
+        "source_status": "current",
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
+      },
+      "content": {
+        "summary": "Visual cleanup in PR #416 (merge a983f2de). The bleed-off dock pulse now uses the trail head colour (the same function as the edge diamonds) and is centred on the cell. Backdrop stars are restored: every star is drawn as a round point of light with a deterministic start layout and no tails. Backdrop shards, drift runes and corner sigils are no longer drawn (the drawing code is still in the source, see MAZER-VIS-017). Merged and deployed to production (Ready). Checked only in headless Chromium, not on a real phone or an installed app.",
+        "objective": "Visual cleanup in PR #416 (merge a983f2de). The bleed-off dock pulse now uses the trail head colour (the same function as the edge diamonds) and is centred on the cell. Backdrop stars are restored: every star is drawn as a round point of light with a deterministic start layout and no tails. Backdrop shards, drift runes and corner sigils are no longer drawn (the drawing code is still in the source, see MAZER-VIS-017). Merged and deployed to production (Ready). Checked only in headless Chromium, not on a real phone or an installed app.",
+        "acceptance_criteria": [
+          "Dock pulse colour matches the trail head colour and is centred on the cell",
+          "Backdrop stars are round points of light with a deterministic layout and no tails",
+          "Shards, runes and sigils are not drawn"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-017_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-017",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Purge the disabled backdrop glyph drawing code and its pinned source-string tests",
+        "description": "Backdrop shards, drift runes and corner sigils stopped being drawn in PR #416 but their drawing code and the tests that pin its source strings are still in the tree. Plan: delete the dead code and the source-string tests, keep the star path. Not started.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-VIS-016"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-10T00:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-017",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-017",
+        "source_status": "current",
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
+      },
+      "content": {
+        "summary": "Backdrop shards, drift runes and corner sigils stopped being drawn in PR #416 but their drawing code and the tests that pin its source strings are still in the tree. Plan: delete the dead code and the source-string tests, keep the star path. Not started.",
+        "objective": "Backdrop shards, drift runes and corner sigils stopped being drawn in PR #416 but their drawing code and the tests that pin its source strings are still in the tree. Plan: delete the dead code and the source-string tests, keep the star path. Not started.",
+        "acceptance_criteria": [
+          "Shard, rune and sigil drawing code is removed",
+          "Source-string tests that pin the removed code are removed or rewritten",
+          "Star backdrop behaviour and raster baselines are unchanged"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-018_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-018",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Trail colour reported static on the owner phone: not reproduced, needs device data",
+        "description": "The owner reports the trail colour looks static on the phone. Headless runs do not reproduce it: the colour at a fixed point changes strongly every 250 ms. Not fixed and not confirmed as a defect. Needs the phone model plus the Trail Shine and Reduce Motion settings from the owner, or a real-device check. Not started.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-10T00:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-018",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-018",
+        "source_status": "current",
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
+      },
+      "content": {
+        "summary": "The owner reports the trail colour looks static on the phone. Headless runs do not reproduce it: the colour at a fixed point changes strongly every 250 ms. Not fixed and not confirmed as a defect. Needs the phone model plus the Trail Shine and Reduce Motion settings from the owner, or a real-device check. Not started.",
+        "objective": "The owner reports the trail colour looks static on the phone. Headless runs do not reproduce it: the colour at a fixed point changes strongly every 250 ms. Not fixed and not confirmed as a defect. Needs the phone model plus the Trail Shine and Reduce Motion settings from the owner, or a real-device check. Not started.",
+        "acceptance_criteria": [
+          "Phone model and Trail Shine and Reduce Motion settings are recorded",
+          "Cause is reproduced or ruled out on a real device",
+          "A fix or a documented no-defect finding is recorded"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-world-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -7086,10 +7399,10 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 135,
-    "exported_public_card_count": 135,
-    "exported_open_card_count": 60,
-    "exported_completed_card_count": 60,
+    "stable_identity_count": 141,
+    "exported_public_card_count": 141,
+    "exported_open_card_count": 62,
+    "exported_completed_card_count": 64,
     "exported_deferred_card_count": 15,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
