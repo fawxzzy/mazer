@@ -32,6 +32,7 @@ import { BOARD_MARKER_MIN_CSS, BOARD_TILE_GEOMETRY, boardMaterial, type BoardTil
 import { drawGoalBeacon } from '../render/goalBeacon';
 import { alignBoundsToWholePixels, alignCameraToWholePixels } from '../render/pixelAlignment';
 import { PlayerLocatorState, drawPlayerLocator } from '../render/playerLocator';
+import { PlayerGlide } from '../render/playerGlide';
 import { drawTrailLayersToCanvasContext, type TrailLayerSegment } from '../render/trailLayersCanvas';
 import {
   TRAIL_FADE_ALPHA_MIN,
@@ -1460,7 +1461,6 @@ const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = 144;
 // than smooth motion. A slower tween still feels responsive for a maze
 // but gives the eye enough frames to actually perceive the glide.
 const LEGACY_PLAY_PLAYER_VISUAL_MOVE_MS = 190;
-const LEGACY_MENU_PLAYER_VISUAL_MOVE_MS = 150;
 const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
 const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.46;
@@ -2102,12 +2102,7 @@ export class MenuScene extends Phaser.Scene {
   private stars: LegacyMenuBackdropStar[] = [];
   private layout!: LegacyMenuLayout;
   private hudTouchControlBounds: VisualRect | null = null;
-  private playerVisualMotion: {
-    durationMs: number;
-    from: LegacyPoint;
-    startedAtMs: number;
-    to: LegacyPoint;
-  } | null = null;
+  private readonly playerGlide = new PlayerGlide();
   private lastPlayerVisualMotionSnapReason: LegacyPlayerVisualMotionSnapReason = null;
   // One shared, PAUSABLE animation clock for Navigation Core v1's continuous
   // trail (base spectral color phase + shared shine distance + its quiet
@@ -6792,7 +6787,7 @@ export class MenuScene extends Phaser.Scene {
       previousPlayer,
       nextFrame.player,
       time,
-      Math.min(LEGACY_MENU_PLAYER_VISUAL_MOVE_MS, Math.max(80, nextFrame.delayMs * 0.72))
+      nextFrame.delayMs
     );
     this.trail = nextFrame.trail;
     this.nextDemoMoveAtMs = time + nextFrame.delayMs;
@@ -7249,9 +7244,7 @@ export class MenuScene extends Phaser.Scene {
     this.legacyPlayTrailPulseNextFrameAtMs = 0;
     this.legacyMenuTitleAnimationNextFrameAtMs = Number.NEGATIVE_INFINITY;
     if (reducedMotion) {
-      if (this.playerVisualMotion !== null) {
-        this.syncLegacyPlayerVisualMotionTo(this.playerVisualMotion.to);
-      }
+      this.syncLegacyPlayerVisualMotionTo(this.playerGlide.getTarget());
     }
     this.backdropDirty = true;
     this.boardDynamicDirty = true;
@@ -8870,7 +8863,7 @@ export class MenuScene extends Phaser.Scene {
     // ONE trail renderer for both surfaces: the menu AI demo and the human
     // player draw the same Navigation Core continuous path through the same
     // function (the AI memory overlay below is a separate layer on top).
-    this.drawLegacyContinuousPlayTrail(time, mazeLeft, mazeTop, mazeTileSize, renderedPlayerPoint, menuTrailAlphaMultiplier);
+    this.drawLegacyContinuousPlayTrail(time, mazeLeft, mazeTop, mazeTileSize, this.resolveLegacyRenderedTrailHeadPoint(time), menuTrailAlphaMultiplier);
 
     // Start/end and the player marker are the "cast" of the maze, and all
     // three now fade out together on the exact same deconstruct timer, well
@@ -10120,20 +10113,18 @@ export class MenuScene extends Phaser.Scene {
     // now that the halo/beacon rings are gone, so tying ITS animation
     // directly to movement is what gives the marker any sense of motion
     // instead of a rigid icon sliding in a straight line.
-    const motion = this.playerVisualMotion;
+    const motionPose = this.playerGlide.getMotionPose(time);
     const halfSide = (tileSize * (showLocatorTicks
       ? LEGACY_PLAY_PLAYER_MARKER_SQUARE_FILL_RATIO
       : LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO)) / 2;
     let coreRadiusX = halfSide;
     let coreRadiusY = halfSide;
-    if (motion !== null && motion.durationMs > 0 && time < motion.startedAtMs + motion.durationMs) {
-      const progress = clamp((time - motion.startedAtMs) / motion.durationMs, 0, 1);
-      const dx = motion.to.x - motion.from.x;
-      const dy = motion.to.y - motion.from.y;
-      const stretchAmount = Math.sin(progress * Math.PI) * 0.18;
+    if (motionPose.amount > 0) {
+      // Smoothed with the glide (no per-step pulse), so the marker does not breathe at the step rate.
+      const stretchAmount = motionPose.amount * 0.1;
       const along = 1 + stretchAmount;
       const across = 1 - (stretchAmount * 0.6);
-      const horizontalMove = Math.abs(dx) >= Math.abs(dy);
+      const horizontalMove = Math.abs(motionPose.headingX) >= Math.abs(motionPose.headingY);
       coreRadiusX = halfSide * (horizontalMove ? along : across);
       coreRadiusY = halfSide * (horizontalMove ? across : along);
     }
@@ -10377,12 +10368,7 @@ export class MenuScene extends Phaser.Scene {
     point: LegacyPoint,
     snapReason: LegacyPlayerVisualMotionSnapReason = null
   ): void {
-    this.playerVisualMotion = {
-      durationMs: 0,
-      from: copyPoint(point),
-      startedAtMs: this.time.now,
-      to: copyPoint(point)
-    };
+    this.playerGlide.snapTo(point, this.time.now);
     this.lastPlayerVisualMotionSnapReason = snapReason;
   }
 
@@ -10409,12 +10395,8 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    this.playerVisualMotion = {
-      durationMs: Math.max(1, Math.round(durationMs)),
-      from: copyPoint(from),
-      startedAtMs: time,
-      to: copyPoint(to)
-    };
+    // durationMs is the expected step cadence; the glide keeps one steady speed across consecutive steps.
+    this.playerGlide.step(from, to, time, durationMs);
     this.lastPlayerVisualMotionSnapReason = null;
   }
 
@@ -10452,29 +10434,16 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hasLegacyPlayerVisualMotionPendingFrame(time: number): boolean {
-    if (this.playerVisualMotion === null) {
-      return false;
-    }
-
-    return time < this.playerVisualMotion.startedAtMs + this.playerVisualMotion.durationMs;
+    return this.playerGlide.isMoving(time);
   }
 
   private resolveLegacyRenderedPlayerPoint(time: number): LegacyPoint {
-    const motion = this.playerVisualMotion;
-    if (motion === null || motion.durationMs <= 0) {
-      return copyPoint(this.player);
-    }
+    // At rest the logical tile is the truth (the glide only owns the in-between frames).
+    return this.playerGlide.isMoving(time) ? this.playerGlide.sample(time) : copyPoint(this.player);
+  }
 
-    const progress = clamp((time - motion.startedAtMs) / motion.durationMs, 0, 1);
-    if (progress >= 1) {
-      return copyPoint(motion.to);
-    }
-
-    const eased = smoothstep(progress);
-    return {
-      x: motion.from.x + ((motion.to.x - motion.from.x) * eased),
-      y: motion.from.y + ((motion.to.y - motion.from.y) * eased)
-    };
+  private resolveLegacyRenderedTrailHeadPoint(time: number): LegacyPoint {
+    return this.playerGlide.isMoving(time) ? this.playerGlide.sampleTrailHead(time) : copyPoint(this.player);
   }
 
   private drawLegacyCyberPanel(

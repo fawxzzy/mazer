@@ -3,7 +3,7 @@ import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyG
 import {
   GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
   GEOMETRY_BUDGET_FRINGE_CAP,
-  GEOMETRY_BUDGET_SATURATION_LEVEL,
+  GEOMETRY_BUDGET_FRINGE_END_LEVEL,
   GEOMETRY_BUDGET_TOP_TARGET,
   resolveGeometryBudgetCandidateSeed,
   resolveGeometryBudgetForks,
@@ -134,7 +134,7 @@ describe('fringe: zero-felt-cost side stubs past the felt saturation (tuner leve
       let same = 0;
       for (let index = 0; index < 10; index += 1) {
         const seed = seedForIndex(index);
-        const top = generateLadderMaze(GEOMETRY_BUDGET_SATURATION_LEVEL, board, seed);
+        const top = generateLadderMaze(GEOMETRY_BUDGET_FRINGE_END_LEVEL, board, seed);
         const felt = generateLadderMaze(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL, board, seed);
         expect((top as { fringeStats?: { cells: number } }).fringeStats?.cells).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
         expect((felt as { fringeStats?: { cells: number } }).fringeStats).toBeUndefined();

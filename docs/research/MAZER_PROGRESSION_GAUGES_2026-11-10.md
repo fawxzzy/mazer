@@ -2,6 +2,10 @@
 
 Scope: how difficulty scales across levels 1..300 on the two frozen boards (phone 25 x 51, desktop 45 x 27), measured before (main `8cf9bd67`) and after the multiple-routes change, with several independent gauges instead of the one number the generator steers on. Source of truth for the design is the "2026-11-10 Multiple routes" section of `docs/research/MAZER_LEVEL_RANK_COMPLEXITY_CONTRACT.md`. Everything here is modelled difficulty (walkers), not player-tested.
 
+## Update: mastery tier (levels 269..388) and the reverse-solve audit
+
+Superseded in part by `docs/research/MAZER_PROGRESSION_FINAL_AUDIT_2026-11-10.md`: the plateau described below as level 268 is now level 388, because the maze is also measured from the goal end (reverse felt) and the last 120 levels raise it; new gauges `reversePricedSteps`, `twoWayPricedSteps`, `reverseHumanSteps` and `twoWayHumanSteps` are in `lib/mazeGauges.ts`.
+
 ## Update: past level 198, the fringe (this change)
 
 Owner report (from the installed app): the menu maze labelled level 18000 is not as complex as it should be. Cause, measured: every level from 198 on generated a maze of the same class (priced felt 759, about 530 floor cells of 1275, 30 junctions and 30 dead ends on both boards, the same numbers as level 30 to 40 in the shape of the maze), because the ladder is defined on one number, the pull-to-goal explorer's steps, and that number had reached what the frozen board holds. Everything below is modelled difficulty (walkers), not player-tested. Design and contract: "2026-11-10 Past level 198: the fringe" in `docs/research/MAZER_LEVEL_RANK_COMPLEXITY_CONTRACT.md`.

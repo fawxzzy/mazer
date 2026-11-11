@@ -22,7 +22,9 @@
 //             [T, T + window], from the felt saturation the felt value holds the top window
 //             and the level's exact fringe count is delivered and rises by one step per
 //             level (worst seed of N+1 above best seed of N), levels at/after the
-//             saturation level are one difficulty class,
+//             saturation level are one difficulty class, every mastery maze (levels past the
+//             fringe) is held to the reverse floor, and over the requested mastery levels the mean
+//             reverse felt of the last third beats the first third's by 100,
 //             and the independent metrics rise across the ladder (40-level window
 //             means of route length, A* effort, greedy effort and decoy depth never
 //             fall by more than 10%, and rise overall).
@@ -34,6 +36,8 @@ import {
   GEOMETRY_BUDGET_CEILING,
   GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
   GEOMETRY_BUDGET_FRINGE_CAP,
+  GEOMETRY_BUDGET_FRINGE_END_LEVEL,
+  GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
   GEOMETRY_BUDGET_TOP_TARGET,
   GEOMETRY_BUDGET_WINDOW,
@@ -98,6 +102,9 @@ const main = (): void => {
         board: board.name,
         target: resolveGeometryBudgetTarget(Math.min(Math.max(level, 2), GEOMETRY_BUDGET_SATURATION_LEVEL)),
         fringeCells: mean(samples.map((s) => s.fringeCells)),
+        reverseFeltMean: mean(samples.map((s) => s.reverseFelt)),
+        reverseFeltMin: Math.min(...samples.map((s) => s.reverseFelt)),
+        masteryShare: mean(samples.map((s) => (s.mastery ? 1 : 0))),
         feltMean: mean(samples.map((s) => s.felt)),
         feltMin: Math.min(...samples.map((s) => s.felt)),
         feltMax: Math.max(...samples.map((s) => s.felt)),
@@ -130,6 +137,7 @@ const main = (): void => {
   }
 
   const failures: string[] = [];
+  const masteryLines: string[] = [];
   const deltas: { board: string; from: number; to: number; worstGap: number; meanDelta: number }[] = [];
   for (const board of BOARDS) {
     const map = byBoard[board.name]!;
@@ -146,7 +154,7 @@ const main = (): void => {
       }
       // The fringe carries the ladder from the felt saturation to the saturation level: the pair
       // (felt, fringe cells) is compared lexicographically, so the fringe must rise for any two seeds.
-      if (consecutive && from >= GEOMETRY_BUDGET_FELT_SATURATION_LEVEL && to <= GEOMETRY_BUDGET_SATURATION_LEVEL) {
+      if (consecutive && from >= GEOMETRY_BUDGET_FELT_SATURATION_LEVEL && to <= GEOMETRY_BUDGET_FRINGE_END_LEVEL) {
         const fringeGap = Math.min(...high.map((s) => s.fringeCells)) - Math.max(...low.map((s) => s.fringeCells));
         if (fringeGap <= 0) {
           failures.push(`${board.name} level ${from}->${to}: worst seed of ${to} does not carry more fringe cells than the best seed of ${from} (gap ${fringeGap})`);
@@ -165,12 +173,36 @@ const main = (): void => {
           }
         }
       }
+      // Mastery tier: a mastery maze is held to the reverse floor.
+      for (const s of samples) {
+        if (s.mastery && s.reverseFelt < GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR) {
+          failures.push(`${board.name} level ${level}: mastery maze reverse felt ${s.reverseFelt} is under the floor ${GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR}`);
+        }
+      }
       if (level >= GEOMETRY_BUDGET_FELT_SATURATION_LEVEL) {
         for (const s of samples) {
           if (s.felt < GEOMETRY_BUDGET_TOP_TARGET || s.felt > GEOMETRY_BUDGET_TOP_TARGET + GEOMETRY_BUDGET_WINDOW) {
             failures.push(`${board.name} level ${level}: top-class maze felt ${s.felt} is off the top target ${GEOMETRY_BUDGET_TOP_TARGET}`);
           }
         }
+      }
+    }
+  }
+
+  // The mastery tier rises statistically, not per maze: over the requested levels from the end of
+  // the fringe to the saturation level the mean reverse felt of the last third must beat the first
+  // third's by at least 100 steps (both boards).
+  const masteryLevels = levels.filter((level) => level >= GEOMETRY_BUDGET_FRINGE_END_LEVEL && level <= GEOMETRY_BUDGET_SATURATION_LEVEL);
+  if (masteryLevels.length >= 9) {
+    const third = Math.floor(masteryLevels.length / 3);
+    for (const board of BOARDS) {
+      const map = byBoard[board.name]!;
+      const meanOf = (group: number[]): number => mean(group.flatMap((level) => map.get(level)!.map((s) => s.reverseFelt)));
+      const first = meanOf(masteryLevels.slice(0, third));
+      const last = meanOf(masteryLevels.slice(-third));
+      masteryLines.push(`${board.name}: mean reverse felt ${first.toFixed(0)} (first third) -> ${last.toFixed(0)} (last third)`);
+      if (last < first + 100) {
+        failures.push(`${board.name}: mastery tier mean reverse felt does not rise by 100 (${first.toFixed(1)} -> ${last.toFixed(1)})`);
       }
     }
   }
@@ -216,6 +248,7 @@ const main = (): void => {
     console.log(`consecutive ramp pairs ${worst.length}: min worst-seed gap ${Math.min(...worst.map((d) => d.worstGap))}, min mean delta ${Math.min(...worst.map((d) => d.meanDelta)).toFixed(2)}, max mean delta ${Math.max(...worst.map((d) => d.meanDelta)).toFixed(2)}`);
   }
   trendLines.forEach((line) => console.log(`trend ${line}`));
+  masteryLines.forEach((line) => console.log(`mastery ${line}`));
   console.log(failures.length === 0 ? 'ladder assertions: PASS' : `ladder assertions: ${failures.length} FAIL\n${failures.slice(0, 20).join('\n')}`);
   if (assertMode && failures.length > 0) {
     process.exitCode = 1;

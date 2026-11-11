@@ -13,10 +13,11 @@
 //  - `hazardBudgetLevels` = level - GEOMETRY_BUDGET_SATURATION_LEVEL (>= 0, +1 per
 //    level, unbounded): the amount of difficulty the geometry can no longer
 //    supply. Hazard allocation should spend exactly this budget.
-//  - GEOMETRY_BUDGET_SATURATION_LEVEL is the END of the fringe ramp, not of the felt ramp: the
-//    felt number saturates first (GEOMETRY_BUDGET_FELT_SATURATION_LEVEL, level 198), and from
-//    there to the saturation level (268) geometry still rises, by zero-felt-cost side stubs
-//    (the fringe, legacyGeometryBudget.ts). Hazards owe nothing in that stretch: it stays 0.
+//  - GEOMETRY_BUDGET_SATURATION_LEVEL is the END of the mastery ramp, not of the felt ramp: the
+//    felt number saturates first (GEOMETRY_BUDGET_FELT_SATURATION_LEVEL, level 198), then
+//    geometry still rises by zero-felt-cost side stubs (the fringe, to level 268), then by the
+//    share of reverse-solve resistant mazes (the mastery tier, to the saturation level 388,
+//    legacyGeometryBudget.ts). Hazards owe nothing in that stretch: it stays 0.
 //  - Below the saturation level it is 0 and must stay 0.
 //  - The geometry at and above the saturation level is the frozen ceiling class
 //    (same target, same fringe, deterministic, mazes differ by seed), so adding hazards on top

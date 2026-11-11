@@ -29,6 +29,15 @@
 //     exactly unchanged. The explorer does not enter a stub that short at a junction, so the
 //     felt value does not move while the maze gains junctions and dead ends.
 //
+//  4. MASTERY LURE (only on mastery mazes, levels past the fringe, legacyGeometryBudget.ts). Not an
+//     extra edit but a rule on lever 2: every fork carved straight off the route must also look
+//     closer to the START than the way back along the route (`doubleLure`), so the same explorer
+//     run from the goal end pays for the fork too. The board is fully visible, so a player can
+//     work back from the goal; the forks of the other levels point toward the goal only and cost
+//     that player about half (reverse 430-475 against 759). The lure needs no floor and does not
+//     move the forward number; the finished maze reports its reverse felt value and may be held to
+//     a floor (`reverseFloor`).
+//
 // Every move is verified by re-running the explorer on the edited grid (about
 // 20 microseconds), so the landing is exact for the real final grid, wrap loops
 // included -- there is no model between the edit and the number. A move that does
@@ -100,6 +109,17 @@ export interface FeltTuningOptions {
   // the full count reports it in fringeShortfall (and a window distance of at least that), so
   // the selection tries the next base. Omit or 0: byte-identical to the tuner without the lever.
   readonly fringeCells?: number;
+  // Mastery maze (lever 4, levels past the fringe, legacyGeometryBudget.ts): every fork carved
+  // straight off the route must also point toward the START (it has to look closer to the start
+  // than the way back along the route), on top of the goal-ward lure every route fork already
+  // has. A solver who works from the goal end then pays for those forks too, which the forward
+  // explorer cannot see. Omit or false: byte-identical to the tuner without the lever (no extra
+  // random draw is made).
+  readonly doubleLure?: boolean;
+  // Floor of the REVERSE felt value (the same explorer run from the goal to the start, minus the
+  // same priced savings). A maze below it reports the shortfall in `windowDistance` (so the
+  // restarts and then the next base are tried). 0 or omitted: no floor.
+  readonly reverseFloor?: number;
 }
 
 export interface FeltTuningResult {
@@ -132,6 +152,10 @@ export interface FeltTuningResult {
   // Fringe stub cells added (lever 3) and the cells the request fell short by.
   readonly fringeTiles: { x: number; y: number }[];
   readonly fringeShortfall: number;
+  // The reverse felt value (explorer from the goal to the start, minus the priced savings) of the
+  // finished maze, measured on every tune; and the steps it fell short of `reverseFloor`.
+  readonly reverseFelt: number;
+  readonly reverseShortfall: number;
   // Cells the stretch lever carved / removed.
   readonly stretchTiles: { x: number; y: number }[];
   readonly stretchRemovedTiles: { x: number; y: number }[];
@@ -252,6 +276,17 @@ const tuneOnce = (
   };
   const point = (cell: number): { x: number; y: number } => ({ x: cell % width, y: (cell - (cell % width)) / width });
   const step = [1, -1, width, -width] as const;
+  const dist2Start = (cell: number): number => {
+    const x = cell % width;
+    const y = (cell - x) / width;
+    const dx = Math.min(Math.abs(x - maze.start.x), width - Math.abs(x - maze.start.x));
+    const dy = Math.min(Math.abs(y - maze.start.y), height - Math.abs(y - maze.start.y));
+    return (dx * dx) + (dy * dy);
+  };
+  // Mastery maze (lever 4): every fork carved straight off the route points toward the goal AND
+  // toward the start, so the explorer pulled from the goal end pays for it too.
+  const doubleLure = options.doubleLure === true;
+  const reverseFloor = Math.max(0, Math.trunc(options.reverseFloor ?? 0));
 
   // Cells never trimmed: the base route, and every cell the stretch lever carves.
   const onRoute = new Uint8Array(size);
@@ -619,6 +654,16 @@ const tuneOnce = (
           if (run.onPath[chosen] === 1) {
             const next = run.pathNext[chosen]!;
             if (next < 0 || dist2(entry) >= dist2(next)) { continue; }
+            // Mastery lure: the fork must also look closer to the START than the way back along
+            // the route, so a solver working from the goal end is drawn into it as well.
+            if (doubleLure) {
+              let prev = -1;
+              for (let q = 0; q < 4; q += 1) {
+                const p = explorer.neighbors[(chosen * 4) + q]!;
+                if (run.onPath[p] === 1 && run.pathNext[p] === chosen) { prev = p; }
+              }
+              if (prev >= 0 && dist2Start(entry) >= dist2Start(prev)) { continue; }
+            }
           }
           const carved = carveBranch(chosen, dir, run.onPath[chosen] === 1 ? Math.min(length, routeBranch) : length);
           if (carved.length >= minimum) {
@@ -746,6 +791,18 @@ const tuneOnce = (
   }
   const fringeShortfall = fringeWanted > 0 ? fringeWanted - fringePlaced : 0;
 
+  // ---- Reverse felt (lever 4's check) --------------------------------------------------
+  // The explorer run from the goal to the start on the finished grid, priced like the forward
+  // number (loop and wrap savings are the same shortest-route savings in either direction).
+  // Measured on every tune (one run, about 20 microseconds); enforced only with a floor.
+  let reverseFelt = 0;
+  if (run.reachedGoal) {
+    const backward = explorer.run(open, goalCell, startCell);
+    reverseFelt = backward.reachedGoal ? backward.steps - total() : 0;
+    run = evaluate();
+  }
+  const reverseShortfall = reverseFloor > 0 ? Math.max(0, reverseFloor - reverseFelt) : 0;
+
   const grid: boolean[][] = [];
   for (let y = 0; y < height; y += 1) {
     const row: boolean[] = [];
@@ -756,7 +813,7 @@ const tuneOnce = (
     grid,
     felt,
     target,
-    onTarget: windowGap(felt) === 0 && fringeShortfall === 0,
+    onTarget: windowGap(felt) === 0 && fringeShortfall === 0 && reverseShortfall === 0,
     routeLength,
     bumps,
     branchesAdded,
@@ -773,11 +830,13 @@ const tuneOnce = (
     loopTiles: loopTiles.filter((tile) => open[(tile.y * width) + tile.x] === 1),
     fringeTiles,
     fringeShortfall,
+    reverseFelt,
+    reverseShortfall,
     stretchTiles,
     stretchRemovedTiles,
     capacityExhausted,
     evals,
-    windowDistance: windowGap(felt) + fringeShortfall,
+    windowDistance: windowGap(felt) + fringeShortfall + reverseShortfall,
     tieDeviationPercent: run.reachedGoal ? measureTieDeviationPercent(explorer, open, startCell, goalCell, felt) : 0,
     hopeless
   };
