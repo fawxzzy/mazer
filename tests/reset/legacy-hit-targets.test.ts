@@ -136,6 +136,7 @@ describe('legacy hit targets (Wave 5C)', () => {
       'play-pause',
       'settings-row-animated-background',
       'settings-row-back-to-menu',
+      'settings-row-haptics',
       'settings-row-how-to-play',
       'settings-row-quit-to-menu',
       'settings-row-reset-progress',

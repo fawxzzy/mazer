@@ -369,6 +369,11 @@ import {
   writeLegacyGameToggleSettings
 } from '../legacy-runtime/legacyGameTogglePreferences';
 import {
+  LEGACY_HAPTIC_PATTERNS,
+  triggerLegacyHaptic,
+  type LegacyHapticPattern
+} from '../legacy-runtime/legacyHaptics';
+import {
   MAZE_CYCLE_TELEMETRY_STORAGE_KEY,
   MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT,
   readMazeCycleTelemetryHistory,
@@ -6965,7 +6970,7 @@ export class MenuScene extends Phaser.Scene {
       });
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
-      this.triggerLegacyHapticPulse([18, 40, 18, 40, 32]);
+      this.triggerLegacyHapticPulse([...LEGACY_HAPTIC_PATTERNS.goal]);
       return {
         accepted: true,
         events: [{ type: 'player-reached-goal', entityId: 'player' }]
@@ -6973,7 +6978,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.boardDynamicDirty = true;
-    this.triggerLegacyHapticPulse(6);
+    this.triggerLegacyHapticPulse(LEGACY_HAPTIC_PATTERNS.step);
     return {
       accepted: true,
       events: [{ type: 'player-moved', entityId: 'player' }]
@@ -10330,23 +10335,14 @@ export class MenuScene extends Phaser.Scene {
     this.playerGlowCanvasImage.setVisible(true);
   }
 
-  // Movement had zero tactile feedback anywhere in the codebase (confirmed
-  // no navigator.vibrate call existed before this). The Vibration API is a
-  // no-op where unsupported (desktop, iOS Safari) so this is a pure
-  // progressive enhancement -- guarded defensively since calling a missing
-  // method (rather than just reading an undefined property) throws.
-  private triggerLegacyHapticPulse(pattern: number | number[]): void {
-    if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') {
-      return;
-    }
-
-    try {
-      navigator.vibrate(pattern);
-    } catch {
-      // Some browsers throw when vibration is blocked (no user gesture yet,
-      // permissions policy, etc.) -- movement itself must never fail over a
-      // missing tactile nicety.
-    }
+  // Single shared entry point for vibration (src/legacy-runtime/legacyHaptics.ts). Honours Settings > Haptics and
+  // reduced motion, and is a no-op where navigator.vibrate is missing (iOS Safari, most desktops).
+  private triggerLegacyHapticPulse(pattern: LegacyHapticPattern): void {
+    triggerLegacyHaptic({
+      enabled: this.settings.hapticsEnabled,
+      pattern,
+      reducedMotion: this.prefersLegacyReducedMotion()
+    });
   }
 
   private syncLegacyPlayerVisualMotionTo(

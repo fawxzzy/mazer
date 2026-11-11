@@ -7,6 +7,7 @@ export type LegacyOverlayToggleFieldId =
   | 'toggleTrailFade'
   | 'toggleTrailPulse'
   | 'toggleAnimatedBackdrop'
+  | 'hapticsEnabled'
   | 'controlMode';
 export type LegacyOverlayToggleStateText = 'On' | 'Off' | 'Arrows' | 'Stick' | 'Animated' | 'Stagnant';
 
@@ -31,6 +32,7 @@ export const resolveLegacyOverlayToggleStateText = (
   switch (fieldId) {
     case 'toggleTrailFade':
     case 'toggleTrailPulse':
+    case 'hapticsEnabled':
       return value ? 'On' : 'Off';
     case 'toggleAnimatedBackdrop':
       return value ? 'Animated' : 'Stagnant';
@@ -52,6 +54,8 @@ export const resolveLegacyOverlayToggleSwitchIsOn = (
       return settings.toggleTrailPulse;
     case 'toggleAnimatedBackdrop':
       return settings.toggleAnimatedBackdrop;
+    case 'hapticsEnabled':
+      return settings.hapticsEnabled;
     case 'controlMode':
       return settings.controlMode === 'stick';
     default:
@@ -112,6 +116,18 @@ export const applyLegacyOverlayToggleField = (
         affectsBoardDynamic: false,
         switchIsOn: animatedBackdropDisplayState.switchIsOn,
         stateText: animatedBackdropDisplayState.stateText
+      };
+    }
+    case 'hapticsEnabled': {
+      nextSettings.hapticsEnabled = !nextSettings.hapticsEnabled;
+      const hapticsDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
+      return {
+        settings: nextSettings,
+        affectsBackdrop: false,
+        affectsBoardStatic: false,
+        affectsBoardDynamic: false,
+        switchIsOn: hapticsDisplayState.switchIsOn,
+        stateText: hapticsDisplayState.stateText
       };
     }
     case 'controlMode': {

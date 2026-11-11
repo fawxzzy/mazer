@@ -15,6 +15,7 @@ export interface LegacySettings {
   toggleTrailFade: boolean;
   toggleTrailPulse: boolean;
   toggleAnimatedBackdrop: boolean;
+  hapticsEnabled: boolean;
   controlMode: LegacyControlMode;
 }
 
@@ -35,6 +36,7 @@ export const LEGACY_DEFAULTS: LegacySettings = {
   toggleTrailFade: false,
   toggleTrailPulse: true,
   toggleAnimatedBackdrop: true,
+  hapticsEnabled: true,
   controlMode: 'stick'
 };
 
@@ -89,5 +91,6 @@ export const copyLegacySettings = (settings: LegacySettings): LegacySettings => 
   toggleTrailFade: settings.toggleTrailFade,
   toggleTrailPulse: settings.toggleTrailPulse ?? true,
   toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop ?? LEGACY_DEFAULTS.toggleAnimatedBackdrop,
+  hapticsEnabled: settings.hapticsEnabled ?? LEGACY_DEFAULTS.hapticsEnabled,
   controlMode: settings.controlMode
 });

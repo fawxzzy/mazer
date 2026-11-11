@@ -38,6 +38,7 @@ describe('legacy game toggle preferences', () => {
     expect(pickLegacyGameTogglePreferences(settings)).toEqual({
       controlMode: 'stick',
       darkMode: true,
+      hapticsEnabled: true,
       movementSpeed: 0.04,
       toggleAnimatedBackdrop: true,
       toggleTrailFade: false,
@@ -62,6 +63,7 @@ describe('legacy game toggle preferences', () => {
     expect(JSON.parse(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY) ?? '{}')).toEqual({
       controlMode: 'stick',
       darkMode: true,
+      hapticsEnabled: true,
       movementSpeed: 0.82,
       toggleAnimatedBackdrop: false,
       toggleTrailFade: true,
@@ -76,6 +78,7 @@ describe('legacy game toggle preferences', () => {
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
       controlMode: 'stick',
       darkMode: true,
+      hapticsEnabled: true,
       movementSpeed: 0.33,
       toggleAnimatedBackdrop: false,
       toggleTrailFade: true,
@@ -88,6 +91,7 @@ describe('legacy game toggle preferences', () => {
     expect(pickLegacyGameTogglePreferences(settings)).toEqual({
       controlMode: 'stick',
       darkMode: true,
+      hapticsEnabled: true,
       movementSpeed: 0.33,
       toggleAnimatedBackdrop: false,
       toggleTrailFade: true,
@@ -229,6 +233,7 @@ describe('legacy game toggle preferences', () => {
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
       controlMode: 'arrows',
       darkMode: false,
+      hapticsEnabled: true,
       movementSpeed: 0.72,
       toggleAnimatedBackdrop: false,
       toggleTrailFade: true,
@@ -241,6 +246,7 @@ describe('legacy game toggle preferences', () => {
     expect(pickLegacyGameTogglePreferences(migrated)).toEqual({
       controlMode: 'arrows',
       darkMode: false,
+      hapticsEnabled: true,
       movementSpeed: 0.72,
       toggleAnimatedBackdrop: false,
       toggleTrailFade: true,
