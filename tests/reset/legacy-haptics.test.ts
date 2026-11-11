@@ -54,6 +54,7 @@ describe('vibration helper', () => {
   test('keeps the shipped step and goal patterns', () => {
     expect(LEGACY_HAPTIC_PATTERNS.step).toBe(6);
     expect([...LEGACY_HAPTIC_PATTERNS.goal]).toEqual([18, 40, 18, 40, 32]);
+    expect(LEGACY_HAPTIC_PATTERNS.wallBump).toBe(8);
   });
 });
 

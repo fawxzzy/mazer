@@ -20,6 +20,8 @@ export type LegacyHapticPattern = number | number[];
 export const LEGACY_HAPTIC_PATTERNS = Object.freeze({
   /** A single accepted step. */
   step: 6,
+  /** A blocked move (wall bump): one short pulse, throttled by shouldBuzzWallBump. */
+  wallBump: 8,
   /** Reaching the goal. */
   goal: Object.freeze([18, 40, 18, 40, 32]) as readonly number[]
 });

@@ -15,7 +15,6 @@ export const PLAYER_GLIDE_DURATION_FLOOR_MS = 40;
 
 export const WALL_BUMP_DURATION_MS = 110;
 export const WALL_BUMP_MAX_OFFSET_PX = 2;
-export const WALL_BUMP_HAPTIC_MS = 8;
 /** A held key or stick against a wall repeats every step; buzz at most this often. */
 export const WALL_BUMP_HAPTIC_MIN_GAP_MS = 140;
 

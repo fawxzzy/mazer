@@ -35,7 +35,6 @@ import { PlayerLocatorState, drawPlayerLocator } from '../render/playerLocator';
 import { PlayerGlide } from '../render/playerGlide';
 import {
   WALL_BUMP_DURATION_MS,
-  WALL_BUMP_HAPTIC_MS,
   resolvePlayerGlideDurationMs,
   resolveWallBumpNudge,
   shouldBuzzWallBump
@@ -5178,7 +5177,7 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicDirty = true;
     if (shouldBuzzWallBump(now, this.lastWallBumpBuzzAtMs, false)) {
       this.lastWallBumpBuzzAtMs = now;
-      this.triggerLegacyHapticPulse(WALL_BUMP_HAPTIC_MS);
+      this.triggerLegacyHapticPulse(LEGACY_HAPTIC_PATTERNS.wallBump);
     }
   }
 
