@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_616f89f64065",
+  "export_id": "pbe_mazer_owner_registry_c519664d673a",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:616f89f64065018874d5d334ce477562628afdae45f0515db83453be3aeba58a",
-  "generated_at": "2026-11-10T23:00:00.000Z",
+  "source_revision": "sha256:c519664d673a3dae12711779360b806adc1634fae1fd91747b71c7655e4bfdd8",
+  "generated_at": "2026-11-10T23:30:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:49cf0a42d818439d230ed2ab1f5cba14a891b48af55c73f84c86c2f92afb3847",
-      "observed_at": "2026-11-10T23:00:00.000Z"
+      "revision": "sha256:6c2ed5a644e7049522ae6fef8ed42ac8cbbb469c3c4fbbcd9df93a5201d1d8b7",
+      "observed_at": "2026-11-10T23:30:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:cf449f029f222cb43fa0f57015bfac1db6d3f7b3bb9b74665ee35759cfb1afdd",
-      "observed_at": "2026-11-10T23:00:00.000Z"
+      "observed_at": "2026-11-10T23:30:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-10T23:00:00.000Z"
+      "observed_at": "2026-11-10T23:30:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-10T23:00:00.000Z"
+      "observed_at": "2026-11-10T23:30:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-10T23:00:00.000Z"
+      "observed_at": "2026-11-10T23:30:00.000Z"
     }
   ],
   "cards": [
@@ -625,6 +625,59 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-auth-email-001_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-AUTH-EMAIL-001",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Branded Mazer auth emails",
+        "description": "Account emails now send from the no-reply address on the Fawxzzy domain through Resend, with a Mazer cyan theme that matches the Mazer sign-in screen (web repository pull request 110 merged, function deployed, Supabase send-mail hook enabled 2026-11-10). Evidence: a Mazer account-recovery message to the QA address arrived and the Resend log shows Delivered; the theme matches. Left in review because NOT verified for Mazer: clicking the link in the message, and the sign-up and change-of-address emails. The link click was verified only on the Fitness-themed message. Also unverified: other mail clients, the Resend free-tier cap of 100 emails per day, and how Supabase behaves if the hook fails.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-001"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-10T00:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-AUTH-EMAIL-001",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-AUTH-EMAIL-001",
+        "source_status": "current",
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
+      },
+      "content": {
+        "summary": "Account emails now send from the no-reply address on the Fawxzzy domain through Resend, with a Mazer cyan theme that matches the Mazer sign-in screen (web repository pull request 110 merged, function deployed, Supabase send-mail hook enabled 2026-11-10). Evidence: a Mazer account-recovery message to the QA address arrived and the Resend log shows Delivered; the theme matches. Left in review because NOT verified for Mazer: clicking the link in the message, and the sign-up and change-of-address emails. The link click was verified only on the Fitness-themed message. Also unverified: other mail clients, the Resend free-tier cap of 100 emails per day, and how Supabase behaves if the hook fails.",
+        "objective": "Account emails now send from the no-reply address on the Fawxzzy domain through Resend, with a Mazer cyan theme that matches the Mazer sign-in screen (web repository pull request 110 merged, function deployed, Supabase send-mail hook enabled 2026-11-10). Evidence: a Mazer account-recovery message to the QA address arrived and the Resend log shows Delivered; the theme matches. Left in review because NOT verified for Mazer: clicking the link in the message, and the sign-up and change-of-address emails. The link click was verified only on the Fitness-themed message. Also unverified: other mail clients, the Resend free-tier cap of 100 emails per day, and how Supabase behaves if the hook fails.",
+        "acceptance_criteria": [
+          "A Mazer-themed recovery message arrives from the Fawxzzy sender (done)",
+          "The Mazer reset link opens the Mazer-themed new-password form (not verified)",
+          "Mazer sign-up and change-of-address emails are sent and render with the Mazer theme (not verified)"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-auth-qa-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -1151,20 +1204,20 @@
         "card_id": "MAZER-DOCS-001",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Land the multi-target deployment architecture doc",
-        "description": "A long architecture note describes running Mazer as a browser game, an installable app and a dedicated hardware display target, with proof gates for each. It exists only as an untracked document in an old checkout and was saved as a patch, not committed. The owner needs to approve a docs-only PR with the stale status text refreshed.",
+        "title": "Multi-target deployment architecture doc",
+        "description": "Merged, docs only: the long architecture note covering Mazer as a browser game, an installable app and a dedicated hardware display target, with proof gates for each, landed through pull request 405 on 2026-11-10 with its stale status text refreshed. No code changed and nothing was deployed. Left open for review: the note still lists unknowns (why two earlier pull requests closed, the current production deploy method, entitlement and purchase code) and has not been reconciled with the Cyberdeck research card.",
         "card_type": "documentation",
-        "lifecycle": "blocked",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-CYBERDECK-001"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-06T00:00:00.000Z",
+        "updated_at": "2026-11-10T00:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-DOCS-001",
         "extensions": {
-          "owner_status": "blocked",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1172,15 +1225,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-DOCS-001",
         "source_status": "current",
-        "source_updated_at": "2026-11-06T00:00:00.000Z"
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "A long architecture note describes running Mazer as a browser game, an installable app and a dedicated hardware display target, with proof gates for each. It exists only as an untracked document in an old checkout and was saved as a patch, not committed. The owner needs to approve a docs-only PR with the stale status text refreshed.",
-        "objective": "A long architecture note describes running Mazer as a browser game, an installable app and a dedicated hardware display target, with proof gates for each. It exists only as an untracked document in an old checkout and was saved as a patch, not committed. The owner needs to approve a docs-only PR with the stale status text refreshed.",
+        "summary": "Merged, docs only: the long architecture note covering Mazer as a browser game, an installable app and a dedicated hardware display target, with proof gates for each, landed through pull request 405 on 2026-11-10 with its stale status text refreshed. No code changed and nothing was deployed. Left open for review: the note still lists unknowns (why two earlier pull requests closed, the current production deploy method, entitlement and purchase code) and has not been reconciled with the Cyberdeck research card.",
+        "objective": "Merged, docs only: the long architecture note covering Mazer as a browser game, an installable app and a dedicated hardware display target, with proof gates for each, landed through pull request 405 on 2026-11-10 with its stale status text refreshed. No code changed and nothing was deployed. Left open for review: the note still lists unknowns (why two earlier pull requests closed, the current production deploy method, entitlement and purchase code) and has not been reconciled with the Cyberdeck research card.",
         "acceptance_criteria": [
-          "Doc is added through a docs-only PR off current main",
-          "Stale PR status lines are refreshed before commit",
-          "Doc is reconciled with the Cyberdeck research card"
+          "Doc is added through a docs-only PR off current main (done: PR 405 merged 2026-11-10)",
+          "Stale PR status lines are refreshed before commit (done)",
+          "Doc is reconciled with the Cyberdeck research card (not done)"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -4937,6 +4990,57 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-repo-hygiene-001_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-REPO-HYGIENE-001",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Mazer leftovers cleanup",
+        "description": "On 2026-11-10, 22 old unmerged local branches were deleted and 7 old stashes were dropped from the primary checkout after a verified bundle backup of every ref (plus a copy on a second drive; stashes also pinned as permanent refs). Kept on purpose: the open sign-up branch, the joystick prototype and rollback SQL branch, and 3 stashes, two of which hold lines found in neither main nor the sign-up branch. Restore commands are in the cleanup report. Local git housekeeping only: no remote branch was deleted or pruned, nothing was pushed or deployed. Three deleted branches exist on no remote, so the backup bundle is now their only copy.",
+        "card_type": "technical-debt",
+        "lifecycle": "completed",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-10T00:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-REPO-HYGIENE-001",
+        "extensions": {
+          "owner_status": "completed",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-REPO-HYGIENE-001",
+        "source_status": "current",
+        "source_updated_at": "2026-11-10T00:00:00.000Z"
+      },
+      "content": {
+        "summary": "On 2026-11-10, 22 old unmerged local branches were deleted and 7 old stashes were dropped from the primary checkout after a verified bundle backup of every ref (plus a copy on a second drive; stashes also pinned as permanent refs). Kept on purpose: the open sign-up branch, the joystick prototype and rollback SQL branch, and 3 stashes, two of which hold lines found in neither main nor the sign-up branch. Restore commands are in the cleanup report. Local git housekeeping only: no remote branch was deleted or pruned, nothing was pushed or deployed. Three deleted branches exist on no remote, so the backup bundle is now their only copy.",
+        "objective": "On 2026-11-10, 22 old unmerged local branches were deleted and 7 old stashes were dropped from the primary checkout after a verified bundle backup of every ref (plus a copy on a second drive; stashes also pinned as permanent refs). Kept on purpose: the open sign-up branch, the joystick prototype and rollback SQL branch, and 3 stashes, two of which hold lines found in neither main nor the sign-up branch. Restore commands are in the cleanup report. Local git housekeeping only: no remote branch was deleted or pruned, nothing was pushed or deployed. Three deleted branches exist on no remote, so the backup bundle is now their only copy.",
+        "acceptance_criteria": [
+          "A verified backup of every deleted branch and dropped stash exists before any delete",
+          "Branches with unique unmerged lines are kept",
+          "Read-back shows deleted tips in the backup and the working tree unchanged"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-run-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -7399,10 +7503,10 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 141,
-    "exported_public_card_count": 141,
-    "exported_open_card_count": 62,
-    "exported_completed_card_count": 64,
+    "stable_identity_count": 143,
+    "exported_public_card_count": 143,
+    "exported_open_card_count": 63,
+    "exported_completed_card_count": 65,
     "exported_deferred_card_count": 15,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
