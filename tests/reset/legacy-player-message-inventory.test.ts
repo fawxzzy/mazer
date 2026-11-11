@@ -459,20 +459,22 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
 describe('message-system structure the inventory depends on', { timeout: GUARD_TIMEOUT_MS }, () => {
   const MESSAGE_MODULE = 'src/legacy-runtime/legacyPlayerMessage.ts';
 
-  test('the message queue has no render surface yet (diagnostics-only)', () => {
-    // visibleMessages is declared in the diagnostics type and filled in the
-    // diagnostics payload, and nothing draws it. If a renderer is added
-    // (the card's goal), this pin must flip and the inventory doc be updated.
+  test('the message queue is drawn as a toast (MAZER-UI-018)', () => {
+    // visibleMessages stays a diagnostics-only mirror (declared + filled); the
+    // player-facing surface is the toast: MenuScene draws rows resolved by the
+    // pure toast module, whose colours come from the tone table.
     const menu = srcText(MENU);
     expect(menu.match(/\bvisibleMessages\b/g)?.length ?? 0).toBe(2);
+    expect(menu).toContain('private drawLegacyPlayerMessageToast(time: number): void');
+    expect(menu).toContain('resolveLegacyPlayerMessageToastFrame(this.playerMessageQueue, time, width)');
+    expect(
+      menu.split('this.drawLegacyPlayerMessageToast(time);').length - 1,
+      'The toast must be drawn in both the overlay and the menu/play update paths.'
+    ).toBe(2);
     expect(
       consumersOf('resolveLegacyPlayerMessageColor', [MESSAGE_MODULE]),
-      'A tone-colour consumer exists: a message render surface was added. Update the inventory doc and flip this pin.'
-    ).toEqual([]);
-    expect(
-      consumersOf('LEGACY_PLAYER_MESSAGE_COLORS', [MESSAGE_MODULE]),
-      'A tone-colour consumer exists: a message render surface was added. Update the inventory doc and flip this pin.'
-    ).toEqual([]);
+      'The toast module is the only consumer of the tone colour resolver.'
+    ).toEqual(['src/legacy-runtime/legacyPlayerMessageToast.ts']);
   });
 
   test('auth feedback is rendered from the raw snapshot, not from the resolved message', () => {

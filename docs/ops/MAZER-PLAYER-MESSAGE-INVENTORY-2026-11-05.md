@@ -29,7 +29,7 @@ edits them.
 
 ## 2. Findings (facts, verified in source)
 
-F1. **The message queue has no render surface.** `MenuScene` builds `playerMessageQueue` and exposes it as
+F1. **The message queue is drawn as a toast (MAZER-UI-018; was: no render surface).** `MenuScene` builds `playerMessageQueue` and exposes it as
 `visibleMessages` in the visual diagnostics payload (type at `MenuScene.ts:758`, filled at `:18805`).
 Nothing draws it. `resolveLegacyPlayerMessageColor` and `LEGACY_PLAYER_MESSAGE_COLORS` have no consumer
 outside `legacyPlayerMessage.ts`. "Routes through `legacyPlayerMessage.ts`" therefore currently means

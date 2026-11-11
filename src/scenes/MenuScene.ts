@@ -504,6 +504,7 @@ import {
   type LegacyQueuedPlayerMessage,
   type LegacyPlayerMessage
 } from '../legacy-runtime/legacyPlayerMessage';
+import { resolveLegacyPlayerMessageToastFrame } from '../legacy-runtime/legacyPlayerMessageToast';
 import {
   hydrateLegacyRemoteAccountState,
   isLegacyRuntimeDiagnosticsAuthFixtureRoute,
@@ -1279,6 +1280,9 @@ const LEGACY_OVERLAY_BACK_CHEVRON_DEPTH = 1000;
 // unresolved) has to sit above the menu front door, since that content
 // keeps rendering underneath it rather than being suppressed.
 const LEGACY_AUTH_GATE_LOADING_DEPTH = 5000;
+// Player message toast: above the auth gate so errors raised on it stay readable.
+const LEGACY_PLAYER_MESSAGE_TOAST_DEPTH = LEGACY_AUTH_GATE_LOADING_DEPTH + 10;
+const LEGACY_PLAYER_MESSAGE_TOAST_ROW_POOL = 3;
 // Mirrors Fitness's own login-pending timeout: if the Supabase call never
 // settles (seen live -- the button flips to "Working" and never recovers,
 // with no thrown error to catch), the submit button must still come back
@@ -1694,6 +1698,8 @@ export class MenuScene extends Phaser.Scene {
   private authGateLocked = false;
   private guestPlayGranted = false;
   private authGateGraphics!: Phaser.GameObjects.Graphics;
+  private playerMessageToastGraphics!: Phaser.GameObjects.Graphics;
+  private playerMessageToastTexts: Phaser.GameObjects.Text[] = [];
   private authGateLoadingText!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
   // Same deferred-to-update() pattern as pendingBootPlayStart above, for
@@ -2415,6 +2421,17 @@ export class MenuScene extends Phaser.Scene {
     this.playerSpawnBurstGraphics = this.add.graphics();
     this.spawnLaserGraphics = this.add.graphics();
     this.authGateGraphics = this.add.graphics();
+    this.playerMessageToastGraphics = this.add.graphics()
+      .setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH)
+      .setVisible(false);
+    this.playerMessageToastTexts = Array.from({ length: LEGACY_PLAYER_MESSAGE_TOAST_ROW_POOL }, () => (
+      this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: '14px',
+        color: '#ffffff',
+        align: 'center'
+      })).setOrigin(0.5, 0).setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH + 1).setVisible(false)
+    ));
     this.authGateLoadingText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, 'Signing you in…', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '15px',
@@ -3197,6 +3214,7 @@ export class MenuScene extends Phaser.Scene {
       // of these paths ran.
       this.levelAnnouncerNumberGlyphPool.forEach((image) => image.setVisible(false));
       this.expireLegacyPlayerMessages(time);
+      this.drawLegacyPlayerMessageToast(time);
       for (const button of this.uiButtons) {
         button.updateFrame?.(time);
       }
@@ -3210,6 +3228,7 @@ export class MenuScene extends Phaser.Scene {
     }
     this.updateStars(time, delta);
     this.expireLegacyPlayerMessages(time);
+    this.drawLegacyPlayerMessageToast(time);
     this.advanceLegacyOverlayScrollMomentum(delta);
     for (const button of this.uiButtons) {
       button.updateFrame?.(time);
@@ -13028,6 +13047,51 @@ export class MenuScene extends Phaser.Scene {
     this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
     this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
     this.clearQueuedLegacyPlayerMessagesBySource('auth');
+  }
+
+  /**
+   * Draws the queued player messages as a fading toast stack (MAZER-UI-018).
+   * Rows come from the pure resolver; positions are rounded to whole pixels.
+   */
+  private drawLegacyPlayerMessageToast(time: number): void {
+    const width = this.layout?.width ?? this.scale.width;
+    const frame = resolveLegacyPlayerMessageToastFrame(this.playerMessageQueue, time, width);
+    const graphics = this.playerMessageToastGraphics;
+    graphics.clear();
+    if (frame.rows.length === 0) {
+      graphics.setVisible(false);
+      for (const text of this.playerMessageToastTexts) {
+        text.setVisible(false);
+      }
+      return;
+    }
+
+    graphics.setVisible(true);
+    const safeArea = readMazerViewportGeometry().safeArea;
+    const padX = 14;
+    const padY = 8;
+    let y = Math.round(safeArea.top + 156);
+    this.playerMessageToastTexts.forEach((text, index) => {
+      const row = frame.rows[index];
+      if (!row) {
+        text.setVisible(false);
+        return;
+      }
+
+      text.setWordWrapWidth(frame.maxWidth - (padX * 2));
+      text.setText(row.copy);
+      text.setColor(row.color);
+      const boxWidth = Math.round(Math.min(frame.maxWidth, text.width + (padX * 2)));
+      const boxHeight = Math.round(text.height + (padY * 2));
+      const left = Math.round((width - boxWidth) / 2);
+      const color = Phaser.Display.Color.HexStringToColor(row.color).color;
+      graphics.fillStyle(0x070b14, 0.92 * row.alpha);
+      graphics.fillRoundedRect(left, y, boxWidth, boxHeight, 10);
+      graphics.lineStyle(2, color, 0.9 * row.alpha);
+      graphics.strokeRoundedRect(left, y, boxWidth, boxHeight, 10);
+      text.setPosition(Math.round(left + (boxWidth / 2)), y + padY).setAlpha(row.alpha).setVisible(true);
+      y += boxHeight + 8;
+    });
   }
 
   private expireLegacyPlayerMessages(time: number): void {
