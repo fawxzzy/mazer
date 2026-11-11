@@ -212,6 +212,9 @@ PR #372 (deterministic install gate, boot splash and bounded account bootstrap) 
 | `src/boot/installGate.ts` | `Paste it into Safari or Chrome.` | static | install gate step, in-app-browser mode; active; none (install instructions) |
 | `src/boot/installGate.ts` | `Install Mazer from there, then open it from your home screen.` | static | install gate step, in-app-browser mode; active; none (install instructions) |
 | `src/boot/installGate.ts` | `Open it from your home screen or desktop.` | static | install gate subtitle, installed-open-app mode (post-install card); active; none (install instructions) |
+| `src/boot/installGate.ts` | `Race through endless mazes, straight from your home screen.` | static | install gate value line (all install cards, with a static mini-maze mark); active; none (install pitch) |
+| `src/boot/installGate.ts` | `Link copied. Paste it into Safari or Chrome.` | static | install gate Copy link confirmation (role=status under the button); active; none (feedback to the Copy link click) |
+| `src/boot/installGate.ts` | `Could not copy the link. Copy the address from your browser instead.` | static | install gate Copy link failure notice (role=status under the button); active; none |
 
 ### 4b. Technical-only literals
 

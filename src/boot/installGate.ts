@@ -68,6 +68,8 @@ export const MAZER_INSTALL_GATE_OVERLAY_ID = 'mazer-install-gate-overlay';
 export interface MazerInstallGateCopy {
   title: string;
   subtitle: string;
+  /** One short line on why installing is worth it; empty for the post-install card. */
+  valueLine: string;
   /** At most three short steps; empty for the post-install "open the app" card. */
   steps: string[];
   /** Null when the card has no native action of its own (manual platforms). */
@@ -78,6 +80,13 @@ export interface MazerInstallGateCopy {
 
 const INSTALL_TITLE = 'Install Mazer';
 const INSTALL_SUBTITLE = 'Mazer only runs as an installed app, not in a browser tab.';
+const INSTALL_VALUE_LINE = 'Race through endless mazes, straight from your home screen.';
+
+/** Shown under the Copy link button once the copy attempt has finished. */
+export const MAZER_INSTALL_GATE_COPY_FEEDBACK = {
+  copied: 'Link copied. Paste it into Safari or Chrome.',
+  failed: 'Could not copy the link. Copy the address from your browser instead.'
+} as const;
 
 /**
  * Per-platform copy. Short and plain, three steps max. There is deliberately
@@ -87,6 +96,7 @@ export const MAZER_INSTALL_GATE_COPY: Readonly<Record<InstallGateMode, MazerInst
   'prompt-available': {
     title: INSTALL_TITLE,
     subtitle: INSTALL_SUBTITLE,
+    valueLine: INSTALL_VALUE_LINE,
     steps: [
       'Press Install below.',
       'Confirm in your browser.',
@@ -99,6 +109,7 @@ export const MAZER_INSTALL_GATE_COPY: Readonly<Record<InstallGateMode, MazerInst
   'manual-desktop-chromium': {
     title: INSTALL_TITLE,
     subtitle: INSTALL_SUBTITLE,
+    valueLine: INSTALL_VALUE_LINE,
     steps: [
       'Click the install icon at the end of the address bar, or open the browser menu and choose Install Mazer.',
       'Confirm the install.',
@@ -111,6 +122,7 @@ export const MAZER_INSTALL_GATE_COPY: Readonly<Record<InstallGateMode, MazerInst
   'manual-desktop-other': {
     title: INSTALL_TITLE,
     subtitle: INSTALL_SUBTITLE,
+    valueLine: INSTALL_VALUE_LINE,
     steps: [
       'Open this page in Chrome or Edge. In Safari, choose File, then Add to Dock.',
       'In Chrome or Edge, click the install icon in the address bar.',
@@ -123,6 +135,7 @@ export const MAZER_INSTALL_GATE_COPY: Readonly<Record<InstallGateMode, MazerInst
   'manual-android': {
     title: INSTALL_TITLE,
     subtitle: INSTALL_SUBTITLE,
+    valueLine: INSTALL_VALUE_LINE,
     steps: [
       'Open this page in Chrome and tap the three-dot menu.',
       'Choose Install app or Add to Home screen.',
@@ -135,6 +148,7 @@ export const MAZER_INSTALL_GATE_COPY: Readonly<Record<InstallGateMode, MazerInst
   'manual-ios': {
     title: INSTALL_TITLE,
     subtitle: INSTALL_SUBTITLE,
+    valueLine: INSTALL_VALUE_LINE,
     steps: [
       'Tap the Share button in Safari.',
       'Choose Add to Home Screen.',
@@ -147,6 +161,7 @@ export const MAZER_INSTALL_GATE_COPY: Readonly<Record<InstallGateMode, MazerInst
   'in-app-browser': {
     title: INSTALL_TITLE,
     subtitle: 'Mazer only runs as an installed app, and in-app browsers cannot install it.',
+    valueLine: INSTALL_VALUE_LINE,
     steps: [
       'Copy the link below.',
       'Paste it into Safari or Chrome.',
@@ -159,6 +174,7 @@ export const MAZER_INSTALL_GATE_COPY: Readonly<Record<InstallGateMode, MazerInst
   'installed-open-app': {
     title: 'Mazer is installed',
     subtitle: 'Open it from your home screen or desktop.',
+    valueLine: '',
     steps: [],
     primaryLabel: null,
     primaryAction: null,
@@ -208,7 +224,8 @@ export interface MazerInstallGateHandle {
 }
 
 export interface MazerInstallGateCallbacks {
-  onCopyLink(): void;
+  /** May resolve to whether the copy worked; the card then confirms or reports failure. */
+  onCopyLink(): void | boolean | Promise<boolean>;
   onInstall(): void;
 }
 
@@ -228,6 +245,15 @@ const renderStepsHtml = (steps: readonly string[]): string => {
 
   return `<ol class="mazer-install-gate-steps">${items}</ol>`;
 };
+
+/** Static mini-maze mark: a decorative three-by-three corridor, hidden from assistive tech. */
+const MINI_MAZE_SVG = '<svg class="mazer-install-gate-mini-maze" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true" focusable="false"><rect x="2" y="2" width="44" height="44" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.4" stroke-width="2"/><path d="M8 14H30V24H16V34H40" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="14" r="3" fill="currentColor"/></svg>';
+
+const renderValueHtml = (valueLine: string): string => (
+  valueLine === ''
+    ? ''
+    : `<div class="mazer-install-gate-value">${MINI_MAZE_SVG}<p class="mazer-install-gate-value-line">${escapeHtml(valueLine)}</p></div>`
+);
 
 const removeInstallGateOverlay = (documentRef: InstallGateDocumentLike): void => {
   const existing = documentRef.getElementById(MAZER_INSTALL_GATE_OVERLAY_ID);
@@ -275,8 +301,9 @@ export const installMazerInstallGate = (
         <strong class="mazer-install-gate-brand">MAZER</strong>
         <h1 class="mazer-install-gate-title">${escapeHtml(copy.title)}</h1>
         <p class="mazer-install-gate-subtitle">${escapeHtml(copy.subtitle)}</p>
+        ${renderValueHtml(copy.valueLine)}
         ${renderStepsHtml(copy.steps)}
-        <div class="mazer-install-gate-actions">${buttonsHtml}</div>
+        <div class="mazer-install-gate-actions">${buttonsHtml}<p class="mazer-install-gate-feedback" data-mazer-install-gate-feedback role="status"></p></div>
       </div>
     `;
 
@@ -286,7 +313,17 @@ export const installMazerInstallGate = (
         if (action === 'install') {
           callbacks.onInstall();
         } else if (action === 'copy') {
-          callbacks.onCopyLink();
+          void Promise.resolve(callbacks.onCopyLink()).then((copied) => {
+            if (copied === undefined) {
+              return;
+            }
+            const feedback = overlay.querySelector('[data-mazer-install-gate-feedback]');
+            if (feedback) {
+              feedback.textContent = copied
+                ? MAZER_INSTALL_GATE_COPY_FEEDBACK.copied
+                : MAZER_INSTALL_GATE_COPY_FEEDBACK.failed;
+            }
+          });
         }
       });
     });
@@ -342,7 +379,7 @@ export const runMazerInstallGate = (
 
     const handle = installMazerInstallGate(documentRef, initialState, {
       onCopyLink: () => {
-        void copyMazerInstallLink(typeof window === 'undefined' ? '' : window.location.href);
+        return copyMazerInstallLink(typeof window === 'undefined' ? '' : window.location.href);
       },
       onInstall: () => {
         void promptInstallSurface();
