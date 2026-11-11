@@ -1104,7 +1104,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // fillLegacyPlayDynamicPathTile -- that function is gone.
     expect(menuSceneSource).not.toContain('private fillLegacyPlayDynamicPathTile(');
     expect(menuSceneSource).toContain('private drawLegacyContinuousPlayTrail(');
-    expect(menuSceneSource).toContain('this.drawLegacyContinuousPlayTrail(time, mazeLeft, mazeTop, mazeTileSize, renderedPlayerPoint, menuTrailAlphaMultiplier);');
+    expect(menuSceneSource).toContain('this.drawLegacyContinuousPlayTrail(time, mazeLeft, mazeTop, mazeTileSize, this.resolveLegacyRenderedTrailHeadPoint(time), menuTrailAlphaMultiplier);');
     expect(menuSceneSource).toContain('this.hasLegacyPlayTrailPulsePendingFrame(time)');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;');
     expect(menuSceneSource).toContain('private legacyPlayTrailPulseNextFrameAtMs = 0;');
@@ -1165,8 +1165,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_COLOR = cyberArcadeMaterial.signal.player;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;');
-    expect(menuSceneSource).toContain('const stretchAmount = Math.sin(progress * Math.PI) * 0.18;');
-    expect(menuSceneSource).toContain('const horizontalMove = Math.abs(dx) >= Math.abs(dy);');
+    expect(menuSceneSource).toContain('const stretchAmount = motionPose.amount * 0.1;');
+    expect(menuSceneSource).toContain('const horizontalMove = Math.abs(motionPose.headingX) >= Math.abs(motionPose.headingY);');
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, beaconRadius);');
     expect(menuSceneSource).toContain('resolveLegacyPlayerLocatorRenderMetrics(');
     expect(menuSceneSource).toContain('drawLocatorTick(centerX - locatorMetrics.outerRadius, centerY, centerX - locatorMetrics.innerRadius, centerY);');
@@ -1585,7 +1585,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(preferenceSource).toContain("window.matchMedia('(prefers-reduced-motion: reduce)')");
     expect(preferenceSource).toContain("mediaQuery.addEventListener('change', this.legacyReducedMotionMediaQueryListener)");
     expect(preferenceSource).toContain("mediaQuery.removeEventListener('change', listener)");
-    expect(preferenceSource).toContain('this.syncLegacyPlayerVisualMotionTo(this.playerVisualMotion.to);');
+    expect(preferenceSource).toContain('this.syncLegacyPlayerVisualMotionTo(this.playerGlide.getTarget());');
     expect(preferenceSource).toContain('this.backdropDirty = true;');
     expect(preferenceSource).toContain('this.boardDynamicDirty = true;');
     expect(preferenceSource).toContain('this.hudDirty = true;');
