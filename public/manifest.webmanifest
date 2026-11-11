@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Mazer",
   "short_name": "Mazer",
-  "description": "Ambient-only maze presentation with profile-driven launch surfaces.",
+  "description": "A fast neon maze game. Find your way to the goal, level after level, on your phone or computer.",
   "lang": "en-US",
   "start_url": "/",
   "scope": "/",
@@ -64,6 +64,36 @@
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/narrow-play-l30.png?v=mazer-shots-v1",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "A mid-game maze on a phone"
+    },
+    {
+      "src": "/screenshots/narrow-play-l100.png?v=mazer-shots-v1",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "A larger, harder maze on a phone"
+    },
+    {
+      "src": "/screenshots/wide-play-l30.png?v=mazer-shots-v1",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "A mid-game maze on a computer"
+    },
+    {
+      "src": "/screenshots/wide-play-l100.png?v=mazer-shots-v1",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "A larger, harder maze on a computer"
     }
   ]
 }

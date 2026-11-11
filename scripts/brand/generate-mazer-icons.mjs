@@ -11,7 +11,7 @@ const MASTER_SHA256 = 'ede90e596682795d10f97bed615071ca1f60e08e290eacf1ea143006d
 const MASTER_BYTES = 1_173_366;
 const MASTER_SIZE = 1024;
 const MASKABLE_SAFE_DIAMETER_RATIO = 0.8;
-const ICO_SIZES = Object.freeze([16, 32, 48, 64, 128, 256]);
+const ICO_SIZES = Object.freeze([16, 32, 48]);
 
 const sha256 = (payload) => createHash('sha256').update(payload).digest('hex');
 

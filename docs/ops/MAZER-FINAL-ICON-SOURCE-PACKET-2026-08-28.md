@@ -38,8 +38,8 @@ No native wrapper or asset catalog exists. `public/icons/mazer-emblem.svg` and `
 
 | Asset | SHA-256 |
 | --- | --- |
-| `public/favicon.ico` | `050a42199c7762f21508df8d53d3cd40eaa8086543de448f3e0b3bc7ae1e43fc` |
-| `public/icons/mazer-app-icon.ico` | `050a42199c7762f21508df8d53d3cd40eaa8086543de448f3e0b3bc7ae1e43fc` |
+| `public/favicon.ico` | `1e688908a878ce00f8881d6eefb9d25818b3062c219f6732037a67a79d104ba1` |
+| `public/icons/mazer-app-icon.ico` | `1e688908a878ce00f8881d6eefb9d25818b3062c219f6732037a67a79d104ba1` |
 | `public/icons/mazer-app-icon.png` | `ede90e596682795d10f97bed615071ca1f60e08e290eacf1ea143006df914d78` |
 | `public/icons/apple-touch-icon.png` | `337c61c2b6fd2c1dd6c2e67e92b5b596137e456e88605afc2edc510c66fc3395` |
 | `public/icons/icon-192.png` | `f7195a659b978ffb790202925a038b991194f69882dda99ebffb7f4b7b6e5279` |

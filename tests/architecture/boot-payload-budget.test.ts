@@ -23,10 +23,10 @@ const BOOT_PRELOAD_BUDGET_BYTES = 1_100_000;
 const BOOT_PRELOAD_SINGLE_FILE_BUDGET_BYTES = 560_000;
 // public/assets is exactly the boot preload set (see the "no unreferenced weight" test).
 const PUBLIC_ASSETS_BUDGET_BYTES = 1_100_000;
-// Measured 2026-11-06: 2,681,017 B of icons/favicons/font listed in vite.config.ts includeAssets (precached, not on the boot
+// Measured 2026-11-11 after the favicon trim (ICO 16/32/48 only): 2,257,957 B (was 2,681,017 B on 2026-11-06) of icons/favicons/font listed in vite.config.ts includeAssets (precached, not on the boot
 // network path). Pinned at today's value, not endorsed: shrinking them needs the brand pipeline
 // (scripts/brand/generate-mazer-icons.mjs + hash pins) and a vite.config.ts (Wave 5C) change.
-const PRECACHE_INCLUDE_ASSETS_BUDGET_BYTES = 2_800_000;
+const PRECACHE_INCLUDE_ASSETS_BUDGET_BYTES = 2_300_000;
 
 const BOOT_CACHE_BUST = /const MAZER_VFX_ASSET_CACHE_BUST = '([^']+)';/.exec(bootSource)?.[1] ?? '';
 

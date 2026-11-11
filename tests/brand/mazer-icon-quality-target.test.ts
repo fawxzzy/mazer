@@ -102,7 +102,7 @@ describe('Mazer icon-quality target', () => {
     const canonical = readFileSync(resolve(process.cwd(), MAZER_ICON_QUALITY_TARGET.canonicalAsset.repositoryPath));
     expect(source.byteLength).toBe(1_173_366);
     expect(canonical.equals(source)).toBe(true);
-    expect(readIcoSizes('public/favicon.ico')).toEqual([16, 32, 48, 64, 128, 256]);
+    expect(readIcoSizes('public/favicon.ico')).toEqual([16, 32, 48]);
     expect(readFileSync(resolve(process.cwd(), 'public/favicon.ico')).equals(
       readFileSync(resolve(process.cwd(), 'public/icons/mazer-app-icon.ico'))
     )).toBe(true);
