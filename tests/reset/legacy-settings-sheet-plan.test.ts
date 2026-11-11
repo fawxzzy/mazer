@@ -55,6 +55,8 @@ describe('settings sheet model', () => {
       'trail-fade',
       'trail-shine',
       'animated-background',
+      'reduce-motion',
+      'reduce-motion-note',
       'haptics'
     ]);
   });
@@ -139,6 +141,7 @@ describe('settings sheet model', () => {
       ['Trail Fade', 'On', 'Off'],
       ['Trail Shine', 'On', 'Off'],
       ['Animated Background', 'Animated', 'Still'],
+      ['Reduce Motion', 'On', 'System'],
       ['Haptics', 'On', 'Off']
     ]);
     for (const toggle of toggles) {
@@ -190,12 +193,12 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
         expect(item.rect.height, `${item.model.id} height`).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
         expect(item.rect.width, `${item.model.id} width`).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
       }
-      // Headings are the only non-interactive rows.
-      expect(p.items.filter((i) => !i.interactive).every((i) => i.model.kind === 'heading')).toBe(true);
+      // Headings and the helper note are the only non-interactive rows.
+      expect(p.items.filter((i) => !i.interactive).every((i) => i.model.kind === 'heading' || i.model.kind === 'note')).toBe(true);
     });
 
     test.each(cases)('%s: label fonts never shrink below the body token and labels may wrap', (_label, p) => {
-      for (const item of p.items) {
+      for (const item of p.items.filter((i) => i.model.kind !== 'note')) {
         expect(item.labelFontSize).toBeGreaterThanOrEqual(designTokens.legacy.fontSizePx.body);
         expect(item.labelMaxLines).toBe(item.model.kind === 'heading' ? 1 : 2);
         expect(item.labelMaxLines * LEGACY_SETTINGS_SIZES.labelLineHeight).toBeLessThanOrEqual(item.rect.height);
@@ -288,6 +291,8 @@ describe('settings sheet plan specifics', () => {
       'trail-fade',
       'trail-shine',
       'animated-background',
+      'reduce-motion',
+      'reduce-motion-note',
       'haptics',
       'quit-to-menu'
     ]);
@@ -303,6 +308,8 @@ describe('settings sheet plan specifics', () => {
       'trail-fade',
       'trail-shine',
       'animated-background',
+      'reduce-motion',
+      'reduce-motion-note',
       'haptics',
       'account-heading',
       'reset-progress',
@@ -382,9 +389,10 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
     const plan = buildLegacySettingsSheetPlan({ context: 'pause', height: 568, settingsExpanded: true, signedIn: true, width: 320 });
     // Before the header reserve was freed: panel.height 552 minus 52 = 500 available. Now: all 552.
     expect(plan.panel.height).toBe(552);
-    // Board Zoom's removal had let the expanded pause card fit at 538. The Haptics toggle row (MAZER-CTRL-001)
-    // adds 60 px, so the natural card is 598: taller than the panel, so the card fills the panel and scrolls.
-    expect(plan.naturalCardHeight).toBe(598);
+    // Board Zoom's removal had let the expanded pause card fit at 538. The Haptics toggle row (MAZER-CTRL-001) and
+    // the Reduce Motion toggle + helper note (MAZER-MOTION-004) make the natural card taller than the panel,
+    // so the card fills the panel and scrolls (the rail is expected).
+    expect(plan.naturalCardHeight).toBe(0);
     expect(plan.card.height).toBe(plan.panel.height);
     expect(plan.scrollable).toBe(true);
     // The signed-in menu sheet is still 590 tall at 320x568: it genuinely overflows and keeps the rail.
@@ -405,7 +413,8 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
     }
     // 390x844 and 1280x720 hold the whole menu sheet without a rail now that the reserve is gone.
     expect(plan('menu', { height: 844, width: 390 }).scrollable).toBe(false);
-    expect(plan('menu', { height: 720, width: 1280 }).scrollable).toBe(false);
+    // The Reduce Motion toggle + note (156 px) tip the signed-in menu sheet over 720 px tall: it scrolls there now.
+    expect(plan('menu', { height: 720, width: 1280 }).scrollable).toBe(true);
   });
 
   test('at 320 wide the label column still holds a 14 px "Background" on its own line', () => {

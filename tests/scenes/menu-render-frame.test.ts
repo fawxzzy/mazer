@@ -1118,7 +1118,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('trailHeadColor: resolveLegacyIridescentTrailColor(trailHeadIndex, trailLength, time, palette.trailColor)');
     expect(menuSceneSource).toContain('trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
     expect(menuSceneSource).toContain('trailPulseEnabled: this.isLegacyTrailShineVisible()');
-    expect(menuSceneSource).toContain('return this.legacyReducedMotionEnabled;');
+    expect(menuSceneSource).toContain('resolveReducedMotion(this.legacyReducedMotionEnabled, this.settings.toggleReducedMotion)');
     expect(menuSceneSource).toContain('private isLegacyTrailShineVisible(): boolean');
     expect(menuSceneSource).toContain('playerCoreRadius: playerMarkerMetrics.coreRadius');
     expect(menuSceneSource).toContain('playerBeaconColor: LEGACY_PLAY_PLAYER_BEACON_COLOR');
@@ -1557,7 +1557,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(preferenceSource).toContain('this.backdropDirty = true;');
     expect(preferenceSource).toContain('this.boardDynamicDirty = true;');
     expect(preferenceSource).toContain('this.hudDirty = true;');
-    expect(preferenceSource).toContain('return this.legacyReducedMotionEnabled;');
+    expect(preferenceSource).toContain('resolveReducedMotion(this.legacyReducedMotionEnabled, this.settings.toggleReducedMotion)');
     expect(preferenceSource).not.toContain('tryMovePlayerFromInput');
     expect(preferenceSource).not.toContain('legacyWorldTurnHost');
   });
