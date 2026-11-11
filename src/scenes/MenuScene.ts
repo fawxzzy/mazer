@@ -414,6 +414,7 @@ import {
   type LegacyProgressionState,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
+import { resolveLegacyGenerationTrack } from '../legacy-runtime/legacyMenuDemoTrack';
 import {
   LEGACY_USERNAME_PATTERN,
   checkLegacyUsernameAvailable,
@@ -5732,24 +5733,18 @@ export class MenuScene extends Phaser.Scene {
     this.titleGraphics.setVisible(generationState.titleVisible);
     this.menuDemoEpisode = this.mode === 'menu' ? createLegacyDemoWalkerEpisode(this.maze) : null;
     if (this.mode === 'menu') {
-      // The menu demo's board and the AI walker's own simulated skill both
-      // now mirror the PLAYER's current progression, not the separately-
-      // persisted ai-runner track's own independent history -- see
-      // resolveLegacyProgressionScaleForMode/resolveLegacyMazeGenerationProfileForMode/
-      // resolveLegacyTargetComplexityForMode's own comments on the same
-      // change for menu-mode generation. The ai-runner track itself still
-      // records its own completions (recordMazeCycleCompletion/
-      // resolveLegacyProgressionTrackIdForSurface are unrelated to this --
-      // completion bookkeeping stays exactly as it was), it just no longer
-      // drives what the ambient demo actually shows or how skilled it plays.
-      const playerTrack = this.progressionState.tracks.player;
+      // MAZER-FLOW-007: the menu demo is an independent attract loop. Its
+      // board and the AI walker's simulated skill both come from the
+      // ai-runner track (one level per completed demo maze), never from the
+      // PLAYER's track -- see resolveLegacyGenerationTrack.
+      const menuTrack = resolveLegacyGenerationTrack(this.progressionState, 'menu');
       const bootstrap = createLegacyMenuDemoBootstrap(
         this.maze,
         this.settings.toggleTrailFade,
         TRAIL_FADE_TAIL,
         {
-          aiSkillLevel: resolveLegacyProgressionLevel(playerTrack.targetComplexity),
-          aiSkillRank: playerTrack.rank
+          aiSkillLevel: resolveLegacyProgressionLevel(menuTrack.targetComplexity),
+          aiSkillRank: menuTrack.rank
         }
       );
       this.menuDemoEpisode = bootstrap.episode;
@@ -5877,29 +5872,27 @@ export class MenuScene extends Phaser.Scene {
       : seed;
   }
 
-  // Salted from the PLAYER's own track now, not ai-runner's -- see
-  // resolveLegacyProgressionScaleForMode's own comment. Keeps a distinct
-  // multiplier set (and its own createLegacyRuntimeRandomSeed call) from
-  // createFreshLegacyPlayGenerationSeed so the menu demo still generates a
-  // different maze instance than whatever the player's live board is, just
-  // salted from the same underlying progression data instead of the
-  // separately-drifting ai-runner counters.
+  // Salted from the menu demo's own ai-runner track (MAZER-FLOW-007), so each
+  // completed demo maze moves the salt along with the demo's level. Keeps a
+  // distinct multiplier set (and its own createLegacyRuntimeRandomSeed call)
+  // from createFreshLegacyPlayGenerationSeed so the demo generates a different
+  // maze instance than whatever the player's live board is.
   private createFreshLegacyMenuGenerationSeed(): number {
-    const playerTrack = this.progressionState.tracks.player;
-    const completedCyclesSeed = resolveLegacyProgressionOrdinalSeedComponent(playerTrack.completedCycles, 1_000_003);
-    const levelSeed = resolveLegacyProgressionOrdinalSeedComponent(playerTrack.level, 1_000_033);
+    const menuTrack = resolveLegacyGenerationTrack(this.progressionState, 'menu');
+    const completedCyclesSeed = resolveLegacyProgressionOrdinalSeedComponent(menuTrack.completedCycles, 1_000_003);
+    const levelSeed = resolveLegacyProgressionOrdinalSeedComponent(menuTrack.level, 1_000_033);
     const progressionSalt = (
-      (playerTrack.targetComplexity * 1151)
+      (menuTrack.targetComplexity * 1151)
       + (completedCyclesSeed * 7219)
       + (levelSeed * 433)
-      + (playerTrack.paceScore * 41)
+      + (menuTrack.paceScore * 41)
     );
     const seed = createLegacyRuntimeRandomSeed({
       nowMs: Math.round(this.time.now + progressionSalt),
       previousSeed: this.mazeSeed
     });
 
-    return seed === this.mazeSeed || seed === playerTrack.lastMazeSeed
+    return seed === this.mazeSeed || seed === menuTrack.lastMazeSeed
       ? createLegacyRuntimeRandomSeed({
         nowMs: Math.round(this.time.now + progressionSalt + 1),
         previousSeed: stepLegacyGenerationSeed(this.mazeSeed)
@@ -15530,17 +15523,13 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  // Both play and the menu demo generate against the PLAYER's own
-  // progression now -- the menu demo used to read the separately-persisted
-  // ai-runner track instead, which let its board drift to a different
-  // level than whatever the player was actually on. The ai-runner track
-  // still exists and still records its own completions (unrelated
-  // bookkeeping -- see resolveLegacyProgressionTrackIdForSurface), it just
-  // no longer decides what the menu shows or how it's generated.
+  // MAZER-FLOW-007: play generates against the PLAYER's track, the menu demo
+  // against the independent ai-runner track (see legacyMenuDemoTrack.ts). Every
+  // generation resolver below goes through this one lookup.
   private resolveLegacyProgressionScaleForMode(mode: RuntimeMode): number {
     return resolveLegacyProgressionGenerationScale(
       this.settings.scale,
-      this.progressionState.tracks.player,
+      resolveLegacyGenerationTrack(this.progressionState, mode),
       this.resolveLegacyProgressionScaleOptionsForMode(mode)
     );
   }
@@ -15553,9 +15542,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyMazeGenerationProfileForMode(mode: RuntimeMode) {
-    // See resolveLegacyProgressionScaleForMode's own comment: menu-mode
-    // generation reads the player's own track now, not ai-runner's.
-    const track = this.progressionState.tracks.player;
+    // See resolveLegacyProgressionScaleForMode's own comment.
+    const track = resolveLegacyGenerationTrack(this.progressionState, mode);
     // Device-relative: how close this level's board already sits to what
     // THIS screen can legibly render drives feeder/bleed-path count now,
     // not just a fixed per-band number that assumes some unconfigured
@@ -15569,10 +15557,9 @@ export class MenuScene extends Phaser.Scene {
     return resolveLegacyMazeGenerationProfileForProgression(track, { fraction });
   }
 
-  private resolveLegacyTargetComplexityForMode(_mode: RuntimeMode): number {
-    // See resolveLegacyProgressionScaleForMode's own comment: menu-mode
-    // generation reads the player's own track now, not ai-runner's.
-    return this.progressionState.tracks.player.targetComplexity;
+  private resolveLegacyTargetComplexityForMode(mode: RuntimeMode): number {
+    // See resolveLegacyProgressionScaleForMode's own comment.
+    return resolveLegacyGenerationTrack(this.progressionState, mode).targetComplexity;
   }
 
   private appendLegacyPlayCyclePoint(point: LegacyPoint): void {

@@ -18,7 +18,7 @@ Conventions:
 3. **The player track forces `challenge` for every completion** (`legacyProgression.ts:1391-1396`). The run-quality score and its player signal are still computed and stored as `paceScore`, but they cannot alter the signal the player track records.
 4. **The AI track records the scorer's own signal** (`legacyProgression.ts:1397`), but that signal only feeds counters and the six-entry window, not the target.
 5. **The run-quality score does have one live effect on gameplay:** the player's `paceScore` feeds `resolveLegacyMovementSpeedProfile` (`src/legacy-runtime/legacyMovementSpeed.ts:14-15`, `:86-93`), shifting effective movement speed by up to `+-0.05 * ((paceScore-50)/50)` of the preference envelope. Changing scorer weights changes player movement feel.
-6. **Menu generation and menu-AI skill read the player track, not the ai-runner track** (`src/scenes/MenuScene.ts:6398-6405`, `:17795-17842`). This contradicts the wording in `docs/current-truth.md` (see Discrepancies).
+6. **Menu generation and menu-AI skill read the independent `ai-runner` track** (MAZER-FLOW-007, 2026-11-11; `resolveLegacyGenerationTrack` in `src/legacy-runtime/legacyMenuDemoTrack.ts`, used by every generation resolver, the menu seed salt and the AI walker skill/rank in `src/scenes/MenuScene.ts`). The demo climbs one level per completed demo maze; play stays on the player track. An earlier revision (commit f9cd8a2e) had bound the menu to the player track, which made a new player's demo repeat the level-1 corridor forever; that was reverted.
 7. **Rank thresholds live in exactly two production copies:** one TypeScript function and the server completion RPC bodies (plus repair migrations). No other source file duplicates them.
 
 ## 1. Pipeline overview
@@ -221,7 +221,7 @@ There is no shared constant: the TypeScript and the SQL are hand-synchronized.
 
 Discrepancies found while verifying (documented, not fixed):
 
-- `docs/current-truth.md` (line 151 and the HUD paragraph) says the menu AI binds to the independent `ai-runner` track. `MenuScene.ts:6398-6405` and `:17795-17842` bind menu generation and AI skill to the **player** track, with source comments saying so deliberately. Which is intended is UNKNOWN; the code is what runs.
+- Resolved (MAZER-FLOW-007, 2026-11-11): `docs/current-truth.md` says the menu AI binds to the independent `ai-runner` track, and the code now does too. Earlier `MenuScene` revisions bound menu generation and AI skill to the player track; the audit above describes that older state.
 - `docs/research/MAZER_LEVEL_RANK_COMPLEXITY_CONTRACT.md` "Current Implemented Truth" still describes signal-dependent step sizes (`challenge` up to +3, `ease` -1/-2, consistency bonuses, pre-supersession bullets) and an AI pressure formula with `wrongBranch*3` and per-decision denominators. The superseding section and the code use the flat `+4` and the scorer in `mazeCycleAiScorer.mjs:26-40` (`wrongBranch*1`, scaled by 100, backtrack `0.75`, recovery `2.25`). Treat the code as authoritative.
 - The AI "average" run is `challenge` while the identical player run is `hold` (scorer asymmetry, section 2.4).
 - Three signal derivations exist (player scorer, AI scorer, telemetry learning signal) with different thresholds.

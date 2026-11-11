@@ -728,14 +728,13 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("window.removeEventListener('blur', this.legacyPlayWindowBlurHandler);");
     expect(menuSceneSource).toContain("document.addEventListener('visibilitychange', this.legacyPlayVisibilityChangeHandler);");
     expect(menuSceneSource).toContain('private handleLegacyPlayInputFocusLoss(): void {');
-    // The menu demo's simulated skill mirrors the PLAYER's own track now,
-    // not the separately-persisted ai-runner track -- see
-    // resolveLegacyProgressionScaleForMode's own comment on the same change
-    // for menu-mode generation.
-    expect(menuSceneSource).toContain('const playerTrack = this.progressionState.tracks.player;');
+    // MAZER-FLOW-007: the menu demo's simulated skill comes from the
+    // independent ai-runner track (resolveLegacyGenerationTrack(..., 'menu')),
+    // never the PLAYER's track.
+    expect(menuSceneSource).toContain("const menuTrack = resolveLegacyGenerationTrack(this.progressionState, 'menu');");
     expect(menuSceneSource).toContain('createLegacyMenuDemoBootstrap(');
-    expect(menuSceneSource).toContain('aiSkillLevel: resolveLegacyProgressionLevel(playerTrack.targetComplexity)');
-    expect(menuSceneSource).toContain('aiSkillRank: playerTrack.rank');
+    expect(menuSceneSource).toContain('aiSkillLevel: resolveLegacyProgressionLevel(menuTrack.targetComplexity)');
+    expect(menuSceneSource).toContain('aiSkillRank: menuTrack.rank');
     expect(menuSceneSource).toContain('advanceLegacyMenuDemoFrame(');
     expect(demoLifecycleSource).toContain('createLegacyMenuSnapshotDemoWalkerConfig(maze.seed)');
     expect(demoLifecycleSource).toContain('createLegacyMenuDemoWalkerConfig(maze.seed, skill)');
