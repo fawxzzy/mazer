@@ -503,11 +503,16 @@ import {
   LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID,
   readLegacyBootstrappedAccountState,
   readLegacyBootstrappedAuthSnapshot,
+  replayLegacyRemoteCompletions,
   writeLegacyRemoteCompletion,
   writeLegacyRemoteProgressionState,
   writeLegacyRemoteSettings,
   type LegacyRemoteProgressionSyncResult
 } from '../legacy-runtime/legacyRemoteProgression';
+import {
+  createLegacyOfflineCompletionFlush,
+  type LegacyOfflineCompletionFlush
+} from '../legacy-runtime/legacyOfflineCompletionFlush';
 import {
   clampLegacyOverlayScrollOffset,
   resolveLegacyOverlayScrollMetrics,
@@ -2084,6 +2089,7 @@ export class MenuScene extends Phaser.Scene {
   private overlayMovementSpeedSliderBounds: VisualRect | null = null;
   private viewportGeometryListener: (() => void) | null = null;
   private oauthPageShowCleanup: (() => void) | null = null;
+  private offlineCompletionFlush: LegacyOfflineCompletionFlush | null = null;
   /** Cached OS accessibility preference; never read from the render loop. */
   private legacyReducedMotionEnabled = false;
   private legacyReducedMotionMediaQuery: MediaQueryList | null = null;
@@ -2502,6 +2508,7 @@ export class MenuScene extends Phaser.Scene {
         this.authSubmitting = false;
         this.uiDirty = true;
       });
+      this.installLegacyOfflineCompletionFlush();
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       // The CanvasTexture is registered in the game-level TextureManager,
@@ -2551,6 +2558,8 @@ export class MenuScene extends Phaser.Scene {
       }
       this.oauthPageShowCleanup?.();
       this.oauthPageShowCleanup = null;
+      this.offlineCompletionFlush?.dispose();
+      this.offlineCompletionFlush = null;
       this.clearVisualDiagnostics();
       clearMenuSceneRuntimeDiagnostics();
     });
@@ -15522,6 +15531,7 @@ export class MenuScene extends Phaser.Scene {
             );
           }
           this.publishLegacyRemoteSyncResult(result);
+          this.offlineCompletionFlush?.noteCompletionResult(result);
         })
         .catch((error: unknown) => {
           if (!isLegacyRemoteCompletionContextCurrent(
@@ -15582,6 +15592,42 @@ export class MenuScene extends Phaser.Scene {
       .catch((error: unknown) => {
         this.publishLegacyRemoteSyncException('settings', error);
       });
+  }
+
+  // MAZER-FLOW-009: replay the durable completion outbox on the browser
+  // `online` event and say once per outage that progress is saved.
+  private installLegacyOfflineCompletionFlush(): void {
+    if (this.levelPreviewStorage !== null) {
+      return;
+    }
+    this.offlineCompletionFlush = createLegacyOfflineCompletionFlush({
+      flush: async () => {
+        const snapshot = { ...this.authSnapshot };
+        const sequence = this.authAccountHydrationSequence;
+        const storage = this.resolveLegacyProgressionStorage();
+        const result = await replayLegacyRemoteCompletions(
+          snapshot,
+          this.progressionState,
+          this.resolveBrowserLocalStorage()
+        );
+        if (!isLegacyRemoteCompletionContextCurrent(
+          snapshot,
+          sequence,
+          this.authSnapshot,
+          this.authAccountHydrationSequence
+        )) {
+          return null;
+        }
+        if (result.progressionState) {
+          this.progressionState = writeLegacyProgressionState(storage, result.progressionState);
+        }
+        this.publishLegacyRemoteSyncResult(result);
+        return result;
+      },
+      isOnline: () => typeof navigator === 'undefined' || navigator.onLine !== false,
+      notify: (message) => this.pushLegacyPlayerMessage(message),
+      target: window
+    });
   }
 
   private publishLegacyRemoteSyncResult(result: LegacyRemoteProgressionSyncResult): void {

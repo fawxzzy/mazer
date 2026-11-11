@@ -40,6 +40,10 @@ import {
   writeMazeCycleTelemetryHistory,
   type MazeCycleTelemetryReceipt
 } from '../../src/legacy-runtime/mazeCycleTelemetry';
+import {
+  createLegacyOfflineCompletionFlush,
+  LEGACY_OFFLINE_COMPLETION_COPY
+} from '../../src/legacy-runtime/legacyOfflineCompletionFlush';
 import { LEGACY_REMOTE_MESSAGE_COPY } from '../../src/legacy-runtime/legacyPlayerMessage';
 import { scoreMazeCycleRunQuality } from '../../src/legacy-runtime/mazeCycleRunQualityScorer.mjs';
 
@@ -1870,5 +1874,143 @@ describe('legacy remote progression', () => {
       skippedReason: null,
       synced: false
     });
+  });
+});
+
+describe('MAZER-FLOW-009 offline completion flush', () => {
+  const buildOfflineFixture = () => {
+    const previous = createEmptyLegacyProgressionState();
+    previous.tracks.player.level = '9007199254740992';
+    previous.tracks.player.completedCycles = '9007199254740991';
+    const next = createEmptyLegacyProgressionState();
+    next.updatedAt = '2026-08-23T18:00:00.000Z';
+    next.tracks.player = {
+      ...previous.tracks.player,
+      completedCycles: '9007199254740992',
+      lastCompletedAt: next.updatedAt,
+      lastReceiptId: 'offline-run',
+      level: '9007199254740993',
+      targetComplexity: 400
+    };
+    const receipt = createCompletionReceipt('offline-run', '30000000-0000-4000-8000-000000000001');
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value)
+    };
+    const from = vi.fn(() => ({
+      select: () => createMaybeSingleChain({ data: { revision: 0, state: previous }, error: null })
+    }));
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: null, error: { code: 'PGRST000', message: 'network unavailable' } })
+      .mockResolvedValueOnce({ data: [{ revision: 1, state: next }], error: null });
+    vi.mocked(getLegacyAuthClient).mockResolvedValue({ from, rpc } as never);
+    const snapshot = { status: 'authenticated' as const, userId: 'user-offline-flush' };
+    const env = { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' };
+    return { env, next, previous, receipt, rpc, snapshot, storage };
+  };
+
+  const createFakeWindow = () => {
+    const listeners = new Set<() => void>();
+    return {
+      addEventListener: (_type: 'online', listener: () => void) => { listeners.add(listener); },
+      fireOnline: () => { for (const listener of [...listeners]) listener(); },
+      listenerCount: () => listeners.size,
+      removeEventListener: (_type: 'online', listener: () => void) => { listeners.delete(listener); }
+    };
+  };
+
+  test('flushes the outbox on the online event and announces the outage once', async () => {
+    const { env, next, previous, receipt, rpc, snapshot, storage } = buildOfflineFixture();
+    const fakeWindow = createFakeWindow();
+    let online = false;
+    const notices: string[] = [];
+    let lastReplay: Promise<unknown> = Promise.resolve();
+    const controller = createLegacyOfflineCompletionFlush({
+      flush: () => {
+        const replay = replayLegacyRemoteCompletions(snapshot, next, storage, env);
+        lastReplay = replay;
+        return replay;
+      },
+      isOnline: () => online,
+      notify: (message) => notices.push(message.copy),
+      target: fakeWindow
+    });
+
+    const failed = await writeLegacyRemoteCompletion(snapshot, previous, next, receipt, env, storage);
+    expect(failed).toMatchObject({ pendingCompletionCount: 1, synced: false });
+    controller.noteCompletionResult(failed);
+    // A second offline completion in the same outage must not repeat the notice.
+    controller.noteCompletionResult(failed);
+    expect(notices).toEqual([LEGACY_OFFLINE_COMPLETION_COPY.saved]);
+    expect(readLegacyRemoteCompletionOutbox(storage, snapshot).entries).toHaveLength(1);
+
+    online = true;
+    fakeWindow.fireOnline();
+    await lastReplay;
+    await Promise.resolve();
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(readLegacyRemoteCompletionOutbox(storage, snapshot).entries).toEqual([]);
+    expect(notices).toEqual([
+      LEGACY_OFFLINE_COMPLETION_COPY.saved,
+      LEGACY_OFFLINE_COMPLETION_COPY.synced
+    ]);
+
+    controller.dispose();
+    expect(fakeWindow.listenerCount()).toBe(0);
+  });
+
+  test('does not announce while online and re-arms the notice for the next outage', async () => {
+    const fakeWindow = createFakeWindow();
+    let online = true;
+    const notices: string[] = [];
+    const flush = vi.fn(async () => ({ error: null, pendingCompletionCount: 0, synced: true }));
+    const controller = createLegacyOfflineCompletionFlush({
+      flush,
+      isOnline: () => online,
+      notify: (message) => notices.push(message.copy),
+      target: fakeWindow
+    });
+    const pending = { pendingCompletionCount: 1, synced: false };
+
+    controller.noteCompletionResult(pending);
+    expect(notices).toEqual([]);
+
+    online = false;
+    controller.noteCompletionResult(pending);
+    online = true;
+    fakeWindow.fireOnline();
+    await vi.waitFor(() => expect(notices).toHaveLength(2));
+
+    online = false;
+    controller.noteCompletionResult(pending);
+    expect(notices).toHaveLength(3);
+    expect(notices[2]).toBe(LEGACY_OFFLINE_COMPLETION_COPY.saved);
+  });
+
+  test('keeps the outage notice armed when the online flush fails and survives a throwing flush', async () => {
+    const fakeWindow = createFakeWindow();
+    let online = false;
+    const notices: string[] = [];
+    const flush = vi.fn()
+      .mockRejectedValueOnce(new Error('still flaky'))
+      .mockResolvedValueOnce({ error: 'x', pendingCompletionCount: 1, synced: false })
+      .mockResolvedValueOnce({ error: null, pendingCompletionCount: 0, synced: true });
+    const controller = createLegacyOfflineCompletionFlush({
+      flush,
+      isOnline: () => online,
+      notify: (message) => notices.push(message.copy),
+      target: fakeWindow
+    });
+    controller.noteCompletionResult({ pendingCompletionCount: 1, synced: false });
+    online = true;
+    fakeWindow.fireOnline();
+    await vi.waitFor(() => expect(flush).toHaveBeenCalledTimes(1));
+    fakeWindow.fireOnline();
+    await vi.waitFor(() => expect(flush).toHaveBeenCalledTimes(2));
+    expect(notices).toEqual([LEGACY_OFFLINE_COMPLETION_COPY.saved]);
+    fakeWindow.fireOnline();
+    await vi.waitFor(() => expect(notices).toHaveLength(2));
+    expect(notices[1]).toBe(LEGACY_OFFLINE_COMPLETION_COPY.synced);
   });
 });
