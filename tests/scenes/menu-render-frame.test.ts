@@ -2301,10 +2301,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("const seedOverride = mode === 'play'");
     expect(menuSceneSource).toContain('seedOverride');
     expect(menuSceneSource).toContain('seedOverride: this.createFreshLegacyPlayGenerationSeed()');
-    // The menu demo now generates against the player's own track too (see
-    // resolveLegacyProgressionScaleForMode's own comment) -- mode is no
-    // longer read inside this one, hence the leading underscore.
-    expect(menuSceneSource).toContain('private resolveLegacyTargetComplexityForMode(_mode: RuntimeMode): number');
+    // MAZER-FLOW-007: every generation resolver picks its track by mode
+    // (play -> player, menu -> ai-runner) through resolveLegacyGenerationTrack.
+    expect(menuSceneSource).toContain('private resolveLegacyTargetComplexityForMode(mode: RuntimeMode): number');
+    expect(menuSceneSource).toContain('resolveLegacyGenerationTrack(this.progressionState, mode).targetComplexity');
+    expect(menuSceneSource).toContain("const menuTrack = resolveLegacyGenerationTrack(this.progressionState, 'menu');");
     expect(menuSceneSource).toContain('targetComplexity: this.resolveLegacyTargetComplexityForMode(mode)');
     expect(menuSceneSource).toContain("targetComplexity: this.resolveLegacyTargetComplexityForMode('play')");
     expect(menuSceneSource).toContain("targetComplexity: this.resolveLegacyTargetComplexityForMode('menu')");
