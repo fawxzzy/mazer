@@ -180,7 +180,7 @@ simply be dropped.
 | G3 | Two side-by-side bottom buttons `Create account` and `Sign in` | One full-width dock `Sign in`; Create Account moves to the secondary rail | wiring packet; layout `dock` |
 | G4 | `Create account` and `Sign in` both call `handleSharedAccountAuthorization()` (identical OAuth start), so Create Account cannot land on a sign-up view | Create Account deep-links to the sign-up view | BLOCKED on FawxzzyWeb (no sign-up deep link exists; see below). Distinct `create-account` action kept so the route can change without touching the screen |
 | G5 | Dock label `Opening` while `authSubmitting`, no upper bound; `handleSharedAccountAuthorization` ignores re-entry while set | Bounded label, then recoverable | `LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS`, `opening-slow`; scene must clear `authSubmitting` |
-| G6 | Redirect chain: Mazer (`beginMazerOAuthAuthorization`) -> Supabase `/auth/v1/oauth/authorize` -> account host `/oauth/authorize` (shows "One moment." while it checks the request) -> `/login` (Fitness-shaped Welcome; sign-in) -> `/oauth/authorize` again -> consent "Continue to Mazer?" -> `https://mazer.fawxzzy.com/` callback | Fewer visible intermediate pages; consent skip for the first-party client is an owner decision | Partly FawxzzyWeb, OWNER-GATED (below) |
+| G6 | Redirect chain: Mazer (`beginMazerOAuthAuthorization`) -> Supabase `/auth/v1/oauth/authorize` -> account host `/oauth/authorize` (shows "One moment." while it checks the request) -> `/login` (Fitness-shaped Welcome; sign-in) -> `/oauth/authorize` again -> (consent "Continue to Mazer?" skipped for the exact first-party Mazer request since FawxzzyWeb PR #118, merged 2026-11-11, not deployed until the FawxzzyWeb release is aliased) -> `https://mazer.fawxzzy.com/` callback | Fewer visible intermediate pages | FawxzzyWeb PR #118 merged; needs a real-device sign-in check after release (MAZER-ACCT-006) |
 | G7 | No pre-boot splash in Mazer: nothing between page load and the Phaser auth gate except, in a non-localhost, non-standalone browser tab, the install gate (`src/boot/installGate.ts`, `shouldRunMazerInstallGateForBoot`), which renders install steps with a blank title and subtitle. Source-observed; this is the leading candidate for the owner's "weird pre login screen" but was not rendered here (UNKNOWN visually) | The auth surface is the first thing a signed-out visitor sees; install is never a prerequisite for sign-in | Out of this packet (`src/boot/*` owned elsewhere); decision needed |
 | G8 | Fitness exempts public account/legal/auth-transport routes from its install gate (`fawxzzy-fitness/docs/PLAYBOOK_NOTES.md`, 2026-09-14 entry: `ProtectedAppInstallGate`, `protectedAppRoutePolicy`). Mazer's gate exempts only legal routes, a live OAuth callback, and password recovery | Same rule: gates protect app content, never account entry | Wiring/boot packet; not this one |
 | G9 (added) | Legal links `Privacy` / `Terms`; `Reset password` sits above them as a footer link; loading gate always says `Signing you in…` (`MenuScene` ~L2703) even for a first-time visitor | `Privacy Policy` / `Terms of Service` in the legal row, `Create Account | Reset Password` in the rail; neutral `Loading…` unless a session or callback exists | wiring packet; `resolveLegacyAuthLoadingCopy` |
@@ -243,11 +243,12 @@ This packet changes none of: `MenuScene.ts`, `legacyPlayerMessage.ts`, `legacyAu
   "supported", confirmed as "not implemented". A candidate (not implemented, FawxzzyWeb change) is an allowlisted
   `intent=signup` query parameter on `/login`, which must survive the OAuth continuation to `/oauth/authorize`.
   Until then Create Account uses the OAuth hand-off, so the player taps Create Account once more on the host.
-- Consent step "Continue to Mazer?": `MazerOAuthAuthorization` renders its own consent card. Skipping it for the
-  first-party Mazer client is technically a FawxzzyWeb source change plus provider-side approval behavior (whether
-  the Supabase OAuth server requires an explicit approve call is UNKNOWN to this packet). OWNER-GATED: it removes
-  an explicit authorization step, so it needs an owner decision, provider configuration review and a separately
-  authorized release.
+- Consent step "Continue to Mazer?" (owner decision 2026-11-11: skip it): FawxzzyWeb PR #118 (merged, main db5199e9)
+  auto-approves the authorization without rendering the consent card, only for the exact Mazer client id, the
+  exact Mazer redirect, scope email, the name Mazer and a matching session user; any other request still shows the
+  consent card. Mazer already refuses callbacks that lack its own stored state and PKCE record. Not deployed until
+  the FawxzzyWeb release is aliased; no real Supabase sign-in was checked; a real-device sign-in check is needed
+  after release (card MAZER-ACCT-006).
 
 ## Open owner questions
 
@@ -255,7 +256,7 @@ This packet changes none of: `MenuScene.ts`, `legacyPlayerMessage.ts`, `legacyAu
 2. Is the browser/desktop "weird pre-login screen" the install gate (G7)? If so, should signed-out visitors skip it
    (Fitness precedent) or should the gate stay ahead of sign-in?
 3. Add `intent=signup` to the account host's `/login`, or accept Create Account = same OAuth hand-off?
-4. Skip the consent card for first-party Mazer, or keep it?
+4. ~~Skip the consent card for first-party Mazer, or keep it?~~ Decided 2026-11-11: skip (FawxzzyWeb PR #118).
 5. Dock height: 52 (this spec) or 56 (family doc)?
 6. For `status: 'unavailable'` without an error message the model shows `MAZER_OAUTH_SAFE_ERROR_MESSAGE` and leaves
    the dock enabled so the player can retry; confirm that is preferred to a disabled dock.
