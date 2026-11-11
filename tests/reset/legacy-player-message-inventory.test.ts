@@ -113,6 +113,8 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'The leaderboard is not available right now.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'Could not reach the leaderboard. Check your connection and try again.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'The leaderboard is not set up yet.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
+  { file: 'src/legacy-runtime/legacyOfflineCompletionFlush.ts', literal: 'You are offline. Progress is saved on this device and will sync when you reconnect.', kind: 'routed-inline', route: 'own copy table LEGACY_OFFLINE_COMPLETION_COPY, notified through the scene message queue and drawn by the toast (MAZER-UI-018)' },
+  { file: 'src/legacy-runtime/legacyOfflineCompletionFlush.ts', literal: 'Back online. Saved progress synced.', kind: 'routed-inline', route: 'own copy table LEGACY_OFFLINE_COMPLETION_COPY, notified through the scene message queue and drawn by the toast (MAZER-UI-018)' },
   { file: 'src/legacy-runtime/legacyOAuthRefresh.ts', literal: 'Account session refresh unavailable.', kind: 'technical', route: 'synthetic HTTP body consumed by the auth client; never rendered' },
   { file: 'src/ui/dom/MazerSwitch.ts', literal: 'On', kind: 'static', route: 'primitive state label' },
   { file: 'src/ui/dom/MazerSwitch.ts', literal: 'Off', kind: 'static', route: 'primitive state label' },
@@ -129,8 +131,6 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'A shimmering, colour-shifting line is your route. {} in Settings fades old trail.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Some mazes wrap around open edges. The edge diamonds glow in your trail colours.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Clears show your level. Harder mazes add shortcuts and loops.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
-  { file: 'src/legacy-runtime/legacyOfflineCompletionFlush.ts', literal: 'You are offline. Progress is saved on this device and will sync when you reconnect.', kind: 'static', route: 'offline-saved notice, once per outage (MAZER-FLOW-009); copy table that feeds createLegacyPlayerMessage' },
-  { file: 'src/legacy-runtime/legacyOfflineCompletionFlush.ts', literal: 'Back online. Saved progress synced.', kind: 'static', route: 'back-online synced notice after a drained outbox flush (MAZER-FLOW-009); copy table that feeds createLegacyPlayerMessage' },
   { file: 'src/legacy-runtime/legacyProgressionResetFlow.ts', literal: 'Your level and leaderboard standing go back to Level 1. Your account, username and settings stay as they are. This can’t be undone.', kind: 'static', route: 'Reset progress confirm/status copy; rendered by the shared Settings reset card (MenuScene.buildProgressionResetConfirmationOverlay); fold into the message module later' },
   { file: 'src/legacy-runtime/legacyProgressionResetFlow.ts', literal: 'Connect to the internet to reset your account progress.', kind: 'static', route: 'Reset progress confirm/status copy; rendered by the shared Settings reset card (MenuScene.buildProgressionResetConfirmationOverlay); fold into the message module later' },
   { file: 'src/legacy-runtime/legacyProgressionResetFlow.ts', literal: 'Your account is still loading. Try again in a moment.', kind: 'static', route: 'Reset progress confirm/status copy; rendered by the shared Settings reset card (MenuScene.buildProgressionResetConfirmationOverlay); fold into the message module later' },
@@ -461,20 +461,22 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
 describe('message-system structure the inventory depends on', { timeout: GUARD_TIMEOUT_MS }, () => {
   const MESSAGE_MODULE = 'src/legacy-runtime/legacyPlayerMessage.ts';
 
-  test('the message queue has no render surface yet (diagnostics-only)', () => {
-    // visibleMessages is declared in the diagnostics type and filled in the
-    // diagnostics payload, and nothing draws it. If a renderer is added
-    // (the card's goal), this pin must flip and the inventory doc be updated.
+  test('the message queue is drawn as a toast (MAZER-UI-018)', () => {
+    // visibleMessages stays a diagnostics-only mirror (declared + filled); the
+    // player-facing surface is the toast: MenuScene draws rows resolved by the
+    // pure toast module, whose colours come from the tone table.
     const menu = srcText(MENU);
     expect(menu.match(/\bvisibleMessages\b/g)?.length ?? 0).toBe(2);
+    expect(menu).toContain('private drawLegacyPlayerMessageToast(time: number): void');
+    expect(menu).toContain('resolveLegacyPlayerMessageToastFrame(this.playerMessageQueue, time, width)');
+    expect(
+      menu.split('this.drawLegacyPlayerMessageToast(time);').length - 1,
+      'The toast must be drawn in both the overlay and the menu/play update paths.'
+    ).toBe(2);
     expect(
       consumersOf('resolveLegacyPlayerMessageColor', [MESSAGE_MODULE]),
-      'A tone-colour consumer exists: a message render surface was added. Update the inventory doc and flip this pin.'
-    ).toEqual([]);
-    expect(
-      consumersOf('LEGACY_PLAYER_MESSAGE_COLORS', [MESSAGE_MODULE]),
-      'A tone-colour consumer exists: a message render surface was added. Update the inventory doc and flip this pin.'
-    ).toEqual([]);
+      'The toast module is the only consumer of the tone colour resolver.'
+    ).toEqual(['src/legacy-runtime/legacyPlayerMessageToast.ts']);
   });
 
   test('auth feedback is rendered from the raw snapshot, not from the resolved message', () => {

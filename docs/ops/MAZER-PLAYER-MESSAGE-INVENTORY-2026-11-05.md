@@ -29,7 +29,7 @@ edits them.
 
 ## 2. Findings (facts, verified in source)
 
-F1. **The message queue has no render surface.** `MenuScene` builds `playerMessageQueue` and exposes it as
+F1. **The message queue is drawn as a toast (MAZER-UI-018; was: no render surface).** `MenuScene` builds `playerMessageQueue` and exposes it as
 `visibleMessages` in the visual diagnostics payload (type at `MenuScene.ts:758`, filled at `:18805`).
 Nothing draws it. `resolveLegacyPlayerMessageColor` and `LEGACY_PLAYER_MESSAGE_COLORS` have no consumer
 outside `legacyPlayerMessage.ts`. "Routes through `legacyPlayerMessage.ts`" therefore currently means
@@ -117,6 +117,8 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | `src/scenes/MenuScene.ts:14171` | `{account}\nManage your profile and account from the shared Fawxzzy account portal.` | no | n/a (helper) | raw-static | Keep as screen helper |
 | `src/scenes/MenuScene.ts:16054` | `Request timed out.` | no (diverges, F9) | error / auth | raw-status | Auth table key `requestTimedOut`; render the resolved message |
 | `src/scenes/MenuScene.ts:17346` | `Progression reset.` | yes (inline copy) | success / progression | routed-inline | Move copy into a progression copy table; add a render surface |
+| `src/legacy-runtime/legacyOfflineCompletionFlush.ts` | `You are offline. Progress is saved on this device and will sync when you reconnect.` | yes (own table) | info / system | routed-inline | Drawn by the toast (MAZER-UI-018) |
+| `src/legacy-runtime/legacyOfflineCompletionFlush.ts` | `Back online. Saved progress synced.` | yes (own table) | success / system | routed-inline | Drawn by the toast (MAZER-UI-018) |
 | `src/scenes/MenuScene.ts:17547` | `Runtime diagnostics authenticated fixture.` | no | n/a | fixture | None (QA fixture) |
 | `src/boot/accessibilitySurface.ts:100` | `Use Arrow keys or WASD to move through the maze. Press Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.` | no | n/a | static | None (a11y description) |
 | `src/boot/accessibilitySurface.ts:109` | `Mazer is ready.` | no | info | static | Live region never updated; candidate sink for the message surface announcements |

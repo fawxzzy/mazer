@@ -2708,7 +2708,7 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
   };
   const noops = [
     'syncLegacyAuthGateLoadingScreen', 'syncLegacyAuthOpeningTimeout', 'recordRuntimeFrame',
-    'expireLegacyPlayerMessages', 'updateStars', 'advanceLegacyOverlayScrollMomentum',
+    'expireLegacyPlayerMessages', 'drawLegacyPlayerMessageToast', 'updateStars', 'advanceLegacyOverlayScrollMomentum',
     'holdLegacyPlayMazeLifecycleDuringPause', 'updateLegacyFlowFeedback', 'advanceLegacyMenuStaticDrawStage',
     'isLegacyMenuBuildPrerollActive', 'hasLegacyPlayTrailPulsePendingFrame',
     'hasLegacyBleedOffGlowPendingFrame', 'hasLegacyPlayerVisualMotionPendingFrame', 'updateLegacyPlayerLocator',
