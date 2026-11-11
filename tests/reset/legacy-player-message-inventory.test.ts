@@ -113,6 +113,8 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'The leaderboard is not available right now.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'Could not reach the leaderboard. Check your connection and try again.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'The leaderboard is not set up yet.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
+  { file: 'src/legacy-runtime/legacyOfflineCompletionFlush.ts', literal: 'You are offline. Progress is saved on this device and will sync when you reconnect.', kind: 'routed-inline', route: 'own copy table LEGACY_OFFLINE_COMPLETION_COPY, notified through the scene message queue and drawn by the toast (MAZER-UI-018)' },
+  { file: 'src/legacy-runtime/legacyOfflineCompletionFlush.ts', literal: 'Back online. Saved progress synced.', kind: 'routed-inline', route: 'own copy table LEGACY_OFFLINE_COMPLETION_COPY, notified through the scene message queue and drawn by the toast (MAZER-UI-018)' },
   { file: 'src/legacy-runtime/legacyOAuthRefresh.ts', literal: 'Account session refresh unavailable.', kind: 'technical', route: 'synthetic HTTP body consumed by the auth client; never rendered' },
   { file: 'src/ui/dom/MazerSwitch.ts', literal: 'On', kind: 'static', route: 'primitive state label' },
   { file: 'src/ui/dom/MazerSwitch.ts', literal: 'Off', kind: 'static', route: 'primitive state label' },
