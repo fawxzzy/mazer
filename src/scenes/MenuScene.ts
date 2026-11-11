@@ -21,9 +21,16 @@ import {
   type BoardTileReveal,
   resolveBoardTileStyleFromSearch
 } from '../render/boardTileLayer';
-import { drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
+import { centerOfCell, drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
+import {
+  resolveBleedGlowColor,
+  resolveBleedGlowEnvelope,
+  resolveBleedGlowProgress,
+  resolveBleedGlowRects
+} from '../render/bleedGlow';
 import { BOARD_MARKER_MIN_CSS, BOARD_TILE_GEOMETRY, boardMaterial, type BoardTileStyleId } from '../render/boardTileStyle';
 import { drawGoalBeacon } from '../render/goalBeacon';
+import { alignBoundsToWholePixels, alignCameraToWholePixels } from '../render/pixelAlignment';
 import { PlayerLocatorState, drawPlayerLocator } from '../render/playerLocator';
 import { drawTrailLayersToCanvasContext, type TrailLayerSegment } from '../render/trailLayersCanvas';
 import {
@@ -41,7 +48,13 @@ import {
   resolveTrailWidthScale,
   sampleIridescentTrail
 } from '../render/trailIridescence';
-import { resolveBackdropStarDraw } from '../render/backdropStars';
+import {
+  BACKDROP_DECORATIVE_GLYPHS_ENABLED,
+  BACKDROP_STAR_TAILS_ENABLED,
+  resolveBackdropStarDraw,
+  resolveBackdropTwinkleAlpha,
+  resolveBackdropTwinkleSize
+} from '../render/backdropStars';
 import { drawChipCell, resolveChipGridGeometry } from '../render/chipTileGraphics';
 import { PhaserGraphicsTileContext } from '../render/phaserTileContext';
 import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameToViewport } from '../boot/viewportGeometry';
@@ -1414,10 +1427,6 @@ const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;
 // the grid (progress 0) out to the true screen edge (progress 1), fading in
 // and out via the sine envelope so the loop has no visible seam, instead of
 // snapping back to the start mid-brightness.
-const LEGACY_BLEED_GLOW_PERIOD_MS = 1900;
-const LEGACY_BLEED_GLOW_BAND_HALF_WIDTH = 0.24;
-const LEGACY_BLEED_GLOW_MAX_ALPHA = 0.5;
-const LEGACY_BLEED_GLOW_STEPS = 8;
 const LEGACY_PLAY_TOUCH_BUTTON_FILL = cyberArcadeMaterial.substrate.panelRaised;
 const LEGACY_PLAY_TOUCH_BUTTON_STROKE = cyberArcadeMaterial.rail.cyan;
 const LEGACY_PLAY_TOUCH_ICON = cyberArcadeMaterial.rail.white;
@@ -2334,6 +2343,8 @@ export class MenuScene extends Phaser.Scene {
     void this.initializeLegacyAuth();
     this.initializeRuntimeDiagnostics();
     this.backdropGraphics = this.add.graphics();
+    // See src/render/pixelAlignment.ts: no half-pixel camera offset on odd-sized viewports.
+    alignCameraToWholePixels(this.cameras.main);
     this.boardZoomContainer = this.add.container(0, 0);
     this.edgeMarkerGraphics = this.add.graphics();
     this.boardStaticGraphics = this.add.graphics();
@@ -7079,28 +7090,32 @@ export class MenuScene extends Phaser.Scene {
     const palette = resolveLegacyMenuBackdropPalette(this.settings.darkMode);
     const backdropMotionEnabled = this.settings.toggleAnimatedBackdrop && !this.prefersLegacyReducedMotion();
     const animationTime = backdropMotionEnabled ? this.time.now : 0;
-    for (const shard of resolveLegacyMenuBackdropShards(width, height, this.settings.darkMode)) {
-      this.drawLegacyBackdropShard(shard, 0.36);
+    // The decorative glyphs (angular shards, drift runes, corner sigils) are switched off in one place, see
+    // src/render/backdropStars.ts: the owner asked for the "weird symbols in the background" to be removed.
+    if (BACKDROP_DECORATIVE_GLYPHS_ENABLED) {
+      for (const shard of resolveLegacyMenuBackdropShards(width, height, this.settings.darkMode)) {
+        this.drawLegacyBackdropShard(shard, 0.36);
+      }
+      for (const shard of resolveLegacyMenuBackdropGlassShards(
+        width,
+        height,
+        this.settings.darkMode,
+        animationTime,
+        backdropMotionEnabled
+      )) {
+        this.drawLegacyBackdropShard(shard, 0.74);
+      }
+      for (const rune of resolveLegacyMenuBackdropDriftRunes(
+        width,
+        height,
+        this.settings.darkMode,
+        animationTime,
+        backdropMotionEnabled
+      )) {
+        this.drawLegacyBackdropRune(rune);
+      }
+      this.drawLegacyBackdropSigils(width, height, animationTime);
     }
-    for (const shard of resolveLegacyMenuBackdropGlassShards(
-      width,
-      height,
-      this.settings.darkMode,
-      animationTime,
-      backdropMotionEnabled
-    )) {
-      this.drawLegacyBackdropShard(shard, 0.74);
-    }
-    for (const rune of resolveLegacyMenuBackdropDriftRunes(
-      width,
-      height,
-      this.settings.darkMode,
-      animationTime,
-      backdropMotionEnabled
-    )) {
-      this.drawLegacyBackdropRune(rune);
-    }
-    this.drawLegacyBackdropSigils(width, height, animationTime);
     for (const star of this.stars) {
       const pixelX = Math.round(star.x * width);
       const pixelY = Math.round(star.y * height);
@@ -7134,15 +7149,14 @@ export class MenuScene extends Phaser.Scene {
         ? (Math.sin(((animationTime / twinklePeriodMs) + starSeed) * Math.PI * 2) + 1) / 2
         : 0.5;
       const twinklePhase = twinkleRaw * twinkleRaw * (3 - (2 * twinkleRaw));
-      const twinkleAlpha = star.alpha * (0.12 + (twinklePhase * 0.88));
-      const sizeMultiplier = 0.55 + (twinklePhase * 0.65);
+      // A star never fully vanishes at the dim end of its twinkle (see backdropStars.ts).
+      const twinkleAlpha = star.alpha * resolveBackdropTwinkleAlpha(twinklePhase);
+      const sizeMultiplier = resolveBackdropTwinkleSize(twinklePhase);
       const starColor = starSeed > 0.82 ? 0xbfe3ff : (starSeed < 0.16 ? 0xffe9c2 : 0xffffff);
-      // The coloured four-point sparkles that the nearest, biggest stars used to get are retired (owner, 2026-11-10:
-      // "no more stagnant stars in the background"); see src/render/backdropStars.ts. Nothing is drawn for those
-      // stars, and nothing at all while the backdrop is not animating (a frozen dot is a pretend star).
-      if (resolveBackdropStarDraw(coreSize, backdropMotionEnabled) === 'none') {
-        continue;
-      }
+      // The coloured four-point sparkles that the nearest, biggest stars used to get are retired for good (owner,
+      // 2026-11-10: "no more stagnant stars in the background"), but every star is still drawn: the nearest ones
+      // as brighter "hero" dots with a soft round halo, the rest as dots; see src/render/backdropStars.ts.
+      const starDraw = resolveBackdropStarDraw(coreSize);
       // Round, not square: the vast majority of stars (every one below the
       // sparkle threshold above -- the bulk of the field) used to be a flat
       // fillRect square, which reads as a blocky pixel rather than a point
@@ -7151,18 +7165,23 @@ export class MenuScene extends Phaser.Scene {
       // that makes every single star in the field read as an actual star
       // instead of a tiny tile.
       const starRadius = (coreSize / 2) * sizeMultiplier;
-      if (coreSize > 1) {
-        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.22);
-        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 2);
+      if (starDraw === 'hero') {
+        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.1);
+        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 5);
+        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.16);
+        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 3);
+        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.24);
+        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 1.5);
+      } else if (coreSize > 1) {
         this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.18);
-        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 1);
+        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 1.5);
       }
       this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale);
       this.backdropGraphics.fillCircle(pixelX, pixelY, Math.max(0.6, starRadius));
       // Fading tail instead of a uniform-alpha dashed line -- brightest
       // where it meets the star core, tapering to nothing at the far end, so
       // fast/near stars read as a warp streak rather than a dotted trail.
-      for (let index = 1; index <= streakLength; index += 1) {
+      for (let index = 1; BACKDROP_STAR_TAILS_ENABLED && index <= streakLength; index += 1) {
         const tailFade = 1 - (index / (streakLength + 1));
         this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.5 * tailFade);
         this.backdropGraphics.fillRect(
@@ -7725,12 +7744,11 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const progress = (((time % LEGACY_BLEED_GLOW_PERIOD_MS) + LEGACY_BLEED_GLOW_PERIOD_MS) % LEGACY_BLEED_GLOW_PERIOD_MS)
-      / LEGACY_BLEED_GLOW_PERIOD_MS;
-    const envelope = Math.sin(Math.PI * progress);
-    if (envelope <= 0.01) {
+    const progress = resolveBleedGlowProgress(time);
+    if (resolveBleedGlowEnvelope(progress) <= 0.01) {
       return;
     }
+    const backingScale = this.resolveBoardTileBackingScale();
 
     const materialTileSize = Math.max(1, Math.round(tileSize));
     const width = this.maze.width;
@@ -7781,49 +7799,19 @@ export class MenuScene extends Phaser.Scene {
           topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth)
         });
 
-        const isVertical = direction === 'top' || direction === 'bottom';
+        // Geometry, colour and centring live in src/render/bleedGlow.ts: the lane is centred on the device-snapped
+        // cell centre (the chip's own centre line) and painted in the trail's colour at the head.
+        const [cellCentreX, cellCentreY] = centerOfCell(point, tileSize, backingScale, mazeLeft, mazeTop);
         for (const area of dockAreas) {
-          const spanStart = isVertical
-            ? (direction === 'top' ? area.bottom : area.top)
-            : (direction === 'left' ? area.right : area.left);
-          const spanEnd = isVertical
-            ? (direction === 'top' ? area.top : area.bottom)
-            : (direction === 'left' ? area.left : area.right);
-          const span = spanEnd - spanStart;
-          if (Math.abs(span) < 1) {
-            continue;
-          }
-
-          for (let step = 0; step < LEGACY_BLEED_GLOW_STEPS; step += 1) {
-            const t0 = step / LEGACY_BLEED_GLOW_STEPS;
-            const t1 = (step + 1) / LEGACY_BLEED_GLOW_STEPS;
-            const dist = Math.abs(((t0 + t1) / 2) - progress);
-            const bandIntensity = Math.max(0, 1 - (dist / LEGACY_BLEED_GLOW_BAND_HALF_WIDTH));
-            if (bandIntensity <= 0.02) {
-              continue;
-            }
-
-            const alpha = LEGACY_BLEED_GLOW_MAX_ALPHA * envelope * bandIntensity;
-            const p0 = spanStart + (span * t0);
-            const p1 = spanStart + (span * t1);
-            const lo = Math.min(p0, p1);
-            const hi = Math.max(p0, p1);
-            this.boardDynamicGraphics.fillStyle(glowColor, alpha);
-            if (isVertical) {
-              this.boardDynamicGraphics.fillRect(
-                Math.round(area.left),
-                Math.round(lo),
-                Math.round(area.right - area.left),
-                Math.round(hi - lo)
-              );
-            } else {
-              this.boardDynamicGraphics.fillRect(
-                Math.round(lo),
-                Math.round(area.top),
-                Math.round(hi - lo),
-                Math.round(area.bottom - area.top)
-              );
-            }
+          for (const rect of resolveBleedGlowRects({
+            direction,
+            area,
+            cellCentre: { x: cellCentreX, y: cellCentreY },
+            tileSize,
+            progress
+          })) {
+            this.boardDynamicGraphics.fillStyle(glowColor, rect.alpha);
+            this.boardDynamicGraphics.fillRect(rect.x, rect.y, rect.width, rect.height);
           }
         }
       }
@@ -8477,8 +8465,10 @@ export class MenuScene extends Phaser.Scene {
     const renderHeight = Math.max(1, boardHeight - (safeInset * 2));
 
     return {
-      boardLeft: boardLeft + safeInset,
-      boardTop: boardTop + safeInset,
+      // Whole css px: the baked board is an Image, and Phaser (roundPixels) floors an Image's position, so a
+      // fractional board origin put the board up to one css px away from the player, trail and markers.
+      boardLeft: Math.round(boardLeft + safeInset),
+      boardTop: Math.round(boardTop + safeInset),
       boardWidth: renderWidth,
       boardHeight: renderHeight,
       tileSize: Math.min(renderWidth / Math.max(1, this.maze.width), renderHeight / Math.max(1, this.maze.height)),
@@ -8872,7 +8862,7 @@ export class MenuScene extends Phaser.Scene {
       mazeRenderFrame.boardWidth,
       mazeRenderFrame.boardHeight,
       mazeTileSize,
-      progressionPalette.trailColor
+      resolveBleedGlowColor(this.trailPaletteHead, time, this.prefersLegacyReducedMotion())
     );
     this.drawLegacyProgressionBadge();
     this.drawLegacyLevelAnnouncer(time);
@@ -9925,10 +9915,13 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
     const padding = Math.ceil(glowWidth);
-    const bounds = computeTrailCanvasBounds(segments, padding);
-    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+    const rawBounds = computeTrailCanvasBounds(segments, padding);
+    if (!rawBounds || rawBounds.width <= 0 || rawBounds.height <= 0) {
       return;
     }
+    // Whole-pixel origin: Phaser (roundPixels) floors an Image's position, so a fractional one made the trail jump a
+    // css px each time the head crossed an integer. See src/render/pixelAlignment.ts.
+    const bounds = alignBoundsToWholePixels(rawBounds);
     const width = Math.max(1, Math.ceil(bounds.width));
     const height = Math.max(1, Math.ceil(bounds.height));
     const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
@@ -10314,7 +10307,10 @@ export class MenuScene extends Phaser.Scene {
     // generous, empirically-checked margin (see the trail canvas's own
     // padding comment for the same reasoning applied to glowWidth there).
     const padding = Math.ceil(wideGlowBlurPx * 2.5);
-    const bounds = computePlayerGlowCanvasBounds(shapeLeft, shapeTop, shapeWidth, shapeHeight, padding);
+    // Whole-pixel origin, same reason as the trail image (src/render/pixelAlignment.ts).
+    const bounds = alignBoundsToWholePixels(
+      computePlayerGlowCanvasBounds(shapeLeft, shapeTop, shapeWidth, shapeHeight, padding)
+    );
     const width = Math.max(1, Math.ceil(bounds.width));
     const height = Math.max(1, Math.ceil(bounds.height));
     const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);

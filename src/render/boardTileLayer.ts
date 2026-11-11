@@ -36,6 +36,7 @@ import {
   type TileBakeContext2D,
   type TileBakeSurface
 } from './boardTileBake';
+import { toWholeImagePosition } from './pixelAlignment';
 import { resolveStartDirection, type StartDirection } from './startDirection';
 import {
   clampBoardDevicePixelRatio,
@@ -387,8 +388,10 @@ export class BoardTileLayer {
     }
 
     // Device-snap the board origin so every baked line lands on a whole device pixel.
-    const left = (Math.round(frame.boardLeft * dpr) / dpr) - result.originX;
-    const top = (Math.round(frame.boardTop * dpr) / dpr) - result.originY;
+    // ...then give Phaser a whole css px (it floors an Image's position under roundPixels; see pixelAlignment.ts),
+    // so `snappedOrigin` below is exactly where the board is drawn and the end markers (Graphics) line up with it.
+    const left = toWholeImagePosition((Math.round(frame.boardLeft * dpr) / dpr) - result.originX);
+    const top = toWholeImagePosition((Math.round(frame.boardTop * dpr) / dpr) - result.originY);
     this.image.setPosition(left, top);
     this.image.setDisplaySize(result.width, result.height);
     this.image.setVisible(true);

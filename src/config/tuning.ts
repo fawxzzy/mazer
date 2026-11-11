@@ -359,11 +359,12 @@ export const legacyTuning = {
       // already drives this at the real per-frame rate regardless -- this
       // was purely an extra throttle on top, so lowering it to match a
       // real frame is a straight smoothness win, not new per-frame cost.
-      // throttled/hidden are real performance-degradation fallbacks, left
-      // as-is.
+      // throttled/hidden are real performance-degradation fallbacks. throttled used to be 250 ms (4 updates a
+      // second), which on a phone that counts as low power (4 or fewer cores, or Save-Data) made every star hop
+      // four times a second instead of drifting; 100 ms (10 a second) keeps most of the saving and reads as motion.
       ambientUpdateIntervalMs: {
         full: 16,
-        throttled: 250,
+        throttled: 100,
         hidden: 1000
       },
       deferredTasksPerFrame: {

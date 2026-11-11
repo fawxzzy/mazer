@@ -1568,7 +1568,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.publishVisualDiagnostics(time, uiRebuilt);');
     expect(tuningSource).toContain('diagnosticsPublishIntervalMs: 1500,');
     expect(tuningSource).toContain('full: 16,');
-    expect(tuningSource).toContain('throttled: 250,');
+    expect(tuningSource).toContain('throttled: 100,');
   });
 
   test('caches OS reduced motion and settles only visual state when it changes', () => {
