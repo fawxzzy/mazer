@@ -97,7 +97,9 @@ describe('MenuScene wiring: pause card', () => {
 
   test('Resume and Quit use the existing bridge-then-lifecycle paths; Settings starts collapsed', () => {
     expect(commands).toContain("{ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume')");
-    expect(commands).toContain("{ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')");
+    // The Quit dispatch moved into the two-step quit confirm (legacyQuitConfirm.ts, PR #409), so it is no longer inside
+    // runLegacySettingsCommand: it must still use the bridge-then-lifecycle path somewhere in the scene.
+    expect(scene).toContain("{ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')");
     expect(scene).toContain('private pauseSettingsExpanded = false;');
     expect(scene).toContain("if (kind === 'pause') {\n      this.pauseSettingsExpanded = false;");
     // The Settings group is the same plan rows the main-menu sheet paints (no movement speed).
