@@ -13,16 +13,16 @@ import {
   GEOMETRY_BUDGET_WINDOW,
   GEOMETRY_BUDGET_CEILING,
   GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS,
-  GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR,
   GEOMETRY_BUDGET_TIE_RETRY_BASES,
+  GEOMETRY_BUDGET_TUNE_ATTEMPTS,
   GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS,
   resolveGeometryBudgetCandidateSeed,
   resolveGeometryBudgetFeltLevel,
   resolveGeometryBudgetForks,
   resolveGeometryBudgetFringeCells,
   resolveGeometryBudgetLoopPlan,
-  resolveGeometryBudgetMastery,
   resolveGeometryBudgetMaxBranch,
+  resolveGeometryBudgetReverseFloor,
   resolveGeometryBudgetRouteBranch,
   resolveGeometryBudgetRouteTarget,
   resolveGeometryBudgetTarget,
@@ -626,9 +626,6 @@ const selectLegacyGeometryBudgetMaze = (
   // plus the fringe (legacyGeometryBudget.ts), so every felt rule reads the felt level.
   const feltLevel = resolveGeometryBudgetFeltLevel(budgetLevel);
   const fringeCells = resolveGeometryBudgetFringeCells(budgetLevel);
-  // Past the fringe a seeded share of the mazes are mastery mazes (reverse-solve resistant).
-  const mastery = resolveGeometryBudgetMastery(budgetLevel, seed);
-  const pastFelt = budgetLevel > feltLevel;
   const gateTarget = resolveGeometryBudgetTarget(feltLevel);
   const routeTarget = resolveGeometryBudgetRouteTarget(feltLevel);
   const maxBranch = resolveGeometryBudgetMaxBranch(feltLevel);
@@ -665,10 +662,14 @@ const selectLegacyGeometryBudgetMaze = (
     const candidateSeed = resolveGeometryBudgetCandidateSeed(seed, feltLevel, index);
     // The rolled wraps are tried on the first few bases only; a base that cannot land
     // with them (priced, they raise the raw target) is retried plain.
-    const baseProfile = profileWithRungs(index < GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS ? wrapRungs : 0);
+    const baseRungs = index < GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS ? wrapRungs : 0;
+    const baseProfile = profileWithRungs(baseRungs);
+    // Every maze is double-lured and held to the reverse floor of its level and wrap rungs
+    // (legacyGeometryBudget.ts).
+    const reverseFloor = resolveGeometryBudgetReverseFloor(feltLevel, baseRungs);
     const base = buildLegacyRuntimeMazeForMode(mode, scale, candidateSeed, baseProfile, aspectRatio);
     searched += 1;
-    let candidate: Omit<LegacyMazeSnapshot, 'generation'> = base;
+    let tuned: ReturnType<typeof tuneMazeFeltToTarget> | null = null;
     let distance = 0;
     let tieBiased = false;
     if (gateTarget !== null) {
@@ -678,24 +679,23 @@ const selectLegacyGeometryBudgetMaze = (
       const loops = index < GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS
         ? (selectionOptions.loopPlan ?? resolveGeometryBudgetLoopPlan(feltLevel, seed, base.width * base.height))
         : LEGACY_EMPTY_LOOP_PLAN;
-      const tuned = tuneMazeFeltToTarget(
+      tuned = tuneMazeFeltToTarget(
         base,
         gateTarget,
         resolveGeometryBudgetCandidateSeed(seed, feltLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
-        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, fringeCells, doubleLure: mastery, reverseFloor: mastery ? GEOMETRY_BUDGET_MASTERY_REVERSE_FLOOR : 0 }
+        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, fringeCells, attempts: GEOMETRY_BUDGET_TUNE_ATTEMPTS, doubleLure: true, reverseFloor }
       );
       distance = tuned.windowDistance;
       // A landed maze whose number is a coin flip for the explorer (a looped maze that
       // disagrees with its tie-averaged value) is accepted only after a few more bases.
       tieBiased = distance === 0 && tuned.tieDeviationPercent > FELT_TIE_DEVIATION_LIMIT_PERCENT;
-      if (tuned.addedTiles.length > 0 || tuned.trimmedTiles.length > 0 || tuned.bumps > 0 || tuned.loops.length > 0 || tuned.cyclesBroken > 0 || tuned.wrapSaving > 0 || tuned.fringeTiles.length > 0) {
-        candidate = assembleTunedMaze(base, tuned, baseProfile, pastFelt ? mastery : null);
-      }
     }
     // Rank: off-window by its distance; a coin-flip landing just behind a clean one.
     const rank = tieBiased ? distance + 0.5 : distance;
     if (selectedMaze === null || rank < selectedRank) {
-      selectedMaze = candidate;
+      // Only a maze that becomes the selection is assembled (route, wrap diagnostics): a base that
+      // missed its window or floor is discarded for the price of the tuning alone.
+      selectedMaze = tuned === null ? base : assembleTunedMaze(base, tuned, baseProfile, reverseFloor);
       selectedProfile = baseProfile;
       selectedDistance = distance;
       selectedRank = rank;
@@ -747,7 +747,7 @@ const assembleTunedMaze = (
   base: Omit<LegacyMazeSnapshot, 'generation'>,
   tuned: ReturnType<typeof tuneMazeFeltToTarget>,
   generationProfile: LegacyMazeGenerationProfile,
-  mastery: boolean | null = null
+  reverseFloor: number
 ): Omit<LegacyMazeSnapshot, 'generation'> => {
   const routed = tuned.bumps > 0 || tuned.loops.length > 0 || tuned.cyclesBroken > 0
     ? resolveLegacyShortestPath(tuned.grid, base.start, base.goal, 'direct-floor')
@@ -774,10 +774,8 @@ const assembleTunedMaze = (
   if (tuned.fringeTiles.length > 0) {
     next.fringeStats = { cells: tuned.fringeTiles.length };
   }
-  // Past the felt saturation: what the maze costs a solver working from the goal end.
-  if (mastery !== null) {
-    next.masteryStats = { mastery, reverseFelt: tuned.reverseFelt };
-  }
+  // What the maze costs a solver working from the goal end, and the floor it was held to.
+  next.reverseStats = { reverseFelt: tuned.reverseFelt, floor: reverseFloor };
   if (routed !== null && routed.found) {
     next.wrapTopologyDiagnostics = resolveLegacyWrapTopologyDiagnostics(
       next,

@@ -103,16 +103,22 @@ export const createFeltExplorer = (width: number, height: number): FeltExplorer 
   const stamp = new Int32Array(size);
   let stampCounter = 0;
   const queue = new Int32Array(FELT_VISION_CELLS + 2);
+  // The goal the dist2 table was built for: a tuner run asks for the same goal hundreds of times in
+  // a row, so the table is rebuilt only when the goal changes (same numbers, no per-run cost).
+  let distGoal = -1;
 
   const run = (open: Uint8Array, startCell: number, goalCell: number, tieSeed = 0): FeltRun => {
-    const goalX = goalCell % width;
-    const goalY = (goalCell - goalX) / width;
-    for (let cell = 0; cell < size; cell += 1) {
-      const x = cell % width;
-      const y = (cell - x) / width;
-      const dx = Math.min(Math.abs(x - goalX), width - Math.abs(x - goalX));
-      const dy = Math.min(Math.abs(y - goalY), height - Math.abs(y - goalY));
-      dist2[cell] = (dx * dx) + (dy * dy);
+    if (goalCell !== distGoal) {
+      const goalX = goalCell % width;
+      const goalY = (goalCell - goalX) / width;
+      for (let cell = 0; cell < size; cell += 1) {
+        const x = cell % width;
+        const y = (cell - x) / width;
+        const dx = Math.min(Math.abs(x - goalX), width - Math.abs(x - goalX));
+        const dy = Math.min(Math.abs(y - goalY), height - Math.abs(y - goalY));
+        dist2[cell] = (dx * dx) + (dy * dy);
+      }
+      distGoal = goalCell;
     }
     visited.fill(0);
     onPath.fill(0);

@@ -10,7 +10,6 @@
 // Dev-server modules are unminified; a production build is not slower.
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -24,14 +23,10 @@ const levels = arg('levels', '2,3,5,10,20,40,60,80,100,120,140,160,185,198,220,2
 const seeds = Number(arg('seeds', '30'));
 const throttles = arg('throttle', '1,4').split(',').map(Number);
 const outDir = arg('out', '');
+// Dev servers of this repo use port 5531 only (a different one with --port, never a random one).
+const fixedPort = Number(arg('port', '5531'));
 
-const freePort = () => new Promise((ok, fail) => {
-  const server = createServer();
-  server.once('error', fail);
-  server.listen(0, '127.0.0.1', () => { const { port } = server.address(); server.close(() => ok(port)); });
-});
-
-const port = await freePort();
+const port = fixedPort;
 const vite = spawn(process.execPath, [resolve(REPO_ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
   cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true
 });
@@ -100,6 +95,9 @@ try {
   await stopVite();
 }
 
+for (const row of results) {
+  console.log(`throttle ${row.throttle}x level ${row.level} ${row.board}: mean ${row.mean.toFixed(1)} p95 ${row.p95.toFixed(1)} max ${row.max.toFixed(1)} ms`);
+}
 for (const rate of throttles) {
   const rows = results.filter((r) => r.throttle === rate);
   const typical = rows.map((r) => r.mean);
