@@ -33,6 +33,12 @@ import { drawGoalBeacon } from '../render/goalBeacon';
 import { alignBoundsToWholePixels, alignCameraToWholePixels } from '../render/pixelAlignment';
 import { PlayerLocatorState, drawPlayerLocator } from '../render/playerLocator';
 import { PlayerGlide } from '../render/playerGlide';
+import {
+  WALL_BUMP_DURATION_MS,
+  resolvePlayerGlideDurationMs,
+  resolveWallBumpNudge,
+  shouldBuzzWallBump
+} from '../render/playerMotionTiming';
 import { drawTrailLayersToCanvasContext, type TrailLayerSegment } from '../render/trailLayersCanvas';
 import {
   TRAIL_FADE_ALPHA_MIN,
@@ -1469,11 +1475,6 @@ const LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS = 16;
 const LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS = 144;
 const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = 104;
 const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = 144;
-// Bumped up from 116ms -- at that duration the eased glide between tiles
-// only spans ~7 frames at 60fps, which read as a quick snap-slide rather
-// than smooth motion. A slower tween still feels responsive for a maze
-// but gives the eye enough frames to actually perceive the glide.
-const LEGACY_PLAY_PLAYER_VISUAL_MOVE_MS = 190;
 const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
 const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.46;
@@ -2114,6 +2115,9 @@ export class MenuScene extends Phaser.Scene {
   private layout!: LegacyMenuLayout;
   private hudTouchControlBounds: VisualRect | null = null;
   private readonly playerGlide = new PlayerGlide();
+  // Blocked-move feedback (MAZER-MOTION-003): a short whole-pixel nudge toward the wall plus a light buzz.
+  private wallBump: { startedAtMs: number; deltaX: number; deltaY: number } | null = null;
+  private lastWallBumpBuzzAtMs: number | null = null;
   private lastPlayerVisualMotionSnapReason: LegacyPlayerVisualMotionSnapReason = null;
   // One shared, PAUSABLE animation clock for Navigation Core v1's continuous
   // trail (base spectral color phase + shared shine distance + its quiet
@@ -5175,8 +5179,37 @@ export class MenuScene extends Phaser.Scene {
   // already uses) keeps it honest at every speed instead of only the one it
   // happened to be tuned for.
   private resolveLegacyPlayerVisualMoveDurationMs(): number {
-    const repeatIntervalMs = this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs;
-    return clamp(Math.round(repeatIntervalMs * 0.85), 90, LEGACY_PLAY_PLAYER_VISUAL_MOVE_MS);
+    // Derived from the live repeat interval (stick-capped) and never longer than it; see playerMotionTiming.ts.
+    return resolvePlayerGlideDurationMs({
+      repeatIntervalMs: this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs,
+      stickActive: this.playTouchStickPointerId !== null,
+      stickRepeatIntervalMaxMs: LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS
+    });
+  }
+
+  private armLegacyWallBump(deltaX: number, deltaY: number): void {
+    if (this.prefersLegacyReducedMotion() || (deltaX === 0 && deltaY === 0)) {
+      return;
+    }
+    const now = this.time.now;
+    this.wallBump = { startedAtMs: now, deltaX, deltaY };
+    this.boardDynamicDirty = true;
+    if (shouldBuzzWallBump(now, this.lastWallBumpBuzzAtMs, false)) {
+      this.lastWallBumpBuzzAtMs = now;
+      this.triggerLegacyHapticPulse(LEGACY_HAPTIC_PATTERNS.wallBump);
+    }
+  }
+
+  private resolveLegacyWallBumpNudge(time: number): { x: number; y: number } {
+    const bump = this.wallBump;
+    if (bump === null) {
+      return { x: 0, y: 0 };
+    }
+    if (time - bump.startedAtMs >= WALL_BUMP_DURATION_MS) {
+      this.wallBump = null;
+      return { x: 0, y: 0 };
+    }
+    return resolveWallBumpNudge(time - bump.startedAtMs, bump.deltaX, bump.deltaY, this.prefersLegacyReducedMotion());
   }
 
   private normalizeLegacyPlayTouchPointerId(pointerId: number | null | undefined): number | null {
@@ -5275,6 +5308,16 @@ export class MenuScene extends Phaser.Scene {
       assistedLaneShiftEnabled: true
     });
     if (!step.moved) {
+      if (step.decision === 'stopped-at-dead-end' || step.decision === 'stopped-at-assist-limit') {
+        // The held direction is walled: nudge toward the wall (MAZER-MOTION-003).
+        const blocked = this.playDirectionalIntent.getDiagnostics().activeDirection;
+        if (blocked !== null) {
+          this.armLegacyWallBump(
+            blocked === 'right' ? 1 : blocked === 'left' ? -1 : 0,
+            blocked === 'down' ? 1 : blocked === 'up' ? -1 : 0
+          );
+        }
+      }
       this.publishInteractionDiagnostics();
       return false;
     }
@@ -6975,6 +7018,7 @@ export class MenuScene extends Phaser.Scene {
       trailFadeTail: TRAIL_FADE_TAIL
     });
     if (!nextStep.moved) {
+      this.armLegacyWallBump(move.deltaX, move.deltaY);
       return { accepted: false };
     }
 
@@ -10129,14 +10173,17 @@ export class MenuScene extends Phaser.Scene {
 
   private fillLegacyPlayerMarkerTile(
     point: LegacyPoint,
-    originX: number,
-    originY: number,
+    baseOriginX: number,
+    baseOriginY: number,
     tileSize: number,
     alpha: number,
     showLocatorTicks: boolean,
     _palette: LegacyProgressionPalette,
     time: number
   ): void {
+    const bumpNudge = this.resolveLegacyWallBumpNudge(time);
+    const originX = baseOriginX + bumpNudge.x;
+    const originY = baseOriginY + bumpNudge.y;
     const centerX = originX + ((point.x + 0.5) * tileSize);
     const centerY = originY + ((point.y + 0.5) * tileSize);
     const playerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
@@ -10467,7 +10514,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hasLegacyPlayerVisualMotionPendingFrame(time: number): boolean {
-    return this.playerGlide.isMoving(time);
+    return this.playerGlide.isMoving(time) || this.wallBump !== null;
   }
 
   private resolveLegacyRenderedPlayerPoint(time: number): LegacyPoint {
