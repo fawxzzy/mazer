@@ -35,6 +35,15 @@ export interface LegacyQueuedPlayerMessage {
 export const LEGACY_PLAYER_MESSAGE_DEFAULT_DURATION_MS = 2400;
 export const LEGACY_PLAYER_MESSAGE_MAX_VISIBLE = 3;
 
+// A sign-in failure is the one message a player has to read to recover, and its
+// longest sentence (LEGACY_OAUTH_FAILURE_MESSAGE_COPY.contextLost) is about 21
+// words. Measured 2026-11-12 in headless Chromium, the toast for it lasted the
+// 2400 ms default: well under the time it takes to read. 8000 ms covers the
+// longest row at 300 ms a word with margin and is never below 6000 ms. The
+// bottom-of-screen banner is held until the next attempt by the scene (see
+// legacyAuthFeedbackLifetime.ts); this is the floor for the toast copy of it.
+export const LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS = 8000;
+
 export const LEGACY_PLAYER_MESSAGE_COLORS: Record<LegacyPlayerMessageTone, string> = {
   error: '#ff7d7d',
   info: '#b7f2ff',
@@ -104,8 +113,26 @@ const LEGACY_OAUTH_FAILURE_CLASS_BY_CODE: Readonly<Record<string, LegacyOAuthFai
   invalid_state: 'contextLost',
   pending_expired: 'timedOut',
   session_invalid: 'session',
-  storage_unavailable: 'storage'
+  storage_unavailable: 'storage',
+  // Boot and sign-in paths that are not a callback failure. They keep the
+  // generic player copy on purpose (the player acts the same way) but each now
+  // carries its own stable code so a report can tell them apart:
+  //   session_quarantined      a shared-account session commit is held in quarantine
+  //   session_read_failed      reading the saved session threw or returned an error
+  //   portal_navigation_failed leaving for the account portal threw
+  portal_navigation_failed: 'generic',
+  session_quarantined: 'generic',
+  session_read_failed: 'generic'
 };
+
+// Codes that describe a boot/session read, not an OAuth callback. When one of
+// these arrives together with provider-shaped text, the code is recorded first
+// so the technical detail stays searchable by code.
+const LEGACY_AUTH_BOOT_FAILURE_CODES: ReadonlySet<string> = new Set([
+  'portal_navigation_failed',
+  'session_quarantined',
+  'session_read_failed'
+]);
 
 export const LEGACY_BOOT_MESSAGE_COPY = {
   bootError: 'The maze did not finish loading. Try refreshing once.',
@@ -212,6 +239,7 @@ export const resolveLegacyOAuthFailureMessage = (
   code: string | null | undefined
 ): LegacyPlayerMessage => createLegacyPlayerMessage({
   copy: resolveLegacyOAuthFailureCopy(code),
+  durationMs: LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS,
   id: `auth.oauth-failure.${resolveLegacyOAuthFailureClass(code)}`,
   source: 'auth',
   technicalDetail: resolveLegacyOAuthFailureTechnicalDetail(code),
@@ -273,6 +301,7 @@ export const resolveLegacyAuthFeedbackMessage = (
     if (isLegacyOAuthFailureCopy(rawError)) {
       return createLegacyPlayerMessage({
         copy: rawError,
+        durationMs: LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS,
         id: 'auth.feedback.error',
         source: 'auth',
         technicalDetail: resolveLegacyOAuthFailureTechnicalDetail(errorCode),
@@ -331,11 +360,15 @@ export const resolveLegacyAuthFeedbackMessage = (
                     : normalizedError.includes('already registered')
                       ? LEGACY_AUTH_MESSAGE_COPY.accountRecovery
                       : LEGACY_AUTH_MESSAGE_COPY.accountUnavailable;
+    const bootCodeDetail = typeof errorCode === 'string' && LEGACY_AUTH_BOOT_FAILURE_CODES.has(errorCode)
+      ? resolveLegacyOAuthFailureTechnicalDetail(errorCode)
+      : null;
     return createLegacyPlayerMessage({
       copy,
+      durationMs: LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS,
       id: 'auth.feedback.error',
       source: 'auth',
-      technicalDetail: rawError,
+      technicalDetail: bootCodeDetail !== null ? `${bootCodeDetail}; ${rawError}` : rawError,
       tone: 'error'
     });
   }
