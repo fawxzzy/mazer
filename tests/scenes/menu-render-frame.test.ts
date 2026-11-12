@@ -824,23 +824,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
     expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars(createBackdropStarRandom()).slice(0, LEGACY_MENU_STAR_COUNT);');
     expect(menuSceneSource).toContain('const backdropMotionEnabled = this.settings.toggleAnimatedBackdrop && !this.prefersLegacyReducedMotion();');
-    expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_SHARD_COUNT');
-    expect(backdropSource).toContain('LEGACY_MENU_GLASS_SHARD_COUNT');
-    expect(backdropSource).toContain('LEGACY_MENU_DRIFT_RUNE_COUNT');
     expect(backdropSource).toContain("LEGACY_MENU_BACKDROP_STAR_MOTION = 'radial-warp'");
     expect(backdropSource).toContain("LEGACY_MENU_BACKDROP_MOTION_PROFILE = 'visible-parallax-warp'");
     expect(backdropSource).toContain('resolveLegacyMenuBackdropWarpVector');
     expect(backdropSource).toContain('resetLegacyMenuBackdropStarNearWarpOrigin');
     expect(menuSceneSource).toContain('starMotion: LEGACY_MENU_BACKDROP_STAR_MOTION');
-    expect(backdropSource).toContain('resolveLegacyMenuBackdropGlassShards');
-    expect(backdropSource).toContain('resolveLegacyMenuBackdropDriftRunes');
     expect(backdropSource).toContain('const roundBackdropNumber = (value: number): number => Math.round(value * 1000) / 1000;');
-    expect(backdropSource).toContain('const localPhase = phase * (0.34 + (index * 0.034)) + (index * 1.73);');
-    expect(backdropSource).toContain('const driftX = Math.sin(localPhase) * LEGACY_MENU_BACKDROP_GLASS_DRIFT_X_RATIO;');
-    expect(backdropSource).toContain('const driftY = Math.cos(localPhase * 0.76) * LEGACY_MENU_BACKDROP_GLASS_DRIFT_Y_RATIO;');
-    expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_GLASS_DRIFT_X_RATIO = 0.038');
-    expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_GLASS_DRIFT_Y_RATIO = 0.024');
-    expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_RUNE_CYCLE_MS = 9000');
+    // MAZER-VIS-027: the shard, glass shard and drift rune generators are deleted, not just unused.
+    expect(backdropSource).not.toMatch(/SHARD|DRIFT_RUNE|RUNE_CYCLE|GLASS_DRIFT|DriftRune/);
     expect(backdropSource).toContain('const tailMagnitude = 0.68 + Math.min(0.28, distanceFromCenter * 0.42);');
   });
 
