@@ -499,6 +499,8 @@ import {
   LEGACY_REMOTE_MESSAGE_COPY,
   createLegacyPlayerMessage,
   enqueueLegacyPlayerMessage,
+  resolveLegacyUsernameSaveFailureMessage,
+  type LegacyUsernameSaveFailureKind,
   expireLegacyPlayerMessageQueue,
   isLegacyOAuthFailureCopy,
   resolveLegacyAuthFeedbackMessage,
@@ -12508,11 +12510,13 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (availability.error) {
+      this.reportAccountUsernameSaveFailure('try-again', availability.error);
       this.uiDirty = true;
       return;
     }
 
     if (availability.available === false) {
+      this.reportAccountUsernameSaveFailure('taken', null);
       this.uiDirty = true;
       return;
     }
@@ -12524,12 +12528,22 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (!saveResult.ok) {
+      this.reportAccountUsernameSaveFailure(saveResult.failure ?? 'failed', saveResult.error);
       this.uiDirty = true;
       return;
     }
 
     this.accountUsernameSavedValue = candidate;
     this.uiDirty = true;
+  }
+
+  // A username save that did not land is told to the player in plain words;
+  // the provider text stays in the message's technicalDetail.
+  private reportAccountUsernameSaveFailure(
+    kind: LegacyUsernameSaveFailureKind,
+    technicalDetail: string | null
+  ): void {
+    this.pushLegacyPlayerMessage(resolveLegacyUsernameSaveFailureMessage(kind, technicalDetail));
   }
 
   private destroyAccountUsernameNativeInput(): void {
@@ -13752,6 +13766,8 @@ export class MenuScene extends Phaser.Scene {
           this.accountUsernameSavedValue = usernameToSave;
           this.accountUsernameLoadedForUserId = result.snapshot.userId;
           this.uiDirty = true;
+        } else {
+          this.reportAccountUsernameSaveFailure(saveResult.failure ?? 'failed', saveResult.error);
         }
       });
     }
