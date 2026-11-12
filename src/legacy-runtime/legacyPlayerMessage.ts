@@ -75,6 +75,38 @@ export const LEGACY_AUTH_MESSAGE_COPY = {
   verifyEmail: 'Check your email to finish account setup.'
 } as const;
 
+// Shared-account sign-in failures, one row per failure CLASS the player can act
+// on (not per internal code). The generic row is the original one-size message
+// and stays the fallback for anything unmapped; it equals
+// MAZER_OAUTH_SAFE_ERROR_MESSAGE in legacyAccountPortal.ts (a test pins both).
+export const LEGACY_OAUTH_FAILURE_MESSAGE_COPY = {
+  cancelled: 'Sign-in did not finish. Choose Sign in to try again.',
+  connection: 'Mazer could not finish connecting to your account. Try again in a moment.',
+  contextLost: 'Sign-in came back to a different screen than where you started. Open Mazer from your home screen icon and try again.',
+  generic: 'Account connection unavailable. Return to Mazer and try again.',
+  session: 'Your account could not be confirmed. Try signing in again.',
+  storage: 'This browser is blocking what Mazer needs to sign in. Turn off private browsing or allow site data, then try again.',
+  timedOut: 'Sign-in took too long. Choose Sign in to start again.'
+} as const;
+
+export type LegacyOAuthFailureClass = keyof typeof LEGACY_OAUTH_FAILURE_MESSAGE_COPY;
+
+// Internal failure code (MazerOAuthFailureCategory) -> player-facing class.
+// Several codes share a class on purpose: the player acts the same way.
+// `expired_or_missing_state` and `invalid_state` both mean the callback did not
+// find (or match) the attempt this browser context started, which is what
+// happens when sign-in finishes in a different window than it began in.
+const LEGACY_OAUTH_FAILURE_CLASS_BY_CODE: Readonly<Record<string, LegacyOAuthFailureClass>> = {
+  authorization_unavailable: 'connection',
+  cancelled: 'cancelled',
+  exchange_unavailable: 'connection',
+  expired_or_missing_state: 'contextLost',
+  invalid_state: 'contextLost',
+  pending_expired: 'timedOut',
+  session_invalid: 'session',
+  storage_unavailable: 'storage'
+};
+
 export const LEGACY_BOOT_MESSAGE_COPY = {
   bootError: 'The maze did not finish loading. Try refreshing once.',
   serviceWorkerError: 'The offline cache could not update. The game can still run online.'
@@ -145,6 +177,47 @@ export const resolveLegacyOfflineSyncedMessage = (): LegacyPlayerMessage => crea
   tone: 'success'
 })!;
 
+export const resolveLegacyOAuthFailureClass = (
+  code: string | null | undefined
+): LegacyOAuthFailureClass => (
+  typeof code === 'string' && Object.prototype.hasOwnProperty.call(LEGACY_OAUTH_FAILURE_CLASS_BY_CODE, code)
+    ? LEGACY_OAUTH_FAILURE_CLASS_BY_CODE[code]
+    : 'generic'
+);
+
+export const resolveLegacyOAuthFailureCopy = (code: string | null | undefined): string => (
+  LEGACY_OAUTH_FAILURE_MESSAGE_COPY[resolveLegacyOAuthFailureClass(code)]
+);
+
+// Diagnostics-only: the internal code goes into technicalDetail so a screenshot
+// of runtime diagnostics identifies the failure. Players never see it. Only a
+// known code is echoed; anything else is recorded as `unmapped`.
+export const resolveLegacyOAuthFailureTechnicalDetail = (
+  code: string | null | undefined
+): string | null => {
+  if (typeof code !== 'string' || code.length === 0) {
+    return null;
+  }
+  return `oauth-failure:${Object.prototype.hasOwnProperty.call(LEGACY_OAUTH_FAILURE_CLASS_BY_CODE, code) ? code : 'unmapped'}`;
+};
+
+export const isLegacyOAuthFailureCopy = (copy: string | null | undefined): boolean => {
+  const trimmed = copy?.trim();
+  return trimmed !== undefined
+    && trimmed.length > 0
+    && (Object.values(LEGACY_OAUTH_FAILURE_MESSAGE_COPY) as string[]).includes(trimmed);
+};
+
+export const resolveLegacyOAuthFailureMessage = (
+  code: string | null | undefined
+): LegacyPlayerMessage => createLegacyPlayerMessage({
+  copy: resolveLegacyOAuthFailureCopy(code),
+  id: `auth.oauth-failure.${resolveLegacyOAuthFailureClass(code)}`,
+  source: 'auth',
+  technicalDetail: resolveLegacyOAuthFailureTechnicalDetail(code),
+  tone: 'error'
+})!;
+
 export const enqueueLegacyPlayerMessage = (
   queue: readonly LegacyQueuedPlayerMessage[],
   message: LegacyPlayerMessage | null,
@@ -190,10 +263,22 @@ export const resolveLegacyAuthValidationMessage = (
 
 export const resolveLegacyAuthFeedbackMessage = (
   error: string | null | undefined,
-  info: string | null | undefined
+  info: string | null | undefined,
+  errorCode?: string | null
 ): LegacyPlayerMessage | null => {
   if (error?.trim()) {
     const rawError = error.trim();
+    // Shared-account sign-in failure copy is already player-safe and class
+    // specific; pass it through instead of re-matching it as provider text.
+    if (isLegacyOAuthFailureCopy(rawError)) {
+      return createLegacyPlayerMessage({
+        copy: rawError,
+        id: 'auth.feedback.error',
+        source: 'auth',
+        technicalDetail: resolveLegacyOAuthFailureTechnicalDetail(errorCode),
+        tone: 'error'
+      });
+    }
     const normalizedError = rawError.toLowerCase();
     const isNetworkError = normalizedError === 'failed to fetch'
       || normalizedError.includes('network')

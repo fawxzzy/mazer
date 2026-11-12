@@ -1763,7 +1763,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const result = await beginMazerOAuthAuthorization();');
     expect(menuSceneSource).toContain('void this.handleSharedAccountAuthorization();');
     expect(menuSceneSource).toContain('private createLegacySignedOutOAuthFailure(): void');
-    expect(menuSceneSource).toContain("this.authSnapshot.error !== MAZER_OAUTH_SAFE_ERROR_MESSAGE");
+    expect(menuSceneSource).toContain('!isLegacyOAuthFailureCopy(this.authSnapshot.error)');
     expect(menuSceneSource).toContain('this.createLegacySignedOutOAuthFailure();');
     expect(menuSceneSource).toContain('this.oauthPageShowCleanup = installMazerOAuthPageShowRecovery(window, () => {');
     expect(menuSceneSource).toContain('this.oauthPageShowCleanup?.();');

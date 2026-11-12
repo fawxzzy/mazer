@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_BOOT_MESSAGE_COPY,
+  LEGACY_OAUTH_FAILURE_MESSAGE_COPY,
   LEGACY_OFFLINE_MESSAGE_COPY,
   LEGACY_OVERLAY_MESSAGE_COPY,
   LEGACY_REMOTE_MESSAGE_COPY
@@ -16,6 +17,7 @@ describe('player message copy rows', () => {
     const tables = {
       LEGACY_AUTH_MESSAGE_COPY,
       LEGACY_BOOT_MESSAGE_COPY,
+      LEGACY_OAUTH_FAILURE_MESSAGE_COPY,
       LEGACY_OFFLINE_MESSAGE_COPY,
       LEGACY_OVERLAY_MESSAGE_COPY,
       LEGACY_REMOTE_MESSAGE_COPY
@@ -31,6 +33,7 @@ describe('player message copy rows', () => {
     expect({
       auth: LEGACY_AUTH_MESSAGE_COPY,
       boot: LEGACY_BOOT_MESSAGE_COPY,
+      oauthFailure: LEGACY_OAUTH_FAILURE_MESSAGE_COPY,
       offline: LEGACY_OFFLINE_MESSAGE_COPY,
       overlay: LEGACY_OVERLAY_MESSAGE_COPY,
       remote: LEGACY_REMOTE_MESSAGE_COPY
@@ -66,6 +69,15 @@ describe('player message copy rows', () => {
         "boot": {
           "bootError": "The maze did not finish loading. Try refreshing once.",
           "serviceWorkerError": "The offline cache could not update. The game can still run online.",
+        },
+        "oauthFailure": {
+          "cancelled": "Sign-in did not finish. Choose Sign in to try again.",
+          "connection": "Mazer could not finish connecting to your account. Try again in a moment.",
+          "contextLost": "Sign-in came back to a different screen than where you started. Open Mazer from your home screen icon and try again.",
+          "generic": "Account connection unavailable. Return to Mazer and try again.",
+          "session": "Your account could not be confirmed. Try signing in again.",
+          "storage": "This browser is blocking what Mazer needs to sign in. Turn off private browsing or allow site data, then try again.",
+          "timedOut": "Sign-in took too long. Choose Sign in to start again.",
         },
         "offline": {
           "saved": "You are offline. Progress is saved on this device and will sync when you reconnect.",
