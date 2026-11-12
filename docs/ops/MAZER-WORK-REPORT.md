@@ -6,24 +6,24 @@ Board as of 2026-11-11T12:00:00.000Z (the registry's own updatedAt). Read time: 
 
 ## At a glance
 
-- **151 cards**: 80 completed, 56 open, 15 deferred.
-- **Needs you now: 20** (14 decisions, 6 phone or device checks).
-- Completed by proof: 0 verified on a device, 34 headless-only, 32 tests or capture frames only, 14 with no device surface, 0 with no evidence recorded.
+- **163 cards**: 86 completed, 62 open, 15 deferred.
+- **Needs you now: 29** (22 decisions, 7 phone or device checks).
+- Completed by proof: 0 verified on a device, 36 headless-only, 34 tests or capture frames only, 16 with no device surface, 0 with no evidence recorded.
 
 | Bucket | Cards |
 | --- | ---: |
-| 1. Needs you now | 20 |
-| 2. Completed | 80 |
-| 3. In review | 2 |
-| 4. Blocked | 17 |
-| 5. Ready to build | 7 |
-| 6. In progress | 10 |
+| 1. Needs you now | 29 |
+| 2. Completed | 86 |
+| 3. In review | 3 |
+| 4. Blocked | 18 |
+| 5. Ready to build | 8 |
+| 6. In progress | 4 |
 | 7. Deferred | 15 |
 | 8. Unclassified | 0 |
 
 ## 1. Needs you now
 
-### Decisions (14)
+### Decisions (22)
 
 - [ ] `MAZER-HAZ-002` Sign or reject the endless hazard product contract (high, blocked)
   - Ask: Sign or reject the endless hazard contract (obstacles, enemies and items in phases)?
@@ -31,12 +31,19 @@ Board as of 2026-11-11T12:00:00.000Z (the registry's own updatedAt). Read time: 
 - [ ] `MAZER-PROG-005` Decide what happens past level 198 so levels keep getting harder (high)
   - Ask: After level 268, is the lever for endless difficulty hazards (the same decision as signing MAZER-HAZ-002) or a bigger board?
   - Recommendation: Hazards: you ruled out zoom and board size, and without a new lever the ladder plateaus at 268.
+- [ ] `MAZER-UI-019` Complete the full UI rework migration on the new standards (high)
+  - Ask: Is the UI rework still one umbrella, or split into child cards (MenuScene decomposition, Wave 6 proof surfaces, future-phaser retirement) with this card closed?
+  - Recommendation: Auditor recommendation: split into children and keep the umbrella as planning only until the acceptance matrix is evaluated.
 - [ ] `MAZER-UI-020` Decide the six design-board picks: font, quit confirm, start style, icons, backdrop, HUD (high)
   - Ask: Do you want the build agent to record the six design picks on its own judgement, or do you want to choose them yourself?
   - Recommendation: Say "go" so the build agent records each pick with its reason (quit confirm is already shipped as MAZER-FLOW-005); that unblocks MAZER-UI-010, UI-015, VIS-011 and VIS-012.
 - [ ] `MAZER-AUDIO-001` Decide whether the game has sound (medium)
   - Ask: Should Mazer have sound at all, and should it default to on or off?
   - Recommendation: Allow small synthesized effects behind a Settings toggle, default off.
+- [ ] `MAZER-DATA-004` Finish the offline-first play, sync and conflict contract (medium)
+  - Ask: Sign or amend the 7 decisions in the offline sync contract: tier order, what a checkpoint means, coin and inventory ledger, outbox bounds and wording, entitlement grace, guest-to-account transfer, required device proofs.
+  - Recommendation: Auditor recommendation: approve the tier order as drafted, define a checkpoint as a completed level only for now, keep coins and inventory local-first, authorise no server work yet.
+  - Then check (installed-app): On the iPhone installed app, signed in: turn on airplane mode, complete a level, force-quit, reopen offline, then turn airplane mode off and wait 10 seconds. Expect: Progress is kept offline; one saved-offline notice; after reconnect the outbox flushes once and the level matches on a second device with no duplicate.
 - [ ] `MAZER-ECON-001` Sign the shop and random item economy contract (medium, in review)
   - Ask: Sign or reject the shop and random-item economy draft contract?
   - Recommendation: Defer signing until the hazard contract is settled; no Phase 1 work depends on it.
@@ -46,6 +53,9 @@ Board as of 2026-11-11T12:00:00.000Z (the registry's own updatedAt). Read time: 
 - [ ] `MAZER-FLOW-011` Decide when input unlocks during the level intro (medium)
   - Ask: When should input unlock after reaching the goal: as now (about 2.5 s), at 75 percent of the reveal, or when the beams land plus a margin?
   - Recommendation: Keep the current unlock: you twice said build and deconstruct felt too fast.
+- [ ] `MAZER-HAZ-007` Complete the turn-synchronous world simulation beyond the player phase (medium)
+  - Ask: Will hazards and enemies be activated, and must they run through the turn host?
+  - Recommendation: Auditor recommendation: defer all non-player phases explicitly until hazards have a shipped product contract, then mark the card completed with a caveat once a deferral table lands.
 - [ ] `MAZER-MOTION-004` Add an in-game reduced-motion setting and finish the gating: open for review, held (medium, in review, #425)
   - Ask: Under reduced motion, should the title and level-number rainbow stop shifting colour, or keep shifting colour and only stop moving?
   - Recommendation: Keep the colours shifting and stop only the movement; PR #425 is then changed to match and merged.
@@ -53,34 +63,54 @@ Board as of 2026-11-11T12:00:00.000Z (the registry's own updatedAt). Read time: 
   - Ask: Should the install gate stay mandatory in install modes where it blocks boot, given access is meant to be enforced by entitlement?
   - Recommendation: Keep the gate as shipped until entitlements exist (MAZER-ECON-003), then revisit.
   - Then check (installed-app): Install Mazer on the phone, open it once online, turn on airplane mode, force-close the app and open it again. Expect: The app shell opens and shows the offline-capable start screen.
+- [ ] `MAZER-QA-006` Finish cross-viewport UI reliability and layout persistence (medium)
+  - Ask: With Board Zoom removed and the board size frozen, is any layout persistence still wanted, or should that criterion be dropped?
+  - Recommendation: Auditor recommendation: drop the persistence criterion; keep the viewport matrix and the device check.
+  - Then check (installed-app): On the iPhone installed app: open the menu, rotate portrait to landscape and back mid-play, and open Settings and Guide in each orientation. Expect: Play pauses on the flip and refits, no clipped panels or purple bars, tap targets reachable, state intact after rotating back.
 - [ ] `MAZER-VIS-012` Unify the backdrop across boot, install gate and sign-in (medium)
   - Ask: Approve one near-black canvas colour across boot, install gate and sign-in, with a calmer gate starfield, the app icon on the install screen and a dot-matrix wordmark on boot?
   - Recommendation: Approve it; portal alignment is tracked as a separate card in another repo.
+- [ ] `MAZER-WORLD-001` Complete the World Identity visual maintenance lane (medium)
+  - Ask: Close World Identity as a completed lane (new work ships as discrete render cards) or keep it as a standing maintenance bucket?
+  - Recommendation: Auditor recommendation: close with a caveat and open one card per concrete defect; an in-progress card with no finish line hides real state.
+  - Then check (installed-app): On the iPhone installed app, open the menu and play on the current build; watch the backdrop stars, end markers and trail for 30 seconds. Expect: No strobing recolour, no image or vector misalignment, the end star is centred and the trail does not shake (PR #416 fixes).
 - [ ] `MAZER-CHAL-001` Add shared-seed daily and weekly challenges (low)
   - Ask: Do you want shared-seed daily and weekly challenges, and at what cadence?
   - Recommendation: Park until the economy and hazard contracts are settled.
+- [ ] `MAZER-MOTION-007` Decide off-scale loops and durations and sweep dead motion code (low)
+  - Ask: Decide which off-scale loops and durations move onto the motion scale and which stay as they are.
+  - Recommendation: Decide value by value with before and after captures; anything you do not name stays unchanged. Then sweep the dead motion code.
 - [ ] `MAZER-PROG-006` Decide a minimum tile size for very large boards (low)
   - Ask: Should the game set a minimum tile size for very large boards, or explicitly defer zoom?
   - Recommendation: Defer explicitly and record it, since board size and zoom are frozen.
+- [ ] `MAZER-PWA-005` Provide approved app icon art with proper corners and a clean screenshot capture route (low)
+  - Ask: Provide approved app icon art with proper corners (or say to keep the current icon).
+  - Recommendation: Supply a master without baked corners; the build agent then regenerates the icons, the hash verifier and clean screenshots.
 - [ ] `MAZER-TOOLS-001` Define a handcrafted asset authoring and import workflow (low)
   - Ask: Do you want a handcrafted-asset import workflow, and in which file format?
   - Recommendation: Park it as deferred; no open card depends on it.
 - [ ] `MAZER-UI-021` Route auth, sync, username and boot errors into the message toast (low)
   - Ask: Which of auth, sync, username and boot errors should appear in the message toast?
   - Recommendation: Show auth, username and boot errors; keep remote sync silent.
+- [ ] `MAZER-VIS-026` Decide dense-board player prominence after the tile-sized ring (low)
+  - Ask: On dense boards, accept the thin player ring, or add a screen-pixel floor on the glow only?
+  - Recommendation: Accept: the ring now matches the end tiles and the find-me ping still finds the player. The alternative is a screen-pixel floor on the glow only.
 
-### Phone and device checks (6)
+### Phone and device checks (7)
 
 - [ ] `MAZER-QA-001` Verify deployed Mazer changes on a real phone and installed app (high)
   - Ask: Run the phone checks below on the real phone and the installed app and tell me what failed.
   - Recommendation: Do the whole list in one sitting on the current production build; each failure becomes a follow-up card.
-  - [ ] (phone) Tap the pause gear in play with your thumb (MAZER-UI-014). Expect: Pause opens on the first tap.
+  - [ ] (phone) Tap the pause gear in play with your thumb and judge its size: it should be at least a thumb-sized target (MAZER-UI-014). Expect: Pause opens on the first tap and the control is large enough not to miss.
   - [ ] (phone) Rotate the phone while a run is live (MAZER-FLOW-008). Expect: The game pauses and Pause says "Rotate back to keep playing" until you rotate back.
   - [ ] (phone) Signed in, turn on airplane mode, finish a level, then turn it off (MAZER-FLOW-009). Expect: One "saved offline" notice during the outage, then one "synced" notice after.
   - [ ] (phone) Open Settings and look for the Haptics row, then bump a wall (MAZER-CTRL-001, MAZER-MOTION-003). Expect: A Haptics row exists (on by default); a wall bump nudges the player 2 px and buzzes where the phone supports vibration (iOS does not).
   - [ ] (phone) Trigger any player message, for example the offline notice above (MAZER-UI-018). Expect: A readable toast appears and no message promises guest play.
   - [ ] (phone) Open Mazer in a normal browser tab, not installed (MAZER-FLOW-010). Expect: The install gate shows a one-line value statement and a mini-maze mark; Copy link shows "Link copied".
   - [ ] (phone) Leave the menu demo running for a few mazes (MAZER-FLOW-007). Expect: The menu AI climbs one level per completed maze.
+  - [ ] (phone) Leave the menu demo running and compare the AI marker with the marker you play (MAZER-VIS-022). Expect: The menu AI marker looks identical to the player marker: same block, keyline, glow and tile-sized ring; no crosshair ticks and no flat square.
+  - [ ] (installed-app) Add Mazer to the home screen, force-close it, then open it from the home-screen icon (MAZER-PWA-002). Expect: The iPhone launch image shows during the cold start (tell me the phone model); a blank dark screen means the launch image link did not match.
+  - [ ] (phone) Send the Mazer home link to yourself in a message app (MAZER-SHARE-001). Expect: A large image preview with the MAZER title appears (the same check as the SHARE-001 steps).
   - [ ] (phone) Walk out along the trail and back around corners (MAZER-VIS-020). Expect: The trail follows every corner with no cut or snap when stepping back.
   - [ ] (phone) Clear a level (MAZER-VIS-019, MAZER-FLOW-004). Expect: Only the rainbow level number shows: no "Level N" caption and no rank letter.
   - [ ] (phone) Open ?previewLevel=60, 100 and 190 and play each (MAZER-PROG-015). Expect: Tell me whether each feels easier, the same or harder than the one before.
@@ -108,8 +138,14 @@ Board as of 2026-11-11T12:00:00.000Z (the registry's own updatedAt). Read time: 
   - Recommendation: If Reduce Motion is on or Trail Shine is off, that explains it: set Reduce Motion off and Trail Shine on and look again; if it still looks static, send the phone model.
   - [ ] (phone) Note iOS Settings > Accessibility > Motion > Reduce Motion (on or off) and Mazer Settings > Trail Shine (on or off). Expect: Both settings are written down.
   - [ ] (phone) With Reduce Motion off and Trail Shine on, walk a level and watch the trail. Expect: The trail colour visibly shifts over time; if it stays static, report both settings and the phone model.
+- [ ] `MAZER-SHARE-001` Finish web share metadata, the preview image and external verification (low, in review, #437)
+  - Ask: Check the share preview on the real platforms: the image address, then iMessage, Slack, Discord and the Facebook Sharing Debugger.
+  - Recommendation: Do the three steps below once; any platform that shows a small or missing image becomes a follow-up card.
+  - [ ] (external-tool) Run: curl -sI "https://mazer.fawxzzy.com/share/mazer-share-preview.png?v=share-v1" (the share image address). Expect: HTTP 200 and content-type image/png.
+  - [ ] (phone) Paste the Mazer home link (https://mazer.fawxzzy.com/) into iMessage, Slack and Discord, one at a time, without sending long text around it. Expect: Each shows a large image preview with the MAZER title; a small icon or no image means the card stays in review.
+  - [ ] (external-tool) Open the Facebook Sharing Debugger, enter the Mazer home link and press Scrape Again. Expect: The image is 1200x630 and picked from the share tags, with no blocking warnings.
 
-66 shipped cards (section 2) have no phone proof; the combined phone pass for them is the MAZER-QA-001 checklist above.
+70 shipped cards (section 2) have no phone proof; the combined phone pass for them is the MAZER-QA-001 checklist above.
 
 ## 2. Completed
 
@@ -117,7 +153,7 @@ Board as of 2026-11-11T12:00:00.000Z (the registry's own updatedAt). Read time: 
 
 None yet: no completed card records a real-device check.
 
-### Shipped, headless-only (needs a phone check) (34)
+### Shipped, headless-only (needs a phone check) (36)
 
 - `MAZER-CTRL-001` Add a haptics setting and test the vibration helper: merged and deployed (2026-11-11, #427, deployed b640f1da)
 - `MAZER-FLOW-004` Level/Rank display removed (owner decision): no rank letter, no Level N caption (2026-11-11, #419, deployed b640f1da)
@@ -127,12 +163,14 @@ None yet: no completed card records a real-device check.
 - `MAZER-FLOW-010` Polish the install gate copy and feedback: merged and deployed (prompt feedback not built) (2026-11-11, #422, deployed b640f1da)
 - `MAZER-MOTION-003` Fix step glide overlap and add wall-bump feedback: merged and deployed (2026-11-11, #424, deployed b640f1da)
 - `MAZER-PROG-015` Double lure on levels 2-268 and the mastery tier removed (ladder v2): merged and deployed (2026-11-11, #420, deployed b640f1da)
+- `MAZER-PWA-002` Add PWA screenshots, iOS launch art and icon cleanup (2026-11-11, #438, deployed 24e15cc1)
 - `MAZER-UI-014` Make the in-play pause control a 44px target: shipped, now pinned by a test (2026-11-11, #428, deployed b640f1da)
 - `MAZER-UI-017` Pin the empty, loading, error, offline and username-gate states of the leaderboard (2026-11-11, #429, deployed b640f1da)
 - `MAZER-UI-018` Draw a player message toast and fix stale guest copy: merged and deployed (2026-11-11, #430, #431, deployed b640f1da)
 - `MAZER-VIS-019` Remove the Level N and Rank X captions (2026-11-11, #419, deployed b640f1da)
 - `MAZER-VIS-020` Fix the trail corner-cut when stepping back over the trail (2026-11-11, #419, deployed b640f1da)
 - `MAZER-VIS-021` Run the trail colour clock on the menu demo too (2026-11-11, #421, deployed b640f1da)
+- `MAZER-VIS-022` AI player and play player share one marker drawn like the end tiles (2026-11-11, #442, deployed 24e15cc1)
 - `MAZER-VIS-014` Remove backdrop stars, centre the end markers, lighten the long trail draw (2026-11-10, #411)
 - `MAZER-FLOW-002` Add a level-complete moment (2026-11-10, #409)
 - `MAZER-FLOW-003` Add a rank-up moment (2026-11-10, #409)
@@ -154,8 +192,10 @@ None yet: no completed card records a real-device check.
 - `MAZER-NAV-001` Freeze Navigation Core v1 (2026-08-29)
 - `MAZER-TELEPORT-001` Freeze Teleport System v1 (2026-08-29)
 
-### Shipped on tests or capture frames only (no browser or phone proof recorded) (32)
+### Shipped on tests or capture frames only (no browser or phone proof recorded) (34)
 
+- `MAZER-UI-022` Move the offline-notice strings into the message module copy tables (2026-11-11, #436, deployed 24e15cc1)
+- `MAZER-VIS-017` Purge the disabled backdrop glyph drawing code and its pinned source-string tests (2026-11-11, #439, deployed 24e15cc1)
 - `MAZER-GEN-004` Fade wrap corridors out between levels 100 and 140 and price them (2026-11-10, #404)
 - `MAZER-PROG-003` Make maze geometry follow the displayed level (2026-11-10, #400)
 - `MAZER-PROG-004` Add shortcuts, alternate routes and decoy loops plus progression gauges (2026-11-10, #401)
@@ -189,9 +229,11 @@ None yet: no completed card records a real-device check.
 - `MAZER-PROG-010` Make board scale ceiling and feeder count device-relative (2026-08-28, #301, #304)
 - `MAZER-PWA-001` Harden PWA installability and delivery assets (2026-08-28)
 
-### No device surface (tooling, governance, data, docs) (14)
+### No device surface (tooling, governance, data, docs) (16)
 
 - `MAZER-GOV-006` Run the message-inventory guard in CI (2026-11-11, #432, deployed b640f1da)
+- `MAZER-GOV-007` Generated work report and work ledger (2026-11-11, #440, deployed 24e15cc1)
+- `MAZER-GOV-008` Run the brand tests in CI (2026-11-11, #437, deployed 24e15cc1)
 - `MAZER-REPO-HYGIENE-001` Mazer leftovers cleanup (2026-11-10)
 - `MAZER-QA-003` Keep the UI-surface capture and verification harness green (2026-11-09, #362, #363, #371, #380, #389, #397)
 - `MAZER-QA-004` Add a hidden Level Preview route for dev and QA (2026-11-09, #398)
@@ -212,14 +254,15 @@ None.
 
 ## 3. In review
 
-Review cards that wait on you are listed in section 1; these are the rest (2).
+Review cards that wait on you are listed in section 1; these are the rest (3).
 
-- `MAZER-GOV-004` Retire the previous project board and refresh this one from all prior discussion (high): The public site still needs both refresh pull requests merged.
+- `MAZER-GOV-004` Retire the previous project board and refresh this one from all prior discussion (high): Mazer PR #434 and FawxzzyWeb PR #119 (the previous refresh) are merged; the registry card text still says the refresh PRs are pending and is left unchanged for the owner to close.
+- `MAZER-MOTION-001` Adopt one motion scale for durations, loops and easing (medium, #441): Merged and deployed at main 24e15cc1 with no visible change. Criterion 3 (dead motion code) is not done and is carried by MAZER-MOTION-007; the scene constants move in MAZER-MOTION-006.
 - `MAZER-DOCS-001` Multi-target deployment architecture doc (low, #405): Docs only, merged; open unknowns remain in the note and it is not reconciled with the Cyberdeck card.
 
 ## 4. Blocked
 
-Grouped by who unblocks (17 cards). Cards that only need your answer or a phone check are in section 1.
+Grouped by who unblocks (18 cards). Cards that only need your answer or a phone check are in section 1.
 
 ### Zac (an approval or a sign-off on a gated change) (3)
 
@@ -236,9 +279,9 @@ Grouped by who unblocks (17 cards). Cards that only need your answer or a phone 
 
 - `MAZER-ACCT-003` Prove installed-app sign-in and progress end to end (high): Needs a real-phone run with a throwaway account covering installed-app sign-in, refresh, recovery, isolation and standalone handoff.
 
-### Another card (waits on a card that is not finished) (11)
+### Another card (waits on a card that is not finished) (12)
 
-- `MAZER-MOTION-002` Animate overlays, controls and the Start and splash transitions (medium): Waits on MAZER-MOTION-001 (planning).
+- `MAZER-MOTION-002` Animate overlays, controls and the Start and splash transitions (medium): Waits on MAZER-MOTION-001 (review).
 - `MAZER-PROG-008` Decide which maze features unlock at which level and content band (medium): Nothing to answer yet: decide MAZER-HAZ-002 and MAZER-ECON-001 first.
 - `MAZER-UI-010` Define one type scale and a second display typeface (medium): Waits on MAZER-UI-020 (planning).
 - `MAZER-UI-015` Build one shared button kit (medium): Waits on MAZER-UI-020 (planning).
@@ -247,37 +290,33 @@ Grouped by who unblocks (17 cards). Cards that only need your answer or a phone 
 - `MAZER-AUDIO-002` Compose and wire original Mazer music from the music-language brief (low): Waits on MAZER-AUDIO-001 (planning).
 - `MAZER-ECON-002` Add coin pickups, inventory and a data-driven cosmetic catalog (low): Waits on the MAZER-ECON-001 sign-off.
 - `MAZER-ECON-003` Define account entitlements and store checkout (low): Waits on the MAZER-ECON-001 sign-off.
-- `MAZER-MOTION-005` Unify the reduced-motion crossfade length with the motion scale (low): Waits on MAZER-MOTION-001 (planning).
+- `MAZER-MOTION-005` Unify the reduced-motion crossfade length with the motion scale (low): Waits on MAZER-MOTION-001 (review).
+- `MAZER-MOTION-006` Migrate scene motion constants to the motion scale (low): Waits on MAZER-MOTION-004 (PR #425) landing.
 - `MAZER-NATIVE-001` Plan the native app-store wrapper after web stabilization (low): Waits on the real-phone verification in MAZER-QA-001.
 
 ## 5. Ready to build
 
-Agent-buildable with no open dependency, highest priority first (7 cards). Hint files are for conflict planning only.
+Agent-buildable with no open dependency, highest priority first (8 cards). Hint files are for conflict planning only.
 
-> Hot file: `src/scenes/MenuScene.ts` (Wave 5C) is touched by MAZER-FLOW-001, MAZER-MOTION-001, MAZER-UI-013, MAZER-UI-016. Run at most 2 of them in one batch and merge them one at a time.
+> Hot file: `src/scenes/MenuScene.ts` (Wave 5C) is touched by MAZER-FLOW-001, MAZER-UI-013, MAZER-UI-016. Run at most 2 of them in one batch and merge them one at a time.
 
 1. `MAZER-FLOW-001` Teach the controls and the goal on level 1 (high)
-2. `MAZER-MOTION-001` Adopt one motion scale for durations, loops and easing (medium) WARNING: overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts
-3. `MAZER-UI-013` Move scene colors onto the shared theme values (medium) WARNING: overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts; overlaps MAZER-MOTION-001 on src/scenes/MenuScene.ts, src/theme/tokens.ts
-4. `MAZER-VIS-017` Purge the disabled backdrop glyph drawing code and its pinned source-string tests (medium)
-5. `MAZER-PWA-002` Add PWA screenshots, iOS launch art and icon cleanup (low)
-6. `MAZER-UI-016` Frame the game on desktop instead of stretching the phone layout (low) WARNING: overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts; overlaps MAZER-MOTION-001 on src/scenes/MenuScene.ts; overlaps MAZER-UI-013 on src/scenes/MenuScene.ts
-7. `MAZER-UI-022` Move the offline-notice strings into the message module copy tables (low)
+2. `MAZER-UI-013` Move scene colors onto the shared theme values (medium) WARNING: overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts
+3. `MAZER-GOV-009` Stabilise load-sensitive tests (low)
+4. `MAZER-UI-016` Frame the game on desktop instead of stretching the phone layout (low) WARNING: overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts; overlaps MAZER-UI-013 on src/scenes/MenuScene.ts
+5. `MAZER-VIS-023` Round the player ring to the cap-tile shape on start and goal tiles (low)
+6. `MAZER-VIS-024` Make the marker diagnostics report the real block size (low) WARNING: overlaps MAZER-VIS-023 on src/render/playerMarker.ts
+7. `MAZER-VIS-025` Snap the trail head to the same device pixel as the player marker (low) WARNING: overlaps MAZER-VIS-023 on src/render/playerMarker.ts; overlaps MAZER-VIS-024 on src/render/playerMarker.ts
+8. `MAZER-VIS-027` Delete the unused backdrop glyph generators in their own wave (low)
 
 ## 6. In progress
 
 Long-running lanes. Audit the current state before assigning any of it to a worker.
 
 - `MAZER-2D-001` Maintain the mobile-clean 2D shipping baseline (high): Standing baseline lane; keep the regression checks green.
-- `MAZER-UI-019` Complete the full UI rework migration on the new standards (high): Layout and component standards are on main; the migration runs under separate wave governance.
-- `MAZER-AI-001` Finish the configurable AI runner and run-corpus calibration (medium): Runner nearly done; calibration is unfinished.
-- `MAZER-DATA-004` Finish the offline-first play, sync and conflict contract (medium): Completion outbox and monotonic merge are on main; the coins, inventory and checkpoint proposal is unsigned and server parts are provider-gated.
-- `MAZER-HAZ-007` Complete the turn-synchronous world simulation beyond the player phase (medium): Turn host and player movement phase are done; enemy, projectile, item, duration and collision handlers are deliberately not integrated.
-- `MAZER-QA-006` Finish cross-viewport UI reliability and layout persistence (medium): Two reliability cards are partly done; July packets exist.
-- `MAZER-WORLD-001` Complete the World Identity visual maintenance lane (medium): Bounded World Identity fixes; the remaining list is not written in the card.
+- `MAZER-AI-001` Finish the configurable AI runner and run-corpus calibration (medium): Auditor recommendation, not a status change: stays in progress and an agent can finish it. Regenerate the three baselines after ladder v2 and report the drift, fix the known calibration script call, and add a threshold table per band. Open question for the owner, not blocking: is a human-configurable runner needed (auditor: the seed-pack runner is enough; drop remote run retention).
 - `MAZER-GOV-005` Keep the visual proof discipline current (low): Near complete; the rule is ongoing governance.
-- `MAZER-RUN-004` Build the shared run status panel (low): Run status panel started and early.
-- `MAZER-SHARE-001` Finish web share metadata, the preview image and external verification (low): Share tags are pinned by a test; the preview image is still the app icon and external checks need a deployed URL.
+- `MAZER-RUN-004` Build the shared run status panel (low): Auditor recommendation, not a status change: planning, low priority. Only the pure view model exists and no scene uses it; wiring it touches the menu scene file, which contends with MAZER-UI-019. After wiring, compare the menu and in-play panels on a phone.
 
 ## 7. Deferred
 
