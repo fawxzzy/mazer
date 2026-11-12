@@ -1500,6 +1500,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const progressionSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyProgression.ts'), 'utf8');
     expect(progressionSource).toContain('playerEvidence: LegacyProgressionPlayerEvidence;');
     expect(progressionSource).toContain('completedCycles: LegacyProgressionOrdinal;');
+    // ...and the scene no longer publishes them in the touch input diagnostics (they are not speed inputs).
+    for (const field of ['progressionCompletedCycles', 'progressionContextApplied', 'progressionLevel', 'progressionPaceScore']) {
+      expect(menuSceneSource).not.toContain(`${field}:`);
+    }
     expect(menuSceneSource).toContain("encoding: 'walkable-rows-v1'");
     expect(menuSceneSource).toContain("walkableRows: this.maze.grid.map((row) => row.map((walkable) => (walkable ? '1' : '0')).join(''))");
   });
