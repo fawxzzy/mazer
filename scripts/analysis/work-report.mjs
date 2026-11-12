@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Generates the Mazer work report from the owner registry plus the operational ledger.
 //
 //   node scripts/analysis/work-report.mjs           write docs/ops/MAZER-WORK-REPORT.md and .json
