@@ -372,12 +372,15 @@ export const isLegacyRemoteCompletionContextCurrent = (
   && initiatingSnapshot.userId === currentSnapshot.userId
 );
 
-const createRemoteProfilePayload = (
-  snapshot: Pick<LegacyAuthSessionSnapshot, 'displayName' | 'userId'>,
+// The server owns mazer_profiles.display_name (it equals the public username
+// and only mazer_set_username / the profile trigger and ensure RPC write it).
+// This payload is the UPDATE path, so it must never carry display_name: a
+// settings sync used to overwrite a renamed profile with the stale auth name.
+export const createRemoteProfilePayload = (
+  snapshot: Pick<LegacyAuthSessionSnapshot, 'userId'>,
   settings: LegacySettings,
   revision: number
 ): Record<string, unknown> => ({
-  display_name: snapshot.displayName,
   revision,
   selected_control_mode: settings.controlMode,
   settings: pickLegacyGameTogglePreferences(settings),
@@ -451,7 +454,7 @@ const initializeRemoteProgressionRows = async (
 
 const updateRemoteProfileRow = async (
   client: SupabaseClient,
-  snapshot: Pick<LegacyAuthSessionSnapshot, 'displayName' | 'userId'>,
+  snapshot: Pick<LegacyAuthSessionSnapshot, 'userId'>,
   settings: LegacySettings,
   expectedRevision: number
 ): Promise<{ error: string | null; revision: number | null }> => {
