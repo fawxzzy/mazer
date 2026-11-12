@@ -75,6 +75,7 @@ describe('player message copy rows', () => {
           "connection": "Mazer could not finish connecting to your account. Try again in a moment.",
           "contextLost": "Sign-in came back to a different screen than where you started. Open Mazer from your home screen icon and try again.",
           "generic": "Account connection unavailable. Return to Mazer and try again.",
+          "providerUnreachable": "Sign-in is unavailable right now. Try again in a few minutes.",
           "session": "Your account could not be confirmed. Try signing in again.",
           "storage": "This browser is blocking what Mazer needs to sign in. Turn off private browsing or allow site data, then try again.",
           "timedOut": "Sign-in took too long. Choose Sign in to start again.",

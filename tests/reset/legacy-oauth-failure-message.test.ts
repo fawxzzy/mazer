@@ -23,7 +23,9 @@ const EXPECTED_CLASS_BY_CODE: ReadonlyArray<readonly [string, LegacyOAuthFailure
   ['authorization_unavailable', 'connection'],
   ['exchange_unavailable', 'connection'],
   ['session_invalid', 'session'],
-  ['storage_unavailable', 'storage']
+  ['storage_unavailable', 'storage'],
+  // MAZER-ACCT-036: the sign-in pre-flight found the account service down.
+  ['provider_unreachable', 'providerUnreachable']
 ];
 
 describe('shared-account sign-in failure copy', () => {
@@ -71,6 +73,17 @@ describe('shared-account sign-in failure copy', () => {
       expect(technical.test(copy), `${key} leaks internal wording: ${copy}`).toBe(false);
       expect(copy, `${key} must not show an internal code`).not.toMatch(/[a-z]+_[a-z_]+/);
     }
+  });
+
+  test('the outage row tells the player what happened and what to do, in plain words', () => {
+    expect(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.providerUnreachable).toBe(
+      'Sign-in is unavailable right now. Try again in a few minutes.'
+    );
+    expect(resolveLegacyOAuthFailureMessage('provider_unreachable')).toMatchObject({
+      durationMs: LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS,
+      technicalDetail: 'oauth-failure:provider_unreachable',
+      tone: 'error'
+    });
   });
 
   test('every class except generic is reachable from an internal code', () => {
