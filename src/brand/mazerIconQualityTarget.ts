@@ -33,16 +33,16 @@ export const MAZER_ICON_QUALITY_TARGET = Object.freeze({
       role: 'browser-default-favicon',
       repositoryPath: 'public/favicon.ico',
       publicUrl: `/favicon.ico?v=${MAZER_ICON_CACHE_VERSION}`,
-      sizes: '16x16 32x32 48x48 64x64 128x128 256x256',
-      sha256: '050a42199c7762f21508df8d53d3cd40eaa8086543de448f3e0b3bc7ae1e43fc',
+      sizes: '16x16 32x32 48x48',
+      sha256: '1e688908a878ce00f8881d6eefb9d25818b3062c219f6732037a67a79d104ba1',
       derivation: 'lanczos3-png-ico'
     }),
     Object.freeze({
       role: 'windows-shortcut',
       repositoryPath: 'public/icons/mazer-app-icon.ico',
       publicUrl: `/icons/mazer-app-icon.ico?v=${MAZER_ICON_CACHE_VERSION}`,
-      sizes: '16x16 32x32 48x48 64x64 128x128 256x256',
-      sha256: '050a42199c7762f21508df8d53d3cd40eaa8086543de448f3e0b3bc7ae1e43fc',
+      sizes: '16x16 32x32 48x48',
+      sha256: '1e688908a878ce00f8881d6eefb9d25818b3062c219f6732037a67a79d104ba1',
       derivation: 'lanczos3-png-ico'
     }),
     Object.freeze({
