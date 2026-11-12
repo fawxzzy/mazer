@@ -30,6 +30,7 @@ import {
 } from '../render/bleedGlow';
 import { BOARD_MARKER_MIN_CSS, BOARD_TILE_GEOMETRY, boardMaterial, type BoardTileStyleId } from '../render/boardTileStyle';
 import { drawGoalBeacon } from '../render/goalBeacon';
+import { MOTION_LOOP_MS, MOTION_PHASER_EASE_SINE_IN_OUT, MOTION_UI_MS } from '../render/motionScale';
 import {
   resolveMenuBlinkPhase,
   resolveReducedMotion,
@@ -1351,7 +1352,7 @@ const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 // applyLegacyMenuBlinkPulse.
 // Slowed way down from an initial 900ms -- per feedback that pace read as
 // too fast/flickery for a deliberate classic-menu blink.
-const LEGACY_MENU_BLINK_PULSE_MS = 2400;
+const LEGACY_MENU_BLINK_PULSE_MS = MOTION_LOOP_MS.blink;
 // Shared by the Options/Pause overlay's Account ring (drawLegacyProfileIcon)
 // and its own Home button's ring (the Home button is gone; Pause is now a card)
 // -- previously two independently hand-copied formulas that could silently
@@ -1551,7 +1552,7 @@ const LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE = 5;
 // actually visible (centered pulse, eased in/out either side) -- see that
 // method's own header comment for the full random-position/twinkle design.
 const LEGACY_WORDMARK_SPARKLE_COUNT = 9;
-const LEGACY_WORDMARK_SPARKLE_CYCLE_MS = 2400;
+const LEGACY_WORDMARK_SPARKLE_CYCLE_MS = MOTION_LOOP_MS.blink;
 const LEGACY_WORDMARK_SPARKLE_PULSE_HALF_WIDTH = 0.22;
 // Sizes the two dead-but-still-allocated raster tile-font Image pools
 // (titleTileFontImagePool, and the per-button pool created in createButton)
@@ -13481,8 +13482,8 @@ export class MenuScene extends Phaser.Scene {
       this.tweens.add({
         targets: caret,
         alpha: 0.18,
-        duration: 420,
-        ease: 'Sine.easeInOut',
+        duration: MOTION_UI_MS.emphasis,
+        ease: MOTION_PHASER_EASE_SINE_IN_OUT,
         yoyo: true,
         repeat: -1
       });

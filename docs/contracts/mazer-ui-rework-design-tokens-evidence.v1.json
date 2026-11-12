@@ -274,7 +274,7 @@
   "motion/loopMs/blink": [
    {
     "file": "src/scenes/MenuScene.ts",
-    "pattern": "LEGACY_MENU_BLINK_PULSE_MS = 2400(?![0-9])"
+    "pattern": "LEGACY_MENU_BLINK_PULSE_MS = MOTION_LOOP_MS\\.blink"
    }
   ],
   "motion/loopMs/drift": [
@@ -336,7 +336,7 @@
   "motion/easing/functions/sineInOut": [
    {
     "file": "src/scenes/MenuScene.ts",
-    "pattern": "ease: 'Sine.easeInOut'"
+    "pattern": "ease: MOTION_PHASER_EASE_SINE_IN_OUT"
    }
   ],
   "legacy/fontSizePx/micro": [
