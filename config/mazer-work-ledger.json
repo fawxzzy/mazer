@@ -1,0 +1,1372 @@
+{
+  "schemaVersion": 1,
+  "registry": "config/mazer-owner-work-registry.json",
+  "cards": {
+    "MAZER-2D-001": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": [],
+      "note": "Standing baseline lane; keep the regression checks green."
+    },
+    "MAZER-WORLD-001": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": [],
+      "note": "Bounded World Identity fixes; the remaining list is not written in the card."
+    },
+    "MAZER-NATIVE-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "dependency",
+        "summary": "The native wrapper starts only after the web baseline is stable and independently verified.",
+        "unblockedBy": "other-card",
+        "ask": "Waits on the real-phone verification in MAZER-QA-001.",
+        "recommendation": "Do not start before MAZER-QA-001 is closed."
+      },
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": []
+    },
+    "MAZER-DATA-001": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ACCOUNT-001": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ICON-001": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PWA-001": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-NAV-001": {
+      "evidence": {"prs": [], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-TELEPORT-001": {
+      "evidence": {"prs": [], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-MAZEV2-001": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-AUTH-QA-001": {
+      "evidence": {"prs": [], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PLANET-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Parked research; not current product work.",
+        "unblockedBy": "Zac",
+        "ask": "Say if the planet-maze research should come back.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-CYBERDECK-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Kept as planning evidence only; no Cyberdeck build is approved.",
+        "unblockedBy": "Zac",
+        "ask": "Say if a Cyberdeck build should start.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-001": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 387}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-002": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 402}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-003": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 402}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-013": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 406}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-014": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 411}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-015": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 416, "mergedSha": "a983f2de"}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-016": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 416, "mergedSha": "a983f2de"}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-017": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["src/legacy-runtime/legacyMenuBackdrop.ts","src/config/tuning.ts","src/scenes/menuRuntimeDiagnostics.ts","tests/reset/legacy-menu-backdrop.test.ts"]
+    },
+    "MAZER-VIS-018": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 421}], "headless": true, "deviceChecked": false},
+      "blocker": {
+        "kind": "device",
+        "summary": "Headless runs show the trail colour changing every 250 ms; the phone still looks static, so the likely cause is a setting.",
+        "unblockedBy": "Zac",
+        "ask": "What are Reduce Motion (iOS Accessibility) and Trail Shine (Mazer Settings) set to on your phone, and does the trail still look static?",
+        "recommendation": "If Reduce Motion is on or Trail Shine is off, that explains it: set Reduce Motion off and Trail Shine on and look again; if it still looks static, send the phone model."
+      },
+      "verify": [
+        {"step":"Note iOS Settings > Accessibility > Motion > Reduce Motion (on or off) and Mazer Settings > Trail Shine (on or off).","where":"phone","expected":"Both settings are written down."},
+        {"step":"With Reduce Motion off and Trail Shine on, walk a level and watch the trail.","where":"phone","expected":"The trail colour visibly shifts over time; if it stays static, report both settings and the phone model."}
+      ],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-VIS-004": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 374},{"repo": "fawxzzy/mazer", "number": 375},{"repo": "fawxzzy/mazer", "number": 384}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-005": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 388}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-006": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 374}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-007": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 384}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-008": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 393}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-009": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 321},{"repo": "fawxzzy/mazer", "number": 330},{"repo": "fawxzzy/mazer", "number": 331},{"repo": "fawxzzy/mazer", "number": 394}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-010": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 399}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-011": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["public/icons","src/scenes/MenuScene.ts"]
+    },
+    "MAZER-VIS-012": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Three visual dialects exist (game, install and sign-in pages, account portal); this is the backdrop pick in MAZER-UI-020.",
+        "unblockedBy": "Zac",
+        "ask": "Approve one near-black canvas colour across boot, install gate and sign-in, with a calmer gate starfield, the app icon on the install screen and a dot-matrix wordmark on boot?",
+        "recommendation": "Approve it; portal alignment is tracked as a separate card in another repo."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-UI-001": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 383},{"repo": "fawxzzy/mazer", "number": 386},{"repo": "fawxzzy/mazer", "number": 390}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-002": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 386}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-003": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 383},{"repo": "fawxzzy/mazer", "number": 386}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-004": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 376},{"repo": "fawxzzy/mazer", "number": 396}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-005": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 396}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-006": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 376}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-007": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 376},{"repo": "fawxzzy/mazer", "number": 382},{"repo": "fawxzzy/mazer", "number": 384}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-008": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 372},{"repo": "fawxzzy/mazer", "number": 376}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-009": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 382}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-010": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["src/theme/tokens.ts","public/fonts","src/scenes/MenuScene.ts"]
+    },
+    "MAZER-UI-011": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 379},{"repo": "fawxzzy/mazer", "number": 397}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-012": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-013": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["src/scenes/MenuScene.ts","src/theme/tokens.ts","src/render/palette.ts"]
+    },
+    "MAZER-UI-014": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 428}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-015": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["src/legacy-runtime/legacyMenuButtonChrome.ts","src/scenes/MenuScene.ts"]
+    },
+    "MAZER-UI-016": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["src/scenes/MenuScene.ts","src/legacy-runtime/legacyMenuLayout.ts"]
+    },
+    "MAZER-UI-017": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 429}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-018": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 430},{"repo": "fawxzzy/mazer", "number": 431}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-019": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": [],
+      "note": "Layout and component standards are on main; the migration runs under separate wave governance."
+    },
+    "MAZER-UI-020": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Six design picks are unrecorded (display font, quit confirm, START style, icon construction, backdrop, play HUD) and four graphics cards wait on them.",
+        "unblockedBy": "Zac",
+        "ask": "Do you want the build agent to record the six design picks on its own judgement, or do you want to choose them yourself?",
+        "recommendation": "Say \"go\" so the build agent records each pick with its reason (quit confirm is already shipped as MAZER-FLOW-005); that unblocks MAZER-UI-010, UI-015, VIS-011 and VIS-012."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-MOTION-001": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["src/theme/tokens.ts","src/scenes/MenuScene.ts"]
+    },
+    "MAZER-MOTION-002": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["src/theme/tokens.ts","src/scenes/MenuScene.ts"]
+    },
+    "MAZER-MOTION-003": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 424}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-MOTION-004": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 425}], "headless": false, "deviceChecked": false},
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "PR #425 is green but held: under reduced motion it also freezes the title, START and level-number rainbow to one hue.",
+        "unblockedBy": "Zac",
+        "ask": "Under reduced motion, should the title and level-number rainbow stop shifting colour, or keep shifting colour and only stop moving?",
+        "recommendation": "Keep the colours shifting and stop only the movement; PR #425 is then changed to match and merged."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-PERF-001": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 375},{"repo": "fawxzzy/mazer", "number": 391}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PERF-002": {
+      "evidence": null,
+      "blocker": {
+        "kind": "device",
+        "summary": "Replaying thousands of drawing commands costs 2.6-4.9 ms per frame; the fix needs a real-device frame trace to prove it.",
+        "unblockedBy": "Zac",
+        "ask": "Capture a frame-rate trace on your phone while the menu is idle and while playing a large board.",
+        "recommendation": "Build the backdrop bake first so one trace shows the fix; the trace is the proof the card requires."
+      },
+      "verify": [
+        {"step":"Record a performance trace on the phone (remote Safari or Chrome inspector) on the idle menu and in play on a large board.","where":"external-tool","expected":"Average frame time stays below the 19 ms point where the game drops ambient motion to 4 fps; the trace is attached to the card."}
+      ],
+      "lane": "agent-buildable",
+      "filesHint": ["src/render/backdropStars.ts","src/legacy-runtime/legacyAnimationCadence.ts","src/scenes/MenuScene.ts"]
+    },
+    "MAZER-PROG-001": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 373}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-002": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 395}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-003": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 400}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-004": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 401}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-005": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "The ladder ends at level 268; the lever after that is a product call.",
+        "unblockedBy": "Zac",
+        "ask": "After level 268, is the lever for endless difficulty hazards (the same decision as signing MAZER-HAZ-002) or a bigger board?",
+        "recommendation": "Hazards: you ruled out zoom and board size, and without a new lever the ladder plateaus at 268."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-PROG-013": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 407}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-014": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 415, "mergedSha": "0a69f679"}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-015": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 420, "mergedSha": "baa1c503"}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-006": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "On a 390 phone at level 99 the tile is about 6.5 px, so the player and goal are tiny.",
+        "unblockedBy": "Zac",
+        "ask": "Should the game set a minimum tile size for very large boards, or explicitly defer zoom?",
+        "recommendation": "Defer explicitly and record it, since board size and zoom are frozen."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-PROG-007": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Milestone moments past rank S wait on the ladder and hazard work.",
+        "unblockedBy": "other-card",
+        "ask": "Waits on MAZER-HAZ-002.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-008": {
+      "evidence": null,
+      "blocker": {
+        "kind": "dependency",
+        "summary": "Feature gating by level and the content-band manifest wait on the hazard and economy decisions.",
+        "unblockedBy": "other-card",
+        "ask": "Nothing to answer yet: decide MAZER-HAZ-002 and MAZER-ECON-001 first.",
+        "recommendation": "Leave it blocked until both are decided."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-PROG-009": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 282},{"repo": "fawxzzy/mazer", "number": 293},{"repo": "fawxzzy/mazer", "number": 308},{"repo": "fawxzzy/mazer", "number": 311},{"repo": "fawxzzy/mazer", "number": 368}], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-010": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 301},{"repo": "fawxzzy/mazer", "number": 304}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-011": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-012": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GEN-001": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 298},{"repo": "fawxzzy/mazer", "number": 302},{"repo": "fawxzzy/mazer", "number": 307},{"repo": "fawxzzy/mazer", "number": 310},{"repo": "fawxzzy/mazer", "number": 315},{"repo": "fawxzzy/mazer", "number": 316},{"repo": "fawxzzy/mazer", "number": 317}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GEN-002": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GEN-004": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 404}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GEN-003": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Both extraction candidates need a refactor of the shared maze core first.",
+        "unblockedBy": "Zac",
+        "ask": "Say if the maze-core refactor should be scheduled.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-HAZ-001": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 373}], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-HAZ-002": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "The draft contract for obstacles, enemies and items is unsigned; five cards are covered by it.",
+        "unblockedBy": "Zac",
+        "ask": "Sign or reject the endless hazard contract (obstacles, enemies and items in phases)?",
+        "recommendation": "Read the draft and sign it if you still want difficulty to come from hazards: it is the only lever past level 268 that keeps zoom and board size frozen."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-HAZ-003": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Covered by the unsigned hazard contract.",
+        "unblockedBy": "other-card",
+        "ask": "Waits on MAZER-HAZ-002.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-HAZ-004": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Covered by the unsigned hazard contract.",
+        "unblockedBy": "other-card",
+        "ask": "Waits on MAZER-HAZ-002.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-HAZ-005": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Covered by the unsigned hazard contract.",
+        "unblockedBy": "other-card",
+        "ask": "Waits on MAZER-HAZ-002.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-HAZ-006": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Covered by the unsigned hazard contract.",
+        "unblockedBy": "other-card",
+        "ask": "Waits on MAZER-HAZ-002.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-HAZ-007": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": [],
+      "note": "Turn host and player movement phase are done; enemy, projectile, item, duration and collision handlers are deliberately not integrated."
+    },
+    "MAZER-HAZ-008": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Covered by the unsigned hazard contract.",
+        "unblockedBy": "other-card",
+        "ask": "Waits on MAZER-HAZ-002.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-001": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["src/tutorial/exampleTutorials.ts","src/tutorial/tutorialRegistry.ts","src/scenes/MenuScene.ts"]
+    },
+    "MAZER-FLOW-002": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 409}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-003": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 409}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-004": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 419}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-005": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 409}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-006": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Quitting or reloading today discards the attempt, so the next Start is a free re-roll.",
+        "unblockedBy": "Zac",
+        "ask": "When a player quits or reloads mid-level, should the same maze resume or should the next Start roll a new maze?",
+        "recommendation": "Resume the same maze so quitting is not a free re-roll (needs seed plumbing)."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-FLOW-007": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 433}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-008": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 426}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-009": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 423}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-010": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 422}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-011": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "After a goal input is locked about 2.5 s; an earlier unlock touches the timer, pacing and AI scoring.",
+        "unblockedBy": "Zac",
+        "ask": "When should input unlock after reaching the goal: as now (about 2.5 s), at 75 percent of the reveal, or when the beams land plus a margin?",
+        "recommendation": "Keep the current unlock: you twice said build and deconstruct felt too fast."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-FLOW-012": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 392}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-013": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 414, "mergedSha": "e35e814e"}], "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-AUDIO-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "There is no audio anywhere in the game and no sound setting.",
+        "unblockedBy": "Zac",
+        "ask": "Should Mazer have sound at all, and should it default to on or off?",
+        "recommendation": "Allow small synthesized effects behind a Settings toggle, default off."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-AUDIO-002": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-CTRL-001": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 427}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-CTRL-002": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ACCT-001": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 350},{"repo": "fawxzzy/mazer", "number": 361},{"repo": "fawxzzy/mazer", "number": 364},{"repo": "fawxzzy/mazer", "number": 369},{"repo": "fawxzzy/mazer", "number": 370}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ACCT-002": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 280},{"repo": "fawxzzy/mazer", "number": 281}], "headless": false, "deviceChecked": false},
+      "blocker": {
+        "kind": "provider",
+        "summary": "The client PR #281 conflicts with main and must not ship until the matching provider-side username hook is live and proven.",
+        "unblockedBy": "provider",
+        "ask": "Confirm the provider-side sign-up username hook is live and proven; then PR #281 is rebased and finished.",
+        "recommendation": "Do not ship #281 before the hook is proven live."
+      },
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": []
+    },
+    "MAZER-ACCT-003": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 364},{"repo": "fawxzzy/mazer", "number": 367},{"repo": "fawxzzy/mazer", "number": 368},{"repo": "fawxzzy/mazer", "number": 369},{"repo": "fawxzzy/mazer", "number": 370}], "headless": false, "deviceChecked": false},
+      "blocker": {
+        "kind": "device",
+        "summary": "No end-to-end run exists for installed-app sign-in, session refresh, recovery, cross-user isolation or standalone handoff.",
+        "unblockedBy": "device",
+        "ask": "Needs a real-phone run with a throwaway account covering installed-app sign-in, refresh, recovery, isolation and standalone handoff.",
+        "recommendation": "Run it after the MAZER-ACCT-006 check, in the same sitting as MAZER-QA-001."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-004": {
+      "evidence": null,
+      "blocker": {
+        "kind": "provider",
+        "summary": "A reset counter on the server needs an approved database change; held since 2026-11-06.",
+        "unblockedBy": "Zac",
+        "ask": "Approve a database change that adds a reset counter, or accept the residual risk for version one?",
+        "recommendation": "Accept the residual risk for version one and keep this on hold."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-005": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-DATA-002": {
+      "evidence": null,
+      "blocker": {
+        "kind": "provider",
+        "summary": "Raising the server difficulty cap or rank steps needs an approved database change; on hold.",
+        "unblockedBy": "Zac",
+        "ask": "Approve a database change to raise the server difficulty cap and rank steps, or keep the old server ladder?",
+        "recommendation": "Keep it on hold until a ladder past the server cap is needed."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-DATA-003": {
+      "evidence": null,
+      "blocker": {
+        "kind": "provider",
+        "summary": "The ATLAS and playbook sync parts need provider or ATLAS steps with explicit owner approval.",
+        "unblockedBy": "Zac",
+        "ask": "Approve the provider and ATLAS steps for remote receipt and playbook sync, or leave them off?",
+        "recommendation": "Approve only against a written scope naming the exact steps."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-DATA-004": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": [],
+      "note": "Completion outbox and monotonic merge are on main; the coins, inventory and checkpoint proposal is unsigned and server parts are provider-gated."
+    },
+    "MAZER-PWA-002": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["public/manifest.webmanifest","public/icons","vite.config.ts"]
+    },
+    "MAZER-PWA-003": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 367},{"repo": "fawxzzy/mazer", "number": 372}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PWA-004": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 372}], "headless": false, "deviceChecked": false},
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "The install gate blocks boot in some install modes without a skip, which clashes with enforcing access by entitlement.",
+        "unblockedBy": "Zac",
+        "ask": "Should the install gate stay mandatory in install modes where it blocks boot, given access is meant to be enforced by entitlement?",
+        "recommendation": "Keep the gate as shipped until entitlements exist (MAZER-ECON-003), then revisit."
+      },
+      "verify": [
+        {"step":"Install Mazer on the phone, open it once online, turn on airplane mode, force-close the app and open it again.","where":"installed-app","expected":"The app shell opens and shows the offline-capable start screen."}
+      ],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-SHARE-001": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": [],
+      "note": "Share tags are pinned by a test; the preview image is still the app icon and external checks need a deployed URL."
+    },
+    "MAZER-QA-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "device",
+        "summary": "Everything shipped since 2026-11-06 was checked on bundles, tests and headless frames only.",
+        "unblockedBy": "Zac",
+        "ask": "Run the phone checks below on the real phone and the installed app and tell me what failed.",
+        "recommendation": "Do the whole list in one sitting on the current production build; each failure becomes a follow-up card."
+      },
+      "verify": [
+        {"step":"Tap the pause gear in play with your thumb (MAZER-UI-014).","where":"phone","expected":"Pause opens on the first tap."},
+        {"step":"Rotate the phone while a run is live (MAZER-FLOW-008).","where":"phone","expected":"The game pauses and Pause says \"Rotate back to keep playing\" until you rotate back."},
+        {"step":"Signed in, turn on airplane mode, finish a level, then turn it off (MAZER-FLOW-009).","where":"phone","expected":"One \"saved offline\" notice during the outage, then one \"synced\" notice after."},
+        {"step":"Open Settings and look for the Haptics row, then bump a wall (MAZER-CTRL-001, MAZER-MOTION-003).","where":"phone","expected":"A Haptics row exists (on by default); a wall bump nudges the player 2 px and buzzes where the phone supports vibration (iOS does not)."},
+        {"step":"Trigger any player message, for example the offline notice above (MAZER-UI-018).","where":"phone","expected":"A readable toast appears and no message promises guest play."},
+        {"step":"Open Mazer in a normal browser tab, not installed (MAZER-FLOW-010).","where":"phone","expected":"The install gate shows a one-line value statement and a mini-maze mark; Copy link shows \"Link copied\"."},
+        {"step":"Leave the menu demo running for a few mazes (MAZER-FLOW-007).","where":"phone","expected":"The menu AI climbs one level per completed maze."},
+        {"step":"Walk out along the trail and back around corners (MAZER-VIS-020).","where":"phone","expected":"The trail follows every corner with no cut or snap when stepping back."},
+        {"step":"Clear a level (MAZER-VIS-019, MAZER-FLOW-004).","where":"phone","expected":"Only the rainbow level number shows: no \"Level N\" caption and no rank letter."},
+        {"step":"Open ?previewLevel=60, 100 and 190 and play each (MAZER-PROG-015).","where":"phone","expected":"Tell me whether each feels easier, the same or harder than the one before."},
+        {"step":"In the installed app, watch the orbit, deconstruct, goal star, trail and locator, and open the Settings sheets.","where":"installed-app","expected":"All render cleanly and match the last captured frames."}
+      ],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-QA-002": {
+      "evidence": null,
+      "blocker": {
+        "kind": "device",
+        "summary": "The mobile-shell device harness exists but has never been run on a real phone.",
+        "unblockedBy": "Zac",
+        "ask": "Run the mobile-shell device harness on your phone and tell me the device model and the result.",
+        "recommendation": "Do it in the same sitting as the MAZER-QA-001 phone pass."
+      },
+      "verify": [
+        {"step":"Run the mobile-shell device harness on the phone (the card does not name the command; ask the build agent for the run steps first).","where":"external-tool","expected":"The harness passes, the device model is recorded and any gap becomes a card."}
+      ],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-QA-003": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 362},{"repo": "fawxzzy/mazer", "number": 363},{"repo": "fawxzzy/mazer", "number": 371},{"repo": "fawxzzy/mazer", "number": 380},{"repo": "fawxzzy/mazer", "number": 389},{"repo": "fawxzzy/mazer", "number": 397}], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-QA-004": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 398}], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-QA-005": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 290},{"repo": "fawxzzy/mazer", "number": 296},{"repo": "fawxzzy/mazer", "number": 299},{"repo": "fawxzzy/mazer", "number": 300}], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-QA-006": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": [],
+      "note": "Two reliability cards are partly done; July packets exist."
+    },
+    "MAZER-GOV-001": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GOV-002": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GOV-003": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 360}], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GOV-004": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": [],
+      "note": "The public site still needs both refresh pull requests merged."
+    },
+    "MAZER-GOV-005": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": [],
+      "note": "Near complete; the rule is ongoing governance."
+    },
+    "MAZER-DOCS-001": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 405}], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": [],
+      "note": "Docs only, merged; open unknowns remain in the note and it is not reconciled with the Cyberdeck card."
+    },
+    "MAZER-AI-001": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": [],
+      "note": "Runner nearly done; calibration is unfinished."
+    },
+    "MAZER-AI-002": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-RUN-001": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-RUN-002": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Player-facing run quality display deferred by the owner.",
+        "unblockedBy": "Zac",
+        "ask": "Say if run quality should be shown to the player.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-RUN-003": {
+      "evidence": null,
+      "blocker": {
+        "kind": "provider",
+        "summary": "Leaderboard admission is server-side (provider change); the achievement rule is an owner decision.",
+        "unblockedBy": "provider",
+        "ask": "Decide the achievement quality rule; leaderboard admission needs a provider change.",
+        "recommendation": "Leave blocked: low priority and the leaderboard side is provider-gated."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-RUN-004": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "long-running",
+      "filesHint": [],
+      "note": "Run status panel started and early."
+    },
+    "MAZER-ECON-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "The draft contract for coins, shop and random items is unsigned; most not-started economy cards depend on it.",
+        "unblockedBy": "Zac",
+        "ask": "Sign or reject the shop and random-item economy draft contract?",
+        "recommendation": "Defer signing until the hazard contract is settled; no Phase 1 work depends on it."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ECON-002": {
+      "evidence": null,
+      "blocker": {
+        "kind": "dependency",
+        "summary": "No coin or inventory code exists; waits on the economy contract.",
+        "unblockedBy": "other-card",
+        "ask": "Waits on the MAZER-ECON-001 sign-off.",
+        "recommendation": "Leave blocked until MAZER-ECON-001 is decided."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ECON-003": {
+      "evidence": null,
+      "blocker": {
+        "kind": "dependency",
+        "summary": "Needs the economy contract plus provider and policy decisions; no checkout library is installed.",
+        "unblockedBy": "other-card",
+        "ask": "Waits on the MAZER-ECON-001 sign-off.",
+        "recommendation": "Leave blocked until MAZER-ECON-001 is decided."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-CAM-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Camera zoom and minimap deferred; board size is frozen.",
+        "unblockedBy": "Zac",
+        "ask": "Say if zoom should come back.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PATH-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Diagonal path graph deferred by the owner.",
+        "unblockedBy": "Zac",
+        "ask": "Say if diagonal movement should come back.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-MODE-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Moving maze mode deferred by the owner.",
+        "unblockedBy": "Zac",
+        "ask": "Say if a moving maze mode should come back.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-MODE-002": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Multiplayer and endless survival deferred by the owner.",
+        "unblockedBy": "Zac",
+        "ask": "Say if multiplayer should come back.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-SOCIAL-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "deferred-by-owner",
+        "summary": "Social profiles, friends and events deferred by the owner.",
+        "unblockedBy": "Zac",
+        "ask": "Say if social features should come back.",
+        "recommendation": "Leave deferred."
+      },
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-CHAL-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "The server seed and leaderboard parts would need a provider change.",
+        "unblockedBy": "Zac",
+        "ask": "Do you want shared-seed daily and weekly challenges, and at what cadence?",
+        "recommendation": "Park until the economy and hazard contracts are settled."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-TOOLS-001": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Not started; needs an owner decision on the asset format.",
+        "unblockedBy": "Zac",
+        "ask": "Do you want a handcrafted-asset import workflow, and in which file format?",
+        "recommendation": "Park it as deferred; no open card depends on it."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-REPO-HYGIENE-001": {
+      "evidence": {"prs": [], "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-AUTH-EMAIL-001": {
+      "evidence": {"prs": [{"repo": "fawxzzy/FawxzzyWeb", "number": 110}], "headless": false, "deviceChecked": false},
+      "blocker": {
+        "kind": "device",
+        "summary": "A Mazer-themed recovery email was delivered, but the link click and the sign-up and change-of-address emails are unverified for Mazer.",
+        "unblockedBy": "Zac",
+        "ask": "Click the link in a Mazer account-recovery email and check the sign-up and change-of-address emails.",
+        "recommendation": "Use the throwaway QA account; one pass covers all three emails."
+      },
+      "verify": [
+        {"step":"Request account recovery for the QA account and click the link in the Mazer-themed email.","where":"production","expected":"The link opens the reset flow and works."},
+        {"step":"Create a new throwaway account and open the sign-up email.","where":"production","expected":"A Mazer-themed email arrives and its link works."},
+        {"step":"Change the email address on the QA account and open the change-of-address email.","where":"production","expected":"A Mazer-themed email arrives and its link works."}
+      ],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-VIS-019": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 419}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-020": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 419}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-021": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 421}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ACCT-006": {
+      "evidence": {"prs": [{"repo": "fawxzzy/FawxzzyWeb", "number": 118, "mergedSha": "db5199e9"}], "headless": false, "deviceChecked": false},
+      "blocker": {
+        "kind": "device",
+        "summary": "FawxzzyWeb PR #118 is merged and aliased live (2026-11-11); no real-device sign-in has been checked.",
+        "unblockedBy": "Zac",
+        "ask": "Open Mazer from the home screen, sign in, and tell me whether a \"Continue to Mazer?\" screen appears.",
+        "recommendation": "Do it once with your real account; if the consent screen still appears, report it and keep the card in review."
+      },
+      "verify": [
+        {"step":"Open Mazer from the home screen, sign out if needed, and sign in.","where":"installed-app","expected":"You land back in Mazer with NO \"Continue to Mazer?\" screen."}
+      ],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-UI-021": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Remote sync is deliberately silent today, so showing sync failures changes that stance.",
+        "unblockedBy": "Zac",
+        "ask": "Which of auth, sync, username and boot errors should appear in the message toast?",
+        "recommendation": "Show auth, username and boot errors; keep remote sync silent."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-UI-022": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["src/legacy-runtime/legacyOfflineCompletionFlush.ts","src/legacy-runtime/legacyPlayerMessage.ts","tests/reset/legacy-player-message-inventory.test.ts"]
+    },
+    "MAZER-MOTION-005": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": ["src/theme/tokens.ts"]
+    },
+    "MAZER-GOV-006": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 432}], "deployedBuild": "b640f1da", "headless": false, "deviceChecked": null},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    }
+  }
+}
