@@ -144,7 +144,9 @@ describe('Mazer icon-quality target', () => {
     expect(indexSource).toContain(`/favicon.ico?v=${MAZER_ICON_CACHE_VERSION}`);
     expect(indexSource).toContain(`/icons/apple-touch-icon.png?v=${MAZER_ICON_CACHE_VERSION}`);
     expect(indexSource).toContain('/manifest.webmanifest');
-    expect(indexSource).toContain(`https://mazer.fawxzzy.com/icons/mazer-app-icon.png?v=${MAZER_ICON_CACHE_VERSION}`);
+    // Social previews use the dedicated share image (MAZER-SHARE-001, pinned by tests/architecture/share-metadata-contract.test.ts),
+    // not the app icon: the icon stays the install/favicon/manifest identity.
+    expect(indexSource).toContain('https://mazer.fawxzzy.com/share/mazer-share-preview.png?v=share-v1');
     expect(manifest.icons.map((icon) => icon.src)).toEqual(expectedManifestUrls);
     expect(manifest.shortcuts[0]?.icons).toEqual([
       expect.objectContaining({ src: `/icons/icon-192.png?v=${MAZER_ICON_CACHE_VERSION}`, purpose: 'any' })

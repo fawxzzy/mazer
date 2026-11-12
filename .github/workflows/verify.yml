@@ -58,6 +58,7 @@ jobs:
           tests/cosmetics
           tests/tutorial
           tests/architecture
+          tests/brand
           --maxWorkers=1
 
       # Listed by file rather than as the tests/render directory so an unrelated
