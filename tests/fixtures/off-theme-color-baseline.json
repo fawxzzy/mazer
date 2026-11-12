@@ -1,0 +1,175 @@
+{
+  "allowlist": [
+    "src/render/palette.ts",
+    "src/render/trailPalette.ts",
+    "src/theme/tokens.*"
+  ],
+  "files": {
+    "src/boot/phaserConfig.ts": {
+      "offToken": 1,
+      "total": 1
+    },
+    "src/brand/mazerIconQualityTarget.ts": {
+      "offToken": 1,
+      "total": 1
+    },
+    "src/config/tuning.ts": {
+      "offToken": 31,
+      "total": 32
+    },
+    "src/future-runtime/phaser/config.ts": {
+      "offToken": 1,
+      "total": 1
+    },
+    "src/future-runtime/phaser/main.ts": {
+      "offToken": 1,
+      "total": 1
+    },
+    "src/future-runtime/phaser/scene.ts": {
+      "offToken": 17,
+      "total": 17
+    },
+    "src/future-runtime/planet3d/render.ts": {
+      "offToken": 15,
+      "total": 15
+    },
+    "src/future-runtime/planet3d/runtime.ts": {
+      "offToken": 1,
+      "total": 1
+    },
+    "src/legacy-runtime/legacyIridescentMaterial.ts": {
+      "offToken": 8,
+      "total": 8
+    },
+    "src/legacy-runtime/legacyMenuBackdrop.ts": {
+      "offToken": 16,
+      "total": 21
+    },
+    "src/legacy-runtime/legacyPlayerMessage.ts": {
+      "offToken": 0,
+      "total": 4
+    },
+    "src/legacy-runtime/legacyProgression.ts": {
+      "offToken": 33,
+      "total": 33
+    },
+    "src/proof-surfaces/styles.css": {
+      "offToken": 9,
+      "total": 9
+    },
+    "src/render/boardRenderer.ts": {
+      "offToken": 6,
+      "total": 6
+    },
+    "src/render/boardTileLayer.ts": {
+      "offToken": 1,
+      "total": 1
+    },
+    "src/render/cyberArcadeMaterial.ts": {
+      "offToken": 1,
+      "total": 1
+    },
+    "src/render/navigationCoreTrail.ts": {
+      "offToken": 8,
+      "total": 8
+    },
+    "src/render/phaserTileContext.ts": {
+      "offToken": 3,
+      "total": 3
+    },
+    "src/render/playerMarker.ts": {
+      "offToken": 1,
+      "total": 1
+    },
+    "src/render/teleportTransferConduitCanvas.ts": {
+      "offToken": 2,
+      "total": 2
+    },
+    "src/scenes/MenuScene.ts": {
+      "offToken": 68,
+      "total": 77
+    },
+    "src/styles/base.css": {
+      "offToken": 18,
+      "total": 21
+    },
+    "src/topology-proof/index.ts": {
+      "offToken": 3,
+      "total": 3
+    },
+    "src/ui/dom/primitives.css": {
+      "offToken": 0,
+      "total": 53
+    },
+    "src/visual-proof/main.ts": {
+      "offToken": 13,
+      "total": 13
+    },
+    "src/visual-proof/readability.ts": {
+      "offToken": 7,
+      "total": 7
+    },
+    "src/visual-proof/scenarioLibrary.ts": {
+      "offToken": 3,
+      "total": 3
+    },
+    "src/visual-proof/styles.css": {
+      "offToken": 10,
+      "total": 10
+    },
+    "src/visual-proof/trail/TrailRenderer.ts": {
+      "offToken": 3,
+      "total": 3
+    },
+    "src/watch-pass-paywall/styles.css": {
+      "offToken": 1,
+      "total": 1
+    },
+    "src/watch-pass-preview/styles.css": {
+      "offToken": 3,
+      "total": 3
+    },
+    "src/watch-pass-setup/styles.css": {
+      "offToken": 3,
+      "total": 3
+    }
+  },
+  "migrationOrder": [
+    "src/boot/phaserConfig.ts",
+    "src/brand/mazerIconQualityTarget.ts",
+    "src/future-runtime/phaser/config.ts",
+    "src/future-runtime/phaser/main.ts",
+    "src/future-runtime/planet3d/runtime.ts",
+    "src/render/boardTileLayer.ts",
+    "src/render/cyberArcadeMaterial.ts",
+    "src/render/playerMarker.ts",
+    "src/watch-pass-paywall/styles.css",
+    "src/render/teleportTransferConduitCanvas.ts",
+    "src/render/phaserTileContext.ts",
+    "src/topology-proof/index.ts",
+    "src/visual-proof/scenarioLibrary.ts",
+    "src/visual-proof/trail/TrailRenderer.ts",
+    "src/watch-pass-preview/styles.css",
+    "src/watch-pass-setup/styles.css",
+    "src/render/boardRenderer.ts",
+    "src/visual-proof/readability.ts",
+    "src/legacy-runtime/legacyIridescentMaterial.ts",
+    "src/render/navigationCoreTrail.ts",
+    "src/proof-surfaces/styles.css",
+    "src/visual-proof/styles.css",
+    "src/visual-proof/main.ts",
+    "src/future-runtime/planet3d/render.ts",
+    "src/legacy-runtime/legacyMenuBackdrop.ts",
+    "src/future-runtime/phaser/scene.ts",
+    "src/styles/base.css",
+    "src/config/tuning.ts",
+    "src/legacy-runtime/legacyProgression.ts",
+    "src/scenes/MenuScene.ts"
+  ],
+  "schemaVersion": 1,
+  "totals": {
+    "files": 32,
+    "offToken": 288,
+    "total": 363
+  }
+}
