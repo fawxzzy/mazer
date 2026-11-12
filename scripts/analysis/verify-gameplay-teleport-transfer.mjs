@@ -22,7 +22,7 @@
  *     to ALL 8 diamonds, then the maze dissolves and the next maze arrives;
  *   - the transfer lifecycle still runs outbound -> stored -> delivering ->
  *     complete -> input unlocked again, via real accepted moves only;
- *   - reduced motion: no beams at all, nothing lights up, 250 ms unlock;
+ *   - reduced motion: no beams at all, nothing lights up, 200 ms unlock;
  *   - compact/touch layout: the same, with the diamonds inside a 390x844 viewport;
  *   - the ring of 8 diamonds is parked on its stations while any beam fires, circulates the
  *     perimeter during the build/deconstruct lap, and is exactly back on its stations at the end
@@ -94,7 +94,7 @@ const introBuildEndMs = (tiles) => INTRO_BUILD_START_MS + introBuildMs(tiles);
 const introLaserEndMs = (tiles) => introBuildEndMs(tiles) + INTRO_BEAM_FLIGHT_MS;
 const introUnlockMs = (tiles) => introLaserEndMs(tiles);
 const outroTotalMs = (tiles) => 400 + Math.max(1800, Math.min(3000, (tiles / 70) * 1000)) + 300;
-const INTRO_REDUCED_UNLOCK_MS = 250;
+const INTRO_REDUCED_UNLOCK_MS = 200; // MOTION_REDUCED_MS.crossfade (MAZER-MOTION-005)
 const RING_FADE_MS = 150;
 const FRAME_MS = 16;
 const UNLOCK_TOLERANCE_MS = FRAME_MS * 2;
@@ -884,7 +884,7 @@ const main = async () => {
     // ================================================================
     // Case 4: reduced motion -- real browser reduced-motion emulation (a
     // context flag, not a scene monkeypatch). No beams, nothing lights up,
-    // 250 ms unlock, and the transfer cycle still completes.
+    // 200 ms unlock, and the transfer cycle still completes.
     // ================================================================
     {
       const h = await openGameContext(browser, resolvedBaseUrl, { viewport: { width: 1280, height: 720 }, reducedMotion: 'reduce' });
