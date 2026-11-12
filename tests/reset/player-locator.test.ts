@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { BOARD_CHIP_FILL, CHIP_CORNER_RATIO, boardMaterial } from '../../src/render/boardTileStyle';
 import { getContrastRatio } from '../../src/render/palette';
+import { resolvePlayerMarkerReach } from '../../src/render/playerMarker';
 import {
   PLAYER_LOCATOR,
   PLAYER_LOCATOR_PING_TOTAL_MS,
@@ -33,9 +34,11 @@ const baseInput = (over: Partial<PlayerLocatorDrawInput> = {}): PlayerLocatorDra
   centerX: 100,
   centerY: 80,
   tileSize: 20,
+  devicePixelRatio: 2,
   coreHalfWidth: 6,
   coreHalfHeight: 6,
   coreCornerRadius: 1.5,
+  coreReachCss: 6.4,
   alpha: 1,
   timeMs: 0,
   pingStartMs: -1,
@@ -43,46 +46,88 @@ const baseInput = (over: Partial<PlayerLocatorDrawInput> = {}): PlayerLocatorDra
   ...over
 });
 
-/** Ring strokes (ring keyline, ring, then 2 per live ping ring): every strokeRoundedRect except the final core keyline. */
+/** Ring strokes (the ring, then 2 per live ping ring): every strokeRoundedRect except the final core keyline. */
 const circles = (calls: Call[]): number => calls.filter((c) => c.fn === 'strokeRoundedRect').length - 1;
 const ringSquares = (calls: Call[]): Call[] => calls.filter((c) => c.fn === 'strokeRoundedRect').slice(0, -1);
 
-describe('player locator geometry', () => {
-  test('ring radius scales with the tile but is floored and capped in css px', () => {
-    const tiny = resolvePlayerLocatorMetrics(5);
-    const phone = resolvePlayerLocatorMetrics(29);
-    const huge = resolvePlayerLocatorMetrics(200);
-    expect(tiny.ringRadiusCss).toBe(PLAYER_LOCATOR.minRingRadiusCss);
-    expect(phone.ringRadiusCss).toBeCloseTo(29 * PLAYER_LOCATOR.ringRadiusTileRatio, 6);
-    expect(huge.ringRadiusCss).toBe(PLAYER_LOCATOR.maxRingRadiusCss);
-    expect(resolvePlayerLocatorMetrics(Number.NaN).ringRadiusCss).toBe(PLAYER_LOCATOR.minRingRadiusCss);
+/** The tile sizes the owner compared: a dense 8 px board, the 14.7 px phone tile and the 25 px desktop tile. */
+const TILES = [8.32, 14.72, 25.44];
+const DPRS = [1, 2, 2.625, 3];
+const reachOf = (tile: number): number => resolvePlayerMarkerReach(tile);
+
+describe('player locator geometry (tile-proportioned: the ring and keyline stay inside the players own tile)', () => {
+  test.each(TILES.flatMap((tile) => DPRS.map((dpr) => [tile, dpr] as const)))('tile %f at DPR %f: the ring lies inside the tile, the glow is a bounded falloff', (tile, dpr) => {
+    const m = resolvePlayerLocatorMetrics(tile, dpr, reachOf(tile));
+    const half = tile / 2;
+    // ring: the outer edge of its stroke is flush with the tile edge, never past it
+    expect(m.ringHalfCss + (m.ringStrokeCss / 2)).toBeCloseTo(half, 9);
+    // whole device pixels, at least one
+    expect(Math.round(m.ringStrokeCss * dpr)).toBeGreaterThanOrEqual(1);
+    expect(m.ringStrokeCss * dpr).toBeCloseTo(Math.round(m.ringStrokeCss * dpr), 9);
+    expect(Math.round(m.coreKeylineCss * dpr)).toBeGreaterThanOrEqual(1);
+    expect(m.coreKeylineCss * dpr).toBeCloseTo(Math.round(m.coreKeylineCss * dpr), 9);
+    // glow: exactly glowSpreadTileRatio of a tile beyond the cell edge (a falloff, not a second ring)
+    expect(m.glowHalfCss).toBeCloseTo(half + (tile * PLAYER_LOCATOR.glowSpreadTileRatio), 9);
+    // the ping is the one css-px sized part: it travels well outside the tile
+    expect(m.pingTravelHalfCss).toBeGreaterThanOrEqual(half + PLAYER_LOCATOR.pingMinTravelCss);
   });
 
-  test('on dense boards (5..8 css px tiles) the ring is larger than the tile, not a dot', () => {
-    for (const tile of [5, 6, 7, 8]) {
-      const m = resolvePlayerLocatorMetrics(tile);
-      expect(m.ringRadiusCss * 2).toBeGreaterThan(tile * 2);
-      expect(m.glowRadiusCss).toBeGreaterThan(m.ringRadiusCss);
-      expect(m.pingTravelRadiusCss).toBeGreaterThan(m.ringRadiusCss + 20);
+  test('where the ring is drawn it never overlaps the block and its keyline (beyond half a device px)', () => {
+    for (const tile of TILES) {
+      for (const dpr of DPRS) {
+        const m = resolvePlayerLocatorMetrics(tile, dpr, reachOf(tile));
+        if (!m.ringVisible) continue;
+        const inner = m.ringHalfCss - (m.ringStrokeCss / 2);
+        expect(inner, `${tile}@${dpr}`).toBeGreaterThanOrEqual(reachOf(tile) + m.coreKeylineCss - (0.5 / dpr) - 1e-9);
+      }
     }
   });
 
-  test('reuses the caller record (no allocation) and is a pure function of the tile', () => {
-    const out = { ringRadiusCss: 0, glowRadiusCss: 0, pingTravelRadiusCss: 0 };
-    expect(resolvePlayerLocatorMetrics(12, out)).toBe(out);
-    expect(resolvePlayerLocatorMetrics(12)).toEqual(out);
+  test('the ring is present on the phone (14.7 px) and desktop (25 px) tiles at every tested DPR, and on 8 px tiles at 2x and up', () => {
+    for (const dpr of DPRS) {
+      expect(resolvePlayerLocatorMetrics(14.72, dpr, reachOf(14.72)).ringVisible, `14.72@${dpr}`).toBe(true);
+      expect(resolvePlayerLocatorMetrics(25.44, dpr, reachOf(25.44)).ringVisible, `25.44@${dpr}`).toBe(true);
+    }
+    for (const dpr of [2, 2.625, 3]) {
+      expect(resolvePlayerLocatorMetrics(8.32, dpr, reachOf(8.32)).ringVisible, `8.32@${dpr}`).toBe(true);
+    }
+    // 8 px at 1x has no room for ring + keyline around a 5 px block: the glow and the ping carry the marker
+    expect(resolvePlayerLocatorMetrics(8.32, 1, reachOf(8.32)).ringVisible).toBe(false);
+  });
+
+  test('a degenerate tile size resolves to nothing (and never NaN)', () => {
+    for (const tile of [0, -4, Number.NaN]) {
+      const m = resolvePlayerLocatorMetrics(tile, 2, 3);
+      expect(m).toEqual({ ringHalfCss: 0, ringStrokeCss: 0, ringVisible: false, glowHalfCss: 0, coreKeylineCss: 0, pingTravelHalfCss: 0 });
+    }
+  });
+
+  test('reuses the caller record (no allocation) and is a pure function of its inputs', () => {
+    const out = resolvePlayerLocatorMetrics(12, 2, 3.5);
+    const again = { ...out, ringHalfCss: -1 };
+    expect(resolvePlayerLocatorMetrics(12, 2, 3.5, again)).toBe(again);
+    expect(again).toEqual(out);
   });
 });
 
 describe('player locator draw', () => {
-  test('static treatment: glow squares, dark-keylined ring, core keyline, and no ping', () => {
+  test('static treatment: glow squares, one thin ring, the core keyline, and no ping', () => {
     const { g, calls } = recorder();
     drawPlayerLocator(g, baseInput());
     expect(calls.filter((c) => c.fn === 'fillRoundedRect')).toHaveLength(PLAYER_LOCATOR.glowSteps);
-    expect(circles(calls)).toBe(2);
-    expect(calls.filter((c) => c.fn === 'strokeRoundedRect')).toHaveLength(3);
+    expect(circles(calls)).toBe(1);
+    expect(calls.filter((c) => c.fn === 'strokeRoundedRect')).toHaveLength(2);
+    const m = resolvePlayerLocatorMetrics(20, 2, 6.4);
     const widths = calls.filter((c) => c.fn === 'lineStyle').map((c) => c.args[0]!);
-    expect(widths[0]).toBeGreaterThan(widths[1]!);
+    expect(widths[0]).toBe(m.ringStrokeCss);
+    expect(widths[1]).toBe(m.coreKeylineCss);
+  });
+
+  test('a tile too small for the ring draws the glow and the keyline only', () => {
+    const { g, calls } = recorder();
+    drawPlayerLocator(g, baseInput({ tileSize: 8.32, devicePixelRatio: 1, coreHalfWidth: 2.5, coreHalfHeight: 2.5, coreReachCss: 2.67 }));
+    expect(circles(calls)).toBe(0);
+    expect(calls.filter((c) => c.fn === 'fillRoundedRect')).toHaveLength(PLAYER_LOCATOR.glowSteps);
   });
 
   test('the core keyline sits just outside the core and is drawn last (the caller then fills the core on top)', () => {
@@ -100,35 +145,35 @@ describe('player locator draw', () => {
   test('a running ping adds staggered rings that fade and expand; reduced motion draws none', () => {
     const live = recorder();
     drawPlayerLocator(live.g, baseInput({ pingStartMs: 1000, timeMs: 1400 }));
-    expect(circles(live.calls)).toBe(2 + 4);
+    expect(circles(live.calls)).toBe(1 + 4);
 
     const early = recorder();
     drawPlayerLocator(early.g, baseInput({ pingStartMs: 1000, timeMs: 1100 }));
-    expect(circles(early.calls)).toBe(2 + 2);
+    expect(circles(early.calls)).toBe(1 + 2);
 
     const done = recorder();
     drawPlayerLocator(done.g, baseInput({ pingStartMs: 1000, timeMs: 1000 + PLAYER_LOCATOR_PING_TOTAL_MS + 1 }));
-    expect(circles(done.calls)).toBe(2);
+    expect(circles(done.calls)).toBe(1);
 
     const reduced = recorder();
     drawPlayerLocator(reduced.g, baseInput({ pingStartMs: 1000, timeMs: 1400, reducedMotion: true }));
-    expect(circles(reduced.calls)).toBe(2);
+    expect(circles(reduced.calls)).toBe(1);
   });
 
   test('ping radius grows monotonically from the ring to the travel radius', () => {
-    const m = resolvePlayerLocatorMetrics(20);
+    const m = resolvePlayerLocatorMetrics(20, 2, 6.4);
     const radii: number[] = [];
     for (const t of [50, 300, 600, 900, 1050]) {
       const { g, calls } = recorder();
       drawPlayerLocator(g, baseInput({ pingStartMs: 0, timeMs: t }));
       // strokeRoundedRect args: x, y, width, height, radius; the half-extent is width / 2
-      radii.push(ringSquares(calls)[2]!.args[2]! / 2);
+      radii.push(ringSquares(calls)[1]!.args[2]! / 2);
     }
     for (let i = 1; i < radii.length; i += 1) {
       expect(radii[i]).toBeGreaterThan(radii[i - 1]!);
     }
-    expect(radii[0]).toBeGreaterThanOrEqual(m.ringRadiusCss);
-    expect(radii[radii.length - 1]).toBeLessThanOrEqual(m.pingTravelRadiusCss);
+    expect(radii[0]).toBeGreaterThanOrEqual(m.ringHalfCss);
+    expect(radii[radii.length - 1]).toBeLessThanOrEqual(m.pingTravelHalfCss);
   });
 
   test('the ring, glow and ping are chip-family rounded squares: concentric with the player, corner = chip proportion', () => {
@@ -164,7 +209,7 @@ describe('player locator draw', () => {
     drawPlayerLocator(half.g, baseInput({ alpha: 0.5 }));
     const full = recorder();
     drawPlayerLocator(full.g, baseInput({ alpha: 1 }));
-    const ringAlpha = (c: Call[]): number => c.filter((x) => x.fn === 'lineStyle')[1]!.args[2]!;
+    const ringAlpha = (c: Call[]): number => c.filter((x) => x.fn === 'lineStyle')[0]!.args[2]!;
     expect(ringAlpha(half.calls)).toBeCloseTo(ringAlpha(full.calls) / 2, 6);
   });
 

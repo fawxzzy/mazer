@@ -1,19 +1,31 @@
 /**
- * Player locator: a clean "where am I" treatment for the play-mode player marker, sized in CSS PIXELS so it
- * scales with the board and never shrinks to a dot on dense boards (tiles of 5..8 css px).
+ * Player locator: the "where am I" treatment around the player marker, sized from the TILE (like the end markers),
+ * with only the find-me ping sized in css pixels.
  *
  * What it adds (the player's own shape, colour and glow are untouched; this only surrounds them):
- *   1. a soft player-green glow (a few equal-alpha concentric rounded squares: Phaser Graphics has no gradients),
- *   2. a crisp ring around the player: a dark keyline stroke under a bright player-green stroke, so it reads
- *      against both the teal chips and the trail,
- *   3. a dark keyline hugging the player's rounded square (drawn before the core fill), which separates the
- *      bright core from the trail running through the same tile,
- *   4. a brief "find me" ping (two staggered expanding rings) on spawn, after unpause / level change, and
- *      whenever the player has stood still for `idleMs`. A ping is cancelled the moment the player moves.
+ *   1. a dark keyline hugging the player's rounded square (drawn before the core fill), the same thin one-to-two
+ *      device pixel outline the end markers trace around their glyphs: it separates the bright core from the trail
+ *      running through the same tile;
+ *   2. a ring: a thin player-green rounded square that lies INSIDE the player's own tile, flush with the tile edge,
+ *      the same width as the chip's lit rim. It reads as the player's cell lighting up in the player's colour and
+ *      never reaches into the neighbouring tiles. Where the tile is too small to hold it without touching the block
+ *      (tiles under about 8 css px at 1x) it is left out and the glow carries the marker;
+ *   3. a soft player-green glow outside the ring (a few equal-alpha concentric rounded squares: Phaser Graphics has
+ *      no gradients), bleeding a fraction of a tile past the cell edge as a falloff;
+ *   4. a brief "find me" ping (two staggered expanding rings) on spawn, after unpause / level change, and whenever
+ *      the player has stood still for `idleMs`. A ping is cancelled the moment the player moves. This is the one part
+ *      that is NOT tile-sized: it travels at least `pingMinTravelCss` px out so it can be seen on a dense board, and
+ *      it exists only in play (the menu demo has no ping state), so it is the one allowed difference between the
+ *      human's marker and the AI's.
+ *
+ * History: the ring used to be a css-px ring (0.7 of a tile, floored at 11 and capped at 30 css px) with a 2.5 px
+ * keyline and a glow out to 1.85x that. That was found by the 2026-11-09 locator card for 5..8 px tiles, but it made
+ * the ring 1.4 to 2.75 tiles across (1.5 at a 14.7 px phone tile, 2.7 at 8 px) so it overran the corridor it sat in,
+ * and it did not look like the start / goal glyphs, which stay inside their tile. The ping keeps the dense-board
+ * findability job; the ring now matches the tile.
  *
  * Shape: the ring, glow and ping are rounded squares with the Chip tile's own corner proportion (radius is
- * CHIP_CORNER_RATIO of the side), concentric with the player's rounded square, so the locator reads as
- * the same chip family as the tile and the player instead of a circle around a square.
+ * CHIP_CORNER_RATIO of the side), concentric with the player's rounded square.
  *
  * Reduced motion: the glow, ring and keyline are static and the ping is never started.
  *
@@ -23,26 +35,28 @@
  *
  * Pure: no Date, no Math.random. The draw is a function of (geometry, timeMs, pingStartMs, reducedMotion).
  */
-import { CHIP_CORNER_RATIO, boardMaterial } from './boardTileStyle';
+import {
+  BOARD_TILE_GEOMETRY,
+  CHIP_CORNER_RATIO,
+  boardMaterial,
+  snapLineWidth
+} from './boardTileStyle';
 
 export const PLAYER_LOCATOR = Object.freeze({
-  /** Ring half-extent as a share of the tile, floored and capped in css px so it reads on every board size. */
-  ringRadiusTileRatio: 0.7,
-  minRingRadiusCss: 11,
-  maxRingRadiusCss: 30,
-  ringStrokeCss: 1.75,
-  /** The dark keyline under the ring is this much wider than the ring stroke (total, not per side). */
-  ringKeylineExtraCss: 2.5,
+  /** Ring stroke as a share of the tile, snapped to whole device px (at least one), capped in css px. */
+  ringStrokeTileRatio: 0.07,
+  ringStrokeMaxCss: 2.2,
   ringAlpha: 0.92,
-  keylineAlpha: 0.78,
-  /** Soft glow: concentric discs from the ring outwards. */
+  /** The ring is dropped when its inner edge would sit inside the core's keyline by more than this many device px. */
+  ringOverlapToleranceDevicePx: 0.5,
+  /** Soft glow: concentric rounded squares from the ring outwards, ending this share of a tile past the ring. */
   glowSteps: 6,
-  glowRadiusPerRing: 1.85,
+  glowSpreadTileRatio: 0.3,
   glowPeakAlpha: 0.24,
-  /** Dark keyline around the player's rounded square (css px, outside the core edge). */
-  coreKeylineCss: 1.5,
+  /** Dark keyline around the player's rounded square: the end markers' keyline, a share of the half-tile. */
+  coreKeylineOfRadius: BOARD_TILE_GEOMETRY.endpoint.keylineOfRadius,
   coreKeylineAlpha: 0.9,
-  /** Find-me ping. */
+  /** Find-me ping (css px: it is the dense-board findability aid, not part of the tile-sized marker). */
   idleMs: 5000,
   idleRepeatMs: 6500,
   pingDurationMs: 1100,
@@ -51,8 +65,8 @@ export const PLAYER_LOCATOR = Object.freeze({
   pingStrokeCss: 2,
   pingKeylineExtraCss: 2,
   pingPeakAlpha: 0.85,
-  /** The ping travels from the ring to this multiple of the ring radius, at least `pingMinTravelCss` px out. */
-  pingTravelPerRing: 3,
+  /** The ping travels from the ring to this multiple of the half-tile, at least `pingMinTravelCss` px out. */
+  pingTravelPerHalfTile: 3,
   pingMinTravelCss: 26
 });
 
@@ -76,22 +90,61 @@ const strokeSquare = (g: LocatorGraphics, cx: number, cy: number, half: number):
 };
 
 export interface PlayerLocatorMetrics {
-  ringRadiusCss: number;
-  glowRadiusCss: number;
-  pingTravelRadiusCss: number;
+  /** Distance from the cell centre to the ring's stroke centre line (css px). */
+  ringHalfCss: number;
+  ringStrokeCss: number;
+  /** False where the tile cannot hold the ring without touching the player's block. */
+  ringVisible: boolean;
+  /** Outer half-extent of the glow (css px). */
+  glowHalfCss: number;
+  /** Width of the dark keyline around the core (css px, whole device px). */
+  coreKeylineCss: number;
+  /** Half-extent the ping reaches at the end of its travel (css px). */
+  pingTravelHalfCss: number;
 }
 
-/** Fills `out` (or a new record) with the css-px geometry for a tile size. Pure. */
+/** The ring, glow and keyline are not part of a tile this small: below this the metrics are all zero. */
+const emptyMetrics = (out: PlayerLocatorMetrics): PlayerLocatorMetrics => {
+  out.ringHalfCss = 0;
+  out.ringStrokeCss = 0;
+  out.ringVisible = false;
+  out.glowHalfCss = 0;
+  out.coreKeylineCss = 0;
+  out.pingTravelHalfCss = 0;
+  return out;
+};
+
+/**
+ * Fills `out` (or a new record) with the css-px geometry for a tile size and device pixel ratio. `coreReachCss` is how
+ * far the player's block reaches from the cell centre at its largest resting size (breathing included), as a half
+ * extent WITHOUT the keyline; it decides whether the ring fits. Pure.
+ */
 export const resolvePlayerLocatorMetrics = (
   tileSize: number,
-  out: PlayerLocatorMetrics = { ringRadiusCss: 0, glowRadiusCss: 0, pingTravelRadiusCss: 0 }
+  devicePixelRatio: number,
+  coreReachCss: number,
+  out: PlayerLocatorMetrics = emptyMetrics({
+    ringHalfCss: 0, ringStrokeCss: 0, ringVisible: false, glowHalfCss: 0, coreKeylineCss: 0, pingTravelHalfCss: 0
+  })
 ): PlayerLocatorMetrics => {
   const k = PLAYER_LOCATOR;
   const tile = Number.isFinite(tileSize) && tileSize > 0 ? tileSize : 0;
-  const ring = Math.min(k.maxRingRadiusCss, Math.max(k.minRingRadiusCss, tile * k.ringRadiusTileRatio));
-  out.ringRadiusCss = ring;
-  out.glowRadiusCss = ring * k.glowRadiusPerRing;
-  out.pingTravelRadiusCss = Math.max(ring * k.pingTravelPerRing, ring + k.pingMinTravelCss);
+  if (tile === 0) {
+    return emptyMetrics(out);
+  }
+  const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
+  const half = tile / 2;
+  const stroke = Math.min(snapLineWidth(tile * k.ringStrokeTileRatio, dpr), Math.max(k.ringStrokeMaxCss, 1 / dpr));
+  const keyline = snapLineWidth(half * k.coreKeylineOfRadius, dpr);
+  const ringHalf = half - (stroke / 2);
+  const innerEdge = half - stroke;
+  const coreEdge = Math.max(0, coreReachCss) + keyline;
+  out.ringStrokeCss = stroke;
+  out.ringHalfCss = ringHalf;
+  out.ringVisible = innerEdge - coreEdge >= -(k.ringOverlapToleranceDevicePx / dpr);
+  out.glowHalfCss = half + (tile * k.glowSpreadTileRatio);
+  out.coreKeylineCss = keyline;
+  out.pingTravelHalfCss = Math.max(half * k.pingTravelPerHalfTile, half + k.pingMinTravelCss);
   return out;
 };
 
@@ -107,17 +160,22 @@ export const PLAYER_LOCATOR_PING_TOTAL_MS = (
   PLAYER_LOCATOR.pingDurationMs + ((PLAYER_LOCATOR.pingCount - 1) * PLAYER_LOCATOR.pingStaggerMs)
 );
 
-const SCRATCH: PlayerLocatorMetrics = { ringRadiusCss: 0, glowRadiusCss: 0, pingTravelRadiusCss: 0 };
+const SCRATCH: PlayerLocatorMetrics = emptyMetrics({
+  ringHalfCss: 0, ringStrokeCss: 0, ringVisible: false, glowHalfCss: 0, coreKeylineCss: 0, pingTravelHalfCss: 0
+});
 
 export interface PlayerLocatorDrawInput {
   /** Cell centre (css px, the same space the marker is drawn in). */
   centerX: number;
   centerY: number;
   tileSize: number;
+  devicePixelRatio: number;
   /** The player's current rounded-square half extents (squash/stretch and breathing included) and corner radius. */
   coreHalfWidth: number;
   coreHalfHeight: number;
   coreCornerRadius: number;
+  /** The block's largest resting half extent (breathing included, no keyline): decides whether the ring fits. */
+  coreReachCss: number;
   /** Lifecycle fade, 0..1. */
   alpha: number;
   timeMs: number;
@@ -133,22 +191,25 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
   if (alpha <= 0) {
     return;
   }
-  const m = resolvePlayerLocatorMetrics(input.tileSize, SCRATCH);
+  const m = resolvePlayerLocatorMetrics(input.tileSize, input.devicePixelRatio, input.coreReachCss, SCRATCH);
   const { centerX: cx, centerY: cy } = input;
+  const half = input.tileSize / 2;
+  // The glow and the ping start at the ring's outer edge, or at the tile edge where the ring is left out.
+  const innerRadius = m.ringVisible ? m.ringHalfCss : half;
 
   // 1. soft glow: equal-alpha concentric rounded squares, stacked so the cumulative alpha at the ring is glowPeakAlpha.
   const perStep = 1 - ((1 - k.glowPeakAlpha) ** (1 / k.glowSteps));
   g.fillStyle(boardMaterial.player, perStep * alpha);
   for (let i = 0; i < k.glowSteps; i += 1) {
-    const r = m.ringRadiusCss + ((m.glowRadiusCss - m.ringRadiusCss) * (1 - (i / k.glowSteps)));
+    const r = innerRadius + ((m.glowHalfCss - innerRadius) * (1 - (i / k.glowSteps)));
     fillSquare(g, cx, cy, r);
   }
 
-  // 2. crisp ring: dark keyline under the bright stroke.
-  g.lineStyle(k.ringStrokeCss + k.ringKeylineExtraCss, boardMaterial.void, k.keylineAlpha * alpha);
-  strokeSquare(g, cx, cy, m.ringRadiusCss);
-  g.lineStyle(k.ringStrokeCss, boardMaterial.player, k.ringAlpha * alpha);
-  strokeSquare(g, cx, cy, m.ringRadiusCss);
+  // 2. the ring: the player's cell lit in the player's colour, inside the tile.
+  if (m.ringVisible) {
+    g.lineStyle(m.ringStrokeCss, boardMaterial.player, k.ringAlpha * alpha);
+    strokeSquare(g, cx, cy, m.ringHalfCss);
+  }
 
   // 3. find-me ping: expanding rings (never in reduced motion; the caller also never starts one).
   if (!input.reducedMotion && input.pingStartMs >= 0) {
@@ -159,7 +220,7 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
         continue;
       }
       const eased = 1 - ((1 - t) * (1 - t));
-      const radius = m.ringRadiusCss + ((m.pingTravelRadiusCss - m.ringRadiusCss) * eased);
+      const radius = innerRadius + ((m.pingTravelHalfCss - innerRadius) * eased);
       const fade = k.pingPeakAlpha * (1 - t) * alpha;
       g.lineStyle(k.pingStrokeCss + k.pingKeylineExtraCss, boardMaterial.void, fade * 0.7);
       strokeSquare(g, cx, cy, radius);
@@ -169,7 +230,7 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
   }
 
   // 4. dark keyline hugging the core (stroke centred half a line-width outside the core edge).
-  const w = k.coreKeylineCss;
+  const w = m.coreKeylineCss;
   g.lineStyle(w, boardMaterial.void, k.coreKeylineAlpha * alpha);
   g.strokeRoundedRect(
     cx - input.coreHalfWidth - (w / 2),

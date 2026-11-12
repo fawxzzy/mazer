@@ -31,6 +31,7 @@ import {
 } from '../../src/legacy-runtime/legacySettingsSheetPlan';
 import * as boardTileBake from '../../src/render/boardTileBake';
 import * as edgeMarkers from '../../src/render/edgeMarkers';
+import * as playerMarker from '../../src/render/playerMarker';
 import { designTokens } from '../../src/theme/tokens';
 
 /**
@@ -48,6 +49,7 @@ const row = (id: LegacyGuideRow['id']): LegacyGuideRow => LEGACY_GUIDE_ROWS.find
 const exportsOf = (module: string): Record<string, unknown> | null => {
   if (module === 'src/render/boardTileBake.ts') return boardTileBake as Record<string, unknown>;
   if (module === 'src/render/edgeMarkers.ts') return edgeMarkers as Record<string, unknown>;
+  if (module === 'src/render/playerMarker.ts') return playerMarker as Record<string, unknown>;
   return null;
 };
 
@@ -139,8 +141,10 @@ describe('guide copy only names things that exist', () => {
 
   test('You: the player is a rounded green block in the Chip tile corner proportion, inside a ring of the same shape', () => {
     expect(row('you').text).toMatch(/rounded block inside a bright ring/);
-    expect(MENU_SCENE).toContain('BOARD_TILE_GEOMETRY.chipCornerRatio * LEGACY_PLAY_PLAYER_MARKER_SQUARE_FILL_RATIO');
+    // one marker for the board, the menu demo's AI and the Guide icon: the Chip corner proportion lives in one module
+    expect(read('src/render/playerMarker.ts')).toContain('cornerRatio: CHIP_CORNER_RATIO');
     expect(read('src/render/playerLocator.ts')).toContain('CHIP_CORNER_RATIO');
+    expect(MENU_SCENE).not.toContain('LEGACY_PLAY_PLAYER_MARKER_SQUARE_FILL_RATIO');
   });
 
   test('Trail row: the copy says the line shimmers and shifts colour, and the legend draws the iridescent palette', () => {
@@ -319,10 +323,10 @@ describe('guide icons are tied to the draw functions the board uses', () => {
     }
   });
 
-  test('Chip wiring closed every chip-wiring todo: goal, start, trail, wrap and levels share a board draw; you and move are guide-local', () => {
+  test('Chip wiring closed every chip-wiring todo: goal, start, you, trail, wrap and levels share a board draw; only move is guide-local', () => {
     const byStatus = (status: string): string[] => LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === status).map((r) => r.id);
-    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'trail', 'wrap', 'levels']);
-    expect(byStatus('guide-local')).toEqual(['you', 'move']);
+    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'levels']);
+    expect(byStatus('guide-local')).toEqual(['move']);
     expect(byStatus('todo-wiring')).toEqual([]);
     expect(LEGACY_GUIDE_ROWS.filter((r) => r.icon.lane === 'chip-wiring').map((r) => r.id)).toEqual([]);
   });
@@ -345,7 +349,7 @@ describe('the scene paints exactly what the guide data declares', () => {
   test('icons declared shared-with-board call the board draw function itself, not a copy', () => {
     const icon = method('private drawLegacyGuideIcon(');
     const shared = LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === 'shared-with-board');
-    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'trail', 'wrap', 'levels']);
+    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'levels']);
     // goal and start: one helper that paints a chip tile and then calls drawBoardMarkers itself.
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'goal',");
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'start',");
@@ -360,10 +364,12 @@ describe('the scene paints exactly what the guide data declares', () => {
     expect(icon).toContain('drawEdgeMarker(');
     // levels: the dot-matrix wordmark chip renderer, same as the level announcer.
     expect(icon).toContain('this.drawLegacyGlyphWordTileBlock(graphics, layout, 0, 1, 1, false)');
-    // guide-local icons reuse the board constants/tokens (player) or mirror the stick (move).
-    expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('LEGACY_PLAY_PLAYER_MARKER_ACCENT_COLOR');
-    // the ring in the copy is the board's own locator draw (src/render/playerLocator.ts), frozen for the icon.
-    expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('drawPlayerLocator(graphics, {');
+    // you: the board's own marker draw (src/render/playerMarker.ts: block, keyline, ring, accent stroke), frozen for the icon,
+    // the same function fillLegacyPlayerMarkerTile calls for the human player and for the menu demo's AI.
+    expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('drawPlayerMarker(graphics, frame, {');
+    expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('resolvePlayerMarkerFrame(');
+    expect(method('private fillLegacyPlayerMarkerTile(')).toContain('drawPlayerMarker(this.boardDynamicGraphics, frame, {');
+    // move mirrors the stick.
     expect(method('private drawLegacyOptionsGuideMoveGlyph(')).toContain('LEGACY_PLAY_TOUCH_BUTTON_STROKE');
     expect(icon).toContain('this.progressionState.tracks.player.level');
   });

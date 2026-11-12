@@ -1062,9 +1062,14 @@ const starPath = (p: Painter, cx: number, cy: number, outer: number, inner: numb
   p.close();
 };
 
+/** One axis of `centerOfCell`: the device-snapped centre of cell `index`, relative to the board origin (css px). */
+export const snappedCellCenter = (index: number, size: number, scale: number): number => (
+  (Math.round(index * size * scale) + Math.round((index + 1) * size * scale)) / 2 / scale
+);
+
 export const centerOfCell = (cell: BoardCell, size: number, scale: number, ox: number, oy: number): [number, number] => [
-  ox + (Math.round(cell.x * size * scale) + Math.round((cell.x + 1) * size * scale)) / 2 / scale,
-  oy + (Math.round(cell.y * size * scale) + Math.round((cell.y + 1) * size * scale)) / 2 / scale
+  ox + snappedCellCenter(cell.x, size, scale),
+  oy + snappedCellCenter(cell.y, size, scale)
 ];
 
 const drawTraceStartMarker = (painter: Painter, style: ResolvedBoardTileStyle, cx: number, cy: number): void => {
