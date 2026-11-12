@@ -439,17 +439,29 @@
       "filesHint": []
     },
     "MAZER-MOTION-004": {
-      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 425}], "headless": false, "deviceChecked": false},
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 425,
+            "mergedSha": "f8c16c72"
+          }
+        ],
+        "deployedBuild": "f8c16c72",
+        "headless": true,
+        "deviceChecked": false
+      },
       "blocker": {
         "kind": "owner-decision",
-        "summary": "PR #425 is green but held: under reduced motion it also freezes the title, START and level-number rainbow to one hue.",
+        "summary": "PR #425 is merged and live. Under reduced motion the dock travelling band and the touch-stick anchor orbit are held still, which is a judgement call; the shared crossfade length is carried by MAZER-MOTION-005.",
         "unblockedBy": "Zac",
-        "ask": "Under reduced motion, should the title and level-number rainbow stop shifting colour, or keep shifting colour and only stop moving?",
-        "recommendation": "Keep the colours shifting and stop only the movement; PR #425 is then changed to match and merged."
+        "ask": "Under Reduce Motion, keep the dock travelling band and the touch-stick anchor orbit held still, or let either one move?",
+        "recommendation": "Keep both held still; colour still shifts, so the dock and stick stay lively without movement."
       },
       "verify": [],
       "lane": "owner-only",
-      "filesHint": []
+      "filesHint": [],
+      "note": "Merged and deployed; kept in review for the open crossfade criterion (MAZER-MOTION-005) and the two judgement calls. Headless only."
     },
     "MAZER-PERF-001": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 375},{"repo": "fawxzzy/mazer", "number": 391}], "headless": true, "deviceChecked": false},
@@ -1372,18 +1384,45 @@
       "filesHint": []
     },
     "MAZER-ACCT-006": {
-      "evidence": {"prs": [{"repo": "fawxzzy/FawxzzyWeb", "number": 118, "mergedSha": "db5199e9"}], "headless": false, "deviceChecked": false},
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/FawxzzyWeb",
+            "number": 118,
+            "mergedSha": "db5199e9"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": false
+      },
       "blocker": {
         "kind": "device",
-        "summary": "FawxzzyWeb PR #118 is merged and aliased live (2026-11-11); no real-device sign-in has been checked. This card also carries the phone check for the new Mazer profile fix (MAZER-ACCT-007, deployed at main 8f757c76).",
+        "summary": "FawxzzyWeb PR #118 is merged and aliased live (2026-11-11); no real-device sign-in has been checked. This card also carries the phone checks for the Mazer profile fixes: MAZER-ACCT-007, the typed-username fix MAZER-ACCT-017 and Edit name MAZER-ACCT-011 (all deployed at main f8c16c72, headless and mocks only).",
         "unblockedBy": "Zac",
         "ask": "Open Mazer from the home screen, sign in, and tell me whether a \"Continue to Mazer?\" screen appears.",
         "recommendation": "Do it once with your real account; if the consent screen still appears, report it and keep the card in review."
       },
       "verify": [
-        {"step":"Open Mazer from the home screen, sign out if needed, and sign in.","where":"installed-app","expected":"You land back in Mazer with NO \"Continue to Mazer?\" screen."},
-        {"step":"With the new build, create a brand-new account from the Mazer Create Account button and sign in, then open Menu > Leaderboard.","where":"installed-app","expected":"No Choose a username gate; your row shows a Mazer-###### handle (checks MAZER-ACCT-007)."},
-        {"step":"Change a setting, close Mazer completely and reopen it.","where":"installed-app","expected":"The setting is still saved (checks MAZER-ACCT-007)."}
+        {
+          "step": "Open Mazer from the home screen, sign out if needed, and sign in.",
+          "where": "installed-app",
+          "expected": "You land back in Mazer with NO \"Continue to Mazer?\" screen."
+        },
+        {
+          "step": "With the current build, create a brand-new account from the Mazer Create Account button, typing a username of your choice, then sign in and open Menu > Leaderboard.",
+          "where": "installed-app",
+          "expected": "No Choose a username gate; your row shows the username you typed, not a Mazer-###### name (checks MAZER-ACCT-007 and MAZER-ACCT-017)."
+        },
+        {
+          "step": "On your own row in the Leaderboard, tap Edit name, change the name and save; then open Edit name again and cancel with Esc or a tap outside.",
+          "where": "installed-app",
+          "expected": "The new name shows on your row; cancel leaves it unchanged; an invalid name shows a plain error (checks MAZER-ACCT-011)."
+        },
+        {
+          "step": "Change a setting, close Mazer completely and reopen it.",
+          "where": "installed-app",
+          "expected": "The setting is still saved (checks MAZER-ACCT-007)."
+        }
       ],
       "lane": "owner-only",
       "filesHint": []
@@ -1413,30 +1452,35 @@
       "note": "FawxzzyWeb PR #121 is merged and NOT live: the release carrying it still needs the requester alias moves."
     },
     "MAZER-ACCT-010": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "With auto-confirm on, a successful sign-up returns a session and a duplicate does not, so account existence can still be inferred from whether the user ends up signed in.",
-        "unblockedBy": "Zac",
-        "ask": "Accept the residual Create Account signal and keep auto-confirm on, or turn auto-confirm off (adds a confirmation step for every new player)?",
-        "recommendation": "Accept the current residual signal and keep auto-confirm; the rest of the form no longer discloses it and a confirmation step costs real sign-ups."
+      "evidence": {
+        "prs": [],
+        "headless": false,
+        "deviceChecked": null
       },
+      "blocker": null,
       "verify": [],
-      "lane": "owner-only",
-      "filesHint": []
+      "lane": null,
+      "filesHint": [],
+      "note": "Owner decision 2026-11-12: accept the residual signal and keep auto-confirm. No code change; the account site docs line is not written and has no card yet."
     },
     "MAZER-ACCT-011": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "The in-game username editor was removed, so a generated Mazer-###### handle cannot be renamed.",
-        "unblockedBy": "Zac",
-        "ask": "Should players be able to rename the generated handle from the leaderboard?",
-        "recommendation": "Yes: build a small editor that reuses the existing username save path."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 450,
+            "mergedSha": "b3adf9be"
+          }
+        ],
+        "deployedBuild": "f8c16c72",
+        "headless": true,
+        "deviceChecked": false
       },
+      "blocker": null,
       "verify": [],
-      "lane": "owner-only",
-      "filesHint": []
+      "lane": null,
+      "filesHint": [],
+      "note": "Fixtures and mocks only; the phone check for Edit name is on MAZER-ACCT-006."
     },
     "MAZER-ACCT-012": {
       "evidence": null,
@@ -1444,7 +1488,7 @@
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": [],
-      "note": "Do after the MAZER-ACCT-011 decision: the editor may reuse the username-active flag."
+      "note": "Only the sign-up branch remains: the username-editor half was done in PR #450. Waits on nothing."
     },
     "MAZER-ACCT-013": {
       "evidence": null,
@@ -1516,8 +1560,10 @@
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": ["src/theme/tokens.ts"],
-      "note": "Recommendation: one 200 ms crossfade for every reduced-motion case (intro 250 to 200, outro 150 to 200, teleport 140 to 200). Waits on MAZER-MOTION-001 (in review) and the PR #425 decision."
+      "filesHint": [
+        "src/theme/tokens.ts"
+      ],
+      "note": "Recommendation: one 200 ms crossfade for every reduced-motion case (intro 250 to 200, outro 150 to 200, teleport 140 to 200). Needs the theme contract edit. Carries criterion 3 of MAZER-MOTION-004; waits on MAZER-MOTION-001 (in review)."
     },
     "MAZER-GOV-006": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 432}], "deployedBuild": "b640f1da", "headless": false, "deviceChecked": null},
@@ -1615,14 +1661,18 @@
       "evidence": null,
       "blocker": {
         "kind": "dependency",
-        "summary": "Both this card and the PR #425 change touch the scene file.",
+        "summary": "PR #425 has landed; this card still waits on MAZER-MOTION-001 and MAZER-MOTION-004, both in review.",
         "unblockedBy": "other-card",
-        "ask": "Waits on MAZER-MOTION-004 (PR #425) landing.",
-        "recommendation": "Start after PR #425 merges; the identical values are mechanical."
+        "ask": "Waits on MAZER-MOTION-001 and MAZER-MOTION-004 (both in review).",
+        "recommendation": "Start once those leave review; the identical values are mechanical."
       },
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": ["src/scenes/MenuScene.ts","src/render/motionScale.ts","src/theme/tokens.ts"]
+      "filesHint": [
+        "src/scenes/MenuScene.ts",
+        "src/render/motionScale.ts",
+        "src/theme/tokens.ts"
+      ]
     },
     "MAZER-MOTION-007": {
       "evidence": null,
@@ -1637,6 +1687,138 @@
       "lane": "owner-only",
       "filesHint": [],
       "note": "The off-scale list was not supplied to this board sync; it is in the notes of PR #441 and the 2026-11-06 motion audit, and is not copied here."
+    },
+    "MAZER-ACCT-017": {
+      "evidence": {
+        "prs": [],
+        "headless": false,
+        "deviceChecked": false
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": [],
+      "note": "Database function v2 and 8-row backfill applied 2026-11-12 with the owner's explicit approval; tested live with the standing test account and on a local throwaway database. The phone check is on MAZER-ACCT-006."
+    },
+    "MAZER-ACCT-018": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "The username typed on the account-site sign-up screen is public on the Mazer leaderboard and the screen does not say so.",
+        "unblockedBy": "Zac",
+        "ask": "Confirm the copy for one line on the account-site sign-up screen saying the username shows on the Mazer leaderboard.",
+        "recommendation": "Add the line (draft: Your username shows on the Mazer leaderboard.); it is a FawxzzyWeb change."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-019": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-ACCT-020": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": [],
+      "note": "Any data change needs the owner's explicit approval first."
+    },
+    "MAZER-ACCT-021": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-ACCT-022": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-FLOW-014": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 449,
+            "mergedSha": "73f754c2"
+          }
+        ],
+        "deployedBuild": "f8c16c72",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": [],
+      "note": "Feel on a phone is not checked; the phone step is on MAZER-CTRL-003. Stick caps were scaled too (one-line revert)."
+    },
+    "MAZER-CTRL-003": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Owner request 2026-11-12 to revisit the controls; the scope is not set. Related to MAZER-CTRL-001 and MAZER-FLOW-014.",
+        "unblockedBy": "Zac",
+        "ask": "Decide the scope of the controls rework: audit and proposal only, or a build after you choose from the proposal?",
+        "recommendation": "Approve the audit and the written proposal first; pick the build scope from the proposal."
+      },
+      "verify": [
+        {
+          "step": "On your phone, play level 1 and then a late level at the default Move Speed, holding a direction and using the touch stick (this is the phone check for MAZER-FLOW-014).",
+          "where": "installed-app",
+          "expected": "Speed feels the same on both levels and a little slower than before; tell me if it is too slow or the stick feels off."
+        }
+      ],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-PROG-016": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": [
+        "src/scenes/menuRuntimeDiagnostics.ts"
+      ]
+    },
+    "MAZER-PERF-003": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-MOTION-008": {
+      "evidence": null,
+      "blocker": {
+        "kind": "device",
+        "summary": "Reduce Motion was only checked in headless Chromium.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, turn Reduce Motion on in Settings and check movement stops and colours keep shifting.",
+        "recommendation": "Do it once on the installed app; it also covers the two held-still judgement calls on MAZER-MOTION-004."
+      },
+      "verify": [
+        {
+          "step": "Open Settings, set Reduce Motion to On, go back to the menu and watch the title and START for about 10 seconds.",
+          "where": "installed-app",
+          "expected": "The title and START colours keep shifting; nothing moves or pulses."
+        },
+        {
+          "step": "Start a level and move around with the touch stick, watching the trail, the marker and the dock.",
+          "where": "installed-app",
+          "expected": "The trail hue and dock glow keep shifting; shine, breath, sparkles, the dock travelling band and the stick orbit are still."
+        }
+      ],
+      "lane": "owner-only",
+      "filesHint": []
     }
   }
 }

@@ -4,15 +4,15 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-11T23:00:00.000Z",
+  "updatedAt": "2026-11-12T12:00:00.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 173,
+    "stableIdentityCount": 184,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 70,
-    "completedCardCount": 88,
+    "openCardCount": 77,
+    "completedCardCount": 92,
     "deferredCardCount": 15,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out."
   },
@@ -1018,21 +1018,21 @@
     {
       "id": "MAZER-MOTION-004",
       "status": "review",
-      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-004",
-      "title": "Add an in-game reduced-motion setting and finish the gating: open for review, held",
-      "description": "PR #425 is open for review with CI green, NOT merged and NOT deployed, and is held for an owner decision: under reduced motion it also freezes the title, START and level-number rainbow to one hue, while the owner wants colour shifting to keep running. The criterion 'one shared crossfade length' is not done; it belongs to MAZER-MOTION-001 and is tracked as MAZER-MOTION-005. Original plan: gate START and button blinks, set a defined static alpha and add a persisted Settings toggle.",
+      "title": "Add a Reduce Motion setting: merged and deployed, crossfade length still open",
+      "description": "PR #425 is merged (f8c16c72) and live at main f8c16c72 (live bundle checked for the Reduce Motion note). Settings > Reduce Motion (System or On) is one gate with the device setting. Owner rule 2026-11-12: reduced motion stops movement and pulsing and never freezes colour. Stopped: trail shine, sheen and breath, blinking icons, the find-me ping, marker breath, backdrop, sparkles, AI option-tile and loading pulses, the dock travelling band and the touch-stick anchor orbit. Colours keep shifting: trail hue, edge-marker border, dock glow, and the title, START, Login and level-number rainbow. Kept in review, not completed, because criterion 3 (one shared crossfade length) is not done and is carried by MAZER-MOTION-005, and because two judgement calls await the owner's veto: the dock band and the stick orbit are held still. Headless only, nothing device-checked; MAZER-MOTION-008 holds the phone check.",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
         "MAZER-MOTION-001"
       ],
       "acceptanceCriteria": [
-        "A Settings toggle persists reduced motion",
-        "START and button blinks stop under reduced motion",
-        "Owner decides whether colour shifting keeps running under reduced motion (open)",
-        "Crossfades use one shared length: not done, see MAZER-MOTION-005"
+        "A Settings toggle persists reduced motion (System or On): merged and deployed in PR #425",
+        "Movement and pulsing stop under reduced motion while colour keeps shifting (owner rule 2026-11-12)",
+        "Crossfades use one shared length: not done, carried by MAZER-MOTION-005",
+        "Owner veto on the held-still dock band and stick orbit: open"
       ]
     },
     {
@@ -2724,11 +2724,11 @@
     {
       "id": "MAZER-MOTION-005",
       "status": "planning",
-      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-005",
       "title": "Unify the reduced-motion crossfade length with the motion scale",
-      "description": "The reduced-motion crossfade still has its own lengths (intro 250 ms, outro 150 ms, teleport 140 ms). Plan: one value shared with the motion scale, set in the theme contract and pinned by the design sync test. Recommendation: 200 ms for every reduced-motion crossfade (intro 250 to 200, outro 150 to 200, teleport 140 to 200). Depends on MAZER-MOTION-001. Split out of MAZER-MOTION-004. Not started.",
+      "description": "The reduced-motion crossfade still has its own lengths (intro 250 ms, outro 150 ms, teleport 140 ms). Plan: one value shared with the motion scale, set in the theme contract and pinned by the design sync test; this needs an edit to the theme contract. Recommendation: 200 ms for every reduced-motion crossfade (intro 250 to 200, outro 150 to 200, teleport 140 to 200). Depends on MAZER-MOTION-001. This card now carries criterion 3 of MAZER-MOTION-004 (one shared crossfade length), which PR #425 did not do. Not started.",
       "cardType": "architecture",
       "priority": "low",
       "dependencies": [
@@ -2944,11 +2944,11 @@
     {
       "id": "MAZER-MOTION-006",
       "status": "planning",
-      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-006",
       "title": "Migrate scene motion constants to the motion scale",
-      "description": "After PR #425 lands, move the scene own motion constants onto the motion scale module. The ones whose values are identical are mechanical; any differing value stays an owner decision (MAZER-MOTION-007). Waits on MAZER-MOTION-004 because both touch the scene file. Not started.",
+      "description": "PR #425 has landed (merged and deployed 2026-11-12), so the scene own motion constants can move onto the motion scale module. The ones whose values are identical are mechanical; any differing value stays an owner decision (MAZER-MOTION-007). Still waits on MAZER-MOTION-001 (in review) and MAZER-MOTION-004 (in review). Not started.",
       "cardType": "technical-debt",
       "priority": "low",
       "dependencies": [
@@ -3039,50 +3039,50 @@
     },
     {
       "id": "MAZER-ACCT-010",
-      "status": "planning",
-      "updatedAt": "2026-11-11T23:00:00.000Z",
+      "status": "completed",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-010",
-      "title": "Decide the Create Account non-enumeration trade-off and auto-confirm",
-      "description": "Owner decision. With auto-confirm on, a successful Create Account returns a session and a duplicate does not, so anyone can infer whether an account exists from whether they end up signed in. Closing that fully means turning auto-confirm off, which adds a confirmation step for every new player. Recommendation: accept the current residual signal and keep auto-confirm, because the rest of the form no longer discloses it and a confirmation step costs real sign-ups. Needs the owner's decision; no change is made until then.",
+      "title": "Decide the Create Account non-enumeration trade-off: accepted, auto-confirm kept",
+      "description": "Owner decision recorded 2026-11-12: accept the residual signal and keep auto-confirm. With auto-confirm on, a successful Create Account returns a session and a duplicate does not, so someone could infer whether an account exists from whether they end up signed in. Closing that fully would mean turning auto-confirm off, which adds a confirmation step for every new player; the rest of the form no longer discloses it and the owner judged that cost not worth paying. No code or setting changed: this card is completed as a decision and has no device surface. Writing the accepted residual into the account site docs is not done and has no card yet.",
       "cardType": "governance",
       "priority": "medium",
       "dependencies": [
         "MAZER-ACCT-009"
       ],
       "acceptanceCriteria": [
-        "The owner states whether to accept the residual signal or turn auto-confirm off",
-        "If auto-confirm stays on, the accepted residual is written into the account site docs",
-        "If auto-confirm goes off, a separate card covers the confirmation flow"
+        "The owner states whether to accept the residual signal or turn auto-confirm off: accepted, auto-confirm stays on (2026-11-12)",
+        "Auto-confirm stays on, so no confirmation-flow card is needed",
+        "Writing the accepted residual into the account site docs: not done, no card yet"
       ]
     },
     {
       "id": "MAZER-ACCT-011",
-      "status": "planning",
-      "updatedAt": "2026-11-11T23:00:00.000Z",
+      "status": "completed",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-011",
-      "title": "Add a leaderboard username editor for account-site players",
-      "description": "The in-game username editor was removed, and the generated Mazer-###### handle given to account-site players (MAZER-ACCT-007) cannot be renamed. Plan: a small editor on the leaderboard that reuses the existing username save path, which already ensures the profile first and shows a plain toast on failure. Owner decision first: whether players should be able to rename at all. Recommendation: build the small editor so a generated handle is not permanent. Not started.",
+      "title": "Add a leaderboard username editor (Edit name): merged and deployed",
+      "description": "Owner decision 2026-11-12: build it. PR #450 (merged b3adf9be, live at main f8c16c72; live bundle checked for the Edit name control): an Edit name control on the pinned You row and on the Choose a username gate opens an inline editor. Names are 2 to 15 letters, numbers, dot, underscore or hyphen; errors are in plain language; Esc, back or a tap outside cancels; a save goes through the existing hardened save path, which ensures the profile first. The dead account-username-editor code was removed. Fixtures and mocks only: no real new-account run, keyboard safety checked by layout tests only, nothing checked on a real phone.",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
         "MAZER-ACCT-007"
       ],
       "acceptanceCriteria": [
-        "The owner decides whether to build the editor",
-        "A signed-in player can change the generated handle from the leaderboard and sees a plain toast when the save fails",
-        "Taken, invalid and offline cases are covered by tests and a headless capture"
+        "Edit name on the pinned You row and on the Choose a username gate opens an inline editor (PR #450, merged and deployed)",
+        "Invalid names show plain-language errors; Esc, back or a tap outside cancels; saving uses the existing hardened path",
+        "Fixtures and mocks only: no real new-account run, keyboard safety by layout tests only, nothing checked on a phone"
       ]
     },
     {
       "id": "MAZER-ACCT-012",
       "status": "planning",
-      "updatedAt": "2026-11-11T23:00:00.000Z",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-012",
-      "title": "Retire dead Mazer sign-up and username-editor code",
-      "description": "Two paths are unreachable on main: the sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site) and the account-username-active flag that nothing sets since the in-game username editor was removed. Remove them together with their tests and copy, unless MAZER-ACCT-011 brings the editor back first; if it does, reuse the flag instead. Not started.",
+      "title": "Retire dead Mazer sign-up code (username-editor half done in PR #450)",
+      "description": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Not started.",
       "cardType": "technical-debt",
       "priority": "low",
       "dependencies": [
@@ -3090,7 +3090,7 @@
       ],
       "acceptanceCriteria": [
         "The unreachable sign-up form mode and its copy are removed",
-        "The unused username-active flag is removed or reused by the editor card",
+        "The username-editor half is already done in PR #450 (dead code removed)",
         "Tests and the message inventory still pass with no change to shown copy"
       ]
     },
@@ -3169,6 +3169,210 @@
         "The five questions are asked and the answers recorded on this card",
         "The answers point to one candidate cause or rule the candidates out",
         "Any follow-up fix becomes its own card"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-017",
+      "status": "completed",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-017",
+      "title": "Give account-site players the username they typed on the leaderboard: function v2",
+      "description": "Root cause: players who typed a username on the account site were given a generated Mazer-###### leaderboard name and their typed name was ignored. Fix, applied 2026-11-12 with the owner's explicit approval: the database profile function was replaced (version 2, same signature and permissions) so it adopts a valid unclaimed typed username, else a generated one, and never renames an existing profile. A one-off backfill also changed 8 existing generated-name profiles to their typed names (the owner approved 8 rows; the old values are saved in a locked table). Tested live with the standing test account (returns the existing profile unchanged, idempotent, wrong id refused, signed-out refused) and on a local throwaway database (15 cases). Privacy note: the typed username is public on the leaderboard and the account-site sign-up screen does not say so (MAZER-ACCT-018). No real new-account run and nothing checked on a real phone; the phone check is on MAZER-ACCT-006.",
+      "cardType": "bug",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-ACCT-007"
+      ],
+      "acceptanceCriteria": [
+        "The profile function adopts a valid unclaimed typed username, else a generated one, and never renames an existing profile (applied 2026-11-12 with owner approval)",
+        "The one-off backfill moved 8 generated-name profiles to their typed names (8 rows approved, old values saved in a locked table)",
+        "Tested live with the standing test account and on a local throwaway database (15 cases); no real new-account run, nothing checked on a phone"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-018",
+      "status": "planning",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-018",
+      "title": "Tell account-site sign-up users their username shows on the Mazer leaderboard",
+      "description": "The username typed on the account-site sign-up screen is public on the Mazer leaderboard (MAZER-ACCT-017), and that screen does not say so. Plan: add one plain line of copy on the sign-up screen; this is a FawxzzyWeb change. Recommendation: add the line. Needs the owner to confirm the copy. Not started.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-ACCT-017"
+      ],
+      "acceptanceCriteria": [
+        "The owner confirms the copy",
+        "The account-site sign-up screen shows the line before a player submits",
+        "Covered by a test and a headless capture of the sign-up screen"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-019",
+      "status": "planning",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-019",
+      "title": "Re-read the username after profile creation during an in-session sign-in",
+      "description": "During an in-session sign-in a sticky client read taken before the profile exists can leave the player on the Choose a username gate until a reload. Plan: re-read the username once after the profile is created. Not started.",
+      "cardType": "bug",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-ACCT-007"
+      ],
+      "acceptanceCriteria": [
+        "After the profile is created in-session, the username is read again and the gate does not stay",
+        "A mock test reproduces the stale read and passes after the fix",
+        "No change to the signed-out and already-named paths"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-020",
+      "status": "planning",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-020",
+      "title": "Fix the four account-site usernames longer than 15 characters",
+      "description": "Four account-site usernames are longer than the 15-character limit because the account site's stored metadata bypassed validation; those players fall back to generated Mazer names. Plan: close the bypass and decide how to shorten the four names. Any data change needs the owner's explicit approval first. Not started.",
+      "cardType": "bug",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-ACCT-017"
+      ],
+      "acceptanceCriteria": [
+        "The bypass that let a name over 15 characters through is closed",
+        "The four affected players get a valid name or a clear way to pick one, after the owner approves any data change",
+        "A test covers a stored name over the limit"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-021",
+      "status": "planning",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-021",
+      "title": "Refresh the header name after a rename",
+      "description": "Follow-up from the Edit name work (PR #450): a worker flagged that the name shown in the header may keep the old value until a reload after a rename saves. Not measured yet. Plan: update the header as soon as a rename saves. Not started.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-ACCT-011"
+      ],
+      "acceptanceCriteria": [
+        "The header name updates right after a rename saves, with no reload",
+        "A test covers the refresh",
+        "Nothing else in the header changes"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-022",
+      "status": "planning",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-022",
+      "title": "Offer Edit name to a named player with no leaderboard rank yet",
+      "description": "Follow-up from the Edit name work (PR #450): Edit name is offered on the pinned You row and on the Choose a username gate, and a named player who has no leaderboard rank yet may have no way to reach it. Not started; scope still to confirm.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-ACCT-011"
+      ],
+      "acceptanceCriteria": [
+        "A named player with no rank yet can reach Edit name",
+        "The ranked flow is unchanged",
+        "Covered by a test and a headless capture"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-014",
+      "status": "completed",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-014",
+      "title": "Make player speed constant and 8% slower: merged and deployed",
+      "description": "Owner request 2026-11-12. PR #449 (merged 73f754c2, live at main f8c16c72; live bundle checked: speed formula v2 present, v1 gone). The step speed used to depend on the Move Speed setting plus a level bonus of up to +0.10 and a pace-score bonus of plus or minus 0.05; now only the setting matters (formula v2) and the step rate is multiplied by 0.92. At the default setting the repeat interval is 139 ms (was 128), about 7.2 steps per second (was 7.8). The touch-stick caps scale to 113, 157 and 157 ms. The menu AI walker is separate and unchanged. Deviation: the stick caps were scaled too, which the owner did not explicitly ask for (a one-line revert). Tested headless and by unit tests; how it feels on a phone was not checked.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Step speed depends only on the Move Speed setting: the level bonus and the pace-score bonus are gone (formula v2)",
+        "Step rate is 0.92 of the old rate: 139 ms repeat interval at the default setting (was 128); touch-stick caps 113, 157 and 157 ms; menu AI walker unchanged",
+        "Tested headless and by unit tests; feel on a phone not checked; stick-cap scaling was not explicitly requested (one-line revert)"
+      ]
+    },
+    {
+      "id": "MAZER-CTRL-003",
+      "status": "planning",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-CTRL-003",
+      "title": "Revisit and rework the controls",
+      "description": "Owner request 2026-11-12. Rework the controls in stages: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). The scope needs the owner's decision before any build. Not started.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-CTRL-001",
+        "MAZER-FLOW-014"
+      ],
+      "acceptanceCriteria": [
+        "A short controls audit across touch drag, the touch stick, keyboard and any other no-gamepad options, with measured feel at 390x844 and 1280x720",
+        "A written controls proposal the owner chooses between before any build starts",
+        "A player-facing Settings and Guide update ships with whatever is built"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-016",
+      "status": "planning",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-016",
+      "title": "Move touchSprint progression diagnostics to the progression diagnostics section",
+      "description": "After the constant-speed change (PR #449) the touchSprint diagnostics fields are no longer speed inputs, so they belong with the progression diagnostics instead. This is Wave 1C work: the menu diagnostics file belongs to one UI wave and must not be mixed with other waves in one change. Not started.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The touchSprint fields move to the progression diagnostics section",
+        "No gameplay or speed behavior changes",
+        "Diagnostics tests pass and the Wave 1C one-wave rule is respected"
+      ]
+    },
+    {
+      "id": "MAZER-PERF-003",
+      "status": "planning",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PERF-003",
+      "title": "Throttle colour-only redraws under reduced motion",
+      "description": "Under Reduce Motion (PR #425) colour keeps shifting, so colour-only redraws still run at the full frame rate. Battery follow-up: redraw colour at a lower rate while reduced motion is on, without a visible colour step. Needs a measurement first. Not started.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Colour-only redraw cost under reduced motion is measured and recorded",
+        "The redraw rate is lowered with no visible colour stepping",
+        "Reduced motion off is unchanged"
+      ]
+    },
+    {
+      "id": "MAZER-MOTION-008",
+      "status": "planning",
+      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-008",
+      "title": "Device check: reduced motion on a real phone",
+      "description": "Reduce Motion (PR #425) was checked only in headless Chromium. The owner checks on a real phone that, with Reduce Motion on, movement and pulsing stop and colours keep shifting. Not started.",
+      "cardType": "reliability",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-MOTION-004"
+      ],
+      "acceptanceCriteria": [
+        "With Reduce Motion on, movement and pulsing are stopped on a real phone",
+        "With Reduce Motion on, the title, level-number and trail colours still shift",
+        "The result is recorded on this card and on MAZER-MOTION-004"
       ]
     }
   ]
