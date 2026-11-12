@@ -9617,6 +9617,7 @@ export class MenuScene extends Phaser.Scene {
     // colour clock is due, with the redraw gap stretched by the last rebuild's real cost; otherwise the canvas already on
     // screen is exactly what a rebuild would paint. src/render/trailRedrawGate.ts.
     const gateMotionPlan = this.resolveLegacyTrailMotionPlan();
+    const gateSnappedOrigin = this.boardTileLayer.snappedOrigin;
     const gateStamp = {
       routeRevision: this.trailPerfectPathCache.revision,
       previousTileKey: previousTrailTile ? `${previousTrailTile.x},${previousTrailTile.y}` : '',
@@ -9626,7 +9627,7 @@ export class MenuScene extends Phaser.Scene {
       originY,
       tileSize,
       alphaMultiplier,
-      styleKey: `${this.boardTileStyle}|${this.boardZoomContainer.scaleX}|${this.boardZoomContainer.scaleY}|${this.settings.toggleTrailFade ? 1 : 0}|${gateMotionPlan.shineVisible ? 1 : 0}|${gateMotionPlan.colourDrifts ? 1 : 0}`
+      styleKey: `${this.boardTileStyle}|${this.boardZoomContainer.scaleX}|${this.boardZoomContainer.scaleY}|${gateSnappedOrigin?.x ?? ''},${gateSnappedOrigin?.y ?? ''}|${this.resolveBoardTileBackingScale()}|${this.settings.toggleTrailFade ? 1 : 0}|${gateMotionPlan.shineVisible ? 1 : 0}|${gateMotionPlan.colourDrifts ? 1 : 0}`
     };
     if (this.trailDrawRecord !== null) {
       observeTrailFrameCost(this.trailDrawRecord, time);
