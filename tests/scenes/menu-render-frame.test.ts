@@ -1082,7 +1082,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyContinuousPlayTrail(');
     expect(menuSceneSource).toContain('this.drawLegacyContinuousPlayTrail(time, mazeLeft, mazeTop, mazeTileSize, this.resolveLegacyRenderedTrailHeadPoint(time), menuTrailAlphaMultiplier);');
     expect(menuSceneSource).toContain('this.hasLegacyPlayTrailPulsePendingFrame(time)');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;');
+    // MAZER-PERF-003: the colour-only redraw cadence lives in src/render/trailColourRedraw.ts (33 ms full motion, 45 ms reduced).
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS');
     expect(menuSceneSource).toContain('private legacyPlayTrailPulseNextFrameAtMs = 0;');
     // The old per-cell pulse window is menu-only now -- the real play
     // trail draws its own shared shine inside drawLegacyContinuousPlayTrail.
@@ -1090,7 +1091,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('mazeRenderFrame.boardWidth,');
     expect(menuSceneSource).toContain('mazeRenderFrame.boardHeight,');
     expect(menuSceneSource).toContain("const active = this.isLegacyTrailColourDrifting() && this.overlay === 'none' && this.trail.length > 1;");
-    expect(menuSceneSource).toContain('this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;');
+    expect(menuSceneSource).toContain('stepTrailColourRedraw(time, this.legacyPlayTrailPulseNextFrameAtMs, this.prefersLegacyReducedMotion())');
+    // The bleed-dock glow shares that one schedule under reduced motion (it was redrawing every frame).
+    expect(menuSceneSource).toContain('this.hasLegacyBleedOffGlowPendingFrame() && (!this.prefersLegacyReducedMotion() || this.isLegacyColourRedrawDue(time))');
     expect(menuSceneSource).toContain('this.resolveLegacyPlayPerfectPathTrail()');
     expect(menuSceneSource).not.toContain('private resolveLegacyPointPathSource(');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start', time);");

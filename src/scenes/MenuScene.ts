@@ -40,6 +40,7 @@ import {
 } from '../render/reducedMotion';
 import { alignBoundsToWholePixels, alignCameraToWholePixels } from '../render/pixelAlignment';
 import { PlayerLocatorState } from '../render/playerLocator';
+import { stepTrailColourRedraw } from '../render/trailColourRedraw';
 import {
   PLAYER_MARKER,
   createPlayerMarkerFrame,
@@ -1491,7 +1492,6 @@ const LEGACY_OVERLAY_SCROLL_MOMENTUM_MIN_PX_PER_MS = 0.12;
 const LEGACY_OVERLAY_SCROLL_MOMENTUM_FRICTION_PER_MS = 0.994;
 const LEGACY_OVERLAY_SCROLL_MOMENTUM_STOP_PX_PER_MS = 0.02;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS;
-const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
 const LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS = 3200;
 const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 32;
@@ -2200,6 +2200,8 @@ export class MenuScene extends Phaser.Scene {
   // real frame.
   private legacyPlayMazeLifecyclePrevFrameMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
+  private legacyColourRedrawCheckedAtMs = -1;
+  private legacyColourRedrawDue = false;
   private legacyMenuTitleAnimationNextFrameAtMs = 0;
   // Edge markers (edgeMarkers.ts): the one-shot wrap flash and the station the
   // spawn laser is currently leaving from (energized while it fires).
@@ -3273,7 +3275,9 @@ export class MenuScene extends Phaser.Scene {
     if (this.playerLocatorState.needsRedraw()) {
       this.boardDynamicDirty = true;
     }
-    if (this.hasLegacyBleedOffGlowPendingFrame()) {
+    // The bleed-dock glow samples the trail colour every frame; under reduced motion that colour-only redraw shares the
+    // trail's lower cadence (MAZER-PERF-003). Full motion redraws every frame, unchanged.
+    if (this.hasLegacyBleedOffGlowPendingFrame() && (!this.prefersLegacyReducedMotion() || this.isLegacyColourRedrawDue(time))) {
       this.boardDynamicDirty = true;
     }
     if (this.hasLegacyPlayerVisualMotionPendingFrame(time)) {
@@ -10396,15 +10400,23 @@ export class MenuScene extends Phaser.Scene {
     // Redraws while the trail colour drifts, which includes reduced motion (colour keeps shifting).
     const active = this.isLegacyTrailColourDrifting() && this.overlay === 'none' && this.trail.length > 1;
     if (!active) {
-      this.legacyPlayTrailPulseNextFrameAtMs = 0;
       return false;
     }
-    if (time < this.legacyPlayTrailPulseNextFrameAtMs) {
-      return false;
-    }
+    return this.isLegacyColourRedrawDue(time);
+  }
 
-    this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;
-    return true;
+  // One colour-redraw schedule per frame, shared by the trail and the bleed-dock glow so they redraw together rather
+  // than doubling the rate. Colour-only redraws run at a lower rate under reduced motion (MAZER-PERF-003,
+  // src/render/trailColourRedraw.ts); full motion keeps the 33 ms cadence.
+  private isLegacyColourRedrawDue(time: number): boolean {
+    if (time === this.legacyColourRedrawCheckedAtMs) {
+      return this.legacyColourRedrawDue;
+    }
+    const step = stepTrailColourRedraw(time, this.legacyPlayTrailPulseNextFrameAtMs, this.prefersLegacyReducedMotion());
+    this.legacyPlayTrailPulseNextFrameAtMs = step.nextDueAtMs;
+    this.legacyColourRedrawCheckedAtMs = time;
+    this.legacyColourRedrawDue = step.due;
+    return step.due;
   }
 
   // Movement no longer has a fixed on-screen widget at all -- the board is
