@@ -35,6 +35,11 @@
  * concentric with the tile edge and never leaves the cap's outline). Open-side corners keep the chip radius.
  * Without radii (any other tile, the Guide icon) the shapes are unchanged.
  *
+ * Morph (MAZER-VIS-028): while the marker glides on or off such a tile the closed corners do not switch between the two
+ * shapes: `tileCornerBlend` (0..1, see playerRingMorph.ts) moves each closed corner radius from the chip radius (0) to
+ * the cap's concentric arc (1). 1 is exactly the end-tile shape above, 0 exactly the plain chip ring, so the resting
+ * frames are unchanged.
+ *
  * Reduced motion: the glow, ring and keyline are static and the ping is never started.
  *
  * Cost: a handful of Graphics calls per dynamic redraw, no gradients, no canvas, and NO per-frame allocation
@@ -104,18 +109,26 @@ export const resolveLocatorCornerRadius = (halfExtent: number): number => halfEx
  * Corner radii of a locator square of half-extent `half` drawn on a tile of half-extent `tileHalf` whose own corner
  * radii are `tileRadii`. A closed (rounded) tile corner gives the tile's arc offset by `half - tileHalf` (the same
  * centre, so concentric with the tile edge), never more than `half` (a full semicircle); a square (open-side) corner
- * keeps the chip proportion. Pure; fills and returns `out`.
+ * keeps the chip proportion. `blend` (default 1) moves the closed corners from the chip proportion (0) to that arc
+ * (1) for the cap / chip morph; 0 and 1 return the two shapes exactly, with no rounding drift. Pure; fills and
+ * returns `out`.
  */
 export const resolveLocatorSquareRadii = (
   half: number,
   tileHalf: number,
   tileRadii: LocatorTileRadii,
-  out: LocatorCornerRadii
+  out: LocatorCornerRadii,
+  blend = 1
 ): LocatorCornerRadii => {
   const uniform = resolveLocatorCornerRadius(half);
-  const corner = (tileRadius: number): number => (
-    tileRadius > 0 ? Math.min(half, Math.max(0, tileRadius + (half - tileHalf))) : uniform
-  );
+  const t = Number.isFinite(blend) ? Math.max(0, Math.min(1, blend)) : 1;
+  const corner = (tileRadius: number): number => {
+    if (tileRadius <= 0 || t <= 0) {
+      return uniform;
+    }
+    const arc = Math.min(half, Math.max(0, tileRadius + (half - tileHalf)));
+    return t >= 1 ? arc : uniform + ((arc - uniform) * t);
+  };
   out.tl = corner(tileRadii[0]);
   out.tr = corner(tileRadii[1]);
   out.br = corner(tileRadii[2]);
@@ -129,23 +142,26 @@ const RADII_SCRATCH: LocatorCornerRadii = { tl: 0, tr: 0, bl: 0, br: 0 };
 const squareRadius = (
   half: number,
   tileHalf: number,
-  tileRadii: LocatorTileRadii | null
+  tileRadii: LocatorTileRadii | null,
+  blend: number
 ): number | LocatorCornerRadii => (
-  tileRadii === null
+  tileRadii === null || blend <= 0
     ? resolveLocatorCornerRadius(half)
-    : resolveLocatorSquareRadii(half, tileHalf, tileRadii, RADII_SCRATCH)
+    : resolveLocatorSquareRadii(half, tileHalf, tileRadii, RADII_SCRATCH, blend)
 );
 
 const fillSquare = (
-  g: LocatorGraphics, cx: number, cy: number, half: number, tileHalf: number, tileRadii: LocatorTileRadii | null
+  g: LocatorGraphics, cx: number, cy: number, half: number, tileHalf: number,
+  tileRadii: LocatorTileRadii | null, blend: number
 ): void => {
-  g.fillRoundedRect(cx - half, cy - half, half * 2, half * 2, squareRadius(half, tileHalf, tileRadii));
+  g.fillRoundedRect(cx - half, cy - half, half * 2, half * 2, squareRadius(half, tileHalf, tileRadii, blend));
 };
 
 const strokeSquare = (
-  g: LocatorGraphics, cx: number, cy: number, half: number, tileHalf: number, tileRadii: LocatorTileRadii | null
+  g: LocatorGraphics, cx: number, cy: number, half: number, tileHalf: number,
+  tileRadii: LocatorTileRadii | null, blend: number
 ): void => {
-  g.strokeRoundedRect(cx - half, cy - half, half * 2, half * 2, squareRadius(half, tileHalf, tileRadii));
+  g.strokeRoundedRect(cx - half, cy - half, half * 2, half * 2, squareRadius(half, tileHalf, tileRadii, blend));
 };
 
 export interface PlayerLocatorMetrics {
@@ -243,6 +259,8 @@ export interface PlayerLocatorDrawInput {
   reducedMotion: boolean;
   /** The tile's own corner radii when it is a start / goal tile (see the header); omitted elsewhere. */
   tileCornerRadii?: LocatorTileRadii | null;
+  /** 0..1 share of that cap shape the closed corners take (the cap / chip morph); omitted = 1 (the full cap shape). */
+  tileCornerBlend?: number;
 }
 
 /** Paints glow, ring, ping and the core keyline. Call BEFORE the player's own fill so the core stays on top. */
@@ -256,6 +274,7 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
   const { centerX: cx, centerY: cy } = input;
   const half = input.tileSize / 2;
   const tileRadii = input.tileCornerRadii ?? null;
+  const blend = input.tileCornerBlend ?? 1;
   // The glow and the ping start at the ring's outer edge, or at the tile edge where the ring is left out.
   const innerRadius = m.ringVisible ? m.ringHalfCss : half;
 
@@ -264,13 +283,13 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
   g.fillStyle(boardMaterial.player, perStep * alpha);
   for (let i = 0; i < k.glowSteps; i += 1) {
     const r = innerRadius + ((m.glowHalfCss - innerRadius) * (1 - (i / k.glowSteps)));
-    fillSquare(g, cx, cy, r, half, tileRadii);
+    fillSquare(g, cx, cy, r, half, tileRadii, blend);
   }
 
   // 2. the ring: the player's cell lit in the player's colour, inside the tile.
   if (m.ringVisible) {
     g.lineStyle(m.ringStrokeCss, boardMaterial.player, k.ringAlpha * alpha);
-    strokeSquare(g, cx, cy, m.ringHalfCss, half, tileRadii);
+    strokeSquare(g, cx, cy, m.ringHalfCss, half, tileRadii, blend);
   }
 
   // 3. find-me ping: expanding rings (never in reduced motion; the caller also never starts one).
@@ -285,9 +304,9 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
       const radius = innerRadius + ((m.pingTravelHalfCss - innerRadius) * eased);
       const fade = k.pingPeakAlpha * (1 - t) * alpha;
       g.lineStyle(k.pingStrokeCss + k.pingKeylineExtraCss, boardMaterial.void, fade * 0.7);
-      strokeSquare(g, cx, cy, radius, half, tileRadii);
+      strokeSquare(g, cx, cy, radius, half, tileRadii, blend);
       g.lineStyle(k.pingStrokeCss, boardMaterial.playerEdge, fade);
-      strokeSquare(g, cx, cy, radius, half, tileRadii);
+      strokeSquare(g, cx, cy, radius, half, tileRadii, blend);
     }
   }
 

@@ -8,7 +8,13 @@
  * under the trail width, but a real offset that varies per cell on fractional DPRs). `buildDeviceSnappedTrailPath` is
  * `buildContinuousTrailPath` with the projection swapped for the marker's own, so a head at the marker's cell is at the
  * marker's exact centre and mid-glide it is at the marker's interpolated centre. Everything after the projection (corner
- * rounding, trimming, geometry) is the same navigationCoreTrail.ts code. Pure; no Phaser import.
+ * rounding, trimming, geometry) is the same navigationCoreTrail.ts code.
+ *
+ * Wall bump (MAZER-VIS-029): a blocked move nudges the marker by a few whole css px (`resolveWallBumpNudge`,
+ * MAZER-MOTION-003). `headOffset` moves ONLY the live head (the path's last point) by that same offset, so the head
+ * stays on the marker's centre and no sliver of trail shows beside the marker during the nudge; the rest of the trail
+ * stays on the board's tiles. A zero or absent offset is the unchanged path (same points, same geometry).
+ * Pure; no Phaser import.
  */
 import type { LegacyPoint } from '../legacy-runtime/legacyMaze';
 import {
@@ -32,6 +38,8 @@ export interface DeviceSnappedTrailPathOptions {
   devicePixelRatio: number;
   cornerRadiusRatio: number;
   playerTrimRatio: number;
+  /** The marker's wall-bump nudge (whole css px) to apply to the head only. Omitted or zero: no change. */
+  headOffset?: { x: number; y: number } | null;
 }
 
 export const createDeviceSnappedTrailProjector = (
@@ -48,9 +56,17 @@ export const buildDeviceSnappedTrailPath = (options: DeviceSnappedTrailPathOptio
   const project = createDeviceSnappedTrailProjector(
     options.tileSize, options.devicePixelRatio, options.originX, options.originY
   );
-  const rounded = splitGridPathAtDiscontinuities(options.gridPath).map((subpath) => (
-    roundPolylineCorners(subpath.map(project), options.tileSize * options.cornerRadiusRatio)
-  ));
+  const offset = options.headOffset ?? null;
+  const shiftHead = offset !== null && (offset.x !== 0 || offset.y !== 0);
+  const projected = splitGridPathAtDiscontinuities(options.gridPath).map((subpath) => subpath.map(project));
+  if (shiftHead && projected.length > 0) {
+    const lastSubpath = projected[projected.length - 1]!;
+    const head = lastSubpath[lastSubpath.length - 1];
+    if (head !== undefined) {
+      lastSubpath[lastSubpath.length - 1] = { x: head.x + offset.x, y: head.y + offset.y };
+    }
+  }
+  const rounded = projected.map((subpath) => roundPolylineCorners(subpath, options.tileSize * options.cornerRadiusRatio));
   if (rounded.length > 0) {
     const lastIndex = rounded.length - 1;
     rounded[lastIndex] = trimPolylineEnd(rounded[lastIndex]!, options.tileSize * options.playerTrimRatio);
