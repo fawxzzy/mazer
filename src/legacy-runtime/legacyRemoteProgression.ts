@@ -1,5 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  claimLegacyProfileEnsureAttempt,
+  ensureLegacyRemoteProfile
+} from './legacyProfileEnsure';
+import {
   LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID,
   createLegacyAuthScopedStorage,
   getLegacyAuthClient,
@@ -60,6 +64,9 @@ export const LEGACY_REMOTE_AI_PROGRESSION_TABLE = 'mazer_ai_progression_states';
 export const LEGACY_REMOTE_CYCLE_RECEIPTS_TABLE = 'mazer_cycle_receipts';
 export const LEGACY_REMOTE_PROGRESSION_TABLE = 'mazer_progression_states';
 export const LEGACY_REMOTE_PROFILE_TABLE = 'mazer_profiles';
+const PROFILE_ENSURE_SETTINGS_SCOPE = 'settings-write';
+const PROFILE_ENSURE_ALREADY_ATTEMPTED_DETAIL = 'mazer_profile_ensure_already_attempted';
+const PROFILE_ENSURE_NO_ROW_DETAIL = 'mazer_profile_ensure_returned_no_row';
 export const LEGACY_REMOTE_AI_RUNNER_KEY = 'menu-runner';
 export const LEGACY_REMOTE_ACCOUNT_SYNC_STORAGE_KEY = 'mazer.remote-account-sync.v1';
 export const LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY = 'mazer.remote-completion-outbox.v1';
@@ -547,35 +554,46 @@ export const bootstrapLegacyRemoteAccountState = async (
 
   let settings = localSettings;
   let settingsRevision: number | null = metadata?.settingsRevision ?? null;
-  if (profileRead.row) {
+  let profileRow = profileRead.row;
+  let profileJustCreated = false;
+  if (!profileRow && !profileRead.error) {
+    // An account created on the shared account host has no Mazer profile row.
+    // One idempotent server-side ensure per bootstrap call (no retry loop); a failure is a
+    // diagnostics entry only and never blocks sign-in or progression.
+    const ensured = await ensureLegacyRemoteProfile(client, snapshot.userId, snapshot.displayName);
+    if (ensured.ok) {
+      const created = await readRemoteProfileRow(client, snapshot.userId);
+      if (created.error) {
+        errors.push(created.error);
+      } else {
+        profileRow = created.row;
+        profileJustCreated = created.row !== null;
+      }
+    } else if (ensured.error) {
+      errors.push(ensured.error);
+    }
+  }
+  if (profileRow) {
     const remoteSettings = {
       ...localSettings,
-      ...normalizeRemoteProfileSettings(profileRead.row, LEGACY_DEFAULTS)
+      ...normalizeRemoteProfileSettings(profileRow, LEGACY_DEFAULTS)
     };
     const localFingerprint = fingerprintSettings(localSettings);
-    const hasUnsyncedLocalSettings = metadata !== null
+    // A freshly created row only holds server defaults: this device's
+    // settings are the canonical ones to push, exactly as the retired direct
+    // insert did, so they are not replaced by defaults on the next load.
+    const hasUnsyncedLocalSettings = profileJustCreated || (metadata !== null
       && metadata.settingsFingerprint !== null
-      && localFingerprint !== metadata.settingsFingerprint;
+      && localFingerprint !== metadata.settingsFingerprint);
     settings = hasUnsyncedLocalSettings ? localSettings : remoteSettings;
-    settingsRevision = profileRead.row.revision;
+    settingsRevision = profileRow.revision;
     if (hasUnsyncedLocalSettings) {
-      const update = await updateRemoteProfileRow(client, snapshot, settings, profileRead.row.revision);
+      const update = await updateRemoteProfileRow(client, snapshot, settings, profileRow.revision);
       if (update.error) {
         errors.push(update.error);
       } else if (update.revision !== null) {
         settingsRevision = update.revision;
       }
-    }
-  } else if (!profileRead.error) {
-    const { data, error } = await client
-      .from(LEGACY_REMOTE_PROFILE_TABLE)
-      .insert(createRemoteProfilePayload(snapshot, settings, 0))
-      .select('revision')
-      .maybeSingle();
-    if (error) {
-      errors.push(error.message);
-    } else {
-      settingsRevision = data ? normalizeRevision(data.revision) : 0;
     }
   }
 
@@ -1945,19 +1963,33 @@ export const writeLegacyRemoteSettings = async (
       });
     }
     if (!remote.row) {
-      const { data, error } = await client
-        .from(LEGACY_REMOTE_PROFILE_TABLE)
-        .insert(createRemoteProfilePayload(snapshot, settings, 0))
-        .select('revision')
-        .maybeSingle();
-      if (error) {
+      // No Mazer profile row yet (account created on the shared host). One
+      // ensure per session for this path; if it cannot be created the write is
+      // reported as not synced and settings stay local.
+      if (!claimLegacyProfileEnsureAttempt(PROFILE_ENSURE_SETTINGS_SCOPE, snapshot.userId)) {
         return createLegacyRemoteProgressionSyncResult('settings', {
-          error: error.message,
+          error: PROFILE_ENSURE_ALREADY_ATTEMPTED_DETAIL,
           skippedReason: null,
           synced: false
         });
       }
-      expectedRevision = data ? normalizeRevision(data.revision) : 0;
+      const ensured = await ensureLegacyRemoteProfile(client, snapshot.userId, snapshot.displayName);
+      if (!ensured.ok) {
+        return createLegacyRemoteProgressionSyncResult('settings', {
+          error: ensured.error,
+          skippedReason: null,
+          synced: false
+        });
+      }
+      const created = await readRemoteProfileRow(client, snapshot.userId);
+      if (created.error || !created.row) {
+        return createLegacyRemoteProgressionSyncResult('settings', {
+          error: created.error ?? PROFILE_ENSURE_NO_ROW_DETAIL,
+          skippedReason: null,
+          synced: false
+        });
+      }
+      expectedRevision = created.row.revision;
     } else {
       return createLegacyRemoteProgressionSyncResult('settings', {
         error: 'Reload account settings before replacing the canonical preferences.',
