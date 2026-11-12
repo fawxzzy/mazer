@@ -120,11 +120,14 @@ re-running a baseline, cannot change the result by itself.
 - The production AI is clean on most generated boards (rank A/S had no
   mistakes in the representative pack), so most cases score 100 and AI
   pressure 0. Discrimination comes from the long-tail and weak-AI targets.
-- `ai-runner-calibration.ts` calls `createLegacyGeneratedMenuMaze(scale, seed)`
-  while that function takes `(width, height, seed, ...)`, so the calibration
-  script's `seed` becomes the maze height. It is outside this change and left
-  as is; the seed-pack runner uses the correct production entry point.
+- `ai-runner-calibration.ts` once called `createLegacyGeneratedMenuMaze(scale, seed)`
+  with the wrong argument order. That was fixed in `52d212bf` (it now passes
+  `(scale, scale, seed)`); the seed-pack runner always used the correct
+  production entry point.
 - Baselines record one runner build; they are evidence about the current
   commit's behavior, not a quality gate.
 - Replaying candidate progression formulas against these packs is a separate
   work item.
+- Update 2026-11-12: baselines were regenerated on current `main` with no
+  `resultDigest` drift, and per-band thresholds now live in
+  `docs/ops/MAZER-AI-RUN-CALIBRATION-THRESHOLDS-2026-11-12.md`.
