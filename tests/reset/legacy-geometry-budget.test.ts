@@ -222,11 +222,13 @@ describe('continuous difficulty function D(level)', () => {
     expect(GEOMETRY_BUDGET_CEILING).toBe(760);
     expect(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL).toBe(198);
     expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(759);
-    // Fringe capacity of the finished top maze (same script): 70 cells, one more per level.
-    expect(GEOMETRY_BUDGET_FRINGE_CAP).toBe(70);
+    // Fringe capacity of the finished top maze (same script): 20 cells, one more per level. It was 70
+    // while the fringe could carve 1-cell stubs; the one-tile stub rule (MAZER-GEN-004) leaves room
+    // for 2- and 3-cell stubs only, and the same calibration (95 percent of bases) gives 20 on desktop.
+    expect(GEOMETRY_BUDGET_FRINGE_CAP).toBe(20);
     expect(GEOMETRY_BUDGET_FRINGE_STEP).toBe(1);
-    expect(GEOMETRY_BUDGET_FRINGE_END_LEVEL).toBe(268);
-    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(268);
+    expect(GEOMETRY_BUDGET_FRINGE_END_LEVEL).toBe(218);
+    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(218);
   });
 
   test('the fringe is exactly one step more per level from the felt saturation to the end of the fringe', () => {

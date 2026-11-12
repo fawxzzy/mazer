@@ -184,6 +184,14 @@ export interface LegacyMazeSnapshot {
   fringeStats?: {
     cells: number;
   };
+  // One-tile stub rule (legacyMazeStubs.ts, MAZER-GEN-004): how the ladder tuner cleared the dead-end
+  // nubs it was left with: cells opened to lengthen a stub to MIN_DEAD_END_BRANCH_CELLS, tips walled
+  // up, and tips walled up unverified as the last resort (forced). Absent when the maze had none.
+  stubStats?: {
+    lengthened: number;
+    removed: number;
+    forced: number;
+  };
   // Reverse-solve resistance of a ladder maze (legacyGeometryBudget.ts, the double lure): the felt
   // explorer run from the goal to the start, minus the priced savings, and the floor of the level
   // it was held to (reverseFelt >= floor). Present on every budget-ladder maze (levels 2 and up).

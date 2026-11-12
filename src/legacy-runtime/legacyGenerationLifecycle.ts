@@ -29,6 +29,7 @@ import {
   resolveGeometryBudgetWrapRungs
 } from './legacyGeometryBudget';
 import { LEGACY_EMPTY_LOOP_PLAN, type LegacyLoopPlan } from './legacyMazeLoops';
+import { forceRemoveOneTileStubs } from './legacyMazeStubs';
 import { FELT_TIE_DEVIATION_LIMIT_PERCENT, FELT_WRAP_PRICE_PERCENT, tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
@@ -754,6 +755,13 @@ const assembleTunedMaze = (
     : null;
   const solutionPath = routed !== null && routed.found ? routed.path : base.solutionPath;
   const next: Omit<LegacyMazeSnapshot, 'generation'> = { ...base, grid: tuned.grid, solutionPath };
+  // Last resort of the one-tile stub rule (legacyMazeStubs.ts): a tip the tuner could not clear
+  // without moving the landed felt number is walled up anyway (a leaf: route, connectivity, start
+  // and goal are untouched). Reported in stubStats.forced; expected to be 0 on every maze.
+  const forcedStubs = tuned.stubRemaining > 0 ? forceRemoveOneTileStubs(next as typeof next & { grid: boolean[][] }) : [];
+  if (tuned.stubLengthened.length > 0 || tuned.stubRemoved.length > 0 || forcedStubs.length > 0) {
+    next.stubStats = { lengthened: tuned.stubLengthened.length, removed: tuned.stubRemoved.length, forced: forcedStubs.length };
+  }
   if (tuned.loops.length > 0) {
     next.loopStats = {
       alternates: tuned.loops.filter((loop) => loop.kind === 'alternate').length,
@@ -791,8 +799,8 @@ const assembleTunedMaze = (
   if (base.generationBuildTrace) {
     next.generationBuildTrace = {
       ...base.generationBuildTrace,
-      decoyTiles: [...tuned.loopTiles, ...tuned.stretchTiles, ...tuned.addedTiles, ...tuned.fringeTiles].map((point) => ({ ...point })),
-      decoyPrunedTiles: [...tuned.stretchRemovedTiles, ...tuned.trimmedTiles].map((point) => ({ ...point }))
+      decoyTiles: [...tuned.loopTiles, ...tuned.stretchTiles, ...tuned.addedTiles, ...tuned.fringeTiles, ...tuned.stubLengthened].map((point) => ({ ...point })),
+      decoyPrunedTiles: [...tuned.stretchRemovedTiles, ...tuned.trimmedTiles, ...tuned.stubRemoved, ...forcedStubs].map((point) => ({ ...point }))
     };
   }
   return next;

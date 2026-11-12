@@ -28,11 +28,11 @@ describe('Phase 2 hazard hand-off stays dormant', () => {
   });
 
   test('the hand-off reports the owed hazard budget as level - saturation, with nothing active', () => {
-    // The fringe (199 to the saturation level 268; the mastery tier that briefly extended it to 388 is gone) owes nothing to hazards either.
-    for (const level of [1, 2, 50, 198, 267, GEOMETRY_BUDGET_SATURATION_LEVEL - 1]) {
+    // The fringe (199 to the saturation level 218; the mastery tier that briefly extended it to 388 is gone) owes nothing to hazards either.
+    for (const level of [1, 2, 50, 198, 217, GEOMETRY_BUDGET_SATURATION_LEVEL - 1]) {
       expect(resolveLegacyHazardHandoff(level)).toMatchObject({ geometrySaturated: false, hazardBudgetLevels: 0, hazardsActive: false });
     }
-    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(268);
+    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(218);
     for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, GEOMETRY_BUDGET_SATURATION_LEVEL + 1, 300, 388, 500, 1000, 1_000_000]) {
       const handoff = resolveLegacyHazardHandoff(level);
       expect(handoff.geometrySaturated).toBe(true);
