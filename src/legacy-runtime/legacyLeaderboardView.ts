@@ -53,8 +53,8 @@ export const LEGACY_LEADERBOARD_COPY = Object.freeze({
   emptyHeading: 'No ranks yet',
   errorBody: 'Something went wrong on our side. Try again in a moment.',
   errorHeading: 'Leaderboard unavailable',
+  editName: 'Edit name',
   exit: 'Back to Menu',
-  goToAccount: 'Go to Account',
   loading: 'Loading the leaderboard…',
   needsUsernameBody: 'Players appear on the leaderboard by username.',
   needsUsernameHeading: 'Choose a username',
@@ -177,6 +177,8 @@ export interface LegacyLeaderboardSelfRowModel {
   tier: LegacyLeaderboardRankTier;
   /** The player's saved username (ellipsis-safe), or null when it is not known. */
   usernameText: string | null;
+  /** Label of the `Edit name` control on this row (the whole pinned row is its hit target). */
+  editLabel: string;
   levelText: string;
   /** True when the You row repeats a row that is in the loaded list. */
   inList: boolean;
@@ -198,7 +200,8 @@ const buildSelfRow = (
   const levelText = formatLegacyProgressionOrdinal(selfRank.playerLevel);
   const name = selfUsername.trim();
   return {
-    accessibilityLabel: `You are rank ${rankText}, level ${levelText}`,
+    accessibilityLabel: `You are rank ${rankText}, level ${levelText}. ${LEGACY_LEADERBOARD_COPY.editName}`,
+    editLabel: LEGACY_LEADERBOARD_COPY.editName,
     inList: loadedRankKeys.has(normalizeLegacyProgressionOrdinal(selfRank.rank)),
     label: LEGACY_LEADERBOARD_COPY.you,
     levelText,
@@ -233,7 +236,7 @@ export interface LegacyLeaderboardViewOptions {
 export type LegacyLeaderboardActionId =
   | 'retry-username'
   | 'retry-page'
-  | 'go-to-account'
+  | 'edit-username'
   | 'sign-in';
 
 export interface LegacyLeaderboardAction {
@@ -258,7 +261,7 @@ export interface LegacyLeaderboardStateModel {
   heading: string | null;
   text: string;
   tone: 'info' | 'muted' | 'error';
-  /** At most one action (Retry / Go to Account / Sign in). */
+  /** At most one action (Retry / Edit name / Sign in). */
   action: LegacyLeaderboardAction | null;
 }
 
@@ -290,7 +293,7 @@ export interface LegacyLeaderboardViewModel {
 
 const RETRY_USERNAME: LegacyLeaderboardAction = Object.freeze({ id: 'retry-username', label: LEGACY_LEADERBOARD_COPY.retry });
 const RETRY_PAGE: LegacyLeaderboardAction = Object.freeze({ id: 'retry-page', label: LEGACY_LEADERBOARD_COPY.retry });
-const GO_TO_ACCOUNT: LegacyLeaderboardAction = Object.freeze({ id: 'go-to-account', label: LEGACY_LEADERBOARD_COPY.goToAccount });
+const EDIT_USERNAME: LegacyLeaderboardAction = Object.freeze({ id: 'edit-username', label: LEGACY_LEADERBOARD_COPY.editName });
 const SIGN_IN: LegacyLeaderboardAction = Object.freeze({ id: 'sign-in', label: LEGACY_LEADERBOARD_COPY.signIn });
 
 const base = (
@@ -314,7 +317,7 @@ const COPY = LEGACY_LEADERBOARD_COPY;
 const STATES = Object.freeze({
   empty: { action: null, heading: COPY.emptyHeading, kind: 'empty', text: COPY.emptyBody, tone: 'muted' },
   error: { action: RETRY_PAGE, heading: COPY.errorHeading, kind: 'error', text: COPY.errorBody, tone: 'error' },
-  needsUsername: { action: GO_TO_ACCOUNT, heading: COPY.needsUsernameHeading, kind: 'needs-username', text: COPY.needsUsernameBody, tone: 'muted' },
+  needsUsername: { action: EDIT_USERNAME, heading: COPY.needsUsernameHeading, kind: 'needs-username', text: COPY.needsUsernameBody, tone: 'muted' },
   notSetUp: { action: RETRY_PAGE, heading: COPY.notSetUpHeading, kind: 'not-set-up', text: COPY.notSetUpBody, tone: 'muted' },
   offline: { action: RETRY_PAGE, heading: COPY.offlineHeading, kind: 'offline', text: COPY.offlineBody, tone: 'info' },
   profileLoading: { action: null, heading: null, kind: 'profile-loading', text: COPY.profileLoading, tone: 'info' },

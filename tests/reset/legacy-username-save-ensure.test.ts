@@ -118,13 +118,17 @@ describe('saveLegacyAccountUsername with a missing profile row', () => {
 });
 
 describe('MenuScene no longer discards a failed username save', () => {
-  test('every saveLegacyAccountUsername call site reports a failure to the player', async () => {
+  test('every saveLegacyAccountUsername use reports a failure to the player', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/scenes/MenuScene.ts', 'utf8').replace(/\r\n?/g, '\n');
-    expect(source.match(/await saveLegacyAccountUsername\(|void saveLegacyAccountUsername\(/g)?.length).toBe(2);
-    expect(source.match(/this\.reportAccountUsernameSaveFailure\(saveResult\.failure \?\? 'failed', saveResult\.error\)/g)?.length).toBe(2);
-    expect(source).toContain("this.reportAccountUsernameSaveFailure('taken', null)");
-    expect(source).toContain("this.reportAccountUsernameSaveFailure('try-again', availability.error)");
+    // The sign-up branch calls it directly; the leaderboard username editor hands it to
+    // submitLegacyUsernameEdit as the `save` service (taken / try-again are decided there,
+    // tests/reset/legacy-leaderboard-username-editor.test.ts) and toasts the outcome.
+    expect(source.match(/await saveLegacyAccountUsername\(|void saveLegacyAccountUsername\(/g)?.length).toBe(1);
+    expect(source).toContain('save: saveLegacyAccountUsername');
+    expect(source.match(/this\.reportAccountUsernameSaveFailure\(saveResult\.failure \?\? 'failed', saveResult\.error\)/g)?.length).toBe(1);
+    expect(source).toContain('this.reportAccountUsernameSaveFailure(outcome.failure, outcome.technicalDetail)');
+    expect(source).toContain("this.reportAccountUsernameSaveFailure('invalid', null)");
     expect(source).toContain('this.pushLegacyPlayerMessage(resolveLegacyUsernameSaveFailureMessage(kind, technicalDetail))');
   });
 });

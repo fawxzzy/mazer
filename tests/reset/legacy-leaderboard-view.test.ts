@@ -171,13 +171,13 @@ describe('leaderboard view-model: designed states (no raw error text)', () => {
     expect(view.state).toMatchObject({ action: { id: 'sign-in', label: 'Sign in' }, kind: 'signed-out' });
   });
 
-  test('username gate: loading is a status line, unavailable retries, needs-username goes to Account', () => {
+  test('username gate: loading is a status line, unavailable retries, needs-username opens the name editor', () => {
     expect(buildLegacyLeaderboardViewModel(state({ usernameGate: 'loading' })).state)
       .toMatchObject({ action: null, heading: null, kind: 'profile-loading' });
     expect(buildLegacyLeaderboardViewModel(state({ usernameGate: 'unavailable' })).state)
       .toMatchObject({ action: { id: 'retry-username' }, kind: 'profile-unavailable' });
     expect(buildLegacyLeaderboardViewModel(state({ usernameGate: 'needs-username' })).state)
-      .toMatchObject({ action: { id: 'go-to-account', label: 'Go to Account' }, kind: 'needs-username' });
+      .toMatchObject({ action: { id: 'edit-username', label: 'Edit name' }, kind: 'needs-username' });
     expect(buildLegacyLeaderboardViewModel(state({ usernameGate: 'needs-username' })).phase).toBe('gate');
   });
 

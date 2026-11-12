@@ -73,3 +73,22 @@ route, plus the fixture identity check in the RPC wrappers). Shapes: `top3` (you
 (painting only). Tests: `legacy-leaderboard-view`, `legacy-leaderboard-overlay-plan` (9 shapes x 3 viewports),
 `legacy-leaderboard-fixture`, plus pins in `menu-render-frame` and the message-inventory guard.
 Guide: it does not describe the leaderboard, so no Guide copy changed (drift test unchanged).
+
+## Username editor (MAZER-ACCT-011, 2026-11-12)
+
+Accounts created on the account host get a generated `Mazer-######` handle and Mazer has no Account-sheet editor any more,
+so the Leaderboard carries a small one. The pinned You row shows an `EDIT NAME` chip (the whole 56 px row is the hit
+target) and the `Choose a username` gate's action is `Edit name` (it used to say `Go to Account`, which led nowhere).
+Either opens an inline editor in the same sheet (`legacyLeaderboardUsernameEditor.ts`: state machine, verdict, save
+orchestration, view-model, layout): title `Edit name`, a 48 px field with a transparent shadow `<input>` over it
+(autocapitalize/autocorrect/autocomplete/spellcheck off, maxlength 15, password-manager opt-out attributes), a short hint,
+and `Cancel` / `Save` side by side (48 px each). The card is top-aligned on a phone so field and buttons end about 216 px from
+the top and stay above the soft keyboard (320x568 included). Validation is `LEGACY_USERNAME_PATTERN` (not reimplemented);
+whitespace is trimmed on Save; the same name just closes; a case-only rename skips the availability check. Save runs
+`mazer_is_username_available` then `saveLegacyAccountUsername` (profile ensure + one retry). Errors are the existing
+username toasts (taken / invalid / try again / generic), shown just under the card so they never cover the buttons; no
+new sentence was added (labels and a non-sentence hint only, so `legacyPlayerMessage.ts` is untouched). Success closes the
+editor, updates the pinned row at once and refreshes the page without the skeleton (`loadLeaderboard({ keepRows: true })`).
+Cancel: Escape, Back, Cancel, or a tap outside the card. Static (no animation, caret does not blink), so reduced motion
+needs no gate. Deleted as dead: `accountUsernameActive`, the unreachable canvas keydown editor, the debounced autosave.
+Left in place: the `authForm.mode === 'signup'` branch (larger, with its own tests; separate cleanup).

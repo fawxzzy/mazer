@@ -462,6 +462,23 @@ import {
   type LegacyLeaderboardSelfRank
 } from '../legacy-runtime/legacyLeaderboard';
 import {
+  CLOSED_LEGACY_USERNAME_EDITOR_STATE,
+  LEGACY_USERNAME_EDITOR_AUTOFILL_OPT_OUT,
+  LEGACY_USERNAME_EDITOR_INPUT_ATTRIBUTES,
+  LEGACY_USERNAME_EDITOR_COPY,
+  LEGACY_USERNAME_EDITOR_SIZES,
+  buildLegacyUsernameEditorPlan,
+  buildLegacyUsernameEditorViewModel,
+  cancelLegacyUsernameEditor,
+  changeLegacyUsernameEditorDraft,
+  createLegacyUsernameEditorFixtureServices,
+  finishLegacyUsernameEditor,
+  openLegacyUsernameEditor,
+  submitLegacyUsernameEdit,
+  submitLegacyUsernameEditor,
+  type LegacyUsernameEditorState
+} from '../legacy-runtime/legacyLeaderboardUsernameEditor';
+import {
   buildLegacyLeaderboardOverlayPlan,
   resolveLegacyLeaderboardRowScreenRect,
   type LegacyLeaderboardOverlayPlan
@@ -1696,17 +1713,20 @@ export class MenuScene extends Phaser.Scene {
   // account-screen username field edits an already-signed-in profile, a
   // different concern with its own save/availability-check lifecycle, so
   // it gets its own small parallel state instead of conflating the two.
-  private accountUsernameDraft = '';
   private accountUsernameSavedValue = '';
   private accountUsernameLoadedForUserId: string | null = null;
   private accountUsernameHydrationPending = false;
   private accountUsernameHydrationError = false;
-  private accountUsernameActive = false;
   private accountUsernameSequence = 0;
-  private accountUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private accountUsernameNativeInput: HTMLInputElement | null = null;
   private accountUsernameNativeInputHandler: ((event: Event) => void) | null = null;
   private accountUsernameNativeKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
+  // Leaderboard username editor (MAZER-ACCT-011): state machine in legacyLeaderboardUsernameEditor.ts;
+  // the native input above is its text field. The sequence ignores a save that a cancel/close outlived.
+  private leaderboardUsernameEditor: LegacyUsernameEditorState = CLOSED_LEGACY_USERNAME_EDITOR_STATE;
+  private leaderboardUsernameEditorSequence = 0;
+  // Top of the message toast while the editor is open: just under the card, so it never covers Save/Cancel.
+  private leaderboardUsernameEditorToastTop: number | null = null;
   private authUnsubscribe: (() => void) | null = null;
   private mazeSeed = DEFAULT_LEGACY_RUNTIME_SEED;
   private explicitRuntimeMazeSeed = false;
@@ -2512,10 +2532,6 @@ export class MenuScene extends Phaser.Scene {
       this.authUnsubscribe = null;
       this.destroyLegacyAuthNativeInput();
       this.destroyAccountUsernameNativeInput();
-      if (this.accountUsernameDebounceTimer !== null) {
-        clearTimeout(this.accountUsernameDebounceTimer);
-        this.accountUsernameDebounceTimer = null;
-      }
       this.detachRuntimeDiagnostics();
       this.detachLegacyPlayFocusGuards();
       this.detachLegacyPlayKeyboardFallback();
@@ -4206,7 +4222,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (
       this.overlay !== 'none'
-      && (this.handleOverlayFieldInput(event) || this.handleLegacyAuthFieldInput(event) || this.handleAccountUsernameFieldInput(event))
+      && (this.handleOverlayFieldInput(event) || this.handleLegacyAuthFieldInput(event) || this.handleLeaderboardUsernameEditorKey(event))
     ) {
       event.preventDefault();
       return true;
@@ -11638,7 +11654,9 @@ export class MenuScene extends Phaser.Scene {
       case 'retry-page':
         void this.loadLeaderboard();
         return;
-      case 'go-to-account':
+      case 'edit-username':
+        this.openLeaderboardUsernameEditor();
+        return;
       case 'sign-in':
         this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface());
         return;
@@ -11679,6 +11697,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private buildLeaderboardOverlay(): void {
+    if (this.leaderboardUsernameEditor.phase !== 'closed') {
+      this.buildLeaderboardUsernameEditorOverlay();
+      return;
+    }
     const view = buildLegacyLeaderboardViewModel(this.resolveLegacyLeaderboardViewState());
     const plan = buildLegacyLeaderboardOverlayPlan(
       view,
@@ -11724,6 +11746,7 @@ export class MenuScene extends Phaser.Scene {
     }
     if (plan.selfRow !== null) {
       this.paintLegacyLeaderboardSelfRow(plan.selfRow);
+      this.uiButtons.push(this.createLegacyLeaderboardEditNameHit(plan.selfRow));
     }
     if (plan.stateBlock !== null) {
       this.paintLegacyLeaderboardState(plan.stateBlock);
@@ -11857,6 +11880,11 @@ export class MenuScene extends Phaser.Scene {
     this.addLegacyLeaderboardText(rect.left + self.rankCenterX, centerY, model.rankText, material.rail.mint, 19, 0.5, 52, { bold: true });
     if (model.usernameText !== null) {
       this.addLegacyLeaderboardText(rect.left + self.nameLeft, centerY - 10, model.label.toUpperCase(), material.rail.mint, 11, 0, self.nameMaxWidth, { bold: true, alpha: 0.9 });
+      // `Edit name` chip beside the YOU label; the whole row is the hit target (self.editHit).
+      const chipLeft = rect.left + self.nameLeft + 36;
+      graphics.lineStyle(1, material.rail.mint, 0.6);
+      graphics.strokeRoundedRect(chipLeft + 0.5, centerY - 19.5, 66, 18, 9);
+      this.addLegacyLeaderboardText(chipLeft + 33, centerY - 10, model.editLabel.toUpperCase(), material.rail.mint, 10, 0.5, 62, { bold: true });
       this.addLegacyLeaderboardText(rect.left + self.nameLeft, centerY + 9, model.usernameText, material.rail.white, 15, 0, self.nameMaxWidth, { bold: true });
     } else {
       this.addLegacyLeaderboardText(rect.left + self.nameLeft, centerY, model.label, material.rail.mint, 17, 0, self.nameMaxWidth, { bold: true });
@@ -12408,7 +12436,6 @@ export class MenuScene extends Phaser.Scene {
     // network at all -- purely cosmetic/local, never actually persisted or
     // validated anywhere real.
     if (userId === LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID) {
-      this.accountUsernameDraft = 'qa-player';
       this.accountUsernameSavedValue = 'qa-player';
       this.accountUsernameHydrationPending = false;
       this.uiDirty = true;
@@ -12433,11 +12460,7 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
-      this.accountUsernameDraft = result.username ?? '';
       this.accountUsernameSavedValue = result.username ?? '';
-      if (this.accountUsernameNativeInput) {
-        this.accountUsernameNativeInput.value = this.accountUsernameDraft;
-      }
       this.uiDirty = true;
     }).catch(() => {
       if (sequence !== this.accountUsernameSequence || this.authSnapshot.userId !== userId) {
@@ -12449,94 +12472,299 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private handleAccountUsernameChange(nextValue: string): void {
-    this.accountUsernameDraft = nextValue;
-    this.uiDirty = true;
-    this.scheduleAccountUsernameEvaluation();
-  }
-
-  private scheduleAccountUsernameEvaluation(): void {
-    if (this.accountUsernameDebounceTimer !== null) {
-      clearTimeout(this.accountUsernameDebounceTimer);
-      this.accountUsernameDebounceTimer = null;
-    }
-    // Bumped unconditionally (even on the early-return branches below) so
-    // any in-flight check/save from a previous keystroke is invalidated
-    // the instant the field changes again, not just when a new debounced
-    // check is actually scheduled.
-    this.accountUsernameSequence += 1;
-    const sequence = this.accountUsernameSequence;
-
-    const candidate = this.accountUsernameDraft.trim();
-    if (candidate.length === 0 || candidate === this.accountUsernameSavedValue) {
-      this.uiDirty = true;
+  // Leaderboard username editor (MAZER-ACCT-011). State machine, verdict, save
+  // orchestration, view-model and layout live in legacyLeaderboardUsernameEditor.ts;
+  // the scene only paints the plan, owns the shadow <input> and runs the services.
+  // Cancel is Escape / Back (handleBackAction), the Cancel button and a scrim tap.
+  private openLeaderboardUsernameEditor(): void {
+    if (this.overlay !== 'leaderboard' || this.authSnapshot.status !== 'authenticated') {
       return;
     }
-
-    if (!LEGACY_USERNAME_PATTERN.test(candidate)) {
-      this.uiDirty = true;
-      return;
-    }
-
+    this.leaderboardUsernameEditorSequence += 1;
+    this.leaderboardUsernameEditor = openLegacyUsernameEditor(this.accountUsernameSavedValue);
     this.uiDirty = true;
-
-    this.accountUsernameDebounceTimer = setTimeout(() => {
-      this.accountUsernameDebounceTimer = null;
-      void this.evaluateAndSaveAccountUsername(candidate, sequence);
-    }, 700);
   }
 
-  private async evaluateAndSaveAccountUsername(candidate: string, sequence: number): Promise<void> {
+  private closeLeaderboardUsernameEditor(): void {
+    if (this.leaderboardUsernameEditor.phase === 'closed' && this.accountUsernameNativeInput === null) {
+      return;
+    }
+    // A save that is still in flight is not cancelled, only ignored by the editor UI.
+    this.leaderboardUsernameEditorSequence += 1;
+    this.leaderboardUsernameEditor = cancelLegacyUsernameEditor();
+    this.destroyAccountUsernameNativeInput();
+    this.uiDirty = true;
+  }
+
+  private submitLeaderboardUsernameEditor(): void {
     const userId = this.authSnapshot.userId;
     if (userId === null) {
       return;
     }
-
-    // mazer_is_username_available checks the whole table, including the
-    // caller's own existing row -- it has no way to know which row is
-    // "self". That's fine for a brand-new name, but a case-only rename
-    // (e.g. "bob" -> "Bob") always case-insensitively matches the caller's
-    // own current row and would be misreported as taken, permanently
-    // blocking the save client-side even though mazer_set_username below
-    // would happily apply it. Skip the availability gate for that one case;
-    // the unique index (and the RPC's own error handling) is still the
-    // real collision authority for every other candidate.
-    const isSelfCaseOnlyRename = candidate.toLowerCase() === this.accountUsernameSavedValue.toLowerCase();
-    const availability = isSelfCaseOnlyRename
-      ? { available: true, error: null }
-      : await checkLegacyUsernameAvailable(candidate);
-    if (sequence !== this.accountUsernameSequence) {
+    const submit = submitLegacyUsernameEditor(this.leaderboardUsernameEditor);
+    if (submit.kind === 'ignored') {
       return;
     }
-
-    if (availability.error) {
-      this.reportAccountUsernameSaveFailure('try-again', availability.error);
+    if (submit.kind === 'invalid') {
+      this.reportAccountUsernameSaveFailure('invalid', null);
       this.uiDirty = true;
       return;
     }
-
-    if (availability.available === false) {
-      this.reportAccountUsernameSaveFailure('taken', null);
-      this.uiDirty = true;
+    if (submit.kind === 'unchanged') {
+      this.closeLeaderboardUsernameEditor();
       return;
     }
-
+    this.leaderboardUsernameEditor = submit.state;
+    this.leaderboardUsernameEditorSequence += 1;
+    const sequence = this.leaderboardUsernameEditorSequence;
     this.uiDirty = true;
-    const saveResult = await saveLegacyAccountUsername(userId, candidate);
-    if (sequence !== this.accountUsernameSequence) {
-      return;
-    }
-
-    if (!saveResult.ok) {
-      this.reportAccountUsernameSaveFailure(saveResult.failure ?? 'failed', saveResult.error);
+    const services = userId === LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID
+      ? createLegacyUsernameEditorFixtureServices()
+      : { checkAvailable: checkLegacyUsernameAvailable, save: saveLegacyAccountUsername };
+    void submitLegacyUsernameEdit(
+      { candidate: submit.candidate, caseOnlyRename: submit.caseOnlyRename, userId },
+      services
+    ).then((outcome) => {
+      if (this.authSnapshot.userId !== userId) {
+        return;
+      }
+      const current = sequence === this.leaderboardUsernameEditorSequence;
+      if (outcome.kind === 'saved') {
+        this.accountUsernameSavedValue = outcome.username;
+        this.accountUsernameLoadedForUserId = userId;
+        if (current) {
+          this.leaderboardUsernameEditor = finishLegacyUsernameEditor(this.leaderboardUsernameEditor, outcome);
+          this.destroyAccountUsernameNativeInput();
+        }
+        if (this.overlay === 'leaderboard') {
+          void this.loadLeaderboard({ keepRows: true });
+        }
+      } else if (current) {
+        this.leaderboardUsernameEditor = finishLegacyUsernameEditor(this.leaderboardUsernameEditor, outcome);
+        this.reportAccountUsernameSaveFailure(outcome.failure, outcome.technicalDetail);
+      }
       this.uiDirty = true;
-      return;
-    }
+    });
+  }
 
-    this.accountUsernameSavedValue = candidate;
+  // Enter saves (also when the shadow input is not focused); Escape is left to the shared
+  // back action. Typing falls back to the canvas only when the input does not hold focus.
+  private handleLeaderboardUsernameEditorKey(event: KeyboardEvent): boolean {
+    if (this.overlay !== 'leaderboard' || this.leaderboardUsernameEditor.phase === 'closed') {
+      return false;
+    }
+    if (event.key === 'Enter') {
+      this.submitLeaderboardUsernameEditor();
+      return true;
+    }
+    const input = this.accountUsernameNativeInput;
+    if (input !== null && typeof document !== 'undefined' && document.activeElement === input) {
+      return false;
+    }
+    if (event.key === 'Backspace') {
+      this.changeLeaderboardUsernameEditorDraft(this.leaderboardUsernameEditor.draft.slice(0, -1));
+      return true;
+    }
+    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) {
+      return false;
+    }
+    this.changeLeaderboardUsernameEditorDraft(`${this.leaderboardUsernameEditor.draft}${event.key}`);
+    return true;
+  }
+
+  private changeLeaderboardUsernameEditorDraft(raw: string): void {
+    this.leaderboardUsernameEditor = changeLegacyUsernameEditorDraft(this.leaderboardUsernameEditor, raw);
+    if (this.accountUsernameNativeInput && this.accountUsernameNativeInput.value !== this.leaderboardUsernameEditor.draft) {
+      this.accountUsernameNativeInput.value = this.leaderboardUsernameEditor.draft;
+    }
     this.uiDirty = true;
   }
 
+  // The transparent text input over the painted field (the same shadow-input technique as
+  // the auth fields, so the OS keyboard, paste and IME work). Capitalisation, correction,
+  // spellcheck and autofill are off; maxlength is 15.
+  private syncLeaderboardUsernameNativeInput(
+    field: { height: number; left: number; top: number; width: number },
+    busy: boolean
+  ): void {
+    const canvas = this.game.canvas;
+    if (typeof document === 'undefined' || typeof window === 'undefined' || !canvas) {
+      return;
+    }
+    let input = this.accountUsernameNativeInput;
+    const created = input === null;
+    if (input === null) {
+      input = document.createElement('input');
+      const attributes = LEGACY_USERNAME_EDITOR_INPUT_ATTRIBUTES;
+      input.type = attributes.type;
+      input.name = attributes.name;
+      input.autocomplete = attributes.autocomplete;
+      input.inputMode = attributes.inputMode;
+      input.enterKeyHint = attributes.enterKeyHint;
+      input.autocapitalize = attributes.autocapitalize;
+      input.spellcheck = attributes.spellcheck;
+      input.maxLength = attributes.maxLength;
+      input.setAttribute('autocorrect', attributes.autocorrect);
+      input.setAttribute('aria-label', LEGACY_USERNAME_EDITOR_COPY.fieldAriaLabel);
+      input.setAttribute('data-mazer-username-input', 'leaderboard');
+      for (const [name, value] of Object.entries(LEGACY_USERNAME_EDITOR_AUTOFILL_OPT_OUT)) {
+        input.setAttribute(name, value);
+      }
+      Object.assign(input.style, {
+        position: 'fixed',
+        zIndex: '2147483647',
+        opacity: '0.01',
+        background: 'transparent',
+        color: 'transparent',
+        caretColor: 'transparent',
+        border: '0',
+        outline: '0',
+        padding: '0',
+        margin: '0'
+      });
+      const target = input;
+      this.accountUsernameNativeInputHandler = () => {
+        this.changeLeaderboardUsernameEditorDraft(target.value);
+      };
+      this.accountUsernameNativeKeyDownHandler = (event: KeyboardEvent) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          event.stopPropagation();
+          this.submitLeaderboardUsernameEditor();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          this.handleBackAction();
+        }
+      };
+      input.addEventListener('input', this.accountUsernameNativeInputHandler);
+      input.addEventListener('keydown', this.accountUsernameNativeKeyDownHandler);
+      input.value = this.leaderboardUsernameEditor.draft;
+      document.body.appendChild(input);
+      this.accountUsernameNativeInput = input;
+    }
+    if (input.value !== this.leaderboardUsernameEditor.draft) {
+      input.value = this.leaderboardUsernameEditor.draft;
+    }
+    input.readOnly = busy;
+    const cssRect = resolveLegacyAuthInputCssRect(
+      { height: field.height, width: field.width, x: field.left + (field.width / 2), y: field.top + (field.height / 2) },
+      canvas.getBoundingClientRect(),
+      this.layout
+    );
+    input.style.left = `${cssRect.left}px`;
+    input.style.top = `${cssRect.top}px`;
+    input.style.width = `${Math.max(1, cssRect.width)}px`;
+    input.style.height = `${cssRect.height}px`;
+    if (created) {
+      const focusTarget = input;
+      window.setTimeout(() => focusTarget.focus({ preventScroll: true }), 0);
+    }
+  }
+
+  private buildLeaderboardUsernameEditorOverlay(): void {
+    const view = buildLegacyUsernameEditorViewModel(this.leaderboardUsernameEditor);
+    const plan = buildLegacyUsernameEditorPlan(
+      view,
+      this.layout.width,
+      this.layout.height,
+      readMazerViewportGeometry().safeArea
+    );
+    const material = cyberArcadeMaterial;
+    this.leaderboardUsernameEditorToastTop = Math.round(plan.card.top + plan.card.height + 8);
+    // A tap on the scrim outside the card cancels the editor (handleOverlayScrimPointerDown -> handleBackAction).
+    this.overlayScrimCloseBounds = createVisualRect(plan.card.left, plan.card.top, plan.card.width, plan.card.height);
+    this.drawLegacySheetCard(plan.card);
+    this.createOverlayTitle(plan.title.text, plan.title.centerY);
+
+    const field = plan.field;
+    const g = this.overlayGraphics;
+    const edge = view.fieldInvalid ? material.signal.goal : material.rail.mint;
+    g.fillStyle(material.substrate.fieldRaised, 1);
+    g.fillRoundedRect(field.left, field.top, field.width, field.height, 10);
+    g.lineStyle(view.fieldInvalid ? 2 : 1.5, edge, view.fieldInvalid ? 0.95 : 0.75);
+    g.strokeRoundedRect(field.left + 0.5, field.top + 0.5, field.width - 1, field.height - 1, 10);
+    const textLeft = field.left + LEGACY_USERNAME_EDITOR_SIZES.fieldPadX;
+    const textWidth = field.width - (LEGACY_USERNAME_EDITOR_SIZES.fieldPadX * 2);
+    const hasValue = view.fieldValue.length > 0;
+    const valueText = this.addLegacyLeaderboardText(
+      textLeft,
+      field.top + (field.height / 2),
+      hasValue ? view.fieldValue : view.placeholder,
+      hasValue ? material.rail.white : material.rail.muted,
+      LEGACY_USERNAME_EDITOR_SIZES.fieldFontSize,
+      0,
+      textWidth,
+      { alpha: hasValue ? 1 : 0.7 }
+    );
+    if (hasValue && !view.busy) {
+      // Static caret: nothing animates in this sheet, so reduced motion needs no gate.
+      const caretX = Math.min(textLeft + textWidth, textLeft + Math.max(0, valueText.width - 16) + 2);
+      g.fillStyle(material.rail.mint, 0.9);
+      g.fillRect(Math.round(caretX), field.top + 12, 2, field.height - 24);
+    }
+    this.addLegacyLeaderboardText(
+      plan.hint.left,
+      plan.hint.centerY,
+      view.hint,
+      view.hintTone === 'error' ? material.signal.goal : material.rail.muted,
+      LEGACY_USERNAME_EDITOR_SIZES.hintFontSize,
+      0,
+      plan.hint.maxWidth
+    );
+
+    this.uiButtons.push(this.createLegacyAuthActionButton(
+      plan.cancel.left + (plan.cancel.width / 2),
+      plan.cancel.top + (plan.cancel.height / 2),
+      plan.cancel.width,
+      plan.cancel.height,
+      view.cancel.label,
+      () => this.handleBackAction(),
+      'secondary'
+    ));
+    this.uiButtons.push(this.createLegacyAuthActionButton(
+      plan.save.left + (plan.save.width / 2),
+      plan.save.top + (plan.save.height / 2),
+      plan.save.width,
+      plan.save.height,
+      view.save.label,
+      () => this.submitLeaderboardUsernameEditor(),
+      'primary',
+      undefined,
+      { disabled: !view.save.enabled }
+    ));
+    this.syncLeaderboardUsernameNativeInput(field, view.busy);
+  }
+
+  // The pinned You row is the `Edit name` hit target (56 px tall, full card width): a
+  // transparent interactive rect; the visible chip is painted by paintLegacyLeaderboardSelfRow.
+  private createLegacyLeaderboardEditNameHit(self: NonNullable<LegacyLeaderboardOverlayPlan['selfRow']>): UiButton {
+    const hit = self.editHit;
+    const background = this.add.rectangle(
+      hit.left + (hit.width / 2),
+      hit.top + (hit.height / 2),
+      hit.width,
+      hit.height,
+      0x000000,
+      0.001
+    );
+    background.setInteractive({ useHandCursor: true });
+    background.on('pointerdown', () => this.openLeaderboardUsernameEditor());
+    const label = this.add.text(hit.left, hit.top, '', { fontFamily: LEGACY_UI_FONT_FAMILY, fontSize: '1px' }).setVisible(false);
+    this.uiTexts.push(label);
+    return {
+      background,
+      bounds: createVisualRect(hit.left, hit.top, hit.width, hit.height),
+      label,
+      semanticAction: 'leaderboard-edit-name',
+      setActive: () => undefined,
+      text: self.model.editLabel,
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+      }
+    };
+  }
   // A username save that did not land is told to the player in plain words;
   // the provider text stays in the message's technicalDetail.
   private reportAccountUsernameSaveFailure(
@@ -12559,38 +12787,6 @@ export class MenuScene extends Phaser.Scene {
     this.accountUsernameNativeInput = null;
     this.accountUsernameNativeInputHandler = null;
     this.accountUsernameNativeKeyDownHandler = null;
-  }
-
-  // Desktop keyboard fallback, mirroring handleLegacyAuthFieldInput --
-  // the native shadow input above is the primary mechanism (real mobile
-  // keyboards/autofill), this covers keydown events reaching the canvas
-  // directly.
-  private handleAccountUsernameFieldInput(event: KeyboardEvent): boolean {
-    if (this.overlay !== 'auth' || !this.accountUsernameActive) {
-      return false;
-    }
-
-    if (event.key === 'Enter' || event.key === 'Escape') {
-      this.accountUsernameActive = false;
-      this.uiDirty = true;
-      return true;
-    }
-
-    if (event.key === 'Backspace') {
-      this.handleAccountUsernameChange(this.accountUsernameDraft.slice(0, -1));
-      return true;
-    }
-
-    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) {
-      return false;
-    }
-
-    if (this.accountUsernameDraft.length >= 15) {
-      return true;
-    }
-
-    this.handleAccountUsernameChange(`${this.accountUsernameDraft}${event.key}`);
-    return true;
   }
 
   private createAuthFooterLink(
@@ -12745,7 +12941,9 @@ export class MenuScene extends Phaser.Scene {
     const safeArea = readMazerViewportGeometry().safeArea;
     const padX = 14;
     const padY = 8;
-    let y = Math.round(safeArea.top + 156);
+    let y = this.overlay === 'leaderboard' && this.leaderboardUsernameEditor.phase !== 'closed' && this.leaderboardUsernameEditorToastTop !== null
+      ? this.leaderboardUsernameEditorToastTop
+      : Math.round(safeArea.top + 156);
     this.playerMessageToastTexts.forEach((text, index) => {
       const row = frame.rows[index];
       if (!row) {
@@ -13688,8 +13886,7 @@ export class MenuScene extends Phaser.Scene {
     this.pendingAuthGateTransition = false;
     this.activeAuthField = null;
     this.destroyLegacyAuthNativeInput();
-    this.destroyAccountUsernameNativeInput();
-    this.accountUsernameActive = false;
+    this.closeLeaderboardUsernameEditor();
     this.startPlayMode();
     this.rebuildUi();
     this.publishVisualDiagnostics(this.time.now, true);
@@ -13762,7 +13959,6 @@ export class MenuScene extends Phaser.Scene {
       const usernameToSave = this.authForm.username.trim();
       void saveLegacyAccountUsername(result.snapshot.userId, usernameToSave).then((saveResult) => {
         if (saveResult.ok) {
-          this.accountUsernameDraft = usernameToSave;
           this.accountUsernameSavedValue = usernameToSave;
           this.accountUsernameLoadedForUserId = result.snapshot.userId;
           this.uiDirty = true;
@@ -14354,10 +14550,13 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGuideGraphics = null;
   }
 
-  private async loadLeaderboard(): Promise<void> {
+  // keepRows: a refresh after a rename keeps the rows on screen instead of the skeleton.
+  private async loadLeaderboard(options: { keepRows?: boolean } = {}): Promise<void> {
     const sequence = ++this.leaderboardSequence;
     const request = resolveLegacyLeaderboardRequest();
-    this.leaderboardStatus = 'loading';
+    if (options.keepRows !== true) {
+      this.leaderboardStatus = 'loading';
+    }
     this.leaderboardErrorMessage = null;
     this.uiDirty = true;
 
@@ -14516,8 +14715,9 @@ export class MenuScene extends Phaser.Scene {
       // and focused at the auth layer's high z-index underneath whatever
       // overlay opens next (e.g. Account -> Reset Progress).
       this.destroyLegacyAuthNativeInput();
-      this.destroyAccountUsernameNativeInput();
-      this.accountUsernameActive = false;
+    }
+    if (previousOverlay === 'leaderboard' && kind !== 'leaderboard') {
+      this.closeLeaderboardUsernameEditor();
     }
     this.quitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
     if (kind === 'pause') {
@@ -14586,8 +14786,9 @@ export class MenuScene extends Phaser.Scene {
     }
     if (this.overlay === 'auth') {
       this.destroyLegacyAuthNativeInput();
-      this.destroyAccountUsernameNativeInput();
-      this.accountUsernameActive = false;
+    }
+    if (this.overlay === 'leaderboard') {
+      this.closeLeaderboardUsernameEditor();
     }
     const returnOverlay = (this.overlay === 'auth' || this.overlay === 'confirm-progression-reset')
       ? this.overlayReturn
@@ -14624,8 +14825,6 @@ export class MenuScene extends Phaser.Scene {
 
   private closeLegacyAuthOverlayToMainMenu(): void {
     this.destroyLegacyAuthNativeInput();
-    this.destroyAccountUsernameNativeInput();
-    this.accountUsernameActive = false;
     this.resetLegacyOverlayScrollState();
     if (this.mode !== 'menu') {
       this.enterMenuMode();
@@ -14954,14 +15153,8 @@ export class MenuScene extends Phaser.Scene {
       this.accountUsernameLoadedForUserId = null;
       this.accountUsernameHydrationPending = false;
       this.accountUsernameHydrationError = false;
-      this.accountUsernameDraft = '';
       this.accountUsernameSavedValue = '';
-      this.accountUsernameActive = false;
-      this.destroyAccountUsernameNativeInput();
-      if (this.accountUsernameDebounceTimer !== null) {
-        clearTimeout(this.accountUsernameDebounceTimer);
-        this.accountUsernameDebounceTimer = null;
-      }
+      this.closeLeaderboardUsernameEditor();
       const hydrationSequence = ++this.authAccountHydrationSequence;
       this.loadPersistedLegacyGameToggleSettings();
       this.loadPersistedMazeCycleTelemetryHistory();
@@ -15434,6 +15627,11 @@ export class MenuScene extends Phaser.Scene {
     // -- the account overlay can only close by actually signing in (see
     // pendingAuthGateTransition in update()).
     if ((this.authGateLocked || this.isLegacyPasswordRecoveryActive()) && this.overlay === 'auth') {
+      return;
+    }
+    // The username editor sits on top of the Leaderboard sheet: back cancels it first.
+    if (this.overlay === 'leaderboard' && this.leaderboardUsernameEditor.phase !== 'closed') {
+      this.closeLeaderboardUsernameEditor();
       return;
     }
     // The Guide sits on top of its Settings sheet: back returns to Settings first.
