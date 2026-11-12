@@ -1,7 +1,8 @@
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
-  LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL
+  LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL,
+  resolveLegacyOAuthFailureCopy
 } from './legacyPlayerMessage';
 import {
   MAZER_OAUTH_AUTH_SESSION_KEY,
@@ -40,6 +41,9 @@ export interface LegacyAuthSessionSnapshot {
   displayName: string | null;
   email: string | null;
   error: string | null;
+  // Diagnostics only: the internal sign-in failure code behind `error`. Never
+  // drawn to the player; present only when a shared-account callback failed.
+  errorCode?: string | null;
   info: string | null;
   status: LegacyAuthStatus;
   userId: string | null;
@@ -406,7 +410,7 @@ const resolveCanonicalUsername = (user: User): string | null => {
 export const createLegacyAuthSessionSnapshot = (
   session: Session | null,
   env: Record<string, string | undefined> = readRuntimeEnv(),
-  overrides: Partial<Pick<LegacyAuthSessionSnapshot, 'error' | 'info'>> = {}
+  overrides: Partial<Pick<LegacyAuthSessionSnapshot, 'error' | 'errorCode' | 'info'>> = {}
 ): LegacyAuthSessionSnapshot => {
   const configured = isLegacyAuthConfigured(env);
   const user = session?.user ?? null;
@@ -428,6 +432,7 @@ export const createLegacyAuthSessionSnapshot = (
     displayName: resolveDisplayName(user),
     email: user.email ?? null,
     error: overrides.error ?? null,
+    ...(overrides.errorCode ? { errorCode: overrides.errorCode } : {}),
     info: overrides.info ?? null,
     status: 'authenticated',
     userId: user.id
@@ -732,6 +737,10 @@ export const isLegacyPasswordRecoveryRuntimeLocation = (
 
 export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSessionSnapshot> => {
   const oauthBootResult = readMazerOAuthBootResult();
+  // Class-specific player copy plus the internal code (diagnostics only).
+  const oauthBootFailure = oauthBootResult.status === 'failed'
+    ? { error: resolveLegacyOAuthFailureCopy(oauthBootResult.category), errorCode: oauthBootResult.category }
+    : null;
   if (isMazerOAuthSessionQuarantined()) {
     await recoverMazerOAuthSessionQuarantine();
     if (isMazerOAuthSessionQuarantined()) {
@@ -741,8 +750,8 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
   const client = await getLegacyAuthClient();
   if (!client) {
     const guestSnapshot = createLegacyGuestAuthSnapshot();
-    return oauthBootResult.status === 'failed'
-      ? { ...guestSnapshot, error: MAZER_OAUTH_SAFE_ERROR_MESSAGE }
+    return oauthBootFailure !== null
+      ? { ...guestSnapshot, ...oauthBootFailure }
       : guestSnapshot;
   }
 
@@ -757,9 +766,10 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
     return { ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE };
   }
   const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-    error: oauthBootResult.status === 'failed'
-      ? MAZER_OAUTH_SAFE_ERROR_MESSAGE
+    error: oauthBootFailure !== null
+      ? oauthBootFailure.error
       : error?.message ?? null,
+    ...(oauthBootFailure !== null ? { errorCode: oauthBootFailure.errorCode } : {}),
     info: oauthBootResult.status === 'connected' ? 'Account connected.' : null
   });
   if (snapshot.status === 'authenticated') {

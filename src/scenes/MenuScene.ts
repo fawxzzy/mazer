@@ -500,7 +500,9 @@ import {
   createLegacyPlayerMessage,
   enqueueLegacyPlayerMessage,
   expireLegacyPlayerMessageQueue,
+  isLegacyOAuthFailureCopy,
   resolveLegacyAuthFeedbackMessage,
+  resolveLegacyOAuthFailureCopy,
   resolveLegacyPasswordRecoveryError,
   resolveLegacyAuthValidationMessage,
   type LegacyQueuedPlayerMessage,
@@ -12617,7 +12619,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyCurrentAuthMessage(): LegacyPlayerMessage | null {
-    const feedbackMessage = resolveLegacyAuthFeedbackMessage(this.authSnapshot.error, this.authSnapshot.info);
+    const feedbackMessage = resolveLegacyAuthFeedbackMessage(
+      this.authSnapshot.error,
+      this.authSnapshot.info,
+      this.authSnapshot.errorCode
+    );
     if (feedbackMessage) {
       return feedbackMessage;
     }
@@ -12681,7 +12687,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private armLegacyAuthFeedbackMessage(): void {
-    const message = resolveLegacyAuthFeedbackMessage(this.authSnapshot.error, this.authSnapshot.info);
+    const message = resolveLegacyAuthFeedbackMessage(
+      this.authSnapshot.error,
+      this.authSnapshot.info,
+      this.authSnapshot.errorCode
+    );
     this.latestAuthFeedbackMessageExpiresAtMs = message
       ? this.time.now + LEGACY_AUTH_BOTTOM_FEEDBACK_DURATION_MS
       : Number.NEGATIVE_INFINITY;
@@ -12692,6 +12702,7 @@ export class MenuScene extends Phaser.Scene {
     this.authSnapshot = {
       ...this.authSnapshot,
       error: null,
+      errorCode: null,
       info: null
     };
     this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
@@ -14407,7 +14418,7 @@ export class MenuScene extends Phaser.Scene {
   private createLegacySignedOutOAuthFailure(): void {
     if (
       this.authSnapshot.status === 'authenticated'
-      || this.authSnapshot.error !== MAZER_OAUTH_SAFE_ERROR_MESSAGE
+      || !isLegacyOAuthFailureCopy(this.authSnapshot.error)
     ) {
       return;
     }
@@ -14416,7 +14427,7 @@ export class MenuScene extends Phaser.Scene {
     const feedback = this.padLegacyCompactUiText(this.add.text(
       this.layout.centerButtonX,
       this.layout.centerButtonY - this.layout.buttonHeight - (compact ? 24 : 28),
-      MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+      this.authSnapshot.error?.trim() ?? MAZER_OAUTH_SAFE_ERROR_MESSAGE,
       {
         align: 'center',
         color: '#ff9d9d',
@@ -14459,7 +14470,7 @@ export class MenuScene extends Phaser.Scene {
     this.authSubmitting = true;
     this.authOpeningStartedAtMs = -1;
     this.authOpeningTimedOut = false;
-    this.authSnapshot = { ...this.authSnapshot, error: null, info: null };
+    this.authSnapshot = { ...this.authSnapshot, error: null, errorCode: null, info: null };
     this.uiDirty = true;
     const result = await beginMazerOAuthAuthorization();
     if (result.status === 'failed') {
@@ -14467,7 +14478,8 @@ export class MenuScene extends Phaser.Scene {
       this.authOpeningStartedAtMs = null;
       this.authSnapshot = {
         ...this.authSnapshot,
-        error: MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+        error: resolveLegacyOAuthFailureCopy(result.category),
+        errorCode: result.category,
         info: null
       };
       this.uiDirty = true;

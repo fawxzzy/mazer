@@ -10,6 +10,7 @@ import {
   MAZER_OAUTH_AUTH_STORAGE_PROBE_KEY,
   MAZER_OAUTH_CLIENT_ID,
   MAZER_OAUTH_PENDING_KEY,
+  MAZER_OAUTH_PENDING_TTL_MS,
   MAZER_OAUTH_SESSION_QUARANTINE_KEY,
   MAZER_OAUTH_SESSION_LOCK_MAX_WAIT_MS,
   MAZER_OAUTH_TOKEN_TIMEOUT_MS,
@@ -410,7 +411,7 @@ describe('Mazer shared account contract', () => {
     ), storage, 2_000_000, storage)).toBe(false);
     expect(isMazerOAuthCallbackReadyForBoot(createLocation(
       `https://mazer.fawxzzy.com/?code=one-time-code&state=${pending.state}`
-    ), storage, 2_400_001, storage)).toBe(false);
+    ), storage, 2_000_000 + MAZER_OAUTH_PENDING_TTL_MS + 1, storage)).toBe(false);
 
     const sharedEpochDriftStorage = new MemoryStorage();
     await beginMazerOAuthAuthorization(createRuntime(sharedEpochDriftStorage));
@@ -696,24 +697,72 @@ describe('Mazer shared account contract', () => {
     const expiredRaw = expiredStorage.getItem(MAZER_OAUTH_PENDING_KEY);
     const expired = JSON.parse(expiredRaw ?? '{}');
     const expiredRuntime = createRuntime(expiredStorage);
-    expiredRuntime.now = () => 2_300_001;
+    expiredRuntime.now = () => 2_000_000 + MAZER_OAUTH_PENDING_TTL_MS + 1;
     await expect(consumeMazerOAuthCallback({
       code: 'code', malformed: false, providerError: false, requested: true, state: expired.state
     }, async () => createClient(createAccessToken().claims), expiredRuntime)).resolves.toEqual({
-      category: 'expired_or_missing_state', status: 'failed'
+      category: 'pending_expired', status: 'failed'
     });
     expect(expiredStorage.getItem(MAZER_OAUTH_PENDING_KEY)).toBeNull();
 
     const newerStorage = new MemoryStorage();
     newerStorage.setItem(MAZER_OAUTH_PENDING_KEY, expiredRaw ?? '');
     const mismatchedRuntime = createRuntime(newerStorage);
-    mismatchedRuntime.now = () => 2_300_001;
+    mismatchedRuntime.now = () => 2_000_000 + MAZER_OAUTH_PENDING_TTL_MS + 1;
     await expect(consumeMazerOAuthCallback({
       code: 'code', malformed: false, providerError: false, requested: true, state: 'y'.repeat(43)
     }, async () => createClient(createAccessToken().claims), mismatchedRuntime)).resolves.toEqual({
       category: 'expired_or_missing_state', status: 'failed'
     });
     expect(newerStorage.getItem(MAZER_OAUTH_PENDING_KEY)).toBe(expiredRaw);
+  });
+
+  test('pending window is 900 s (the account host window): just under passes, just over is pending_expired', async () => {
+    expect(MAZER_OAUTH_PENDING_TTL_MS).toBe(900_000);
+    const cases: ReadonlyArray<readonly [number, string]> = [
+      [0, 'cancelled'],
+      [299_999, 'cancelled'],
+      [300_001, 'cancelled'],
+      [899_999, 'cancelled'],
+      [900_000, 'cancelled'],
+      [900_001, 'pending_expired'],
+      [3_600_000, 'pending_expired']
+    ];
+    for (const [ageMs, category] of cases) {
+      const storage = new MemoryStorage();
+      await beginMazerOAuthAuthorization(createRuntime(storage));
+      const pending = JSON.parse(storage.getItem(MAZER_OAUTH_PENDING_KEY) ?? '{}');
+      const fetchImpl = vi.fn() as typeof fetch;
+      const runtime = createRuntime(storage, createLocation(), fetchImpl);
+      runtime.now = () => 2_000_000 + ageMs;
+      const callback = {
+        code: null, malformed: false, providerError: true, requested: true, state: pending.state
+      };
+      // The boot-time install-gate check uses the same window.
+      expect(isMazerOAuthCallbackReadyForBoot(createLocation(
+        `https://mazer.fawxzzy.com/?error=access_denied&state=${pending.state}`
+      ), storage, 2_000_000 + ageMs, storage), `ready at ${ageMs} ms`).toBe(category === 'cancelled');
+      await expect(
+        consumeMazerOAuthCallback(callback, async () => createClient(createAccessToken().claims), runtime),
+        `age ${ageMs} ms`
+      ).resolves.toEqual({ category, status: 'failed' });
+      // Single-use: the record is claimed (removed) either way, so a replay of
+      // the same callback can never find it again, however long the window.
+      expect(storage.getItem(MAZER_OAUTH_PENDING_KEY)).toBeNull();
+      runtime.now = () => 2_000_000;
+      await expect(
+        consumeMazerOAuthCallback(callback, async () => createClient(createAccessToken().claims), runtime)
+      ).resolves.toEqual({ category: 'expired_or_missing_state', status: 'failed' });
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  });
+
+  test('a missing pending record (callback opened in a different context) is expired_or_missing_state, not pending_expired', async () => {
+    const storage = new MemoryStorage();
+    await expect(consumeMazerOAuthCallback({
+      code: 'code', malformed: false, providerError: false, requested: true, state: 'x'.repeat(43)
+    }, async () => createClient(createAccessToken().claims), createRuntime(storage)))
+      .resolves.toEqual({ category: 'expired_or_missing_state', status: 'failed' });
   });
 
   test('treats provider cancellation as terminal, consumes pending state, and never exchanges', async () => {
