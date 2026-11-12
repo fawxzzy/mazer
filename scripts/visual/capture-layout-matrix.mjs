@@ -323,8 +323,11 @@ const captureViewport = async ({
   metadataDir,
   timeoutMs
 }) => {
+  // A viewport with `rotateFrom` loads at that size and is resized to its own size
+  // before capture, which is what an orientation change does to a live page.
+  const initialSize = viewport.rotateFrom ?? viewport;
   const context = await browser.newContext({
-    viewport: { width: viewport.width, height: viewport.height },
+    viewport: { width: initialSize.width, height: initialSize.height },
     deviceScaleFactor: 1,
     colorScheme: 'dark',
     reducedMotion: 'reduce'
@@ -365,11 +368,29 @@ const captureViewport = async ({
       timeout: Math.min(10_000, timeoutMs)
     }).catch(() => {});
     await page.waitForTimeout(250);
-    const diagnostics = await waitForLayoutDiagnostics(page, timeoutMs, {
+    let diagnostics = await waitForLayoutDiagnostics(page, timeoutMs, {
       route,
       url,
-      viewport
+      viewport: viewport.rotateFrom ? { ...viewport, ...viewport.rotateFrom } : viewport
     });
+    if (viewport.rotateFrom) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      const rotateStartedAt = Date.now();
+      for (;;) {
+        await page.waitForTimeout(250);
+        diagnostics = await waitForLayoutDiagnostics(page, timeoutMs, { route, url, viewport });
+        if (
+          diagnostics.viewport?.width === viewport.width
+          && diagnostics.viewport?.height === viewport.height
+        ) {
+          break;
+        }
+        if ((Date.now() - rotateStartedAt) >= timeoutMs) {
+          throw new Error(`Layout did not settle at ${viewport.width}x${viewport.height} after rotating back.`);
+        }
+      }
+      await page.waitForTimeout(250);
+    }
     const screenContract = buildVisualScreenContract({
       expectedRoute: route,
       actualUrl: page.url(),

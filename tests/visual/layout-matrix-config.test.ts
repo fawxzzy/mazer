@@ -48,4 +48,44 @@ describe('layout matrix config', () => {
     expect(resolveLayoutMatrixRoute(all[7], undefined, { design: 'recovery' })).toBe('/?profile=tv&theme=noir&design=recovery');
     expect(resolveLayoutMatrixRoute(all[5], '/?theme=ember', { design: 'recovery' })).toBe('/?theme=ember&design=recovery');
   });
+
+  test('pins the supported viewport matrix (320, 360, 390, 430, landscape, rotate-back, 768, 1440)', async () => {
+    const { resolveLayoutMatrixRoute, resolveLayoutMatrixViewports } = await loadConfig();
+
+    const supported = resolveLayoutMatrixViewports('supported');
+
+    expect(supported).toEqual([
+      { id: 'phone-320', label: 'Phone 320 (small)', width: 320, height: 568 },
+      { id: 'phone-360', label: 'Phone 360 (compact Android)', width: 360, height: 800 },
+      { id: 'phone-portrait', label: 'Phone Portrait', width: 390, height: 844 },
+      { id: 'phone-tall', label: 'Phone Tall', width: 430, height: 932 },
+      { id: 'phone-landscape', label: 'Phone Landscape', width: 844, height: 390 },
+      {
+        id: 'phone-rotate-back',
+        label: 'Phone Rotate Back (landscape to portrait)',
+        width: 390,
+        height: 844,
+        rotateFrom: { width: 844, height: 390 }
+      },
+      { id: 'tablet-portrait', label: 'Tablet Portrait', width: 768, height: 1024 },
+      { id: 'desktop', label: 'Desktop', width: 1440, height: 900 }
+    ]);
+    expect(new Set(supported.map((viewport: { id: string }) => viewport.id)).size).toBe(supported.length);
+    for (const viewport of supported) {
+      expect(resolveLayoutMatrixRoute(viewport)).toBe(
+        viewport.id === 'desktop' ? '/' : '/?profile=mobile&theme=aurora'
+      );
+    }
+  });
+
+  test('keeps the supported group out of `all` so the pinned groups cannot drift', async () => {
+    const { LAYOUT_MATRIX_PRESET_GROUPS, resolveLayoutMatrixViewports } = await loadConfig();
+
+    const allIds = resolveLayoutMatrixViewports('all').map((viewport: { id: string }) => viewport.id);
+
+    expect(allIds).toHaveLength(14);
+    expect(allIds).not.toContain('phone-320');
+    expect(allIds).not.toContain('phone-rotate-back');
+    expect(Object.keys(LAYOUT_MATRIX_PRESET_GROUPS)).toEqual(['core', 'extended', 'platform', 'supported']);
+  });
 });
