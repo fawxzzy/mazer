@@ -1,28 +1,28 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_f0e246f478a5",
+  "export_id": "pbe_mazer_owner_registry_b48297a3dd60",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:f0e246f478a59af0e3c690751f1eb080c3a855949aae0968788858ad5d2d2e21",
-  "generated_at": "2026-11-12T14:00:00.000Z",
+  "source_revision": "sha256:b48297a3dd601a724ee84a53f995bbbade3627882a81ea731a79a0f7078aaf81",
+  "generated_at": "2026-11-12T20:00:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:e47cb2853071f0339a2c6287c35bb97e5c74746e8605b25a95d3d30dfc502ca0",
-      "observed_at": "2026-11-12T14:00:00.000Z"
+      "revision": "sha256:5abc8081c3d0702316893405821ee3de3d581c039f4fe0f506745cbe215b4bbb",
+      "observed_at": "2026-11-12T20:00:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
       "kind": "markdown",
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
-      "revision": "sha256:26d79d909e70b4497dc623d27e65aed30d5ad9b57d14031d990fb82f5ca8828a",
-      "observed_at": "2026-11-12T14:00:00.000Z"
+      "revision": "sha256:d2cfb6a93c23d289ae5b1974e7903c13c59c780b62c465b9e0a8bad58a4f7a25",
+      "observed_at": "2026-11-12T20:00:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-12T14:00:00.000Z"
+      "observed_at": "2026-11-12T20:00:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-12T14:00:00.000Z"
+      "observed_at": "2026-11-12T20:00:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-12T14:00:00.000Z"
+      "observed_at": "2026-11-12T20:00:00.000Z"
     }
   ],
   "cards": [
@@ -843,26 +843,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-014_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-014",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Record the failure code on every sign-in boot failure path",
-        "description": "The sign-in failure code reaches diagnostics for callback failures (MAZER-ACCT-008), but the quarantine and session-read failure paths at boot still show generic copy with no code, so a report cannot tell them apart. Plan: carry the same code through those two paths. Not started.",
+        "title": "Record a failure code on every sign-in boot failure: deployed, device check pending",
+        "description": "PRs #453 and #454 are merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). Every boot and sign-in failure now records a stable code of the form oauth-failure followed by the code name in runtime diagnostics: the new codes session_quarantined, session_read_failed and portal_navigation_failed sit next to the existing callback codes. Player copy stays plain and never shows the code, so a code is only readable with the runtime diagnostics switch (MAZER-ACCT-031). Kept in review: nothing is checked on a real phone, and no test yet pins every emitted code to the class map (MAZER-PROG-017).",
         "card_type": "reliability",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-008"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-11T23:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-014",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -870,15 +870,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-014",
         "source_status": "current",
-        "source_updated_at": "2026-11-11T23:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "The sign-in failure code reaches diagnostics for callback failures (MAZER-ACCT-008), but the quarantine and session-read failure paths at boot still show generic copy with no code, so a report cannot tell them apart. Plan: carry the same code through those two paths. Not started.",
-        "objective": "The sign-in failure code reaches diagnostics for callback failures (MAZER-ACCT-008), but the quarantine and session-read failure paths at boot still show generic copy with no code, so a report cannot tell them apart. Plan: carry the same code through those two paths. Not started.",
+        "summary": "PRs #453 and #454 are merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). Every boot and sign-in failure now records a stable code of the form oauth-failure followed by the code name in runtime diagnostics: the new codes session_quarantined, session_read_failed and portal_navigation_failed sit next to the existing callback codes. Player copy stays plain and never shows the code, so a code is only readable with the runtime diagnostics switch (MAZER-ACCT-031). Kept in review: nothing is checked on a real phone, and no test yet pins every emitted code to the class map (MAZER-PROG-017).",
+        "objective": "PRs #453 and #454 are merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). Every boot and sign-in failure now records a stable code of the form oauth-failure followed by the code name in runtime diagnostics: the new codes session_quarantined, session_read_failed and portal_navigation_failed sit next to the existing callback codes. Player copy stays plain and never shows the code, so a code is only readable with the runtime diagnostics switch (MAZER-ACCT-031). Kept in review: nothing is checked on a real phone, and no test yet pins every emitted code to the class map (MAZER-PROG-017).",
         "acceptance_criteria": [
-          "Quarantine and session-read failures record a code in diagnostics",
-          "Player copy stays plain and never shows the code",
-          "Unit tests cover both paths"
+          "Quarantine and session-read failures record a code in diagnostics: merged and deployed (PRs #453, #454)",
+          "Player copy stays plain and never shows the code: merged and deployed",
+          "Unit tests cover both paths: merged; a test that pins every emitted code to the class map is MAZER-PROG-017"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -896,26 +896,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-015_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-015",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Check how long the sign-in failure message stays on screen",
-        "description": "Unconfirmed: the auth feedback timer may clear the sign-in failure message before a player can read it, which would hide the new failure copy (MAZER-ACCT-008). Measure the on-screen time in headless Chromium first, then decide whether the message should stay until dismissed or until the next sign-in attempt. Not started.",
+        "title": "Keep the sign-in failure message readable: deployed, device check pending",
+        "description": "Measured first, as planned: before the fix the failure toast stayed 5015 ms at boot and 17 ms after a Sign in tap, too short to read. PRs #453 and #454 (merged, live at Mazer main 476c4789, headless Chromium only) hold the failure line until the next sign-in attempt and keep the toast on screen at least 8000 ms. Kept in review: nothing is checked on a real phone.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-008"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-11T23:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-015",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -923,15 +923,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-015",
         "source_status": "current",
-        "source_updated_at": "2026-11-11T23:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "Unconfirmed: the auth feedback timer may clear the sign-in failure message before a player can read it, which would hide the new failure copy (MAZER-ACCT-008). Measure the on-screen time in headless Chromium first, then decide whether the message should stay until dismissed or until the next sign-in attempt. Not started.",
-        "objective": "Unconfirmed: the auth feedback timer may clear the sign-in failure message before a player can read it, which would hide the new failure copy (MAZER-ACCT-008). Measure the on-screen time in headless Chromium first, then decide whether the message should stay until dismissed or until the next sign-in attempt. Not started.",
+        "summary": "Measured first, as planned: before the fix the failure toast stayed 5015 ms at boot and 17 ms after a Sign in tap, too short to read. PRs #453 and #454 (merged, live at Mazer main 476c4789, headless Chromium only) hold the failure line until the next sign-in attempt and keep the toast on screen at least 8000 ms. Kept in review: nothing is checked on a real phone.",
+        "objective": "Measured first, as planned: before the fix the failure toast stayed 5015 ms at boot and 17 ms after a Sign in tap, too short to read. PRs #453 and #454 (merged, live at Mazer main 476c4789, headless Chromium only) hold the failure line until the next sign-in attempt and keep the toast on screen at least 8000 ms. Kept in review: nothing is checked on a real phone.",
         "acceptance_criteria": [
-          "The on-screen time of each sign-in failure message is measured and written down",
-          "If it is too short to read, the message stays until dismissed or the next attempt",
-          "A test pins the chosen behavior"
+          "The on-screen time of each sign-in failure message is measured and written down: done (5015 ms at boot, 17 ms after a Sign in tap)",
+          "The message stays until the next attempt and the toast lasts at least 8000 ms: merged and deployed",
+          "A test pins the chosen behavior: merged; phone check still open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -1056,26 +1056,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-018_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-018",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Tell account-site sign-up users their username shows on the Mazer leaderboard",
-        "description": "The username typed on the account-site sign-up screen is public on the Mazer leaderboard (MAZER-ACCT-017), and that screen does not say so. Plan: add one plain line of copy on the sign-up screen; this is a FawxzzyWeb change. Recommendation: add the line. Needs the owner to confirm the copy. Not started.",
+        "title": "Tell sign-up users their username shows on the leaderboard: merged, not deployed",
+        "description": "FawxzzyWeb PR #124 is merged (e03c7db8) and NOT deployed: the account-site sign-up screen gains the line This username shows on the Mazer leaderboard. and the duplicate-sign-up notice moves out of the button label. The live site shows neither until the production aliases move to a build that includes PR #124. The owner has not yet confirmed the copy. Kept in review: merged-not-deployed, headless and mocks only, nothing checked on a real phone.",
         "card_type": "feature",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-017"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T12:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-018",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1083,15 +1083,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-018",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T12:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "The username typed on the account-site sign-up screen is public on the Mazer leaderboard (MAZER-ACCT-017), and that screen does not say so. Plan: add one plain line of copy on the sign-up screen; this is a FawxzzyWeb change. Recommendation: add the line. Needs the owner to confirm the copy. Not started.",
-        "objective": "The username typed on the account-site sign-up screen is public on the Mazer leaderboard (MAZER-ACCT-017), and that screen does not say so. Plan: add one plain line of copy on the sign-up screen; this is a FawxzzyWeb change. Recommendation: add the line. Needs the owner to confirm the copy. Not started.",
+        "summary": "FawxzzyWeb PR #124 is merged (e03c7db8) and NOT deployed: the account-site sign-up screen gains the line This username shows on the Mazer leaderboard. and the duplicate-sign-up notice moves out of the button label. The live site shows neither until the production aliases move to a build that includes PR #124. The owner has not yet confirmed the copy. Kept in review: merged-not-deployed, headless and mocks only, nothing checked on a real phone.",
+        "objective": "FawxzzyWeb PR #124 is merged (e03c7db8) and NOT deployed: the account-site sign-up screen gains the line This username shows on the Mazer leaderboard. and the duplicate-sign-up notice moves out of the button label. The live site shows neither until the production aliases move to a build that includes PR #124. The owner has not yet confirmed the copy. Kept in review: merged-not-deployed, headless and mocks only, nothing checked on a real phone.",
         "acceptance_criteria": [
-          "The owner confirms the copy",
-          "The account-site sign-up screen shows the line before a player submits",
-          "Covered by a test and a headless capture of the sign-up screen"
+          "The owner confirms the copy: still open",
+          "The account-site sign-up screen shows the line before a player submits: merged in FawxzzyWeb PR #124, not deployed",
+          "Covered by a test and a headless capture of the sign-up screen: merged; capture not recorded here"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -1109,26 +1109,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-019_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-019",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Re-read the username after profile creation during an in-session sign-in",
-        "description": "During an in-session sign-in a sticky client read taken before the profile exists can leave the player on the Choose a username gate until a reload. Plan: re-read the username once after the profile is created. Not started.",
+        "title": "Re-read the username after profile creation mid sign-in: deployed, device check pending",
+        "description": "PR #455 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium and mocks only). During an in-session sign-in the username is now read once more after the profile bootstrap, so the Choose a username gate no longer stays until a reload. Kept in review: nothing is checked on a real phone.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-007"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T12:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-019",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1136,15 +1136,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-019",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T12:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "During an in-session sign-in a sticky client read taken before the profile exists can leave the player on the Choose a username gate until a reload. Plan: re-read the username once after the profile is created. Not started.",
-        "objective": "During an in-session sign-in a sticky client read taken before the profile exists can leave the player on the Choose a username gate until a reload. Plan: re-read the username once after the profile is created. Not started.",
+        "summary": "PR #455 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium and mocks only). During an in-session sign-in the username is now read once more after the profile bootstrap, so the Choose a username gate no longer stays until a reload. Kept in review: nothing is checked on a real phone.",
+        "objective": "PR #455 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium and mocks only). During an in-session sign-in the username is now read once more after the profile bootstrap, so the Choose a username gate no longer stays until a reload. Kept in review: nothing is checked on a real phone.",
         "acceptance_criteria": [
-          "After the profile is created in-session, the username is read again and the gate does not stay",
-          "A mock test reproduces the stale read and passes after the fix",
-          "No change to the signed-out and already-named paths"
+          "After the profile is created in-session, the username is read again and the gate does not stay: merged and deployed (PR #455)",
+          "A mock test reproduces the stale read and passes after the fix: merged",
+          "No change to the signed-out and already-named paths: merged; phone check open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -1169,7 +1169,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Fix the four account-site usernames longer than 15 characters",
-        "description": "Four account-site usernames are longer than the 15-character limit because the account site's stored metadata bypassed validation; those players fall back to generated Mazer names. Plan: close the bypass and decide how to shorten the four names. Any data change needs the owner's explicit approval first. Not started.",
+        "description": "Four account-site usernames are longer than the 15-character limit because the stored metadata on the account site bypassed validation; those players fall back to generated Mazer names. Plan: close the bypass and decide how to shorten the four names. Any data change needs explicit approval from the owner first. Related: MAZER-ACCT-030 (a few usernames over the limit are never indexed for sign-in by username). Not started.",
         "card_type": "bug",
         "lifecycle": "planning",
         "priority": "low",
@@ -1178,7 +1178,7 @@
           "MAZER-ACCT-017"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T12:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-020",
         "extensions": {
           "owner_status": "planning",
@@ -1189,11 +1189,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-020",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T12:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "Four account-site usernames are longer than the 15-character limit because the account site's stored metadata bypassed validation; those players fall back to generated Mazer names. Plan: close the bypass and decide how to shorten the four names. Any data change needs the owner's explicit approval first. Not started.",
-        "objective": "Four account-site usernames are longer than the 15-character limit because the account site's stored metadata bypassed validation; those players fall back to generated Mazer names. Plan: close the bypass and decide how to shorten the four names. Any data change needs the owner's explicit approval first. Not started.",
+        "summary": "Four account-site usernames are longer than the 15-character limit because the stored metadata on the account site bypassed validation; those players fall back to generated Mazer names. Plan: close the bypass and decide how to shorten the four names. Any data change needs explicit approval from the owner first. Related: MAZER-ACCT-030 (a few usernames over the limit are never indexed for sign-in by username). Not started.",
+        "objective": "Four account-site usernames are longer than the 15-character limit because the stored metadata on the account site bypassed validation; those players fall back to generated Mazer names. Plan: close the bypass and decide how to shorten the four names. Any data change needs explicit approval from the owner first. Related: MAZER-ACCT-030 (a few usernames over the limit are never indexed for sign-in by username). Not started.",
         "acceptance_criteria": [
           "The bypass that let a name over 15 characters through is closed",
           "The four affected players get a valid name or a clear way to pick one, after the owner approves any data change",
@@ -1215,26 +1215,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-021_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-021",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Refresh the header name after a rename",
-        "description": "Follow-up from the Edit name work (PR #450): a worker flagged that the name shown in the header may keep the old value until a reload after a rename saves. Not measured yet. Plan: update the header as soon as a rename saves. Not started.",
+        "title": "Refresh the header name after a rename: deployed, device check pending",
+        "description": "PR #455 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium and mocks only): the header name now follows a rename in the same session without a reload. Whether the stored sign-in name also updates, which decides what the header shows after a reload, is not confirmed (MAZER-ACCT-033). Kept in review: nothing is checked on a real phone.",
         "card_type": "feature",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-011"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T12:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-021",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1242,15 +1242,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-021",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T12:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "Follow-up from the Edit name work (PR #450): a worker flagged that the name shown in the header may keep the old value until a reload after a rename saves. Not measured yet. Plan: update the header as soon as a rename saves. Not started.",
-        "objective": "Follow-up from the Edit name work (PR #450): a worker flagged that the name shown in the header may keep the old value until a reload after a rename saves. Not measured yet. Plan: update the header as soon as a rename saves. Not started.",
+        "summary": "PR #455 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium and mocks only): the header name now follows a rename in the same session without a reload. Whether the stored sign-in name also updates, which decides what the header shows after a reload, is not confirmed (MAZER-ACCT-033). Kept in review: nothing is checked on a real phone.",
+        "objective": "PR #455 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium and mocks only): the header name now follows a rename in the same session without a reload. Whether the stored sign-in name also updates, which decides what the header shows after a reload, is not confirmed (MAZER-ACCT-033). Kept in review: nothing is checked on a real phone.",
         "acceptance_criteria": [
-          "The header name updates right after a rename saves, with no reload",
-          "A test covers the refresh",
-          "Nothing else in the header changes"
+          "The header name updates right after a rename saves, with no reload: merged and deployed (PR #455)",
+          "A test covers the refresh: merged",
+          "Nothing else in the header changes: merged; phone check open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -1268,26 +1268,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-022_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-022",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Offer Edit name to a named player with no leaderboard rank yet",
-        "description": "Follow-up from the Edit name work (PR #450): Edit name is offered on the pinned You row and on the Choose a username gate, and a named player who has no leaderboard rank yet may have no way to reach it. Not started; scope still to confirm.",
+        "title": "Offer Edit name to a named player with no rank: deployed, device check pending",
+        "description": "PR #455 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium and mocks only). A named player with no leaderboard rank now sees a pinned You row with dashes and an Edit name control, and an empty board offers Edit name. Kept in review: nothing is checked on a real phone.",
         "card_type": "feature",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-011"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T12:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-022",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1295,15 +1295,592 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-022",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T12:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "Follow-up from the Edit name work (PR #450): Edit name is offered on the pinned You row and on the Choose a username gate, and a named player who has no leaderboard rank yet may have no way to reach it. Not started; scope still to confirm.",
-        "objective": "Follow-up from the Edit name work (PR #450): Edit name is offered on the pinned You row and on the Choose a username gate, and a named player who has no leaderboard rank yet may have no way to reach it. Not started; scope still to confirm.",
+        "summary": "PR #455 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium and mocks only). A named player with no leaderboard rank now sees a pinned You row with dashes and an Edit name control, and an empty board offers Edit name. Kept in review: nothing is checked on a real phone.",
+        "objective": "PR #455 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium and mocks only). A named player with no leaderboard rank now sees a pinned You row with dashes and an Edit name control, and an empty board offers Edit name. Kept in review: nothing is checked on a real phone.",
         "acceptance_criteria": [
-          "A named player with no rank yet can reach Edit name",
-          "The ranked flow is unchanged",
-          "Covered by a test and a headless capture"
+          "A named player with no rank yet can reach Edit name: merged and deployed (PR #455)",
+          "The ranked flow is unchanged: merged",
+          "Covered by a test and a headless capture: merged; phone check open"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-023_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-023",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Account-site sign-out can land on the login page instead of Mazer",
+        "description": "Code-read only, not reproduced: on the account site the sign-out event handler in usePortalSession can send the player to the login page before the return to Mazer runs. Proposed fix: a signing-out flag that stops the event handler racing the return. Separate design question: signing out on the account site does not end the Mazer sign-in session. Not started.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-001"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-023",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-023",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "Code-read only, not reproduced: on the account site the sign-out event handler in usePortalSession can send the player to the login page before the return to Mazer runs. Proposed fix: a signing-out flag that stops the event handler racing the return. Separate design question: signing out on the account site does not end the Mazer sign-in session. Not started.",
+        "objective": "Code-read only, not reproduced: on the account site the sign-out event handler in usePortalSession can send the player to the login page before the return to Mazer runs. Proposed fix: a signing-out flag that stops the event handler racing the return. Separate design question: signing out on the account site does not end the Mazer sign-in session. Not started.",
+        "acceptance_criteria": [
+          "The race is reproduced or ruled out in a headless run",
+          "Signing out from the account site returns to Mazer when a Mazer return is pending",
+          "A test covers the sign-out ordering"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-024_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-024",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Fill the receipt typed columns the completion functions ignore",
+        "description": "The typed columns on completion receipts (completion time, path length and six more) are all default zero because the completion functions never fill them. Proposed: a before-insert trigger plus a backfill. The SQL is written and was tested on a throwaway database; it is NOT applied. It needs the owner approval of the exact file hash.",
+        "card_type": "migration",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-024",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-024",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "The typed columns on completion receipts (completion time, path length and six more) are all default zero because the completion functions never fill them. Proposed: a before-insert trigger plus a backfill. The SQL is written and was tested on a throwaway database; it is NOT applied. It needs the owner approval of the exact file hash.",
+        "objective": "The typed columns on completion receipts (completion time, path length and six more) are all default zero because the completion functions never fill them. Proposed: a before-insert trigger plus a backfill. The SQL is written and was tested on a throwaway database; it is NOT applied. It needs the owner approval of the exact file hash.",
+        "acceptance_criteria": [
+          "The owner approves the exact SQL file hash",
+          "New receipts carry real completion time and path length",
+          "Existing receipts are backfilled and verified by readback, with a rollback file"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-025_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-025",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Decide who owns the stored display name after a rename",
+        "description": "After a rename the stored profile display name keeps the old value. Recommendation: the server owns it and always sets it equal to the username; SQL and a client change that stops writing it are proposed. Neither is applied; the owner decision is pending.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-011"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-025",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-025",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "After a rename the stored profile display name keeps the old value. Recommendation: the server owns it and always sets it equal to the username; SQL and a client change that stops writing it are proposed. Neither is applied; the owner decision is pending.",
+        "objective": "After a rename the stored profile display name keeps the old value. Recommendation: the server owns it and always sets it equal to the username; SQL and a client change that stops writing it are proposed. Neither is applied; the owner decision is pending.",
+        "acceptance_criteria": [
+          "The owner decides who owns the display name",
+          "After a rename the stored display name matches the username",
+          "The client no longer writes the display name; a test covers it"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-026_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-026",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Harden the username sign-in lockout (v4)",
+        "description": "Eleven wrong tries lock a username and also block the correct sign-in details for 15 minutes, so anyone can lock another player out of username sign-in. This existed in v2 and is more visible now that v3 reports it. Mitigation ideas: key the failure counter by username plus client, count failures only, drop the forwarded-address fallback, raise the per-username aggregate cap. Not started; any database change needs the owner approval of the exact SQL.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-026",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-026",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "Eleven wrong tries lock a username and also block the correct sign-in details for 15 minutes, so anyone can lock another player out of username sign-in. This existed in v2 and is more visible now that v3 reports it. Mitigation ideas: key the failure counter by username plus client, count failures only, drop the forwarded-address fallback, raise the per-username aggregate cap. Not started; any database change needs the owner approval of the exact SQL.",
+        "objective": "Eleven wrong tries lock a username and also block the correct sign-in details for 15 minutes, so anyone can lock another player out of username sign-in. This existed in v2 and is more visible now that v3 reports it. Mitigation ideas: key the failure counter by username plus client, count failures only, drop the forwarded-address fallback, raise the per-username aggregate cap. Not started; any database change needs the owner approval of the exact SQL.",
+        "acceptance_criteria": [
+          "A wrong-try flood no longer blocks the right password from the real owner",
+          "The new counter keys and caps are chosen by the owner and tested on a throwaway database",
+          "Rollback and a live readback are recorded"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-027_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-027",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Resolve the duplicate-username collisions with the oldest account winning",
+        "description": "A few accounts share two usernames, which the new duplicate-username guard does not change. Proposed resolution file 05: the oldest account keeps the name and the others lose the username key only. They keep sign-in with the account address and lose the greeting name in the menu. Not applied: the owner must flip the pair_extension_recorded flag, then the flipped file is hashed for approval.",
+        "card_type": "migration",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-017"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-027",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-027",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "A few accounts share two usernames, which the new duplicate-username guard does not change. Proposed resolution file 05: the oldest account keeps the name and the others lose the username key only. They keep sign-in with the account address and lose the greeting name in the menu. Not applied: the owner must flip the pair_extension_recorded flag, then the flipped file is hashed for approval.",
+        "objective": "A few accounts share two usernames, which the new duplicate-username guard does not change. Proposed resolution file 05: the oldest account keeps the name and the others lose the username key only. They keep sign-in with the account address and lose the greeting name in the menu. Not applied: the owner must flip the pair_extension_recorded flag, then the flipped file is hashed for approval.",
+        "acceptance_criteria": [
+          "The owner flips the flag and approves the exact flipped file hash",
+          "Each shared username resolves to exactly one account",
+          "The losing accounts can still sign in by email; verified by readback"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-028_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-028",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Verify the before-user-created auth hook is registered at the provider",
+        "description": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. The hook role has no read access to the Mazer profile table, so if it is registered the Mazer-namespace branch may error. Not started.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-007"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-028",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-028",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. The hook role has no read access to the Mazer profile table, so if it is registered the Mazer-namespace branch may error. Not started.",
+        "objective": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. The hook role has no read access to the Mazer profile table, so if it is registered the Mazer-namespace branch may error. Not started.",
+        "acceptance_criteria": [
+          "Registration of the hook is confirmed or ruled out and written down",
+          "If registered, a sign-up from the Mazer namespace is probed and does not error",
+          "Any fix is applied only with the owner approval of the exact change"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-029_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-029",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Map the username-taken and generic database errors on the account site and Fitness",
+        "description": "A taken username and a generic database error during sign-up or rename reach the player as unclear copy on the account site and on Fitness sign-up and rename. Plan: map both to plain messages. Open question for the owner: how much a message may disclose about whether a username exists.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-029",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-029",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "A taken username and a generic database error during sign-up or rename reach the player as unclear copy on the account site and on Fitness sign-up and rename. Plan: map both to plain messages. Open question for the owner: how much a message may disclose about whether a username exists.",
+        "objective": "A taken username and a generic database error during sign-up or rename reach the player as unclear copy on the account site and on Fitness sign-up and rename. Plan: map both to plain messages. Open question for the owner: how much a message may disclose about whether a username exists.",
+        "acceptance_criteria": [
+          "The owner decides how much a taken-username message may disclose",
+          "Both errors map to plain copy on the account site and Fitness",
+          "Tests cover the mapping on each surface"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-030_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-030",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Shorten or index the usernames over 15 characters for sign-in",
+        "description": "A few usernames over the 15-character limit (MAZER-ACCT-020) are silently never indexed for sign-in by username, so that way of signing in cannot find them; sign-in with the account address still works. Plan: shorten them or index them, together with MAZER-ACCT-020. Any data change needs approval from the owner first.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-020"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-030",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-030",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "A few usernames over the 15-character limit (MAZER-ACCT-020) are silently never indexed for sign-in by username, so that way of signing in cannot find them; sign-in with the account address still works. Plan: shorten them or index them, together with MAZER-ACCT-020. Any data change needs approval from the owner first.",
+        "objective": "A few usernames over the 15-character limit (MAZER-ACCT-020) are silently never indexed for sign-in by username, so that way of signing in cannot find them; sign-in with the account address still works. Plan: shorten them or index them, together with MAZER-ACCT-020. Any data change needs approval from the owner first.",
+        "acceptance_criteria": [
+          "The affected players are identified without exposing their names",
+          "Each gets a way to sign in by username or a clear message",
+          "A test covers a stored username over the limit"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-031_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-031",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Show a failure code a player can read off a phone",
+        "description": "Sign-in failure codes (MAZER-ACCT-014) are only visible with the runtime diagnostics switch, which a player cannot easily turn on from a phone. Plan: show a short code on a surface that carries nothing that identifies a person, so a player can read it out. The owner decides which surface.",
+        "card_type": "feature",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-014"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-031",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-031",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "Sign-in failure codes (MAZER-ACCT-014) are only visible with the runtime diagnostics switch, which a player cannot easily turn on from a phone. Plan: show a short code on a surface that carries nothing that identifies a person, so a player can read it out. The owner decides which surface.",
+        "objective": "Sign-in failure codes (MAZER-ACCT-014) are only visible with the runtime diagnostics switch, which a player cannot easily turn on from a phone. Plan: show a short code on a surface that carries nothing that identifies a person, so a player can read it out. The owner decides which surface.",
+        "acceptance_criteria": [
+          "The owner picks a surface that shows no personal data",
+          "A failed sign-in shows a short readable code on a phone",
+          "A test confirms the code never includes personal data"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-032_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-032",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Ellipsize a long header name instead of hiding it",
+        "description": "The header identity label hides a name that does not fit instead of cutting it with an ellipsis, so a long name leaves the header blank. Plan: ellipsize the name. Not started.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-021"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-032",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-032",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "The header identity label hides a name that does not fit instead of cutting it with an ellipsis, so a long name leaves the header blank. Plan: ellipsize the name. Not started.",
+        "objective": "The header identity label hides a name that does not fit instead of cutting it with an ellipsis, so a long name leaves the header blank. Plan: ellipsize the name. Not started.",
+        "acceptance_criteria": [
+          "A 15-character name that does not fit is shown cut with an ellipsis",
+          "A short name is unchanged",
+          "A layout test covers narrow widths"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-033_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-033",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Confirm whether a rename updates the sign-in name used by the header",
+        "description": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts.",
+        "card_type": "research",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-021"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-033",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-033",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts.",
+        "objective": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts.",
+        "acceptance_criteria": [
+          "The header after a rename plus reload is checked and written down",
+          "If it reverts to the old name the rename updates the stored sign-in name",
+          "A test covers the reload case"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -4588,26 +5165,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-motion-005_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-MOTION-005",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Unify the reduced-motion crossfade length with the motion scale",
-        "description": "The reduced-motion crossfade still has its own lengths (intro 250 ms, outro 150 ms, teleport 140 ms). Plan: one value shared with the motion scale, set in the theme contract and pinned by the design sync test; this needs an edit to the theme contract. Recommendation: 200 ms for every reduced-motion crossfade (intro 250 to 200, outro 150 to 200, teleport 140 to 200). Depends on MAZER-MOTION-001. This card now carries criterion 3 of MAZER-MOTION-004 (one shared crossfade length), which PR #425 did not do. Not started.",
+        "title": "One reduced-motion crossfade length of 200 ms: deployed, device check pending",
+        "description": "PR #457 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). Every reduced-motion crossfade now uses one 200 ms length, MOTION_REDUCED_MS.crossfade, in the motion scale (intro 250 to 200, outro 150 to 200). The teleport transfer still reads a read-only alias, teleportCrossfade, until a wave 4D-B edit moves it (MAZER-MOTION-009). Kept in review: nothing is checked on a real phone; this also completes criterion 3 of MAZER-MOTION-004 in code.",
         "card_type": "architecture",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-MOTION-001"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T12:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-005",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -4615,15 +5192,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-005",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T12:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "The reduced-motion crossfade still has its own lengths (intro 250 ms, outro 150 ms, teleport 140 ms). Plan: one value shared with the motion scale, set in the theme contract and pinned by the design sync test; this needs an edit to the theme contract. Recommendation: 200 ms for every reduced-motion crossfade (intro 250 to 200, outro 150 to 200, teleport 140 to 200). Depends on MAZER-MOTION-001. This card now carries criterion 3 of MAZER-MOTION-004 (one shared crossfade length), which PR #425 did not do. Not started.",
-        "objective": "The reduced-motion crossfade still has its own lengths (intro 250 ms, outro 150 ms, teleport 140 ms). Plan: one value shared with the motion scale, set in the theme contract and pinned by the design sync test; this needs an edit to the theme contract. Recommendation: 200 ms for every reduced-motion crossfade (intro 250 to 200, outro 150 to 200, teleport 140 to 200). Depends on MAZER-MOTION-001. This card now carries criterion 3 of MAZER-MOTION-004 (one shared crossfade length), which PR #425 did not do. Not started.",
+        "summary": "PR #457 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). Every reduced-motion crossfade now uses one 200 ms length, MOTION_REDUCED_MS.crossfade, in the motion scale (intro 250 to 200, outro 150 to 200). The teleport transfer still reads a read-only alias, teleportCrossfade, until a wave 4D-B edit moves it (MAZER-MOTION-009). Kept in review: nothing is checked on a real phone; this also completes criterion 3 of MAZER-MOTION-004 in code.",
+        "objective": "PR #457 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). Every reduced-motion crossfade now uses one 200 ms length, MOTION_REDUCED_MS.crossfade, in the motion scale (intro 250 to 200, outro 150 to 200). The teleport transfer still reads a read-only alias, teleportCrossfade, until a wave 4D-B edit moves it (MAZER-MOTION-009). Kept in review: nothing is checked on a real phone; this also completes criterion 3 of MAZER-MOTION-004 in code.",
         "acceptance_criteria": [
-          "One reduced-motion crossfade length exists in the motion scale",
-          "Theme contract and design sync test updated",
-          "Not started; waits on MAZER-MOTION-001"
+          "One reduced-motion crossfade length exists in the motion scale: merged and deployed (PR #457)",
+          "Theme contract and design sync test updated: merged",
+          "Teleport transfer moved onto the shared length: open, MAZER-MOTION-009 (wave 4D-B)"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -4784,6 +5361,59 @@
           "With Reduce Motion on, movement and pulsing are stopped on a real phone",
           "With Reduce Motion on, the title, level-number and trail colours still shift",
           "The result is recorded on this card and on MAZER-MOTION-004"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-motion-009_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-MOTION-009",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Move the teleport transfer to the shared reduced-motion crossfade",
+        "description": "MAZER-MOTION-005 added one 200 ms reduced-motion crossfade, MOTION_REDUCED_MS.crossfade. The teleport transfer presentation still reads a read-only alias, teleportCrossfade. Plan: point the teleport transfer at the shared value and delete the alias in the wave 4D-B edit. Not started.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-MOTION-005"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-009",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-009",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "MAZER-MOTION-005 added one 200 ms reduced-motion crossfade, MOTION_REDUCED_MS.crossfade. The teleport transfer presentation still reads a read-only alias, teleportCrossfade. Plan: point the teleport transfer at the shared value and delete the alias in the wave 4D-B edit. Not started.",
+        "objective": "MAZER-MOTION-005 added one 200 ms reduced-motion crossfade, MOTION_REDUCED_MS.crossfade. The teleport transfer presentation still reads a read-only alias, teleportCrossfade. Plan: point the teleport transfer at the shared value and delete the alias in the wave 4D-B edit. Not started.",
+        "acceptance_criteria": [
+          "The teleport transfer reads MOTION_REDUCED_MS.crossfade",
+          "The teleportCrossfade alias is deleted",
+          "Design sync test and theme contract updated"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5009,24 +5639,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-perf-002_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PERF-002",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Reduce canvas redraw cost and soften the throttle floor",
-        "description": "Canvas replay of thousands of star and tile drawing commands costs 2.6-4.9 ms per frame even on a static overlay, and the frame governor drops ambient motion to 4 fps when frames average over 19 ms. Plan: bake the backdrop, stop forcing redraws, and floor the throttle at about 15 fps. Needs a real-device trace.",
+        "title": "Cut canvas redraw cost: trail gate merged, not deployed; backdrop bake still open",
+        "description": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) and NOT deployed: the play trail is now rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Cause measured: trail rebuild cost grows with route length and plateaus around level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93.5 ms to 39.1 ms. Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Original scope still open: bake the backdrop, raise the throttle floor, and attach a real-device trace. Kept in review as merged-not-deployed, not completed.",
         "card_type": "reliability",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-06T00:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-002",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5034,15 +5664,16 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-002",
         "source_status": "current",
-        "source_updated_at": "2026-11-06T00:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "Canvas replay of thousands of star and tile drawing commands costs 2.6-4.9 ms per frame even on a static overlay, and the frame governor drops ambient motion to 4 fps when frames average over 19 ms. Plan: bake the backdrop, stop forcing redraws, and floor the throttle at about 15 fps. Needs a real-device trace.",
-        "objective": "Canvas replay of thousands of star and tile drawing commands costs 2.6-4.9 ms per frame even on a static overlay, and the frame governor drops ambient motion to 4 fps when frames average over 19 ms. Plan: bake the backdrop, stop forcing redraws, and floor the throttle at about 15 fps. Needs a real-device trace.",
+        "summary": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) and NOT deployed: the play trail is now rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Cause measured: trail rebuild cost grows with route length and plateaus around level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93.5 ms to 39.1 ms. Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Original scope still open: bake the backdrop, raise the throttle floor, and attach a real-device trace. Kept in review as merged-not-deployed, not completed.",
+        "objective": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) and NOT deployed: the play trail is now rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Cause measured: trail rebuild cost grows with route length and plateaus around level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93.5 ms to 39.1 ms. Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Original scope still open: bake the backdrop, raise the throttle floor, and attach a real-device trace. Kept in review as merged-not-deployed, not completed.",
         "acceptance_criteria": [
-          "Backdrop is baked or cached and static screens stop reallocating",
-          "Throttle floor raised from 250 ms to about 66 ms",
-          "Real-device frame trace attached"
+          "Trail rebuilt only when it can differ and the shortest route memoised: PR #459 merged, not deployed",
+          "Backdrop is baked or cached and static screens stop reallocating: open",
+          "Throttle floor raised from 250 ms to about 66 ms: open",
+          "Real-device frame trace attached: open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5060,24 +5691,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-perf-003_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PERF-003",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Throttle colour-only redraws under reduced motion",
-        "description": "Under Reduce Motion (PR #425) colour keeps shifting, so colour-only redraws still run at the full frame rate. Battery follow-up: redraw colour at a lower rate while reduced motion is on, without a visible colour step. Needs a measurement first. Not started.",
+        "title": "Throttle colour-only redraws under reduced motion: deployed, device check pending",
+        "description": "PR #456 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). Under Reduce Motion the colour redraws of the trail and the bleed-dock glow now share one 45 ms schedule, about 20 a second, with a largest step of 8 of 255 on the core and 17 of 255 on the bloom, so no visible stepping is expected. The glow was the dominant redraw source. Kept in review: not looked at on a real phone.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-12T12:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-003",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5085,15 +5716,278 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-003",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T12:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "Under Reduce Motion (PR #425) colour keeps shifting, so colour-only redraws still run at the full frame rate. Battery follow-up: redraw colour at a lower rate while reduced motion is on, without a visible colour step. Needs a measurement first. Not started.",
-        "objective": "Under Reduce Motion (PR #425) colour keeps shifting, so colour-only redraws still run at the full frame rate. Battery follow-up: redraw colour at a lower rate while reduced motion is on, without a visible colour step. Needs a measurement first. Not started.",
+        "summary": "PR #456 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). Under Reduce Motion the colour redraws of the trail and the bleed-dock glow now share one 45 ms schedule, about 20 a second, with a largest step of 8 of 255 on the core and 17 of 255 on the bloom, so no visible stepping is expected. The glow was the dominant redraw source. Kept in review: not looked at on a real phone.",
+        "objective": "PR #456 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). Under Reduce Motion the colour redraws of the trail and the bleed-dock glow now share one 45 ms schedule, about 20 a second, with a largest step of 8 of 255 on the core and 17 of 255 on the bloom, so no visible stepping is expected. The glow was the dominant redraw source. Kept in review: not looked at on a real phone.",
         "acceptance_criteria": [
-          "Colour-only redraw cost under reduced motion is measured and recorded",
+          "Colour-only redraw cost under reduced motion is measured and recorded: done in headless Chromium (glow was the dominant source)",
+          "The redraw rate is lowered with no visible colour stepping: merged and deployed (PR #456); phone check open",
+          "Reduced motion off is unchanged: merged"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-perf-004_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-004",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Incremental head-only trail update while the player moves",
+        "description": "PR #459 (MAZER-PERF-002) made still frames cheaper but left the cost while walking unchanged, because every step still rebuilds the whole trail. Plan: while the player moves, update only the head segment instead of rebuilding the trail. A worker is building it now; nothing is merged.",
+        "card_type": "reliability",
+        "lifecycle": "in-progress",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-PERF-002"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-004",
+        "extensions": {
+          "owner_status": "in_progress",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-004",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "PR #459 (MAZER-PERF-002) made still frames cheaper but left the cost while walking unchanged, because every step still rebuilds the whole trail. Plan: while the player moves, update only the head segment instead of rebuilding the trail. A worker is building it now; nothing is merged.",
+        "objective": "PR #459 (MAZER-PERF-002) made still frames cheaper but left the cost while walking unchanged, because every step still rebuilds the whole trail. Plan: while the player moves, update only the head segment instead of rebuilding the trail. A worker is building it now; nothing is merged.",
+        "acceptance_criteria": [
+          "Walking frame cost on a long route is measured before and after",
+          "Only the head segment is redrawn per step; the trail picture is pixel-identical to a full rebuild",
+          "Trail pixel baselines stay unchanged and a test covers the incremental path"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-perf-005_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-005",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Cheaper long-trail bloom without dimming the halo",
+        "description": "On a long route the trail bloom is a large share of the remaining redraw cost. Plan: find a cheaper way to draw the bloom that keeps the halo as bright as today. Not started.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-PERF-002"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-005",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-005",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "On a long route the trail bloom is a large share of the remaining redraw cost. Plan: find a cheaper way to draw the bloom that keeps the halo as bright as today. Not started.",
+        "objective": "On a long route the trail bloom is a large share of the remaining redraw cost. Plan: find a cheaper way to draw the bloom that keeps the halo as bright as today. Not started.",
+        "acceptance_criteria": [
+          "Bloom cost on a long route is measured and written down",
+          "The halo is not visibly dimmer in a before and after capture",
+          "Trail pixel baselines stay unchanged or are updated deliberately"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-perf-006_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-006",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Cap the trail canvas backing resolution on 3x phones",
+        "description": "On 3x phones the trail canvas backing store is very large, which raises the cost of every trail redraw. Plan: cap the backing resolution on 3x phones. This changes how sharp the trail looks, so the owner reviews the pixels before it ships. Not started.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-PERF-002"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-006",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-006",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "On 3x phones the trail canvas backing store is very large, which raises the cost of every trail redraw. Plan: cap the backing resolution on 3x phones. This changes how sharp the trail looks, so the owner reviews the pixels before it ships. Not started.",
+        "objective": "On 3x phones the trail canvas backing store is very large, which raises the cost of every trail redraw. Plan: cap the backing resolution on 3x phones. This changes how sharp the trail looks, so the owner reviews the pixels before it ships. Not started.",
+        "acceptance_criteria": [
+          "The cap and the redraw cost saved are measured",
+          "The owner reviews before and after trail pixels on a 3x phone and approves",
+          "Nothing changes at 1x and 2x"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-perf-007_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-007",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Throttle the wrap-glow full-board redraw under full motion",
+        "description": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Not started.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-PERF-003"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-007",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-007",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Not started.",
+        "objective": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Not started.",
+        "acceptance_criteria": [
+          "The full-motion wrap-glow redraw cost is measured on a wrap level",
           "The redraw rate is lowered with no visible colour stepping",
-          "Reduced motion off is unchanged"
+          "Reduced motion and non-wrap levels are unchanged"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-perf-008_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-008",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Spread level-start maze generation across frames or a worker",
+        "description": "Generating a large maze at the start of a level takes about 400 to 800 ms at 4x scale. It is already hidden behind the level intro, so players do not see it today. Plan: spread the work across frames or move it to a worker so it cannot cause a hitch if the intro gets shorter. Not started.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-008",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-008",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "Generating a large maze at the start of a level takes about 400 to 800 ms at 4x scale. It is already hidden behind the level intro, so players do not see it today. Plan: spread the work across frames or move it to a worker so it cannot cause a hitch if the intro gets shorter. Not started.",
+        "objective": "Generating a large maze at the start of a level takes about 400 to 800 ms at 4x scale. It is already hidden behind the level intro, so players do not see it today. Plan: spread the work across frames or move it to a worker so it cannot cause a hitch if the intro gets shorter. Not started.",
+        "acceptance_criteria": [
+          "Generation time at level start is measured on a large level",
+          "Generation no longer blocks a frame for more than a few milliseconds",
+          "The generated maze is identical for the same seed"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5984,6 +6878,59 @@
           "The touchSprint fields move to the progression diagnostics section",
           "No gameplay or speed behavior changes",
           "Diagnostics tests pass and the Wave 1C one-wave rule is respected"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-prog-017_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PROG-017",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Pin every emitted sign-in failure code to the class map with a test",
+        "description": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014). Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code and fails when one is missing from the class map. Not started.",
+        "card_type": "automation",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-014"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-017",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-017",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014). Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code and fails when one is missing from the class map. Not started.",
+        "objective": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014). Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code and fails when one is missing from the class map. Not started.",
+        "acceptance_criteria": [
+          "The test collects every code the sign-in paths can emit",
+          "It fails when a code has no class map entry",
+          "It runs in the normal verify workflow"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -9348,26 +10295,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-023_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-023",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Round the player ring to the cap-tile shape on start and goal tiles",
-        "description": "On the start and goal tiles at large tile sizes the corners of the square player ring poke past the rounded dead-end disc. Plan: round the ring to the cap-tile shape on those tiles only. Follow-up to MAZER-VIS-022. Not started.",
+        "title": "Round the player ring to the cap-tile shape on start and goal: deployed, check pending",
+        "description": "PR #458 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). On the start and goal tiles the player ring now follows the rounded cap-tile corners instead of poking past the dead-end disc. The ring still switches shape abruptly halfway (MAZER-VIS-028). Kept in review: nothing is checked on a real phone.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-VIS-022"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-11T12:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-023",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -9375,15 +10322,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-023",
         "source_status": "current",
-        "source_updated_at": "2026-11-11T12:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "On the start and goal tiles at large tile sizes the corners of the square player ring poke past the rounded dead-end disc. Plan: round the ring to the cap-tile shape on those tiles only. Follow-up to MAZER-VIS-022. Not started.",
-        "objective": "On the start and goal tiles at large tile sizes the corners of the square player ring poke past the rounded dead-end disc. Plan: round the ring to the cap-tile shape on those tiles only. Follow-up to MAZER-VIS-022. Not started.",
+        "summary": "PR #458 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). On the start and goal tiles the player ring now follows the rounded cap-tile corners instead of poking past the dead-end disc. The ring still switches shape abruptly halfway (MAZER-VIS-028). Kept in review: nothing is checked on a real phone.",
+        "objective": "PR #458 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). On the start and goal tiles the player ring now follows the rounded cap-tile corners instead of poking past the dead-end disc. The ring still switches shape abruptly halfway (MAZER-VIS-028). Kept in review: nothing is checked on a real phone.",
         "acceptance_criteria": [
-          "The ring follows the cap-tile shape on start and goal tiles",
-          "No ring corner extends past the dead-end disc at large tile sizes",
-          "Pixel baselines for the marker are updated deliberately"
+          "The ring follows the cap-tile shape on start and goal tiles: merged and deployed (PR #458)",
+          "No ring corner extends past the dead-end disc at large tile sizes: merged; phone check open",
+          "Pixel baselines for the marker are updated deliberately: done, 4 trail corner raster baselines regenerated on purpose"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -9401,26 +10348,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-024_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-024",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Make the marker diagnostics report the real block size",
-        "description": "The marker style diagnostics for the player still report the old radius ratios 0.46 and 0.72 instead of the block size the shared marker now draws. Plan: report the real drawn values. Follow-up to MAZER-VIS-022. Not started.",
+        "title": "Make the marker diagnostics report the real block size: deployed",
+        "description": "PR #458 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). The marker style diagnostics now report the real drawn radii, 0.3 and 0.5 of a tile, instead of the old ratios 0.46 and 0.72. This is a diagnostics-only change with no player-visible surface, so no phone check is needed beyond MAZER-VIS-023.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-VIS-022"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-11T12:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-024",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -9428,15 +10375,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-024",
         "source_status": "current",
-        "source_updated_at": "2026-11-11T12:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "The marker style diagnostics for the player still report the old radius ratios 0.46 and 0.72 instead of the block size the shared marker now draws. Plan: report the real drawn values. Follow-up to MAZER-VIS-022. Not started.",
-        "objective": "The marker style diagnostics for the player still report the old radius ratios 0.46 and 0.72 instead of the block size the shared marker now draws. Plan: report the real drawn values. Follow-up to MAZER-VIS-022. Not started.",
+        "summary": "PR #458 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). The marker style diagnostics now report the real drawn radii, 0.3 and 0.5 of a tile, instead of the old ratios 0.46 and 0.72. This is a diagnostics-only change with no player-visible surface, so no phone check is needed beyond MAZER-VIS-023.",
+        "objective": "PR #458 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). The marker style diagnostics now report the real drawn radii, 0.3 and 0.5 of a tile, instead of the old ratios 0.46 and 0.72. This is a diagnostics-only change with no player-visible surface, so no phone check is needed beyond MAZER-VIS-023.",
         "acceptance_criteria": [
-          "Marker diagnostics report the real drawn block size",
-          "The old radius ratios 0.46 and 0.72 are gone from the diagnostics",
-          "A test pins the diagnostic values to the drawing code"
+          "Marker diagnostics report the real drawn block size: merged and deployed (PR #458)",
+          "The old radius ratios 0.46 and 0.72 are gone from the diagnostics: merged",
+          "A test pins the diagnostic values to the drawing code: merged"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -9454,26 +10401,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-025_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-025",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Snap the trail head to the same device pixel as the player marker",
-        "description": "The trail head can sit up to 0.5 device pixels away from the player marker centre; today it is hidden under the trail width. Plan: snap the head to the same device pixel as the marker. Follow-up to MAZER-VIS-022. Not started.",
+        "title": "Snap the trail head to the marker device pixel: deployed, device check pending",
+        "description": "PR #458 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). The trail head is now snapped to the same device-pixel centre as the player marker. Four trail corner raster baselines were regenerated on purpose. The head does not yet follow the wall-bump nudge of the marker (MAZER-VIS-029). Kept in review: nothing is checked on a real phone.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-VIS-022"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-11T12:00:00.000Z",
+        "updated_at": "2026-11-12T20:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-025",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -9481,15 +10428,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-025",
         "source_status": "current",
-        "source_updated_at": "2026-11-11T12:00:00.000Z"
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
       },
       "content": {
-        "summary": "The trail head can sit up to 0.5 device pixels away from the player marker centre; today it is hidden under the trail width. Plan: snap the head to the same device pixel as the marker. Follow-up to MAZER-VIS-022. Not started.",
-        "objective": "The trail head can sit up to 0.5 device pixels away from the player marker centre; today it is hidden under the trail width. Plan: snap the head to the same device pixel as the marker. Follow-up to MAZER-VIS-022. Not started.",
+        "summary": "PR #458 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). The trail head is now snapped to the same device-pixel centre as the player marker. Four trail corner raster baselines were regenerated on purpose. The head does not yet follow the wall-bump nudge of the marker (MAZER-VIS-029). Kept in review: nothing is checked on a real phone.",
+        "objective": "PR #458 is merged and live at Mazer main 476c4789 (live bundle strings checked, headless Chromium only). The trail head is now snapped to the same device-pixel centre as the player marker. Four trail corner raster baselines were regenerated on purpose. The head does not yet follow the wall-bump nudge of the marker (MAZER-VIS-029). Kept in review: nothing is checked on a real phone.",
         "acceptance_criteria": [
-          "The trail head uses the same device-snapped centre as the player marker",
-          "Trail corner raster baselines stay unchanged or are updated deliberately",
-          "Headless measurement shows zero offset between head and marker centre"
+          "The trail head uses the same device-snapped centre as the player marker: merged and deployed (PR #458)",
+          "Trail corner raster baselines updated deliberately: done, 4 baselines regenerated",
+          "Headless measurement shows zero offset between head and marker centre: merged; phone check open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -9611,6 +10558,113 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-vis-028_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-028",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Morph the player ring between cap and chip shape instead of popping",
+        "description": "The player ring now follows the cap-tile shape on start and goal tiles (MAZER-VIS-023) but switches between the cap and chip shape abruptly at the halfway point when the player enters or leaves such a tile. Plan: blend the ring between the two shapes. Not started.",
+        "card_type": "feature",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-VIS-023"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-028",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-028",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "The player ring now follows the cap-tile shape on start and goal tiles (MAZER-VIS-023) but switches between the cap and chip shape abruptly at the halfway point when the player enters or leaves such a tile. Plan: blend the ring between the two shapes. Not started.",
+        "objective": "The player ring now follows the cap-tile shape on start and goal tiles (MAZER-VIS-023) but switches between the cap and chip shape abruptly at the halfway point when the player enters or leaves such a tile. Plan: blend the ring between the two shapes. Not started.",
+        "acceptance_criteria": [
+          "The ring blends smoothly between cap and chip shape across the tile",
+          "No frame shows a corner poking past the dead-end disc",
+          "Pixel baselines for the marker are updated deliberately"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-029_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-029",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Make the trail head follow the wall-bump nudge of the marker",
+        "description": "A blocked move nudges the player marker about 2 px (MAZER-MOTION-003), but the trail head, now snapped to the resting centre of the marker (MAZER-VIS-025), does not follow the nudge. Plan: apply the same nudge to the trail head. Not started.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-MOTION-003",
+          "MAZER-VIS-025"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T20:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-029",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-029",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T20:00:00.000Z"
+      },
+      "content": {
+        "summary": "A blocked move nudges the player marker about 2 px (MAZER-MOTION-003), but the trail head, now snapped to the resting centre of the marker (MAZER-VIS-025), does not follow the nudge. Plan: apply the same nudge to the trail head. Not started.",
+        "objective": "A blocked move nudges the player marker about 2 px (MAZER-MOTION-003), but the trail head, now snapped to the resting centre of the marker (MAZER-VIS-025), does not follow the nudge. Plan: apply the same nudge to the trail head. Not started.",
+        "acceptance_criteria": [
+          "The trail head moves with the marker during a wall bump",
+          "No sliver of trail shows beside the marker during the nudge",
+          "Trail pixel baselines stay unchanged at rest"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-world-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -9666,9 +10720,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 184,
-    "exported_public_card_count": 184,
-    "exported_open_card_count": 76,
+    "stable_identity_count": 204,
+    "exported_public_card_count": 204,
+    "exported_open_card_count": 96,
     "exported_completed_card_count": 92,
     "exported_deferred_card_count": 16,
     "imported_research_candidate_count": 0,
