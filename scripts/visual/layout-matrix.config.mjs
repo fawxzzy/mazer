@@ -12,7 +12,19 @@ export const LAYOUT_MATRIX_VIEWPORTS = Object.freeze({
   'iphone-dynamic-island': Object.freeze({ id: 'iphone-dynamic-island', label: 'iPhone Dynamic Island', width: 393, height: 852 }),
   'android-cutout': Object.freeze({ id: 'android-cutout', label: 'Android Cutout', width: 412, height: 915 }),
   'macos-browser': Object.freeze({ id: 'macos-browser', label: 'macOS Browser', width: 1440, height: 900 }),
-  'windows-browser': Object.freeze({ id: 'windows-browser', label: 'Windows Browser', width: 1365, height: 768 })
+  'windows-browser': Object.freeze({ id: 'windows-browser', label: 'Windows Browser', width: 1365, height: 768 }),
+  // MAZER-QA-006: viewports that exist only for the `supported` group. The ids start
+  // with `phone-` so they resolve the mobile route like the other phone presets.
+  'phone-320': Object.freeze({ id: 'phone-320', label: 'Phone 320 (small)', width: 320, height: 568 }),
+  'phone-360': Object.freeze({ id: 'phone-360', label: 'Phone 360 (compact Android)', width: 360, height: 800 }),
+  // Loads in landscape, then rotates the SAME page back to portrait before capture.
+  'phone-rotate-back': Object.freeze({
+    id: 'phone-rotate-back',
+    label: 'Phone Rotate Back (landscape to portrait)',
+    width: 390,
+    height: 844,
+    rotateFrom: Object.freeze({ width: 844, height: 390 })
+  })
 });
 
 export const LAYOUT_MATRIX_PRESET_GROUPS = Object.freeze({
@@ -35,6 +47,18 @@ export const LAYOUT_MATRIX_PRESET_GROUPS = Object.freeze({
     'android-cutout',
     'macos-browser',
     'windows-browser'
+  ]),
+  // MAZER-QA-006: the supported viewport matrix (docs/architecture/MAZER-SUPPORTED-VIEWPORT-MATRIX.md).
+  // Deliberately NOT part of `all`, so `core`, `extended`, `platform` and `all` stay pinned.
+  supported: Object.freeze([
+    'phone-320',
+    'phone-360',
+    'phone-portrait',
+    'phone-tall',
+    'phone-landscape',
+    'phone-rotate-back',
+    'tablet-portrait',
+    'desktop'
   ])
 });
 
