@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
+  LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY,
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_BOOT_MESSAGE_COPY,
   LEGACY_OFFLINE_MESSAGE_COPY,
@@ -409,6 +410,7 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
 
   test('routed copy tables are player-safe (no provider or internal wording)', () => {
     const tables = {
+      LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY,
       LEGACY_AUTH_MESSAGE_COPY,
       LEGACY_BOOT_MESSAGE_COPY,
       LEGACY_OFFLINE_MESSAGE_COPY,
@@ -430,6 +432,7 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
     const source = readSource(file);
     const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
     const tableNames = new Set([
+      'LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY',
       'LEGACY_AUTH_MESSAGE_COPY',
       'LEGACY_BOOT_MESSAGE_COPY',
       'LEGACY_REMOTE_MESSAGE_COPY',
