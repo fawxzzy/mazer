@@ -49,6 +49,13 @@
  * No Phaser, DOM, randomness or wall-clock dependency.
  */
 
+import {
+  MOTION_DURATION_MS,
+  MOTION_EASING,
+  MOTION_REDUCED_MS,
+  MOTION_STAGGER_BEAM_TOTAL_MS
+} from './motionScale';
+
 export type IntroPhase = 'digit-in' | 'reveal' | 'laser' | 'pop' | 'done' | 'crossfade';
 
 export interface IntroOptions {
@@ -89,15 +96,15 @@ export interface IntroState {
   readonly done: boolean;
 }
 
-export const INTRO_DIGIT_IN_MS = 200;
+export const INTRO_DIGIT_IN_MS = MOTION_DURATION_MS.base;
 /** @deprecated Pre-reorder laser start; see INTRO_REVEAL_START_MS. The beams now leave at resolveIntroLaserStartMs(N). */
 export const INTRO_LASER_START_MS = 100;
 /** Beam flight time (build end -> landing). */
-export const INTRO_LASER_MS = 400;
+export const INTRO_LASER_MS = MOTION_DURATION_MS.long;
 /** @deprecated Pre-reorder laser end; see INTRO_REVEAL_START_MS. */
 export const INTRO_LASER_END_MS = INTRO_LASER_START_MS + INTRO_LASER_MS;
 /** Beams stagger by at most this much across the 8 diamonds (every beam still lands by the laser end). */
-export const INTRO_BEAM_STAGGER_MS = 60;
+export const INTRO_BEAM_STAGGER_MS = MOTION_STAGGER_BEAM_TOTAL_MS;
 /**
  * @deprecated Pre-reorder timeline (beams first, maze appears as they land). The Wave 1B design tokens
  * (motion.durationMs.reveal = INTRO_REVEAL_END_MS - INTRO_REVEAL_START_MS) still cite these constants and
@@ -128,7 +135,7 @@ export const INTRO_REVEAL_MAX_MS = 3200;
 export const INTRO_DIGIT_OUT_MS = 500;
 export const INTRO_POP_MS = 350;
 export const INTRO_GOAL_PULSE_MS = 250;
-export const INTRO_REDUCED_MOTION_MS = 250;
+export const INTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS.introCrossfade;
 export const INTRO_DIGIT_MIN_SCALE = 0.72;
 /** Taps/keys inside this window after the intro began are ignored (the Start press itself). */
 export const INTRO_SKIP_GRACE_MS = 200;
@@ -145,30 +152,22 @@ export const RING_ORBIT_LAPS = 1;
 export const OUTRO_PLAYER_REMOVE_MS = 150;
 export const OUTRO_TRAIL_FADE_MS = 250;
 /** The edge-path group disappears all at once at this instant of the deconstruct. */
-export const OUTRO_LASER_MS = 400;
+export const OUTRO_LASER_MS = MOTION_DURATION_MS.long;
 export const OUTRO_EDGE_PATHS_OFF_MS = OUTRO_LASER_MS;
 export const OUTRO_TILES_START_MS = OUTRO_EDGE_PATHS_OFF_MS;
 export const OUTRO_REMOVE_MIN_MS = 1800;
 export const OUTRO_REMOVE_MAX_MS = 3000;
-export const OUTRO_DIGIT_IN_MS = 300;
-export const OUTRO_HANDOFF_MS = 300;
-export const OUTRO_REDUCED_MOTION_MS = 150;
+export const OUTRO_DIGIT_IN_MS = MOTION_DURATION_MS.slow;
+export const OUTRO_HANDOFF_MS = MOTION_DURATION_MS.slow;
+export const OUTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS.outroCrossfade;
 
 const clamp01 = (value: number): number => (
   Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0
 );
 
-const smoothstep = (value: number): number => {
-  const x = clamp01(value);
-  return x * x * (3 - (2 * x));
-};
+const { smoothstep, smootherstep, easeOutCubic: motionEaseOutCubic } = MOTION_EASING;
 
-const smootherstep = (value: number): number => smoothstep(smoothstep(value));
-
-export const easeOutCubic = (value: number): number => {
-  const x = clamp01(value);
-  return 1 - ((1 - x) ** 3);
-};
+export const easeOutCubic = motionEaseOutCubic;
 
 const normalizeCount = (value: number): number => (
   Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0

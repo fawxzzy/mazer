@@ -206,7 +206,7 @@
   "motion/durationMs/fast": [
    {
     "file": "src/render/edgeMarkers.ts",
-    "pattern": "EDGE_MARKER_FLASH_MS = 120(?![0-9])"
+    "pattern": "EDGE_MARKER_FLASH_MS = MOTION_DURATION_MS\\.fast"
    },
    {
     "file": "src/ui/dom/primitives.css",
@@ -216,27 +216,27 @@
   "motion/durationMs/base": [
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "INTRO_DIGIT_IN_MS = 200(?![0-9])"
+    "pattern": "INTRO_DIGIT_IN_MS = MOTION_DURATION_MS\\.base"
    }
   ],
   "motion/durationMs/slow": [
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "OUTRO_DIGIT_IN_MS = 300(?![0-9])"
+    "pattern": "OUTRO_DIGIT_IN_MS = MOTION_DURATION_MS\\.slow"
    },
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "OUTRO_HANDOFF_MS = 300(?![0-9])"
+    "pattern": "OUTRO_HANDOFF_MS = MOTION_DURATION_MS\\.slow"
    }
   ],
   "motion/durationMs/long": [
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "INTRO_LASER_MS = 400(?![0-9])"
+    "pattern": "INTRO_LASER_MS = MOTION_DURATION_MS\\.long"
    },
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "OUTRO_LASER_MS = 400(?![0-9])"
+    "pattern": "OUTRO_LASER_MS = MOTION_DURATION_MS\\.long"
    }
   ],
   "motion/durationMs/reveal": [
@@ -262,13 +262,13 @@
   "motion/staggerMs/beamTotal": [
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "INTRO_BEAM_STAGGER_MS = 60(?![0-9])"
+    "pattern": "INTRO_BEAM_STAGGER_MS = MOTION_STAGGER_BEAM_TOTAL_MS"
    }
   ],
   "motion/loopMs/beat": [
    {
     "file": "src/legacy-runtime/legacyPlayerTransfer.ts",
-    "pattern": "LEGACY_PLAYER_TRANSFER_SWIRL_PERIOD_MS = 1200(?![0-9])"
+    "pattern": "LEGACY_PLAYER_TRANSFER_SWIRL_PERIOD_MS = MOTION_LOOP_MS\\.beat"
    }
   ],
   "motion/loopMs/blink": [
@@ -280,31 +280,31 @@
   "motion/loopMs/drift": [
    {
     "file": "src/render/edgeMarkers.ts",
-    "pattern": "EDGE_MARKER_IDLE_PERIOD_MS = 3600(?![0-9])"
+    "pattern": "EDGE_MARKER_IDLE_PERIOD_MS = MOTION_LOOP_MS\\.drift"
    }
   ],
   "motion/reducedMotionMs/introCrossfade": [
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "INTRO_REDUCED_MOTION_MS = 250(?![0-9])"
+    "pattern": "INTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS\\.introCrossfade"
    }
   ],
   "motion/reducedMotionMs/outroCrossfade": [
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "OUTRO_REDUCED_MOTION_MS = 150(?![0-9])"
+    "pattern": "OUTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS\\.outroCrossfade"
    }
   ],
   "motion/reducedMotionMs/teleportCrossfade": [
    {
     "file": "src/render/teleportTransferPresentation.ts",
-    "pattern": "REDUCED_MOTION_CROSSFADE_MS = 140(?![0-9])"
+    "pattern": "REDUCED_MOTION_CROSSFADE_MS = MOTION_REDUCED_MS\\.teleportCrossfade"
    }
   ],
   "motion/reducedMotionMs/teleportFadeEdge": [
    {
     "file": "src/render/teleportTransferPresentation.ts",
-    "pattern": "REDUCED_MOTION_FADE_EDGE_MS = 45(?![0-9])"
+    "pattern": "REDUCED_MOTION_FADE_EDGE_MS = MOTION_REDUCED_MS\\.teleportFadeEdge"
    }
   ],
   "motion/easing/css/standard": [
@@ -322,13 +322,13 @@
   "motion/easing/functions/smoothstep": [
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "const smoothstep = "
+    "pattern": "const \\{ smoothstep, smootherstep, "
    }
   ],
   "motion/easing/functions/smootherstep": [
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "const smootherstep = "
+    "pattern": "const \\{ smoothstep, smootherstep, "
    }
   ],
   "motion/easing/functions/easeOutCubic": [

@@ -47,3 +47,7 @@ CSS names: color keys keep their registry spelling with dots turned into dashes;
 ## Non-goals of this wave
 
 This pass does not add a public theme switcher, activate rooms or new gameplay objects, extract the DOM shell, or change ambient maze-family scheduling. Header/profile/diamond revisions and live renderer layout remain later-wave work.
+
+## Motion scale module (MAZER-MOTION-001)
+
+`src/render/motionScale.ts` is the one place code reads durations, loop periods, reduced-motion crossfade lengths and easing from. It adds no numbers: it re-exports the shipped `motion.*` tokens (ladder fast 120, base 200, slow 300, long 400, reveal 700; loops beat 1200, blink 2400, drift 3600, all harmonics of the beat) plus `motionEasing` and the Phaser `Sine.easeInOut` name. The intro/outro, edge marker, trail sweep, player-transfer and teleport reduced-motion constants now bind to it with no value change, and the evidence contract cites the bindings (the sync test still asserts the numbers). The 120/200/320/480/720 retune and the four divergent reduced-motion lengths stay owner decisions.
