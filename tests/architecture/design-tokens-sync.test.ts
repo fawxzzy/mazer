@@ -216,9 +216,11 @@ describe('design token provenance: every added token equals a value that already
     expect(motion.staggerMs.beamTotal).toBe(INTRO_BEAM_STAGGER_MS);
     expect(motion.loopMs.beat).toBe(LEGACY_PLAYER_TRANSFER_SWIRL_PERIOD_MS);
     expect(motion.loopMs.drift).toBe(EDGE_MARKER_IDLE_PERIOD_MS);
-    expect(motion.reducedMotionMs.introCrossfade).toBe(INTRO_REDUCED_MOTION_MS);
-    expect(motion.reducedMotionMs.outroCrossfade).toBe(OUTRO_REDUCED_MOTION_MS);
-    expect(motion.reducedMotionMs.teleportCrossfade).toBe(TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS);
+    // MAZER-MOTION-005: one crossfade length, read by the intro, the outro and the teleport window.
+    expect(motion.reducedMotionMs.crossfade).toBe(INTRO_REDUCED_MOTION_MS);
+    expect(motion.reducedMotionMs.crossfade).toBe(OUTRO_REDUCED_MOTION_MS);
+    expect(motion.reducedMotionMs.crossfade).toBe(TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS);
+    expect(motion.reducedMotionMs.crossfade).toBe(motion.durationMs.base);
     expect(motion.reducedMotionMs.teleportFadeEdge).toBe(TELEPORT_TRANSFER_REDUCED_MOTION_FADE_EDGE_MS);
   });
 
