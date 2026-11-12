@@ -6,36 +6,36 @@
     "registryUpdatedAt": "2026-11-11T12:00:00.000Z"
   },
   "counters": {
-    "total": 151,
-    "open": 56,
-    "completed": 80,
+    "total": 163,
+    "open": 62,
+    "completed": 86,
     "deferred": 15,
     "buckets": {
-      "needs-you": 20,
-      "in-review": 2,
-      "blocked": 17,
-      "ready": 7,
-      "in-progress": 10,
+      "needs-you": 29,
+      "in-review": 3,
+      "blocked": 18,
+      "ready": 8,
+      "in-progress": 4,
       "unclassified": 0,
       "deferred": 15,
-      "completed": 80
+      "completed": 86
     },
     "needsYou": {
-      "decisions": 14,
-      "checks": 6
+      "decisions": 22,
+      "checks": 7
     },
     "completedByTier": {
       "device": 0,
-      "headless": 34,
-      "source-only": 32,
-      "no-device-surface": 14,
+      "headless": 36,
+      "source-only": 34,
+      "no-device-surface": 16,
       "unrecorded": 0
     },
     "blockedByGroup": {
       "Zac": 3,
       "provider": 2,
       "device": 1,
-      "other-card": 11,
+      "other-card": 12,
       "unknown": 0
     }
   },
@@ -66,6 +66,18 @@
         "verify": []
       },
       {
+        "id": "MAZER-UI-019",
+        "title": "Complete the full UI rework migration on the new standards",
+        "status": "in_progress",
+        "priority": "high",
+        "kind": "decision",
+        "ask": "Is the UI rework still one umbrella, or split into child cards (MenuScene decomposition, Wave 6 proof surfaces, future-phaser retirement) with this card closed?",
+        "recommendation": "Auditor recommendation: split into children and keep the umbrella as planning only until the acceptance matrix is evaluated.",
+        "context": "MenuScene is about 16,600 lines (11,748 at Wave 0A) and decomposition has not started; Wave 6 and the nine-point Definition of Complete were never evaluated.",
+        "prs": "",
+        "verify": []
+      },
+      {
         "id": "MAZER-UI-020",
         "title": "Decide the six design-board picks: font, quit confirm, start style, icons, backdrop, HUD",
         "status": "planning",
@@ -88,6 +100,24 @@
         "context": "There is no audio anywhere in the game and no sound setting.",
         "prs": "",
         "verify": []
+      },
+      {
+        "id": "MAZER-DATA-004",
+        "title": "Finish the offline-first play, sync and conflict contract",
+        "status": "in_progress",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Sign or amend the 7 decisions in the offline sync contract: tier order, what a checkpoint means, coin and inventory ledger, outbox bounds and wording, entitlement grace, guest-to-account transfer, required device proofs.",
+        "recommendation": "Auditor recommendation: approve the tier order as drafted, define a checkpoint as a completed level only for now, keep coins and inventory local-first, authorise no server work yet.",
+        "context": "The offline sync contract draft is unsigned (7 open decisions); coin and inventory tiers exist only as a proposal; server parts are provider-gated.",
+        "prs": "",
+        "verify": [
+          {
+            "step": "On the iPhone installed app, signed in: turn on airplane mode, complete a level, force-quit, reopen offline, then turn airplane mode off and wait 10 seconds.",
+            "where": "installed-app",
+            "expected": "Progress is kept offline; one saved-offline notice; after reconnect the outbox flushes once and the level matches on a second device with no duplicate."
+          }
+        ]
       },
       {
         "id": "MAZER-ECON-001",
@@ -126,6 +156,18 @@
         "verify": []
       },
       {
+        "id": "MAZER-HAZ-007",
+        "title": "Complete the turn-synchronous world simulation beyond the player phase",
+        "status": "in_progress",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Will hazards and enemies be activated, and must they run through the turn host?",
+        "recommendation": "Auditor recommendation: defer all non-player phases explicitly until hazards have a shipped product contract, then mark the card completed with a caveat once a deferral table lands.",
+        "context": "Only the player movement phase uses the turn host; enemy, projectile, pickup, item, duration and collision handlers are unintegrated and have had no commits since 2026-07-14.",
+        "prs": "",
+        "verify": []
+      },
+      {
         "id": "MAZER-MOTION-004",
         "title": "Add an in-game reduced-motion setting and finish the gating: open for review, held",
         "status": "review",
@@ -156,6 +198,24 @@
         ]
       },
       {
+        "id": "MAZER-QA-006",
+        "title": "Finish cross-viewport UI reliability and layout persistence",
+        "status": "in_progress",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "With Board Zoom removed and the board size frozen, is any layout persistence still wanted, or should that criterion be dropped?",
+        "recommendation": "Auditor recommendation: drop the persistence criterion; keep the viewport matrix and the device check.",
+        "context": "Layout persistence has no defined state to persist (Board Zoom was removed) and the supported viewport matrix is not written down.",
+        "prs": "",
+        "verify": [
+          {
+            "step": "On the iPhone installed app: open the menu, rotate portrait to landscape and back mid-play, and open Settings and Guide in each orientation.",
+            "where": "installed-app",
+            "expected": "Play pauses on the flip and refits, no clipped panels or purple bars, tap targets reachable, state intact after rotating back."
+          }
+        ]
+      },
+      {
         "id": "MAZER-VIS-012",
         "title": "Unify the backdrop across boot, install gate and sign-in",
         "status": "planning",
@@ -166,6 +226,24 @@
         "context": "Three visual dialects exist (game, install and sign-in pages, account portal); this is the backdrop pick in MAZER-UI-020.",
         "prs": "",
         "verify": []
+      },
+      {
+        "id": "MAZER-WORLD-001",
+        "title": "Complete the World Identity visual maintenance lane",
+        "status": "in_progress",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Close World Identity as a completed lane (new work ships as discrete render cards) or keep it as a standing maintenance bucket?",
+        "recommendation": "Auditor recommendation: close with a caveat and open one card per concrete defect; an in-progress card with no finish line hides real state.",
+        "context": "Open-ended maintenance lane with no finish line; its text predates Chip tiles, diamonds and the Nov 10 render fixes.",
+        "prs": "",
+        "verify": [
+          {
+            "step": "On the iPhone installed app, open the menu and play on the current build; watch the backdrop stars, end markers and trail for 30 seconds.",
+            "where": "installed-app",
+            "expected": "No strobing recolour, no image or vector misalignment, the end star is centred and the trail does not shake (PR #416 fixes)."
+          }
+        ]
       },
       {
         "id": "MAZER-CHAL-001",
@@ -180,6 +258,18 @@
         "verify": []
       },
       {
+        "id": "MAZER-MOTION-007",
+        "title": "Decide off-scale loops and durations and sweep dead motion code",
+        "status": "planning",
+        "priority": "low",
+        "kind": "decision",
+        "ask": "Decide which off-scale loops and durations move onto the motion scale and which stay as they are.",
+        "recommendation": "Decide value by value with before and after captures; anything you do not name stays unchanged. Then sweep the dead motion code.",
+        "context": "Some loops and durations are off the motion scale and some motion code is dead; each move changes how something looks.",
+        "prs": "",
+        "verify": []
+      },
+      {
         "id": "MAZER-PROG-006",
         "title": "Decide a minimum tile size for very large boards",
         "status": "planning",
@@ -188,6 +278,18 @@
         "ask": "Should the game set a minimum tile size for very large boards, or explicitly defer zoom?",
         "recommendation": "Defer explicitly and record it, since board size and zoom are frozen.",
         "context": "On a 390 phone at level 99 the tile is about 6.5 px, so the player and goal are tiny.",
+        "prs": "",
+        "verify": []
+      },
+      {
+        "id": "MAZER-PWA-005",
+        "title": "Provide approved app icon art with proper corners and a clean screenshot capture route",
+        "status": "planning",
+        "priority": "low",
+        "kind": "decision",
+        "ask": "Provide approved app icon art with proper corners (or say to keep the current icon).",
+        "recommendation": "Supply a master without baked corners; the build agent then regenerates the icons, the hash verifier and clean screenshots.",
+        "context": "The icon master has baked black corners and new icon art is owner-gated; screenshots carry a small preview label.",
         "prs": "",
         "verify": []
       },
@@ -214,6 +316,18 @@
         "context": "Remote sync is deliberately silent today, so showing sync failures changes that stance.",
         "prs": "",
         "verify": []
+      },
+      {
+        "id": "MAZER-VIS-026",
+        "title": "Decide dense-board player prominence after the tile-sized ring",
+        "status": "planning",
+        "priority": "low",
+        "kind": "decision",
+        "ask": "On dense boards, accept the thin player ring, or add a screen-pixel floor on the glow only?",
+        "recommendation": "Accept: the ring now matches the end tiles and the find-me ping still finds the player. The alternative is a screen-pixel floor on the glow only.",
+        "context": "The ring is now tile-sized: on 8 px tiles it is a thin ring that shows only from 2x displays, and the find-me ping finds the player.",
+        "prs": "",
+        "verify": []
       }
     ],
     "checks": [
@@ -229,9 +343,9 @@
         "prs": "",
         "verify": [
           {
-            "step": "Tap the pause gear in play with your thumb (MAZER-UI-014).",
+            "step": "Tap the pause gear in play with your thumb and judge its size: it should be at least a thumb-sized target (MAZER-UI-014).",
             "where": "phone",
-            "expected": "Pause opens on the first tap."
+            "expected": "Pause opens on the first tap and the control is large enough not to miss."
           },
           {
             "step": "Rotate the phone while a run is live (MAZER-FLOW-008).",
@@ -262,6 +376,21 @@
             "step": "Leave the menu demo running for a few mazes (MAZER-FLOW-007).",
             "where": "phone",
             "expected": "The menu AI climbs one level per completed maze."
+          },
+          {
+            "step": "Leave the menu demo running and compare the AI marker with the marker you play (MAZER-VIS-022).",
+            "where": "phone",
+            "expected": "The menu AI marker looks identical to the player marker: same block, keyline, glow and tile-sized ring; no crosshair ticks and no flat square."
+          },
+          {
+            "step": "Add Mazer to the home screen, force-close it, then open it from the home-screen icon (MAZER-PWA-002).",
+            "where": "installed-app",
+            "expected": "The iPhone launch image shows during the cold start (tell me the phone model); a blank dark screen means the launch image link did not match."
+          },
+          {
+            "step": "Send the Mazer home link to yourself in a message app (MAZER-SHARE-001).",
+            "where": "phone",
+            "expected": "A large image preview with the MAZER title appears (the same check as the SHARE-001 steps)."
           },
           {
             "step": "Walk out along the trail and back around corners (MAZER-VIS-020).",
@@ -389,6 +518,34 @@
             "expected": "The trail colour visibly shifts over time; if it stays static, report both settings and the phone model."
           }
         ]
+      },
+      {
+        "id": "MAZER-SHARE-001",
+        "title": "Finish web share metadata, the preview image and external verification",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "Check the share preview on the real platforms: the image address, then iMessage, Slack, Discord and the Facebook Sharing Debugger.",
+        "recommendation": "Do the three steps below once; any platform that shows a small or missing image becomes a follow-up card.",
+        "context": "The share preview is merged and live but has never been checked on an external platform.",
+        "prs": "#437",
+        "verify": [
+          {
+            "step": "Run: curl -sI \"https://mazer.fawxzzy.com/share/mazer-share-preview.png?v=share-v1\" (the share image address).",
+            "where": "external-tool",
+            "expected": "HTTP 200 and content-type image/png."
+          },
+          {
+            "step": "Paste the Mazer home link (https://mazer.fawxzzy.com/) into iMessage, Slack and Discord, one at a time, without sending long text around it.",
+            "where": "phone",
+            "expected": "Each shows a large image preview with the MAZER title; a small icon or no image means the card stays in review."
+          },
+          {
+            "step": "Open the Facebook Sharing Debugger, enter the Mazer home link and press Scrape Again.",
+            "where": "external-tool",
+            "expected": "The image is 1200x630 and picked from the share tags, with no blocking warnings."
+          }
+        ]
       }
     ]
   },
@@ -484,6 +641,17 @@
         "updatedAt": "2026-11-11T12:00:00.000Z"
       },
       {
+        "id": "MAZER-PWA-002",
+        "title": "Add PWA screenshots, iOS launch art and icon cleanup",
+        "status": "completed",
+        "priority": "low",
+        "date": "2026-11-11",
+        "tier": "headless",
+        "prs": "#438",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-11T12:00:00.000Z"
+      },
+      {
         "id": "MAZER-UI-014",
         "title": "Make the in-play pause control a 44px target: shipped, now pinned by a test",
         "status": "completed",
@@ -547,6 +715,17 @@
         "tier": "headless",
         "prs": "#421",
         "deployedBuild": "b640f1da",
+        "updatedAt": "2026-11-11T12:00:00.000Z"
+      },
+      {
+        "id": "MAZER-VIS-022",
+        "title": "AI player and play player share one marker drawn like the end tiles",
+        "status": "completed",
+        "priority": "medium",
+        "date": "2026-11-11",
+        "tier": "headless",
+        "prs": "#442",
+        "deployedBuild": "24e15cc1",
         "updatedAt": "2026-11-11T12:00:00.000Z"
       },
       {
@@ -771,6 +950,28 @@
       }
     ],
     "source-only": [
+      {
+        "id": "MAZER-UI-022",
+        "title": "Move the offline-notice strings into the message module copy tables",
+        "status": "completed",
+        "priority": "low",
+        "date": "2026-11-11",
+        "tier": "source-only",
+        "prs": "#436",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-11T12:00:00.000Z"
+      },
+      {
+        "id": "MAZER-VIS-017",
+        "title": "Purge the disabled backdrop glyph drawing code and its pinned source-string tests",
+        "status": "completed",
+        "priority": "medium",
+        "date": "2026-11-11",
+        "tier": "source-only",
+        "prs": "#439",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-11T12:00:00.000Z"
+      },
       {
         "id": "MAZER-GEN-004",
         "title": "Fade wrap corridors out between levels 100 and 140 and price them",
@@ -1137,6 +1338,28 @@
         "updatedAt": "2026-11-11T12:00:00.000Z"
       },
       {
+        "id": "MAZER-GOV-007",
+        "title": "Generated work report and work ledger",
+        "status": "completed",
+        "priority": "medium",
+        "date": "2026-11-11",
+        "tier": "no-device-surface",
+        "prs": "#440",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-11T12:00:00.000Z"
+      },
+      {
+        "id": "MAZER-GOV-008",
+        "title": "Run the brand tests in CI",
+        "status": "completed",
+        "priority": "medium",
+        "date": "2026-11-11",
+        "tier": "no-device-surface",
+        "prs": "#437",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-11T12:00:00.000Z"
+      },
+      {
         "id": "MAZER-REPO-HYGIENE-001",
         "title": "Mazer leftovers cleanup",
         "status": "completed",
@@ -1289,7 +1512,15 @@
       "status": "review",
       "priority": "high",
       "prs": "",
-      "note": "The public site still needs both refresh pull requests merged."
+      "note": "Mazer PR #434 and FawxzzyWeb PR #119 (the previous refresh) are merged; the registry card text still says the refresh PRs are pending and is left unchanged for the owner to close."
+    },
+    {
+      "id": "MAZER-MOTION-001",
+      "title": "Adopt one motion scale for durations, loops and easing",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#441",
+      "note": "Merged and deployed at main 24e15cc1 with no visible change. Criterion 3 (dead motion code) is not done and is carried by MAZER-MOTION-007; the scene constants move in MAZER-MOTION-006."
     },
     {
       "id": "MAZER-DOCS-001",
@@ -1368,7 +1599,7 @@
         "status": "planning",
         "priority": "medium",
         "kind": "dependency",
-        "ask": "Waits on MAZER-MOTION-001 (planning).",
+        "ask": "Waits on MAZER-MOTION-001 (review).",
         "derived": true
       },
       {
@@ -1449,8 +1680,17 @@
         "status": "planning",
         "priority": "low",
         "kind": "dependency",
-        "ask": "Waits on MAZER-MOTION-001 (planning).",
+        "ask": "Waits on MAZER-MOTION-001 (review).",
         "derived": true
+      },
+      {
+        "id": "MAZER-MOTION-006",
+        "title": "Migrate scene motion constants to the motion scale",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-MOTION-004 (PR #425) landing.",
+        "derived": false
       },
       {
         "id": "MAZER-NATIVE-001",
@@ -1482,22 +1722,6 @@
         "warnings": []
       },
       {
-        "id": "MAZER-MOTION-001",
-        "title": "Adopt one motion scale for durations, loops and easing",
-        "status": "planning",
-        "priority": "medium",
-        "filesHint": [
-          "src/theme/tokens.ts",
-          "src/scenes/MenuScene.ts"
-        ],
-        "waves": [
-          "5C"
-        ],
-        "warnings": [
-          "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts"
-        ]
-      },
-      {
         "id": "MAZER-UI-013",
         "title": "Move scene colors onto the shared theme values",
         "status": "planning",
@@ -1511,35 +1735,17 @@
           "5C"
         ],
         "warnings": [
-          "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts",
-          "overlaps MAZER-MOTION-001 on src/scenes/MenuScene.ts, src/theme/tokens.ts"
+          "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts"
         ]
       },
       {
-        "id": "MAZER-VIS-017",
-        "title": "Purge the disabled backdrop glyph drawing code and its pinned source-string tests",
-        "status": "planning",
-        "priority": "medium",
-        "filesHint": [
-          "src/legacy-runtime/legacyMenuBackdrop.ts",
-          "src/config/tuning.ts",
-          "src/scenes/menuRuntimeDiagnostics.ts",
-          "tests/reset/legacy-menu-backdrop.test.ts"
-        ],
-        "waves": [
-          "1C"
-        ],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-PWA-002",
-        "title": "Add PWA screenshots, iOS launch art and icon cleanup",
+        "id": "MAZER-GOV-009",
+        "title": "Stabilise load-sensitive tests",
         "status": "planning",
         "priority": "low",
         "filesHint": [
-          "public/manifest.webmanifest",
-          "public/icons",
-          "vite.config.ts"
+          "tests/render/endpointTilePixels.test.ts",
+          "vitest.config.ts"
         ],
         "waves": [],
         "warnings": []
@@ -1558,29 +1764,70 @@
         ],
         "warnings": [
           "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts",
-          "overlaps MAZER-MOTION-001 on src/scenes/MenuScene.ts",
           "overlaps MAZER-UI-013 on src/scenes/MenuScene.ts"
         ]
       },
       {
-        "id": "MAZER-UI-022",
-        "title": "Move the offline-notice strings into the message module copy tables",
+        "id": "MAZER-VIS-023",
+        "title": "Round the player ring to the cap-tile shape on start and goal tiles",
         "status": "planning",
         "priority": "low",
         "filesHint": [
-          "src/legacy-runtime/legacyOfflineCompletionFlush.ts",
-          "src/legacy-runtime/legacyPlayerMessage.ts",
-          "tests/reset/legacy-player-message-inventory.test.ts"
+          "src/render/playerMarker.ts",
+          "src/render/endpointTiles.ts",
+          "tests/render/playerMarkerPixels.test.ts"
+        ],
+        "waves": [],
+        "warnings": []
+      },
+      {
+        "id": "MAZER-VIS-024",
+        "title": "Make the marker diagnostics report the real block size",
+        "status": "planning",
+        "priority": "low",
+        "filesHint": [
+          "src/render/playerMarker.ts",
+          "src/scenes/menuRuntimeDiagnostics.ts",
+          "tests/scenes/menu-runtime-diagnostics.test.ts"
         ],
         "waves": [
-          "3B"
+          "1C"
         ],
+        "warnings": [
+          "overlaps MAZER-VIS-023 on src/render/playerMarker.ts"
+        ]
+      },
+      {
+        "id": "MAZER-VIS-025",
+        "title": "Snap the trail head to the same device pixel as the player marker",
+        "status": "planning",
+        "priority": "low",
+        "filesHint": [
+          "src/render/playerMarker.ts",
+          "src/render/trailHeadPath.ts",
+          "tests/fixtures/trail-corner-raster"
+        ],
+        "waves": [],
+        "warnings": [
+          "overlaps MAZER-VIS-023 on src/render/playerMarker.ts",
+          "overlaps MAZER-VIS-024 on src/render/playerMarker.ts"
+        ]
+      },
+      {
+        "id": "MAZER-VIS-027",
+        "title": "Delete the unused backdrop glyph generators in their own wave",
+        "status": "planning",
+        "priority": "low",
+        "filesHint": [
+          "src/legacy-runtime/legacyMenuBackdrop.ts",
+          "tests/reset/legacy-menu-backdrop.test.ts"
+        ],
+        "waves": [],
         "warnings": []
       }
     ],
     "menuSceneCards": [
       "MAZER-FLOW-001",
-      "MAZER-MOTION-001",
       "MAZER-UI-013",
       "MAZER-UI-016"
     ]
@@ -1594,46 +1841,11 @@
       "note": "Standing baseline lane; keep the regression checks green."
     },
     {
-      "id": "MAZER-UI-019",
-      "title": "Complete the full UI rework migration on the new standards",
-      "status": "in_progress",
-      "priority": "high",
-      "note": "Layout and component standards are on main; the migration runs under separate wave governance."
-    },
-    {
       "id": "MAZER-AI-001",
       "title": "Finish the configurable AI runner and run-corpus calibration",
       "status": "in_progress",
       "priority": "medium",
-      "note": "Runner nearly done; calibration is unfinished."
-    },
-    {
-      "id": "MAZER-DATA-004",
-      "title": "Finish the offline-first play, sync and conflict contract",
-      "status": "in_progress",
-      "priority": "medium",
-      "note": "Completion outbox and monotonic merge are on main; the coins, inventory and checkpoint proposal is unsigned and server parts are provider-gated."
-    },
-    {
-      "id": "MAZER-HAZ-007",
-      "title": "Complete the turn-synchronous world simulation beyond the player phase",
-      "status": "in_progress",
-      "priority": "medium",
-      "note": "Turn host and player movement phase are done; enemy, projectile, item, duration and collision handlers are deliberately not integrated."
-    },
-    {
-      "id": "MAZER-QA-006",
-      "title": "Finish cross-viewport UI reliability and layout persistence",
-      "status": "in_progress",
-      "priority": "medium",
-      "note": "Two reliability cards are partly done; July packets exist."
-    },
-    {
-      "id": "MAZER-WORLD-001",
-      "title": "Complete the World Identity visual maintenance lane",
-      "status": "in_progress",
-      "priority": "medium",
-      "note": "Bounded World Identity fixes; the remaining list is not written in the card."
+      "note": "Auditor recommendation, not a status change: stays in progress and an agent can finish it. Regenerate the three baselines after ladder v2 and report the drift, fix the known calibration script call, and add a threshold table per band. Open question for the owner, not blocking: is a human-configurable runner needed (auditor: the seed-pack runner is enough; drop remote run retention)."
     },
     {
       "id": "MAZER-GOV-005",
@@ -1647,14 +1859,7 @@
       "title": "Build the shared run status panel",
       "status": "in_progress",
       "priority": "low",
-      "note": "Run status panel started and early."
-    },
-    {
-      "id": "MAZER-SHARE-001",
-      "title": "Finish web share metadata, the preview image and external verification",
-      "status": "in_progress",
-      "priority": "low",
-      "note": "Share tags are pinned by a test; the preview image is still the app icon and external checks need a deployed URL."
+      "note": "Auditor recommendation, not a status change: planning, low priority. Only the pure view model exists and no scene uses it; wiring it touches the menu scene file, which contends with MAZER-UI-019. After wiring, compare the menu and in-play panels on a phone."
     }
   ],
   "deferred": [
@@ -1786,8 +1991,8 @@
       "sub": null
     },
     "MAZER-WORLD-001": {
-      "bucket": "in-progress",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "decision"
     },
     "MAZER-NATIVE-001": {
       "bucket": "blocked",
@@ -1862,8 +2067,8 @@
       "sub": "headless"
     },
     "MAZER-VIS-017": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "source-only"
     },
     "MAZER-VIS-018": {
       "bucket": "needs-you",
@@ -1978,15 +2183,15 @@
       "sub": "headless"
     },
     "MAZER-UI-019": {
-      "bucket": "in-progress",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "decision"
     },
     "MAZER-UI-020": {
       "bucket": "needs-you",
       "sub": "decision"
     },
     "MAZER-MOTION-001": {
-      "bucket": "ready",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-MOTION-002": {
@@ -2110,8 +2315,8 @@
       "sub": null
     },
     "MAZER-HAZ-007": {
-      "bucket": "in-progress",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "decision"
     },
     "MAZER-HAZ-008": {
       "bucket": "deferred",
@@ -2214,12 +2419,12 @@
       "sub": "Zac"
     },
     "MAZER-DATA-004": {
-      "bucket": "in-progress",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "decision"
     },
     "MAZER-PWA-002": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-PWA-003": {
       "bucket": "completed",
@@ -2230,8 +2435,8 @@
       "sub": "decision"
     },
     "MAZER-SHARE-001": {
-      "bucket": "in-progress",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-QA-001": {
       "bucket": "needs-you",
@@ -2254,8 +2459,8 @@
       "sub": "no-device-surface"
     },
     "MAZER-QA-006": {
-      "bucket": "in-progress",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "decision"
     },
     "MAZER-GOV-001": {
       "bucket": "completed",
@@ -2374,8 +2579,8 @@
       "sub": "decision"
     },
     "MAZER-UI-022": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "source-only"
     },
     "MAZER-MOTION-005": {
       "bucket": "blocked",
@@ -2384,6 +2589,54 @@
     "MAZER-GOV-006": {
       "bucket": "completed",
       "sub": "no-device-surface"
+    },
+    "MAZER-VIS-022": {
+      "bucket": "completed",
+      "sub": "headless"
+    },
+    "MAZER-VIS-023": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-VIS-024": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-VIS-025": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-VIS-026": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-VIS-027": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-GOV-007": {
+      "bucket": "completed",
+      "sub": "no-device-surface"
+    },
+    "MAZER-GOV-008": {
+      "bucket": "completed",
+      "sub": "no-device-surface"
+    },
+    "MAZER-GOV-009": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-PWA-005": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-MOTION-006": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-MOTION-007": {
+      "bucket": "needs-you",
+      "sub": "decision"
     }
   }
 }

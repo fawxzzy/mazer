@@ -8,11 +8,11 @@
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 151,
+    "stableIdentityCount": 163,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 56,
-    "completedCardCount": 80,
+    "openCardCount": 62,
+    "completedCardCount": 86,
     "deferredCardCount": 15,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out."
   },
@@ -395,20 +395,20 @@
     },
     {
       "id": "MAZER-VIS-017",
-      "status": "planning",
-      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "status": "completed",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-017",
       "title": "Purge the disabled backdrop glyph drawing code and its pinned source-string tests",
-      "description": "Backdrop shards, drift runes and corner sigils stopped being drawn in PR #416 but their drawing code and the tests that pin its source strings are still in the tree. Plan: delete the dead code and the source-string tests, keep the star path. Not started.",
+      "description": "Merged (PR #439) and live in production at main 24e15cc1. The shard, rune and sigil drawing code and the two disabled-glyph flags are removed; a behaviour test replaces the source-string pins and the star pixel baselines are unchanged. The unused pure generators in the backdrop module remain on purpose (that file belongs to a different wave than the scene file) and are carried by MAZER-VIS-027. Checked by unit tests and pixel baselines only, not on a real phone.",
       "cardType": "technical-debt",
       "priority": "medium",
       "dependencies": [
         "MAZER-VIS-016"
       ],
       "acceptanceCriteria": [
-        "Shard, rune and sigil drawing code is removed",
-        "Source-string tests that pin the removed code are removed or rewritten",
+        "Shard, rune and sigil drawing code is removed (PR #439)",
+        "Source-string tests that pin the removed code are replaced by a behaviour test",
         "Star backdrop behaviour and raster baselines are unchanged"
       ]
     },
@@ -962,21 +962,21 @@
     },
     {
       "id": "MAZER-MOTION-001",
-      "status": "planning",
-      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-001",
       "title": "Adopt one motion scale for durations, loops and easing",
-      "description": "The game has about 18 unrelated loop periods, 6 easings and 30 durations, and dead motion definitions that drive nothing. Proposal: a pure motion module with a 120/200/320/480/720 ms ladder, loops as harmonics of 1200 ms and one reduced-motion crossfade. Values were added to the theme in PR #381; consuming them in the scene is not started.",
+      "description": "Merged (PR #441) and live in production at main 24e15cc1: one motion scale module that binds the shipped values (duration ladder, loop periods, reduced-motion crossfades, easing), with no visible change and no value changed. Acceptance criterion 3, removing dead tuning and unused DOM motion code, is deliberately NOT done: it is carried by MAZER-MOTION-007. The scene still uses its own constants until MAZER-MOTION-006. Checked only in headless Chromium and unit tests, not on a real phone. The retuned ladder (120/200/320/480/720 ms) from the original proposal is not shipped.",
       "cardType": "architecture",
       "priority": "medium",
       "dependencies": [
         "MAZER-UI-012"
       ],
       "acceptanceCriteria": [
-        "A pure motion module exists with unit tests",
-        "Existing intro and edge constants re-export from it with no value change",
-        "Dead tuning and unused DOM motion code removed after it lands"
+        "A pure motion module exists with unit tests (PR #441)",
+        "Existing intro and edge constants re-export from it with no value change (PR #441)",
+        "Dead tuning and unused DOM motion code removed after it lands: NOT done, see MAZER-MOTION-007"
       ]
     },
     {
@@ -2007,20 +2007,20 @@
     },
     {
       "id": "MAZER-PWA-002",
-      "status": "planning",
-      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "status": "completed",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PWA-002",
       "title": "Add PWA screenshots, iOS launch art and icon cleanup",
-      "description": "The manifest has no screenshots, there is no iOS launch splash, the favicon is 221 KB, the manifest description is internal jargon, and the any-purpose icon shows baked black corners. Fix these plus the off-brand emblem. Large launch art files are frozen by provenance rules, so some need owner OK.",
+      "description": "Merged (PR #438) and live in production at main 24e15cc1. Done: the manifest lists screenshots, nine iPhone launch images are linked, the favicon is trimmed to 16, 32 and 48 px (221 KB to 10 KB), the precache budget is lowered to 2.3 MB, and screenshots and launch art are deliberately outside the precache. The Windows shortcut icon loses its 256 px entry. NOT done, carried by MAZER-PWA-005: new icon art (the master has baked black corners and is owner-gated) and a clean screenshot capture route without the preview label. Checked only in headless Chromium and by bundle contents, not on a real phone; the launch image on a home-screen cold start is on the phone checklist (MAZER-QA-001).",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [
         "MAZER-PWA-001"
       ],
       "acceptanceCriteria": [
-        "Manifest includes screenshots and a plain-language description",
-        "iOS startup images exist for common devices",
+        "Manifest includes screenshots and a plain-language description (PR #438)",
+        "iOS startup images exist for common devices (nine iPhone launch images)",
         "Favicon trimmed to small sizes; icon hash verifier updated"
       ]
     },
@@ -2064,19 +2064,19 @@
     },
     {
       "id": "MAZER-SHARE-001",
-      "status": "in_progress",
-      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-SHARE-001",
       "title": "Finish web share metadata, the preview image and external verification",
-      "description": "Canonical and share tags exist and are pinned by a test, but the preview image is still the app icon and a dedicated preview asset is not confirmed. Verifying the preview on external platforms needs a deployed URL and checks outside the repository, so that part is gated.",
+      "description": "Merged (PR #437) and live in production at main 24e15cc1: a dedicated 1200x630 preview image, absolute production URLs in the share tags, a tag contract test and a regenerator script. Acceptance criterion 3, checking the preview on external platforms (iMessage, Slack, Discord, the Facebook sharing debugger), is OPEN and belongs to the owner; until then this card is not completed. Verified by bundle contents only, not on any external platform or phone.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [],
       "acceptanceCriteria": [
-        "A dedicated preview image is chosen and referenced by the share tags",
-        "A test pins the canonical and share tags",
-        "The preview is checked on external platforms after deployment"
+        "A dedicated preview image is chosen and referenced by the share tags (PR #437, merged and deployed)",
+        "A test pins the canonical and share tags (PR #437)",
+        "The preview is checked on external platforms after deployment: OPEN, owner-only"
       ]
     },
     {
@@ -2704,21 +2704,21 @@
     },
     {
       "id": "MAZER-UI-022",
-      "status": "planning",
+      "status": "completed",
       "updatedAt": "2026-11-11T12:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-022",
       "title": "Move the offline-notice strings into the message module copy tables",
-      "description": "The offline-saved and synced notices from PR #423 are pinned in the message inventory but their strings live outside the message module copy tables. Wave 3B, its own pull request. Not started.",
+      "description": "Merged (PR #436) and live in production at main 24e15cc1. The offline-saved and synced notices now live in the message module copy tables; the strings, ids and tone are unchanged and the inventory test keeps the rows unique. Verified by unit tests and bundle contents only; no browser capture was recorded for it and it was not checked on a real phone.",
       "cardType": "technical-debt",
       "priority": "low",
       "dependencies": [
         "MAZER-UI-018"
       ],
       "acceptanceCriteria": [
-        "Offline notice strings live in the message module copy tables",
-        "Inventory test still pins the rows",
-        "No change to the shown copy"
+        "Offline notice strings live in the message module copy tables (PR #436)",
+        "Inventory test still pins the rows and keeps them unique",
+        "No change to the shown copy: strings, ids and tone are unchanged"
       ]
     },
     {
@@ -2728,7 +2728,7 @@
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-005",
       "title": "Unify the reduced-motion crossfade length with the motion scale",
-      "description": "The reduced-motion crossfade still has its own length. Plan: one value shared with the motion scale, set in the theme contract and pinned by the design sync test. Depends on MAZER-MOTION-001. Split out of MAZER-MOTION-004. Not started.",
+      "description": "The reduced-motion crossfade still has its own lengths (intro 250 ms, outro 150 ms, teleport 140 ms). Plan: one value shared with the motion scale, set in the theme contract and pinned by the design sync test. Recommendation: 200 ms for every reduced-motion crossfade (intro 250 to 200, outro 150 to 200, teleport 140 to 200). Depends on MAZER-MOTION-001. Split out of MAZER-MOTION-004. Not started.",
       "cardType": "architecture",
       "priority": "low",
       "dependencies": [
@@ -2755,6 +2755,229 @@
         "Inventory guard runs in the verify workflow",
         "Offline-notice rows pinned",
         "Pull request merged (PR #432); the guard runs on every verify workflow run"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-022",
+      "status": "completed",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-022",
+      "title": "AI player and play player share one marker drawn like the end tiles",
+      "description": "Merged (PR #442) and live in production at main 24e15cc1. One shared marker module now draws the marker for play, the menu demo AI and the Guide icon: same block size, keyline, glow and device-snapped centre as the end tiles. The ring is now tile-sized and inside the player tile; the old crosshair ticks, the halo and the flat-square AI marker are removed. The find-me ping stays play-only. Frame cost is about +0.07 ms per call in headless Chromium. Checked only in headless Chromium and unit tests, not on a real phone; the menu AI marker check is on the phone checklist (MAZER-QA-001).",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-VIS-016"
+      ],
+      "acceptanceCriteria": [
+        "Play, the menu demo AI and the Guide icon draw one shared marker (PR #442)",
+        "The marker matches the end tiles in block size, keyline, glow and device-snapped centre",
+        "Old crosshair ticks, halo and the flat-square AI marker are removed; the find-me ping stays play-only"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-023",
+      "status": "planning",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-023",
+      "title": "Round the player ring to the cap-tile shape on start and goal tiles",
+      "description": "On the start and goal tiles at large tile sizes the corners of the square player ring poke past the rounded dead-end disc. Plan: round the ring to the cap-tile shape on those tiles only. Follow-up to MAZER-VIS-022. Not started.",
+      "cardType": "bug",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-VIS-022"
+      ],
+      "acceptanceCriteria": [
+        "The ring follows the cap-tile shape on start and goal tiles",
+        "No ring corner extends past the dead-end disc at large tile sizes",
+        "Pixel baselines for the marker are updated deliberately"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-024",
+      "status": "planning",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-024",
+      "title": "Make the marker diagnostics report the real block size",
+      "description": "The marker style diagnostics for the player still report the old radius ratios 0.46 and 0.72 instead of the block size the shared marker now draws. Plan: report the real drawn values. Follow-up to MAZER-VIS-022. Not started.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-VIS-022"
+      ],
+      "acceptanceCriteria": [
+        "Marker diagnostics report the real drawn block size",
+        "The old radius ratios 0.46 and 0.72 are gone from the diagnostics",
+        "A test pins the diagnostic values to the drawing code"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-025",
+      "status": "planning",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-025",
+      "title": "Snap the trail head to the same device pixel as the player marker",
+      "description": "The trail head can sit up to 0.5 device pixels away from the player marker centre; today it is hidden under the trail width. Plan: snap the head to the same device pixel as the marker. Follow-up to MAZER-VIS-022. Not started.",
+      "cardType": "bug",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-VIS-022"
+      ],
+      "acceptanceCriteria": [
+        "The trail head uses the same device-snapped centre as the player marker",
+        "Trail corner raster baselines stay unchanged or are updated deliberately",
+        "Headless measurement shows zero offset between head and marker centre"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-026",
+      "status": "planning",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-026",
+      "title": "Decide dense-board player prominence after the tile-sized ring",
+      "description": "At 8 px tiles the old ring was 22 px across; the ring is now tile-sized, so on dense boards it is a thin ring that shows only from 2x displays, and the find-me ping in CSS pixels is what finds the player. Owner recommendation: accept this. Alternative: a screen-pixel floor applied to the glow only. Needs the owner; no decision recorded.",
+      "cardType": "governance",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-VIS-022"
+      ],
+      "acceptanceCriteria": [
+        "Owner decides: accept the thin ring on dense boards, or add a screen-pixel floor on the glow only",
+        "The decision and its reason are recorded on this card",
+        "If a floor is chosen, a build card carries the change with pixel proof"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-027",
+      "status": "planning",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-027",
+      "title": "Delete the unused backdrop glyph generators in their own wave",
+      "description": "Follow-up to MAZER-VIS-017. The pure shard, rune and sigil generators in the backdrop module are unused but remain because that file belongs to a different wave than the scene file. Plan: delete them in their own pull request, together with the pinned source assertions and the shard-count tests. Not started.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-VIS-017"
+      ],
+      "acceptanceCriteria": [
+        "The unused backdrop glyph generators are removed in their own wave",
+        "Pinned source assertions and shard-count tests are removed",
+        "Star backdrop behaviour and raster baselines are unchanged"
+      ]
+    },
+    {
+      "id": "MAZER-GOV-007",
+      "status": "completed",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GOV-007",
+      "title": "Generated work report and work ledger",
+      "description": "Merged (PR #440) and live on main 24e15cc1: a work ledger holding proof tier, blockers, verification steps and lanes, a generator with a check mode, and the generated report. The verify workflow runs the check, so a stale report fails CI. A shebang line with CRLF that broke loading of the report test on fresh Windows checkouts was fixed. Tooling only, no device surface.",
+      "cardType": "automation",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "A ledger, a generator with a check mode and a generated report exist (PR #440)",
+        "The verify workflow runs the check and fails when the report is stale",
+        "The report test loads on fresh Windows checkouts (shebang fix)"
+      ]
+    },
+    {
+      "id": "MAZER-GOV-008",
+      "status": "completed",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GOV-008",
+      "title": "Run the brand tests in CI",
+      "description": "Merged (PR #437) and live on main 24e15cc1. The brand test folder was never run by CI, which hid a conflict between two pull requests; it now runs in the verify workflow. Tooling only, no device surface.",
+      "cardType": "automation",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The brand tests run in the verify workflow (PR #437)",
+        "The conflict that the missing gate hid is fixed on main",
+        "A failing brand test fails the verify workflow"
+      ]
+    },
+    {
+      "id": "MAZER-GOV-009",
+      "status": "planning",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GOV-009",
+      "title": "Stabilise load-sensitive tests",
+      "description": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Not started.",
+      "cardType": "reliability",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The endpoint tile pixel test at tile 25.44 and device pixel ratio 3 passes under parallel load",
+        "Vitest worker task-update timeouts no longer fail full runs",
+        "Three consecutive full parallel runs pass without a rerun"
+      ]
+    },
+    {
+      "id": "MAZER-PWA-005",
+      "status": "planning",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PWA-005",
+      "title": "Provide approved app icon art with proper corners and a clean screenshot capture route",
+      "description": "Carried from MAZER-PWA-002. The icon master has baked black corners and new icon art is owner-gated; the manifest screenshots carry a small preview label because the capture route has no clean mode. Needs approved icon art from the owner, then a screenshot route without the label. Not started.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-PWA-002"
+      ],
+      "acceptanceCriteria": [
+        "Owner provides approved app icon art with proper corners",
+        "Icon files and the icon hash verifier are regenerated from the approved art",
+        "Manifest screenshots are captured without the preview label"
+      ]
+    },
+    {
+      "id": "MAZER-MOTION-006",
+      "status": "planning",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-006",
+      "title": "Migrate scene motion constants to the motion scale",
+      "description": "After PR #425 lands, move the scene own motion constants onto the motion scale module. The ones whose values are identical are mechanical; any differing value stays an owner decision (MAZER-MOTION-007). Waits on MAZER-MOTION-004 because both touch the scene file. Not started.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-MOTION-001",
+        "MAZER-MOTION-004"
+      ],
+      "acceptanceCriteria": [
+        "Scene constants with identical values read from the motion scale",
+        "No value changes and no visible change",
+        "Constants that differ from the scale are listed for MAZER-MOTION-007, not changed"
+      ]
+    },
+    {
+      "id": "MAZER-MOTION-007",
+      "status": "planning",
+      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-007",
+      "title": "Decide off-scale loops and durations and sweep dead motion code",
+      "description": "Some loops and durations do not sit on the motion scale, and some motion definitions and DOM motion code drive nothing. The owner decides which off-scale values stay or move onto the scale (each move is a visible retune); then the dead code is swept. Completes criterion 3 of MAZER-MOTION-001. No decision recorded.",
+      "cardType": "governance",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-MOTION-001"
+      ],
+      "acceptanceCriteria": [
+        "Owner decides which off-scale loops and durations move onto the scale",
+        "Dead tuning and unused DOM motion code are removed",
+        "Each retuned value has before and after capture proof"
       ]
     }
   ]
