@@ -3,18 +3,18 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-12T23:00:00.000Z"
+    "registryUpdatedAt": "2026-11-12T23:30:00.000Z"
   },
   "counters": {
-    "total": 206,
-    "open": 98,
+    "total": 210,
+    "open": 102,
     "completed": 92,
     "deferred": 16,
     "buckets": {
-      "needs-you": 51,
+      "needs-you": 52,
       "in-review": 6,
-      "blocked": 27,
-      "ready": 10,
+      "blocked": 29,
+      "ready": 11,
       "in-progress": 4,
       "unclassified": 0,
       "deferred": 16,
@@ -22,7 +22,7 @@
     },
     "needsYou": {
       "decisions": 32,
-      "checks": 19
+      "checks": 20
     },
     "completedByTier": {
       "device": 0,
@@ -35,7 +35,7 @@
       "Zac": 4,
       "provider": 2,
       "device": 1,
-      "other-card": 20,
+      "other-card": 22,
       "unknown": 0
     }
   },
@@ -482,6 +482,29 @@
             "step": "Start a sign-in from the installed app, finish it in a normal Chrome tab instead, then open the installed app from its icon.",
             "where": "phone",
             "expected": "The installed app shows the came-back-to-a-different-screen message telling you to open Mazer from your home-screen icon; tell me the diagnostics code if you can see it (expect expired or missing state)."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-GEN-006",
+        "title": "No one-tile dead-end stubs in generated mazes",
+        "status": "review",
+        "priority": "high",
+        "kind": "check",
+        "ask": "On your phone, open previewLevel=150, 218 and 300 and look at the board: no single-cell nubs hanging off corridors, every dead-end spur at least two tiles, the maze solves normally. Then say whether the shorter rising ladder and lower late difficulty feel acceptable.",
+        "recommendation": "Accept the minimum of 2 and the ladder ending at level 218; let the hazard layer (MAZER-HAZ-002) supply difficulty past it.",
+        "context": "PR #464 is merged and deployed (951ef3cf) and checked in headless Chromium and tests only; nothing is checked on a real phone, and the shorter rising ladder (ends at level 218, was 268) needs the owner judgement.",
+        "prs": "#464",
+        "verify": [
+          {
+            "step": "Open previewLevel=150 and look at the board.",
+            "where": "phone",
+            "expected": "No single-cell nubs hanging off corridors; every dead-end spur is at least two tiles; the maze solves normally."
+          },
+          {
+            "step": "Open previewLevel=218 and previewLevel=300 and look at the boards.",
+            "where": "phone",
+            "expected": "Same: no single-cell nubs, spurs of at least two tiles, solvable; level 300 is the same class as level 218."
           }
         ]
       },
@@ -2103,6 +2126,15 @@
         "derived": false
       },
       {
+        "id": "MAZER-PROG-019",
+        "title": "Revisit ladder length after the no-stub rule: another cost-free lever or hazards",
+        "status": "planning",
+        "priority": "medium",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-GEN-006 (review), MAZER-HAZ-002 (blocked).",
+        "derived": true
+      },
+      {
         "id": "MAZER-UI-010",
         "title": "Define one type scale and a second display typeface",
         "status": "planning",
@@ -2247,6 +2279,15 @@
         "derived": true
       },
       {
+        "id": "MAZER-QA-007",
+        "title": "Replace the 268 checkpoint in the level preview jump list with 218",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-GEN-006 (review).",
+        "derived": true
+      },
+      {
         "id": "MAZER-VIS-028",
         "title": "Morph the player ring between cap and chip shape instead of popping",
         "status": "planning",
@@ -2282,6 +2323,15 @@
         "waves": [
           "5C"
         ],
+        "warnings": []
+      },
+      {
+        "id": "MAZER-GEN-005",
+        "title": "Unreachable floor islands appear in about 6% of generated mazes",
+        "status": "planning",
+        "priority": "medium",
+        "filesHint": [],
+        "waves": [],
         "warnings": []
       },
       {
@@ -3383,6 +3433,22 @@
     "MAZER-PROG-018": {
       "bucket": "ready",
       "sub": null
+    },
+    "MAZER-GEN-006": {
+      "bucket": "needs-you",
+      "sub": "check"
+    },
+    "MAZER-GEN-005": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-QA-007": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-PROG-019": {
+      "bucket": "blocked",
+      "sub": "other-card"
     }
   }
 }

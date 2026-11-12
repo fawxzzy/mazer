@@ -2369,6 +2369,67 @@
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": []
+    },
+    "MAZER-GEN-006": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 464,
+            "mergedSha": "951ef3cf"
+          }
+        ],
+        "deployedBuild": "951ef3cf",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "PR #464 is merged and deployed (951ef3cf) and checked in headless Chromium and tests only; nothing is checked on a real phone, and the shorter rising ladder (ends at level 218, was 268) needs the owner judgement.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, open previewLevel=150, 218 and 300 and look at the board: no single-cell nubs hanging off corridors, every dead-end spur at least two tiles, the maze solves normally. Then say whether the shorter rising ladder and lower late difficulty feel acceptable.",
+        "recommendation": "Accept the minimum of 2 and the ladder ending at level 218; let the hazard layer (MAZER-HAZ-002) supply difficulty past it."
+      },
+      "verify": [
+        {
+          "step": "Open previewLevel=150 and look at the board.",
+          "where": "phone",
+          "expected": "No single-cell nubs hanging off corridors; every dead-end spur is at least two tiles; the maze solves normally."
+        },
+        {
+          "step": "Open previewLevel=218 and previewLevel=300 and look at the boards.",
+          "where": "phone",
+          "expected": "Same: no single-cell nubs, spurs of at least two tiles, solvable; level 300 is the same class as level 218."
+        }
+      ],
+      "lane": "owner-only",
+      "filesHint": [
+        "src/legacy-runtime/legacyMazeStubs.ts",
+        "src/legacy-runtime/legacyMazeFeltTuning.ts",
+        "src/legacy-runtime/legacyGeometryBudget.ts"
+      ],
+      "note": "PR #464 merged and deployed (951ef3cf). Device check and owner judgement on the ladder ending at 218 pending."
+    },
+    "MAZER-GEN-005": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-QA-007": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-PROG-019": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
     }
   }
 }
