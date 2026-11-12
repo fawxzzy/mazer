@@ -17,6 +17,12 @@
 export const LEGACY_AUTH_FAILURE_CODES = {
   /** Leaving for the shared account portal threw (navigation refused). */
   portalNavigationFailed: 'portal_navigation_failed',
+  /**
+   * The pre-flight before leaving for the sign-in page found the account
+   * service down, so the app stayed put (MAZER-ACCT-036). Emitted as an
+   * oauth-failure category by beginMazerOAuthAuthorization.
+   */
+  providerUnreachable: 'provider_unreachable',
   /** A shared-account session commit is held in quarantine and did not clear. */
   sessionQuarantined: 'session_quarantined',
   /** Reading the saved session threw, or the read returned an error. */
