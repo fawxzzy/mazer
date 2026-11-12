@@ -2,6 +2,8 @@
 
 Generated proof packets stay under `tmp/captures/mazer-visual-proof/` to match the ATLAS path policy for disposable visual artifacts.
 
+> **Archival pointer:** `artifacts/visual/baseline.json` (generated 2026-04-16, run `f98cebb-2026-04-16T21-45-53-862Z`) is an archival record of the old visual-proof baseline. It predates the current mobile-clean 2D shipping lane and no `npm test` or CI gate depends on it; `npm run visual:compare` still compares against it, so treat that output as historical, not as a gate for current visual changes. For a current visual change, follow `docs/PLAYBOOK_VISUAL_EVIDENCE.md` and cite fresh evidence in the PR instead of promoting or comparing against this pointer.
+
 Single-command health pack:
 
 - `npm run health` is the default future-lane gate pack for `codex/mazer-d2-learning-scorer`.
