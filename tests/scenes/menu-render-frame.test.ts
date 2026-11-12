@@ -2349,7 +2349,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.createLegacyAuthPasswordVisibilityButton(');
     expect(menuSceneSource).toContain('const passwordToggleReserve = fieldId === \'password\'');
     expect(menuSceneSource).toContain("this.authPasswordVisible ? 'text' : 'password'");
-    expect(menuSceneSource).toContain("ease: 'Sine.easeInOut'");
+    expect(menuSceneSource).toContain('ease: MOTION_PHASER_EASE_SINE_IN_OUT');
     expect(menuSceneSource).toContain('this.syncLegacyAuthNativeInputValue();');
     expect(menuSceneSource).toContain('this.destroyLegacyAuthNativeInput();');
     expect(menuSceneSource).toContain('private buildPasswordRecoveryOverlay(');
