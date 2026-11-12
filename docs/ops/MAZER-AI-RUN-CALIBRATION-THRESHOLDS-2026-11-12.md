@@ -20,7 +20,9 @@ calibration). Builds on
 ## Baseline regeneration on current main
 
 `npm run ai:corpus:baseline` was run once per pack against `origin/main`
-`1b2d8ebf`. Output is written only when content differs.
+`1b2d8ebf`, and again after rebasing onto `2aa0c46c` (which adds the progression
+`playerEvidence` diagnostics but no generator change). Both runs matched the
+committed baselines byte for byte. Output is written only when content differs.
 
 | pack | pack hash (unchanged) | resultDigest before and after (identical) | drift |
 | --- | --- | --- | --- |
