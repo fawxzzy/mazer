@@ -1,28 +1,28 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_0f6676b9e10d",
+  "export_id": "pbe_mazer_owner_registry_ef9e410f158c",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:0f6676b9e10dbdce7a08fabe4ed6129847c27f9ad45629783de5627b5d703367",
-  "generated_at": "2026-11-12T23:30:00.000Z",
+  "source_revision": "sha256:ef9e410f158c341759677fd260ca1b87caa81eabae09448e93e371397a9a6da3",
+  "generated_at": "2026-11-12T23:55:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:4f17c8ecafa3e6f088cc6b3dea20ffb79b64b72ac384e985efb9cceef93c8e90",
-      "observed_at": "2026-11-12T23:30:00.000Z"
+      "revision": "sha256:d923ba59bf6344c57c3fc5bb051da5da2a5e8537b37f18ecf83075d1c96b2541",
+      "observed_at": "2026-11-12T23:55:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
       "kind": "markdown",
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
-      "revision": "sha256:93a269a05d7a3df1a29ae485c545be7434791c8ae294c4da17512c09cd7d52ec",
-      "observed_at": "2026-11-12T23:30:00.000Z"
+      "revision": "sha256:450fa5231533681461781f7d0ce7fa7da01e90bd1fe861836e24dbaa9e60e902",
+      "observed_at": "2026-11-12T23:55:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-12T23:30:00.000Z"
+      "observed_at": "2026-11-12T23:55:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-12T23:30:00.000Z"
+      "observed_at": "2026-11-12T23:55:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-12T23:30:00.000Z"
+      "observed_at": "2026-11-12T23:55:00.000Z"
     }
   ],
   "cards": [
@@ -1934,6 +1934,113 @@
           "The owner decides to run the backfill or leave the old values",
           "If run, the exact file hash is approved first and the result is verified by readback",
           "A rollback or preimage copy exists before any row changes"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-036_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-036",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Sign-in outage handling: never strand the player on a provider error page",
+        "description": "Outage on 2026-11-12, about 20:35 to 21:11 UTC: the account provider was down (its status page listed Database Connection Errors; the project sign-in and data origin answered 503, then gateway errors 521 and 525) and the owner was left on a blank provider 503 page inside the installed app with no way back. The provider recovered about 21:11 UTC. No data was lost and nothing was caused by our changes: the last database change was more than two hours earlier and sign-in by both routes (account address and username) worked after it. Fix, merged AND deployed (PR #466 at bc912691 and PR #467 at c80d8ce9; production Mazer c80d8ce9): Sign in first asks the account service whether it is up (a 4 second probe of its public discovery document, no sign-in details sent, never stored by the browser, success cached 30 seconds, failures never cached). A 5xx, 4xx, timeout, offline state or a gateway page without the cross-origin header keeps Mazer on Welcome and shows the plain failure line Sign-in is unavailable right now. Try again in a few minutes. with diagnostics code oauth-failure:provider_unreachable; a probe refused in both modes (an extension or content-policy block) falls through and navigates as before. Owner decision accepted: a network error where a follow-up still gets an answer is treated as provider down. Live checks: the bundle carries the new strings and a real sign-in by both routes (account address and username) after the deploy succeeded with no errors. Measured: the first Sign in tap costs 100 to 250 ms more (187 to 247 ms without the probe, 293 to 500 ms with it) and 0 ms inside the 30 second cache window (cache unit-tested only). Kept in review: checked in headless Chromium with mocked failure shapes and against the live service only. NOT verified: a real phone or the installed app, a real outage, browser offline mode, an actual extension block, and a slow-but-up provider (the 4 second limit would block it; the first live probe during recovery took 4.5 seconds upstream).",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-008"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T23:55:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-036",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-036",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T23:55:00.000Z"
+      },
+      "content": {
+        "summary": "Outage on 2026-11-12, about 20:35 to 21:11 UTC: the account provider was down (its status page listed Database Connection Errors; the project sign-in and data origin answered 503, then gateway errors 521 and 525) and the owner was left on a blank provider 503 page inside the installed app with no way back. The provider recovered about 21:11 UTC. No data was lost and nothing was caused by our changes: the last database change was more than two hours earlier and sign-in by both routes (account address and username) worked after it. Fix, merged AND deployed (PR #466 at bc912691 and PR #467 at c80d8ce9; production Mazer c80d8ce9): Sign in first asks the account service whether it is up (a 4 second probe of its public discovery document, no sign-in details sent, never stored by the browser, success cached 30 seconds, failures never cached). A 5xx, 4xx, timeout, offline state or a gateway page without the cross-origin header keeps Mazer on Welcome and shows the plain failure line Sign-in is unavailable right now. Try again in a few minutes. with diagnostics code oauth-failure:provider_unreachable; a probe refused in both modes (an extension or content-policy block) falls through and navigates as before. Owner decision accepted: a network error where a follow-up still gets an answer is treated as provider down. Live checks: the bundle carries the new strings and a real sign-in by both routes (account address and username) after the deploy succeeded with no errors. Measured: the first Sign in tap costs 100 to 250 ms more (187 to 247 ms without the probe, 293 to 500 ms with it) and 0 ms inside the 30 second cache window (cache unit-tested only). Kept in review: checked in headless Chromium with mocked failure shapes and against the live service only. NOT verified: a real phone or the installed app, a real outage, browser offline mode, an actual extension block, and a slow-but-up provider (the 4 second limit would block it; the first live probe during recovery took 4.5 seconds upstream).",
+        "objective": "Outage on 2026-11-12, about 20:35 to 21:11 UTC: the account provider was down (its status page listed Database Connection Errors; the project sign-in and data origin answered 503, then gateway errors 521 and 525) and the owner was left on a blank provider 503 page inside the installed app with no way back. The provider recovered about 21:11 UTC. No data was lost and nothing was caused by our changes: the last database change was more than two hours earlier and sign-in by both routes (account address and username) worked after it. Fix, merged AND deployed (PR #466 at bc912691 and PR #467 at c80d8ce9; production Mazer c80d8ce9): Sign in first asks the account service whether it is up (a 4 second probe of its public discovery document, no sign-in details sent, never stored by the browser, success cached 30 seconds, failures never cached). A 5xx, 4xx, timeout, offline state or a gateway page without the cross-origin header keeps Mazer on Welcome and shows the plain failure line Sign-in is unavailable right now. Try again in a few minutes. with diagnostics code oauth-failure:provider_unreachable; a probe refused in both modes (an extension or content-policy block) falls through and navigates as before. Owner decision accepted: a network error where a follow-up still gets an answer is treated as provider down. Live checks: the bundle carries the new strings and a real sign-in by both routes (account address and username) after the deploy succeeded with no errors. Measured: the first Sign in tap costs 100 to 250 ms more (187 to 247 ms without the probe, 293 to 500 ms with it) and 0 ms inside the 30 second cache window (cache unit-tested only). Kept in review: checked in headless Chromium with mocked failure shapes and against the live service only. NOT verified: a real phone or the installed app, a real outage, browser offline mode, an actual extension block, and a slow-but-up provider (the 4 second limit would block it; the first live probe during recovery took 4.5 seconds upstream).",
+        "acceptance_criteria": [
+          "Failure row providerUnreachable and code oauth-failure:provider_unreachable are in production: merged and deployed (PRs #466, #467)",
+          "Sign in stays on Welcome and holds the failure line when the account service answers 5xx or 4xx, times out, is offline, or returns a gateway page: unit and headless mock tests pass; a real outage was not available",
+          "With the service reachable, tap Sign in on a real phone: it goes to the account page as before (device check pending)",
+          "With airplane mode on (or the account service blocked), tap Sign in on a real phone: Mazer stays on Welcome and shows the line for several seconds, then works again when the network is back (device check pending)"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-037_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-037",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Warm the account-service check on Welcome so the first Sign in tap pays no extra delay",
+        "description": "MAZER-ACCT-036 added a 4 second pre-flight probe before Sign in leaves the app; measured, the first tap costs 100 to 250 ms more and taps inside the 30 second cache window cost nothing. Proposal: run the same probe quietly when Welcome appears so the cache is already warm at the first tap. Needs a change to the Welcome scene (MenuScene, Wave 5C, a hot file), must never show a failure line by itself, and must not turn a slow-but-up service into a blocked Sign in. Not started.",
+        "card_type": "feature",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-036"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T23:55:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-037",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-037",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T23:55:00.000Z"
+      },
+      "content": {
+        "summary": "MAZER-ACCT-036 added a 4 second pre-flight probe before Sign in leaves the app; measured, the first tap costs 100 to 250 ms more and taps inside the 30 second cache window cost nothing. Proposal: run the same probe quietly when Welcome appears so the cache is already warm at the first tap. Needs a change to the Welcome scene (MenuScene, Wave 5C, a hot file), must never show a failure line by itself, and must not turn a slow-but-up service into a blocked Sign in. Not started.",
+        "objective": "MAZER-ACCT-036 added a 4 second pre-flight probe before Sign in leaves the app; measured, the first tap costs 100 to 250 ms more and taps inside the 30 second cache window cost nothing. Proposal: run the same probe quietly when Welcome appears so the cache is already warm at the first tap. Needs a change to the Welcome scene (MenuScene, Wave 5C, a hot file), must never show a failure line by itself, and must not turn a slow-but-up service into a blocked Sign in. Not started.",
+        "acceptance_criteria": [
+          "The probe runs when Welcome appears and reuses the existing 30 second success cache",
+          "A failed warm-up shows nothing; only a Sign in tap shows the failure line",
+          "The first Sign in tap after Welcome has no measurable extra delay when the service is up (measured before and after)"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -7060,7 +7167,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Pin every emitted sign-in failure code to the class map with a test",
-        "description": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014). Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code and fails when one is missing from the class map. Not started.",
+        "description": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014), and MAZER-ACCT-036 added provider_unreachable (code oauth-failure:provider_unreachable) for a down account service. Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code, including provider_unreachable, and fails when one is missing from the class map. Not started.",
         "card_type": "automation",
         "lifecycle": "planning",
         "priority": "low",
@@ -7069,7 +7176,7 @@
           "MAZER-ACCT-014"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-12T23:55:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-017",
         "extensions": {
           "owner_status": "planning",
@@ -7080,11 +7187,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-017",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-12T23:55:00.000Z"
       },
       "content": {
-        "summary": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014). Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code and fails when one is missing from the class map. Not started.",
-        "objective": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014). Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code and fails when one is missing from the class map. Not started.",
+        "summary": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014), and MAZER-ACCT-036 added provider_unreachable (code oauth-failure:provider_unreachable) for a down account service. Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code, including provider_unreachable, and fails when one is missing from the class map. Not started.",
+        "objective": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014), and MAZER-ACCT-036 added provider_unreachable (code oauth-failure:provider_unreachable) for a down account service. Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code, including provider_unreachable, and fails when one is missing from the class map. Not started.",
         "acceptance_criteria": [
           "The test collects every code the sign-in paths can emit",
           "It fails when a code has no class map entry",
@@ -11036,9 +11143,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 210,
-    "exported_public_card_count": 210,
-    "exported_open_card_count": 102,
+    "stable_identity_count": 212,
+    "exported_public_card_count": 212,
+    "exported_open_card_count": 104,
     "exported_completed_card_count": 92,
     "exported_deferred_card_count": 16,
     "imported_research_candidate_count": 0,

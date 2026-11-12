@@ -3,17 +3,17 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-12T23:30:00.000Z"
+    "registryUpdatedAt": "2026-11-12T23:55:00.000Z"
   },
   "counters": {
-    "total": 210,
-    "open": 102,
+    "total": 212,
+    "open": 104,
     "completed": 92,
     "deferred": 16,
     "buckets": {
-      "needs-you": 52,
+      "needs-you": 53,
       "in-review": 6,
-      "blocked": 29,
+      "blocked": 30,
       "ready": 11,
       "in-progress": 4,
       "unclassified": 0,
@@ -22,7 +22,7 @@
     },
     "needsYou": {
       "decisions": 32,
-      "checks": 20
+      "checks": 21
     },
     "completedByTier": {
       "device": 0,
@@ -35,7 +35,7 @@
       "Zac": 4,
       "provider": 2,
       "device": 1,
-      "other-card": 22,
+      "other-card": 23,
       "unknown": 0
     }
   },
@@ -482,6 +482,29 @@
             "step": "Start a sign-in from the installed app, finish it in a normal Chrome tab instead, then open the installed app from its icon.",
             "where": "phone",
             "expected": "The installed app shows the came-back-to-a-different-screen message telling you to open Mazer from your home-screen icon; tell me the diagnostics code if you can see it (expect expired or missing state)."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-ACCT-036",
+        "title": "Sign-in outage handling: never strand the player on a provider error page",
+        "status": "review",
+        "priority": "high",
+        "kind": "check",
+        "ask": "On your phone, tap Sign in with the account service reachable, then with airplane mode on, and tell me what you see each time.",
+        "recommendation": "Do it once together with the other sign-in checks; if the airplane-mode line does not appear, send the diagnostics code.",
+        "context": "Live at Mazer main c80d8ce9 and checked in headless Chromium with mocked failure shapes and against the live service only; nothing is checked on a real phone, and no real outage was available.",
+        "prs": "#466, #467",
+        "verify": [
+          {
+            "step": "With the account service reachable, tap Sign in.",
+            "where": "phone",
+            "expected": "You go to the account page as before, with at most a short extra pause on the first tap."
+          },
+          {
+            "step": "Turn on airplane mode (or block the account service), then tap Sign in.",
+            "where": "phone",
+            "expected": "Mazer stays on Welcome and shows Sign-in is unavailable right now. Try again in a few minutes. for several seconds; turn the network back on and Sign in works again."
           }
         ]
       },
@@ -2189,6 +2212,15 @@
         "derived": true
       },
       {
+        "id": "MAZER-ACCT-037",
+        "title": "Warm the account-service check on Welcome so the first Sign in tap pays no extra delay",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-ACCT-036 (review).",
+        "derived": true
+      },
+      {
         "id": "MAZER-AI-002",
         "title": "Add AI-assisted maze completion with spendable hints",
         "status": "planning",
@@ -3447,6 +3479,14 @@
       "sub": "other-card"
     },
     "MAZER-PROG-019": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-ACCT-036": {
+      "bucket": "needs-you",
+      "sub": "check"
+    },
+    "MAZER-ACCT-037": {
       "bucket": "blocked",
       "sub": "other-card"
     }

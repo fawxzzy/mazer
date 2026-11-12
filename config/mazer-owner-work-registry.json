@@ -4,14 +4,14 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-12T23:30:00.000Z",
+  "updatedAt": "2026-11-12T23:55:00.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 210,
+    "stableIdentityCount": 212,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 102,
+    "openCardCount": 104,
     "completedCardCount": 92,
     "deferredCardCount": 16,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out."
@@ -3530,11 +3530,11 @@
     {
       "id": "MAZER-PROG-017",
       "status": "planning",
-      "updatedAt": "2026-11-12T20:00:00.000Z",
+      "updatedAt": "2026-11-12T23:55:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-017",
       "title": "Pin every emitted sign-in failure code to the class map with a test",
-      "description": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014). Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code and fails when one is missing from the class map. Not started.",
+      "description": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014), and MAZER-ACCT-036 added provider_unreachable (code oauth-failure:provider_unreachable) for a down account service. Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code, including provider_unreachable, and fails when one is missing from the class map. Not started.",
       "cardType": "automation",
       "priority": "low",
       "dependencies": [
@@ -3859,6 +3859,45 @@
         "Owner states whether a ladder ending at level 218 is acceptable",
         "Candidate levers are measured for felt cost and held-out difficulty",
         "The chosen path is recorded on this card and the hazard contract card"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-036",
+      "status": "review",
+      "updatedAt": "2026-11-12T23:55:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-036",
+      "title": "Sign-in outage handling: never strand the player on a provider error page",
+      "description": "Outage on 2026-11-12, about 20:35 to 21:11 UTC: the account provider was down (its status page listed Database Connection Errors; the project sign-in and data origin answered 503, then gateway errors 521 and 525) and the owner was left on a blank provider 503 page inside the installed app with no way back. The provider recovered about 21:11 UTC. No data was lost and nothing was caused by our changes: the last database change was more than two hours earlier and sign-in by both routes (account address and username) worked after it. Fix, merged AND deployed (PR #466 at bc912691 and PR #467 at c80d8ce9; production Mazer c80d8ce9): Sign in first asks the account service whether it is up (a 4 second probe of its public discovery document, no sign-in details sent, never stored by the browser, success cached 30 seconds, failures never cached). A 5xx, 4xx, timeout, offline state or a gateway page without the cross-origin header keeps Mazer on Welcome and shows the plain failure line Sign-in is unavailable right now. Try again in a few minutes. with diagnostics code oauth-failure:provider_unreachable; a probe refused in both modes (an extension or content-policy block) falls through and navigates as before. Owner decision accepted: a network error where a follow-up still gets an answer is treated as provider down. Live checks: the bundle carries the new strings and a real sign-in by both routes (account address and username) after the deploy succeeded with no errors. Measured: the first Sign in tap costs 100 to 250 ms more (187 to 247 ms without the probe, 293 to 500 ms with it) and 0 ms inside the 30 second cache window (cache unit-tested only). Kept in review: checked in headless Chromium with mocked failure shapes and against the live service only. NOT verified: a real phone or the installed app, a real outage, browser offline mode, an actual extension block, and a slow-but-up provider (the 4 second limit would block it; the first live probe during recovery took 4.5 seconds upstream).",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-ACCT-008"
+      ],
+      "acceptanceCriteria": [
+        "Failure row providerUnreachable and code oauth-failure:provider_unreachable are in production: merged and deployed (PRs #466, #467)",
+        "Sign in stays on Welcome and holds the failure line when the account service answers 5xx or 4xx, times out, is offline, or returns a gateway page: unit and headless mock tests pass; a real outage was not available",
+        "With the service reachable, tap Sign in on a real phone: it goes to the account page as before (device check pending)",
+        "With airplane mode on (or the account service blocked), tap Sign in on a real phone: Mazer stays on Welcome and shows the line for several seconds, then works again when the network is back (device check pending)"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-037",
+      "status": "planning",
+      "updatedAt": "2026-11-12T23:55:00.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-037",
+      "title": "Warm the account-service check on Welcome so the first Sign in tap pays no extra delay",
+      "description": "MAZER-ACCT-036 added a 4 second pre-flight probe before Sign in leaves the app; measured, the first tap costs 100 to 250 ms more and taps inside the 30 second cache window cost nothing. Proposal: run the same probe quietly when Welcome appears so the cache is already warm at the first tap. Needs a change to the Welcome scene (MenuScene, Wave 5C, a hot file), must never show a failure line by itself, and must not turn a slow-but-up service into a blocked Sign in. Not started.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-ACCT-036"
+      ],
+      "acceptanceCriteria": [
+        "The probe runs when Welcome appears and reuses the existing 30 second success cache",
+        "A failed warm-up shows nothing; only a Sign in tap shows the failure line",
+        "The first Sign in tap after Welcome has no measurable extra delay when the service is up (measured before and after)"
       ]
     }
   ]

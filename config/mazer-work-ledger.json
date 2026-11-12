@@ -2430,6 +2430,58 @@
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": []
+    },
+    "MAZER-ACCT-036": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 466,
+            "mergedSha": "bc912691"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 467,
+            "mergedSha": "c80d8ce9"
+          }
+        ],
+        "deployedBuild": "c80d8ce9",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "Live at Mazer main c80d8ce9 and checked in headless Chromium with mocked failure shapes and against the live service only; nothing is checked on a real phone, and no real outage was available.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, tap Sign in with the account service reachable, then with airplane mode on, and tell me what you see each time.",
+        "recommendation": "Do it once together with the other sign-in checks; if the airplane-mode line does not appear, send the diagnostics code."
+      },
+      "verify": [
+        {
+          "step": "With the account service reachable, tap Sign in.",
+          "where": "phone",
+          "expected": "You go to the account page as before, with at most a short extra pause on the first tap."
+        },
+        {
+          "step": "Turn on airplane mode (or block the account service), then tap Sign in.",
+          "where": "phone",
+          "expected": "Mazer stays on Welcome and shows Sign-in is unavailable right now. Try again in a few minutes. for several seconds; turn the network back on and Sign in works again."
+        }
+      ],
+      "lane": "owner-only",
+      "filesHint": [
+        "src/legacy-runtime/legacyProviderPreflight.ts"
+      ],
+      "note": "PRs #466 and #467 merged and deployed (c80d8ce9). Not verified: a real phone, a real outage, browser offline mode, an extension block, a slow-but-up service."
+    },
+    "MAZER-ACCT-037": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": [
+        "src/scenes/MenuScene.ts"
+      ]
     }
   }
 }
