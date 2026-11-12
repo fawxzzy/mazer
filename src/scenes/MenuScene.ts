@@ -276,6 +276,11 @@ import {
   shouldRecoverLegacyTapAfterUiRebuild
 } from '../legacy-runtime/legacyUiTapRecovery';
 import {
+  applyLegacyUsernameRenameToSnapshot,
+  shouldRereadLegacyUsernameAfterProfileCreate,
+  type LegacyUsernameRename
+} from '../legacy-runtime/legacyAccountUsernameState';
+import {
   LEGACY_HEADER_IDENTITY_LABEL_NAME,
   LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX,
   resolveLegacyHeaderIdentityPlacement
@@ -1727,6 +1732,11 @@ export class MenuScene extends Phaser.Scene {
   // it gets its own small parallel state instead of conflating the two.
   private accountUsernameSavedValue = '';
   private accountUsernameLoadedForUserId: string | null = null;
+  // MAZER-ACCT-019: the user the one post-profile-create username re-read was done for.
+  private accountUsernameRereadForUserId: string | null = null;
+  // MAZER-ACCT-021: a rename saved this session; the header reads the auth snapshot, which a
+  // rename never updates, so the snapshot is patched with this (also on later auth refreshes).
+  private accountUsernameRename: LegacyUsernameRename | null = null;
   private accountUsernameHydrationPending = false;
   private accountUsernameHydrationError = false;
   private accountUsernameSequence = 0;
@@ -12469,6 +12479,26 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
+  // MAZER-ACCT-019: one extra username read per signed-in user after the profile bootstrap, only
+  // when the first read left no name (rule: legacyAccountUsernameState.ts). The new read bumps
+  // accountUsernameSequence, so a stale in-flight read can no longer stomp it.
+  private rereadAccountUsernameAfterProfileCreate(userId: string | null): void {
+    if (userId === null || userId !== this.authSnapshot.userId) {
+      return;
+    }
+    if (!shouldRereadLegacyUsernameAfterProfileCreate({
+      loadedForUserId: this.accountUsernameLoadedForUserId,
+      rereadForUserId: this.accountUsernameRereadForUserId,
+      savedValue: this.accountUsernameSavedValue,
+      userId
+    })) {
+      return;
+    }
+    this.accountUsernameRereadForUserId = userId;
+    this.accountUsernameLoadedForUserId = null;
+    this.loadAccountUsernameIfNeeded();
+  }
+
   private loadAccountUsernameIfNeeded(): void {
     const userId = this.authSnapshot.userId;
     if (userId === null || this.accountUsernameLoadedForUserId === userId) {
@@ -12584,6 +12614,9 @@ export class MenuScene extends Phaser.Scene {
       if (outcome.kind === 'saved') {
         this.accountUsernameSavedValue = outcome.username;
         this.accountUsernameLoadedForUserId = userId;
+        // MAZER-ACCT-021: the header name follows the rename at once.
+        this.accountUsernameRename = { userId, username: outcome.username };
+        this.authSnapshot = applyLegacyUsernameRenameToSnapshot(this.authSnapshot, this.accountUsernameRename);
         if (current) {
           this.leaderboardUsernameEditor = finishLegacyUsernameEditor(this.leaderboardUsernameEditor, outcome);
           this.destroyAccountUsernameNativeInput();
@@ -15175,6 +15208,8 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.authSnapshot = snapshot;
+    // A rename saved this session outlives a fresh auth snapshot, whose metadata name is stale (MAZER-ACCT-021).
+    this.authSnapshot = applyLegacyUsernameRenameToSnapshot(this.authSnapshot, this.accountUsernameRename);
     this.authGateAwaitingResolution = false;
     if (snapshot.status === 'authenticated') {
       this.guestPlayGranted = false;
@@ -15205,6 +15240,8 @@ export class MenuScene extends Phaser.Scene {
       // account and must not leak into the next one's account screen, even
       // for a single frame before loadAccountUsernameIfNeeded re-fetches.
       this.accountUsernameLoadedForUserId = null;
+      this.accountUsernameRereadForUserId = null;
+      this.accountUsernameRename = null;
       this.accountUsernameHydrationPending = false;
       this.accountUsernameHydrationError = false;
       this.accountUsernameSavedValue = '';
@@ -15263,6 +15300,9 @@ export class MenuScene extends Phaser.Scene {
     } catch {
       // The account-scoped local cache remains usable when the provider cannot
       // be reached. Do not turn a background refresh into a player-facing toast.
+      if (hydrationSequence === this.authAccountHydrationSequence) {
+        this.rereadAccountUsernameAfterProfileCreate(snapshot.userId);
+      }
       return;
     }
     if (
@@ -15272,6 +15312,9 @@ export class MenuScene extends Phaser.Scene {
     ) {
       return;
     }
+    // The bootstrap may just have created the profile row: a username read that ran before it
+    // saw nothing (MAZER-ACCT-019).
+    this.rereadAccountUsernameAfterProfileCreate(snapshot.userId);
 
     if (result.progressionState) {
       this.progressionState = result.progressionState;

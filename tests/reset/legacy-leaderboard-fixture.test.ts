@@ -31,7 +31,7 @@ describe('leaderboard dev/test fixture seed', () => {
   });
 
   test('knows exactly the documented shapes', () => {
-    expect([...LEGACY_LEADERBOARD_FIXTURE_SHAPES]).toEqual(['top3', 'rank57', 'empty', 'loading', 'error', 'offline', 'signed-out']);
+    expect([...LEGACY_LEADERBOARD_FIXTURE_SHAPES]).toEqual(['top3', 'rank57', 'unranked', 'empty', 'loading', 'error', 'offline', 'signed-out']);
   });
 
   test('top3 puts you at rank 2 inside the loaded rows; rank57 leaves you outside them', () => {
@@ -46,6 +46,9 @@ describe('leaderboard dev/test fixture seed', () => {
     expect(far.selfRank).toMatchObject({ hasUsername: true, rank: '57' });
     const levels = far.entries.map((e) => Number(e.playerLevel));
     expect([...levels].sort((a, b) => b - a)).toEqual(levels);
+    const unranked = buildLegacyLeaderboardFixtureData('unranked');
+    expect(unranked.entries).toHaveLength(50);
+    expect(unranked.selfRank).toBeNull();
     expect(buildLegacyLeaderboardFixtureData('empty')).toEqual({ entries: [], selfRank: null });
   });
 });
