@@ -450,6 +450,8 @@ import {
   type LegacyAuthSessionSnapshot,
   type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
+import { LEGACY_AUTH_FAILURE_CODES } from '../legacy-runtime/legacyAuthFailureCodes';
+import { resolveLegacyAuthFeedbackExpiresAtMs } from '../legacy-runtime/legacyAuthFeedbackLifetime';
 import {
   MAZER_OAUTH_SAFE_ERROR_MESSAGE,
   beginMazerOAuthAuthorization,
@@ -1324,7 +1326,6 @@ const LEGACY_PLAYER_MESSAGE_TOAST_ROW_POOL = 3;
 // handleLegacyAuthSubmit's attempt-id guard) -- this only bounds how long
 // the UI waits before letting the player try again.
 const LEGACY_AUTH_SUBMIT_TIMEOUT_MS = 12000;
-const LEGACY_AUTH_BOTTOM_FEEDBACK_DURATION_MS = 5000;
 // Extra forgiveness beyond the chevron's own drawn touch-target size when
 // resolving which hit box a tap belongs to first -- corner buttons are
 // statistically the hardest to land a precise tap on.
@@ -12954,8 +12955,15 @@ export class MenuScene extends Phaser.Scene {
       this.authSnapshot.info,
       this.authSnapshot.errorCode
     );
+    // A sign-in failure stays until the next attempt (MAZER-ACCT-015); other
+    // feedback keeps the short timer. See legacyAuthFeedbackLifetime.ts.
     this.latestAuthFeedbackMessageExpiresAtMs = message
-      ? this.time.now + LEGACY_AUTH_BOTTOM_FEEDBACK_DURATION_MS
+      ? resolveLegacyAuthFeedbackExpiresAtMs(this.time.now, {
+        authenticated: this.authSnapshot.status === 'authenticated',
+        error: this.authSnapshot.error,
+        errorCode: this.authSnapshot.errorCode,
+        info: this.authSnapshot.info
+      })
       : Number.NEGATIVE_INFINITY;
     this.pushLegacyPlayerMessage(message);
   }
@@ -14724,8 +14732,10 @@ export class MenuScene extends Phaser.Scene {
       this.authSnapshot = {
         ...this.authSnapshot,
         error: MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+        errorCode: LEGACY_AUTH_FAILURE_CODES.portalNavigationFailed,
         info: null
       };
+      this.armLegacyAuthFeedbackMessage();
       this.uiDirty = true;
     }
   }
@@ -14737,7 +14747,8 @@ export class MenuScene extends Phaser.Scene {
     this.authSubmitting = true;
     this.authOpeningStartedAtMs = -1;
     this.authOpeningTimedOut = false;
-    this.authSnapshot = { ...this.authSnapshot, error: null, errorCode: null, info: null };
+    // The next attempt dismisses the previous failure: banner, code and toast.
+    this.clearLegacyAuthFeedbackMessage();
     this.uiDirty = true;
     const result = await beginMazerOAuthAuthorization();
     if (result.status === 'failed') {
@@ -14749,6 +14760,9 @@ export class MenuScene extends Phaser.Scene {
         errorCode: result.category,
         info: null
       };
+      // Without arming, the expiry check (time >= -Infinity) cleared this
+      // failure on the very next frame (measured at 17 ms).
+      this.armLegacyAuthFeedbackMessage();
       this.uiDirty = true;
     }
   }

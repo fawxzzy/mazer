@@ -22,6 +22,7 @@ import {
   runMazerExclusiveAuthMutation
 } from './legacyAccountPortal';
 import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';
+import { LEGACY_AUTH_FAILURE_CODES, type LegacyAuthFailureCode } from './legacyAuthFailureCodes';
 import { createMazerAuthFetch } from './legacyOAuthRefresh';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
@@ -48,7 +49,8 @@ export interface LegacyAuthSessionSnapshot {
   email: string | null;
   error: string | null;
   // Diagnostics only: the internal sign-in failure code behind `error`. Never
-  // drawn to the player; present only when a shared-account callback failed.
+  // drawn to the player; present when a shared-account callback failed or a boot
+  // path failed (legacyAuthFailureCodes.ts).
   errorCode?: string | null;
   info: string | null;
   status: LegacyAuthStatus;
@@ -747,10 +749,18 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
   const oauthBootFailure = oauthBootResult.status === 'failed'
     ? { error: resolveLegacyOAuthFailureCopy(oauthBootResult.category), errorCode: oauthBootResult.category }
     : null;
+  // MAZER-ACCT-014: every other boot failure path below records its own stable
+  // code (legacyAuthFailureCodes.ts) next to the unchanged generic player copy.
+  // A callback failure from this same boot is the more specific story for the
+  // player, so it wins when both exist.
+  const createBootFailureSnapshot = (code: LegacyAuthFailureCode): LegacyAuthSessionSnapshot => ({
+    ...createLegacyGuestAuthSnapshot(),
+    ...(oauthBootFailure ?? { error: MAZER_OAUTH_SAFE_ERROR_MESSAGE, errorCode: code })
+  });
   if (isMazerOAuthSessionQuarantined()) {
     await recoverMazerOAuthSessionQuarantine();
     if (isMazerOAuthSessionQuarantined()) {
-      return { ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE };
+      return createBootFailureSnapshot(LEGACY_AUTH_FAILURE_CODES.sessionQuarantined);
     }
   }
   const client = await getLegacyAuthClient();
@@ -765,17 +775,21 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
   try {
     sessionResult = await client.auth.getSession();
   } catch {
-    return { ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE };
+    return createBootFailureSnapshot(LEGACY_AUTH_FAILURE_CODES.sessionReadFailed);
   }
   const { data, error } = sessionResult;
   if (isMazerOAuthSessionQuarantined()) {
-    return { ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE };
+    return createBootFailureSnapshot(LEGACY_AUTH_FAILURE_CODES.sessionQuarantined);
   }
+  const sessionReadErrorCode = oauthBootFailure === null && error
+    ? LEGACY_AUTH_FAILURE_CODES.sessionReadFailed
+    : null;
   const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
     error: oauthBootFailure !== null
       ? oauthBootFailure.error
       : error?.message ?? null,
     ...(oauthBootFailure !== null ? { errorCode: oauthBootFailure.errorCode } : {}),
+    ...(sessionReadErrorCode !== null ? { errorCode: sessionReadErrorCode } : {}),
     info: oauthBootResult.status === 'connected' ? 'Account connected.' : null
   });
   if (snapshot.status === 'authenticated') {
