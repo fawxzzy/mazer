@@ -1122,7 +1122,7 @@
       "verify": [],
       "lane": null,
       "filesHint": [],
-      "note": "Mazer PR #434 and FawxzzyWeb PR #119 (the previous refresh) are merged; the registry card text still says the refresh PRs are pending and is left unchanged for the owner to close."
+      "note": "Mazer PR #434 and FawxzzyWeb PR #119 (the previous refresh) are merged and the card text now says so; left in review for the owner to close."
     },
     "MAZER-GOV-005": {
       "evidence": null,
@@ -1375,14 +1375,119 @@
       "evidence": {"prs": [{"repo": "fawxzzy/FawxzzyWeb", "number": 118, "mergedSha": "db5199e9"}], "headless": false, "deviceChecked": false},
       "blocker": {
         "kind": "device",
-        "summary": "FawxzzyWeb PR #118 is merged and aliased live (2026-11-11); no real-device sign-in has been checked.",
+        "summary": "FawxzzyWeb PR #118 is merged and aliased live (2026-11-11); no real-device sign-in has been checked. This card also carries the phone check for the new Mazer profile fix (MAZER-ACCT-007, deployed at main 8f757c76).",
         "unblockedBy": "Zac",
         "ask": "Open Mazer from the home screen, sign in, and tell me whether a \"Continue to Mazer?\" screen appears.",
         "recommendation": "Do it once with your real account; if the consent screen still appears, report it and keep the card in review."
       },
       "verify": [
-        {"step":"Open Mazer from the home screen, sign out if needed, and sign in.","where":"installed-app","expected":"You land back in Mazer with NO \"Continue to Mazer?\" screen."}
+        {"step":"Open Mazer from the home screen, sign out if needed, and sign in.","where":"installed-app","expected":"You land back in Mazer with NO \"Continue to Mazer?\" screen."},
+        {"step":"With the new build, create a brand-new account from the Mazer Create Account button and sign in, then open Menu > Leaderboard.","where":"installed-app","expected":"No Choose a username gate; your row shows a Mazer-###### handle (checks MAZER-ACCT-007)."},
+        {"step":"Change a setting, close Mazer completely and reopen it.","where":"installed-app","expected":"The setting is still saved (checks MAZER-ACCT-007)."}
       ],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-007": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 446, "mergedSha": "49590f86"}, {"repo": "fawxzzy/mazer", "number": 447, "mergedSha": "8f757c76"}], "deployedBuild": "8f757c76", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": [],
+      "note": "Database function applied 2026-11-11 with the owner approval; client merged and deployed at main 8f757c76. Headless and mocks only; the phone check is on MAZER-ACCT-006."
+    },
+    "MAZER-ACCT-008": {
+      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 444, "mergedSha": "ca889604"}, {"repo": "fawxzzy/mazer", "number": 445, "mergedSha": "86fa412b"}], "deployedBuild": "8f757c76", "headless": true, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": [],
+      "note": "Unit tests and headless Chromium with failures injected; no real failing round trip and no phone. The original report is not confirmed fixed."
+    },
+    "MAZER-ACCT-009": {
+      "evidence": {"prs": [{"repo": "fawxzzy/FawxzzyWeb", "number": 121, "mergedSha": "bcfc556d"}], "headless": false, "deviceChecked": false},
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": [],
+      "note": "FawxzzyWeb PR #121 is merged and NOT live: the release carrying it still needs the requester alias moves."
+    },
+    "MAZER-ACCT-010": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "With auto-confirm on, a successful sign-up returns a session and a duplicate does not, so account existence can still be inferred from whether the user ends up signed in.",
+        "unblockedBy": "Zac",
+        "ask": "Accept the residual Create Account signal and keep auto-confirm on, or turn auto-confirm off (adds a confirmation step for every new player)?",
+        "recommendation": "Accept the current residual signal and keep auto-confirm; the rest of the form no longer discloses it and a confirmation step costs real sign-ups."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-011": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "The in-game username editor was removed, so a generated Mazer-###### handle cannot be renamed.",
+        "unblockedBy": "Zac",
+        "ask": "Should players be able to rename the generated handle from the leaderboard?",
+        "recommendation": "Yes: build a small editor that reuses the existing username save path."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-012": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": [],
+      "note": "Do after the MAZER-ACCT-011 decision: the editor may reuse the username-active flag."
+    },
+    "MAZER-ACCT-013": {
+      "evidence": null,
+      "blocker": {
+        "kind": "device",
+        "summary": "Where sign-in lands on an installed Android app versus a Chrome tab has never been run on a real phone.",
+        "unblockedBy": "Zac",
+        "ask": "On an Android phone with Mazer installed from Chrome, run the three sign-in steps below and report what you see.",
+        "recommendation": "Run all three in one sitting; the third step needs a normal Chrome tab. Related to MAZER-ACCT-003."
+      },
+      "verify": [
+        {"step":"Open Mazer from the installed home-screen icon, sign out if needed, tap Sign in and complete it normally.","where":"installed-app","expected":"You land back in Mazer signed in, with no error message."},
+        {"step":"Sign out, start a sign-in from the installed app, wait about 6 minutes on the account screen, then finish it.","where":"installed-app","expected":"It still completes (the window is 15 minutes). A took-too-long message means the window did not apply."},
+        {"step":"Start a sign-in from the installed app, finish it in a normal Chrome tab instead, then open the installed app from its icon.","where":"phone","expected":"The installed app shows the came-back-to-a-different-screen message telling you to open Mazer from your home-screen icon; tell me the diagnostics code if you can see it (expect expired or missing state)."}
+      ],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-014": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-ACCT-015": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": [],
+      "note": "Unconfirmed: measure first."
+    },
+    "MAZER-ACCT-016": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "The Galaxy S21 sign-in failure has no confirmed cause; the answers decide which candidate is real.",
+        "unblockedBy": "Zac",
+        "ask": "Please ask her: (1) Did she open Mazer from the home-screen icon, and was it Chrome she installed it from? (2) Where did she see the words about a session: the Create Account form or inside the game, and as close to word for word as possible? (3) Did a browser or address bar appear on top of the app? (4) Did she use a username or the account address, and try several times in a row (the username limit is 15 minutes)? (5) Roughly what time did she try, before or after the sign-in fixes at about midday on 2026-11-11?",
+        "recommendation": "Relay her answers on this card; do not guess a cause before then."
+      },
+      "verify": [],
       "lane": "owner-only",
       "filesHint": []
     },

@@ -3,30 +3,30 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-11T12:00:00.000Z"
+    "registryUpdatedAt": "2026-11-11T23:00:00.000Z"
   },
   "counters": {
-    "total": 163,
-    "open": 62,
-    "completed": 86,
+    "total": 173,
+    "open": 70,
+    "completed": 88,
     "deferred": 15,
     "buckets": {
-      "needs-you": 29,
-      "in-review": 3,
-      "blocked": 18,
-      "ready": 8,
+      "needs-you": 33,
+      "in-review": 4,
+      "blocked": 19,
+      "ready": 10,
       "in-progress": 4,
       "unclassified": 0,
       "deferred": 15,
-      "completed": 86
+      "completed": 88
     },
     "needsYou": {
-      "decisions": 22,
-      "checks": 7
+      "decisions": 25,
+      "checks": 8
     },
     "completedByTier": {
       "device": 0,
-      "headless": 36,
+      "headless": 38,
       "source-only": 34,
       "no-device-surface": 16,
       "unrecorded": 0
@@ -35,7 +35,7 @@
       "Zac": 3,
       "provider": 2,
       "device": 1,
-      "other-card": 12,
+      "other-card": 13,
       "unknown": 0
     }
   },
@@ -86,6 +86,42 @@
         "ask": "Do you want the build agent to record the six design picks on its own judgement, or do you want to choose them yourself?",
         "recommendation": "Say \"go\" so the build agent records each pick with its reason (quit confirm is already shipped as MAZER-FLOW-005); that unblocks MAZER-UI-010, UI-015, VIS-011 and VIS-012.",
         "context": "Six design picks are unrecorded (display font, quit confirm, START style, icon construction, backdrop, play HUD) and four graphics cards wait on them.",
+        "prs": "",
+        "verify": []
+      },
+      {
+        "id": "MAZER-ACCT-010",
+        "title": "Decide the Create Account non-enumeration trade-off and auto-confirm",
+        "status": "planning",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Accept the residual Create Account signal and keep auto-confirm on, or turn auto-confirm off (adds a confirmation step for every new player)?",
+        "recommendation": "Accept the current residual signal and keep auto-confirm; the rest of the form no longer discloses it and a confirmation step costs real sign-ups.",
+        "context": "With auto-confirm on, a successful sign-up returns a session and a duplicate does not, so account existence can still be inferred from whether the user ends up signed in.",
+        "prs": "",
+        "verify": []
+      },
+      {
+        "id": "MAZER-ACCT-011",
+        "title": "Add a leaderboard username editor for account-site players",
+        "status": "planning",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Should players be able to rename the generated handle from the leaderboard?",
+        "recommendation": "Yes: build a small editor that reuses the existing username save path.",
+        "context": "The in-game username editor was removed, so a generated Mazer-###### handle cannot be renamed.",
+        "prs": "",
+        "verify": []
+      },
+      {
+        "id": "MAZER-ACCT-016",
+        "title": "Collect the Galaxy S21 sign-in details from the owner family member",
+        "status": "planning",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Please ask her: (1) Did she open Mazer from the home-screen icon, and was it Chrome she installed it from? (2) Where did she see the words about a session: the Create Account form or inside the game, and as close to word for word as possible? (3) Did a browser or address bar appear on top of the app? (4) Did she use a username or the account address, and try several times in a row (the username limit is 15 minutes)? (5) Roughly what time did she try, before or after the sign-in fixes at about midday on 2026-11-11?",
+        "recommendation": "Relay her answers on this card; do not guess a cause before then.",
+        "context": "The Galaxy S21 sign-in failure has no confirmed cause; the answers decide which candidate is real.",
         "prs": "",
         "verify": []
       },
@@ -332,6 +368,34 @@
     ],
     "checks": [
       {
+        "id": "MAZER-ACCT-013",
+        "title": "Confirm where sign-in lands on the installed Android app",
+        "status": "planning",
+        "priority": "high",
+        "kind": "check",
+        "ask": "On an Android phone with Mazer installed from Chrome, run the three sign-in steps below and report what you see.",
+        "recommendation": "Run all three in one sitting; the third step needs a normal Chrome tab. Related to MAZER-ACCT-003.",
+        "context": "Where sign-in lands on an installed Android app versus a Chrome tab has never been run on a real phone.",
+        "prs": "",
+        "verify": [
+          {
+            "step": "Open Mazer from the installed home-screen icon, sign out if needed, tap Sign in and complete it normally.",
+            "where": "installed-app",
+            "expected": "You land back in Mazer signed in, with no error message."
+          },
+          {
+            "step": "Sign out, start a sign-in from the installed app, wait about 6 minutes on the account screen, then finish it.",
+            "where": "installed-app",
+            "expected": "It still completes (the window is 15 minutes). A took-too-long message means the window did not apply."
+          },
+          {
+            "step": "Start a sign-in from the installed app, finish it in a normal Chrome tab instead, then open the installed app from its icon.",
+            "where": "phone",
+            "expected": "The installed app shows the came-back-to-a-different-screen message telling you to open Mazer from your home-screen icon; tell me the diagnostics code if you can see it (expect expired or missing state)."
+          }
+        ]
+      },
+      {
         "id": "MAZER-QA-001",
         "title": "Verify deployed Mazer changes on a real phone and installed app",
         "status": "blocked",
@@ -416,19 +480,29 @@
       },
       {
         "id": "MAZER-ACCT-006",
-        "title": "Skip the Mazer OAuth consent screen (Continue to Mazer?): merged, not deployed",
+        "title": "Skip the Mazer OAuth consent screen (Continue to Mazer?): live, needs a device check",
         "status": "review",
         "priority": "medium",
         "kind": "check",
         "ask": "Open Mazer from the home screen, sign in, and tell me whether a \"Continue to Mazer?\" screen appears.",
         "recommendation": "Do it once with your real account; if the consent screen still appears, report it and keep the card in review.",
-        "context": "FawxzzyWeb PR #118 is merged and aliased live (2026-11-11); no real-device sign-in has been checked.",
+        "context": "FawxzzyWeb PR #118 is merged and aliased live (2026-11-11); no real-device sign-in has been checked. This card also carries the phone check for the new Mazer profile fix (MAZER-ACCT-007, deployed at main 8f757c76).",
         "prs": "FawxzzyWeb#118",
         "verify": [
           {
             "step": "Open Mazer from the home screen, sign out if needed, and sign in.",
             "where": "installed-app",
             "expected": "You land back in Mazer with NO \"Continue to Mazer?\" screen."
+          },
+          {
+            "step": "With the new build, create a brand-new account from the Mazer Create Account button and sign in, then open Menu > Leaderboard.",
+            "where": "installed-app",
+            "expected": "No Choose a username gate; your row shows a Mazer-###### handle (checks MAZER-ACCT-007)."
+          },
+          {
+            "step": "Change a setting, close Mazer completely and reopen it.",
+            "where": "installed-app",
+            "expected": "The setting is still saved (checks MAZER-ACCT-007)."
           }
         ]
       },
@@ -552,6 +626,28 @@
   "completed": {
     "device": [],
     "headless": [
+      {
+        "id": "MAZER-ACCT-007",
+        "title": "Give accounts made on the account site a Mazer profile",
+        "status": "completed",
+        "priority": "high",
+        "date": "2026-11-11",
+        "tier": "headless",
+        "prs": "#446, #447",
+        "deployedBuild": "8f757c76",
+        "updatedAt": "2026-11-11T23:00:00.000Z"
+      },
+      {
+        "id": "MAZER-ACCT-008",
+        "title": "Widen the sign-in window to 15 minutes and name each sign-in failure",
+        "status": "completed",
+        "priority": "high",
+        "date": "2026-11-11",
+        "tier": "headless",
+        "prs": "#444, #445",
+        "deployedBuild": "8f757c76",
+        "updatedAt": "2026-11-11T23:00:00.000Z"
+      },
       {
         "id": "MAZER-CTRL-001",
         "title": "Add a haptics setting and test the vibration helper: merged and deployed",
@@ -1507,12 +1603,20 @@
   },
   "inReview": [
     {
+      "id": "MAZER-ACCT-009",
+      "title": "Make the Create Account result honest",
+      "status": "review",
+      "priority": "high",
+      "prs": "FawxzzyWeb#121",
+      "note": "FawxzzyWeb PR #121 is merged and NOT live: the release carrying it still needs the requester alias moves."
+    },
+    {
       "id": "MAZER-GOV-004",
       "title": "Retire the previous project board and refresh this one from all prior discussion",
       "status": "review",
       "priority": "high",
       "prs": "",
-      "note": "Mazer PR #434 and FawxzzyWeb PR #119 (the previous refresh) are merged; the registry card text still says the refresh PRs are pending and is left unchanged for the owner to close."
+      "note": "Mazer PR #434 and FawxzzyWeb PR #119 (the previous refresh) are merged and the card text now says so; left in review for the owner to close."
     },
     {
       "id": "MAZER-MOTION-001",
@@ -1639,6 +1743,15 @@
         "derived": true
       },
       {
+        "id": "MAZER-ACCT-012",
+        "title": "Retire dead Mazer sign-up and username-editor code",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-ACCT-011 (planning).",
+        "derived": true
+      },
+      {
         "id": "MAZER-AI-002",
         "title": "Add AI-assisted maze completion with spendable hints",
         "status": "planning",
@@ -1737,6 +1850,24 @@
         "warnings": [
           "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts"
         ]
+      },
+      {
+        "id": "MAZER-ACCT-014",
+        "title": "Record the failure code on every sign-in boot failure path",
+        "status": "planning",
+        "priority": "low",
+        "filesHint": [],
+        "waves": [],
+        "warnings": []
+      },
+      {
+        "id": "MAZER-ACCT-015",
+        "title": "Check how long the sign-in failure message stays on screen",
+        "status": "planning",
+        "priority": "low",
+        "filesHint": [],
+        "waves": [],
+        "warnings": []
       },
       {
         "id": "MAZER-GOV-009",
@@ -2635,6 +2766,46 @@
       "sub": "other-card"
     },
     "MAZER-MOTION-007": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-ACCT-007": {
+      "bucket": "completed",
+      "sub": "headless"
+    },
+    "MAZER-ACCT-008": {
+      "bucket": "completed",
+      "sub": "headless"
+    },
+    "MAZER-ACCT-009": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-ACCT-010": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-ACCT-011": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-ACCT-012": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-ACCT-013": {
+      "bucket": "needs-you",
+      "sub": "check"
+    },
+    "MAZER-ACCT-014": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-ACCT-015": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-ACCT-016": {
       "bucket": "needs-you",
       "sub": "decision"
     }
