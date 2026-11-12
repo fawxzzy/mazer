@@ -2084,7 +2084,7 @@ export const runLivePlayQa = async (options = {}) => {
       productionAcceptanceContract
     );
     const initialRuntime = initialDiagnostics.runtime;
-    const initialProgressionLevel = initialRuntime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null;
+    const initialProgressionLevel = initialRuntime?.progression?.playerEvidence?.level ?? initialRuntime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null;
     const playtest = initialRuntime?.play?.playtest ?? null;
     const routePlan = solveWalkableRoute({
       player: initialRuntime?.play?.player ?? null,
@@ -2212,7 +2212,7 @@ export const runLivePlayQa = async (options = {}) => {
     assertLivePlayQaNavigationStable(navigationTracker);
     const finalDiagnostics = lifecycleProof?.finalDiagnostics ?? goalReachedDiagnostics;
     const progressionCompletionProof = summarizePlayerProgressionCompletion({
-      finalLevel: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null,
+      finalLevel: finalDiagnostics.runtime?.progression?.playerEvidence?.level ?? finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null,
       initialLevel: initialProgressionLevel,
       visibleMessages: finalDiagnostics.visual?.overlayUi?.visibleMessages
     });
@@ -2329,10 +2329,10 @@ export const runLivePlayQa = async (options = {}) => {
         visible: finalDiagnostics.visual?.touchControls?.visible ?? false,
         inputMethod,
         movementSpeed: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.movementSpeed ?? null,
-        progressionCompletedCycles: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionCompletedCycles ?? null,
-        progressionContextApplied: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionContextApplied ?? null,
-        progressionLevel: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null,
-        progressionPaceScore: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionPaceScore ?? null,
+        progressionCompletedCycles: finalDiagnostics.runtime?.progression?.playerEvidence?.completedCycles ?? finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionCompletedCycles ?? null,
+        progressionContextApplied: finalDiagnostics.runtime?.progression?.playerEvidence?.contextApplied ?? finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionContextApplied ?? null,
+        progressionLevel: finalDiagnostics.runtime?.progression?.playerEvidence?.level ?? finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null,
+        progressionPaceScore: finalDiagnostics.runtime?.progression?.playerEvidence?.paceScore ?? finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionPaceScore ?? null,
         repeatInitialDelayMs: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.repeatInitialDelayMs ?? null,
         repeatIntervalMs: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.repeatIntervalMs ?? null,
         turnDelayMs: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.turnDelayMs ?? null

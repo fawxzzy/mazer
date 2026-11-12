@@ -283,10 +283,18 @@ export interface MenuSceneRuntimeDiagnostics {
         heldControl: string | null;
         movementSpeed: number;
         movementSpeedLabel: string;
-        progressionCompletedCycles: string;
-        progressionContextApplied: boolean;
-        progressionLevel: number;
-        progressionPaceScore: number;
+        // MAZER-PROG-016: these four moved to `progression.playerEvidence`
+        // (progression section). They are still published here for one
+        // release so older QA readers keep working; the scene stops emitting
+        // them in the stacked Wave 5C change and a follow-up deletes them.
+        /** @deprecated read progression.playerEvidence.completedCycles */
+        progressionCompletedCycles?: string;
+        /** @deprecated read progression.playerEvidence.contextApplied */
+        progressionContextApplied?: boolean;
+        /** @deprecated read progression.playerEvidence.level */
+        progressionLevel?: number;
+        /** @deprecated read progression.playerEvidence.paceScore */
+        progressionPaceScore?: number;
         repeatInitialDelayMs: number;
         repeatIntervalMs: number;
         stickInitialDelayMaxMs: number;

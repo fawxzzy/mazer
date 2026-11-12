@@ -87,7 +87,7 @@ describe('level preview URL parsing', () => {
   });
 
   test('the jump list is the agreed checkpoints', () => {
-    expect([...LEGACY_LEVEL_PREVIEW_CHECKPOINTS]).toEqual([1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 268, 300]);
+    expect([...LEGACY_LEVEL_PREVIEW_CHECKPOINTS]).toEqual([1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 218, 300]);
   });
 });
 

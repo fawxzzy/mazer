@@ -35,9 +35,9 @@ export const LEGACY_LEVEL_PREVIEW_PARAM = 'previewLevel';
 export const LEGACY_LEVEL_PREVIEW_MIN_LEVEL = 1;
 /** Above this a typed/clamped level is meaningless (geometry saturates far lower); keeps ordinals small. */
 export const LEGACY_LEVEL_PREVIEW_MAX_LEVEL = 999;
-/** The jump list in the pause sheet. */
+/** The jump list in the pause sheet. 218 is the end of the strictly rising ladder (MAZER-GEN-006); 300 is on the plateau. */
 export const LEGACY_LEVEL_PREVIEW_CHECKPOINTS: readonly number[] = Object.freeze([
-  1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 268, 300
+  1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 218, 300
 ]);
 
 const POSITIVE_INTEGER_PATTERN = /^\d{1,9}$/;
