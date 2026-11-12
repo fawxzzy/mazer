@@ -1,0 +1,110 @@
+{
+  "schema": "mazer.ai-run-calibration-thresholds.v1",
+  "rules": {
+    "hard": "Every case reaches the goal, uses no reset, never beats the benchmark path, and has no profile-normalization drift. Any violation fails.",
+    "runQualityMinFloor": "floor((lowest run-quality total among standard-AI cases in the band) - 10) to a multiple of 5, never below 0.",
+    "aiPressureMedianCeiling": "ceil((highest per-target median AI pressure in the band) + 10) to a multiple of 5.",
+    "routeOverrunMaxCeiling": "(highest per-target max route-overrun ratio in the band) + 0.10, rounded to 2 decimals.",
+    "complexityMedianRange": "[0.75, 1.25] x the median of the per-target median measured complexity in the band (a before/after drift alarm, not a quality claim).",
+    "discrimination": "At least one weak-AI target must still show AI pressure median above 0 and run-quality minimum below 100; otherwise the pack no longer discriminates and needs a new version."
+  },
+  "basedOn": [
+    {
+      "packId": "mazer-ai-seed-representative",
+      "packVersion": "1.0.0",
+      "packHash": "sha256:0d6e8708fc36c5959ffb7e1a7e218a6a92930fd31520eb1c124f7764a01eb14b",
+      "resultDigest": "sha256:1c0394f9b50b9b802a43351d848aa774636179cf9facba111fdb61c02952fa03"
+    },
+    {
+      "packId": "mazer-ai-seed-stress",
+      "packVersion": "1.0.0",
+      "packHash": "sha256:70bae411f671ae4780ccbcf0c17fd52d24931a9248e438c1caf6316777f1f368",
+      "resultDigest": "sha256:41ac9201267fdc0a134fbab341306466598faef33d6ce9ec86aa4c9d06f9f9b7"
+    },
+    {
+      "packId": "mazer-ai-seed-wrap-anomaly",
+      "packVersion": "1.0.0",
+      "packHash": "sha256:fff6da86ebfc73b45d6ffadbe599b2e6b5b7516ff04b802bc1929b990f56405c",
+      "resultDigest": "sha256:f2a385dc16a4dcfbd3752d635e7cbd6793127fc9a639fbcb02c27293d1d33fab"
+    }
+  ],
+  "bands": {
+    "tutorial": {
+      "standardTargetIds": [
+        "tutorial-t8"
+      ],
+      "runQualityMinFloor": 90,
+      "aiPressureMedianCeiling": 10,
+      "routeOverrunMaxCeiling": 0.1,
+      "complexityMedianRange": {
+        "min": 25.1,
+        "max": 41.9
+      }
+    },
+    "starter": {
+      "standardTargetIds": [
+        "starter-early-t16",
+        "starter-late-t64",
+        "starter-mid-t32"
+      ],
+      "runQualityMinFloor": 90,
+      "aiPressureMedianCeiling": 10,
+      "routeOverrunMaxCeiling": 0.1,
+      "complexityMedianRange": {
+        "min": 39,
+        "max": 65
+      }
+    },
+    "explorer": {
+      "standardTargetIds": [
+        "explorer-t96",
+        "wrap-explorer-both-axes"
+      ],
+      "runQualityMinFloor": 90,
+      "aiPressureMedianCeiling": 10,
+      "routeOverrunMaxCeiling": 0.1,
+      "complexityMedianRange": {
+        "min": 135,
+        "max": 225
+      }
+    },
+    "navigator": {
+      "standardTargetIds": [
+        "navigator-t160",
+        "wrap-navigator-heavy-feeders",
+        "wrap-navigator-portrait"
+      ],
+      "runQualityMinFloor": 90,
+      "aiPressureMedianCeiling": 10,
+      "routeOverrunMaxCeiling": 0.1,
+      "complexityMedianRange": {
+        "min": 186,
+        "max": 310
+      }
+    },
+    "architect": {
+      "standardTargetIds": [
+        "architect-t280"
+      ],
+      "runQualityMinFloor": 90,
+      "aiPressureMedianCeiling": 10,
+      "routeOverrunMaxCeiling": 0.1,
+      "complexityMedianRange": {
+        "min": 222.8,
+        "max": 371.3
+      }
+    },
+    "mythic": {
+      "standardTargetIds": [
+        "mythic-t400"
+      ],
+      "runQualityMinFloor": 90,
+      "aiPressureMedianCeiling": 10,
+      "routeOverrunMaxCeiling": 0.1,
+      "complexityMedianRange": {
+        "min": 300,
+        "max": 500
+      }
+    }
+  }
+}
