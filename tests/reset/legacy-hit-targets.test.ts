@@ -170,6 +170,7 @@ describe('MenuScene interactive-zone inventory', () => {
     createButton: 'generic button; front-door Start/Login use the full-screen zone',
     createLegacyAuthActionButton: 'auth action button (44+)',
     createLegacyAuthPasswordVisibilityButton: 'password visibility toggle: size passed by caller',
+    createLegacyLeaderboardEditNameHit: 'leaderboard You row: the whole pinned row (full card width x 56 px) is the Edit name target',
     createLegacyMenuLeaderboardButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
     createLegacyMenuProfileButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
     createLegacyMenuSettingsCogButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
