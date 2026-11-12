@@ -1,38 +1,27 @@
 import { clampNumber } from './legacyDefaults';
-import {
-  compareLegacyProgressionOrdinals,
-  normalizeLegacyProgressionOrdinal,
-  type LegacyProgressionOrdinal
-} from './legacyProgression';
 
 export const LEGACY_MOVEMENT_SPEED_MIN = 0;
 export const LEGACY_MOVEMENT_SPEED_MAX = 1;
 export const LEGACY_MOVEMENT_SPEED_DEFAULT = 0.04;
 export const LEGACY_MOVEMENT_SPEED_STEP = 0.05;
-export const LEGACY_MOVEMENT_PACE_PROFILE_VERSION = 'legacy-movement-pace-v1';
+export const LEGACY_MOVEMENT_PACE_PROFILE_VERSION = 'legacy-movement-pace-v2';
 
-const LEGACY_MOVEMENT_LEVEL_ADJUSTMENT_MAX = 0.1;
-const LEGACY_MOVEMENT_PACE_ADJUSTMENT_MAX = 0.05;
+/**
+ * Owner request (Zac, 2026-11-12): the player moves a little slower overall and at one constant speed. Step rate is
+ * this factor times the previous rate, so repeat interval, hold-start delay and the touch-stick caps are divided by it.
+ * Applied once, in scaleLegacyMovementDelayMs; level and pace never change the speed.
+ */
+export const LEGACY_MOVEMENT_STEP_RATE_FACTOR = 0.92;
 
-export interface LegacyMovementSpeedProgressionContext {
-  readonly completedCycles: LegacyProgressionOrdinal;
-  // Bounded difficulty level derived from targetComplexity, never the
-  // unbounded player-facing completion ordinal.
-  readonly level: number;
-  readonly paceScore: number;
-}
+export const scaleLegacyMovementDelayMs = (delayMs: number): number => (
+  Math.round(delayMs / LEGACY_MOVEMENT_STEP_RATE_FACTOR)
+);
 
 export interface LegacyMovementSpeedProfile {
   readonly baseSpeed: number;
-  readonly completedCycles: LegacyProgressionOrdinal;
-  readonly contextApplied: boolean;
   readonly effectiveSpeed: number;
   readonly formulaVersion: typeof LEGACY_MOVEMENT_PACE_PROFILE_VERSION;
   readonly initialDelayMs: number;
-  readonly level: number;
-  readonly levelAdjustment: number;
-  readonly paceAdjustment: number;
-  readonly paceScore: number;
   readonly repeatIntervalMs: number;
   readonly turnDelayMs: number;
 }
@@ -64,51 +53,21 @@ export const quantizeLegacyMovementSpeed = (
 };
 
 export const resolveLegacyMovementSpeedProfile = (
-  speed: number,
-  context?: Partial<LegacyMovementSpeedProgressionContext>
+  speed: number
 ): LegacyMovementSpeedProfile => {
   const baseSpeed = normalizeLegacyMovementSpeed(speed);
-  const rawCompletedCycles = context?.completedCycles;
-  const rawLevel = context?.level;
-  const rawPaceScore = context?.paceScore;
-  const completedCycles = normalizeLegacyProgressionOrdinal(rawCompletedCycles);
-  const level = Math.round(clampNumber(
-    typeof rawLevel === 'number' && Number.isFinite(rawLevel) ? rawLevel : 1,
-    1,
-    99
-  ));
-  const paceScore = Math.round(clampNumber(
-    typeof rawPaceScore === 'number' && Number.isFinite(rawPaceScore) ? rawPaceScore : 50,
-    0,
-    100
-  ));
-  const contextApplied = compareLegacyProgressionOrdinals(completedCycles, '0') > 0;
-  const levelAdjustment = contextApplied
-    ? ((level - 1) / 98) * LEGACY_MOVEMENT_LEVEL_ADJUSTMENT_MAX
-    : 0;
-  const paceAdjustment = contextApplied
-    ? ((paceScore - 50) / 50) * LEGACY_MOVEMENT_PACE_ADJUSTMENT_MAX
-    : 0;
-  const preferenceEnvelope = 4 * baseSpeed * (1 - baseSpeed);
-  const effectiveSpeed = normalizeLegacyMovementSpeed(Number((
-    baseSpeed + ((levelAdjustment + paceAdjustment) * preferenceEnvelope)
-  ).toFixed(4)), baseSpeed);
+  // The Move Speed setting is the whole story: no level or pace term.
+  const effectiveSpeed = baseSpeed;
   const ease = Math.pow(effectiveSpeed, 0.82);
-  const initialDelayMs = Math.round(316 - (ease * 156));
-  const repeatIntervalMs = Math.round(132 - (ease * 54));
+  const initialDelayMs = scaleLegacyMovementDelayMs(Math.round(316 - (ease * 156)));
+  const repeatIntervalMs = scaleLegacyMovementDelayMs(Math.round(132 - (ease * 54)));
   const turnDelayMs = Math.round(initialDelayMs + 46 - (ease * 12));
 
   return {
     baseSpeed,
-    completedCycles,
-    contextApplied,
     effectiveSpeed,
     formulaVersion: LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
     initialDelayMs,
-    level,
-    levelAdjustment: Number(levelAdjustment.toFixed(4)),
-    paceAdjustment: Number(paceAdjustment.toFixed(4)),
-    paceScore,
     repeatIntervalMs,
     turnDelayMs
   };

@@ -59,7 +59,7 @@ const createFixture = (): MenuSceneRuntimeDiagnostics => ({
         arrowPointerActive: false,
         baseMovementSpeed: 0.3,
         effectiveMovementSpeed: 0.3,
-        formulaVersion: 'legacy-movement-pace-v1',
+        formulaVersion: 'legacy-movement-pace-v2',
         heldControl: null,
         movementSpeed: 0.3,
         movementSpeedLabel: '30%',

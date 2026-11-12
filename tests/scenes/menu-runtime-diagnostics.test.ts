@@ -377,7 +377,7 @@ describe('menu runtime diagnostics', () => {
             activeControls: [],
             baseMovementSpeed: 0.3,
             effectiveMovementSpeed: 0.3,
-            formulaVersion: 'legacy-movement-pace-v1',
+            formulaVersion: 'legacy-movement-pace-v2',
             heldControl: null,
             movementSpeed: 0.3,
             movementSpeedLabel: '30%',
@@ -646,7 +646,7 @@ describe('menu runtime diagnostics', () => {
       )?.play?.inputBuffer.touchSprint.turnDelayMs).toBe(300);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )?.play?.inputBuffer.touchSprint.formulaVersion).toBe('legacy-movement-pace-v1');
+      )?.play?.inputBuffer.touchSprint.formulaVersion).toBe('legacy-movement-pace-v2');
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )?.play?.inputBuffer.touchSprint.effectiveMovementSpeed).toBe(0.3);
