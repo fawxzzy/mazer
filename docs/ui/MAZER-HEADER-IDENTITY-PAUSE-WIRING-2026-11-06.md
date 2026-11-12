@@ -16,10 +16,12 @@ pause/Options header.
   (`resolveLegacyMenuPathTitleLayout`), replacing the assumed 220 px title.
   Measured (runtime diagnostics, authFixture): 390x844 title left 113 / width
   164 (room ~53 px); 320x568 title left 99 / width 123 (room ~41 px).
-- 320 px short form: below 360 px viewport width the visible-character floor is
-  4 instead of 6 (`LEGACY_HEADER_IDENTITY_SHORT_FORM_*`), so the label shows a
-  stub such as `qa-pl…` instead of dropping to icon-only. Wider phones keep the
-  6-character rule. Desktop shows the whole name.
+- Long names (MAZER-ACCT-032): the label is never hidden for a name that does not
+  fit. It shrinks to the minimum font and is cut with an ellipsis; it stays
+  icon-only only when not even one character plus the ellipsis fits
+  (`LEGACY_HEADER_IDENTITY_MIN_VISIBLE_CHARS = 1`). This replaces the earlier
+  6-character rule and the 320 px short form (floor 4), which hid a 10-character
+  name at 390 px. Desktop shows the whole name.
 - Diamonds: the label is nudged down (never up, never below the profile icon's
   bottom edge) until its text rect clears every diamond bounding square by 1 px;
   if it cannot, it is hidden. At 320 px the nudge is ~3 px. The diamonds

@@ -9,8 +9,14 @@
  * docs/ui/MAZER-LEADERBOARD-PAUSE-IDENTITY-REDESIGN-2026-11-05.md.
  */
 
-/** Hide the label (icon only) when fewer than this many characters are visible. */
-export const LEGACY_HEADER_IDENTITY_MIN_VISIBLE_CHARS = 6;
+/**
+ * Hide the label (icon only) only when fewer than this many characters are
+ * visible. MAZER-ACCT-032: the floor used to be 6 (4 on the tightest phones),
+ * which hid a 10-character name at 390 px and left the header blank. A long
+ * name is now always cut with an ellipsis; only a header with no room for even
+ * one character plus the ellipsis stays icon-only.
+ */
+export const LEGACY_HEADER_IDENTITY_MIN_VISIBLE_CHARS = 1;
 /** Horizontal gap between the profile icon's right edge and the label. */
 export const LEGACY_HEADER_IDENTITY_ICON_GAP_PX = 8;
 /** Minimum horizontal clearance between the label's right edge and the title's left edge. */
@@ -119,8 +125,7 @@ export interface LegacyHeaderIdentityLayoutInput {
   measure?: LegacyUiSizedTextMeasure;
   /**
    * Visible-character floor before the label is hidden; defaults to
-   * LEGACY_HEADER_IDENTITY_MIN_VISIBLE_CHARS. The scene lowers it on the
-   * tightest phones ("short form") instead of dropping to icon-only.
+   * LEGACY_HEADER_IDENTITY_MIN_VISIBLE_CHARS.
    */
   minVisibleChars?: number;
 }
@@ -169,9 +174,10 @@ const hidden = (
  *  - available = titleLeft - TITLE_GAP - left (also capped by the viewport edge)
  *  - shrink the font (preferred -> MIN) until the whole name fits; if it still
  *    does not fit at MIN, ellipsize at MIN
- *  - hide the label (icon only) when fewer than
+ *  - hide the label (icon only) only when fewer than
  *    min(LEGACY_HEADER_IDENTITY_MIN_VISIBLE_CHARS, name length) characters are
- *    visible at MIN. A short name that fits whole is always shown.
+ *    visible at MIN, i.e. when not even one character plus the ellipsis fits.
+ *    A name that fits whole is always shown.
  * Invariant: when visible, right <= titleLeft - TITLE_GAP.
  */
 export const resolveLegacyHeaderIdentityLayout = (

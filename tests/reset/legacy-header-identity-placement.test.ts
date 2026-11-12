@@ -7,7 +7,6 @@ import {
 } from '../../src/legacy-runtime/legacyHeaderIdentity';
 import {
   LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX,
-  LEGACY_HEADER_IDENTITY_SHORT_FORM_MIN_VISIBLE_CHARS,
   resolveHeaderControlRects,
   resolveLegacyHeaderIdentityPlacement,
   type LegacyHeaderRect as EdgeRect
@@ -108,15 +107,30 @@ describe('header identity placement (username top-left, right of the profile ico
     }
   });
 
-  test('uses a short form at 320 px (fewer visible characters) instead of dropping to icon-only', () => {
-    const tight = place(320, 568, 'qa-player');
-    expect(tight.placement.visible).toBe(true);
-    const text = tight.placement.identity.displayText;
-    expect(text.endsWith('…')).toBe(true);
-    expect(Array.from(text).length - 1).toBeGreaterThanOrEqual(LEGACY_HEADER_IDENTITY_SHORT_FORM_MIN_VISIBLE_CHARS);
-    // A phone wide enough keeps the longer rule: the same name there is whole or longer than the short form.
-    const phone = place(390, 844, 'qa-player');
-    expect(Array.from(phone.placement.identity.displayText).length).toBeGreaterThanOrEqual(Array.from(text).length);
+  // MAZER-ACCT-032: measured 2026-11-12, 'renamed-qa' (10 characters) was hidden at
+  // 390 px while 'qa-player' showed 'qa-pla…'. A name that does not fit is cut, never hidden.
+  test.each(VIEWPORTS)('a long name is cut with an ellipsis instead of hiding the label at $width x $height', ({ width, height }) => {
+    for (const name of ['renamed-qa', 'abcdefghijklmno']) {
+      const { placement } = place(width, height, name);
+      expect(placement.visible).toBe(true);
+      const text = placement.identity.displayText;
+      expect(text.length).toBeGreaterThan(0);
+      if (text !== name) {
+        expect(text.endsWith('…')).toBe(true);
+        expect(name.startsWith(text.slice(0, -1))).toBe(true);
+      }
+      expect((placement.rect as EdgeRect).right).toBeLessThanOrEqual(placement.titleLeft - LEGACY_HEADER_IDENTITY_TITLE_GAP_PX);
+    }
+  });
+
+  test('narrow widths keep the label: a 15-character name shows a stub, a short name is unchanged', () => {
+    for (const width of [320, 360, 375, 390, 430]) {
+      const { placement } = place(width, 844, 'abcdefghijklmno');
+      expect(placement.visible).toBe(true);
+      expect(placement.identity.displayText.endsWith('…')).toBe(true);
+    }
+    expect(place(390, 844, 'Zac').placement.identity.displayText).toBe('Zac');
+    expect(place(1280, 720, 'qa-player').placement.identity.displayText).toBe('qa-player');
   });
 
   test('is hidden when signed out, guest, blank or email-shaped (no label object at all)', () => {

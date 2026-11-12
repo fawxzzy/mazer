@@ -1,8 +1,13 @@
 import {
   createProviderPreflightCache,
   runProviderPreflight,
+  type ProviderPreflightDeps,
   type ProviderPreflightResult
 } from './legacyProviderPreflight';
+import {
+  createProviderPreflightWarmupState,
+  warmProviderPreflight
+} from './legacyProviderPreflightWarmup';
 
 export const MAZER_ACCOUNT_APP = 'mazer';
 export const MAZER_ACCOUNT_PORTAL_ORIGIN = 'https://account.fawxzzy.com';
@@ -152,6 +157,34 @@ export interface MazerOAuthClient {
 }
 
 const mazerProviderPreflightCache = createProviderPreflightCache();
+const mazerProviderPreflightWarmupState = createProviderPreflightWarmupState();
+
+const createBrowserProviderPreflightDeps = (): ProviderPreflightDeps => ({
+  cache: mazerProviderPreflightCache,
+  clearTimer: (handle) => clearTimeout(handle),
+  fetch: window.fetch.bind(window),
+  isOnline: () => typeof navigator === 'undefined' ? undefined : navigator.onLine,
+  now: () => Date.now(),
+  setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
+});
+
+/**
+ * MAZER-ACCT-037: run the sign-in pre-flight quietly when Welcome is drawn so
+ * the 30 s success cache is warm at the first Sign in tap. Fire and forget:
+ * never throws, never shows anything, never caches a failure. See
+ * legacyProviderPreflightWarmup.ts for the rules.
+ */
+export const warmMazerProviderPreflight = (): void => {
+  if (typeof window === 'undefined' || typeof window.fetch !== 'function') {
+    return;
+  }
+  try {
+    void warmProviderPreflight(createBrowserProviderPreflightDeps(), mazerProviderPreflightWarmupState)
+      .catch(() => undefined);
+  } catch {
+    // A warm-up is best effort; the Sign in tap still runs its own probe.
+  }
+};
 
 let mazerOAuthBootResult: MazerOAuthBootResult = { status: 'none' };
 
@@ -299,14 +332,7 @@ const resolveBrowserRuntime = (): MazerOAuthRuntimeResolution => {
           }
         },
         now: () => Date.now(),
-        preflightProvider: () => runProviderPreflight({
-          cache: mazerProviderPreflightCache,
-          clearTimer: (handle) => clearTimeout(handle),
-          fetch: window.fetch.bind(window),
-          isOnline: () => typeof navigator === 'undefined' ? undefined : navigator.onLine,
-          now: () => Date.now(),
-          setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
-        }),
+        preflightProvider: () => runProviderPreflight(createBrowserProviderPreflightDeps()),
         runExclusiveSessionTransaction: async (operation) => {
           const result = await runMazerExclusiveAuthMutation(operation);
           return result.status === 'completed' ? result.value : null;
