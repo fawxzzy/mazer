@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_BOOT_MESSAGE_COPY,
+  LEGACY_OAUTH_FAILURE_MESSAGE_COPY,
   LEGACY_OFFLINE_MESSAGE_COPY,
   LEGACY_OVERLAY_MESSAGE_COPY,
   LEGACY_REMOTE_MESSAGE_COPY
@@ -411,6 +412,7 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
     const tables = {
       LEGACY_AUTH_MESSAGE_COPY,
       LEGACY_BOOT_MESSAGE_COPY,
+      LEGACY_OAUTH_FAILURE_MESSAGE_COPY,
       LEGACY_OFFLINE_MESSAGE_COPY,
       LEGACY_OVERLAY_MESSAGE_COPY,
       LEGACY_REMOTE_MESSAGE_COPY
@@ -432,6 +434,7 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
     const tableNames = new Set([
       'LEGACY_AUTH_MESSAGE_COPY',
       'LEGACY_BOOT_MESSAGE_COPY',
+      'LEGACY_OAUTH_FAILURE_MESSAGE_COPY',
       'LEGACY_REMOTE_MESSAGE_COPY',
       'LEGACY_OFFLINE_MESSAGE_COPY',
       'LEGACY_OVERLAY_MESSAGE_COPY'
