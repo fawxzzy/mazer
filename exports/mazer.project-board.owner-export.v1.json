@@ -1,28 +1,28 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_b48297a3dd60",
+  "export_id": "pbe_mazer_owner_registry_0dfe53eaa1c7",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:b48297a3dd601a724ee84a53f995bbbade3627882a81ea731a79a0f7078aaf81",
-  "generated_at": "2026-11-12T20:00:00.000Z",
+  "source_revision": "sha256:0dfe53eaa1c7e38629032770f9235c247f73ed11c15df4b8fa62de8037d836d6",
+  "generated_at": "2026-11-12T23:00:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:5abc8081c3d0702316893405821ee3de3d581c039f4fe0f506745cbe215b4bbb",
-      "observed_at": "2026-11-12T20:00:00.000Z"
+      "revision": "sha256:5c94f6de44e840ed8071100274973a39d85eade2a7d8341d9113de7ac89445fe",
+      "observed_at": "2026-11-12T23:00:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
       "kind": "markdown",
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
-      "revision": "sha256:d2cfb6a93c23d289ae5b1974e7903c13c59c780b62c465b9e0a8bad58a4f7a25",
-      "observed_at": "2026-11-12T20:00:00.000Z"
+      "revision": "sha256:b6ef52ca95155d5227d92f8a6c443fe5a88b8344b6cbd96967f34f71cafc83f5",
+      "observed_at": "2026-11-12T23:00:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-12T20:00:00.000Z"
+      "observed_at": "2026-11-12T23:00:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-12T20:00:00.000Z"
+      "observed_at": "2026-11-12T23:00:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-12T20:00:00.000Z"
+      "observed_at": "2026-11-12T23:00:00.000Z"
     }
   ],
   "cards": [
@@ -1062,8 +1062,8 @@
         "card_id": "MAZER-ACCT-018",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Tell sign-up users their username shows on the leaderboard: merged, not deployed",
-        "description": "FawxzzyWeb PR #124 is merged (e03c7db8) and NOT deployed: the account-site sign-up screen gains the line This username shows on the Mazer leaderboard. and the duplicate-sign-up notice moves out of the button label. The live site shows neither until the production aliases move to a build that includes PR #124. The owner has not yet confirmed the copy. Kept in review: merged-not-deployed, headless and mocks only, nothing checked on a real phone.",
+        "title": "Tell sign-up users their username shows on the leaderboard: live, phone check open",
+        "description": "FawxzzyWeb PR #124 is merged (e03c7db8) and DEPLOYED with PR #125: the live account site (production aliases moved to build fawxzzyweb-4eoth56bm) shows the line This username shows on the Mazer leaderboard. on the sign-up screen, and the duplicate-sign-up notice sits out of the button label; the sign-in Edge Function (version 11) is live too. Read back on the live sign-up screen in a headless browser, not on a real phone. The owner has not yet confirmed the copy. Kept in review: deployed, headless only, nothing checked on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "medium",
@@ -1072,7 +1072,7 @@
           "MAZER-ACCT-017"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-12T23:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-018",
         "extensions": {
           "owner_status": "review",
@@ -1083,14 +1083,14 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-018",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-12T23:00:00.000Z"
       },
       "content": {
-        "summary": "FawxzzyWeb PR #124 is merged (e03c7db8) and NOT deployed: the account-site sign-up screen gains the line This username shows on the Mazer leaderboard. and the duplicate-sign-up notice moves out of the button label. The live site shows neither until the production aliases move to a build that includes PR #124. The owner has not yet confirmed the copy. Kept in review: merged-not-deployed, headless and mocks only, nothing checked on a real phone.",
-        "objective": "FawxzzyWeb PR #124 is merged (e03c7db8) and NOT deployed: the account-site sign-up screen gains the line This username shows on the Mazer leaderboard. and the duplicate-sign-up notice moves out of the button label. The live site shows neither until the production aliases move to a build that includes PR #124. The owner has not yet confirmed the copy. Kept in review: merged-not-deployed, headless and mocks only, nothing checked on a real phone.",
+        "summary": "FawxzzyWeb PR #124 is merged (e03c7db8) and DEPLOYED with PR #125: the live account site (production aliases moved to build fawxzzyweb-4eoth56bm) shows the line This username shows on the Mazer leaderboard. on the sign-up screen, and the duplicate-sign-up notice sits out of the button label; the sign-in Edge Function (version 11) is live too. Read back on the live sign-up screen in a headless browser, not on a real phone. The owner has not yet confirmed the copy. Kept in review: deployed, headless only, nothing checked on a real phone.",
+        "objective": "FawxzzyWeb PR #124 is merged (e03c7db8) and DEPLOYED with PR #125: the live account site (production aliases moved to build fawxzzyweb-4eoth56bm) shows the line This username shows on the Mazer leaderboard. on the sign-up screen, and the duplicate-sign-up notice sits out of the button label; the sign-in Edge Function (version 11) is live too. Read back on the live sign-up screen in a headless browser, not on a real phone. The owner has not yet confirmed the copy. Kept in review: deployed, headless only, nothing checked on a real phone.",
         "acceptance_criteria": [
           "The owner confirms the copy: still open",
-          "The account-site sign-up screen shows the line before a player submits: merged in FawxzzyWeb PR #124, not deployed",
+          "The account-site sign-up screen shows the line before a player submits: merged in FawxzzyWeb PR #124 and live, headless readback only",
           "Covered by a test and a headless capture of the sign-up screen: merged; capture not recorded here"
         ],
         "discoveries": [],
@@ -1374,24 +1374,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-024_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-024",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Fill the receipt typed columns the completion functions ignore",
-        "description": "The typed columns on completion receipts (completion time, path length and six more) are all default zero because the completion functions never fill them. Proposed: a before-insert trigger plus a backfill. The SQL is written and was tested on a throwaway database; it is NOT applied. It needs the owner approval of the exact file hash.",
+        "title": "Receipt typed columns now filled by a trigger and backfill; run-quality use still open",
+        "description": "APPLIED in production by the owner approval of the exact files and verified by readback. A before-insert trigger on the completion receipts fills the typed columns (completion time, path length and the rest), and a batched backfill filled 24,437 existing receipts in 13 batches of 2,000. Readback: all 26,308 receipts have a path length and completion time above zero, the trigger is enabled, no long transactions. Old values are saved in a preimage table; rollback files exist, but a rollback would overwrite later real values on those rows. Limits: the values are asserted by the client and outliers exist (one completion time above 42 million ms), so any run-quality gating must validate them; the typed columns are metadata only today. Lesson recorded: SQL hash guards must be computed from the LIVE function body (the repository copy had LF line endings while the live body had CRLF, so a first version of a stale-name script would have aborted on production), and the production SQL runner role cannot drop or disable triggers on the auth users table (owned by the auth admin role), so rollbacks drop the function with CASCADE. Not a device surface; kept in review until run-quality use is decided.",
         "card_type": "migration",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-12T23:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-024",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1399,15 +1399,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-024",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-12T23:00:00.000Z"
       },
       "content": {
-        "summary": "The typed columns on completion receipts (completion time, path length and six more) are all default zero because the completion functions never fill them. Proposed: a before-insert trigger plus a backfill. The SQL is written and was tested on a throwaway database; it is NOT applied. It needs the owner approval of the exact file hash.",
-        "objective": "The typed columns on completion receipts (completion time, path length and six more) are all default zero because the completion functions never fill them. Proposed: a before-insert trigger plus a backfill. The SQL is written and was tested on a throwaway database; it is NOT applied. It needs the owner approval of the exact file hash.",
+        "summary": "APPLIED in production by the owner approval of the exact files and verified by readback. A before-insert trigger on the completion receipts fills the typed columns (completion time, path length and the rest), and a batched backfill filled 24,437 existing receipts in 13 batches of 2,000. Readback: all 26,308 receipts have a path length and completion time above zero, the trigger is enabled, no long transactions. Old values are saved in a preimage table; rollback files exist, but a rollback would overwrite later real values on those rows. Limits: the values are asserted by the client and outliers exist (one completion time above 42 million ms), so any run-quality gating must validate them; the typed columns are metadata only today. Lesson recorded: SQL hash guards must be computed from the LIVE function body (the repository copy had LF line endings while the live body had CRLF, so a first version of a stale-name script would have aborted on production), and the production SQL runner role cannot drop or disable triggers on the auth users table (owned by the auth admin role), so rollbacks drop the function with CASCADE. Not a device surface; kept in review until run-quality use is decided.",
+        "objective": "APPLIED in production by the owner approval of the exact files and verified by readback. A before-insert trigger on the completion receipts fills the typed columns (completion time, path length and the rest), and a batched backfill filled 24,437 existing receipts in 13 batches of 2,000. Readback: all 26,308 receipts have a path length and completion time above zero, the trigger is enabled, no long transactions. Old values are saved in a preimage table; rollback files exist, but a rollback would overwrite later real values on those rows. Limits: the values are asserted by the client and outliers exist (one completion time above 42 million ms), so any run-quality gating must validate them; the typed columns are metadata only today. Lesson recorded: SQL hash guards must be computed from the LIVE function body (the repository copy had LF line endings while the live body had CRLF, so a first version of a stale-name script would have aborted on production), and the production SQL runner role cannot drop or disable triggers on the auth users table (owned by the auth admin role), so rollbacks drop the function with CASCADE. Not a device surface; kept in review until run-quality use is decided.",
         "acceptance_criteria": [
-          "The owner approves the exact SQL file hash",
-          "New receipts carry real completion time and path length",
-          "Existing receipts are backfilled and verified by readback, with a rollback file"
+          "The owner approves the exact SQL file hash: done, applied",
+          "New receipts carry real completion time and path length: trigger enabled and verified by readback",
+          "Existing receipts are backfilled and verified by readback, with a rollback file: done; run-quality gating that validates the client-asserted values is open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -1425,26 +1425,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-025_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-025",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Decide who owns the stored display name after a rename",
-        "description": "After a rename the stored profile display name keeps the old value. Recommendation: the server owns it and always sets it equal to the username; SQL and a client change that stops writing it are proposed. Neither is applied; the owner decision is pending.",
+        "title": "Stored display name is now server-owned after a rename: live, device check open",
+        "description": "Owner ruled that the server owns the stored display name and keeps it equal to the username. Client: PR #462 is merged and deployed (main 0537aa61): settings sync no longer writes the profile display name (production grants had let signed-in players edit it). Database: the patch is APPLIED, so the rename function now also writes the display name equal to the new username (one added line; applied from file hash c71a0586, live function hash verified 1b1fae6c, access rules unchanged, a rolled-back acceptance rename passed). NOT backfilled by design: 51 of 132 profiles still differ from their username and 25 are empty; an optional backfill file exists and is recommended NOT to run because it overwrites intentional values (MAZER-ACCT-034). Old installed app copies may still overwrite the display name until they update. Device check pending: rename on the Leaderboard, change Move Speed, reload; the name must be unchanged everywhere. Kept in review: headless Chromium and mocks only, not on a real phone.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-011"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-12T23:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-025",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1452,15 +1452,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-025",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-12T23:00:00.000Z"
       },
       "content": {
-        "summary": "After a rename the stored profile display name keeps the old value. Recommendation: the server owns it and always sets it equal to the username; SQL and a client change that stops writing it are proposed. Neither is applied; the owner decision is pending.",
-        "objective": "After a rename the stored profile display name keeps the old value. Recommendation: the server owns it and always sets it equal to the username; SQL and a client change that stops writing it are proposed. Neither is applied; the owner decision is pending.",
+        "summary": "Owner ruled that the server owns the stored display name and keeps it equal to the username. Client: PR #462 is merged and deployed (main 0537aa61): settings sync no longer writes the profile display name (production grants had let signed-in players edit it). Database: the patch is APPLIED, so the rename function now also writes the display name equal to the new username (one added line; applied from file hash c71a0586, live function hash verified 1b1fae6c, access rules unchanged, a rolled-back acceptance rename passed). NOT backfilled by design: 51 of 132 profiles still differ from their username and 25 are empty; an optional backfill file exists and is recommended NOT to run because it overwrites intentional values (MAZER-ACCT-034). Old installed app copies may still overwrite the display name until they update. Device check pending: rename on the Leaderboard, change Move Speed, reload; the name must be unchanged everywhere. Kept in review: headless Chromium and mocks only, not on a real phone.",
+        "objective": "Owner ruled that the server owns the stored display name and keeps it equal to the username. Client: PR #462 is merged and deployed (main 0537aa61): settings sync no longer writes the profile display name (production grants had let signed-in players edit it). Database: the patch is APPLIED, so the rename function now also writes the display name equal to the new username (one added line; applied from file hash c71a0586, live function hash verified 1b1fae6c, access rules unchanged, a rolled-back acceptance rename passed). NOT backfilled by design: 51 of 132 profiles still differ from their username and 25 are empty; an optional backfill file exists and is recommended NOT to run because it overwrites intentional values (MAZER-ACCT-034). Old installed app copies may still overwrite the display name until they update. Device check pending: rename on the Leaderboard, change Move Speed, reload; the name must be unchanged everywhere. Kept in review: headless Chromium and mocks only, not on a real phone.",
         "acceptance_criteria": [
-          "The owner decides who owns the display name",
-          "After a rename the stored display name matches the username",
-          "The client no longer writes the display name; a test covers it"
+          "The owner decides who owns the display name: decided, the server owns it",
+          "After a rename the stored display name matches the username: database patch applied and verified by readback; existing profiles are not backfilled (MAZER-ACCT-034)",
+          "The client no longer writes the display name; a test covers it: PR #462 merged and deployed, phone check open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -1589,7 +1589,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Verify the before-user-created auth hook is registered at the provider",
-        "description": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. The hook role has no read access to the Mazer profile table, so if it is registered the Mazer-namespace branch may error. Not started.",
+        "description": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. Checked 2026-11-12 on production: the hook function reads the Mazer profile table as the auth admin role, which has a column grant on username plus a row-level access policy, so the Mazer branch should work if the hook is registered (read from the grants, not proven by a live sign-up). Registration itself is still not confirmed. Not started.",
         "card_type": "reliability",
         "lifecycle": "planning",
         "priority": "medium",
@@ -1598,7 +1598,7 @@
           "MAZER-ACCT-007"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-12T23:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-028",
         "extensions": {
           "owner_status": "planning",
@@ -1609,11 +1609,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-028",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-12T23:00:00.000Z"
       },
       "content": {
-        "summary": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. The hook role has no read access to the Mazer profile table, so if it is registered the Mazer-namespace branch may error. Not started.",
-        "objective": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. The hook role has no read access to the Mazer profile table, so if it is registered the Mazer-namespace branch may error. Not started.",
+        "summary": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. Checked 2026-11-12 on production: the hook function reads the Mazer profile table as the auth admin role, which has a column grant on username plus a row-level access policy, so the Mazer branch should work if the hook is registered (read from the grants, not proven by a live sign-up). Registration itself is still not confirmed. Not started.",
+        "objective": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. Checked 2026-11-12 on production: the hook function reads the Mazer profile table as the auth admin role, which has a column grant on username plus a row-level access policy, so the Mazer branch should work if the hook is registered (read from the grants, not proven by a live sign-up). Registration itself is still not confirmed. Not started.",
         "acceptance_criteria": [
           "Registration of the hook is confirmed or ruled out and written down",
           "If registered, a sign-up from the Mazer namespace is probed and does not error",
@@ -1881,6 +1881,59 @@
           "The header after a rename plus reload is checked and written down",
           "If it reverts to the old name the rename updates the stored sign-in name",
           "A test covers the reload case"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-034_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-034",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Optionally backfill the stored display name for already renamed profiles",
+        "description": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied.",
+        "card_type": "migration",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-025"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-034",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-034",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied.",
+        "objective": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied.",
+        "acceptance_criteria": [
+          "The owner decides to run the backfill or leave the old values",
+          "If run, the exact file hash is approved first and the result is verified by readback",
+          "A rollback or preimage copy exists before any row changes"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5645,15 +5698,15 @@
         "card_id": "MAZER-PERF-002",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Cut canvas redraw cost: trail gate merged, not deployed; backdrop bake still open",
-        "description": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) and NOT deployed: the play trail is now rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Cause measured: trail rebuild cost grows with route length and plateaus around level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93.5 ms to 39.1 ms. Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Original scope still open: bake the backdrop, raise the throttle floor, and attach a real-device trace. Kept in review as merged-not-deployed, not completed.",
+        "title": "Cut canvas redraw cost: trail gate merged and live; backdrop bake still open",
+        "description": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) AND deployed to production (main 34b428fd, later builds include it): the play trail is rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Finding: while standing still the trail was rebuilt in full on every redraw, its cost grows with route length and plateaus at level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93 ms to 39 ms (a headless proxy, not a phone). Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Device check pending: open a level 300 preview (previewLevel 300), stand still 10 seconds (should be smooth), then walk continuously (may still stutter). Still open: bake the backdrop, raise the throttle floor, and attach a real-device frame trace. Kept in review: deployed, checked only in headless Chromium, not on a real phone.",
         "card_type": "reliability",
         "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-12T23:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-002",
         "extensions": {
           "owner_status": "review",
@@ -5664,16 +5717,16 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-002",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-12T23:00:00.000Z"
       },
       "content": {
-        "summary": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) and NOT deployed: the play trail is now rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Cause measured: trail rebuild cost grows with route length and plateaus around level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93.5 ms to 39.1 ms. Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Original scope still open: bake the backdrop, raise the throttle floor, and attach a real-device trace. Kept in review as merged-not-deployed, not completed.",
-        "objective": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) and NOT deployed: the play trail is now rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Cause measured: trail rebuild cost grows with route length and plateaus around level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93.5 ms to 39.1 ms. Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Original scope still open: bake the backdrop, raise the throttle floor, and attach a real-device trace. Kept in review as merged-not-deployed, not completed.",
+        "summary": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) AND deployed to production (main 34b428fd, later builds include it): the play trail is rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Finding: while standing still the trail was rebuilt in full on every redraw, its cost grows with route length and plateaus at level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93 ms to 39 ms (a headless proxy, not a phone). Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Device check pending: open a level 300 preview (previewLevel 300), stand still 10 seconds (should be smooth), then walk continuously (may still stutter). Still open: bake the backdrop, raise the throttle floor, and attach a real-device frame trace. Kept in review: deployed, checked only in headless Chromium, not on a real phone.",
+        "objective": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) AND deployed to production (main 34b428fd, later builds include it): the play trail is rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Finding: while standing still the trail was rebuilt in full on every redraw, its cost grows with route length and plateaus at level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93 ms to 39 ms (a headless proxy, not a phone). Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Device check pending: open a level 300 preview (previewLevel 300), stand still 10 seconds (should be smooth), then walk continuously (may still stutter). Still open: bake the backdrop, raise the throttle floor, and attach a real-device frame trace. Kept in review: deployed, checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
-          "Trail rebuilt only when it can differ and the shortest route memoised: PR #459 merged, not deployed",
+          "Trail rebuilt only when it can differ and the shortest route memoised: PR #459 merged and deployed (34b428fd), headless only",
           "Backdrop is baked or cached and static screens stop reallocating: open",
           "Throttle floor raised from 250 ms to about 66 ms: open",
-          "Real-device frame trace attached: open"
+          "Real-device frame trace attached, including the level 300 still and walking check: open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5748,20 +5801,20 @@
         "card_id": "MAZER-PERF-004",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Incremental head-only trail update while the player moves",
-        "description": "PR #459 (MAZER-PERF-002) made still frames cheaper but left the cost while walking unchanged, because every step still rebuilds the whole trail. Plan: while the player moves, update only the head segment instead of rebuilding the trail. A worker is building it now; nothing is merged.",
+        "title": "Cheaper trail while walking: draft PR #461 needs an owner decision, no pixel parity",
+        "description": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged.",
         "card_type": "reliability",
-        "lifecycle": "in-progress",
+        "lifecycle": "blocked",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-PERF-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-12T23:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-004",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "blocked",
           "public_safe": true
         }
       },
@@ -5769,15 +5822,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-004",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-12T23:00:00.000Z"
       },
       "content": {
-        "summary": "PR #459 (MAZER-PERF-002) made still frames cheaper but left the cost while walking unchanged, because every step still rebuilds the whole trail. Plan: while the player moves, update only the head segment instead of rebuilding the trail. A worker is building it now; nothing is merged.",
-        "objective": "PR #459 (MAZER-PERF-002) made still frames cheaper but left the cost while walking unchanged, because every step still rebuilds the whole trail. Plan: while the player moves, update only the head segment instead of rebuilding the trail. A worker is building it now; nothing is merged.",
+        "summary": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged.",
+        "objective": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged.",
         "acceptance_criteria": [
-          "Walking frame cost on a long route is measured before and after",
-          "Only the head segment is redrawn per step; the trail picture is pixel-identical to a full rebuild",
-          "Trail pixel baselines stay unchanged and a test covers the incremental path"
+          "Walking frame cost on a long route is measured before and after: measured in the draft, about 1.3 to 2 times cheaper, headless proxy",
+          "Pixel parity with a full rebuild is not possible with a tail-split cache; the owner chooses among options A to D after a phone check: open",
+          "Trail pixel baselines and a test covering the chosen path stay green before any merge: open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -6931,6 +6984,57 @@
           "The test collects every code the sign-in paths can emit",
           "It fails when a code has no class map entry",
           "It runs in the normal verify workflow"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-prog-018_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PROG-018",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Test every database change on a faithful scratch Postgres 17 and pin the live hash",
+        "description": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Not started.",
+        "card_type": "automation",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-12T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-018",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-018",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Not started.",
+        "objective": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Not started.",
+        "acceptance_criteria": [
+          "The rule is written in the repository docs and referenced by the SQL proposal checklist",
+          "A reusable scratch Postgres 17 harness runs an applied file plus its rollback",
+          "A read-only preimage query pack reads the live function body and computes the hash the guard pins"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -10720,9 +10824,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 204,
-    "exported_public_card_count": 204,
-    "exported_open_card_count": 96,
+    "stable_identity_count": 206,
+    "exported_public_card_count": 206,
+    "exported_open_card_count": 98,
     "exported_completed_card_count": 92,
     "exported_deferred_card_count": 16,
     "imported_research_candidate_count": 0,

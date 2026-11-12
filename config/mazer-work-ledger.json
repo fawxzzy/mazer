@@ -479,21 +479,22 @@
             "mergedSha": "7d6312eb"
           }
         ],
+        "deployedBuild": "34b428fd",
         "headless": true,
         "deviceChecked": false
       },
       "blocker": {
         "kind": "device",
-        "summary": "PR #459 is merged but not deployed; the backdrop bake and throttle floor are not built; the fix needs a real-device frame trace to prove it.",
+        "summary": "PR #459 is merged and deployed (34b428fd) and checked in headless Chromium only; the backdrop bake and throttle floor are not built; a real-device trace is missing.",
         "unblockedBy": "Zac",
-        "ask": "After the next Mazer deploy, check a level 300 preview: walk to just before the goal, stand still 10 seconds, then walk continuously, and capture a frame trace on your phone.",
-        "recommendation": "Standing still should now be smooth; continuous walking may still stutter (that is MAZER-PERF-004). Build the backdrop bake next so one trace shows both."
+        "ask": "On your phone, open a level 300 preview, stand still 10 seconds, then walk continuously, and tell me how each feels; capture a frame trace if you can.",
+        "recommendation": "Standing still should now be smooth; continuous walking may still stutter (MAZER-PERF-004). Build the backdrop bake next so one trace shows both."
       },
       "verify": [
         {
-          "step": "After the next Mazer deploy, open a level 300 preview (previewLevel 300), walk to just before the goal and stand still for 10 seconds.",
+          "step": "Open a level 300 preview (previewLevel 300), walk to just before the goal and stand still for 10 seconds.",
           "where": "phone",
-          "expected": "Still frames are smooth (about 39 ms of draw per still frame in the headless measurement, was about 94 ms)."
+          "expected": "Still frames are smooth (about 39 ms of draw per still frame in the headless measurement, was about 93 ms)."
         },
         {
           "step": "On the same level, walk continuously.",
@@ -512,7 +513,7 @@
         "src/legacy-runtime/legacyAnimationCadence.ts",
         "src/scenes/MenuScene.ts"
       ],
-      "note": "PR #459 merged, not deployed. Open: backdrop bake, throttle floor, device trace."
+      "note": "PR #459 merged and deployed (34b428fd). Open: backdrop bake, throttle floor, device trace."
     },
     "MAZER-PROG-001": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 373}], "headless": false, "deviceChecked": false},
@@ -1900,26 +1901,27 @@
             "mergedSha": "e03c7db8"
           }
         ],
-        "headless": false,
+        "deployedBuild": "fawxzzyweb-4eoth56bm",
+        "headless": true,
         "deviceChecked": false
       },
       "blocker": {
         "kind": "owner-decision",
-        "summary": "PR #124 is merged but not deployed, and the copy of the line has not been confirmed by the owner.",
+        "summary": "PR #124 is merged and live (headless readback of the sign-up screen); the owner has not confirmed the copy and nothing is checked on a phone.",
         "unblockedBy": "Zac",
-        "ask": "Confirm the sign-up line copy (This username shows on the Mazer leaderboard.) and move the production aliases to the build that includes FawxzzyWeb PR #124.",
-        "recommendation": "Keep the copy; check it on the live sign-up screen after the alias move."
+        "ask": "Confirm the sign-up line copy (This username shows on the Mazer leaderboard.) and look at it once on your phone.",
+        "recommendation": "Keep the copy."
       },
       "verify": [
         {
-          "step": "After the alias move, open the account-site Create Account screen on your phone.",
+          "step": "Open the account-site Create Account screen on your phone.",
           "where": "production",
           "expected": "The line This username shows on the Mazer leaderboard. is visible before you submit; a duplicate sign-up notice appears as its own line, not in the button label."
         }
       ],
       "lane": "owner-only",
       "filesHint": [],
-      "note": "Merged, not deployed (FawxzzyWeb PR #124)."
+      "note": "Merged and live (FawxzzyWeb PR #124 with #125); kept in review until copy confirmed and phone check."
     },
     "MAZER-ACCT-019": {
       "evidence": {
@@ -2119,12 +2121,27 @@
       "filesHint": []
     },
     "MAZER-PERF-004": {
-      "evidence": null,
-      "blocker": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 461
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Draft PR #461 (head 476e5cf2, CI not started, not merged) cuts walking frame cost about 1.3 to 2 times but cannot keep pixel parity: trail colour, sheen and breath would step every 250 ms to 1 s on long routes.",
+        "unblockedBy": "Zac",
+        "ask": "After a phone check, choose: A ship as is; B cap cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker.",
+        "recommendation": "D as the follow-up; the draft stays unmerged until you choose."
+      },
       "verify": [],
-      "lane": "agent-buildable",
+      "lane": "owner-only",
       "filesHint": [],
-      "note": "In progress: a worker is building it."
+      "note": "Blocked on an owner decision; draft PR #461 is not merged."
     },
     "MAZER-PERF-005": {
       "evidence": null,
@@ -2205,30 +2222,47 @@
       "filesHint": []
     },
     "MAZER-ACCT-024": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "The SQL is written and scratch-tested but changes a live table.",
-        "unblockedBy": "Zac",
-        "ask": "Approve the exact SQL file hash for the receipt trigger and backfill, or say not now.",
-        "recommendation": "Approve after a read of the file; the rollback is a single drop."
+      "evidence": {
+        "prs": [],
+        "headless": false,
+        "deviceChecked": null
       },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
-      "filesHint": []
+      "filesHint": [],
+      "note": "Applied in production and verified by readback (trigger enabled, all receipts have path length and completion time). No device surface; run-quality gating that validates client-asserted values is open."
     },
     "MAZER-ACCT-025": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "Two writers can leave the stored display name stale after a rename.",
-        "unblockedBy": "Zac",
-        "ask": "Should the server own the display name and always set it equal to the username?",
-        "recommendation": "Yes: one owner, no stale copy; apply the SQL and stop the client writing it."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 462,
+            "mergedSha": "0537aa61"
+          }
+        ],
+        "deployedBuild": "0537aa61",
+        "headless": true,
+        "deviceChecked": false
       },
-      "verify": [],
+      "blocker": {
+        "kind": "device",
+        "summary": "Client PR #462 is live at main 0537aa61 and the database patch is applied and verified by readback; nothing is checked on a real phone.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, rename on the Leaderboard, change Move Speed in Settings, reload, and tell me whether the name is unchanged everywhere.",
+        "recommendation": "Do it once. Old installed app copies may overwrite the display name until they update."
+      },
+      "verify": [
+        {
+          "step": "Rename yourself on the Leaderboard, change Move Speed in Settings, then reload the app.",
+          "where": "installed-app",
+          "expected": "The name is unchanged everywhere (header, Leaderboard, Settings)."
+        }
+      ],
       "lane": "owner-only",
-      "filesHint": []
+      "filesHint": [],
+      "note": "Merged and deployed (PR #462) and database patch applied; kept in review until a phone check. Existing profiles are not backfilled (MAZER-ACCT-034)."
     },
     "MAZER-ACCT-026": {
       "evidence": null,
@@ -2260,7 +2294,7 @@
       "evidence": null,
       "blocker": {
         "kind": "provider",
-        "summary": "Hook registration lives in the provider dashboard.",
+        "summary": "Hook registration lives in the provider dashboard; the hook function itself can read the Mazer profile table (column grant plus a policy).",
         "unblockedBy": "Zac",
         "ask": "Read the auth hook settings in the provider dashboard and tell me whether the before-user-created hook is set.",
         "recommendation": "Read it once; if set, run one probe sign-up from the Mazer namespace."
@@ -2310,6 +2344,26 @@
       "filesHint": []
     },
     "MAZER-ACCT-033": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-ACCT-034": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Backfilling overwrites display names players may have chosen on purpose.",
+        "unblockedBy": "Zac",
+        "ask": "Run the optional display name backfill, or leave the old values?",
+        "recommendation": "Do not run it."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-PROG-018": {
       "evidence": null,
       "blocker": null,
       "verify": [],
