@@ -1,21 +1,16 @@
 import { describe, expect, test } from 'vitest';
 import {
-  LEGACY_MENU_BACKDROP_SHARD_COUNT,
   LEGACY_MENU_BACKDROP_MOTION_PROFILE,
   LEGACY_MENU_BACKDROP_STAR_MOTION,
-  LEGACY_MENU_DRIFT_RUNE_COUNT,
-  LEGACY_MENU_GLASS_SHARD_COUNT,
   LEGACY_MENU_STAR_COUNT,
   advanceLegacyMenuBackdropStars,
   createLegacyMenuBackdropStars,
-  resolveLegacyMenuBackdropDriftRunes,
-  resolveLegacyMenuBackdropGlassShards,
   resolveLegacyMenuBackdropPalette,
-  resolveLegacyMenuBackdropShards,
   resolveLegacyMenuBackdropStreakLength,
   resolveLegacyMenuBackdropTailStep,
   resolveLegacyMenuBackdropWarpDistance
 } from '../../src/legacy-runtime/legacyMenuBackdrop';
+import * as backdropModule from '../../src/legacy-runtime/legacyMenuBackdrop';
 import { cyberArcadeMaterial } from '../../src/render/cyberArcadeMaterial';
 
 describe('legacyMenuBackdrop', () => {
@@ -94,42 +89,23 @@ describe('legacyMenuBackdrop', () => {
       starAlphaScale: 0.74,
       overlayAlpha: 0.1
     });
-
-    const shards = resolveLegacyMenuBackdropShards(1280, 720, false);
-    expect(shards).toHaveLength(LEGACY_MENU_BACKDROP_SHARD_COUNT);
-    expect(shards[0].x).toBeCloseTo(70.4, 1);
-    expect(shards[0].length).toBeCloseTo(111.6, 1);
-    expect(shards[0].thickness).toBeCloseTo(4, 2);
-    expect(shards[1].x).toBeCloseTo(1209.6, 1);
-    expect(shards[1].length).toBeCloseTo(115.2, 1);
-    expect(shards[5].alpha).toBeGreaterThan(0.017);
   });
 
-  test('resolves low-count glass shards and runes with visible motion only when requested', () => {
-    const staticShards = resolveLegacyMenuBackdropGlassShards(390, 844, false, 0, false);
-    const animatedShards = resolveLegacyMenuBackdropGlassShards(390, 844, false, 4000, true);
-    const staticRunes = resolveLegacyMenuBackdropDriftRunes(390, 844, false, 0, false);
-    const animatedRunes = resolveLegacyMenuBackdropDriftRunes(390, 844, false, 4000, true);
-    const staticAtLaterTime = resolveLegacyMenuBackdropGlassShards(390, 844, false, 4000, false);
-
-    expect(staticShards).toHaveLength(LEGACY_MENU_GLASS_SHARD_COUNT);
-    expect(staticRunes).toHaveLength(LEGACY_MENU_DRIFT_RUNE_COUNT);
-    expect(staticShards[0].length).toBeCloseTo(35.9, 1);
-    expect(staticShards[0].thickness).toBeCloseTo(3, 1);
-    expect(staticShards[0].alpha).toBeCloseTo(0.042, 3);
-    expect(staticRunes[0].size).toBeGreaterThanOrEqual(3);
-    expect(staticAtLaterTime).toEqual(staticShards);
-    expect(animatedShards[0].x).not.toBe(staticShards[0].x);
-    expect(animatedRunes[1].x).not.toBe(staticRunes[1].x);
-    expect(Math.abs(animatedShards[0].x - staticShards[0].x)).toBeGreaterThan(5);
-    expect(Math.abs(animatedRunes[1].x - staticRunes[1].x)).toBeGreaterThan(20);
-    expect(animatedShards[0].alpha).not.toBe(staticShards[0].alpha);
-    expect(animatedRunes[1].alpha).not.toBe(staticRunes[1].alpha);
-
-    const darkShards = resolveLegacyMenuBackdropGlassShards(390, 844, true, 0, false);
-    const darkRunes = resolveLegacyMenuBackdropDriftRunes(390, 844, true, 0, false);
-    expect(darkShards[0].alpha).toBeLessThan(staticShards[0].alpha);
-    expect(darkRunes[0].alpha).toBeLessThan(staticRunes[0].alpha);
+  // MAZER-VIS-027: the unused angular shard, glass shard and drift rune generators (and their counts and
+  // pinned source strings) are deleted; the backdrop module is the round star field and its palette only.
+  test('exposes only the star backdrop surface', () => {
+    expect(Object.keys(backdropModule).sort()).toEqual([
+      'LEGACY_MENU_BACKDROP_MOTION_PROFILE',
+      'LEGACY_MENU_BACKDROP_STAR_MOTION',
+      'LEGACY_MENU_STAR_COUNT',
+      'advanceLegacyMenuBackdropStars',
+      'createLegacyMenuBackdropStars',
+      'resolveLegacyMenuBackdropPalette',
+      'resolveLegacyMenuBackdropStreakLength',
+      'resolveLegacyMenuBackdropTailStep',
+      'resolveLegacyMenuBackdropWarpDistance',
+      'resolveLegacyMenuBackdropWarpVector'
+    ]);
   });
 
   test('keeps star streaks short with smooth inward radial tails', () => {
