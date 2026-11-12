@@ -240,6 +240,8 @@ export interface PlayerMarkerDrawInput {
   reducedMotion: boolean;
   /** On a start / goal tile: that tile's corner radii, so the ring follows the cap shape (playerLocator.ts). */
   tileCornerRadii?: LocatorTileRadii | null;
+  /** 0..1 share of the cap shape on those corners while gliding on or off the tile (playerRingMorph.ts); omitted = 1. */
+  tileCornerBlend?: number;
 }
 
 /**
@@ -268,7 +270,8 @@ export const drawPlayerMarker = (
     timeMs: input.timeMs,
     pingStartMs: input.pingStartMs,
     reducedMotion: input.reducedMotion,
-    tileCornerRadii: input.tileCornerRadii ?? null
+    tileCornerRadii: input.tileCornerRadii ?? null,
+    tileCornerBlend: input.tileCornerBlend ?? 1
   });
   const left = frame.centerX - frame.coreHalfWidth;
   const top = frame.centerY - frame.coreHalfHeight;

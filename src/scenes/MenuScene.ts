@@ -48,7 +48,6 @@ import {
   drawPlayerMarker,
   resolvePlayerMarkerCenter,
   resolvePlayerMarkerDiagnosticRadii,
-  resolvePlayerMarkerEndpointRadii,
   resolvePlayerMarkerFrame,
   type PlayerMarkerFrame
 } from '../render/playerMarker';
@@ -90,6 +89,7 @@ import {
 } from '../render/navigationCoreTrail';
 import { resolveTrailGridPathWithHead } from '../render/trailHeadPath';
 import { buildDeviceSnappedTrailPath } from '../render/trailDeviceSnap';
+import { createPlayerRingMorph, resolvePlayerMarkerEndpointMorph } from '../render/playerRingMorph';
 import { TrailPerfectPathCache } from '../render/trailPerfectPathCache';
 import { observeTrailFrameCost, shouldRebuildTrail, type TrailDrawRecord } from '../render/trailRedrawGate';
 import {
@@ -2102,6 +2102,7 @@ export class MenuScene extends Phaser.Scene {
   // Blocked-move feedback (MAZER-MOTION-003): a short whole-pixel nudge toward the wall plus a light buzz.
   private wallBump: { startedAtMs: number; deltaX: number; deltaY: number } | null = null;
   private lastWallBumpBuzzAtMs: number | null = null;
+  private readonly playerRingMorphScratch = createPlayerRingMorph();
   private lastPlayerVisualMotionSnapReason: LegacyPlayerVisualMotionSnapReason = null;
   // One shared, PAUSABLE animation clock for Navigation Core v1's continuous
   // trail (base spectral color phase + shared shine distance + its quiet
@@ -9613,6 +9614,8 @@ export class MenuScene extends Phaser.Scene {
     // screen is exactly what a rebuild would paint. src/render/trailRedrawGate.ts.
     const gateMotionPlan = this.resolveLegacyTrailMotionPlan();
     const gateSnappedOrigin = this.boardTileLayer.snappedOrigin;
+    // The head follows the marker's wall-bump nudge (MAZER-VIS-029); a change of nudge is a change of picture.
+    const headNudge = this.resolveLegacyWallBumpNudge(time);
     const gateStamp = {
       routeRevision: this.trailPerfectPathCache.revision,
       previousTileKey: previousTrailTile ? `${previousTrailTile.x},${previousTrailTile.y}` : '',
@@ -9622,7 +9625,7 @@ export class MenuScene extends Phaser.Scene {
       originY,
       tileSize,
       alphaMultiplier,
-      styleKey: `${this.boardTileStyle}|${this.boardZoomContainer.scaleX}|${this.boardZoomContainer.scaleY}|${gateSnappedOrigin?.x ?? ''},${gateSnappedOrigin?.y ?? ''}|${this.resolveBoardTileBackingScale()}|${this.settings.toggleTrailFade ? 1 : 0}|${gateMotionPlan.shineVisible ? 1 : 0}|${gateMotionPlan.colourDrifts ? 1 : 0}`
+      styleKey: `${this.boardTileStyle}|${this.boardZoomContainer.scaleX}|${this.boardZoomContainer.scaleY}|${gateSnappedOrigin?.x ?? ''},${gateSnappedOrigin?.y ?? ''}|${this.resolveBoardTileBackingScale()}|${this.settings.toggleTrailFade ? 1 : 0}|${gateMotionPlan.shineVisible ? 1 : 0}|${gateMotionPlan.colourDrifts ? 1 : 0}|${headNudge.x},${headNudge.y}`
     };
     if (this.trailDrawRecord !== null) {
       observeTrailFrameCost(this.trailDrawRecord, time);
@@ -9657,7 +9660,8 @@ export class MenuScene extends Phaser.Scene {
       tileSize,
       devicePixelRatio: this.resolveBoardTileBackingScale(),
       cornerRadiusRatio: LEGACY_PLAY_TRAIL_CORNER_RADIUS_RATIO,
-      playerTrimRatio: LEGACY_PLAY_TRAIL_PLAYER_TRIM_RATIO
+      playerTrimRatio: LEGACY_PLAY_TRAIL_PLAYER_TRIM_RATIO,
+      headOffset: headNudge
     });
     if (geometry.totalLength <= 0 || geometry.vertices.length < 2) {
       return;
@@ -10075,6 +10079,10 @@ export class MenuScene extends Phaser.Scene {
       headingX: motionPose.headingX,
       headingY: motionPose.headingY
     }, this.playerMarkerFrameScratch);
+    const endpointMorph = resolvePlayerMarkerEndpointMorph(
+      point.x, point.y, this.maze.start, this.maze.goal, this.boardTileLayer.endpointTiles, reducedMotion,
+      this.playerRingMorphScratch
+    );
     // Soft shadowBlur glow (a canvas image under the Graphics), then locator, block and accent stroke.
     this.drawPlayerGlowCanvas(frame, tileSize, alpha, playerCoreColor);
     drawPlayerMarker(this.boardDynamicGraphics, frame, {
@@ -10083,14 +10091,9 @@ export class MenuScene extends Phaser.Scene {
       alpha,
       timeMs: time,
       coreColor: playerCoreColor,
-      // On the start / goal (dead-end cap) tile the ring follows the tile's rounded shape.
-      tileCornerRadii: resolvePlayerMarkerEndpointRadii(
-        point.x,
-        point.y,
-        this.maze.start,
-        this.maze.goal,
-        this.boardTileLayer.endpointTiles
-      ),
+      // On the start / goal (dead-end cap) tile the ring follows the tile's rounded shape, morphing while gliding on or off.
+      tileCornerRadii: endpointMorph.radii,
+      tileCornerBlend: endpointMorph.blend,
       pingStartMs: this.playerLocatorState.activePingStartMs,
       reducedMotion
     });
