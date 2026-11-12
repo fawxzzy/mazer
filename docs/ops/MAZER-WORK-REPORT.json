@@ -3,26 +3,26 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-12T14:00:00.000Z"
+    "registryUpdatedAt": "2026-11-12T20:00:00.000Z"
   },
   "counters": {
-    "total": 184,
-    "open": 76,
+    "total": 204,
+    "open": 96,
     "completed": 92,
     "deferred": 16,
     "buckets": {
-      "needs-you": 33,
-      "in-review": 4,
-      "blocked": 18,
-      "ready": 17,
-      "in-progress": 4,
+      "needs-you": 50,
+      "in-review": 5,
+      "blocked": 27,
+      "ready": 9,
+      "in-progress": 5,
       "unclassified": 0,
       "deferred": 16,
       "completed": 92
     },
     "needsYou": {
-      "decisions": 24,
-      "checks": 9
+      "decisions": 32,
+      "checks": 18
     },
     "completedByTier": {
       "device": 0,
@@ -32,10 +32,10 @@
       "unrecorded": 0
     },
     "blockedByGroup": {
-      "Zac": 3,
+      "Zac": 4,
       "provider": 2,
       "device": 1,
-      "other-card": 12,
+      "other-card": 20,
       "unknown": 0
     }
   },
@@ -103,13 +103,55 @@
       },
       {
         "id": "MAZER-ACCT-018",
-        "title": "Tell account-site sign-up users their username shows on the Mazer leaderboard",
+        "title": "Tell sign-up users their username shows on the leaderboard: merged, not deployed",
+        "status": "review",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Confirm the sign-up line copy (This username shows on the Mazer leaderboard.) and move the production aliases to the build that includes FawxzzyWeb PR #124.",
+        "recommendation": "Keep the copy; check it on the live sign-up screen after the alias move.",
+        "context": "PR #124 is merged but not deployed, and the copy of the line has not been confirmed by the owner.",
+        "prs": "FawxzzyWeb#124",
+        "verify": [
+          {
+            "step": "After the alias move, open the account-site Create Account screen on your phone.",
+            "where": "production",
+            "expected": "The line This username shows on the Mazer leaderboard. is visible before you submit; a duplicate sign-up notice appears as its own line, not in the button label."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-ACCT-023",
+        "title": "Account-site sign-out can land on the login page instead of Mazer",
         "status": "planning",
         "priority": "medium",
         "kind": "decision",
-        "ask": "Confirm the copy for one line on the account-site sign-up screen saying the username shows on the Mazer leaderboard.",
-        "recommendation": "Add the line (draft: Your username shows on the Mazer leaderboard.); it is a FawxzzyWeb change.",
-        "context": "The username typed on the account-site sign-up screen is public on the Mazer leaderboard and the screen does not say so.",
+        "ask": "Should signing out on the account site also end the Mazer session?",
+        "recommendation": "Fix the race first; decide the session question as a separate step.",
+        "context": "The race fix needs no decision, but whether account-site sign-out should also end the Mazer session is a design choice.",
+        "prs": "",
+        "verify": []
+      },
+      {
+        "id": "MAZER-ACCT-024",
+        "title": "Fill the receipt typed columns the completion functions ignore",
+        "status": "planning",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Approve the exact SQL file hash for the receipt trigger and backfill, or say not now.",
+        "recommendation": "Approve after a read of the file; the rollback is a single drop.",
+        "context": "The SQL is written and scratch-tested but changes a live table.",
+        "prs": "",
+        "verify": []
+      },
+      {
+        "id": "MAZER-ACCT-026",
+        "title": "Harden the username sign-in lockout (v4)",
+        "status": "planning",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Pick the v4 counter design (key, cap, failures only).",
+        "recommendation": "Key by username plus client, count failures only, drop the forwarded-address fallback, raise the aggregate cap.",
+        "context": "Choosing the counter key and caps is a trade-off between lockout and brute-force protection.",
         "prs": "",
         "verify": []
       },
@@ -270,6 +312,54 @@
         ]
       },
       {
+        "id": "MAZER-ACCT-025",
+        "title": "Decide who owns the stored display name after a rename",
+        "status": "planning",
+        "priority": "low",
+        "kind": "decision",
+        "ask": "Should the server own the display name and always set it equal to the username?",
+        "recommendation": "Yes: one owner, no stale copy; apply the SQL and stop the client writing it.",
+        "context": "Two writers can leave the stored display name stale after a rename.",
+        "prs": "",
+        "verify": []
+      },
+      {
+        "id": "MAZER-ACCT-027",
+        "title": "Resolve the duplicate-username collisions with the oldest account winning",
+        "status": "planning",
+        "priority": "low",
+        "kind": "decision",
+        "ask": "Flip the pair_extension_recorded flag in file 05 and approve its hash.",
+        "recommendation": "Oldest account wins; the others keep email sign-in.",
+        "context": "The resolution changes which account keeps a public username.",
+        "prs": "",
+        "verify": []
+      },
+      {
+        "id": "MAZER-ACCT-029",
+        "title": "Map the username-taken and generic database errors on the account site and Fitness",
+        "status": "planning",
+        "priority": "low",
+        "kind": "decision",
+        "ask": "Is it acceptable for the account site and Fitness to say a username is taken?",
+        "recommendation": "Yes for sign-up, since the leaderboard already shows names; keep the generic error vague.",
+        "context": "A plain taken-username message tells a visitor that the name exists.",
+        "prs": "",
+        "verify": []
+      },
+      {
+        "id": "MAZER-ACCT-031",
+        "title": "Show a failure code a player can read off a phone",
+        "status": "planning",
+        "priority": "low",
+        "kind": "decision",
+        "ask": "Pick where a short failure code may be shown to a player.",
+        "recommendation": "A small line under the failure message with the short code only.",
+        "context": "Showing a code is a copy and privacy choice.",
+        "prs": "",
+        "verify": []
+      },
+      {
         "id": "MAZER-CHAL-001",
         "title": "Add shared-seed daily and weekly challenges",
         "status": "planning",
@@ -290,6 +380,18 @@
         "ask": "Decide which off-scale loops and durations move onto the motion scale and which stay as they are.",
         "recommendation": "Decide value by value with before and after captures; anything you do not name stays unchanged. Then sweep the dead motion code.",
         "context": "Some loops and durations are off the motion scale and some motion code is dead; each move changes how something looks.",
+        "prs": "",
+        "verify": []
+      },
+      {
+        "id": "MAZER-PERF-006",
+        "title": "Cap the trail canvas backing resolution on 3x phones",
+        "status": "planning",
+        "priority": "low",
+        "kind": "decision",
+        "ask": "Review the trail pixels on your 3x phone once the cap is built and approve or reject it.",
+        "recommendation": "Build it behind the cap and look at one level before deciding.",
+        "context": "A lower backing resolution could soften the trail on 3x phones.",
         "prs": "",
         "verify": []
       },
@@ -505,6 +607,24 @@
         ]
       },
       {
+        "id": "MAZER-ACCT-019",
+        "title": "Re-read the username after profile creation mid sign-in: deployed, device check pending",
+        "status": "review",
+        "priority": "medium",
+        "kind": "check",
+        "ask": "On your phone, sign in with an account that has a username but no leaderboard rank and tell me whether the Choose a username gate appears.",
+        "recommendation": "Do it once; it shares a run with MAZER-ACCT-022.",
+        "context": "Live at main 476c4789 and checked with mocks and headless Chromium only.",
+        "prs": "#455",
+        "verify": [
+          {
+            "step": "Sign in to Mazer with an account that already has a username but no leaderboard rank, then open Menu > Leaderboard.",
+            "where": "installed-app",
+            "expected": "No Choose a username gate appears and no reload is needed."
+          }
+        ]
+      },
+      {
         "id": "MAZER-AUTH-EMAIL-001",
         "title": "Branded Mazer auth emails",
         "status": "review",
@@ -557,15 +677,25 @@
       },
       {
         "id": "MAZER-PERF-002",
-        "title": "Reduce canvas redraw cost and soften the throttle floor",
-        "status": "planning",
+        "title": "Cut canvas redraw cost: trail gate merged, not deployed; backdrop bake still open",
+        "status": "review",
         "priority": "medium",
         "kind": "check",
-        "ask": "Capture a frame-rate trace on your phone while the menu is idle and while playing a large board.",
-        "recommendation": "Build the backdrop bake first so one trace shows the fix; the trace is the proof the card requires.",
-        "context": "Replaying thousands of drawing commands costs 2.6-4.9 ms per frame; the fix needs a real-device frame trace to prove it.",
-        "prs": "",
+        "ask": "After the next Mazer deploy, check a level 300 preview: walk to just before the goal, stand still 10 seconds, then walk continuously, and capture a frame trace on your phone.",
+        "recommendation": "Standing still should now be smooth; continuous walking may still stutter (that is MAZER-PERF-004). Build the backdrop bake next so one trace shows both.",
+        "context": "PR #459 is merged but not deployed; the backdrop bake and throttle floor are not built; the fix needs a real-device frame trace to prove it.",
+        "prs": "#459",
         "verify": [
+          {
+            "step": "After the next Mazer deploy, open a level 300 preview (previewLevel 300), walk to just before the goal and stand still for 10 seconds.",
+            "where": "phone",
+            "expected": "Still frames are smooth (about 39 ms of draw per still frame in the headless measurement, was about 94 ms)."
+          },
+          {
+            "step": "On the same level, walk continuously.",
+            "where": "phone",
+            "expected": "May still stutter; walking frame cost is unchanged by PR #459 (MAZER-PERF-004). Note how it feels."
+          },
           {
             "step": "Record a performance trace on the phone (remote Safari or Chrome inspector) on the idle menu and in play on a large board.",
             "where": "external-tool",
@@ -615,6 +745,119 @@
         ]
       },
       {
+        "id": "MAZER-ACCT-014",
+        "title": "Record a failure code on every sign-in boot failure: deployed, device check pending",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone, make a sign-in fail once and tell me whether the failure line stays until you try again (the code itself is only visible in runtime diagnostics).",
+        "recommendation": "Do it once together with the other sign-in checks on MAZER-ACCT-015; no separate run is needed.",
+        "context": "Live at main 476c4789 and checked in headless Chromium only; nothing is checked on a real phone.",
+        "prs": "#453, #454",
+        "verify": [
+          {
+            "step": "Tap Sign in with the network off (or cancel on the account page), then wait without touching anything.",
+            "where": "installed-app",
+            "expected": "A plain failure line appears and stays until your next sign-in attempt; the toast stays at least 8 seconds. No code is shown to the player."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-ACCT-015",
+        "title": "Keep the sign-in failure message readable: deployed, device check pending",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone, make a sign-in fail and confirm the failure line is still there a minute later and goes only when you try again.",
+        "recommendation": "Do it once on the installed app.",
+        "context": "Live at main 476c4789 and checked in headless Chromium only; the on-screen time was never measured on a real phone.",
+        "prs": "#453, #454",
+        "verify": [
+          {
+            "step": "Tap Sign in while offline or cancel on the account page, then leave the screen alone for a minute.",
+            "where": "installed-app",
+            "expected": "The failure line is still there; it clears only when you tap Sign in again."
+          },
+          {
+            "step": "Reopen the app after a failed sign-in so the failure happens at boot.",
+            "where": "installed-app",
+            "expected": "The failure toast stays at least 8 seconds (it was 5 seconds at boot before the fix)."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-ACCT-021",
+        "title": "Refresh the header name after a rename: deployed, device check pending",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone, rename yourself with Edit name and check the header, then reload and check it again.",
+        "recommendation": "Do it once; it shares a run with MAZER-ACCT-019 and MAZER-ACCT-022.",
+        "context": "Live at main 476c4789 and checked with mocks and headless Chromium only.",
+        "prs": "#455",
+        "verify": [
+          {
+            "step": "On the leaderboard tap Edit name, save a new name, go back to the menu and read the header; then reload the app and read it again.",
+            "where": "installed-app",
+            "expected": "The header shows the new name straight after saving. After the reload, report what it shows (that answers MAZER-ACCT-033)."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-ACCT-022",
+        "title": "Offer Edit name to a named player with no rank: deployed, device check pending",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone, open the leaderboard with a named account that has no rank and tell me what you see.",
+        "recommendation": "Do it once together with MAZER-ACCT-019.",
+        "context": "Live at main 476c4789 and checked with mocks and headless Chromium only.",
+        "prs": "#455",
+        "verify": [
+          {
+            "step": "Sign in with an account that has a username but no rank and open Menu > Leaderboard; also open it when the board is empty.",
+            "where": "installed-app",
+            "expected": "A pinned You row shows dashes and an Edit name control; an empty board still offers Edit name."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-MOTION-005",
+        "title": "One reduced-motion crossfade length of 200 ms: deployed, device check pending",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone with Reduce Motion on, start a level and tell me whether the fade-in feels quick and clean.",
+        "recommendation": "Do it once; it also feeds the phone check on MAZER-MOTION-008.",
+        "context": "Live at Mazer main 476c4789 and checked in headless Chromium only.",
+        "prs": "#457",
+        "verify": [
+          {
+            "step": "Turn Reduce Motion on in Settings, then start a level and watch the intro.",
+            "where": "installed-app",
+            "expected": "The intro is a short 200 ms crossfade: no motion, no abrupt pop."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-PERF-003",
+        "title": "Throttle colour-only redraws under reduced motion: deployed, device check pending",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone with Reduce Motion on, watch the trail and the dock glow on a wrap-corridor level for 10 seconds and tell me whether colours drift smoothly or step.",
+        "recommendation": "Do it once; it can share a run with MAZER-MOTION-008.",
+        "context": "Live at Mazer main 476c4789 and checked in headless Chromium only; no real-phone look at the colour drift.",
+        "prs": "#456",
+        "verify": [
+          {
+            "step": "Turn Reduce Motion on, open a wrap-corridor level and watch the trail and the dock glow for 10 seconds.",
+            "where": "installed-app",
+            "expected": "Colours drift smoothly; no visible stepping and no stutter."
+          }
+        ]
+      },
+      {
         "id": "MAZER-SHARE-001",
         "title": "Finish web share metadata, the preview image and external verification",
         "status": "review",
@@ -639,6 +882,42 @@
             "step": "Open the Facebook Sharing Debugger, enter the Mazer home link and press Scrape Again.",
             "where": "external-tool",
             "expected": "The image is 1200x630 and picked from the share tags, with no blocking warnings."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-VIS-023",
+        "title": "Round the player ring to the cap-tile shape on start and goal: deployed, check pending",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone, look at the start and goal tiles and the trail head at the largest tile size and tell me if anything looks off.",
+        "recommendation": "Do it once; the three marker cards share one look.",
+        "context": "Live at Mazer main 476c4789 and checked in headless Chromium only.",
+        "prs": "#458",
+        "verify": [
+          {
+            "step": "Play a level and stop on the start tile and the goal tile at the largest tile size you can reach.",
+            "where": "installed-app",
+            "expected": "The player ring follows the rounded tile corners; no square corner pokes past the round dead-end disc."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-VIS-025",
+        "title": "Snap the trail head to the marker device pixel: deployed, device check pending",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone, look at the start and goal tiles and the trail head at the largest tile size and tell me if anything looks off.",
+        "recommendation": "Do it once; the three marker cards share one look.",
+        "context": "Live at Mazer main 476c4789 and checked in headless Chromium only.",
+        "prs": "#458",
+        "verify": [
+          {
+            "step": "Walk a few tiles and stop, then look at where the trail ends under the player marker.",
+            "where": "installed-app",
+            "expected": "The trail ends exactly at the marker centre; no sliver of trail shows beside the marker."
           }
         ]
       }
@@ -1698,6 +1977,14 @@
       "priority": "low",
       "prs": "#405",
       "note": "Docs only, merged; open unknowns remain in the note and it is not reconciled with the Cyberdeck card."
+    },
+    {
+      "id": "MAZER-VIS-024",
+      "title": "Make the marker diagnostics report the real block size: deployed",
+      "status": "review",
+      "priority": "low",
+      "prs": "#458",
+      "note": "Merged and deployed (PR #458); diagnostics only, kept in review with MAZER-VIS-023 and 025."
     }
   ],
   "blocked": {
@@ -1709,6 +1996,15 @@
         "priority": "medium",
         "kind": "provider",
         "ask": "Approve a database change that adds a reset counter, or accept the residual risk for version one?",
+        "derived": false
+      },
+      {
+        "id": "MAZER-ACCT-028",
+        "title": "Verify the before-user-created auth hook is registered at the provider",
+        "status": "planning",
+        "priority": "medium",
+        "kind": "provider",
+        "ask": "Read the auth hook settings in the provider dashboard and tell me whether the before-user-created hook is set.",
         "derived": false
       },
       {
@@ -1808,6 +2104,33 @@
         "derived": true
       },
       {
+        "id": "MAZER-ACCT-030",
+        "title": "Shorten or index the usernames over 15 characters for sign-in",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-ACCT-020 (planning).",
+        "derived": true
+      },
+      {
+        "id": "MAZER-ACCT-032",
+        "title": "Ellipsize a long header name instead of hiding it",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-ACCT-021 (review).",
+        "derived": true
+      },
+      {
+        "id": "MAZER-ACCT-033",
+        "title": "Confirm whether a rename updates the sign-in name used by the header",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-ACCT-021 (review).",
+        "derived": true
+      },
+      {
         "id": "MAZER-AI-002",
         "title": "Add AI-assisted maze completion with spendable hints",
         "status": "planning",
@@ -1844,15 +2167,6 @@
         "derived": false
       },
       {
-        "id": "MAZER-MOTION-005",
-        "title": "Unify the reduced-motion crossfade length with the motion scale",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-MOTION-001 (review).",
-        "derived": true
-      },
-      {
         "id": "MAZER-MOTION-006",
         "title": "Migrate scene motion constants to the motion scale",
         "status": "planning",
@@ -1862,6 +2176,15 @@
         "derived": false
       },
       {
+        "id": "MAZER-MOTION-009",
+        "title": "Move the teleport transfer to the shared reduced-motion crossfade",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-MOTION-005 (review).",
+        "derived": true
+      },
+      {
         "id": "MAZER-NATIVE-001",
         "title": "Plan the native app-store wrapper after web stabilization",
         "status": "planning",
@@ -1869,6 +2192,51 @@
         "kind": "dependency",
         "ask": "Waits on the real-phone verification in MAZER-QA-001.",
         "derived": false
+      },
+      {
+        "id": "MAZER-PERF-005",
+        "title": "Cheaper long-trail bloom without dimming the halo",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-PERF-002 (review).",
+        "derived": true
+      },
+      {
+        "id": "MAZER-PERF-007",
+        "title": "Throttle the wrap-glow full-board redraw under full motion",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-PERF-003 (review).",
+        "derived": true
+      },
+      {
+        "id": "MAZER-PROG-017",
+        "title": "Pin every emitted sign-in failure code to the class map with a test",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-ACCT-014 (review).",
+        "derived": true
+      },
+      {
+        "id": "MAZER-VIS-028",
+        "title": "Morph the player ring between cap and chip shape instead of popping",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-VIS-023 (review).",
+        "derived": true
+      },
+      {
+        "id": "MAZER-VIS-029",
+        "title": "Make the trail head follow the wall-bump nudge of the marker",
+        "status": "planning",
+        "priority": "low",
+        "kind": "dependency",
+        "ask": "Waits on MAZER-VIS-025 (review).",
+        "derived": true
       }
     ],
     "unknown": []
@@ -1888,15 +2256,6 @@
         "waves": [
           "5C"
         ],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-ACCT-019",
-        "title": "Re-read the username after profile creation during an in-session sign-in",
-        "status": "planning",
-        "priority": "medium",
-        "filesHint": [],
-        "waves": [],
         "warnings": []
       },
       {
@@ -1926,44 +2285,8 @@
         "warnings": []
       },
       {
-        "id": "MAZER-ACCT-014",
-        "title": "Record the failure code on every sign-in boot failure path",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-ACCT-015",
-        "title": "Check how long the sign-in failure message stays on screen",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
         "id": "MAZER-ACCT-020",
         "title": "Fix the four account-site usernames longer than 15 characters",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-ACCT-021",
-        "title": "Refresh the header name after a rename",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-ACCT-022",
-        "title": "Offer Edit name to a named player with no leaderboard rank yet",
         "status": "planning",
         "priority": "low",
         "filesHint": [],
@@ -1983,8 +2306,8 @@
         "warnings": []
       },
       {
-        "id": "MAZER-PERF-003",
-        "title": "Throttle colour-only redraws under reduced motion",
+        "id": "MAZER-PERF-008",
+        "title": "Spread level-start maze generation across frames or a worker",
         "status": "planning",
         "priority": "low",
         "filesHint": [],
@@ -2022,53 +2345,6 @@
         ]
       },
       {
-        "id": "MAZER-VIS-023",
-        "title": "Round the player ring to the cap-tile shape on start and goal tiles",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [
-          "src/render/playerMarker.ts",
-          "src/render/endpointTiles.ts",
-          "tests/render/playerMarkerPixels.test.ts"
-        ],
-        "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-VIS-024",
-        "title": "Make the marker diagnostics report the real block size",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [
-          "src/render/playerMarker.ts",
-          "src/scenes/menuRuntimeDiagnostics.ts",
-          "tests/scenes/menu-runtime-diagnostics.test.ts"
-        ],
-        "waves": [
-          "1C"
-        ],
-        "warnings": [
-          "overlaps MAZER-PROG-016 on src/scenes/menuRuntimeDiagnostics.ts",
-          "overlaps MAZER-VIS-023 on src/render/playerMarker.ts"
-        ]
-      },
-      {
-        "id": "MAZER-VIS-025",
-        "title": "Snap the trail head to the same device pixel as the player marker",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [
-          "src/render/playerMarker.ts",
-          "src/render/trailHeadPath.ts",
-          "tests/fixtures/trail-corner-raster"
-        ],
-        "waves": [],
-        "warnings": [
-          "overlaps MAZER-VIS-023 on src/render/playerMarker.ts",
-          "overlaps MAZER-VIS-024 on src/render/playerMarker.ts"
-        ]
-      },
-      {
         "id": "MAZER-VIS-027",
         "title": "Delete the unused backdrop glyph generators in their own wave",
         "status": "planning",
@@ -2101,6 +2377,13 @@
       "status": "in_progress",
       "priority": "medium",
       "note": "Auditor recommendation, not a status change: stays in progress and an agent can finish it. Regenerate the three baselines after ladder v2 and report the drift, fix the known calibration script call, and add a threshold table per band. Open question for the owner, not blocking: is a human-configurable runner needed (auditor: the seed-pack runner is enough; drop remote run retention)."
+    },
+    {
+      "id": "MAZER-PERF-004",
+      "title": "Incremental head-only trail update while the player moves",
+      "status": "in_progress",
+      "priority": "medium",
+      "note": "In progress: a worker is building it."
     },
     {
       "id": "MAZER-GOV-005",
@@ -2846,8 +3129,8 @@
       "sub": "source-only"
     },
     "MAZER-MOTION-005": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-GOV-006": {
       "bucket": "completed",
@@ -2858,16 +3141,16 @@
       "sub": "headless"
     },
     "MAZER-VIS-023": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-VIS-024": {
-      "bucket": "ready",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-025": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-VIS-026": {
       "bucket": "needs-you",
@@ -2930,12 +3213,12 @@
       "sub": "check"
     },
     "MAZER-ACCT-014": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-ACCT-015": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-ACCT-016": {
       "bucket": "needs-you",
@@ -2950,20 +3233,20 @@
       "sub": "decision"
     },
     "MAZER-ACCT-019": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-ACCT-020": {
       "bucket": "ready",
       "sub": null
     },
     "MAZER-ACCT-021": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-ACCT-022": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-FLOW-014": {
       "bucket": "completed",
@@ -2978,12 +3261,92 @@
       "sub": null
     },
     "MAZER-PERF-003": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-MOTION-008": {
       "bucket": "needs-you",
       "sub": "check"
+    },
+    "MAZER-PERF-004": {
+      "bucket": "in-progress",
+      "sub": null
+    },
+    "MAZER-PERF-005": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-PERF-006": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-PERF-007": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-PERF-008": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-VIS-028": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-VIS-029": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-MOTION-009": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-PROG-017": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-ACCT-023": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-ACCT-024": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-ACCT-025": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-ACCT-026": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-ACCT-027": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-ACCT-028": {
+      "bucket": "blocked",
+      "sub": "Zac"
+    },
+    "MAZER-ACCT-029": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-ACCT-030": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-ACCT-031": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-ACCT-032": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-ACCT-033": {
+      "bucket": "blocked",
+      "sub": "other-card"
     }
   }
 }

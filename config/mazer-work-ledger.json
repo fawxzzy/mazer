@@ -471,19 +471,48 @@
       "filesHint": []
     },
     "MAZER-PERF-002": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 459,
+            "mergedSha": "7d6312eb"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false
+      },
       "blocker": {
         "kind": "device",
-        "summary": "Replaying thousands of drawing commands costs 2.6-4.9 ms per frame; the fix needs a real-device frame trace to prove it.",
+        "summary": "PR #459 is merged but not deployed; the backdrop bake and throttle floor are not built; the fix needs a real-device frame trace to prove it.",
         "unblockedBy": "Zac",
-        "ask": "Capture a frame-rate trace on your phone while the menu is idle and while playing a large board.",
-        "recommendation": "Build the backdrop bake first so one trace shows the fix; the trace is the proof the card requires."
+        "ask": "After the next Mazer deploy, check a level 300 preview: walk to just before the goal, stand still 10 seconds, then walk continuously, and capture a frame trace on your phone.",
+        "recommendation": "Standing still should now be smooth; continuous walking may still stutter (that is MAZER-PERF-004). Build the backdrop bake next so one trace shows both."
       },
       "verify": [
-        {"step":"Record a performance trace on the phone (remote Safari or Chrome inspector) on the idle menu and in play on a large board.","where":"external-tool","expected":"Average frame time stays below the 19 ms point where the game drops ambient motion to 4 fps; the trace is attached to the card."}
+        {
+          "step": "After the next Mazer deploy, open a level 300 preview (previewLevel 300), walk to just before the goal and stand still for 10 seconds.",
+          "where": "phone",
+          "expected": "Still frames are smooth (about 39 ms of draw per still frame in the headless measurement, was about 94 ms)."
+        },
+        {
+          "step": "On the same level, walk continuously.",
+          "where": "phone",
+          "expected": "May still stutter; walking frame cost is unchanged by PR #459 (MAZER-PERF-004). Note how it feels."
+        },
+        {
+          "step": "Record a performance trace on the phone (remote Safari or Chrome inspector) on the idle menu and in play on a large board.",
+          "where": "external-tool",
+          "expected": "Average frame time stays below the 19 ms point where the game drops ambient motion to 4 fps; the trace is attached to the card."
+        }
       ],
       "lane": "agent-buildable",
-      "filesHint": ["src/render/backdropStars.ts","src/legacy-runtime/legacyAnimationCadence.ts","src/scenes/MenuScene.ts"]
+      "filesHint": [
+        "src/render/backdropStars.ts",
+        "src/legacy-runtime/legacyAnimationCadence.ts",
+        "src/scenes/MenuScene.ts"
+      ],
+      "note": "PR #459 merged, not deployed. Open: backdrop bake, throttle floor, device trace."
     },
     "MAZER-PROG-001": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 373}], "headless": false, "deviceChecked": false},
@@ -1513,19 +1542,81 @@
       "filesHint": []
     },
     "MAZER-ACCT-014": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
-      "lane": "agent-buildable",
-      "filesHint": []
-    },
-    "MAZER-ACCT-015": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 453,
+            "mergedSha": "b49e62b0"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 454,
+            "mergedSha": "636b8638"
+          }
+        ],
+        "deployedBuild": "476c4789",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "Live at main 476c4789 and checked in headless Chromium only; nothing is checked on a real phone.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, make a sign-in fail once and tell me whether the failure line stays until you try again (the code itself is only visible in runtime diagnostics).",
+        "recommendation": "Do it once together with the other sign-in checks on MAZER-ACCT-015; no separate run is needed."
+      },
+      "verify": [
+        {
+          "step": "Tap Sign in with the network off (or cancel on the account page), then wait without touching anything.",
+          "where": "installed-app",
+          "expected": "A plain failure line appears and stays until your next sign-in attempt; the toast stays at least 8 seconds. No code is shown to the player."
+        }
+      ],
       "lane": "agent-buildable",
       "filesHint": [],
-      "note": "Unconfirmed: measure first."
+      "note": "Merged and deployed (PRs #453, #454); kept in review until a phone check. Headless only."
+    },
+    "MAZER-ACCT-015": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 453,
+            "mergedSha": "b49e62b0"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 454,
+            "mergedSha": "636b8638"
+          }
+        ],
+        "deployedBuild": "476c4789",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "Live at main 476c4789 and checked in headless Chromium only; the on-screen time was never measured on a real phone.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, make a sign-in fail and confirm the failure line is still there a minute later and goes only when you try again.",
+        "recommendation": "Do it once on the installed app."
+      },
+      "verify": [
+        {
+          "step": "Tap Sign in while offline or cancel on the account page, then leave the screen alone for a minute.",
+          "where": "installed-app",
+          "expected": "The failure line is still there; it clears only when you tap Sign in again."
+        },
+        {
+          "step": "Reopen the app after a failed sign-in so the failure happens at boot.",
+          "where": "installed-app",
+          "expected": "The failure toast stays at least 8 seconds (it was 5 seconds at boot before the fix)."
+        }
+      ],
+      "lane": "agent-buildable",
+      "filesHint": [],
+      "note": "Measured, fixed, merged and deployed (PRs #453, #454); kept in review until a phone check. Headless only."
     },
     "MAZER-ACCT-016": {
       "evidence": null,
@@ -1561,14 +1652,37 @@
       "filesHint": ["src/legacy-runtime/legacyOfflineCompletionFlush.ts","src/legacy-runtime/legacyPlayerMessage.ts","tests/reset/legacy-player-message-inventory.test.ts"]
     },
     "MAZER-MOTION-005": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 457,
+            "mergedSha": "428220a9"
+          }
+        ],
+        "deployedBuild": "476c4789",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "Live at Mazer main 476c4789 and checked in headless Chromium only.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone with Reduce Motion on, start a level and tell me whether the fade-in feels quick and clean.",
+        "recommendation": "Do it once; it also feeds the phone check on MAZER-MOTION-008."
+      },
+      "verify": [
+        {
+          "step": "Turn Reduce Motion on in Settings, then start a level and watch the intro.",
+          "where": "installed-app",
+          "expected": "The intro is a short 200 ms crossfade: no motion, no abrupt pop."
+        }
+      ],
       "lane": "agent-buildable",
       "filesHint": [
         "src/theme/tokens.ts"
       ],
-      "note": "Recommendation: one 200 ms crossfade for every reduced-motion case (intro 250 to 200, outro 150 to 200, teleport 140 to 200). Needs the theme contract edit. Carries criterion 3 of MAZER-MOTION-004; waits on MAZER-MOTION-001 (in review)."
+      "note": "Merged and deployed (PR #457); one 200 ms crossfade. Kept in review until a phone check; the teleport alias is MAZER-MOTION-009."
     },
     "MAZER-GOV-006": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 432}], "deployedBuild": "b640f1da", "headless": false, "deviceChecked": null},
@@ -1585,25 +1699,97 @@
       "filesHint": []
     },
     "MAZER-VIS-023": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 458,
+            "mergedSha": "476c4789"
+          }
+        ],
+        "deployedBuild": "476c4789",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "Live at Mazer main 476c4789 and checked in headless Chromium only.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, look at the start and goal tiles and the trail head at the largest tile size and tell me if anything looks off.",
+        "recommendation": "Do it once; the three marker cards share one look."
+      },
+      "verify": [
+        {
+          "step": "Play a level and stop on the start tile and the goal tile at the largest tile size you can reach.",
+          "where": "installed-app",
+          "expected": "The player ring follows the rounded tile corners; no square corner pokes past the round dead-end disc."
+        }
+      ],
       "lane": "agent-buildable",
-      "filesHint": ["src/render/playerMarker.ts","src/render/endpointTiles.ts","tests/render/playerMarkerPixels.test.ts"]
+      "filesHint": [
+        "src/render/playerMarker.ts",
+        "src/render/endpointTiles.ts",
+        "tests/render/playerMarkerPixels.test.ts"
+      ],
+      "note": "Merged and deployed (PR #458); kept in review until a phone check."
     },
     "MAZER-VIS-024": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 458,
+            "mergedSha": "476c4789"
+          }
+        ],
+        "deployedBuild": "476c4789",
+        "headless": true,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": ["src/render/playerMarker.ts","src/scenes/menuRuntimeDiagnostics.ts","tests/scenes/menu-runtime-diagnostics.test.ts"]
+      "filesHint": [
+        "src/render/playerMarker.ts",
+        "src/scenes/menuRuntimeDiagnostics.ts",
+        "tests/scenes/menu-runtime-diagnostics.test.ts"
+      ],
+      "note": "Merged and deployed (PR #458); diagnostics only, kept in review with MAZER-VIS-023 and 025."
     },
     "MAZER-VIS-025": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 458,
+            "mergedSha": "476c4789"
+          }
+        ],
+        "deployedBuild": "476c4789",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "Live at Mazer main 476c4789 and checked in headless Chromium only.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, look at the start and goal tiles and the trail head at the largest tile size and tell me if anything looks off.",
+        "recommendation": "Do it once; the three marker cards share one look."
+      },
+      "verify": [
+        {
+          "step": "Walk a few tiles and stop, then look at where the trail ends under the player marker.",
+          "where": "installed-app",
+          "expected": "The trail ends exactly at the marker centre; no sliver of trail shows beside the marker."
+        }
+      ],
       "lane": "agent-buildable",
-      "filesHint": ["src/render/playerMarker.ts","src/render/trailHeadPath.ts","tests/fixtures/trail-corner-raster"]
+      "filesHint": [
+        "src/render/playerMarker.ts",
+        "src/render/trailHeadPath.ts",
+        "tests/fixtures/trail-corner-raster"
+      ],
+      "note": "Merged and deployed (PR #458); kept in review until a phone check."
     },
     "MAZER-VIS-026": {
       "evidence": null,
@@ -1706,24 +1892,65 @@
       "note": "Database function v2 and 8-row backfill applied 2026-11-12 with the owner's explicit approval; tested live with the standing test account and on a local throwaway database. The phone check is on MAZER-ACCT-006."
     },
     "MAZER-ACCT-018": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/FawxzzyWeb",
+            "number": 124,
+            "mergedSha": "e03c7db8"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": false
+      },
       "blocker": {
         "kind": "owner-decision",
-        "summary": "The username typed on the account-site sign-up screen is public on the Mazer leaderboard and the screen does not say so.",
+        "summary": "PR #124 is merged but not deployed, and the copy of the line has not been confirmed by the owner.",
         "unblockedBy": "Zac",
-        "ask": "Confirm the copy for one line on the account-site sign-up screen saying the username shows on the Mazer leaderboard.",
-        "recommendation": "Add the line (draft: Your username shows on the Mazer leaderboard.); it is a FawxzzyWeb change."
+        "ask": "Confirm the sign-up line copy (This username shows on the Mazer leaderboard.) and move the production aliases to the build that includes FawxzzyWeb PR #124.",
+        "recommendation": "Keep the copy; check it on the live sign-up screen after the alias move."
       },
-      "verify": [],
+      "verify": [
+        {
+          "step": "After the alias move, open the account-site Create Account screen on your phone.",
+          "where": "production",
+          "expected": "The line This username shows on the Mazer leaderboard. is visible before you submit; a duplicate sign-up notice appears as its own line, not in the button label."
+        }
+      ],
       "lane": "owner-only",
-      "filesHint": []
+      "filesHint": [],
+      "note": "Merged, not deployed (FawxzzyWeb PR #124)."
     },
     "MAZER-ACCT-019": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 455,
+            "mergedSha": "47d0cb04"
+          }
+        ],
+        "deployedBuild": "476c4789",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "Live at main 476c4789 and checked with mocks and headless Chromium only.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, sign in with an account that has a username but no leaderboard rank and tell me whether the Choose a username gate appears.",
+        "recommendation": "Do it once; it shares a run with MAZER-ACCT-022."
+      },
+      "verify": [
+        {
+          "step": "Sign in to Mazer with an account that already has a username but no leaderboard rank, then open Menu > Leaderboard.",
+          "where": "installed-app",
+          "expected": "No Choose a username gate appears and no reload is needed."
+        }
+      ],
       "lane": "agent-buildable",
-      "filesHint": []
+      "filesHint": [],
+      "note": "Merged and deployed (PR #455); kept in review until a phone check."
     },
     "MAZER-ACCT-020": {
       "evidence": null,
@@ -1734,18 +1961,66 @@
       "note": "Any data change needs the owner's explicit approval first."
     },
     "MAZER-ACCT-021": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 455,
+            "mergedSha": "47d0cb04"
+          }
+        ],
+        "deployedBuild": "476c4789",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "Live at main 476c4789 and checked with mocks and headless Chromium only.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, rename yourself with Edit name and check the header, then reload and check it again.",
+        "recommendation": "Do it once; it shares a run with MAZER-ACCT-019 and MAZER-ACCT-022."
+      },
+      "verify": [
+        {
+          "step": "On the leaderboard tap Edit name, save a new name, go back to the menu and read the header; then reload the app and read it again.",
+          "where": "installed-app",
+          "expected": "The header shows the new name straight after saving. After the reload, report what it shows (that answers MAZER-ACCT-033)."
+        }
+      ],
       "lane": "agent-buildable",
-      "filesHint": []
+      "filesHint": [],
+      "note": "Merged and deployed (PR #455); kept in review until a phone check."
     },
     "MAZER-ACCT-022": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 455,
+            "mergedSha": "47d0cb04"
+          }
+        ],
+        "deployedBuild": "476c4789",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "Live at main 476c4789 and checked with mocks and headless Chromium only.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, open the leaderboard with a named account that has no rank and tell me what you see.",
+        "recommendation": "Do it once together with MAZER-ACCT-019."
+      },
+      "verify": [
+        {
+          "step": "Sign in with an account that has a username but no rank and open Menu > Leaderboard; also open it when the board is empty.",
+          "where": "installed-app",
+          "expected": "A pinned You row shows dashes and an Edit name control; an empty board still offers Edit name."
+        }
+      ],
       "lane": "agent-buildable",
-      "filesHint": []
+      "filesHint": [],
+      "note": "Merged and deployed (PR #455); kept in review until a phone check."
     },
     "MAZER-FLOW-014": {
       "evidence": {
@@ -1789,11 +2064,35 @@
       ]
     },
     "MAZER-PERF-003": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 456,
+            "mergedSha": "57951734"
+          }
+        ],
+        "deployedBuild": "476c4789",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "Live at Mazer main 476c4789 and checked in headless Chromium only; no real-phone look at the colour drift.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone with Reduce Motion on, watch the trail and the dock glow on a wrap-corridor level for 10 seconds and tell me whether colours drift smoothly or step.",
+        "recommendation": "Do it once; it can share a run with MAZER-MOTION-008."
+      },
+      "verify": [
+        {
+          "step": "Turn Reduce Motion on, open a wrap-corridor level and watch the trail and the dock glow for 10 seconds.",
+          "where": "installed-app",
+          "expected": "Colours drift smoothly; no visible stepping and no stutter."
+        }
+      ],
       "lane": "agent-buildable",
-      "filesHint": []
+      "filesHint": [],
+      "note": "Merged and deployed (PR #456); kept in review until a phone check."
     },
     "MAZER-MOTION-008": {
       "evidence": null,
@@ -1817,6 +2116,204 @@
         }
       ],
       "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-PERF-004": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": [],
+      "note": "In progress: a worker is building it."
+    },
+    "MAZER-PERF-005": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-PERF-006": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "A lower backing resolution could soften the trail on 3x phones.",
+        "unblockedBy": "Zac",
+        "ask": "Review the trail pixels on your 3x phone once the cap is built and approve or reject it.",
+        "recommendation": "Build it behind the cap and look at one level before deciding."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-PERF-007": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-PERF-008": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-VIS-028": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-VIS-029": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-MOTION-009": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": [
+        "src/theme/tokens.ts"
+      ],
+      "note": "Wave 4D-B edit."
+    },
+    "MAZER-PROG-017": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-ACCT-023": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "The race fix needs no decision, but whether account-site sign-out should also end the Mazer session is a design choice.",
+        "unblockedBy": "Zac",
+        "ask": "Should signing out on the account site also end the Mazer session?",
+        "recommendation": "Fix the race first; decide the session question as a separate step."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-024": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "The SQL is written and scratch-tested but changes a live table.",
+        "unblockedBy": "Zac",
+        "ask": "Approve the exact SQL file hash for the receipt trigger and backfill, or say not now.",
+        "recommendation": "Approve after a read of the file; the rollback is a single drop."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-025": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Two writers can leave the stored display name stale after a rename.",
+        "unblockedBy": "Zac",
+        "ask": "Should the server own the display name and always set it equal to the username?",
+        "recommendation": "Yes: one owner, no stale copy; apply the SQL and stop the client writing it."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-026": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Choosing the counter key and caps is a trade-off between lockout and brute-force protection.",
+        "unblockedBy": "Zac",
+        "ask": "Pick the v4 counter design (key, cap, failures only).",
+        "recommendation": "Key by username plus client, count failures only, drop the forwarded-address fallback, raise the aggregate cap."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-027": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "The resolution changes which account keeps a public username.",
+        "unblockedBy": "Zac",
+        "ask": "Flip the pair_extension_recorded flag in file 05 and approve its hash.",
+        "recommendation": "Oldest account wins; the others keep email sign-in."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-028": {
+      "evidence": null,
+      "blocker": {
+        "kind": "provider",
+        "summary": "Hook registration lives in the provider dashboard.",
+        "unblockedBy": "Zac",
+        "ask": "Read the auth hook settings in the provider dashboard and tell me whether the before-user-created hook is set.",
+        "recommendation": "Read it once; if set, run one probe sign-up from the Mazer namespace."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-029": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "A plain taken-username message tells a visitor that the name exists.",
+        "unblockedBy": "Zac",
+        "ask": "Is it acceptable for the account site and Fitness to say a username is taken?",
+        "recommendation": "Yes for sign-up, since the leaderboard already shows names; keep the generic error vague."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-030": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-ACCT-031": {
+      "evidence": null,
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Showing a code is a copy and privacy choice.",
+        "unblockedBy": "Zac",
+        "ask": "Pick where a short failure code may be shown to a player.",
+        "recommendation": "A small line under the failure message with the short code only."
+      },
+      "verify": [],
+      "lane": "owner-only",
+      "filesHint": []
+    },
+    "MAZER-ACCT-032": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-ACCT-033": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
       "filesHint": []
     }
   }
