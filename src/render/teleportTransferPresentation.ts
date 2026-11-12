@@ -165,7 +165,7 @@ export const TELEPORT_TRANSFER_EXTRACTION_ABSORPTION_MS = 160;
 // long, from the start of the (effectively instant, under reduced
 // motion) outbound clock, a stable open conduit is shown before settling
 // into the ordinary closed 'stored' presentation.
-export const TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS = MOTION_REDUCED_MS.teleportCrossfade;
+export const TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS = MOTION_REDUCED_MS.crossfade;
 
 // The fade-in/fade-out edges within a reduced-motion window (the
 // extraction crossfade above, and delivery's own reduced-motion window

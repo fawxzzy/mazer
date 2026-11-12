@@ -293,8 +293,8 @@
     "pattern": "OUTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS\\.crossfade"
    },
    {
-    "file": "src/render/motionScale.ts",
-    "pattern": "teleportCrossfade: motion\\.reducedMotionMs\\.crossfade"
+    "file": "src/render/teleportTransferPresentation.ts",
+    "pattern": "EXTRACTION_REDUCED_MOTION_CROSSFADE_MS = MOTION_REDUCED_MS\\.crossfade"
    }
   ],
   "motion/reducedMotionMs/teleportFadeEdge": [
