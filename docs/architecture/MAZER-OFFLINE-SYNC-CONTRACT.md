@@ -1,6 +1,6 @@
 # Mazer Offline Sync and Conflict Contract (Draft)
 
-Status: DRAFT, unsigned
+Status: DRAFT, unsigned (section 7 fixtures, 7A coverage matrix and 7B offline flush added 2026-11-12 under MAZER-DATA-004; nothing else in this draft changed)
 Date: 2026-11-05
 Base: `origin/main` at the commit this branch was cut from (`1670c8af`)
 Board card: `mazer-offline-first-play-sync-and-conflict-contract` (state `open`, priority high, 0 percent, "Planning admission"; "No remote write or schema work is authorized by this card.")
@@ -151,7 +151,47 @@ Fixtures, each runnable without a network by injecting a fake client (the existi
 
 Real-environment proof (NOT VERIFIED until performed): airplane-mode behavior on real iOS and Android browsers and installed PWAs, background-tab storage eviction, and multi-day offline. These cannot be proven by unit tests; see the browser matrix in `docs/architecture/MAZER-PWA-STRATEGY-AND-BROWSER-MATRIX.md`.
 
-Running the fixtures requires `npm test`; this draft ran none.
+### 7A. Coverage matrix (2026-11-12, **DOCUMENTED FACT**, verified by running the files named)
+
+Legend: **covered** = a test asserts the whole fixture; **partial** = the core is asserted but one named part is not; **missing** = no test; **not buildable** = the objects the fixture needs do not exist in `src/`.
+
+Proof file added by MAZER-DATA-004: `tests/reset/legacy-remote-progression-proof-fixtures.test.ts`. It drives the real outbox and `replayLegacyRemoteCompletions` with an injected fake server (modelled on `20260822000100_mazer_endless_completion_rpc.sql`: a duplicate run id is a no-op, a stale revision is `40001`, a wrong level is `22023`) and an in-memory storage that can throw or silently drop writes. Existing file: `tests/reset/legacy-remote-progression.test.ts`.
+
+| # | Fixture | Status | Tests (file: title) |
+| --- | --- | --- | --- |
+| 1 | Offline completion, restart, resume | covered | proof: "keeps three offline completions in order with zero server calls, and survives a restart"; "after a restart the reconnect flush sends each run exactly once and lands on level 4"; "a flush cut short by a dropped connection resumes after restart without re-sending the accepted run". Existing: "retains one exact completion UUID across failure and replay beyond Number.MAX_SAFE_INTEGER". A restart is simulated by copying the durable key/value map into a fresh storage object, not by a real page reload. |
+| 2 | Reconnect flush, one server call per entry | covered | proof: "after a restart the reconnect flush sends each run exactly once ..." (three `accepted` calls, one per run). Existing: "reconstructs the exact proven 59-to-64 cloud gap as five idempotent completions"; "refreshes the remote cursor before repairing a gapped outbox and converges exactly once"; the three MAZER-FLOW-009 flush tests (7B). |
+| 3 | Duplicate delivery of the same id | covered for completions; the coin and item half is not buildable | proof: "completing the same run twice keeps one outbox entry and the server advances once"; "a response lost after the server accepted the run is settled by the exact receipt lookup, not re-sent"; "replaying a fully flushed outbox again is a no-op with no server calls"; "an outbox that already holds the same run id twice submits it once"; "a throwing clear after the server accepted keeps the entry pending, then the retry is a duplicate and advances nothing". Existing: "keeps an accepted receipt pending when durable clear fails, then retries the same run id once". |
+| 4 | Reordered delivery converges to the in-order state | covered, with one finding (below) | proof: "a reverse-ordered outbox is repaired from the local receipt history and equals the in-order state in one replay"; "a reverse-ordered outbox without local receipts never over-advances and holds as pending, not synced"; "a reverse-ordered outbox flushed directly (no recovery pass) converges in at most three flushes with no duplicate or out-of-order accept". |
+| 5 | Storage failure at each write; metadata never claims synced | covered for enqueue, clear and metadata writes | enqueue: "a throwing outbox write at enqueue keeps the completion unsynced ..."; "a silently dropped outbox write at enqueue (no exception) is caught by the read-back ...". clear: "a throwing clear after the server accepted ..."; "a silently dropped clear (no exception) is caught by the read-back ...". metadata: "a throwing sync-metadata write while the entry is pending never makes the result claim synced"; "a throwing sync-metadata write after the server accepted still reports the server-confirmed state, with a marker that bootstrap reads as unsynced". Also "after every storage failure clears, the next healthy replay delivers the run once and marks synced". Existing: "keeps sync metadata pending when a local completion retry receipt cannot be persisted". Not covered: a failure of the local progression write (`mazer.progression.v1`), which is outside the outbox. |
+| 6 | Multi-device: higher wins, lower chain proven or held | partial | Existing: "preserves an unproven stale UUID without letting it block a valid multi-device completion chain"; "preserves a stale UUID when exact acceptance proof fails without blocking the valid cursor"; "merges first-contact device progress without lowering a newer canonical track"; "never lets a stale higher completion count lower either visible progression track". Missing: two live fake clients completing different levels against one fake server in a single test. |
+| 7 | Account switch during an await | covered | Existing: "discards a deferred completion result after the authenticated account changes"; "never regresses pending account progress across reload and sign-out/sign-in hydration". |
+| 8 | Coin ledger | **not buildable** | No coin or inventory object exists in `src/`. Recorded as `test.todo` in the proof file. |
+| 9 | Entitlement offline grace | **not buildable** | No entitlement object exists in `src/`. Recorded as `test.todo` in the proof file. |
+| 10 | Hydration regression (Level 110 coherent row, impossible Level 99) | partial | Existing: "hydrates a coherent production-shaped historical row instead of rebasing it to Level 1" (Level 110); `legacy-progression.test.ts`: "still rejects impossible player progression from an authoritative remote row". The literal Level 99 three-cycle payload from the 2026-08-27 hydration doc is not asserted by that number. |
+
+How CI runs these. `npm test` globs `tests/reset`, but the CI workflow `.github/workflows/verify.yml` does not run `npm test`: it lists test files by name. The step "Verify progression, RPC, leaderboard, and UI boundaries" now lists the new proof file next to `legacy-remote-progression.test.ts`, so the fixtures run on every PR.
+
+**Finding (reported, not fixed; this card adds proof fixtures only).** In `deriveExactRemoteCompletionRecovery`, the branch for a cloud row still at level 1 with no receipt boundary takes `surfaceReceipts.slice(0, localBoundaryIndex + 1)`. Local telemetry is newest first and the local boundary is the newest receipt (index 0), so that slice holds one receipt however many completions were made. With two or more offline completions, a lost outbox and a fresh cloud row, recovery is therefore held with "Local play telemetry does not exactly cover the progression gap" instead of rebuilding the chain. Nothing is lost (local progress and receipts stay and the run is reported as held, never invented), so the effect is a stuck-pending sync, not corruption. The failing expectation is recorded as `test.skip` "rebuilds a multi-completion chain from local receipts when the cloud row is still at level 1 and the outbox is lost". Probable fix: `slice(localBoundaryIndex)`, taking every receipt from the local boundary to the oldest. A single-completion case passes today only because the one-element slice happens to be exact.
+
+Behaviour the fixtures pin (observations, not changes):
+- A reordered outbox converges in one replay only when local receipts let recovery re-derive the sequential order (existing entries are deduped by run id, so `recoveredCompletionCount` is 0). Without receipts it is held as pending with an error and nothing is submitted out of order. Flushing a reversed outbox directly (the completion path, no recovery pass) takes up to one flush per entry because each pass defers gapped entries.
+- A response lost after server acceptance is settled in the same flush: the cursor refresh shows the entry is below the server level, and the own-row receipt lookup proves the exact run id before the entry is removed.
+- A failed sync-metadata write is swallowed by design (it is a cache). A stale marker cannot equal the new local `updatedAt`, which `bootstrapLegacyRemoteAccountState` treats as unsynced and merges monotonically.
+
+### 7B. Offline flush (MAZER-FLOW-009, **DOCUMENTED FACT**)
+
+`src/legacy-runtime/legacyOfflineCompletionFlush.ts` is a pure helper (no Phaser, no Supabase). `MenuScene.installLegacyOfflineCompletionFlush` injects the event target (`window`), the online probe (`navigator.onLine !== false`), the flush call (`replayLegacyRemoteCompletions`) and the notifier, and skips installation in level-preview sandboxes. Behaviour:
+
+1. On the browser `online` event it runs one flush. A flush already running defers a single re-run after it ends, so replays never overlap.
+2. The flush is the replay in section 2.3. If the authenticated account or hydration sequence changed during the await, the scene discards the result (`isLegacyRemoteCompletionContextCurrent`) and the helper receives `null`.
+3. Every completion result is passed to `noteCompletionResult`. When the completion is not synced, work is pending and the browser is offline, the player gets one message per outage: "You are offline. Progress is saved on this device and will sync when you reconnect." Further offline completions in the same outage do not repeat it.
+4. When a flush returns `synced` with zero pending and an outage notice was shown, the player gets one message, "Back online. Saved progress synced.", and the notice re-arms for the next outage. A failed or throwing flush leaves the notice armed and the outbox durable; the next completion, boot or `online` event retries.
+5. `dispose()` removes the listener and stops further notices.
+
+Tests: `tests/reset/legacy-remote-progression.test.ts`, describe "MAZER-FLOW-009 offline completion flush": "flushes the outbox on the online event and announces the outage once"; "does not announce while online and re-arms the notice for the next outage"; "keeps the outage notice armed when the online flush fails and survives a throwing flush". Not tested: the `MenuScene` closure (the discard-on-account-change branch) and a real `online` event in a real browser.
+
+Running the fixtures: `npx vitest run tests/reset/legacy-remote-progression-proof-fixtures.test.ts tests/reset/legacy-remote-progression.test.ts` (also part of `npm test` and of the CI step named in 7A). Section 7A was verified on 2026-11-12 by running those two files; see the PR for the results.
 
 ## 8. Provider-gated / out of scope
 
@@ -174,4 +214,4 @@ Any new Supabase table, column, RPC, or migration (coin ledger, inventory, entit
 - Server-side behavior under concurrent completions beyond what the migrations and tests show.
 - Storage eviction and quota behavior on real iOS/Android browsers.
 - Numeric bounds (outbox size, age, grace duration).
-- The result of running the existing test suite at this base (not run in this session).
+- Real-device behaviour of everything in section 7B (airplane mode, the `online` event on iOS and Android browsers and installed PWAs).
