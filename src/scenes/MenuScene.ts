@@ -467,7 +467,8 @@ import {
   beginMazerOAuthAuthorization,
   installMazerOAuthPageShowRecovery,
   navigateToMazerAccountPortal,
-  navigateToMazerLegalPortal
+  navigateToMazerLegalPortal,
+  warmMazerProviderPreflight
 } from '../legacy-runtime/legacyAccountPortal';
 import {
   createLegacyPasswordRecoveryState,
@@ -12355,6 +12356,8 @@ export class MenuScene extends Phaser.Scene {
     stacked: boolean,
     centerX: number
   ): void {
+    // MAZER-ACCT-037: quiet, throttled, never shows anything (see the module).
+    warmMazerProviderPreflight();
     const model = this.buildLegacyAuthScreenModel();
     const layout = resolveLegacyAuthScreenLayout(this.layout.width, this.layout.height, readMazerViewportGeometry().safeArea);
     const material = cyberArcadeMaterial;

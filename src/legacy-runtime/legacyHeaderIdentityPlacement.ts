@@ -29,11 +29,6 @@ import { resolveLegacyMenuPathTitleLayout, resolveLegacyMenuTitleFontSize } from
 /** Phaser object name of the on-screen label (QA scripts find it by this). */
 export const LEGACY_HEADER_IDENTITY_LABEL_NAME = 'header-identity';
 
-/** Below this viewport width the label uses the short form (fewer visible characters). */
-export const LEGACY_HEADER_IDENTITY_SHORT_FORM_MAX_WIDTH_PX = 360;
-/** Visible-character floor of the short form (320 px: ~41 px of room fits "qa-p..." style stubs). */
-export const LEGACY_HEADER_IDENTITY_SHORT_FORM_MIN_VISIBLE_CHARS = 4;
-
 /** Vertical padding (px, top and bottom) so descenders are never clipped; no stroke, no plate. */
 export const LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX = 2;
 
@@ -135,9 +130,6 @@ export const resolveLegacyHeaderIdentityPlacement = (
   const identity = resolveLegacyHeaderIdentityLayout({
     fontPx: LEGACY_HEADER_IDENTITY_PREFERRED_FONT_PX,
     measure: input.measure,
-    minVisibleChars: layout.width < LEGACY_HEADER_IDENTITY_SHORT_FORM_MAX_WIDTH_PX
-      ? LEGACY_HEADER_IDENTITY_SHORT_FORM_MIN_VISIBLE_CHARS
-      : undefined,
     profileFrameCenterY: profileFrame.centerY,
     profileFrameRight: profileFrame.right,
     text: input.username,

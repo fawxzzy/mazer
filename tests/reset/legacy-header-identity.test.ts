@@ -129,7 +129,7 @@ describe('legacy header identity: ellipsizeLegacyUiText', () => {
 
 describe('legacy header identity: constants', () => {
   test('exports the documented thresholds', () => {
-    expect(LEGACY_HEADER_IDENTITY_MIN_VISIBLE_CHARS).toBe(6);
+    expect(LEGACY_HEADER_IDENTITY_MIN_VISIBLE_CHARS).toBe(1);
     expect(LEGACY_HEADER_IDENTITY_MIN_FONT_PX).toBe(11);
     expect(LEGACY_HEADER_IDENTITY_ICON_GAP_PX).toBe(8);
     expect(LEGACY_HEADER_IDENTITY_TITLE_GAP_PX).toBeGreaterThan(0);
@@ -184,7 +184,7 @@ describe('legacy header identity: layout rules', () => {
     expect(layout.fontPx).toBeGreaterThanOrEqual(LEGACY_HEADER_IDENTITY_MIN_FONT_PX);
   });
 
-  test('ellipsizes at the minimum font and keeps at least 6 visible characters', () => {
+  test('ellipsizes at the minimum font instead of hiding a name that does not fit', () => {
     const text = 'Alexandrina_Wolf';
     const layout = resolveLegacyHeaderIdentityLayout({
       fontPx: 14,
@@ -202,20 +202,52 @@ describe('legacy header identity: layout rules', () => {
     expect(layout.right).toBeLessThanOrEqual(layout.left + layout.maxWidth);
   });
 
-  test('hides the label (icon only) when fewer than 6 characters would be visible', () => {
-    const text = 'Alexandrina_Wolf';
-    const layout = resolveLegacyHeaderIdentityLayout({
-      fontPx: 14,
-      measure: measureAt,
-      profileFrameRight: 44,
-      text,
-      titleLeft: 52 + LEGACY_HEADER_IDENTITY_TITLE_GAP_PX + 40,
-      viewportHeight: 844,
-      viewportWidth: 600
-    });
+  // MAZER-ACCT-032: the label is hidden only when not even one character plus
+  // the ellipsis fits. At 11 px the test ellipsis costs 11 px and 'A' 6.6 px.
+  const longNameLayout = (budgetPx: number) => resolveLegacyHeaderIdentityLayout({
+    fontPx: 14,
+    measure: measureAt,
+    profileFrameRight: 44,
+    text: 'Alexandrina_Wolf',
+    titleLeft: 52 + LEGACY_HEADER_IDENTITY_TITLE_GAP_PX + budgetPx,
+    viewportHeight: 844,
+    viewportWidth: 600
+  });
+
+  test('hides the label (icon only) only when not even one character plus the ellipsis fits', () => {
+    const layout = longNameLayout(15);
     expect(layout.visible).toBe(false);
     expect(layout.displayText).toBe('');
     expect(layout.hiddenReason).toBe('too-few-visible-characters');
+  });
+
+  test('a long name that has room for only one character is cut to that character and an ellipsis, not hidden', () => {
+    const layout = longNameLayout(18);
+    expect(layout.visible).toBe(true);
+    expect(layout.displayText).toBe('A…');
+    expect(layout.right).toBeLessThanOrEqual(layout.left + layout.maxWidth);
+  });
+
+  test('a 15-character name that does not fit is shown cut with an ellipsis at every budget that holds a character', () => {
+    for (let budget = 18; budget < 90; budget += 1) {
+      const layout = resolveLegacyHeaderIdentityLayout({
+        fontPx: 14,
+        measure: measureAt,
+        profileFrameRight: 44,
+        text: 'abcdefghijklmno',
+        titleLeft: 52 + LEGACY_HEADER_IDENTITY_TITLE_GAP_PX + budget,
+        viewportHeight: 844,
+        viewportWidth: 600
+      });
+      expect(layout.visible).toBe(true);
+      expect(layout.displayText.endsWith(LEGACY_HEADER_IDENTITY_ELLIPSIS)).toBe(true);
+      expect(layout.right).toBeLessThanOrEqual(layout.left + layout.maxWidth + 1e-9);
+    }
+  });
+
+  test('a name that fits whole is unchanged', () => {
+    const layout = layoutFor(1280, 'qa-player', 14, 720);
+    expect(layout.displayText).toBe('qa-player');
   });
 
   test('a short name that fits whole is shown even though it has fewer than 6 characters', () => {
@@ -224,7 +256,7 @@ describe('legacy header identity: layout rules', () => {
     expect(layout.displayText).toBe('Zac');
   });
 
-  test('a short name that cannot fit whole is hidden, not shown as "Z…"', () => {
+  test('a short name that cannot fit whole is cut with an ellipsis, not hidden', () => {
     const layout = resolveLegacyHeaderIdentityLayout({
       fontPx: 14,
       measure: measureAt,
@@ -234,7 +266,8 @@ describe('legacy header identity: layout rules', () => {
       viewportHeight: 844,
       viewportWidth: 600
     });
-    expect(layout.visible).toBe(false);
+    expect(layout.visible).toBe(true);
+    expect(layout.displayText.endsWith(LEGACY_HEADER_IDENTITY_ELLIPSIS)).toBe(true);
   });
 
   test('hides for empty text, no room, and invalid geometry', () => {
@@ -284,8 +317,9 @@ describe('legacy header identity: phone widths under the DERIVED title-footprint
     } else {
       expect(layout.displayText).toBe('');
     }
-    // With a 1em-wide glyph and only ~25-60px of room, the worst case must be icon-only on phones.
-    expect(layout.visible).toBe(false);
+    // With a 1em-wide glyph and only ~17-60px of room, the worst case is a stub or icon-only
+    // (never a name that overflows): the full name cannot fit.
+    expect(layout.displayText).not.toBe('WWWWWWWWWWWWWWW');
   });
 
   test.each(widths)('short names stay inside the budget at %ipx', (width) => {
@@ -353,7 +387,7 @@ describe('legacy header identity: invariants', () => {
     }
   });
 
-  test('minVisibleChars lowers the visible-character floor (320 px short form) without changing the default', () => {
+  test('minVisibleChars can still raise the visible-character floor above the default of 1', () => {
     // 41 px of room at 11 px / 0.62em (6.82 px per glyph): 5 glyphs + ellipsis do not fit 6 visible chars.
     const input = {
       profileFrameRight: 42,
@@ -363,13 +397,13 @@ describe('legacy header identity: invariants', () => {
       viewportWidth: 320,
       fontPx: 14
     };
-    const strict = resolveLegacyHeaderIdentityLayout(input);
+    const strict = resolveLegacyHeaderIdentityLayout({ ...input, minVisibleChars: 6 });
     expect(strict.visible).toBe(false);
     expect(strict.hiddenReason).toBe('too-few-visible-characters');
-    const shortForm = resolveLegacyHeaderIdentityLayout({ ...input, minVisibleChars: 4 });
-    expect(shortForm.visible).toBe(true);
-    expect(shortForm.displayText.endsWith(LEGACY_HEADER_IDENTITY_ELLIPSIS)).toBe(true);
-    expect(shortForm.right).toBeLessThanOrEqual(99 - LEGACY_HEADER_IDENTITY_TITLE_GAP_PX + 1e-9);
+    const byDefault = resolveLegacyHeaderIdentityLayout(input);
+    expect(byDefault.visible).toBe(true);
+    expect(byDefault.displayText.endsWith(LEGACY_HEADER_IDENTITY_ELLIPSIS)).toBe(true);
+    expect(byDefault.right).toBeLessThanOrEqual(99 - LEGACY_HEADER_IDENTITY_TITLE_GAP_PX + 1e-9);
   });
 
   test('is deterministic for identical input', () => {
