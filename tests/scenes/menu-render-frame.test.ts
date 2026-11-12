@@ -13,7 +13,6 @@ import {
   resolveLegacyMenuPathRenderFrame,
   resolveLegacyMenuPathRenderFrames,
   resolveLegacyMenuPathRenderSegments,
-  resolveLegacyPlayerMarkerRenderMetrics
 } from '../../src/legacy-runtime/legacyMenuRender';
 import {
   resolveLegacyMenuPathTitleOrbitGeometry,
@@ -1047,7 +1046,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // the marker is centred on the device-snapped tile centre (the baked tile's and the end glyphs'), not a raw fractional one
     expect(menuSceneSource).toContain('resolvePlayerMarkerCenter(');
     expect(menuSceneSource).toContain('this.boardTileLayer.snappedOrigin ?? { x: baseOriginX, y: baseOriginY }');
-    expect(menuSceneSource).toContain('resolveLegacyPlayerMarkerRenderMetrics(');
+    // the diagnostics report the real drawn block and ring (playerMarker.ts), not diamond-era ratios
+    expect(menuSceneSource).toContain('resolvePlayerMarkerDiagnosticRadii(');
+    expect(menuSceneSource).not.toContain('resolveLegacyPlayerMarkerRenderMetrics');
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO');
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO');
     // The player is ONE rounded chip block for play and for the menu demo's AI (src/render/playerMarker.ts): the old
     // flat sharp-square branch with its 85 % fill ratio, catchlight and locator ticks is gone.
     expect(menuSceneSource).not.toContain('LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO');
@@ -1140,8 +1143,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, this.resolveLegacyPlayerVisualMoveDurationMs());');
     expect(menuSceneSource).toContain('renderScreenX: mazeRenderFrame.boardLeft + ((renderedPlayerPoint.x + 0.5) * mazeRenderFrame.tileSize)');
     expect(menuSceneSource).toContain('visualMotionActive: this.hasLegacyPlayerVisualMotionPendingFrame(time)');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.46;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.72;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_COLOR = cyberArcadeMaterial.signal.player;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;');
@@ -1157,18 +1158,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.62, 3)).toBe(3);
     expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.34, 2)).toBe(2);
     expect(resolveLegacyDynamicMarkerInset(3.265, 0.22)).toBe(0);
-    const tinyPlayer = resolveLegacyPlayerMarkerRenderMetrics(3.265, 0.34, 0.54);
-    expect(tinyPlayer.coreRadius).toBeCloseTo(1.11, 3);
-    expect(tinyPlayer.haloRadius).toBeCloseTo(1.502, 3);
-    expect(tinyPlayer.strokeWidth).toBe(1);
-    const phonePlayer = resolveLegacyPlayerMarkerRenderMetrics(7, 0.34, 0.46);
-    expect(phonePlayer.coreRadius).toBeCloseTo(2.38, 3);
-    expect(phonePlayer.haloRadius).toBeCloseTo(3.22, 3);
-    expect(phonePlayer.strokeWidth).toBe(1);
-    const phonePlayPlayer = resolveLegacyPlayerMarkerRenderMetrics(7, 0.46, 0.72, 0.46, 0.72);
-    expect(phonePlayPlayer.coreRadius).toBeCloseTo(3.22, 3);
-    expect(phonePlayPlayer.haloRadius).toBeCloseTo(5.04, 3);
-    expect(phonePlayPlayer.strokeWidth).toBe(1);
     const tinyEndpoint = resolveLegacyEndpointMarkerRenderMetrics(3.265);
     expect(tinyEndpoint.coreRadius).toBeCloseTo(1, 3);
     expect(tinyEndpoint.outerRadius).toBeCloseTo(1.567, 3);
@@ -1188,10 +1177,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(resolveLegacyDynamicTrailStrokeWidth(18, 0.62, 3)).toBe(11);
     expect(resolveLegacyDynamicTrailStrokeWidth(18, 0.34, 2)).toBe(6);
     expect(resolveLegacyDynamicMarkerInset(18, 0.22)).toBe(3);
-    const desktopPlayer = resolveLegacyPlayerMarkerRenderMetrics(18, 0.34, 0.54);
-    expect(desktopPlayer.coreRadius).toBeCloseTo(6.12, 3);
-    expect(desktopPlayer.haloRadius).toBeCloseTo(8.28, 3);
-    expect(desktopPlayer.strokeWidth).toBe(2);
     const desktopEndpoint = resolveLegacyEndpointMarkerRenderMetrics(18);
     expect(desktopEndpoint.coreRadius).toBeCloseTo(5.011, 3);
     expect(desktopEndpoint.outerRadius).toBeCloseTo(8.64, 3);

@@ -46,6 +46,8 @@ import {
   createPlayerMarkerFrame,
   drawPlayerMarker,
   resolvePlayerMarkerCenter,
+  resolvePlayerMarkerDiagnosticRadii,
+  resolvePlayerMarkerEndpointRadii,
   resolvePlayerMarkerFrame,
   type PlayerMarkerFrame
 } from '../render/playerMarker';
@@ -83,10 +85,10 @@ import { PhaserGraphicsTileContext } from '../render/phaserTileContext';
 import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameToViewport } from '../boot/viewportGeometry';
 import {
   advanceTrailShineState,
-  buildContinuousTrailPath,
   resampleTrailVertices
 } from '../render/navigationCoreTrail';
 import { resolveTrailGridPathWithHead } from '../render/trailHeadPath';
+import { buildDeviceSnappedTrailPath } from '../render/trailDeviceSnap';
 import {
   computeTrailCanvasBounds,
   drawTrailToCanvasContext
@@ -586,7 +588,6 @@ import {
   resolveLegacyMenuBorderDockDirections,
   resolveLegacyMenuBorderDockRenderFrames,
   resolveLegacyMenuBorderDockRenderAreas,
-  resolveLegacyPlayerMarkerRenderMetrics,
   type LegacyMenuBorderDockDirection
 } from '../legacy-runtime/legacyMenuRender';
 import {
@@ -1506,11 +1507,6 @@ const LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS = 16;
 const LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS = scaleLegacyMovementDelayMs(144);
 const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = scaleLegacyMovementDelayMs(104);
 const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = scaleLegacyMovementDelayMs(144);
-// Diagnostics only (markerStyle.playerCoreRadius / playerHaloRadius): the diamond-era radius ratios the runtime
-// diagnostics have always reported. The marker itself is drawn from src/render/playerMarker.ts (one shape for the
-// human player, the menu demo's AI and the Guide icon), not from these.
-const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.46;
-const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.72;
 const LEGACY_PLAY_PLAYER_BEACON_COLOR = cyberArcadeMaterial.signal.player;
 const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent;
 const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;
@@ -3540,12 +3536,10 @@ export class MenuScene extends Phaser.Scene {
     });
     const rememberedAuthIdentity = readLegacyRememberedIdentityState(this.resolveBrowserLocalStorage());
     const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
-    const playerMarkerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
+    // markerStyle.playerCoreRadius / playerHaloRadius: the real drawn block and ring (src/render/playerMarker.ts).
+    const playerMarkerMetrics = resolvePlayerMarkerDiagnosticRadii(
       mazeRenderFrame.tileSize,
-      LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO,
-      LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO,
-      LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO,
-      LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO
+      this.resolveBoardTileBackingScale()
     );
     const playLifecycle = this.resolveLegacyPlayLifecycleDiagnostics(time);
     this.legacyWorldTurnHost.setState(this.resolveLegacyWorldTurnHostState());
@@ -9605,11 +9599,15 @@ export class MenuScene extends Phaser.Scene {
     // stroke calls. performance.now() unconditionally: this method only
     // ever runs in a real browser Scene.
     const perfBuildStartedAtMs = performance.now();
-    const geometry = buildContinuousTrailPath({
+    // Project through the player marker's own device-snapped centres (same origin, same backing scale), so the trail's
+    // head lands exactly on the marker's centre (trailDeviceSnap.ts).
+    const trailSnappedOrigin = this.boardTileLayer.snappedOrigin;
+    const geometry = buildDeviceSnappedTrailPath({
       gridPath,
-      originX,
-      originY,
+      originX: trailSnappedOrigin?.x ?? originX,
+      originY: trailSnappedOrigin?.y ?? originY,
       tileSize,
+      devicePixelRatio: this.resolveBoardTileBackingScale(),
       cornerRadiusRatio: LEGACY_PLAY_TRAIL_CORNER_RADIUS_RATIO,
       playerTrimRatio: LEGACY_PLAY_TRAIL_PLAYER_TRIM_RATIO
     });
@@ -10025,6 +10023,14 @@ export class MenuScene extends Phaser.Scene {
       alpha,
       timeMs: time,
       coreColor: playerCoreColor,
+      // On the start / goal (dead-end cap) tile the ring follows the tile's rounded shape.
+      tileCornerRadii: resolvePlayerMarkerEndpointRadii(
+        point.x,
+        point.y,
+        this.maze.start,
+        this.maze.goal,
+        this.boardTileLayer.endpointTiles
+      ),
       pingStartMs: this.playerLocatorState.activePingStartMs,
       reducedMotion
     });
@@ -16085,12 +16091,10 @@ export class MenuScene extends Phaser.Scene {
       : Math.max(0, titlePieceCount - titleVisiblePieces);
     const touchControls = this.resolveLegacyPlayTouchControlDiagnostics();
     const overlayPanel = this.overlay === 'none' ? null : this.resolveOverlayPanelFrame();
-    const playerMarkerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
+    // markerStyle.playerCoreRadius / playerHaloRadius: the real drawn block and ring (src/render/playerMarker.ts).
+    const playerMarkerMetrics = resolvePlayerMarkerDiagnosticRadii(
       mazeRenderFrame.tileSize,
-      LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO,
-      LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO,
-      LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO,
-      LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO
+      this.resolveBoardTileBackingScale()
     );
     const progressionDiagnostics = summarizeLegacyProgressionDiagnostics(
       this.progressionState,

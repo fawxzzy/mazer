@@ -1,4 +1,4 @@
-import type { LocatorGraphics } from '../../../src/render/playerLocator';
+import type { LocatorCornerRadii, LocatorGraphics } from '../../../src/render/playerLocator';
 import type { RasterContext } from './rasterContext';
 
 /**
@@ -26,24 +26,29 @@ export class RasterGraphics implements LocatorGraphics {
     this.ctx.globalAlpha = alpha;
   }
 
-  private roundedPath(x: number, y: number, w: number, h: number, radius: number): void {
-    const r = Math.max(0, Math.min(radius, w / 2, h / 2));
+  private roundedPath(x: number, y: number, w: number, h: number, radius: number | LocatorCornerRadii): void {
+    const limit = Math.min(w / 2, h / 2);
+    const clamp = (r: number): number => Math.max(0, Math.min(r, limit));
+    const tl = clamp(typeof radius === 'number' ? radius : radius.tl);
+    const tr = clamp(typeof radius === 'number' ? radius : radius.tr);
+    const br = clamp(typeof radius === 'number' ? radius : radius.br);
+    const bl = clamp(typeof radius === 'number' ? radius : radius.bl);
     const c = this.ctx;
     c.beginPath();
-    c.moveTo(x + r, y);
-    c.arcTo(x + w, y, x + w, y + h, r);
-    c.arcTo(x + w, y + h, x, y + h, r);
-    c.arcTo(x, y + h, x, y, r);
-    c.arcTo(x, y, x + w, y, r);
+    c.moveTo(x + tl, y);
+    c.arcTo(x + w, y, x + w, y + h, tr);
+    c.arcTo(x + w, y + h, x, y + h, br);
+    c.arcTo(x, y + h, x, y, bl);
+    c.arcTo(x, y, x + w, y, tl);
     c.closePath();
   }
 
-  fillRoundedRect(x: number, y: number, width: number, height: number, radius: number): void {
+  fillRoundedRect(x: number, y: number, width: number, height: number, radius: number | LocatorCornerRadii): void {
     this.roundedPath(x, y, width, height, radius);
     this.ctx.fill();
   }
 
-  strokeRoundedRect(x: number, y: number, width: number, height: number, radius: number): void {
+  strokeRoundedRect(x: number, y: number, width: number, height: number, radius: number | LocatorCornerRadii): void {
     this.roundedPath(x, y, width, height, radius);
     this.ctx.stroke();
   }
