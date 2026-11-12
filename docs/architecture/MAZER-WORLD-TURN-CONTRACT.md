@@ -33,6 +33,30 @@ Rejected movement cannot run downstream phases or consume a turn number.
 Handlers are registered once at host construction, and bounded diagnostics list
 the registered phases in this same canonical order.
 
+## Phase Status
+
+Which canonical phases are live in the shipping scene. `LIVE` means the legacy
+`MenuScene` registers a handler for the phase. `DEFERRED` means no handler is
+registered, and none may be registered until the gating contract is signed.
+
+| Order | Phase | Status | Gate |
+| --- | --- | --- | --- |
+| 1 | `player-movement` | LIVE | Registered by `MenuScene` at host construction. |
+| 2 | `enemy-movement` | DEFERRED | Pending MAZER-HAZ-002 (Phase 2 hazards contract, unsigned). |
+| 3 | `projectile-movement` | DEFERRED | Pending MAZER-HAZ-002. |
+| 4 | `pickups` | DEFERRED | Pending MAZER-HAZ-002. |
+| 5 | `item-effects` | DEFERRED | Pending MAZER-HAZ-002. |
+| 6 | `duration-expiry` | DEFERRED | Pending MAZER-HAZ-002. |
+| 7 | `collisions` | DEFERRED | Pending MAZER-HAZ-002. |
+
+Only `player-movement` is live: 1 of 7 phases. The six deferred phases are an
+explicit decision, not an oversight. Phase 2 hazards stay held until
+MAZER-HAZ-002 is signed, and the board stays free of hazards, enemies, and
+obstacles until then. `tests/architecture/world-turn-contract.test.ts` keeps this
+table equal to `WORLD_TURN_PHASES` and fails if `MenuScene` registers any phase
+other than `player-movement`. Wiring a deferred phase requires changing this
+table, that test, and the signed contract in the same change.
+
 ## Cosmetic Clock
 
 Backdrop stars, HUD pulses, compass presentation, menu animation, and other
