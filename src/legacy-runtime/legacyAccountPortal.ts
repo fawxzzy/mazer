@@ -1,3 +1,9 @@
+import {
+  createProviderPreflightCache,
+  runProviderPreflight,
+  type ProviderPreflightResult
+} from './legacyProviderPreflight';
+
 export const MAZER_ACCOUNT_APP = 'mazer';
 export const MAZER_ACCOUNT_PORTAL_ORIGIN = 'https://account.fawxzzy.com';
 export const MAZER_CANONICAL_RETURN_URL = 'https://mazer.fawxzzy.com/';
@@ -42,6 +48,9 @@ export type MazerOAuthFailureCategory =
   | 'pending_expired'
   | 'invalid_state'
   | 'authorization_unavailable'
+  // MAZER-ACCT-036: the pre-flight before leaving for the sign-in page found
+  // the account service down; Mazer did not navigate.
+  | 'provider_unreachable'
   | 'exchange_unavailable'
   | 'session_invalid'
   | 'storage_unavailable';
@@ -101,6 +110,12 @@ export interface MazerOAuthRuntime {
   notifyAcceptedSession?(session: Record<string, unknown>): boolean;
   now(): number;
   runExclusiveSessionTransaction<T>(operation: () => T): Promise<T | null>;
+  /**
+   * Asks the account service whether it is up before the app leaves for the
+   * sign-in page (MAZER-ACCT-036). Optional: the browser runtime supplies it;
+   * a runtime without it skips the check and navigates as before.
+   */
+  preflightProvider?(): Promise<ProviderPreflightResult>;
   runQueuedSessionTransaction<T>(operation: () => T): Promise<T | null>;
   sessionStorage: MazerOAuthStorage;
   setTimer(handler: () => void, timeoutMs: number): ReturnType<typeof setTimeout>;
@@ -135,6 +150,8 @@ export interface MazerOAuthClient {
     signOut(options: { scope: 'local' }): Promise<{ error: unknown }>;
   };
 }
+
+const mazerProviderPreflightCache = createProviderPreflightCache();
 
 let mazerOAuthBootResult: MazerOAuthBootResult = { status: 'none' };
 
@@ -282,6 +299,14 @@ const resolveBrowserRuntime = (): MazerOAuthRuntimeResolution => {
           }
         },
         now: () => Date.now(),
+        preflightProvider: () => runProviderPreflight({
+          cache: mazerProviderPreflightCache,
+          clearTimer: (handle) => clearTimeout(handle),
+          fetch: window.fetch.bind(window),
+          isOnline: () => typeof navigator === 'undefined' ? undefined : navigator.onLine,
+          now: () => Date.now(),
+          setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
+        }),
         runExclusiveSessionTransaction: async (operation) => {
           const result = await runMazerExclusiveAuthMutation(operation);
           return result.status === 'completed' ? result.value : null;
@@ -454,6 +479,20 @@ export const beginMazerOAuthAuthorization = async (
   const authStorage = resolveRuntimeAuthStorage(resolvedRuntime);
   if (authStorage === null) {
     return failed('storage_unavailable');
+  }
+  // Before any state is written: if the account service is down, stay in the
+  // app. Leaving would strand the player on a provider error page (installed
+  // apps have no back button). Fails open only when the probe itself is blocked.
+  if (resolvedRuntime.preflightProvider !== undefined) {
+    let preflight: ProviderPreflightResult | null = null;
+    try {
+      preflight = await resolvedRuntime.preflightProvider();
+    } catch {
+      preflight = null;
+    }
+    if (preflight !== null && !preflight.proceed) {
+      return failed('provider_unreachable');
+    }
   }
   let sharedMutationState: {
     authSessionPreimageRaw: string | null;

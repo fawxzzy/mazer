@@ -358,6 +358,81 @@ describe('Mazer shared account contract', () => {
     expect(storage.getItem(MAZER_AUTH_MUTATION_EPOCH_KEY)).toBe('1');
   });
 
+  // MAZER-ACCT-036: never strand the player on a provider error page.
+  describe('provider pre-flight before leaving the app', () => {
+    const withPreflight = (
+      runtime: MazerOAuthRuntime,
+      result: { proceed: boolean; reason: 'blocked' | 'cached' | 'http_error' | 'missing_cors' | 'offline' | 'ok' | 'timeout'; status: number | null }
+    ): MazerOAuthRuntime & { preflightProvider: ReturnType<typeof vi.fn> } => {
+      const preflightProvider = vi.fn(async () => result);
+      return Object.assign(runtime, { preflightProvider });
+    };
+
+    test('a provider that is down keeps the player in the app: no navigation, no pending record, failure category', async () => {
+      const storage = new MemoryStorage();
+      const runtime = withPreflight(createRuntime(storage), { proceed: false, reason: 'http_error', status: 503 });
+      await expect(beginMazerOAuthAuthorization(runtime)).resolves.toEqual({
+        category: 'provider_unreachable',
+        status: 'failed'
+      });
+      expect(runtime.location.assigned).toEqual([]);
+      expect(storage.getItem(MAZER_OAUTH_PENDING_KEY)).toBeNull();
+      // Nothing was mutated, so a failed attempt cannot disturb another tab's flow.
+      expect(storage.getItem(MAZER_AUTH_MUTATION_EPOCH_KEY)).toBeNull();
+    });
+
+    test('a healthy provider navigates exactly as before', async () => {
+      const storage = new MemoryStorage();
+      const runtime = withPreflight(createRuntime(storage), { proceed: true, reason: 'ok', status: 200 });
+      await expect(beginMazerOAuthAuthorization(runtime)).resolves.toEqual({ status: 'none' });
+      expect(runtime.preflightProvider).toHaveBeenCalledTimes(1);
+      expect(runtime.location.assigned).toHaveLength(1);
+      expect(storage.getItem(MAZER_OAUTH_PENDING_KEY)).not.toBeNull();
+    });
+
+    test('a blocked probe falls through and still navigates', async () => {
+      const storage = new MemoryStorage();
+      const runtime = withPreflight(createRuntime(storage), { proceed: true, reason: 'blocked', status: null });
+      await expect(beginMazerOAuthAuthorization(runtime)).resolves.toEqual({ status: 'none' });
+      expect(runtime.location.assigned).toHaveLength(1);
+    });
+
+    test('a pre-flight that throws never blocks sign-in', async () => {
+      const storage = new MemoryStorage();
+      const runtime = Object.assign(createRuntime(storage), {
+        preflightProvider: vi.fn(async () => { throw new Error('boom'); })
+      });
+      await expect(beginMazerOAuthAuthorization(runtime)).resolves.toEqual({ status: 'none' });
+      expect(runtime.location.assigned).toHaveLength(1);
+    });
+
+    test('a storage failure is still reported as storage, before any network call', async () => {
+      const runtime = withPreflight(createRuntime(new MemoryStorage()), { proceed: false, reason: 'timeout', status: null });
+      const deniedRuntime = { ...runtime, authStorage: null, sessionStorage: null } as unknown as MazerOAuthRuntime;
+      await expect(beginMazerOAuthAuthorization(deniedRuntime)).resolves.toEqual({
+        category: 'storage_unavailable',
+        status: 'failed'
+      });
+      expect(runtime.preflightProvider).not.toHaveBeenCalled();
+    });
+
+    test('the next attempt after an outage asks again and succeeds once the provider is back', async () => {
+      const storage = new MemoryStorage();
+      let up = false;
+      const preflightProvider = vi.fn(async () => (
+        up
+          ? { proceed: true, reason: 'ok' as const, status: 200 }
+          : { proceed: false, reason: 'http_error' as const, status: 521 }
+      ));
+      const runtime = Object.assign(createRuntime(storage), { preflightProvider });
+      await expect(beginMazerOAuthAuthorization(runtime)).resolves.toMatchObject({ category: 'provider_unreachable' });
+      up = true;
+      await expect(beginMazerOAuthAuthorization(runtime)).resolves.toEqual({ status: 'none' });
+      expect(preflightProvider).toHaveBeenCalledTimes(2);
+      expect(runtime.location.assigned).toHaveLength(1);
+    });
+  });
+
   test('restores only the validated direct-play launch intent after OAuth succeeds', async () => {
     const storage = new MemoryStorage();
     const startRuntime = createRuntime(storage, createLocation('https://mazer.fawxzzy.com/?mode=play'));
