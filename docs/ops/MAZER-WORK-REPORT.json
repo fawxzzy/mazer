@@ -3,39 +3,39 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-11T23:00:00.000Z"
+    "registryUpdatedAt": "2026-11-12T12:00:00.000Z"
   },
   "counters": {
-    "total": 173,
-    "open": 70,
-    "completed": 88,
+    "total": 184,
+    "open": 77,
+    "completed": 92,
     "deferred": 15,
     "buckets": {
-      "needs-you": 33,
+      "needs-you": 34,
       "in-review": 4,
-      "blocked": 19,
-      "ready": 10,
+      "blocked": 18,
+      "ready": 17,
       "in-progress": 4,
       "unclassified": 0,
       "deferred": 15,
-      "completed": 88
+      "completed": 92
     },
     "needsYou": {
       "decisions": 25,
-      "checks": 8
+      "checks": 9
     },
     "completedByTier": {
       "device": 0,
-      "headless": 38,
-      "source-only": 34,
-      "no-device-surface": 16,
+      "headless": 40,
+      "source-only": 35,
+      "no-device-surface": 17,
       "unrecorded": 0
     },
     "blockedByGroup": {
       "Zac": 3,
       "provider": 2,
       "device": 1,
-      "other-card": 13,
+      "other-card": 12,
       "unknown": 0
     }
   },
@@ -90,30 +90,6 @@
         "verify": []
       },
       {
-        "id": "MAZER-ACCT-010",
-        "title": "Decide the Create Account non-enumeration trade-off and auto-confirm",
-        "status": "planning",
-        "priority": "medium",
-        "kind": "decision",
-        "ask": "Accept the residual Create Account signal and keep auto-confirm on, or turn auto-confirm off (adds a confirmation step for every new player)?",
-        "recommendation": "Accept the current residual signal and keep auto-confirm; the rest of the form no longer discloses it and a confirmation step costs real sign-ups.",
-        "context": "With auto-confirm on, a successful sign-up returns a session and a duplicate does not, so account existence can still be inferred from whether the user ends up signed in.",
-        "prs": "",
-        "verify": []
-      },
-      {
-        "id": "MAZER-ACCT-011",
-        "title": "Add a leaderboard username editor for account-site players",
-        "status": "planning",
-        "priority": "medium",
-        "kind": "decision",
-        "ask": "Should players be able to rename the generated handle from the leaderboard?",
-        "recommendation": "Yes: build a small editor that reuses the existing username save path.",
-        "context": "The in-game username editor was removed, so a generated Mazer-###### handle cannot be renamed.",
-        "prs": "",
-        "verify": []
-      },
-      {
         "id": "MAZER-ACCT-016",
         "title": "Collect the Galaxy S21 sign-in details from the owner family member",
         "status": "planning",
@@ -122,6 +98,18 @@
         "ask": "Please ask her: (1) Did she open Mazer from the home-screen icon, and was it Chrome she installed it from? (2) Where did she see the words about a session: the Create Account form or inside the game, and as close to word for word as possible? (3) Did a browser or address bar appear on top of the app? (4) Did she use a username or the account address, and try several times in a row (the username limit is 15 minutes)? (5) Roughly what time did she try, before or after the sign-in fixes at about midday on 2026-11-11?",
         "recommendation": "Relay her answers on this card; do not guess a cause before then.",
         "context": "The Galaxy S21 sign-in failure has no confirmed cause; the answers decide which candidate is real.",
+        "prs": "",
+        "verify": []
+      },
+      {
+        "id": "MAZER-ACCT-018",
+        "title": "Tell account-site sign-up users their username shows on the Mazer leaderboard",
+        "status": "planning",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Confirm the copy for one line on the account-site sign-up screen saying the username shows on the Mazer leaderboard.",
+        "recommendation": "Add the line (draft: Your username shows on the Mazer leaderboard.); it is a FawxzzyWeb change.",
+        "context": "The username typed on the account-site sign-up screen is public on the Mazer leaderboard and the screen does not say so.",
         "prs": "",
         "verify": []
       },
@@ -136,6 +124,24 @@
         "context": "There is no audio anywhere in the game and no sound setting.",
         "prs": "",
         "verify": []
+      },
+      {
+        "id": "MAZER-CTRL-003",
+        "title": "Revisit and rework the controls",
+        "status": "planning",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Decide the scope of the controls rework: audit and proposal only, or a build after you choose from the proposal?",
+        "recommendation": "Approve the audit and the written proposal first; pick the build scope from the proposal.",
+        "context": "Owner request 2026-11-12 to revisit the controls; the scope is not set. Related to MAZER-CTRL-001 and MAZER-FLOW-014.",
+        "prs": "",
+        "verify": [
+          {
+            "step": "On your phone, play level 1 and then a late level at the default Move Speed, holding a direction and using the touch stick (this is the phone check for MAZER-FLOW-014).",
+            "where": "installed-app",
+            "expected": "Speed feels the same on both levels and a little slower than before; tell me if it is too slow or the stick feels off."
+          }
+        ]
       },
       {
         "id": "MAZER-DATA-004",
@@ -205,13 +211,13 @@
       },
       {
         "id": "MAZER-MOTION-004",
-        "title": "Add an in-game reduced-motion setting and finish the gating: open for review, held",
+        "title": "Add a Reduce Motion setting: merged and deployed, crossfade length still open",
         "status": "review",
         "priority": "medium",
         "kind": "decision",
-        "ask": "Under reduced motion, should the title and level-number rainbow stop shifting colour, or keep shifting colour and only stop moving?",
-        "recommendation": "Keep the colours shifting and stop only the movement; PR #425 is then changed to match and merged.",
-        "context": "PR #425 is green but held: under reduced motion it also freezes the title, START and level-number rainbow to one hue.",
+        "ask": "Under Reduce Motion, keep the dock travelling band and the touch-stick anchor orbit held still, or let either one move?",
+        "recommendation": "Keep both held still; colour still shifts, so the dock and stick stay lively without movement.",
+        "context": "PR #425 is merged and live. Under reduced motion the dock travelling band and the touch-stick anchor orbit are held still, which is a judgement call; the shared crossfade length is carried by MAZER-MOTION-005.",
         "prs": "#425",
         "verify": []
       },
@@ -486,7 +492,7 @@
         "kind": "check",
         "ask": "Open Mazer from the home screen, sign in, and tell me whether a \"Continue to Mazer?\" screen appears.",
         "recommendation": "Do it once with your real account; if the consent screen still appears, report it and keep the card in review.",
-        "context": "FawxzzyWeb PR #118 is merged and aliased live (2026-11-11); no real-device sign-in has been checked. This card also carries the phone check for the new Mazer profile fix (MAZER-ACCT-007, deployed at main 8f757c76).",
+        "context": "FawxzzyWeb PR #118 is merged and aliased live (2026-11-11); no real-device sign-in has been checked. This card also carries the phone checks for the Mazer profile fixes: MAZER-ACCT-007, the typed-username fix MAZER-ACCT-017 and Edit name MAZER-ACCT-011 (all deployed at main f8c16c72, headless and mocks only).",
         "prs": "FawxzzyWeb#118",
         "verify": [
           {
@@ -495,9 +501,14 @@
             "expected": "You land back in Mazer with NO \"Continue to Mazer?\" screen."
           },
           {
-            "step": "With the new build, create a brand-new account from the Mazer Create Account button and sign in, then open Menu > Leaderboard.",
+            "step": "With the current build, create a brand-new account from the Mazer Create Account button, typing a username of your choice, then sign in and open Menu > Leaderboard.",
             "where": "installed-app",
-            "expected": "No Choose a username gate; your row shows a Mazer-###### handle (checks MAZER-ACCT-007)."
+            "expected": "No Choose a username gate; your row shows the username you typed, not a Mazer-###### name (checks MAZER-ACCT-007 and MAZER-ACCT-017)."
+          },
+          {
+            "step": "On your own row in the Leaderboard, tap Edit name, change the name and save; then open Edit name again and cancel with Esc or a tap outside.",
+            "where": "installed-app",
+            "expected": "The new name shows on your row; cancel leaves it unchanged; an invalid name shows a plain error (checks MAZER-ACCT-011)."
           },
           {
             "step": "Change a setting, close Mazer completely and reopen it.",
@@ -531,6 +542,29 @@
             "step": "Change the email address on the QA account and open the change-of-address email.",
             "where": "production",
             "expected": "A Mazer-themed email arrives and its link works."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-MOTION-008",
+        "title": "Device check: reduced motion on a real phone",
+        "status": "planning",
+        "priority": "medium",
+        "kind": "check",
+        "ask": "On your phone, turn Reduce Motion on in Settings and check movement stops and colours keep shifting.",
+        "recommendation": "Do it once on the installed app; it also covers the two held-still judgement calls on MAZER-MOTION-004.",
+        "context": "Reduce Motion was only checked in headless Chromium.",
+        "prs": "",
+        "verify": [
+          {
+            "step": "Open Settings, set Reduce Motion to On, go back to the menu and watch the title and START for about 10 seconds.",
+            "where": "installed-app",
+            "expected": "The title and START colours keep shifting; nothing moves or pulses."
+          },
+          {
+            "step": "Start a level and move around with the touch stick, watching the trail, the marker and the dock.",
+            "where": "installed-app",
+            "expected": "The trail hue and dock glow keep shifting; shine, breath, sparkles, the dock travelling band and the stick orbit are still."
           }
         ]
       },
@@ -626,6 +660,28 @@
   "completed": {
     "device": [],
     "headless": [
+      {
+        "id": "MAZER-ACCT-011",
+        "title": "Add a leaderboard username editor (Edit name): merged and deployed",
+        "status": "completed",
+        "priority": "medium",
+        "date": "2026-11-12",
+        "tier": "headless",
+        "prs": "#450",
+        "deployedBuild": "f8c16c72",
+        "updatedAt": "2026-11-12T12:00:00.000Z"
+      },
+      {
+        "id": "MAZER-FLOW-014",
+        "title": "Make player speed constant and 8% slower: merged and deployed",
+        "status": "completed",
+        "priority": "medium",
+        "date": "2026-11-12",
+        "tier": "headless",
+        "prs": "#449",
+        "deployedBuild": "f8c16c72",
+        "updatedAt": "2026-11-12T12:00:00.000Z"
+      },
       {
         "id": "MAZER-ACCT-007",
         "title": "Give accounts made on the account site a Mazer profile",
@@ -1047,6 +1103,17 @@
     ],
     "source-only": [
       {
+        "id": "MAZER-ACCT-017",
+        "title": "Give account-site players the username they typed on the leaderboard: function v2",
+        "status": "completed",
+        "priority": "high",
+        "date": "2026-11-12",
+        "tier": "source-only",
+        "prs": "",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-12T12:00:00.000Z"
+      },
+      {
         "id": "MAZER-UI-022",
         "title": "Move the offline-notice strings into the message module copy tables",
         "status": "completed",
@@ -1423,6 +1490,17 @@
     ],
     "no-device-surface": [
       {
+        "id": "MAZER-ACCT-010",
+        "title": "Decide the Create Account non-enumeration trade-off: accepted, auto-confirm kept",
+        "status": "completed",
+        "priority": "medium",
+        "date": "2026-11-12",
+        "tier": "no-device-surface",
+        "prs": "",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-12T12:00:00.000Z"
+      },
+      {
         "id": "MAZER-GOV-006",
         "title": "Run the message-inventory guard in CI",
         "status": "completed",
@@ -1743,15 +1821,6 @@
         "derived": true
       },
       {
-        "id": "MAZER-ACCT-012",
-        "title": "Retire dead Mazer sign-up and username-editor code",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-ACCT-011 (planning).",
-        "derived": true
-      },
-      {
         "id": "MAZER-AI-002",
         "title": "Add AI-assisted maze completion with spendable hints",
         "status": "planning",
@@ -1802,7 +1871,7 @@
         "status": "planning",
         "priority": "low",
         "kind": "dependency",
-        "ask": "Waits on MAZER-MOTION-004 (PR #425) landing.",
+        "ask": "Waits on MAZER-MOTION-001 and MAZER-MOTION-004 (both in review).",
         "derived": false
       },
       {
@@ -1835,6 +1904,15 @@
         "warnings": []
       },
       {
+        "id": "MAZER-ACCT-019",
+        "title": "Re-read the username after profile creation during an in-session sign-in",
+        "status": "planning",
+        "priority": "medium",
+        "filesHint": [],
+        "waves": [],
+        "warnings": []
+      },
+      {
         "id": "MAZER-UI-013",
         "title": "Move scene colors onto the shared theme values",
         "status": "planning",
@@ -1850,6 +1928,15 @@
         "warnings": [
           "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts"
         ]
+      },
+      {
+        "id": "MAZER-ACCT-012",
+        "title": "Retire dead Mazer sign-up code (username-editor half done in PR #450)",
+        "status": "planning",
+        "priority": "low",
+        "filesHint": [],
+        "waves": [],
+        "warnings": []
       },
       {
         "id": "MAZER-ACCT-014",
@@ -1870,6 +1957,33 @@
         "warnings": []
       },
       {
+        "id": "MAZER-ACCT-020",
+        "title": "Fix the four account-site usernames longer than 15 characters",
+        "status": "planning",
+        "priority": "low",
+        "filesHint": [],
+        "waves": [],
+        "warnings": []
+      },
+      {
+        "id": "MAZER-ACCT-021",
+        "title": "Refresh the header name after a rename",
+        "status": "planning",
+        "priority": "low",
+        "filesHint": [],
+        "waves": [],
+        "warnings": []
+      },
+      {
+        "id": "MAZER-ACCT-022",
+        "title": "Offer Edit name to a named player with no leaderboard rank yet",
+        "status": "planning",
+        "priority": "low",
+        "filesHint": [],
+        "waves": [],
+        "warnings": []
+      },
+      {
         "id": "MAZER-GOV-009",
         "title": "Stabilise load-sensitive tests",
         "status": "planning",
@@ -1879,6 +1993,28 @@
           "vitest.config.ts"
         ],
         "waves": [],
+        "warnings": []
+      },
+      {
+        "id": "MAZER-PERF-003",
+        "title": "Throttle colour-only redraws under reduced motion",
+        "status": "planning",
+        "priority": "low",
+        "filesHint": [],
+        "waves": [],
+        "warnings": []
+      },
+      {
+        "id": "MAZER-PROG-016",
+        "title": "Move touchSprint progression diagnostics to the progression diagnostics section",
+        "status": "planning",
+        "priority": "low",
+        "filesHint": [
+          "src/scenes/menuRuntimeDiagnostics.ts"
+        ],
+        "waves": [
+          "1C"
+        ],
         "warnings": []
       },
       {
@@ -1925,6 +2061,7 @@
           "1C"
         ],
         "warnings": [
+          "overlaps MAZER-PROG-016 on src/scenes/menuRuntimeDiagnostics.ts",
           "overlaps MAZER-VIS-023 on src/render/playerMarker.ts"
         ]
       },
@@ -2782,16 +2919,16 @@
       "sub": null
     },
     "MAZER-ACCT-010": {
-      "bucket": "needs-you",
-      "sub": "decision"
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-ACCT-011": {
-      "bucket": "needs-you",
-      "sub": "decision"
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-ACCT-012": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "ready",
+      "sub": null
     },
     "MAZER-ACCT-013": {
       "bucket": "needs-you",
@@ -2808,6 +2945,50 @@
     "MAZER-ACCT-016": {
       "bucket": "needs-you",
       "sub": "decision"
+    },
+    "MAZER-ACCT-017": {
+      "bucket": "completed",
+      "sub": "source-only"
+    },
+    "MAZER-ACCT-018": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-ACCT-019": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-ACCT-020": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-ACCT-021": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-ACCT-022": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-FLOW-014": {
+      "bucket": "completed",
+      "sub": "headless"
+    },
+    "MAZER-CTRL-003": {
+      "bucket": "needs-you",
+      "sub": "decision"
+    },
+    "MAZER-PROG-016": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-PERF-003": {
+      "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-MOTION-008": {
+      "bucket": "needs-you",
+      "sub": "check"
     }
   }
 }
