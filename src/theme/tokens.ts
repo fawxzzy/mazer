@@ -48,7 +48,7 @@ export interface DesignMotionTokens {
   introBeatMs: number;
   staggerMs: { beamTotal: number };
   loopMs: { beat: number; blink: number; drift: number };
-  reducedMotionMs: { introCrossfade: number; outroCrossfade: number; teleportCrossfade: number; teleportFadeEdge: number };
+  reducedMotionMs: { crossfade: number; teleportFadeEdge: number };
   easing: { css: { standard: string; inOut: string }; functions: DesignEasingFunctionName[] };
 }
 

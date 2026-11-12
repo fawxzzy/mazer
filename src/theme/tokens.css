@@ -68,9 +68,7 @@
   --mazer-token-motion-loop-beat: 1200ms;
   --mazer-token-motion-loop-blink: 2400ms;
   --mazer-token-motion-loop-drift: 3600ms;
-  --mazer-token-motion-reduced-intro-crossfade: 250ms;
-  --mazer-token-motion-reduced-outro-crossfade: 150ms;
-  --mazer-token-motion-reduced-teleport-crossfade: 140ms;
+  --mazer-token-motion-reduced-crossfade: 200ms;
   --mazer-token-motion-reduced-teleport-fade-edge: 45ms;
   --mazer-token-motion-ease-standard: ease;
   --mazer-token-motion-ease-in-out: ease-in-out;

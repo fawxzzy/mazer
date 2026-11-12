@@ -283,22 +283,18 @@
     "pattern": "EDGE_MARKER_IDLE_PERIOD_MS = MOTION_LOOP_MS\\.drift"
    }
   ],
-  "motion/reducedMotionMs/introCrossfade": [
+  "motion/reducedMotionMs/crossfade": [
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "INTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS\\.introCrossfade"
-   }
-  ],
-  "motion/reducedMotionMs/outroCrossfade": [
+    "pattern": "INTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS\\.crossfade"
+   },
    {
     "file": "src/render/introTimeline.ts",
-    "pattern": "OUTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS\\.outroCrossfade"
-   }
-  ],
-  "motion/reducedMotionMs/teleportCrossfade": [
+    "pattern": "OUTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS\\.crossfade"
+   },
    {
-    "file": "src/render/teleportTransferPresentation.ts",
-    "pattern": "REDUCED_MOTION_CROSSFADE_MS = MOTION_REDUCED_MS\\.teleportCrossfade"
+    "file": "src/render/motionScale.ts",
+    "pattern": "teleportCrossfade: motion\\.reducedMotionMs\\.crossfade"
    }
   ],
   "motion/reducedMotionMs/teleportFadeEdge": [

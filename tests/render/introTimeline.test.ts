@@ -251,7 +251,7 @@ describe('introTimeline (time-driven intro)', () => {
     expect(skipIntroElapsedMs(100, { ...REDUCED, tileCount: 500 })).toBe(INTRO_REDUCED_MOTION_MS);
   });
 
-  test('reduced motion: ~250 ms crossfade, no laser, no sparkles, unlock at 250', () => {
+  test('reduced motion: 200 ms crossfade, no laser, no sparkles, unlock at 200', () => {
     const options = { ...REDUCED, tileCount: 200 };
     expect(INTRO_REDUCED_MOTION_MS).toBeLessThanOrEqual(300);
     let previousDigit = 1;
@@ -273,12 +273,12 @@ describe('introTimeline (time-driven intro)', () => {
     }
     expect(resolveIntro(INTRO_REDUCED_MOTION_MS, options).digitAlpha).toBe(0);
     expect(resolveIntro(INTRO_REDUCED_MOTION_MS, options).boardAlpha).toBe(1);
-    // Reduced motion keeps the 250 ms crossfade whatever the tile count, deconstruct 150 ms.
-    expect(resolveIntroInputUnlockMs(true, 5)).toBe(250);
-    expect(resolveIntroInputUnlockMs(true, 5000)).toBe(250);
-    expect(resolveIntroDurationMs(true, 5000)).toBe(250);
-    expect(resolveIntroDeconstruct(150, { ...REDUCED, tileCount: 900 }).done).toBe(true);
-    expect(resolveIntroDeconstruct(149, { ...REDUCED, tileCount: 900 }).done).toBe(false);
+    // Reduced motion keeps the 200 ms crossfade whatever the tile count, deconstruct 200 ms.
+    expect(resolveIntroInputUnlockMs(true, 5)).toBe(200);
+    expect(resolveIntroInputUnlockMs(true, 5000)).toBe(200);
+    expect(resolveIntroDurationMs(true, 5000)).toBe(200);
+    expect(resolveIntroDeconstruct(200, { ...REDUCED, tileCount: 900 }).done).toBe(true);
+    expect(resolveIntroDeconstruct(199, { ...REDUCED, tileCount: 900 }).done).toBe(false);
   });
 });
 

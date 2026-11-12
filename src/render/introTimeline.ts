@@ -43,8 +43,8 @@
  * tiles/s, 1800, 3000) ms, then a 300 ms handoff beat. The lighting fades over the
  * last 150 ms.
  *
- * Reduced motion: a 250 ms crossfade (digit fades out while the finished board
- * fades in), no laser, no sparkles, no orbit, no ring lighting, input unlocks at 250 ms.
+ * Reduced motion: a 200 ms crossfade (MOTION_REDUCED_MS.crossfade) (digit fades out while the finished board
+ * fades in), no laser, no sparkles, no orbit, no ring lighting, input unlocks at 200 ms.
  *
  * No Phaser, DOM, randomness or wall-clock dependency.
  */
@@ -135,7 +135,7 @@ export const INTRO_REVEAL_MAX_MS = 3200;
 export const INTRO_DIGIT_OUT_MS = 500;
 export const INTRO_POP_MS = 350;
 export const INTRO_GOAL_PULSE_MS = 250;
-export const INTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS.introCrossfade;
+export const INTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS.crossfade;
 export const INTRO_DIGIT_MIN_SCALE = 0.72;
 /** Taps/keys inside this window after the intro began are ignored (the Start press itself). */
 export const INTRO_SKIP_GRACE_MS = 200;
@@ -159,7 +159,7 @@ export const OUTRO_REMOVE_MIN_MS = 1800;
 export const OUTRO_REMOVE_MAX_MS = 3000;
 export const OUTRO_DIGIT_IN_MS = MOTION_DURATION_MS.slow;
 export const OUTRO_HANDOFF_MS = MOTION_DURATION_MS.slow;
-export const OUTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS.outroCrossfade;
+export const OUTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS.crossfade;
 
 const clamp01 = (value: number): number => (
   Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0
