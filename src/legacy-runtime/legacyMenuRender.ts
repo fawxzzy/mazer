@@ -75,12 +75,6 @@ export type LegacyMenuBorderDockFacetOptions = Pick<
   | 'tileRect'
 >;
 
-export interface LegacyPlayerMarkerRenderMetrics {
-  coreRadius: number;
-  haloRadius: number;
-  strokeWidth: number;
-}
-
 export interface LegacyEndpointMarkerRenderMetrics {
   coreRadius: number;
   outerRadius: number;
@@ -114,31 +108,6 @@ export const resolveLegacyDynamicTrailStrokeWidth = (
 ): number => {
   const maxWidth = Math.max(1, Math.floor(tileSize));
   return Math.min(maxWidth, Math.max(minimumWidth, Math.round(tileSize * ratio)));
-};
-
-export const resolveLegacyPlayerMarkerRenderMetrics = (
-  tileSize: number,
-  coreRatio: number,
-  haloRatio: number,
-  maxCoreRatio = 0.38,
-  maxHaloRatio = 0.46
-): LegacyPlayerMarkerRenderMetrics => {
-  const maxHaloRadius = Math.max(1, tileSize * maxHaloRatio);
-  const maxCoreRadius = Math.max(1, tileSize * maxCoreRatio);
-  const haloRadius = Math.min(
-    maxHaloRadius,
-    Math.max(1, tileSize * haloRatio)
-  );
-  const coreRadius = Math.min(
-    maxCoreRadius,
-    Math.max(1, tileSize * coreRatio)
-  );
-
-  return {
-    coreRadius,
-    haloRadius,
-    strokeWidth: Math.max(1, Math.min(2, Math.floor(tileSize * 0.12)))
-  };
 };
 
 export const resolveLegacyEndpointMarkerRenderMetrics = (

@@ -27,6 +27,14 @@
  * Shape: the ring, glow and ping are rounded squares with the Chip tile's own corner proportion (radius is
  * CHIP_CORNER_RATIO of the side), concentric with the player's rounded square.
  *
+ * End tiles (MAZER-VIS-023): the start and goal tiles are dead-end CAP tiles, whose closed corners are fully round
+ * (BOARD_TILE_GEOMETRY.capRadiusRatio) while the square ring's corners kept the 0.3 chip radius, so at large tile
+ * sizes the ring's corners poked past the rounded dead-end disc. When the caller passes the tile's own corner radii
+ * (`tileCornerRadii`, board tile geometry order tl, tr, br, bl; 0 = an open side) every closed corner of the ring, the
+ * glow and the ping follows the tile's curve: the same arc, offset by the ring's inset (so the ring is exactly
+ * concentric with the tile edge and never leaves the cap's outline). Open-side corners keep the chip radius.
+ * Without radii (any other tile, the Guide icon) the shapes are unchanged.
+ *
  * Reduced motion: the glow, ring and keyline are static and the ping is never started.
  *
  * Cost: a handful of Graphics calls per dynamic redraw, no gradients, no canvas, and NO per-frame allocation
@@ -73,20 +81,71 @@ export const PLAYER_LOCATOR = Object.freeze({
 /** The subset of Phaser.GameObjects.Graphics the locator paints with (a fake in tests). */
 export interface LocatorGraphics {
   fillStyle(color: number, alpha?: number): unknown;
-  fillRoundedRect(x: number, y: number, width: number, height: number, radius: number): unknown;
+  fillRoundedRect(x: number, y: number, width: number, height: number, radius: number | LocatorCornerRadii): unknown;
   lineStyle(width: number, color: number, alpha?: number): unknown;
-  strokeRoundedRect(x: number, y: number, width: number, height: number, radius: number): unknown;
+  strokeRoundedRect(x: number, y: number, width: number, height: number, radius: number | LocatorCornerRadii): unknown;
 }
+
+/** Per-corner radii in Phaser's `RoundedRectRadius` shape. */
+export interface LocatorCornerRadii {
+  tl: number;
+  tr: number;
+  bl: number;
+  br: number;
+}
+
+/** A tile's corner radii in board tile geometry order: top-left, top-right, bottom-right, bottom-left (0 = square). */
+export type LocatorTileRadii = readonly [number, number, number, number];
 
 /** Corner radius of a chip-family rounded square of the given half-extent (the Chip tile's corner proportion). */
 export const resolveLocatorCornerRadius = (halfExtent: number): number => halfExtent * 2 * CHIP_CORNER_RATIO;
 
-const fillSquare = (g: LocatorGraphics, cx: number, cy: number, half: number): void => {
-  g.fillRoundedRect(cx - half, cy - half, half * 2, half * 2, resolveLocatorCornerRadius(half));
+/**
+ * Corner radii of a locator square of half-extent `half` drawn on a tile of half-extent `tileHalf` whose own corner
+ * radii are `tileRadii`. A closed (rounded) tile corner gives the tile's arc offset by `half - tileHalf` (the same
+ * centre, so concentric with the tile edge), never more than `half` (a full semicircle); a square (open-side) corner
+ * keeps the chip proportion. Pure; fills and returns `out`.
+ */
+export const resolveLocatorSquareRadii = (
+  half: number,
+  tileHalf: number,
+  tileRadii: LocatorTileRadii,
+  out: LocatorCornerRadii
+): LocatorCornerRadii => {
+  const uniform = resolveLocatorCornerRadius(half);
+  const corner = (tileRadius: number): number => (
+    tileRadius > 0 ? Math.min(half, Math.max(0, tileRadius + (half - tileHalf))) : uniform
+  );
+  out.tl = corner(tileRadii[0]);
+  out.tr = corner(tileRadii[1]);
+  out.br = corner(tileRadii[2]);
+  out.bl = corner(tileRadii[3]);
+  return out;
 };
 
-const strokeSquare = (g: LocatorGraphics, cx: number, cy: number, half: number): void => {
-  g.strokeRoundedRect(cx - half, cy - half, half * 2, half * 2, resolveLocatorCornerRadius(half));
+/** Scratch for the per-corner path: Phaser reads the radii synchronously inside each call, so one record is reused. */
+const RADII_SCRATCH: LocatorCornerRadii = { tl: 0, tr: 0, bl: 0, br: 0 };
+
+const squareRadius = (
+  half: number,
+  tileHalf: number,
+  tileRadii: LocatorTileRadii | null
+): number | LocatorCornerRadii => (
+  tileRadii === null
+    ? resolveLocatorCornerRadius(half)
+    : resolveLocatorSquareRadii(half, tileHalf, tileRadii, RADII_SCRATCH)
+);
+
+const fillSquare = (
+  g: LocatorGraphics, cx: number, cy: number, half: number, tileHalf: number, tileRadii: LocatorTileRadii | null
+): void => {
+  g.fillRoundedRect(cx - half, cy - half, half * 2, half * 2, squareRadius(half, tileHalf, tileRadii));
+};
+
+const strokeSquare = (
+  g: LocatorGraphics, cx: number, cy: number, half: number, tileHalf: number, tileRadii: LocatorTileRadii | null
+): void => {
+  g.strokeRoundedRect(cx - half, cy - half, half * 2, half * 2, squareRadius(half, tileHalf, tileRadii));
 };
 
 export interface PlayerLocatorMetrics {
@@ -182,6 +241,8 @@ export interface PlayerLocatorDrawInput {
   /** Start time of the running ping, or a negative number for none. */
   pingStartMs: number;
   reducedMotion: boolean;
+  /** The tile's own corner radii when it is a start / goal tile (see the header); omitted elsewhere. */
+  tileCornerRadii?: LocatorTileRadii | null;
 }
 
 /** Paints glow, ring, ping and the core keyline. Call BEFORE the player's own fill so the core stays on top. */
@@ -194,6 +255,7 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
   const m = resolvePlayerLocatorMetrics(input.tileSize, input.devicePixelRatio, input.coreReachCss, SCRATCH);
   const { centerX: cx, centerY: cy } = input;
   const half = input.tileSize / 2;
+  const tileRadii = input.tileCornerRadii ?? null;
   // The glow and the ping start at the ring's outer edge, or at the tile edge where the ring is left out.
   const innerRadius = m.ringVisible ? m.ringHalfCss : half;
 
@@ -202,13 +264,13 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
   g.fillStyle(boardMaterial.player, perStep * alpha);
   for (let i = 0; i < k.glowSteps; i += 1) {
     const r = innerRadius + ((m.glowHalfCss - innerRadius) * (1 - (i / k.glowSteps)));
-    fillSquare(g, cx, cy, r);
+    fillSquare(g, cx, cy, r, half, tileRadii);
   }
 
   // 2. the ring: the player's cell lit in the player's colour, inside the tile.
   if (m.ringVisible) {
     g.lineStyle(m.ringStrokeCss, boardMaterial.player, k.ringAlpha * alpha);
-    strokeSquare(g, cx, cy, m.ringHalfCss);
+    strokeSquare(g, cx, cy, m.ringHalfCss, half, tileRadii);
   }
 
   // 3. find-me ping: expanding rings (never in reduced motion; the caller also never starts one).
@@ -223,9 +285,9 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
       const radius = innerRadius + ((m.pingTravelHalfCss - innerRadius) * eased);
       const fade = k.pingPeakAlpha * (1 - t) * alpha;
       g.lineStyle(k.pingStrokeCss + k.pingKeylineExtraCss, boardMaterial.void, fade * 0.7);
-      strokeSquare(g, cx, cy, radius);
+      strokeSquare(g, cx, cy, radius, half, tileRadii);
       g.lineStyle(k.pingStrokeCss, boardMaterial.playerEdge, fade);
-      strokeSquare(g, cx, cy, radius);
+      strokeSquare(g, cx, cy, radius, half, tileRadii);
     }
   }
 

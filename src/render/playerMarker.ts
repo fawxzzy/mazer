@@ -31,7 +31,12 @@ import {
   clampBoardDevicePixelRatio,
   snapLineWidth
 } from './boardTileStyle';
-import { drawPlayerLocator, type LocatorGraphics } from './playerLocator';
+import {
+  drawPlayerLocator,
+  resolvePlayerLocatorMetrics,
+  type LocatorGraphics,
+  type LocatorTileRadii
+} from './playerLocator';
 
 export const PLAYER_MARKER = Object.freeze({
   /** The block is this share of the tile across. */
@@ -67,6 +72,59 @@ export const resolvePlayerMarkerRestHalf = (tileSize: number): number => (
 export const resolvePlayerMarkerReach = (tileSize: number): number => (
   resolvePlayerMarkerRestHalf(tileSize) * (1 + PLAYER_MARKER.breatheAmount)
 );
+
+export interface PlayerMarkerDiagnosticRadii {
+  /** Half the block's resting width: what `drawPlayerMarker` fills (no breathing, no glide pose). */
+  coreRadius: number;
+  /** Half the locator ring's outer extent: the player's own cell edge, where the ring is stroked flush. */
+  haloRadius: number;
+}
+
+/**
+ * The radii the runtime diagnostics (`markerStyle.playerCoreRadius` / `playerHaloRadius`) report, derived from the same
+ * functions the drawing uses (`resolvePlayerMarkerRestHalf`, `resolvePlayerLocatorMetrics`), so they cannot drift from
+ * what is on screen. They used to be the diamond-era ratios 0.46 and 0.72 of the tile, which matched nothing drawn.
+ */
+export const resolvePlayerMarkerDiagnosticRadii = (
+  tileSize: number,
+  devicePixelRatio: number,
+  out: PlayerMarkerDiagnosticRadii = { coreRadius: 0, haloRadius: 0 }
+): PlayerMarkerDiagnosticRadii => {
+  const locator = resolvePlayerLocatorMetrics(tileSize, devicePixelRatio, resolvePlayerMarkerReach(tileSize));
+  out.coreRadius = resolvePlayerMarkerRestHalf(tileSize);
+  // The ring is stroked centred `ringHalfCss` out with `ringStrokeCss` width, so its outer edge is their sum (the
+  // tile edge); where the tile is too small for a ring the glow starts from the tile edge, the same distance.
+  out.haloRadius = locator.ringHalfCss + (locator.ringStrokeCss / 2);
+  return out;
+};
+
+/** A start / goal tile's geometry as far as the ring needs it: its corner radii in board tile order. */
+export interface PlayerMarkerEndpointTile {
+  radii: LocatorTileRadii;
+}
+
+/**
+ * The corner radii the locator ring should follow when the marker sits on the start or goal tile, else null (every
+ * other tile keeps the plain chip-corner ring). `cellX` / `cellY` may be fractional while gliding: the nearest cell
+ * decides, so the ring takes the end tile's curve once the block is more than half way into it.
+ */
+export const resolvePlayerMarkerEndpointRadii = (
+  cellX: number,
+  cellY: number,
+  start: { x: number; y: number } | null | undefined,
+  goal: { x: number; y: number } | null | undefined,
+  tiles: { start: PlayerMarkerEndpointTile | null; goal: PlayerMarkerEndpointTile | null }
+): LocatorTileRadii | null => {
+  const x = Math.round(cellX);
+  const y = Math.round(cellY);
+  if (start && start.x === x && start.y === y) {
+    return tiles.start?.radii ?? null;
+  }
+  if (goal && goal.x === x && goal.y === y) {
+    return tiles.goal?.radii ?? null;
+  }
+  return null;
+};
 
 export interface PlayerMarkerCenter {
   x: number;
@@ -180,6 +238,8 @@ export interface PlayerMarkerDrawInput {
   /** Running find-me ping start, or negative for none (always negative in the menu demo and the Guide). */
   pingStartMs: number;
   reducedMotion: boolean;
+  /** On a start / goal tile: that tile's corner radii, so the ring follows the cap shape (playerLocator.ts). */
+  tileCornerRadii?: LocatorTileRadii | null;
 }
 
 /**
@@ -207,7 +267,8 @@ export const drawPlayerMarker = (
     alpha,
     timeMs: input.timeMs,
     pingStartMs: input.pingStartMs,
-    reducedMotion: input.reducedMotion
+    reducedMotion: input.reducedMotion,
+    tileCornerRadii: input.tileCornerRadii ?? null
   });
   const left = frame.centerX - frame.coreHalfWidth;
   const top = frame.centerY - frame.coreHalfHeight;
