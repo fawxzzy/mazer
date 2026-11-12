@@ -4,7 +4,8 @@
 - Preserve gameplay logic truth from `legacy/old-project.zip`.
 - Treat files under `legacy/screenshots/` as archival visual reference unless screenshot-grade legacy parity is explicitly reopened.
 - Current active direction is mechanics-first and mobile-clean: preserve old gameplay responsibilities, but allow board, tile, floor, player, trail, and HUD visuals to change when that improves top-down readability and mobile usability.
-- When current prose conflicts, prefer `docs/current-truth.md`, the latest visual-gate artifacts, and `tests/scenes/demo-build.test.ts` over older notes.
+- When current prose conflicts, prefer `docs/current-truth.md`, the latest visual-gate artifacts, and `tests/scenes/menu-render-frame.test.ts` over older notes. (The old demo-build suite no longer exists; do not cite it.)
+- For any visual change, follow `docs/PLAYBOOK_VISUAL_EVIDENCE.md`: capture evidence from a preview or local host (never production accounts), keep disposable artifacts under `tmp/`, and cite the evidence path in the PR template's "Visual change" line (or `N/A`).
 - Do not claim production is current unless the latest local visual pass is both committed and deployed.
 - Treat every Vercel production deploy, promotion, rollback/promotion, or production-alias cutover as approval-gated.
 - Do not run any production-targeting Vercel mutation for Mazer unless the operator explicitly says so in the current thread with wording such as `deploy to prod`, `deploy to production`, or `promote Mazer on Vercel`.
