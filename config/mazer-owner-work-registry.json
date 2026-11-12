@@ -4,16 +4,16 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-12T12:00:00.000Z",
+  "updatedAt": "2026-11-12T14:00:00.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
     "stableIdentityCount": 184,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 77,
+    "openCardCount": 76,
     "completedCardCount": 92,
-    "deferredCardCount": 15,
+    "deferredCardCount": 16,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out."
   },
   "workItems": [
@@ -3304,17 +3304,17 @@
     },
     {
       "id": "MAZER-CTRL-003",
-      "status": "planning",
-      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-12T14:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-CTRL-003",
       "title": "Revisit and rework the controls",
-      "description": "Owner request 2026-11-12. Rework the controls in stages: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). The scope needs the owner's decision before any build. Not started.",
+      "description": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started.",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
-        "MAZER-CTRL-001",
-        "MAZER-FLOW-014"
+        "MAZER-HAZ-002",
+        "MAZER-HAZ-003"
       ],
       "acceptanceCriteria": [
         "A short controls audit across touch drag, the touch stick, keyboard and any other no-gamepad options, with measured feel at 390x844 and 1280x720",

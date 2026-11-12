@@ -1397,7 +1397,7 @@
       },
       "blocker": {
         "kind": "device",
-        "summary": "FawxzzyWeb PR #118 is merged and aliased live (2026-11-11); no real-device sign-in has been checked. This card also carries the phone checks for the Mazer profile fixes: MAZER-ACCT-007, the typed-username fix MAZER-ACCT-017 and Edit name MAZER-ACCT-011 (all deployed at main f8c16c72, headless and mocks only).",
+        "summary": "FawxzzyWeb PR #118 is merged and aliased live (2026-11-11); no real-device sign-in has been checked. This card also carries the phone checks for the Mazer profile fixes: MAZER-ACCT-007, the typed-username fix MAZER-ACCT-017, Edit name MAZER-ACCT-011 and the constant player speed MAZER-FLOW-014 (all deployed at main f8c16c72, headless and mocks only).",
         "unblockedBy": "Zac",
         "ask": "Open Mazer from the home screen, sign in, and tell me whether a \"Continue to Mazer?\" screen appears.",
         "recommendation": "Do it once with your real account; if the consent screen still appears, report it and keep the card in review."
@@ -1422,6 +1422,11 @@
           "step": "Change a setting, close Mazer completely and reopen it.",
           "where": "installed-app",
           "expected": "The setting is still saved (checks MAZER-ACCT-007)."
+        },
+        {
+          "step": "Play level 1 and then a late level at the default Move Speed on your phone, holding a direction and using the touch stick (this is the phone check for MAZER-FLOW-014).",
+          "where": "installed-app",
+          "expected": "Speed feels the same on both levels and a little slower than before; tell me if it is too slow or the stick feels off."
         }
       ],
       "lane": "owner-only",
@@ -1759,24 +1764,18 @@
       "verify": [],
       "lane": null,
       "filesHint": [],
-      "note": "Feel on a phone is not checked; the phone step is on MAZER-CTRL-003. Stick caps were scaled too (one-line revert)."
+      "note": "Feel on a phone is not checked; the phone step is on MAZER-ACCT-006. Stick caps were scaled too (one-line revert)."
     },
     "MAZER-CTRL-003": {
       "evidence": null,
       "blocker": {
-        "kind": "owner-decision",
-        "summary": "Owner request 2026-11-12 to revisit the controls; the scope is not set. Related to MAZER-CTRL-001 and MAZER-FLOW-014.",
+        "kind": "deferred-by-owner",
+        "summary": "The owner placed the controls rework in the obstacles and enemies (Phase 2) work; it is held until he says it is ready.",
         "unblockedBy": "Zac",
-        "ask": "Decide the scope of the controls rework: audit and proposal only, or a build after you choose from the proposal?",
-        "recommendation": "Approve the audit and the written proposal first; pick the build scope from the proposal."
+        "ask": "Say when Phase 2 (obstacles and enemies) starts.",
+        "recommendation": "Keep it held with the Phase 2 cards (MAZER-HAZ-002 and MAZER-HAZ-003)."
       },
-      "verify": [
-        {
-          "step": "On your phone, play level 1 and then a late level at the default Move Speed, holding a direction and using the touch stick (this is the phone check for MAZER-FLOW-014).",
-          "where": "installed-app",
-          "expected": "Speed feels the same on both levels and a little slower than before; tell me if it is too slow or the stick feels off."
-        }
-      ],
+      "verify": [],
       "lane": "owner-only",
       "filesHint": []
     },
