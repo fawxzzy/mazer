@@ -1,28 +1,28 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_a285cbd97280",
+  "export_id": "pbe_mazer_owner_registry_9659ead0f216",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:a285cbd97280d49ca299cfe8973f2de400641ee002d4e77ae788e4253a40f3c4",
-  "generated_at": "2026-11-11T12:00:00.000Z",
+  "source_revision": "sha256:9659ead0f216d8b222d13a42d3c194cb36c9bda542bd390b6f386f0e3f87a965",
+  "generated_at": "2026-11-11T23:00:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:edab518463b1d1267bb85a8843c8a5c2857fc45a7f242f0ec9bb95e5182b4eae",
-      "observed_at": "2026-11-11T12:00:00.000Z"
+      "revision": "sha256:48e5457ab3613c5cc2bc38fc1f8e9a34f1006022e681f56b9b84471442e14099",
+      "observed_at": "2026-11-11T23:00:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
       "kind": "markdown",
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
-      "revision": "sha256:f706386ee9321cadbf6de72b9cbefc1d22f8910c7db706795dd10060837acc44",
-      "observed_at": "2026-11-11T12:00:00.000Z"
+      "revision": "sha256:fae934858b537b27bbaa9b0f5098dcbdc36c756dfff4574550ea55d3f394258b",
+      "observed_at": "2026-11-11T23:00:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-11T12:00:00.000Z"
+      "observed_at": "2026-11-11T23:00:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-11T12:00:00.000Z"
+      "observed_at": "2026-11-11T23:00:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-11T12:00:00.000Z"
+      "observed_at": "2026-11-11T23:00:00.000Z"
     }
   ],
   "cards": [
@@ -425,8 +425,8 @@
         "card_id": "MAZER-ACCT-006",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Skip the Mazer OAuth consent screen (Continue to Mazer?): merged, not deployed",
-        "description": "Owner decision 2026-11-11: skip the Continue to Mazer? consent card. FawxzzyWeb PR #118 is MERGED (db5199e9) but NOT deployed: the FawxzzyWeb release carrying it is pending an alias approval by the requester. It auto-approves only for the exact Mazer client id, the exact Mazer redirect, the single basic scope, the name Mazer and a matching session user; Mazer already refuses callbacks without its own stored state and PKCE record. No real Supabase sign-in was checked. Needs a real-device sign-in check after the release. The auth screen anatomy doc rows (G6 and the consent bullet) are updated in the same change.",
+        "title": "Skip the Mazer OAuth consent screen (Continue to Mazer?): live, needs a device check",
+        "description": "Owner decision 2026-11-11: skip the Continue to Mazer? consent card. FawxzzyWeb PR #118 is MERGED (db5199e9) and the FawxzzyWeb release carrying it was aliased live on 2026-11-11. It auto-approves only for the exact Mazer client id, the exact Mazer redirect, the single basic scope, the name Mazer and a matching session user; Mazer already refuses callbacks without its own stored state and PKCE record. A production end-to-end sign-in in an emulated Galaxy S21 with the standing test account worked in headless Chromium. Still needs the owner's real-device sign-in check; kept in review until then. The auth screen anatomy doc rows (G6 and the consent bullet) are updated in the same change.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "medium",
@@ -435,7 +435,7 @@
           "MAZER-ACCT-005"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-11T12:00:00.000Z",
+        "updated_at": "2026-11-11T23:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-006",
         "extensions": {
           "owner_status": "review",
@@ -446,15 +446,546 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-006",
         "source_status": "current",
-        "source_updated_at": "2026-11-11T12:00:00.000Z"
+        "source_updated_at": "2026-11-11T23:00:00.000Z"
       },
       "content": {
-        "summary": "Owner decision 2026-11-11: skip the Continue to Mazer? consent card. FawxzzyWeb PR #118 is MERGED (db5199e9) but NOT deployed: the FawxzzyWeb release carrying it is pending an alias approval by the requester. It auto-approves only for the exact Mazer client id, the exact Mazer redirect, the single basic scope, the name Mazer and a matching session user; Mazer already refuses callbacks without its own stored state and PKCE record. No real Supabase sign-in was checked. Needs a real-device sign-in check after the release. The auth screen anatomy doc rows (G6 and the consent bullet) are updated in the same change.",
-        "objective": "Owner decision 2026-11-11: skip the Continue to Mazer? consent card. FawxzzyWeb PR #118 is MERGED (db5199e9) but NOT deployed: the FawxzzyWeb release carrying it is pending an alias approval by the requester. It auto-approves only for the exact Mazer client id, the exact Mazer redirect, the single basic scope, the name Mazer and a matching session user; Mazer already refuses callbacks without its own stored state and PKCE record. No real Supabase sign-in was checked. Needs a real-device sign-in check after the release. The auth screen anatomy doc rows (G6 and the consent bullet) are updated in the same change.",
+        "summary": "Owner decision 2026-11-11: skip the Continue to Mazer? consent card. FawxzzyWeb PR #118 is MERGED (db5199e9) and the FawxzzyWeb release carrying it was aliased live on 2026-11-11. It auto-approves only for the exact Mazer client id, the exact Mazer redirect, the single basic scope, the name Mazer and a matching session user; Mazer already refuses callbacks without its own stored state and PKCE record. A production end-to-end sign-in in an emulated Galaxy S21 with the standing test account worked in headless Chromium. Still needs the owner's real-device sign-in check; kept in review until then. The auth screen anatomy doc rows (G6 and the consent bullet) are updated in the same change.",
+        "objective": "Owner decision 2026-11-11: skip the Continue to Mazer? consent card. FawxzzyWeb PR #118 is MERGED (db5199e9) and the FawxzzyWeb release carrying it was aliased live on 2026-11-11. It auto-approves only for the exact Mazer client id, the exact Mazer redirect, the single basic scope, the name Mazer and a matching session user; Mazer already refuses callbacks without its own stored state and PKCE record. A production end-to-end sign-in in an emulated Galaxy S21 with the standing test account worked in headless Chromium. Still needs the owner's real-device sign-in check; kept in review until then. The auth screen anatomy doc rows (G6 and the consent bullet) are updated in the same change.",
         "acceptance_criteria": [
           "Consent card skipped only for the exact first-party Mazer request",
-          "FawxzzyWeb release deployed to the live domains",
+          "FawxzzyWeb release deployed to the live domains (done 2026-11-11)",
           "Real-device sign-in check recorded after release"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-007_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-007",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Give accounts made on the account site a Mazer profile",
+        "description": "Accounts made on the account site, which is what the Mazer Create Account button uses, got no Mazer profile row: only the in-Mazer sign-up path fired the trigger. The profile insert therefore failed with a not-null error on every sign-in, the leaderboard showed Choose a username with no way out, and settings never synced. 111 of 129 accounts had no profile and 9 of them had signed in to Mazer. A profile-ensure database function was applied to the live project on 2026-11-11 with the owner's explicit approval (one new function, no existing object changed; tested with the standing test account: it creates a generated Mazer-###### handle, is idempotent, and refuses a wrong user id and anonymous callers; profile rows 18 to 19). Mazer PRs 446 and 447 make the client call it once per bootstrap and on the settings write path instead of the failing insert; a username save ensures the profile first and a failed save shows a plain toast. Merged and deployed at main 8f757c76 (live bundle checked: the ensure call is present, the old direct insert is gone). The 9 affected players recover on their next load. Headless Chromium and mocks only: no real brand-new-account run and nothing checked on a real phone.",
+        "card_type": "bug",
+        "lifecycle": "completed",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-005"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-11T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-007",
+        "extensions": {
+          "owner_status": "completed",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-007",
+        "source_status": "current",
+        "source_updated_at": "2026-11-11T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "Accounts made on the account site, which is what the Mazer Create Account button uses, got no Mazer profile row: only the in-Mazer sign-up path fired the trigger. The profile insert therefore failed with a not-null error on every sign-in, the leaderboard showed Choose a username with no way out, and settings never synced. 111 of 129 accounts had no profile and 9 of them had signed in to Mazer. A profile-ensure database function was applied to the live project on 2026-11-11 with the owner's explicit approval (one new function, no existing object changed; tested with the standing test account: it creates a generated Mazer-###### handle, is idempotent, and refuses a wrong user id and anonymous callers; profile rows 18 to 19). Mazer PRs 446 and 447 make the client call it once per bootstrap and on the settings write path instead of the failing insert; a username save ensures the profile first and a failed save shows a plain toast. Merged and deployed at main 8f757c76 (live bundle checked: the ensure call is present, the old direct insert is gone). The 9 affected players recover on their next load. Headless Chromium and mocks only: no real brand-new-account run and nothing checked on a real phone.",
+        "objective": "Accounts made on the account site, which is what the Mazer Create Account button uses, got no Mazer profile row: only the in-Mazer sign-up path fired the trigger. The profile insert therefore failed with a not-null error on every sign-in, the leaderboard showed Choose a username with no way out, and settings never synced. 111 of 129 accounts had no profile and 9 of them had signed in to Mazer. A profile-ensure database function was applied to the live project on 2026-11-11 with the owner's explicit approval (one new function, no existing object changed; tested with the standing test account: it creates a generated Mazer-###### handle, is idempotent, and refuses a wrong user id and anonymous callers; profile rows 18 to 19). Mazer PRs 446 and 447 make the client call it once per bootstrap and on the settings write path instead of the failing insert; a username save ensures the profile first and a failed save shows a plain toast. Merged and deployed at main 8f757c76 (live bundle checked: the ensure call is present, the old direct insert is gone). The 9 affected players recover on their next load. Headless Chromium and mocks only: no real brand-new-account run and nothing checked on a real phone.",
+        "acceptance_criteria": [
+          "A database function creates the Mazer profile for a signed-in account and refuses a wrong user id or an anonymous caller (applied 2026-11-11 with owner approval)",
+          "The client calls it once per bootstrap and on the settings write path instead of the failing insert (PRs 446 and 447, deployed at main 8f757c76)",
+          "A failed username save shows a plain toast; headless and mocks only, no real new-account run and nothing checked on a phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-008_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-008",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Widen the sign-in window to 15 minutes and name each sign-in failure",
+        "description": "A family member on a Galaxy S21 could not sign in and every callback failure showed the same message. Mazer's pending sign-in record expired after 5 minutes while the account site allows 15. PR 444 adds seven plain failure messages by class (took too long, came back to a different screen, cancelled, connection, session, storage, generic) and PR 445 wires them and widens the pending window from 5 to 15 minutes; the record is claimed exactly once, so a longer window adds no replay surface. The internal failure code is recorded in diagnostics only, and a new pending-expired code splits took too long from came back to a different screen. Merged and deployed at main 8f757c76. Unit tests plus headless Chromium with failures injected into the live scene at 390 and 1280 widths; no real sign-in round trip with a failure and nothing checked on a real phone. The fix is NOT proven against the original report: her root cause is unconfirmed (see MAZER-ACCT-016).",
+        "card_type": "reliability",
+        "lifecycle": "completed",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-001"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-11T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-008",
+        "extensions": {
+          "owner_status": "completed",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-008",
+        "source_status": "current",
+        "source_updated_at": "2026-11-11T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "A family member on a Galaxy S21 could not sign in and every callback failure showed the same message. Mazer's pending sign-in record expired after 5 minutes while the account site allows 15. PR 444 adds seven plain failure messages by class (took too long, came back to a different screen, cancelled, connection, session, storage, generic) and PR 445 wires them and widens the pending window from 5 to 15 minutes; the record is claimed exactly once, so a longer window adds no replay surface. The internal failure code is recorded in diagnostics only, and a new pending-expired code splits took too long from came back to a different screen. Merged and deployed at main 8f757c76. Unit tests plus headless Chromium with failures injected into the live scene at 390 and 1280 widths; no real sign-in round trip with a failure and nothing checked on a real phone. The fix is NOT proven against the original report: her root cause is unconfirmed (see MAZER-ACCT-016).",
+        "objective": "A family member on a Galaxy S21 could not sign in and every callback failure showed the same message. Mazer's pending sign-in record expired after 5 minutes while the account site allows 15. PR 444 adds seven plain failure messages by class (took too long, came back to a different screen, cancelled, connection, session, storage, generic) and PR 445 wires them and widens the pending window from 5 to 15 minutes; the record is claimed exactly once, so a longer window adds no replay surface. The internal failure code is recorded in diagnostics only, and a new pending-expired code splits took too long from came back to a different screen. Merged and deployed at main 8f757c76. Unit tests plus headless Chromium with failures injected into the live scene at 390 and 1280 widths; no real sign-in round trip with a failure and nothing checked on a real phone. The fix is NOT proven against the original report: her root cause is unconfirmed (see MAZER-ACCT-016).",
+        "acceptance_criteria": [
+          "The pending sign-in window matches the account site at 15 minutes with a single-use claim (PR 445)",
+          "Each sign-in failure class shows its own plain message and the internal code stays in diagnostics only (PRs 444 and 445)",
+          "Merged and deployed (main 8f757c76); headless and unit tests only, the original report is not confirmed fixed"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-009_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-009",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Make the Create Account result honest",
+        "description": "The account site Create Account form showed the success-styled notice Your account request is complete. You can continue to your account when a session is available. whenever sign-up returned no session (already registered, a weak new login choice, rate limit, network, unknown) and also after a successful sign-up without a Mazer return context. A family member reported a session was not available, which matches it. FawxzzyWeb PR 121 is MERGED (main bcfc556d) with an honest neutral message instead of the false success text, and a real session now continues straight into the account. It is NOT live: the FawxzzyWeb release carrying it is not yet aliased to the live domains. Residual: with auto-confirm on, a successful sign-up returns a session and a duplicate does not, so whether an account already exists can still be inferred by whether the user ends up signed in; closing that means turning auto-confirm off (see MAZER-ACCT-010). Not checked on a device.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-006"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-11T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-009",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-009",
+        "source_status": "current",
+        "source_updated_at": "2026-11-11T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "The account site Create Account form showed the success-styled notice Your account request is complete. You can continue to your account when a session is available. whenever sign-up returned no session (already registered, a weak new login choice, rate limit, network, unknown) and also after a successful sign-up without a Mazer return context. A family member reported a session was not available, which matches it. FawxzzyWeb PR 121 is MERGED (main bcfc556d) with an honest neutral message instead of the false success text, and a real session now continues straight into the account. It is NOT live: the FawxzzyWeb release carrying it is not yet aliased to the live domains. Residual: with auto-confirm on, a successful sign-up returns a session and a duplicate does not, so whether an account already exists can still be inferred by whether the user ends up signed in; closing that means turning auto-confirm off (see MAZER-ACCT-010). Not checked on a device.",
+        "objective": "The account site Create Account form showed the success-styled notice Your account request is complete. You can continue to your account when a session is available. whenever sign-up returned no session (already registered, a weak new login choice, rate limit, network, unknown) and also after a successful sign-up without a Mazer return context. A family member reported a session was not available, which matches it. FawxzzyWeb PR 121 is MERGED (main bcfc556d) with an honest neutral message instead of the false success text, and a real session now continues straight into the account. It is NOT live: the FawxzzyWeb release carrying it is not yet aliased to the live domains. Residual: with auto-confirm on, a successful sign-up returns a session and a duplicate does not, so whether an account already exists can still be inferred by whether the user ends up signed in; closing that means turning auto-confirm off (see MAZER-ACCT-010). Not checked on a device.",
+        "acceptance_criteria": [
+          "Create Account shows a neutral message that does not claim success when no session came back (PR 121 merged)",
+          "FawxzzyWeb release carrying PR 121 aliased to the live domains (not done)",
+          "Real new-account run on the live account site recorded after release (not done)"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-010_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-010",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Decide the Create Account non-enumeration trade-off and auto-confirm",
+        "description": "Owner decision. With auto-confirm on, a successful Create Account returns a session and a duplicate does not, so anyone can infer whether an account exists from whether they end up signed in. Closing that fully means turning auto-confirm off, which adds a confirmation step for every new player. Recommendation: accept the current residual signal and keep auto-confirm, because the rest of the form no longer discloses it and a confirmation step costs real sign-ups. Needs the owner's decision; no change is made until then.",
+        "card_type": "governance",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-009"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-11T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-010",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-010",
+        "source_status": "current",
+        "source_updated_at": "2026-11-11T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "Owner decision. With auto-confirm on, a successful Create Account returns a session and a duplicate does not, so anyone can infer whether an account exists from whether they end up signed in. Closing that fully means turning auto-confirm off, which adds a confirmation step for every new player. Recommendation: accept the current residual signal and keep auto-confirm, because the rest of the form no longer discloses it and a confirmation step costs real sign-ups. Needs the owner's decision; no change is made until then.",
+        "objective": "Owner decision. With auto-confirm on, a successful Create Account returns a session and a duplicate does not, so anyone can infer whether an account exists from whether they end up signed in. Closing that fully means turning auto-confirm off, which adds a confirmation step for every new player. Recommendation: accept the current residual signal and keep auto-confirm, because the rest of the form no longer discloses it and a confirmation step costs real sign-ups. Needs the owner's decision; no change is made until then.",
+        "acceptance_criteria": [
+          "The owner states whether to accept the residual signal or turn auto-confirm off",
+          "If auto-confirm stays on, the accepted residual is written into the account site docs",
+          "If auto-confirm goes off, a separate card covers the confirmation flow"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-011_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-011",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Add a leaderboard username editor for account-site players",
+        "description": "The in-game username editor was removed, and the generated Mazer-###### handle given to account-site players (MAZER-ACCT-007) cannot be renamed. Plan: a small editor on the leaderboard that reuses the existing username save path, which already ensures the profile first and shows a plain toast on failure. Owner decision first: whether players should be able to rename at all. Recommendation: build the small editor so a generated handle is not permanent. Not started.",
+        "card_type": "feature",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-007"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-11T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-011",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-011",
+        "source_status": "current",
+        "source_updated_at": "2026-11-11T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "The in-game username editor was removed, and the generated Mazer-###### handle given to account-site players (MAZER-ACCT-007) cannot be renamed. Plan: a small editor on the leaderboard that reuses the existing username save path, which already ensures the profile first and shows a plain toast on failure. Owner decision first: whether players should be able to rename at all. Recommendation: build the small editor so a generated handle is not permanent. Not started.",
+        "objective": "The in-game username editor was removed, and the generated Mazer-###### handle given to account-site players (MAZER-ACCT-007) cannot be renamed. Plan: a small editor on the leaderboard that reuses the existing username save path, which already ensures the profile first and shows a plain toast on failure. Owner decision first: whether players should be able to rename at all. Recommendation: build the small editor so a generated handle is not permanent. Not started.",
+        "acceptance_criteria": [
+          "The owner decides whether to build the editor",
+          "A signed-in player can change the generated handle from the leaderboard and sees a plain toast when the save fails",
+          "Taken, invalid and offline cases are covered by tests and a headless capture"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-012_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-012",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Retire dead Mazer sign-up and username-editor code",
+        "description": "Two paths are unreachable on main: the sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site) and the account-username-active flag that nothing sets since the in-game username editor was removed. Remove them together with their tests and copy, unless MAZER-ACCT-011 brings the editor back first; if it does, reuse the flag instead. Not started.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-011"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-11T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-012",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-012",
+        "source_status": "current",
+        "source_updated_at": "2026-11-11T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "Two paths are unreachable on main: the sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site) and the account-username-active flag that nothing sets since the in-game username editor was removed. Remove them together with their tests and copy, unless MAZER-ACCT-011 brings the editor back first; if it does, reuse the flag instead. Not started.",
+        "objective": "Two paths are unreachable on main: the sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site) and the account-username-active flag that nothing sets since the in-game username editor was removed. Remove them together with their tests and copy, unless MAZER-ACCT-011 brings the editor back first; if it does, reuse the flag instead. Not started.",
+        "acceptance_criteria": [
+          "The unreachable sign-up form mode and its copy are removed",
+          "The unused username-active flag is removed or reused by the editor card",
+          "Tests and the message inventory still pass with no change to shown copy"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-013_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-013",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Confirm where sign-in lands on the installed Android app",
+        "description": "One candidate for the Galaxy S21 report is that sign-in completes in a different context than the one that started it: the installed app versus a Chrome tab, where the pending sign-in record (kept per tab) is missing and the player sees the different-screen message. This needs a real Android phone. The owner runs the three device steps on the card. Related: MAZER-ACCT-003, the full installed-app proof. Not started.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-008"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-11T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-013",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-013",
+        "source_status": "current",
+        "source_updated_at": "2026-11-11T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "One candidate for the Galaxy S21 report is that sign-in completes in a different context than the one that started it: the installed app versus a Chrome tab, where the pending sign-in record (kept per tab) is missing and the player sees the different-screen message. This needs a real Android phone. The owner runs the three device steps on the card. Related: MAZER-ACCT-003, the full installed-app proof. Not started.",
+        "objective": "One candidate for the Galaxy S21 report is that sign-in completes in a different context than the one that started it: the installed app versus a Chrome tab, where the pending sign-in record (kept per tab) is missing and the player sees the different-screen message. This needs a real Android phone. The owner runs the three device steps on the card. Related: MAZER-ACCT-003, the full installed-app proof. Not started.",
+        "acceptance_criteria": [
+          "Sign in from the installed app and complete it normally: you land back in Mazer signed in",
+          "Start a sign-in from the installed app, wait about 6 minutes, then finish it: it still completes (the window is 15 minutes)",
+          "Start in the installed app, finish in a normal Chrome tab, then open the installed app: the different-screen message appears and its diagnostics code reads expired or missing state"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-014_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-014",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Record the failure code on every sign-in boot failure path",
+        "description": "The sign-in failure code reaches diagnostics for callback failures (MAZER-ACCT-008), but the quarantine and session-read failure paths at boot still show generic copy with no code, so a report cannot tell them apart. Plan: carry the same code through those two paths. Not started.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-008"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-11T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-014",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-014",
+        "source_status": "current",
+        "source_updated_at": "2026-11-11T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "The sign-in failure code reaches diagnostics for callback failures (MAZER-ACCT-008), but the quarantine and session-read failure paths at boot still show generic copy with no code, so a report cannot tell them apart. Plan: carry the same code through those two paths. Not started.",
+        "objective": "The sign-in failure code reaches diagnostics for callback failures (MAZER-ACCT-008), but the quarantine and session-read failure paths at boot still show generic copy with no code, so a report cannot tell them apart. Plan: carry the same code through those two paths. Not started.",
+        "acceptance_criteria": [
+          "Quarantine and session-read failures record a code in diagnostics",
+          "Player copy stays plain and never shows the code",
+          "Unit tests cover both paths"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-015_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-015",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Check how long the sign-in failure message stays on screen",
+        "description": "Unconfirmed: the auth feedback timer may clear the sign-in failure message before a player can read it, which would hide the new failure copy (MAZER-ACCT-008). Measure the on-screen time in headless Chromium first, then decide whether the message should stay until dismissed or until the next sign-in attempt. Not started.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-008"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-11T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-015",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-015",
+        "source_status": "current",
+        "source_updated_at": "2026-11-11T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "Unconfirmed: the auth feedback timer may clear the sign-in failure message before a player can read it, which would hide the new failure copy (MAZER-ACCT-008). Measure the on-screen time in headless Chromium first, then decide whether the message should stay until dismissed or until the next sign-in attempt. Not started.",
+        "objective": "Unconfirmed: the auth feedback timer may clear the sign-in failure message before a player can read it, which would hide the new failure copy (MAZER-ACCT-008). Measure the on-screen time in headless Chromium first, then decide whether the message should stay until dismissed or until the next sign-in attempt. Not started.",
+        "acceptance_criteria": [
+          "The on-screen time of each sign-in failure message is measured and written down",
+          "If it is too short to read, the message stays until dismissed or the next attempt",
+          "A test pins the chosen behavior"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-016_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-016",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Collect the Galaxy S21 sign-in details from the owner family member",
+        "description": "Owner relay. The root cause of the Galaxy S21 sign-in failure is not confirmed; candidates are the misleading Create Account notice hiding a failed sign-up, the 5-minute Mazer window against the account site's 15 minutes, the installed app versus a Chrome tab, the 15-minute username rate limit, and duplicate usernames. Five questions are open, see the ask. Not resolved until she answers; the owner relays her answers.",
+        "card_type": "research",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-008",
+          "MAZER-ACCT-009"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-11T23:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-016",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-016",
+        "source_status": "current",
+        "source_updated_at": "2026-11-11T23:00:00.000Z"
+      },
+      "content": {
+        "summary": "Owner relay. The root cause of the Galaxy S21 sign-in failure is not confirmed; candidates are the misleading Create Account notice hiding a failed sign-up, the 5-minute Mazer window against the account site's 15 minutes, the installed app versus a Chrome tab, the 15-minute username rate limit, and duplicate usernames. Five questions are open, see the ask. Not resolved until she answers; the owner relays her answers.",
+        "objective": "Owner relay. The root cause of the Galaxy S21 sign-in failure is not confirmed; candidates are the misleading Create Account notice hiding a failed sign-up, the 5-minute Mazer window against the account site's 15 minutes, the installed app versus a Chrome tab, the 15-minute username rate limit, and duplicate usernames. Five questions are open, see the ask. Not resolved until she answers; the owner relays her answers.",
+        "acceptance_criteria": [
+          "The five questions are asked and the answers recorded on this card",
+          "The answers point to one candidate cause or rule the candidates out",
+          "Any follow-up fix becomes its own card"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -2498,7 +3029,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Retire the previous project board and refresh this one from all prior discussion",
-        "description": "The earlier Mazer board lived on a system that is now archived; its 66 cards were reconciled against the repository but never synced here. On 2026-11-10 the owner asked for this board to be filled from every earlier chat and project note, with completed work as history. The cards come from the tracker, audit ledger, reconciliation, chat closeouts and merged pull requests, and the public site still needs both refresh pull requests merged.",
+        "description": "The earlier Mazer board lived on a system that is now archived; its 66 cards were reconciled against the repository but never synced here. On 2026-11-10 the owner asked for this board to be filled from every earlier chat and project note, with completed work as history. The cards come from the tracker, audit ledger, reconciliation, chat closeouts and merged pull requests. Both refresh pull requests are merged (Mazer PR 434 and FawxzzyWeb PR 119) and the public site shows the refreshed cards; later board syncs keep it current. Left in review for the owner to close.",
         "card_type": "governance",
         "lifecycle": "review",
         "priority": "high",
@@ -2521,12 +3052,12 @@
         "source_updated_at": "2026-11-10T00:00:00.000Z"
       },
       "content": {
-        "summary": "The earlier Mazer board lived on a system that is now archived; its 66 cards were reconciled against the repository but never synced here. On 2026-11-10 the owner asked for this board to be filled from every earlier chat and project note, with completed work as history. The cards come from the tracker, audit ledger, reconciliation, chat closeouts and merged pull requests, and the public site still needs both refresh pull requests merged.",
-        "objective": "The earlier Mazer board lived on a system that is now archived; its 66 cards were reconciled against the repository but never synced here. On 2026-11-10 the owner asked for this board to be filled from every earlier chat and project note, with completed work as history. The cards come from the tracker, audit ledger, reconciliation, chat closeouts and merged pull requests, and the public site still needs both refresh pull requests merged.",
+        "summary": "The earlier Mazer board lived on a system that is now archived; its 66 cards were reconciled against the repository but never synced here. On 2026-11-10 the owner asked for this board to be filled from every earlier chat and project note, with completed work as history. The cards come from the tracker, audit ledger, reconciliation, chat closeouts and merged pull requests. Both refresh pull requests are merged (Mazer PR 434 and FawxzzyWeb PR 119) and the public site shows the refreshed cards; later board syncs keep it current. Left in review for the owner to close.",
+        "objective": "The earlier Mazer board lived on a system that is now archived; its 66 cards were reconciled against the repository but never synced here. On 2026-11-10 the owner asked for this board to be filled from every earlier chat and project note, with completed work as history. The cards come from the tracker, audit ledger, reconciliation, chat closeouts and merged pull requests. Both refresh pull requests are merged (Mazer PR 434 and FawxzzyWeb PR 119) and the public site shows the refreshed cards; later board syncs keep it current. Left in review for the owner to close.",
         "acceptance_criteria": [
           "Every card has a stable id, a status that matches its source and a traceable origin",
           "Stale statuses are corrected on this board rather than in the archive",
-          "The public site shows the refreshed cards after the web repository refresh merges"
+          "The public site shows the refreshed cards (web repository refresh merged)"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -8557,10 +9088,10 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 163,
-    "exported_public_card_count": 163,
-    "exported_open_card_count": 62,
-    "exported_completed_card_count": 86,
+    "stable_identity_count": 173,
+    "exported_public_card_count": 173,
+    "exported_open_card_count": 70,
+    "exported_completed_card_count": 88,
     "exported_deferred_card_count": 15,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
