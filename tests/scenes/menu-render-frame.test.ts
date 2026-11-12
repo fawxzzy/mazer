@@ -715,9 +715,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.58;');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = cyberArcadeMaterial.rail.mint;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = cyberArcadeMaterial.rail.cyan;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;');
     expect(menuSceneSource).not.toContain('LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO');
     expect(menuSceneSource).not.toContain('LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS');
     expect(menuSceneSource).not.toContain('LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS');
@@ -811,24 +808,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(edgeMarkersSource).not.toContain('rail.mint');
     expect(edgeMarkersSource).not.toContain('rail.cyan');
     expect(edgeMarkersSource).not.toMatch(/0x[0-9a-fA-F]{6}/);
-    expect(menuSceneSource).toContain('private drawLegacyBackdropSigils(width: number, height: number, time: number): void');
-    expect(menuSceneSource).toContain('resolveLegacyMenuBackdropGlassShards(');
-    expect(menuSceneSource).toContain('resolveLegacyMenuBackdropDriftRunes(');
-    expect(menuSceneSource).toContain('glassShards: LEGACY_MENU_GLASS_SHARD_COUNT');
-    expect(menuSceneSource).toContain('driftRunes: LEGACY_MENU_DRIFT_RUNE_COUNT');
-    expect(menuSceneSource).toContain('drawLegacyBackdropShard(');
-    expect(menuSceneSource).toContain('drawLegacyBackdropRune(');
-    // Angular shards/runes must stay angular (fillPoints/strokePath), not
-    // regress back to the round orbs/motes this replaced -- scoped to just
-    // that one method's own body, not the whole file, since the starfield's
-    // individual stars legitimately use fillCircle now (round points of
-    // light instead of flat square pixels -- "the stars kinda suck").
-    const shardMethodStart = menuSceneSource.indexOf('private drawLegacyBackdropShard(');
-    const shardMethodEnd = menuSceneSource.indexOf('\n  private ', shardMethodStart + 1);
-    expect(shardMethodStart).toBeGreaterThan(-1);
-    expect(shardMethodEnd).toBeGreaterThan(shardMethodStart);
-    const shardMethodSource = menuSceneSource.slice(shardMethodStart, shardMethodEnd);
-    expect(shardMethodSource).not.toContain('fillCircle');
+    // MAZER-VIS-017: the shard/rune/sigil drawing code is gone; the backdrop draws round stars only.
+    for (const removed of ['drawLegacyBackdropSigils', 'drawLegacyBackdropShard', 'drawLegacyBackdropRune', 'rotateBackdropPoint']) {
+      expect(menuSceneSource).not.toContain(removed);
+    }
     expect(legacyMenuRenderSource).toContain('resolveLegacyMenuPathStrokeSegments');
     expect(menuSceneSource).toContain('skip it entirely in menu mode. Play mode\'s gameplay');
   });
@@ -853,8 +836,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('starMotion: LEGACY_MENU_BACKDROP_STAR_MOTION');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropGlassShards');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropDriftRunes');
-    expect(menuSceneSource).toContain('this.drawLegacyBackdropSigils(width, height, animationTime);');
-    expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(shard.color, shard.alpha * 0.038);');
     expect(backdropSource).toContain('const roundBackdropNumber = (value: number): number => Math.round(value * 1000) / 1000;');
     expect(backdropSource).toContain('const localPhase = phase * (0.34 + (index * 0.034)) + (index * 1.73);');
     expect(backdropSource).toContain('const driftX = Math.sin(localPhase) * LEGACY_MENU_BACKDROP_GLASS_DRIFT_X_RATIO;');
@@ -863,13 +844,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_GLASS_DRIFT_Y_RATIO = 0.024');
     expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_RUNE_CYCLE_MS = 9000');
     expect(backdropSource).toContain('const tailMagnitude = 0.68 + Math.min(0.28, distanceFromCenter * 0.42);');
-    expect(menuSceneSource).toContain('Math.round(pixelX + (step.x * index))');
-    expect(menuSceneSource).toContain('const upperRailStart = this.rotateBackdropPoint(shard, -halfLength * 0.86, -halfThickness * 0.58);');
-    expect(menuSceneSource).toContain('const upperRailBreakEnd = this.rotateBackdropPoint(shard, halfLength * 0.1, -halfThickness * 0.58);');
-    expect(menuSceneSource).toContain('const leadingCutStart = this.rotateBackdropPoint(shard, halfLength * 0.54, -halfThickness - taper);');
-    expect(menuSceneSource).toContain('const notchStart = this.rotateBackdropPoint(shard, halfLength * 0.02, -halfThickness * 1.05);');
-    expect(menuSceneSource).toContain('const tickStart = this.rotateBackdropPoint(rune, rune.size * 0.16, -rune.size * 0.72);');
-    expect(menuSceneSource).toContain('sigils: 4');
   });
 
   test('keeps active play maze rendering on connected corridors instead of square debug cells', () => {
