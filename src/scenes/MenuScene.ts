@@ -409,7 +409,6 @@ import {
 import {
   LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH,
   LEGACY_PROGRESSION_STORAGE_KEY,
-  compareLegacyProgressionOrdinals,
   createEmptyLegacyProgressionState,
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
@@ -3530,7 +3529,6 @@ export class MenuScene extends Phaser.Scene {
       optionalRetargetCount: 0
     };
     const movementSpeedProfile = this.resolveLegacyPlayMovementSpeedProfile();
-    const diagnosticsPlayerTrack = this.progressionState.tracks.player;
     const trailSegmentCap = this.settings.toggleTrailFade
       ? TRAIL_FADE_TAIL
       : Math.max(this.trail.length, this.menuDemoConfig?.behavior.trailMaxLength ?? this.trail.length);
@@ -3681,11 +3679,6 @@ export class MenuScene extends Phaser.Scene {
             heldControl: this.resolveLegacyPlayHeldTouchControl(),
             movementSpeed: normalizeLegacyMovementSpeed(this.settings.movementSpeed),
             movementSpeedLabel: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
-            progressionCompletedCycles: diagnosticsPlayerTrack.completedCycles,
-            // Diagnostics only: progression evidence exists. It no longer affects speed (constant-speed owner request).
-            progressionContextApplied: compareLegacyProgressionOrdinals(diagnosticsPlayerTrack.completedCycles, '0') > 0,
-            progressionLevel: resolveLegacyProgressionLevel(diagnosticsPlayerTrack.targetComplexity),
-            progressionPaceScore: diagnosticsPlayerTrack.paceScore,
             repeatInitialDelayMs: movementSpeedProfile.initialDelayMs,
             repeatIntervalMs: movementSpeedProfile.repeatIntervalMs,
             stickInitialDelayMaxMs: LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS,
