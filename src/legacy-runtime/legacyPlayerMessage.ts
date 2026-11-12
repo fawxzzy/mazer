@@ -93,6 +93,7 @@ export const LEGACY_OAUTH_FAILURE_MESSAGE_COPY = {
   connection: 'Mazer could not finish connecting to your account. Try again in a moment.',
   contextLost: 'Sign-in came back to a different screen than where you started. Open Mazer from your home screen icon and try again.',
   generic: 'Account connection unavailable. Return to Mazer and try again.',
+  providerUnreachable: 'Sign-in is unavailable right now. Try again in a few minutes.',
   session: 'Your account could not be confirmed. Try signing in again.',
   storage: 'This browser is blocking what Mazer needs to sign in. Turn off private browsing or allow site data, then try again.',
   timedOut: 'Sign-in took too long. Choose Sign in to start again.'
@@ -112,6 +113,10 @@ const LEGACY_OAUTH_FAILURE_CLASS_BY_CODE: Readonly<Record<string, LegacyOAuthFai
   expired_or_missing_state: 'contextLost',
   invalid_state: 'contextLost',
   pending_expired: 'timedOut',
+  // MAZER-ACCT-036: the pre-flight before leaving for the sign-in page found the
+  // account service down, so Mazer stayed put instead of stranding the player
+  // on a provider error page.
+  provider_unreachable: 'providerUnreachable',
   session_invalid: 'session',
   storage_unavailable: 'storage',
   // Boot and sign-in paths that are not a callback failure. They keep the
