@@ -1277,7 +1277,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const availableCandidateSlots = Math.max(0, LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT - remainingMoves.length);');
     expect(menuSceneSource).toContain('private resolveLegacyPlayHeldTouchDelay(kind:');
     expect(menuSceneSource).toContain('private resolveLegacyPlayMovementSpeedProfile()');
-    expect(menuSceneSource).toContain('completedCycles: playerTrack.completedCycles');
+    expect(menuSceneSource).toContain('return resolveLegacyMovementSpeedProfile(this.settings.movementSpeed);');
     expect(menuSceneSource).toContain('effectiveMovementSpeed: movementSpeedProfile.effectiveSpeed');
     expect(menuSceneSource).toContain('formulaVersion: movementSpeedProfile.formulaVersion');
     expect(menuSceneSource).toContain("this.resolveLegacyPlayHeldTouchDelay(hadActiveMove ? 'turn' : 'initial')");

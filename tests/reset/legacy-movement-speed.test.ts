@@ -2,6 +2,9 @@ import { describe, expect, test } from 'vitest';
 import {
   formatLegacyMovementSpeedPercent,
   LEGACY_MOVEMENT_SPEED_DEFAULT,
+  LEGACY_MOVEMENT_SPEED_STEP,
+  LEGACY_MOVEMENT_STEP_RATE_FACTOR,
+  scaleLegacyMovementDelayMs,
   LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
   normalizeLegacyMovementSpeed,
   quantizeLegacyMovementSpeed,
@@ -29,47 +32,30 @@ describe('legacy movement speed profile', () => {
     const defaultSpeed = resolveLegacyMovementSpeedProfile(0.3);
     const fast = resolveLegacyMovementSpeedProfile(1);
 
+    // Old formula values (132/112/78 repeat, 316/258/160 initial) divided by the 0.92 step-rate factor.
     expect(slow).toEqual({
       baseSpeed: 0,
-      completedCycles: '0',
-      contextApplied: false,
       effectiveSpeed: 0,
       formulaVersion: LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
-      initialDelayMs: 316,
-      level: 1,
-      levelAdjustment: 0,
-      paceAdjustment: 0,
-      paceScore: 50,
-      repeatIntervalMs: 132,
-      turnDelayMs: 362
+      initialDelayMs: 343,
+      repeatIntervalMs: 143,
+      turnDelayMs: 389
     });
     expect(defaultSpeed).toEqual({
       baseSpeed: 0.3,
-      completedCycles: '0',
-      contextApplied: false,
       effectiveSpeed: 0.3,
       formulaVersion: LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
-      initialDelayMs: 258,
-      level: 1,
-      levelAdjustment: 0,
-      paceAdjustment: 0,
-      paceScore: 50,
-      repeatIntervalMs: 112,
-      turnDelayMs: 300
+      initialDelayMs: 280,
+      repeatIntervalMs: 122,
+      turnDelayMs: 322
     });
     expect(fast).toEqual({
       baseSpeed: 1,
-      completedCycles: '0',
-      contextApplied: false,
       effectiveSpeed: 1,
       formulaVersion: LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
-      initialDelayMs: 160,
-      level: 1,
-      levelAdjustment: 0,
-      paceAdjustment: 0,
-      paceScore: 50,
-      repeatIntervalMs: 78,
-      turnDelayMs: 194
+      initialDelayMs: 174,
+      repeatIntervalMs: 85,
+      turnDelayMs: 208
     });
     expect(slow.repeatIntervalMs).toBeGreaterThan(defaultSpeed.repeatIntervalMs);
     expect(defaultSpeed.repeatIntervalMs).toBeGreaterThan(fast.repeatIntervalMs);
@@ -77,52 +63,40 @@ describe('legacy movement speed profile', () => {
     expect(defaultSpeed.turnDelayMs).toBeGreaterThan(defaultSpeed.initialDelayMs);
   });
 
-  test('applies bounded level and established-pace adjustments without overriding speed endpoints', () => {
-    const newPlayer = resolveLegacyMovementSpeedProfile(0.3, {
-      completedCycles: '0',
-      level: 99,
-      paceScore: 100
-    });
-    const establishedFast = resolveLegacyMovementSpeedProfile(0.3, {
-      completedCycles: '12',
-      level: 99,
-      paceScore: 100
-    });
-    const establishedSlow = resolveLegacyMovementSpeedProfile(0.3, {
-      completedCycles: '12',
-      level: 1,
-      paceScore: 0
-    });
+  test('is 8 percent slower than the previous default timing (owner request 2026-11-12)', () => {
+    expect(LEGACY_MOVEMENT_STEP_RATE_FACTOR).toBe(0.92);
+    const profile = resolveLegacyMovementSpeedProfile(LEGACY_MOVEMENT_SPEED_DEFAULT);
+    const oldRepeat = Math.round(132 - (Math.pow(LEGACY_MOVEMENT_SPEED_DEFAULT, 0.82) * 54));
+    const oldInitial = Math.round(316 - (Math.pow(LEGACY_MOVEMENT_SPEED_DEFAULT, 0.82) * 156));
+    expect(oldRepeat).toBe(128);
+    expect(profile.repeatIntervalMs).toBe(Math.round(oldRepeat / 0.92));
+    expect(profile.initialDelayMs).toBe(Math.round(oldInitial / 0.92));
+    expect(scaleLegacyMovementDelayMs(104)).toBe(113);
+  });
 
-    expect(newPlayer).toMatchObject({
-      contextApplied: false,
-      effectiveSpeed: 0.3,
-      levelAdjustment: 0,
-      paceAdjustment: 0
-    });
-    expect(establishedFast).toMatchObject({
-      contextApplied: true,
-      effectiveSpeed: 0.426,
-      levelAdjustment: 0.1,
-      paceAdjustment: 0.05
-    });
-    expect(establishedSlow).toMatchObject({
-      contextApplied: true,
-      effectiveSpeed: 0.258,
-      levelAdjustment: 0,
-      paceAdjustment: -0.05
-    });
-    expect(establishedFast.repeatIntervalMs).toBeLessThan(newPlayer.repeatIntervalMs);
-    expect(establishedSlow.repeatIntervalMs).toBeGreaterThan(newPlayer.repeatIntervalMs);
-    expect(resolveLegacyMovementSpeedProfile(0, {
-      completedCycles: '12',
-      level: 99,
-      paceScore: 100
-    }).effectiveSpeed).toBe(0);
-    expect(resolveLegacyMovementSpeedProfile(1, {
-      completedCycles: '12',
-      level: 1,
-      paceScore: 0
-    }).effectiveSpeed).toBe(1);
+  test('speed is constant: it depends on the setting only, never on level or pace', () => {
+    const profile = resolveLegacyMovementSpeedProfile as (speed: number, ...ignored: unknown[]) => ReturnType<typeof resolveLegacyMovementSpeedProfile>;
+    for (const speed of [0, 0.04, 0.3, 0.5, 1]) {
+      const baseline = profile(speed);
+      for (const level of [1, 50, 99]) {
+        for (const paceScore of [0, 25, 50, 100]) {
+          expect(profile(speed, { completedCycles: '12', level, paceScore })).toEqual(baseline);
+        }
+      }
+      expect(baseline.effectiveSpeed).toBe(baseline.baseSpeed);
+    }
+  });
+
+  test('is monotonic across the whole slider and keeps the ramp ordering', () => {
+    let previous = resolveLegacyMovementSpeedProfile(0);
+    for (let step = 1; step <= 20; step += 1) {
+      const next = resolveLegacyMovementSpeedProfile(step * LEGACY_MOVEMENT_SPEED_STEP);
+      expect(next.repeatIntervalMs).toBeLessThanOrEqual(previous.repeatIntervalMs);
+      expect(next.initialDelayMs).toBeLessThanOrEqual(previous.initialDelayMs);
+      expect(next.initialDelayMs).toBeGreaterThan(next.repeatIntervalMs);
+      expect(next.turnDelayMs).toBeGreaterThan(next.initialDelayMs);
+      previous = next;
+    }
+    expect(previous.repeatIntervalMs).toBe(85);
   });
 });

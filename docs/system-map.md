@@ -263,7 +263,7 @@ This is the fastest way to answer "if I click or press this, what actually owns 
 
 - `src/legacy-runtime/legacyMovementSpeed.ts`
   - persisted Move Speed as the player-owned base preference
-  - versioned `legacy-movement-pace-v1` effective timing formula
+  - versioned `legacy-movement-pace-v2` effective timing formula
   - neutral no-history behavior and bounded completed-cycle level/pace adjustment
   - shared initial, repeat, and turn delays for keyboard, touch arrows, and stick
   - explicit `0%` / `100%` endpoint preservation and bounded diagnostics

@@ -391,6 +391,7 @@ import {
 import {
   LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH,
   LEGACY_PROGRESSION_STORAGE_KEY,
+  compareLegacyProgressionOrdinals,
   createEmptyLegacyProgressionState,
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
@@ -539,7 +540,8 @@ import {
 import {
   formatLegacyMovementSpeedPercent,
   normalizeLegacyMovementSpeed,
-  resolveLegacyMovementSpeedProfile
+  resolveLegacyMovementSpeedProfile,
+  scaleLegacyMovementDelayMs
 } from '../legacy-runtime/legacyMovementSpeed';
 import {
   createLegacyDemoWalkerEpisode,
@@ -1468,9 +1470,10 @@ const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
 const LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS = 3200;
 const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 32;
 const LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS = 16;
-const LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS = 144;
-const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = 104;
-const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = 144;
+// Stick caps follow the same owner-requested step-rate factor as the profile, or stick players would see no change.
+const LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS = scaleLegacyMovementDelayMs(144);
+const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = scaleLegacyMovementDelayMs(104);
+const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = scaleLegacyMovementDelayMs(144);
 // Diagnostics only (markerStyle.playerCoreRadius / playerHaloRadius): the diamond-era radius ratios the runtime
 // diagnostics have always reported. The marker itself is drawn from src/render/playerMarker.ts (one shape for the
 // human player, the menu demo's AI and the Guide icon), not from these.
@@ -3476,6 +3479,7 @@ export class MenuScene extends Phaser.Scene {
       optionalRetargetCount: 0
     };
     const movementSpeedProfile = this.resolveLegacyPlayMovementSpeedProfile();
+    const diagnosticsPlayerTrack = this.progressionState.tracks.player;
     const trailSegmentCap = this.settings.toggleTrailFade
       ? TRAIL_FADE_TAIL
       : Math.max(this.trail.length, this.menuDemoConfig?.behavior.trailMaxLength ?? this.trail.length);
@@ -3628,10 +3632,11 @@ export class MenuScene extends Phaser.Scene {
             heldControl: this.resolveLegacyPlayHeldTouchControl(),
             movementSpeed: normalizeLegacyMovementSpeed(this.settings.movementSpeed),
             movementSpeedLabel: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
-            progressionCompletedCycles: movementSpeedProfile.completedCycles,
-            progressionContextApplied: movementSpeedProfile.contextApplied,
-            progressionLevel: movementSpeedProfile.level,
-            progressionPaceScore: movementSpeedProfile.paceScore,
+            progressionCompletedCycles: diagnosticsPlayerTrack.completedCycles,
+            // Diagnostics only: progression evidence exists. It no longer affects speed (constant-speed owner request).
+            progressionContextApplied: compareLegacyProgressionOrdinals(diagnosticsPlayerTrack.completedCycles, '0') > 0,
+            progressionLevel: resolveLegacyProgressionLevel(diagnosticsPlayerTrack.targetComplexity),
+            progressionPaceScore: diagnosticsPlayerTrack.paceScore,
             repeatInitialDelayMs: movementSpeedProfile.initialDelayMs,
             repeatIntervalMs: movementSpeedProfile.repeatIntervalMs,
             stickInitialDelayMaxMs: LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS,
@@ -5094,12 +5099,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyPlayMovementSpeedProfile() {
-    const playerTrack = this.progressionState.tracks.player;
-    return resolveLegacyMovementSpeedProfile(this.settings.movementSpeed, {
-      completedCycles: playerTrack.completedCycles,
-      level: resolveLegacyProgressionLevel(playerTrack.targetComplexity),
-      paceScore: playerTrack.paceScore
-    });
+    // Constant speed: only the Move Speed setting matters (progression never changes it).
+    return resolveLegacyMovementSpeedProfile(this.settings.movementSpeed);
   }
 
   // The player-move visual glide has to stay under the actual per-step
