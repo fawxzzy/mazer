@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
+import { LEGACY_OAUTH_FAILURE_MESSAGE_COPY } from '../../src/legacy-runtime/legacyPlayerMessage';
 import {
   LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS,
   LEGACY_AUTH_GUEST_SCOPE,
@@ -967,8 +968,8 @@ describe('legacy auth runtime', () => {
     expect(authSource).toContain('export const readLegacyAuthSessionSnapshot = async');
     expect(authSource).toContain('if (isMazerOAuthSessionQuarantined()) {');
     expect(authSource).toContain("listener({ ...createLegacyGuestAuthSnapshot(), error: MAZER_OAUTH_SAFE_ERROR_MESSAGE }, event);");
-    expect(authSource).toContain("error: oauthBootResult.status === 'failed'");
-    expect(authSource).toContain('? MAZER_OAUTH_SAFE_ERROR_MESSAGE');
+    expect(authSource).toContain('error: oauthBootFailure !== null');
+    expect(authSource).toContain('? oauthBootFailure.error');
     expect(authSource).toContain(': error?.message ?? null');
     expect(authSource).toContain('export const subscribeLegacyAuthState = (');
     expect(authSource).toContain("if (snapshot.status === 'authenticated')");
@@ -1034,7 +1035,7 @@ describe('legacy auth runtime', () => {
     expect(isLegacyAuthStorageEventKey(null, rollbackStorageKey)).toBe(false);
   });
 
-  test('preserves fixed-safe callback failure feedback when no auth client can be constructed', async () => {
+  test('keeps callback failure feedback class-safe, with the internal code kept out of the player copy', async () => {
     await consumeMazerOAuthCallback({
       code: null,
       malformed: false,
@@ -1043,10 +1044,14 @@ describe('legacy auth runtime', () => {
       state: null
     }, async () => null, null);
 
-    await expect(readLegacyAuthSessionSnapshot()).resolves.toMatchObject({
-      error: MAZER_OAUTH_SAFE_ERROR_MESSAGE,
+    const snapshot = await readLegacyAuthSessionSnapshot();
+    expect(snapshot).toMatchObject({
+      error: LEGACY_OAUTH_FAILURE_MESSAGE_COPY.connection,
+      errorCode: 'authorization_unavailable',
       status: 'unavailable'
     });
+    expect(snapshot.error).not.toContain('authorization_unavailable');
+    expect(snapshot.error).not.toBe(MAZER_OAUTH_SAFE_ERROR_MESSAGE);
   });
 
   test('binds browser data queries to a schema resolved per-project, not a hardcoded constant', () => {

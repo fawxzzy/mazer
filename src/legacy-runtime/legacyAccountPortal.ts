@@ -16,7 +16,13 @@ export const MAZER_OAUTH_AUTH_STORAGE_PROBE_BYTES = 65_536;
 // auth-js derives this exact name from the persisted session key. OAuth
 // commits and auth-js refreshes must share it because both replace that key.
 export const MAZER_OAUTH_SESSION_LOCK_NAME = `lock:${MAZER_OAUTH_AUTH_SESSION_KEY}`;
-export const MAZER_OAUTH_PENDING_TTL_MS = 300_000;
+// Matches the account host's pending window (FawxzzyWeb MAZER_OAUTH_PENDING_TTL_MS
+// = 900_000). A slow phone sign-up with retries can pass five minutes; a shorter
+// window here made Mazer reject a callback the host still honours. The record is
+// claimed exactly once (removeExactPendingRecord runs before the code exchange),
+// is bound to the per-tab state, PKCE verifier and auth-mutation epochs, and
+// lives in sessionStorage, so a longer window adds no replay surface.
+export const MAZER_OAUTH_PENDING_TTL_MS = 900_000;
 export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
 export const MAZER_OAUTH_SESSION_LOCK_MAX_WAIT_MS = MAZER_OAUTH_TOKEN_TIMEOUT_MS;
 export const MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS = 60_000;
@@ -33,6 +39,7 @@ export type MazerLegalRoute = 'privacy' | 'terms';
 export type MazerOAuthFailureCategory =
   | 'cancelled'
   | 'expired_or_missing_state'
+  | 'pending_expired'
   | 'invalid_state'
   | 'authorization_unavailable'
   | 'exchange_unavailable'
@@ -1112,15 +1119,22 @@ const consumeMazerOAuthCallbackInner = async (
     const removal = removeExactPendingRecord(runtime.sessionStorage, pendingRaw);
     return failed(removal === 'failed' ? 'storage_unavailable' : 'expired_or_missing_state');
   }
+  const pendingAgeMs = runtime.now() - pending.createdAtEpochMs;
+  const pendingExpired = pendingAgeMs > MAZER_OAUTH_PENDING_TTL_MS;
   if (
-    runtime.now() - pending.createdAtEpochMs < 0
-    || runtime.now() - pending.createdAtEpochMs > MAZER_OAUTH_PENDING_TTL_MS
+    pendingAgeMs < 0
+    || pendingExpired
     || pending.authMutationEpoch !== currentEpoch
   ) {
     if (callback.state === pending.state) {
       const removal = removeExactPendingRecord(runtime.sessionStorage, pendingRaw);
       if (removal === 'failed') {
         return failed('storage_unavailable');
+      }
+      // Same attempt, aged out: tell "took too long" apart from "came back
+      // somewhere else". A state mismatch cannot be attributed to age.
+      if (pendingExpired) {
+        return failed('pending_expired');
       }
     }
     return failed('expired_or_missing_state');
