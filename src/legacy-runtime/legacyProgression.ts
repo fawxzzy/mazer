@@ -117,6 +117,20 @@ export interface LegacyProgressionPalette {
   trailPulseEdgeColor: number;
 }
 
+/**
+ * The player-track numbers a QA report or a screenshot reads next to the
+ * progression section. They used to sit inside the play input diagnostics
+ * (`play.inputBuffer.touchSprint.progression*`) even though they stopped being
+ * speed inputs when movement speed became constant (MAZER-PROG-016).
+ */
+export interface LegacyProgressionPlayerEvidence {
+  completedCycles: LegacyProgressionOrdinal;
+  /** Diagnostics only: progression evidence exists. It does not affect speed. */
+  contextApplied: boolean;
+  level: number;
+  paceScore: number;
+}
+
 export interface LegacyProgressionDiagnostics {
   activeTrackId: LegacyProgressionTrackId;
   complexity: LegacyMazeComplexityBreakdown;
@@ -124,6 +138,7 @@ export interface LegacyProgressionDiagnostics {
   generationReview: LegacyProgressionGenerationReview;
   palette: LegacyProgressionPalette;
   pacing: LegacyProgressionPacingSummary;
+  playerEvidence: LegacyProgressionPlayerEvidence;
   storageKey: string;
   tracks: Record<LegacyProgressionTrackId, LegacyProgressionTrack>;
 }
@@ -1809,6 +1824,12 @@ export const summarizeLegacyProgressionDiagnostics = (
     },
     palette: resolveLegacyProgressionPalette(activeTrack, activeTrackId),
     pacing: summarizeLegacyProgressionPacing(activeTrack, complexity.total, activeTrackId),
+    playerEvidence: {
+      completedCycles: normalized.tracks.player.completedCycles,
+      contextApplied: compareLegacyProgressionOrdinals(normalized.tracks.player.completedCycles, '0') > 0,
+      level: resolveLegacyProgressionLevel(normalized.tracks.player.targetComplexity),
+      paceScore: normalized.tracks.player.paceScore
+    },
     storageKey,
     tracks: {
       player: copyTrack(normalized.tracks.player),

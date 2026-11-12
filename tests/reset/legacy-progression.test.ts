@@ -2071,4 +2071,49 @@ describe('legacy progression', () => {
     expect(diagnostics.pacing.activeLevel).toBe('1');
     expect(diagnostics.pacing.measuredMazeComplexity).toBe(diagnostics.complexity.total);
   });
+
+  // MAZER-PROG-016: the player-track numbers moved here from the play input diagnostics.
+  test('the progression section carries the player-track evidence (level, completions, pace, context)', () => {
+    const maze = createProgressionTestMaze();
+    const fresh = summarizeLegacyProgressionDiagnostics(createEmptyLegacyProgressionState(), 'ai-runner', maze);
+    expect(fresh.playerEvidence).toEqual({
+      completedCycles: '0',
+      contextApplied: false,
+      level: 1,
+      paceScore: fresh.tracks.player.paceScore
+    });
+
+    const storage = new MemoryStorage();
+    let state = createEmptyLegacyProgressionState();
+    for (let cycle = 1; cycle <= 3; cycle += 1) {
+      state = recordLegacyProgressionCycle(
+        storage,
+        state,
+        createMazeCycleTelemetryReceipt({
+          averageFrameMs: 16,
+          completedAt: `2026-08-2${cycle}T12:00:00.000Z`,
+          completionTimeMs: 8_000,
+          controlMode: 'stick',
+          maze,
+          playerPath: maze.solutionPath,
+          resetUsed: false,
+          surface: 'play',
+          backtracks: 0,
+          wrongTurns: 0
+        }),
+        maze
+      );
+    }
+    const advanced = summarizeLegacyProgressionDiagnostics(state, 'player', maze);
+    expect(advanced.playerEvidence).toEqual({
+      completedCycles: '3',
+      contextApplied: true,
+      level: resolveLegacyProgressionLevel(state.tracks.player.targetComplexity),
+      paceScore: state.tracks.player.paceScore
+    });
+    expect(advanced.playerEvidence.level).toBeGreaterThan(1);
+    // The evidence is always the PLAYER track, even when the AI track is active.
+    const aiActive = summarizeLegacyProgressionDiagnostics(state, 'ai-runner', maze);
+    expect(aiActive.playerEvidence).toEqual(advanced.playerEvidence);
+  });
 });

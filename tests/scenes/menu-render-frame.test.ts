@@ -1496,7 +1496,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(runtimeDiagnosticsSource).toContain("encoding: 'walkable-rows-v1';");
     expect(runtimeDiagnosticsSource).toContain('walkableRows: string[];');
-    expect(runtimeDiagnosticsSource).toContain('progressionCompletedCycles: string;');
+    // MAZER-PROG-016: the player-track numbers live in the progression section now.
+    const progressionSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyProgression.ts'), 'utf8');
+    expect(progressionSource).toContain('playerEvidence: LegacyProgressionPlayerEvidence;');
+    expect(progressionSource).toContain('completedCycles: LegacyProgressionOrdinal;');
     expect(menuSceneSource).toContain("encoding: 'walkable-rows-v1'");
     expect(menuSceneSource).toContain("walkableRows: this.maze.grid.map((row) => row.map((walkable) => (walkable ? '1' : '0')).join(''))");
   });
