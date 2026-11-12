@@ -124,12 +124,12 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
     heading: 'You',
     icon: {
       badge: 'square',
-      boardDraw: { module: 'src/scenes/MenuScene.ts', symbol: 'fillLegacyPlayerMarkerTile' },
+      boardDraw: { module: 'src/render/playerMarker.ts', symbol: 'drawPlayerMarker' },
       chipDraw: { marker: 'player', module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' },
       glyph: 'player-block',
       lane: null,
-      reasonId: 'player-marker-draw-bound-to-board-graphics',
-      status: 'guide-local'
+      reasonId: 'player-legend-calls-shared-marker-draw',
+      status: 'shared-with-board'
     },
     id: 'you',
     text: 'You are the green rounded block inside a bright ring.'

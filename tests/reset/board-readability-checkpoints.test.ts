@@ -69,20 +69,27 @@ describe('shipped Chip board: real role colours against the real chip floor (non
 describe('player locator wiring in MenuScene', () => {
   const scene = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n?/g, '\n');
 
-  test('the locator is drawn before the core fill and only in the play branch', () => {
+  test('the player marker is ONE draw for play and the menu demo AI: no mode branch, locator drawn before the core fill', () => {
     const start = scene.indexOf('private fillLegacyPlayerMarkerTile(');
     const body = scene.slice(start, scene.indexOf('private drawPlayerGlowCanvas(', start));
-    const locator = body.indexOf('drawPlayerLocator(this.boardDynamicGraphics');
-    const coreFill = body.indexOf('this.boardDynamicGraphics.fillStyle(playerCoreColor, alpha);');
-    const playBranch = body.indexOf('if (showLocatorTicks) {');
-    expect(playBranch).toBeGreaterThan(-1);
-    expect(locator).toBeGreaterThan(playBranch);
-    expect(coreFill).toBeGreaterThan(locator);
+    // no per-surface branch or flag in the marker draw (the AI and the human are the same marker for the same state)
+    expect(body).not.toMatch(/this\.mode\b/);
+    expect(body).not.toContain('showLocatorTicks');
+    expect(body).not.toContain('fillRect(');
+    // the glow canvas, then the shared draw (locator first, then the block fill and the accent stroke, inside drawPlayerMarker)
+    const glow = body.indexOf('this.drawPlayerGlowCanvas(frame');
+    const marker = body.indexOf('drawPlayerMarker(this.boardDynamicGraphics, frame, {');
+    expect(glow).toBeGreaterThan(-1);
+    expect(marker).toBeGreaterThan(glow);
+    const shared = readFileSync(resolve(process.cwd(), 'src/render/playerMarker.ts'), 'utf8').replace(/\r\n?/g, '\n');
+    const draw = shared.slice(shared.indexOf('export const drawPlayerMarker'));
+    expect(draw.indexOf('drawPlayerLocator(')).toBeGreaterThan(-1);
+    expect(draw.indexOf('g.fillRoundedRect(')).toBeGreaterThan(draw.indexOf('drawPlayerLocator('));
   });
 
   test('the ping only forces dynamic redraws through needsRedraw, and reduced motion is passed through', () => {
     expect(scene).toContain('this.playerLocatorState.needsRedraw()');
     expect(scene).toContain('this.playerLocatorState.update(time, live,');
-    expect(scene).toMatch(/pingStartMs: this\.playerLocatorState\.activePingStartMs,\n\s+reducedMotion: this\.prefersLegacyReducedMotion\(\)/);
+    expect(scene).toMatch(/pingStartMs: this\.playerLocatorState\.activePingStartMs,\n\s+reducedMotion\n/);
   });
 });

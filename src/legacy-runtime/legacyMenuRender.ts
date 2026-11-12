@@ -81,12 +81,6 @@ export interface LegacyPlayerMarkerRenderMetrics {
   strokeWidth: number;
 }
 
-export interface LegacyPlayerLocatorRenderMetrics {
-  innerRadius: number;
-  outerRadius: number;
-  strokeWidth: number;
-}
-
 export interface LegacyEndpointMarkerRenderMetrics {
   coreRadius: number;
   outerRadius: number;
@@ -144,23 +138,6 @@ export const resolveLegacyPlayerMarkerRenderMetrics = (
     coreRadius,
     haloRadius,
     strokeWidth: Math.max(1, Math.min(2, Math.floor(tileSize * 0.12)))
-  };
-};
-
-export const resolveLegacyPlayerLocatorRenderMetrics = (
-  tileSize: number,
-  haloRadius: number,
-  strokeWidth: number
-): LegacyPlayerLocatorRenderMetrics => {
-  const maxOuterRadius = Math.max(1, tileSize * 0.48);
-  const responsiveOuterRadius = Math.max(haloRadius + (strokeWidth * 0.5), tileSize * 0.46);
-  const outerRadius = Math.min(maxOuterRadius, responsiveOuterRadius);
-  const tickLength = Math.min(Math.max(1, tileSize * 0.16), outerRadius * 0.52);
-
-  return {
-    innerRadius: Math.max(0.5, outerRadius - tickLength),
-    outerRadius,
-    strokeWidth: Math.max(1, strokeWidth)
   };
 };
 

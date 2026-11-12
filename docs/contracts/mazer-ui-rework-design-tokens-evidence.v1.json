@@ -128,7 +128,7 @@
   ],
   "legacy/color/player.markerAccent": [
    {
-    "file": "src/scenes/MenuScene.ts"
+    "file": "src/render/playerMarker.ts"
    }
   ],
   "legacy/color/goal.magenta": [
