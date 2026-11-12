@@ -30,15 +30,13 @@ export const MOTION_STAGGER_BEAM_TOTAL_MS = motion.staggerMs.beamTotal;
 
 /**
  * Reduced-motion lengths. `crossfade` (200 ms, equal to the base step of the duration ladder) is the ONE
- * crossfade length: the intro, the outro and the teleport extraction window all use it (MAZER-MOTION-005;
- * before that they were 250 / 150 / 140 ms). `teleportFadeEdge` (45 ms) is the fade at each edge inside the
+ * crossfade length: the intro, the outro and the teleport extraction window all read it (MAZER-MOTION-005;
+ * before that they were 250 / 150 / 140 ms; MAZER-MOTION-009 moved the teleport presentation off the old
+ * `teleportCrossfade` alias and deleted it). `teleportFadeEdge` (45 ms) is the fade at each edge inside the
  * teleport window, not a crossfade length.
  */
 export const MOTION_REDUCED_MS = Object.freeze({
   crossfade: motion.reducedMotionMs.crossfade,
-  // Read-only alias of `crossfade`, kept only so the teleport presentation (another integrator wave's file) keeps
-  // compiling unchanged. It is the same value, never a second length; drop it when that file next moves to `crossfade`.
-  teleportCrossfade: motion.reducedMotionMs.crossfade,
   teleportFadeEdge: motion.reducedMotionMs.teleportFadeEdge
 });
 

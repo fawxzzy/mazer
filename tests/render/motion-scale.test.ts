@@ -34,7 +34,9 @@ describe('motion scale', () => {
   it('pins the shipped values (no retune)', () => {
     expect(MOTION_DURATION_MS).toEqual({ fast: 120, base: 200, slow: 300, long: 400, reveal: 700 });
     expect(MOTION_LOOP_MS).toEqual({ beat: 1200, blink: 2400, drift: 3600 });
-    expect(MOTION_REDUCED_MS).toEqual({ crossfade: 200, teleportCrossfade: 200, teleportFadeEdge: 45 });
+    expect(MOTION_REDUCED_MS).toEqual({ crossfade: 200, teleportFadeEdge: 45 });
+    // MOTION-009: the read-only teleportCrossfade alias is gone; the teleport transfer reads `crossfade`.
+    expect('teleportCrossfade' in MOTION_REDUCED_MS).toBe(false);
     // MOTION-005: the one reduced-motion crossfade length sits on the duration ladder (the base step).
     expect(MOTION_REDUCED_MS.crossfade).toBe(MOTION_DURATION_MS.base);
     expect(MOTION_STAGGER_BEAM_TOTAL_MS).toBe(60);
