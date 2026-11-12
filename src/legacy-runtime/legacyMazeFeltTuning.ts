@@ -47,6 +47,7 @@
 // Pure: no ambient randomness or clock, no floats, no I/O.
 
 import { FELT_VISION_CELLS, createFeltExplorer, type FeltRun } from './legacyMazeFeltDifficulty';
+import { MIN_DEAD_END_BRANCH_CELLS, countStubTips, fixOneTileStubs, probeDeadEndBranch } from './legacyMazeStubs';
 import {
   LOOP_DECOY_MIN_CELLS,
   LOOP_FELT_HEADROOM,
@@ -156,6 +157,11 @@ export interface FeltTuningResult {
   // Fringe stub cells added (lever 3) and the cells the request fell short by.
   readonly fringeTiles: { x: number; y: number }[];
   readonly fringeShortfall: number;
+  // One-tile stub rule (lever 5): cells opened to lengthen a stub, tips walled up, and stubs
+  // neither move could fix (counted into windowDistance).
+  readonly stubLengthened: { x: number; y: number }[];
+  readonly stubRemoved: { x: number; y: number }[];
+  readonly stubRemaining: number;
   // The reverse felt value (explorer from the goal to the start, minus the priced savings) of the
   // finished maze, measured on every tune; and the steps it fell short of `reverseFloor`.
   readonly reverseFelt: number;
@@ -739,17 +745,22 @@ const tuneOnce = (
   // ---- Lever 3: fringe (zero-felt-cost side stubs) ------------------------------------
   // Only on a landed maze. Candidates are (host, direction) pairs: a corridor or junction cell
   // (never a tip, the start or the goal) and an interior wall cell next to it whose only open
-  // neighbour is the host. Visited in a seeded shuffle, three passes (stubs of up to 3, 2 and 1
-  // cells) so the pockets the longer stubs left are still filled. A stub is kept only when the
-  // explorer reaches the goal in exactly the same number of steps, so the landed felt value is
-  // untouched; the last stub is cut to the cells still owed, so the count is exact.
+  // neighbour is the host. Visited in a seeded shuffle, two passes (stubs of up to 3, then 2
+  // cells) so the pockets the longer stubs left are still filled. A stub is NEVER shorter than
+  // MIN_DEAD_END_BRANCH_CELLS (the one-tile stub rule, MAZER-GEN-004): the cut that makes the
+  // count exact never leaves one cell owed (it takes one more or one fewer), and a stub that
+  // came out one cell long is not kept. A stub is kept only when the explorer reaches the goal
+  // in exactly the same number of steps, so the landed felt value is untouched. When the pockets
+  // cannot hold the last cells (only one cell owed, or no 2-cell pocket left), they are laid on
+  // the end of an existing short dead-end branch instead (at most FELT_VISION_CELLS long after).
   const fringeWanted = Math.max(0, Math.trunc(options.fringeCells ?? 0));
   const fringeTiles: { x: number; y: number }[] = [];
   let fringePlaced = 0;
   if (fringeWanted > 0 && !hopeless && windowGap(felt) === 0) {
     const fringeRand = createStream((seed ^ 0x2f6b1d93) >>> 0);
     const landedSteps = felt;
-    for (let pass = 0; pass < FELT_VISION_CELLS && fringePlaced < fringeWanted; pass += 1) {
+    const passes = FELT_VISION_CELLS - MIN_DEAD_END_BRANCH_CELLS + 1;
+    for (let pass = 0; pass < passes && fringeWanted - fringePlaced >= MIN_DEAD_END_BRANCH_CELLS; pass += 1) {
       const longest = FELT_VISION_CELLS - pass;
       const candidates: number[] = [];
       for (let cell = 0; cell < size; cell += 1) {
@@ -766,23 +777,39 @@ const tuneOnce = (
         candidates[other] = held;
       }
       for (const candidate of candidates) {
-        if (fringePlaced >= fringeWanted) { break; }
+        const owed = fringeWanted - fringePlaced;
+        if (owed < MIN_DEAD_END_BRANCH_CELLS) { break; }
         const host = candidate >> 2;
         const dir = candidate & 3;
         const entry = host + step[dir]!;
         // An earlier stub of this pass may have used the pocket.
         if (!interior(entry) || open[entry] === 1 || openCount(entry) !== 1 || openCount(host) < 2) { continue; }
-        const wanted = Math.min(fringeWanted - fringePlaced, 1 + (fringeRand() % longest));
+        let wanted = Math.min(owed, MIN_DEAD_END_BRANCH_CELLS + (fringeRand() % (longest - MIN_DEAD_END_BRANCH_CELLS + 1)));
+        // Never leave a single cell owed: that cell could only become a one-tile stub.
+        if (owed - wanted === 1) { wanted = wanted < longest ? wanted + 1 : wanted - 1; }
         const chain: number[] = [entry];
         open[entry] = 1;
+        // Straight on while the wall allows, else a turn (either side, seeded): a bent stub fits the
+        // L-shaped pockets a straight one cannot, which the 2-cell minimum would otherwise waste.
+        let heading = dir;
         while (chain.length < wanted) {
-          const next = chain[chain.length - 1]! + step[dir]!;
-          if (!interior(next) || open[next] === 1 || openCount(next) !== 1) { break; }
-          open[next] = 1;
-          chain.push(next);
+          const tail = chain[chain.length - 1]!;
+          const turnFirst = fringeRand() % 2;
+          const headings = [heading, (heading < 2 ? 2 : 0) + turnFirst, (heading < 2 ? 2 : 0) + (1 - turnFirst)];
+          let grew = false;
+          for (const nextHeading of headings) {
+            const next = tail + step[nextHeading]!;
+            if (!interior(next) || open[next] === 1 || openCount(next) !== 1) { continue; }
+            open[next] = 1;
+            chain.push(next);
+            heading = nextHeading;
+            grew = true;
+            break;
+          }
+          if (!grew) { break; }
         }
-        const after = evaluate();
-        if (after.reachedGoal && after.steps === landedSteps) {
+        const after = chain.length >= MIN_DEAD_END_BRANCH_CELLS ? evaluate() : null;
+        if (after !== null && after.reachedGoal && after.steps === landedSteps) {
           fringePlaced += chain.length;
           chain.forEach((cell) => fringeTiles.push(point(cell)));
         } else {
@@ -790,10 +817,81 @@ const tuneOnce = (
         }
       }
     }
+    // Cells still owed (a single one, or pockets that ran out): extend short dead-end branches
+    // that already exist, a branch never going past FELT_VISION_CELLS cells. Branches of one cell
+    // (a stub the lever below would have to fix anyway) are taken first.
+    for (let round = 0; round < 6 && fringePlaced < fringeWanted; round += 1) {
+      const tips: number[] = [];
+      for (let cell = 0; cell < size; cell += 1) {
+        if (!interior(cell) || onRoute[cell] === 1) { continue; }
+        const probe = probeDeadEndBranch(open, explorer.neighbors, cell, startCell, goalCell);
+        if (probe !== null && probe.length < FELT_VISION_CELLS) { tips.push(cell); }
+      }
+      for (let index = tips.length - 1; index > 0; index -= 1) {
+        const other = fringeRand() % (index + 1);
+        const held = tips[index]!;
+        tips[index] = tips[other]!;
+        tips[other] = held;
+      }
+      const ranked = tips
+        .map((tip) => ({ tip, length: probeDeadEndBranch(open, explorer.neighbors, tip, startCell, goalCell)!.length }))
+        .sort((left, right) => left.length - right.length);
+      let progressed = false;
+      for (const { tip } of ranked) {
+        if (fringePlaced >= fringeWanted) { break; }
+        for (let k = 0; k < 4; k += 1) {
+          const cell = tip + step[k]!;
+          if (!interior(cell) || open[cell] === 1 || openCount(cell) !== 1) { continue; }
+          open[cell] = 1;
+          const after = evaluate();
+          if (after.reachedGoal && after.steps === landedSteps) {
+            fringePlaced += 1;
+            fringeTiles.push(point(cell));
+            progressed = true;
+            break;
+          }
+          open[cell] = 0;
+        }
+      }
+      if (!progressed) { break; }
+    }
     run = evaluate();
     felt = run.steps;
   }
   const fringeShortfall = fringeWanted > 0 ? fringeWanted - fringePlaced : 0;
+
+  // ---- Lever 5: no one-tile stubs (MAZER-GEN-004) ------------------------------------------
+  // The rule: no dead-end branch shorter than MIN_DEAD_END_BRANCH_CELLS (legacyMazeStubs.ts). The
+  // base maze, the trims of lever 2 and the fringe's own pockets leave 1-cell nubs; each is
+  // lengthened by one cell where the wall has room, else walled up, and kept only when the landed
+  // felt number is exactly unchanged. A stub neither move can fix counts as stubRemaining and
+  // keeps the maze off the window (the selection then restarts, tries the next base, and only as
+  // a last resort assembleTunedMaze walls the leftover tips up). A maze without a stub is not
+  // touched and draws nothing from any stream, so it is byte-identical to before the rule.
+  let stubLengthened: { x: number; y: number }[] = [];
+  let stubRemoved: { x: number; y: number }[] = [];
+  let stubRemaining = 0;
+  if (run.reachedGoal) {
+    const stubContext = { open, neighbors: explorer.neighbors, startCell, goalCell };
+    if (countStubTips(stubContext) > 0) {
+      const landedSteps = run.steps;
+      const fixed = fixOneTileStubs({
+        ...stubContext,
+        step,
+        interior,
+        rand: createStream((seed ^ 0x6a09e667) >>> 0),
+        verify: () => {
+          const after = evaluate();
+          return after.reachedGoal && after.steps === landedSteps;
+        }
+      });
+      stubLengthened = fixed.lengthened.map(point);
+      stubRemoved = fixed.removed.map(point);
+      stubRemaining = fixed.remaining;
+      run = evaluate();
+      felt = run.steps;
+    }
+  }
 
   // ---- Reverse felt (lever 4's check) --------------------------------------------------
   // The explorer run from the goal to the start on the finished grid, priced like the forward
@@ -817,7 +915,7 @@ const tuneOnce = (
     grid,
     felt,
     target,
-    onTarget: windowGap(felt) === 0 && fringeShortfall === 0 && reverseShortfall === 0,
+    onTarget: windowGap(felt) === 0 && fringeShortfall === 0 && reverseShortfall === 0 && stubRemaining === 0,
     routeLength,
     bumps,
     branchesAdded,
@@ -834,13 +932,16 @@ const tuneOnce = (
     loopTiles: loopTiles.filter((tile) => open[(tile.y * width) + tile.x] === 1),
     fringeTiles,
     fringeShortfall,
+    stubLengthened,
+    stubRemoved,
+    stubRemaining,
     reverseFelt,
     reverseShortfall,
     stretchTiles,
     stretchRemovedTiles,
     capacityExhausted,
     evals,
-    windowDistance: windowGap(felt) + fringeShortfall + reverseShortfall,
+    windowDistance: windowGap(felt) + fringeShortfall + reverseShortfall + stubRemaining,
     tieDeviationPercent: run.reachedGoal ? measureTieDeviationPercent(explorer, open, startCell, goalCell, felt) : 0,
     hopeless
   };

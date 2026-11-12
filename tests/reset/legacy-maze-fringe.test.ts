@@ -37,6 +37,10 @@ const countKinds = (grid: ReadonlyArray<ReadonlyArray<boolean>>): { floor: numbe
   return { floor, junctions, deadEnds };
 };
 
+// Fewer cells than the capacity floor of the top maze (the one-tile stub rule leaves room for 2- and
+// 3-cell stubs only: the calibrated capacity is GEOMETRY_BUDGET_FRINGE_CAP, the minimum measured 16).
+const FRINGE_TEST_CELLS = 16;
+
 const tuneTop = (aspectRatio: number, index: number, fringeCells: number) => {
   const level = GEOMETRY_BUDGET_FELT_SATURATION_LEVEL;
   const seed = resolveGeometryBudgetCandidateSeed(4100 + index, 9000, 0);
@@ -57,21 +61,23 @@ describe('fringe: zero-felt-cost side stubs past the felt saturation (tuner leve
     for (const board of LADDER_BOARDS) {
       for (let index = 0; index < 4; index += 1) {
         const plain = tuneTop(board.aspectRatio, index, 0);
-        const fringed = tuneTop(board.aspectRatio, index, 40);
+        const fringed = tuneTop(board.aspectRatio, index, FRINGE_TEST_CELLS);
         expect(plain.tuned.onTarget).toBe(true);
         expect(fringed.tuned.onTarget).toBe(true);
         expect(fringed.tuned.fringeShortfall).toBe(0);
-        expect(fringed.tuned.fringeTiles.length).toBe(40);
+        expect(fringed.tuned.fringeTiles.length).toBe(FRINGE_TEST_CELLS);
         expect(plain.tuned.fringeTiles.length).toBe(0);
         // Same landed number: the explorer does not enter a stub of at most FELT_VISION_CELLS cells.
         expect(fringed.tuned.felt).toBe(plain.tuned.felt);
         // Exactly the stub cells differ, and every one of them is a new floor cell.
         const before = countKinds(plain.tuned.grid);
         const after = countKinds(fringed.tuned.grid);
-        expect(after.floor - before.floor).toBe(40);
+        // (the one-tile stub rule lengthens or walls up nubs on both mazes: count those separately)
+        const stubDelta = (result: ReturnType<typeof tuneTop>['tuned']): number => result.stubLengthened.length - result.stubRemoved.length;
+        expect((after.floor - stubDelta(fringed.tuned)) - (before.floor - stubDelta(plain.tuned))).toBe(FRINGE_TEST_CELLS);
         // Real structure: every stub is a junction on its host and a dead end of its own.
-        expect(after.junctions).toBeGreaterThan(before.junctions + 5);
-        expect(after.deadEnds).toBeGreaterThan(before.deadEnds + 5);
+        expect(after.junctions).toBeGreaterThan(before.junctions + 2);
+        expect(after.deadEnds).toBeGreaterThan(before.deadEnds + 2);
         // An independent explorer run on the finished grid agrees with the tuner's number.
         const { width, height } = fringed.base;
         const open = new Uint8Array(width * height);
@@ -88,16 +94,29 @@ describe('fringe: zero-felt-cost side stubs past the felt saturation (tuner leve
 
   test('every stub is a dead end of at most FELT_VISION_CELLS cells on interior ground: no 2x2 block, no border cell', () => {
     for (const board of LADDER_BOARDS) {
-      const { base, tuned } = tuneTop(board.aspectRatio, 1, 60);
-      const plain = tuneTop(board.aspectRatio, 1, 0).tuned;
+      // The first sampled base whose plain and fringed tunings are the same maze apart from the fringe
+      // (a stub the one-tile rule could not fix on a first landing sends one of them to another attempt).
+      let pair: { base: ReturnType<typeof tuneTop>['base']; tuned: ReturnType<typeof tuneTop>['tuned']; plain: ReturnType<typeof tuneTop>['tuned'] } | null = null;
+      for (let index = 1; index < 8 && pair === null; index += 1) {
+        const fringedRun = tuneTop(board.aspectRatio, index, FRINGE_TEST_CELLS);
+        const plainRun = tuneTop(board.aspectRatio, index, 0).tuned;
+        const removed = new Set([...plainRun.stubRemoved, ...fringedRun.tuned.stubRemoved].map((tile) => `${tile.x},${tile.y}`));
+        let related = true;
+        plainRun.grid.forEach((row, y) => row.forEach((cell, x) => { if (cell && !fringedRun.tuned.grid[y]![x] && !removed.has(`${x},${y}`)) { related = false; } }));
+        if (related) { pair = { base: fringedRun.base, tuned: fringedRun.tuned, plain: plainRun }; }
+      }
+      expect(pair).not.toBeNull();
+      const { base, tuned, plain } = pair!;
       const stubs = new Set(tuned.fringeTiles.map((tile) => `${tile.x},${tile.y}`));
-      expect(stubs.size).toBe(60);
+      expect(stubs.size).toBe(FRINGE_TEST_CELLS);
       for (const tile of tuned.fringeTiles) {
         expect(tile.x).toBeGreaterThanOrEqual(1);
         expect(tile.y).toBeGreaterThanOrEqual(1);
         expect(tile.x).toBeLessThanOrEqual(base.width - 2);
         expect(tile.y).toBeLessThanOrEqual(base.height - 2);
-        expect(plain.grid[tile.y]![tile.x]).toBe(false);
+        // (a cell the one-tile stub rule opened on the plain maze is not part of the plain maze proper)
+        const openedByStubRule = plain.stubLengthened.some((cell) => cell.x === tile.x && cell.y === tile.y);
+        expect(plain.grid[tile.y]![tile.x] && !openedByStubRule).toBe(false);
         expect(tuned.grid[tile.y]![tile.x]).toBe(true);
       }
       // No 2x2 floor block anywhere that the plain maze did not already have.
@@ -147,7 +166,12 @@ describe('fringe: zero-felt-cost side stubs past the felt saturation (tuner leve
           expect(top.start).toEqual(felt.start);
           expect(top.goal).toEqual(felt.goal);
           expect(top.solutionPath.length).toBe(felt.solutionPath.length);
-          expect(countKinds(top.grid).floor - countKinds(felt.grid).floor).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
+          // (plus whatever the one-tile stub rule lengthened or walled up on either maze)
+          const stubDelta = (maze: unknown): number => {
+            const stats = (maze as { stubStats?: { lengthened: number; removed: number; forced: number } }).stubStats;
+            return stats === undefined ? 0 : stats.lengthened - stats.removed - stats.forced;
+          };
+          expect((countKinds(top.grid).floor - stubDelta(top)) - (countKinds(felt.grid).floor - stubDelta(felt))).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
         }
       }
       // Most seeds (the calibration share is 75 percent) hold the whole fringe on the first landing.

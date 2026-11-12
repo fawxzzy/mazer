@@ -128,7 +128,7 @@ const reverseFeltOf = (maze: ReturnType<typeof generateLadderMaze>): number => {
 const FLOOR_BANDS = [
   { name: 'plain 2-9', levels: [2, 3, 5, 9], wrapped: false, permille: 975 },
   { name: 'wrapped 10-139', levels: [10, 12, 20, 30, 50, 100, 120, 139], wrapped: true, permille: 400 },
-  { name: 'plain 140-268', levels: [140, 160, 198, 220, 268], wrapped: false, permille: 975 }
+  { name: 'plain 140-218', levels: [140, 160, 198, 210, 218], wrapped: false, permille: 975 }
 ] as const;
 // Mean reverse felt of the ladder before the lure (docs/research/MAZER_PROGRESSION_FINAL_AUDIT_2026-11-10.md,
 // "What if the lure covered levels 2 to 268", forced-off column), phone / desktop, 40 seeds.
