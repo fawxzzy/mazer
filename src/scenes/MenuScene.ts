@@ -89,6 +89,8 @@ import {
 } from '../render/navigationCoreTrail';
 import { resolveTrailGridPathWithHead } from '../render/trailHeadPath';
 import { buildDeviceSnappedTrailPath } from '../render/trailDeviceSnap';
+import { TrailPerfectPathCache } from '../render/trailPerfectPathCache';
+import { observeTrailFrameCost, shouldRebuildTrail, type TrailDrawRecord } from '../render/trailRedrawGate';
 import {
   computeTrailCanvasBounds,
   drawTrailToCanvasContext
@@ -1256,6 +1258,11 @@ interface LegacyTrailPerfDiagnostics {
   tileSize: number;
   shineEnabled: boolean;
   trailFadeEnabled: boolean;
+  /** Trail rebuilds and skipped (kept-as-is) redraws since the scene started: MAZER-PERF-002, src/render/trailRedrawGate.ts. */
+  trailRebuildCount: number;
+  trailSkippedRedrawCount: number;
+  /** Shortest-route computations since the scene started (src/render/trailPerfectPathCache.ts). */
+  perfectPathComputeCount: number;
 }
 
 interface LegacyQaDiagnosticsApi {
@@ -2153,6 +2160,12 @@ export class MenuScene extends Phaser.Scene {
   // drawLegacyContinuousPlayTrail call in play mode; null until the first
   // one runs (or if the trail is empty/off-screen that frame).
   private lastTrailPerfDiagnostics: LegacyTrailPerfDiagnostics | null = null;
+  // MAZER-PERF-002: the shortest route is memoised per (maze, trail, player), and the trail canvas is rebuilt only when
+  // its picture can differ (src/render/trailPerfectPathCache.ts, trailRedrawGate.ts).
+  private readonly trailPerfectPathCache = new TrailPerfectPathCache();
+  private trailDrawRecord: TrailDrawRecord | null = null;
+  private trailRebuildCount = 0;
+  private trailSkippedRedrawCount = 0;
   // A one-way latch for the start marker's pre-spawn -> post-spawn
   // transition -- must not flip back to false just because the player
   // revisits the start tile later. Flipped only from
@@ -8658,6 +8671,15 @@ export class MenuScene extends Phaser.Scene {
   // accepted move (grid-adjacent), so a path through the visited set from
   // that origin to the player always exists.
   private resolveLegacyPlayPerfectPathTrail(): LegacyPoint[] {
+    return this.trailPerfectPathCache.resolve(
+      this.maze,
+      this.trail,
+      this.player,
+      () => this.computeLegacyPlayPerfectPathTrail()
+    );
+  }
+
+  private computeLegacyPlayPerfectPathTrail(): LegacyPoint[] {
     const visitedGrid = this.maze.grid.map((row) => row.map(() => false));
     const markVisited = (point: LegacyPoint): void => {
       if (visitedGrid[point.y]?.[point.x] !== undefined) {
@@ -9591,6 +9613,36 @@ export class MenuScene extends Phaser.Scene {
     // The tile the player just left (the trail array appends one point per accepted move): tells a forward step
     // from a step back over the trail, which must keep the arrival tile in the drawn path (trailHeadPath.ts).
     const previousTrailTile = this.trail.length > 1 ? this.trail[this.trail.length - 2]! : null;
+    // MAZER-PERF-002: rebuild the trail canvas only when its picture can differ (route, head, geometry, fade) or the
+    // colour clock is due, with the redraw gap stretched by the last rebuild's real cost; otherwise the canvas already on
+    // screen is exactly what a rebuild would paint. src/render/trailRedrawGate.ts.
+    const gateMotionPlan = this.resolveLegacyTrailMotionPlan();
+    const gateStamp = {
+      routeRevision: this.trailPerfectPathCache.revision,
+      previousTileKey: previousTrailTile ? `${previousTrailTile.x},${previousTrailTile.y}` : '',
+      headX: renderedPlayerPoint.x,
+      headY: renderedPlayerPoint.y,
+      originX,
+      originY,
+      tileSize,
+      alphaMultiplier,
+      styleKey: `${this.boardTileStyle}|${this.boardZoomContainer.scaleX}|${this.boardZoomContainer.scaleY}|${this.settings.toggleTrailFade ? 1 : 0}|${gateMotionPlan.shineVisible ? 1 : 0}|${gateMotionPlan.colourDrifts ? 1 : 0}`
+    };
+    if (this.trailDrawRecord !== null) {
+      observeTrailFrameCost(this.trailDrawRecord, time);
+    }
+    if (this.trailDrawRecord !== null && !shouldRebuildTrail(this.trailDrawRecord, gateStamp, time, gateMotionPlan.colourDrifts)) {
+      // Keep the canvas as it is; refresh what other layers read from this call (the bleed glow samples the head colour).
+      this.trailSkippedRedrawCount += 1;
+      this.trailPaletteHead = {
+        distanceTiles: (this.trailDrawRecord.totalLength + this.trailOriginAdvanceDistancePx) / tileSize,
+        timeMs: resolveTrailColourTimeMs(animationTime, gateMotionPlan),
+        animated: gateMotionPlan.shineVisible
+      };
+      this.trailCanvasImage?.setVisible(true);
+      return;
+    }
+    this.trailDrawRecord = null;
     const gridPath = resolveTrailGridPathWithHead(perfectPath, previousTrailTile, renderedPlayerPoint);
 
     // Real, measured frame-time evidence (Wave 4D-A's own frame-time
@@ -9754,6 +9806,15 @@ export class MenuScene extends Phaser.Scene {
     this.drawTrailCanvasSegments(canvasSegments, coreWidth, glowWidth, underlayWidth, glowAlphaScale);
 
     const perfDrawEndedAtMs = performance.now();
+    this.trailRebuildCount += 1;
+    if (this.trailCanvasImage?.visible === true) {
+      this.trailDrawRecord = {
+        stamp: gateStamp,
+        drawnAtMs: time,
+        totalLength: geometry.totalLength,
+        costMs: perfDrawEndedAtMs - perfBuildStartedAtMs
+      };
+    }
     this.lastTrailPerfDiagnostics = {
       vertexCountBeforeResample: geometry.vertices.length,
       vertexCountAfterResample: vertices.length,
@@ -9764,7 +9825,10 @@ export class MenuScene extends Phaser.Scene {
       totalLengthPx: geometry.totalLength,
       tileSize,
       shineEnabled,
-      trailFadeEnabled
+      trailFadeEnabled,
+      trailRebuildCount: this.trailRebuildCount,
+      trailSkippedRedrawCount: this.trailSkippedRedrawCount,
+      perfectPathComputeCount: this.trailPerfectPathCache.computeCount
     };
   }
 
