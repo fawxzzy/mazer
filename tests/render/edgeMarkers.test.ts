@@ -223,13 +223,16 @@ describe('edge marker animation budget', () => {
     }
   });
 
-  test('reduced motion: nothing animates, lights up or flashes', () => {
+  test('reduced motion: nothing moves, lights up or flashes (the border colour is the one thing that keeps shifting)', () => {
     const energized = new Set<number>([1, 3]);
     const flash = { ids: [1, 3], startedAtMs: 0 };
-    const reference = resolveEdgeMarkerStates({ energizedIds: energized, flash, reducedMotion: true, timeMs: 0 });
+    const withoutColour = (states: ReturnType<typeof resolveEdgeMarkerStates>) => (
+      states.map(({ borderColor: _borderColor, ...rest }) => rest)
+    );
+    const reference = withoutColour(resolveEdgeMarkerStates({ energizedIds: energized, flash, reducedMotion: true, timeMs: 0 }));
     for (let ms = 0; ms <= 8000; ms += 137) {
       const states = resolveEdgeMarkerStates({ energizedIds: energized, flash, reducedMotion: true, timeMs: ms });
-      expect(states).toEqual(reference);
+      expect(withoutColour(states)).toEqual(reference);
       expect(states.every((state) => !state.energized && state.flash === 0)).toBe(true);
     }
   });
@@ -875,14 +878,22 @@ describe('colour contract: border = live trail colour, inside = player colour (o
     expect(a[0]?.borderColor).toBe(resolveTrailPaletteBorderColor(5, 100, false));
   });
 
-  test('the border moves with time (the trail colour shifts) and is frozen in reduced motion and with Trail Shine off', () => {
-    const at = (timeMs: number, extra: { reducedMotion?: boolean; trailAnimated?: boolean } = {}) => (
-      resolveEdgeMarkerStates({ reducedMotion: extra.reducedMotion ?? false, trailAnimated: extra.trailAnimated, timeMs, trailHeadDistanceTiles: 6 })[0]!.borderColor
+  test('the border moves with time (the trail colour shifts), in reduced motion too; only a static trail clock (Trail Shine off) holds it', () => {
+    const at = (timeMs: number, extra: { reducedMotion?: boolean; trailAnimated?: boolean; trailTimeMs?: number } = {}) => (
+      resolveEdgeMarkerStates({
+        reducedMotion: extra.reducedMotion ?? false,
+        trailAnimated: extra.trailAnimated,
+        ...(extra.trailTimeMs === undefined ? {} : { trailTimeMs: extra.trailTimeMs }),
+        timeMs,
+        trailHeadDistanceTiles: 6
+      })[0]!.borderColor
     );
     expect(at(0)).not.toBe(at(600));
-    expect(at(0, { reducedMotion: true })).toBe(at(9999, { reducedMotion: true }));
-    expect(at(0, { trailAnimated: false })).toBe(at(9999, { trailAnimated: false }));
-    expect(at(0, { reducedMotion: true })).toBe(resolveTrailPaletteBorderColor(6, 0, true));
+    // MAZER-MOTION-004 (owner rule): reduced motion does NOT freeze colour.
+    expect(at(0, { reducedMotion: true })).not.toBe(at(600, { reducedMotion: true }));
+    expect(at(600, { reducedMotion: true })).toBe(resolveTrailPaletteBorderColor(6, 600, true));
+    // Trail Shine off: the scene feeds a fixed colour time, so the border is the static gradient colour.
+    expect(at(0, { trailAnimated: false, trailTimeMs: 0 })).toBe(at(9999, { trailAnimated: false, trailTimeMs: 0 }));
   });
 
   test('an icon with no explicit border colour (the Guide legend) draws the static trail gradient colour, never a fixed cyan or mint', () => {

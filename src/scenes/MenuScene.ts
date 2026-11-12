@@ -30,6 +30,14 @@ import {
 } from '../render/bleedGlow';
 import { BOARD_MARKER_MIN_CSS, BOARD_TILE_GEOMETRY, boardMaterial, type BoardTileStyleId } from '../render/boardTileStyle';
 import { drawGoalBeacon } from '../render/goalBeacon';
+import {
+  resolveMenuBlinkPhase,
+  resolveReducedMotion,
+  resolveReducedMotionSource,
+  resolveTrailColourTimeMs,
+  resolveTrailMotionPlan,
+  type ReducedMotionSource
+} from '../render/reducedMotion';
 import { alignBoundsToWholePixels, alignCameraToWholePixels } from '../render/pixelAlignment';
 import { PlayerLocatorState } from '../render/playerLocator';
 import {
@@ -732,7 +740,8 @@ interface LegacyIridescentMaterialDiagnostics {
 interface MenuSceneVisualDiagnostics {
   accessibility: {
     reducedMotion: boolean;
-    reducedMotionSource: 'os-media-query-cache';
+    reducedMotionSource: ReducedMotionSource;
+    reducedMotionSettingOn: boolean;
   };
   materialSystem: {
     version: typeof CYBER_ARCADE_MATERIAL_VERSION;
@@ -2067,6 +2076,7 @@ export class MenuScene extends Phaser.Scene {
   private oauthPageShowCleanup: (() => void) | null = null;
   private offlineCompletionFlush: LegacyOfflineCompletionFlush | null = null;
   /** Cached OS accessibility preference; never read from the render loop. */
+  // The DEVICE preference only (prefers-reduced-motion); the effective value also folds in Settings > Reduce Motion.
   private legacyReducedMotionEnabled = false;
   private legacyReducedMotionMediaQuery: MediaQueryList | null = null;
   private legacyReducedMotionMediaQueryListener: ((event: MediaQueryListEvent) => void) | null = null;
@@ -2584,8 +2594,7 @@ export class MenuScene extends Phaser.Scene {
         : this.authSnapshot.status === 'guest'
           ? 'guest'
           : 'failed';
-    const reducedMotionPreferred = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reducedMotionPreferred = this.prefersLegacyReducedMotion();
     const installSurfaceState = getInstallSurfaceState();
     const installPhase: UiStateSnapshot['installPhase'] = installSurfaceState.installed
       ? 'installed'
@@ -3319,7 +3328,9 @@ export class MenuScene extends Phaser.Scene {
     // jumps on the next AI-move redraw -- the identical "glitchy while
     // idle" symptom the play-mode cog had before its own fix, just gated
     // on a dirty flag that fix never covered.
-    if (this.mode === 'menu' && this.overlay === 'none' && !this.prefersLegacyReducedMotion()) {
+    // Reduced motion still redraws here: the START / Login rainbow keeps shifting (colour is not motion);
+    // only the blink is held lit (resolveMenuBlinkPhase).
+    if (this.mode === 'menu' && this.overlay === 'none') {
       this.boardPathDirty = true;
     }
     if (this.isLegacyMenuHandoffAnimationActive(time)) {
@@ -7215,12 +7226,20 @@ export class MenuScene extends Phaser.Scene {
     this.legacyReducedMotionMediaQueryListener = null;
   }
 
-  private applyLegacyReducedMotionPreference(reducedMotion: boolean): void {
-    if (this.legacyReducedMotionEnabled === reducedMotion) {
+  private applyLegacyReducedMotionPreference(systemReducedMotion: boolean): void {
+    const wasReduced = this.prefersLegacyReducedMotion();
+    this.legacyReducedMotionEnabled = systemReducedMotion;
+    this.settleLegacyReducedMotionChange(wasReduced);
+  }
+
+  // Runs whenever the EFFECTIVE reduced-motion value may have changed (device setting event, the
+  // Settings > Reduce Motion switch, or settings replaced by an account sync).
+  private settleLegacyReducedMotionChange(wasReduced: boolean): void {
+    const reducedMotion = this.prefersLegacyReducedMotion();
+    if (wasReduced === reducedMotion) {
       return;
     }
 
-    this.legacyReducedMotionEnabled = reducedMotion;
     this.backdropAccumulatedDeltaMs = 0;
     this.backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
     this.legacyPlayTrailPulseNextFrameAtMs = 0;
@@ -7236,11 +7255,22 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private prefersLegacyReducedMotion(): boolean {
-    return this.legacyReducedMotionEnabled;
+    return resolveReducedMotion(this.legacyReducedMotionEnabled, this.settings.toggleReducedMotion);
   }
 
+  // MOVEMENT gate: the travelling shine/sheen band, the swell and the width breathing.
   private isLegacyTrailShineVisible(): boolean {
-    return this.settings.toggleTrailPulse && !this.prefersLegacyReducedMotion();
+    return this.resolveLegacyTrailMotionPlan().shineVisible;
+  }
+
+  // COLOUR gate: the trail hue drift. Reduced motion does not stop it (owner rule, 2026-11-12); only the player's own
+  // Trail Shine OFF does.
+  private isLegacyTrailColourDrifting(): boolean {
+    return this.resolveLegacyTrailMotionPlan().colourDrifts;
+  }
+
+  private resolveLegacyTrailMotionPlan(): ReturnType<typeof resolveTrailMotionPlan> {
+    return resolveTrailMotionPlan(this.settings.toggleTrailPulse, this.prefersLegacyReducedMotion());
   }
 
   private drawStaticBoard(): void {
@@ -7577,7 +7607,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const progress = resolveBleedGlowProgress(time);
+    const progress = resolveBleedGlowProgress(time, this.prefersLegacyReducedMotion());
     if (resolveBleedGlowEnvelope(progress) <= 0.01) {
       return;
     }
@@ -7809,10 +7839,10 @@ export class MenuScene extends Phaser.Scene {
     // the sigils would only redraw whenever boardPathDirty happened to be
     // set for some unrelated reason, freezing in place the rest of the
     // time instead of orbiting smoothly.
+    // Reduced motion does not gate this: the title rainbow and the edge-marker border colour keep shifting.
     if (
       (this.mode !== 'menu' && this.mode !== 'play')
       || this.overlay !== 'none'
-      || this.prefersLegacyReducedMotion()
     ) {
       return false;
     }
@@ -9286,7 +9316,7 @@ export class MenuScene extends Phaser.Scene {
     // Start/Login glyphs share) -- applied to the real settings icon
     // (MAZER_HUD_SETTINGS_TEXTURE_KEY) via applyLegacyHudIconFrame instead
     // of the hand-drawn thin-line gear this replaced.
-    const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+    const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion());
     const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuSettingsCogActive ? 0.08 : 0), 0.14, 1);
     const blinkScale = 0.92 + (phase * 0.08) + (this.menuSettingsCogActive ? 0.02 : 0);
     // 1.15x, not 0.68x (the old gear's own outer-diameter ratio) -- the real
@@ -9331,7 +9361,7 @@ export class MenuScene extends Phaser.Scene {
     // applied to the real leaderboard icon (MAZER_HUD_LEADERBOARD_TEXTURE_KEY)
     // via applyLegacyHudIconFrame instead of the three hand-drawn bars this
     // replaced.
-    const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+    const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion());
     const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuLeaderboardActive ? 0.08 : 0), 0.14, 1);
     const blinkScale = 0.92 + (phase * 0.08) + (this.menuLeaderboardActive ? 0.02 : 0);
     const desiredSize = Math.min(frame.width, frame.height) * 1.15 * blinkScale;
@@ -9433,7 +9463,7 @@ export class MenuScene extends Phaser.Scene {
     // square drawn one step ahead of the demo walker was removed per owner
     // request (2026-11-05). Option tiles still render.
     const { optionPoints } = this.resolveLegacyMenuAiMemoryPoints();
-    const optionAlpha = clamp(0.34 + (0.08 * Math.sin(time / 240)), 0.28, 0.44) * alphaMultiplier;
+    const optionAlpha = clamp(0.34 + (this.prefersLegacyReducedMotion() ? 0 : 0.08 * Math.sin(time / 240)), 0.28, 0.44) * alphaMultiplier;
     for (const point of optionPoints) {
       this.fillLegacyDynamicPathTile(
         point,
@@ -9478,7 +9508,9 @@ export class MenuScene extends Phaser.Scene {
     const isTrailVisibleAndLive = (this.mode === 'play' || this.mode === 'menu')
       && this.overlay === 'none'
       && !this.isLegacyPlayLifecycleInputLocked();
-    if (isTrailVisibleAndLive && !this.prefersLegacyReducedMotion()) {
+    // This is the COLOUR clock: it runs whenever the board is live, reduced motion or not (owner rule, 2026-11-12:
+    // reduced motion stops movement, never colour). The shine/breath MOVEMENT is gated separately below.
+    if (isTrailVisibleAndLive) {
       if (this.trailAnimationLastRealMs !== null) {
         this.trailAnimationElapsedMs += Math.max(0, time - this.trailAnimationLastRealMs);
       }
@@ -9578,7 +9610,8 @@ export class MenuScene extends Phaser.Scene {
     // traveling highlight. Driven by the pausable animationTime, not raw
     // scene time, so Pause freezes it and reduced motion holds it static
     // rather than snapping to a random phase whenever it's re-enabled.
-    const shineEnabled = this.isLegacyTrailShineVisible();
+    const trailMotionPlan = this.resolveLegacyTrailMotionPlan();
+    const shineEnabled = trailMotionPlan.shineVisible;
     let shineState: ReturnType<typeof advanceTrailShineState> | null = null;
     if (shineEnabled) {
       shineState = advanceTrailShineState(
@@ -9598,13 +9631,14 @@ export class MenuScene extends Phaser.Scene {
       this.trailShineLapCycleLength = shineState.lapCycleLength;
     }
 
-    // Iridescent colour and pulse (src/render/trailIridescence.ts). The Trail Shine setting is the trail's
-    // animation switch: off, or reduced motion, freezes it to the static iridescent gradient (no time term,
-    // no wave, constant breath), which is exactly what shineEnabled already means.
+    // Iridescent colour and pulse (src/render/trailIridescence.ts). Two gates (reducedMotion.ts, resolveTrailMotionPlan):
+    // MOVEMENT (shine band, swell, breath) stops under reduced motion or Trail Shine off, which is what shineEnabled
+    // means; COLOUR (the hue sweep on the colour clock) stops only for Trail Shine off, never for reduced motion.
     const trailAnimated = shineEnabled;
+    const trailColourTimeMs = resolveTrailColourTimeMs(animationTime, trailMotionPlan);
     this.trailPaletteHead = {
       distanceTiles: (geometry.totalLength + this.trailOriginAdvanceDistancePx) / tileSize,
-      timeMs: animationTime,
+      timeMs: trailColourTimeMs,
       animated: trailAnimated
     };
     const trailBreath = resolveTrailBreath(animationTime, !trailAnimated);
@@ -9662,7 +9696,7 @@ export class MenuScene extends Phaser.Scene {
       // every time the origin slides forward. The sweep is periodic over
       // distance, so this is a phase realignment, not a length change.
       const colorPhaseTiles = (midDistance + this.trailOriginAdvanceDistancePx) / tileSize;
-      const sample = sampleIridescentTrail(colorPhaseTiles, animationTime, !trailAnimated);
+      const sample = sampleIridescentTrail(colorPhaseTiles, trailColourTimeMs, !trailAnimated);
       const baseColor = sample.glow;
       let coreColor = sample.core;
       let coreAlpha = ageAlpha * alphaMultiplier;
@@ -9882,7 +9916,7 @@ export class MenuScene extends Phaser.Scene {
     underContext.opacity = Math.min(1, alpha);
     const context = new PhaserGraphicsTileContext(this.boardDynamicGraphics);
     context.opacity = Math.min(1, alpha);
-    const phase = time !== undefined ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2 : 0;
+    const phase = time !== undefined ? resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion()) : 0;
     const backingScale = this.resolveBoardTileBackingScale();
     if (kind === 'goal') {
       drawGoalBeacon(underContext, {
@@ -10359,7 +10393,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
-    const active = this.isLegacyTrailShineVisible() && this.overlay === 'none' && this.trail.length > 1;
+    // Redraws while the trail colour drifts, which includes reduced motion (colour keeps shifting).
+    const active = this.isLegacyTrailColourDrifting() && this.overlay === 'none' && this.trail.length > 1;
     if (!active) {
       this.legacyPlayTrailPulseNextFrameAtMs = 0;
       return false;
@@ -10453,7 +10488,10 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.62);
     this.hudGraphics.fillCircle(centerX, centerY, anchorDotRadius);
     const anchorOrbitRadius = anchorDotRadius * 2.6;
-    const anchorOrbitAngle = (time / LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS) * Math.PI * 2;
+    // Reduced motion: the orbiting tick holds still.
+    const anchorOrbitAngle = this.prefersLegacyReducedMotion()
+      ? 0
+      : (time / LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS) * Math.PI * 2;
     this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.55);
     this.hudGraphics.fillCircle(
       centerX + (Math.cos(anchorOrbitAngle) * anchorOrbitRadius),
@@ -10484,7 +10522,7 @@ export class MenuScene extends Phaser.Scene {
     active: boolean,
     time: number
   ): void {
-    const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+    const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion());
     const blinkAlpha = clamp(0.22 + (phase * 0.78) + (active ? 0.08 : 0), 0.14, 1);
     const blinkScale = 0.92 + (phase * 0.08) + (active ? 0.02 : 0);
     const visualSize = clamp(Math.round(Math.min(this.layout.width, this.layout.height) * 0.085), 36, 40);
@@ -10923,6 +10961,19 @@ export class MenuScene extends Phaser.Scene {
     switch (model.kind) {
       case 'heading':
         this.createLegacySheetHeading(rect, model.label, item.stateFontSize);
+        return;
+      case 'note':
+        this.addLegacySheetWrappedText(
+          model.label,
+          rect.left - 8,
+          centerY,
+          rect.width,
+          '#9fb6c9',
+          item.stateFontSize,
+          item.stateFontSize - 1,
+          item.labelMaxLines,
+          { alpha: 0.85 }
+        );
         return;
       case 'action':
         this.uiButtons.push(this.createLegacyAuthActionButton(
@@ -14465,7 +14516,7 @@ export class MenuScene extends Phaser.Scene {
           this.loadAccountUsernameIfNeeded();
         }
         background.setVisible(true);
-        const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+        const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion());
         const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuProfileActive ? 0.08 : 0), 0.14, 1);
         const blinkScale = 0.92 + (phase * 0.08) + (this.menuProfileActive ? 0.02 : 0);
         const iconSize = Math.max(18, Math.round(Math.min(frame.width, frame.height) * 0.9));
@@ -14951,9 +15002,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private applyOverlayToggleFieldChange(fieldId: LegacyOverlayToggleFieldId): void {
+    const wasReducedMotion = this.prefersLegacyReducedMotion();
     const result = applyLegacyOverlayToggleField(this.settings, fieldId);
     this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), result.settings);
     this.syncLegacyRemoteSettings();
+    this.settleLegacyReducedMotionChange(wasReducedMotion);
     if (fieldId === 'controlMode') {
       this.resetLegacyPlayInputBuffer();
       this.hudDirty = true;
@@ -15533,10 +15586,12 @@ export class MenuScene extends Phaser.Scene {
     await writeLegacyRemoteSettings(snapshot, settings)
       .then((result) => {
         if (result.settings) {
+          const wasReducedMotion = this.prefersLegacyReducedMotion();
           this.settings = writeLegacyGameToggleSettings(
             this.resolveLegacyGameToggleStorage(),
             result.settings
           );
+          this.settleLegacyReducedMotionChange(wasReducedMotion);
           this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
           this.boardStaticDirty = true;
           this.boardPathDirty = true;
@@ -15724,7 +15779,7 @@ export class MenuScene extends Phaser.Scene {
     this.authGateGraphics.fillStyle(0x02080f, 0.96);
     this.authGateGraphics.fillRect(0, 0, width, height);
 
-    const pulse = 0.5 + (0.5 * Math.sin(time / 420));
+    const pulse = this.prefersLegacyReducedMotion() ? 0.5 : 0.5 + (0.5 * Math.sin(time / 420));
     const radius = 16 + (pulse * 4);
     this.authGateGraphics.fillStyle(cyberArcadeMaterial.signal.player, 0.82 + (pulse * 0.14));
     this.authGateGraphics.beginPath();
@@ -16033,7 +16088,8 @@ export class MenuScene extends Phaser.Scene {
     const diagnostics: MenuSceneVisualDiagnostics = {
       accessibility: {
         reducedMotion: this.prefersLegacyReducedMotion(),
-        reducedMotionSource: 'os-media-query-cache'
+        reducedMotionSource: resolveReducedMotionSource(this.legacyReducedMotionEnabled, this.settings.toggleReducedMotion),
+        reducedMotionSettingOn: this.settings.toggleReducedMotion
       },
       materialSystem: {
         ...materialSystem,

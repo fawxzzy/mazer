@@ -16,6 +16,8 @@ export interface LegacySettings {
   toggleTrailPulse: boolean;
   toggleAnimatedBackdrop: boolean;
   hapticsEnabled: boolean;
+  /** Settings > Reduce Motion: true forces reduced motion on; false defers to the device setting. */
+  toggleReducedMotion: boolean;
   controlMode: LegacyControlMode;
 }
 
@@ -37,6 +39,7 @@ export const LEGACY_DEFAULTS: LegacySettings = {
   toggleTrailPulse: true,
   toggleAnimatedBackdrop: true,
   hapticsEnabled: true,
+  toggleReducedMotion: false,
   controlMode: 'stick'
 };
 
@@ -92,5 +95,6 @@ export const copyLegacySettings = (settings: LegacySettings): LegacySettings => 
   toggleTrailPulse: settings.toggleTrailPulse ?? true,
   toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop ?? LEGACY_DEFAULTS.toggleAnimatedBackdrop,
   hapticsEnabled: settings.hapticsEnabled ?? LEGACY_DEFAULTS.hapticsEnabled,
+  toggleReducedMotion: settings.toggleReducedMotion ?? LEGACY_DEFAULTS.toggleReducedMotion,
   controlMode: settings.controlMode
 });

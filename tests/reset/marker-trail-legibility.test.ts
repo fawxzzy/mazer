@@ -106,7 +106,7 @@ describe('trail wiring in the scene', () => {
     expect(MENU_SCENE).toContain("from '../render/trailLegibility'");
     expect(MENU_SCENE).toContain("from '../render/trailIridescence'");
     expect(MENU_SCENE).toContain('const restingWidths = resolveTrailWidths(tileSize);');
-    expect(MENU_SCENE).toContain('sampleIridescentTrail(colorPhaseTiles, animationTime, !trailAnimated)');
+    expect(MENU_SCENE).toContain('sampleIridescentTrail(colorPhaseTiles, trailColourTimeMs, !trailAnimated)');
     expect(MENU_SCENE).toContain('const LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN = TRAIL_FADE_ALPHA_MIN;');
     expect(MENU_SCENE).toContain('underlayAlpha: alphaMultiplier');
     expect(MENU_SCENE).not.toContain('LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS');
@@ -114,7 +114,7 @@ describe('trail wiring in the scene', () => {
 
   test('the Trail Fade and Trail Shine switches still gate the age fade and the shine (Trail Shine is also the pulse switch)', () => {
     expect(MENU_SCENE).toContain('const trailFadeEnabled = this.settings.toggleTrailFade;');
-    expect(MENU_SCENE).toContain('const shineEnabled = this.isLegacyTrailShineVisible();');
+    expect(MENU_SCENE).toContain('const shineEnabled = trailMotionPlan.shineVisible;');
     expect(MENU_SCENE).toContain('const trailAnimated = shineEnabled;');
   });
 });

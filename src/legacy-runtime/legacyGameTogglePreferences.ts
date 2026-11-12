@@ -19,6 +19,7 @@ export interface LegacyGameTogglePreferences {
   hapticsEnabled: boolean;
   movementSpeed: number;
   toggleAnimatedBackdrop: boolean;
+  toggleReducedMotion: boolean;
   toggleTrailFade: boolean;
   toggleTrailPulse: boolean;
 }
@@ -73,6 +74,7 @@ const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Parti
     'hapticsEnabled',
     'movementSpeed',
     'toggleAnimatedBackdrop',
+    'toggleReducedMotion',
     'toggleTrailFade',
     'toggleTrailPulse'
   ] satisfies Array<keyof LegacyGameTogglePreferences>;
@@ -100,6 +102,7 @@ export const pickLegacyGameTogglePreferences = (
   hapticsEnabled: settings.hapticsEnabled,
   movementSpeed: normalizeLegacyMovementSpeed(settings.movementSpeed),
   toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop,
+  toggleReducedMotion: settings.toggleReducedMotion,
   toggleTrailFade: settings.toggleTrailFade,
   toggleTrailPulse: settings.toggleTrailPulse
 });
@@ -118,6 +121,7 @@ export const normalizeLegacyGameTogglePreferences = (
     clampNumber(fallback.movementSpeed, LEGACY_MOVEMENT_SPEED_MIN, LEGACY_MOVEMENT_SPEED_MAX)
   ),
   toggleAnimatedBackdrop: normalizeBoolean(value?.toggleAnimatedBackdrop, fallback.toggleAnimatedBackdrop),
+  toggleReducedMotion: normalizeBoolean(value?.toggleReducedMotion, fallback.toggleReducedMotion),
   toggleTrailFade: normalizeBoolean(value?.toggleTrailFade, fallback.toggleTrailFade),
   toggleTrailPulse: normalizeBoolean(value?.toggleTrailPulse, fallback.toggleTrailPulse)
 });

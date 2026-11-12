@@ -41,6 +41,7 @@ describe('legacy game toggle preferences', () => {
       hapticsEnabled: true,
       movementSpeed: 0.04,
       toggleAnimatedBackdrop: true,
+      toggleReducedMotion: false,
       toggleTrailFade: false,
       toggleTrailPulse: true
     });
@@ -66,6 +67,7 @@ describe('legacy game toggle preferences', () => {
       hapticsEnabled: true,
       movementSpeed: 0.82,
       toggleAnimatedBackdrop: false,
+      toggleReducedMotion: false,
       toggleTrailFade: true,
       toggleTrailPulse: false
     });
@@ -81,6 +83,7 @@ describe('legacy game toggle preferences', () => {
       hapticsEnabled: true,
       movementSpeed: 0.33,
       toggleAnimatedBackdrop: false,
+      toggleReducedMotion: false,
       toggleTrailFade: true,
       toggleTrailPulse: false
     }));
@@ -94,6 +97,7 @@ describe('legacy game toggle preferences', () => {
       hapticsEnabled: true,
       movementSpeed: 0.33,
       toggleAnimatedBackdrop: false,
+      toggleReducedMotion: false,
       toggleTrailFade: true,
       toggleTrailPulse: false
     });
@@ -236,6 +240,7 @@ describe('legacy game toggle preferences', () => {
       hapticsEnabled: true,
       movementSpeed: 0.72,
       toggleAnimatedBackdrop: false,
+      toggleReducedMotion: false,
       toggleTrailFade: true,
       toggleTrailPulse: false
     }));
@@ -249,6 +254,7 @@ describe('legacy game toggle preferences', () => {
       hapticsEnabled: true,
       movementSpeed: 0.72,
       toggleAnimatedBackdrop: false,
+      toggleReducedMotion: false,
       toggleTrailFade: true,
       toggleTrailPulse: false
     });

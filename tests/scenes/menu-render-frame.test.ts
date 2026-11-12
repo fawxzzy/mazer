@@ -1089,7 +1089,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolvedBoardLeft,');
     expect(menuSceneSource).toContain('mazeRenderFrame.boardWidth,');
     expect(menuSceneSource).toContain('mazeRenderFrame.boardHeight,');
-    expect(menuSceneSource).toContain("const active = this.isLegacyTrailShineVisible() && this.overlay === 'none' && this.trail.length > 1;");
+    expect(menuSceneSource).toContain("const active = this.isLegacyTrailColourDrifting() && this.overlay === 'none' && this.trail.length > 1;");
     expect(menuSceneSource).toContain('this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;');
     expect(menuSceneSource).toContain('this.resolveLegacyPlayPerfectPathTrail()');
     expect(menuSceneSource).not.toContain('private resolveLegacyPointPathSource(');
@@ -1118,7 +1118,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('trailHeadColor: resolveLegacyIridescentTrailColor(trailHeadIndex, trailLength, time, palette.trailColor)');
     expect(menuSceneSource).toContain('trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
     expect(menuSceneSource).toContain('trailPulseEnabled: this.isLegacyTrailShineVisible()');
-    expect(menuSceneSource).toContain('return this.legacyReducedMotionEnabled;');
+    expect(menuSceneSource).toContain('resolveReducedMotion(this.legacyReducedMotionEnabled, this.settings.toggleReducedMotion)');
     expect(menuSceneSource).toContain('private isLegacyTrailShineVisible(): boolean');
     expect(menuSceneSource).toContain('playerCoreRadius: playerMarkerMetrics.coreRadius');
     expect(menuSceneSource).toContain('playerBeaconColor: LEGACY_PLAY_PLAYER_BEACON_COLOR');
@@ -1557,7 +1557,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(preferenceSource).toContain('this.backdropDirty = true;');
     expect(preferenceSource).toContain('this.boardDynamicDirty = true;');
     expect(preferenceSource).toContain('this.hudDirty = true;');
-    expect(preferenceSource).toContain('return this.legacyReducedMotionEnabled;');
+    expect(preferenceSource).toContain('resolveReducedMotion(this.legacyReducedMotionEnabled, this.settings.toggleReducedMotion)');
     expect(preferenceSource).not.toContain('tryMovePlayerFromInput');
     expect(preferenceSource).not.toContain('legacyWorldTurnHost');
   });
@@ -1592,7 +1592,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // and LVL badge (boardDynamicDirty), or the blink freezes between
     // whatever else happens to touch boardPathDirty and jumps on the next
     // unrelated redraw instead of pulsing smoothly.
-    expect(menuSceneSource).toContain("if (this.mode === 'menu' && this.overlay === 'none' && !this.prefersLegacyReducedMotion()) {\n      this.boardPathDirty = true;\n    }");
+    expect(menuSceneSource).toContain("if (this.mode === 'menu' && this.overlay === 'none') {\n      this.boardPathDirty = true;\n    }");
     // Both the menu header settings icon and this touch-control settings
     // icon share the exact same source metrics (real icon, not a
     // procedural gear duplicated per surface).

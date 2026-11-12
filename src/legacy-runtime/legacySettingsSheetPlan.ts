@@ -16,7 +16,7 @@
  *   - whether the Settings group is a collapsed disclosure (pause) or the
  *     always-open body (menu).
  * Everything inside the Settings group (How to play, Display heading, Board
- * Trail Fade, Trail Shine, Animated Background) is the SAME row spec
+ * Trail Fade, Trail Shine, Animated Background, Reduce Motion + its note) is the SAME row spec
  * with the SAME geometry, so the surfaces cannot drift apart again.
  *
  * Pure: no Phaser, no DOM, no storage, no network, no wiring. A later lane
@@ -31,6 +31,12 @@
  * (body 14, label 16, small 13). No font in a plan row is ever below the
  * `body` token for labels; the plan wraps instead of shrinking.
  */
+import {
+  REDUCED_MOTION_SETTING_LABEL,
+  REDUCED_MOTION_SETTING_NOTE,
+  REDUCED_MOTION_SETTING_OFF_LABEL,
+  REDUCED_MOTION_SETTING_ON_LABEL
+} from '../render/reducedMotion';
 import { designTokens } from '../theme/tokens';
 import { LEGACY_ROTATE_PROMPT_LABEL } from './legacyOrientationFlip';
 import { LEGACY_QUIT_CONFIRM_ARMED_LABEL } from './legacyQuitConfirm';
@@ -44,7 +50,12 @@ import {
 export type LegacySettingsContext = 'menu' | 'pause';
 
 /** Setting keys the scene already persists (legacyOverlayToggleFields). */
-export type LegacySettingsToggleKey = 'toggleTrailFade' | 'toggleTrailPulse' | 'toggleAnimatedBackdrop' | 'hapticsEnabled';
+export type LegacySettingsToggleKey =
+  | 'toggleTrailFade'
+  | 'toggleTrailPulse'
+  | 'toggleAnimatedBackdrop'
+  | 'toggleReducedMotion'
+  | 'hapticsEnabled';
 
 export type LegacySettingsRowId =
   | 'rotate-notice'
@@ -56,6 +67,8 @@ export type LegacySettingsRowId =
   | 'trail-fade'
   | 'trail-shine'
   | 'animated-background'
+  | 'reduce-motion'
+  | 'reduce-motion-note'
   | 'haptics'
   | 'account-heading'
   | 'reset-progress'
@@ -71,6 +84,7 @@ export type LegacySettingsRowKind =
   | 'disclosure'
   | 'nav'
   | 'heading'
+  | 'note'
   | 'toggle';
 
 export type LegacySettingsEmphasis = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'danger-outline';
@@ -186,6 +200,12 @@ export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsRowModel[] = Obj
     onLabel: 'Animated',
     settingKey: 'toggleAnimatedBackdrop'
   }),
+  row('reduce-motion', 'toggle', REDUCED_MOTION_SETTING_LABEL, {
+    offLabel: REDUCED_MOTION_SETTING_OFF_LABEL,
+    onLabel: REDUCED_MOTION_SETTING_ON_LABEL,
+    settingKey: 'toggleReducedMotion'
+  }),
+  row('reduce-motion-note', 'note', REDUCED_MOTION_SETTING_NOTE),
   // Vibration on phones that support it (not iOS Safari: no navigator.vibrate there, so the row changes nothing).
   row('haptics', 'toggle', 'Haptics', { offLabel: 'Off', onLabel: 'On', settingKey: 'hapticsEnabled' })
 ]);
@@ -342,6 +362,10 @@ export const LEGACY_SETTINGS_SIZES = Object.freeze({
   rowHeight: 52,
   /** Non-interactive heading row. */
   headingHeight: 24,
+  /** Non-interactive wrapped helper note under a toggle (13 px, up to 5 lines at the compact card width). */
+  noteHeight: 88,
+  noteLineHeight: 17,
+  noteMaxLines: 5,
   /** Switch graphic (the whole row is the hit target). */
   switchHeight: 24,
   switchWidth: LEGACY_UI_MIN_TOUCH_TARGET,
@@ -466,12 +490,14 @@ const rowHeightOf = (model: LegacySettingsRowModel): number => {
       return LEGACY_SETTINGS_SIZES.rowHeight;
     case 'heading':
       return LEGACY_SETTINGS_SIZES.headingHeight;
+    case 'note':
+      return LEGACY_SETTINGS_SIZES.noteHeight;
     default:
       return model.kind satisfies never;
   }
 };
 
-const isInteractiveKind = (kind: LegacySettingsRowKind): boolean => kind !== 'heading';
+const isInteractiveKind = (kind: LegacySettingsRowKind): boolean => kind !== 'heading' && kind !== 'note';
 
 /** Inner part layout of one row, relative to the row's own rect (left/top are ROW-LOCAL). */
 const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: number): LegacySettingsRowParts => {
@@ -504,6 +530,7 @@ const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: n
     }
     case 'action':
     case 'heading':
+    case 'note':
       return { ...none, label: rectOf(pad, 0, Math.max(1, width - (pad * 2)), height) };
     default:
       return model.kind satisfies never;
@@ -585,7 +612,7 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
       return {
         interactive: isInteractiveKind(rowModel.kind),
         labelFontSize: s.labelFontSize,
-        labelMaxLines: rowModel.kind === 'heading' ? 1 : s.labelMaxLines,
+        labelMaxLines: rowModel.kind === 'heading' ? 1 : rowModel.kind === 'note' ? s.noteMaxLines : s.labelMaxLines,
         model: rowModel,
         parts: resolveRowParts(rowModel, rowWidth, height),
         rect,
