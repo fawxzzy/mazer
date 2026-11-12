@@ -131,6 +131,17 @@ export const LEGACY_OVERLAY_MESSAGE_COPY = {
   settingsUpdated: 'Settings updated.'
 } as const;
 
+// Saving the leaderboard username (mazer_set_username). The taken and invalid
+// rows reuse the auth copy so the same sentence reads the same everywhere.
+export const LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY = {
+  failed: 'Your username could not be saved. Please try again later.',
+  invalid: LEGACY_AUTH_MESSAGE_COPY.usernameInvalid,
+  taken: LEGACY_AUTH_MESSAGE_COPY.usernameTaken,
+  tryAgain: 'Could not save your username. Check your connection and try again.'
+} as const;
+
+export type LegacyUsernameSaveFailureKind = 'failed' | 'invalid' | 'taken' | 'try-again';
+
 export type LegacyRemoteMessageContext = 'cycle-receipt' | 'progression' | 'settings';
 export type LegacyRemoteSkippedReason = 'disabled' | 'guest' | 'missing-client' | null;
 
@@ -463,4 +474,26 @@ export const resolveLegacyOverlayFieldCommitMessage = (
   id: `overlay.field.${normalizeLegacyPlayerMessageIdPart(label)}`,
   source: 'overlay',
   tone: outcome === 'unchanged' ? 'info' : 'success'
+})!;
+
+const LEGACY_USERNAME_SAVE_FAILURE_COPY: Record<LegacyUsernameSaveFailureKind, string> = {
+  failed: LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY.failed,
+  invalid: LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY.invalid,
+  taken: LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY.taken,
+  'try-again': LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY.tryAgain
+};
+
+/**
+ * The toast for a username save that did not land. Provider text stays in
+ * technicalDetail; the player only ever sees one of the four plain sentences.
+ */
+export const resolveLegacyUsernameSaveFailureMessage = (
+  kind: LegacyUsernameSaveFailureKind,
+  technicalDetail?: string | null
+): LegacyPlayerMessage => createLegacyPlayerMessage({
+  copy: LEGACY_USERNAME_SAVE_FAILURE_COPY[kind],
+  id: 'account.username.save-failed',
+  source: 'auth',
+  technicalDetail: technicalDetail ?? null,
+  tone: kind === 'try-again' || kind === 'failed' ? 'warning' : 'error'
 })!;
