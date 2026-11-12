@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS,
   LEGACY_OAUTH_FAILURE_MESSAGE_COPY,
   isLegacyOAuthFailureCopy,
   resolveLegacyAuthFeedbackMessage,
@@ -115,6 +116,84 @@ describe('shared-account sign-in failure copy', () => {
   test('provider-shaped auth errors still resolve exactly as before', () => {
     expect(resolveLegacyAuthFeedbackMessage('Failed to fetch', null, 'invalid_state')).toMatchObject({
       technicalDetail: 'Failed to fetch'
+    });
+  });
+
+  // MAZER-ACCT-014: boot paths that are not a callback failure. They keep the
+  // plain generic copy and carry their own code in diagnostics only.
+  test.each(['session_quarantined', 'session_read_failed', 'portal_navigation_failed'])(
+    'boot failure code %s keeps generic copy and records its own code',
+    (code) => {
+      expect(resolveLegacyOAuthFailureClass(code)).toBe('generic');
+      expect(resolveLegacyOAuthFailureCopy(code)).toBe(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic);
+      expect(resolveLegacyOAuthFailureCopy(code)).not.toContain(code);
+      expect(resolveLegacyOAuthFailureTechnicalDetail(code)).toBe(`oauth-failure:${code}`);
+      expect(resolveLegacyOAuthFailureMessage(code)).toMatchObject({
+        copy: LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic,
+        technicalDetail: `oauth-failure:${code}`
+      });
+      // The boot snapshot carries MAZER_OAUTH_SAFE_ERROR_MESSAGE (the generic row).
+      const feedback = resolveLegacyAuthFeedbackMessage(MAZER_OAUTH_SAFE_ERROR_MESSAGE, null, code);
+      expect(feedback).toMatchObject({
+        copy: LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic,
+        id: 'auth.feedback.error',
+        technicalDetail: `oauth-failure:${code}`
+      });
+      expect(feedback?.copy).not.toContain(code);
+    }
+  );
+
+  test('quarantine and session-read failures are told apart in diagnostics', () => {
+    const quarantined = resolveLegacyAuthFeedbackMessage(MAZER_OAUTH_SAFE_ERROR_MESSAGE, null, 'session_quarantined');
+    const readFailed = resolveLegacyAuthFeedbackMessage(MAZER_OAUTH_SAFE_ERROR_MESSAGE, null, 'session_read_failed');
+    expect(quarantined?.copy).toBe(readFailed?.copy);
+    expect(quarantined?.technicalDetail).not.toBe(readFailed?.technicalDetail);
+  });
+
+  test('a provider-shaped session read error keeps its player copy and gains the code first', () => {
+    const message = resolveLegacyAuthFeedbackMessage('Failed to fetch', null, 'session_read_failed');
+    expect(message).toMatchObject({
+      copy: 'Account service is unreachable. Try again shortly.',
+      technicalDetail: 'oauth-failure:session_read_failed; Failed to fetch'
+    });
+    // No boot code: exactly as before.
+    expect(resolveLegacyAuthFeedbackMessage('Failed to fetch', null)).toMatchObject({ technicalDetail: 'Failed to fetch' });
+  });
+
+  test('an unknown code is still recorded as unmapped, never echoed', () => {
+    expect(resolveLegacyAuthFeedbackMessage(MAZER_OAUTH_SAFE_ERROR_MESSAGE, null, 'user@example.com'))
+      .toMatchObject({ technicalDetail: 'oauth-failure:unmapped' });
+  });
+
+  // MAZER-ACCT-015: how long a sign-in failure stays readable.
+  describe('sign-in failure message duration', () => {
+    const wordCount = (copy: string): number => copy.trim().split(/\s+/).length;
+
+    test('the floor is at least 6 s and a documented number', () => {
+      expect(LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS).toBe(8000);
+      expect(LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS).toBeGreaterThanOrEqual(6000);
+    });
+
+    test('every failure row can be read at 300 ms a word inside that floor', () => {
+      for (const [key, copy] of Object.entries(LEGACY_OAUTH_FAILURE_MESSAGE_COPY)) {
+        expect(wordCount(copy) * 300, `${key} is too long for the floor`).toBeLessThanOrEqual(LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS);
+      }
+    });
+
+    test('class messages, passed-through class copy and provider errors all use it', () => {
+      for (const [code] of EXPECTED_CLASS_BY_CODE) {
+        expect(resolveLegacyOAuthFailureMessage(code).durationMs).toBe(LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS);
+      }
+      expect(resolveLegacyAuthFeedbackMessage(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.contextLost, null, 'invalid_state')?.durationMs)
+        .toBe(LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS);
+      expect(resolveLegacyAuthFeedbackMessage('Failed to fetch', null)?.durationMs)
+        .toBe(LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS);
+      expect(resolveLegacyAuthFeedbackMessage('Invalid login credentials', null)?.durationMs)
+        .toBe(LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS);
+    });
+
+    test('success and info feedback keep the short default', () => {
+      expect(resolveLegacyAuthFeedbackMessage(null, 'Account connected.')?.durationMs).toBe(2400);
     });
   });
 });
