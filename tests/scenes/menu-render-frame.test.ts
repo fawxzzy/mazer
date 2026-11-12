@@ -2600,7 +2600,7 @@ describe('Chip wiring: start/goal markers, trail underlay, board layer', () => {
 
   test('the trail sits on a dark underlay on the Chip floor (amendment open item A8), drawn by the same trail compositor', () => {
     expect(menuSceneSource).toContain("if (this.boardTileStyle === 'chip') {");
-    expect(menuSceneSource).toContain('drawTrailLayersToCanvasContext(this.trailCanvasTexture.context, segments, {');
+    expect(menuSceneSource).toContain('drawTrailLayersToCanvasContext(texture.context, segments, {');
     expect(menuSceneSource).toContain('underlayAlpha: LEGACY_TRAIL_UNDERLAY_ALPHA');
     expect(menuSceneSource).toContain('underlayWidth,');
   });

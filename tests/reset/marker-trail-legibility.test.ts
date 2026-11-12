@@ -278,7 +278,7 @@ describe('goal beacon (css-px halo and ping)', () => {
 
   test('the beacon layer sits above the baked tiles and BELOW the trail canvas, and is cleared with the dynamic layer', () => {
     expect(MENU_SCENE).toContain('      this.boardTileLayer.image,\n      this.goalBeaconGraphics,\n');
-    expect(MENU_SCENE.indexOf('this.goalBeaconGraphics,')).toBeLessThan(MENU_SCENE.indexOf('this.trailCanvasImage,\n      this.playerGlowCanvasImage'));
+    expect(MENU_SCENE.indexOf('this.goalBeaconGraphics,')).toBeLessThan(MENU_SCENE.indexOf('this.trailCanvasImage,\n      this.trailTailCanvasImage,\n      this.playerGlowCanvasImage'));
     expect(MENU_SCENE).toContain('this.boardDynamicGraphics.clear();\n    this.goalBeaconGraphics.clear();');
   });
 });

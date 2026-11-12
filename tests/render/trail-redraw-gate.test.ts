@@ -193,14 +193,17 @@ describe('scene wiring (MAZER-PERF-002)', () => {
 
   it('memoises the shortest route and gates the trail canvas rebuild through the pure helpers', () => {
     expect(source).toContain("import { TrailPerfectPathCache } from '../render/trailPerfectPathCache';");
-    expect(source).toContain("import { observeTrailFrameCost, shouldRebuildTrail, type TrailDrawRecord } from '../render/trailRedrawGate';");
+    expect(source).toContain("import { observeTrailFrameCost, type TrailDrawRecord } from '../render/trailRedrawGate';");
     expect(source).toContain('this.trailPerfectPathCache.resolve(');
-    expect(source).toContain('shouldRebuildTrail(this.trailDrawRecord, gateStamp, time, gateMotionPlan.colourDrifts)');
+    // MAZER-PERF-004: the gate is now reached through planTrailRedraw, which asks shouldRebuildTrail first.
+    expect(source).toContain('planTrailRedraw(this.trailDrawRecord, gateStamp, time, gateMotionPlan.colourDrifts)');
+    expect(readFileSync(new URL('../../src/render/trailTailSplit.ts', import.meta.url), 'utf8')).toContain('shouldRebuildTrail(previous, next, nowMs, timeDriven)');
     expect(source).toContain('observeTrailFrameCost(this.trailDrawRecord, time);');
   });
 
   it('records a rebuild only when the canvas image really was drawn and shown', () => {
     expect(source).toContain('if (this.trailCanvasImage?.visible === true) {');
-    expect(source).toContain('this.trailDrawRecord = {');
+    expect(source).toContain('stamp: gateStamp,');
+    expect(source).toContain('this.trailDrawRecord = record;');
   });
 });

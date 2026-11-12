@@ -58,7 +58,7 @@ import {
   resolveWallBumpNudge,
   shouldBuzzWallBump
 } from '../render/playerMotionTiming';
-import { drawTrailLayersToCanvasContext, type TrailLayerSegment } from '../render/trailLayersCanvas';
+import { drawTrailLayersToCanvasContext, resolveBloomDownscale, type TrailLayerSegment } from '../render/trailLayersCanvas';
 import {
   TRAIL_FADE_ALPHA_MIN,
   TRAIL_GLOW_ALPHA_RATIO,
@@ -90,8 +90,18 @@ import {
 import { resolveTrailGridPathWithHead } from '../render/trailHeadPath';
 import { buildDeviceSnappedTrailPath } from '../render/trailDeviceSnap';
 import { TrailPerfectPathCache } from '../render/trailPerfectPathCache';
-import { observeTrailFrameCost, shouldRebuildTrail, type TrailDrawRecord } from '../render/trailRedrawGate';
+import { observeTrailFrameCost, type TrailDrawRecord } from '../render/trailRedrawGate';
 import {
+  TRAIL_SPLIT_MIN_COST_MS,
+  chooseTrailSplit,
+  isTrailPrefixUnchanged,
+  isTrailTailWithinBound,
+  planTrailRedraw,
+  type TrailSplitCut,
+  type TrailSplitState
+} from '../render/trailTailSplit';
+import {
+  chunkTrailSegments,
   computeTrailCanvasBounds,
   drawTrailToCanvasContext
 } from '../render/navigationCoreTrailCanvas';
@@ -1261,6 +1271,10 @@ interface LegacyTrailPerfDiagnostics {
   /** Trail rebuilds and skipped (kept-as-is) redraws since the scene started: MAZER-PERF-002, src/render/trailRedrawGate.ts. */
   trailRebuildCount: number;
   trailSkippedRedrawCount: number;
+  /** Head-only (tail) redraws and strokes drawn by the latest redraw: MAZER-PERF-004, src/render/trailTailSplit.ts. */
+  trailTailRedrawCount: number;
+  trailLastRedrawMode: 'full' | 'tail' | 'split-full';
+  trailLastRedrawStrokeSegments: number;
   /** Shortest-route computations since the scene started (src/render/trailPerfectPathCache.ts). */
   perfectPathComputeCount: number;
 }
@@ -1968,6 +1982,14 @@ export class MenuScene extends Phaser.Scene {
   private trailCanvasWidth = 0;
   private trailCanvasHeight = 0;
   private trailCanvasResolution = 0;
+  // MAZER-PERF-004: the last few tiles of a long trail on their own small canvas, redrawn while the head moves, over the
+  // main canvas that then holds only the older prefix (src/render/trailTailSplit.ts). Hidden unless a split is live.
+  private trailTailCanvasTextureKey: string | null = null;
+  private trailTailCanvasTexture: Phaser.Textures.CanvasTexture | null = null;
+  private trailTailCanvasImage: Phaser.GameObjects.Image | null = null;
+  private trailTailCanvasWidth = 0;
+  private trailTailCanvasHeight = 0;
+  private trailTailCanvasResolution = 0;
   // Same real-2D-canvas compositor pattern as trailCanvasImage above, for
   // the player marker's own two drop-shadow glow layers (see
   // navigationCorePlayerGlowCanvas.ts's own header comment for why a
@@ -2163,7 +2185,20 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-PERF-002: the shortest route is memoised per (maze, trail, player), and the trail canvas is rebuilt only when
   // its picture can differ (src/render/trailPerfectPathCache.ts, trailRedrawGate.ts).
   private readonly trailPerfectPathCache = new TrailPerfectPathCache();
-  private trailDrawRecord: TrailDrawRecord | null = null;
+  private trailDrawRecord: (TrailDrawRecord & { split?: TrailSplitState }) | null = null;
+  // MAZER-PERF-004: the frozen colour clock, shine and widths the live prefix/tail split was drawn at, the head-only
+  // redraws that follow it, and the measured cost of the last whole-trail rebuild (decides whether the next one splits).
+  private trailSplitEpoch: {
+    colourTimeMs: number;
+    animated: boolean;
+    shineState: ReturnType<typeof advanceTrailShineState> | null;
+    coreWidth: number;
+    glowWidth: number;
+    underlayWidth: number;
+    glowAlphaScale: number;
+  } | null = null;
+  private trailTailRedrawCount = 0;
+  private trailLastFullCostMs: number | null = null;
   private trailRebuildCount = 0;
   private trailSkippedRedrawCount = 0;
   // A one-way latch for the start marker's pre-spawn -> post-spawn
@@ -2371,6 +2406,9 @@ export class MenuScene extends Phaser.Scene {
     this.trailCanvasTextureKey = `legacy-nav-core-trail-${nextMenuSceneInstanceId()}`;
     this.trailCanvasTexture = this.textures.createCanvas(this.trailCanvasTextureKey, 1, 1);
     this.trailCanvasImage = this.add.image(0, 0, this.trailCanvasTextureKey).setOrigin(0, 0).setVisible(false);
+    this.trailTailCanvasTextureKey = `legacy-nav-core-trail-tail-${nextMenuSceneInstanceId()}`;
+    this.trailTailCanvasTexture = this.textures.createCanvas(this.trailTailCanvasTextureKey, 1, 1);
+    this.trailTailCanvasImage = this.add.image(0, 0, this.trailTailCanvasTextureKey).setOrigin(0, 0).setVisible(false);
     // Same real-2D-canvas approach as the trail above, for the play-mode
     // player marker's own drop-shadow glow layers -- see the field's own
     // comment.
@@ -2398,6 +2436,7 @@ export class MenuScene extends Phaser.Scene {
       // own canvas-composited glow sits right after the trail's, same
       // reason -- both must render before the crisp shapes Graphics draws.
       this.trailCanvasImage,
+      this.trailTailCanvasImage,
       this.playerGlowCanvasImage,
       this.boardDynamicGraphics,
       // Same boardZoomContainer/boardDynamicGraphics-relative coordinate
@@ -2549,6 +2588,12 @@ export class MenuScene extends Phaser.Scene {
       this.trailCanvasTexture = null;
       this.trailCanvasImage = null;
       this.trailCanvasTextureKey = null;
+      if (this.trailTailCanvasTextureKey !== null && this.textures.exists(this.trailTailCanvasTextureKey)) {
+        this.textures.remove(this.trailTailCanvasTextureKey);
+      }
+      this.trailTailCanvasTexture = null;
+      this.trailTailCanvasImage = null;
+      this.trailTailCanvasTextureKey = null;
       if (this.playerGlowCanvasTextureKey !== null && this.textures.exists(this.playerGlowCanvasTextureKey)) {
         this.textures.remove(this.playerGlowCanvasTextureKey);
       }
@@ -6706,6 +6751,7 @@ export class MenuScene extends Phaser.Scene {
     // fillLegacyPlayerMarkerTile), so it is exactly as exposed to this same
     // ghost-image risk -- hidden here too.
     this.trailCanvasImage?.setVisible(false);
+    this.trailTailCanvasImage?.setVisible(false);
     this.playerGlowCanvasImage?.setVisible(false);
     this.resetLegacyPlayInputBuffer();
     this.clearPlayHudImmediately();
@@ -9581,6 +9627,7 @@ export class MenuScene extends Phaser.Scene {
     // from the last frame that actually had a trail. Only re-shown once a
     // real geometry is about to be drawn into it, further down.
     this.trailCanvasImage?.setVisible(false);
+    this.trailTailCanvasImage?.setVisible(false);
     if (alphaMultiplier <= 0 || tileSize <= 0) {
       return;
     }
@@ -9616,6 +9663,8 @@ export class MenuScene extends Phaser.Scene {
     // MAZER-PERF-002: rebuild the trail canvas only when its picture can differ (route, head, geometry, fade) or the
     // colour clock is due, with the redraw gap stretched by the last rebuild's real cost; otherwise the canvas already on
     // screen is exactly what a rebuild would paint. src/render/trailRedrawGate.ts.
+    // MAZER-PERF-004: on a long (expensive) route a frame in which only the head moved redraws just the last few tiles at
+    // the epoch's frozen colour clock instead of the whole trail. src/render/trailTailSplit.ts.
     const gateMotionPlan = this.resolveLegacyTrailMotionPlan();
     const gateSnappedOrigin = this.boardTileLayer.snappedOrigin;
     const gateStamp = {
@@ -9632,18 +9681,26 @@ export class MenuScene extends Phaser.Scene {
     if (this.trailDrawRecord !== null) {
       observeTrailFrameCost(this.trailDrawRecord, time);
     }
-    if (this.trailDrawRecord !== null && !shouldRebuildTrail(this.trailDrawRecord, gateStamp, time, gateMotionPlan.colourDrifts)) {
+    const redrawMode = planTrailRedraw(this.trailDrawRecord, gateStamp, time, gateMotionPlan.colourDrifts);
+    if (this.trailDrawRecord !== null && redrawMode === 'keep') {
       // Keep the canvas as it is; refresh what other layers read from this call (the bleed glow samples the head colour).
       this.trailSkippedRedrawCount += 1;
+      const keptEpoch = this.trailDrawRecord.split !== undefined ? this.trailSplitEpoch : null;
       this.trailPaletteHead = {
         distanceTiles: (this.trailDrawRecord.totalLength + this.trailOriginAdvanceDistancePx) / tileSize,
-        timeMs: resolveTrailColourTimeMs(animationTime, gateMotionPlan),
-        animated: gateMotionPlan.shineVisible
+        timeMs: keptEpoch ? keptEpoch.colourTimeMs : resolveTrailColourTimeMs(animationTime, gateMotionPlan),
+        animated: keptEpoch ? keptEpoch.animated : gateMotionPlan.shineVisible
       };
       this.trailCanvasImage?.setVisible(true);
+      this.trailTailCanvasImage?.setVisible(this.trailDrawRecord.split !== undefined);
       return;
     }
-    this.trailDrawRecord = null;
+    const previousRecord = this.trailDrawRecord;
+    if (previousRecord !== null) {
+      // What a whole-trail rebuild really costs (the draw call, raised to the frame time once seen): decides below whether
+      // the next full rebuild splits the trail into a prefix and a head-only tail.
+      this.trailLastFullCostMs = previousRecord.costMs;
+    }
     const gridPath = resolveTrailGridPathWithHead(perfectPath, previousTrailTile, renderedPlayerPoint);
 
     // Real, measured frame-time evidence (Wave 4D-A's own frame-time
@@ -9665,10 +9722,65 @@ export class MenuScene extends Phaser.Scene {
       playerTrimRatio: LEGACY_PLAY_TRAIL_PLAYER_TRIM_RATIO
     });
     if (geometry.totalLength <= 0 || geometry.vertices.length < 2) {
+      this.trailDrawRecord = null;
       return;
     }
     const vertices = resampleTrailVertices(geometry.vertices, LEGACY_PLAY_TRAIL_RESAMPLE_INTERVAL_PX);
     const perfBuildEndedAtMs = performance.now();
+
+    // MAZER-PERF-004 head-only frame: the prefix canvas (everything older than the cut) is still exactly what a rebuild at
+    // the epoch's clock would paint, so redraw only the tail at that same frozen clock.
+    const splitState = previousRecord?.split;
+    const epoch = this.trailSplitEpoch;
+    if (
+      redrawMode === 'tail'
+      && previousRecord !== null
+      && splitState !== undefined
+      && epoch !== null
+      && isTrailPrefixUnchanged(splitState.prefixVertices, vertices, splitState.stableIndex)
+      && isTrailTailWithinBound(geometry.totalLength, splitState, tileSize)
+    ) {
+      const tailSegments = this.styleTrailSegments(vertices, splitState.cutIndex + 1, vertices.length - 1, {
+        totalLength: geometry.totalLength,
+        tileSize,
+        fadeEnabled: this.settings.toggleTrailFade,
+        alphaMultiplier,
+        colourTimeMs: epoch.colourTimeMs,
+        animated: epoch.animated,
+        shineState: epoch.shineState
+      });
+      this.trailPaletteHead = {
+        distanceTiles: (geometry.totalLength + this.trailOriginAdvanceDistancePx) / tileSize,
+        timeMs: epoch.colourTimeMs,
+        animated: epoch.animated
+      };
+      this.drawTrailCanvasSegments(tailSegments, epoch.coreWidth, epoch.glowWidth, epoch.underlayWidth, epoch.glowAlphaScale, splitState);
+      this.trailCanvasImage?.setVisible(true);
+      this.trailTailRedrawCount += 1;
+      previousRecord.stamp = gateStamp;
+      previousRecord.totalLength = geometry.totalLength;
+      const tailDrawEndedAtMs = performance.now();
+      this.lastTrailPerfDiagnostics = {
+        vertexCountBeforeResample: geometry.vertices.length,
+        vertexCountAfterResample: vertices.length,
+        strokeSegmentCount: tailSegments.length,
+        geometryBuildMs: perfBuildEndedAtMs - perfBuildStartedAtMs,
+        drawMs: tailDrawEndedAtMs - perfBuildEndedAtMs,
+        totalMs: tailDrawEndedAtMs - perfBuildStartedAtMs,
+        totalLengthPx: geometry.totalLength,
+        tileSize,
+        shineEnabled: epoch.animated,
+        trailFadeEnabled: this.settings.toggleTrailFade,
+        trailRebuildCount: this.trailRebuildCount,
+        trailSkippedRedrawCount: this.trailSkippedRedrawCount,
+        trailTailRedrawCount: this.trailTailRedrawCount,
+        trailLastRedrawMode: 'tail',
+        trailLastRedrawStrokeSegments: tailSegments.length,
+        perfectPathComputeCount: this.trailPerfectPathCache.computeCount
+      };
+      return;
+    }
+    this.trailDrawRecord = null;
 
     // Trail Shine setting + reduced motion share this one gate (see
     // isLegacyTrailShineVisible's own definition) -- reduced motion keeps
@@ -9720,8 +9832,108 @@ export class MenuScene extends Phaser.Scene {
     // smooth age/distance opacity, continuous by distance so there is no
     // per-cell alpha step.
     const trailFadeEnabled = this.settings.toggleTrailFade;
-    let perfStrokeSegmentCount = 0;
+    const styleParams = {
+      totalLength: geometry.totalLength,
+      tileSize,
+      fadeEnabled: trailFadeEnabled,
+      alphaMultiplier,
+      colourTimeMs: trailColourTimeMs,
+      animated: trailAnimated,
+      shineState
+    };
 
+    // MAZER-PERF-004: split an expensive trail into a prefix (main canvas) and a tail (own canvas) at one frozen clock, so
+    // the frames in which only the head moves can redraw the tail alone. Not with Trail Fade on (the age alpha depends on the
+    // whole length, so the old part changes whenever the head moves) and not on a cheap route (behaviour unchanged).
+    const allSegments = this.styleTrailSegments(vertices, 1, vertices.length - 1, styleParams);
+    let splitCut: TrailSplitCut | null = null;
+    if (!trailFadeEnabled && this.boardTileStyle === 'chip' && (this.trailLastFullCostMs ?? 0) >= TRAIL_SPLIT_MIN_COST_MS) {
+      // Cut only where a stroke chunk of the whole trail starts, so the tail's chunks (and their colours) are exactly the
+      // whole trail's from the cut on, and the picture matches a full rebuild at the same clock.
+      const chunkStarts = new Set(chunkTrailSegments(allSegments).map((chunk) => chunk[0]!.previous));
+      splitCut = chooseTrailSplit(vertices, tileSize, (underlayWidth * 0.625) + 1, (cutIndex) => chunkStarts.has(vertices[cutIndex]!));
+    }
+    const prefixCount = splitCut
+      ? allSegments.findIndex((segment) => segment.previous === vertices[splitCut!.cutIndex])
+      : allSegments.length;
+    const mainSegments = prefixCount >= 0 ? allSegments.slice(0, prefixCount) : allSegments;
+    // Composited on the real 2D canvas (src/render/navigationCoreTrailCanvas.ts),
+    // not stroked as Phaser Graphics vector paths -- see trailCanvasImage's
+    // own field comment for why (Phaser.CANVAS has no WebGL-only postFX
+    // blur to reach for, and a raw CanvasRenderingContext2D gives real round
+    // joins on one continuous path plus a genuine shadowBlur halo, neither
+    // of which a Graphics stroke call exposes).
+    this.drawTrailCanvasSegments(mainSegments, coreWidth, glowWidth, underlayWidth, glowAlphaScale, null, splitCut !== null);
+    let strokeSegmentCount = mainSegments.length;
+    if (splitCut) {
+      const tailSegments = allSegments.slice(prefixCount);
+      this.drawTrailCanvasSegments(tailSegments, coreWidth, glowWidth, underlayWidth, glowAlphaScale, splitCut);
+      strokeSegmentCount += tailSegments.length;
+    } else {
+      this.trailTailCanvasImage?.setVisible(false);
+    }
+
+    const perfDrawEndedAtMs = performance.now();
+    this.trailRebuildCount += 1;
+    if (this.trailCanvasImage?.visible === true) {
+      const record: TrailDrawRecord & { split?: TrailSplitState } = {
+        stamp: gateStamp,
+        drawnAtMs: time,
+        totalLength: geometry.totalLength,
+        costMs: perfDrawEndedAtMs - perfBuildStartedAtMs
+      };
+      if (splitCut) {
+        record.split = { ...splitCut, prefixVertices: vertices };
+        this.trailSplitEpoch = {
+          colourTimeMs: trailColourTimeMs,
+          animated: trailAnimated,
+          shineState,
+          coreWidth,
+          glowWidth,
+          underlayWidth,
+          glowAlphaScale
+        };
+      }
+      this.trailDrawRecord = record;
+    }
+    this.lastTrailPerfDiagnostics = {
+      vertexCountBeforeResample: geometry.vertices.length,
+      vertexCountAfterResample: vertices.length,
+      strokeSegmentCount,
+      geometryBuildMs: perfBuildEndedAtMs - perfBuildStartedAtMs,
+      drawMs: perfDrawEndedAtMs - perfBuildEndedAtMs,
+      totalMs: perfDrawEndedAtMs - perfBuildStartedAtMs,
+      totalLengthPx: geometry.totalLength,
+      tileSize,
+      shineEnabled,
+      trailFadeEnabled,
+      trailRebuildCount: this.trailRebuildCount,
+      trailSkippedRedrawCount: this.trailSkippedRedrawCount,
+      trailTailRedrawCount: this.trailTailRedrawCount,
+      trailLastRedrawMode: splitCut ? 'split-full' : 'full',
+      trailLastRedrawStrokeSegments: strokeSegmentCount,
+      perfectPathComputeCount: this.trailPerfectPathCache.computeCount
+    };
+  }
+
+  // The style of every drawn segment between two vertices of the resampled trail (the segment ending at `fromVertex`
+  // through the one ending at `toVertex`, inclusive), from the colour clock and shine state in `params`. Pure in its
+  // inputs, so a tail redraw at a frozen epoch styles its segments exactly as the full rebuild did.
+  private styleTrailSegments(
+    vertices: ReturnType<typeof resampleTrailVertices>,
+    fromVertex: number,
+    toVertex: number,
+    params: {
+      totalLength: number;
+      tileSize: number;
+      fadeEnabled: boolean;
+      alphaMultiplier: number;
+      colourTimeMs: number;
+      animated: boolean;
+      shineState: ReturnType<typeof advanceTrailShineState> | null;
+    }
+  ): TrailLayerSegment[] {
+    const { totalLength, tileSize, fadeEnabled, alphaMultiplier, colourTimeMs: trailColourTimeMs, animated: trailAnimated, shineState } = params;
     // Style is computed once per segment, then drawn in two SEPARATE
     // complete passes over every segment (all glow, then all core) rather
     // than interleaved glow-then-core-then-next-segment's-glow. Interleaving
@@ -9732,8 +9944,8 @@ export class MenuScene extends Phaser.Scene {
     // overlap. Splitting into two full passes means every core stroke ends
     // up on top of every glow stroke, with no draw-order dependency on
     // segment index.
-    const segments = [];
-    for (let i = 1; i < vertices.length; i += 1) {
+    const segments: TrailLayerSegment[] = [];
+    for (let i = Math.max(1, fromVertex); i <= toVertex && i < vertices.length; i += 1) {
       const previous = vertices[i - 1]!;
       const current = vertices[i]!;
       // A subpath break is a topology discontinuity (e.g. a wraparound
@@ -9743,13 +9955,12 @@ export class MenuScene extends Phaser.Scene {
       if (current.newSubpath) {
         continue;
       }
-      perfStrokeSegmentCount += 1;
 
       const midDistance = (previous.distance + current.distance) / 2;
-      const ageAlpha = trailFadeEnabled
+      const ageAlpha = fadeEnabled
         ? clamp(
           LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN
-            + ((midDistance / geometry.totalLength) * (LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX - LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN)),
+            + ((midDistance / totalLength) * (LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX - LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN)),
           LEGACY_PLAY_TRAIL_AGE_ALPHA_MIN,
           LEGACY_PLAY_TRAIL_AGE_ALPHA_MAX
         )
@@ -9786,51 +9997,17 @@ export class MenuScene extends Phaser.Scene {
         }
       }
 
-      segments.push({ previous, current, baseColor, coreColor, coreAlpha });
+      segments.push({
+        previous,
+        current,
+        glowColor: baseColor,
+        coreColor,
+        alpha: coreAlpha,
+        // The dark ground follows the lifecycle fade only, never the age fade (keeps the core's contrast).
+        underlayAlpha: alphaMultiplier
+      });
     }
-
-    // Composited on the real 2D canvas (src/render/navigationCoreTrailCanvas.ts),
-    // not stroked as Phaser Graphics vector paths -- see trailCanvasImage's
-    // own field comment for why (Phaser.CANVAS has no WebGL-only postFX
-    // blur to reach for, and a raw CanvasRenderingContext2D gives real round
-    // joins on one continuous path plus a genuine shadowBlur halo, neither
-    // of which a Graphics stroke call exposes).
-    const canvasSegments: TrailLayerSegment[] = segments.map((segment) => ({
-      previous: segment.previous,
-      current: segment.current,
-      glowColor: segment.baseColor,
-      coreColor: segment.coreColor,
-      alpha: segment.coreAlpha,
-      // The dark ground follows the lifecycle fade only, never the age fade (keeps the core's contrast).
-      underlayAlpha: alphaMultiplier
-    }));
-    this.drawTrailCanvasSegments(canvasSegments, coreWidth, glowWidth, underlayWidth, glowAlphaScale);
-
-    const perfDrawEndedAtMs = performance.now();
-    this.trailRebuildCount += 1;
-    if (this.trailCanvasImage?.visible === true) {
-      this.trailDrawRecord = {
-        stamp: gateStamp,
-        drawnAtMs: time,
-        totalLength: geometry.totalLength,
-        costMs: perfDrawEndedAtMs - perfBuildStartedAtMs
-      };
-    }
-    this.lastTrailPerfDiagnostics = {
-      vertexCountBeforeResample: geometry.vertices.length,
-      vertexCountAfterResample: vertices.length,
-      strokeSegmentCount: perfStrokeSegmentCount,
-      geometryBuildMs: perfBuildEndedAtMs - perfBuildStartedAtMs,
-      drawMs: perfDrawEndedAtMs - perfBuildEndedAtMs,
-      totalMs: perfDrawEndedAtMs - perfBuildStartedAtMs,
-      totalLengthPx: geometry.totalLength,
-      tileSize,
-      shineEnabled,
-      trailFadeEnabled,
-      trailRebuildCount: this.trailRebuildCount,
-      trailSkippedRedrawCount: this.trailSkippedRedrawCount,
-      perfectPathComputeCount: this.trailPerfectPathCache.computeCount
-    };
+    return segments;
   }
 
   // Resizes/repositions the trail's own canvas (only when its bounding box
@@ -9858,9 +10035,16 @@ export class MenuScene extends Phaser.Scene {
     coreWidth: number,
     glowWidth: number,
     underlayWidth: number,
-    glowAlphaScale: number
+    glowAlphaScale: number,
+    tailCut: { x: number; y: number; dx: number; dy: number } | null = null,
+    splitLayer = tailCut !== null
   ): void {
-    if (!this.trailCanvasTexture || !this.trailCanvasImage || segments.length === 0) {
+    // The main canvas, or (MAZER-PERF-004) the small tail canvas that sits over it while the head moves, which leaves a small
+    // box behind the straight cut where it meets the main canvas untouched (trailLayersCanvas.ts, excludeBehind).
+    const tail = tailCut !== null;
+    const texture = tail ? this.trailTailCanvasTexture : this.trailCanvasTexture;
+    const image = tail ? this.trailTailCanvasImage : this.trailCanvasImage;
+    if (!texture || !image || segments.length === 0) {
       return;
     }
     const padding = Math.ceil(glowWidth);
@@ -9870,27 +10054,45 @@ export class MenuScene extends Phaser.Scene {
     }
     // Whole-pixel origin: Phaser (roundPixels) floors an Image's position, so a fractional one made the trail jump a
     // css px each time the head crossed an integer. See src/render/pixelAlignment.ts.
-    const bounds = alignBoundsToWholePixels(rawBounds);
-    const width = Math.max(1, Math.ceil(bounds.width));
-    const height = Math.max(1, Math.ceil(bounds.height));
+    let bounds = alignBoundsToWholePixels(rawBounds);
     const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
     const resolution = Math.min(
       MAZER_CANVAS_RESOLUTION_MAX * 2,
       resolveMazerCanvasResolution() * zoomScale
     );
+    if (splitLayer) {
+      // MAZER-PERF-004: the bloom is rasterised on a 1/f scratch canvas whose grid starts at this canvas's origin, so two
+      // canvases that must agree pixel for pixel (the prefix, the tail, a full rebuild) start on a multiple of f css px:
+      // then their scratch grids coincide (f x resolution / f is a whole number of scratch pixels).
+      const lattice = resolveBloomDownscale(Math.max(2, glowWidth * 0.5) * resolution);
+      const left = Math.floor(bounds.left / lattice) * lattice;
+      const top = Math.floor(bounds.top / lattice) * lattice;
+      bounds = { left, top, width: (bounds.left + bounds.width) - left, height: (bounds.top + bounds.height) - top };
+    }
+    const width = Math.max(1, Math.ceil(bounds.width));
+    const height = Math.max(1, Math.ceil(bounds.height));
     const backingWidth = Math.max(1, Math.ceil(width * resolution));
     const backingHeight = Math.max(1, Math.ceil(height * resolution));
+    const knownWidth = tail ? this.trailTailCanvasWidth : this.trailCanvasWidth;
+    const knownHeight = tail ? this.trailTailCanvasHeight : this.trailCanvasHeight;
+    const knownResolution = tail ? this.trailTailCanvasResolution : this.trailCanvasResolution;
     if (
-      backingWidth !== this.trailCanvasWidth
-      || backingHeight !== this.trailCanvasHeight
-      || resolution !== this.trailCanvasResolution
+      backingWidth !== knownWidth
+      || backingHeight !== knownHeight
+      || resolution !== knownResolution
     ) {
-      this.trailCanvasTexture.setSize(backingWidth, backingHeight);
-      this.trailCanvasWidth = backingWidth;
-      this.trailCanvasHeight = backingHeight;
-      this.trailCanvasResolution = resolution;
+      texture.setSize(backingWidth, backingHeight);
+      if (tail) {
+        this.trailTailCanvasWidth = backingWidth;
+        this.trailTailCanvasHeight = backingHeight;
+        this.trailTailCanvasResolution = resolution;
+      } else {
+        this.trailCanvasWidth = backingWidth;
+        this.trailCanvasHeight = backingHeight;
+        this.trailCanvasResolution = resolution;
+      }
     } else {
-      this.trailCanvasTexture.clear(0, 0, backingWidth, backingHeight, false);
+      texture.clear(0, 0, backingWidth, backingHeight, false);
     }
     // Idempotent (setTransform, not scale/save/restore) -- context state
     // otherwise persists across frames and would compound every call. Path
@@ -9913,7 +10115,7 @@ export class MenuScene extends Phaser.Scene {
     // everything else) -- multiply it by `resolution` explicitly so the
     // device-pixel blur, once downscaled for display, reads as the same
     // logical radius regardless of backing resolution.
-    this.trailCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
+    texture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
     const trailDrawOptions = {
       originX: bounds.left,
       originY: bounds.top,
@@ -9928,19 +10130,21 @@ export class MenuScene extends Phaser.Scene {
       // bottom to top: neon bloom, dark underlay, crisp core (src/render/trailLayersCanvas.ts). Same path and
       // colours as the single compositor; the underlay follows the lifecycle fade only (underlayAlpha), the
       // core also follows the trail's age fade.
-      drawTrailLayersToCanvasContext(this.trailCanvasTexture.context, segments, {
+      drawTrailLayersToCanvasContext(texture.context, segments, {
         ...trailDrawOptions,
+        bloomExactScale: splitLayer,
         underlayWidth,
         underlayColor: boardMaterial.void,
-        underlayAlpha: LEGACY_TRAIL_UNDERLAY_ALPHA
+        underlayAlpha: LEGACY_TRAIL_UNDERLAY_ALPHA,
+        excludeBehind: tailCut ? { x: tailCut.x, y: tailCut.y, dx: tailCut.dx, dy: tailCut.dy, halfWidth: (underlayWidth / 2) + 1, depth: glowWidth } : undefined
       });
     } else {
-      drawTrailToCanvasContext(this.trailCanvasTexture.context, segments, trailDrawOptions);
+      drawTrailToCanvasContext(texture.context, segments, trailDrawOptions);
     }
-    this.trailCanvasTexture.refresh();
-    this.trailCanvasImage.setPosition(bounds.left, bounds.top);
-    this.trailCanvasImage.setDisplaySize(width, height);
-    this.trailCanvasImage.setVisible(true);
+    texture.refresh();
+    image.setPosition(bounds.left, bounds.top);
+    image.setDisplaySize(width, height);
+    image.setVisible(true);
   }
 
   private fillLegacyDynamicPathTile(

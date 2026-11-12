@@ -28,6 +28,20 @@ export interface TrailLayersOptions {
   /** bg.canvas, and the alpha it is laid down at. */
   underlayColor: number;
   underlayAlpha: number;
+  /**
+   * Leave a small box untouched: it lies BEHIND the point (x, y), square to the unit direction (dx, dy), `halfWidth` to
+   * each side and `depth` back (board coordinates, same space as the segments). Used by the head-only tail redraw
+   * (src/render/trailTailSplit.ts): the tail starts at a straight cut, and its first segment would otherwise paint its
+   * round caps (the dark underlay in particular) and its bloom over the end of the older trail drawn on another canvas.
+   * The box is only as wide as that older stretch, so a later part of the tail that curls back alongside it is unaffected.
+   */
+  /**
+   * Scale the bloom's scratch canvas back up by exactly its downscale factor instead of stretching it to the target's size.
+   * The stretch differs a little (up to half a scratch pixel across the canvas) with the canvas size, so two canvases that
+   * must agree pixel for pixel (the split trail's prefix and tail) set this. Off by default: unsplit trails are unchanged.
+   */
+  bloomExactScale?: boolean;
+  excludeBehind?: { x: number; y: number; dx: number; dy: number; halfWidth: number; depth: number };
 }
 
 const rgba = (color: number, alpha: number): string => (
@@ -129,7 +143,17 @@ const drawBloomDownscaled = (
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(scratch.canvas as CanvasImageSource, 0, 0, scratch.canvas.width, scratch.canvas.height, 0, 0, target.width!, target.height!);
+  ctx.drawImage(
+    scratch.canvas as CanvasImageSource,
+    0,
+    0,
+    scratch.canvas.width,
+    scratch.canvas.height,
+    0,
+    0,
+    options.bloomExactScale ? scratch.canvas.width * factor : target.width!,
+    options.bloomExactScale ? scratch.canvas.height * factor : target.height!
+  );
   ctx.restore();
   return true;
 };
@@ -145,6 +169,29 @@ export const drawTrailLayersToCanvasContext = (
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
+  if (options.excludeBehind) {
+    const { x, y, dx, dy, halfWidth, depth } = options.excludeBehind;
+    const reach = 8192;
+    let px = x - options.originX;
+    let py = y - options.originY;
+    // The trail runs along the board grid, so at a straight cut the line is square to an axis: put it on a device pixel
+    // boundary, so no edge pixel is half covered (a half covered dark underlay over the older core is a visible hairline).
+    const scale = typeof ctx.getTransform === 'function' ? ctx.getTransform().a : 1;
+    if (scale > 0 && Math.abs(dx) > 0.999) {
+      px = Math.round(px * scale) / scale;
+    } else if (scale > 0 && Math.abs(dy) > 0.999) {
+      py = Math.round(py * scale) / scale;
+    }
+    // Square to (dx, dy) is (-dy, dx). An even-odd clip of a huge rectangle with the box cut out of it.
+    ctx.beginPath();
+    ctx.rect(px - reach, py - reach, 2 * reach, 2 * reach);
+    ctx.moveTo(px - (dy * halfWidth), py + (dx * halfWidth));
+    ctx.lineTo(px + (dy * halfWidth), py - (dx * halfWidth));
+    ctx.lineTo(px + (dy * halfWidth) - (dx * depth), py - (dx * halfWidth) - (dy * depth));
+    ctx.lineTo(px - (dy * halfWidth) - (dx * depth), py + (dx * halfWidth) - (dy * depth));
+    ctx.closePath();
+    ctx.clip('evenodd');
+  }
 
   // 1. Bloom: blurred glow in each segment's own base colour.
   const chunks = chunkTrailSegments(segments);
