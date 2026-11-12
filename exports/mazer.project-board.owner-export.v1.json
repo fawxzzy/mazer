@@ -1,28 +1,28 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_0dfe53eaa1c7",
+  "export_id": "pbe_mazer_owner_registry_0f6676b9e10d",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:0dfe53eaa1c7e38629032770f9235c247f73ed11c15df4b8fa62de8037d836d6",
-  "generated_at": "2026-11-12T23:00:00.000Z",
+  "source_revision": "sha256:0f6676b9e10dbdce7a08fabe4ed6129847c27f9ad45629783de5627b5d703367",
+  "generated_at": "2026-11-12T23:30:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:5c94f6de44e840ed8071100274973a39d85eade2a7d8341d9113de7ac89445fe",
-      "observed_at": "2026-11-12T23:00:00.000Z"
+      "revision": "sha256:4f17c8ecafa3e6f088cc6b3dea20ffb79b64b72ac384e985efb9cceef93c8e90",
+      "observed_at": "2026-11-12T23:30:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
       "kind": "markdown",
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
-      "revision": "sha256:b6ef52ca95155d5227d92f8a6c443fe5a88b8344b6cbd96967f34f71cafc83f5",
-      "observed_at": "2026-11-12T23:00:00.000Z"
+      "revision": "sha256:93a269a05d7a3df1a29ae485c545be7434791c8ae294c4da17512c09cd7d52ec",
+      "observed_at": "2026-11-12T23:30:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-12T23:00:00.000Z"
+      "observed_at": "2026-11-12T23:30:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-12T23:00:00.000Z"
+      "observed_at": "2026-11-12T23:30:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-12T23:00:00.000Z"
+      "observed_at": "2026-11-12T23:30:00.000Z"
     }
   ],
   "cards": [
@@ -3920,6 +3920,111 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-gen-005_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-GEN-005",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Unreachable floor islands appear in about 6% of generated mazes",
+        "description": "About 6 percent of generated mazes carry a small group of floor tiles that no path reaches, visible as orphan tiles. Measured identical before and after the no-stub rule (MAZER-GEN-006), so it is an older generator behaviour, not a regression. Plan: find where the islands are created, then either wall them up or connect them without changing the felt-difficulty number, and add a property test over many seeds. Not started.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-12T23:30:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-005",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-005",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T23:30:00.000Z"
+      },
+      "content": {
+        "summary": "About 6 percent of generated mazes carry a small group of floor tiles that no path reaches, visible as orphan tiles. Measured identical before and after the no-stub rule (MAZER-GEN-006), so it is an older generator behaviour, not a regression. Plan: find where the islands are created, then either wall them up or connect them without changing the felt-difficulty number, and add a property test over many seeds. Not started.",
+        "objective": "About 6 percent of generated mazes carry a small group of floor tiles that no path reaches, visible as orphan tiles. Measured identical before and after the no-stub rule (MAZER-GEN-006), so it is an older generator behaviour, not a regression. Plan: find where the islands are created, then either wall them up or connect them without changing the felt-difficulty number, and add a property test over many seeds. Not started.",
+        "acceptance_criteria": [
+          "Root cause of the islands is identified",
+          "No generated maze has floor tiles the start cannot reach",
+          "A property test over many seeds and both boards pins it"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-gen-006_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-GEN-006",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "No one-tile dead-end stubs in generated mazes",
+        "description": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-PROG-013"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T23:30:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-006",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-006",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T23:30:00.000Z"
+      },
+      "content": {
+        "summary": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open.",
+        "objective": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open.",
+        "acceptance_criteria": [
+          "No generated ladder maze (levels 2 and up) has a dead-end branch shorter than 2 cells",
+          "Felt-difficulty number unchanged by every stub edit; AI runner solves 340 of 340",
+          "Phone preview of levels 150, 218 and 300 shows no single-cell nubs and solves normally",
+          "Owner accepts the ladder ending at level 218 and the lower late difficulty"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-gov-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -7050,6 +7155,60 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-prog-019_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PROG-019",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Revisit ladder length after the no-stub rule: another cost-free lever or hazards",
+        "description": "The no-stub rule (MAZER-GEN-006) shortened the strictly rising ladder from 268 to 218 and lowered held-out difficulty of late mazes while the felt number stayed the same. Decide how to restore headroom past 218: find another lever that costs no felt difficulty, or let the hazard layer supply difficulty (MAZER-HAZ-002, blocked on an owner decision). Needs the owner's reaction to the shorter ladder first. Not started.",
+        "card_type": "research",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-GEN-006",
+          "MAZER-HAZ-002"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T23:30:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-019",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-019",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T23:30:00.000Z"
+      },
+      "content": {
+        "summary": "The no-stub rule (MAZER-GEN-006) shortened the strictly rising ladder from 268 to 218 and lowered held-out difficulty of late mazes while the felt number stayed the same. Decide how to restore headroom past 218: find another lever that costs no felt difficulty, or let the hazard layer supply difficulty (MAZER-HAZ-002, blocked on an owner decision). Needs the owner's reaction to the shorter ladder first. Not started.",
+        "objective": "The no-stub rule (MAZER-GEN-006) shortened the strictly rising ladder from 268 to 218 and lowered held-out difficulty of late mazes while the felt number stayed the same. Decide how to restore headroom past 218: find another lever that costs no felt difficulty, or let the hazard layer supply difficulty (MAZER-HAZ-002, blocked on an owner decision). Needs the owner's reaction to the shorter ladder first. Not started.",
+        "acceptance_criteria": [
+          "Owner states whether a ladder ending at level 218 is acceptable",
+          "Candidate levers are measured for felt cost and held-out difficulty",
+          "The chosen path is recorded on this card and the hazard contract card"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-pwa-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -7608,6 +7767,59 @@
           "UI holds across the supported viewport matrix",
           "Layout state survives reload",
           "Real-device checks are recorded"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-qa-007_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-QA-007",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Replace the 268 checkpoint in the level preview jump list with 218",
+        "description": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Not started.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-GEN-006"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-12T23:30:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-007",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-007",
+        "source_status": "current",
+        "source_updated_at": "2026-11-12T23:30:00.000Z"
+      },
+      "content": {
+        "summary": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Not started.",
+        "objective": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Not started.",
+        "acceptance_criteria": [
+          "The jump list offers 218 as the end-of-fringe checkpoint",
+          "No remaining reference to 268 as a ladder end in the preview list",
+          "Tests that name the checkpoint pass"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -10824,9 +11036,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 206,
-    "exported_public_card_count": 206,
-    "exported_open_card_count": 98,
+    "stable_identity_count": 210,
+    "exported_public_card_count": 210,
+    "exported_open_card_count": 102,
     "exported_completed_card_count": 92,
     "exported_deferred_card_count": 16,
     "imported_research_candidate_count": 0,
