@@ -109,6 +109,12 @@ The two offline notices (`remote.outbox.offline-saved`, `remote.outbox.synced`) 
 Section 5 counts are the audit-base snapshot and are not recomputed.
 Guard: every table value must be a sentence with no provider or internal wording.
 
+Shared-account sign-in failures (2026-11-11): `LEGACY_OAUTH_FAILURE_MESSAGE_COPY` (7 class rows: `timedOut`, `contextLost`,
+`cancelled`, `connection`, `session`, `storage`, `generic`) is a sixth routed table, resolved by
+`resolveLegacyOAuthFailureMessage(code)` (id `auth.oauth-failure.<class>`, tone error). The internal failure code is recorded only in
+`technicalDetail` (`oauth-failure:<code>`, diagnostics) and never in player copy. `resolveLegacyAuthFeedbackMessage` passes this copy
+through unchanged. The `generic` row equals `MAZER_OAUTH_SAFE_ERROR_MESSAGE` (the literal pinned in section 4 for `legacyAccountPortal.ts`).
+
 ## 4. Pinned literal inventory (player-facing strings outside the message module)
 
 Columns: "Via module" is whether the string flows through `legacyPlayerMessage.ts`. "Tone / source" is the
