@@ -18,6 +18,7 @@
  * Shapes:
  *   top3      you are rank 2 of the loaded top 50
  *   rank57    you are rank 57, outside the loaded top 50 (pinned You row only)
+ *   unranked  a named player with no rank yet (MAZER-ACCT-022): a loaded board, pinned You row with dashes
  *   empty     nobody has a public rank yet (also the default for the fixture)
  *   loading   the page request never resolves
  *   error     the page request fails with the generic friendly error
@@ -29,6 +30,7 @@ import type { LegacyLeaderboardEntry, LegacyLeaderboardSelfRank } from './legacy
 export const LEGACY_LEADERBOARD_FIXTURE_SHAPES = [
   'top3',
   'rank57',
+  'unranked',
   'empty',
   'loading',
   'error',
@@ -117,6 +119,8 @@ export const buildLegacyLeaderboardFixtureData = (
         entries: buildFixtureEntries(null),
         selfRank: { hasUsername: true, playerLevel: fixtureLevelForRank(57), rank: '57' }
       };
+    case 'unranked':
+      return { entries: buildFixtureEntries(null), selfRank: null };
     default:
       return { entries: [], selfRank: null };
   }

@@ -182,8 +182,13 @@ export interface LegacyLeaderboardSelfRowModel {
   levelText: string;
   /** True when the You row repeats a row that is in the loaded list. */
   inList: boolean;
+  /** False for a named player who has no leaderboard rank yet (rank and level show a dash). */
+  ranked: boolean;
   accessibilityLabel: string;
 }
+
+/** Rank and level text of a named player who has no rank yet (a dash, not a sentence). */
+export const LEGACY_LEADERBOARD_UNRANKED_TEXT = '–';
 
 const buildSelfRow = (
   selfRank: LegacyLeaderboardSelfRank | null,
@@ -191,20 +196,35 @@ const buildSelfRow = (
   loadedRankKeys: ReadonlySet<string>,
   usernameMaxChars: number
 ): LegacyLeaderboardSelfRowModel | null => {
-  // A caller without a username has no rank (the gate handles that); a named caller
-  // with a null rank is a server contradiction: treat both as "no usable self-rank".
+  const name = selfUsername.trim();
+  // No usable self-rank: a caller without a username has none (the gate handles that), and a
+  // named caller may not be ranked yet (MAZER-ACCT-022). A named player still gets the pinned
+  // You row, with a dash for rank and level, so Edit name stays reachable. An unnamed one gets none.
   if (selfRank === null || !selfRank.hasUsername || selfRank.rank === null) {
-    return null;
+    if (name.length === 0) {
+      return null;
+    }
+    return {
+      accessibilityLabel: `You have no rank yet. ${LEGACY_LEADERBOARD_COPY.editName}`,
+      editLabel: LEGACY_LEADERBOARD_COPY.editName,
+      inList: false,
+      label: LEGACY_LEADERBOARD_COPY.you,
+      levelText: LEGACY_LEADERBOARD_UNRANKED_TEXT,
+      ranked: false,
+      rankText: LEGACY_LEADERBOARD_UNRANKED_TEXT,
+      tier: 'standard',
+      usernameText: resolveLegacyLeaderboardUsernameDisplay(name, usernameMaxChars)
+    };
   }
   const rankText = formatLegacyProgressionOrdinal(selfRank.rank);
   const levelText = formatLegacyProgressionOrdinal(selfRank.playerLevel);
-  const name = selfUsername.trim();
   return {
     accessibilityLabel: `You are rank ${rankText}, level ${levelText}. ${LEGACY_LEADERBOARD_COPY.editName}`,
     editLabel: LEGACY_LEADERBOARD_COPY.editName,
     inList: loadedRankKeys.has(normalizeLegacyProgressionOrdinal(selfRank.rank)),
     label: LEGACY_LEADERBOARD_COPY.you,
     levelText,
+    ranked: true,
     rankText,
     tier: resolveLegacyLeaderboardRankTier(selfRank.rank),
     usernameText: name.length > 0 ? resolveLegacyLeaderboardUsernameDisplay(name, usernameMaxChars) : null
@@ -316,6 +336,8 @@ const COPY = LEGACY_LEADERBOARD_COPY;
 
 const STATES = Object.freeze({
   empty: { action: null, heading: COPY.emptyHeading, kind: 'empty', text: COPY.emptyBody, tone: 'muted' },
+  // Same block for a named player: Edit name stays reachable with an empty board (MAZER-ACCT-022).
+  emptyNamed: { action: EDIT_USERNAME, heading: COPY.emptyHeading, kind: 'empty', text: COPY.emptyBody, tone: 'muted' },
   error: { action: RETRY_PAGE, heading: COPY.errorHeading, kind: 'error', text: COPY.errorBody, tone: 'error' },
   needsUsername: { action: EDIT_USERNAME, heading: COPY.needsUsernameHeading, kind: 'needs-username', text: COPY.needsUsernameBody, tone: 'muted' },
   notSetUp: { action: RETRY_PAGE, heading: COPY.notSetUpHeading, kind: 'not-set-up', text: COPY.notSetUpBody, tone: 'muted' },
@@ -377,7 +399,7 @@ export const buildLegacyLeaderboardViewModel = (
   }
 
   if (loaded.length === 0) {
-    return base('empty', { state: STATES.empty });
+    return base('empty', { state: state.selfUsername.trim().length > 0 ? STATES.emptyNamed : STATES.empty });
   }
 
   return base('ready', {

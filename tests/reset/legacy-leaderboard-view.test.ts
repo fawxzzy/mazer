@@ -4,6 +4,7 @@ import {
   LEGACY_LEADERBOARD_COPY,
   LEGACY_LEADERBOARD_SKELETON_ROWS,
   LEGACY_LEADERBOARD_TOP_N,
+  LEGACY_LEADERBOARD_UNRANKED_TEXT,
   LEGACY_LEADERBOARD_USERNAME_MAX_CHARS,
   buildLegacyLeaderboardViewModel,
   resolveLegacyLeaderboardRankTier,
@@ -108,10 +109,36 @@ describe('leaderboard view-model: the pinned You row', () => {
     expect(view.selfRow).toMatchObject({ inList: true, rankText: '2', tier: 'cyan' });
   });
 
-  test('no usable self-rank (no username, or a named caller with a null rank) means no You row, never a broken one', () => {
-    expect(buildLegacyLeaderboardViewModel(state({ selfRank: self(null, '5', false) })).selfRow).toBeNull();
-    expect(buildLegacyLeaderboardViewModel(state({ selfRank: self(null, '5', true) })).selfRow).toBeNull();
-    expect(buildLegacyLeaderboardViewModel(state({ selfRank: null })).selfRow).toBeNull();
+  test('an unnamed caller with no usable self-rank gets no You row', () => {
+    expect(buildLegacyLeaderboardViewModel(state({ selfRank: self(null, '5', false), selfUsername: '' })).selfRow).toBeNull();
+    expect(buildLegacyLeaderboardViewModel(state({ selfRank: null, selfUsername: '' })).selfRow).toBeNull();
+  });
+
+  test('MAZER-ACCT-022: a named player with no rank yet still gets a You row, so Edit name stays reachable', () => {
+    for (const selfRank of [null, self(null, '5', true), self(null, '5', false)]) {
+      const view = buildLegacyLeaderboardViewModel(state({ selfRank }));
+      expect(view.selfRow).toMatchObject({
+        editLabel: 'Edit name',
+        inList: false,
+        label: 'You',
+        levelText: LEGACY_LEADERBOARD_UNRANKED_TEXT,
+        ranked: false,
+        rankText: LEGACY_LEADERBOARD_UNRANKED_TEXT,
+        usernameText: 'qa-player'
+      });
+    }
+  });
+
+  test('MAZER-ACCT-022: the ranked flow is unchanged', () => {
+    const view = buildLegacyLeaderboardViewModel(state({ entries: entries(50), selfRank: self('57', '68') }));
+    expect(view.selfRow).toMatchObject({ levelText: '68', ranked: true, rankText: '57' });
+  });
+
+  test('MAZER-ACCT-022: an empty board offers Edit name to a named player only', () => {
+    const named = buildLegacyLeaderboardViewModel(state({ entries: [], status: 'empty' }));
+    expect(named.state).toMatchObject({ action: { id: 'edit-username', label: 'Edit name' }, kind: 'empty' });
+    const unnamed = buildLegacyLeaderboardViewModel(state({ entries: [], selfUsername: '', status: 'empty' }));
+    expect(unnamed.state).toMatchObject({ action: null, kind: 'empty' });
   });
 
   test('an unknown saved username falls back to the bare You label', () => {
@@ -131,8 +158,8 @@ describe('leaderboard view-model: designed states (no raw error text)', () => {
     }
   });
 
-  test('empty: heading, one line, no action', () => {
-    const view = buildLegacyLeaderboardViewModel(state({ entries: [], status: 'empty' }));
+  test('empty: heading, one line, no action (an unnamed player; a named one gets Edit name, MAZER-ACCT-022)', () => {
+    const view = buildLegacyLeaderboardViewModel(state({ entries: [], selfUsername: '', status: 'empty' }));
     expect(view.phase).toBe('empty');
     expect(view.state).toMatchObject({ action: null, heading: 'No ranks yet', kind: 'empty' });
   });
