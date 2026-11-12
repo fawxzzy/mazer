@@ -10,6 +10,7 @@
  * function of (geometry, timeMs, reducedMotion) only, no Date/Math.random.
  */
 import { centerOfCell, type TileBakeContext2D } from './boardTileBake';
+import { MOTION_LOOP_MS } from './motionScale';
 import {
   BOARD_MARKER_MIN_CSS,
   boardMaterial,
@@ -30,7 +31,7 @@ export const GOAL_BEACON = Object.freeze({
   haloPeakAlpha: 0.34,
   /** The pulse swings the halo alpha between (1 - swing) and 1 of its peak. */
   pulseSwing: 0.35,
-  pulsePeriodMs: 2400,
+  pulsePeriodMs: MOTION_LOOP_MS.blink,
   /** Reduced motion holds the pulse at this fraction of the peak. */
   reducedMotionLevel: 0.82,
   /** One expanding ping per period, lasting `pingDurationMs`. */
