@@ -49,16 +49,23 @@ describe('trail colour clock: the trail colour shifts with time on the menu demo
     expect(advance(scene, 2000)).toBe(1000);
   });
 
-  test.each(['play', 'menu'] as const)('%s: it holds while an overlay is open, the board is locked, or reduced motion is on', (mode) => {
+  test.each(['play', 'menu'] as const)('%s: it holds while an overlay is open or the board is locked', (mode) => {
     const overlay = makeScene({ mode, overlay: 'options', trailAnimationElapsedMs: 500 });
     advance(overlay, 1000);
     expect(advance(overlay, 2000)).toBe(500);
     const locked = makeScene({ mode, locked: true, trailAnimationElapsedMs: 500 });
     advance(locked, 1000);
     expect(advance(locked, 2000)).toBe(500);
+  });
+
+  test.each(['play', 'menu'] as const)('%s: reduced motion does NOT hold the colour clock (owner rule 2026-11-12: colours keep shifting)', (mode) => {
     const reduced = makeScene({ mode, reduced: true, trailAnimationElapsedMs: 500 });
     advance(reduced, 1000);
-    expect(advance(reduced, 2000)).toBe(500);
+    expect(advance(reduced, 2000)).toBe(1500);
+    // ...but it still pauses with an overlay, exactly like the unreduced clock
+    reduced.overlay = 'options';
+    advance(reduced, 3000);
+    expect(advance(reduced, 4000)).toBe(1500);
   });
 
   test('a pause does not bank the time spent paused', () => {

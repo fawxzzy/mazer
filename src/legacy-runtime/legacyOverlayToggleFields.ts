@@ -8,8 +8,6 @@ export type LegacyOverlayToggleFieldId =
   | 'toggleTrailPulse'
   | 'toggleAnimatedBackdrop'
   | 'hapticsEnabled'
-      };
-    }
   | 'toggleReducedMotion'
   | 'controlMode';
 export type LegacyOverlayToggleStateText = 'On' | 'Off' | 'Arrows' | 'Stick' | 'Animated' | 'Stagnant' | 'System';
@@ -61,8 +59,6 @@ export const resolveLegacyOverlayToggleSwitchIsOn = (
       return settings.toggleAnimatedBackdrop;
     case 'hapticsEnabled':
       return settings.hapticsEnabled;
-      };
-    }
     case 'toggleReducedMotion':
       return settings.toggleReducedMotion;
     case 'controlMode':

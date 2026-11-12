@@ -136,41 +136,42 @@ export const resolveTrailSheen = (distanceTiles: number, timeMs: number): number
   return squared * squared * base;
 };
 
-/** The sweep position 0..1 the core and bloom are read at, including the sheen's hue refraction. */
-export const resolveIridescentPosition = (distanceTiles: number, timeMs: number, reducedMotion: boolean): number => {
-  const t = reducedMotion ? 0 : timeMs;
-  const sheen = reducedMotion ? 0 : resolveTrailSheen(distanceTiles, timeMs);
+/**
+ * The sweep position 0..1 the core and bloom are read at, including the sheen's hue refraction.
+ *
+ * `motionStopped` stops MOVEMENT only (the travelling sheen band and, in `sampleIridescentTrail`, the swell). The hue
+ * sweep is COLOUR and always follows `timeMs` (MAZER-MOTION-004: reduced motion never freezes colour); a caller that
+ * wants a fully static trail passes `timeMs` 0 as well.
+ */
+export const resolveIridescentPosition = (distanceTiles: number, timeMs: number, motionStopped: boolean): number => {
+  const sheen = motionStopped ? 0 : resolveTrailSheen(distanceTiles, timeMs);
   return sweepPosition(
     (distanceTiles / IRIDESCENT_TRAIL_TILES_PER_SWEEP)
-    + (t / IRIDESCENT_TRAIL_SWEEP_PERIOD_MS)
+    + (timeMs / IRIDESCENT_TRAIL_SWEEP_PERIOD_MS)
     + (TRAIL_SHEEN_HUE_SHIFT * sheen)
   );
 };
 
 /** The palette at the sample's own hue position, with no lifts: the contrast floor the lifts only brighten from. */
-export const resolveIridescentBaseCore = (distanceTiles: number, timeMs: number, reducedMotion: boolean): number => (
-  sampleStops(IRIDESCENT_TRAIL_CORE_STOPS, resolveIridescentPosition(distanceTiles, timeMs, reducedMotion))
+export const resolveIridescentBaseCore = (distanceTiles: number, timeMs: number, motionStopped: boolean): number => (
+  sampleStops(IRIDESCENT_TRAIL_CORE_STOPS, resolveIridescentPosition(distanceTiles, timeMs, motionStopped))
 );
 
 /**
  * Core, bloom, swell and sheen at a point of the trail. `distanceTiles` is the physical distance along the trail in
  * tiles (stable on a cell, see the scene's origin-advance accounting). Fills and returns a shared scratch record:
- * read it before the next call.
+ * read it before the next call. `motionStopped` holds the sheen band and the swell still; the hue sweep still follows
+ * `timeMs` (see resolveIridescentPosition).
  */
 export const sampleIridescentTrail = (
   distanceTiles: number,
   timeMs: number,
-  reducedMotion: boolean,
+  motionStopped: boolean,
   out: IridescentTrailSample = SCRATCH
 ): IridescentTrailSample => {
-  const sheen = reducedMotion ? 0 : resolveTrailSheen(distanceTiles, timeMs);
-  const t = reducedMotion ? 0 : timeMs;
-  const position = sweepPosition(
-    (distanceTiles / IRIDESCENT_TRAIL_TILES_PER_SWEEP)
-    + (t / IRIDESCENT_TRAIL_SWEEP_PERIOD_MS)
-    + (TRAIL_SHEEN_HUE_SHIFT * sheen)
-  );
-  const wave = reducedMotion ? TRAIL_PULSE_REDUCED_LEVEL : resolveTrailPulseWave(distanceTiles, timeMs);
+  const sheen = motionStopped ? 0 : resolveTrailSheen(distanceTiles, timeMs);
+  const position = resolveIridescentPosition(distanceTiles, timeMs, motionStopped);
+  const wave = motionStopped ? TRAIL_PULSE_REDUCED_LEVEL : resolveTrailPulseWave(distanceTiles, timeMs);
   const restingCore = sampleStops(IRIDESCENT_TRAIL_CORE_STOPS, position);
   const restingGlow = sampleStops(IRIDESCENT_TRAIL_GLOW_STOPS, position);
   const coreLift = Math.min(1, (TRAIL_PULSE_CORE_LIFT_MAX * wave) + (TRAIL_SHEEN_CORE_LIFT_MAX * sheen));
@@ -190,5 +191,5 @@ export const sampleIridescentTrail = (
 export const resolveTrailPaletteBorderColor = (
   headDistanceTiles: number,
   timeMs: number,
-  reducedMotion: boolean
-): number => sampleIridescentTrail(headDistanceTiles, timeMs, reducedMotion, { core: 0, glow: 0, wave: 0, sheen: 0 }).core;
+  motionStopped: boolean
+): number => sampleIridescentTrail(headDistanceTiles, timeMs, motionStopped, { core: 0, glow: 0, wave: 0, sheen: 0 }).core;

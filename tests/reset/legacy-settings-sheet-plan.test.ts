@@ -392,7 +392,7 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
     // Board Zoom's removal had let the expanded pause card fit at 538. The Haptics toggle row (MAZER-CTRL-001) and
     // the Reduce Motion toggle + helper note (MAZER-MOTION-004) make the natural card taller than the panel,
     // so the card fills the panel and scrolls (the rail is expected).
-    expect(plan.naturalCardHeight).toBe(0);
+    expect(plan.naturalCardHeight).toBe(754);
     expect(plan.card.height).toBe(plan.panel.height);
     expect(plan.scrollable).toBe(true);
     // The signed-in menu sheet is still 590 tall at 320x568: it genuinely overflows and keeps the rail.

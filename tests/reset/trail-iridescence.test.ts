@@ -297,16 +297,33 @@ describe('iridescent trail pulse', () => {
   });
 });
 
-describe('iridescent trail with reduced motion (and Trail Shine off): a static gradient', () => {
-  test('no time term and a constant pulse level: any two times give the same colours', () => {
+describe('iridescent trail with motion stopped (reduced motion, or Trail Shine off): no shine, no swell', () => {
+  test('motion stopped holds the swell level and the sheen at rest; with the colour time held too, two times give the same colours', () => {
     for (let d = 0; d < 20; d += 0.7) {
       const t0 = { ...sampleIridescentTrail(d, 0, true, { core: 0, glow: 0, wave: 0, sheen: 0 }) };
-      const t1 = { ...sampleIridescentTrail(d, 12345, true, { core: 0, glow: 0, wave: 0, sheen: 0 }) };
+      const t1 = { ...sampleIridescentTrail(d, 0, true, { core: 0, glow: 0, wave: 0, sheen: 0 }) };
       expect(t1).toEqual(t0);
       expect(t0.wave).toBe(TRAIL_PULSE_REDUCED_LEVEL);
+      const later = { ...sampleIridescentTrail(d, 12345, true, { core: 0, glow: 0, wave: 0, sheen: 0 }) };
+      expect(later.wave).toBe(TRAIL_PULSE_REDUCED_LEVEL);
+      expect(later.sheen).toBe(0);
     }
     expect(resolveTrailBreath(0, true)).toBe(resolveTrailBreath(99999, true));
     expect(resolveTrailWidthScale(resolveTrailBreath(0, true))).toBe(resolveTrailWidthScale(resolveTrailBreath(1234, true)));
+  });
+
+  test('MAZER-MOTION-004: motion stopped does NOT freeze colour: the hue sweep still follows the colour time', () => {
+    const out = { core: 0, glow: 0, wave: 0, sheen: 0 };
+    const cores = new Set<number>();
+    for (let t = 0; t < IRIDESCENT_TRAIL_SWEEP_PERIOD_MS; t += 500) {
+      cores.add(sampleIridescentTrail(3, t, true, out).core);
+      expect(out.sheen).toBe(0);
+      expect(out.wave).toBe(TRAIL_PULSE_REDUCED_LEVEL);
+    }
+    // out and back: the triangle sweep revisits colours, so 500 ms steps over one period show several distinct ones
+    expect(cores.size).toBeGreaterThanOrEqual(4);
+    // one full sweep period later the colour is back where it started
+    expect(sampleIridescentTrail(3, IRIDESCENT_TRAIL_SWEEP_PERIOD_MS, true, out).core).toBe(sampleIridescentTrail(3, 0, true, out).core);
   });
 
   test('it is still iridescent: the static gradient shifts along the trail (no banding from a frozen wave)', () => {
@@ -318,12 +335,13 @@ describe('iridescent trail with reduced motion (and Trail Shine off): a static g
     expect(cores.size).toBeGreaterThanOrEqual(14);
   });
 
-  test('the scene gates the animation on Trail Shine (which already includes reduced motion) and redraws only while it is on', () => {
+  test('the scene splits the trail into a MOVEMENT gate (shine, breath: off under reduced motion) and a COLOUR gate (hue drift: only Trail Shine off holds it)', () => {
     expect(MENU_SCENE).toContain('const trailAnimated = shineEnabled;');
     expect(MENU_SCENE).toContain('resolveTrailBreath(animationTime, !trailAnimated)');
-    expect(MENU_SCENE).toContain('return this.settings.toggleTrailPulse && !this.prefersLegacyReducedMotion();');
-    // the continuous-redraw cadence that animates the pulse is only armed while the shine/pulse switch is on
-    expect(MENU_SCENE).toContain('const active = this.isLegacyTrailShineVisible() && this.overlay === \'none\' && this.trail.length > 1;');
+    expect(MENU_SCENE).toContain('return resolveTrailMotionPlan(this.settings.toggleTrailPulse, this.prefersLegacyReducedMotion());');
+    expect(MENU_SCENE).toContain('const trailColourTimeMs = resolveTrailColourTimeMs(animationTime, trailMotionPlan);');
+    // the continuous-redraw cadence runs while the COLOUR drifts, so it keeps running under reduced motion
+    expect(MENU_SCENE).toContain('const active = this.isLegacyTrailColourDrifting() && this.overlay === \'none\' && this.trail.length > 1;');
   });
 
   test('the Guide trail legend uses the same resting palette, frozen (time 0, no pulse)', () => {

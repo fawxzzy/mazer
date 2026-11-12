@@ -34,7 +34,8 @@ import {
   resolveMenuBlinkPhase,
   resolveReducedMotion,
   resolveReducedMotionSource,
-  resolveWordmarkHueTimeMs,
+  resolveTrailColourTimeMs,
+  resolveTrailMotionPlan,
   type ReducedMotionSource
 } from '../render/reducedMotion';
 import { alignBoundsToWholePixels, alignCameraToWholePixels } from '../render/pixelAlignment';
@@ -3308,7 +3309,9 @@ export class MenuScene extends Phaser.Scene {
     // jumps on the next AI-move redraw -- the identical "glitchy while
     // idle" symptom the play-mode cog had before its own fix, just gated
     // on a dirty flag that fix never covered.
-    if (this.mode === 'menu' && this.overlay === 'none' && !this.prefersLegacyReducedMotion()) {
+    // Reduced motion still redraws here: the START / Login rainbow keeps shifting (colour is not motion);
+    // only the blink is held lit (resolveMenuBlinkPhase).
+    if (this.mode === 'menu' && this.overlay === 'none') {
       this.boardPathDirty = true;
     }
     if (this.isLegacyMenuHandoffAnimationActive(time)) {
@@ -7238,8 +7241,19 @@ export class MenuScene extends Phaser.Scene {
     return resolveReducedMotion(this.legacyReducedMotionEnabled, this.settings.toggleReducedMotion);
   }
 
+  // MOVEMENT gate: the travelling shine/sheen band, the swell and the width breathing.
   private isLegacyTrailShineVisible(): boolean {
-    return this.settings.toggleTrailPulse && !this.prefersLegacyReducedMotion();
+    return this.resolveLegacyTrailMotionPlan().shineVisible;
+  }
+
+  // COLOUR gate: the trail hue drift. Reduced motion does not stop it (owner rule, 2026-11-12); only the player's own
+  // Trail Shine OFF does.
+  private isLegacyTrailColourDrifting(): boolean {
+    return this.resolveLegacyTrailMotionPlan().colourDrifts;
+  }
+
+  private resolveLegacyTrailMotionPlan(): ReturnType<typeof resolveTrailMotionPlan> {
+    return resolveTrailMotionPlan(this.settings.toggleTrailPulse, this.prefersLegacyReducedMotion());
   }
 
   private drawStaticBoard(): void {
@@ -7576,7 +7590,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const progress = resolveBleedGlowProgress(time);
+    const progress = resolveBleedGlowProgress(time, this.prefersLegacyReducedMotion());
     if (resolveBleedGlowEnvelope(progress) <= 0.01) {
       return;
     }
@@ -7808,10 +7822,10 @@ export class MenuScene extends Phaser.Scene {
     // the sigils would only redraw whenever boardPathDirty happened to be
     // set for some unrelated reason, freezing in place the rest of the
     // time instead of orbiting smoothly.
+    // Reduced motion does not gate this: the title rainbow and the edge-marker border colour keep shifting.
     if (
       (this.mode !== 'menu' && this.mode !== 'play')
       || this.overlay !== 'none'
-      || this.prefersLegacyReducedMotion()
     ) {
       return false;
     }
@@ -8987,12 +9001,10 @@ export class MenuScene extends Phaser.Scene {
       cellSize: layout.cellSize
     });
     const visibleCellCount = clamp(Math.ceil(layout.cells.length * clamp(revealProgress, 0, 1)), 0, layout.cells.length);
-    // Reduced motion holds the rainbow at one defined hue phase instead of freezing wherever the clock stopped.
-    const hueTimeMs = resolveWordmarkHueTimeMs(time, this.prefersLegacyReducedMotion());
     for (let index = 0; index < visibleCellCount; index += 1) {
       const cell = layout.cells[index];
       const cellColor = Phaser.Display.Color.HSVToRGB(
-        (hueTimeMs / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (cell.column / Math.max(1, layout.columns)),
+        (time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (cell.column / Math.max(1, layout.columns)),
         0.8,
         1
       ).color;
@@ -9479,7 +9491,9 @@ export class MenuScene extends Phaser.Scene {
     const isTrailVisibleAndLive = (this.mode === 'play' || this.mode === 'menu')
       && this.overlay === 'none'
       && !this.isLegacyPlayLifecycleInputLocked();
-    if (isTrailVisibleAndLive && !this.prefersLegacyReducedMotion()) {
+    // This is the COLOUR clock: it runs whenever the board is live, reduced motion or not (owner rule, 2026-11-12:
+    // reduced motion stops movement, never colour). The shine/breath MOVEMENT is gated separately below.
+    if (isTrailVisibleAndLive) {
       if (this.trailAnimationLastRealMs !== null) {
         this.trailAnimationElapsedMs += Math.max(0, time - this.trailAnimationLastRealMs);
       }
@@ -9579,7 +9593,8 @@ export class MenuScene extends Phaser.Scene {
     // traveling highlight. Driven by the pausable animationTime, not raw
     // scene time, so Pause freezes it and reduced motion holds it static
     // rather than snapping to a random phase whenever it's re-enabled.
-    const shineEnabled = this.isLegacyTrailShineVisible();
+    const trailMotionPlan = this.resolveLegacyTrailMotionPlan();
+    const shineEnabled = trailMotionPlan.shineVisible;
     let shineState: ReturnType<typeof advanceTrailShineState> | null = null;
     if (shineEnabled) {
       shineState = advanceTrailShineState(
@@ -9599,13 +9614,14 @@ export class MenuScene extends Phaser.Scene {
       this.trailShineLapCycleLength = shineState.lapCycleLength;
     }
 
-    // Iridescent colour and pulse (src/render/trailIridescence.ts). The Trail Shine setting is the trail's
-    // animation switch: off, or reduced motion, freezes it to the static iridescent gradient (no time term,
-    // no wave, constant breath), which is exactly what shineEnabled already means.
+    // Iridescent colour and pulse (src/render/trailIridescence.ts). Two gates (reducedMotion.ts, resolveTrailMotionPlan):
+    // MOVEMENT (shine band, swell, breath) stops under reduced motion or Trail Shine off, which is what shineEnabled
+    // means; COLOUR (the hue sweep on the colour clock) stops only for Trail Shine off, never for reduced motion.
     const trailAnimated = shineEnabled;
+    const trailColourTimeMs = resolveTrailColourTimeMs(animationTime, trailMotionPlan);
     this.trailPaletteHead = {
       distanceTiles: (geometry.totalLength + this.trailOriginAdvanceDistancePx) / tileSize,
-      timeMs: animationTime,
+      timeMs: trailColourTimeMs,
       animated: trailAnimated
     };
     const trailBreath = resolveTrailBreath(animationTime, !trailAnimated);
@@ -9663,7 +9679,7 @@ export class MenuScene extends Phaser.Scene {
       // every time the origin slides forward. The sweep is periodic over
       // distance, so this is a phase realignment, not a length change.
       const colorPhaseTiles = (midDistance + this.trailOriginAdvanceDistancePx) / tileSize;
-      const sample = sampleIridescentTrail(colorPhaseTiles, animationTime, !trailAnimated);
+      const sample = sampleIridescentTrail(colorPhaseTiles, trailColourTimeMs, !trailAnimated);
       const baseColor = sample.glow;
       let coreColor = sample.core;
       let coreAlpha = ageAlpha * alphaMultiplier;
@@ -10360,7 +10376,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
-    const active = this.isLegacyTrailShineVisible() && this.overlay === 'none' && this.trail.length > 1;
+    // Redraws while the trail colour drifts, which includes reduced motion (colour keeps shifting).
+    const active = this.isLegacyTrailColourDrifting() && this.overlay === 'none' && this.trail.length > 1;
     if (!active) {
       this.legacyPlayTrailPulseNextFrameAtMs = 0;
       return false;
@@ -10454,7 +10471,10 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.62);
     this.hudGraphics.fillCircle(centerX, centerY, anchorDotRadius);
     const anchorOrbitRadius = anchorDotRadius * 2.6;
-    const anchorOrbitAngle = (time / LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS) * Math.PI * 2;
+    // Reduced motion: the orbiting tick holds still.
+    const anchorOrbitAngle = this.prefersLegacyReducedMotion()
+      ? 0
+      : (time / LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS) * Math.PI * 2;
     this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.55);
     this.hudGraphics.fillCircle(
       centerX + (Math.cos(anchorOrbitAngle) * anchorOrbitRadius),

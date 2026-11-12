@@ -361,7 +361,10 @@ export interface EdgeMarkerStateInput {
   readonly trailHeadDistanceTiles?: number;
   /** The trail's own (pausable) animation clock, so the border and the trail share one phase; defaults to `timeMs`. */
   readonly trailTimeMs?: number;
-  /** False freezes the border to the static trail gradient (Trail Shine off); reduced motion always freezes it. */
+  /**
+   * False (Trail Shine off) and reduced motion both stop the trail's sheen band and swell in the border colour. Neither
+   * freezes the hue: the scene passes `trailTimeMs` 0 for the Trail Shine OFF static trail, and the colour clock otherwise.
+   */
   readonly trailAnimated?: boolean;
 }
 

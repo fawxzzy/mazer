@@ -21,6 +21,7 @@
  * The band is a smooth bump (a raised cosine) rather than eight flat-alpha slabs, so it reads as light moving, not as
  * a stack of rectangles.
  */
+import { REDUCED_MOTION_BLEED_GLOW_PROGRESS } from './reducedMotion';
 import { resolveTrailPaletteBorderColor } from './trailPalette';
 
 export const BLEED_GLOW = Object.freeze({
@@ -57,9 +58,14 @@ export const resolveBleedGlowColor = (
   reducedMotion || (head !== null && head.animated === false)
 );
 
-/** 0..1 loop position of the pulse for a scene time. */
-export const resolveBleedGlowProgress = (timeMs: number): number => (
-  (((timeMs % BLEED_GLOW.periodMs) + BLEED_GLOW.periodMs) % BLEED_GLOW.periodMs) / BLEED_GLOW.periodMs
+/**
+ * 0..1 loop position of the pulse for a scene time. Reduced motion holds the band at the peak of its envelope (it
+ * stops travelling; its colour still follows the trail colour clock, see resolveBleedGlowColor).
+ */
+export const resolveBleedGlowProgress = (timeMs: number, reducedMotion = false): number => (
+  reducedMotion
+    ? REDUCED_MOTION_BLEED_GLOW_PROGRESS
+    : (((timeMs % BLEED_GLOW.periodMs) + BLEED_GLOW.periodMs) % BLEED_GLOW.periodMs) / BLEED_GLOW.periodMs
 );
 
 /** Fade in at the inner end and out at the screen edge: 0 at both ends of the loop, 1 in the middle. */
