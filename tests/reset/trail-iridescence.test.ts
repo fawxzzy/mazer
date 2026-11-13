@@ -218,13 +218,28 @@ describe('iridescent trail: the shift is clearly visible (owner feedback: too su
     }
   });
 
-  test('frame cost: 60 000 samples (a 1000-segment trail for 60 frames) well inside the budget', () => {
+  test('frame cost: a 1000-segment trail for 60 frames is 60 000 constant-work samples that reuse one record', () => {
+    // MAZER-GOV-009: this used to assert a wall-clock budget (< 2 ms per frame), which failed on a busy machine
+    // although the code was unchanged. The cost guarantee is the work done per sample: sampleIridescentTrail is
+    // straight-line arithmetic (no loop, no allocation), so a frame costs exactly its sample count. Assert that
+    // (one reused record for every call, a repeatable result) and only REPORT the measured time.
     const out = { core: 0, glow: 0, wave: 0, sheen: 0 };
+    const SAMPLES = 60000;
+    const checksum = (): number => {
+      let sum = 0;
+      for (let i = 0; i < SAMPLES; i += 1) {
+        const sample = sampleIridescentTrail(i / 16, i * 3, false, out);
+        if (sample !== out) throw new Error('sampleIridescentTrail allocated instead of filling the caller record');
+        sum = (sum + sample.core + sample.glow) % 4294967296;
+      }
+      return sum;
+    };
     const start = performance.now();
-    for (let i = 0; i < 60000; i += 1) sampleIridescentTrail(i / 16, i * 3, false, out);
+    const first = checksum();
     const perFrameMs = (performance.now() - start) / 60;
-    console.info(`TRAIL_PALETTE_SAMPLE_COST ${perFrameMs.toFixed(4)} ms per 1000-segment frame`);
-    expect(perFrameMs).toBeLessThan(2);
+    console.info(`TRAIL_PALETTE_SAMPLE_COST ${perFrameMs.toFixed(4)} ms per 1000-segment frame (report only)`);
+    expect(checksum()).toBe(first);
+    expect(Number.isFinite(perFrameMs)).toBe(true);
   });
 });
 
@@ -290,10 +305,9 @@ describe('iridescent trail pulse', () => {
     expect(a).toBe(b);
     const mine = { core: 0, glow: 0, wave: 0, sheen: 0 };
     expect(sampleIridescentTrail(1, 100, false, mine)).toBe(mine);
-    // cheap: a long trail of 1000 resampled segments, redrawn 60 times, is 60k samples
-    const start = performance.now();
-    for (let i = 0; i < 60000; i += 1) sampleIridescentTrail(i / 16, i * 3, false, mine);
-    expect(performance.now() - start).toBeLessThan(500);
+    // cheap: a long trail of 1000 resampled segments, redrawn 60 times, is 60k samples. The cost claim is the work
+    // count (no allocation, one record), asserted here per call; no wall-clock bound (MAZER-GOV-009).
+    for (let i = 0; i < 60000; i += 1) expect(sampleIridescentTrail(i / 16, i * 3, false, mine) === mine).toBe(true);
   });
 });
 

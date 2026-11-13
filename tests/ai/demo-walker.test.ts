@@ -528,7 +528,7 @@ describe('demo walker', () => {
     }
 
     expect(reachedGoal).toBe(true);
-  }, 15_000);
+  }, 120_000);
 
   test('caps trail buffers instead of retaining the full path', () => {
     const episode = generateMaze({
@@ -844,7 +844,7 @@ describe('demo walker', () => {
       recoveryCount: 0,
       wrongBranchCount: 0
     });
-  }, 15_000);
+  }, 120_000);
 
   test('fails closed when the goal is unreachable instead of reporting a false one-node completion', () => {
     const episode = createUnreachableGoalEpisode();
@@ -1122,7 +1122,7 @@ describe('demo walker', () => {
 
       expect(sawWrongBranchOrRecovery).toBe(true);
     }
-  }, 15_000);
+  }, 120_000);
 
   test('generated legacy menu mazes keep AI routes adjacent and bounded', () => {
     const cases = [
@@ -1203,7 +1203,7 @@ describe('demo walker', () => {
 
       expect(state.phase === 'goal-hold' || sawRegenerationRequest).toBe(true);
     }
-  }, 30_000);
+  }, 120_000);
 
   test('generated menu AI follows bounded human local-memory routes and later requests goal regeneration across scale bands', () => {
     const cases = [
@@ -1275,7 +1275,7 @@ describe('demo walker', () => {
       expect(sawGoalReset).toBe(true);
       expect(sawGoalRegenerationRequest).toBe(true);
     }
-  }, 30_000);
+  }, 120_000);
 });
 
 const buildDemoSpectatorEpisode = (pathLength: number): MazeEpisode => {

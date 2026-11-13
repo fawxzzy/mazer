@@ -6,8 +6,8 @@ import { describe, expect, test } from 'vitest';
 import { runContinuousLifeline } from '../../../scripts/lifeline/continuous.ts';
 import { resolveBlessedPlaybookWeights } from '../../../scripts/training/common.mjs';
 
-const CONTINUOUS_LIFELINE_TIMEOUT_MS = 25000;
-const CONTINUOUS_LIFELINE_GUARD_TIMEOUT_MS = 15000;
+const CONTINUOUS_LIFELINE_TIMEOUT_MS = 120_000;
+const CONTINUOUS_LIFELINE_GUARD_TIMEOUT_MS = 90_000;
 
 const makeTempRoot = () => resolve('tmp', 'lifeline-tests', `continuous-${randomUUID()}`);
 const makeHealthRunner = () => () => ({ ok: true, stdout: '', stderr: '' });

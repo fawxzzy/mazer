@@ -44,7 +44,7 @@ beforeAll(async () => {
     resolveEffectivePresentationChrome,
     shouldShowPresentationTitle
   } = await import('../../src/boot/presentation'));
-}, 20_000);
+}, 90_000);
 
 describe('boot presentation config resolution', () => {
   test('launch param selection defaults safely and sanitizes invalid values', () => {

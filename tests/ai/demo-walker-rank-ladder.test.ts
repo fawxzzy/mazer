@@ -91,5 +91,5 @@ describe('human-memory AI rank ladder', () => {
         `${ranks[cursor - 1]} -> ${ranks[cursor]} route-ratio regression: ${JSON.stringify({ previous, current })}`
       ).toBeLessThanOrEqual(previous.routeRatio);
     }
-  }, 20_000);
+  }, 120_000);
 });

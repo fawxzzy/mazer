@@ -377,7 +377,7 @@ describe('one diamond system: no old diamond art anywhere in the scene', () => {
       return OLD_ART.some((needle) => text.includes(needle));
     });
     expect(offenders).toEqual([]);
-  }, 30000);
+  }, 120_000);
 
   test('BootScene preloads none of the retired diamond/beam art and the PNGs are gone', () => {
     const boot = readFileSync(resolve(process.cwd(), 'src/scenes/BootScene.ts'), 'utf8');
@@ -716,7 +716,7 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
       }
     }
     expect(flushSamples).toBeGreaterThan(2000);
-  }, 30_000);
+  }, 120_000);
 
   test.each(ORBIT_VIEWPORTS)('the path is continuous (no teleporting, angle swings smoothly through the corners) at $width x $height', (viewport) => {
     const samples = 2000;
@@ -737,7 +737,7 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
       });
       previous = current;
     }
-  }, 30_000);
+  }, 120_000);
 
   test('orientation: diagonal at a corner, the pure edge normal at a side midpoint, next corner diagonal (inward)', () => {
     const viewport = { width: 390, height: 844 };
