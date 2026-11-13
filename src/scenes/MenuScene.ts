@@ -3298,9 +3298,9 @@ export class MenuScene extends Phaser.Scene {
     if (this.playerLocatorState.needsRedraw()) {
       this.boardDynamicDirty = true;
     }
-    // The bleed-dock glow samples the trail colour every frame; under reduced motion that colour-only redraw shares the
-    // trail's lower cadence (MAZER-PERF-003). Full motion redraws every frame, unchanged.
-    if (this.hasLegacyBleedOffGlowPendingFrame() && (!this.prefersLegacyReducedMotion() || this.isLegacyColourRedrawDue(time))) {
+    // The bleed-dock glow follows the trail's shared colour-redraw schedule at every motion setting (MAZER-PERF-003
+    // reduced 45 ms, MAZER-PERF-007 full motion 33 ms) instead of redrawing the whole dynamic board every frame.
+    if (this.hasLegacyBleedOffGlowPendingFrame() && this.isLegacyColourRedrawDue(time)) {
       this.boardDynamicDirty = true;
     }
     if (this.hasLegacyPlayerVisualMotionPendingFrame(time)) {

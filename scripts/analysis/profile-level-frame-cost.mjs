@@ -33,6 +33,9 @@ const throttle = Number(arg('throttle', '4'));
 const idleMs = Number(arg('idle-ms', '10000'));
 const walkMs = Number(arg('walk-ms', '10000'));
 const outFile = arg('out', '');
+// --dpr=N overrides the device pixel ratio (default 3 on a phone-width viewport, else 1). A software-rendered headless run
+// at DPR 3 is render-bound, so a throttled-by-frame-rate redraw cannot show its saving there; --dpr=1 shows it.
+const dprOverride = Number(arg('dpr', '0'));
 // --fulltrail: before sampling, put the player one tile short of the goal with the whole solved route as its trail (the worst
 // case for any per-frame cost that scales with trail length), then sample `idle` with the trail pulse redrawing.
 const fullTrail = process.argv.includes('--fulltrail');
@@ -153,7 +156,7 @@ const results = [];
 try {
   for (const viewport of viewports) {
     for (const level of levels) {
-      const context = await browser.newContext({ viewport, deviceScaleFactor: viewport.width < 600 ? 3 : 1, hasTouch: viewport.width < 600 });
+      const context = await browser.newContext({ viewport, deviceScaleFactor: dprOverride > 0 ? dprOverride : (viewport.width < 600 ? 3 : 1), hasTouch: viewport.width < 600 });
       const page = await context.newPage();
       await page.addInitScript(INSTALL_OBSERVERS);
       const cdp = await context.newCDPSession(page);
