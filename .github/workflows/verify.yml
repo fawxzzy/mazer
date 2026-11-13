@@ -6,6 +6,10 @@ on:
     # "Owner export" workflow; the full build and AI shards add ~7 minutes and prove nothing about it.
     paths-ignore:
       - "config/mazer-owner-work-registry.json"
+      - "config/mazer-work-ledger.json"
+      - "config/mazer-board-events.jsonl"
+      - "docs/ops/MAZER-WORK-REPORT.md"
+      - "docs/ops/MAZER-WORK-REPORT.json"
       - "exports/mazer.project-board.owner-export.v1.json"
   push:
     branches:
@@ -99,8 +103,9 @@ jobs:
           tests/reset/work-report.test.ts
           --maxWorkers=1
 
-      - name: Verify the generated work report is current
-        run: node ./scripts/analysis/work-report.mjs --check
+      # The "generated work report is current" check moved to the Owner export workflow (ci.yml): it is a function of the
+      # registry, ledger and event archive only, and this workflow is skipped for board-only pull requests, so a check here
+      # turned main red after a board-only merge.
 
       - name: Verify PR 284 maze output parity and search-work diagnostics
         shell: bash
