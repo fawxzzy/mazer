@@ -34,7 +34,7 @@ node scripts/board/board-sync.mjs event --card MAZER-VIS-030 --status review \
   --pr 492:1dc4e9ca --deployed fawxzzy-mazer-dq6f32ysl --headless --device false
 ```
 
-Flags: `--card` (required), `--text` (required, one plain line, 700 chars max), `--status`, `--title` (90 max), `--pr <number>[:<mergedSha>]` (repeat; `--webpr` for FawxzzyWeb), `--deployed <build>`, `--headless`, `--device true|false|none` (`none` = no device surface), `--checked-on "<device, build>"` (required with `--device true`), `--note`, `--lane`, or `--json '<whole event>'` for blocker, verify steps and new cards. `ts` defaults to now (UTC). The id is the first 12 hex characters of the sha256 of the canonical event, so the same event is never applied twice and an edited line is detected.
+Flags: `--card` (required), `--text` (required, one plain line, 700 chars max), `--status`, `--title` (90 max), `--description` (corrective, 1500 max), `--pr <number>[:<mergedSha>]` (repeat; `--webpr` for FawxzzyWeb), `--deployed <build>`, `--headless`, `--device true|false|none` (`none` = no device surface), `--checked-on "<device, build>"` (required with `--device true`), `--note`, `--lane`, or `--json '<whole event>'` for blocker, verify steps and new cards. `ts` defaults to now (UTC). The id is the first 12 hex characters of the sha256 of the canonical event, so the same event is never applied twice and an edited line is detected.
 
 | Field | Meaning |
 | --- | --- |
@@ -48,6 +48,8 @@ Flags: `--card` (required), `--text` (required, one plain line, 700 chars max), 
 | `verify` | optional list of `{ step, where, expected }` replacing the ledger steps |
 | `note`, `lane` | ledger fields |
 | `title` | optional new card title |
+| `description` | corrective, existing card only: replaces the whole card description (earlier generated lines included; they stay in the archive), then this event's own generated line is appended. 1500 chars max, one line, public-text screens apply. A new card uses `new.description` |
+| `acceptanceCriteria` | corrective, existing card only: replaces the criteria list; 3 or more entries, 400 chars each, public-text screens apply. A new card uses `new.acceptanceCriteria` |
 | `new` | creates a card: `{ title, description, cardType, priority, dependencies, acceptanceCriteria (3 or more) }` |
 | `reopen` | `true` to move a completed card back |
 | `by` | free label, not part of the id |
@@ -55,6 +57,16 @@ Flags: `--card` (required), `--text` (required, one plain line, 700 chars max), 
 Example new-card event: `--json '{"v":1,"ts":"2026-11-14T09:00:00Z","card":"MAZER-VIS-040","status":"planning","text":"New card.","new":{"title":"...","description":"...","cardType":"feature","priority":"low","dependencies":[],"acceptanceCriteria":["a","b","c"]}}'`.
 
 If the push fails (offline), the event is saved in the git directory of the clone and `board-sync.mjs flush` (or the next `event`) sends it.
+
+## Public-text screens (what a card may say)
+
+Card text is published on the owner board, so every string an event can set must pass the nine public-text screens: URL, drive or backslash path, relative or home path (a name such as `scripts/...`, `docs/...`, `config/...` followed by a slash), file name (anything ending in `.json`, `.mjs`, `.js`, `.md`, `.sql`, `.log` and similar), long token-like run, secret or credential word, security finding word, money word, personal data word. The list lives in one module, `scripts/board/public-text-screens.mjs`, and `tests/project-board-owner-export.test.mjs` imports the same module, so the board-sync scripts and the export test cannot drift.
+
+- `event` refuses a failing string before anything is written to the `board-events` branch or the offline queue. Screened fields: `text`, `title`, `description`, `acceptanceCriteria[]`, `note`, `blocker.summary`, `blocker.ask`, `blocker.recommendation`, `verify[].step`, `verify[].expected`, `evidence.checkedOn`, `evidence.deployedBuild`, `new.title`, `new.description`, `new.acceptanceCriteria[]`.
+- `plan` and `apply` screen every pending event again, and the card title and description as they would be published (including the generated `Board update` line); one failure refuses the whole fold and writes nothing.
+- `check` (CI) screens the title and description of every registry card and every archived event.
+- The error names the field, the exact screen and the offending substring, for example: `new.description fails the public-text "file name" screen: "sw.js"`. Reword instead of quoting the name: say "the service worker script", "the board sync process document".
+- Acceptance criteria are screened here although the export test only screens titles and summaries; a few older criteria in the registry would fail that stricter screen, so `check` does not screen criteria already in the registry.
 
 ## Status versus evidence (enforced by the fold, not by an agent)
 
@@ -115,6 +127,18 @@ Production builds, alias moves, database, env values and DNS stay outside all of
 - `apply` writes registry, ledger, archive, export and report together, so the generated files are never half updated.
 - `tests/reset/work-report.test.ts` no longer pins specific card ids as "needs the owner"; a decision being answered used to break Verify on main.
 - The Owner export workflow also runs `board-sync.mjs check` (registry and ledger ids, archive integrity, provenance counts, canonical registry formatting) and `tests/board-sync.test.mjs`.
+
+## Replacing a pending event that a screen rejects
+
+Recorded events are never edited in place (the id is a hash of the content), and a rejected event stops the whole fold, so a pending event that fails a screen has to be replaced on the `board-events` branch before `apply`. Keep the same `ts` and every other field, change only the offending string, and remove the old line, so the fold order and the later events for the same card stay valid:
+
+1. `git fetch origin board-events`, then `git show origin/board-events:events.jsonl > events.jsonl`.
+2. Replace the failing line with the same event carrying the reworded string and no `id` (or run `board-sync.mjs event --json ...` for the corrected event and delete only the old line afterwards).
+3. `blob=$(git hash-object -w events.jsonl)`, `tree=$(printf '100644 blob %s	events.jsonl
+' $blob | git mktree)`, `commit=$(git commit-tree $tree -p origin/board-events -m "board events: reword rejected text")`, `git push origin $commit:refs/heads/board-events` (a normal fast-forward; no force).
+4. `node scripts/board/board-sync.mjs plan` must now print no problems.
+
+Once a card has been folded and published, the repair is a new event with `description` (and `acceptanceCriteria`) instead; no branch edit is needed.
 
 ## Rollback
 

@@ -2,7 +2,7 @@
 // Mazer board sync: append cheap board events during work, fold them into the registry, the work ledger,
 // the owner export and the work report in one deterministic command. No LLM, no network except `event`/`status`/`flush`.
 //
-//   node scripts/board/board-sync.mjs event --card MAZER-X-001 --status review --text "..." [--pr 492:<mergedSha>] [--deployed <build>] [--headless] [--device false|true|none]
+//   node scripts/board/board-sync.mjs event --card MAZER-X-001 --status review --text "..." [--title ..] [--description ..] [--pr 492:<mergedSha>] [--deployed <build>] [--headless] [--device false|true|none]
 //   node scripts/board/board-sync.mjs status [--due]        pending count, oldest age, board-as-of marker (exit 3 with --due when not due)
 //   node scripts/board/board-sync.mjs plan                  dry-run diff of folding every pending event (writes nothing)
 //   node scripts/board/board-sync.mjs apply                 fold + write registry, ledger, archive, export, work report
@@ -20,6 +20,7 @@ import { buildWorkReport, REPORT_JSON_PATH, REPORT_MD_PATH } from "../analysis/w
 import {
   DEFAULT_POLICY, dueStatus, eventId, foldEvents, parseJsonl, validateEventShape, withId, canonicalJson,
 } from "./board-events.mjs";
+import { screenProblems } from "./public-text-screens.mjs";
 import { repinWeb, WEB_FILES, WEB_NEXT_COMMANDS } from "./web-repin.mjs";
 
 export const REGISTRY_PATH = "config/mazer-owner-work-registry.json";
@@ -264,6 +265,8 @@ export function checkIntegrity(repoRoot) {
   if (new Set(ids).size !== ids.length) errors.push("registry has duplicate card ids");
   const idSet = new Set(ids);
   for (const id of Object.keys(state.ledger.cards ?? {})) if (!idSet.has(id)) errors.push(`ledger names ${id}, which is not in the registry`);
+  // The published card text (title, description) must pass the same screens as tests/project-board-owner-export.test.mjs.
+  for (const c of state.registry.workItems) for (const field of ["title", "description"]) errors.push(...screenProblems(`${REGISTRY_PATH}#${c.id} ${field}`, c[field]));
   const archived = archiveIds(state.archiveRaw);
   errors.push(...archived.errors);
   const seen = new Set();
@@ -289,7 +292,7 @@ export function checkIntegrity(repoRoot) {
 
 function parseArgs(argv) {
   const out = { _: [], prs: [], eventFiles: [] };
-  const flagsWithValue = new Set(["card", "status", "text", "title", "note", "lane", "deployed", "device", "checked-on", "pr", "webpr", "events", "web", "max-events", "max-days", "remote", "json", "by", "ts"]);
+  const flagsWithValue = new Set(["card", "status", "text", "title", "note", "lane", "deployed", "device", "checked-on", "description", "pr", "webpr", "events", "web", "max-events", "max-days", "remote", "json", "by", "ts"]);
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (!a.startsWith("--")) { out._.push(a); continue; }
@@ -310,6 +313,7 @@ function eventFromArgs(args) {
   const event = { v: 1, ts: args.ts ?? new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), card: args.card, text: args.text };
   if (args.status) event.status = args.status;
   if (args.title) event.title = args.title;
+  if (args.description) event.description = args.description;
   if (args.note) event.note = args.note;
   if (args.lane) event.lane = args.lane;
   if (args.by) event.by = args.by;

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { PUBLIC_TEXT_SCREENS } from "../scripts/board/public-text-screens.mjs";
 import {
   assertFawxzzyWebConsumerAcceptance,
   assertPublicSafety,
@@ -89,18 +90,8 @@ test("maps every owner status to its atlas lifecycle without inventing readiness
 });
 
 test("keeps published card text free of paths, links, file names, hashes and sensitive words", () => {
-  // Mirrors the screens FawxzzyWeb applies before publishing a card title or summary, so a bad card fails here first.
-  const screens = [
-    ["url", /\bhttps?:\/\//i],
-    ["drive or backslash path", /(?:\b[A-Za-z]:[\\/]|\\)/],
-    ["relative or home path", /(?:\b(?:repos|runtime|docs|handoff|secrets|packages|scripts|config|exports|planning|tmp|src|api|supabase)\/[\w.-]+|~\/|\/(?:Users|home|etc|var)\/)/i],
-    ["file name", /\b[\w-]+\.(?:env|dpapi|json|mjs|cjs|js|ts|tsx|md|zip|docx?|xlsx?|pem|key|log|sql|ps1|sh|ya?ml|toml|exe)\b/i],
-    ["long token-like run", /(?:[A-Za-z0-9+/]{32,}={0,2}|\b[a-f0-9]{32,}\b)/],
-    ["secret or credential word", /\b(?:passwords?|passwd|secrets?|credentials?|api[ -]?keys?|private[ -]keys?|access[ -]keys?|tokens?|cookies?|jwt|session id)\b/i],
-    ["security finding word", /\b(?:security|vulnerabilit\w*|advisor|dependabot|leak(?:ed|s)?|incident|exploit\w*|cve-\d+)\b/i],
-    ["money word", /\b(?:monetiz\w*|premium|paid|payments?|billing|invoices?|stripe|subscriptions?|pricing|revenue|paywall)\b/i],
-    ["personal data word", /\b(?:personal data|e-?mail|ssn|phone number|home address|career)\b/i],
-  ];
+  // The screens FawxzzyWeb applies before publishing a card title or summary, shared with scripts/board so they cannot drift.
+  const screens = PUBLIC_TEXT_SCREENS;
   const output = buildProjectBoardOwnerExport(registry, bytes);
   const titles = new Set();
   for (const card of output.cards) {
