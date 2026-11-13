@@ -19,6 +19,10 @@
  *             packet streams out, so drain = (c - launchMs) / PULSE, exactly 0 at release and exactly 1 when the
  *             tail has left (`launchMs + PULSE`): the diamond is empty, the beam fully gone from it.
  *
+ * Where the colour sits is geometry, not timing (edgeBeamArt.ts `resolveDiamondFillShape`): it is always anchored at the
+ * diamond's INNER tip. A rising fill grows from the inner tip outward; a falling fill retreats the same way back, so the
+ * colour leaves from the OUTER tip first and the last of it exits at the inner tip, toward where the outgoing beam goes.
+ *
  * `c` is the master laser clock in ms (the same clock `laserProgress = smoothstep(c / EDGE_BEAM_FLIGHT_MS)` is a
  * function of). The head keeps the exact shipped flight: `resolveBeamHeadFromMaster` is the pre-VIS-030
  * `resolveEdgeBeamProgress` (staggered by at most INTRO_BEAM_STAGGER_MS across the ring, every head still lands by
@@ -143,8 +147,6 @@ export interface EdgeBeamPulse {
   readonly headLanded: boolean;
   /** Diamond fill 0..1 as this beam alone leaves it (see resolveEdgeDiamondFill for the ring-level value). */
   readonly diamondFill: number;
-  /** Which way the fill region moves: it grows from the inner tip (incoming) or retreats to the outer tip (outgoing). */
-  readonly fillMode: 'grow' | 'drain';
 }
 
 /**
@@ -169,8 +171,7 @@ export const resolveEdgeBeamPulse = (
       tail,
       visible,
       headLanded: head >= 1,
-      diamondFill: resolveDiamondFillFromIncoming(clock, index, count),
-      fillMode: 'grow'
+      diamondFill: resolveDiamondFillFromIncoming(clock, index, count)
     };
   }
   return {
@@ -179,8 +180,7 @@ export const resolveEdgeBeamPulse = (
     tail,
     visible,
     headLanded: head >= 1,
-    diamondFill: clampUnit(charge) * (1 - resolveDiamondDrainFromOutgoing(clock, index, count)),
-    fillMode: 'drain'
+    diamondFill: clampUnit(charge) * (1 - resolveDiamondDrainFromOutgoing(clock, index, count))
   };
 };
 

@@ -702,9 +702,32 @@ describe('ring fill and spin over the intro / outro timelines (per frame)', () =
     expect(resolveEdgeRingFills(null)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
+  test('one fill only: lighting cues (wrap end, wrap flash) never add an interior shape; the fill is the only fillPath of a diamond (MAZER-VIS-033)', () => {
+    const stations = resolveEdgeStations({ width: 390, height: 844 });
+    const cues = { energizedIds: new Set([0, 1, 2, 3, 4, 5, 6, 7]), flash: { ids: [0, 1, 2, 3, 4, 5, 6, 7], startedAtMs: 0 }, reducedMotion: false, timeMs: 10 };
+    // Empty diamonds, every cue on: no interior paint at all (the old instant core is gone), only the 8 outlines.
+    const empty = makeRecorder();
+    drawEdgeMarkers(empty, stations, resolveEdgeMarkerStates(cues));
+    expect(empty.calls.filter((call) => call === 'fillPath')).toHaveLength(0);
+    expect(empty.calls.filter((call) => call === 'strokePath')).toHaveLength(8);
+    // Full diamonds, every cue on: exactly one fill per diamond (never a second, smaller one next to it).
+    const full = makeRecorder();
+    drawEdgeMarkers(full, stations, resolveEdgeMarkerStates({ ...cues, fills: [1, 1, 1, 1, 1, 1, 1, 1] }));
+    expect(full.calls.filter((call) => call === 'fillPath')).toHaveLength(8);
+    // The cues still brighten the BORDER (alpha), they just paint no interior.
+    const quiet = resolveEdgeMarkerStates({ reducedMotion: false, timeMs: 10 });
+    expect(resolveEdgeMarkerStates(cues)[3]!.alpha).toBeGreaterThan(quiet[3]!.alpha);
+  });
+
+  test('the old lit core is gone from the source: no half-size kite is traced inside a diamond', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/render/edgeMarkers.ts'), 'utf8');
+    expect(source).not.toMatch(/resolveEdgeMarkerVertices([^)]*,s*0.d+)/);
+    expect(source).not.toContain('Player-coloured core');
+  });
+
   test('the markers draw an interior fill only while a diamond holds some; the border is the live trail colour either way', () => {
     const stations = resolveEdgeStations({ width: 390, height: 844 });
-    const full = resolveEdgeMarkerStates({ reducedMotion: false, fills: resolveEdgeRingFills({ direction: 'inward', clockMs: -1, ringFill: 1 }), fillMode: 'drain', timeMs: 0 });
+    const full = resolveEdgeMarkerStates({ reducedMotion: false, fills: resolveEdgeRingFills({ direction: 'inward', clockMs: -1, ringFill: 1 }), timeMs: 0 });
     const fullRecorder = makeRecorder();
     drawEdgeMarkers(fullRecorder, stations, full);
     expect(fullRecorder.calls.filter((call) => call === 'fillPath')).toHaveLength(8);
@@ -964,7 +987,7 @@ function makeRecorder(): Recorder {
 describe('colour contract: border = live trail colour, inside = player colour (one source, trailPalette.ts)', () => {
   const stations = resolveEdgeStations({ width: 390, height: 844 });
 
-  test('the player colour is one token: the player marker, the diamonds core and the beams all read PLAYER_COLOR', () => {
+  test('the player colour is one token: the player marker, the diamond fill and the beams all read PLAYER_COLOR', () => {
     expect(PLAYER_COLOR).toBe(cyberArcadeMaterial.signal.player);
     expect(boardMaterial.player).toBe(PLAYER_COLOR);
   });

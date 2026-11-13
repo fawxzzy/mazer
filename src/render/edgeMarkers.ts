@@ -31,19 +31,22 @@
  *   and near-flush on the left/right sides, and never outside the viewport.
  * - Calm at rest: one slow breathing alpha (0.45-0.6 over 3.6 s), no per-marker
  *   sparkles. In reduced motion the markers are completely static (phase 0).
- * - Meaningful: a marker lights up (a core in the PLAYER's colour) while it is a live wrap end or
- *   the spawn laser's emitter, and flashes once (~120 ms) on a wrapped step,
- *   paired with the destination edge.
+ * - Meaningful: a marker's BORDER brightens while it is a live wrap end, and flashes once (~120 ms) on a wrapped step,
+ *   paired with the destination edge. The interior is never lit by those cues (there used to be a small instant core;
+ *   it was removed in MAZER-VIS-033 because it showed a second, different fill next to the beam fill): the only colour
+ *   inside a diamond is the beam fill below.
  * - Colour contract (trailPalette.ts is the single source of truth): the diamond's BORDER is always the live
  *   iridescent trail colour (the trail's own core colour at the trail head, same clock, same reduced-motion rule;
- *   never a fixed colour), and everything INSIDE it or fired out of it (the lit core, the beams, the landing
+ *   never a fixed colour), and everything INSIDE it or fired out of it (the beam fill, the beams, the landing
  *   sparkles) is the player's colour, `PLAYER_COLOR`.
  *
  * Lasers and fill (MAZER-VIS-030): on departure the player fires a beam out to ALL 8 diamonds; each diamond FILLS with
  * the player's colour from the exact instant its beam touches it (grows from its inner tip, full when the beam is fully
  * absorbed) and stays full through the deconstruct and the build. On arrival ALL 8 diamonds (orbiting, full, parked on
  * their rest stations once the build completes) fire a beam inward to the spawn tile and each DRAINS from the exact
- * instant its beam leaves it (empty when the beam has fully left). Each beam is a comet pulse (edgeBeamArt.ts:
+ * instant its beam leaves it (empty when the beam has fully left). The colour is always anchored at the inner tip: it
+ * fills from the inner tip outward and drains the other way round, leaving from the OUTER tip first, so the last of it
+ * exits at the inner tip, toward where the laser shoots out. Each beam is a comet pulse (edgeBeamArt.ts:
  * bloom, tapered gradient body, bright pulsing head, a contact ripple), staggered by at most 60 ms across the ring and
  * derived only from the master laser clock (edgeBeamTimeline.ts), so menu and play can never disagree. Reduced motion:
  * no beam; the diamonds crossfade full/empty over the 200 ms crossfade.
@@ -69,8 +72,7 @@ import {
   drawBeamPulse,
   drawContactRipple,
   drawDiamondFill,
-  resolveOutlineExitPoint,
-  type DiamondFillMode
+  resolveOutlineExitPoint
 } from './edgeBeamArt';
 
 export type EdgeSide = 'top' | 'right' | 'bottom' | 'left';
@@ -351,8 +353,6 @@ export interface EdgeMarkerState {
    * The interior is the player's colour.
    */
   readonly fill?: number;
-  /** grow: the fill rises from the inner tip (the beam coming in); drain: it retreats to the outer tip (the beam leaving). */
-  readonly fillMode?: DiamondFillMode;
   /** Reduced motion: the interior crossfades by alpha instead of sweeping. */
   readonly fillCrossfade?: boolean;
   /**
@@ -373,7 +373,6 @@ export interface EdgeMarkerStateInput {
   readonly energizedIds?: ReadonlySet<number>;
   /** Per-station interior fill 0..1 indexed by id (resolveEdgeRingFills). */
   readonly fills?: ReadonlyArray<number>;
-  readonly fillMode?: DiamondFillMode;
   /** Reduced motion: the interior crossfades by alpha instead of sweeping. */
   readonly fillCrossfade?: boolean;
   /** Ring orbit phase in radians (timeline ringSpinRad: 2 pi = one lap, positive = clockwise). */
@@ -440,7 +439,6 @@ export const resolveEdgeMarkerStates = (input: EdgeMarkerStateInput): ReadonlyAr
       energized,
       energy,
       fill,
-      fillMode: input.fillMode ?? 'grow',
       fillCrossfade: input.fillCrossfade === true,
       spinRad: input.reducedMotion || !Number.isFinite(input.spinRad) ? 0 : (input.spinRad ?? 0),
       flash,
@@ -547,18 +545,8 @@ export const drawEdgeMarker = (
       fill: state.fill ?? 0,
       halfHeight: EDGE_MARKER_HALF_HEIGHT,
       inwardAngle: station.inwardAngle,
-      mode: state.fillMode ?? 'grow',
       vertices: outline
     });
-  }
-  if (state.energized || state.flash > 0) {
-    // Player-coloured core: a smaller kite inside the outline.
-    tracePolygon(graphics, resolveEdgeMarkerVertices(station, 0.5));
-    graphics.fillStyle(
-      PLAYER_COLOR,
-      Math.max(state.flash, state.energized ? 0.7 * state.energy : 0) * state.alpha
-    );
-    graphics.fillPath();
   }
   tracePolygon(graphics, outline);
   graphics.lineStyle(

@@ -3,10 +3,12 @@
  * colour that fills and drains inside each edge diamond. Timing lives in edgeBeamTimeline.ts; this module only turns a
  * state (fill 0..1, head/tail 0..1) into shapes.
  *
- * - Diamond fill: the diamond's own outline polygon cut by a plane perpendicular to its long (inward) axis. A fill GROWS
- *   from the inner tip (the end the incoming beam touches) toward the outer tip; a drain RETREATS toward the outer tip,
- *   so the colour leaves through the same end the outgoing beam leaves from. A one-pixel bright front line sits on the
- *   cut while it moves. Reduced motion: no sweeping front, the whole interior crossfades by alpha instead.
+ * - Diamond fill: the diamond's own outline polygon cut by a plane perpendicular to its long (inward) axis. The colour
+ *   is ALWAYS anchored at the INNER tip (the end the beams touch and leave through): a fill GROWS from the inner tip
+ *   toward the outer tip, and a drain is that same motion run backwards, so the colour leaves from the OUTER tip first
+ *   and the last of it exits at the inner tip, toward where the outgoing laser shoots out. One shape function, one
+ *   direction, so a diamond can never show two different fills. A one-pixel bright front line sits on the cut while it
+ *   moves. Reduced motion: no sweeping front, the whole interior crossfades by alpha instead.
  * - Beam: a comet of one colour (the player's, trailPalette.PLAYER_COLOR). A soft bloom (two wide, low-alpha strokes),
  *   a body whose alpha ramps up toward the head and whose width tapers from a hair at the tail to ~2 px at the head
  *   (the ramp is a stack of nested spans, so there is no seam and no per-segment overdraw), and a bright pulsing head.
@@ -110,8 +112,6 @@ export const clipPolygonAlongAxis = (
   return out;
 };
 
-export type DiamondFillMode = 'grow' | 'drain';
-
 export interface DiamondFillShape {
   /** The filled part of the diamond (empty when fill is 0). */
   readonly polygon: ReadonlyArray<ArtPoint>;
@@ -122,16 +122,15 @@ export interface DiamondFillShape {
 /**
  * The part of a diamond that is filled at `fill` 0..1. `vertices` is the OUTLINE polygon, `center` its centre,
  * `inwardAngle` the direction of its long axis (the end it points to is the INNER tip) and `halfHeight` its half length
- * along that axis. grow: [inner tip .. inner tip - fill * length]; drain: [outer tip .. outer tip + fill * length].
- * Exactly 0 -> nothing, exactly 1 -> the whole outline.
+ * along that axis. The region is [inner tip .. inner tip - fill * length] for a rising fill (incoming beam) and a falling
+ * one (outgoing beam) alike. Exactly 0 -> nothing, exactly 1 -> the whole outline.
  */
 export const resolveDiamondFillShape = (
   vertices: ReadonlyArray<ArtPoint>,
   center: ArtPoint,
   inwardAngle: number,
   halfHeight: number,
-  fill: number,
-  mode: DiamondFillMode
+  fill: number
 ): DiamondFillShape => {
   const level = clampUnit(fill);
   if (level <= 0) {
@@ -142,8 +141,8 @@ export const resolveDiamondFillShape = (
   }
   const axis = { x: Math.cos(inwardAngle), y: Math.sin(inwardAngle) };
   const length = 2 * halfHeight;
-  const offset = mode === 'grow' ? halfHeight - (length * level) : -halfHeight + (length * level);
-  const polygon = clipPolygonAlongAxis(vertices, center, axis, offset, mode === 'grow' ? 'ge' : 'le');
+  const offset = halfHeight - (length * level);
+  const polygon = clipPolygonAlongAxis(vertices, center, axis, offset, 'ge');
   // The front chord: the two clipped vertices that lie on the cutting plane.
   const onPlane = polygon.filter((point) => Math.abs((((point.x - center.x) * axis.x) + ((point.y - center.y) * axis.y)) - offset) < 1e-6);
   const front = onPlane.length >= 2 ? ([onPlane[0] as ArtPoint, onPlane[onPlane.length - 1] as ArtPoint] as const) : null;
@@ -201,7 +200,6 @@ export interface DiamondFillDraw {
   readonly inwardAngle: number;
   readonly halfHeight: number;
   readonly fill: number;
-  readonly mode: DiamondFillMode;
   /** Reduced motion: no sweeping front, the whole interior is drawn at alpha = fill. */
   readonly crossfade: boolean;
 }
@@ -218,7 +216,7 @@ export const drawDiamondFill = (graphics: ArtGraphics, input: DiamondFillDraw): 
     graphics.fillPath();
     return;
   }
-  const shape = resolveDiamondFillShape(input.vertices, input.center, input.inwardAngle, input.halfHeight, level, input.mode);
+  const shape = resolveDiamondFillShape(input.vertices, input.center, input.inwardAngle, input.halfHeight, level);
   if (shape.polygon.length < 3) {
     return;
   }

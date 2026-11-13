@@ -8640,7 +8640,6 @@ export class MenuScene extends Phaser.Scene {
         flash: this.edgeMarkerWrapFlash,
         reducedMotion,
         fillCrossfade: this.edgeRing.lifecycle?.crossfade === true,
-        fillMode: this.edgeRing.lifecycle?.direction === 'inward' ? 'drain' : 'grow',
         fills: resolveEdgeRingFills(this.edgeRing.lifecycle),
         spinRad: this.edgeRing.spinRad,
         timeMs: time,
@@ -11643,7 +11642,7 @@ export class MenuScene extends Phaser.Scene {
         drawEdgeMarker(
           graphics,
           { id: 1, inwardAngle: Math.PI / 2, isCorner: false, side: 'top', x: centerX, y: centerY },
-          { alpha: 0.95, energized: false, energy: 0, fill: 0.6, fillMode: 'grow', flash: 0, hidden: false, id: 1, spinRad: 0 }
+          { alpha: 0.95, energized: false, energy: 0, fill: 0.6, flash: 0, hidden: false, id: 1, spinRad: 0 }
         );
         return;
       case 'level-numeral': {

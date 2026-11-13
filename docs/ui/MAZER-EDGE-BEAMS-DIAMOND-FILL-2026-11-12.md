@@ -2,6 +2,8 @@
 
 Status: implemented 2026-11-12 on branch `claude/mazer-vis-030-20261112`, after the owner asked: "the lasers that shoot out to the diamonds and out from them we need to spruce up and make look better, redesign, also the way it animated: I want the colour inside the diamond to fill up as the laser goes into it then drain out as the laser shoots out, and ensure the timing is on contact and all that and it looks right." Source, unit, pixel and headless-Chromium evidence only; NOT checked on a real phone.
 
+Amended 2026-11-13 by MAZER-VIS-033 (`docs/ui/MAZER-EDGE-DIAMOND-ONE-FILL-2026-11-13.md`): the drain direction below is reversed (the colour now leaves from the OUTER tip first and the last of it exits at the INNER tip) and the small instant "lit core" this document lists under "Before" is deleted for good (it was still drawn next to the new fill on wrap-end diamonds). Where this document says otherwise, the VIS-033 document wins.
+
 ## What "the diamonds" and "the lasers" are
 
 They are the eight edge diamonds (`src/render/edgeMarkers.ts`, MAZER-VIS-004) and the beams drawn by `drawEdgeBeams`: on a level change the player fires a beam OUT to all eight diamonds (the deconstruct, "departure"), the maze dissolves, then the maze builds and all eight diamonds fire a beam OUT to the spawn tile (the build, "arrival"). The Teleport System v1 conduit presentation (`teleportTransferPresentation.ts`, `teleportTransferConduitCanvas.ts`) is NOT drawn by the scene any more (`getGameplayTransferPresentationDiagnostics` returns `null`, "retired with the old diamond/conduit presentation"), so no Wave 4D-B file is touched.
@@ -43,7 +45,7 @@ One pulse model, one clock, in `src/render/edgeBeamTimeline.ts` (pure, no Phaser
 
 "Head leaves" and "head touches" are the same closed-form instants the unit tests pin (`resolveBeamTimes`: the inverse of the flight curve, not a sampled value). The tails end inside the 350 ms landing pop that already follows the landing.
 
-Contact is geometric, not at the centre: each beam ends on the diamond OUTLINE (`resolveOutlineExitPoint`, the exact point where the line from the diamond centre toward the player or spawn tile leaves the kite), so the head is on the diamond at the very instant the fill starts and leaves it at the very instant the drain starts. The fill grows from the INNER tip (the end the beam comes in through) toward the outer tip; the drain retreats toward the OUTER tip, so the colour leaves through the same end the beam leaves from. A one pixel bright front line rides the cut.
+Contact is geometric, not at the centre: each beam ends on the diamond OUTLINE (`resolveOutlineExitPoint`, the exact point where the line from the diamond centre toward the player or spawn tile leaves the kite), so the head is on the diamond at the very instant the fill starts and leaves it at the very instant the drain starts. The fill grows from the INNER tip (the end the beam comes in through) toward the outer tip. (VIS-033: the drain runs the same motion backwards, so the colour leaves from the OUTER tip first and the last of it exits at the INNER tip, toward where the beam shoots out; this document first shipped the opposite.) A one pixel bright front line rides the cut.
 
 The ring now holds still until the last beam is absorbed: the outro orbit starts at `OUTRO_RING_ORBIT_START_MS` = 600 ms (was 400) and still ends with the outro, so no total duration moved (the orbit is 200 ms shorter and slightly faster).
 
