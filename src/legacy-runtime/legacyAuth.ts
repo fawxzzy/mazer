@@ -70,7 +70,6 @@ export interface LegacyPasswordRecoveryUrlState {
   requested: boolean;
 }
 
-let legacyPasswordRecoveryBootUrlState: LegacyPasswordRecoveryUrlState | null = null;
 interface LegacyPasswordUpdateInFlight {
   password: string;
   promise: Promise<{ error: { message?: string | null } | null }>;
@@ -879,31 +878,6 @@ export const signInLegacyAuth = async (
   });
 };
 
-export const requestLegacyPasswordReset = async (email: string): Promise<LegacyAuthActionResult> => {
-  const client = await getLegacyAuthClient();
-  if (!client) {
-    return {
-      snapshot: createGuestSnapshot(false, {
-        error: LEGACY_AUTH_MESSAGE_COPY.passwordResetNotConfigured
-      })
-    };
-  }
-
-  const redirectTo = typeof window === 'undefined'
-    ? undefined
-    : resolveLegacyPasswordRecoveryRedirectUrl(window.location.origin);
-  const { error } = await client.auth.resetPasswordForEmail(normalizeLegacyAuthEmail(email), {
-    redirectTo
-  });
-
-  return {
-    snapshot: createGuestSnapshot(true, {
-      error: error?.message ?? null,
-      info: error ? null : LEGACY_AUTH_MESSAGE_COPY.passwordResetSent
-    })
-  };
-};
-
 export const resolveLegacyPasswordRecoveryRedirectUrl = (origin: string): string => (
   `${origin.replace(/\/$/, '')}${LEGACY_PASSWORD_RECOVERY_PATH}`
 );
@@ -935,23 +909,12 @@ export const resolveLegacyPasswordRecoveryUrlState = (
   };
 };
 
-export const captureLegacyPasswordRecoveryBootUrlState = (
-  location: Pick<Location, 'hash' | 'pathname' | 'search'> | undefined = (
-    typeof window === 'undefined' ? undefined : window.location
-  )
-): LegacyPasswordRecoveryUrlState => {
-  const state = resolveLegacyPasswordRecoveryUrlState(location);
-  legacyPasswordRecoveryBootUrlState = state.requested ? state : null;
-  return state;
-};
-
 export const readLegacyPasswordRecoveryBootUrlState = (
   location: Pick<Location, 'hash' | 'pathname' | 'search'> | undefined = (
     typeof window === 'undefined' ? undefined : window.location
   )
 ): LegacyPasswordRecoveryUrlState => {
-  const liveState = resolveLegacyPasswordRecoveryUrlState(location);
-  return liveState.requested ? liveState : legacyPasswordRecoveryBootUrlState ?? liveState;
+  return resolveLegacyPasswordRecoveryUrlState(location);
 };
 
 export const resolveLegacyPasswordRecoveryCleanUrl = (
@@ -1030,7 +993,6 @@ const invokeLegacyPasswordUpdateWithTimeout = async (
 });
 
 export const clearLegacyPasswordRecoveryUrl = (outcome: 'continue' | 'invalid'): void => {
-  legacyPasswordRecoveryBootUrlState = null;
   if (typeof window === 'undefined') {
     return;
   }
@@ -1258,20 +1220,6 @@ export const writeLegacyRememberedIdentity = (
   email: string
 ): void => {
   writeLegacyRememberedIdentityState(storage, { email });
-};
-
-export const resolveLegacyAuthAccountLabel = (
-  snapshot: LegacyAuthSessionSnapshot
-): string => {
-  if (snapshot.status === 'authenticated') {
-    return snapshot.displayName ?? snapshot.email ?? 'Account';
-  }
-
-  if (snapshot.configured) {
-    return 'Guest';
-  }
-
-  return 'Guest';
 };
 
 const sanitizeStorageScopePart = (value: string): string => value.replace(/[^a-zA-Z0-9_-]/g, '_');

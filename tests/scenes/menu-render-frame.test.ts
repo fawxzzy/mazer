@@ -2351,7 +2351,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     };
 
     expect(authSource).toContain("export const LEGACY_PASSWORD_RECOVERY_PATH = '/update-password';");
-    expect(authSource).toContain('resolveLegacyPasswordRecoveryRedirectUrl(window.location.origin)');
     expect(authSource).toContain('client.auth.updateUser({ password })');
     expect(menuSceneSource).toContain("if (event === 'PASSWORD_RECOVERY') {");
     expect(menuSceneSource).toContain("this.applyLegacyPasswordRecoveryEntry(snapshot, 'BOOTSTRAP_PATH', true);");
