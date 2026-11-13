@@ -21,9 +21,14 @@ import { MAZER_BOOT_SPLASH_MAX_AFTER_GAME_CREATE_MS } from './bootSplash';
 import { waitForMazerUiFonts } from './fontReadiness';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
+import { runMazerSignedOutHandoffAtBoot } from './signedOutHandoffBoot';
 import { initializeInstallSurface } from './installSurface';
 import { createMazerPhaserConfig } from './phaserConfig';
-import { installMazerProductionServiceWorker, installMazerServiceWorkerControllerReload } from './serviceWorkerLifecycle';
+import {
+  installMazerProductionServiceWorker,
+  installMazerServiceWorkerControllerReload,
+  selectMazerBootArtUrls
+} from './serviceWorkerLifecycle';
 import { installMazerViewportGeometry, syncMazerGameToViewport } from './viewportGeometry';
 
 const LOCALHOST_SW_RESET_KEY = 'mazer:localhost-sw-reset:v1';
@@ -82,8 +87,17 @@ const registerProductionServiceWorker = (): void => {
 
   if (!isLocalhostRuntime() && 'serviceWorker' in navigator) {
     installMazerServiceWorkerControllerReload({
+      controlledAtBoot: navigator.serviceWorker.controller !== null,
       addControllerChangeListener: (listener) => navigator.serviceWorker.addEventListener('controllerchange', listener),
-      reload: () => window.location.reload()
+      reload: () => window.location.reload(),
+      warmBootArt: () => {
+        // First install: the worker now controls this page, so re-requesting the boot art through it (the browser's
+        // HTTP cache answers the network part) fills the offline runtime cache without reloading the page.
+        const names = performance.getEntriesByType('resource').map((entry) => entry.name);
+        for (const url of selectMazerBootArtUrls(names, window.location.origin)) {
+          void fetch(url).catch(() => undefined);
+        }
+      }
     });
   }
 };
@@ -167,6 +181,10 @@ const boot = async (): Promise<void> => {
       onBlocked: () => markMazerBootStatus('splash-removed')
     });
   }
+
+  // MAZER-ACCT-040: a signed-out launch goes straight to the account host's sign-in
+  // page, before Phaser exists. Signed-in, bypass and failure cases fall through.
+  await runMazerSignedOutHandoffAtBoot(oauthCallbackRequested);
 
   // Bounded: a slow or failing remote account bootstrap must never keep the
   // player on a blank page. The game starts on cached / guest state instead.

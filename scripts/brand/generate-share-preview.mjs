@@ -1,64 +1,85 @@
-// Regenerates public/share/mazer-share-preview.png (1200x630, the Open Graph /
-// Twitter large-card size) from the REAL game: a headless capture of the
-// sandboxed Level Preview route (?previewLevel=N, no account writes, never
-// install-gated) at desktop size, cropped to a clean board, plus a wordmark.
-// The image lives in public/share (NOT public/assets, which is pinned to the
-// boot preload set, and NOT in vite includeAssets, so it adds no precache).
+// Regenerates public/share/mazer-share-preview.png (1200x630, the Open Graph / Twitter large-card size)
+// from the ONE Mazer app image (src/brand/source-art/mazer-app-icon-master.png, the FawxzzyWeb site's
+// Mazer icon; docs/ops/MAZER-APP-IMAGE-SOURCE-2026-11-13.md). Deterministic: sharp only, no browser, no
+// network, no text (so no system-font drift): the app image centred on the brand background with a soft
+// teal glow. `--check` compares against the checked-in file instead of writing.
 //
-// NOTE: the maze is generated per page load (no seed query param exists), so each
-// run yields a different, equally real board; the committed PNG is one such run.
+// The image lives in public/share (NOT public/assets, which is pinned to the boot preload set, and NOT in
+// vite includeAssets, so it adds no precache).
 //
-// Usage: npm run dev -- --host 127.0.0.1 --port <port> --strictPort   (other shell)
-//        node scripts/brand/generate-share-preview.mjs --base-url=http://127.0.0.1:<port> [--level=30]
-import { mkdir, writeFile } from 'node:fs/promises';
+// Usage: node scripts/brand/generate-share-preview.mjs [--check]
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright';
 import sharp from 'sharp';
 
 export const SHARE_PREVIEW_WIDTH = 1200;
 export const SHARE_PREVIEW_HEIGHT = 630;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const OUTPUT = resolve(ROOT, 'public', 'share', 'mazer-share-preview.png');
+const MASTER_PATH = resolve(ROOT, 'src', 'brand', 'source-art', 'mazer-app-icon-master.png');
+const OUTPUT_RELATIVE = 'public/share/mazer-share-preview.png';
+const OUTPUT = resolve(ROOT, OUTPUT_RELATIVE);
 
-const arg = (name, fallback) => {
-  const hit = process.argv.slice(2).find((value) => value.startsWith(`--${name}=`));
-  return hit ? hit.slice(name.length + 3) : fallback;
-};
+const BACKGROUND = '#02080f';
+const ICON_SIZE = 470;
+// The master is a rounded art frame on a black surround; crop the surround (measured: 41 px on each side of
+// the 1024 master) and round the corners so the card shows the art, not a black square.
+const MASTER_ART_MARGIN = 41;
+const MASTER_SIZE = 1024;
+const ICON_CORNER_RATIO = 0.2;
 
-const baseUrl = arg('base-url', 'http://127.0.0.1:4173');
-const level = Number.parseInt(arg('level', '30'), 10);
-const settleMs = Number.parseInt(arg('settle-ms', '20000'), 10);
-
-const wordmarkSvg = `<svg width="${SHARE_PREVIEW_WIDTH}" height="${SHARE_PREVIEW_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+const backdropSvg = `<svg width="${SHARE_PREVIEW_WIDTH}" height="${SHARE_PREVIEW_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#02080f" stop-opacity="0"/>
-      <stop offset="1" stop-color="#02080f" stop-opacity="0.92"/>
-    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="55%">
+      <stop offset="0" stop-color="#3ddbd4" stop-opacity="0.34"/>
+      <stop offset="0.45" stop-color="#3ddbd4" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#3ddbd4" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <rect x="0" y="390" width="${SHARE_PREVIEW_WIDTH}" height="240" fill="url(#fade)"/>
-  <text x="64" y="560" font-family="Arial, Helvetica, sans-serif" font-size="120" font-weight="700" letter-spacing="30" fill="#3ddbd4">MAZER</text>
-  <text x="68" y="600" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#d7fff8">A maze game for your phone</text>
+  <rect width="100%" height="100%" fill="${BACKGROUND}"/>
+  <rect width="100%" height="100%" fill="url(#glow)"/>
 </svg>`;
 
-const browser = await chromium.launch({ headless: true });
-try {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
-  const page = await context.newPage();
-  await page.goto(new URL(`/?previewLevel=${level}`, baseUrl).toString(), { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(settleMs);
-  const frame = await page.screenshot({ type: 'png' });
-  const resized = await sharp(frame)
-    // 1:1 crop (no scaling blur) that drops the corner settings gear at the top
-    // and leaves the "preview" caption under the wordmark gradient.
-    .extract({ left: 40, top: 30, width: SHARE_PREVIEW_WIDTH, height: SHARE_PREVIEW_HEIGHT })
-    .composite([{ input: Buffer.from(wordmarkSvg), top: 0, left: 0 }])
-    .png({ compressionLevel: 9, palette: true, quality: 90 })
+const roundedMask = (size) => Buffer.from(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${Math.round(size * ICON_CORNER_RATIO)}" fill="#fff"/></svg>`
+);
+
+export const renderSharePreview = async (master) => {
+  const crop = MASTER_SIZE - (MASTER_ART_MARGIN * 2);
+  const icon = await sharp(master)
+    .extract({ height: crop, left: MASTER_ART_MARGIN, top: MASTER_ART_MARGIN, width: crop })
+    .resize({ fit: 'fill', height: ICON_SIZE, kernel: sharp.kernel.lanczos3, width: ICON_SIZE })
+    .ensureAlpha()
+    .composite([{ blend: 'dest-in', input: roundedMask(ICON_SIZE) }])
+    .png()
     .toBuffer();
+  return sharp(Buffer.from(backdropSvg))
+    .composite([{
+      input: icon,
+      left: Math.round((SHARE_PREVIEW_WIDTH - ICON_SIZE) / 2),
+      top: Math.round((SHARE_PREVIEW_HEIGHT - ICON_SIZE) / 2)
+    }])
+    .removeAlpha()
+    .png({ colours: 128, compressionLevel: 9, effort: 10, palette: true, quality: 92 })
+    .toBuffer();
+};
+
+const main = async () => {
+  const payload = await renderSharePreview(await readFile(MASTER_PATH));
+  if (process.argv.includes('--check')) {
+    const actual = await readFile(OUTPUT).catch(() => null);
+    if (!actual || !actual.equals(payload)) throw new Error(`${OUTPUT_RELATIVE} is stale or missing; run node scripts/brand/generate-share-preview.mjs`);
+    console.log(`${OUTPUT_RELATIVE} is current (${payload.length} bytes)`);
+    return;
+  }
   await mkdir(dirname(OUTPUT), { recursive: true });
-  await writeFile(OUTPUT, resized);
-  console.log(`wrote ${OUTPUT} (${resized.length} bytes, level ${level})`);
-} finally {
-  await browser.close();
+  await writeFile(OUTPUT, payload);
+  console.log(`wrote ${OUTPUT_RELATIVE} (${payload.length} bytes)`);
+};
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
 }

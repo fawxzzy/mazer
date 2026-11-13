@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 import {
   installMazerProductionServiceWorker,
   installMazerServiceWorkerControllerReload,
+  selectMazerBootArtUrls,
+  MAZER_BOOT_ART_PATH_PREFIXES,
   type MazerServiceWorkerLifecycleRuntime
 } from '../../src/boot/serviceWorkerLifecycle';
 
@@ -129,6 +131,7 @@ describe('service worker controller reload', () => {
     const reload = vi.fn();
 
     installMazerServiceWorkerControllerReload({
+      controlledAtBoot: true,
       addControllerChangeListener: (listener) => listeners.push(listener),
       reload
     });
@@ -145,6 +148,7 @@ describe('service worker controller reload', () => {
     const reload = vi.fn();
 
     installMazerServiceWorkerControllerReload({
+      controlledAtBoot: true,
       addControllerChangeListener: (listener) => listeners.push(listener),
       reload
     });
@@ -154,5 +158,85 @@ describe('service worker controller reload', () => {
     listeners[0]();
 
     expect(reload).toHaveBeenCalledOnce();
+  });
+
+  test('MAZER-PERF-010: the first install claiming a never-controlled page does not reload it', () => {
+    const listeners: Array<() => void> = [];
+    const reload = vi.fn();
+    const warmBootArt = vi.fn();
+
+    installMazerServiceWorkerControllerReload({
+      controlledAtBoot: false,
+      addControllerChangeListener: (listener) => listeners.push(listener),
+      reload,
+      warmBootArt
+    });
+    listeners[0]();
+
+    expect(reload).not.toHaveBeenCalled();
+    expect(warmBootArt).toHaveBeenCalledOnce();
+  });
+
+  test('MAZER-PERF-010: a later update still reloads a page that started uncontrolled, once', () => {
+    const listeners: Array<() => void> = [];
+    const reload = vi.fn();
+    const warmBootArt = vi.fn();
+
+    installMazerServiceWorkerControllerReload({
+      controlledAtBoot: false,
+      addControllerChangeListener: (listener) => listeners.push(listener),
+      reload,
+      warmBootArt
+    });
+    listeners[0](); // first install claims the page
+    listeners[0](); // a deploy while the tab stays open
+    listeners[0]();
+
+    expect(warmBootArt).toHaveBeenCalledOnce();
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  test('MAZER-PERF-010: an already-controlled page still reloads once onto an update', () => {
+    const listeners: Array<() => void> = [];
+    const reload = vi.fn();
+
+    expect(installMazerServiceWorkerControllerReload({
+      controlledAtBoot: true,
+      addControllerChangeListener: (listener) => listeners.push(listener),
+      reload
+    })).toBe(true);
+    listeners[0]();
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  test('MAZER-PERF-010: boot snapshots the controller before it registers the worker', () => {
+    const main = readFileSync(resolve(__dirname, '../../src/boot/main.ts'), 'utf8');
+    const snapshot = main.indexOf('controlledAtBoot: navigator.serviceWorker.controller !== null');
+    expect(snapshot).toBeGreaterThan(-1);
+    // The reload runtime is built inside registerProductionServiceWorker, right after the (async) register call is
+    // started; the claim can only happen later, so the snapshot still describes the page as it loaded.
+    expect(main.indexOf('installMazerProductionServiceWorker({')).toBeLessThan(snapshot);
+  });
+
+  test('selects only the same-origin boot art the page already loaded', () => {
+    const origin = 'https://mazer.fawxzzy.com';
+    expect(selectMazerBootArtUrls([
+      `${origin}/assets/hud/hud-profile.webp`,
+      `${origin}/assets/hud/hud-profile.webp`,
+      `${origin}/fonts/mazer-tile-font/mazer-font-atlas.json`,
+      `${origin}/assets/main-abc.js`,
+      'https://example.com/assets/hud/other.webp',
+      'not a url'
+    ], origin)).toEqual([
+      `${origin}/assets/hud/hud-profile.webp`,
+      `${origin}/fonts/mazer-tile-font/mazer-font-atlas.json`
+    ]);
+  });
+
+  test('the boot-art prefixes match the worker runtime cache in vite.config.ts', () => {
+    const config = readFileSync(resolve(__dirname, '../../vite.config.ts'), 'utf8');
+    for (const prefix of MAZER_BOOT_ART_PATH_PREFIXES) {
+      expect(config).toContain(`url.pathname.startsWith('${prefix}')`);
+    }
   });
 });

@@ -267,3 +267,7 @@ This packet changes none of: `MenuScene.ts`, `legacyPlayerMessage.ts`, `legacyAu
 Source-level only: `npm run lint` (tsc), `tests/reset/legacy-auth-screen-view.test.ts`, `npx vitest run tests/reset`,
 and `npm run test`. NOT RUN: any rendered Phaser capture, any live account-host request, any deploy. Screenshots
 referenced above were viewed read-only and are not committed.
+
+## Update 2026-11-13 (MAZER-ACCT-040): this screen is now the fallback
+
+A signed-out launch no longer draws this screen first: boot starts the same OAuth hand-off by itself during the HTML splash and the player lands on the account host's sign-in page. This screen remains for the cases where that automatic hand-off did not or must not happen (hand-off refused: account service down, offline, storage blocked; the player backed out of the host; an OAuth return that failed; after an explicit Sign out; `?autoSignIn=0` for QA). Its layout, copy and phases are unchanged. Rules and tests: `docs/ops/MAZER-SIGNED-OUT-HANDOFF-2026-11-13.md`.

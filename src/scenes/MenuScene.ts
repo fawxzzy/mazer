@@ -41,7 +41,9 @@ import {
   type ReducedMotionSource
 } from '../render/reducedMotion';
 import { alignBoundsToWholePixels, alignCameraToWholePixels } from '../render/pixelAlignment';
-import { resolveUiLoaderPulse, resolveUiTransitionPlan, type UiTransitionKind } from '../render/uiTransition';
+import { AppLoaderOverlay } from '../render/appLoaderOverlay';
+import { isMazerBootSplashPresent } from '../boot/bootSplash';
+import { resolveUiTransitionPlan, type UiTransitionKind } from '../render/uiTransition';
 import { UiTransitionGhost } from '../render/uiTransitionGhost';
 import { PlayerLocatorState } from '../render/playerLocator';
 import { stepTrailColourRedraw } from '../render/trailColourRedraw';
@@ -1706,7 +1708,6 @@ export class MenuScene extends Phaser.Scene {
   private authGateAwaitingResolution = true;
   private authGateLocked = false;
   private guestPlayGranted = false;
-  private authGateGraphics!: Phaser.GameObjects.Graphics;
   private playerMessageToastGraphics!: Phaser.GameObjects.Graphics;
   // MAZER-MOTION-002: fading snapshot cover for Start / overlay open / overlay close (src/render/uiTransition.ts).
   private uiTransitionGhost: UiTransitionGhost | null = null;
@@ -1714,6 +1715,8 @@ export class MenuScene extends Phaser.Scene {
   private playerMessageToastTexts: Phaser.GameObjects.Text[] = [];
   private authGateLoadingText!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
+  // MAZER-VIS-039: the one app loader (icon, ring, fade in/out) behind the `Signing you in…` cover (src/render/appLoader.ts).
+  private appLoader: AppLoaderOverlay | null = null;
   // Same deferred-to-update() pattern as pendingBootPlayStart above, for
   // the same reason -- applyLegacyAuthSnapshot can run synchronously mid-
   // create() (the runtime auth fixture resolves immediately), before
@@ -2469,7 +2472,6 @@ export class MenuScene extends Phaser.Scene {
     this.touchSettingsCogIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.playerSpawnBurstGraphics = this.add.graphics();
     this.spawnLaserGraphics = this.add.graphics();
-    this.authGateGraphics = this.add.graphics();
     this.uiTransitionGhost = new UiTransitionGhost(this, 'mazer-ui-transition-ghost', LEGACY_PLAYER_MESSAGE_TOAST_DEPTH - 1);
     this.playerMessageToastGraphics = this.add.graphics()
       .setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH)
@@ -2487,6 +2489,7 @@ export class MenuScene extends Phaser.Scene {
       fontSize: '15px',
       color: '#d7fff8'
     })).setOrigin(0.5).setVisible(false).setDepth(LEGACY_AUTH_GATE_LOADING_DEPTH);
+    this.appLoader = new AppLoaderOverlay(this, LEGACY_AUTH_GATE_LOADING_DEPTH);
 
     this.footerText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
@@ -16044,13 +16047,23 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private syncLegacyAuthGateLoadingScreen(time: number): void {
+    // The cover is the shared app loader: it fades in (never pops), holds, and fades out over the live scene. While the
+    // HTML boot splash is still up the cover starts opaque so the splash fades out over an identical frame.
+    const loaderAlpha = this.appLoader?.sync(
+      this.authGateAwaitingResolution,
+      time,
+      this.prefersLegacyReducedMotion(),
+      this.layout.width,
+      this.layout.height,
+      isMazerBootSplashPresent()
+    ) ?? 0;
     if (!this.authGateAwaitingResolution) {
       if (this.authGateLoadingBlocker !== null) {
         this.authGateLoadingBlocker.destroy();
         this.authGateLoadingBlocker = null;
       }
-      this.authGateLoadingText.setVisible(false);
-      this.authGateGraphics.clear();
+      // The input shield is gone at once; the label leaves with the cover's fade.
+      this.authGateLoadingText.setAlpha(loaderAlpha).setVisible(loaderAlpha > 0);
       return;
     }
 
@@ -16064,33 +16077,17 @@ export class MenuScene extends Phaser.Scene {
       this.authGateLoadingBlocker.setSize(width, height);
     }
 
-    const centerX = width / 2;
-    const centerY = height / 2;
-    this.authGateGraphics.clear();
-    this.authGateGraphics.setDepth(LEGACY_AUTH_GATE_LOADING_DEPTH - 1);
-    this.authGateGraphics.fillStyle(0x02080f, 0.96);
-    this.authGateGraphics.fillRect(0, 0, width, height);
-
-    const pulse = resolveUiLoaderPulse(time, this.prefersLegacyReducedMotion());
-    const radius = 16 + (pulse * 4);
-    this.authGateGraphics.fillStyle(cyberArcadeMaterial.signal.player, 0.82 + (pulse * 0.14));
-    this.authGateGraphics.beginPath();
-    this.authGateGraphics.moveTo(centerX, centerY - radius);
-    this.authGateGraphics.lineTo(centerX + radius, centerY);
-    this.authGateGraphics.lineTo(centerX, centerY + radius);
-    this.authGateGraphics.lineTo(centerX - radius, centerY);
-    this.authGateGraphics.closePath();
-    this.authGateGraphics.fillPath();
-    this.authGateGraphics.lineStyle(2, cyberArcadeMaterial.rail.cyan, 0.5 + (pulse * 0.3));
-    this.authGateGraphics.strokePath();
-
     this.authGateLoadingText.setText(resolveLegacyAuthLoadingCopy({
       awaitingResolution: this.authGateAwaitingResolution,
       callbackInProgress: false,
       hasSession: this.authGateHasSessionEvidence
     }));
-    this.authGateLoadingText.setPosition(centerX, centerY + radius + 26);
-    this.authGateLoadingText.setVisible(true);
+    const loaderLayout = this.appLoader?.currentLayout;
+    this.authGateLoadingText.setPosition(
+      Math.round(loaderLayout?.centreX ?? width / 2),
+      Math.round(loaderLayout?.labelCentreY ?? height / 2)
+    );
+    this.authGateLoadingText.setAlpha(loaderAlpha).setVisible(loaderAlpha > 0);
   }
 
   private resolveLegacyPlayTouchControlDiagnostics(): MenuSceneVisualDiagnostics['touchControls'] {

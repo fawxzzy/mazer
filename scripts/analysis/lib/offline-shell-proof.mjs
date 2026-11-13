@@ -186,6 +186,8 @@ export const summarizeByPath = (requests, appOrigin) => {
  * Describes current behaviour only; it does not endorse it (the policy
  * itself is an open owner decision).
  */
+// MAZER-ACCT-040: installed (standalone) contexts use ?autoSignIn=0 here: this table is about the install
+// gate, and a signed-out standalone launch would otherwise leave for the account host after the gate.
 export const INSTALL_GATE_SCENARIOS = Object.freeze([
   { id: 'localhost-browser', label: 'Browser tab on localhost / 127.0.0.1', host: 'localhost', display: 'browser', ua: 'desktop-chromium', path: '/', expect: { blocked: false } },
   { id: 'localhost-forced', label: 'Browser tab on 127.0.0.1 with ?forceInstallGate=1', host: 'localhost', display: 'browser', ua: 'desktop-chromium', path: '/?forceInstallGate=1', expect: { blocked: true, mode: 'manual-desktop-chromium' } },
@@ -198,11 +200,11 @@ export const INSTALL_GATE_SCENARIOS = Object.freeze([
   { id: 'browser-install-prompt', label: 'Browser tab that fires beforeinstallprompt', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/', event: 'beforeinstallprompt', expect: { blocked: true, mode: 'prompt-available' } },
   { id: 'browser-app-installed-event', label: 'Browser tab after an appinstalled event', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/', event: 'appinstalled', expect: { blocked: true, mode: 'installed-open-app' } },
   { id: 'browser-fullscreen-only', label: 'Browser tab in plain display-mode: fullscreen (F11)', host: 'public', display: 'fullscreen', ua: 'desktop-chromium', path: '/', expect: { blocked: true, mode: 'manual-desktop-chromium' } },
-  { id: 'standalone-matchmedia', label: 'Installed app, display-mode: standalone', host: 'public', display: 'standalone', ua: 'desktop-chromium', path: '/', expect: { blocked: false } },
-  { id: 'standalone-minimal-ui', label: 'Installed app, display-mode: minimal-ui', host: 'public', display: 'minimal-ui', ua: 'desktop-chromium', path: '/', expect: { blocked: false } },
-  { id: 'standalone-wco', label: 'Installed desktop app, display-mode: window-controls-overlay', host: 'public', display: 'window-controls-overlay', ua: 'desktop-chromium', path: '/', expect: { blocked: false } },
-  { id: 'standalone-ios', label: 'iPhone home-screen app (navigator.standalone)', host: 'public', display: 'navigator-standalone', ua: 'ios', path: '/', expect: { blocked: false } },
-  { id: 'standalone-android-referrer', label: 'Android WebAPK launch (android-app:// referrer)', host: 'public', display: 'android-referrer', ua: 'android', path: '/', expect: { blocked: false } },
+  { id: 'standalone-matchmedia', label: 'Installed app, display-mode: standalone', host: 'public', display: 'standalone', ua: 'desktop-chromium', path: '/?autoSignIn=0', expect: { blocked: false } },
+  { id: 'standalone-minimal-ui', label: 'Installed app, display-mode: minimal-ui', host: 'public', display: 'minimal-ui', ua: 'desktop-chromium', path: '/?autoSignIn=0', expect: { blocked: false } },
+  { id: 'standalone-wco', label: 'Installed desktop app, display-mode: window-controls-overlay', host: 'public', display: 'window-controls-overlay', ua: 'desktop-chromium', path: '/?autoSignIn=0', expect: { blocked: false } },
+  { id: 'standalone-ios', label: 'iPhone home-screen app (navigator.standalone)', host: 'public', display: 'navigator-standalone', ua: 'ios', path: '/?autoSignIn=0', expect: { blocked: false } },
+  { id: 'standalone-android-referrer', label: 'Android WebAPK launch (android-app:// referrer)', host: 'public', display: 'android-referrer', ua: 'android', path: '/?autoSignIn=0', expect: { blocked: false } },
   { id: 'route-level-preview', label: 'Browser tab, ?previewLevel=1 (QA sandbox route)', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/?previewLevel=1', expect: { blocked: false } },
   { id: 'route-oauth-callback', label: 'Browser tab, OAuth callback request (?error=access_denied)', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/?error=access_denied', expect: { blocked: false } }
 ]);
