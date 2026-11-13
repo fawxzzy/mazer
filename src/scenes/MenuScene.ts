@@ -28,6 +28,7 @@ import {
   resolveBleedGlowProgress,
   resolveBleedGlowRects
 } from '../render/bleedGlow';
+import { BleedGlowColourSmoother } from '../render/bleedGlowColourStep';
 import { BOARD_MARKER_MIN_CSS, BOARD_TILE_GEOMETRY, boardMaterial, type BoardTileStyleId } from '../render/boardTileStyle';
 import { drawGoalBeacon } from '../render/goalBeacon';
 import { MOTION_LOOP_MS, MOTION_PHASER_EASE_SINE_IN_OUT, MOTION_UI_MS } from '../render/motionScale';
@@ -2164,6 +2165,8 @@ export class MenuScene extends Phaser.Scene {
   // animation time, and whether the trail is animated (Trail Shine on, no reduced motion). Null when no trail was
   // drawn this frame; the diamonds then use distance 0 on the scene clock.
   private trailPaletteHead: { distanceTiles: number; timeMs: number; animated: boolean } | null = null;
+  // Bounds the dock glow's colour step per redraw at the sheen crossing (src/render/bleedGlowColourStep.ts).
+  private readonly bleedGlowColourSmoother = new BleedGlowColourSmoother();
   private lastTrailOriginPoint: LegacyPoint | null = null;
   // See LegacyTrailPerfDiagnostics's own header comment. Overwritten every
   // drawLegacyContinuousPlayTrail call in play mode; null until the first
@@ -3306,9 +3309,9 @@ export class MenuScene extends Phaser.Scene {
     if (this.playerLocatorState.needsRedraw()) {
       this.boardDynamicDirty = true;
     }
-    // The bleed-dock glow samples the trail colour every frame; under reduced motion that colour-only redraw shares the
-    // trail's lower cadence (MAZER-PERF-003). Full motion redraws every frame, unchanged.
-    if (this.hasLegacyBleedOffGlowPendingFrame() && (!this.prefersLegacyReducedMotion() || this.isLegacyColourRedrawDue(time))) {
+    // The bleed-dock glow follows the trail's shared colour-redraw schedule at every motion setting (MAZER-PERF-003
+    // reduced 45 ms, MAZER-PERF-007 full motion 33 ms) instead of redrawing the whole dynamic board every frame.
+    if (this.hasLegacyBleedOffGlowPendingFrame() && this.isLegacyColourRedrawDue(time)) {
       this.boardDynamicDirty = true;
     }
     if (this.hasLegacyPlayerVisualMotionPendingFrame(time)) {
@@ -8791,7 +8794,7 @@ export class MenuScene extends Phaser.Scene {
       mazeRenderFrame.boardWidth,
       mazeRenderFrame.boardHeight,
       mazeTileSize,
-      resolveBleedGlowColor(this.trailPaletteHead, time, this.prefersLegacyReducedMotion())
+      this.bleedGlowColourSmoother.next(resolveBleedGlowColor(this.trailPaletteHead, time, this.prefersLegacyReducedMotion()), time)
     );
     this.drawLegacyProgressionBadge();
     this.drawLegacyLevelAnnouncer(time);

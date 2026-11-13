@@ -1086,8 +1086,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('mazeRenderFrame.boardHeight,');
     expect(menuSceneSource).toContain("const active = this.isLegacyTrailColourDrifting() && this.overlay === 'none' && this.trail.length > 1;");
     expect(menuSceneSource).toContain('stepTrailColourRedraw(time, this.legacyPlayTrailPulseNextFrameAtMs, this.prefersLegacyReducedMotion())');
-    // The bleed-dock glow shares that one schedule under reduced motion (it was redrawing every frame).
-    expect(menuSceneSource).toContain('this.hasLegacyBleedOffGlowPendingFrame() && (!this.prefersLegacyReducedMotion() || this.isLegacyColourRedrawDue(time))');
+    // The bleed-dock glow shares that one schedule at every motion setting (MAZER-PERF-003 reduced, MAZER-PERF-007 full motion).
+    expect(menuSceneSource).toContain('this.hasLegacyBleedOffGlowPendingFrame() && this.isLegacyColourRedrawDue(time)');
     expect(menuSceneSource).toContain('this.resolveLegacyPlayPerfectPathTrail()');
     expect(menuSceneSource).not.toContain('private resolveLegacyPointPathSource(');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start', time);");
