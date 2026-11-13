@@ -1,8 +1,8 @@
 # Mazer work ledger (schema v1)
 
-The registry (`config/mazer-owner-work-registry.json`) stays the single source of truth for each card's status, title, priority and dependencies. The ledger (`config/mazer-work-ledger.json`) holds only what the registry cannot express: proof tier, who or what blocks a card, exact verification steps, work lane and file hints. `node scripts/analysis/work-report.mjs` joins the two into `docs/ops/MAZER-WORK-REPORT.md` and `.json`. Those two outputs are generated and never hand-edited; CI runs `--check` and fails when they are stale.
+The registry (`config/mazer-owner-work-registry.json`) stays the single source of truth for each card's status, title, priority and dependencies. The ledger (`config/mazer-work-ledger.json`) holds only what the registry cannot express: proof tier, who or what blocks a card, exact verification steps, work lane and file hints. `node scripts/analysis/work-report.mjs` joins the two into `docs/ops/MAZER-WORK-REPORT.md` and `.json`. Those two outputs are generated and never hand-edited; the Owner export workflow runs `--check` whenever the registry, ledger, event archive or generator changes and fails when they are stale.
 
-Update flow after a batch: board sync updates the registry, then update the ledger entries for the cards that moved, then run `node scripts/analysis/work-report.mjs` and commit all four files together.
+Update flow: append board events while work happens and fold them at a milestone with `node scripts/board/board-sync.mjs apply`, which updates the registry, this ledger (evidence, blocker, verify, note, lane), the owner export and the work report together. See `docs/ops/MAZER-BOARD-SYNC-PROCESS.md`. Hand edits to the ledger remain valid for anything an event cannot express (`filesHint`, long notes); commit them with a fresh `node scripts/analysis/work-report.mjs`.
 
 ## File shape
 
