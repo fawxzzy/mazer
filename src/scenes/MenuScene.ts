@@ -117,6 +117,7 @@ import {
   drawEdgeMarkers,
   resolveEdgeMarkerStates,
   resolveEdgeRingFills,
+  resolveEdgeRingScales,
   resolveEdgeStations,
   resolveWrapEndStationIds,
   resolveWrapFlashStationIds,
@@ -8818,6 +8819,8 @@ export class MenuScene extends Phaser.Scene {
         reducedMotion,
         fillCrossfade: this.edgeRing.lifecycle?.crossfade === true,
         fills: resolveEdgeRingFills(this.edgeRing.lifecycle),
+        // 50% while the maze runs; grows/shrinks about the inner tip with the beams (MAZER-VIS-038).
+        scales: resolveEdgeRingScales(this.edgeRing.lifecycle),
         spinRad: this.edgeRing.spinRad,
         timeMs: time,
         // The border is the live trail colour: the trail head's own palette sample (trailPalette.ts).

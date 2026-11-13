@@ -13,13 +13,17 @@
  *
  *   - ARRIVAL (Start, and the maze-to-maze arrival after a goal): ALL 8
  *     edge diamonds fire a beam INWARD to the spawn tile (every beam starts at
- *     its own diamond, all 8 are in flight together, they converge on the
- *     spawn tile, each full diamond drains from the instant its beam leaves it) -- but ONLY AFTER
- *     the maze build is complete (the diamonds orbit, full, during the build);
+ *     its own diamond's INNERMOST point (its inner tip), all 8 are in flight together, they converge on the
+ *     spawn tile, each full diamond drains from the instant its beam leaves it and its beam stays attached
+ *     to the tip until the drain is over) -- but ONLY AFTER
+ *     the maze build is complete (the diamonds orbit, full size, during the build); each empty diamond then shrinks
+ *     back to 50% of its size, anchored on its inner tip;
  *     the player appears at the beam landing and input unlocks there, 500 ms
  *     + the build length after the intro began;
  *   - DEPARTURE (goal reached -> deconstruct): the player fires a beam OUTWARD
- *     to ALL 8 diamonds, then the maze dissolves and the next maze arrives;
+ *     to ALL 8 diamonds (each diamond grows from 50% to 100% by the instant its beam touches its inner tip and the
+ *     beam stays attached until the fill is complete), then the maze dissolves and the next maze arrives;
+ *   - while the maze runs every diamond is 50% of its full size (a fixed size in reduced motion, no size animation);
  *   - the transfer lifecycle still runs outbound -> stored -> delivering ->
  *     complete -> input unlocked again, via real accepted moves only;
  *   - reduced motion: no beams at all, the diamonds only crossfade full/empty (no sweep, no brightening), 200 ms unlock;
@@ -98,8 +102,16 @@ const INTRO_REDUCED_UNLOCK_MS = 200; // MOTION_REDUCED_MS.crossfade (MAZER-MOTIO
 const FRAME_MS = 16;
 const UNLOCK_TOLERANCE_MS = FRAME_MS * 2;
 const OUTRO_LASER_END_MS = 400;
-// The pulse tail runs one base step (edgeBeamTimeline.ts EDGE_BEAM_PULSE_MS = MOTION_DURATION_MS.base = 200) behind the head.
+// A departure beam stays attached for one base step after its head lands (the fill, edgeBeamTimeline.ts EDGE_BEAM_PULSE_MS =
+// MOTION_DURATION_MS.base = 200) and then retracts over one fast step (EDGE_BEAM_RETRACT_MS = 120). An arrival beam is gone by head landing + 20 ms.
 const PULSE_TAIL_MS = 200;
+const RETRACT_MS = 120;
+const DEPARTURE_BEAM_END_MS = OUTRO_LASER_END_MS + PULSE_TAIL_MS + RETRACT_MS;
+// Diamond size: half size while the maze runs, full size from the departure grow to the end of the build, back to half after the drain.
+const KITE_FULL_LENGTH_PX = 20;
+const KITE_REST_LENGTH_PX = 10;
+const KITE_LENGTH_TOLERANCE_PX = 0.05;
+const INNER_TIP_REACH_PX = 10;
 const ALL_STATION_IDS = [0, 1, 2, 3, 4, 5, 6, 7];
 // A diamond counts as lit when its stroke alpha is above the idle breathing maximum (0.6).
 const LIT_ALPHA_FLOOR = 0.62;
@@ -121,12 +133,15 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
  *  - playerSpawnBurstGraphics.lineBetween -> the retired per-sigil volley (must stay 0)
  * and exposes stepFrames / stepUntil on the shared manual 16 ms clock.
  */
-const PULSE_LINES = 31;
-const installHarness = (page) => page.evaluate((PULSE_LINES) => {
+// A beam is 2 x 3 bloom lines + 5 body lines + up to 8 stream dashes (edgeBeamArt.ts); its FIRST line is the outer bloom (9 css px wide,
+// tail -> head), so a pulse starts at the first line drawn under a bloom-outer-width style. The landing poof is 12 sparkle lines.
+const BLOOM_OUTER_MIN_WIDTH_PX = 8;
+const POOF_LINES = 12;
+const installHarness = (page) => page.evaluate(({ BLOOM_OUTER_MIN_WIDTH_PX, POOF_LINES }) => {
   const getScene = () => window.__MAZER_GAME__.scene.getScene('MenuScene');
   const initial = getScene();
 
-  const laser = { lines: [] };
+  const laser = { lines: [], width: 0 };
   const volley = { count: 0 };
   const edge = { frame: [], style: null, vertices: [] };
   const wrap = (graphics, names, handler) => {
@@ -138,8 +153,10 @@ const installHarness = (page) => page.evaluate((PULSE_LINES) => {
       };
     }
   };
-  wrap(initial.spawnLaserGraphics, ['clear', 'lineBetween'], (name, args) => {
-    if (name === 'clear') { laser.lines = []; } else { laser.lines.push([args[0], args[1], args[2], args[3]]); }
+  wrap(initial.spawnLaserGraphics, ['clear', 'lineStyle', 'lineBetween'], (name, args) => {
+    if (name === 'clear') { laser.lines = []; laser.width = 0; }
+    else if (name === 'lineStyle') { laser.width = args[0]; }
+    else { laser.lines.push({ line: [args[0], args[1], args[2], args[3]], width: laser.width }); }
   });
   wrap(initial.playerSpawnBurstGraphics, ['lineBetween'], () => { volley.count += 1; });
   wrap(initial.edgeMarkerGraphics, ['clear', 'lineStyle', 'beginPath', 'moveTo', 'lineTo', 'strokePath'], (name, args) => {
@@ -179,14 +196,23 @@ const installHarness = (page) => page.evaluate((PULSE_LINES) => {
     const transfer = scene.resolveLegacyPlayerTransferState(t).phase;
     if (transfer === 'delivering') { state.sawDelivering = true; }
     const firing = Array.from(scene.edgeBeamFiringIds).sort((a, b) => a - b);
-    const lines = laser.lines;
     const focus = tileCenter(scene, scene.player);
-    // Each pulse is PULSE_LINES lineBetween calls (edgeBeamArt.ts: 2 x 8 bloom + 14 body + 1 lead), in station order; the landing poof's
-    // sparkle lines come after them. The first line of a pulse runs tail -> head.
-    const pulseLines = firing.length * PULSE_LINES;
-    const sparkleMids = lines.length > pulseLines
-      ? lines.slice(pulseLines).map((l) => ({ x: (l[0] + l[2]) / 2, y: (l[1] + l[3]) / 2 }))
+    // The landing poof (12 sparkle lines) is drawn after the beams while the spawn burst is in its flash; take it off the end.
+    const burst = scene.resolveLegacyPlayerSpawnBurstState(t);
+    const poof = burst.active && burst.travelProgress >= 1 && burst.flashProgress > 0 && burst.flashProgress < 1;
+    const allLines = laser.lines;
+    const lines = poof ? allLines.slice(0, Math.max(0, allLines.length - POOF_LINES)) : allLines;
+    const sparkleMids = poof
+      ? allLines.slice(Math.max(0, allLines.length - POOF_LINES)).map((l) => ({ x: (l.line[0] + l.line[2]) / 2, y: (l.line[1] + l.line[3]) / 2 }))
       : [];
+    // A pulse starts at the first line drawn under the outer-bloom width; its first line runs tail -> head, in station order.
+    const pulses = [];
+    lines.forEach((entry, index) => {
+      const bloom = entry.width >= BLOOM_OUTER_MIN_WIDTH_PX;
+      if (bloom && (index === 0 || lines[index - 1].width < BLOOM_OUTER_MIN_WIDTH_PX)) { pulses.push({ first: entry.line, lines: 0 }); }
+      if (pulses.length > 0) { pulses[pulses.length - 1].lines += 1; }
+    });
+    const stationsNow = scene.resolveLegacyEdgeStations();
     return {
       t,
       mode: scene.mode,
@@ -200,19 +226,26 @@ const installHarness = (page) => page.evaluate((PULSE_LINES) => {
       transfer,
       armed: scene.playerTransferEnergyArmed,
       firing,
-      lineCount: lines.length,
-      beamPairs: firing.length > 0 ? firing.map((_, group) => lines[group * PULSE_LINES]).filter(Boolean) : [],
+      lineCount: allLines.length,
+      dpr: scene.resolveBoardTileBackingScale(),
+      pulseCount: pulses.length,
+      pulseLineCounts: pulses.map((pulse) => pulse.lines),
+      beamPairs: pulses.map((pulse) => pulse.first),
+      // The line set of every pulse, for the endpoint checks: [x1, y1, x2, y2] of the longest line (the body/bloom span, tail -> head).
       sparkleMids,
       focus,
-      stations: scene.resolveLegacyEdgeStations().map((s) => ({ id: s.id, x: s.x, y: s.y })),
+      stations: stationsNow.map((s) => ({ id: s.id, x: s.x, y: s.y, a: s.inwardAngle })),
       lit: edge.frame.map((marker, index) => (marker.alpha > 0.62 ? index : null)).filter((index) => index !== null),
       tiles: scene.menuStaticDrawTileOrder.length,
       // Tiles currently shown (null = no limit = the whole maze), and whether the player marker is revealed yet.
       tilesVisible: scene.menuStaticDrawTilesVisible === null ? scene.menuStaticDrawTileOrder.length : scene.menuStaticDrawTilesVisible,
       playerReveal: scene.resolveLegacyPlayerSpawnBurstState(t).markerRevealAlpha,
       markerCount: edge.frame.length,
-      // Kite centroid (the ring orbits the perimeter, so it moves during the intro/outro lap and is exactly parked otherwise).
-      ring: edge.frame.map((marker) => (marker.vertices.length === 0 ? null : { x: marker.vertices.reduce((s, v) => s + v.x, 0) / marker.vertices.length, y: marker.vertices.reduce((s, v) => s + v.y, 0) / marker.vertices.length })),
+      // Kite INNER TIP (vertex 0: the ring orbits the perimeter, so it moves during the intro/outro lap and is exactly parked
+      // otherwise; unlike the centroid it does not move when the diamond scales about it).
+      ring: edge.frame.map((marker) => (marker.vertices.length === 0 ? null : { x: marker.vertices[0].x, y: marker.vertices[0].y })),
+      // Kite length tip -> outer tip, per marker: 20 css px at full size, 10 at the 50% rest size.
+      kiteLengths: edge.frame.map((marker) => (marker.vertices.length < 3 ? null : Math.hypot(marker.vertices[0].x - marker.vertices[2].x, marker.vertices[0].y - marker.vertices[2].y))),
       markerBounds: (() => {
         const all = edge.frame.flatMap((marker) => marker.vertices);
         return all.length === 0 ? null : {
@@ -261,10 +294,10 @@ const installHarness = (page) => page.evaluate((PULSE_LINES) => {
     volleyCount: () => volley.count,
     resetVolley: () => { volley.count = 0; },
     resetCycleWatch: () => { state.sawDelivering = false; },
-    stations: () => getScene().resolveLegacyEdgeStations().map((s) => ({ id: s.id, x: s.x, y: s.y })),
+    stations: () => getScene().resolveLegacyEdgeStations().map((s) => ({ id: s.id, x: s.x, y: s.y, a: s.inwardAngle })),
     viewport: () => ({ width: getScene().layout.width, height: getScene().layout.height })
   };
-}, PULSE_LINES);
+}, { BLOOM_OUTER_MIN_WIDTH_PX, POOF_LINES });
 
 /** Opens a real game context/page, stops the RAF loop and installs the harness. */
 const openGameContext = async (browser, baseUrl, contextOptions) => {
@@ -338,10 +371,130 @@ const beamStationId = (pair, stations, focus, direction, id) => {
   const cos = ((vx * fx) + (vy * fy)) / (vLen * fLen);
   const heading = direction === 'inward' ? cos : -cos;
   const offLine = (p) => Math.abs(((p.x - station.x) * fy) - ((p.y - station.y) * fx)) / fLen;
-  return heading > Math.cos((8 * Math.PI) / 180) && offLine({ x: pair[0], y: pair[1] }) <= KITE_REACH_PX && offLine({ x: pair[2], y: pair[3] }) <= KITE_REACH_PX ? id : null;
+  // The beam now joins the focus to the diamond's INNER TIP (not its centre), so it can differ from station -> focus by up to
+  // asin(10 / distance): 20 degrees still tells the eight stations (45 degrees apart) from one another.
+  return heading > Math.cos((20 * Math.PI) / 180) && offLine({ x: pair[0], y: pair[1] }) <= KITE_REACH_PX && offLine({ x: pair[2], y: pair[3] }) <= KITE_REACH_PX ? id : null;
 };
 // Half extent of a kite plus a stroke (EDGE_MARKER_MAX_EXTENT_PX is 10.5).
 const KITE_REACH_PX = 11;
+
+/** The diamond's INNERMOST point (the tip facing the board) for a harness station: centre + 10 px along its inward axis. */
+const innerTipOf = (station) => ({ x: station.x + (Math.cos(station.a) * INNER_TIP_REACH_PX), y: station.y + (Math.sin(station.a) * INNER_TIP_REACH_PX) });
+
+/** Longest run of consecutive frames for which `predicate(frame)` holds. */
+const longestRun = (frames, predicate) => {
+  let best = 0;
+  let current = 0;
+  for (const frame of frames) {
+    current = predicate(frame) ? current + 1 : 0;
+    best = Math.max(best, current);
+  }
+  return best;
+};
+
+/**
+ * MAZER-VIS-038 beam attachment, from the drawn geometry. Both directions end on the diamond's INNER TIP (pixel snapped, so within
+ * one device pixel) and the beam stays attached there for the WHOLE fill (departure: head on the tip AND tail on the player) /
+ * the WHOLE drain (arrival: tail on the tip) before it lets go. Returns, per station, the longest attached run in frames.
+ */
+const analyzeAttachment = (frames, direction) => {
+  const runs = [];
+  const maxErrors = [];
+  for (const id of ALL_STATION_IDS) {
+    const attached = (frame) => {
+      const order = frame.firing.indexOf(id);
+      const pair = order >= 0 ? frame.beamPairs[order] : undefined;
+      const station = frame.stations.find((s) => s.id === id);
+      if (!pair || !station) { return false; }
+      const tolerance = 1.01 / frame.dpr;
+      const tip = innerTipOf(station);
+      if (direction === 'outward') {
+        return dist({ x: pair[2], y: pair[3] }, tip) <= tolerance && dist({ x: pair[0], y: pair[1] }, frame.focus) <= Math.max(tolerance, 1.5);
+      }
+      return dist({ x: pair[0], y: pair[1] }, tip) <= tolerance;
+    };
+    runs.push(longestRun(frames, attached));
+    // Smallest distance between the beam's diamond end and the inner tip over the whole beam life (0 = snapped onto it).
+    let best = Number.POSITIVE_INFINITY;
+    frames.forEach((frame) => {
+      const order = frame.firing.indexOf(id);
+      const pair = order >= 0 ? frame.beamPairs[order] : undefined;
+      const station = frame.stations.find((s) => s.id === id);
+      if (pair && station) {
+        const end = direction === 'outward' ? { x: pair[2], y: pair[3] } : { x: pair[0], y: pair[1] };
+        best = Math.min(best, dist(end, innerTipOf(station)));
+      }
+    });
+    maxErrors.push(best);
+  }
+  return { minAttachedFrames: Math.min(...runs), runs, worstTipError: Math.max(...maxErrors), maxErrors };
+};
+
+/**
+ * MAZER-VIS-038 size cycle, checked on the drawn kites (tip -> outer tip length: 20 css px at full size, 10 at 50%).
+ * DEPARTURE frames (`kind` 'departure'): every kite starts at ~50%, only ever grows, is full size on every frame its own beam head
+ * sits on its tip, and is full size from the last contact to the end of the deconstruct.
+ * ARRIVAL frames (`kind` 'arrival', `buildEndAge` = the age the beams leave): full size through the build (after the cold-start charge),
+ * only ever shrinks from the moment its own beam has left and drained, never shrinks while its beam is draining it, and is back
+ * at 50% by the end.
+ */
+const lengthOf = (frame, id) => frame.kiteLengths[id];
+const approx = (value, target) => value !== null && value !== undefined && Math.abs(value - target) <= KITE_LENGTH_TOLERANCE_PX;
+const analyzeKiteSize = (frames, kind, { buildEndAge = null, chargedAge = 0 } = {}) => {
+  const problems = [];
+  const note = (why, detail) => { if (problems.length < 4) { problems.push({ why, detail }); } };
+  const withKites = frames.filter((f) => f.kiteLengths.length === 8 && f.kiteLengths.every((v) => v !== null));
+  if (withKites.length === 0) { return { ok: false, problems: [{ why: 'no frame with 8 kites' }] }; }
+  if (kind === 'departure') {
+    const first = withKites[0];
+    // The first deconstruct frame is at most a frame into the grow (c = 16 ms of a >= 302 ms smoothstep): below 11 px.
+    if (!first.kiteLengths.every((v) => v >= KITE_REST_LENGTH_PX - KITE_LENGTH_TOLERANCE_PX && v <= 11)) { note('does not start at 50%', first.kiteLengths); }
+    ALL_STATION_IDS.forEach((id) => {
+      let previous = 0;
+      withKites.forEach((frame) => {
+        const length = lengthOf(frame, id);
+        if (length < previous - 0.01) { note('shrank during the departure', { id, previous, length }); }
+        previous = length;
+        const order = frame.firing.indexOf(id);
+        const pair = order >= 0 ? frame.beamPairs[order] : undefined;
+        const station = frame.stations.find((s) => s.id === id);
+        const headOnTip = pair && station && dist({ x: pair[2], y: pair[3] }, innerTipOf(station)) <= 1.01 / frame.dpr;
+        if (headOnTip && !approx(length, KITE_FULL_LENGTH_PX)) { note('beam attached to a diamond that is not full size', { id, length, age: frame.outroAge }); }
+        if (frame.outroAge !== null && frame.outroAge >= OUTRO_LASER_END_MS + FRAME_MS && !approx(length, KITE_FULL_LENGTH_PX)) { note('not full size after the last contact', { id, length, age: frame.outroAge }); }
+      });
+    });
+    return { ok: problems.length === 0, problems };
+  }
+  // arrival
+  withKites.forEach((frame) => {
+    const age = frame.introAge;
+    if (age === null) { return; }
+    if (age >= chargedAge && buildEndAge !== null && age <= buildEndAge) {
+      frame.kiteLengths.forEach((length, id) => { if (!approx(length, KITE_FULL_LENGTH_PX)) { note('not full size during the build', { id, length, age }); } });
+    }
+  });
+  const firstFiringAge = new Map();
+  withKites.forEach((frame) => frame.firing.forEach((id) => { if (!firstFiringAge.has(id) && frame.introAge !== null) { firstFiringAge.set(id, frame.introAge); } }));
+  ALL_STATION_IDS.forEach((id) => {
+    let previous = KITE_FULL_LENGTH_PX + 1;
+    withKites.forEach((frame) => {
+      const age = frame.introAge;
+      if (age === null || buildEndAge === null || age < buildEndAge - FRAME_MS) { return; }
+      const length = lengthOf(frame, id);
+      if (length > previous + 0.01) { note('grew during the arrival', { id, previous, length }); }
+      previous = length;
+      const launch = firstFiringAge.get(id);
+      // The diamond must not shrink while its own beam is still draining it (drain = 200 ms from its launch).
+      if (launch !== undefined && age < launch + PULSE_TAIL_MS - (2 * FRAME_MS) && !approx(length, KITE_FULL_LENGTH_PX)) { note('shrank before it was drained', { id, length, age, launch }); }
+    });
+  });
+  const last = withKites[withKites.length - 1];
+  // Only when the recorded frames run to the end of the intro (the beams leave, land, and the 350 ms pop is over: 750 ms after they leave);
+  // some captures stop at the input unlock, which is before the last diamond has finished shrinking.
+  const coversEnd = buildEndAge !== null && last.introAge !== null && last.introAge >= buildEndAge + 750 - FRAME_MS;
+  if (coversEnd && !last.kiteLengths.every((length) => approx(length, KITE_REST_LENGTH_PX))) { note('not back at 50% at the end', last.kiteLengths); }
+  return { ok: problems.length === 0, problems };
+};
 
 /**
  * The ring FILL contract (MAZER-VIS-030, supersedes live audit findings 4 and 6), checked on every frame. A diamond
@@ -439,7 +592,7 @@ const analyzeBeams = (frames, _unusedMenuStations, direction) => {
     const station = entry.station;
     const total = dist(station, entry.focus);
     const remaining = direction === 'inward' ? dist(entry.tip, entry.focus) : dist(entry.tip, station);
-    // A diamond end is the contact point on the kite OUTLINE (up to the kite's reach from its centre), not its centre.
+    // The diamond end is the kite's INNER TIP (10 px from its centre toward the board).
     if (!(total > 0 && remaining <= Math.max(total * 0.1, KITE_REACH_PX))) { tipsReachFarEnd = false; }
   }
   return {
@@ -451,6 +604,7 @@ const analyzeBeams = (frames, _unusedMenuStations, direction) => {
     pairCountMatchesScene,
     wrongDirectionPairs,
     lighting: analyzeLighting(frames, direction),
+    attachment: analyzeAttachment(frames, direction),
     maxConcurrent,
     firstAge,
     lastAge,
@@ -666,6 +820,7 @@ const assertArrival = (label, frames, stations, { reducedMotion = false, viewpor
   if (reducedMotion) {
     check(`${label}: reduced motion draws NO beam at all (no laser, no poof) during the whole build`, buildFrames.every((f) => f.firing.length === 0 && f.lineCount === 0), JSON.stringify(buildFrames.filter((f) => f.lineCount > 0).slice(0, 2)));
     check(`${label}: reduced motion never lights a diamond (the ring is completely static)`, buildFrames.every((f) => f.lit.length === 0 && f.markerCount === 8), JSON.stringify(buildFrames.filter((f) => f.lit.length > 0).slice(0, 2)));
+    check(`${label}: reduced motion keeps every diamond at a FIXED 50% size through the build (no size animation)`, buildFrames.filter((f) => f.markerCount === 8).every((f) => f.kiteLengths.every((length) => approx(length, KITE_REST_LENGTH_PX))), JSON.stringify(buildFrames.find((f) => f.markerCount === 8 && f.kiteLengths.some((length) => !approx(length, KITE_REST_LENGTH_PX)))?.kiteLengths));
     check(
       `${label}: reduced-motion input unlocks at ~${INTRO_REDUCED_UNLOCK_MS} ms into the build, not before`,
       unlock !== null && unlock.previousLocked && unlock.age >= INTRO_REDUCED_UNLOCK_MS && unlock.age < INTRO_REDUCED_UNLOCK_MS + UNLOCK_TOLERANCE_MS,
@@ -685,8 +840,11 @@ const assertArrival = (label, frames, stations, { reducedMotion = false, viewpor
   check(`${label}: every beam converges on the spawn tile (its last drawn tip is within 10% of the way to it)`, a.tipsReachFarEnd, JSON.stringify(a));
   check(`${label}: ALL 8 diamonds are full through the whole build and drain only as THEIR beam leaves`, a.lighting.ok, JSON.stringify(a.lighting));
   const buildTiles = buildFrames[0]?.tiles ?? 0;
+  check(`${label}: every arrival beam starts exactly on its diamond's INNER TIP (pixel snapped, within 1 device pixel) and stays attached there for the whole drain (>= ${Math.floor(PULSE_TAIL_MS / FRAME_MS) - 2} frames)`, a.attachment.worstTipError <= 1.01 / (buildFrames.find((f) => f.firing.length > 0)?.dpr ?? 1) && a.attachment.minAttachedFrames >= Math.floor(PULSE_TAIL_MS / FRAME_MS) - 2, JSON.stringify(a.attachment));
+  const kitesArrival = analyzeKiteSize(buildFrames, 'arrival', { buildEndAge: introBuildEndMs(buildTiles), chargedAge: INTRO_BUILD_START_MS + INTRO_RING_CHARGE_MS + (3 * FRAME_MS) });
+  check(`${label}: the diamonds are 100% size through the build, hold it while their beam drains them, then each shrinks back to 50% (anchored on its tip) and rests at 50%`, kitesArrival.ok, JSON.stringify(kitesArrival.problems));
   check(
-    `${label}: the beams fire only AFTER the build completes, the heads land 400 ms later and the tails are absorbed within ${PULSE_TAIL_MS} ms more (${introBuildEndMs(buildTiles)}-${introLaserEndMs(buildTiles)}+${PULSE_TAIL_MS} ms, one frame of slack)`,
+    `${label}: the beams fire only AFTER the build completes, the heads land 400 ms later and every beam is gone within ${PULSE_TAIL_MS} ms more (${introBuildEndMs(buildTiles)}-${introLaserEndMs(buildTiles)}+${PULSE_TAIL_MS} ms, one frame of slack)`,
     a.firstAge !== null && a.firstAge >= introBuildEndMs(buildTiles) - FRAME_MS && a.lastAge <= introLaserEndMs(buildTiles) + PULSE_TAIL_MS + FRAME_MS,
     `first=${a.firstAge} last=${a.lastAge}`
   );
@@ -729,6 +887,7 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
   if (reducedMotion) {
     check(`${label}: reduced motion draws no beam through the whole goal-reset cycle`, frames.every((f) => f.firing.length === 0 && f.lineCount === 0), JSON.stringify(frames.filter((f) => f.lineCount > 0).slice(0, 2)));
     check(`${label}: reduced motion never lights a diamond through the whole cycle`, frames.every((f) => f.lit.length === 0), JSON.stringify(frames.filter((f) => f.lit.length > 0).slice(0, 2)));
+    check(`${label}: reduced motion keeps every diamond at a FIXED 50% size through the whole cycle (no size animation, ${frames.length} frames)`, frames.filter((f) => f.markerCount === 8).every((f) => f.kiteLengths.every((length) => approx(length, KITE_REST_LENGTH_PX))), JSON.stringify(frames.find((f) => f.markerCount === 8 && f.kiteLengths.some((length) => !approx(length, KITE_REST_LENGTH_PX)))?.kiteLengths));
   } else {
     const d = analyzeBeams(departure, stations, 'outward');
     check(`${label}: on goal-reset the player fires a beam to ALL 8 diamonds (the scene's own firing set covers stations 0-7)`, sameList(d.sceneIds, ALL_STATION_IDS), JSON.stringify(d));
@@ -742,8 +901,15 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
     check(`${label}: every departure beam reaches its diamond (last drawn tip within 10% of it)`, d.tipsReachFarEnd, JSON.stringify(d));
     check(`${label}: each diamond fills as the player beam REACHES it and all 8 stay full to the end of the deconstruct`, d.lighting.ok, JSON.stringify(d.lighting));
     check(
-      `${label}: the departure beams fire inside the deconstruct laser window (heads 0-${OUTRO_LASER_END_MS} ms, tails absorbed within ${PULSE_TAIL_MS} ms more, one frame of slack)`,
-      d.firstAge !== null && d.firstAge >= 0 && d.lastAge <= OUTRO_LASER_END_MS + PULSE_TAIL_MS + FRAME_MS,
+      `${label}: every departure beam ends exactly on its diamond's INNER TIP (pixel snapped) and stays attached there, tail on the player, for the whole fill (>= ${Math.floor(PULSE_TAIL_MS / FRAME_MS) - 2} frames)`,
+      d.attachment.worstTipError <= 1.01 / (departure.find((f) => f.firing.length > 0)?.dpr ?? 1) && d.attachment.minAttachedFrames >= Math.floor(PULSE_TAIL_MS / FRAME_MS) - 2,
+      JSON.stringify(d.attachment)
+    );
+    const kitesDeparture = analyzeKiteSize(departure, 'departure');
+    check(`${label}: on goal the diamonds grow from 50% to 100%, are full size whenever their beam is attached, and stay full to the end of the deconstruct`, kitesDeparture.ok, JSON.stringify(kitesDeparture.problems));
+    check(
+      `${label}: the departure beams fire inside the deconstruct laser window (heads 0-${OUTRO_LASER_END_MS} ms, attached for the ${PULSE_TAIL_MS} ms fill, retracted within ${RETRACT_MS} ms more: <= ${DEPARTURE_BEAM_END_MS} ms, one frame of slack)`,
+      d.firstAge !== null && d.firstAge >= 0 && d.lastAge <= DEPARTURE_BEAM_END_MS + FRAME_MS,
       `first=${d.firstAge} last=${d.lastAge}`
     );
     const arrivalFrames = outroIndex >= 0 && buildIndex >= 0 ? frames.slice(buildIndex) : [];
@@ -776,6 +942,7 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
     last.firing.length === 0 && last.lineCount === 0 && last.lit.length === 0 && last.player.x === last.start.x && last.player.y === last.start.y,
     JSON.stringify({ firing: last.firing, lineCount: last.lineCount, lit: last.lit, player: last.player, start: last.start })
   );
+  check(`${label}: with the maze running every diamond rests at 50% size (${KITE_REST_LENGTH_PX} px tip to outer tip)`, last.markerCount === 8 && last.kiteLengths.every((length) => approx(length, KITE_REST_LENGTH_PX)), JSON.stringify(last.kiteLengths));
   const legalMove = await resolveLegalMove(h.page);
   if (legalMove !== null) {
     const after = await moveUntilAccepted(h.page, h.stepOnce, legalMove, 200);

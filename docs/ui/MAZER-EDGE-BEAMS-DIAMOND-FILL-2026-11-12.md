@@ -2,6 +2,8 @@
 
 Status: implemented 2026-11-12 on branch `claude/mazer-vis-030-20261112`, after the owner asked: "the lasers that shoot out to the diamonds and out from them we need to spruce up and make look better, redesign, also the way it animated: I want the colour inside the diamond to fill up as the laser goes into it then drain out as the laser shoots out, and ensure the timing is on contact and all that and it looks right." Source, unit, pixel and headless-Chromium evidence only; NOT checked on a real phone.
 
+Amended 2026-11-13 by MAZER-VIS-038 (`docs/ui/MAZER-EDGE-INNER-TIP-SIZE-CYCLE-2026-11-13.md`): beams now start and end on the diamond's INNER TIP (not the outline contact point), stay attached for the whole fill / drain (the tail no longer lags the head by 200 ms), the diamonds sit at 50% size while the maze runs, and `OUTRO_RING_ORBIT_START_MS` is 720 ms. Where this document says otherwise, the VIS-038 document wins.
+
 Amended 2026-11-13 by MAZER-VIS-033 (`docs/ui/MAZER-EDGE-DIAMOND-ONE-FILL-2026-11-13.md`): the drain direction below is reversed (the colour now leaves from the OUTER tip first and the last of it exits at the INNER tip) and the small instant "lit core" this document lists under "Before" is deleted for good (it was still drawn next to the new fill on wrap-end diamonds). Where this document says otherwise, the VIS-033 document wins.
 
 ## What "the diamonds" and "the lasers" are
