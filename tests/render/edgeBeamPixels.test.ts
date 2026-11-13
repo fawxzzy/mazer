@@ -17,7 +17,8 @@ import { RasterContext } from './support/rasterContext';
  * Pixel proof of the diamond interior fill and the beam, on real pixels (the real draw code over the software
  * rasteriser, pixel-centre sampling) at the device pixel ratios the owner compared. The kite is the hero here:
  *  - the filled share of the diamond follows the fill fraction at every DPR (area share within a pixel of the exact);
- *  - fill grows from the inner tip and drain retreats to the outer tip;
+ *  - the colour is always anchored at the inner tip: it grows from there and drains back to it (the outer tip empties first);
+ *  - one fill only: the wrap-end / wrap-flash cues never paint a second (core) shape inside the diamond;
  *  - the fill never paints outside the outline;
  *  - the beam, at its contact instant, ends ON the outline (no pixel of the beam body past the diamond centre).
  */
@@ -46,17 +47,17 @@ const DPRS = [1, 2, 2.625, 3];
 const SIZE = 40;
 const CENTER = { x: 20.3, y: 20.7 };
 
-const stateFor = (fill: number, mode: 'grow' | 'drain'): EdgeMarkerState => ({
-  alpha: 0, energized: false, energy: 0, fill, fillMode: mode, flash: 0, hidden: false, id: 1, spinRad: 0
+const stateFor = (fill: number): EdgeMarkerState => ({
+  alpha: 0, energized: false, energy: 0, fill, flash: 0, hidden: false, id: 1, spinRad: 0
 });
 
 /** Rasterise ONE diamond with only its interior fill (the stroke alpha is 0) at `dpr`; returns the lit pixel centres in css px. */
-const rasteriseFill = (fill: number, mode: 'grow' | 'drain', dpr: number, inwardAngle = Math.PI / 2): Array<{ x: number; y: number }> => {
+const rasteriseFill = (fill: number, dpr: number, inwardAngle = Math.PI / 2): Array<{ x: number; y: number }> => {
   const width = Math.ceil(SIZE * dpr);
   const ctx = new RasterContext(width, width);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const graphics = new Graphics(ctx);
-  drawEdgeMarker(graphics, { id: 1, inwardAngle, isCorner: false, side: 'top', x: CENTER.x, y: CENTER.y }, stateFor(fill, mode));
+  drawEdgeMarker(graphics, { id: 1, inwardAngle, isCorner: false, side: 'top', x: CENTER.x, y: CENTER.y }, stateFor(fill));
   const lit: Array<{ x: number; y: number }> = [];
   for (let py = 0; py < width; py += 1) {
     for (let px = 0; px < width; px += 1) {
@@ -94,47 +95,71 @@ describe('diamond interior fill on real pixels', () => {
   const outline = resolveEdgeMarkerVertices({ x: CENTER.x, y: CENTER.y, inwardAngle: Math.PI / 2 }, 1);
   const outlineArea = polygonArea(outline);
 
-  test.each(DPRS)('at DPR %s the lit share follows the fill fraction (0, 25, 50, 75, 100 %%) for both grow and drain', (dpr) => {
+  test.each(DPRS)('at DPR %s the lit share follows the fill fraction (0, 25, 50, 75, 100 %%)', (dpr) => {
     const pixelArea = 1 / (dpr * dpr);
     // The 1 px front line adds up to ~chord x 1 px of paint on the cut; edge pixels may be included or dropped.
     const tolerance = 18;
-    for (const mode of ['grow', 'drain'] as const) {
-      let previous = -1;
-      for (const fill of [0, 0.25, 0.5, 0.75, 1]) {
-        const lit = rasteriseFill(fill, mode, dpr);
-        const expected = fill === 0 ? 0 : polygonArea(resolveDiamondFillShape(outline, CENTER, Math.PI / 2, EDGE_MARKER_HALF_HEIGHT, fill, mode).polygon);
-        expect(lit.length * pixelArea, `${mode} ${fill} dpr ${dpr}`).toBeGreaterThanOrEqual(expected - tolerance);
-        expect(lit.length * pixelArea, `${mode} ${fill} dpr ${dpr}`).toBeLessThanOrEqual(expected + tolerance);
-        expect(lit.length, `${mode} ${fill} monotonic`).toBeGreaterThanOrEqual(previous);
-        previous = lit.length;
-      }
-      // full == the whole diamond
-      expect(previous * pixelArea).toBeGreaterThan(outlineArea - tolerance);
+    let previous = -1;
+    for (const fill of [0, 0.25, 0.5, 0.75, 1]) {
+      const lit = rasteriseFill(fill, dpr);
+      const expected = fill === 0 ? 0 : polygonArea(resolveDiamondFillShape(outline, CENTER, Math.PI / 2, EDGE_MARKER_HALF_HEIGHT, fill).polygon);
+      expect(lit.length * pixelArea, `${fill} dpr ${dpr}`).toBeGreaterThanOrEqual(expected - tolerance);
+      expect(lit.length * pixelArea, `${fill} dpr ${dpr}`).toBeLessThanOrEqual(expected + tolerance);
+      expect(lit.length, `${fill} monotonic`).toBeGreaterThanOrEqual(previous);
+      previous = lit.length;
     }
+    // full == the whole diamond
+    expect(previous * pixelArea).toBeGreaterThan(outlineArea - tolerance);
   });
 
   test.each(DPRS)('at DPR %s the fill never paints outside the diamond outline', (dpr) => {
     for (const fill of [0.1, 0.25, 0.5, 0.9, 1]) {
-      for (const mode of ['grow', 'drain'] as const) {
-        for (const point of rasteriseFill(fill, mode, dpr)) {
-          expect(insideConvex(outline, point, 0.75 + (1 / dpr)), `${mode} ${fill} dpr ${dpr} at ${point.x},${point.y}`).toBe(true);
-        }
+      for (const point of rasteriseFill(fill, dpr)) {
+        expect(insideConvex(outline, point, 0.75 + (1 / dpr)), `${fill} dpr ${dpr} at ${point.x},${point.y}`).toBe(true);
       }
     }
   });
 
-  test.each(DPRS)('at DPR %s grow starts at the inner tip and drain retreats to the outer tip', (dpr) => {
+  test.each(DPRS)('at DPR %s the colour is anchored at the inner tip: it grows from it and, as the fill falls, leaves the outer tip first and the inner tip last', (dpr) => {
     // inwardAngle pi/2 points +y: the inner tip is the larger y.
-    const grow = rasteriseFill(0.3, 'grow', dpr);
-    const drain = rasteriseFill(0.3, 'drain', dpr);
-    const growMinY = Math.min(...grow.map((point) => point.y));
-    const drainMaxY = Math.max(...drain.map((point) => point.y));
-    // grow region: [inner tip (y = c + 10) up to y = c + 10 - 0.3 * 20 = c + 4]
-    expect(growMinY).toBeGreaterThanOrEqual(CENTER.y + 4 - 0.5 - (1 / dpr));
-    expect(Math.max(...grow.map((point) => point.y))).toBeGreaterThan(CENTER.y + EDGE_MARKER_HALF_HEIGHT - 1.5);
-    // drain region: [outer tip (y = c - 10) down to y = c - 10 + 6 = c - 4]
-    expect(drainMaxY).toBeLessThanOrEqual(CENTER.y - 4 + 0.5 + (1 / dpr));
-    expect(Math.min(...drain.map((point) => point.y))).toBeLessThan(CENTER.y - EDGE_MARKER_HALF_HEIGHT + 1.5);
+    const at = (fill: number) => rasteriseFill(fill, dpr);
+    const span = (points: Array<{ x: number; y: number }>) => ({ min: Math.min(...points.map((p) => p.y)), max: Math.max(...points.map((p) => p.y)) });
+    const grown = span(at(0.3));
+    // region: [inner tip (y = c + 10) up to y = c + 10 - 0.3 * 20 = c + 4]
+    expect(grown.min).toBeGreaterThanOrEqual(CENTER.y + 4 - 0.5 - (1 / dpr));
+    expect(grown.max).toBeGreaterThan(CENTER.y + EDGE_MARKER_HALF_HEIGHT - 1.5);
+    // A FALLING fill (1 -> 0.7 -> 0.4 -> 0.1) keeps the inner edge of the colour on the inner tip and pulls its outer edge toward it.
+    let previous = span(at(1));
+    for (const fill of [0.7, 0.4, 0.1]) {
+      const now = span(at(fill));
+      expect(now.max, `inner end stays on the inner tip at ${fill}`).toBeGreaterThan(CENTER.y + EDGE_MARKER_HALF_HEIGHT - 1.5);
+      expect(now.min, `outer end retreats toward the inner tip at ${fill}`).toBeGreaterThan(previous.min);
+      previous = now;
+    }
+    // Nested (exact geometry, the 1 px front line aside): the region at 0.4 lies inside the region at 0.7, so the colour only ever leaves.
+    const wide = resolveDiamondFillShape(outline, CENTER, Math.PI / 2, EDGE_MARKER_HALF_HEIGHT, 0.7).polygon;
+    const narrow = resolveDiamondFillShape(outline, CENTER, Math.PI / 2, EDGE_MARKER_HALF_HEIGHT, 0.4).polygon;
+    expect(narrow.length).toBeGreaterThanOrEqual(3);
+    expect(narrow.every((point) => insideConvex(wide, point, 1e-6))).toBe(true);
+  });
+
+  test.each(DPRS)('at DPR %s only ONE fill is ever drawn: energized / wrap-flash cues add no second shape inside the diamond', (dpr) => {
+    const width = Math.ceil(SIZE * dpr);
+    const centre = (state: EdgeMarkerState) => {
+      const ctx = new RasterContext(width, width);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawEdgeMarker(new Graphics(ctx), { id: 1, inwardAngle: Math.PI / 2, isCorner: false, side: 'top', x: CENTER.x, y: CENTER.y }, state);
+      const px = Math.floor(CENTER.x * dpr);
+      const py = Math.floor(CENTER.y * dpr);
+      return (ctx.data[(((py * width) + px) * 4) + 3] ?? 0) / 255;
+    };
+    const cues = { alpha: 0.95, energized: true, energy: 1, flash: 1, hidden: false, id: 1 as const, spinRad: 0 };
+    // Empty diamond with every cue on: nothing in the interior (the old instant core is gone).
+    expect(centre({ ...cues, fill: 0 })).toBe(0);
+    expect(centre(cues)).toBe(0);
+    // Filled diamond: the interior is exactly the one fill alpha, with or without the cues (no stacked second layer).
+    expect(centre({ ...cues, fill: 1 })).toBeCloseTo(DIAMOND_FILL_ALPHA, 1);
+    expect(centre({ ...cues, fill: 1, energized: false, energy: 0, flash: 0 })).toBeCloseTo(DIAMOND_FILL_ALPHA, 1);
   });
 
   test('the interior is the player colour at the fill alpha', () => {
@@ -142,7 +167,7 @@ describe('diamond interior fill on real pixels', () => {
     const width = SIZE * dpr;
     const ctx = new RasterContext(width, width);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawEdgeMarker(new Graphics(ctx), { id: 1, inwardAngle: Math.PI / 2, isCorner: false, side: 'top', x: CENTER.x, y: CENTER.y }, stateFor(1, 'grow'));
+    drawEdgeMarker(new Graphics(ctx), { id: 1, inwardAngle: Math.PI / 2, isCorner: false, side: 'top', x: CENTER.x, y: CENTER.y }, stateFor(1));
     const px = Math.round(CENTER.x * dpr);
     const py = Math.round(CENTER.y * dpr);
     const index = ((py * width) + px) * 4;
