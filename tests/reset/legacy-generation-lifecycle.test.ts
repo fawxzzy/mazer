@@ -228,7 +228,7 @@ describe('legacy generation lifecycle', () => {
     expect(selected.generation?.selection?.initialWindowUnderTarget).toBe(selected.generation?.selection?.allCandidatesUnderTarget);
     expect(selected.generation?.selection?.initialWindowOverTarget).toBe(selected.generation?.selection?.allCandidatesOverTarget);
     expect(['under-target', 'on-target', 'over-target']).toContain(selected.generation?.selection?.delivery);
-  }, 15_000);
+  }, 120_000);
 
   test('runs a bounded pressure retry when the initial sampled window under-delivers', () => {
     const selected = createLegacyRuntimeMazeForMode('menu', 50, 3749, null, {
@@ -289,7 +289,7 @@ describe('legacy generation lifecycle', () => {
         + (selected.generation?.selection?.pressureRetryCandidateCount ?? 0)
         + (selected.generation?.selection?.adaptiveRetryCandidateCount ?? 0)
     );
-  }, 15_000);
+  }, 120_000);
 
   test('steps regeneration seeds deterministically', () => {
     expect(stepLegacyGenerationSeed(0)).toBe(1);

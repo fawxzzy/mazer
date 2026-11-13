@@ -1,11 +1,15 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { describe, expect, test } from 'vitest';
 import { runDeterministicRuntimeEvalSuite } from '../../../src/mazer-core/eval';
 
-const CLI_RUNTIME_EVAL_TIMEOUT_MS = 30_000;
+// MAZER-GOV-009: the CLI child takes ~25 s alone and several times that on a busy machine. It runs ASYNC so the worker keeps
+// answering the vitest runner while it waits (a synchronous spawn froze the worker for the whole child run).
+const execFileAsync = promisify(execFile);
+const CLI_RUNTIME_EVAL_TIMEOUT_MS = 300_000;
 
 describe('runtime eval harness', () => {
   test('produces a stable suite summary with the requested metric contract', () => {
@@ -74,16 +78,17 @@ describe('runtime eval harness', () => {
     expect(JSON.stringify(summary)).not.toMatch(/manifest|PlanetProofManifest|objectiveNodeId/i);
   });
 
-  test('emits the same machine-readable summary from the CLI runner', () => {
+  test('emits the same machine-readable summary from the CLI runner', async () => {
     const repoRoot = resolve(process.cwd());
     const tempDir = mkdtempSync(join(tmpdir(), 'mazer-runtime-eval-'));
     const outputPath = join(tempDir, 'summary.json');
     const scriptPath = resolve(repoRoot, 'scripts/eval/run-eval.mjs');
 
     try {
-      const stdout = execFileSync('node', [scriptPath, '--out', outputPath], {
+      const { stdout } = await execFileAsync('node', [scriptPath, '--out', outputPath], {
         cwd: repoRoot,
-        encoding: 'utf8'
+        encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024
       });
       const cliSummary = JSON.parse(stdout);
       const fileSummary = JSON.parse(readFileSync(outputPath, 'utf8'));

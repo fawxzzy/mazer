@@ -55,5 +55,5 @@ describe('human-memory AI known-frontier recovery', () => {
         expect(regeneration.shouldRegenerateMaze).toBe(true);
       }
     }
-  }, 30_000);
+  }, 120_000);
 });

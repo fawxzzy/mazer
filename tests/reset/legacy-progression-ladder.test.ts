@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
+import { yieldToRunner } from '../fixtures/yieldToRunner';
 import {
   GEOMETRY_BUDGET_TOP_TARGET,
   GEOMETRY_BUDGET_MIN_STEP,
@@ -50,11 +51,13 @@ const SAT = GEOMETRY_BUDGET_SATURATION_LEVEL;
 const FELT_SAT = GEOMETRY_BUDGET_FELT_SATURATION_LEVEL;
 
 describe('progression ladder: strictly harder every level up to the felt saturation', () => {
-  test('for ANY two seeds the worst maze of level N+1 beats the best maze of level N (every level, reduced sample)', () => {
+  test('for ANY two seeds the worst maze of level N+1 beats the best maze of level N (every level, reduced sample)', async () => {
     // Full-scale version: scripts/analysis/progression-ladder-report.ts --assert.
     for (const board of LADDER_BOARDS) {
       let previousBest = -Infinity;
       for (let level = 2; level < FELT_SAT; level += 1) {
+        // MAZER-GOV-009: this test is ~35 s of synchronous work (minutes on a busy machine); yield so the runner is never starved.
+        await yieldToRunner();
         const samples = [0, 1].map((index) => sampleLevel(level, board, seedForIndex(index)));
         samples.forEach((sample) => {
           expect(sample.onTarget).toBe(true);
