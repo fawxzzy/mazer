@@ -19,9 +19,10 @@
  *
  * CENTRING AND FIT (2026-11-10, owner: "the star isn't centred in its tile, same with the start arrow, and its size
  * should not make it bleed over the tile edges"). The VISIBLE glyph is the fill plus its dark keyline, so that whole
- * bounding box is what is centred on the tile, not the shape's own centre: the point-up star is moved down by the
- * 0.0955 of its radius that its circumcentre sits below its bounding-box centre, and the triangle's bounding box (not
- * its centroid) sits on the cell centre. The glyph is then scaled down, if needed, so that the farthest point of the
+ * bounding box is what is centred on the tile for the play triangle (its bounding box, not its centroid, sits on the
+ * cell centre). The STAR is no longer centred by its bounding box (MAZER-VIS-034): that left its centre of mass up to
+ * 1.9 device px low, and ignored that the chip's lit rim is painted on the closed sides only. Its circumcentre (=
+ * centre of mass) goes on the tile's painted-interior centre, see endpointOpticalCentre.ts. The glyph is then scaled down, if needed, so that the farthest point of the
  * keyline stays an inset inside the tile's FILL (the area inside the lit rim: the closest of its four edges to the
  * cell centre) with at least 0.5 device px to spare: the keyline never reaches the rim or the tile edge, at any tile
  * size or DPR. Where the one-device-pixel keyline would take too much of that room it is thinned so the glyph keeps
@@ -32,6 +33,7 @@
  * (goalBeacon.ts), which has its own css-px sizing.
  */
 import { DEFAULT_START_DIRECTION, type StartDirection } from './startDirection';
+import { resolveGoalStarCentre, STAR_CIRCUMCENTRE_BELOW_BOX_CENTRE } from './endpointOpticalCentre';
 import {
   BOARD_TILE_GEOMETRY,
   snapLineWidth
@@ -103,10 +105,13 @@ const rotate = (direction: StartDirection, u: number, v: number): readonly [numb
 
 /** Share of the half-tile kept clear between the keyline's farthest point and the rim. */
 const FIT_INSET_OF_RADIUS = 0.07;
-/** A five-point star's circumcentre sits this share of its outer radius below its bounding-box centre (cos 36 deg). */
-const STAR_BOX_CENTRE_SHIFT = (1 - Math.cos(Math.PI / 5)) / 2;
-/** Farthest vertex of the bbox-centred unit star from the box centre (a bottom tip), in outer radii. */
-const STAR_FAR_VERTEX = Math.hypot(Math.sin(Math.PI / 5), Math.cos(Math.PI / 5) + STAR_BOX_CENTRE_SHIFT);
+/**
+ * Farthest vertex of the unit star from the cell centre, in outer radii, as the fit has always measured it (the
+ * bounding-box-centred star's bottom tip). The star is now centred by its circumcentre, so every tip is exactly one
+ * outer radius from its centre: this stays as the (slightly conservative) bound, which keeps the star's size, and the
+ * keyline's clearance from the rim, exactly as they were.
+ */
+const STAR_FAR_VERTEX = Math.hypot(Math.sin(Math.PI / 5), Math.cos(Math.PI / 5) + STAR_CIRCUMCENTRE_BELOW_BOX_CENTRE);
 
 /** Distance from the cell centre to the nearest edge of the tile's fill (the area inside the lit rim). */
 const fillRoom = (tile: EndpointTileRect, cx: number, cy: number): number => Math.min(
@@ -133,9 +138,11 @@ export const resolveEndpointTile = (
     // Thin the keyline when it would take more than a fifth of the room (tiny tiles), then fit the star.
     keyline = Math.min(keyline, room / 5);
     const outer = Math.max(0, Math.min(radius * k.goalStarOuterOfRadius, (room - keyline) / STAR_FAR_VERTEX));
+    // The star's circumcentre (its centre of mass) goes on the tile's painted-interior centre (endpointOpticalCentre.ts).
+    const at = resolveGoalStarCentre(tile);
     return {
       kind,
-      frame: { cx, cy: cy + (outer * STAR_BOX_CENTRE_SHIFT), radius, keyline },
+      frame: { cx: at.x, cy: at.y, radius, keyline },
       star: { outer, inner: outer * (k.goalStarInnerOfRadius / k.goalStarOuterOfRadius) },
       play: null
     };

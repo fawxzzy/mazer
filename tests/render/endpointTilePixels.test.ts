@@ -10,6 +10,7 @@ import {
   type TileBakeContext2D
 } from '../../src/render/boardTileBake';
 import { boardMaterial } from '../../src/render/boardTileStyle';
+import { resolveGoalStarCentre } from '../../src/render/endpointOpticalCentre';
 import { START_DIRECTIONS, type StartDirection } from '../../src/render/startDirection';
 import { RasterContext, type Rgba } from './support/rasterContext';
 
@@ -163,8 +164,12 @@ describe.each(TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, dpr] as cons
         const red = changed.filter((px) => same(px.color, GLYPH_COLORS.goal));
         expect(red.length, `star pixels, cell ${cell.x},${cell.y}`).toBeGreaterThan(0);
         const xs = changed.map((px) => px.dx);
-        // a five-point star is symmetric about the vertical axis: its bounding box is centred horizontally
-        expect(Math.abs((Math.min(...xs) + Math.max(...xs)) / 2), `x centre, cell ${cell.x},${cell.y}`).toBeLessThanOrEqual(1);
+        // a five-point star is symmetric about the vertical axis: its bounding box is centred horizontally on its
+        // circumcentre, which is the tile's painted-interior centre (endpointOpticalCentre.ts: the cell centre, or half
+        // a rim toward the open sides on a corner / junction; MAZER-VIS-034)
+        const tile = computeChipTileAt(inputFor(tileSize, dpr, cell), cell)!;
+        const aim = (resolveGoalStarCentre(tile).x - (tile.left + (tile.width / 2))) * dpr;
+        expect(Math.abs(((Math.min(...xs) + Math.max(...xs)) / 2) - aim), `x centre, cell ${cell.x},${cell.y}`).toBeLessThanOrEqual(1);
         if (tileSize * dpr >= 20) {
           expect(changed.some((px) => same(px.color, VOID)), 'keyline painted around the star').toBe(true);
         }
@@ -195,8 +200,11 @@ describe.each(WHOLE_GLYPH_TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, 
       ...(['goal'] as const).map((kind) => ({ kind, direction: 'right' as StartDirection })),
       ...START_DIRECTIONS.map((direction) => ({ kind: 'start' as const, direction }))
     ];
+    // The play arrow is centred by its bounding box. The goal STAR is not: since MAZER-VIS-034 its centre of mass (not
+    // its bounding box) goes on the tile's painted-interior centre, which tests/render/endpointOpticalCentre.test.ts pins.
+    const boxCentredCases = cases.filter((c) => c.kind === 'start');
 
-    test.each(cases)('$kind ($direction): bbox centre within 0.5 device px of the tile centre', ({ kind, direction }) => {
+    test.each(boxCentredCases)('$kind ($direction): bbox centre within 0.5 device px of the tile centre', ({ kind, direction }) => {
       for (const cell of cells) {
         const r = render(tileSize, dpr, cell, kind, direction);
         const changed = changedPixels(r);
