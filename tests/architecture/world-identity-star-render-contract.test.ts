@@ -35,5 +35,12 @@ describe('World Identity background-star render contract', () => {
     expect(menuSceneSource).not.toContain('Phaser.Display.Color.HSVToRGB(starSeed');
     expect(menuSceneSource).toContain('resolveBackdropStarDraw(coreSize)');
 
+    // MAZER-VIS-035: the rainbow subset is chosen from the stable seed (never a position) and its hue reads the scene
+    // clock, not the motion-gated animationTime, so reduced motion / Still keep the colour shifting.
+    expect(menuSceneSource).toContain('isBackdropRainbowStar(starSeed)');
+    expect(menuSceneSource).toContain('resolveBackdropRainbowColor(starSeed, this.time.now)');
+    expect(menuSceneSource).not.toContain('resolveBackdropRainbowColor(starSeed, animationTime)');
+    expect(menuSceneSource).toContain('stepBackdropColourRedraw(time, this.backdropColourNextDueAtMs)');
+
   });
 });

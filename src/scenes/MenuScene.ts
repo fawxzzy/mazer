@@ -80,6 +80,12 @@ import {
   resolveBackdropTwinkleAlpha,
   resolveBackdropTwinkleSize
 } from '../render/backdropStars';
+import {
+  capBackdropStarAlpha,
+  isBackdropRainbowStar,
+  resolveBackdropRainbowColor,
+  stepBackdropColourRedraw
+} from '../render/backdropStarHue';
 import { drawChipCell, resolveChipGridGeometry } from '../render/chipTileGraphics';
 import { PhaserGraphicsTileContext } from '../render/phaserTileContext';
 import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameToViewport } from '../boot/viewportGeometry';
@@ -2244,6 +2250,8 @@ export class MenuScene extends Phaser.Scene {
   private visualDiagnosticsPlayLifecycleSignature: string | null = null;
   private backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
   private backdropAccumulatedDeltaMs = 0;
+  // MAZER-VIS-035: next time the rainbow backdrop stars are due a colour-only redraw while the drift redraw is off.
+  private backdropColourNextDueAtMs = 0;
   private runtimeDiagnosticsConfig: MenuSceneRuntimeConfig = {
     enabled: false,
     lowPowerDetected: false,
@@ -7122,6 +7130,15 @@ export class MenuScene extends Phaser.Scene {
     if (this.stars.length === 0 || !this.settings.toggleAnimatedBackdrop || this.prefersLegacyReducedMotion()) {
       this.backdropAccumulatedDeltaMs = 0;
       this.backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
+      // Reduced motion / Still stop the drift and twinkle, never colour: the rainbow stars keep shifting through the
+      // low-rate colour gate (src/render/backdropStarHue.ts) instead of a per-frame redraw.
+      if (this.stars.length > 0) {
+        const colourStep = stepBackdropColourRedraw(time, this.backdropColourNextDueAtMs);
+        this.backdropColourNextDueAtMs = colourStep.nextDueAtMs;
+        if (colourStep.due) {
+          this.backdropDirty = true;
+        }
+      }
       return;
     }
 
@@ -7180,7 +7197,13 @@ export class MenuScene extends Phaser.Scene {
       // A star never fully vanishes at the dim end of its twinkle (see backdropStars.ts).
       const twinkleAlpha = star.alpha * resolveBackdropTwinkleAlpha(twinklePhase);
       const sizeMultiplier = resolveBackdropTwinkleSize(twinklePhase);
-      const starColor = starSeed > 0.82 ? 0xbfe3ff : (starSeed < 0.16 ? 0xffe9c2 : 0xffffff);
+      // A fixed ~20 % of stars (chosen from the stable seed) keep a dim, slowly drifting rainbow hue (MAZER-VIS-035,
+      // src/render/backdropStarHue.ts). The hue reads the scene clock in every motion mode: colour is not motion.
+      const rainbowStar = isBackdropRainbowStar(starSeed);
+      const starColor = rainbowStar
+        ? resolveBackdropRainbowColor(starSeed, this.time.now)
+        : (starSeed > 0.82 ? 0xbfe3ff : (starSeed < 0.16 ? 0xffe9c2 : 0xffffff));
+      const starAlpha = capBackdropStarAlpha(twinkleAlpha * palette.starAlphaScale, rainbowStar);
       // The coloured four-point sparkles that the nearest, biggest stars used to get are retired for good (owner,
       // 2026-11-10: "no more stagnant stars in the background"), but every star is still drawn: the nearest ones
       // as brighter "hero" dots with a soft round halo, the rest as dots; see src/render/backdropStars.ts.
@@ -7194,17 +7217,17 @@ export class MenuScene extends Phaser.Scene {
       // instead of a tiny tile.
       const starRadius = (coreSize / 2) * sizeMultiplier;
       if (starDraw === 'hero') {
-        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.1);
+        this.backdropGraphics.fillStyle(starColor, starAlpha * 0.1);
         this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 5);
-        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.16);
+        this.backdropGraphics.fillStyle(starColor, starAlpha * 0.16);
         this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 3);
-        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.24);
+        this.backdropGraphics.fillStyle(starColor, starAlpha * 0.24);
         this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 1.5);
       } else if (coreSize > 1) {
-        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.18);
+        this.backdropGraphics.fillStyle(starColor, starAlpha * 0.18);
         this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 1.5);
       }
-      this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale);
+      this.backdropGraphics.fillStyle(starColor, starAlpha);
       this.backdropGraphics.fillCircle(pixelX, pixelY, Math.max(0.6, starRadius));
     }
 

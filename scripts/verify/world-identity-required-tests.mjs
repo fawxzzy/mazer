@@ -20,7 +20,8 @@
 /** The full required set -- what CI needs to run in its entirety. */
 export const WORLD_IDENTITY_REQUIRED_TESTS = [
   'tests/reset/legacy-menu-backdrop.test.ts',
-  'tests/architecture/world-identity-star-render-contract.test.ts'
+  'tests/architecture/world-identity-star-render-contract.test.ts',
+  'tests/render/backdropStarHue.test.ts'
 ];
 
 /**

@@ -1,0 +1,424 @@
+[
+  {
+    "level": 1,
+    "viewport": "390x844",
+    "throttle": 4,
+    "maze": {
+      "width": 25,
+      "height": 51,
+      "floorTiles": 49,
+      "mode": "play",
+      "level": "1"
+    },
+    "wrapped": [
+      "update",
+      "resolveLegacyPlayPerfectPathTrail",
+      "drawLegacyContinuousPlayTrail",
+      "drawTrailCanvasSegments",
+      "drawLegacyBleedOffGlow",
+      "drawDynamicBoard",
+      "drawBoardPaths",
+      "drawStaticBoard",
+      "drawHud",
+      "drawBackdrop",
+      "rebuildUi",
+      "render"
+    ],
+    "firstFrameMs": 12321,
+    "revealMs": 1530,
+    "longestTaskMs": 4116,
+    "longTaskCount": 13,
+    "idle": {
+      "frameMs": {
+        "n": 18,
+        "mean": 343.5,
+        "p95": 499.9,
+        "max": 499.9
+      },
+      "perFrameMs": {
+        "drawBackdrop": 1.456,
+        "drawHud": 6.261,
+        "update": 29.261,
+        "render": 36.056,
+        "drawLegacyBleedOffGlow": 0.061,
+        "resolveLegacyPlayPerfectPathTrail": 0,
+        "drawLegacyContinuousPlayTrail": 1.306,
+        "drawDynamicBoard": 4.089
+      },
+      "calls": {
+        "drawBackdrop": 19,
+        "drawHud": 19,
+        "update": 19,
+        "render": 19,
+        "drawLegacyBleedOffGlow": 5,
+        "resolveLegacyPlayPerfectPathTrail": 5,
+        "drawLegacyContinuousPlayTrail": 5,
+        "drawDynamicBoard": 5
+      }
+    },
+    "walk": {
+      "frameMs": {
+        "n": 11,
+        "mean": 368.17,
+        "p95": 633.3,
+        "max": 633.3
+      },
+      "perFrameMs": {
+        "drawBackdrop": 2.736,
+        "drawHud": 4.464,
+        "update": 42.582,
+        "render": 38.673,
+        "drawLegacyBleedOffGlow": 0.036,
+        "resolveLegacyPlayPerfectPathTrail": 0.964,
+        "drawLegacyContinuousPlayTrail": 23.691,
+        "drawDynamicBoard": 30.627,
+        "drawTrailCanvasSegments": 19.264
+      },
+      "calls": {
+        "drawBackdrop": 12,
+        "drawHud": 12,
+        "update": 12,
+        "render": 12,
+        "drawLegacyBleedOffGlow": 11,
+        "resolveLegacyPlayPerfectPathTrail": 11,
+        "drawLegacyContinuousPlayTrail": 11,
+        "drawDynamicBoard": 11,
+        "drawTrailCanvasSegments": 11
+      },
+      "moves": 12,
+      "routeLength": 48,
+      "trail": {
+        "vertexCountBeforeResample": 2,
+        "vertexCountAfterResample": 40,
+        "strokeSegmentCount": 39,
+        "geometryBuildMs": 0.4000000059604645,
+        "drawMs": 11.099999994039536,
+        "totalMs": 11.5,
+        "totalLengthPx": 157.584,
+        "tileSize": 14.72,
+        "shineEnabled": true,
+        "trailFadeEnabled": false,
+        "trailRebuildCount": 11,
+        "trailSkippedRedrawCount": 0,
+        "perfectPathComputeCount": 12
+      }
+    }
+  },
+  {
+    "level": 300,
+    "viewport": "390x844",
+    "throttle": 4,
+    "maze": {
+      "width": 25,
+      "height": 51,
+      "floorTiles": 532,
+      "mode": "play",
+      "level": "300"
+    },
+    "wrapped": [
+      "update",
+      "resolveLegacyPlayPerfectPathTrail",
+      "drawLegacyContinuousPlayTrail",
+      "drawTrailCanvasSegments",
+      "drawLegacyBleedOffGlow",
+      "drawDynamicBoard",
+      "drawBoardPaths",
+      "drawStaticBoard",
+      "drawHud",
+      "drawBackdrop",
+      "rebuildUi",
+      "render"
+    ],
+    "firstFrameMs": 8409,
+    "revealMs": 1635,
+    "longestTaskMs": 3354,
+    "longTaskCount": 10,
+    "idle": {
+      "frameMs": {
+        "n": 15,
+        "mean": 405.54,
+        "p95": 583.3,
+        "max": 583.3
+      },
+      "perFrameMs": {
+        "drawBackdrop": 2.32,
+        "drawLegacyBleedOffGlow": 0.093,
+        "resolveLegacyPlayPerfectPathTrail": 0.04,
+        "drawTrailCanvasSegments": 7.327,
+        "drawLegacyContinuousPlayTrail": 9.953,
+        "drawDynamicBoard": 20.213,
+        "drawHud": 8.227,
+        "update": 48.533,
+        "render": 47.793
+      },
+      "calls": {
+        "drawBackdrop": 16,
+        "drawLegacyBleedOffGlow": 16,
+        "resolveLegacyPlayPerfectPathTrail": 16,
+        "drawTrailCanvasSegments": 16,
+        "drawLegacyContinuousPlayTrail": 16,
+        "drawDynamicBoard": 16,
+        "drawHud": 16,
+        "update": 16,
+        "render": 16
+      }
+    },
+    "walk": {
+      "frameMs": {
+        "n": 10,
+        "mean": 416.65,
+        "p95": 700.1,
+        "max": 700.1
+      },
+      "perFrameMs": {
+        "drawBackdrop": 2.79,
+        "drawLegacyBleedOffGlow": 0.06,
+        "resolveLegacyPlayPerfectPathTrail": 0.91,
+        "drawTrailCanvasSegments": 17.38,
+        "drawLegacyContinuousPlayTrail": 21.32,
+        "drawDynamicBoard": 28.32,
+        "drawHud": 5.38,
+        "update": 42.68,
+        "render": 45.33
+      },
+      "calls": {
+        "drawBackdrop": 11,
+        "drawLegacyBleedOffGlow": 11,
+        "resolveLegacyPlayPerfectPathTrail": 11,
+        "drawTrailCanvasSegments": 11,
+        "drawLegacyContinuousPlayTrail": 11,
+        "drawDynamicBoard": 11,
+        "drawHud": 11,
+        "update": 11,
+        "render": 11
+      },
+      "moves": 11,
+      "routeLength": 111,
+      "trail": {
+        "vertexCountBeforeResample": 9,
+        "vertexCountAfterResample": 45,
+        "strokeSegmentCount": 44,
+        "geometryBuildMs": 3.7000000178813934,
+        "drawMs": 21.69999998807907,
+        "totalMs": 25.400000005960464,
+        "totalLengthPx": 156.51902332068357,
+        "tileSize": 14.72,
+        "shineEnabled": true,
+        "trailFadeEnabled": false,
+        "trailRebuildCount": 31,
+        "trailSkippedRedrawCount": 0,
+        "perfectPathComputeCount": 12
+      }
+    }
+  },
+  {
+    "level": 1,
+    "viewport": "1280x720",
+    "throttle": 4,
+    "maze": {
+      "width": 47,
+      "height": 25,
+      "floorTiles": 45,
+      "mode": "play",
+      "level": "1"
+    },
+    "wrapped": [
+      "update",
+      "resolveLegacyPlayPerfectPathTrail",
+      "drawLegacyContinuousPlayTrail",
+      "drawTrailCanvasSegments",
+      "drawLegacyBleedOffGlow",
+      "drawDynamicBoard",
+      "drawBoardPaths",
+      "drawStaticBoard",
+      "drawHud",
+      "drawBackdrop",
+      "rebuildUi",
+      "render"
+    ],
+    "firstFrameMs": 6850,
+    "revealMs": 916,
+    "longestTaskMs": 2055,
+    "longTaskCount": 13,
+    "idle": {
+      "frameMs": {
+        "n": 58,
+        "mean": 102.29,
+        "p95": 183.3,
+        "max": 216.7
+      },
+      "perFrameMs": {
+        "drawBackdrop": 1.467,
+        "drawLegacyBleedOffGlow": 0.024,
+        "resolveLegacyPlayPerfectPathTrail": 0.009,
+        "drawLegacyContinuousPlayTrail": 0.181,
+        "drawDynamicBoard": 1.364,
+        "drawHud": 4.457,
+        "update": 13.4,
+        "render": 24.634
+      },
+      "calls": {
+        "drawBackdrop": 59,
+        "drawLegacyBleedOffGlow": 16,
+        "resolveLegacyPlayPerfectPathTrail": 16,
+        "drawLegacyContinuousPlayTrail": 16,
+        "drawDynamicBoard": 16,
+        "drawHud": 59,
+        "update": 59,
+        "render": 59
+      }
+    },
+    "walk": {
+      "frameMs": {
+        "n": 19,
+        "mean": 204.37,
+        "p95": 333.3,
+        "max": 333.3
+      },
+      "perFrameMs": {
+        "drawBackdrop": 2.047,
+        "drawLegacyBleedOffGlow": 0.142,
+        "resolveLegacyPlayPerfectPathTrail": 1.653,
+        "drawLegacyContinuousPlayTrail": 23.626,
+        "drawDynamicBoard": 29.368,
+        "drawHud": 4.232,
+        "update": 41.032,
+        "render": 46.663,
+        "drawTrailCanvasSegments": 17.6
+      },
+      "calls": {
+        "drawBackdrop": 20,
+        "drawLegacyBleedOffGlow": 19,
+        "resolveLegacyPlayPerfectPathTrail": 19,
+        "drawLegacyContinuousPlayTrail": 19,
+        "drawDynamicBoard": 19,
+        "drawHud": 20,
+        "update": 20,
+        "render": 20,
+        "drawTrailCanvasSegments": 19
+      },
+      "moves": 20,
+      "routeLength": 44,
+      "trail": {
+        "vertexCountBeforeResample": 2,
+        "vertexCountAfterResample": 120,
+        "strokeSegmentCount": 119,
+        "geometryBuildMs": 0.09999999403953552,
+        "drawMs": 13.200000017881393,
+        "totalMs": 13.300000011920929,
+        "totalLengthPx": 475.86799999999994,
+        "tileSize": 25.44,
+        "shineEnabled": true,
+        "trailFadeEnabled": false,
+        "trailRebuildCount": 19,
+        "trailSkippedRedrawCount": 0,
+        "perfectPathComputeCount": 20
+      }
+    }
+  },
+  {
+    "level": 300,
+    "viewport": "1280x720",
+    "throttle": 4,
+    "maze": {
+      "width": 47,
+      "height": 25,
+      "floorTiles": 535,
+      "mode": "play",
+      "level": "300"
+    },
+    "wrapped": [
+      "update",
+      "resolveLegacyPlayPerfectPathTrail",
+      "drawLegacyContinuousPlayTrail",
+      "drawTrailCanvasSegments",
+      "drawLegacyBleedOffGlow",
+      "drawDynamicBoard",
+      "drawBoardPaths",
+      "drawStaticBoard",
+      "drawHud",
+      "drawBackdrop",
+      "rebuildUi",
+      "render"
+    ],
+    "firstFrameMs": 11925,
+    "revealMs": 1010,
+    "longestTaskMs": 4978,
+    "longTaskCount": 12,
+    "idle": {
+      "frameMs": {
+        "n": 49,
+        "mean": 123.13,
+        "p95": 233.4,
+        "max": 266.6
+      },
+      "perFrameMs": {
+        "drawBackdrop": 1.324,
+        "drawLegacyBleedOffGlow": 0.006,
+        "resolveLegacyPlayPerfectPathTrail": 0,
+        "drawLegacyContinuousPlayTrail": 0.218,
+        "drawDynamicBoard": 1.665,
+        "drawHud": 4.178,
+        "update": 14.39,
+        "render": 27.306
+      },
+      "calls": {
+        "drawBackdrop": 50,
+        "drawLegacyBleedOffGlow": 10,
+        "resolveLegacyPlayPerfectPathTrail": 10,
+        "drawLegacyContinuousPlayTrail": 10,
+        "drawDynamicBoard": 10,
+        "drawHud": 50,
+        "update": 50,
+        "render": 50
+      }
+    },
+    "walk": {
+      "frameMs": {
+        "n": 23,
+        "mean": 170.29,
+        "p95": 216.7,
+        "max": 250
+      },
+      "perFrameMs": {
+        "drawBackdrop": 2.022,
+        "drawLegacyBleedOffGlow": 0.052,
+        "resolveLegacyPlayPerfectPathTrail": 1.226,
+        "drawLegacyContinuousPlayTrail": 24.13,
+        "drawDynamicBoard": 28.922,
+        "drawHud": 2.917,
+        "update": 37.23,
+        "render": 31.178,
+        "drawTrailCanvasSegments": 19.835
+      },
+      "calls": {
+        "drawBackdrop": 24,
+        "drawLegacyBleedOffGlow": 23,
+        "resolveLegacyPlayPerfectPathTrail": 23,
+        "drawLegacyContinuousPlayTrail": 23,
+        "drawDynamicBoard": 23,
+        "drawHud": 24,
+        "update": 24,
+        "render": 24,
+        "drawTrailCanvasSegments": 23
+      },
+      "moves": 24,
+      "routeLength": 111,
+      "trail": {
+        "vertexCountBeforeResample": 51,
+        "vertexCountAfterResample": 172,
+        "strokeSegmentCount": 171,
+        "geometryBuildMs": 0.5999999940395355,
+        "drawMs": 13.099999994039536,
+        "totalMs": 13.699999988079071,
+        "totalLengthPx": 567.0004016947912,
+        "tileSize": 25.44,
+        "shineEnabled": true,
+        "trailFadeEnabled": false,
+        "trailRebuildCount": 23,
+        "trailSkippedRedrawCount": 0,
+        "perfectPathComputeCount": 24
+      }
+    }
+  }
+]
