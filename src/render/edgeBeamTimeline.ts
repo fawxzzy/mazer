@@ -34,13 +34,13 @@
  *
  * No Phaser, DOM, randomness or wall-clock dependency.
  */
-import { INTRO_BEAM_STAGGER_MS, INTRO_LASER_MS } from './introTimeline';
-import { MOTION_DURATION_MS, MOTION_EASING } from './motionScale';
+import { INTRO_BEAM_PULSE_MS, INTRO_BEAM_STAGGER_MS, INTRO_LASER_MS } from './introTimeline';
+import { MOTION_EASING } from './motionScale';
 
 /** Head flight time (launch of the master clock to the last head landing). Equal to the shipped laser length. */
 export const EDGE_BEAM_FLIGHT_MS = INTRO_LASER_MS;
 /** How far the tail runs behind the head, and so how long a diamond takes to fill or drain: one base step. */
-export const EDGE_BEAM_PULSE_MS = MOTION_DURATION_MS.base;
+export const EDGE_BEAM_PULSE_MS = INTRO_BEAM_PULSE_MS;
 /** Number of diamonds the ring has. */
 export const EDGE_BEAM_COUNT = 8;
 
