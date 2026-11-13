@@ -3,20 +3,25 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-13T12:00:00.000Z"
+    "registryUpdatedAt": "2026-11-13T17:51:42.000Z",
+    "boardSync": {
+      "at": "2026-11-13T17:51:42.000Z",
+      "appliedEventCount": 26,
+      "lastEventId": "5805e37e4567"
+    }
   },
   "counters": {
-    "total": 219,
-    "open": 110,
+    "total": 230,
+    "open": 121,
     "completed": 93,
     "deferred": 16,
     "buckets": {
       "needs-you": 58,
-      "in-review": 20,
-      "blocked": 21,
-      "ready": 6,
-      "in-progress": 3,
-      "unclassified": 2,
+      "in-review": 31,
+      "blocked": 20,
+      "ready": 4,
+      "in-progress": 4,
+      "unclassified": 4,
       "deferred": 16,
       "completed": 93
     },
@@ -35,7 +40,7 @@
       "Zac": 4,
       "provider": 2,
       "device": 1,
-      "other-card": 14,
+      "other-card": 13,
       "unknown": 0
     }
   },
@@ -266,7 +271,7 @@
         "ask": "Should the install gate stay mandatory in install modes where it blocks boot, given access is meant to be enforced by entitlement?",
         "recommendation": "Keep the gate as shipped until entitlements exist (MAZER-ECON-003), then revisit.",
         "context": "The install gate blocks boot in some install modes without a skip, which clashes with enforcing access by entitlement.",
-        "prs": "#372",
+        "prs": "#372, #501",
         "verify": [
           {
             "step": "Install Mazer on the phone, open it once online, turn on airplane mode, force-close the app and open it again.",
@@ -2135,6 +2140,22 @@
       "note": "Applied in production and verified by readback (trigger enabled, all receipts have path length and completion time). No device surface; run-quality gating that validates client-asserted values is open."
     },
     {
+      "id": "MAZER-FLOW-015",
+      "title": "Show the level clear time above the level number between levels",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#494",
+      "note": ""
+    },
+    {
+      "id": "MAZER-GEN-005",
+      "title": "Unreachable floor islands appear in about 6% of generated mazes",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#499",
+      "note": ""
+    },
+    {
       "id": "MAZER-GEN-007",
       "title": "Straighter ladder mazes, ladder to 288: PR #484 merged and live, owner look pending",
       "status": "review",
@@ -2143,12 +2164,28 @@
       "note": "PR #484 open, not merged; density fill added at head 316acd0a."
     },
     {
+      "id": "MAZER-GOV-010",
+      "title": "Board updates by event log and milestone fold, not per PR",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#495",
+      "note": ""
+    },
+    {
       "id": "MAZER-MOTION-001",
       "title": "Adopt one motion scale for durations, loops and easing",
       "status": "review",
       "priority": "medium",
       "prs": "#441",
       "note": "Merged and deployed at main 24e15cc1 with no visible change. Criterion 3 (dead motion code) is not done and is carried by MAZER-MOTION-007; the scene constants move in MAZER-MOTION-006."
+    },
+    {
+      "id": "MAZER-MOTION-002",
+      "title": "Animate overlays, controls and the Start and splash transitions",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#505",
+      "note": ""
     },
     {
       "id": "MAZER-PROG-018",
@@ -2173,6 +2210,14 @@
       "priority": "medium",
       "prs": "",
       "note": "Worker running; no PR yet."
+    },
+    {
+      "id": "MAZER-VIS-033",
+      "title": "Edge diamonds: one fill only, fill inner to outer, drain outer to inner",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#497",
+      "note": ""
     },
     {
       "id": "MAZER-ACCT-012",
@@ -2231,6 +2276,14 @@
       "note": "PR #488 open for review, not merged."
     },
     {
+      "id": "MAZER-PERF-008",
+      "title": "Spread level-start maze generation across frames or a worker",
+      "status": "review",
+      "priority": "low",
+      "prs": "#503",
+      "note": ""
+    },
+    {
       "id": "MAZER-PROG-016",
       "title": "Touch sprint diagnostics now live in the progression section: merged and live, review",
       "status": "review",
@@ -2255,6 +2308,14 @@
       "note": "PR #469 merged and deployed (62f36472). The ladder end may move to 288 if PR #484 lands."
     },
     {
+      "id": "MAZER-QA-008",
+      "title": "Add ladder-end checkpoints 283 and 288 to the level preview",
+      "status": "review",
+      "priority": "low",
+      "prs": "#502",
+      "note": ""
+    },
+    {
       "id": "MAZER-VIS-024",
       "title": "Make the marker diagnostics report the real block size: deployed",
       "status": "review",
@@ -2269,6 +2330,38 @@
       "priority": "low",
       "prs": "#477",
       "note": "PR #477 merged and deployed (62f36472). Deleted unused code, no visible change."
+    },
+    {
+      "id": "MAZER-VIS-032",
+      "title": "Start the outro ring orbit from the master laser clock, not a fixed 600 ms",
+      "status": "review",
+      "priority": "low",
+      "prs": "#500",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-034",
+      "title": "Centre the goal star by its centre of mass in the tile",
+      "status": "review",
+      "priority": "low",
+      "prs": "#496",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-035",
+      "title": "Keep a few background stars rainbow-coloured",
+      "status": "review",
+      "priority": "low",
+      "prs": "#498",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-036",
+      "title": "Centre the start arrow by its painted centroid",
+      "status": "review",
+      "priority": "low",
+      "prs": "#502",
+      "note": ""
     }
   ],
   "blocked": {
@@ -2342,15 +2435,6 @@
       }
     ],
     "other-card": [
-      {
-        "id": "MAZER-MOTION-002",
-        "title": "Animate overlays, controls and the Start and splash transitions",
-        "status": "planning",
-        "priority": "medium",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-MOTION-001 (review).",
-        "derived": true
-      },
       {
         "id": "MAZER-PROG-008",
         "title": "Decide which maze features unlock at which level and content band",
@@ -2489,15 +2573,6 @@
         "warnings": []
       },
       {
-        "id": "MAZER-GEN-005",
-        "title": "Unreachable floor islands appear in about 6% of generated mazes",
-        "status": "planning",
-        "priority": "medium",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
         "id": "MAZER-ACCT-020",
         "title": "Fix the four account-site usernames longer than 15 characters",
         "status": "planning",
@@ -2509,15 +2584,6 @@
       {
         "id": "MAZER-MOTION-010",
         "title": "Delete or bind the unused tuning value menu.status.pulseDurationMs",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-PERF-008",
-        "title": "Spread level-start maze generation across frames or a worker",
         "status": "planning",
         "priority": "low",
         "filesHint": [],
@@ -2553,6 +2619,13 @@
       "status": "active",
       "priority": "high",
       "note": "PR #474 merged (docs). Ongoing baseline card."
+    },
+    {
+      "id": "MAZER-PERF-010",
+      "title": "Investigate an intermittent slow boot seen by the QA sign-in test",
+      "status": "in_progress",
+      "priority": "medium",
+      "note": ""
     },
     {
       "id": "MAZER-PERF-005",
@@ -2701,6 +2774,20 @@
   ],
   "unclassified": [
     {
+      "id": "MAZER-PERF-009",
+      "title": "Prefetch or time-slice the first maze of a session",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
+      "id": "MAZER-PWA-006",
+      "title": "Trim dev pages from the precache and decide update behaviour on deploy",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
       "id": "MAZER-VIS-031",
       "title": "Lower the edge beam draw-call count if a phone hitches",
       "status": "planning",
@@ -2708,8 +2795,8 @@
       "lane": null
     },
     {
-      "id": "MAZER-VIS-032",
-      "title": "Start the outro ring orbit from the master laser clock, not a fixed 600 ms",
+      "id": "MAZER-VIS-037",
+      "title": "Bound the trail canvas colour step at the sheen crossing",
       "status": "planning",
       "priority": "low",
       "lane": null
@@ -2925,8 +3012,8 @@
       "sub": null
     },
     "MAZER-MOTION-002": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-MOTION-003": {
       "bucket": "completed",
@@ -3469,7 +3556,7 @@
       "sub": null
     },
     "MAZER-PERF-008": {
-      "bucket": "ready",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-028": {
@@ -3545,7 +3632,7 @@
       "sub": "check"
     },
     "MAZER-GEN-005": {
-      "bucket": "ready",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-QA-007": {
@@ -3589,7 +3676,51 @@
       "sub": null
     },
     "MAZER-VIS-032": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-FLOW-015": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-033": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-034": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-035": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-036": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-QA-008": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-GOV-010": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-PWA-006": {
       "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-VIS-037": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-PERF-009": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-PERF-010": {
+      "bucket": "in-progress",
       "sub": null
     }
   }

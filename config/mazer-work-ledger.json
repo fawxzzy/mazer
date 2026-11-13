@@ -464,11 +464,25 @@
       "note": "Merged and deployed at main 24e15cc1 with no visible change. Criterion 3 (dead motion code) is not done and is carried by MAZER-MOTION-007; the scene constants move in MAZER-MOTION-006."
     },
     "MAZER-MOTION-002": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 505,
+            "mergedSha": "4cb1a2dd"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-qbu403nwk"
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": ["src/theme/tokens.ts","src/scenes/MenuScene.ts"]
+      "filesHint": [
+        "src/theme/tokens.ts",
+        "src/scenes/MenuScene.ts"
+      ]
     },
     "MAZER-MOTION-003": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 424}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
@@ -1092,7 +1106,22 @@
       "filesHint": []
     },
     "MAZER-PWA-004": {
-      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 372}], "headless": false, "deviceChecked": false},
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 372
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 501,
+            "mergedSha": "e2e84c62"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-1n3xcc1qg"
+      },
       "blocker": {
         "kind": "owner-decision",
         "summary": "The install gate blocks boot in some install modes without a skip, which clashes with enforcing access by entitlement.",
@@ -1101,7 +1130,11 @@
         "recommendation": "Keep the gate as shipped until entitlements exist (MAZER-ECON-003), then revisit."
       },
       "verify": [
-        {"step":"Install Mazer on the phone, open it once online, turn on airplane mode, force-close the app and open it again.","where":"installed-app","expected":"The app shell opens and shows the offline-capable start screen."}
+        {
+          "step": "Install Mazer on the phone, open it once online, turn on airplane mode, force-close the app and open it again.",
+          "where": "installed-app",
+          "expected": "The app shell opens and shows the offline-capable start screen."
+        }
       ],
       "lane": "owner-only",
       "filesHint": []
@@ -2351,11 +2384,13 @@
         "prs": [
           {
             "repo": "fawxzzy/mazer",
-            "number": 488
+            "number": 488,
+            "mergedSha": "3d5f3614"
           }
         ],
         "headless": true,
-        "deviceChecked": false
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-5dfftudqq"
       },
       "blocker": null,
       "verify": [],
@@ -2364,7 +2399,18 @@
       "note": "PR #488 open for review, not merged."
     },
     "MAZER-PERF-008": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 503,
+            "mergedSha": "77d2e9eb"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-1n3xcc1qg"
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
@@ -2731,7 +2777,18 @@
       "note": "PR #464 merged and deployed (951ef3cf). Device check and owner judgement on the ladder ending at 218 pending."
     },
     "MAZER-GEN-005": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 499,
+            "mergedSha": "09049594"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-1n3xcc1qg"
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
@@ -2841,11 +2898,13 @@
         "prs": [
           {
             "repo": "fawxzzy/mazer",
-            "number": 484
+            "number": 484,
+            "mergedSha": "5cee1ed2"
           }
         ],
         "headless": true,
-        "deviceChecked": false
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-dyhmua9v6"
       },
       "blocker": null,
       "verify": [],
@@ -2882,6 +2941,177 @@
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-FLOW-015": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 494,
+            "mergedSha": "252d6cd0"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-5dfftudqq"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-033": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 497,
+            "mergedSha": "566259c5"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-5dfftudqq"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-034": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 496,
+            "mergedSha": "519d36ec"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-5dfftudqq"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-035": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 498,
+            "mergedSha": "d5a354c6"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-5dfftudqq"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-036": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 502,
+            "mergedSha": "28e67ee0"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-o9hufd7kf"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-QA-008": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 502,
+            "mergedSha": "28e67ee0"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-o9hufd7kf"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GOV-010": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 495,
+            "mergedSha": "14c85ca1"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PWA-006": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-032": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 500,
+            "mergedSha": "22b97c23"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-1n3xcc1qg"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-037": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PERF-009": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PERF-010": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
       "filesHint": []
     }
   }
