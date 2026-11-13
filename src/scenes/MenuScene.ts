@@ -255,6 +255,14 @@ import {
 } from '../legacy-runtime/legacyDirectionalIntent';
 import { resolveLegacyFrozenElapsedMs } from '../legacy-runtime/legacyPlayHud';
 import {
+  LEGACY_COMPLETION_TIME_STROKE_COLOR,
+  LEGACY_COMPLETION_TIME_TEXT_COLOR,
+  captureLegacyCompletionTimeMs,
+  resolveLegacyCompletionTimeLine,
+  resolveLegacyCompletionTimeLineLayout,
+  shouldRetainLegacyCompletionTime
+} from '../legacy-runtime/legacyCompletionTime';
+import {
   resolveLegacyPlayerTransferVisualState,
   type LegacyPlayerTransferVisualState
 } from '../legacy-runtime/legacyPlayerTransfer';
@@ -1844,7 +1852,10 @@ export class MenuScene extends Phaser.Scene {
   // back to the original maze-path dot-cell glyph only if the asset never
   // loaded.
   private titleTileFontImagePool: Phaser.GameObjects.Image[] = [];
+  // Completion Time line above the level number (legacyCompletionTime.ts, display only: never stored or sent).
   private levelAnnouncerLabelText!: Phaser.GameObjects.Text;
+  private lastCompletedRunMs: number | null = null;
+  private completionTimeFontPx = 0;
   // Pause > Quit to Menu two-step confirm (legacyQuitConfirm.ts).
   private quitConfirmState: LegacyQuitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
   private levelAnnouncerWasVisible = false;
@@ -6991,7 +7002,15 @@ export class MenuScene extends Phaser.Scene {
     this.appendLegacyPlayCyclePoint(nextStep.player);
 
     if (nextStep.reachedGoal) {
+      const firstGoalArrival = this.playCompletedAtMs === null;
       this.playCompletedAtMs ??= this.time.now;
+      if (firstGoalArrival) {
+        this.lastCompletedRunMs = captureLegacyCompletionTimeMs(resolveLegacyFrozenElapsedMs({
+          completedAtMs: this.playCompletedAtMs,
+          nowMs: this.time.now,
+          startedAtMs: this.playStartedAtMs
+        }));
+      }
       this.recordMazeCycleCompletion('play');
       this.armLegacyPlayerTransferEnergy(this.time.now);
       // Build the next maze at the goal-reached instant -- but deferred by
@@ -8926,6 +8945,12 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyLevelAnnouncer(time: number): void {
     const { alpha, scale, revealProgress } = this.resolveLegacyLevelAnnouncerVisualState(time);
     this.levelAnnouncerLabelText.setVisible(false);
+    if (!shouldRetainLegacyCompletionTime({
+      mode: this.mode,
+      nextRunStarted: this.playCompletedAtMs === null && this.hasPlayerEverLeftStart
+    })) {
+      this.lastCompletedRunMs = null;
+    }
     if (alpha <= 0) {
       this.levelAnnouncerNumberGraphics.setVisible(false);
       // Bug fix: every call site that hides the level-announcer's number
@@ -8969,6 +8994,34 @@ export class MenuScene extends Phaser.Scene {
     this.levelAnnouncerNumberGraphics
       .setPosition(centerX, centerY)
       .setScale(scale)
+      .setAlpha(alpha)
+      .setVisible(true);
+    this.drawLegacyCompletionTimeLine(alpha, centerY, glyphLayout.height);
+  }
+
+  // "Completion Time: MM:SS" above the level number: same alpha as the number (so the same easing, duration
+  // and Reduce Motion crossfade), never scaled or moved, so it stays crisp. Only after a timed Play run.
+  private drawLegacyCompletionTimeLine(alpha: number, numberCenterY: number, numberHeight: number): void {
+    const line = resolveLegacyCompletionTimeLine({ completedMs: this.lastCompletedRunMs, mode: this.mode });
+    if (line === null) {
+      return;
+    }
+    const layout = resolveLegacyCompletionTimeLineLayout({
+      numberCenterY,
+      numberHeight,
+      viewportHeight: this.layout.height,
+      viewportWidth: this.layout.width
+    });
+    if (layout.fontPx !== this.completionTimeFontPx) {
+      this.completionTimeFontPx = layout.fontPx;
+      this.levelAnnouncerLabelText.setFontSize(layout.fontPx);
+    }
+    this.levelAnnouncerLabelText
+      .setText(line)
+      .setColor(LEGACY_COMPLETION_TIME_TEXT_COLOR)
+      .setStroke(LEGACY_COMPLETION_TIME_STROKE_COLOR, Math.max(3, Math.round(layout.fontPx * 0.22)))
+      .setOrigin(0.5, 1)
+      .setPosition(layout.centerX, layout.bottomY)
       .setAlpha(alpha)
       .setVisible(true);
   }
@@ -10455,6 +10508,7 @@ export class MenuScene extends Phaser.Scene {
       createLegacyLevelPreviewProgressionState(next)
     );
     this.previewLevelsExpanded = false;
+    this.lastCompletedRunMs = null;
     this.closeOverlay();
     this.startPlayMode();
     this.hudDirty = true;
@@ -14955,6 +15009,7 @@ export class MenuScene extends Phaser.Scene {
       this.playCycleResetUsed = true;
       this.playStartedAtMs = this.time.now;
       this.playCompletedAtMs = null;
+      this.lastCompletedRunMs = null;
       this.resetLegacyWorldTurnHost();
       this.resetLegacyPlayInputBuffer();
       this.boardDynamicDirty = true;
