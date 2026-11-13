@@ -44,7 +44,64 @@ The stated bound (core <= 8, bloom <= 17) holds for the hue sweep at 33 ms (5 / 
 crosses the trail head at full motion (about 6 tiles a second): that jumps 20 per redraw instead of 11. That is the same step the
 trail beside the player already takes today on the same 33 ms schedule (same function, same gap), so the dock glow and the trail
 now change colour in lockstep. Only the core colour is used by the dock glow; the bloom column applies to the trail itself.
-Owner pixel check recommended: watch a wrap dock while the sheen passes the trail head.
+These are the RAW numbers; the dock glow step is now bounded at 8, see the next section. Owner pixel check recommended: watch
+a wrap dock while the sheen passes the trail head.
+
+### Sheen-crossing colour step: reproduced and fixed (owner 2026-11-13)
+
+Owner: "there's a possible colour-step risk at the sheen crossing. fix it". The step above (20 per redraw) was left flagged;
+it is now bounded.
+
+Cause. The dock glow is painted in the trail core colour at the trail head, which includes the travelling sheen (a narrow
+ridge, about 6 tiles a second, 9 tiles apart, that lifts the core toward pearl and refracts the hue). On the shared 33 ms
+schedule that ridge is sampled at about 30 Hz, so the colour jumps up to 20 channel units (of 255) per redraw where it crosses
+the head, against 11 when the glow redrew every frame at 60 Hz. A walking player makes it no better (head distance and time both
+move under the ridge). Interpolating between redraws would need more redraws, which is the cost PERF-007 removes, so the fix
+bounds the step at the source instead of raising the cadence.
+
+Smoothness bound (unit: largest change of any 8-bit channel of the painted glow colour between two consecutive displayed
+frames; the colour only changes on a redraw, so this is the per-redraw step): at most `BLEED_GLOW_MAX_COLOUR_STEP` = 8
+(= `TRAIL_COLOUR_MAX_CORE_STEP`, about 3 % of the range), at every display rate, motion setting and head speed.
+
+Fix (`src/render/bleedGlowColourStep.ts`, one field and one call in `MenuScene.drawDynamicBoard`). The glow colour follows the
+trail-head colour but moves at most 8 units per 33 ms (about 240 a second; a shorter gap scales the allowed step down, a longer
+one never above 8), along the straight line to the target so the hue is not skewed. The hue sweep alone (5 units per 33 ms at full
+motion, 7 per 45 ms under reduced motion) is slower than that, so reduced motion keeps its full colour drift and Trail Shine off
+is untouched; only the sheen ridge is softened (the dock flash rises over about three redraws instead of one and its peak trails the
+raw colour by up to 44 to 48 units for a few redraws). After a gap over 250 ms (glow off screen, paused clock) or a clock reset it
+resyncs to the target with no ramp. Redraw cadence is unchanged: still the shared 33 ms / 45 ms schedule.
+
+Pure simulation, worst case over every phase of the sheen spacing, 8 s, `tests/render/bleed-glow-colour-step.test.ts`
+(largest per-frame step of the displayed glow colour, pre-fix -> fixed):
+
+| Display | idle head, full motion | walking head (8 tiles/s, redraw every frame) | idle, reduced motion |
+| --- | --- | --- | --- |
+| 60 Hz | 20 -> 8 | 13 -> 5 | 8 -> 8 (unchanged, no lag) |
+| 120 Hz | 20 -> 8 | 7 -> 3 | 8 -> 8 (unchanged, no lag) |
+| 144 Hz | 21 -> 8 | 6 -> 2 | 8 -> 8 (unchanged, no lag) |
+
+Redraws a second are identical with and without the smoothing (it never arms a redraw).
+
+Real browser (`scripts/analysis/measure-bleed-glow-colour-step.mjs`, headless Chromium, level 30, 40-tile trail, 10 s, same build,
+pre-fix = the smoother replaced by the identity in the page). Glow = the colour the scene passed to the painter; pixel = one device
+pixel at the centre of the most opaque glow rect (it also contains the moving band alpha, so it is not a pure colour step):
+
+| Viewport | DPR | Pass | frames/s | redraws/s | glow colour step max / p99 | lane pixel step max / p99 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 390x844 | 1 | raw (pre-fix) | 59.1 | 37 | 18 / 15 | 15 / 10 |
+| 390x844 | 1 | fixed | 59.7 | 37.1 | 8 / 8 | 18 / 10 |
+| 390x844 | 3 | raw (pre-fix) | 20.5 | 20.4 | 33 / 23 | 20 / 19 |
+| 390x844 | 3 | fixed | 19.8 | 19.7 | 8 / 8 | 21 / 20 |
+| 1280x720 | 1 | raw (pre-fix) | 48.1 | 33.1 | 21 / 16 | 11 / 10 |
+| 1280x720 | 1 | fixed | 49.9 | 33.8 | 8 / 8 | 21 / 13 |
+| 1280x720 | 3 | raw (pre-fix) | 8.1 | 8 | 63 / 63 | 41 / 41 |
+| 1280x720 | 3 | fixed | 7.4 | 7.3 | 8 / 8 | 42 / 42 |
+
+Reading: the glow colour step falls from 18 / 21 (DPR 1, 59 and 48 fps) and 33 / 63 (DPR 3, render-bound at 20 and 8 fps, i.e. 50 to 125 ms between redraws) to 8 in every row, with the redraw rate unchanged (37.0 -> 37.1 and 33.1 -> 33.8 at DPR 1; PR #488 measured 37.0 and 35.1 on the same levels, so no regression). The lane-pixel step does NOT fall: that pixel is dominated by the travelling band alpha (at most 0.55, moving about 0.05 per 33 ms redraw), which does not depend on the sheen and is not changed here; the colour part of it is at most 8 x 0.55 = 4.4. The DPR 3 rows are render-bound on this software-rendered host (the redraw gap there is 50 to 125 ms, not 33 ms), so they exaggerate the band step and say nothing about a phone GPU. The pixel numbers are therefore reported, not bounded.
+
+Headless Chromium runs at the host refresh (about 60 Hz); 120 and 144 Hz are the simulation only. Nothing was checked on a real
+phone or display. Not covered: the trail canvas itself still takes its own 20-unit core step on this schedule (unchanged, and its
+bloom code conflicts with draft PR #461); a follow-up card could apply the same bound there.
 
 ### Kept frame vs forced redraw (`scripts/analysis/check-bleed-glow-redraw-equivalence.mjs`)
 
