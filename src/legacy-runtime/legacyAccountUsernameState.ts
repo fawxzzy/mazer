@@ -12,9 +12,19 @@
  *    `shouldRereadLegacyUsernameAfterProfileCreate` says when ONE more read is due.
  *
  * 2. The header label shows the auth snapshot's `canonicalUsername` (the sign-in
- *    metadata name), which a rename never updates. `applyLegacyUsernameRenameToSnapshot`
- *    carries a saved rename into the snapshot so the header follows it at once, and
- *    keeps it there when the auth layer later hands the scene a fresh snapshot.
+ *    metadata name), which a rename never updates: `mazer_set_username` writes only
+ *    `mazer_profiles.username` and the client never touches `user_metadata`.
+ *    `applyLegacyUsernameRenameToSnapshot` carries a saved rename into the snapshot so
+ *    the header follows it at once, and keeps it there when the auth layer later hands
+ *    the scene a fresh snapshot.
+ *
+ * 3. (MAZER-ACCT-033) After a RELOAD the snapshot is rebuilt from the sign-in metadata,
+ *    so the in-session patch is gone and the header reverted to the old name while the
+ *    Leaderboard showed the new one (confirmed live on 2026-11-12). The profile username
+ *    the scene reads once per user is therefore treated as a saved rename too
+ *    (`resolveLegacyProfileUsernameRename`): the header shows the same name as the
+ *    Leaderboard row, in the session that renamed and after any reload. The account
+ *    host's sign-in name is deliberately left alone (it is shared by every app).
  */
 import type { LegacyAuthSessionSnapshot } from './legacyAuth';
 
@@ -71,4 +81,20 @@ export const applyLegacyUsernameRenameToSnapshot = (
     return snapshot;
   }
   return { ...snapshot, canonicalUsername: username };
+};
+
+/**
+ * The profile username the scene just read, as a rename for the header (MAZER-ACCT-033).
+ * Null when there is no signed-in user or the read found no name (no profile row yet,
+ * blank value), so the header then keeps the sign-in name exactly as before.
+ */
+export const resolveLegacyProfileUsernameRename = (
+  userId: string | null,
+  profileUsername: string | null | undefined
+): LegacyUsernameRename | null => {
+  const username = typeof profileUsername === 'string' ? profileUsername.trim() : '';
+  if (userId === null || username.length === 0) {
+    return null;
+  }
+  return { userId, username };
 };

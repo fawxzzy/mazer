@@ -283,6 +283,7 @@ import {
 } from '../legacy-runtime/legacyUiTapRecovery';
 import {
   applyLegacyUsernameRenameToSnapshot,
+  resolveLegacyProfileUsernameRename,
   shouldRereadLegacyUsernameAfterProfileCreate,
   type LegacyUsernameRename
 } from '../legacy-runtime/legacyAccountUsernameState';
@@ -12627,6 +12628,12 @@ export class MenuScene extends Phaser.Scene {
       }
 
       this.accountUsernameSavedValue = result.username ?? '';
+      // MAZER-ACCT-033: after a reload the header must show the saved profile name, not the stale sign-in name.
+      const rename = resolveLegacyProfileUsernameRename(userId, result.username);
+      if (rename !== null) {
+        this.accountUsernameRename = rename;
+        this.authSnapshot = applyLegacyUsernameRenameToSnapshot(this.authSnapshot, rename);
+      }
       this.uiDirty = true;
     }).catch(() => {
       if (sequence !== this.accountUsernameSequence || this.authSnapshot.userId !== userId) {

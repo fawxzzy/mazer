@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import type { LegacyAuthSessionSnapshot } from '../../src/legacy-runtime/legacyAuth';
 import {
   applyLegacyUsernameRenameToSnapshot,
+  resolveLegacyProfileUsernameRename,
   shouldRereadLegacyUsernameAfterProfileCreate,
   type LegacyUsernameRereadInput
 } from '../../src/legacy-runtime/legacyAccountUsernameState';
@@ -111,6 +112,48 @@ describe('MAZER-ACCT-021: the header name follows a saved rename', () => {
   });
 });
 
+describe('MAZER-ACCT-033: the header keeps the saved name after a reload', () => {
+  const freshSnapshot = (): LegacyAuthSessionSnapshot => ({
+    canonicalUsername: 'mzr-qa-1112',
+    configured: true,
+    displayName: 'mzr-qa-1112',
+    email: 'a@b.c',
+    error: null,
+    info: null,
+    status: 'authenticated',
+    userId: 'u1'
+  });
+
+  test('the rule: a profile name for the signed-in user is a rename, a missing or blank one is not', () => {
+    expect(resolveLegacyProfileUsernameRename('u1', 'mzr-qa-tmp1')).toEqual({ userId: 'u1', username: 'mzr-qa-tmp1' });
+    expect(resolveLegacyProfileUsernameRename('u1', '  Padded  ')).toEqual({ userId: 'u1', username: 'Padded' });
+    expect(resolveLegacyProfileUsernameRename('u1', null)).toBeNull();
+    expect(resolveLegacyProfileUsernameRename('u1', undefined)).toBeNull();
+    expect(resolveLegacyProfileUsernameRename('u1', '   ')).toBeNull();
+    expect(resolveLegacyProfileUsernameRename(null, 'name')).toBeNull();
+  });
+
+  test('rename, reload, read: the rebuilt snapshot carries the old sign-in name until the profile read lands, then the saved name', () => {
+    // Session 1: the player renames; the server keeps the new name in the profile only.
+    let profileName = 'mzr-qa-1112';
+    profileName = 'mzr-qa-tmp1';
+    // Reload: the auth layer rebuilds the snapshot from the unchanged sign-in metadata.
+    const afterReload = freshSnapshot();
+    expect(afterReload.canonicalUsername).toBe('mzr-qa-1112');
+    // The scene's one username read finds the profile name and applies it as a rename.
+    const patched = applyLegacyUsernameRenameToSnapshot(afterReload, resolveLegacyProfileUsernameRename('u1', profileName));
+    expect(patched.canonicalUsername).toBe('mzr-qa-tmp1');
+    // A later auth refresh (token refresh) hands back the stale metadata name; the held rename keeps it.
+    const rename = resolveLegacyProfileUsernameRename('u1', profileName);
+    expect(applyLegacyUsernameRenameToSnapshot(freshSnapshot(), rename).canonicalUsername).toBe('mzr-qa-tmp1');
+  });
+
+  test('a player with no profile row yet keeps the sign-in name in the header', () => {
+    const base = freshSnapshot();
+    expect(applyLegacyUsernameRenameToSnapshot(base, resolveLegacyProfileUsernameRename('u1', null))).toBe(base);
+  });
+});
+
 describe('scene wiring (source pins)', () => {
   const menu = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n?/g, '\n');
 
@@ -119,6 +162,14 @@ describe('scene wiring (source pins)', () => {
     expect(start).toBeGreaterThan(0);
     expect(menu.slice(start, start + 700)).toContain("this.authSnapshot.canonicalUsername?.trim() ?? ''");
     expect(menu.split('this.authSnapshot = applyLegacyUsernameRenameToSnapshot(this.authSnapshot, this.accountUsernameRename);').length - 1).toBe(2);
+  });
+
+  test('the one-per-user profile read feeds the header (reload case, MAZER-ACCT-033)', () => {
+    const start = menu.indexOf('const rename = resolveLegacyProfileUsernameRename(userId, result.username);');
+    expect(start).toBeGreaterThan(0);
+    const block = menu.slice(start, start + 400);
+    expect(block).toContain('this.accountUsernameRename = rename;');
+    expect(block).toContain('applyLegacyUsernameRenameToSnapshot(this.authSnapshot, rename)');
   });
 
   test('a saved rename updates the held name and repaints', () => {
