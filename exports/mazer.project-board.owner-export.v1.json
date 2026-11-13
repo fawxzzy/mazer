@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_9d51ae6f0adb",
+  "export_id": "pbe_mazer_owner_registry_9d706b1ca080",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:9d51ae6f0adbdd5eb6f5c00feddbe8afc71fd79bbabc75a63e46852975bd50c9",
-  "generated_at": "2026-11-13T12:00:00.000Z",
+  "source_revision": "sha256:9d706b1ca0806c5e34455a8c87f5f59ebd272ac54472b955648213417d536a73",
+  "generated_at": "2026-11-13T17:51:42.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:cfe308c89b83ad0cee141f2d9720c16e628aa5dde667125beaab35c47551eb75",
-      "observed_at": "2026-11-13T12:00:00.000Z"
+      "revision": "sha256:55df36b760eb9900d27196d24312203426a21a45487a81b21e3950f3b40886f2",
+      "observed_at": "2026-11-13T17:51:42.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:a67753ce27c71dbfb2582900208e7e00de72cc64dcbd0fcb71de2ead073b30a1",
-      "observed_at": "2026-11-13T12:00:00.000Z"
+      "observed_at": "2026-11-13T17:51:42.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-13T12:00:00.000Z"
+      "observed_at": "2026-11-13T17:51:42.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-13T12:00:00.000Z"
+      "observed_at": "2026-11-13T17:51:42.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-13T12:00:00.000Z"
+      "observed_at": "2026-11-13T17:51:42.000Z"
     }
   ],
   "cards": [
@@ -3877,6 +3877,57 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-flow-015_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-FLOW-015",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Show the level clear time above the level number between levels",
+        "description": "The between-levels banner shows Completion Time: MM:SS above the level number, fading with it. It uses the existing per-level run timer (start when input opens, stop at the goal, hold time excluded), is display only and never stored or sent. Board update 2026-11-13: Merged and deployed; headless only. Shows Completion Time MM:SS above the level number between levels; display only. PR #494 merged (252d6cd0). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-13T17:25:26.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-015",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-015",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T17:25:26.000Z"
+      },
+      "content": {
+        "summary": "The between-levels banner shows Completion Time: MM:SS above the level number, fading with it. It uses the existing per-level run timer (start when input opens, stop at the goal, hold time excluded), is display only and never stored or sent. Board update 2026-11-13: Merged and deployed; headless only. Shows Completion Time MM:SS above the level number between levels; display only. PR #494 merged (252d6cd0). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The between-levels banner shows Completion Time: MM:SS above the level number, fading with it. It uses the existing per-level run timer (start when input opens, stop at the goal, hold time excluded), is display only and never stored or sent. Board update 2026-11-13: Merged and deployed; headless only. Shows Completion Time MM:SS above the level number between levels; display only. PR #494 merged (252d6cd0). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Line sits above the level number and fades with it, including the Reduce Motion crossfade",
+          "Timer starts at input unlock, stops at the goal move and excludes pauses",
+          "Value is display only: not persisted, sent or written to receipts"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-gen-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -4085,24 +4136,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-gen-005_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-GEN-005",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Unreachable floor islands appear in about 6% of generated mazes",
-        "description": "About 6 percent of generated mazes carry a small group of floor tiles that no path reaches, visible as orphan tiles. Measured identical before and after the no-stub rule (MAZER-GEN-006), so it is an older generator behaviour, not a regression. Plan: find where the islands are created, then either wall them up or connect them without changing the felt-difficulty number, and add a property test over many seeds. Not started.",
+        "description": "About 6 percent of generated mazes carry a small group of floor tiles that no path reaches, visible as orphan tiles. Measured identical before and after the no-stub rule (MAZER-GEN-006), so it is an older generator behaviour, not a regression. Plan: find where the islands are created, then either wall them up or connect them without changing the felt-difficulty number, and add a property test over many seeds. Not started. Board update 2026-11-13: Merged and deployed; headless only. Orphan floor tiles are walled up at generation; measured rate was 0.56 percent of mazes (not the 6 percent first noted), now 0. 14 golden ladder hashes changed. PR #499 merged (09049594). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-12T23:30:00.000Z",
+        "updated_at": "2026-11-13T17:25:58.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-005",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -4110,11 +4161,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-005",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T23:30:00.000Z"
+        "source_updated_at": "2026-11-13T17:25:58.000Z"
       },
       "content": {
-        "summary": "About 6 percent of generated mazes carry a small group of floor tiles that no path reaches, visible as orphan tiles. Measured identical before and after the no-stub rule (MAZER-GEN-006), so it is an older generator behaviour, not a regression. Plan: find where the islands are created, then either wall them up or connect them without changing the felt-difficulty number, and add a property test over many seeds. Not started.",
-        "objective": "About 6 percent of generated mazes carry a small group of floor tiles that no path reaches, visible as orphan tiles. Measured identical before and after the no-stub rule (MAZER-GEN-006), so it is an older generator behaviour, not a regression. Plan: find where the islands are created, then either wall them up or connect them without changing the felt-difficulty number, and add a property test over many seeds. Not started.",
+        "summary": "About 6 percent of generated mazes carry a small group of floor tiles that no path reaches, visible as orphan tiles. Measured identical before and after the no-stub rule (MAZER-GEN-006), so it is an older generator behaviour, not a regression. Plan: find where the islands are created, then either wall them up or connect them without changing the felt-difficulty number, and add a property test over many seeds. Not started. Board update 2026-11-13: Merged and deployed; headless only. Orphan floor tiles are walled up at generation; measured rate was 0.56 percent of mazes (not the 6 percent first noted), now 0. 14 golden ladder hashes changed. PR #499 merged (09049594). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
+        "objective": "About 6 percent of generated mazes carry a small group of floor tiles that no path reaches, visible as orphan tiles. Measured identical before and after the no-stub rule (MAZER-GEN-006), so it is an older generator behaviour, not a regression. Plan: find where the islands are created, then either wall them up or connect them without changing the felt-difficulty number, and add a property test over many seeds. Not started. Board update 2026-11-13: Merged and deployed; headless only. Orphan floor tiles are walled up at generation; measured rate was 0.56 percent of mazes (not the 6 percent first noted), now 0. 14 golden ladder hashes changed. PR #499 merged (09049594). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Root cause of the islands is identified",
           "No generated maze has floor tiles the start cannot reach",
@@ -4197,7 +4248,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Straighter ladder mazes, ladder to 288: PR #484 merged and live, owner look pending",
-        "description": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). PR #484 (merge 5cee1ed2, head e2ae8640) is MERGED AND DEPLOYED (production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl). It lowers the route share of the felt tuner and makes carved branches keep their heading, then a density fill spends the freed cells on short side branches and breaks long empty halls. Measured before merge: pointless snaking fell to 3 to 14 percent of the floor, zero one-tile stubs, the AI runner solved 340 of 340. Known issues stated in the PR: the fill can read as a comb and sparse seeds are possible. Checked in a headless browser and tests only; no formal device check. The owner gave informal feedback, \"no lag, no single tiles so far\", which is NOT a formal check. Needs owner device feedback on the comb look and sparse seeds. The preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
+        "description": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). PR #484 (merge 5cee1ed2, head e2ae8640) is MERGED AND DEPLOYED (production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl). It lowers the route share of the felt tuner and makes carved branches keep their heading, then a density fill spends the freed cells on short side branches and breaks long empty halls. Measured before merge: pointless snaking fell to 3 to 14 percent of the floor, zero one-tile stubs, the AI runner solved 340 of 340. Known issues stated in the PR: the fill can read as a comb and sparse seeds are possible. Checked in a headless browser and tests only; no formal device check. The owner gave informal feedback, \"no lag, no single tiles so far\", which is NOT a formal check. Needs owner device feedback on the comb look and sparse seeds. The preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow. Board update 2026-11-13: Merged and deployed; owner informal feedback: no lag and no single tiles so far (not a formal check). Comb look and sparse seeds still need a phone check at levels 50, 150, 218 and 300. PR #484 merged (5cee1ed2). Deployed: production build fawxzzy-mazer-dyhmua9v6. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "medium",
@@ -4206,7 +4257,7 @@
           "MAZER-GEN-006"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T12:00:00.000Z",
+        "updated_at": "2026-11-13T17:26:18.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-007",
         "extensions": {
           "owner_status": "review",
@@ -4217,11 +4268,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-007",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T12:00:00.000Z"
+        "source_updated_at": "2026-11-13T17:26:18.000Z"
       },
       "content": {
-        "summary": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). PR #484 (merge 5cee1ed2, head e2ae8640) is MERGED AND DEPLOYED (production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl). It lowers the route share of the felt tuner and makes carved branches keep their heading, then a density fill spends the freed cells on short side branches and breaks long empty halls. Measured before merge: pointless snaking fell to 3 to 14 percent of the floor, zero one-tile stubs, the AI runner solved 340 of 340. Known issues stated in the PR: the fill can read as a comb and sparse seeds are possible. Checked in a headless browser and tests only; no formal device check. The owner gave informal feedback, \"no lag, no single tiles so far\", which is NOT a formal check. Needs owner device feedback on the comb look and sparse seeds. The preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
-        "objective": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). PR #484 (merge 5cee1ed2, head e2ae8640) is MERGED AND DEPLOYED (production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl). It lowers the route share of the felt tuner and makes carved branches keep their heading, then a density fill spends the freed cells on short side branches and breaks long empty halls. Measured before merge: pointless snaking fell to 3 to 14 percent of the floor, zero one-tile stubs, the AI runner solved 340 of 340. Known issues stated in the PR: the fill can read as a comb and sparse seeds are possible. Checked in a headless browser and tests only; no formal device check. The owner gave informal feedback, \"no lag, no single tiles so far\", which is NOT a formal check. Needs owner device feedback on the comb look and sparse seeds. The preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
+        "summary": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). PR #484 (merge 5cee1ed2, head e2ae8640) is MERGED AND DEPLOYED (production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl). It lowers the route share of the felt tuner and makes carved branches keep their heading, then a density fill spends the freed cells on short side branches and breaks long empty halls. Measured before merge: pointless snaking fell to 3 to 14 percent of the floor, zero one-tile stubs, the AI runner solved 340 of 340. Known issues stated in the PR: the fill can read as a comb and sparse seeds are possible. Checked in a headless browser and tests only; no formal device check. The owner gave informal feedback, \"no lag, no single tiles so far\", which is NOT a formal check. Needs owner device feedback on the comb look and sparse seeds. The preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow. Board update 2026-11-13: Merged and deployed; owner informal feedback: no lag and no single tiles so far (not a formal check). Comb look and sparse seeds still need a phone check at levels 50, 150, 218 and 300. PR #484 merged (5cee1ed2). Deployed: production build fawxzzy-mazer-dyhmua9v6. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). PR #484 (merge 5cee1ed2, head e2ae8640) is MERGED AND DEPLOYED (production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl). It lowers the route share of the felt tuner and makes carved branches keep their heading, then a density fill spends the freed cells on short side branches and breaks long empty halls. Measured before merge: pointless snaking fell to 3 to 14 percent of the floor, zero one-tile stubs, the AI runner solved 340 of 340. Known issues stated in the PR: the fill can read as a comb and sparse seeds are possible. Checked in a headless browser and tests only; no formal device check. The owner gave informal feedback, \"no lag, no single tiles so far\", which is NOT a formal check. Needs owner device feedback on the comb look and sparse seeds. The preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow. Board update 2026-11-13: Merged and deployed; owner informal feedback: no lag and no single tiles so far (not a formal check). Comb look and sparse seeds still need a phone check at levels 50, 150, 218 and 300. PR #484 merged (5cee1ed2). Deployed: production build fawxzzy-mazer-dyhmua9v6. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Pointless-snaking share falls sharply on every band: measured 31-47 to 3-14 percent before merge",
           "No one-tile stubs; every ladder maze solvable: 340 of 340 before merge",
@@ -4689,6 +4740,57 @@
           "The endpoint tile pixel test at tile 25.44 and device pixel ratio 3 passes under parallel load: PR #489 merged, one machine",
           "Vitest worker task-update timeouts no longer fail full runs: PR #489 merged, one machine",
           "Three consecutive full parallel runs pass without a rerun: measured three at once, 0 failed each, one machine"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-gov-010_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-GOV-010",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Board updates by event log and milestone fold, not per PR",
+        "description": "Board changes are recorded as one event line each (board-events branch) and folded by a deterministic script at milestones into the registry, ledger, export, work report and Web snapshot. Replaces the per-PR agent edit. The process is written up in the Mazer board sync process document. Board update 2026-11-13: Merged (PR 495); no runtime surface. Board rule, project-board-sync agent and mazer-batch skill rewritten to the event and milestone process. The Board sync workflow has not run on GitHub yet. PR #495 merged (14c85ca1). No runtime surface to deploy. No device surface.",
+        "card_type": "governance",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-13T17:25:50.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GOV-010",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GOV-010",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T17:25:50.000Z"
+      },
+      "content": {
+        "summary": "Board changes are recorded as one event line each (board-events branch) and folded by a deterministic script at milestones into the registry, ledger, export, work report and Web snapshot. Replaces the per-PR agent edit. The process is written up in the Mazer board sync process document. Board update 2026-11-13: Merged (PR 495); no runtime surface. Board rule, project-board-sync agent and mazer-batch skill rewritten to the event and milestone process. The Board sync workflow has not run on GitHub yet. PR #495 merged (14c85ca1). No runtime surface to deploy. No device surface.",
+        "objective": "Board changes are recorded as one event line each (board-events branch) and folded by a deterministic script at milestones into the registry, ledger, export, work report and Web snapshot. Replaces the per-PR agent edit. The process is written up in the Mazer board sync process document. Board update 2026-11-13: Merged (PR 495); no runtime surface. Board rule, project-board-sync agent and mazer-batch skill rewritten to the event and milestone process. The Board sync workflow has not run on GitHub yet. PR #495 merged (14c85ca1). No runtime surface to deploy. No device surface.",
+        "acceptance_criteria": [
+          "Events fold deterministically with evidence rules enforced",
+          "Trigger policy and rollback are documented",
+          "The Board sync workflow is proven once on GitHub"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5383,26 +5485,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-motion-002_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-MOTION-002",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Animate overlays, controls and the Start and splash transitions",
-        "description": "Overlay open and close, hover, press, toggles and toasts are instant while maze transitions get eased motion, and pressing Start removes the title, icons and corridor in one frame while the HTML splash hard-cuts to the game. The plan is a 200 ms panel rise with staggered rows, 120 ms state changes, a short exit of menu chrome and a splash fade with a shared loader period. Not started.",
+        "description": "Overlay open and close, hover, press, toggles and toasts are instant while maze transitions get eased motion, and pressing Start removes the title, icons and corridor in one frame while the HTML splash hard-cuts to the game. The plan is a 200 ms panel rise with staggered rows, 120 ms state changes, a short exit of menu chrome and a splash fade with a shared loader period. Not started. Board update 2026-11-13: Start, overlay open/close and the splash crossfade from a snapshot (merged PR 505); rise and staggered rows not built. Deploy pending. PR #505 merged (4cb1a2dd). Merged, not deployed. Board update 2026-11-13: Merged and deployed; headless only. Start, overlay open/close and the splash crossfade from a snapshot (skipped below 30 fps); loader pulse retuned to 1200 ms. Rise and staggered rows, and eased hover/press, are not built. PR #505 merged (4cb1a2dd). Deployed: production build fawxzzy-mazer-qbu403nwk. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-MOTION-001"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-06T00:00:00.000Z",
+        "updated_at": "2026-11-13T17:32:38.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-002",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5410,11 +5512,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-002",
         "source_status": "current",
-        "source_updated_at": "2026-11-06T00:00:00.000Z"
+        "source_updated_at": "2026-11-13T17:32:38.000Z"
       },
       "content": {
-        "summary": "Overlay open and close, hover, press, toggles and toasts are instant while maze transitions get eased motion, and pressing Start removes the title, icons and corridor in one frame while the HTML splash hard-cuts to the game. The plan is a 200 ms panel rise with staggered rows, 120 ms state changes, a short exit of menu chrome and a splash fade with a shared loader period. Not started.",
-        "objective": "Overlay open and close, hover, press, toggles and toasts are instant while maze transitions get eased motion, and pressing Start removes the title, icons and corridor in one frame while the HTML splash hard-cuts to the game. The plan is a 200 ms panel rise with staggered rows, 120 ms state changes, a short exit of menu chrome and a splash fade with a shared loader period. Not started.",
+        "summary": "Overlay open and close, hover, press, toggles and toasts are instant while maze transitions get eased motion, and pressing Start removes the title, icons and corridor in one frame while the HTML splash hard-cuts to the game. The plan is a 200 ms panel rise with staggered rows, 120 ms state changes, a short exit of menu chrome and a splash fade with a shared loader period. Not started. Board update 2026-11-13: Start, overlay open/close and the splash crossfade from a snapshot (merged PR 505); rise and staggered rows not built. Deploy pending. PR #505 merged (4cb1a2dd). Merged, not deployed. Board update 2026-11-13: Merged and deployed; headless only. Start, overlay open/close and the splash crossfade from a snapshot (skipped below 30 fps); loader pulse retuned to 1200 ms. Rise and staggered rows, and eased hover/press, are not built. PR #505 merged (4cb1a2dd). Deployed: production build fawxzzy-mazer-qbu403nwk. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Overlay open and close, hover, press, toggles and toasts are instant while maze transitions get eased motion, and pressing Start removes the title, icons and corridor in one frame while the HTML splash hard-cuts to the game. The plan is a 200 ms panel rise with staggered rows, 120 ms state changes, a short exit of menu chrome and a splash fade with a shared loader period. Not started. Board update 2026-11-13: Start, overlay open/close and the splash crossfade from a snapshot (merged PR 505); rise and staggered rows not built. Deploy pending. PR #505 merged (4cb1a2dd). Merged, not deployed. Board update 2026-11-13: Merged and deployed; headless only. Start, overlay open/close and the splash crossfade from a snapshot (skipped below 30 fps); loader pulse retuned to 1200 ms. Rise and staggered rows, and eased hover/press, are not built. PR #505 merged (4cb1a2dd). Deployed: production build fawxzzy-mazer-qbu403nwk. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Panels rise and fade using the shared motion scale",
           "Start and splash transitions no longer cut in a single frame",
@@ -6335,7 +6437,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Wrap-dock glow redraw on the shared 33 ms schedule: PR #488 open for review",
-        "description": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check. HELD 2026-11-13: PR #488 stays open until the owner looks at the wrap-dock glow colour step on a phone (the sheen band steps up to 20 of 255 instead of 11); not merged, not deployed.",
+        "description": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check. HELD 2026-11-13: PR #488 stays open until the owner looks at the wrap-dock glow colour step on a phone (the sheen band steps up to 20 of 255 instead of 11); not merged, not deployed. Board update 2026-11-13: Merged and deployed; headless only. Dock glow redraws on the shared 33 ms schedule and its colour step is bounded at 8 of 255 per redraw. Owner phone look at the wrap dock still needed. PR #488 merged (3d5f3614). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
         "card_type": "reliability",
         "lifecycle": "review",
         "priority": "low",
@@ -6344,7 +6446,7 @@
           "MAZER-PERF-003"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T12:00:00.000Z",
+        "updated_at": "2026-11-13T17:25:54.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-007",
         "extensions": {
           "owner_status": "review",
@@ -6355,11 +6457,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-007",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T12:00:00.000Z"
+        "source_updated_at": "2026-11-13T17:25:54.000Z"
       },
       "content": {
-        "summary": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check. HELD 2026-11-13: PR #488 stays open until the owner looks at the wrap-dock glow colour step on a phone (the sheen band steps up to 20 of 255 instead of 11); not merged, not deployed.",
-        "objective": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check. HELD 2026-11-13: PR #488 stays open until the owner looks at the wrap-dock glow colour step on a phone (the sheen band steps up to 20 of 255 instead of 11); not merged, not deployed.",
+        "summary": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check. HELD 2026-11-13: PR #488 stays open until the owner looks at the wrap-dock glow colour step on a phone (the sheen band steps up to 20 of 255 instead of 11); not merged, not deployed. Board update 2026-11-13: Merged and deployed; headless only. Dock glow redraws on the shared 33 ms schedule and its colour step is bounded at 8 of 255 per redraw. Owner phone look at the wrap dock still needed. PR #488 merged (3d5f3614). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check. HELD 2026-11-13: PR #488 stays open until the owner looks at the wrap-dock glow colour step on a phone (the sheen band steps up to 20 of 255 instead of 11); not merged, not deployed. Board update 2026-11-13: Merged and deployed; headless only. Dock glow redraws on the shared 33 ms schedule and its colour step is bounded at 8 of 255 per redraw. Owner phone look at the wrap dock still needed. PR #488 merged (3d5f3614). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The full-motion wrap-glow redraw cost is measured on a wrap level: PR #488, headless",
           "The redraw rate is lowered with no visible colour stepping: lowered; the sheen step rises from 11 to 20 of 255, flagged for the owner",
@@ -6381,24 +6483,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-perf-008_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PERF-008",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Spread level-start maze generation across frames or a worker",
-        "description": "Generating a large maze at the start of a level takes about 400 to 800 ms at 4x scale. It is already hidden behind the level intro, so players do not see it today. Plan: spread the work across frames or move it to a worker so it cannot cause a hitch if the intro gets shorter. Not started.",
+        "description": "Generating a large maze at the start of a level takes about 400 to 800 ms at 4x scale. It is already hidden behind the level intro, so players do not see it today. Plan: spread the work across frames or move it to a worker so it cannot cause a hitch if the intro gets shorter. Not started. Board update 2026-11-13: Merged and deployed; headless only. Level-start and goal-reset maze generation can run in a Web Worker with an identical sync fallback; at 4x CPU startPlayMode 210-894 ms to 11-23 ms. First maze of a session is not improved. PR #503 merged (77d2e9eb). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
         "card_type": "reliability",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-13T17:26:10.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-008",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -6406,15 +6508,119 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-008",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-13T17:26:10.000Z"
       },
       "content": {
-        "summary": "Generating a large maze at the start of a level takes about 400 to 800 ms at 4x scale. It is already hidden behind the level intro, so players do not see it today. Plan: spread the work across frames or move it to a worker so it cannot cause a hitch if the intro gets shorter. Not started.",
-        "objective": "Generating a large maze at the start of a level takes about 400 to 800 ms at 4x scale. It is already hidden behind the level intro, so players do not see it today. Plan: spread the work across frames or move it to a worker so it cannot cause a hitch if the intro gets shorter. Not started.",
+        "summary": "Generating a large maze at the start of a level takes about 400 to 800 ms at 4x scale. It is already hidden behind the level intro, so players do not see it today. Plan: spread the work across frames or move it to a worker so it cannot cause a hitch if the intro gets shorter. Not started. Board update 2026-11-13: Merged and deployed; headless only. Level-start and goal-reset maze generation can run in a Web Worker with an identical sync fallback; at 4x CPU startPlayMode 210-894 ms to 11-23 ms. First maze of a session is not improved. PR #503 merged (77d2e9eb). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Generating a large maze at the start of a level takes about 400 to 800 ms at 4x scale. It is already hidden behind the level intro, so players do not see it today. Plan: spread the work across frames or move it to a worker so it cannot cause a hitch if the intro gets shorter. Not started. Board update 2026-11-13: Merged and deployed; headless only. Level-start and goal-reset maze generation can run in a Web Worker with an identical sync fallback; at 4x CPU startPlayMode 210-894 ms to 11-23 ms. First maze of a session is not improved. PR #503 merged (77d2e9eb). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Generation time at level start is measured on a large level",
           "Generation no longer blocks a frame for more than a few milliseconds",
           "The generated maze is identical for the same seed"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-perf-009_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-009",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Prefetch or time-slice the first maze of a session",
+        "description": "Boot straight into play, previewLevel and the Play Mazer shortcut still generate the first maze synchronously (100 to 900 ms at 4x CPU). Also investigate the post-install render and bake long task seen once at 4x.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-PERF-008"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-13T17:26:34.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-009",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-009",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T17:26:34.000Z"
+      },
+      "content": {
+        "summary": "Boot straight into play, previewLevel and the Play Mazer shortcut still generate the first maze synchronously (100 to 900 ms at 4x CPU). Also investigate the post-install render and bake long task seen once at 4x.",
+        "objective": "Boot straight into play, previewLevel and the Play Mazer shortcut still generate the first maze synchronously (100 to 900 ms at 4x CPU). Also investigate the post-install render and bake long task seen once at 4x.",
+        "acceptance_criteria": [
+          "First maze no longer blocks a frame for more than a few ms at 4x",
+          "Maze output stays identical for the same seed",
+          "Post-install long task cause is established"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-perf-010_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-010",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Investigate an intermittent slow boot seen by the QA sign-in test",
+        "description": "About 1 in 5 QA sign-in runs since the 3d5f3614 deploy still show the HTML boot splash more than 3.5 s after page load; 16 fresh loads on an idle machine booted in 1.1 to 2.8 s. A worker is measuring slow-boot rate per recent build and bisecting. Cause unknown: could be code, host load or edge latency.",
+        "card_type": "reliability",
+        "lifecycle": "in-progress",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-13T17:51:42.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-010",
+        "extensions": {
+          "owner_status": "in_progress",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-010",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T17:51:42.000Z"
+      },
+      "content": {
+        "summary": "About 1 in 5 QA sign-in runs since the 3d5f3614 deploy still show the HTML boot splash more than 3.5 s after page load; 16 fresh loads on an idle machine booted in 1.1 to 2.8 s. A worker is measuring slow-boot rate per recent build and bisecting. Cause unknown: could be code, host load or edge latency.",
+        "objective": "About 1 in 5 QA sign-in runs since the 3d5f3614 deploy still show the HTML boot splash more than 3.5 s after page load; 16 fresh loads on an idle machine booted in 1.1 to 2.8 s. A worker is measuring slow-boot rate per recent build and bisecting. Cause unknown: could be code, host load or edge latency.",
+        "acceptance_criteria": [
+          "Slow-boot rate (over 3.5 s) is measured per recent build with at least 60 loads each",
+          "Cause is identified as code, host or edge, with data",
+          "If code, a fix with a regression test lands; if not, the QA harness waits for the splash to clear"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -7647,7 +7853,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Settle the install gate policy and prove the offline shell",
-        "description": "The manifest, offline shell, lifecycle handling and the install gate (PR #372) exist. Open points: the boot-time install gate blocks boot in some install modes without a skip, which clashes with the plan that access is enforced by entitlement, and offline reload after a warm install has no real-device proof.",
+        "description": "The manifest, offline shell, lifecycle handling and the install gate (PR #372) exist. Open points: the boot-time install gate blocks boot in some install modes without a skip, which clashes with the plan that access is enforced by entitlement, and offline reload after a warm install has no real-device proof. Board update 2026-11-13: Offline-shell headless proof merged and deployed (19 of 19 checks; HUD icons and tile-font atlas now runtime-cached). Install gate policy decision and a real-device airplane-mode check are still open. PR #501 merged (e2e84c62). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
         "card_type": "reliability",
         "lifecycle": "in-progress",
         "priority": "medium",
@@ -7656,7 +7862,7 @@
           "MAZER-PWA-003"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
+        "updated_at": "2026-11-13T17:26:06.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PWA-004",
         "extensions": {
           "owner_status": "in_progress",
@@ -7667,11 +7873,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PWA-004",
         "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
+        "source_updated_at": "2026-11-13T17:26:06.000Z"
       },
       "content": {
-        "summary": "The manifest, offline shell, lifecycle handling and the install gate (PR #372) exist. Open points: the boot-time install gate blocks boot in some install modes without a skip, which clashes with the plan that access is enforced by entitlement, and offline reload after a warm install has no real-device proof.",
-        "objective": "The manifest, offline shell, lifecycle handling and the install gate (PR #372) exist. Open points: the boot-time install gate blocks boot in some install modes without a skip, which clashes with the plan that access is enforced by entitlement, and offline reload after a warm install has no real-device proof.",
+        "summary": "The manifest, offline shell, lifecycle handling and the install gate (PR #372) exist. Open points: the boot-time install gate blocks boot in some install modes without a skip, which clashes with the plan that access is enforced by entitlement, and offline reload after a warm install has no real-device proof. Board update 2026-11-13: Offline-shell headless proof merged and deployed (19 of 19 checks; HUD icons and tile-font atlas now runtime-cached). Install gate policy decision and a real-device airplane-mode check are still open. PR #501 merged (e2e84c62). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The manifest, offline shell, lifecycle handling and the install gate (PR #372) exist. Open points: the boot-time install gate blocks boot in some install modes without a skip, which clashes with the plan that access is enforced by entitlement, and offline reload after a warm install has no real-device proof. Board update 2026-11-13: Offline-shell headless proof merged and deployed (19 of 19 checks; HUD icons and tile-font atlas now runtime-cached). Install gate policy decision and a real-device airplane-mode check are still open. PR #501 merged (e2e84c62). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Owner decides the install gate policy",
           "The shell works offline on a real device",
@@ -7729,6 +7935,59 @@
           "Owner provides approved app icon art with proper corners",
           "Icon files and the icon hash verifier are regenerated from the approved art",
           "Manifest screenshots are captured without the preview label"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-pwa-006_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PWA-006",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Trim dev pages from the precache and decide update behaviour on deploy",
+        "description": "The production precache ships about 300 KiB of dev and QA pages plus the legacy service worker script, and a new deploy reloads a running session about 1.5 s after the update check with no prompt. Decide the update behaviour (prompt or deferred) and measure mid-level restore.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-PWA-004"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-13T17:24:53.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PWA-006",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PWA-006",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T17:24:53.000Z"
+      },
+      "content": {
+        "summary": "The production precache ships about 300 KiB of dev and QA pages plus the legacy service worker script, and a new deploy reloads a running session about 1.5 s after the update check with no prompt. Decide the update behaviour (prompt or deferred) and measure mid-level restore.",
+        "objective": "The production precache ships about 300 KiB of dev and QA pages plus the legacy service worker script, and a new deploy reloads a running session about 1.5 s after the update check with no prompt. Decide the update behaviour (prompt or deferred) and measure mid-level restore.",
+        "acceptance_criteria": [
+          "Dev and QA pages and the legacy service worker script are out of the precache",
+          "Update behaviour on deploy is decided and documented",
+          "Mid-level restore after the reload is measured"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -8090,6 +8349,57 @@
           "The jump list offers 218 as the end-of-fringe checkpoint: PR #469 merged and deployed",
           "No remaining reference to 268 as a ladder end in the preview list: done",
           "Tests that name the checkpoint pass: done"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-qa-008_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-QA-008",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Add ladder-end checkpoints 283 and 288 to the level preview",
+        "description": "The level preview jump list ended at 218 then 300 while the ladder ends at 288. 283 (felt saturation) and 288 (last budget level) are added and pinned to their constants. Board update 2026-11-13: Merged and deployed; headless only. Preview checkpoints 283 and 288 added. PR #502 merged (28e67ee0). Deployed: production build fawxzzy-mazer-o9hufd7kf. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "reliability",
+        "lifecycle": "review",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-13T17:25:46.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-008",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-008",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T17:25:46.000Z"
+      },
+      "content": {
+        "summary": "The level preview jump list ended at 218 then 300 while the ladder ends at 288. 283 (felt saturation) and 288 (last budget level) are added and pinned to their constants. Board update 2026-11-13: Merged and deployed; headless only. Preview checkpoints 283 and 288 added. PR #502 merged (28e67ee0). Deployed: production build fawxzzy-mazer-o9hufd7kf. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The level preview jump list ended at 218 then 300 while the ladder ends at 288. 283 (felt saturation) and 288 (last budget level) are added and pinned to their constants. Board update 2026-11-13: Merged and deployed; headless only. Preview checkpoints 283 and 288 added. PR #502 merged (28e67ee0). Deployed: production build fawxzzy-mazer-o9hufd7kf. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "283 and 288 are in the jump list",
+          "A test pins them to the felt saturation and last budget constants",
+          "Existing checkpoints are kept"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -11413,26 +11723,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-032_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-032",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Start the outro ring orbit from the master laser clock, not a fixed 600 ms",
-        "description": "The edge diamond ring now holds still until the last beam is absorbed, and the outro orbit starts at a fixed 600 ms (MAZER-VIS-030). Plan: derive the orbit start from the master laser clock so it follows the beam timing if the laser length or stagger ever changes. No visible change expected at current timings. Not started.",
+        "description": "The edge diamond ring now holds still until the last beam is absorbed, and the outro orbit starts at a fixed 600 ms (MAZER-VIS-030). Plan: derive the orbit start from the master laser clock so it follows the beam timing if the laser length or stagger ever changes. No visible change expected at current timings. Not started. Board update 2026-11-13: Merged and deployed; no visible change. Outro orbit start is derived from the laser clock constants (still 600 ms). PR #500 merged (22b97c23). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-VIS-030"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T12:00:00.000Z",
+        "updated_at": "2026-11-13T17:26:02.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-032",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -11440,15 +11750,276 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-032",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T12:00:00.000Z"
+        "source_updated_at": "2026-11-13T17:26:02.000Z"
       },
       "content": {
-        "summary": "The edge diamond ring now holds still until the last beam is absorbed, and the outro orbit starts at a fixed 600 ms (MAZER-VIS-030). Plan: derive the orbit start from the master laser clock so it follows the beam timing if the laser length or stagger ever changes. No visible change expected at current timings. Not started.",
-        "objective": "The edge diamond ring now holds still until the last beam is absorbed, and the outro orbit starts at a fixed 600 ms (MAZER-VIS-030). Plan: derive the orbit start from the master laser clock so it follows the beam timing if the laser length or stagger ever changes. No visible change expected at current timings. Not started.",
+        "summary": "The edge diamond ring now holds still until the last beam is absorbed, and the outro orbit starts at a fixed 600 ms (MAZER-VIS-030). Plan: derive the orbit start from the master laser clock so it follows the beam timing if the laser length or stagger ever changes. No visible change expected at current timings. Not started. Board update 2026-11-13: Merged and deployed; no visible change. Outro orbit start is derived from the laser clock constants (still 600 ms). PR #500 merged (22b97c23). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The edge diamond ring now holds still until the last beam is absorbed, and the outro orbit starts at a fixed 600 ms (MAZER-VIS-030). Plan: derive the orbit start from the master laser clock so it follows the beam timing if the laser length or stagger ever changes. No visible change expected at current timings. Not started. Board update 2026-11-13: Merged and deployed; no visible change. Outro orbit start is derived from the laser clock constants (still 600 ms). PR #500 merged (22b97c23). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The orbit start is computed from the master laser clock constants",
           "At current timings the orbit still starts at 600 ms and total durations do not move",
           "A unit test pins the relation"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-033_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-033",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Edge diamonds: one fill only, fill inner to outer, drain outer to inner",
+        "description": "The old instant half-size core on wrap-end diamonds is removed so the beam fill is the only interior colour. The fill grows from the inner tip and drains outer tip first. Owner reported two bottom diamonds missing in play: not reproduced headlessly, cause unconfirmed (hypothesis: rounded display corners clip the full-bleed corner kites). Board update 2026-11-13: Items 1 and 2 merged and deployed: one fill only, inner-to-outer fill, outer-to-inner drain. Item 3 (two bottom diamonds missing) not reproduced; needs phone model, mode and a screenshot. PR #497 merged (566259c5). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-VIS-030"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-13T17:25:30.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-033",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-033",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T17:25:30.000Z"
+      },
+      "content": {
+        "summary": "The old instant half-size core on wrap-end diamonds is removed so the beam fill is the only interior colour. The fill grows from the inner tip and drains outer tip first. Owner reported two bottom diamonds missing in play: not reproduced headlessly, cause unconfirmed (hypothesis: rounded display corners clip the full-bleed corner kites). Board update 2026-11-13: Items 1 and 2 merged and deployed: one fill only, inner-to-outer fill, outer-to-inner drain. Item 3 (two bottom diamonds missing) not reproduced; needs phone model, mode and a screenshot. PR #497 merged (566259c5). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The old instant half-size core on wrap-end diamonds is removed so the beam fill is the only interior colour. The fill grows from the inner tip and drains outer tip first. Owner reported two bottom diamonds missing in play: not reproduced headlessly, cause unconfirmed (hypothesis: rounded display corners clip the full-bleed corner kites). Board update 2026-11-13: Items 1 and 2 merged and deployed: one fill only, inner-to-outer fill, outer-to-inner drain. Item 3 (two bottom diamonds missing) not reproduced; needs phone model, mode and a screenshot. PR #497 merged (566259c5). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Only one fill is ever drawn inside a diamond",
+          "Fill grows inner to outer and drains outer to inner, with the Reduce Motion crossfade kept",
+          "All 8 diamonds show on the owner phone (needs phone model, mode and a bottom-edge screenshot)"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-034_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-034",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Centre the goal star by its centre of mass in the tile",
+        "description": "The goal star was centred by its bounding box and sat 1 to 2 device px low on every tile, up to 3.7 on corner tiles. It is now drawn on its circumcentre at the centre of the painted chip fill (bulb centre on dead ends). Board update 2026-11-13: Merged and deployed; headless only. Goal star centred by its centre of mass. PR #496 merged (519d36ec). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-13T17:25:34.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-034",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-034",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T17:25:34.000Z"
+      },
+      "content": {
+        "summary": "The goal star was centred by its bounding box and sat 1 to 2 device px low on every tile, up to 3.7 on corner tiles. It is now drawn on its circumcentre at the centre of the painted chip fill (bulb centre on dead ends). Board update 2026-11-13: Merged and deployed; headless only. Goal star centred by its centre of mass. PR #496 merged (519d36ec). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The goal star was centred by its bounding box and sat 1 to 2 device px low on every tile, up to 3.7 on corner tiles. It is now drawn on its circumcentre at the centre of the painted chip fill (bulb centre on dead ends). Board update 2026-11-13: Merged and deployed; headless only. Goal star centred by its centre of mass. PR #496 merged (519d36ec). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Star centroid within 0.5 device px of the painted interior centre on all tile shapes and DPRs",
+          "Star size and look unchanged",
+          "Owner confirms the centring on a phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-035_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-035",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Keep a few background stars rainbow-coloured",
+        "description": "About 20 percent of backdrop stars (chosen by a stable per-star seed) keep a dim rainbow hue that cycles once per 24 s with per-star phase offsets. Reduce Motion stops drift and twinkle but colours keep shifting. Board update 2026-11-13: Merged and deployed; headless only. About 20 percent of background stars keep a slow dim rainbow hue; tint visibility unverified on a phone. PR #498 merged (d5a354c6). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-13T17:25:38.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-035",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-035",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T17:25:38.000Z"
+      },
+      "content": {
+        "summary": "About 20 percent of backdrop stars (chosen by a stable per-star seed) keep a dim rainbow hue that cycles once per 24 s with per-star phase offsets. Reduce Motion stops drift and twinkle but colours keep shifting. Board update 2026-11-13: Merged and deployed; headless only. About 20 percent of background stars keep a slow dim rainbow hue; tint visibility unverified on a phone. PR #498 merged (d5a354c6). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "objective": "About 20 percent of backdrop stars (chosen by a stable per-star seed) keep a dim rainbow hue that cycles once per 24 s with per-star phase offsets. Reduce Motion stops drift and twinkle but colours keep shifting. Board update 2026-11-13: Merged and deployed; headless only. About 20 percent of background stars keep a slow dim rainbow hue; tint visibility unverified on a phone. PR #498 merged (d5a354c6). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "A small stable subset of stars shows a slow rainbow hue",
+          "Reduce Motion keeps colour shifting without movement and adds no per-frame full redraw",
+          "Owner confirms the tint reads on a phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-036_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-036",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Centre the start arrow by its painted centroid",
+        "description": "The start arrow was bounding-box centred. It is now centred by the centroid of its painted pixels on the tile painted-interior centre, like the goal star. Four corner raster baselines were refreshed. Board update 2026-11-13: Merged and deployed; headless only. Start arrow centred by painted centroid; four corner raster baselines refreshed. PR #502 merged (28e67ee0). Deployed: production build fawxzzy-mazer-o9hufd7kf. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-VIS-034"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-13T17:25:42.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-036",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-036",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T17:25:42.000Z"
+      },
+      "content": {
+        "summary": "The start arrow was bounding-box centred. It is now centred by the centroid of its painted pixels on the tile painted-interior centre, like the goal star. Four corner raster baselines were refreshed. Board update 2026-11-13: Merged and deployed; headless only. Start arrow centred by painted centroid; four corner raster baselines refreshed. PR #502 merged (28e67ee0). Deployed: production build fawxzzy-mazer-o9hufd7kf. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The start arrow was bounding-box centred. It is now centred by the centroid of its painted pixels on the tile painted-interior centre, like the goal star. Four corner raster baselines were refreshed. Board update 2026-11-13: Merged and deployed; headless only. Start arrow centred by painted centroid; four corner raster baselines refreshed. PR #502 merged (28e67ee0). Deployed: production build fawxzzy-mazer-o9hufd7kf. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Arrow centroid within 0.5 device px of the painted interior centre",
+          "Size and keyline unchanged",
+          "Owner confirms on a phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-037_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-037",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Bound the trail canvas colour step at the sheen crossing",
+        "description": "The wrap-dock glow colour is now limited to 8 of 255 per redraw (PERF-007) but the trail canvas core still steps up to 20 per 33 ms there. Apply the same bound after draft #461 settles, and check the dock band alpha step on a phone.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-PERF-007"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-13T17:26:34.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-037",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-037",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T17:26:34.000Z"
+      },
+      "content": {
+        "summary": "The wrap-dock glow colour is now limited to 8 of 255 per redraw (PERF-007) but the trail canvas core still steps up to 20 per 33 ms there. Apply the same bound after draft #461 settles, and check the dock band alpha step on a phone.",
+        "objective": "The wrap-dock glow colour is now limited to 8 of 255 per redraw (PERF-007) but the trail canvas core still steps up to 20 per 33 ms there. Apply the same bound after draft #461 settles, and check the dock band alpha step on a phone.",
+        "acceptance_criteria": [
+          "Trail core colour step per redraw is at most 8",
+          "Redraw rate does not regress",
+          "Owner confirms smoothness on a phone"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -11519,9 +12090,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 219,
-    "exported_public_card_count": 219,
-    "exported_open_card_count": 110,
+    "stable_identity_count": 230,
+    "exported_public_card_count": 230,
+    "exported_open_card_count": 121,
     "exported_completed_card_count": 93,
     "exported_deferred_card_count": 16,
     "imported_research_candidate_count": 0,
