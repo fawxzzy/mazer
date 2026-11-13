@@ -44,8 +44,8 @@ The signed-in state is faked the way the other capture scripts do it (`?runtimeD
 | 8 | `offline-no-failed-app-requests` | 13 app-origin requests during offline reload and play, all 13 answered by the service worker, 0 failures, 0 requests to any origin other than the app (and the account provider) |
 | 9 | `offline-only-service-worker-background-fetches-attempt-network` | The only connection attempts that reached the (dead) server were the worker's own background fetches (`/app-sw.js`, `/workbox-*.js`, boot-art revalidation); no page request tried the network |
 | 10 | `offline-cold-launch-boots-and-plays` | A new tab opened while offline on `/?previewLevel=1` boots and the player moves |
-| 11 | `offline-sign-in-shows-provider-unreachable` | Signed out and offline, tapping Sign in sets `errorCode = provider_unreachable`, message `Sign-in is unavailable right now. Try again in a few minutes.`, and that text is drawn on the canvas |
-| 12 | `offline-sign-in-does-not-hang-or-navigate` | The failure line appears 25 to 180 ms after the tap (three runs), `authSubmitting` is false again, the page did not navigate away |
+| 11 | `offline-sign-in-shows-provider-unreachable` | Signed out and offline, the cold launch itself tries the hand-off to the account host (MAZER-ACCT-040, no tap), and the fallback screen holds `errorCode = provider_unreachable`, message `Sign-in is unavailable right now. Try again in a few minutes.`, and that text is drawn on the canvas |
+| 12 | `offline-sign-in-does-not-hang-or-navigate` | The fallback screen with the failure line is up after the launch (time recorded in the report), `authSubmitting` is false, a Sign in control is present, the page did not navigate away |
 | 13 | `offline-cold-launch-no-failed-app-requests` | Cold launch plus sign-in: 26 app requests, 26 from the service worker, 0 failures, no page request tried the network |
 | 14 | `update-new-build-takes-over` | With A running and playing, B is deployed (server swap) and `registration.update()` called: B's marker is live in the page, one registration |
 | 15 | `update-old-precache-removed` | After the update the precache holds only B's main bundle; A's is evicted (Workbox `cleanupOutdatedCaches`) |
@@ -79,7 +79,7 @@ The app itself only calls `registration.update()` once per page load, so a long-
 2. **First install reloaded the page once (superseded by MAZER-PERF-010, 2026-11-13).** The worker is registered after the game is created, claims the page, and the `controllerchange` handler reloaded it (not only on updates): 2 main-frame navigations on a first load, so a second splash a precache-download (1.5 to 7.6 s on production) after the first menu. That turned out not to be harmless: a QA tap on the menu landed on the second splash. The reload is now armed only for a page that was already controlled when it loaded (`controlledAtBoot` in `src/boot/serviceWorkerLifecycle.ts`), so the update path is untouched and the first-ever install no longer reloads. See `docs/ops/MAZER-SPLASH-TAIL-MEASUREMENT-2026-11-13.md`.
 3. **First-install reload could drop an OAuth return onto the install gate (closed by the same change).** In a non-installed tab, an OAuth callback URL bypasses the gate and boots, registers the worker, then the claim-time reload used to land on `/` (callback parameters already scrubbed) and show the install gate. Reproduced with `?error=access_denied` before the change; with the first-install reload gone there is no second boot to land on the gate (re-running the proof was not part of that change).
 4. **The precache also ships the dev/QA entry pages.** `proof-surfaces`, `visual-proof`, `watch-pass-*`, `planet3d`, `future-phaser` and their chunks (about 300 KiB on disk) are in every player's precache, and the legacy cleanup worker `sw.js` is in it too. Not a bug; a trim candidate for whoever owns `vite.config.ts` (Wave 5C).
-5. **Signed-out visitors cannot play offline** (the sign-in gate stays locked; Sign in fails fast with the existing line, see check 11). The proof reaches level 1 offline through the fixture / `?previewLevel=1` routes, not through a real saved session, so "a signed-in player reopens the installed app offline" is proven only up to that fixture.
+5. **Signed-out visitors cannot play offline** (the sign-in gate stays locked; a signed-out launch stops on the fallback screen with the existing line, see check 11). The proof reaches level 1 offline through the fixture / `?previewLevel=1` routes, not through a real saved session, so "a signed-in player reopens the installed app offline" is proven only up to that fixture.
 
 ## Install gate: current behaviour (no change)
 
@@ -129,9 +129,9 @@ What this says about the open decision (facts only):
 ### Device checks for Zac (not run)
 
 1. On the phone, open the installed Mazer once while online, play a few seconds, close it fully.
-2. Turn on airplane mode, reopen Mazer from the home screen. Expected: it boots to the menu (signed-in) or the sign-in screen (signed out) with HUD icons visible; no blank screen.
+2. Turn on airplane mode, reopen Mazer from the home screen. Expected: it boots to the menu (signed-in) or, signed out, to the Mazer fallback screen with "Sign-in is unavailable right now. Try again in a few minutes." (the launch no longer goes to the host while offline); HUD icons visible; no blank screen.
 3. Start a level and move. Expected: plays normally.
-4. Signed out, tap Sign in. Expected: "Sign-in is unavailable right now. Try again in a few minutes." within about a second, no hang.
+4. Signed out and still offline, tap Sign in on that screen. Expected: the same line again within about a second, no hang.
 5. Turn airplane mode off, force-quit and reopen. Expected: normal online boot.
 
 ## Doc note for `docs/current-truth.md`

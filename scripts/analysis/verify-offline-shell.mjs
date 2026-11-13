@@ -14,8 +14,9 @@
  *   1. first online load registers /app-sw.js, claims the page and precaches the shell
  *   2. with the network blocked (context.setOffline) a reload boots the menu, level 1
  *      starts and the player moves; no request to the app origin fails
- *   3. a cold offline launch (new tab) boots too, and Sign in shows the existing
- *      provider_unreachable line instead of hanging
+ *   3. a cold offline launch (new tab) boots too, and a signed-out launch (which now tries the
+ *      account-host hand-off by itself, MAZER-ACCT-040) lands on the Mazer fallback screen with the
+ *      existing provider_unreachable line instead of hanging
  *   4. what happens to a running session when a new build is deployed
  *   5. Cache Storage names / entry counts / bytes
  *   6. a table of install-gate behaviour by display mode, host and user agent (current behaviour; no change)
@@ -479,33 +480,22 @@ const runOfflineColdLaunchAndSignIn = async ({ session, server, checks, findings
     `new tab, /?previewLevel=1 while offline; player ${JSON.stringify(movement.start)} -> ${JSON.stringify(movement.end)}`));
   await page.close();
 
-  // Signed-out cold launch: the sign-in screen, then Sign in with no network.
+  // Signed-out cold launch (MAZER-ACCT-040): no button. Boot itself tries the hand-off to the
+  // account host, finds the service unreachable (offline), stays in the app and shows the held
+  // failure line on the Mazer fallback screen.
   const signInPage = await context.newPage();
   log.watchPage(signInPage);
   log.phase = 'offline-sign-in';
+  const launchedAt = Date.now();
   await signInPage.goto(`${origin}${SIGNED_OUT_PATH}`, { waitUntil: 'load' });
-  await pollPage(signInPage, () => {
-    const scene = window.__MAZER_GAME__?.scene.getScene('MenuScene');
-    return Boolean(scene && scene.authGateLocked === true && scene.uiButtons.some((button) => button.text === 'Sign in'));
-  }, 'signed-out sign-in screen with a Sign in button');
-  const point = await signInPage.evaluate(() => {
-    const game = window.__MAZER_GAME__;
-    const scene = game.scene.getScene('MenuScene');
-    const button = scene.uiButtons.find((candidate) => candidate.text === 'Sign in');
-    const rect = game.canvas.getBoundingClientRect();
-    return {
-      x: rect.left + (button.bounds.centerX * rect.width) / game.scale.gameSize.width,
-      y: rect.top + (button.bounds.centerY * rect.height) / game.scale.gameSize.height
-    };
-  });
-  const clickedAt = Date.now();
-  await signInPage.mouse.click(point.x, point.y);
   const outcome = await pollPage(signInPage, () => {
     const scene = window.__MAZER_GAME__?.scene.getScene('MenuScene');
     const code = scene?.authSnapshot?.errorCode ?? null;
-    return code ? { code, message: scene.authSnapshot.error ?? null, submitting: scene.authSubmitting === true } : null;
-  }, 'a sign-in failure code', { timeoutMs: 15_000 });
-  const elapsedMs = Date.now() - clickedAt;
+    return scene && scene.authGateLocked === true && code
+      ? { code, message: scene.authSnapshot.error ?? null, submitting: scene.authSubmitting === true }
+      : null;
+  }, 'the fallback sign-in screen holding a sign-in failure code', { timeoutMs: 20_000 });
+  const elapsedMs = Date.now() - launchedAt;
   const onScreen = await pollPage(signInPage, (message) => {
     const scene = window.__MAZER_GAME__?.scene.getScene('MenuScene');
     const texts = [...(scene?.uiTexts ?? []), ...(scene?.playerMessageToastTexts ?? [])];
@@ -513,22 +503,26 @@ const runOfflineColdLaunchAndSignIn = async ({ session, server, checks, findings
   }, 'the failure line drawn on the canvas', { arg: PROVIDER_UNREACHABLE_MESSAGE, timeoutMs: 5000 }).then(() => true, () => false);
   const stillUsable = await signInPage.evaluate(() => {
     const scene = window.__MAZER_GAME__?.scene.getScene('MenuScene');
-    return { submitting: scene.authSubmitting === true, url: window.location.href };
+    return {
+      hasSignInButton: scene.uiButtons.some((button) => button.text === 'Sign in' || button.text === 'Try again'),
+      submitting: scene.authSubmitting === true,
+      url: window.location.href
+    };
   });
   checks.push(makeCheck('offline-sign-in-shows-provider-unreachable', outcome.code === 'provider_unreachable' && outcome.message === PROVIDER_UNREACHABLE_MESSAGE && onScreen,
-    `errorCode=${outcome.code} message=${JSON.stringify(outcome.message)} drawnOnCanvas=${onScreen}`));
-  checks.push(makeCheck('offline-sign-in-does-not-hang-or-navigate', elapsedMs < 6000 && stillUsable.submitting === false && stillUsable.url.startsWith(origin),
-    `failure shown ${elapsedMs} ms after the click; authSubmitting=${stillUsable.submitting}; still on ${new URL(stillUsable.url).origin}`));
+    `signed-out cold launch, no tap: errorCode=${outcome.code} message=${JSON.stringify(outcome.message)} drawnOnCanvas=${onScreen}`));
+  checks.push(makeCheck('offline-sign-in-does-not-hang-or-navigate', elapsedMs < 20_000 && stillUsable.submitting === false && stillUsable.hasSignInButton && stillUsable.url.startsWith(origin),
+    `fallback screen with the failure line ${elapsedMs} ms after the launch; authSubmitting=${stillUsable.submitting}; retry control present=${stillUsable.hasSignInButton}; still on ${new URL(stillUsable.url).origin}`));
   const unexpectedAttempts = findUnexpectedNetworkAttempts(server.state.hits.slice(hitsBefore).map((hit) => hit.path));
   const requests = [...log.inPhase('offline-cold-launch-play-route'), ...log.inPhase('offline-sign-in')];
   const evaluation = evaluateOfflineRequests(requests, origin);
   checks.push(makeCheck('offline-cold-launch-no-failed-app-requests', evaluation.pass && unexpectedAttempts.length === 0,
     `app requests=${evaluation.appRequests} (service worker: ${evaluation.appServedFromServiceWorker}); failures=${JSON.stringify(evaluation.appFailures)}; unexpected external=${JSON.stringify(evaluation.unexpectedExternal)}; network attempts that were not service-worker background fetches=${JSON.stringify(unexpectedAttempts)}`));
-  evidence.offlineSignIn = { errorCode: outcome.code, message: outcome.message, millisecondsToFailureLine: elapsedMs };
+  evidence.offlineSignIn = { errorCode: outcome.code, message: outcome.message, millisecondsToFailureLine: elapsedMs, tappedSignIn: false };
   evidence.offlineColdLaunch = { appRequests: evaluation.appRequests, appServedFromServiceWorker: evaluation.appServedFromServiceWorker, appFailures: evaluation.appFailures, allowedExternalFailures: evaluation.allowedExternal.length };
   await signInPage.close();
   if (!findings.some((line) => line.includes('Sign in'))) {
-    findings.push('Signed out and offline, Sign in stays on the sign-in screen and shows "Sign-in is unavailable right now. Try again in a few minutes." (provider_unreachable) within a second; the sign-in gate stays locked for a signed-out visitor, so a first-time visitor with no saved session cannot play offline (the proof reaches level 1 offline through the QA fixture/preview routes, not through a real saved session).');
+    findings.push('Signed out and offline, the launch itself tries the hand-off to the account host (MAZER-ACCT-040, no Sign in tap), stays on the Mazer fallback screen and shows "Sign-in is unavailable right now. Try again in a few minutes." (provider_unreachable); the sign-in gate stays locked for a signed-out visitor, so a first-time visitor with no saved session cannot play offline (the proof reaches level 1 offline through the QA fixture/preview routes, not through a real saved session).');
   }
 };
 
@@ -721,7 +715,7 @@ const main = async () => {
     const session = await runOnlineFirstLoad({ browser, server, distA, checks, findings, evidence });
     log('2. Offline reload, level 1, movement ...');
     await runOfflineReloadAndPlay({ session, server, checks, findings, evidence });
-    log('3. Offline cold launch + Sign in ...');
+    log('3. Offline cold launch + signed-out launch (auto hand-off refused) ...');
     await runOfflineColdLaunchAndSignIn({ session, server, checks, findings, evidence });
     await session.context.close();
     log('4. New build while a session is running ...');

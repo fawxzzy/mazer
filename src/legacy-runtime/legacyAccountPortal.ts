@@ -1382,6 +1382,16 @@ export const consumeMazerOAuthCallback = async (
 
 export const readMazerOAuthBootResult = (): MazerOAuthBootResult => mazerOAuthBootResult;
 
+/**
+ * MAZER-ACCT-040: the boot-time automatic hand-off failed before leaving the
+ * page (account service down, offline, storage blocked). The scene reads the
+ * boot result for its held failure line, exactly as for a callback failure.
+ * Never overwrites a callback outcome: only called when no callback was present.
+ */
+export const recordMazerOAuthBootFailure = (category: MazerOAuthFailureCategory): void => {
+  mazerOAuthBootResult = failed(category);
+};
+
 export const installMazerOAuthPageShowRecovery = (
   lifecycle: MazerOAuthPageLifecycle,
   recover: () => void
