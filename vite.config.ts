@@ -71,6 +71,20 @@ export default defineConfig({
             urlPattern: ({ url }) => url.origin === 'https://bxtcuhkotumitoqtrcej.supabase.co'
               && url.pathname === '/auth/v1/oauth/token',
             handler: 'NetworkOnly'
+          },
+          {
+            // BootScene preloads the HUD icons and the tile-font atlas on every boot, but they are
+            // deliberately NOT precached (boot-payload-budget.test.ts keeps raster art out of the
+            // install download). Without this entry an offline launch fails those loads
+            // (MAZER-PWA-004, scripts/analysis/verify-offline-shell.mjs). They are cached the first
+            // time a controlled page boots online and revalidated in the background afterwards.
+            urlPattern: ({ url }) => url.origin === self.location.origin
+              && (url.pathname.startsWith('/assets/hud/') || url.pathname.startsWith('/fonts/mazer-tile-font/')),
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'mazer-boot-art-v1',
+              expiration: { maxEntries: 16 }
+            }
           }
         ],
         skipWaiting: true,
