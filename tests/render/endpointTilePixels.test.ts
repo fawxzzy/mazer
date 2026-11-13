@@ -200,23 +200,25 @@ describe.each(WHOLE_GLYPH_TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, 
       ...(['goal'] as const).map((kind) => ({ kind, direction: 'right' as StartDirection })),
       ...START_DIRECTIONS.map((direction) => ({ kind: 'start' as const, direction }))
     ];
-    // The play arrow is centred by its bounding box. The goal STAR is not: since MAZER-VIS-034 its centre of mass (not
-    // its bounding box) goes on the tile's painted-interior centre, which tests/render/endpointOpticalCentre.test.ts pins.
-    const boxCentredCases = cases.filter((c) => c.kind === 'start');
+    // The play arrow is NOT centred by its bounding box either (MAZER-VIS-036): like the goal star (MAZER-VIS-034) its
+    // painted centroid goes on the tile's painted-interior centre. tests/render/endpointOpticalCentre.test.ts and
+    // startArrowOpticalCentre.test.ts pin the centroid over the full matrix; here the arrow's centroid is checked on
+    // this suite's cells and tile sizes (down to 6.4 css px, where the glyph is fitted small).
+    const arrowCases = cases.filter((c) => c.kind === 'start');
 
-    test.each(boxCentredCases)('$kind ($direction): bbox centre within 0.5 device px of the tile centre', ({ kind, direction }) => {
+    test.each(arrowCases)('$kind ($direction): painted centroid within 0.5 device px of the painted-interior centre', ({ kind, direction }) => {
       for (const cell of cells) {
+        const input = inputFor(tileSize, dpr, cell);
+        const layout = computeBoardTileLayout(input);
+        const tile = computeChipTileAt(input, cell)!;
         const r = render(tileSize, dpr, cell, kind, direction);
         const changed = changedPixels(r);
         expect(changed.length).toBeGreaterThan(0);
-        const xs = changed.map((px) => px.x);
-        const ys = changed.map((px) => px.y);
-        const bx = (Math.min(...xs) + Math.max(...xs) + 1) / 2;
-        const by = (Math.min(...ys) + Math.max(...ys) + 1) / 2;
-        const tx = (r.rect.x0 + r.rect.x1 + 1) / 2;
-        const ty = (r.rect.y0 + r.rect.y1 + 1) / 2;
-        expect(Math.abs(bx - tx), `x centre offset, ${kind} ${direction} cell ${cell.x},${cell.y}`).toBeLessThanOrEqual(0.5);
-        expect(Math.abs(by - ty), `y centre offset, ${kind} ${direction} cell ${cell.x},${cell.y}`).toBeLessThanOrEqual(0.5);
+        const cx = changed.reduce((n, px) => n + px.x + 0.5, 0) / changed.length;
+        const cy = changed.reduce((n, px) => n + px.y + 0.5, 0) / changed.length;
+        const target = resolveGoalStarCentre(tile);
+        expect(Math.abs(cx - ((layout.originX + target.x) * dpr)), `x centroid offset, ${kind} ${direction} cell ${cell.x},${cell.y}`).toBeLessThanOrEqual(0.5);
+        expect(Math.abs(cy - ((layout.originY + target.y) * dpr)), `y centroid offset, ${kind} ${direction} cell ${cell.x},${cell.y}`).toBeLessThanOrEqual(0.5);
       }
     });
 
@@ -248,7 +250,7 @@ describe.each([[14.72, 3], [25.44, 2], [10, 3]] as const)('start arrow direction
     direction === 'right' ? px.dx : direction === 'left' ? -px.dx : direction === 'down' ? px.dy : -px.dy
   );
 
-  test.each(START_DIRECTIONS)('the arrow points %s: its apex is ahead of the centre, its flat back behind it, and the box is centred', (direction) => {
+  test.each(START_DIRECTIONS)('the arrow points %s: its apex is ahead of the centre, its flat back behind it, and the apex leans forward', (direction) => {
     const r = render(tileSize, dpr, cell, 'start', direction);
     const gold = changedPixels(r).filter((px) => same(px.color, GLYPH_COLORS.start));
     expect(gold.length).toBeGreaterThan(4);
@@ -256,11 +258,9 @@ describe.each([[14.72, 3], [25.44, 2], [10, 3]] as const)('start arrow direction
     const behind = gold.filter((px) => along(direction, px) < 0).length;
     const maxAhead = Math.max(...gold.map((px) => along(direction, px)));
     const maxBehind = -Math.min(...gold.map((px) => along(direction, px)));
-    // the glyph's BOUNDING BOX is centred (not its centroid): apex and flat back are the same distance from the
-    // centre, within a device pixel of rasterisation
-    expect(Math.abs(maxAhead - maxBehind)).toBeLessThanOrEqual(1);
-    // the apex is a point, the back is the full base: more filled mass behind the centre than ahead of it
-    expect(behind).toBeGreaterThan(ahead);
+    // the glyph's CENTROID is on the centre (MAZER-VIS-036), not its bounding box: the apex reaches further ahead of the
+    // centre than the flat back sits behind it (a triangle is heavy at its base, so the point leans forward)
+    expect(maxAhead).toBeGreaterThan(maxBehind);
   });
 
   test('the four directions are four distinct renderings', () => {
