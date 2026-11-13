@@ -2,6 +2,7 @@
 // No file system, no git, no clock: the same events and the same inputs always produce the same outputs.
 // Process, event format and trigger policy: docs/ops/MAZER-BOARD-SYNC-PROCESS.md.
 import crypto from "node:crypto";
+import { screenProblems } from "./public-text-screens.mjs";
 
 export const EVENT_VERSION = 1;
 export const STATUSES = ["active", "in_progress", "planning", "review", "blocked", "completed", "deferred_candidate"];
@@ -14,12 +15,14 @@ export const LANES = ["agent-buildable", "long-running", "owner-only"];
 export const CARD_ID = /^MAZER-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$/;
 export const MAX_TEXT = 700;
 export const MAX_TITLE = 90;
+export const MAX_DESCRIPTION = 1500;
+export const MIN_CRITERIA = 3;
 // Generated lines in a card description. Only the newest few stay in the card; every event stays in the archive.
 export const KEEP_UPDATE_LINES = 3;
 export const UPDATE_MARKER = "Board update ";
 const UPDATE_LINE = /(?:^| )Board update \d{4}-\d{2}-\d{2}: .*?(?= Board update \d{4}-\d{2}-\d{2}: |$)/gs;
 
-const ALLOWED_KEYS = new Set(["v", "id", "ts", "card", "status", "text", "title", "new", "evidence", "blocker", "verify", "note", "lane", "reopen", "by"]);
+const ALLOWED_KEYS = new Set(["v", "id", "ts", "card", "status", "text", "title", "description", "acceptanceCriteria", "new", "evidence", "blocker", "verify", "note", "lane", "reopen", "by"]);
 const EVIDENCE_KEYS = new Set(["prs", "deployedBuild", "headless", "deviceChecked", "checkedOn"]);
 const NEW_KEYS = new Set(["title", "description", "cardType", "priority", "dependencies", "acceptanceCriteria"]);
 
@@ -78,7 +81,15 @@ function textProblems(label, value, max) {
   if (URL_OR_PATH.test(value)) out.push(`${label} must not contain a URL or a file path (public board text)`);
   if (EMAIL.test(value)) out.push(`${label} must not contain an email address`);
   if (value.includes(UPDATE_MARKER)) out.push(`${label} must not contain "${UPDATE_MARKER.trim()}" (reserved for generated lines)`);
+  // The same nine screens as tests/project-board-owner-export.test.mjs, so a string that would fail the exported
+  // board is refused here, before it is written to the events branch and again whenever it is folded or checked.
+  out.push(...screenProblems(label, value));
   return out;
+}
+
+function criteriaProblems(label, list) {
+  if (!Array.isArray(list) || list.length < MIN_CRITERIA) return [`${label} needs at least ${MIN_CRITERIA} entries (exporter rule)`];
+  return list.flatMap((c) => textProblems(`${label}[]`, c, 400));
 }
 
 /** Shape-only validation of one event line (no registry needed). */
@@ -91,6 +102,15 @@ export function validateEventShape(event) {
   if (event.status !== undefined && !STATUSES.includes(event.status)) errors.push(`status must be one of ${STATUSES.join(", ")} ("archived" is refused)`);
   errors.push(...textProblems("text", event.text, MAX_TEXT));
   if (event.title !== undefined) errors.push(...textProblems("title", event.title, MAX_TITLE));
+  // Corrective fields for an EXISTING card (a card being created uses new.description / new.acceptanceCriteria).
+  if (event.description !== undefined) {
+    if (event.new !== undefined) errors.push("description replaces an existing card's description; a new card uses new.description");
+    errors.push(...textProblems("description", event.description, MAX_DESCRIPTION));
+  }
+  if (event.acceptanceCriteria !== undefined) {
+    if (event.new !== undefined) errors.push("acceptanceCriteria replaces an existing card's criteria; a new card uses new.acceptanceCriteria");
+    errors.push(...criteriaProblems("acceptanceCriteria", event.acceptanceCriteria));
+  }
   if (event.note !== undefined && event.note !== null) errors.push(...textProblems("note", event.note, 300));
   if (event.lane !== undefined && event.lane !== null && !LANES.includes(event.lane)) errors.push(`lane must be one of ${LANES.join(", ")}`);
   if (event.evidence !== undefined) {
@@ -107,6 +127,7 @@ export function validateEventShape(event) {
         }
       }
       if (ev.deployedBuild !== undefined && !(typeof ev.deployedBuild === "string" && /^[A-Za-z0-9._-]{4,80}$/.test(ev.deployedBuild))) errors.push("evidence.deployedBuild must be a build name or sha (letters, digits, . _ -)");
+      else if (ev.deployedBuild !== undefined) errors.push(...screenProblems("evidence.deployedBuild", ev.deployedBuild));
       if (ev.headless !== undefined && typeof ev.headless !== "boolean") errors.push("evidence.headless must be boolean");
       if (ev.deviceChecked !== undefined && ev.deviceChecked !== null && typeof ev.deviceChecked !== "boolean") errors.push("evidence.deviceChecked must be boolean or null");
       if (ev.deviceChecked === true) errors.push(...(typeof ev.checkedOn === "string" ? textProblems("evidence.checkedOn", ev.checkedOn, 120) : ["evidence.checkedOn (what device and build) is required when deviceChecked is true"]));
@@ -124,6 +145,7 @@ export function validateEventShape(event) {
     else for (const s of event.verify) {
       if (!VERIFY_WHERE.includes(s?.where)) errors.push(`verify[].where must be one of ${VERIFY_WHERE.join(", ")}`);
       if (!s?.step || !s?.expected) errors.push("verify[] needs step and expected");
+      else for (const f of ["step", "expected"]) errors.push(...textProblems(`verify[].${f}`, s[f], 400));
     }
   }
   if (event.new !== undefined) {
@@ -132,12 +154,11 @@ export function validateEventShape(event) {
     else {
       for (const key of Object.keys(n)) if (!NEW_KEYS.has(key)) errors.push(`new has unknown field "${key}"`);
       errors.push(...textProblems("new.title", n.title, MAX_TITLE));
-      errors.push(...textProblems("new.description", n.description, 1500));
+      errors.push(...textProblems("new.description", n.description, MAX_DESCRIPTION));
       if (!CARD_TYPES.includes(n.cardType)) errors.push(`new.cardType must be one of ${CARD_TYPES.join(", ")}`);
       if (!PRIORITIES.includes(n.priority ?? null)) errors.push("new.priority must be critical, high, medium, low or null");
       if (!Array.isArray(n.dependencies ?? [])) errors.push("new.dependencies must be an array of card ids");
-      if (!Array.isArray(n.acceptanceCriteria) || n.acceptanceCriteria.length < 3) errors.push("new.acceptanceCriteria needs at least 3 entries (exporter rule)");
-      else for (const c of n.acceptanceCriteria) errors.push(...textProblems("new.acceptanceCriteria[]", c, 400));
+      errors.push(...criteriaProblems("new.acceptanceCriteria", n.acceptanceCriteria));
     }
   }
   return errors;
@@ -282,6 +303,10 @@ export function foldEvents({ registry: registryIn, ledger: ledgerIn, events, app
     const next = { ...card };
     if (event.status) next.status = event.status;
     if (event.title) next.title = event.title;
+    // Corrective replacement of published text (events are append-only, so a bad description is fixed by a new event).
+    // `description` replaces the whole description, earlier generated lines included (they stay in the archive).
+    if (event.description !== undefined) next.description = event.description.trim();
+    if (event.acceptanceCriteria !== undefined) next.acceptanceCriteria = event.acceptanceCriteria.map((c) => c.trim());
     if (event.evidence) entry.evidence = mergeEvidence(entry.evidence, event.evidence);
     if (event.blocker !== undefined) entry.blocker = event.blocker === null ? null : { ...event.blocker };
     if (event.verify !== undefined) entry.verify = event.verify.map((s) => ({ ...s }));
@@ -297,7 +322,10 @@ export function foldEvents({ registry: registryIn, ledger: ledgerIn, events, app
     if (card.updatedAt && normalizeTs(event.ts) < card.updatedAt && !creating) warnings.push(`${where(item)} ${event.card}: event is older than the card's updatedAt (${card.updatedAt}); applied anyway`);
     if (problems.length) { errors.push(...problems.map((p) => `${where(item)} ${p.startsWith(event.card) ? p : `${event.card}: ${p}`}`)); continue; }
 
-    if (!creating) next.description = appendUpdateLine(card.description, renderUpdateLine(event, entry.evidence, Boolean(event.evidence)));
+    if (!creating) next.description = appendUpdateLine(next.description, renderUpdateLine(event, entry.evidence, Boolean(event.evidence)));
+    // Second screen, on the card text exactly as it would be published (title, and description with the generated line).
+    const published = [...screenProblems("resulting title", next.title), ...screenProblems("resulting description", next.description)];
+    if (published.length) { errors.push(...published.map((p) => `${where(item)} ${event.card}: ${p}`)); continue; }
     next.updatedAt = normalizeTs(event.ts);
     if (creating) { registry.workItems.push(next); byId.set(next.id, next); }
     else { Object.assign(card, next); }

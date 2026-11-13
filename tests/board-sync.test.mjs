@@ -13,6 +13,7 @@ import {
 } from "../scripts/board/board-sync.mjs";
 import { repinWeb, WEB_NEXT_COMMANDS } from "../scripts/board/web-repin.mjs";
 import { renderOutputs } from "../scripts/analysis/work-report.mjs";
+import { PUBLIC_TEXT_SCREENS, screenMatches } from "../scripts/board/public-text-screens.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const M = "fawxzzy/mazer";
@@ -232,9 +233,174 @@ test("an event the exporter rejects aborts apply before anything is written", ()
   const before = fs.readFileSync(path.join(dir, "config/mazer-owner-work-registry.json"), "utf8");
   const lines = [];
   assert.equal(runBoardSync(["apply", "--events", file], dir, (l) => lines.push(l)), 2);
-  assert.match(lines.join("\n"), /owner export rejected/);
+  assert.match(lines.join("\n"), /"secret or credential word" screen: "password"/);
   assert.equal(fs.readFileSync(path.join(dir, "config/mazer-owner-work-registry.json"), "utf8"), before);
+  assert.equal(fs.existsSync(path.join(dir, "config/mazer-board-events.jsonl")), false);
 });
+
+// ---- public-text screens (shared with tests/project-board-owner-export.test.mjs) ---------------------------------------------
+
+const OK_NEW = { title: "Fine title", description: "Plain description of the work.", cardType: "feature", priority: "low", dependencies: [], acceptanceCriteria: ["one thing", "two things", "three things"] };
+const SAMPLES = {
+  "url": "see https://example.test/page",
+  "drive or backslash path": "kept in C:\\work\\notes",
+  "relative or home path": "see scripts/board/helper for details",
+  "file name": "edit board-sync.mjs first",
+  "long token-like run": `value ${"a1B2".repeat(9)} appeared`,
+  "secret or credential word": "rotate the api key",
+  "security finding word": "a security note",
+  "money word": "add a paywall",
+  "personal data word": "needs a phone number",
+};
+
+test("one shared screen list: nine screens, imported by the export test and by board-sync", () => {
+  assert.deepEqual(PUBLIC_TEXT_SCREENS.map(([name]) => name), Object.keys(SAMPLES));
+  const exportTest = fs.readFileSync(path.join(repoRoot, "tests/project-board-owner-export.test.mjs"), "utf8");
+  assert.match(exportTest, /from "\.\.\/scripts\/board\/public-text-screens\.mjs"/);
+  assert.doesNotMatch(exportTest, /const screens = \[/, "the export test must not carry its own copy of the screens");
+  const events = fs.readFileSync(path.join(repoRoot, "scripts/board/board-events.mjs"), "utf8");
+  assert.match(events, /from "\.\/public-text-screens\.mjs"/);
+  for (const [name, sample] of Object.entries(SAMPLES)) assert.ok(screenMatches(sample).some((m) => m.screen === name), `${name} matches its sample`);
+  assert.deepEqual(screenMatches("A plain sentence about the maze board and the tiles."), []);
+});
+
+test("every event-settable published string is screened, naming the screen and the substring", () => {
+  const ok = { v: 1, ts: "2026-11-13T00:00:00Z", card: "MAZER-A-001", text: "fine" };
+  const bad = "see scripts/board/board-sync for it";
+  const cases = {
+    "text": { text: bad },
+    "title": { title: bad },
+    "description": { description: bad },
+    "acceptanceCriteria[]": { acceptanceCriteria: ["a fine one", bad, "another fine one"] },
+    "note": { note: bad },
+    "blocker.summary": { status: "blocked", blocker: { kind: "owner-decision", unblockedBy: "Zac", summary: bad, ask: "Pick." } },
+    "blocker.ask": { status: "blocked", blocker: { kind: "owner-decision", unblockedBy: "Zac", summary: "Needs a call.", ask: bad } },
+    "blocker.recommendation": { status: "blocked", blocker: { kind: "owner-decision", unblockedBy: "Zac", summary: "Needs a call.", ask: "Pick.", recommendation: bad } },
+    "verify[].step": { verify: [{ where: "phone", step: bad, expected: "fine" }] },
+    "verify[].expected": { verify: [{ where: "phone", step: "fine", expected: bad }] },
+    "evidence.checkedOn": { evidence: { deviceChecked: true, checkedOn: bad } },
+    "evidence.deployedBuild": { evidence: { deployedBuild: "build.json" } },
+    "new.title": { new: { ...OK_NEW, title: bad } },
+    "new.description": { new: { ...OK_NEW, description: bad } },
+    "new.acceptanceCriteria[]": { new: { ...OK_NEW, acceptanceCriteria: ["a fine one", bad, "another fine one"] } },
+  };
+  for (const [field, extra] of Object.entries(cases)) {
+    const problems = validateEventShape({ ...ok, ...extra }).filter((p) => p.includes("public-text"));
+    assert.ok(problems.some((p) => p.startsWith(field)), `${field} is screened: ${problems.join(" | ")}`);
+  }
+  const named = validateEventShape({ ...ok, text: bad }).find((p) => p.includes("public-text"));
+  assert.match(named, /text fails the public-text "relative or home path" screen: "scripts\/board"/);
+});
+
+test("the GOV-010 shape: a path and the word agent in a new-card description are refused at event time", () => {
+  const description = "Build the tool in scripts/board/board-sync and let each agent record one line.";
+  const event = { v: 1, ts: "2026-11-13T00:00:00Z", card: "MAZER-GOV-010", text: "x", status: "planning", new: { ...OK_NEW, description } };
+  const problems = validateEventShape(event);
+  assert.match(problems.join("\n"), /new\.description fails the public-text "relative or home path" screen: "scripts\/board"/);
+});
+
+test("event is rejected before anything reaches the events branch or the local fallback", () => {
+  const { work } = gitRepoWithRemote();
+  const bad = { v: 1, ts: "2026-12-01T10:00:00Z", card: "MAZER-A-001", text: "mentions sw.js in the text" };
+  assert.throws(() => appendEvent(work, bad), /file name" screen: "sw\.js"/);
+  assert.equal(readRemoteEvents(work), "", "nothing was pushed");
+  assert.equal(fs.existsSync(localFallbackPath(work)), false, "nothing was queued offline either");
+  assert.throws(() => runBoardSync(["event", "--card", "MAZER-A-001", "--text", "edit scripts/board/x now"], work, () => {}), /event rejected/);
+});
+
+test("plan, apply and check refuse screened text and write nothing", () => {
+  const dir = scratchRepo();
+  const reg = JSON.parse(fs.readFileSync(path.join(dir, "config/mazer-owner-work-registry.json"), "utf8"));
+  const id = reg.workItems[0].id;
+  const file = path.join(dir, "events.jsonl");
+  // A recorded line that predates the screens (or came from a hand-edited branch) is caught at fold time too.
+  fs.writeFileSync(file, `${canonicalJson(base("2026-12-01T10:00:00Z", id, { text: "the tool lives in scripts/board/board-sync here" }))}\n`);
+  const before = fs.readFileSync(path.join(dir, "config/mazer-owner-work-registry.json"), "utf8");
+  for (const command of ["plan", "apply"]) {
+    const lines = [];
+    assert.equal(runBoardSync([command, "--events", file], dir, (l) => lines.push(l)), 2, command);
+    assert.match(lines.join("\n"), /REFUSED/);
+    assert.match(lines.join("\n"), /"relative or home path" screen: "scripts\/board"/);
+  }
+  assert.equal(fs.readFileSync(path.join(dir, "config/mazer-owner-work-registry.json"), "utf8"), before);
+  assert.equal(fs.existsSync(path.join(dir, "config/mazer-board-events.jsonl")), false);
+
+  // check flags a registry card whose published title or description fails a screen
+  const dirty = JSON.parse(before);
+  dirty.workItems[0].description += " Details live in scripts/board/board-sync.";
+  fs.writeFileSync(path.join(dir, "config/mazer-owner-work-registry.json"), serializeJson(dirty, before));
+  const checked = checkIntegrity(dir).errors.join("\n");
+  assert.match(checked, new RegExp(`${id} description fails the public-text "relative or home path" screen`));
+});
+
+test("the generated update line is screened too (the folded text, not only the event fields)", () => {
+  const reg = registry([card("MAZER-A-001", "planning", { title: "Title with notes.md inside" })]);
+  const r = fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-A-001", { text: "Unrelated plain update." })]);
+  assert.match(r.errors.join("\n"), /MAZER-A-001: resulting title fails the public-text "file name" screen: "notes\.md"/);
+  assert.equal(r.applied.length, 0);
+});
+
+// ---- corrective description / acceptanceCriteria for an existing card -------------------------------------------------------------
+
+test("a corrective event replaces an existing card's description and criteria (3 or more), then appends its own update line", () => {
+  const reg = registry([card("MAZER-A-001", "planning", { description: "Old text. Board update 2026-11-02: earlier line." })]);
+  const fixed = fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-A-001", {
+    text: "Corrected the published wording.",
+    description: "Corrected description in plain words.",
+    acceptanceCriteria: ["first criterion", "second criterion", "third criterion", "fourth criterion"],
+  })]);
+  assert.deepEqual(fixed.errors, []);
+  const c = fixed.registry.workItems[0];
+  assert.equal(c.description, "Corrected description in plain words. Board update 2026-11-13: Corrected the published wording.");
+  assert.deepEqual(c.acceptanceCriteria, ["first criterion", "second criterion", "third criterion", "fourth criterion"]);
+  assert.equal(c.status, "planning", "status is untouched when the event sets none");
+
+  const only = fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-A-001", { description: "Only the description changes." })]);
+  assert.deepEqual(only.errors, []);
+  assert.deepEqual(only.registry.workItems[0].acceptanceCriteria, ["a", "b", "c"]);
+
+  assert.match(fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-A-001", { acceptanceCriteria: ["x", "y"] })]).errors.join(), /acceptanceCriteria needs at least 3/);
+  assert.match(fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-A-001", { description: "see scripts/board/x" })]).errors.join(), /description fails the public-text "relative or home path"/);
+  assert.match(fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-A-001", { description: "x".repeat(1501) })]).errors.join(), /description is 1501 chars/);
+  assert.match(fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-B-001", { new: OK_NEW, description: "no" })]).errors.join(), /new card uses new\.description/);
+  assert.match(fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-B-001", { new: OK_NEW, acceptanceCriteria: ["a", "b", "c"] })]).errors.join(), /new card uses new\.acceptanceCriteria/);
+});
+
+test("a corrective event goes through the pipeline: a published description is repaired by a later sync", () => {
+  const dir = scratchRepo();
+  const reg = JSON.parse(fs.readFileSync(path.join(dir, "config/mazer-owner-work-registry.json"), "utf8"));
+  const id = reg.workItems[0].id;
+  const file = path.join(dir, "fix.jsonl");
+  fs.writeFileSync(file, `${canonicalJson(base("2026-12-01T10:00:00Z", id, { text: "Wording corrected.", description: "A clean replacement description." }))}\n`);
+  assert.equal(runBoardSync(["apply", "--events", file], dir, () => {}), 0);
+  const after = JSON.parse(fs.readFileSync(path.join(dir, "config/mazer-owner-work-registry.json"), "utf8"));
+  assert.equal(after.workItems[0].description, "A clean replacement description. Board update 2026-12-01: Wording corrected.");
+  assert.deepEqual(checkIntegrity(dir).errors, []);
+  const exported = JSON.parse(fs.readFileSync(path.join(dir, "exports/mazer.project-board.owner-export.v1.json"), "utf8"));
+  assert.match(exported.cards.find((x) => x.record.card_id === id).content.summary, /A clean replacement description/);
+});
+
+test("status after an apply prints the last-sync form of the marker (scratch copy)", () => {
+  const dir = scratchRepo();
+  const reg = JSON.parse(fs.readFileSync(path.join(dir, "config/mazer-owner-work-registry.json"), "utf8"));
+  const target = reg.workItems.find((c) => c.status === "review").id;
+  const first = demoEvents(dir, target);
+  assert.equal(runBoardSync(["apply", "--events", first], dir, () => {}), 0);
+  const second = path.join(dir, "second.jsonl");
+  const later = base("2026-12-02T10:00:00Z", target, { text: "One more plain line." });
+  fs.writeFileSync(second, `${fs.readFileSync(first, "utf8")}${canonicalJson(later)}\n`);
+  const lines = [];
+  assert.equal(runBoardSync(["status", "--events", second], dir, (l) => lines.push(l)), 0);
+  assert.match(lines[0], /^Board as of 2026-12-01 \(last sync 2026-12-01, 2 events applied in total\), 1 pending event,/);
+  const status = computeStatus(dir, { eventFiles: [second] }, Date.parse("2026-12-03T10:00:00Z"));
+  assert.equal(status.pending, 1);
+  assert.equal(status.lastSync.slice(0, 10), "2026-12-01");
+  assert.match(status.line, new RegExp(`^${MARKER_HEAD}, 1 pending event, oldest 1 d\\. Not due\\.`));
+});
+
+// Both forms of the marker: before the first apply (no sync yet) and after one ("last sync <date>, N events applied in total").
+const MARKER_HEAD = String.raw`Board as of \d{4}-\d{2}-\d{2}(?: \(last sync \d{4}-\d{2}-\d{2}, \d+ events applied in total\))?`;
+const STATUS_MARKER_TWO_PENDING = new RegExp(`^${MARKER_HEAD}, 2 pending events, oldest 1 d\\. Not due\\.`);
 
 test("status prints the honest marker and exits 3 under --due when nothing is due", () => {
   const dir = scratchRepo();
@@ -243,7 +409,7 @@ test("status prints the honest marker and exits 3 under --due when nothing is du
   const status = computeStatus(dir, { eventFiles: [events] }, Date.parse("2026-12-02T10:00:00Z"));
   assert.equal(status.pending, 2);
   assert.equal(status.due, false);
-  assert.match(status.line, /Board as of 2026-11-\d\d, 2 pending events, oldest 1 d\. Not due\./);
+  assert.match(status.line, STATUS_MARKER_TWO_PENDING);
   const late = computeStatus(dir, { eventFiles: [events] }, Date.parse("2026-12-20T00:00:00Z"));
   assert.equal(late.due, true);
   assert.equal(runBoardSync(["status", "--due", "--max-days", "100000", "--max-events", "1000", "--events", events], dir, () => {}), 3);
