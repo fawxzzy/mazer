@@ -875,12 +875,36 @@ const parseViewport = (value) => {
   };
 };
 
+// MAZER-MOTION-002: a real tap starts a short eased cover (Start, overlay open/close). Every capture or assertion that
+// follows a real tap waits for it to finish, deterministically through the QA hook, instead of sleeping or relaxing a check.
+// Without the QA surface (runtimeDiagnostics off) there is nothing to read, so this returns at once.
+export const waitOutUiTransition = async (page, timeoutMs = 3000) => {
+  try {
+    // Phaser takes the pointer event on its next game step, so let two frames pass before reading the flag.
+    await page.evaluate(() => new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve(undefined)));
+    }));
+    await page.waitForFunction(
+      () => window.__MAZER_QA__?.isUiTransitionActive?.() !== true,
+      null,
+      { timeout: timeoutMs }
+    );
+  } catch (error) {
+    // A tap that hands off to another page (the Account button navigates to the portal) destroys the execution
+    // context mid-wait: that is the hand-off working, not a cover left on screen, so it is not an error here.
+    if (!/Execution context was destroyed|navigation/i.test(String(error?.message ?? error))) {
+      throw error;
+    }
+  }
+};
+
 export const clickPoint = async (page, point, label) => {
   if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
     throw new Error(`Missing click point for ${label}.`);
   }
 
   await page.mouse.click(point.x, point.y);
+  await waitOutUiTransition(page);
 };
 
 export const openOptionsOverlayViaQa = async (page, timeoutMs) => {

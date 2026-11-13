@@ -4,6 +4,7 @@ import {
   type LegacyPlayerMessage
 } from '../legacy-runtime/legacyPlayerMessage';
 import {
+  fadeOutMazerBootSplash,
   removeMazerBootSplash,
   resolveMazerBootSplashMessage,
   setMazerBootSplashMessage
@@ -76,8 +77,11 @@ export const markMazerBootStatus = (stage: MazerBootStage, errorMessage?: string
   // explicitly when the menu exists, when the install gate takes over, or when
   // boot fails (so an error is never hidden behind it).
   setMazerBootSplashMessage(resolveMazerBootSplashMessage(stage));
-  if (stage === 'splash-removed' || stage === 'error') {
+  if (stage === 'error') {
+    // An error must never sit behind a fading splash.
     removeMazerBootSplash();
+  } else if (stage === 'splash-removed') {
+    fadeOutMazerBootSplash();
   } else if (stage === 'menu-scene-create') {
     markMazerBootStatus('splash-removed');
   }

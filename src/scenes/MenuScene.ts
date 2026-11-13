@@ -41,6 +41,8 @@ import {
   type ReducedMotionSource
 } from '../render/reducedMotion';
 import { alignBoundsToWholePixels, alignCameraToWholePixels } from '../render/pixelAlignment';
+import { resolveUiLoaderPulse, resolveUiTransitionPlan, type UiTransitionKind } from '../render/uiTransition';
+import { UiTransitionGhost } from '../render/uiTransitionGhost';
 import { PlayerLocatorState } from '../render/playerLocator';
 import { stepTrailColourRedraw } from '../render/trailColourRedraw';
 import {
@@ -1296,6 +1298,8 @@ interface LegacyQaDiagnosticsApi {
   openPauseOverlay(): LegacyQaOverlayResult;
   startGuestPlayMode(): LegacyQaOverlayResult;
   startPlayMode(): LegacyQaOverlayResult;
+  /** True while the eased snapshot cover (MAZER-MOTION-002) is still fading; capture scripts wait it out. */
+  isUiTransitionActive(): boolean;
   // Wave 3A bridge QA surface -- calls the same live UiLegacyBridge instance
   // the real scene uses, not a test-only duplicate.
   getUiStateSnapshot(): UiStateSnapshot | null;
@@ -1640,6 +1644,16 @@ const smoothstep = (value: number): number => {
 };
 const legacyScenePointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
 
+// MAZER-MOTION-002: QA hooks that open an overlay or start play; they skip the eased snapshot cover.
+const QA_STATE_CHANGE_ENTRY_POINTS = [
+  'openSettingsOverlay',
+  'openOptionsOverlay',
+  'openPauseOverlay',
+  'startGuestPlayMode',
+  'startPlayMode',
+  'dispatchUiCommand'
+] as const;
+
 const createVisualRect = (left: number, top: number, width: number, height: number): VisualRect => ({
   left,
   top,
@@ -1693,6 +1707,9 @@ export class MenuScene extends Phaser.Scene {
   private guestPlayGranted = false;
   private authGateGraphics!: Phaser.GameObjects.Graphics;
   private playerMessageToastGraphics!: Phaser.GameObjects.Graphics;
+  // MAZER-MOTION-002: fading snapshot cover for Start / overlay open / overlay close (src/render/uiTransition.ts).
+  private uiTransitionGhost: UiTransitionGhost | null = null;
+  private uiTransitionSuppressed = false;
   private playerMessageToastTexts: Phaser.GameObjects.Text[] = [];
   private authGateLoadingText!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
@@ -2452,6 +2469,7 @@ export class MenuScene extends Phaser.Scene {
     this.playerSpawnBurstGraphics = this.add.graphics();
     this.spawnLaserGraphics = this.add.graphics();
     this.authGateGraphics = this.add.graphics();
+    this.uiTransitionGhost = new UiTransitionGhost(this, 'mazer-ui-transition-ghost', LEGACY_PLAYER_MESSAGE_TOAST_DEPTH - 1);
     this.playerMessageToastGraphics = this.add.graphics()
       .setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH)
       .setVisible(false);
@@ -2574,6 +2592,8 @@ export class MenuScene extends Phaser.Scene {
       this.installLegacyOfflineCompletionFlush();
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.uiTransitionGhost?.release();
+      this.uiTransitionGhost = null;
       // The CanvasTexture is registered in the game-level TextureManager,
       // which outlives this scene instance -- unlike a plain Graphics
       // object or Image (which Phaser destroys along with the scene), a
@@ -2805,6 +2825,25 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  private withoutUiTransition<T>(run: () => T): T {
+    const previous = this.uiTransitionSuppressed;
+    this.uiTransitionSuppressed = true;
+    try {
+      return run();
+    } finally {
+      this.uiTransitionSuppressed = previous;
+    }
+  }
+
+  // MAZER-MOTION-002: snapshot what is on screen, then ease it out over the already-final live scene. Never delays
+  // or moves anything live (taps act on the next frame as before); a no-op when there is nothing to copy.
+  private beginUiTransition(kind: UiTransitionKind): void {
+    if (this.uiTransitionSuppressed || !this.uiTransitionGhost) {
+      return;
+    }
+    this.uiTransitionGhost.begin(resolveUiTransitionPlan(kind, this.prefersLegacyReducedMotion()), this.time.now);
+  }
+
   private installLegacyQaDiagnosticsSurface(): void {
     if (!this.runtimeDiagnosticsConfig.enabled || typeof window === 'undefined') {
       return;
@@ -2817,6 +2856,7 @@ export class MenuScene extends Phaser.Scene {
       openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay(),
       startGuestPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartGuestPlayMode(),
       startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode(),
+      isUiTransitionActive: (): boolean => this.uiTransitionGhost?.active === true,
       getUiStateSnapshot: (): UiStateSnapshot | null => this.uiBridge?.getSnapshot() ?? null,
       getUiViewModels: (): UiViewModels | null => this.uiBridge?.getViewModels() ?? null,
       dispatchUiCommand: (command: unknown): UiLegacyBridgeDispatchResult => (
@@ -2835,6 +2875,12 @@ export class MenuScene extends Phaser.Scene {
       // null-returning shim so QA scripts that call it do not throw.
       getGameplayTransferPresentationDiagnostics: () => null
     };
+    // QA entry points that change state do it without the eased cover, so scripted captures stay deterministic.
+    const qa = window.__MAZER_QA__;
+    for (const name of QA_STATE_CHANGE_ENTRY_POINTS) {
+      const original = qa[name] as (...args: unknown[]) => unknown;
+      (qa as unknown as Record<string, unknown>)[name] = (...args: unknown[]) => this.withoutUiTransition(() => original(...args));
+    }
   }
 
   private detachLegacyQaDiagnosticsSurface(): void {
@@ -3226,6 +3272,7 @@ export class MenuScene extends Phaser.Scene {
     this.syncLegacyAuthOpeningTimeout(time);
     this.syncLegacyAuthGateLoadingScreen(time);
     this.recordRuntimeFrame(delta);
+    this.uiTransitionGhost?.update(time, delta);
     if (this.overlay === 'auth') {
       // Auth owns the full screen. The level announcer sits above the normal
       // overlay depth, so freezing simulation alone can strand its current
@@ -6857,6 +6904,9 @@ export class MenuScene extends Phaser.Scene {
   private startPlayMode(): void {
     if (!this.hasLegacyPlayAccess()) {
       return;
+    }
+    if (this.mode === 'menu') {
+      this.beginUiTransition('start');
     }
     this.resetLegacyPlayInputBuffer();
     this.resetLegacyPlayerTransferEnergy();
@@ -14993,6 +15043,10 @@ export class MenuScene extends Phaser.Scene {
       this.closeLeaderboardUsernameEditor();
     }
     this.quitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
+    // MAZER-MOTION-002: snapshot the screen as it is (the canvas holds the last frame until the next render).
+    if (kind !== previousOverlay) {
+      this.beginUiTransition('overlay-open');
+    }
     if (kind === 'pause') {
       this.pauseSettingsExpanded = false;
       this.previewLevelsExpanded = false;
@@ -15048,6 +15102,9 @@ export class MenuScene extends Phaser.Scene {
 
   private closeOverlay(): void {
     this.quitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
+    if (this.overlay !== 'none') {
+      this.beginUiTransition('overlay-close');
+    }
     this.orientationFlipOriginLandscape = null;
     this.settingsGuideOpen = false;
     this.overlayGuideBounds = null;
@@ -16011,7 +16068,7 @@ export class MenuScene extends Phaser.Scene {
     this.authGateGraphics.fillStyle(0x02080f, 0.96);
     this.authGateGraphics.fillRect(0, 0, width, height);
 
-    const pulse = this.prefersLegacyReducedMotion() ? 0.5 : 0.5 + (0.5 * Math.sin(time / 420));
+    const pulse = resolveUiLoaderPulse(time, this.prefersLegacyReducedMotion());
     const radius = 16 + (pulse * 4);
     this.authGateGraphics.fillStyle(cyberArcadeMaterial.signal.player, 0.82 + (pulse * 0.14));
     this.authGateGraphics.beginPath();

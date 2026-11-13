@@ -312,7 +312,7 @@
   "motion/easing/css/inOut": [
    {
     "file": "index.html",
-    "pattern": "1.4s ease-in-out"
+    "pattern": "1.2s ease-in-out"
    }
   ],
   "motion/easing/functions/smoothstep": [

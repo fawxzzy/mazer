@@ -64,7 +64,8 @@
       }
       #mazer-boot-splash .mazer-boot-splash-pulse {
         width: 10px; height: 10px; border-radius: 50%; background: #3ddbd4;
-        animation: mazer-boot-splash-pulse 1.4s ease-in-out infinite;
+        /* One beat (MOTION_LOOP_MS.beat = 1200 ms), the same period as the in-game loader; pinned by tests. */
+        animation: mazer-boot-splash-pulse 1.2s ease-in-out infinite;
       }
       #mazer-boot-splash .mazer-boot-splash-text { margin: 0; font-size: 14px; color: #a4beb8; }
       @keyframes mazer-boot-splash-pulse {
