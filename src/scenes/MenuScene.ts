@@ -446,6 +446,13 @@ import {
 } from '../legacy-runtime/legacyProgression';
 import { resolveLegacyGenerationTrack } from '../legacy-runtime/legacyMenuDemoTrack';
 import {
+  LegacyMazePrefetchSlot,
+  createLegacyMazeGenerationJobInput,
+  createLegacyMazeGenerationJobInputFromRequest,
+  resolveLegacyMazeGenerationJobKey
+} from '../legacy-runtime/legacyMazeGenerationJob';
+import { createLegacyMazeWorkerHost } from '../legacy-runtime/legacyMazeWorkerClient';
+import {
   checkLegacyUsernameAvailable,
   clearLegacyPasswordRecoveryUrl,
   createEmptyLegacyAuthFormState,
@@ -1886,6 +1893,21 @@ export class MenuScene extends Phaser.Scene {
   // means the arm call consumes an already-built maze and does no
   // synchronous work of its own.
   private pendingLegacyDeconstructResetMaze: { mode: LegacyGenerationMode; seed: number; maze: LegacyMazeSnapshot } | null = null;
+  // MAZER-PERF-008: the same precompute, run in a Web Worker when one is available, so the goal-reached
+  // frame no longer blocks on it (taken in consumeLegacyDeconstructResetMaze; falls back to the sync path).
+  private deconstructResetMazeSlotInstance: LegacyMazePrefetchSlot | null = null;
+  // MAZER-PERF-008: the next play-start maze, built in a worker while the menu is idle (taken in rebuildMaze).
+  private playStartMazeSlotInstance: LegacyMazePrefetchSlot | null = null;
+  private playStartMazePrefetchPrimed = false;
+  // Created on first use (a worker is only spawned when a build actually starts).
+  private get deconstructResetMazeSlot(): LegacyMazePrefetchSlot {
+    this.deconstructResetMazeSlotInstance ??= new LegacyMazePrefetchSlot(createLegacyMazeWorkerHost());
+    return this.deconstructResetMazeSlotInstance;
+  }
+  private get playStartMazeSlot(): LegacyMazePrefetchSlot {
+    this.playStartMazeSlotInstance ??= new LegacyMazePrefetchSlot(createLegacyMazeWorkerHost());
+    return this.playStartMazeSlotInstance;
+  }
   // The menu demo's own equivalent of play mode's schedulePlayResetReturn
   // hold, for the identical reason (see pendingLegacyDeconstructResetMaze's
   // own comment just above). shouldStartLegacyMenuDeconstructOnGoalArrival
@@ -3255,7 +3277,7 @@ export class MenuScene extends Phaser.Scene {
       && !this.shouldDelayLegacyMenuDeconstructRebuild(nextRequest, time)
     ) {
       this.pendingGenerationRequest = null;
-      this.applyGenerationRequest(nextRequest, time);
+      this.applyGenerationRequest(this.attachLegacyDeconstructWorkerMaze(nextRequest), time);
     }
 
     // Real Auth resolves asynchronously after the menu placeholder is built.
@@ -3277,6 +3299,9 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.advanceLegacyMenuStaticDrawStage(time);
+    if (this.mode === 'menu' && this.playStartMazePrefetchPrimed === false && !this.authGateAwaitingResolution) {
+      this.primeLegacyPlayStartMazePrefetch();
+    }
     if (
       this.menuStaticDrawLifecyclePhase === 'deconstructing'
       && (
@@ -5805,10 +5830,11 @@ export class MenuScene extends Phaser.Scene {
 
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
     const mode = this.mode;
+    const prefetched = this.takeLegacyPlayStartMazePrefetch();
     const seedOverride = mode === 'play'
       ? this.explicitRuntimeMazeSeed
         ? this.mazeSeed
-        : this.createFreshLegacyPlayGenerationSeed()
+        : prefetched?.seed ?? this.createFreshLegacyPlayGenerationSeed()
       : undefined;
     const generationScale = this.resolveLegacyProgressionScaleForMode(mode);
     this.applyGenerationRequest(
@@ -5818,6 +5844,7 @@ export class MenuScene extends Phaser.Scene {
           dueAtMs: this.time.now,
           generationProfile: this.resolveLegacyMazeGenerationProfileForMode(mode),
           mode,
+          ...(prefetched ? { precomputedMazeOverride: prefetched.maze } : {}),
           queuedAtMs: this.time.now,
           reason: mode === 'play' ? 'play-start' : 'boot-menu',
           scale: generationScale,
@@ -5826,6 +5853,53 @@ export class MenuScene extends Phaser.Scene {
         }),
       nextDemoMoveAtMs
     );
+  }
+
+  // MAZER-PERF-008: the generation inputs of the next play-start maze for `seed`, resolved exactly as
+  // rebuildMaze resolves them (the request normalises seed, profile and target complexity).
+  private createLegacyPlayStartMazeJobInput(seed: number | undefined) {
+    const generationScale = this.resolveLegacyProgressionScaleForMode('play');
+    return createLegacyMazeGenerationJobInputFromRequest(createLegacyGenerationRequest({
+      aspectRatio: this.resolveLegacyBoardAspectRatioForMode('play', generationScale),
+      currentSeed: this.mazeSeed,
+      dueAtMs: this.time.now,
+      generationProfile: this.resolveLegacyMazeGenerationProfileForMode('play'),
+      mode: 'play',
+      queuedAtMs: this.time.now,
+      reason: 'play-start',
+      scale: generationScale,
+      seedOverride: seed,
+      targetComplexity: this.resolveLegacyTargetComplexityForMode('play')
+    }), generationScale);
+  }
+
+  // MAZER-PERF-008: the maze a worker built while the menu was idle, only if every generation input still
+  // matches; otherwise null and rebuildMaze generates synchronously as before.
+  private takeLegacyPlayStartMazePrefetch(): { seed: number; maze: LegacyMazeSnapshot } | null {
+    if (this.mode !== 'play') {
+      return null;
+    }
+    this.playStartMazePrefetchPrimed = false;
+    this.deconstructResetMazeSlot.warm();
+    if (this.explicitRuntimeMazeSeed || this.playStartMazeSlotInstance === null) {
+      return null;
+    }
+    return this.playStartMazeSlotInstance.take(
+      resolveLegacyMazeGenerationJobKey(this.createLegacyPlayStartMazeJobInput(undefined))
+    );
+  }
+
+  // MAZER-PERF-008: while the menu is idle, start the next play-start maze in a worker (a random seed,
+  // exactly as startPlayMode would draw one). takeLegacyPlayStartMazePrefetch hands it over only if every
+  // generation input still matches, else rebuildMaze generates synchronously as before, so this can only
+  // ever remove a stall.
+  private primeLegacyPlayStartMazePrefetch(): void {
+    this.playStartMazePrefetchPrimed = true;
+    if (this.explicitRuntimeMazeSeed || !this.playStartMazeSlot.available) {
+      return;
+    }
+    const input = this.createLegacyPlayStartMazeJobInput(this.createFreshLegacyPlayGenerationSeed());
+    this.playStartMazeSlot.start(input, resolveLegacyMazeGenerationJobKey(input));
   }
 
   private refreshRuntimeMazeSeedIfUnpinned(): void {
@@ -6280,6 +6354,14 @@ export class MenuScene extends Phaser.Scene {
     // deliberately NOT touched by this -- those happen during a build/
     // reveal animation the player is already watching, not mid-motion, so
     // full candidate-search quality is worth its cost there.
+    // MAZER-PERF-008: off the main thread when a worker is available (identical call, identical maze).
+    if (this.deconstructResetMazeSlot.start(
+      createLegacyMazeGenerationJobInput({ aspectRatio, mode, profile, scale, seed, selection: { candidateCount: 1, targetComplexity } }),
+      mode
+    )) {
+      this.pendingLegacyDeconstructResetMaze = null;
+      return;
+    }
     const maze = createLegacyRuntimeMazeForMode(
       mode,
       scale,
@@ -6298,6 +6380,16 @@ export class MenuScene extends Phaser.Scene {
   // early precompute (there shouldn't be one, but this keeps that a
   // graceful fallback instead of a silent behavior change if one is ever
   // missed).
+  // MAZER-PERF-008: at the moment a goal-reset request is consumed (the old maze has finished deconstructing),
+  // attach the maze the worker built meanwhile; if it is not done yet this builds the identical maze right here.
+  private attachLegacyDeconstructWorkerMaze(request: LegacyGenerationRequest): LegacyGenerationRequest {
+    if (!this.isLegacyDeconstructGenerationReason(request.reason)) {
+      return request;
+    }
+    const built = this.deconstructResetMazeSlotInstance?.take(request.mode) ?? null;
+    return built && built.seed === request.seed ? { ...request, precomputedMaze: built.maze } : request;
+  }
+
   private consumeLegacyDeconstructResetMaze(mode: LegacyGenerationMode): { seed: number; maze: LegacyMazeSnapshot } | null {
     const pending = this.pendingLegacyDeconstructResetMaze;
     if (!pending || pending.mode !== mode) {
@@ -6326,6 +6418,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.pendingLegacyDeconstructResetMaze?.mode === 'menu') {
       this.pendingLegacyDeconstructResetMaze = null;
     }
+    this.deconstructResetMazeSlotInstance?.clear('menu');
   }
 
   private armLegacyMenuStaticDeconstructStage(time: number): void {
@@ -6373,7 +6466,10 @@ export class MenuScene extends Phaser.Scene {
       // having their own short wall-clock windows eaten by a build that
       // used to happen right here. precompute: true stays as a fallback for
       // the (should never happen) case where nothing was precomputed.
-      const precomputed = this.consumeLegacyDeconstructResetMaze('play');
+      // MAZER-PERF-008: a maze still building in the worker is NOT waited for here: its seed goes on the
+      // request and the maze is attached when the request is consumed (attachLegacyDeconstructWorkerMaze).
+      const workerSeed = this.deconstructResetMazeSlotInstance?.peekSeed('play') ?? null;
+      const precomputed = workerSeed === null ? this.consumeLegacyDeconstructResetMaze('play') : null;
       this.pendingGenerationRequest = createLegacyPlayResetGenerationRequest({
         aspectRatio: this.resolveLegacyBoardAspectRatioForMode('play', playGenerationScale),
         currentSeed: this.mazeSeed,
@@ -6381,12 +6477,15 @@ export class MenuScene extends Phaser.Scene {
         nowMs: time + this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
         ...(precomputed
           ? { precomputedMazeOverride: precomputed.maze, seedOverride: precomputed.seed }
-          : { precompute: true, seedOverride: this.createFreshLegacyPlayGenerationSeed() }),
+          : workerSeed !== null
+            ? { seedOverride: workerSeed }
+            : { precompute: true, seedOverride: this.createFreshLegacyPlayGenerationSeed() }),
         scale: playGenerationScale,
         targetComplexity: this.resolveLegacyTargetComplexityForMode('play')
       });
     } else {
-      const precomputed = this.consumeLegacyDeconstructResetMaze('menu');
+      const workerSeed = this.deconstructResetMazeSlotInstance?.peekSeed('menu') ?? null;
+      const precomputed = workerSeed === null ? this.consumeLegacyDeconstructResetMaze('menu') : null;
       this.queueGenerationRequest(
         'menu-demo-goal-reset',
         this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
@@ -6394,7 +6493,9 @@ export class MenuScene extends Phaser.Scene {
           mode: 'menu',
           ...(precomputed
             ? { precomputedMazeOverride: precomputed.maze, seedOverride: precomputed.seed }
-            : { precompute: true, seedOverride: this.createFreshLegacyMenuGenerationSeed() }),
+            : workerSeed !== null
+              ? { seedOverride: workerSeed }
+              : { precompute: true, seedOverride: this.createFreshLegacyMenuGenerationSeed() }),
           stepSeed: true
         }
       );
