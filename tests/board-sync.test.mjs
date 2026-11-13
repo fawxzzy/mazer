@@ -11,7 +11,7 @@ import {
 import {
   appendEvent, patchLedgerText, applyPlan, checkIntegrity, computePlan, computeStatus, flushLocal, formatPlan, localFallbackPath, readRemoteEvents, runBoardSync, serializeJson,
 } from "../scripts/board/board-sync.mjs";
-import { repinWeb } from "../scripts/board/web-repin.mjs";
+import { repinWeb, WEB_NEXT_COMMANDS } from "../scripts/board/web-repin.mjs";
 import { renderOutputs } from "../scripts/analysis/work-report.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
@@ -302,42 +302,40 @@ test("offline append falls back to a local file in the git dir and flush pushes 
 
 // ---- FawxzzyWeb re-pin ----------------------------------------------------------------------------------------------------------
 
-test("web re-pin copies the export, pins the sha, adds new ids sorted and updates every hard-coded count", () => {
+test("web re-pin copies the export into the Web board sources and reports new and removed ids", () => {
   const web = tmp("web");
-  const w = (rel, text) => { fs.mkdirSync(path.dirname(path.join(web, rel)), { recursive: true }); fs.writeFileSync(path.join(web, rel), text); };
-  const allow = { schema: "x", sources: [{ board: "fitness", sha256: "f" }, { board: "mazer", path: "p", sha256: "old" }], include: { fitness: ["F-1"], mazer: ["MAZER-A-001", "MAZER-C-001"] } };
-  w("planning/project-board-public-allowlist.v1.json", `${JSON.stringify(allow, null, 2).replace(/\n/g, "\r\n")}\r\n`);
-  w("tests/e2e/project-board-preview.spec.ts", 'x("Mazer, 2 cards"); y("Mazer, 2 cards");\r\n');
-  w("tests/project-board-public-snapshot.test.mjs", 'const BOARD_COUNTS = { fitness: 29, mazer: 2, trove: 4 };\n');
-  w("docs/project-board-owner-export.md", "carries the full board: 2 owner cards including completed history.\n");
+  const source = path.join(web, "planning/board-sources/mazer.project-board.owner-export.v1.json");
+  fs.mkdirSync(path.dirname(source), { recursive: true });
+  const old = { cards: ["MAZER-A-001", "MAZER-GONE-001"].map((id) => ({ record: { card_id: id } })) };
+  fs.writeFileSync(source, `${JSON.stringify(old, null, 2)}
+`);
   const exportPath = path.join(tmp("exp"), "export.json");
   const exported = { cards: ["MAZER-A-001", "MAZER-B-001", "MAZER-C-001"].map((id) => ({ record: { card_id: id } })) };
-  fs.writeFileSync(exportPath, `${JSON.stringify(exported, null, 2)}\n`);
+  const bytes = `${JSON.stringify(exported, null, 2)}
+`;
+  fs.writeFileSync(exportPath, bytes);
   const dry = repinWeb({ webDir: web, exportPath, write: false });
-  assert.deepEqual(dry.newIds, ["MAZER-B-001"]);
-  assert.equal(fs.existsSync(path.join(web, "planning/board-sources/mazer.project-board.owner-export.v1.json")), false, "dry run writes nothing");
-  repinWeb({ webDir: web, exportPath, write: true });
-  const written = fs.readFileSync(path.join(web, "planning/project-board-public-allowlist.v1.json"), "utf8");
-  assert.ok(written.includes("\r\n"), "CRLF preserved");
-  const parsed = JSON.parse(written);
-  assert.deepEqual(parsed.include.mazer, ["MAZER-A-001", "MAZER-B-001", "MAZER-C-001"]);
-  assert.equal(parsed.sources[1].sha256, dry.sha256);
-  assert.equal(parsed.sources[0].sha256, "f");
-  assert.equal((fs.readFileSync(path.join(web, "tests/e2e/project-board-preview.spec.ts"), "utf8").match(/Mazer, 3 cards/g) ?? []).length, 2);
-  assert.match(fs.readFileSync(path.join(web, "tests/project-board-public-snapshot.test.mjs"), "utf8"), /mazer: 3,/);
-  assert.match(fs.readFileSync(path.join(web, "docs/project-board-owner-export.md"), "utf8"), /3 owner cards/);
+  assert.deepEqual(dry.newIds, ["MAZER-B-001", "MAZER-C-001"]);
+  assert.deepEqual(dry.removedIds, ["MAZER-GONE-001"]);
+  assert.equal(dry.cards, 3);
+  assert.equal(fs.readFileSync(source, "utf8"), `${JSON.stringify(old, null, 2)}
+`, "dry run writes nothing");
+  const done = repinWeb({ webDir: web, exportPath, write: true });
+  assert.equal(fs.readFileSync(source, "utf8"), bytes, "the export is copied byte for byte");
+  assert.deepEqual(done.files, ["planning/board-sources/mazer.project-board.owner-export.v1.json"]);
+  assert.ok(WEB_NEXT_COMMANDS.includes("npm run data:project-board-owner-snapshot"));
+  assert.ok(!WEB_NEXT_COMMANDS.some((command) => command.includes("project-board-public")));
 });
 
-test("web re-pin refuses when the export lost an allowlisted id or a Web file changed shape", () => {
+test("web re-pin creates the source when absent and refuses a file that is not an owner export", () => {
   const web = tmp("web2");
-  const w = (rel, text) => { fs.mkdirSync(path.dirname(path.join(web, rel)), { recursive: true }); fs.writeFileSync(path.join(web, rel), text); };
-  w("planning/project-board-public-allowlist.v1.json", JSON.stringify({ sources: [{ board: "mazer", sha256: "o" }], include: { mazer: ["MAZER-A-001", "MAZER-GONE-001"] } }));
   const exportPath = path.join(tmp("exp2"), "export.json");
   fs.writeFileSync(exportPath, JSON.stringify({ cards: [{ record: { card_id: "MAZER-A-001" } }] }));
-  assert.throws(() => repinWeb({ webDir: web, exportPath }), /no longer contains allowlisted ids/);
-  w("planning/project-board-public-allowlist.v1.json", JSON.stringify({ sources: [{ board: "mazer", sha256: "o" }], include: { mazer: ["MAZER-A-001"] } }));
-  w("tests/e2e/project-board-preview.spec.ts", "nothing here\n");
-  assert.throws(() => repinWeb({ webDir: web, exportPath }), /changed shape/);
+  const created = repinWeb({ webDir: web, exportPath, write: true });
+  assert.deepEqual(created.newIds, ["MAZER-A-001"]);
+  assert.equal(fs.existsSync(path.join(web, "planning/board-sources/mazer.project-board.owner-export.v1.json")), true);
+  fs.writeFileSync(exportPath, JSON.stringify({ nothing: true }));
+  assert.throws(() => repinWeb({ webDir: web, exportPath }), /not an owner export/);
 });
 
 test("serializeJson round-trips the committed registry byte for byte", () => {

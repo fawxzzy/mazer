@@ -20,7 +20,7 @@ import { buildWorkReport, REPORT_JSON_PATH, REPORT_MD_PATH } from "../analysis/w
 import {
   DEFAULT_POLICY, dueStatus, eventId, foldEvents, parseJsonl, validateEventShape, withId, canonicalJson,
 } from "./board-events.mjs";
-import { repinWeb, WEB_NEXT_COMMANDS } from "./web-repin.mjs";
+import { repinWeb, WEB_FILES, WEB_NEXT_COMMANDS } from "./web-repin.mjs";
 
 export const REGISTRY_PATH = "config/mazer-owner-work-registry.json";
 export const LEDGER_PATH = "config/mazer-work-ledger.json";
@@ -361,7 +361,7 @@ export function runBoardSync(argv, repoRoot = process.cwd(), out = (line) => pro
     const result = repinWeb({ webDir: path.resolve(args.web), exportPath: path.join(repoRoot, EXPORT_PATH), write: Boolean(args.write) });
     out(`board-sync web: ${args.write ? "wrote" : "would write (dry run, add --write)"} ${result.cards} cards, export sha256 ${result.sha256}`);
     for (const e of result.edits) out(`  ${e}`);
-    out(`Next in the Web worktree: ${WEB_NEXT_COMMANDS.join(" ; ")}; stage only: ${result.files.join(", ")}, src/data/project-board-public.generated.json, src/data/project-board-preview.generated.json`);
+    out(`Next in the Web worktree: ${WEB_NEXT_COMMANDS.join(" ; ")}; stage only: ${result.files.join(", ")}, ${WEB_FILES.snapshot}`);
     return 0;
   }
   out("usage: board-sync.mjs <event|status|plan|apply|check|web|flush> [options]; see docs/ops/MAZER-BOARD-SYNC-PROCESS.md");
