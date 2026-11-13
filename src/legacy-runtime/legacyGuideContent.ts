@@ -188,7 +188,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'levels',
-    text: 'Clears show your level. Harder mazes add shortcuts and loops.'
+    text: 'Clears show your clear time and level. Harder mazes add shortcuts and loops.'
   }
 ]);
 
