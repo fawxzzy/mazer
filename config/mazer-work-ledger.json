@@ -3,12 +3,22 @@
   "registry": "config/mazer-owner-work-registry.json",
   "cards": {
     "MAZER-2D-001": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 474,
+            "mergedSha": "472b2eb2"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": "long-running",
       "filesHint": [],
-      "note": "Standing baseline lane; keep the regression checks green."
+      "note": "PR #474 merged (docs). Ongoing baseline card."
     },
     "MAZER-WORLD-001": {
       "evidence": null,
@@ -348,11 +358,26 @@
       "filesHint": []
     },
     "MAZER-UI-013": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 481,
+            "mergedSha": "98f867e7"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": ["src/scenes/MenuScene.ts","src/theme/tokens.ts","src/render/palette.ts"]
+      "filesHint": [
+        "src/scenes/MenuScene.ts",
+        "src/theme/tokens.ts",
+        "src/render/palette.ts"
+      ],
+      "note": "PR #481 merged: ratchet only. Migration of existing colours not started."
     },
     "MAZER-UI-014": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 428}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
@@ -390,18 +415,32 @@
       "filesHint": []
     },
     "MAZER-UI-019": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 482,
+            "mergedSha": "d5a29cee"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
+      },
       "blocker": {
         "kind": "owner-decision",
-        "summary": "MenuScene is about 16,600 lines (11,748 at Wave 0A) and decomposition has not started; Wave 6 and the nine-point Definition of Complete were never evaluated.",
+        "summary": "The wave status report landed (PR #482): contracts layer done, migration layer not started, the menu scene is about 16,600 lines.",
         "unblockedBy": "Zac",
         "ask": "Is the UI rework still one umbrella, or split into child cards (MenuScene decomposition, Wave 6 proof surfaces, future-phaser retirement) with this card closed?",
         "recommendation": "Auditor recommendation: split into children and keep the umbrella as planning only until the acceptance matrix is evaluated."
       },
       "verify": [],
       "lane": "long-running",
-      "filesHint": ["docs/architecture/MAZER-UI-REWORK-DECISION-REGISTRY.md","docs/contracts/mazer-ui-rework-decision-registry.v1.json","config/mazer-owner-work-registry.json"],
-      "note": "Auditor recommendation, not a status change: stays in progress but the text needs a refresh. Next slice an agent can do: a read-only wave-status report, an evaluation of the Definition of Complete on current main, and proposed child cards."
+      "filesHint": [
+        "docs/architecture/MAZER-UI-REWORK-DECISION-REGISTRY.md",
+        "docs/contracts/mazer-ui-rework-decision-registry.v1.json",
+        "config/mazer-owner-work-registry.json"
+      ],
+      "note": "PR #482 merged: status report. Owner decision to split into children open."
     },
     "MAZER-UI-020": {
       "evidence": null,
@@ -751,18 +790,32 @@
       "filesHint": []
     },
     "MAZER-HAZ-007": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 472,
+            "mergedSha": "e69bd0f9"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
+      },
       "blocker": {
         "kind": "owner-decision",
-        "summary": "Only the player movement phase uses the turn host; enemy, projectile, pickup, item, duration and collision handlers are unintegrated and have had no commits since 2026-07-14.",
+        "summary": "The Phase Status table landed (PR #472): only the player movement phase is live and six other phases are deferred pending MAZER-HAZ-002; whether hazards and enemies are activated is the owner decision.",
         "unblockedBy": "Zac",
         "ask": "Will hazards and enemies be activated, and must they run through the turn host?",
         "recommendation": "Auditor recommendation: defer all non-player phases explicitly until hazards have a shipped product contract, then mark the card completed with a caveat once a deferral table lands."
       },
       "verify": [],
       "lane": "long-running",
-      "filesHint": ["docs/architecture/MAZER-WORLD-TURN-CONTRACT.md","tests/architecture/world-turn-contract.test.ts","src/mazer-core/world/WorldTurnHost.ts"],
-      "note": "Auditor recommendation, not a status change: planning (deferred) or completed-with-caveat. Agent-buildable slice: a phase-status table in the contract with a test that matches the registered handlers."
+      "filesHint": [
+        "docs/architecture/MAZER-WORLD-TURN-CONTRACT.md",
+        "tests/architecture/world-turn-contract.test.ts",
+        "src/mazer-core/world/WorldTurnHost.ts"
+      ],
+      "note": "PR #472 merged: phase status table, test-pinned. Completion waits on the owner decision."
     },
     "MAZER-HAZ-008": {
       "evidence": null,
@@ -994,20 +1047,34 @@
       "filesHint": []
     },
     "MAZER-DATA-004": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 476,
+            "mergedSha": "8bc01637"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": false
+      },
       "blocker": {
         "kind": "owner-decision",
-        "summary": "The offline sync contract draft is unsigned (7 open decisions); coin and inventory tiers exist only as a proposal; server parts are provider-gated.",
+        "summary": "Proof fixtures landed (PR #476); the owner contract signing, a device airplane-mode test and the provider-gated server parts are open.",
         "unblockedBy": "Zac",
-        "ask": "Sign or amend the 7 decisions in the offline sync contract: tier order, what a checkpoint means, coin and inventory ledger, outbox bounds and wording, entitlement grace, guest-to-account transfer, required device proofs.",
-        "recommendation": "Auditor recommendation: approve the tier order as drafted, define a checkpoint as a completed level only for now, keep coins and inventory local-first, authorise no server work yet."
+        "ask": "Sign or amend the offline sync contract, and run the airplane-mode check on a phone.",
+        "recommendation": "Sign the contract as written for the client part; keep server parts blocked until approved."
       },
       "verify": [
-        {"step":"On the iPhone installed app, signed in: turn on airplane mode, complete a level, force-quit, reopen offline, then turn airplane mode off and wait 10 seconds.","where":"installed-app","expected":"Progress is kept offline; one saved-offline notice; after reconnect the outbox flushes once and the level matches on a second device with no duplicate."}
+        {"step":"Play a level with airplane mode on, then turn the network back on and wait.","where":"phone","expected":"Progress is kept and flushes once the network returns, with no duplicate or lost completion."}
       ],
-      "lane": "long-running",
-      "filesHint": ["tests/reset/legacy-remote-progression.test.ts","src/legacy-runtime/legacyRemoteProgression.ts","src/legacy-runtime/legacyOfflineCompletionFlush.ts"],
-      "note": "Auditor recommendation, not a status change: stays in progress (active, PR #423 landed 2026-11-11); move to review once the contract is answered. Agent-buildable slice: proof fixtures for reordered or duplicate delivery and storage failure against the existing outbox."
+      "lane": "owner-only",
+      "filesHint": [
+        "tests/reset/legacy-remote-progression.test.ts",
+        "src/legacy-runtime/legacyRemoteProgression.ts",
+        "src/legacy-runtime/legacyOfflineCompletionFlush.ts"
+      ],
+      "note": "PR #476 merged: proof fixtures. Signing and device test open."
     },
     "MAZER-PWA-002": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 438, "mergedSha": "987ea6af"}], "deployedBuild": "24e15cc1", "headless": true, "deviceChecked": false},
@@ -1122,10 +1189,20 @@
       "filesHint": []
     },
     "MAZER-QA-006": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 480,
+            "mergedSha": "62f36472"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": false
+      },
       "blocker": {
         "kind": "owner-decision",
-        "summary": "Layout persistence has no defined state to persist (Board Zoom was removed) and the supported viewport matrix is not written down.",
+        "summary": "The viewport matrix and presets landed (PR #480); the layout persistence criterion has no state to persist.",
         "unblockedBy": "Zac",
         "ask": "With Board Zoom removed and the board size frozen, is any layout persistence still wanted, or should that criterion be dropped?",
         "recommendation": "Auditor recommendation: drop the persistence criterion; keep the viewport matrix and the device check."
@@ -1134,8 +1211,11 @@
         {"step":"On the iPhone installed app: open the menu, rotate portrait to landscape and back mid-play, and open Settings and Guide in each orientation.","where":"installed-app","expected":"Play pauses on the flip and refits, no clipped panels or purple bars, tap targets reachable, state intact after rotating back."}
       ],
       "lane": "long-running",
-      "filesHint": ["scripts/visual/capture-layout-matrix.mjs","tests/legacy-runtime/legacyMenuLayout.test.ts"],
-      "note": "Auditor recommendation, not a status change: move to review once the viewport matrix is recorded. Agent-buildable slice: define the matrix and run the layout matrix at 320, 360, 390, 430, 768, 1440 and landscape."
+      "filesHint": [
+        "scripts/visual/capture-layout-matrix.mjs",
+        "tests/legacy-runtime/legacyMenuLayout.test.ts"
+      ],
+      "note": "PR #480 merged: viewport matrix and presets. Rotate check and persistence decision open."
     },
     "MAZER-GOV-001": {
       "evidence": {"prs": [], "headless": false, "deviceChecked": null},
@@ -1167,12 +1247,22 @@
       "note": "Mazer PR #434 and FawxzzyWeb PR #119 (the previous refresh) are merged and the card text now says so; left in review for the owner to close."
     },
     "MAZER-GOV-005": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 474,
+            "mergedSha": "472b2eb2"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": "long-running",
       "filesHint": [],
-      "note": "Near complete; the rule is ongoing governance."
+      "note": "PR #474 merged (docs and template). Governance, no device surface."
     },
     "MAZER-DOCS-001": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 405}], "headless": false, "deviceChecked": null},
@@ -1183,12 +1273,32 @@
       "note": "Docs only, merged; open unknowns remain in the note and it is not reconciled with the Cyberdeck card."
     },
     "MAZER-AI-001": {
-      "evidence": null,
-      "blocker": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 479,
+            "mergedSha": "b6676ace"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
+      },
+      "blocker": {
+        "kind": "owner-decision",
+        "summary": "Thresholds and checker landed (PR #479) with no baseline drift; remote run retention is not built.",
+        "unblockedBy": "Zac",
+        "ask": "Drop remote run retention, or approve it as a separate provider-side step?",
+        "recommendation": "Drop it: the seed-pack runner is enough."
+      },
       "verify": [],
-      "lane": "agent-buildable",
-      "filesHint": ["scripts/analysis/ai-runner-calibration.ts","scripts/analysis/lib/ai-run-seed-pack-runner.ts","tests/fixtures/ai-run-seed-packs/baselines"],
-      "note": "Auditor recommendation, not a status change: stays in progress and an agent can finish it. Regenerate the three baselines after ladder v2 and report the drift, fix the known calibration script call, and add a threshold table per band. Open question for the owner, not blocking: is a human-configurable runner needed (auditor: the seed-pack runner is enough; drop remote run retention)."
+      "lane": "owner-only",
+      "filesHint": [
+        "scripts/analysis/ai-runner-calibration.ts",
+        "scripts/analysis/lib/ai-run-seed-pack-runner.ts",
+        "tests/fixtures/ai-run-seed-packs/baselines"
+      ],
+      "note": "PR #479 merged. Open only the retention decision."
     },
     "MAZER-AI-002": {
       "evidence": null,
@@ -1518,12 +1628,25 @@
       "note": "Fixtures and mocks only; the phone check for Edit name is on MAZER-ACCT-006."
     },
     "MAZER-ACCT-012": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 485
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 486
+          }
+        ],
+        "headless": false,
+        "deviceChecked": false
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": [],
-      "note": "Only the sign-up branch remains: the username-editor half was done in PR #450. Waits on nothing."
+      "note": "PR #485 and #486 open for review, not merged."
     },
     "MAZER-ACCT-013": {
       "evidence": null,
@@ -1639,7 +1762,7 @@
         "summary": "Remote sync is deliberately silent today, so showing sync failures changes that stance.",
         "unblockedBy": "Zac",
         "ask": "Which of auth, sync, username and boot errors should appear in the message toast?",
-        "recommendation": "Show auth, username and boot errors; keep remote sync silent."
+        "recommendation": "Keep remote sync silent, show boot errors on the splash, and toast only the service-worker warning that the offline cache could not update."
       },
       "verify": [],
       "lane": "owner-only",
@@ -1807,11 +1930,26 @@
       "note": "At 8 px tiles the old ring was 22 px across; nothing is broken, it is a look decision."
     },
     "MAZER-VIS-027": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 477,
+            "mergedSha": "0c533955"
+          }
+        ],
+        "deployedBuild": "62f36472",
+        "headless": true,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": ["src/legacy-runtime/legacyMenuBackdrop.ts","tests/reset/legacy-menu-backdrop.test.ts"]
+      "filesHint": [
+        "src/legacy-runtime/legacyMenuBackdrop.ts",
+        "tests/reset/legacy-menu-backdrop.test.ts"
+      ],
+      "note": "PR #477 merged and deployed (62f36472). Deleted unused code, no visible change."
     },
     "MAZER-GOV-007": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 440, "mergedSha": "6d5532f7"}], "deployedBuild": "24e15cc1", "headless": false, "deviceChecked": null},
@@ -1828,12 +1966,24 @@
       "filesHint": []
     },
     "MAZER-GOV-009": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 489
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": ["tests/render/endpointTilePixels.test.ts","vitest.config.ts"],
-      "note": "The endpoint tile pixel test at tile 25.44 and device pixel ratio 3 fails only under parallel load; it passes alone every time. Vitest worker task-update timeouts also appear."
+      "filesHint": [
+        "tests/render/endpointTilePixels.test.ts",
+        "vitest.config.ts"
+      ],
+      "note": "PR #489 open for review, not merged."
     },
     "MAZER-PWA-005": {
       "evidence": null,
@@ -1850,21 +2000,27 @@
       "note": "Carried from MAZER-PWA-002, which shipped without new icon art."
     },
     "MAZER-MOTION-006": {
-      "evidence": null,
-      "blocker": {
-        "kind": "dependency",
-        "summary": "PR #425 has landed; this card still waits on MAZER-MOTION-001 and MAZER-MOTION-004, both in review.",
-        "unblockedBy": "other-card",
-        "ask": "Waits on MAZER-MOTION-001 and MAZER-MOTION-004 (both in review).",
-        "recommendation": "Start once those leave review; the identical values are mechanical."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 471,
+            "mergedSha": "1ec17824"
+          }
+        ],
+        "deployedBuild": "62f36472",
+        "headless": true,
+        "deviceChecked": null
       },
+      "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": [
         "src/scenes/MenuScene.ts",
         "src/render/motionScale.ts",
         "src/theme/tokens.ts"
-      ]
+      ],
+      "note": "PR #471 merged and deployed (62f36472). No visible change by design."
     },
     "MAZER-MOTION-007": {
       "evidence": null,
@@ -2057,13 +2213,30 @@
       "filesHint": []
     },
     "MAZER-PROG-016": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 469,
+            "mergedSha": "404c2b81"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 473,
+            "mergedSha": "2aa0c46c"
+          }
+        ],
+        "deployedBuild": "62f36472",
+        "headless": true,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": [
         "src/scenes/menuRuntimeDiagnostics.ts"
-      ]
+      ],
+      "note": "PR #469 and #473 merged and deployed (62f36472). Diagnostics only, no device surface."
     },
     "MAZER-PERF-003": {
       "evidence": {
@@ -2136,7 +2309,7 @@
         "summary": "Draft PR #461 (head 476e5cf2, CI not started, not merged) cuts walking frame cost about 1.3 to 2 times but cannot keep pixel parity: trail colour, sheen and breath would step every 250 ms to 1 s on long routes.",
         "unblockedBy": "Zac",
         "ask": "After a phone check, choose: A ship as is; B cap cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker.",
-        "recommendation": "D as the follow-up; the draft stays unmerged until you choose."
+        "recommendation": "Close draft PR #461: the owner reports no more lag; revisit only if lag returns (option D stays the follow-up)."
       },
       "verify": [],
       "lane": "owner-only",
@@ -2144,11 +2317,21 @@
       "note": "Blocked on an owner decision; draft PR #461 is not merged."
     },
     "MAZER-PERF-005": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 488
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": []
+      "filesHint": [],
+      "note": "Measured in PR #488 (open). Cheaper bloom waits on an owner pixel review."
     },
     "MAZER-PERF-006": {
       "evidence": null,
@@ -2164,11 +2347,21 @@
       "filesHint": []
     },
     "MAZER-PERF-007": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 488
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": []
+      "filesHint": [],
+      "note": "PR #488 open for review, not merged."
     },
     "MAZER-PERF-008": {
       "evidence": null,
@@ -2178,38 +2371,111 @@
       "filesHint": []
     },
     "MAZER-VIS-028": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
-      "lane": "agent-buildable",
-      "filesHint": []
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 478,
+            "mergedSha": "8c25bdbd"
+          }
+        ],
+        "deployedBuild": "62f36472",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "PR #478 is merged and deployed (62f36472) and checked in headless Chromium and tests only; nothing is checked on a real phone.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, walk the marker off and onto the start and goal tiles and watch the ring.",
+        "recommendation": "Accept if the ring eases between the two shapes with no pop."
+      },
+      "verify": [
+        {"step":"Walk the marker off the start tile and onto the goal tile and watch the ring shape.","where":"phone","expected":"The ring eases between the cap and chip shape across the tile with no pop and no corner poking out."}
+      ],
+      "lane": "owner-only",
+      "filesHint": [],
+      "note": "PR #478 merged and deployed (62f36472). Device check pending."
     },
     "MAZER-VIS-029": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
-      "lane": "agent-buildable",
-      "filesHint": []
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 478,
+            "mergedSha": "8c25bdbd"
+          }
+        ],
+        "deployedBuild": "62f36472",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "PR #478 is merged and deployed (62f36472) and checked in headless Chromium and tests only; nothing is checked on a real phone.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, bump into a wall and watch the end of the trail.",
+        "recommendation": "Accept if the trail end moves with the marker; note whether the 2 px skew on a sideways bump is visible."
+      },
+      "verify": [
+        {"step":"Walk into a wall and watch the trail end next to the marker.","where":"phone","expected":"The trail end follows the marker nudge with no sliver beside it; a bump perpendicular to the last segment may skew it by up to 2 px for a moment."}
+      ],
+      "lane": "owner-only",
+      "filesHint": [],
+      "note": "PR #478 merged and deployed (62f36472). Device check pending."
     },
     "MAZER-MOTION-009": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 475,
+            "mergedSha": "e0fe1db5"
+          }
+        ],
+        "deployedBuild": "62f36472",
+        "headless": true,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": [
         "src/theme/tokens.ts"
       ],
-      "note": "Wave 4D-B edit."
+      "note": "PR #475 merged and deployed (62f36472). Same 200 ms value, no visible change expected."
     },
     "MAZER-PROG-017": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 469,
+            "mergedSha": "404c2b81"
+          }
+        ],
+        "deployedBuild": "62f36472",
+        "headless": true,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": []
+      "filesHint": [],
+      "note": "PR #469 merged and deployed (62f36472). Test only, no device surface."
     },
     "MAZER-ACCT-023": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/FawxzzyWeb",
+            "number": 130,
+            "mergedSha": "15ee11a1"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": false
+      },
       "blocker": {
         "kind": "owner-decision",
         "summary": "The race fix needs no decision, but whether account-site sign-out should also end the Mazer session is a design choice.",
@@ -2219,7 +2485,8 @@
       },
       "verify": [],
       "lane": "owner-only",
-      "filesHint": []
+      "filesHint": [],
+      "note": "FawxzzyWeb PR #130 merged-not-deployed until aliases move."
     },
     "MAZER-ACCT-024": {
       "evidence": {
@@ -2265,17 +2532,28 @@
       "note": "Merged and deployed (PR #462) and database patch applied; kept in review until a phone check. Existing profiles are not backfilled (MAZER-ACCT-034)."
     },
     "MAZER-ACCT-026": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/FawxzzyWeb",
+            "number": 129,
+            "mergedSha": "137d8a51"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false
+      },
       "blocker": {
         "kind": "owner-decision",
-        "summary": "Choosing the counter key and caps is a trade-off between lockout and brute-force protection.",
+        "summary": "v4 is live and a coordinator sign-in check passed. FawxzzyWeb PR #133 (v5) is an open proposal: failures-only check and record, keyed by username and client, no forwarded-address header; its SQL is not applied.",
         "unblockedBy": "Zac",
-        "ask": "Pick the v4 counter design (key, cap, failures only).",
-        "recommendation": "Key by username plus client, count failures only, drop the forwarded-address fallback, raise the aggregate cap."
+        "ask": "Review the v5 proposal (FawxzzyWeb PR #133) and decide whether its exact SQL may be applied.",
+        "recommendation": "Review the differences from live v4 first; nothing is applied until you approve the exact SQL."
       },
       "verify": [],
       "lane": "owner-only",
-      "filesHint": []
+      "filesHint": [],
+      "note": "v4 live; coordinator sign-in check passed. v5 proposal open, SQL not applied."
     },
     "MAZER-ACCT-027": {
       "evidence": null,
@@ -2304,7 +2582,17 @@
       "filesHint": []
     },
     "MAZER-ACCT-029": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/FawxzzyWeb",
+            "number": 130,
+            "mergedSha": "15ee11a1"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": false
+      },
       "blocker": {
         "kind": "owner-decision",
         "summary": "A plain taken-username message tells a visitor that the name exists.",
@@ -2314,7 +2602,8 @@
       },
       "verify": [],
       "lane": "owner-only",
-      "filesHint": []
+      "filesHint": [],
+      "note": "FawxzzyWeb PR #130 merged-not-deployed. Fitness patch proposed as text."
     },
     "MAZER-ACCT-030": {
       "evidence": null,
@@ -2337,18 +2626,48 @@
       "filesHint": []
     },
     "MAZER-ACCT-032": {
-      "evidence": null,
-      "blocker": null,
-      "verify": [],
-      "lane": "agent-buildable",
-      "filesHint": []
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 470,
+            "mergedSha": "22a29cb4"
+          }
+        ],
+        "deployedBuild": "62f36472",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "PR #470 is merged and deployed (62f36472) and checked in headless Chromium and tests only; nothing is checked on a real phone.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, sign in with a long name and look at the header.",
+        "recommendation": "Accept if the name reads cut with an ellipsis and the header does not overflow."
+      },
+      "verify": [
+        {"step":"Sign in with an account whose name is 15 characters (or open a narrow window) and look at the header.","where":"phone","expected":"The name shows cut with an ellipsis; the header is never blank unless not even one character fits; a short name is unchanged."}
+      ],
+      "lane": "owner-only",
+      "filesHint": [],
+      "note": "PR #470 merged and deployed (62f36472). Device check pending."
     },
     "MAZER-ACCT-033": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 487
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": []
+      "filesHint": [],
+      "note": "PR #487 open for review, not merged, not deployed."
     },
     "MAZER-ACCT-034": {
       "evidence": null,
@@ -2368,7 +2687,8 @@
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": []
+      "filesHint": [],
+      "note": "Worker running; no PR yet."
     },
     "MAZER-GEN-006": {
       "evidence": {
@@ -2418,11 +2738,23 @@
       "filesHint": []
     },
     "MAZER-QA-007": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 469,
+            "mergedSha": "404c2b81"
+          }
+        ],
+        "deployedBuild": "62f36472",
+        "headless": true,
+        "deviceChecked": false
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": []
+      "filesHint": [],
+      "note": "PR #469 merged and deployed (62f36472). The ladder end may move to 288 if PR #484 lands."
     },
     "MAZER-PROG-019": {
       "evidence": null,
@@ -2475,13 +2807,82 @@
       "note": "PRs #466 and #467 merged and deployed (c80d8ce9). Not verified: a real phone, a real outage, browser offline mode, an extension block, a slow-but-up service."
     },
     "MAZER-ACCT-037": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 470,
+            "mergedSha": "22a29cb4"
+          }
+        ],
+        "deployedBuild": "62f36472",
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": {
+        "kind": "device",
+        "summary": "PR #470 is merged and deployed (62f36472) and checked in headless Chromium with a mocked probe only; nothing is checked on a real phone.",
+        "unblockedBy": "Zac",
+        "ask": "On your phone, leave Welcome idle for 2 to 5 seconds, then tap Sign in; then try airplane mode.",
+        "recommendation": "Accept if the tap goes straight to the account page and airplane mode shows no failure line until Sign in is tapped."
+      },
+      "verify": [
+        {"step":"Open Welcome, wait 2 to 5 seconds, then tap Sign in.","where":"phone","expected":"No pause before the account page opens."},
+        {"step":"Turn airplane mode on, open Welcome and wait 5 seconds without tapping.","where":"phone","expected":"No failure line appears until Sign in is tapped; then the plain failure line shows for several seconds."}
+      ],
+      "lane": "owner-only",
+      "filesHint": [
+        "src/scenes/MenuScene.ts"
+      ],
+      "note": "PR #470 merged and deployed (62f36472). Device check pending."
+    },
+    "MAZER-GEN-007": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 484
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": [],
+      "note": "PR #484 open, not merged; density fill added at head 316acd0a."
+    },
+    "MAZER-VIS-030": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": [],
+      "note": "Worker running; no PR yet."
+    },
+    "MAZER-UI-023": {
       "evidence": null,
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": [
-        "src/scenes/MenuScene.ts"
+        "src/scenes/menuRuntimeDiagnostics.ts"
       ]
+    },
+    "MAZER-ACCT-038": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
+    },
+    "MAZER-MOTION-010": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": "agent-buildable",
+      "filesHint": []
     }
   }
 }
