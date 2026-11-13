@@ -102,7 +102,7 @@ Manual (about ten steps, no agent needed):
 2. `node scripts/board/board-sync.mjs apply`.
 3. Commit the six generated files in one pull request. Only the "Owner export" workflow runs (one check, about a minute); the 12-check Verify workflow ignores board-only changes.
 4. Merge on a clean state with all checks passed on the exact head (`--match-head-commit`).
-5. In a FawxzzyWeb worktree off `origin/main`: `node <mazer>/scripts/board/board-sync.mjs web --web . --write`, then the Web commands it prints (`npm run data:project-board-public`, `npm run test:project-board-preview`, `npx eslint .`, `npm run build`), commit the listed files, open the Web pull request, merge when `verify` passes.
+5. In a FawxzzyWeb worktree off `origin/main`: `node <mazer>/scripts/board/board-sync.mjs web --web . --write` (it only copies the export into `planning/board-sources/`; the Web Projects page is owner-only, so there is no allowlist or hard-coded count), then the Web commands it prints (`npm run data:project-board-owner-snapshot`, `npm run test:project-board-preview`, `npx eslint .`, `npm run build`), commit the listed files, open the Web pull request, merge when `verify` passes.
 6. Unaliased production build and readback (`Mazer, N cards`); the owner moves the four aliases.
 
 Automated: `.github/workflows/board-sync.yml` (run it from the Actions tab or `gh workflow run board-sync.yml`) does steps 1 to 3 with no LLM and no secrets: it checks the trigger policy (skip with the `force` input), runs `plan` and `apply`, verifies the outputs, opens the pull request and starts the Owner export workflow on its branch (pull requests opened with the workflow token do not start `pull_request` workflows, so it dispatches `ci.yml`). A weekly schedule exists but only runs when the repository variable `MAZER_BOARD_SYNC_SCHEDULE` is `on`. Prerequisite: the repository setting that lets Actions create pull requests. Not yet exercised in a real run: the first dispatch after merge is its test; if it fails, the manual flow above is unchanged.
@@ -132,4 +132,4 @@ The fold is Mazer-specific only in its paths, card id pattern and the exporter i
 
 - The Board sync workflow and the `board-events` branch have not run against GitHub yet; the event store is tested against local bare repositories (append, two clones alternating, offline fallback, flush) and the fold against scratch copies of the real registry and ledger.
 - Token and step figures for the new flow are projections; the "before" figures are measured from the fifteen recorded agent runs (see the pull request description).
-- The Web re-pin automates the three hard-coded counts and the allowlist; it fails loudly if the Web files change shape. A permanent fix (counts derived from the allowlist) belongs in FawxzzyWeb.
+- The Web re-pin only copies the export; FawxzzyWeb regenerates its owner snapshot from every card (no allowlist, no hard-coded counts since 2026-11-13).
