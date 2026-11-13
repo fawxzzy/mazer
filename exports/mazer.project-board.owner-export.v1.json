@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_6b7b7e3b237b",
+  "export_id": "pbe_mazer_owner_registry_9d51ae6f0adb",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:6b7b7e3b237b330726c6a0dd40b7383b2836bead04244c88d41a6ab966c9b530",
-  "generated_at": "2026-11-13T01:30:00.000Z",
+  "source_revision": "sha256:9d51ae6f0adbdd5eb6f5c00feddbe8afc71fd79bbabc75a63e46852975bd50c9",
+  "generated_at": "2026-11-13T12:00:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:d1d7adc6c617cb962bf36936dc65faa79c7548594c43fa32d08a8a7f2ad0210d",
-      "observed_at": "2026-11-13T01:30:00.000Z"
+      "revision": "sha256:cfe308c89b83ad0cee141f2d9720c16e628aa5dde667125beaab35c47551eb75",
+      "observed_at": "2026-11-13T12:00:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:a67753ce27c71dbfb2582900208e7e00de72cc64dcbd0fcb71de2ead073b30a1",
-      "observed_at": "2026-11-13T01:30:00.000Z"
+      "observed_at": "2026-11-13T12:00:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-13T01:30:00.000Z"
+      "observed_at": "2026-11-13T12:00:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-13T01:30:00.000Z"
+      "observed_at": "2026-11-13T12:00:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-13T01:30:00.000Z"
+      "observed_at": "2026-11-13T12:00:00.000Z"
     }
   ],
   "cards": [
@@ -743,8 +743,8 @@
         "card_id": "MAZER-ACCT-012",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Retire dead Mazer sign-up code: PRs #485 and #486 (stacked) open for review",
-        "description": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #485 (head 97641156, Wave 5C) removes the unreachable in-app sign-up mode and its tests; stacked PR #486 (head ea75d622, Wave 3B) removes five copy rows nothing reads. No shown copy changes. CI was red only on the stale generated work report check (also red on main), not on these changes. No browser run; nothing on a real phone. Follow-ups: MAZER-ACCT-038 and MAZER-UI-023.",
+        "title": "Retire dead Mazer sign-up code: PRs #485 and #486 merged and live, review pending",
+        "description": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Update 2026-11-13: MERGED AND DEPLOYED. PR #485 (merge 8f72a4df, Wave 5C) removed the unreachable in-app sign-up mode and its tests; PR #486 (merge e1e70709, Wave 3B) removed five copy rows nothing reads. Live on production builds fawxzzy-mazer-k75xjog2z, fawxzzy-mazer-dyhmua9v6 and fawxzzy-mazer-dq6f32ysl. Sign-in by username and by the account other method was checked with the standing test account on the later builds. No shown copy changed. No independent review is recorded for these two PRs. Nothing checked on a real phone. Follow-ups: MAZER-ACCT-038 and MAZER-UI-023.",
         "card_type": "technical-debt",
         "lifecycle": "review",
         "priority": "low",
@@ -753,7 +753,7 @@
           "MAZER-ACCT-011"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-012",
         "extensions": {
           "owner_status": "review",
@@ -764,15 +764,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-012",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
       },
       "content": {
-        "summary": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #485 (head 97641156, Wave 5C) removes the unreachable in-app sign-up mode and its tests; stacked PR #486 (head ea75d622, Wave 3B) removes five copy rows nothing reads. No shown copy changes. CI was red only on the stale generated work report check (also red on main), not on these changes. No browser run; nothing on a real phone. Follow-ups: MAZER-ACCT-038 and MAZER-UI-023.",
-        "objective": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #485 (head 97641156, Wave 5C) removes the unreachable in-app sign-up mode and its tests; stacked PR #486 (head ea75d622, Wave 3B) removes five copy rows nothing reads. No shown copy changes. CI was red only on the stale generated work report check (also red on main), not on these changes. No browser run; nothing on a real phone. Follow-ups: MAZER-ACCT-038 and MAZER-UI-023.",
+        "summary": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Update 2026-11-13: MERGED AND DEPLOYED. PR #485 (merge 8f72a4df, Wave 5C) removed the unreachable in-app sign-up mode and its tests; PR #486 (merge e1e70709, Wave 3B) removed five copy rows nothing reads. Live on production builds fawxzzy-mazer-k75xjog2z, fawxzzy-mazer-dyhmua9v6 and fawxzzy-mazer-dq6f32ysl. Sign-in by username and by the account other method was checked with the standing test account on the later builds. No shown copy changed. No independent review is recorded for these two PRs. Nothing checked on a real phone. Follow-ups: MAZER-ACCT-038 and MAZER-UI-023.",
+        "objective": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Update 2026-11-13: MERGED AND DEPLOYED. PR #485 (merge 8f72a4df, Wave 5C) removed the unreachable in-app sign-up mode and its tests; PR #486 (merge e1e70709, Wave 3B) removed five copy rows nothing reads. Live on production builds fawxzzy-mazer-k75xjog2z, fawxzzy-mazer-dyhmua9v6 and fawxzzy-mazer-dq6f32ysl. Sign-in by username and by the account other method was checked with the standing test account on the later builds. No shown copy changed. No independent review is recorded for these two PRs. Nothing checked on a real phone. Follow-ups: MAZER-ACCT-038 and MAZER-UI-023.",
         "acceptance_criteria": [
-          "The unreachable sign-up form mode and its copy are removed: PR #485 and #486 open",
+          "The unreachable sign-up form mode and its copy are removed: PRs #485 and #486 merged and deployed",
           "The username-editor half is already done in PR #450 (dead code removed)",
-          "Tests and the message inventory still pass with no change to shown copy: pass locally, CI red only on the stale work report"
+          "Tests and the message inventory still pass with no change to shown copy: passed; sign-in by username and the other method checked on the deployed build; no independent review recorded"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -1485,14 +1485,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Username sign-in lockout (v4) live and sign-in verified; v5 proposal open, not applied",
-        "description": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. Update 2026-11-13: the coordinator verified a live sign-in with both sign-in methods (by username and by the account’s other method) after version 12; the live per-client behavior is not separately verified. Known limits are tracked privately. Kept in review: deployed and checked by the coordinator’s live sign-in, but not on a real phone. PROPOSAL ONLY, NOT MERGED, SQL NOT APPLIED: FawxzzyWeb PR #133 (lockout v5) adds failures-only check and record functions keyed by username and client, with no forwarded-address header, on top of the live v4. Nothing of v5 is live.",
+        "description": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. Update 2026-11-13: the coordinator verified a live sign-in with both sign-in methods (by username and by the account’s other method) after version 12; the live per-client behavior is not separately verified. Known limits are tracked privately. Kept in review: deployed and checked by the coordinator’s live sign-in, but not on a real phone. PROPOSAL ONLY, NOT MERGED, SQL NOT APPLIED: FawxzzyWeb PR #133 (lockout v5) adds failures-only check and record functions keyed by username and client, with no forwarded-address header, on top of the live v4. Nothing of v5 is live. Status 2026-11-13: FawxzzyWeb PR #133 (v5) is still unmerged and unapplied. It needs a database approval box and an owner decision on the exact change; v4 is already live from another session.",
         "card_type": "reliability",
         "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-026",
         "extensions": {
           "owner_status": "review",
@@ -1503,11 +1503,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-026",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
       },
       "content": {
-        "summary": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. Update 2026-11-13: the coordinator verified a live sign-in with both sign-in methods (by username and by the account’s other method) after version 12; the live per-client behavior is not separately verified. Known limits are tracked privately. Kept in review: deployed and checked by the coordinator’s live sign-in, but not on a real phone. PROPOSAL ONLY, NOT MERGED, SQL NOT APPLIED: FawxzzyWeb PR #133 (lockout v5) adds failures-only check and record functions keyed by username and client, with no forwarded-address header, on top of the live v4. Nothing of v5 is live.",
-        "objective": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. Update 2026-11-13: the coordinator verified a live sign-in with both sign-in methods (by username and by the account’s other method) after version 12; the live per-client behavior is not separately verified. Known limits are tracked privately. Kept in review: deployed and checked by the coordinator’s live sign-in, but not on a real phone. PROPOSAL ONLY, NOT MERGED, SQL NOT APPLIED: FawxzzyWeb PR #133 (lockout v5) adds failures-only check and record functions keyed by username and client, with no forwarded-address header, on top of the live v4. Nothing of v5 is live.",
+        "summary": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. Update 2026-11-13: the coordinator verified a live sign-in with both sign-in methods (by username and by the account’s other method) after version 12; the live per-client behavior is not separately verified. Known limits are tracked privately. Kept in review: deployed and checked by the coordinator’s live sign-in, but not on a real phone. PROPOSAL ONLY, NOT MERGED, SQL NOT APPLIED: FawxzzyWeb PR #133 (lockout v5) adds failures-only check and record functions keyed by username and client, with no forwarded-address header, on top of the live v4. Nothing of v5 is live. Status 2026-11-13: FawxzzyWeb PR #133 (v5) is still unmerged and unapplied. It needs a database approval box and an owner decision on the exact change; v4 is already live from another session.",
+        "objective": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. Update 2026-11-13: the coordinator verified a live sign-in with both sign-in methods (by username and by the account’s other method) after version 12; the live per-client behavior is not separately verified. Known limits are tracked privately. Kept in review: deployed and checked by the coordinator’s live sign-in, but not on a real phone. PROPOSAL ONLY, NOT MERGED, SQL NOT APPLIED: FawxzzyWeb PR #133 (lockout v5) adds failures-only check and record functions keyed by username and client, with no forwarded-address header, on top of the live v4. Nothing of v5 is live. Status 2026-11-13: FawxzzyWeb PR #133 (v5) is still unmerged and unapplied. It needs a database approval box and an owner decision on the exact change; v4 is already live from another session.",
         "acceptance_criteria": [
           "A wrong-try flood no longer blocks the right password from the real owner",
           "The new counter keys and caps are chosen by the owner and tested on a throwaway database",
@@ -1589,7 +1589,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Verify the before-user-created auth hook is registered at the provider",
-        "description": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. Checked 2026-11-12 on production: the hook function reads the Mazer profile table as the auth admin role, which has a column grant on username plus a row-level access policy, so the Mazer branch should work if the hook is registered (read from the grants, not proven by a live sign-up). Registration itself is still not confirmed. Not started.",
+        "description": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. Checked 2026-11-12 on production: the hook function reads the Mazer profile table as the auth admin role, which has a column grant on username plus a row-level access policy, so the Mazer branch should work if the hook is registered (read from the grants, not proven by a live sign-up). Registration itself is still not confirmed. Not started. Re-checked 2026-11-13: still UNKNOWN. It needs an owner look at the auth provider dashboard hook list; nothing was changed.",
         "card_type": "reliability",
         "lifecycle": "planning",
         "priority": "medium",
@@ -1598,7 +1598,7 @@
           "MAZER-ACCT-007"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T23:00:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-028",
         "extensions": {
           "owner_status": "planning",
@@ -1609,11 +1609,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-028",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T23:00:00.000Z"
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
       },
       "content": {
-        "summary": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. Checked 2026-11-12 on production: the hook function reads the Mazer profile table as the auth admin role, which has a column grant on username plus a row-level access policy, so the Mazer branch should work if the hook is registered (read from the grants, not proven by a live sign-up). Registration itself is still not confirmed. Not started.",
-        "objective": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. Checked 2026-11-12 on production: the hook function reads the Mazer profile table as the auth admin role, which has a column grant on username plus a row-level access policy, so the Mazer branch should work if the hook is registered (read from the grants, not proven by a live sign-up). Registration itself is still not confirmed. Not started.",
+        "summary": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. Checked 2026-11-12 on production: the hook function reads the Mazer profile table as the auth admin role, which has a column grant on username plus a row-level access policy, so the Mazer branch should work if the hook is registered (read from the grants, not proven by a live sign-up). Registration itself is still not confirmed. Not started. Re-checked 2026-11-13: still UNKNOWN. It needs an owner look at the auth provider dashboard hook list; nothing was changed.",
+        "objective": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. Checked 2026-11-12 on production: the hook function reads the Mazer profile table as the auth admin role, which has a column grant on username plus a row-level access policy, so the Mazer branch should work if the hook is registered (read from the grants, not proven by a live sign-up). Registration itself is still not confirmed. Not started. Re-checked 2026-11-13: still UNKNOWN. It needs an owner look at the auth provider dashboard hook list; nothing was changed.",
         "acceptance_criteria": [
           "Registration of the hook is confirmed or ruled out and written down",
           "If registered, a sign-up from the Mazer namespace is probed and does not error",
@@ -1852,8 +1852,8 @@
         "card_id": "MAZER-ACCT-033",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Header follows the saved profile name after a reload: PR #487 open for review",
-        "description": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (head 058f842b, OPEN, NOT MERGED, not deployed) reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked in a headless browser with a mocked profile call only. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
+        "title": "Header follows the saved profile name after reload: PR #487 merged and live, recheck open",
+        "description": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (merge 24f7daee) is MERGED AND DEPLOYED (live from production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl): it reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked before merge in a headless browser with a mocked profile call only. After deploy only sign-in was checked; the rename plus reload case was NOT re-run on the deployed build. No independent review is recorded. Nothing on a real phone. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
         "card_type": "research",
         "lifecycle": "review",
         "priority": "low",
@@ -1862,7 +1862,7 @@
           "MAZER-ACCT-021"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-033",
         "extensions": {
           "owner_status": "review",
@@ -1873,15 +1873,16 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-033",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
       },
       "content": {
-        "summary": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (head 058f842b, OPEN, NOT MERGED, not deployed) reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked in a headless browser with a mocked profile call only. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
-        "objective": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (head 058f842b, OPEN, NOT MERGED, not deployed) reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked in a headless browser with a mocked profile call only. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
+        "summary": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (merge 24f7daee) is MERGED AND DEPLOYED (live from production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl): it reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked before merge in a headless browser with a mocked profile call only. After deploy only sign-in was checked; the rename plus reload case was NOT re-run on the deployed build. No independent review is recorded. Nothing on a real phone. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
+        "objective": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (merge 24f7daee) is MERGED AND DEPLOYED (live from production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl): it reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked before merge in a headless browser with a mocked profile call only. After deploy only sign-in was checked; the rename plus reload case was NOT re-run on the deployed build. No independent review is recorded. Nothing on a real phone. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
         "acceptance_criteria": [
-          "The header after a rename plus reload is checked and written down: yes, it reverted (live)",
+          "The header after a rename plus reload is checked and written down: yes, it reverted (live, before the fix)",
           "If it reverts to the old name the rename updates the stored sign-in name: not chosen; PR #487 reads the profile name instead",
-          "A test covers the reload case: PR #487, open"
+          "A test covers the reload case: PR #487, merged",
+          "Rename plus reload re-checked on the deployed build: open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -4195,20 +4196,20 @@
         "card_id": "MAZER-GEN-007",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Straighter ladder mazes: less pointless snaking, rising ladder extended: PR #484 open",
-        "description": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). OPEN, NOT MERGED, NOT DEPLOYED; PR #484 (head 316acd0a) now also carries a density fill that spends the freed cells on short side branches and breaks long empty halls, so the floor is back within 2 to 6 percent of the old maze and the largest blank patch is at or under the old one on most bands; known issues stated in the PR: the fill reads as a comb in places and the largest blank patch is slightly worse at level 150. Zero one-tile stubs and the AI runner solves 340 of 340 at the first head. CI was red only on the stale generated work report check. Headless browser and tests only; nothing checked on a real phone. If it lands, the preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
+        "title": "Straighter ladder mazes, ladder to 288: PR #484 merged and live, owner look pending",
+        "description": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). PR #484 (merge 5cee1ed2, head e2ae8640) is MERGED AND DEPLOYED (production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl). It lowers the route share of the felt tuner and makes carved branches keep their heading, then a density fill spends the freed cells on short side branches and breaks long empty halls. Measured before merge: pointless snaking fell to 3 to 14 percent of the floor, zero one-tile stubs, the AI runner solved 340 of 340. Known issues stated in the PR: the fill can read as a comb and sparse seeds are possible. Checked in a headless browser and tests only; no formal device check. The owner gave informal feedback, \"no lag, no single tiles so far\", which is NOT a formal check. Needs owner device feedback on the comb look and sparse seeds. The preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-GEN-006"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-007",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -4216,16 +4217,17 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-007",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
       },
       "content": {
-        "summary": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). OPEN, NOT MERGED, NOT DEPLOYED; PR #484 (head 316acd0a) now also carries a density fill that spends the freed cells on short side branches and breaks long empty halls, so the floor is back within 2 to 6 percent of the old maze and the largest blank patch is at or under the old one on most bands; known issues stated in the PR: the fill reads as a comb in places and the largest blank patch is slightly worse at level 150. Zero one-tile stubs and the AI runner solves 340 of 340 at the first head. CI was red only on the stale generated work report check. Headless browser and tests only; nothing checked on a real phone. If it lands, the preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
-        "objective": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). OPEN, NOT MERGED, NOT DEPLOYED; PR #484 (head 316acd0a) now also carries a density fill that spends the freed cells on short side branches and breaks long empty halls, so the floor is back within 2 to 6 percent of the old maze and the largest blank patch is at or under the old one on most bands; known issues stated in the PR: the fill reads as a comb in places and the largest blank patch is slightly worse at level 150. Zero one-tile stubs and the AI runner solves 340 of 340 at the first head. CI was red only on the stale generated work report check. Headless browser and tests only; nothing checked on a real phone. If it lands, the preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
+        "summary": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). PR #484 (merge 5cee1ed2, head e2ae8640) is MERGED AND DEPLOYED (production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl). It lowers the route share of the felt tuner and makes carved branches keep their heading, then a density fill spends the freed cells on short side branches and breaks long empty halls. Measured before merge: pointless snaking fell to 3 to 14 percent of the floor, zero one-tile stubs, the AI runner solved 340 of 340. Known issues stated in the PR: the fill can read as a comb and sparse seeds are possible. Checked in a headless browser and tests only; no formal device check. The owner gave informal feedback, \"no lag, no single tiles so far\", which is NOT a formal check. Needs owner device feedback on the comb look and sparse seeds. The preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
+        "objective": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). PR #484 (merge 5cee1ed2, head e2ae8640) is MERGED AND DEPLOYED (production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl). It lowers the route share of the felt tuner and makes carved branches keep their heading, then a density fill spends the freed cells on short side branches and breaks long empty halls. Measured before merge: pointless snaking fell to 3 to 14 percent of the floor, zero one-tile stubs, the AI runner solved 340 of 340. Known issues stated in the PR: the fill can read as a comb and sparse seeds are possible. Checked in a headless browser and tests only; no formal device check. The owner gave informal feedback, \"no lag, no single tiles so far\", which is NOT a formal check. Needs owner device feedback on the comb look and sparse seeds. The preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
         "acceptance_criteria": [
-          "Pointless-snaking share falls sharply on every band: measured 31-47 to 3-14 percent at the first head",
-          "No one-tile stubs; every ladder maze solvable: 340 of 340 at the first head",
-          "The blank patches are filled or the owner accepts them: density fill added at head 316acd0a, comb look open for the owner",
-          "Merged, deployed and checked on a real phone: open"
+          "Pointless-snaking share falls sharply on every band: measured 31-47 to 3-14 percent before merge",
+          "No one-tile stubs; every ladder maze solvable: 340 of 340 before merge",
+          "The blank patches are filled or the owner accepts them: density fill merged; comb look open for the owner",
+          "Merged and deployed: yes (PR #484, build fawxzzy-mazer-dyhmua9v6)",
+          "Checked on a real phone: open; owner informal feedback only"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -4659,18 +4661,18 @@
         "card_id": "MAZER-GOV-009",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Stabilise load-sensitive tests: PR #489 open for review",
-        "description": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #489 (head 8fed98b4) is test-side only: a vitest config with a 60 second default timeout, named heavy tests raised, half the logical CPUs as workers (CI keeps one), a setup file that yields after slow tests, an async runtime-eval test, and a trail frame-cost test that asserts the work instead of wall-clock time. Measured on one machine: one run with no load went from 4 failed tests to 0, and three runs at once went from 16 to 20 failed to 0 failed with exit 0. The remaining wall-clock asserts did not fail in any run and were left alone (follow-up suggested). CI was red on the stale generated work report check.",
+        "title": "Stabilise load-sensitive tests: PR #489 merged",
+        "description": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Update 2026-11-13: MERGED. PR #489 (merge 0f0f7b7d) is test-side only, so there is no deployed behaviour to check; it is on main, which is deployed at 1dc4e9ca. It adds a vitest configuration with a 60 second default timeout, named heavy tests raised, half the logical CPUs as workers (CI keeps one), a setup file that yields after slow tests, an async runtime-eval test, and a trail frame-cost test that asserts the work instead of wall-clock time. Measured on one machine: three runs at once went from 16 to 20 failed tests to 0 failed with exit 0. Not measured on any other machine. The remaining wall-clock asserts did not fail in any run and were left alone (follow-up suggested). No independent review is recorded.",
         "card_type": "reliability",
-        "lifecycle": "review",
+        "lifecycle": "completed",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GOV-009",
         "extensions": {
-          "owner_status": "review",
+          "owner_status": "completed",
           "public_safe": true
         }
       },
@@ -4678,15 +4680,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GOV-009",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
       },
       "content": {
-        "summary": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #489 (head 8fed98b4) is test-side only: a vitest config with a 60 second default timeout, named heavy tests raised, half the logical CPUs as workers (CI keeps one), a setup file that yields after slow tests, an async runtime-eval test, and a trail frame-cost test that asserts the work instead of wall-clock time. Measured on one machine: one run with no load went from 4 failed tests to 0, and three runs at once went from 16 to 20 failed to 0 failed with exit 0. The remaining wall-clock asserts did not fail in any run and were left alone (follow-up suggested). CI was red on the stale generated work report check.",
-        "objective": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #489 (head 8fed98b4) is test-side only: a vitest config with a 60 second default timeout, named heavy tests raised, half the logical CPUs as workers (CI keeps one), a setup file that yields after slow tests, an async runtime-eval test, and a trail frame-cost test that asserts the work instead of wall-clock time. Measured on one machine: one run with no load went from 4 failed tests to 0, and three runs at once went from 16 to 20 failed to 0 failed with exit 0. The remaining wall-clock asserts did not fail in any run and were left alone (follow-up suggested). CI was red on the stale generated work report check.",
+        "summary": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Update 2026-11-13: MERGED. PR #489 (merge 0f0f7b7d) is test-side only, so there is no deployed behaviour to check; it is on main, which is deployed at 1dc4e9ca. It adds a vitest configuration with a 60 second default timeout, named heavy tests raised, half the logical CPUs as workers (CI keeps one), a setup file that yields after slow tests, an async runtime-eval test, and a trail frame-cost test that asserts the work instead of wall-clock time. Measured on one machine: three runs at once went from 16 to 20 failed tests to 0 failed with exit 0. Not measured on any other machine. The remaining wall-clock asserts did not fail in any run and were left alone (follow-up suggested). No independent review is recorded.",
+        "objective": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Update 2026-11-13: MERGED. PR #489 (merge 0f0f7b7d) is test-side only, so there is no deployed behaviour to check; it is on main, which is deployed at 1dc4e9ca. It adds a vitest configuration with a 60 second default timeout, named heavy tests raised, half the logical CPUs as workers (CI keeps one), a setup file that yields after slow tests, an async runtime-eval test, and a trail frame-cost test that asserts the work instead of wall-clock time. Measured on one machine: three runs at once went from 16 to 20 failed tests to 0 failed with exit 0. Not measured on any other machine. The remaining wall-clock asserts did not fail in any run and were left alone (follow-up suggested). No independent review is recorded.",
         "acceptance_criteria": [
-          "The endpoint tile pixel test at tile 25.44 and device pixel ratio 3 passes under parallel load: PR #489, one machine",
-          "Vitest worker task-update timeouts no longer fail full runs: PR #489, one machine",
-          "Three consecutive full parallel runs pass without a rerun: measured three at once, 0 failed each"
+          "The endpoint tile pixel test at tile 25.44 and device pixel ratio 3 passes under parallel load: PR #489 merged, one machine",
+          "Vitest worker task-update timeouts no longer fail full runs: PR #489 merged, one machine",
+          "Three consecutive full parallel runs pass without a rerun: measured three at once, 0 failed each, one machine"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -6174,7 +6176,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Cheaper trail while walking: draft PR #461 needs an owner decision, no pixel parity",
-        "description": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged. Owner informal feedback 2026-11-12 evening, NOT a formal check: \"no more lag I think\". Draft PR #461 stays unmerged; recommended to close it, since the lag no longer shows.",
+        "description": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged. Owner informal feedback 2026-11-12 evening, NOT a formal check: \"no more lag I think\". Draft PR #461 stays unmerged; recommended to close it, since the lag no longer shows. Status 2026-11-13: draft PR #461 is still open and unmerged; recommended to close it. The owner decision is still needed.",
         "card_type": "reliability",
         "lifecycle": "blocked",
         "priority": "medium",
@@ -6183,7 +6185,7 @@
           "MAZER-PERF-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-004",
         "extensions": {
           "owner_status": "blocked",
@@ -6194,11 +6196,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-004",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
       },
       "content": {
-        "summary": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged. Owner informal feedback 2026-11-12 evening, NOT a formal check: \"no more lag I think\". Draft PR #461 stays unmerged; recommended to close it, since the lag no longer shows.",
-        "objective": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged. Owner informal feedback 2026-11-12 evening, NOT a formal check: \"no more lag I think\". Draft PR #461 stays unmerged; recommended to close it, since the lag no longer shows.",
+        "summary": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged. Owner informal feedback 2026-11-12 evening, NOT a formal check: \"no more lag I think\". Draft PR #461 stays unmerged; recommended to close it, since the lag no longer shows. Status 2026-11-13: draft PR #461 is still open and unmerged; recommended to close it. The owner decision is still needed.",
+        "objective": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged. Owner informal feedback 2026-11-12 evening, NOT a formal check: \"no more lag I think\". Draft PR #461 stays unmerged; recommended to close it, since the lag no longer shows. Status 2026-11-13: draft PR #461 is still open and unmerged; recommended to close it. The owner decision is still needed.",
         "acceptance_criteria": [
           "Walking frame cost on a long route is measured before and after: measured in the draft, about 1.3 to 2 times cheaper, headless proxy",
           "Pixel parity with a full rebuild is not possible with a tail-split cache; the owner chooses among options A to D after a phone check: open",
@@ -6333,7 +6335,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Wrap-dock glow redraw on the shared 33 ms schedule: PR #488 open for review",
-        "description": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check.",
+        "description": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check. HELD 2026-11-13: PR #488 stays open until the owner looks at the wrap-dock glow colour step on a phone (the sheen band steps up to 20 of 255 instead of 11); not merged, not deployed.",
         "card_type": "reliability",
         "lifecycle": "review",
         "priority": "low",
@@ -6342,7 +6344,7 @@
           "MAZER-PERF-003"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-007",
         "extensions": {
           "owner_status": "review",
@@ -6353,11 +6355,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-007",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
       },
       "content": {
-        "summary": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check.",
-        "objective": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check.",
+        "summary": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check. HELD 2026-11-13: PR #488 stays open until the owner looks at the wrap-dock glow colour step on a phone (the sheen band steps up to 20 of 255 instead of 11); not merged, not deployed.",
+        "objective": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check. HELD 2026-11-13: PR #488 stays open until the owner looks at the wrap-dock glow colour step on a phone (the sheen band steps up to 20 of 255 instead of 11); not merged, not deployed.",
         "acceptance_criteria": [
           "The full-motion wrap-glow redraw cost is measured on a wrap level: PR #488, headless",
           "The redraw rate is lowered with no visible colour stepping: lowered; the sheen step rises from 11 to 20 of 255, flagged for the owner",
@@ -7379,18 +7381,18 @@
         "card_id": "MAZER-PROG-018",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Test every database change on a faithful scratch Postgres 17 and pin the live hash",
-        "description": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Update 2026-11-13: work has started and a worker is running. Not merged, and no pull request yet at the time of this sync.",
+        "title": "Test every database change on a scratch Postgres 17, pin the live hash: PR #491 merged",
+        "description": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Update 2026-11-13: MERGED. PR #491 (merge 6b944ca4) adds the SQL change process document (the rule, the proposal checklist, the failure modes), a checklist line in the pull request template and a pointer in the agent instructions, plus a db-scratch script folder (a scratch Postgres 17 harness and a read-only preimage query pack). Docs and scripts only; nothing deployed, nothing applied to any database. Evidence: the harness self-test passed 20 of 20 checks on a real scratch Postgres 17.9 cluster and 20 unit tests pass. Not verified: pack queries 90 to 92 and the volatile path against the live database; the scratch cluster uses the C locale while production reports en_US.UTF-8. No independent review is recorded. Kept in review until a real SQL change goes through the harness.",
         "card_type": "automation",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-018",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -7398,15 +7400,16 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-018",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
       },
       "content": {
-        "summary": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Update 2026-11-13: work has started and a worker is running. Not merged, and no pull request yet at the time of this sync.",
-        "objective": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Update 2026-11-13: work has started and a worker is running. Not merged, and no pull request yet at the time of this sync.",
+        "summary": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Update 2026-11-13: MERGED. PR #491 (merge 6b944ca4) adds the SQL change process document (the rule, the proposal checklist, the failure modes), a checklist line in the pull request template and a pointer in the agent instructions, plus a db-scratch script folder (a scratch Postgres 17 harness and a read-only preimage query pack). Docs and scripts only; nothing deployed, nothing applied to any database. Evidence: the harness self-test passed 20 of 20 checks on a real scratch Postgres 17.9 cluster and 20 unit tests pass. Not verified: pack queries 90 to 92 and the volatile path against the live database; the scratch cluster uses the C locale while production reports en_US.UTF-8. No independent review is recorded. Kept in review until a real SQL change goes through the harness.",
+        "objective": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Update 2026-11-13: MERGED. PR #491 (merge 6b944ca4) adds the SQL change process document (the rule, the proposal checklist, the failure modes), a checklist line in the pull request template and a pointer in the agent instructions, plus a db-scratch script folder (a scratch Postgres 17 harness and a read-only preimage query pack). Docs and scripts only; nothing deployed, nothing applied to any database. Evidence: the harness self-test passed 20 of 20 checks on a real scratch Postgres 17.9 cluster and 20 unit tests pass. Not verified: pack queries 90 to 92 and the volatile path against the live database; the scratch cluster uses the C locale while production reports en_US.UTF-8. No independent review is recorded. Kept in review until a real SQL change goes through the harness.",
         "acceptance_criteria": [
-          "The rule is written in the repository docs and referenced by the SQL proposal checklist",
-          "A reusable scratch Postgres 17 harness runs an applied file plus its rollback",
-          "A read-only preimage query pack reads the live function body and computes the hash the guard pins"
+          "The rule is written in the repository docs and referenced by the SQL proposal checklist: PR #491 merged",
+          "A reusable scratch Postgres 17 harness runs an applied file plus its rollback: self-test 20 of 20 on one machine",
+          "A read-only preimage query pack reads the live function body and computes the hash the guard pins: queries 1 to 6 ran read-only; queries 90 to 92 not run live",
+          "The process is used end to end on a real SQL change: open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -8058,7 +8061,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "The level preview jump list now offers 218 instead of 268: merged and live, review",
-        "description": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 ends the preview checkpoints at 218, the end of the strictly rising ladder, and updates the tests that name it. If the straighter-maze change (MAZER-GEN-007, PR #484, not merged) lands, the ladder end moves again and this list must follow.",
+        "description": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 ends the preview checkpoints at 218, the end of the strictly rising ladder, and updates the tests that name it. If the straighter-maze change (MAZER-GEN-007, PR #484, not merged) lands, the ladder end moves again and this list must follow. Note 2026-11-13: the straighter-maze change (PR #484) is now merged and deployed and moved the ladder end to 288, but the jump list on main still ends its checkpoints at 218 then 300; this list has not been updated to follow.",
         "card_type": "technical-debt",
         "lifecycle": "review",
         "priority": "low",
@@ -8067,7 +8070,7 @@
           "MAZER-GEN-006"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-007",
         "extensions": {
           "owner_status": "review",
@@ -8078,11 +8081,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-007",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
       },
       "content": {
-        "summary": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 ends the preview checkpoints at 218, the end of the strictly rising ladder, and updates the tests that name it. If the straighter-maze change (MAZER-GEN-007, PR #484, not merged) lands, the ladder end moves again and this list must follow.",
-        "objective": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 ends the preview checkpoints at 218, the end of the strictly rising ladder, and updates the tests that name it. If the straighter-maze change (MAZER-GEN-007, PR #484, not merged) lands, the ladder end moves again and this list must follow.",
+        "summary": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 ends the preview checkpoints at 218, the end of the strictly rising ladder, and updates the tests that name it. If the straighter-maze change (MAZER-GEN-007, PR #484, not merged) lands, the ladder end moves again and this list must follow. Note 2026-11-13: the straighter-maze change (PR #484) is now merged and deployed and moved the ladder end to 288, but the jump list on main still ends its checkpoints at 218 then 300; this list has not been updated to follow.",
+        "objective": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 ends the preview checkpoints at 218, the end of the strictly rising ladder, and updates the tests that name it. If the straighter-maze change (MAZER-GEN-007, PR #484, not merged) lands, the ladder end moves again and this list must follow. Note 2026-11-13: the straighter-maze change (PR #484) is now merged and deployed and moved the ladder end to 288, but the jump list on main still ends its checkpoints at 218 then 300; this list has not been updated to follow.",
         "acceptance_criteria": [
           "The jump list offers 218 as the end-of-fringe checkpoint: PR #469 merged and deployed",
           "No remaining reference to 268 as a ladder end in the preview list: done",
@@ -11311,18 +11314,18 @@
         "card_id": "MAZER-VIS-030",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Redesign the diamond lasers and fill and drain the diamond with the beam",
-        "description": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond. This is teleport presentation work in wave 4D-B. Work has started and a worker is running; no pull request yet, nothing built, nothing merged.",
+        "title": "Edge diamonds fill on beam contact, drain on release: merged and live, phone check pending",
+        "description": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond, timed to contact. Merged and deployed; not checked on a real phone. PR #492 (merge 1dc4e9ca, head 7a006ab7), live on production build fawxzzy-mazer-dq6f32ysl (Guide copy verified in the shipped bundle). Each edge diamond is empty until the beam head touches it, then fills linearly and is full when the beam tail arrives 200 ms later; on the way out it drains the same way, so the colour leaves through the beam end. Beams are comets in the player colour with a ripple on the contact point. Flight timing, the 400 ms laser and the input unlock are unchanged; the outro ring orbit now starts at 600 ms instead of 400. Reduced Motion shows no travelling beam and a 200 ms crossfade of the diamond fill. The Guide Wrap row now mentions the filling diamonds. Evidence: source, unit, pixel and headless Chromium only. Not checked on a real phone: beam look, contact timing and frame rate on a phone are unknown. No independent review recorded. A design note is in the repository UI docs. Follow-ups: MAZER-VIS-031 and MAZER-VIS-032.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-13T12:00:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-030",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -11330,15 +11333,122 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-030",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
       },
       "content": {
-        "summary": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond. This is teleport presentation work in wave 4D-B. Work has started and a worker is running; no pull request yet, nothing built, nothing merged.",
-        "objective": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond. This is teleport presentation work in wave 4D-B. Work has started and a worker is running; no pull request yet, nothing built, nothing merged.",
+        "summary": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond, timed to contact. Merged and deployed; not checked on a real phone. PR #492 (merge 1dc4e9ca, head 7a006ab7), live on production build fawxzzy-mazer-dq6f32ysl (Guide copy verified in the shipped bundle). Each edge diamond is empty until the beam head touches it, then fills linearly and is full when the beam tail arrives 200 ms later; on the way out it drains the same way, so the colour leaves through the beam end. Beams are comets in the player colour with a ripple on the contact point. Flight timing, the 400 ms laser and the input unlock are unchanged; the outro ring orbit now starts at 600 ms instead of 400. Reduced Motion shows no travelling beam and a 200 ms crossfade of the diamond fill. The Guide Wrap row now mentions the filling diamonds. Evidence: source, unit, pixel and headless Chromium only. Not checked on a real phone: beam look, contact timing and frame rate on a phone are unknown. No independent review recorded. A design note is in the repository UI docs. Follow-ups: MAZER-VIS-031 and MAZER-VIS-032.",
+        "objective": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond, timed to contact. Merged and deployed; not checked on a real phone. PR #492 (merge 1dc4e9ca, head 7a006ab7), live on production build fawxzzy-mazer-dq6f32ysl (Guide copy verified in the shipped bundle). Each edge diamond is empty until the beam head touches it, then fills linearly and is full when the beam tail arrives 200 ms later; on the way out it drains the same way, so the colour leaves through the beam end. Beams are comets in the player colour with a ripple on the contact point. Flight timing, the 400 ms laser and the input unlock are unchanged; the outro ring orbit now starts at 600 ms instead of 400. Reduced Motion shows no travelling beam and a 200 ms crossfade of the diamond fill. The Guide Wrap row now mentions the filling diamonds. Evidence: source, unit, pixel and headless Chromium only. Not checked on a real phone: beam look, contact timing and frame rate on a phone are unknown. No independent review recorded. A design note is in the repository UI docs. Follow-ups: MAZER-VIS-031 and MAZER-VIS-032.",
         "acceptance_criteria": [
-          "The diamond lasers are redesigned: open",
-          "The beam fills and drains the diamond: open",
-          "Reduced motion and pixel baselines are handled deliberately: open"
+          "The diamond lasers are redesigned as comet beams: PR #492 merged and deployed, headless only",
+          "The beam fills the diamond on contact and drains it on release: pure timeline with unit tests, headless Chromium frames; not checked on a phone",
+          "Reduced motion and pixel baselines are handled deliberately: 200 ms crossfade, baselines updated in the PR",
+          "Real-device check of look, timing and frame rate: open"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-031_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-031",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Lower the edge beam draw-call count if a phone hitches",
+        "description": "The redesigned edge beams (MAZER-VIS-030) draw a bloom and a body as stacked layers, set by BEAM_BODY_LAYERS and BEAM_BLOOM_LAYERS in the beam art file. Plan: if a real phone hitches during a level change, lower the layer counts or merge spans and re-measure. Do nothing until a phone check shows a hitch. Not started.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-VIS-030"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-13T12:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-031",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-031",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
+      },
+      "content": {
+        "summary": "The redesigned edge beams (MAZER-VIS-030) draw a bloom and a body as stacked layers, set by BEAM_BODY_LAYERS and BEAM_BLOOM_LAYERS in the beam art file. Plan: if a real phone hitches during a level change, lower the layer counts or merge spans and re-measure. Do nothing until a phone check shows a hitch. Not started.",
+        "objective": "The redesigned edge beams (MAZER-VIS-030) draw a bloom and a body as stacked layers, set by BEAM_BODY_LAYERS and BEAM_BLOOM_LAYERS in the beam art file. Plan: if a real phone hitches during a level change, lower the layer counts or merge spans and re-measure. Do nothing until a phone check shows a hitch. Not started.",
+        "acceptance_criteria": [
+          "A phone hitch during beams is confirmed or ruled out on a real device",
+          "If confirmed, the layer counts are lowered and the look is compared against the current one",
+          "Pixel baselines and the unit tests stay green"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-032_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-032",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Start the outro ring orbit from the master laser clock, not a fixed 600 ms",
+        "description": "The edge diamond ring now holds still until the last beam is absorbed, and the outro orbit starts at a fixed 600 ms (MAZER-VIS-030). Plan: derive the orbit start from the master laser clock so it follows the beam timing if the laser length or stagger ever changes. No visible change expected at current timings. Not started.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-VIS-030"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-13T12:00:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-032",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-032",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T12:00:00.000Z"
+      },
+      "content": {
+        "summary": "The edge diamond ring now holds still until the last beam is absorbed, and the outro orbit starts at a fixed 600 ms (MAZER-VIS-030). Plan: derive the orbit start from the master laser clock so it follows the beam timing if the laser length or stagger ever changes. No visible change expected at current timings. Not started.",
+        "objective": "The edge diamond ring now holds still until the last beam is absorbed, and the outro orbit starts at a fixed 600 ms (MAZER-VIS-030). Plan: derive the orbit start from the master laser clock so it follows the beam timing if the laser length or stagger ever changes. No visible change expected at current timings. Not started.",
+        "acceptance_criteria": [
+          "The orbit start is computed from the master laser clock constants",
+          "At current timings the orbit still starts at 600 ms and total durations do not move",
+          "A unit test pins the relation"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -11409,10 +11519,10 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 217,
-    "exported_public_card_count": 217,
-    "exported_open_card_count": 109,
-    "exported_completed_card_count": 92,
+    "stable_identity_count": 219,
+    "exported_public_card_count": 219,
+    "exported_open_card_count": 110,
+    "exported_completed_card_count": 93,
     "exported_deferred_card_count": 16,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,

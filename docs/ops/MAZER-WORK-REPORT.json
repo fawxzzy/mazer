@@ -3,22 +3,22 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-13T01:30:00.000Z"
+    "registryUpdatedAt": "2026-11-13T12:00:00.000Z"
   },
   "counters": {
-    "total": 217,
-    "open": 109,
-    "completed": 92,
+    "total": 219,
+    "open": 110,
+    "completed": 93,
     "deferred": 16,
     "buckets": {
       "needs-you": 58,
-      "in-review": 18,
+      "in-review": 20,
       "blocked": 21,
       "ready": 6,
-      "in-progress": 6,
-      "unclassified": 0,
+      "in-progress": 3,
+      "unclassified": 2,
       "deferred": 16,
-      "completed": 92
+      "completed": 93
     },
     "needsYou": {
       "decisions": 33,
@@ -28,7 +28,7 @@
       "device": 0,
       "headless": 40,
       "source-only": 35,
-      "no-device-surface": 17,
+      "no-device-surface": 18,
       "unrecorded": 0
     },
     "blockedByGroup": {
@@ -1909,6 +1909,17 @@
     ],
     "no-device-surface": [
       {
+        "id": "MAZER-GOV-009",
+        "title": "Stabilise load-sensitive tests: PR #489 merged",
+        "status": "completed",
+        "priority": "low",
+        "date": "2026-11-13",
+        "tier": "no-device-surface",
+        "prs": "#489",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-13T12:00:00.000Z"
+      },
+      {
         "id": "MAZER-ACCT-010",
         "title": "Decide the Create Account non-enumeration trade-off: accepted, auto-confirm kept",
         "status": "completed",
@@ -2124,12 +2135,28 @@
       "note": "Applied in production and verified by readback (trigger enabled, all receipts have path length and completion time). No device surface; run-quality gating that validates client-asserted values is open."
     },
     {
+      "id": "MAZER-GEN-007",
+      "title": "Straighter ladder mazes, ladder to 288: PR #484 merged and live, owner look pending",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#484",
+      "note": "PR #484 open, not merged; density fill added at head 316acd0a."
+    },
+    {
       "id": "MAZER-MOTION-001",
       "title": "Adopt one motion scale for durations, loops and easing",
       "status": "review",
       "priority": "medium",
       "prs": "#441",
       "note": "Merged and deployed at main 24e15cc1 with no visible change. Criterion 3 (dead motion code) is not done and is carried by MAZER-MOTION-007; the scene constants move in MAZER-MOTION-006."
+    },
+    {
+      "id": "MAZER-PROG-018",
+      "title": "Test every database change on a scratch Postgres 17, pin the live hash: PR #491 merged",
+      "status": "review",
+      "priority": "medium",
+      "prs": "",
+      "note": "Worker running; no PR yet."
     },
     {
       "id": "MAZER-UI-013",
@@ -2140,8 +2167,16 @@
       "note": "PR #481 merged: ratchet only. Migration of existing colours not started."
     },
     {
+      "id": "MAZER-VIS-030",
+      "title": "Edge diamonds fill on beam contact, drain on release: merged and live, phone check pending",
+      "status": "review",
+      "priority": "medium",
+      "prs": "",
+      "note": "Worker running; no PR yet."
+    },
+    {
       "id": "MAZER-ACCT-012",
-      "title": "Retire dead Mazer sign-up code: PRs #485 and #486 (stacked) open for review",
+      "title": "Retire dead Mazer sign-up code: PRs #485 and #486 merged and live, review pending",
       "status": "review",
       "priority": "low",
       "prs": "#485, #486",
@@ -2149,7 +2184,7 @@
     },
     {
       "id": "MAZER-ACCT-033",
-      "title": "Header follows the saved profile name after a reload: PR #487 open for review",
+      "title": "Header follows the saved profile name after reload: PR #487 merged and live, recheck open",
       "status": "review",
       "priority": "low",
       "prs": "#487",
@@ -2170,14 +2205,6 @@
       "priority": "low",
       "prs": "#474",
       "note": "PR #474 merged (docs and template). Governance, no device surface."
-    },
-    {
-      "id": "MAZER-GOV-009",
-      "title": "Stabilise load-sensitive tests: PR #489 open for review",
-      "status": "review",
-      "priority": "low",
-      "prs": "#489",
-      "note": "PR #489 open for review, not merged."
     },
     {
       "id": "MAZER-MOTION-006",
@@ -2528,27 +2555,6 @@
       "note": "PR #474 merged (docs). Ongoing baseline card."
     },
     {
-      "id": "MAZER-GEN-007",
-      "title": "Straighter ladder mazes: less pointless snaking, rising ladder extended: PR #484 open",
-      "status": "in_progress",
-      "priority": "medium",
-      "note": "PR #484 open, not merged; density fill added at head 316acd0a."
-    },
-    {
-      "id": "MAZER-PROG-018",
-      "title": "Test every database change on a faithful scratch Postgres 17 and pin the live hash",
-      "status": "in_progress",
-      "priority": "medium",
-      "note": "Worker running; no PR yet."
-    },
-    {
-      "id": "MAZER-VIS-030",
-      "title": "Redesign the diamond lasers and fill and drain the diamond with the beam",
-      "status": "in_progress",
-      "priority": "medium",
-      "note": "Worker running; no PR yet."
-    },
-    {
       "id": "MAZER-PERF-005",
       "title": "Cheaper long-trail bloom: measured in PR #488, change needs an owner pixel review",
       "status": "in_progress",
@@ -2693,7 +2699,22 @@
       "waitsOn": "Zac"
     }
   ],
-  "unclassified": [],
+  "unclassified": [
+    {
+      "id": "MAZER-VIS-031",
+      "title": "Lower the edge beam draw-call count if a phone hitches",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
+      "id": "MAZER-VIS-032",
+      "title": "Start the outro ring orbit from the master laser clock, not a fixed 600 ms",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    }
+  ],
   "cards": {
     "MAZER-2D-001": {
       "bucket": "in-progress",
@@ -3332,8 +3353,8 @@
       "sub": "no-device-surface"
     },
     "MAZER-GOV-009": {
-      "bucket": "in-review",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-PWA-005": {
       "bucket": "needs-you",
@@ -3516,7 +3537,7 @@
       "sub": "decision"
     },
     "MAZER-PROG-018": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-GEN-006": {
@@ -3544,11 +3565,11 @@
       "sub": "check"
     },
     "MAZER-GEN-007": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-030": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-UI-023": {
@@ -3561,6 +3582,14 @@
     },
     "MAZER-MOTION-010": {
       "bucket": "ready",
+      "sub": null
+    },
+    "MAZER-VIS-031": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-VIS-032": {
+      "bucket": "unclassified",
       "sub": null
     }
   }
