@@ -7,10 +7,18 @@ import sharp from 'sharp';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MASTER_RELATIVE_PATH = 'src/brand/source-art/mazer-app-icon-master.png';
 const MASTER_PATH = resolve(REPO_ROOT, MASTER_RELATIVE_PATH);
-const MASTER_SHA256 = 'ede90e596682795d10f97bed615071ca1f60e08e290eacf1ea143006df914d78';
-const MASTER_BYTES = 1_173_366;
+// The master is the FawxzzyWeb site's Mazer app image, copied byte-for-byte (see
+// docs/ops/MAZER-APP-IMAGE-SOURCE-2026-11-13.md: source path, sha256, and how to re-sync).
+const MASTER_SHA256 = '91764e546b8c1488b3d48baeda927ae18600b088178e190244fb9d8ce35e2440';
+const MASTER_BYTES = 934_398;
 const MASTER_SIZE = 1024;
 const MASKABLE_SAFE_DIAMETER_RATIO = 0.8;
+// The master is an opaque square: a rounded art frame on a black surround. Pixels dimmer than this channel
+// value belong to the surround, so the VISIBLE art is what the maskable safe circle must contain.
+const VISIBLE_ART_MIN_CHANNEL = 20;
+// iOS ignores transparency in apple-touch-icon (it paints black), so it is flattened on the brand background.
+const BRAND_BACKGROUND = Object.freeze({ b: 0x0f, g: 0x08, r: 0x02 });
+const FAVICON_CORNER_RATIO = 0.22;
 const ICO_SIZES = Object.freeze([16, 32, 48]);
 
 const sha256 = (payload) => createHash('sha256').update(payload).digest('hex');
@@ -68,11 +76,29 @@ const renderStandardPng = (master, size) => (
     .toBuffer()
 );
 
-const renderMaskablePng = async (master, size) => {
-  // A maskable icon's guaranteed safe zone is the centered circle whose
-  // diameter is 80% of the canvas. Fit the complete square master inside that
-  // circle so both the rainbow perimeter and central maze survive every mask.
-  const innerSize = Math.floor((size * MASKABLE_SAFE_DIAMETER_RATIO) / Math.SQRT2);
+/** Visible art extent: farthest distance from the centre, and the left/top margin of the art, in master pixels. */
+const measureVisibleArt = async (master) => {
+  const { data, info } = await sharp(master, { failOn: 'error' }).raw().toBuffer({ resolveWithObject: true });
+  const centre = (info.width - 1) / 2;
+  let radius = 0;
+  let margin = info.width;
+  for (let y = 0; y < info.height; y += 1) {
+    for (let x = 0; x < info.width; x += 1) {
+      const offset = (y * info.width + x) * info.channels;
+      if (Math.max(data[offset], data[offset + 1], data[offset + 2]) >= VISIBLE_ART_MIN_CHANNEL) {
+        radius = Math.max(radius, Math.hypot(x - centre, y - centre));
+        margin = Math.min(margin, x, y);
+      }
+    }
+  }
+  return { margin, radius: Math.ceil(radius) };
+};
+
+const renderMaskablePng = async (master, size, visibleRadius) => {
+  // A maskable icon's guaranteed safe zone is the centered circle whose diameter is 80% of the canvas.
+  // Scale the master so its VISIBLE art (frame, maze, wordmark) fits inside that circle, so every
+  // platform mask (circle, squircle, rounded square) leaves all of it showing.
+  const innerSize = Math.floor((size * MASKABLE_SAFE_DIAMETER_RATIO * MASTER_SIZE) / (2 * visibleRadius));
   const inset = Math.floor((size - innerSize) / 2);
   const resized = await renderStandardPng(master, innerSize);
 
@@ -85,6 +111,30 @@ const renderMaskablePng = async (master, size) => {
     }
   })
     .composite([{ input: resized, left: inset, top: inset }])
+    .png(pngOptions)
+    .toBuffer();
+};
+
+const renderAppleTouchPng = (master, size) => (
+  sharp(master, { failOn: 'error' })
+    .flatten({ background: BRAND_BACKGROUND })
+    .resize({ fit: 'fill', height: size, kernel: sharp.kernel.lanczos3, width: size })
+    .removeAlpha()
+    .png(pngOptions)
+    .toBuffer()
+);
+
+/** Favicon: crop the black surround, round the corners (transparent), so a tab shows the art, not a black square. */
+const renderFaviconPng = async (master, size, margin) => {
+  const crop = MASTER_SIZE - (margin * 2);
+  const mask = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${Math.round(size * FAVICON_CORNER_RATIO)}" fill="#fff"/></svg>`
+  );
+  return sharp(master, { failOn: 'error' })
+    .extract({ height: crop, left: margin, top: margin, width: crop })
+    .resize({ fit: 'fill', height: size, kernel: sharp.kernel.lanczos3, width: size })
+    .ensureAlpha()
+    .composite([{ blend: 'dest-in', input: mask }])
     .png(pngOptions)
     .toBuffer();
 };
@@ -139,20 +189,22 @@ const readAndVerifyMaster = async () => {
 };
 
 const buildOutputs = async (master) => {
+  const art = await measureVisibleArt(master);
   const [appleTouch, standard192, standard512, maskable192, maskable512] = await Promise.all([
-    renderStandardPng(master, 180),
+    renderAppleTouchPng(master, 180),
     renderStandardPng(master, 192),
     renderStandardPng(master, 512),
-    renderMaskablePng(master, 192),
-    renderMaskablePng(master, 512)
+    renderMaskablePng(master, 192, art.radius),
+    renderMaskablePng(master, 512, art.radius)
   ]);
   const icoEntries = await Promise.all(ICO_SIZES.map(async (size) => ({
-    payload: await renderStandardPng(master, size),
+    payload: await renderFaviconPng(master, size, art.margin),
     size
   })));
   const ico = createPngIco(icoEntries);
 
   return {
+    art,
     icoEntries,
     outputs: new Map([
       ['public/favicon.ico', ico],
@@ -206,7 +258,7 @@ const writeProofPreviews = async (proofDir, icoEntries, outputs) => {
 
 const options = parseArguments(process.argv.slice(2));
 const { identity, payload: master } = await readAndVerifyMaster();
-const { icoEntries, outputs } = await buildOutputs(master);
+const { art, icoEntries, outputs } = await buildOutputs(master);
 
 if (options.check) await checkOutputs(outputs);
 else await writeOutputs(options.outputRoot, outputs);
@@ -214,12 +266,13 @@ if (options.proofDir) await writeProofPreviews(options.proofDir, icoEntries, out
 
 const summary = {
   check: options.check,
-  generator: 'sharp-lanczos3-fixed-png-and-png-ico-v1',
+  generator: 'sharp-lanczos3-site-icon-png-and-png-ico-v2',
   master: identity,
   maskable: {
     background: '#000000',
-    completeMasterFitsGuaranteedSafeCircle: true,
-    safeDiameterRatio: MASKABLE_SAFE_DIAMETER_RATIO
+    completeVisibleArtFitsGuaranteedSafeCircle: true,
+    safeDiameterRatio: MASKABLE_SAFE_DIAMETER_RATIO,
+    visibleArtRadiusPx: art.radius
   },
   outputRoot: options.outputRoot,
   outputs: Object.fromEntries([...outputs].map(([relativePath, payload]) => [relativePath, {

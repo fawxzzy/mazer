@@ -13,7 +13,7 @@ export const IOS_LAUNCH_ART_DEVICES = Object.freeze([
 ]);
 
 export const IOS_LAUNCH_ART_DIR = 'public/splash';
-export const IOS_LAUNCH_ART_CACHE_VERSION = 'mazer-launch-v1';
+export const IOS_LAUNCH_ART_CACHE_VERSION = 'mazer-launch-v2';
 export const launchArtFileName = (device) => `ios-${device.id}.png`;
 export const launchArtPixels = (device) => ({ width: device.width * device.ratio, height: device.height * device.ratio });
 export const launchArtMedia = (device) => (

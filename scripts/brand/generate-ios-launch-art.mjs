@@ -16,8 +16,13 @@ import {
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MASTER_PATH = resolve(REPO_ROOT, 'src/brand/source-art/mazer-app-icon-master.png');
 const BACKGROUND = { r: 0x02, g: 0x08, b: 0x0f };
+// Keep in step with the in-app loader (src/render/appLoader.ts LOADER_ICON_*): the launch image, the HTML boot
+// splash and the Phaser loader draw the icon at the same size and place, so the hand-offs do not jump.
 const ICON_WIDTH_RATIO = 0.3;
-const ICON_CORNER_RATIO = 0.2237;
+const ICON_CORNER_RATIO = 0.2;
+// The master is a rounded art frame on a black surround (41 px each side of 1024): crop it, round the corners.
+const MASTER_SIZE = 1024;
+const MASTER_ART_MARGIN = 41;
 
 const roundedMask = (size) => Buffer.from(
   `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${Math.round(size * ICON_CORNER_RATIO)}" fill="#fff"/></svg>`
@@ -26,7 +31,9 @@ const roundedMask = (size) => Buffer.from(
 const render = async (master, device) => {
   const { width, height } = launchArtPixels(device);
   const iconSize = Math.round(width * ICON_WIDTH_RATIO);
+  const crop = MASTER_SIZE - (MASTER_ART_MARGIN * 2);
   const icon = await sharp(master)
+    .extract({ height: crop, left: MASTER_ART_MARGIN, top: MASTER_ART_MARGIN, width: crop })
     .resize({ width: iconSize, height: iconSize, fit: 'fill', kernel: sharp.kernel.lanczos3 })
     .ensureAlpha()
     .composite([{ input: roundedMask(iconSize), blend: 'dest-in' }])

@@ -2,13 +2,23 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
+  MAZER_BOOT_SPLASH_FADE_IN_ANIMATION,
   MAZER_BOOT_SPLASH_ID,
+  MAZER_BOOT_SPLASH_STAGE_ID,
   fadeOutMazerBootSplash,
   removeMazerBootSplash,
   type BootSplashDocumentLike,
   type BootSplashElementLike
 } from '../../src/boot/bootSplash';
 import { clearMazerBootStatusForTests, markMazerBootStatus } from '../../src/boot/bootStatus';
+import {
+  LOADER_FADE_IN_MS,
+  LOADER_MIN_HOLD_MS,
+  LOADER_PULSE_PERIOD_MS,
+  LOADER_RING_REDUCED_ALPHA,
+  LOADER_RING_REDUCED_SCALE,
+  LOADER_SHOW_DELAY_MS
+} from '../../src/render/appLoader';
 import { MOTION_DURATION_MS, MOTION_LOOP_MS, MOTION_REDUCED_MS } from '../../src/render/motionScale';
 
 let styleLog: string[] = [];
@@ -110,16 +120,96 @@ describe('boot splash fades out instead of hard-cutting (MAZER-MOTION-002)', () 
   });
 });
 
-describe('index.html splash pulse is on the shared loader beat', () => {
+describe('index.html splash loader is on the shared loader timeline (MAZER-VIS-039)', () => {
   const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
 
-  test('the dot pulses once per beat (MOTION_LOOP_MS.beat)', () => {
-    const match = html.match(/animation:\s*mazer-boot-splash-pulse\s+([\d.]+)s\s/);
-    expect(match).not.toBeNull();
-    expect(Math.round(Number(match?.[1]) * 1000)).toBe(MOTION_LOOP_MS.beat);
+  test('the icon and the ring each pulse once per beat (MOTION_LOOP_MS.beat)', () => {
+    for (const name of ['mazer-boot-splash-breathe', 'mazer-boot-splash-ring']) {
+      const at = html.indexOf(`animation: ${name} `);
+      expect(at, name).toBeGreaterThan(-1);
+      const match = /^([0-9.]+)s /.exec(html.slice(at + `animation: ${name} `.length));
+      expect(match, name).not.toBeNull();
+      expect(Math.round(Number(match?.[1]) * 1000), name).toBe(LOADER_PULSE_PERIOD_MS);
+    }
+    expect(LOADER_PULSE_PERIOD_MS).toBe(MOTION_LOOP_MS.beat);
   });
 
-  test('reduced motion still stops the pulse (movement), as before', () => {
-    expect(html).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*#mazer-boot-splash \.mazer-boot-splash-pulse \{ animation: none/);
+  test('the stage fades in after the show delay over the fade-in step, and never starts visible', () => {
+    const match = html.match(/\.mazer-boot-splash-stage \{[^}]*?opacity: 0;\s*animation: mazer-boot-splash-in (\d+)ms ease (\d+)ms both;/);
+    expect(match).not.toBeNull();
+    expect(Number(match?.[1])).toBe(LOADER_FADE_IN_MS);
+    expect(Number(match?.[1])).toBe(MOTION_DURATION_MS.base);
+    expect(Number(match?.[2])).toBe(LOADER_SHOW_DELAY_MS);
+  });
+
+  test('the fade-in animation is on the stage, never on the root, so the root fade-out is not overridden', () => {
+    expect(html).toMatch(/#mazer-boot-splash \{[^}]*background: #02080f/);
+    expect(html.match(/#mazer-boot-splash \{[^}]*\}/)?.[0]).not.toMatch(/animation/);
+    expect(html).toContain(`id="${MAZER_BOOT_SPLASH_STAGE_ID}"`);
+    expect(html).toContain(`@keyframes ${MAZER_BOOT_SPLASH_FADE_IN_ANIMATION}`);
+  });
+
+  test('reduced motion stops the icon pulse and the ring movement (a still halo), as the owner rule says', () => {
+    expect(html).toMatch(/prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.mazer-boot-splash-icon \{ animation: none; \}/);
+    expect(html).toMatch(/\.mazer-boot-splash-ring \{ animation: none; transform: scale\(1\.08\); opacity: 0\.28; \}/);
+    expect(LOADER_RING_REDUCED_SCALE).toBe(1.08);
+    expect(LOADER_RING_REDUCED_ALPHA).toBe(0.28);
+  });
+
+  test('the loader icon is inline (no request, no pop-in) and its size is reserved', () => {
+    expect(html).toMatch(/<img id="mazer-boot-splash-icon"[^>]*width="256" height="256"[^>]*src="data:image\/webp;base64,/);
+    expect(html).not.toMatch(/<img[^>]*src="\//);
+  });
+});
+
+describe('boot splash exit waits out the minimum hold once the icon has shown (MAZER-VIS-039)', () => {
+  const animated = (currentTime: unknown): BootSplashElementLike => ({
+    textContent: '',
+    remove: () => undefined,
+    getAnimations: () => [{ animationName: MAZER_BOOT_SPLASH_FADE_IN_ANIMATION, currentTime }]
+  });
+  const stageAndSplash = (currentTime: unknown) => {
+    const splash = new StyledSplash();
+    const stage = animated(currentTime);
+    const doc: BootSplashDocumentLike = {
+      getElementById: (id) => (id === MAZER_BOOT_SPLASH_ID ? splash : id === MAZER_BOOT_SPLASH_STAGE_ID ? stage : null)
+    };
+    return { splash, doc };
+  };
+
+  test('still inside the show delay: the loader never showed, so the exit starts at once', () => {
+    const { splash, doc } = stageAndSplash(LOADER_SHOW_DELAY_MS - 1);
+    const scheduled: number[] = [];
+    fadeOutMazerBootSplash({ documentRef: doc, reducedMotion: false, schedule: (_cb, delayMs) => { scheduled.push(delayMs); } });
+    expect(splash.style.opacity).toBe('0');
+    expect(scheduled).toEqual([MOTION_DURATION_MS.slow]);
+  });
+
+  test('shown 200 ms ago: the exit waits for the rest of the hold, then fades', () => {
+    const { splash, doc } = stageAndSplash(LOADER_SHOW_DELAY_MS + 200);
+    const scheduled: Array<{ callback: () => void; delayMs: number }> = [];
+    fadeOutMazerBootSplash({ documentRef: doc, reducedMotion: false, schedule: (callback, delayMs) => { scheduled.push({ callback, delayMs }); } });
+    expect(splash.style.opacity).toBe('');
+    expect(scheduled).toHaveLength(1);
+    expect(scheduled[0].delayMs).toBe(LOADER_MIN_HOLD_MS - 200);
+    scheduled[0].callback();
+    expect(splash.style.opacity).toBe('0');
+    expect(scheduled[1].delayMs).toBe(MOTION_DURATION_MS.slow);
+  });
+
+  test('shown long enough: the exit starts at once; a second request never double-schedules', () => {
+    const { splash, doc } = stageAndSplash(LOADER_SHOW_DELAY_MS + LOADER_MIN_HOLD_MS + 50);
+    const scheduled: number[] = [];
+    const schedule = (_cb: () => void, delayMs: number): void => { scheduled.push(delayMs); };
+    fadeOutMazerBootSplash({ documentRef: doc, reducedMotion: true, schedule });
+    fadeOutMazerBootSplash({ documentRef: doc, reducedMotion: true, schedule });
+    expect(splash.style.opacity).toBe('0');
+    expect(scheduled).toEqual([MOTION_REDUCED_MS.crossfade]);
+  });
+
+  test('an unreadable animation clock is treated as no hold to serve', () => {
+    const { splash, doc } = stageAndSplash(null);
+    fadeOutMazerBootSplash({ documentRef: doc, reducedMotion: false, schedule: () => undefined });
+    expect(splash.style.opacity).toBe('0');
   });
 });

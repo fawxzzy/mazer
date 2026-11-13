@@ -51,7 +51,7 @@ describe('Mazer icon-quality target', () => {
       repositoryPath: 'src/brand/source-art/mazer-app-icon-master.png',
       width: 1024,
       height: 1024,
-      bytes: 1_173_366,
+      bytes: 934_398,
       sha256: MAZER_ICON_SOURCE_SHA256
     });
     expect(summary.generator).toMatchObject({
@@ -63,8 +63,8 @@ describe('Mazer icon-quality target', () => {
     expect(summary.canonicalAsset.sha256).toBe(summary.sourceMaster.sha256);
     expect(summary.supersededEvidence.every((asset) => asset.authoritative === false)).toBe(true);
     expect(summary.visualRules).toEqual(expect.arrayContaining([
-      'locked-final-master-no-redesign',
-      'preserve-rainbow-frame-and-central-maze',
+      'site-app-image-is-the-only-master',
+      'preserve-frame-maze-and-wordmark',
       'maskable-safe-zone-padding',
       'no-competing-authoritative-artwork'
     ]));
@@ -100,7 +100,7 @@ describe('Mazer icon-quality target', () => {
 
     const source = readFileSync(resolve(process.cwd(), MAZER_ICON_QUALITY_TARGET.sourceMaster.repositoryPath));
     const canonical = readFileSync(resolve(process.cwd(), MAZER_ICON_QUALITY_TARGET.canonicalAsset.repositoryPath));
-    expect(source.byteLength).toBe(1_173_366);
+    expect(source.byteLength).toBe(934_398);
     expect(canonical.equals(source)).toBe(true);
     expect(readIcoSizes('public/favicon.ico')).toEqual([16, 32, 48]);
     expect(readFileSync(resolve(process.cwd(), 'public/favicon.ico')).equals(
@@ -111,7 +111,7 @@ describe('Mazer icon-quality target', () => {
     expect(MAZER_ICON_QUALITY_TARGET.maskablePolicy).toEqual({
       background: '#000000',
       guaranteedSafeCircleDiameterRatio: 0.8,
-      completeMasterFitsSafeCircle: true
+      completeVisibleArtFitsSafeCircle: true
     });
   });
 
@@ -144,9 +144,9 @@ describe('Mazer icon-quality target', () => {
     expect(indexSource).toContain(`/favicon.ico?v=${MAZER_ICON_CACHE_VERSION}`);
     expect(indexSource).toContain(`/icons/apple-touch-icon.png?v=${MAZER_ICON_CACHE_VERSION}`);
     expect(indexSource).toContain('/manifest.webmanifest');
-    // Social previews use the dedicated share image (MAZER-SHARE-001, pinned by tests/architecture/share-metadata-contract.test.ts),
-    // not the app icon: the icon stays the install/favicon/manifest identity.
-    expect(indexSource).toContain('https://mazer.fawxzzy.com/share/mazer-share-preview.png?v=share-v1');
+    // Social previews use the share image (MAZER-SHARE-001, pinned by tests/architecture/share-metadata-contract.test.ts),
+    // which since MAZER-VIS-039 is the same app image composed 1200x630 (scripts/brand/generate-share-preview.mjs).
+    expect(indexSource).toContain('https://mazer.fawxzzy.com/share/mazer-share-preview.png?v=share-v2');
     expect(manifest.icons.map((icon) => icon.src)).toEqual(expectedManifestUrls);
     expect(manifest.shortcuts[0]?.icons).toEqual([
       expect.objectContaining({ src: `/icons/icon-192.png?v=${MAZER_ICON_CACHE_VERSION}`, purpose: 'any' })

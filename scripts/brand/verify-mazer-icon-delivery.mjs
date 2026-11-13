@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-export const MAZER_ICON_CACHE_VERSION = 'mazer-final-icon-v2';
+export const MAZER_ICON_CACHE_VERSION = 'mazer-site-icon-v1';
 export const MAZER_ICON_DELIVERY_PATHS = Object.freeze([
   'favicon.ico',
   'icons/mazer-app-icon.ico',
