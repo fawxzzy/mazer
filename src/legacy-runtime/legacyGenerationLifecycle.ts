@@ -597,6 +597,10 @@ const resolveLegacyAdaptiveUnderTargetScale = (scale: number): number => {
   );
 };
 
+// Rank penalty of a base whose wrap spoke was walled back up (below one whole window step, so an on-window
+// plain maze still beats an off-window one, and above the 0.5 of a coin-flip landing).
+const WRAP_LOST_RANK_PENALTY = 0.75;
+
 // Selection for geometry-budget profiles (progression levels 2..LAST_BUDGET_LEVEL).
 // There is no target-complexity search and no pressure/adaptive retry: those
 // would resize the board and swap the profile, which the budget ladder forbids,
@@ -694,7 +698,11 @@ const selectLegacyGeometryBudgetMaze = (
       tieBiased = distance === 0 && tuned.tieDeviationPercent > FELT_TIE_DEVIATION_LIMIT_PERCENT;
     }
     // Rank: off-window by its distance; a coin-flip landing just behind a clean one.
-    const rank = tieBiased ? distance + 0.5 : distance;
+    // A base whose wrap spoke could not join the maze was walled back up (MAZER-GEN-005): it is a plain maze
+    // wearing a wrap profile, so a base that carries its wrap properly is preferred; it is the choice only
+    // when every base in the budget is such a maze.
+    const wrapLost = (base.islandStats?.base ?? 0) > 0 && baseRungs > 0;
+    const rank = (tieBiased ? distance + 0.5 : distance) + (wrapLost ? WRAP_LOST_RANK_PENALTY : 0);
     if (selectedMaze === null || rank < selectedRank) {
       // Only a maze that becomes the selection is assembled (route, wrap diagnostics): a base that
       // missed its window or floor is discarded for the price of the tuning alone.
@@ -703,7 +711,7 @@ const selectLegacyGeometryBudgetMaze = (
       selectedDistance = distance;
       selectedRank = rank;
     }
-    if (distance === 0 && (!tieBiased || index >= GEOMETRY_BUDGET_TIE_RETRY_BASES - 1)) {
+    if (distance === 0 && !wrapLost && (!tieBiased || index >= GEOMETRY_BUDGET_TIE_RETRY_BASES - 1)) {
       break;
     }
   }
@@ -763,6 +771,11 @@ const assembleTunedMaze = (
   const forcedStubs = tuned.stubRemaining > 0 ? forceRemoveOneTileStubs(next as typeof next & { grid: boolean[][] }) : [];
   if (tuned.stubLengthened.length > 0 || tuned.stubRemoved.length > 0 || forcedStubs.length > 0) {
     next.stubStats = { lengthened: tuned.stubLengthened.length, removed: tuned.stubRemoved.length, forced: forcedStubs.length };
+  }
+  // Floor-island rule (legacyMazeIslands.ts): what the base build and the tune had to wall back up.
+  const islandBase = base.islandStats?.base ?? 0;
+  if (islandBase > 0 || tuned.islandCellsDropped > 0 || tuned.islandCellsForced > 0) {
+    next.islandStats = { base: islandBase, dropped: tuned.islandCellsDropped, forced: tuned.islandCellsForced };
   }
   if (tuned.loops.length > 0) {
     next.loopStats = {

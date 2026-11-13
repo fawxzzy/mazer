@@ -48,6 +48,7 @@
 
 import { FELT_VISION_CELLS, createFeltExplorer, type FeltRun } from './legacyMazeFeltDifficulty';
 import { HALL_MIN_CELLS } from './legacyMazeDensity';
+import { fillUnreachableCells } from './legacyMazeIslands';
 import { MIN_DEAD_END_BRANCH_CELLS, countStubTips, fixOneTileStubs, probeDeadEndBranch } from './legacyMazeStubs';
 import {
   LOOP_DECOY_MIN_CELLS,
@@ -180,6 +181,10 @@ export interface FeltTuningResult {
   readonly stubLengthened: { x: number; y: number }[];
   readonly stubRemoved: { x: number; y: number }[];
   readonly stubRemaining: number;
+  // Floor-island rule (legacyMazeIslands.ts): cells walled up because closing a loop connector orphaned them, and
+  // cells the last-resort sweep at the end walled up (expected 0).
+  readonly islandCellsDropped: number;
+  readonly islandCellsForced: number;
   // The reverse felt value (explorer from the goal to the start, minus the priced savings) of the
   // finished maze, measured on every tune; and the steps it fell short of `reverseFloor`.
   readonly reverseFelt: number;
@@ -466,6 +471,7 @@ const tuneOnce = (
   // given back from here (it is part of the base maze), so a base whose wrap alone passes
   // the ceiling is marked hopeless and the selection tries the next base.
   const wrapPercent = Math.max(0, Math.trunc(options.wrapPricePercent ?? 0));
+  let islandCellsDropped = 0;
   let loopSaving = 0;
   let wrapSaving = 0;
   let overCeiling = false;
@@ -497,6 +503,19 @@ const tuneOnce = (
       dropped = true;
     }
     if (dropped) {
+      // Closing a connector can strand what hung on it: the stretch lever's switchback detours ride the
+      // explorer's route, which may run through a loop connector, and a detour's two ends are connector
+      // cells. Such a detour is unreachable once the connector is closed (MAZER-GEN-005), so it is walled up
+      // here, before the later levers read the grid. The explorer never entered it: nothing else changes.
+      const stranded = fillUnreachableCells(open, explorer.neighbors, startCell);
+      if (stranded.length > 0) {
+        islandCellsDropped = stranded.length;
+        const gone = new Set(stranded);
+        for (let index = stretchTiles.length - 1; index >= 0; index -= 1) {
+          const tile = stretchTiles[index]!;
+          if (gone.has((tile.y * width) + tile.x)) { stretchTiles.splice(index, 1); }
+        }
+      }
       loopTiles.length = 0;
       loopRecords.forEach((record) => record.cells.forEach((cell) => { loopTiles.push(point(cell)); }));
       run = evaluate();
@@ -1061,6 +1080,9 @@ const tuneOnce = (
   }
   const reverseShortfall = reverseFloor > 0 ? Math.max(0, reverseFloor - reverseFelt) : 0;
 
+  // Last resort of the floor-island rule: nothing above leaves floor the start cannot reach (expected 0).
+  const islandCellsForced = fillUnreachableCells(open, explorer.neighbors, startCell).length;
+
   const grid: boolean[][] = [];
   for (let y = 0; y < height; y += 1) {
     const row: boolean[] = [];
@@ -1092,6 +1114,8 @@ const tuneOnce = (
     stubLengthened,
     stubRemoved,
     stubRemaining,
+    islandCellsDropped,
+    islandCellsForced,
     reverseFelt,
     reverseShortfall,
     stretchTiles,
