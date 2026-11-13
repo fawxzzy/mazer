@@ -323,7 +323,10 @@ describe('geometry budget felt tuning (realized felt difficulty)', () => {
       for (let from = 0; from + 80 <= proxies.length; from += 40) {
         expect(windowMean(from + 40, from + 80)).toBeGreaterThan(windowMean(from, from + 40) * 0.9);
       }
-      expect(windowMean(proxies.length - 40, proxies.length)).toBeGreaterThan(windowMean(0, 40) * 1.5);
+      // 1.3, not 1.5 (MAZER-GEN-007): the proxy counts the route's turns and length, which the straighter ladder no longer
+      // grows by switchback bumps (the felt number is paid by branch cells instead). Measured last-40 over first-40:
+      // 1.61 / 1.62 / 1.61 before (phone / desktop / square), 1.39 / 1.38 / 1.38 after.
+      expect(windowMean(proxies.length - 40, proxies.length)).toBeGreaterThan(windowMean(0, 40) * 1.3);
     }, 300_000);
   }
 

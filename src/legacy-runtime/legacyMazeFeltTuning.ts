@@ -116,6 +116,13 @@ export interface FeltTuningOptions {
   // explorer cannot see. Omit or false: byte-identical to the tuner without the lever (no extra
   // random draw is made).
   readonly doubleLure?: boolean;
+  // Straight branches (MAZER-GEN-007, pointless snaking): every cell of a carved deceptive branch
+  // keeps its heading and turns only when the wall ahead is blocked (a branch used to turn with
+  // probability one in three at every cell, which bent a 24-cell branch into an S-bend/zigzag with
+  // about eight corners and nothing to choose along it). The felt cost of a branch is its length,
+  // not its shape, so the number lands exactly as before. Omit or false: byte-identical to the
+  // tuner without the rule.
+  readonly straightBranches?: boolean;
   // Floor of the REVERSE felt value (the same explorer run from the goal to the start, minus the
   // same priced savings). A maze below it reports the shortfall in `windowDistance` (so the
   // restarts and then the next base are tried). 0 or omitted: no floor.
@@ -296,6 +303,7 @@ const tuneOnce = (
   // Double lure (lever 4): every fork carved straight off the route points toward the goal AND
   // toward the start, so the explorer pulled from the goal end pays for it too.
   const doubleLure = options.doubleLure === true;
+  const straightBranches = options.straightBranches === true;
   const reverseFloor = Math.max(0, Math.trunc(options.reverseFloor ?? 0));
 
   // Cells never trimmed: the base route, and every cell the stretch lever carves.
@@ -509,7 +517,8 @@ const tuneOnce = (
       open[cell] = 1;
       carved.push(cell);
       if (carved.length >= length) { break; }
-      const straightFirst = (rand() % 3) !== 0;
+      // The draw is made either way, so a maze that does not use the rule keeps its stream.
+      const straightFirst = (rand() % 3) !== 0 || straightBranches;
       const turnA = (heading < 2 ? 2 : 0) + (rand() & 1);
       const turnB = (heading < 2 ? 2 : 0) + (1 - (turnA & 1));
       const order = straightFirst ? [heading, turnA, turnB] : [turnA, heading, turnB];

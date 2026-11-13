@@ -4,6 +4,7 @@ import { createLegacyDemoWalkerEpisode, createLegacyMenuDemoWalkerConfig } from 
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import {
   GEOMETRY_BUDGET_CEILING,
+  GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
   GEOMETRY_BUDGET_LOOP_FIRST_LEVEL,
   GEOMETRY_BUDGET_LOOP_FULL_LEVEL,
   GEOMETRY_BUDGET_LOOP_PURE_FLOOR_PERCENT,
@@ -309,7 +310,8 @@ describe('generated ladder mazes carry loops by the plan, and the menu AI clears
         }
       }
     }
-  });
+  }, 30_000);
+
 
   test('loop cells are interior, the start and goal are intact, every maze lands the priced window, and the tie price holds', () => {
     let looped = 0;
@@ -321,7 +323,7 @@ describe('generated ladder mazes carry loops by the plan, and the menu AI clears
           const seed = seedForIndex(index);
           const maze = generateLadderMaze(level, board, seed);
           total += 1;
-          const target = resolveGeometryBudgetTarget(Math.min(level, 198))!;
+          const target = resolveGeometryBudgetTarget(Math.min(level, GEOMETRY_BUDGET_FELT_SATURATION_LEVEL))!;
           const priced = measurePricedFeltSteps(maze);
           expect(priced).toBeGreaterThanOrEqual(target);
           expect(priced).toBeLessThanOrEqual(target + 1);

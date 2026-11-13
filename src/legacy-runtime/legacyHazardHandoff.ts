@@ -13,8 +13,8 @@
 //  - `hazardBudgetLevels` = level - GEOMETRY_BUDGET_SATURATION_LEVEL (>= 0, +1 per
 //    level, unbounded): the amount of difficulty the geometry can no longer
 //    supply. Hazard allocation should spend exactly this budget.
-//  - GEOMETRY_BUDGET_SATURATION_LEVEL (218; it was 268 until the one-tile stub rule halved the fringe capacity) is the END of the fringe, not of the felt ramp: the
-//    felt number saturates first (GEOMETRY_BUDGET_FELT_SATURATION_LEVEL, level 198), then
+//  - GEOMETRY_BUDGET_SATURATION_LEVEL (288; it was 268, then 218 under the one-tile stub rule, until the route stretch was cut, MAZER-GEN-007) is the END of the fringe, not of the felt ramp: the
+//    felt number saturates first (GEOMETRY_BUDGET_FELT_SATURATION_LEVEL, level 283), then
 //    geometry still rises by zero-felt-cost side stubs (the fringe, to the saturation level,
 //    legacyGeometryBudget.ts). Hazards owe nothing in that stretch: it stays 0. (A mastery tier
 //    from 269 to 388 briefly moved the saturation level to 388; with the double lure on every
