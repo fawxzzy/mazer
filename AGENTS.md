@@ -19,3 +19,4 @@
 - Prefer small, testable commits by lane/wave.
 - Keep scene wiring explicit in `src/boot/phaserConfig.ts`.
 - Avoid introducing service worker behavior that can stale localhost development.
+- Any SQL proposal (a file under `supabase/migrations/` or a proposal for a production database change) follows `docs/ops/MAZER-SQL-CHANGE-PROCESS.md`: tested on a faithful scratch PostgreSQL 17 (`scripts/db-scratch/`), any hash guard pins the md5 of the LIVE function body, independent review, and an owner box naming the sha256 of the exact apply file. Production database writes stay approval-gated.
