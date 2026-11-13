@@ -40,11 +40,9 @@ describe('player message copy rows', () => {
     }).toMatchInlineSnapshot(`
       {
         "auth": {
-          "accountCreated": "Your account is ready.",
           "accountRecovery": "Account setup could not be completed. Try signing in or use Forgot Password.",
           "accountUnavailable": "Account service is unavailable right now. Try again shortly.",
           "authUnavailable": "Account access is unavailable right now. Try again shortly.",
-          "createReady": "Details look good. Create your account when you are ready.",
           "emailInvalid": "Enter a valid email address.",
           "enterEmail": "Enter an email.",
           "loginNotConfigured": "Account access is unavailable right now. Try again shortly.",
@@ -60,11 +58,8 @@ describe('player message copy rows', () => {
           "passwordResetSent": "Password reset email sent.",
           "signedIn": "Signed in.",
           "signedOut": "Signed out.",
-          "signupNotConfigured": "Account creation is unavailable right now. Try again shortly.",
           "usernameInvalid": "Use 2-15 letters, numbers, periods, underscores, or hyphens.",
-          "usernameRequired": "Enter a username.",
           "usernameTaken": "That username is already taken.",
-          "verifyEmail": "Check your email to finish account setup.",
         },
         "boot": {
           "bootError": "The maze did not finish loading. Try refreshing once.",

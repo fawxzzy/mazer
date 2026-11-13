@@ -57,11 +57,9 @@ export const LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL = 'MAZER_SIGNUP_USERNAME_IN
 export const LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL = 'MAZER_SIGNUP_USERNAME_TAKEN';
 
 export const LEGACY_AUTH_MESSAGE_COPY = {
-  accountCreated: 'Your account is ready.',
   accountRecovery: 'Account setup could not be completed. Try signing in or use Forgot Password.',
   accountUnavailable: 'Account service is unavailable right now. Try again shortly.',
   authUnavailable: 'Account access is unavailable right now. Try again shortly.',
-  createReady: 'Details look good. Create your account when you are ready.',
   emailInvalid: 'Enter a valid email address.',
   enterEmail: 'Enter an email.',
   loginNotConfigured: 'Account access is unavailable right now. Try again shortly.',
@@ -76,12 +74,9 @@ export const LEGACY_AUTH_MESSAGE_COPY = {
   passwordResetNotConfigured: 'Password reset is unavailable right now. Try again shortly.',
   passwordResetSent: 'Password reset email sent.',
   usernameInvalid: 'Use 2-15 letters, numbers, periods, underscores, or hyphens.',
-  usernameRequired: 'Enter a username.',
   usernameTaken: 'That username is already taken.',
-  signupNotConfigured: 'Account creation is unavailable right now. Try again shortly.',
   signedIn: 'Signed in.',
-  signedOut: 'Signed out.',
-  verifyEmail: 'Check your email to finish account setup.'
+  signedOut: 'Signed out.'
 } as const;
 
 // Shared-account sign-in failures, one row per failure CLASS the player can act
