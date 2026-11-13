@@ -3,24 +3,24 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-13T17:51:42.000Z",
+    "registryUpdatedAt": "2026-11-13T21:02:25.000Z",
     "boardSync": {
-      "at": "2026-11-13T17:51:42.000Z",
-      "appliedEventCount": 26,
-      "lastEventId": "5805e37e4567"
+      "at": "2026-11-13T21:02:25.000Z",
+      "appliedEventCount": 35,
+      "lastEventId": "14d59f5f37d6"
     }
   },
   "counters": {
-    "total": 230,
-    "open": 121,
+    "total": 234,
+    "open": 125,
     "completed": 93,
     "deferred": 16,
     "buckets": {
       "needs-you": 58,
-      "in-review": 31,
+      "in-review": 36,
       "blocked": 20,
       "ready": 4,
-      "in-progress": 4,
+      "in-progress": 3,
       "unclassified": 4,
       "deferred": 16,
       "completed": 93
@@ -2124,6 +2124,14 @@
       "note": "FawxzzyWeb PR #121 is merged and NOT live: the release carrying it still needs the requester alias moves."
     },
     {
+      "id": "MAZER-ACCT-040",
+      "title": "Load straight into the account sign-in instead of the Mazer sign-in screen",
+      "status": "review",
+      "priority": "high",
+      "prs": "#510",
+      "note": ""
+    },
+    {
       "id": "MAZER-GOV-004",
       "title": "Retire the previous project board and refresh this one from all prior discussion",
       "status": "review",
@@ -2138,6 +2146,14 @@
       "priority": "medium",
       "prs": "",
       "note": "Applied in production and verified by readback (trigger enabled, all receipts have path length and completion time). No device surface; run-quality gating that validates client-asserted values is open."
+    },
+    {
+      "id": "MAZER-ACCT-039",
+      "title": "Test the account reset flow end to end",
+      "status": "review",
+      "priority": "medium",
+      "prs": "FawxzzyWeb#150",
+      "note": ""
     },
     {
       "id": "MAZER-FLOW-015",
@@ -2188,6 +2204,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-PERF-010",
+      "title": "Investigate an intermittent slow boot seen by the QA sign-in test",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#509",
+      "note": ""
+    },
+    {
       "id": "MAZER-PROG-018",
       "title": "Test every database change on a scratch Postgres 17, pin the live hash: PR #491 merged",
       "status": "review",
@@ -2217,6 +2241,22 @@
       "status": "review",
       "priority": "medium",
       "prs": "#497",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-038",
+      "title": "Edge diamonds: beams on the inner tip, half size while playing, continuous beams",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#512",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-039",
+      "title": "One smooth loader and the website app image everywhere",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#511",
       "note": ""
     },
     {
@@ -2619,13 +2659,6 @@
       "status": "active",
       "priority": "high",
       "note": "PR #474 merged (docs). Ongoing baseline card."
-    },
-    {
-      "id": "MAZER-PERF-010",
-      "title": "Investigate an intermittent slow boot seen by the QA sign-in test",
-      "status": "in_progress",
-      "priority": "medium",
-      "note": ""
     },
     {
       "id": "MAZER-PERF-005",
@@ -3720,7 +3753,23 @@
       "sub": null
     },
     "MAZER-PERF-010": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-ACCT-039": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-039": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-ACCT-040": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-038": {
+      "bucket": "in-review",
       "sub": null
     }
   }

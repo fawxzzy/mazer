@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_9d706b1ca080",
+  "export_id": "pbe_mazer_owner_registry_8d5b9df99070",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:9d706b1ca0806c5e34455a8c87f5f59ebd272ac54472b955648213417d536a73",
-  "generated_at": "2026-11-13T17:51:42.000Z",
+  "source_revision": "sha256:8d5b9df99070e3ffdc400de1f296ae2d87dd376a56c8b265e3248a6b6cea5136",
+  "generated_at": "2026-11-13T21:02:25.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:55df36b760eb9900d27196d24312203426a21a45487a81b21e3950f3b40886f2",
-      "observed_at": "2026-11-13T17:51:42.000Z"
+      "revision": "sha256:2dfe033343f4a93d1c6990a4422ee2247f70af7981ddbcb36c7d03f61d768a11",
+      "observed_at": "2026-11-13T21:02:25.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:a67753ce27c71dbfb2582900208e7e00de72cc64dcbd0fcb71de2ead073b30a1",
-      "observed_at": "2026-11-13T17:51:42.000Z"
+      "observed_at": "2026-11-13T21:02:25.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-13T17:51:42.000Z"
+      "observed_at": "2026-11-13T21:02:25.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-13T17:51:42.000Z"
+      "observed_at": "2026-11-13T21:02:25.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-13T17:51:42.000Z"
+      "observed_at": "2026-11-13T21:02:25.000Z"
     }
   ],
   "cards": [
@@ -2097,6 +2097,108 @@
           "Each remaining helper or sentinel is proven unreachable or kept with a reason",
           "Unreachable ones are deleted with their tests",
           "No change to shown copy"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-039_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-039",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Test the account reset flow end to end",
+        "description": "The account site reset flow was tested headlessly: request form validation, the generic response for unknown addresses, busy states, bogus and expired link landings and open-redirect probes all pass. Dead recovery links now offer a request-a-new-link action. The emailed-link leg, known-address timing and the Mazer round trip after a real reset are not verified and need a phone run. Board update 2026-11-13: Headless test merged on the site side (PR 150) with two dead-end fixes; not live yet. The emailed-link leg, known-address timing and the Mazer round trip need the owner phone run; dashboard checks need the owner. FawxzzyWeb PR #150 merged (d867fceb). Merged, not deployed. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "reliability",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-13T20:33:55.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-039",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-039",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T20:33:55.000Z"
+      },
+      "content": {
+        "summary": "The account site reset flow was tested headlessly: request form validation, the generic response for unknown addresses, busy states, bogus and expired link landings and open-redirect probes all pass. Dead recovery links now offer a request-a-new-link action. The emailed-link leg, known-address timing and the Mazer round trip after a real reset are not verified and need a phone run. Board update 2026-11-13: Headless test merged on the site side (PR 150) with two dead-end fixes; not live yet. The emailed-link leg, known-address timing and the Mazer round trip need the owner phone run; dashboard checks need the owner. FawxzzyWeb PR #150 merged (d867fceb). Merged, not deployed. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The account site reset flow was tested headlessly: request form validation, the generic response for unknown addresses, busy states, bogus and expired link landings and open-redirect probes all pass. Dead recovery links now offer a request-a-new-link action. The emailed-link leg, known-address timing and the Mazer round trip after a real reset are not verified and need a phone run. Board update 2026-11-13: Headless test merged on the site side (PR 150) with two dead-end fixes; not live yet. The emailed-link leg, known-address timing and the Mazer round trip need the owner phone run; dashboard checks need the owner. FawxzzyWeb PR #150 merged (d867fceb). Merged, not deployed. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Request form, generic response and error states behave as designed on the live site",
+          "A real emailed link completes a reset and the account signs in to Mazer with the new details by username and by address",
+          "Cross-device behaviour and other-session revocation are decided and documented"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-040_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-040",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Load straight into the account sign-in instead of the Mazer sign-in screen",
+        "description": "A signed-out launch now goes to the account host sign-in during the HTML splash. The Mazer Welcome screen is only the fallback for a refused hand-off, offline, a backed-out or failed return, or an explicit Sign out. A 15 minute per-tab loop guard and a sign-out flag prevent bouncing. Board update 2026-11-13: Merged and deployed; headless only. Signed-out launch goes straight to the account sign-in with a loop guard; verified by the real sign-in harness by username and by address. Owner decision pending on ending the account session at Mazer Sign out. PR #510 merged (67745da2). Deployed: production build fawxzzy-mazer-ddyiq4ttb. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-13T20:33:59.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-040",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-040",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T20:33:59.000Z"
+      },
+      "content": {
+        "summary": "A signed-out launch now goes to the account host sign-in during the HTML splash. The Mazer Welcome screen is only the fallback for a refused hand-off, offline, a backed-out or failed return, or an explicit Sign out. A 15 minute per-tab loop guard and a sign-out flag prevent bouncing. Board update 2026-11-13: Merged and deployed; headless only. Signed-out launch goes straight to the account sign-in with a loop guard; verified by the real sign-in harness by username and by address. Owner decision pending on ending the account session at Mazer Sign out. PR #510 merged (67745da2). Deployed: production build fawxzzy-mazer-ddyiq4ttb. Checked only in headless Chromium, not on a real phone.",
+        "objective": "A signed-out launch now goes to the account host sign-in during the HTML splash. The Mazer Welcome screen is only the fallback for a refused hand-off, offline, a backed-out or failed return, or an explicit Sign out. A 15 minute per-tab loop guard and a sign-out flag prevent bouncing. Board update 2026-11-13: Merged and deployed; headless only. Signed-out launch goes straight to the account sign-in with a loop guard; verified by the real sign-in harness by username and by address. Owner decision pending on ending the account session at Mazer Sign out. PR #510 merged (67745da2). Deployed: production build fawxzzy-mazer-ddyiq4ttb. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Signed-out launch reaches the account sign-in with no Mazer sign-in flash and signed-in launches do not redirect",
+          "Failed, denied and cancelled returns and offline land on the fallback with no loop",
+          "Owner confirms on a phone, including cancel-then-return and Sign out then relaunch"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -6594,17 +6696,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Investigate an intermittent slow boot seen by the QA sign-in test",
-        "description": "About 1 in 5 QA sign-in runs since the 3d5f3614 deploy still show the HTML boot splash more than 3.5 s after page load; 16 fresh loads on an idle machine booted in 1.1 to 2.8 s. A worker is measuring slow-boot rate per recent build and bisecting. Cause unknown: could be code, host load or edge latency.",
+        "description": "About 1 in 5 QA sign-in runs since the 3d5f3614 deploy still show the HTML boot splash more than 3.5 s after page load; 16 fresh loads on an idle machine booted in 1.1 to 2.8 s. A worker is measuring slow-boot rate per recent build and bisecting. Cause unknown: could be code, host load or edge latency. Board update 2026-11-13: Merged and deployed; headless only. First-visit service worker claim no longer reloads the page, which removes a second boot splash seconds after the menu. Real phone check pending. PR #509 merged (70979a6e). Deployed: production build fawxzzy-mazer-ddyiq4ttb. Checked only in headless Chromium, not on a real phone.",
         "card_type": "reliability",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-13T17:51:42.000Z",
+        "updated_at": "2026-11-13T20:34:08.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-010",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -6612,11 +6714,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-010",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T17:51:42.000Z"
+        "source_updated_at": "2026-11-13T20:34:08.000Z"
       },
       "content": {
-        "summary": "About 1 in 5 QA sign-in runs since the 3d5f3614 deploy still show the HTML boot splash more than 3.5 s after page load; 16 fresh loads on an idle machine booted in 1.1 to 2.8 s. A worker is measuring slow-boot rate per recent build and bisecting. Cause unknown: could be code, host load or edge latency.",
-        "objective": "About 1 in 5 QA sign-in runs since the 3d5f3614 deploy still show the HTML boot splash more than 3.5 s after page load; 16 fresh loads on an idle machine booted in 1.1 to 2.8 s. A worker is measuring slow-boot rate per recent build and bisecting. Cause unknown: could be code, host load or edge latency.",
+        "summary": "About 1 in 5 QA sign-in runs since the 3d5f3614 deploy still show the HTML boot splash more than 3.5 s after page load; 16 fresh loads on an idle machine booted in 1.1 to 2.8 s. A worker is measuring slow-boot rate per recent build and bisecting. Cause unknown: could be code, host load or edge latency. Board update 2026-11-13: Merged and deployed; headless only. First-visit service worker claim no longer reloads the page, which removes a second boot splash seconds after the menu. Real phone check pending. PR #509 merged (70979a6e). Deployed: production build fawxzzy-mazer-ddyiq4ttb. Checked only in headless Chromium, not on a real phone.",
+        "objective": "About 1 in 5 QA sign-in runs since the 3d5f3614 deploy still show the HTML boot splash more than 3.5 s after page load; 16 fresh loads on an idle machine booted in 1.1 to 2.8 s. A worker is measuring slow-boot rate per recent build and bisecting. Cause unknown: could be code, host load or edge latency. Board update 2026-11-13: Merged and deployed; headless only. First-visit service worker claim no longer reloads the page, which removes a second boot splash seconds after the menu. Real phone check pending. PR #509 merged (70979a6e). Deployed: production build fawxzzy-mazer-ddyiq4ttb. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Slow-boot rate (over 3.5 s) is measured per recent build with at least 60 loads each",
           "Cause is identified as code, host or edge, with data",
@@ -12035,6 +12137,110 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-vis-038_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-038",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Edge diamonds: beams on the inner tip, half size while playing, continuous beams",
+        "description": "Beams connect to the innermost point of each diamond in both directions. Diamonds sit at half size while the maze runs, grow back just before the beams arrive on goal, and shrink again once drained. Beams stay connected until each diamond is fully filled or drained. Board update 2026-11-13: Merged and deployed; headless only. Beams attach to each diamond inner tip both ways, diamonds sit at half size while playing and grow to full by beam contact, and beams stay connected for the whole fill and drain. Owner phone check pending, including the two bottom corner diamonds. PR #512 merged (ef745bda). Deployed: production build fawxzzy-mazer-1hf3yrduh. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-VIS-033"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-13T21:02:25.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-038",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-038",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T21:02:25.000Z"
+      },
+      "content": {
+        "summary": "Beams connect to the innermost point of each diamond in both directions. Diamonds sit at half size while the maze runs, grow back just before the beams arrive on goal, and shrink again once drained. Beams stay connected until each diamond is fully filled or drained. Board update 2026-11-13: Merged and deployed; headless only. Beams attach to each diamond inner tip both ways, diamonds sit at half size while playing and grow to full by beam contact, and beams stay connected for the whole fill and drain. Owner phone check pending, including the two bottom corner diamonds. PR #512 merged (ef745bda). Deployed: production build fawxzzy-mazer-1hf3yrduh. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Beams connect to the innermost point of each diamond in both directions. Diamonds sit at half size while the maze runs, grow back just before the beams arrive on goal, and shrink again once drained. Beams stay connected until each diamond is fully filled or drained. Board update 2026-11-13: Merged and deployed; headless only. Beams attach to each diamond inner tip both ways, diamonds sit at half size while playing and grow to full by beam contact, and beams stay connected for the whole fill and drain. Owner phone check pending, including the two bottom corner diamonds. PR #512 merged (ef745bda). Deployed: production build fawxzzy-mazer-1hf3yrduh. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Beams start and end exactly on each diamond inner tip",
+          "Diamonds are half size during play and full size from just before the beams arrive until drained",
+          "Beams stay connected for the whole fill and the whole drain"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-039_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-039",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "One smooth loader and the website app image everywhere",
+        "description": "The boot splash and the in-game loading cover share one loader: it shows only after 150 ms, holds at least 350 ms, fades in over 200 ms and out over 300 ms, with a still halo under Reduce Motion. The Mazer app image is now the website Mazer image for every icon, link preview, launch image, the loader and the install gate, generated by committed scripts. Board update 2026-11-13: Merged and deployed; headless only. One loader (fade in after 150 ms, hold 350 ms, fade out) on the splash and the in-game cover, and the website Mazer image is now the only master for every icon, link preview and launch image. PR #511 merged (a7a4a347). Deployed: production build fawxzzy-mazer-ddyiq4ttb. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-13T20:34:03.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-039",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-039",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T20:34:03.000Z"
+      },
+      "content": {
+        "summary": "The boot splash and the in-game loading cover share one loader: it shows only after 150 ms, holds at least 350 ms, fades in over 200 ms and out over 300 ms, with a still halo under Reduce Motion. The Mazer app image is now the website Mazer image for every icon, link preview, launch image, the loader and the install gate, generated by committed scripts. Board update 2026-11-13: Merged and deployed; headless only. One loader (fade in after 150 ms, hold 350 ms, fade out) on the splash and the in-game cover, and the website Mazer image is now the only master for every icon, link preview and launch image. PR #511 merged (a7a4a347). Deployed: production build fawxzzy-mazer-ddyiq4ttb. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The boot splash and the in-game loading cover share one loader: it shows only after 150 ms, holds at least 350 ms, fades in over 200 ms and out over 300 ms, with a still halo under Reduce Motion. The Mazer app image is now the website Mazer image for every icon, link preview, launch image, the loader and the install gate, generated by committed scripts. Board update 2026-11-13: Merged and deployed; headless only. One loader (fade in after 150 ms, hold 350 ms, fade out) on the splash and the in-game cover, and the website Mazer image is now the only master for every icon, link preview and launch image. PR #511 merged (a7a4a347). Deployed: production build fawxzzy-mazer-ddyiq4ttb. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Loader fades in and out smoothly with no flash, jump or pop-in on boot and between screens",
+          "Home-screen icons, link previews and launch images all use the website image",
+          "Owner confirms the loader feel and the installed icon on a phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-world-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -12090,9 +12296,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 230,
-    "exported_public_card_count": 230,
-    "exported_open_card_count": 121,
+    "stable_identity_count": 234,
+    "exported_public_card_count": 234,
+    "exported_open_card_count": 125,
     "exported_completed_card_count": 93,
     "exported_deferred_card_count": 16,
     "imported_research_candidate_count": 0,
