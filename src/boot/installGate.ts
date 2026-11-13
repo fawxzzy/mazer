@@ -1,3 +1,4 @@
+import { MAZER_BOOT_LOADER_ICON_DATA_URI } from '../brand/bootLoaderIconData';
 import { getInstallSurfaceState, promptInstallSurface, subscribeInstallSurface, type InstallSurfaceState } from './installSurface';
 import {
   resolveInstallGateDecision,
@@ -298,7 +299,7 @@ export const installMazerInstallGate = (
 
     overlay.innerHTML = `
       <div class="mazer-install-gate-card">
-        <strong class="mazer-install-gate-brand">MAZER</strong>
+        <img class="mazer-install-gate-brand" alt="Mazer" width="48" height="48" decoding="sync" src="${MAZER_BOOT_LOADER_ICON_DATA_URI}" />
         <h1 class="mazer-install-gate-title">${escapeHtml(copy.title)}</h1>
         <p class="mazer-install-gate-subtitle">${escapeHtml(copy.subtitle)}</p>
         ${renderValueHtml(copy.valueLine)}

@@ -182,12 +182,12 @@ canvas:focus-visible {
   width: 100%;
 }
 
+/* MAZER-VIS-039: the one Mazer app image (the same inline icon as the boot loader), size reserved so nothing jumps. */
 .mazer-install-gate-brand {
-  color: #3ddbd4;
-  font-family: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.32em;
+  border-radius: 20%;
+  display: block;
+  height: 48px;
+  width: 48px;
 }
 
 .mazer-install-gate-title {

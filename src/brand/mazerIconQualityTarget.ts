@@ -1,6 +1,6 @@
-export const MAZER_ICON_QUALITY_TARGET_VERSION = 'mazer-icon-quality-target-v2' as const;
-export const MAZER_ICON_CACHE_VERSION = 'mazer-final-icon-v2' as const;
-export const MAZER_ICON_SOURCE_SHA256 = 'ede90e596682795d10f97bed615071ca1f60e08e290eacf1ea143006df914d78' as const;
+export const MAZER_ICON_QUALITY_TARGET_VERSION = 'mazer-icon-quality-target-v3' as const;
+export const MAZER_ICON_CACHE_VERSION = 'mazer-site-icon-v1' as const;
+export const MAZER_ICON_SOURCE_SHA256 = '91764e546b8c1488b3d48baeda927ae18600b088178e190244fb9d8ce35e2440' as const;
 
 export const MAZER_ICON_QUALITY_TARGET = Object.freeze({
   version: MAZER_ICON_QUALITY_TARGET_VERSION,
@@ -10,21 +10,21 @@ export const MAZER_ICON_QUALITY_TARGET = Object.freeze({
     repositoryPath: 'src/brand/source-art/mazer-app-icon-master.png',
     width: 1024,
     height: 1024,
-    bytes: 1_173_366,
+    bytes: 934_398,
     sha256: MAZER_ICON_SOURCE_SHA256
   }),
   generator: Object.freeze({
     repositoryPath: 'scripts/brand/generate-mazer-icons.mjs',
     command: 'npm run brand:icons',
     checkCommand: 'npm run brand:icons:check',
-    implementation: 'sharp-lanczos3-fixed-png-and-png-ico-v1'
+    implementation: 'sharp-lanczos3-site-icon-png-and-png-ico-v2'
   }),
   canonicalAsset: Object.freeze({
     repositoryPath: 'public/icons/mazer-app-icon.png',
     publicUrl: `/icons/mazer-app-icon.png?v=${MAZER_ICON_CACHE_VERSION}`,
     width: 1024,
     height: 1024,
-    bytes: 1_173_366,
+    bytes: 934_398,
     sha256: MAZER_ICON_SOURCE_SHA256,
     derivation: 'byte-identical-copy'
   }),
@@ -34,23 +34,23 @@ export const MAZER_ICON_QUALITY_TARGET = Object.freeze({
       repositoryPath: 'public/favicon.ico',
       publicUrl: `/favicon.ico?v=${MAZER_ICON_CACHE_VERSION}`,
       sizes: '16x16 32x32 48x48',
-      sha256: '1e688908a878ce00f8881d6eefb9d25818b3062c219f6732037a67a79d104ba1',
-      derivation: 'lanczos3-png-ico'
+      sha256: 'ab605e8596246087a1dae114c12ab360136c364bf57d50b24a7efdd80d3b11ba',
+      derivation: 'cropped-rounded-lanczos3-png-ico'
     }),
     Object.freeze({
       role: 'windows-shortcut',
       repositoryPath: 'public/icons/mazer-app-icon.ico',
       publicUrl: `/icons/mazer-app-icon.ico?v=${MAZER_ICON_CACHE_VERSION}`,
       sizes: '16x16 32x32 48x48',
-      sha256: '1e688908a878ce00f8881d6eefb9d25818b3062c219f6732037a67a79d104ba1',
-      derivation: 'lanczos3-png-ico'
+      sha256: 'ab605e8596246087a1dae114c12ab360136c364bf57d50b24a7efdd80d3b11ba',
+      derivation: 'cropped-rounded-lanczos3-png-ico'
     }),
     Object.freeze({
       role: 'apple-touch',
       repositoryPath: 'public/icons/apple-touch-icon.png',
       publicUrl: `/icons/apple-touch-icon.png?v=${MAZER_ICON_CACHE_VERSION}`,
       sizes: '180x180',
-      sha256: '337c61c2b6fd2c1dd6c2e67e92b5b596137e456e88605afc2edc510c66fc3395',
+      sha256: '75029cc71bb2fefbcae636f2496fe99a3b229fc42223107d2d1834710c834c45',
       derivation: 'lanczos3-resize'
     }),
     Object.freeze({
@@ -58,7 +58,7 @@ export const MAZER_ICON_QUALITY_TARGET = Object.freeze({
       repositoryPath: 'public/icons/icon-192.png',
       publicUrl: `/icons/icon-192.png?v=${MAZER_ICON_CACHE_VERSION}`,
       sizes: '192x192',
-      sha256: 'f7195a659b978ffb790202925a038b991194f69882dda99ebffb7f4b7b6e5279',
+      sha256: 'cf8f46d880655b987bd10d9d371117525043cf842d7cb10270e741a653f30785',
       derivation: 'lanczos3-resize'
     }),
     Object.freeze({
@@ -66,7 +66,7 @@ export const MAZER_ICON_QUALITY_TARGET = Object.freeze({
       repositoryPath: 'public/icons/icon-512.png',
       publicUrl: `/icons/icon-512.png?v=${MAZER_ICON_CACHE_VERSION}`,
       sizes: '512x512',
-      sha256: '50461c1f1b370f45f20492149ba3480c07be1d68abcfabe1050e064710f0d0c9',
+      sha256: '2accb4caf909e8a85e47ddda4611f4b350588ee6b4ebe50b999ea2026bed767a',
       derivation: 'lanczos3-resize'
     }),
     Object.freeze({
@@ -74,7 +74,7 @@ export const MAZER_ICON_QUALITY_TARGET = Object.freeze({
       repositoryPath: 'public/icons/icon-192-maskable.png',
       publicUrl: `/icons/icon-192-maskable.png?v=${MAZER_ICON_CACHE_VERSION}`,
       sizes: '192x192',
-      sha256: '1c134cc6ec2f8656f8af4d4e351ba65b491fed60ebbb2609c8ccf7bb56b78b80',
+      sha256: '19bc5c22e17ba4bef417776182381776537fa6b962285f2f392058256cc17c38',
       derivation: 'lanczos3-resize-with-safe-padding'
     }),
     Object.freeze({
@@ -82,14 +82,14 @@ export const MAZER_ICON_QUALITY_TARGET = Object.freeze({
       repositoryPath: 'public/icons/icon-512-maskable.png',
       publicUrl: `/icons/icon-512-maskable.png?v=${MAZER_ICON_CACHE_VERSION}`,
       sizes: '512x512',
-      sha256: 'c28062ea9de69856558be5cf499cc616fb1e90177df0ba966d90101ec9a8d102',
+      sha256: '2b403b4d1375ec453b36c05113b11a4cf071d7cbf0e1e4ea1178dcab7fdde9ad',
       derivation: 'lanczos3-resize-with-safe-padding'
     })
   ]),
   maskablePolicy: Object.freeze({
     background: '#000000',
     guaranteedSafeCircleDiameterRatio: 0.8,
-    completeMasterFitsSafeCircle: true
+    completeVisibleArtFitsSafeCircle: true
   }),
   intentionalConsumers: Object.freeze([
     'browser-favicon',
@@ -97,7 +97,9 @@ export const MAZER_ICON_QUALITY_TARGET = Object.freeze({
     'apple-touch',
     'windows-shortcut',
     'watch-pass-browser-metadata',
-    'social-preview-existing-app-icon-consumer',
+    'social-preview-app-image-composition',
+    'boot-loader-inline-icon',
+    'ios-launch-art',
     'workbox-precache'
   ]),
   supersededEvidence: Object.freeze([
@@ -110,13 +112,11 @@ export const MAZER_ICON_QUALITY_TARGET = Object.freeze({
       path: 'data/atlas/ui-visual-proof/mazer/app-icon-2026-07-09/reference.png',
       sha256: '55677db4dff3896979d3e00e1b9ebcb85fd9fc04f106d5a67701cee61ea467d1',
       authoritative: false
-    }),
-    Object.freeze({ path: 'public/icons/mazer-emblem.ico', authoritative: false }),
-    Object.freeze({ path: 'public/icons/mazer-emblem.svg', authoritative: false })
+    })
   ]),
   visualRules: Object.freeze([
-    'locked-final-master-no-redesign',
-    'preserve-rainbow-frame-and-central-maze',
+    'site-app-image-is-the-only-master',
+    'preserve-frame-maze-and-wordmark',
     'high-quality-lanczos3-downsampling',
     'maskable-safe-zone-padding',
     'no-competing-authoritative-artwork'

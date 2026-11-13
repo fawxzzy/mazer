@@ -27,7 +27,7 @@ describe('Mazer icon-delivery verifier', () => {
     ['parent traversal', 'icons/../favicon.ico'],
     ['dot traversal', 'icons/./favicon.ico'],
     ['encoded traversal', 'icons/%2e%2e/favicon.ico'],
-    ['query', 'favicon.ico?v=mazer-final-icon-v2'],
+    ['query', 'favicon.ico?v=mazer-site-icon-v1'],
     ['hash', 'favicon.ico#icon'],
     ['backslash', 'icons\\favicon.ico'],
     ['empty segment', 'icons//favicon.ico'],
