@@ -35,9 +35,14 @@ export const LEGACY_LEVEL_PREVIEW_PARAM = 'previewLevel';
 export const LEGACY_LEVEL_PREVIEW_MIN_LEVEL = 1;
 /** Above this a typed/clamped level is meaningless (geometry saturates far lower); keeps ordinals small. */
 export const LEGACY_LEVEL_PREVIEW_MAX_LEVEL = 999;
-/** The jump list in the pause sheet. 218 is the end of the strictly rising ladder (MAZER-GEN-006); 300 is on the plateau. */
+/**
+ * The jump list in the pause sheet. 198 and 218 are earlier ladder ends (MAZER-GEN-006, kept as checkpoints);
+ * 283 is where the felt number saturates (GEOMETRY_BUDGET_FELT_SATURATION_LEVEL) and 288 is the last budget level, the
+ * end of the fringe (LAST_BUDGET_LEVEL; MAZER-GEN-007, MAZER-QA-008); 300 is on the plateau just past it. The test pins
+ * 283 and 288 to those constants, so a future ladder change that moves them fails there instead of drifting silently.
+ */
 export const LEGACY_LEVEL_PREVIEW_CHECKPOINTS: readonly number[] = Object.freeze([
-  1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 218, 300
+  1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 218, 283, 288, 300
 ]);
 
 const POSITIVE_INTEGER_PATTERN = /^\d{1,9}$/;

@@ -1,5 +1,6 @@
 /**
- * Where the goal STAR's optical centre goes on its tile (MAZER-VIS-034): pure geometry, no drawing.
+ * Where an end glyph's optical centre goes on its tile (the goal star: MAZER-VIS-034; the start arrow: MAZER-VIS-036):
+ * pure geometry, no drawing.
  *
  * Owner report (2026-11-13): "the end tile star needs better centering in the tiles especially when its in a corner
  * tile too". Measured on the raster of the real bake + marker draw (and confirmed on a real Chromium screenshot at
@@ -24,6 +25,24 @@
  * round bulb, and the eye centres on the bulb's circle, which is the cell centre; the fill rect's centre (half a rim
  * toward the opening) or the interior's area centroid (dragged toward the opening by the straight stub behind the
  * half-disc) would push the star out of the bulb.
+ *
+ * START ARROW (MAZER-VIS-036). The play triangle (flat base behind, apex ahead, pointing the way the player first moves)
+ * had the same two faults, and a bigger one of its own. It was centred by its BOUNDING BOX, but a triangle's mass is
+ * not at its box centre: its centroid sits a third of the length from the flat base, a sixth of the length (0.16 of the
+ * half-tile) BEHIND the box centre. Measured on the raster of the real bake + marker draw before this change (every open
+ * direction, every tile shape, tiles 9.95 to 25.44 css px, DPR 1 / 2 / 2.625 / 3), the painted arrow's centroid was off the
+ * tile's interior centre by 0.35 to 4.7 device px on a straight tile and by up to 8.9 device px on a corner tile (it grows
+ * with the tile: the length is 0.95 of the half-tile), against at most 0.38 after. The weight sat behind the centre and
+ * the point ahead of it, so the arrow read as sliding out of its tile.
+ *
+ * DECISION 3, same rule as the star, by CENTROID: the arrow is drawn so the centroid of its PAINTED pixels (the triangle
+ * dilated by half its gold stroke plus the dark keyline, which is exactly the shape the marker pass paints) lands on the
+ * same target point as the star (the painted interior's centre, the cell centre on a dead end's bulb). The alternative,
+ * keeping the box centred and only fixing the corner offset, leaves the visible mass trailing behind the target, which is
+ * the fault the owner sees on the star. The apex then reaches further toward the open side and the base sits nearer the
+ * centre; the arrow points in the direction of travel, which is always an OPEN side, so the extra reach goes toward
+ * clear chip, never toward a lit rim. The same shift never leaves the interior (see the pinned tests). Size is the
+ * nominal triangle times the same fit as before, so nothing is bigger or smaller.
  *
  * Nothing about the star's SIZE changes: the fit in endpointTiles.ts is still taken from the cell centre, and the
  * target only ever moves AWAY from a lit rim (toward the open sides), so the keyline keeps at least its clearance.
@@ -59,7 +78,7 @@ const isDeadEnd = (tile: EndpointTileRect): boolean => (
  * A dead end: the cell centre (the bulb's circle). Every other tile: the centre of the chip fill rect (the area inside
  * the lit rim; the rim is only painted on closed sides), which on a straight tile or a cross is the cell centre too.
  */
-export const resolveGoalStarCentre = (tile: EndpointTileRect): OpticalCentre => {
+export const resolveEndpointCentre = (tile: EndpointTileRect): OpticalCentre => {
   if (isDeadEnd(tile)) {
     return tileCentre(tile);
   }
@@ -67,4 +86,61 @@ export const resolveGoalStarCentre = (tile: EndpointTileRect): OpticalCentre => 
     x: tile.fill.left + (tile.fill.width / 2),
     y: tile.fill.top + (tile.fill.height / 2)
   };
+};
+
+/** The goal star's target (MAZER-VIS-034): the painted-interior centre of the tile. */
+export const resolveGoalStarCentre = resolveEndpointCentre;
+
+type Vec = readonly [number, number];
+
+/**
+ * The centroid of a triangle DILATED by `offset` (every point within `offset` of the triangle: what a round-join stroke
+ * of width 2 * offset paints together with the fill). Exact: the triangle's own mass, plus one rectangular strip per edge
+ * (centroid half an offset out from the edge midpoint), plus a circular sector at each vertex (exterior angle, centroid
+ * on the outward bisector 4 d sin(theta/2) / (3 theta) from the vertex). With offset 0 it is the plain centroid.
+ */
+export const dilatedTriangleCentroid = (a: Vec, b: Vec, c: Vec, offset: number): OpticalCentre => {
+  const pts: readonly Vec[] = [a, b, c];
+  const cross = ((b[0] - a[0]) * (c[1] - a[1])) - ((b[1] - a[1]) * (c[0] - a[0]));
+  const centre: OpticalCentre = { x: (a[0] + b[0] + c[0]) / 3, y: (a[1] + b[1] + c[1]) / 3 };
+  const d = Math.max(0, offset);
+  if (d === 0 || cross === 0) {
+    return centre;
+  }
+  const orient = cross > 0 ? 1 : -1;
+  const normals: Vec[] = pts.map((p, i) => {
+    const q = pts[(i + 1) % 3]!;
+    const dx = q[0] - p[0];
+    const dy = q[1] - p[1];
+    const len = Math.hypot(dx, dy);
+    return [(orient * dy) / len, (-orient * dx) / len] as const;
+  });
+  let area = Math.abs(cross) / 2;
+  let mx = area * centre.x;
+  let my = area * centre.y;
+  for (let i = 0; i < 3; i += 1) {
+    const p = pts[i]!;
+    const q = pts[(i + 1) % 3]!;
+    const n = normals[i]!;
+    const strip = Math.hypot(q[0] - p[0], q[1] - p[1]) * d;
+    area += strip;
+    mx += strip * (((p[0] + q[0]) / 2) + (n[0] * d / 2));
+    my += strip * (((p[1] + q[1]) / 2) + (n[1] * d / 2));
+  }
+  for (let i = 0; i < 3; i += 1) {
+    const p = pts[i]!;
+    const nPrev = normals[(i + 2) % 3]!;
+    const nNext = normals[i]!;
+    const theta = Math.acos(Math.max(-1, Math.min(1, (nPrev[0] * nNext[0]) + (nPrev[1] * nNext[1]))));
+    if (theta === 0) continue;
+    const bx = nPrev[0] + nNext[0];
+    const by = nPrev[1] + nNext[1];
+    const bl = Math.hypot(bx, by);
+    const reach = (4 * d * Math.sin(theta / 2)) / (3 * theta);
+    const sector = (theta * d * d) / 2;
+    area += sector;
+    mx += sector * (p[0] + ((bx / bl) * reach));
+    my += sector * (p[1] + ((by / bl) * reach));
+  }
+  return { x: mx / area, y: my / area };
 };

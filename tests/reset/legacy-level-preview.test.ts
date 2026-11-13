@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { LAST_BUDGET_LEVEL } from '../../src/legacy-runtime/legacyGeometryBudget';
+import { GEOMETRY_BUDGET_FELT_SATURATION_LEVEL, LAST_BUDGET_LEVEL } from '../../src/legacy-runtime/legacyGeometryBudget';
 import { createLegacyMaze } from '../../src/legacy-runtime/legacyMaze';
 import {
   LEGACY_LEVEL_PREVIEW_CHECKPOINTS,
@@ -87,7 +87,19 @@ describe('level preview URL parsing', () => {
   });
 
   test('the jump list is the agreed checkpoints', () => {
-    expect([...LEGACY_LEVEL_PREVIEW_CHECKPOINTS]).toEqual([1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 218, 300]);
+    expect([...LEGACY_LEVEL_PREVIEW_CHECKPOINTS]).toEqual([1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 218, 283, 288, 300]);
+  });
+
+  test('the ladder ends are checkpoints: the felt saturation level and the last budget level (MAZER-QA-008)', () => {
+    expect(LEGACY_LEVEL_PREVIEW_CHECKPOINTS).toContain(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL);
+    expect(LEGACY_LEVEL_PREVIEW_CHECKPOINTS).toContain(LAST_BUDGET_LEVEL);
+    expect(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL).toBe(283);
+    expect(LAST_BUDGET_LEVEL).toBe(288);
+    // ascending and unique, and the last one is on the plateau past the ladder's end
+    const sorted = [...LEGACY_LEVEL_PREVIEW_CHECKPOINTS].sort((a, b) => a - b);
+    expect([...LEGACY_LEVEL_PREVIEW_CHECKPOINTS]).toEqual(sorted);
+    expect(new Set(sorted).size).toBe(sorted.length);
+    expect(sorted[sorted.length - 1]).toBeGreaterThan(LAST_BUDGET_LEVEL);
   });
 });
 
