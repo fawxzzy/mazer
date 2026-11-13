@@ -6,7 +6,6 @@ import {
 } from './legacyProfileEnsure';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
-  LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL,
   resolveLegacyOAuthFailureCopy,
   type LegacyUsernameSaveFailureKind
 } from './legacyPlayerMessage';
@@ -33,8 +32,8 @@ export const LEGACY_AUTH_JS_LOCK_MAX_WAIT_MS = LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS
 export const LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID = 'runtime-diagnostics-auth-fixture';
 
 export type LegacyAuthStatus = 'guest' | 'authenticated' | 'unavailable';
-export type LegacyAuthFormMode = 'login' | 'signup';
-export type LegacyAuthFieldId = 'email' | 'password' | 'confirmPassword' | 'displayName' | 'username';
+export type LegacyAuthFormMode = 'login';
+export type LegacyAuthFieldId = 'email' | 'password' | 'confirmPassword' | 'displayName';
 export type LegacyRememberedIdentitySessionState = 'ready' | 'reauth-required';
 
 export interface LegacyAuthConfig {
@@ -63,7 +62,6 @@ export interface LegacyAuthFormState {
   email: string;
   mode: LegacyAuthFormMode;
   password: string;
-  username: string;
 }
 
 export interface LegacyPasswordRecoveryUrlState {
@@ -96,20 +94,11 @@ export interface LegacyAuthSubmitState {
   reason: string | null;
 }
 
-export interface LegacySignUpMetadata {
-  app_namespace: 'mazer';
-  display_name: string;
-  username: string;
-}
-
 export const resolveLegacyAuthInvalidFields = (
   form: LegacyAuthFormState
 ): LegacyAuthFieldId[] => {
   const invalidFields: LegacyAuthFieldId[] = [];
 
-  if (form.mode === 'signup' && !LEGACY_USERNAME_PATTERN.test(form.username.trim())) {
-    invalidFields.push('username');
-  }
   if (!normalizeLegacyAuthEmail(form.email).includes('@')) {
     invalidFields.push('email');
   }
@@ -889,60 +878,6 @@ export const signInLegacyAuth = async (
   });
 };
 
-export const signUpLegacyAuth = async (
-  email: string,
-  password: string,
-  username: string
-): Promise<LegacyAuthActionResult> => {
-  const client = await getLegacyAuthClient();
-  if (!client) {
-    return {
-      snapshot: createGuestSnapshot(false, {
-        error: LEGACY_AUTH_MESSAGE_COPY.signupNotConfigured
-      })
-    };
-  }
-
-  const metadata = buildLegacySignUpMetadata(username);
-  if (!metadata) {
-    return {
-      snapshot: createGuestSnapshot(true, {
-        error: LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL
-      })
-    };
-  }
-
-  const auth = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
-  return runLegacyAuthDirectSessionMutation(auth.storageKey, async () => {
-    const transport = auth as Partial<LegacyAuthAbortableTransport>;
-    if (typeof transport.fetch !== 'function') {
-      return createLegacyAuthMutationUnavailableResult();
-    }
-    const { data, error } = await runLegacyAbortableCredentialRequest(
-      transport as LegacyAuthAbortableTransport,
-      () => client.auth.signUp({
-        email: normalizeLegacyAuthEmail(email),
-        password,
-        options: { data: metadata }
-      })
-    );
-
-    const info = resolveLegacySignUpInfo(Boolean(error), Boolean(data.session));
-    const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-      error: error?.message ?? null,
-      info
-    });
-    if (snapshot.status === 'authenticated') {
-      syncLegacyRememberedIdentityFromAuthenticatedSession(
-        typeof window === 'undefined' ? undefined : window.localStorage,
-        snapshot
-      );
-    }
-
-    return { snapshot };
-  });
-};
-
 export const requestLegacyPasswordReset = async (email: string): Promise<LegacyAuthActionResult> => {
   const client = await getLegacyAuthClient();
   if (!client) {
@@ -1274,8 +1209,7 @@ export const createEmptyLegacyAuthFormState = (
   displayName: '',
   email: rememberedEmail,
   mode,
-  password: '',
-  username: ''
+  password: ''
 });
 
 export const resolveLegacyAuthSubmitState = (
@@ -1286,20 +1220,6 @@ export const resolveLegacyAuthSubmitState = (
     return {
       canSubmit: false,
       reason: LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured
-    };
-  }
-
-  if (form.mode === 'signup' && form.username.trim().length === 0) {
-    return {
-      canSubmit: false,
-      reason: LEGACY_AUTH_MESSAGE_COPY.usernameRequired
-    };
-  }
-
-  if (form.mode === 'signup' && !LEGACY_USERNAME_PATTERN.test(form.username.trim())) {
-    return {
-      canSubmit: false,
-      reason: LEGACY_AUTH_MESSAGE_COPY.usernameInvalid
     };
   }
 
@@ -1384,33 +1304,6 @@ export const createLegacyAuthScopedStorage = (
 // pattern, for instant client-side feedback before ever calling the
 // availability RPC.
 export const LEGACY_USERNAME_PATTERN = /^[A-Za-z0-9._-]{2,15}$/;
-
-export const buildLegacySignUpMetadata = (
-  username: unknown
-): LegacySignUpMetadata | null => {
-  if (typeof username !== 'string') {
-    return null;
-  }
-  const candidate = username.trim();
-  if (!LEGACY_USERNAME_PATTERN.test(candidate)) {
-    return null;
-  }
-
-  return {
-    app_namespace: 'mazer',
-    display_name: candidate,
-    username: candidate
-  };
-};
-
-export const resolveLegacySignUpInfo = (
-  hasError: boolean,
-  hasSession: boolean
-): string | null => hasError
-  ? null
-  : hasSession
-    ? LEGACY_AUTH_MESSAGE_COPY.accountCreated
-    : LEGACY_AUTH_MESSAGE_COPY.verifyEmail;
 
 export const readLegacyAccountUsername = async (
   userId: string

@@ -9,7 +9,6 @@ import {
   LEGACY_AUTH_REMEMBERED_IDENTITY_KEY,
   LegacyAuthJsLockAcquireTimeoutError,
   LegacyAuthJsLockUnavailableError,
-  buildLegacySignUpMetadata,
   buildLegacyRememberedIdentityState,
   captureLegacyPasswordRecoveryBootUrlState,
   clearLegacyPasswordRecoveryUrl,
@@ -40,7 +39,6 @@ import {
   resolveLegacyAuthScopedStorageKey,
   resolveLegacyAuthStorageScope,
   resolveLegacyAuthSubmitState,
-  resolveLegacySignUpInfo,
   runLegacyAbortableCredentialRequest,
   runLegacyAuthJsLock,
   syncLegacyRememberedIdentityFromAuthenticatedSession,
@@ -211,10 +209,6 @@ describe('legacy auth runtime', () => {
         data: { session: null },
         error: null
       }));
-      const signUp = vi.fn(async () => ({
-        data: { session: null },
-        error: null
-      }));
       const authClient = {
         auth: {
           fetch: vi.fn() as unknown as typeof fetch,
@@ -223,7 +217,6 @@ describe('legacy auth runtime', () => {
             data: { subscription: { unsubscribe: vi.fn() } }
           })),
           signInWithPassword,
-          signUp,
           storageKey
         }
       };
@@ -258,13 +251,12 @@ describe('legacy auth runtime', () => {
 
         await expect(Promise.all([
           freshAuth.signInLegacyAuth('player@example.test', 'secret1'),
-          freshAuth.signUpLegacyAuth('new@example.test', 'secret1', 'MazeNew')
+          freshAuth.signInLegacyAuth('second@example.test', 'secret1')
         ])).resolves.toEqual([
           { snapshot: expect.objectContaining({ status: 'unavailable' }) },
           { snapshot: expect.objectContaining({ status: 'unavailable' }) }
         ]);
         expect(signInWithPassword).not.toHaveBeenCalled();
-        expect(signUp).not.toHaveBeenCalled();
 
         releaseCurrentWriter();
         await expect(currentWriter).resolves.toMatchObject({ status: 'completed' });
@@ -272,13 +264,7 @@ describe('legacy auth runtime', () => {
           'player@example.test',
           'secret1'
         )).resolves.toHaveProperty('snapshot');
-        await expect(freshAuth.signUpLegacyAuth(
-          'new@example.test',
-          'secret1',
-          'MazeNew'
-        )).resolves.toHaveProperty('snapshot');
         expect(signInWithPassword).toHaveBeenCalledOnce();
-        expect(signUp).toHaveBeenCalledOnce();
       } finally {
         vi.doUnmock('@supabase/supabase-js');
         vi.unstubAllEnvs();
@@ -644,7 +630,7 @@ describe('legacy auth runtime', () => {
     expect(buildScript).toContain('loadLocalViteEnv();');
   });
 
-  test('keeps form readiness strict enough for login and signup', () => {
+  test('keeps form readiness strict enough for login', () => {
     const form = createEmptyLegacyAuthFormState('login');
 
     expect(resolveLegacyAuthSubmitState(form, false)).toEqual({
@@ -670,19 +656,7 @@ describe('legacy auth runtime', () => {
       password: 'short'
     }, true).reason).toBe('Password needs 6+ characters.');
 
-    const signup = createEmptyLegacyAuthFormState('signup');
-    expect(resolveLegacyAuthInvalidFields(signup)).toEqual(['username', 'email', 'password']);
-    expect(resolveLegacyAuthSubmitState({
-      ...signup,
-      email: 'player@example.com',
-      password: 'secret1'
-    }, true).reason).toBe('Enter a username.');
-    expect(resolveLegacyAuthSubmitState({
-      ...signup,
-      email: 'player@example.com',
-      password: 'secret1',
-      username: 'fawxzzy'
-    }, true)).toEqual({ canSubmit: true, reason: null });
+    expect(resolveLegacyAuthInvalidFields(form)).toEqual(['email', 'password']);
   });
 
   test('binds password reset email callbacks to the exact recovery route', () => {
@@ -808,7 +782,6 @@ describe('legacy auth runtime', () => {
     expect(resolveLegacyPasswordRecoveryEnterAction('password', true)).toBe('focus-confirmation');
     expect(resolveLegacyPasswordRecoveryEnterAction('confirmPassword', true)).toBe('submit');
     expect(resolveLegacyPasswordRecoveryEnterAction('email', true)).toBeNull();
-    expect(resolveLegacyPasswordRecoveryEnterAction('username', true)).toBeNull();
     expect(resolveLegacyPasswordRecoveryEnterAction('displayName', true)).toBeNull();
 
     expect(resolveLegacyPasswordUpdateSubmitState('secret1', '', true).canSubmit).toBe(false);
@@ -856,26 +829,6 @@ describe('legacy auth runtime', () => {
     expect(rejectResult.ok).toBe(false);
     expect(rejectResult.error).toBe('bad network');
     expect(rejectClient.auth.updateUser).toHaveBeenCalledOnce();
-  });
-
-  test('builds canonical Mazer signup metadata without deriving a username from email', () => {
-    expect(buildLegacySignUpMetadata(' Fawxzzy-1 ')).toEqual({
-      app_namespace: 'mazer',
-      display_name: 'Fawxzzy-1',
-      username: 'Fawxzzy-1'
-    });
-
-    for (const invalid of ['', 'a', 'sixteen_chars____', 'space name', 'unicode-☃', 'mail@example.com']) {
-      expect(buildLegacySignUpMetadata(invalid)).toBeNull();
-    }
-    for (const nonString of [null, undefined, 123, {}, { trim: () => { throw new Error('must not run'); } }]) {
-      expect(() => buildLegacySignUpMetadata(nonString)).not.toThrow();
-      expect(buildLegacySignUpMetadata(nonString)).toBeNull();
-    }
-
-    expect(resolveLegacySignUpInfo(false, true)).toBe('Your account is ready.');
-    expect(resolveLegacySignUpInfo(false, false)).toBe('Check your email to finish account setup.');
-    expect(resolveLegacySignUpInfo(true, true)).toBeNull();
   });
 
   test('normalizes remembered identity without making it required for guest play', () => {

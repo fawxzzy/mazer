@@ -24,17 +24,6 @@ describe('legacy auth presentation', () => {
     }));
   });
 
-  test('uses the canonical login label when switching from account creation', () => {
-    expect(resolveLegacyAuthPresentation({
-      mode: 'signup',
-      rememberedIdentity: null,
-      snapshot: { configured: true, status: 'guest' }
-    })).toEqual(expect.objectContaining({
-      alternateActionLabel: 'Log in',
-      primaryActionLabel: 'Create account'
-    }));
-  });
-
   test('keeps a remembered account on the same clean sign-in presentation', () => {
     const presentation = resolveLegacyAuthPresentation({
       mode: 'login',
@@ -84,7 +73,7 @@ describe('legacy auth presentation', () => {
 
   test('keeps account configuration failures in categorical feedback instead of subtitle copy', () => {
     expect(resolveLegacyAuthPresentation({
-      mode: 'signup',
+      mode: 'login',
       rememberedIdentity: null,
       snapshot: { configured: false, status: 'unavailable' }
     })).toEqual(expect.objectContaining({
@@ -112,10 +101,6 @@ describe('legacy auth presentation', () => {
       'Account access is unavailable right now. Try again shortly.',
       null
     )).toBe('Account access unavailable');
-    expect(resolveLegacyAuthBottomFeedbackLabel(
-      'Account creation is unavailable right now. Try again shortly.',
-      null
-    )).toBe('Account creation unavailable');
     expect(resolveLegacyAuthBottomFeedbackLabel(
       'Password reset is unavailable right now. Try again shortly.',
       null
