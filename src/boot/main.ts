@@ -23,7 +23,11 @@ import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
 import { initializeInstallSurface } from './installSurface';
 import { createMazerPhaserConfig } from './phaserConfig';
-import { installMazerProductionServiceWorker, installMazerServiceWorkerControllerReload } from './serviceWorkerLifecycle';
+import {
+  installMazerProductionServiceWorker,
+  installMazerServiceWorkerControllerReload,
+  selectMazerBootArtUrls
+} from './serviceWorkerLifecycle';
 import { installMazerViewportGeometry, syncMazerGameToViewport } from './viewportGeometry';
 
 const LOCALHOST_SW_RESET_KEY = 'mazer:localhost-sw-reset:v1';
@@ -82,8 +86,17 @@ const registerProductionServiceWorker = (): void => {
 
   if (!isLocalhostRuntime() && 'serviceWorker' in navigator) {
     installMazerServiceWorkerControllerReload({
+      controlledAtBoot: navigator.serviceWorker.controller !== null,
       addControllerChangeListener: (listener) => navigator.serviceWorker.addEventListener('controllerchange', listener),
-      reload: () => window.location.reload()
+      reload: () => window.location.reload(),
+      warmBootArt: () => {
+        // First install: the worker now controls this page, so re-requesting the boot art through it (the browser's
+        // HTTP cache answers the network part) fills the offline runtime cache without reloading the page.
+        const names = performance.getEntriesByType('resource').map((entry) => entry.name);
+        for (const url of selectMazerBootArtUrls(names, window.location.origin)) {
+          void fetch(url).catch(() => undefined);
+        }
+      }
     });
   }
 };
