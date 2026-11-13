@@ -19,6 +19,7 @@ import {
   resolveGeometryBudgetCandidateSeed,
   resolveGeometryBudgetFeltLevel,
   resolveGeometryBudgetForks,
+  resolveGeometryBudgetFillFloor,
   resolveGeometryBudgetFringeCells,
   resolveGeometryBudgetLoopPlan,
   resolveGeometryBudgetMaxBranch,
@@ -627,6 +628,7 @@ const selectLegacyGeometryBudgetMaze = (
   // plus the fringe (legacyGeometryBudget.ts), so every felt rule reads the felt level.
   const feltLevel = resolveGeometryBudgetFeltLevel(budgetLevel);
   const fringeCells = resolveGeometryBudgetFringeCells(budgetLevel);
+  const fillFloor = resolveGeometryBudgetFillFloor(budgetLevel);
   const gateTarget = resolveGeometryBudgetTarget(feltLevel);
   const routeTarget = resolveGeometryBudgetRouteTarget(feltLevel);
   const maxBranch = resolveGeometryBudgetMaxBranch(feltLevel);
@@ -684,7 +686,7 @@ const selectLegacyGeometryBudgetMaze = (
         base,
         gateTarget,
         resolveGeometryBudgetCandidateSeed(seed, feltLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
-        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, fringeCells, attempts: GEOMETRY_BUDGET_TUNE_ATTEMPTS, doubleLure: true, reverseFloor }
+        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, fringeCells, attempts: GEOMETRY_BUDGET_TUNE_ATTEMPTS, doubleLure: true, straightBranches: true, fillFloor, reverseFloor }
       );
       distance = tuned.windowDistance;
       // A landed maze whose number is a coin flip for the explorer (a looped maze that
@@ -799,7 +801,7 @@ const assembleTunedMaze = (
   if (base.generationBuildTrace) {
     next.generationBuildTrace = {
       ...base.generationBuildTrace,
-      decoyTiles: [...tuned.loopTiles, ...tuned.stretchTiles, ...tuned.addedTiles, ...tuned.fringeTiles, ...tuned.stubLengthened].map((point) => ({ ...point })),
+      decoyTiles: [...tuned.loopTiles, ...tuned.stretchTiles, ...tuned.addedTiles, ...tuned.fringeTiles, ...tuned.fillTiles, ...tuned.stubLengthened].map((point) => ({ ...point })),
       decoyPrunedTiles: [...tuned.stretchRemovedTiles, ...tuned.trimmedTiles, ...tuned.stubRemoved, ...forcedStubs].map((point) => ({ ...point }))
     };
   }

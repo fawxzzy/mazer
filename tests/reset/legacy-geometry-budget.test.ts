@@ -37,6 +37,7 @@ import {
   resolveGeometryBudgetSchedule,
   resolveGeometryBudgetTarget
 } from '../../src/legacy-runtime/legacyGeometryBudget';
+import { GEOMETRY_BUDGET_CALIBRATION } from '../../scripts/analysis/generate-geometry-budget-targets';
 import { measurePricedFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import { normalizeLegacyMazeGenerationProfile } from '../../src/legacy-runtime/legacyMaze';
 
@@ -219,16 +220,19 @@ describe('continuous difficulty function D(level)', () => {
     expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(GEOMETRY_BUDGET_FRINGE_END_LEVEL);
     expect(LAST_BUDGET_LEVEL).toBe(GEOMETRY_BUDGET_SATURATION_LEVEL);
     // Measured hard ceiling of the frozen board (see scripts/analysis/generate-geometry-budget-targets.ts).
-    expect(GEOMETRY_BUDGET_CEILING).toBe(760);
-    expect(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL).toBe(198);
-    expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(759);
-    // Fringe capacity of the finished top maze (same script): 20 cells, one more per level. It was 70
-    // while the fringe could carve 1-cell stubs; the one-tile stub rule (MAZER-GEN-004) leaves room
-    // for 2- and 3-cell stubs only, and the same calibration (95 percent of bases) gives 20 on desktop.
-    expect(GEOMETRY_BUDGET_FRINGE_CAP).toBe(20);
+    // 930 since MAZER-GEN-007 (it was 760): the route is no longer stretched with switchbacks, so the same felt number
+    // costs fewer floor cells and the capacity pass reads a 25th percentile of 930 (phone 977, desktop 930).
+    expect(GEOMETRY_BUDGET_CEILING).toBe(930);
+    expect(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL).toBe(283);
+    expect(GEOMETRY_BUDGET_TOP_TARGET).toBe(929);
+    // Fringe capacity of the finished top maze (same script): 5 cells, one more per level (the 5th percentile
+    // is about 19 on the phone board and 10 on desktop, and the calibration rounds down to a multiple of 5 and takes the
+    // weaker board). It was 70 while the fringe could carve 1-cell stubs, 20 under the
+    // one-tile stub rule (MAZER-GEN-004) at felt ceiling 760; the felt ceiling is 930 now and the top maze is fuller.
+    expect(GEOMETRY_BUDGET_FRINGE_CAP).toBe(5);
     expect(GEOMETRY_BUDGET_FRINGE_STEP).toBe(1);
-    expect(GEOMETRY_BUDGET_FRINGE_END_LEVEL).toBe(218);
-    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(218);
+    expect(GEOMETRY_BUDGET_FRINGE_END_LEVEL).toBe(288);
+    expect(GEOMETRY_BUDGET_SATURATION_LEVEL).toBe(288);
   });
 
   test('the fringe is exactly one step more per level from the felt saturation to the end of the fringe', () => {
@@ -249,18 +253,18 @@ describe('continuous difficulty function D(level)', () => {
     }
   });
 
-  test('the reverse floor is a share of the level\'s forward target: 740 at the top class, lower for a maze that owns a wrap corridor', () => {
+  test('the reverse floor is a share of the level\'s forward target: 905 at the top class (975 permille of 929), lower for a maze that owns a wrap corridor', () => {
     expect(GEOMETRY_BUDGET_REVERSE_FLOOR_PERMILLE).toBe(975);
     expect(GEOMETRY_BUDGET_REVERSE_FLOOR_WRAP_PERMILLE).toBe(400);
     expect(GEOMETRY_BUDGET_TUNE_ATTEMPTS).toBe(2);
     expect(resolveGeometryBudgetReverseFloor(1)).toBe(0);
     expect(resolveGeometryBudgetReverseFloor(Number.NaN)).toBe(0);
     expect(resolveGeometryBudgetReverseFloor(0)).toBe(0);
-    // The value the retired mastery tier shipped with is the plateau's floor, to the step.
-    expect(resolveGeometryBudgetReverseFloor(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL)).toBe(740);
+    // 975 permille of the top target (929) is the plateau's floor, to the step.
+    expect(resolveGeometryBudgetReverseFloor(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL)).toBe(905);
     expect(resolveGeometryBudgetReverseFloor(2)).toBe(86);
     for (const level of [GEOMETRY_BUDGET_SATURATION_LEVEL, GEOMETRY_BUDGET_SATURATION_LEVEL + 1, 500, 1_000_000]) {
-      expect(resolveGeometryBudgetReverseFloor(level)).toBe(740);
+      expect(resolveGeometryBudgetReverseFloor(level)).toBe(905);
     }
     let previous = 0;
     let previousWrapped = 0;
@@ -308,9 +312,9 @@ describe('continuous difficulty function D(level)', () => {
     }
     expect(resolveGeometryBudgetForks(LAST_BUDGET_LEVEL)).toBeLessThanOrEqual(30);
     expect(resolveGeometryBudgetRouteBranch(LAST_BUDGET_LEVEL)).toBeLessThanOrEqual(16);
-    // The calibration script samples capacity at route target 300 / branch cap 40
+    // The calibration script samples capacity at route target 0 (the ladder's route share) / branch cap 40
     // / fork length 16 / 30 forks.
-    expect(resolveGeometryBudgetRouteTarget(LAST_BUDGET_LEVEL)).toBeLessThanOrEqual(300);
+    expect(resolveGeometryBudgetRouteTarget(LAST_BUDGET_LEVEL)).toBeLessThanOrEqual(GEOMETRY_BUDGET_CALIBRATION.routeTarget);
     expect(resolveGeometryBudgetMaxBranch(LAST_BUDGET_LEVEL)).toBe(40);
     expect(resolveGeometryBudgetRouteTarget(500)).toBe(resolveGeometryBudgetRouteTarget(LAST_BUDGET_LEVEL));
   });
@@ -327,8 +331,8 @@ describe('continuous difficulty function D(level)', () => {
     const ramp = resolveContinuousDifficulty(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL - 1);
     expect(ramp).toMatchObject({ regime: 'ramp', geometrySaturated: false, hazardBudgetLevels: 0, fringeCells: 0 });
     // Between the felt saturation and the saturation level the fringe rises and nothing is owed to hazards.
-    const fringe = resolveContinuousDifficulty(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 10);
-    expect(fringe).toMatchObject({ regime: 'fringe', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: false, hazardBudgetLevels: 0, fringeCells: 10 * GEOMETRY_BUDGET_FRINGE_STEP });
+    const fringe = resolveContinuousDifficulty(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 2);
+    expect(fringe).toMatchObject({ regime: 'fringe', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: false, hazardBudgetLevels: 0, fringeCells: 2 * GEOMETRY_BUDGET_FRINGE_STEP });
     // The mastery regime is gone: from the end of the fringe the ladder is the plateau.
     expect(resolveContinuousDifficulty(GEOMETRY_BUDGET_FRINGE_END_LEVEL - 1).regime).toBe('fringe');
     for (const level of [GEOMETRY_BUDGET_FRINGE_END_LEVEL + 30, 388]) {
@@ -336,7 +340,7 @@ describe('continuous difficulty function D(level)', () => {
     }
     const atCeiling = resolveContinuousDifficulty(GEOMETRY_BUDGET_SATURATION_LEVEL);
     expect(atCeiling).toMatchObject({
-      regime: 'plateau', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: true, hazardBudgetLevels: 0, fringeCells: GEOMETRY_BUDGET_FRINGE_CAP, reverseFloor: 740
+      regime: 'plateau', geometryTarget: GEOMETRY_BUDGET_TOP_TARGET, geometrySaturated: true, hazardBudgetLevels: 0, fringeCells: GEOMETRY_BUDGET_FRINGE_CAP, reverseFloor: 905
     });
     expect(resolveContinuousDifficulty(GEOMETRY_BUDGET_SATURATION_LEVEL + 120).hazardBudgetLevels).toBe(120);
     let previousHazard = -1;

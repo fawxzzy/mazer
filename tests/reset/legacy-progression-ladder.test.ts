@@ -126,12 +126,12 @@ const reverseFeltOf = (maze: ReturnType<typeof generateLadderMaze>): number => {
 // Ladder v2 (2026-11-11): the double lure applies to every maze of every level from 2 (it was a
 // mastery tier past level 268), and every maze is held to a reverse floor. The documented floor
 // per band, as a permille of the level's forward target (legacyGeometryBudget.ts):
-//   levels 2..9 and 140..268, a maze with no wrap corridor: 975 (740 at the top class)
+//   levels 2..9 and 140..288, a maze with no wrap corridor: 975 (905 at the top class)
 //   levels 10..139, a maze that owns a wrap corridor:        400
 const FLOOR_BANDS = [
   { name: 'plain 2-9', levels: [2, 3, 5, 9], wrapped: false, permille: 975 },
   { name: 'wrapped 10-139', levels: [10, 12, 20, 30, 50, 100, 120, 139], wrapped: true, permille: 400 },
-  { name: 'plain 140-218', levels: [140, 160, 198, 210, 218], wrapped: false, permille: 975 }
+  { name: 'plain 140-288', levels: [140, 160, 198, 240, 283, 288], wrapped: false, permille: 975 }
 ] as const;
 // Mean reverse felt of the ladder before the lure (docs/research/MAZER_PROGRESSION_FINAL_AUDIT_2026-11-10.md,
 // "What if the lure covered levels 2 to 268", forced-off column), phone / desktop, 40 seeds.
@@ -142,7 +142,7 @@ const REVERSE_FELT_BEFORE_THE_LURE: Record<number, readonly [number, number]> = 
 describe('progression ladder v2: the double lure on every level from 2, and the reverse floor', () => {
   const sampleSeeds = Array.from({ length: 12 }, (_, index) => seedForIndex(index + 3));
 
-  test('every sampled level 2..268 on both boards: lured, forward felt in its window, reverse felt at or above the documented floor of its band', () => {
+  test('every sampled level 2..288 on both boards: lured, forward felt in its window, reverse felt at or above the documented floor of its band', () => {
     for (const board of LADDER_BOARDS) {
       for (const band of FLOOR_BANDS) {
         for (const level of band.levels) {
@@ -193,14 +193,14 @@ describe('progression ladder v2: the double lure on every level from 2, and the 
     }
   }, 240_000);
 
-  test('the plateau class: a level from the end of the fringe on is the same lured class, held to 740 reverse steps (no mastery share, no level past 268 adds one)', () => {
+  test('the plateau class: a level from the end of the fringe on is the same lured class, held to 905 reverse steps (no mastery share, no level past 288 adds one)', () => {
     for (const board of LADDER_BOARDS) {
       for (const level of [GEOMETRY_BUDGET_FRINGE_END_LEVEL, 300, 388, 1_000]) {
         for (const seed of sampleSeeds.slice(0, 6)) {
           const maze = generateLadderMaze(level, board, seed);
           const stats = (maze as LegacyMazeSnapshot).reverseStats!;
-          expect(stats.floor).toBe(740);
-          expect(stats.reverseFelt).toBeGreaterThanOrEqual(740);
+          expect(stats.floor).toBe(905);
+          expect(stats.reverseFelt).toBeGreaterThanOrEqual(905);
           expect((maze as LegacyMazeSnapshot).fringeStats?.cells).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
           expect((maze as unknown as { masteryStats?: unknown }).masteryStats).toBeUndefined();
         }

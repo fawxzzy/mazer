@@ -37,9 +37,10 @@ const countKinds = (grid: ReadonlyArray<ReadonlyArray<boolean>>): { floor: numbe
   return { floor, junctions, deadEnds };
 };
 
-// Fewer cells than the capacity floor of the top maze (the one-tile stub rule leaves room for 2- and
-// 3-cell stubs only: the calibrated capacity is GEOMETRY_BUDGET_FRINGE_CAP, the minimum measured 16).
-const FRINGE_TEST_CELLS = 16;
+// A request most bases of the top maze can hold (the calibrated capacity, the 5th percentile of the weaker board,
+// is GEOMETRY_BUDGET_FRINGE_CAP = 5 rounded down; the median is about 35). The top maze is the felt ceiling's, which only
+// about 3 in 4 plain bases reach (calibration share), so the tests judge the bases that land.
+const FRINGE_TEST_CELLS = 8;
 
 const tuneTop = (aspectRatio: number, index: number, fringeCells: number) => {
   const level = GEOMETRY_BUDGET_FELT_SATURATION_LEVEL;
@@ -51,6 +52,8 @@ const tuneTop = (aspectRatio: number, index: number, fringeCells: number) => {
     maxBranch: resolveGeometryBudgetMaxBranch(level),
     routeBranch: resolveGeometryBudgetRouteBranch(level),
     forks: resolveGeometryBudgetForks(level),
+    // The ladder's own tuner setting (legacyGenerationLifecycle.ts).
+    straightBranches: true,
     fringeCells
   });
   return { base, tuned };
@@ -59,11 +62,17 @@ const tuneTop = (aspectRatio: number, index: number, fringeCells: number) => {
 describe('fringe: zero-felt-cost side stubs past the felt saturation (tuner lever 3)', () => {
   test('the fringe adds exactly the requested cells and leaves the landed felt number and the route untouched', () => {
     for (const board of LADDER_BOARDS) {
-      for (let index = 0; index < 4; index += 1) {
+      let judged = 0;
+      for (let index = 0; index < 12 && judged < 4; index += 1) {
         const plain = tuneTop(board.aspectRatio, index, 0);
         const fringed = tuneTop(board.aspectRatio, index, FRINGE_TEST_CELLS);
-        expect(plain.tuned.onTarget).toBe(true);
-        expect(fringed.tuned.onTarget).toBe(true);
+        if (!plain.tuned.onTarget || !fringed.tuned.onTarget) { continue; }
+        // Same maze apart from the fringe: a base whose fringed tuning needed another attempt is a different maze.
+        const removedStubs = new Set([...plain.tuned.stubRemoved, ...fringed.tuned.stubRemoved].map((tile) => `${tile.x},${tile.y}`));
+        let related = true;
+        plain.tuned.grid.forEach((row, y) => row.forEach((cell, x) => { if (cell && !fringed.tuned.grid[y]![x] && !removedStubs.has(`${x},${y}`)) { related = false; } }));
+        if (!related) { continue; }
+        judged += 1;
         expect(fringed.tuned.fringeShortfall).toBe(0);
         expect(fringed.tuned.fringeTiles.length).toBe(FRINGE_TEST_CELLS);
         expect(plain.tuned.fringeTiles.length).toBe(0);
@@ -89,6 +98,7 @@ describe('fringe: zero-felt-cost side stubs past the felt saturation (tuner leve
         );
         expect(run.steps).toBe(plain.tuned.felt);
       }
+      expect(judged).toBe(4);
     }
   });
 
@@ -97,9 +107,10 @@ describe('fringe: zero-felt-cost side stubs past the felt saturation (tuner leve
       // The first sampled base whose plain and fringed tunings are the same maze apart from the fringe
       // (a stub the one-tile rule could not fix on a first landing sends one of them to another attempt).
       let pair: { base: ReturnType<typeof tuneTop>['base']; tuned: ReturnType<typeof tuneTop>['tuned']; plain: ReturnType<typeof tuneTop>['tuned'] } | null = null;
-      for (let index = 1; index < 8 && pair === null; index += 1) {
+      for (let index = 1; index < 16 && pair === null; index += 1) {
         const fringedRun = tuneTop(board.aspectRatio, index, FRINGE_TEST_CELLS);
         const plainRun = tuneTop(board.aspectRatio, index, 0).tuned;
+        if (!plainRun.onTarget || !fringedRun.tuned.onTarget) { continue; }
         const removed = new Set([...plainRun.stubRemoved, ...fringedRun.tuned.stubRemoved].map((tile) => `${tile.x},${tile.y}`));
         let related = true;
         plainRun.grid.forEach((row, y) => row.forEach((cell, x) => { if (cell && !fringedRun.tuned.grid[y]![x] && !removed.has(`${x},${y}`)) { related = false; } }));

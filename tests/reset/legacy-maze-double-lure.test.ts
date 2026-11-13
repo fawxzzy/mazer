@@ -25,6 +25,8 @@ const tune = (aspectRatio: number, index: number, extra: { doubleLure?: boolean;
     maxBranch: resolveGeometryBudgetMaxBranch(LEVEL),
     routeBranch: resolveGeometryBudgetRouteBranch(LEVEL),
     forks: resolveGeometryBudgetForks(LEVEL),
+    // The ladder's own tuner settings (legacyGenerationLifecycle.ts).
+    straightBranches: true,
     ...extra
   });
   return { base, tuned };
@@ -59,7 +61,8 @@ describe('double lure: reverse-solve resistance (tuner lever 4)', () => {
         const plain = tune(board.aspectRatio, index, {});
         const lured = tune(board.aspectRatio, index, { doubleLure: true });
         // The lure narrows the hosts a fork may use, so a base can run out of room (measured: 10 to
-        // 20 percent of the bases; the selection then tries the next base). Judge the landed ones.
+        // 20 percent of the bases at the old ceiling, about a third at the ceiling of 930, which only 3 in 4 plain bases reach;
+        // the selection then tries the next base). Judge the landed ones.
         if (!plain.tuned.onTarget || !lured.tuned.onTarget) { continue; }
         landed += 1;
         expect(lured.tuned.felt).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_TOP_TARGET);
@@ -69,7 +72,7 @@ describe('double lure: reverse-solve resistance (tuner lever 4)', () => {
         plainTotal += plain.tuned.reverseFelt;
         lureTotal += lured.tuned.reverseFelt;
       }
-      expect(landed).toBeGreaterThanOrEqual(10);
+      expect(landed).toBeGreaterThanOrEqual(6);
       // Measured: about 450 against 700 (phone and desktop); a wide margin keeps this robust.
       expect(lureTotal / landed).toBeGreaterThan((plainTotal / landed) + 120);
     }

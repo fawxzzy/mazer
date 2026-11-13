@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import {
+  GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
   GEOMETRY_BUDGET_TOP_TARGET,
+  LAST_BUDGET_LEVEL,
   GEOMETRY_BUDGET_WINDOW,
   resolveGeometryBudgetFringeCells
 } from '../../src/legacy-runtime/legacyGeometryBudget';
@@ -198,7 +200,7 @@ describe('one-tile stub analysis (MAZER-GEN-004)', () => {
 // Every generated ladder maze, every band, both frozen boards: no dead-end branch shorter than the rule's
 // minimum (the start and goal caps excepted), the maze still solvable and connected, deterministic per seed,
 // and the contracts the ladder pins (felt window, exact fringe count) intact.
-const PROPERTY_LEVELS = [2, 3, 10, 20, 50, 100, 139, 150, 198, 199, 200, 210, 218, 219, 268, 300, 999] as const;
+const PROPERTY_LEVELS = [2, 3, 10, 20, 50, 100, 139, 150, 198, 218, 268, 288, 289, 293, 298, 299, 300, 999] as const;
 const PROPERTY_SEEDS = 10;
 
 const reachableFloor = (maze: LegacyMazeSnapshot): Set<number> => {
@@ -254,7 +256,7 @@ describe('no one-tile stubs in any generated ladder maze', () => {
 
   test('deterministic per seed: the same level and seed give the same maze, stubStats included', () => {
     for (const board of LADDER_BOARDS) {
-      for (const level of [20, 150, 210, 300]) {
+      for (const level of [20, 150, 290, 300]) {
         const first = generateLadderMaze(level, board, seedForIndex(3));
         const second = generateLadderMaze(level, board, seedForIndex(3));
         expect(hashLadderMaze(second)).toBe(hashLadderMaze(first));
@@ -265,7 +267,7 @@ describe('no one-tile stubs in any generated ladder maze', () => {
 
   test('the ladder contracts hold on the sampled mazes: felt in its window past the felt saturation, exact fringe count', () => {
     for (const board of LADDER_BOARDS) {
-      for (const level of [199, 205, 210, 218, 300]) {
+      for (const level of [GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 1, GEOMETRY_BUDGET_FELT_SATURATION_LEVEL + 5, LAST_BUDGET_LEVEL, 300]) {
         for (let index = 0; index < 6; index += 1) {
           const maze = generateLadderMaze(level, board, seedForIndex(index));
           const label = `${board.name} level ${level} seed ${index}`;
