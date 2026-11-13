@@ -35,6 +35,7 @@ import {
   type EndpointTileRect,
   type EndpointTileSpec
 } from './endpointTiles';
+import { shouldDrawEndpointMarker } from './endpointMarkerLayering';
 
 /**
  * Part of every bake hash: bump it whenever the baked pixels change. v2: the bright junction nodes are gone
@@ -1030,6 +1031,11 @@ export interface BoardMarkerInput {
   phase?: number;
   reducedMotion?: boolean;
   /**
+   * Chip style: the goal star's clockwise rotation in radians (goalStarSpin.ts), about its circumcentre. Default 0
+   * (tip up): what the Guide icon and every static frame draw. Ignored under reducedMotion.
+   */
+  goalStarRotation?: number;
+  /**
    * Chip style: the start / goal cell's own chip geometry in BOARD-LOCAL css px (`computeChipTileAt`, from the
    * same bake layout), so the end marker is centred on the baked tile's device-snapped cell. `startTile.direction` is
    * the way the start arrow points. Omit for a standalone cell (Guide icons): an isolated chip, arrow pointing right.
@@ -1050,10 +1056,11 @@ export interface BoardMarkerStats {
   stateOps: number;
 }
 
-const starPath = (p: Painter, cx: number, cy: number, outer: number, inner: number): void => {
+/** A five-point star about (cx, cy), tip up when `rotation` is 0; a positive `rotation` (radians) turns it clockwise. */
+const starPath = (p: Painter, cx: number, cy: number, outer: number, inner: number, rotation = 0): void => {
   p.begin();
   for (let i = 0; i < 10; i += 1) {
-    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const a = -Math.PI / 2 + (i * Math.PI) / 5 + rotation;
     const rad = i % 2 === 1 ? inner : outer;
     const x = cx + Math.cos(a) * rad;
     const y = cy + Math.sin(a) * rad;
@@ -1135,21 +1142,23 @@ const drawEndpointGlyph = (
   style: ResolvedBoardTileStyle,
   spec: EndpointTileSpec,
   ox: number,
-  oy: number
+  oy: number,
+  starRotation = 0
 ): void => {
   const m = style.material;
   const { frame } = spec;
   const cx = ox + frame.cx;
   const cy = oy + frame.cy;
   if (spec.star) {
-    // keyline: the star's outline, stroked wide in the void colour (half of it falls inside, under the fill)
-    starPath(painter, cx, cy, spec.star.outer, spec.star.inner);
+    // keyline: the star's outline, stroked wide in the void colour (half of it falls inside, under the fill).
+    // The star is turned about (cx, cy), its circumcentre (goalStarSpin.ts), so the centring never moves.
+    starPath(painter, cx, cy, spec.star.outer, spec.star.inner, starRotation);
     painter.fillStyle(cssRgb(m.void));
     painter.strokeStyle(cssRgb(m.void));
     painter.lineWidth(frame.keyline * 2);
     painter.fill();
     painter.stroke();
-    starPath(painter, cx, cy, spec.star.outer, spec.star.inner);
+    starPath(painter, cx, cy, spec.star.outer, spec.star.inner, starRotation);
     painter.fillStyle(cssRgb(m.goal));
     painter.fill();
     return;
@@ -1261,13 +1270,16 @@ export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput
   painter.save();
   painter.alpha(1);
   painter.caps('round', 'round');
-  const onStart = input.start && input.player
-    && input.player.x === input.start.x && input.player.y === input.start.y;
+  const onStart = Boolean(input.start && input.player
+    && input.player.x === input.start.x && input.player.y === input.start.y);
   const paintEndpoint = (kind: EndpointKind, cell: BoardCell, tile: EndpointTileRect | null | undefined): void => {
     const rect = tile ?? standaloneEndpointRect(cell, input.tileSize, scale, style);
-    drawEndpointGlyph(painter, style, resolveEndpointTile(kind, rect, scale), ox, oy);
+    drawEndpointGlyph(
+      painter, style, resolveEndpointTile(kind, rect, scale), ox, oy,
+      kind === 'goal' && !input.reducedMotion ? (input.goalStarRotation ?? 0) : 0
+    );
   };
-  if (input.start && !onStart) {
+  if (input.start && shouldDrawEndpointMarker('start', onStart)) {
     if (styleId === 'trace') {
       const [cx, cy] = centerOfCell(input.start, input.tileSize, scale, ox, oy);
       const startTile = Math.max(input.tileSize, input.minimumMarkerSizes?.startTileCss ?? 0);

@@ -22,6 +22,8 @@ import {
   resolveBoardTileStyleFromSearch
 } from '../render/boardTileLayer';
 import { centerOfCell, drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
+import { resolvePlayerCoreAlphaScale, shouldDrawEndpointMarker } from '../render/endpointMarkerLayering';
+import { isGoalStarSpinning, resolveGoalStarRotation } from '../render/goalStarSpin';
 import {
   resolveBleedGlowColor,
   resolveBleedGlowEnvelope,
@@ -100,7 +102,7 @@ import {
 } from '../render/navigationCoreTrail';
 import { resolveTrailGridPathWithHead } from '../render/trailHeadPath';
 import { buildDeviceSnappedTrailPath } from '../render/trailDeviceSnap';
-import { createPlayerRingMorph, resolvePlayerMarkerEndpointMorph } from '../render/playerRingMorph';
+import { createPlayerRingMorph, resolveEndpointRingBlend, resolvePlayerMarkerEndpointMorph } from '../render/playerRingMorph';
 import { TrailPerfectPathCache } from '../render/trailPerfectPathCache';
 import { observeTrailFrameCost, shouldRebuildTrail, type TrailDrawRecord } from '../render/trailRedrawGate';
 import {
@@ -3377,6 +3379,12 @@ export class MenuScene extends Phaser.Scene {
       this.hudDirty = true;
     }
     if (this.hasLegacyPlayTrailPulsePendingFrame(time)) {
+      this.boardDynamicDirty = true;
+    }
+    // The goal star turns slowly (goalStarSpin.ts): the star is painted into boardDynamicGraphics, so an idle board
+    // needs the dynamic redraw to keep it moving. It rides the same colour-redraw cadence as the trail, so it adds no
+    // second schedule. Reduce Motion: the star is static, nothing to redraw.
+    if (this.hasGoalStarSpinPendingFrame(time)) {
       this.boardDynamicDirty = true;
     }
     // Player locator: a find-me ping on spawn / unpause / next level and after the player idles. It only forces
@@ -10211,7 +10219,9 @@ export class MenuScene extends Phaser.Scene {
   // sits directly on the baked tile with no box behind it, centred from the layer's device-snapped board origin
   // and tile geometry (boardTileLayer.endpointTiles; the start tile carries the arrow's direction, the first step
   // of the solution path). They are drawn in boardDynamicGraphics, over the trail. Start is hidden while the player
-  // stands on it (the player marker is the start). The goal beacon (a halo, goalBeaconGraphics) is separate.
+  // stands on it (the player marker is the start); the goal star is ALWAYS drawn and the player marker, painted after
+  // it, draws over it (endpointMarkerLayering.ts, MAZER-VIS-041). The goal star turns slowly (goalStarSpin.ts). The goal
+  // beacon (a halo, goalBeaconGraphics) is separate.
   private fillPlayDynamicMarkerTile(
     point: LegacyPoint,
     originX: number,
@@ -10221,7 +10231,7 @@ export class MenuScene extends Phaser.Scene {
     kind: 'start' | 'goal',
     time?: number
   ): void {
-    if (kind === 'start' && this.player.x === point.x && this.player.y === point.y) {
+    if (!shouldDrawEndpointMarker(kind, this.player.x === point.x && this.player.y === point.y)) {
       return;
     }
     const origin = this.boardTileLayer.snappedOrigin ?? { x: originX, y: originY };
@@ -10258,13 +10268,10 @@ export class MenuScene extends Phaser.Scene {
       startTile: endpointTiles.start,
       goalTile: endpointTiles.goal,
       phase,
-      reducedMotion: this.prefersLegacyReducedMotion()
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      // The slow spin (goalStarSpin.ts): from the shared scene clock; 0 (tip up, static) under Reduce Motion.
+      goalStarRotation: kind === 'goal' ? resolveGoalStarRotation(time ?? 0, this.prefersLegacyReducedMotion()) : 0
     };
-    // The player standing on the goal covers the star; the star's keyline would poke out around the player's rounded
-    // square as dark spikes, so (like the start marker) the goal glyph yields to the player. The beacon stays.
-    if (kind === 'goal' && this.player.x === point.x && this.player.y === point.y) {
-      return;
-    }
     // Chip: the star / play arrow straight onto the baked tile (no pad, no badge: nothing is painted under the trail
     // any more); Trace: its own marker artwork. Both go through the same call.
     drawBoardMarkers(context, markerInput);
@@ -10330,6 +10337,10 @@ export class MenuScene extends Phaser.Scene {
       // On the start / goal (dead-end cap) tile the ring follows the tile's rounded shape, morphing while gliding on or off.
       tileCornerRadii: endpointMorph.radii,
       tileCornerBlend: endpointMorph.blend,
+      // Over the goal the core is translucent so the star (always drawn, under the marker) shows through.
+      coreAlphaScale: resolvePlayerCoreAlphaScale(
+        this.maze.goal ? resolveEndpointRingBlend(point.x, point.y, this.maze.goal, reducedMotion) : 0
+      ),
       pingStartMs: this.playerLocatorState.activePingStartMs,
       reducedMotion
     });
@@ -10734,6 +10745,16 @@ export class MenuScene extends Phaser.Scene {
     this.legacyColourRedrawCheckedAtMs = time;
     this.legacyColourRedrawDue = step.due;
     return step.due;
+  }
+
+  private hasGoalStarSpinPendingFrame(time: number): boolean {
+    if (!isGoalStarSpinning(this.prefersLegacyReducedMotion()) || this.overlay !== 'none' || !this.maze?.goal) {
+      return false;
+    }
+    if (this.menuStaticDrawLifecyclePhase !== 'idle' && this.menuStaticDrawLifecyclePhase !== 'settled') {
+      return false;
+    }
+    return this.isLegacyColourRedrawDue(time);
   }
 
   // Movement no longer has a fixed on-screen widget at all -- the board is
