@@ -10,7 +10,7 @@ Open a level directly, on a phone or desktop, to feel the ladder without touchin
 https://mazer.fawxzzy.com/?previewLevel=100
 ```
 
-Checkpoints worth trying: 1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 250.
+Checkpoints worth trying (the pause sheet's jump list): 1, 2, 5, 10, 20, 30, 60, 100, 150, 190, 198, 218, 283, 288, 300. 283 is where the felt difficulty saturates and 288 is the last budget level (the end of the fringe); 300 is on the plateau past it (MAZER-QA-008).
 
 - It starts straight into play (no menu, no sign-in, no install gate) at that level.
 - Generation is the unchanged real path: the preview seeds the player track with the state a player at that level would have (`level N`, completion ordinal `N-1`, target complexity `8 + 4*(N-1)`, saturating at 400 / level 99), then the same resolvers real play uses read it. Board size is the real board for the device (phone portrait 25x51, desktop landscape).

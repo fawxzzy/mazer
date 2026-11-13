@@ -18,11 +18,12 @@
  *    from it.
  *
  * CENTRING AND FIT (2026-11-10, owner: "the star isn't centred in its tile, same with the start arrow, and its size
- * should not make it bleed over the tile edges"). The VISIBLE glyph is the fill plus its dark keyline, so that whole
- * bounding box is what is centred on the tile for the play triangle (its bounding box, not its centroid, sits on the
- * cell centre). The STAR is no longer centred by its bounding box (MAZER-VIS-034): that left its centre of mass up to
- * 1.9 device px low, and ignored that the chip's lit rim is painted on the closed sides only. Its circumcentre (=
- * centre of mass) goes on the tile's painted-interior centre, see endpointOpticalCentre.ts. The glyph is then scaled down, if needed, so that the farthest point of the
+ * should not make it bleed over the tile edges"). The VISIBLE glyph is the fill plus its dark keyline. Both glyphs are
+ * centred OPTICALLY, by the centroid of what is painted, on the tile's painted-interior centre (the chip fill, inside the
+ * lit rim, which is inset on the closed sides only; see endpointOpticalCentre.ts): the STAR by its circumcentre
+ * (MAZER-VIS-034) and the play TRIANGLE by the centroid of the triangle dilated by its stroke and keyline (MAZER-VIS-036;
+ * a bounding-box-centred triangle left its mass a sixth of its length behind the centre). The glyph is scaled down, if
+ * needed, so that the farthest point of the
  * keyline stays an inset inside the tile's FILL (the area inside the lit rim: the closest of its four edges to the
  * cell centre) with at least 0.5 device px to spare: the keyline never reaches the rim or the tile edge, at any tile
  * size or DPR. Where the one-device-pixel keyline would take too much of that room it is thinned so the glyph keeps
@@ -33,7 +34,7 @@
  * (goalBeacon.ts), which has its own css-px sizing.
  */
 import { DEFAULT_START_DIRECTION, type StartDirection } from './startDirection';
-import { resolveGoalStarCentre, STAR_CIRCUMCENTRE_BELOW_BOX_CENTRE } from './endpointOpticalCentre';
+import { dilatedTriangleCentroid, resolveEndpointCentre, STAR_CIRCUMCENTRE_BELOW_BOX_CENTRE } from './endpointOpticalCentre';
 import {
   BOARD_TILE_GEOMETRY,
   snapLineWidth
@@ -139,7 +140,7 @@ export const resolveEndpointTile = (
     keyline = Math.min(keyline, room / 5);
     const outer = Math.max(0, Math.min(radius * k.goalStarOuterOfRadius, (room - keyline) / STAR_FAR_VERTEX));
     // The star's circumcentre (its centre of mass) goes on the tile's painted-interior centre (endpointOpticalCentre.ts).
-    const at = resolveGoalStarCentre(tile);
+    const at = resolveEndpointCentre(tile);
     return {
       kind,
       frame: { cx: at.x, cy: at.y, radius, keyline },
@@ -150,29 +151,34 @@ export const resolveEndpointTile = (
   const direction = tile.direction ?? DEFAULT_START_DIRECTION;
   keyline = Math.min(keyline, room / 4);
   const stroke = Math.min(snapLineWidth(radius * k.startPlayStrokeOfRadius, devicePixelRatio), room / 3);
-  // The triangle's bounding box is centred on the cell centre (u spans -length/2 .. +length/2 along travel, v spans
-  // -halfHeight .. +halfHeight across it); its farthest vertex from the centre is a base corner.
+  // The triangle in glyph space (u along travel, v across it), nominal size scaled by the fit. It is placed so the
+  // centroid of its PAINTED pixels (the triangle dilated by half the gold stroke plus the keyline) is on the tile's
+  // painted-interior centre, the same target as the goal star (endpointOpticalCentre.ts, MAZER-VIS-036). It used to
+  // be placed by its bounding box, which left the visible mass a sixth of its length behind the centre.
   const nominalHalfHeight = radius * k.startPlayHalfHeightOfRadius;
   const nominalLength = radius * k.startPlayLengthOfRadius;
+  // Its farthest vertex from the cell centre as the fit has always measured it (a base corner of the box-centred
+  // triangle): kept as the bound, so the size, and the keyline's clearance from the rim, are what they were.
   const farVertex = Math.hypot(nominalLength / 2, nominalHalfHeight);
   const fit = Math.max(0, Math.min(1, (room - (stroke / 2) - keyline) / farVertex));
   const halfHeight = nominalHalfHeight * fit;
   const length = nominalLength * fit;
-  const back = -(length / 2);
-  const [ax, ay] = rotate(direction, back, -halfHeight);
-  const [bx, by] = rotate(direction, back, halfHeight);
-  const [px, py] = rotate(direction, back + length, 0);
+  const painted = dilatedTriangleCentroid([0, -halfHeight], [0, halfHeight], [length, 0], (stroke / 2) + keyline);
+  const at = resolveEndpointCentre(tile);
+  const [ax, ay] = rotate(direction, -painted.x, -halfHeight);
+  const [bx, by] = rotate(direction, -painted.x, halfHeight);
+  const [px, py] = rotate(direction, length - painted.x, 0);
   return {
     kind,
-    frame: { cx, cy, radius, keyline },
+    frame: { cx: at.x, cy: at.y, radius, keyline },
     star: null,
     play: {
-      ax: cx + ax,
-      ay: cy + ay,
-      bx: cx + bx,
-      by: cy + by,
-      cx: cx + px,
-      cy: cy + py,
+      ax: at.x + ax,
+      ay: at.y + ay,
+      bx: at.x + bx,
+      by: at.y + by,
+      cx: at.x + px,
+      cy: at.y + py,
       stroke,
       direction
     }
