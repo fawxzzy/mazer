@@ -174,7 +174,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'wrap',
-    text: 'Some mazes wrap around open edges. The edge diamonds glow in your trail colours.'
+    text: 'Some mazes wrap around open edges. Trail-coloured edge diamonds fill as beams hit.'
   },
   {
     heading: 'Levels',

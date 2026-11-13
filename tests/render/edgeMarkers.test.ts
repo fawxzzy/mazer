@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuPathTitleOrbitPose } from '../../src/legacy-runtime/legacyMenuTitle';
 import {
   EDGE_MARKER_IDLE_ALPHA_MAX,
-  EDGE_RING_BUILD_LIT,
   EDGE_MARKER_IDLE_ALPHA_MIN,
   EDGE_MARKER_IDLE_PERIOD_MS,
   EDGE_MARKER_FLASH_MS,
@@ -15,7 +14,7 @@ import {
   drawEdgeBeams,
   resolveEdgeMarkerIdleAlpha,
   resolveEdgeStationNormalExtent,
-  resolveEdgeRingEnergies,
+  resolveEdgeRingFills,
   resolveEdgeMarkerStates,
   resolveEdgeMarkerVertices,
   resolveEdgeStationPosition,
@@ -37,6 +36,8 @@ import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayo
 import {
   INTRO_BEAM_STAGGER_MS,
   INTRO_BUILD_START_MS,
+  INTRO_RING_CHARGE_MS,
+  OUTRO_RING_ORBIT_START_MS,
   INTRO_LASER_MS,
   OUTRO_TILES_START_MS,
   RING_ENERGY_FADE_MS,
@@ -48,6 +49,30 @@ import {
   resolveOutroTotalMs
 } from '../../src/render/introTimeline';
 import { resolveTeleportAnchorPoses } from '../../src/render/teleportAnchorPose';
+import {
+  EDGE_BEAM_FLIGHT_MS,
+  EDGE_BEAM_PULSE_MS,
+  resolveBeamHead,
+  resolveBeamTimes,
+  resolveDiamondDrainFromOutgoing,
+  resolveDiamondFillFromIncoming
+} from '../../src/render/edgeBeamTimeline';
+import { BEAM_BLOOM_OUTER_PX, BEAM_HOT_MIX, snapToDevice, snapWidthToDevice } from '../../src/render/edgeBeamArt';
+import { MOTION_REDUCED_MS } from '../../src/render/motionScale';
+import { mixPaletteRgb } from '../../src/render/trailPalette';
+
+const HOT = mixPaletteRgb(PLAYER_COLOR, cyberArcadeMaterial.rail.white, BEAM_HOT_MIX);
+
+/** True when `point` lies on an edge of the closed polygon (within a hair). */
+const isOnPolygonEdge = (vertices: ReadonlyArray<{ x: number; y: number }>, point: { x: number; y: number }): boolean => (
+  vertices.some((a, index) => {
+    const b = vertices[(index + 1) % vertices.length] as { x: number; y: number };
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    const cross = Math.abs(((b.x - a.x) * (point.y - a.y)) - ((b.y - a.y) * (point.x - a.x))) / length;
+    const along = (((point.x - a.x) * (b.x - a.x)) + ((point.y - a.y) * (b.y - a.y))) / (length * length);
+    return cross < 1e-6 && along >= -1e-9 && along <= 1 + 1e-9;
+  })
+);
 
 const VIEWPORTS = [
   { width: 390, height: 844 },
@@ -422,27 +447,39 @@ describe('all-8 beams (arrival and departure)', () => {
     expect([...mid.firingIds].sort()).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
 
-  test('arrival: beams run diamond -> spawn tile; departure: player -> diamond (the mirror)', () => {
+  test('arrival: pulses run diamond outline -> spawn tile; departure: player -> diamond outline (the mirror)', () => {
     const inward = resolveEdgeBeams({ direction: 'inward', focus, laserProgress: 0.5, spawnPop: 0, stations });
     const outward = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 0.5, spawnPop: 0, stations });
     stations.forEach((station, index) => {
-      expect(inward.beams[index]?.from).toEqual({ x: station.x, y: station.y });
+      const vertices = resolveEdgeMarkerVertices(station, 1);
+      const contact = inward.beams[index]?.contact as { x: number; y: number };
+      // The diamond end of the path is the exact contact point on the diamond OUTLINE, not its centre.
+      expect(outward.beams[index]?.contact).toEqual(contact);
+      expect(Math.hypot(contact.x - station.x, contact.y - station.y)).toBeLessThanOrEqual(EDGE_MARKER_MAX_EXTENT_PX);
+      expect(isOnPolygonEdge(vertices, contact), `station ${index}`).toBe(true);
+      expect(inward.beams[index]?.from).toEqual(contact);
       expect(inward.beams[index]?.to).toEqual(focus);
       expect(outward.beams[index]?.from).toEqual(focus);
-      expect(outward.beams[index]?.to).toEqual({ x: station.x, y: station.y });
+      expect(outward.beams[index]?.to).toEqual(contact);
     });
   });
 
-  test('a diamond brightens only while its beam fires', () => {
-    const before = resolveEdgeBeams({ direction: 'inward', focus, laserProgress: 0, spawnPop: 0, stations });
-    const landed = resolveEdgeBeams({ direction: 'inward', focus, laserProgress: 1, spawnPop: 0, stations });
+  test('a pulse is on screen from the instant its head leaves until its tail has arrived, never before or after', () => {
+    const before = resolveEdgeBeams({ direction: 'inward', focus, laserProgress: 0, spawnPop: 0, stations, clockMs: -1 });
     expect(before.firingIds.size).toBe(0);
-    expect(landed.firingIds.size).toBe(0);
+    for (let index = 0; index < 8; index += 1) {
+      const times = resolveBeamTimes(index);
+      const at = (clockMs: number) => resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 0, spawnPop: 0, stations, clockMs }).beams[index];
+      expect(at(times.launchMs - 0.001)?.firing, `${index} before launch`).toBe(false);
+      expect(at(times.launchMs + 1)?.firing, `${index} just after launch`).toBe(true);
+      expect(at(times.tailArrivesMs - 1)?.firing, `${index} before the tail lands`).toBe(true);
+      expect(at(times.tailArrivesMs + 0.001)?.firing, `${index} tail landed`).toBe(false);
+    }
     const states = resolveEdgeMarkerStates({ energizedIds: new Set([2]), reducedMotion: false, timeMs: 0 });
     expect(states[2]?.alpha).toBeGreaterThan(states[1]?.alpha ?? 1);
   });
 
-  test('inward beams end in a 6-sparkle poof around the spawn tile, only after all beams landed', () => {
+  test('inward beams end in a 6-sparkle poof around the spawn tile, only after all heads landed', () => {
     expect(resolveEdgeBeams({ direction: 'inward', focus, laserProgress: 0.9, spawnPop: 0.5, stations }).sparkles).toHaveLength(0);
     const poof = resolveEdgeBeams({ direction: 'inward', focus, laserProgress: 1, spawnPop: 0.5, stations });
     expect(poof.sparkles).toHaveLength(6);
@@ -453,21 +490,38 @@ describe('all-8 beams (arrival and departure)', () => {
     expect(resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 1, spawnPop: 0.5, stations }).sparkles).toHaveLength(0);
   });
 
-  test('each beam draws a 3 px glow + a 1 px core + a head dot, in palette tokens', () => {
+  test('each pulse draws a bloom, a tapered gradient body, a head and a ripple, all in the player colour family (palette tokens only)', () => {
     const recorder = makeRecorder();
-    drawEdgeBeams(recorder, { direction: 'inward', focus, laserProgress: 0.5, spawnPop: 0, stations });
-    expect(recorder.lineWidths).toEqual(Array.from({ length: 8 }, () => [3, 1]).flat());
-    // everything that shoots out of the player is the player colour (one token, trailPalette.PLAYER_COLOR)
-    expect(recorder.lineColors).toEqual(Array.from({ length: 8 }, () => [PLAYER_COLOR, PLAYER_COLOR]).flat());
-    expect(recorder.fillColors.every((color) => color === PLAYER_COLOR)).toBe(true);
-    expect(recorder.circles).toHaveLength(8);
-    expect(recorder.lineBetweenCount).toBe(16);
+    // 150 ms into the laser: every head has left (the latest at 96 ms), no tail yet.
+    drawEdgeBeams(recorder, { direction: 'inward', focus, laserProgress: 0, spawnPop: 0, stations, clockMs: 150 });
+    // 8 beams x (16 bloom + 14 body + 1 lead) = 248 lines, widths from 1 up to the 9 px bloom, one head per beam.
+    expect(recorder.lineBetweenCount).toBe(8 * 31);
+    expect(Math.max(...recorder.lineWidths)).toBe(BEAM_BLOOM_OUTER_PX);
+    expect(Math.min(...recorder.lineWidths)).toBe(1);
+    expect(recorder.lineColors.every((color) => color === PLAYER_COLOR || color === HOT)).toBe(true);
+    expect(recorder.lineColors.filter((color) => color === PLAYER_COLOR).length).toBe(8 * 17);
+    expect(recorder.fillColors.every((color) => color === PLAYER_COLOR || color === HOT)).toBe(true);
+    expect(recorder.circles).toHaveLength(16);
   });
 
-  test('nothing draws before launch or after landing', () => {
+  test('crisp on fractional DPR: line ends sit on a device pixel centre and widths are whole device pixels', () => {
+    for (const dpr of [1, 2, 2.625, 2.75, 3]) {
+      const recorder = makeRecorder();
+      drawEdgeBeams(recorder, { direction: 'outward', focus: { x: 195.3, y: 401.7 }, laserProgress: 0, spawnPop: 0, stations, clockMs: 300, devicePixelRatio: dpr });
+      expect(recorder.lineBetweenCount).toBeGreaterThan(0);
+      for (const width of recorder.lineWidths) {
+        const device = width * dpr;
+        expect(Math.abs(device - Math.round(device)), `dpr ${dpr} width ${width}`).toBeLessThan(1e-9);
+      }
+    }
+    expect(snapToDevice(10.1, 2.625) * 2.625 % 1).toBeCloseTo(0.5, 9);
+    expect(snapWidthToDevice(0.2, 3)).toBeCloseTo(1 / 3, 9);
+  });
+
+  test('nothing draws before launch or after the tails have landed', () => {
     const recorder = makeRecorder();
-    drawEdgeBeams(recorder, { direction: 'outward', focus, laserProgress: 0, spawnPop: 0, stations });
-    drawEdgeBeams(recorder, { direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations });
+    drawEdgeBeams(recorder, { direction: 'outward', focus, laserProgress: 0, spawnPop: 0, stations, clockMs: 0 });
+    drawEdgeBeams(recorder, { direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations, clockMs: EDGE_BEAM_FLIGHT_MS + EDGE_BEAM_PULSE_MS });
     expect(recorder.lineBetweenCount).toBe(0);
   });
 });
@@ -476,15 +530,23 @@ describe('scene wiring of the ring lifecycle', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
   const section = (from: string, to: string): string => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)));
 
-  test('the ring keeps its intro clock after the build settles so the fade-out and the last clearing redraw play', () => {
+  test('the ring keeps its intro clock after the build settles, holds full after the outro until the next intro, and crossfades in reduced motion', () => {
     const helper = section('private resolveLegacyEdgeRingIntroState(', 'private resolveLegacyOutroState(');
     expect(helper).toContain("this.menuStaticDrawLifecyclePhase !== 'building' && this.menuStaticDrawLifecyclePhase !== 'settled'");
     const ring = section('private resolveLegacyEdgeRing(', 'private drawLegacyEdgeMarkers(');
     expect(ring).toContain('this.resolveLegacyEdgeRingIntroState(time)');
-    expect(ring).toContain('outro.ringEnergy');
-    expect(ring).toContain('intro.ringEnergy');
-    // Reduced motion and overlays: no lifecycle at all.
-    expect(ring).toContain('this.prefersLegacyReducedMotion() || this.overlay !== \'none\'');
+    expect(ring).toContain('outro.ringFill');
+    expect(ring).toContain('intro.ringFill');
+    expect(ring).toContain('clockMs: outro.laserClockMs');
+    expect(ring).toContain('clockMs: intro.laserClockMs');
+    // Overlays: no lifecycle. Reduced motion keeps it (the diamonds crossfade) instead of dropping it.
+    expect(ring).toContain("if (this.overlay !== 'none') {");
+    expect(ring).toContain('const crossfade = this.prefersLegacyReducedMotion();');
+    // The beams and the ring read one clock each and the same device scale as the board.
+    const lasers = section('private drawLegacyEdgeLasers(', 'private resolveLegacyEdgeRing(');
+    expect(lasers).toContain('clockMs: outro.laserClockMs');
+    expect(lasers).toContain('clockMs: spawnBurst.clockMs');
+    expect(lasers).toContain('devicePixelRatio: this.resolveBoardTileBackingScale()');
   });
 
   test('markers redraw every frame while the lifecycle is active and once more after it ends', () => {
@@ -496,130 +558,175 @@ describe('scene wiring of the ring lifecycle', () => {
   });
 });
 
-describe('ring lighting and spin over the intro / outro timelines (per frame)', () => {
+describe('ring fill and spin over the intro / outro timelines (per frame)', () => {
   const TILES = 300;
   const FULL = { reducedMotion: false, tileCount: TILES } as const;
-  const energiesAt = (direction: 'inward' | 'outward', ms: number): ReadonlyArray<number> => {
+  const CYCLE = { ...FULL, digitAlreadyVisible: true } as const;
+  const fillsAt = (direction: 'inward' | 'outward', ms: number, options: { digitAlreadyVisible?: boolean } = { digitAlreadyVisible: true }): ReadonlyArray<number> => {
     if (direction === 'inward') {
-      const intro = resolveIntro(ms, FULL);
-      return resolveEdgeRingEnergies(intro.done ? null : { direction, laserProgress: intro.laserProgress, ringEnergy: intro.ringEnergy });
+      const intro = resolveIntro(ms, { ...FULL, ...options });
+      return resolveEdgeRingFills(intro.done ? null : { direction, clockMs: intro.laserClockMs, ringFill: intro.ringFill });
     }
     const outro = resolveIntroDeconstruct(ms, FULL);
-    return resolveEdgeRingEnergies(outro.done ? null : { direction, laserProgress: outro.laserProgress, ringEnergy: outro.ringEnergy });
+    return resolveEdgeRingFills({ direction, clockMs: outro.laserClockMs, ringFill: outro.ringFill });
   };
-  const litCount = (energies: ReadonlyArray<number>): number => energies.filter((energy) => energy > 0).length;
-  const fullyLit = (energies: ReadonlyArray<number>): number => energies.filter((energy) => energy === 1).length;
+  const fullCount = (fills: ReadonlyArray<number>): number => fills.filter((fill) => fill === 1).length;
 
-  test('arrival: ALL 8 diamonds are lit from the start of the build and brighten as THEIR beam fires (after the build), then fade together', () => {
-    const buildEnd = resolveIntroRevealEndMs(TILES);
-    const laserStart = resolveIntroLaserStartMs(TILES);
-    const laserEnd = resolveIntroLaserEndMs(TILES);
-    expect(laserStart).toBe(buildEnd);
-    // Lit from the very first frame, at the build level, for the whole build (the ring is orbiting): never dark, never full.
-    for (let ms = 0; ms <= buildEnd; ms += 1) {
-      const energies = energiesAt('inward', ms);
-      expect(litCount(energies), `t=${ms}`).toBe(8);
-      expect(energies.every((energy) => energy === EDGE_RING_BUILD_LIT), `t=${ms}`).toBe(true);
-    }
-    // Each diamond brightens only when its own beam leaves, all the way to full by its landing; never dims in between.
+  test('departure: each diamond is EMPTY until its beam touches it, fills linearly from that exact instant and is full when the beam is absorbed', () => {
     for (let index = 0; index < 8; index += 1) {
-      let previous = EDGE_RING_BUILD_LIT;
-      for (let ms = buildEnd; ms <= laserEnd; ms += 1) {
-        const energy = energiesAt('inward', ms)[index] as number;
-        expect(energy, `diamond ${index} t=${ms}`).toBeGreaterThanOrEqual(previous - 1e-12);
-        previous = energy;
-      }
-      expect(previous, `diamond ${index}`).toBe(1);
-    }
-    expect(energiesAt('inward', Math.ceil(buildEnd) + 1)[0]).toBeGreaterThan(EDGE_RING_BUILD_LIT);
-    expect(fullyLit(energiesAt('inward', Math.ceil(laserEnd)))).toBe(8);
-    // Then the ring fades out together, monotonically, to exactly 0 and stays 0 through done.
-    let previous = 8;
-    for (let ms = laserEnd; ms <= laserEnd + RING_ENERGY_FADE_MS; ms += 1) {
-      const total = energiesAt('inward', ms).reduce((sum, energy) => sum + energy, 0);
-      expect(total).toBeLessThanOrEqual(previous + 1e-9);
-      previous = total;
-    }
-    expect(previous).toBe(0);
-    for (let ms = laserEnd + RING_ENERGY_FADE_MS; ms <= laserEnd + 3000; ms += 1) {
-      expect(litCount(energiesAt('inward', ms)), `t=${ms}`).toBe(0);
-    }
-  });
-
-  test('departure: a diamond lights as the player beam REACHES it; all 8 lit when the beams land and held until the end fade', () => {
-    const total = resolveOutroTotalMs(TILES);
-    expect(litCount(energiesAt('outward', 0))).toBe(0);
-    for (let index = 0; index < 8; index += 1) {
-      let landedAt = Number.POSITIVE_INFINITY;
-      let litAt = Number.POSITIVE_INFINITY;
-      for (let ms = 0; ms <= 600; ms += 1) {
+      const times = resolveBeamTimes(index);
+      let firstFill = Number.POSITIVE_INFINITY;
+      let fullAt = Number.POSITIVE_INFINITY;
+      let previous = 0;
+      for (let ms = 0; ms <= 800; ms += 1) {
         const outro = resolveIntroDeconstruct(ms, FULL);
-        if (landedAt === Number.POSITIVE_INFINITY && resolveEdgeBeamProgress(outro.laserProgress, index) >= 1) {
-          landedAt = ms;
+        const fill = fillsAt('outward', ms)[index] as number;
+        expect(fill, `diamond ${index} t=${ms}`).toBeGreaterThanOrEqual(previous - 1e-12);
+        previous = fill;
+        if (firstFill === Number.POSITIVE_INFINITY && fill > 0) {
+          firstFill = ms;
         }
-        if (litAt === Number.POSITIVE_INFINITY && energiesAt('outward', ms)[index] === 1) {
-          litAt = ms;
+        if (fullAt === Number.POSITIVE_INFINITY && fill === 1) {
+          fullAt = ms;
+        }
+        // Contact: the head is on the diamond (progress 1) exactly when the fill is allowed to start.
+        if (ms < times.contactMs - 1) {
+          expect(resolveEdgeBeamProgress(outro.laserProgress, index)).toBeLessThan(1);
+          expect(fill, `diamond ${index} before contact t=${ms}`).toBe(0);
         }
       }
-      // Fully lit exactly when its beam arrives; not lit while the beam is still well short of it.
-      expect(litAt, `diamond ${index}`).toBe(landedAt);
-      expect(energiesAt('outward', Math.max(0, landedAt - 120))[index]).toBeLessThan(1);
+      expect(firstFill, `diamond ${index} first fill`).toBe(Math.floor(times.contactMs) + 1);
+      expect(fullAt, `diamond ${index} full`).toBe(Math.ceil(times.tailArrivesMs));
     }
-    // By the time all outbound beams have landed (400 ms) all 8 are lit, and stay lit until the last 150 ms.
-    for (let ms = 400; ms <= total - RING_ENERGY_FADE_MS; ms += 1) {
-      expect(fullyLit(energiesAt('outward', ms)), `t=${ms}`).toBe(8);
+    // The ring is full once every beam is absorbed and stays full through the deconstruct, to the very last frame.
+    const total = resolveOutroTotalMs(TILES);
+    for (let ms = 600; ms <= total + 1000; ms += 1) {
+      expect(fullCount(fillsAt('outward', ms)), `t=${ms}`).toBe(8);
     }
-    // Fade out together and end unlit (no stale lit frame after the outro).
-    expect(litCount(energiesAt('outward', total))).toBe(0);
-    for (let ms = total; ms <= total + 2000; ms += 25) {
-      expect(litCount(energiesAt('outward', ms))).toBe(0);
+    expect(fillsAt('outward', 0)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+  });
+
+  test('arrival after a deconstruct: the ring is FULL through the whole build, then each diamond drains from the exact instant its beam leaves and is empty when it has left', () => {
+    const buildEnd = resolveIntroRevealEndMs(TILES);
+    const laserEnd = resolveIntroLaserEndMs(TILES);
+    for (let ms = 0; ms <= buildEnd; ms += 1) {
+      expect(fullCount(fillsAt('inward', ms)), `t=${ms}`).toBe(8);
+    }
+    for (let index = 0; index < 8; index += 1) {
+      const times = resolveBeamTimes(index);
+      let previous = 1;
+      for (let ms = buildEnd; ms <= buildEnd + 800; ms += 1) {
+        const fill = fillsAt('inward', ms)[index] as number;
+        const clock = ms - buildEnd;
+        expect(fill, `diamond ${index} t=${ms}`).toBeLessThanOrEqual(previous + 1e-12);
+        previous = fill;
+        if (clock <= times.launchMs) {
+          expect(fill, `diamond ${index} before release t=${ms}`).toBe(1);
+        }
+        if (clock >= times.tailLeavesMs) {
+          expect(fill, `diamond ${index} after the tail left t=${ms}`).toBe(0);
+        }
+      }
+      expect(fillsAt('inward', buildEnd + Math.ceil(times.launchMs) + 1)[index]).toBeLessThan(1);
+    }
+    // After the last head lands (the input unlock) the ring is already draining or empty, and it is empty from there + one pulse.
+    for (let ms = laserEnd + EDGE_BEAM_PULSE_MS; ms <= laserEnd + 3000; ms += 1) {
+      expect(fillsAt('inward', ms).every((fill) => fill === 0), `t=${ms}`).toBe(true);
     }
   });
 
-  test('no lifecycle (rest) and reduced motion are completely unlit and unspun', () => {
-    expect(resolveEdgeRingEnergies(null)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+  test('a cold start (no deconstruct before it) charges the ring over the first build ms, then drains the same way', () => {
+    const cold = { digitAlreadyVisible: false };
+    expect(fillsAt('inward', 0, cold)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+    let previous = 0;
+    for (let ms = 100; ms <= 600; ms += 1) {
+      const fill = fillsAt('inward', ms, cold)[0] as number;
+      expect(fill).toBeGreaterThanOrEqual(previous - 1e-12);
+      previous = fill;
+    }
+    expect(fillsAt('inward', 100 + INTRO_RING_CHARGE_MS, cold)).toEqual([1, 1, 1, 1, 1, 1, 1, 1]);
+    expect(fillsAt('inward', resolveIntroLaserEndMs(TILES) + EDGE_BEAM_PULSE_MS, cold)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+  });
+
+  test('the seam between a deconstruct and the next build never shows an empty frame: the last outro frame and the first intro frame are both full', () => {
+    const outroEnd = resolveOutroTotalMs(TILES);
+    expect(fullCount(fillsAt('outward', outroEnd))).toBe(8);
+    expect(fullCount(fillsAt('outward', outroEnd + 5000))).toBe(8);
+    expect(fullCount(fillsAt('inward', 0))).toBe(8);
+  });
+
+  test('the fill and drain times are exactly the beam contact and release instants (same clock as the head)', () => {
+    for (let index = 0; index < 8; index += 1) {
+      const times = resolveBeamTimes(index);
+      // head === 1 at contact, head === 0 until release.
+      expect(resolveBeamHead(times.contactMs, index)).toBeCloseTo(1, 9);
+      expect(resolveBeamHead(times.launchMs, index)).toBeCloseTo(0, 9);
+      // The ring-level fill agrees with the timeline module at every ms.
+      for (let ms = 0; ms <= 900; ms += 7) {
+        expect(resolveEdgeRingFills({ direction: 'outward', clockMs: ms, ringFill: 0 })[index]).toBe(resolveDiamondFillFromIncoming(ms, index));
+        expect(resolveEdgeRingFills({ direction: 'inward', clockMs: ms, ringFill: 1 })[index]).toBeCloseTo(1 - resolveDiamondDrainFromOutgoing(ms, index), 12);
+      }
+    }
+  });
+
+  test('reduced motion: no beam clock and no spin; the whole ring crossfades over the 200 ms crossfade, with the same end states', () => {
     const states = resolveEdgeMarkerStates({
       reducedMotion: true,
-      ringEnergies: [1, 1, 1, 1, 1, 1, 1, 1],
+      fills: [1, 1, 1, 1, 1, 1, 1, 1],
+      fillCrossfade: true,
       spinRad: 3,
       timeMs: 0
     });
-    expect(states.every((state) => !state.energized && state.energy === 0 && state.spinRad === 0)).toBe(true);
+    expect(states.every((state) => !state.energized && state.energy === 0 && state.spinRad === 0 && state.fill === 1 && state.fillCrossfade === true)).toBe(true);
     for (let ms = 0; ms <= 4000; ms += 50) {
-      const intro = resolveIntro(ms, { reducedMotion: true, tileCount: TILES });
+      const intro = resolveIntro(ms, { reducedMotion: true, tileCount: TILES, digitAlreadyVisible: true });
       const outro = resolveIntroDeconstruct(ms, { reducedMotion: true, tileCount: TILES });
-      expect([intro.ringSpinRad, intro.ringEnergy, outro.ringSpinRad, outro.ringEnergy]).toEqual([0, 0, 0, 0]);
+      expect([intro.ringSpinRad, intro.ringEnergy, intro.laserClockMs, outro.ringSpinRad, outro.ringEnergy, outro.laserClockMs]).toEqual([0, 0, -1, 0, 0, -1]);
     }
+    // Outro: empty -> full over exactly MOTION_REDUCED_MS.crossfade, monotonic, then stays full. Intro: full -> empty likewise.
+    expect(resolveIntroDeconstruct(0, { reducedMotion: true, tileCount: TILES }).ringFill).toBe(0);
+    expect(resolveIntroDeconstruct(MOTION_REDUCED_MS.crossfade / 2, { reducedMotion: true, tileCount: TILES }).ringFill).toBeCloseTo(0.5, 12);
+    expect(resolveIntroDeconstruct(MOTION_REDUCED_MS.crossfade, { reducedMotion: true, tileCount: TILES }).ringFill).toBe(1);
+    expect(resolveIntroDeconstruct(5000, { reducedMotion: true, tileCount: TILES }).ringFill).toBe(1);
+    const reducedIntro = { reducedMotion: true, tileCount: TILES, digitAlreadyVisible: true } as const;
+    expect(resolveIntro(0, reducedIntro).ringFill).toBe(1);
+    expect(resolveIntro(MOTION_REDUCED_MS.crossfade / 2, reducedIntro).ringFill).toBeCloseTo(0.5, 12);
+    expect(resolveIntro(MOTION_REDUCED_MS.crossfade, reducedIntro).ringFill).toBe(0);
+    expect(resolveIntro(0, { reducedMotion: true, tileCount: TILES }).ringFill).toBe(0);
+    // The ring-level fill in crossfade mode is uniform (no per-beam timing).
+    expect(resolveEdgeRingFills({ direction: 'outward', clockMs: -1, ringFill: 0.37, crossfade: true })).toEqual(Array.from({ length: 8 }, () => 0.37));
+    expect(MOTION_REDUCED_MS.crossfade).toBe(200);
   });
 
-  test('the markers draw all 8 player-coloured cores while the ring is lit and none at rest; the border is the live trail colour either way', () => {
+  test('no lifecycle (rest) is completely empty', () => {
+    expect(resolveEdgeRingFills(null)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+  });
+
+  test('the markers draw an interior fill only while a diamond holds some; the border is the live trail colour either way', () => {
     const stations = resolveEdgeStations({ width: 390, height: 844 });
-    const lit = resolveEdgeMarkerStates({
-      reducedMotion: false,
-      ringEnergies: resolveEdgeRingEnergies({ direction: 'inward', laserProgress: 1, ringEnergy: 1 }),
-      timeMs: 0
-    });
-    const litRecorder = makeRecorder();
-    drawEdgeMarkers(litRecorder, stations, lit);
-    expect(litRecorder.calls.filter((call) => call === 'fillPath')).toHaveLength(8);
-    expect(litRecorder.fillColors).toEqual(Array.from({ length: 8 }, () => PLAYER_COLOR));
-    // the border never goes mint when lit: it is the trail palette's colour at the trail head (here no trail: distance 0, t 0)
+    const full = resolveEdgeMarkerStates({ reducedMotion: false, fills: resolveEdgeRingFills({ direction: 'inward', clockMs: -1, ringFill: 1 }), fillMode: 'drain', timeMs: 0 });
+    const fullRecorder = makeRecorder();
+    drawEdgeMarkers(fullRecorder, stations, full);
+    expect(fullRecorder.calls.filter((call) => call === 'fillPath')).toHaveLength(8);
+    expect(fullRecorder.fillColors).toEqual(Array.from({ length: 8 }, () => PLAYER_COLOR));
     const border = resolveTrailPaletteBorderColor(0, 0, false);
-    expect(litRecorder.lineColors).toEqual(Array.from({ length: 8 }, () => border));
-    const rest = resolveEdgeMarkerStates({ reducedMotion: false, ringEnergies: resolveEdgeRingEnergies(null), timeMs: 0 });
+    expect(fullRecorder.lineColors).toEqual(Array.from({ length: 8 }, () => border));
+    const rest = resolveEdgeMarkerStates({ reducedMotion: false, fills: resolveEdgeRingFills(null), timeMs: 0 });
     const restRecorder = makeRecorder();
     drawEdgeMarkers(restRecorder, stations, rest);
     expect(restRecorder.calls.filter((call) => call === 'fillPath')).toHaveLength(0);
     expect(restRecorder.lineColors).toEqual(Array.from({ length: 8 }, () => border));
   });
 
-  test('orbit phase: parked while the beams fly, then one full lap (build clockwise, deconstruct counter-clockwise), exactly 0 at both ends', () => {
+  test('orbit phase: parked while the beams fly and are absorbed, then one full lap (build clockwise, deconstruct counter-clockwise), exactly 0 at both ends', () => {
     const introEnd = resolveIntroRevealEndMs(TILES);
     const outroEnd = resolveOutroTotalMs(TILES);
     const cases = [
       { label: 'intro', startMs: INTRO_BUILD_START_MS, end: introEnd, sign: 1, phaseAt: (ms: number) => resolveIntro(ms, FULL).ringSpinRad },
-      { label: 'outro', startMs: OUTRO_TILES_START_MS, end: outroEnd, sign: -1, phaseAt: (ms: number) => resolveIntroDeconstruct(ms, FULL).ringSpinRad }
+      { label: 'outro', startMs: OUTRO_RING_ORBIT_START_MS, end: outroEnd, sign: -1, phaseAt: (ms: number) => resolveIntroDeconstruct(ms, FULL).ringSpinRad }
     ];
+    void CYCLE;
+    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_TILES_START_MS + EDGE_BEAM_PULSE_MS);
     for (const { label, startMs, end, sign, phaseAt } of cases) {
       // Parked (an exact 0 -> the rest layout) for the whole beam flight, so every beam fires from / lands on a rest station.
       for (let ms = 0; ms <= startMs; ms += 1) {
@@ -795,8 +902,9 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
     const outward = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 0.5, spawnPop: 0, stations });
     expect(inward.beams).toHaveLength(8);
     stations.forEach((station, index) => {
-      expect(inward.beams[index]?.from).toEqual({ x: station.x, y: station.y });
-      expect(outward.beams[index]?.to).toEqual({ x: station.x, y: station.y });
+      // The diamond end is the contact point on the moving diamond's own outline.
+      expect(isOnPolygonEdge(resolveEdgeMarkerVertices(station, 1), inward.beams[index]?.from as { x: number; y: number })).toBe(true);
+      expect(isOnPolygonEdge(resolveEdgeMarkerVertices(station, 1), outward.beams[index]?.to as { x: number; y: number })).toBe(true);
     });
   });
 
@@ -811,7 +919,8 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
           expect(intro.ringSpinRad, `intro n=${tileCount} t=${ms}`).toBe(0);
         }
         const outro = resolveIntroDeconstruct(ms, options);
-        if (outro.laserProgress < 1) {
+        // The ring holds still while the last beam is still being absorbed (head lands at 400, tail 200 ms later).
+        if (ms <= OUTRO_TILES_START_MS + EDGE_BEAM_PULSE_MS) {
           expect(outro.ringSpinRad, `outro n=${tileCount} t=${ms}`).toBe(0);
         }
       }

@@ -25,8 +25,10 @@
  *   build end      100+B             wrap/bleed edge paths (docks + their border cells) appear
  *                                    atomically, the digit is gone, the orbit has parked
  *   laser     (100+B)-(500+B)        ALL 8 edge diamonds fire a beam inward from their REST
- *                                    stations to the spawn tile (stagger <= 60 ms, every beam
- *                                    lands by the end); a diamond brightens as its beam fires
+ *                                    stations to the spawn tile (stagger <= 60 ms, every head
+ *                                    lands by the end); a full diamond DRAINS from the instant
+ *                                    its beam leaves it (empty 200 ms later; the beam tails
+ *                                    finish inside the landing pop)
  *   landing        500+B             beams converge: the player appears (spawnPop 0 -> 1 over
  *                                    350 ms), input unlocks, the goal marker pulses (250 ms);
  *                                    the ring lighting fades over 150 ms
@@ -36,9 +38,10 @@
  * reorder, when the beams flew in the first 400 ms and the build started as they landed.
  *
  * Deconstruct (resolveIntroDeconstruct) is the mirror: the player fires a beam out to
- * ALL 8 diamonds (0-400; each diamond lights as its beam reaches it; the ring stays
- * parked while the beams fly, then circulates one full lap COUNTER-clockwise along the
- * perimeter from 400 to the end: it unwinds what the build wound), the edge paths vanish atomically
+ * ALL 8 diamonds (heads 0-400; each diamond FILLS from the instant its beam touches it and
+ * is full when the beam is absorbed, at most 200 ms later; the ring stays parked while the
+ * beams fly and are absorbed, then circulates one full lap COUNTER-clockwise along the
+ * perimeter from 600 to the end: it unwinds what the build wound), the edge paths vanish atomically
  * at 400, the tiles dissolve LINEARLY from 400 over removeMs(N) = clamp(N / 70
  * tiles/s, 1800, 3000) ms, then a 300 ms handoff beat. The lighting fades over the
  * last 150 ms.
@@ -90,8 +93,24 @@ export interface IntroState {
   readonly boardAlpha: number;
   /** Diamond-ring orbit phase in radians (+ = clockwise; whole laps: exactly 0 at rest, before the build starts and from the build end on). */
   readonly ringSpinRad: number;
-  /** Ring-wide lighting envelope 0..1: 1 from the intro start through the build and the beam flight, fading to 0 after the landing. */
+  /**
+   * Ring-wide lighting envelope 0..1: 1 from the intro start through the build and the beam flight, fading to 0 after the landing.
+   * No longer drives the diamond interiors (MAZER-VIS-030: `ringFill` + `laserClockMs` do); it only keeps the ring lifecycle alive.
+   */
   readonly ringEnergy: number;
+  /**
+   * How full the diamonds are BEFORE any beam leaves (0..1). Full motion: 1 after a deconstruct (`digitAlreadyVisible`), a
+   * cold start charges the ring over INTRO_RING_CHARGE_MS from the build start. Each diamond then drains from this level as
+   * its own beam leaves (edgeBeamTimeline.ts). Reduced motion: the whole ring crossfades from full to empty (or stays empty on
+   * a cold start) over the 200 ms crossfade.
+   */
+  readonly ringFill: number;
+  /**
+   * Master laser clock in ms: elapsed minus the instant the beams leave (negative before the build completes). The same clock
+   * `laserProgress` is smoothstep(clock / INTRO_LASER_MS) of; edgeBeamTimeline.ts derives every head, tail and drain from it.
+   * Reduced motion has no beams: always -1.
+   */
+  readonly laserClockMs: number;
   readonly inputUnlocked: boolean;
   readonly done: boolean;
 }
@@ -134,6 +153,8 @@ export const INTRO_REVEAL_MAX_MS = 3200;
 /** The level digit fades out over the last INTRO_DIGIT_OUT_MS of the reveal. */
 export const INTRO_DIGIT_OUT_MS = 500;
 export const INTRO_POP_MS = 350;
+/** A ring with no deconstruct before it (cold start) charges up over this long once the build starts. */
+export const INTRO_RING_CHARGE_MS = MOTION_DURATION_MS.long;
 export const INTRO_GOAL_PULSE_MS = 250;
 export const INTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS.crossfade;
 export const INTRO_DIGIT_MIN_SCALE = 0.72;
@@ -155,6 +176,12 @@ export const OUTRO_TRAIL_FADE_MS = 250;
 export const OUTRO_LASER_MS = MOTION_DURATION_MS.long;
 export const OUTRO_EDGE_PATHS_OFF_MS = OUTRO_LASER_MS;
 export const OUTRO_TILES_START_MS = OUTRO_EDGE_PATHS_OFF_MS;
+/**
+ * The ring starts to circulate once the last beam has been fully absorbed: the last head lands at OUTRO_LASER_MS and its
+ * tail runs one base step (edgeBeamTimeline.ts EDGE_BEAM_PULSE_MS) further, so the diamonds hold still while they fill.
+ * The orbit still ends with the outro, so no total duration moves.
+ */
+export const OUTRO_RING_ORBIT_START_MS = OUTRO_TILES_START_MS + MOTION_DURATION_MS.base;
 export const OUTRO_REMOVE_MIN_MS = 1800;
 export const OUTRO_REMOVE_MAX_MS = 3000;
 export const OUTRO_DIGIT_IN_MS = MOTION_DURATION_MS.slow;
@@ -291,7 +318,7 @@ export const resolveSpawnLaser = (sinceLaserStartMs: number): {
   };
 };
 
-const resolveReducedMotionIntro = (elapsedMs: number, tileCount: number): IntroState => {
+const resolveReducedMotionIntro = (elapsedMs: number, tileCount: number, digitAlreadyVisible: boolean): IntroState => {
   const progress = clamp01(elapsedMs / INTRO_REDUCED_MOTION_MS);
   const finished = elapsedMs >= INTRO_REDUCED_MOTION_MS;
   return {
@@ -306,6 +333,9 @@ const resolveReducedMotionIntro = (elapsedMs: number, tileCount: number): IntroS
     boardAlpha: progress,
     ringSpinRad: 0,
     ringEnergy: 0,
+    // A deconstruct left the diamonds full: they crossfade to empty. A cold start has nothing to drain.
+    ringFill: digitAlreadyVisible ? 1 - progress : 0,
+    laserClockMs: -1,
     inputUnlocked: finished,
     done: finished
   };
@@ -315,7 +345,7 @@ export const resolveIntro = (elapsedMs: number, options: IntroOptions): IntroSta
   const elapsed = normalizeElapsed(elapsedMs);
   const tileCount = normalizeCount(options.tileCount);
   if (options.reducedMotion) {
-    return resolveReducedMotionIntro(elapsed, tileCount);
+    return resolveReducedMotionIntro(elapsed, tileCount, options.digitAlreadyVisible === true);
   }
 
   const revealMs = resolveIntroRevealMs(tileCount);
@@ -365,6 +395,10 @@ export const resolveIntro = (elapsedMs: number, options: IntroOptions): IntroSta
     // One clockwise lap over the whole build: exactly 0 (rest stations) when the beams fire.
     ringSpinRad: resolveRingOrbitRad(elapsed, INTRO_BUILD_START_MS, revealEndMs, 1),
     ringEnergy: resolveRingEnergyEnvelope(elapsed, laserEndMs),
+    ringFill: options.digitAlreadyVisible === true
+      ? 1
+      : smoothstep(clamp01((elapsed - INTRO_BUILD_START_MS) / INTRO_RING_CHARGE_MS)),
+    laserClockMs: elapsed - laserStartMs,
     inputUnlocked: elapsed >= laserEndMs,
     done: elapsed >= doneMs
   };
@@ -384,8 +418,15 @@ export interface OutroState {
   readonly laserProgress: number;
   /** Diamond-ring orbit phase in radians (- = counter-clockwise; whole laps: exactly 0 at rest, before 400 ms and after the outro). */
   readonly ringSpinRad: number;
-  /** Ring-wide lighting envelope 0..1: 1 until the last 150 ms of the outro, then 0. */
+  /** Ring-wide lighting envelope 0..1: 1 until the last 150 ms of the outro, then 0. No longer drives the diamond interiors (see `ringFill`). */
   readonly ringEnergy: number;
+  /**
+   * Reduced motion only: the ring's uniform fill 0..1 (a 200 ms crossfade from empty to full; stays full). Always 0 in full
+   * motion, where each diamond fills from its own incoming beam (edgeBeamTimeline.ts) and stays full to the end.
+   */
+  readonly ringFill: number;
+  /** Master laser clock in ms (= elapsed; the player's beams leave at 0). Reduced motion has no beams: always -1. */
+  readonly laserClockMs: number;
   /** True once the tiles are gone (the handoff beat starts here). */
   readonly tilesGone: boolean;
   /** True once the whole deconstruct including the handoff beat has run. */
@@ -408,6 +449,9 @@ export const resolveIntroDeconstruct = (elapsedMs: number, options: IntroOptions
       laserProgress: 0,
       ringSpinRad: 0,
       ringEnergy: 0,
+      // No beam: the diamonds crossfade to full over the 200 ms crossfade, and stay full into the next intro.
+      ringFill: clamp01(elapsed / OUTRO_REDUCED_MOTION_MS),
+      laserClockMs: -1,
       tilesGone: elapsed > 0,
       done: finished
     };
@@ -430,8 +474,10 @@ export const resolveIntroDeconstruct = (elapsedMs: number, options: IntroOptions
     digitScale: INTRO_DIGIT_MIN_SCALE + ((1 - INTRO_DIGIT_MIN_SCALE) * digitAlpha),
     bleedProgress: elapsed < OUTRO_EDGE_PATHS_OFF_MS ? 1 : 0,
     laserProgress: smoothstep(elapsed / OUTRO_LASER_MS),
-    ringSpinRad: resolveRingOrbitRad(elapsed, OUTRO_TILES_START_MS, totalMs, -1),
+    ringSpinRad: resolveRingOrbitRad(elapsed, OUTRO_RING_ORBIT_START_MS, totalMs, -1),
     ringEnergy: resolveRingEnergyEnvelope(elapsed, totalMs - RING_ENERGY_FADE_MS),
+    ringFill: 0,
+    laserClockMs: elapsed,
     tilesGone: elapsed >= tilesEndMs,
     done: elapsed >= totalMs
   };

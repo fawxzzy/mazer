@@ -39,12 +39,14 @@
  *   never a fixed colour), and everything INSIDE it or fired out of it (the lit core, the beams, the landing
  *   sparkles) is the player's colour, `PLAYER_COLOR`.
  *
- * Lasers: on arrival ALL 8 diamonds (orbiting and lit through the whole build, parked on their
- * rest stations once it completes) fire a beam inward to the spawn tile; on
- * departure the player fires a beam out to ALL 8 diamonds. Each beam is a 3 px
- * glow + 1 px core + head dot, staggered by at most 60 ms across the ring and
- * derived only from the master timeline's laserProgress, so menu and play can
- * never disagree. A diamond brightens while its beam is firing.
+ * Lasers and fill (MAZER-VIS-030): on departure the player fires a beam out to ALL 8 diamonds; each diamond FILLS with
+ * the player's colour from the exact instant its beam touches it (grows from its inner tip, full when the beam is fully
+ * absorbed) and stays full through the deconstruct and the build. On arrival ALL 8 diamonds (orbiting, full, parked on
+ * their rest stations once the build completes) fire a beam inward to the spawn tile and each DRAINS from the exact
+ * instant its beam leaves it (empty when the beam has fully left). Each beam is a comet pulse (edgeBeamArt.ts:
+ * bloom, tapered gradient body, bright pulsing head, a contact ripple), staggered by at most 60 ms across the ring and
+ * derived only from the master laser clock (edgeBeamTimeline.ts), so menu and play can never disagree. Reduced motion:
+ * no beam; the diamonds crossfade full/empty over the 200 ms crossfade.
  *
  * Geometry and state are pure; the draw helpers only call the tiny Graphics
  * surface declared below (so they are testable without Phaser). Colours come
@@ -52,8 +54,24 @@
  */
 import { isLegacyWrappedStepTransition } from '../legacy-runtime/legacyMaze';
 import { PLAYER_COLOR, resolveTrailPaletteBorderColor } from './trailPalette';
-import { INTRO_BEAM_STAGGER_MS, INTRO_LASER_MS } from './introTimeline';
 import { MOTION_DURATION_MS, MOTION_LOOP_MS } from './motionScale';
+import {
+  EDGE_BEAM_FLIGHT_MS,
+  EDGE_BEAM_PULSE_MS,
+  inverseSmoothstep,
+  resolveBeamHeadFromMaster,
+  resolveBeamTail,
+  resolveBeamTimes,
+  resolveEdgeBeamPulse,
+  type EdgeBeamDirection
+} from './edgeBeamTimeline';
+import {
+  drawBeamPulse,
+  drawContactRipple,
+  drawDiamondFill,
+  resolveOutlineExitPoint,
+  type DiamondFillMode
+} from './edgeBeamArt';
 
 export type EdgeSide = 'top' | 'right' | 'bottom' | 'left';
 export type EdgeStationId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -84,10 +102,7 @@ export const EDGE_MARKER_IDLE_ALPHA_MIN = 0.45;
 export const EDGE_MARKER_IDLE_ALPHA_MAX = 0.6;
 export const EDGE_MARKER_ENERGIZED_ALPHA = 0.95;
 export const EDGE_MARKER_FLASH_MS = MOTION_DURATION_MS.fast;
-export const SPAWN_LASER_GLOW_PX = 3;
-export const SPAWN_LASER_CORE_PX = 1;
 export const SPAWN_LASER_POOF_SPARKLES = 6;
-export const EDGE_BEAM_ALPHA = 0.95;
 
 /** Station ids of the four edge midpoints. */
 export const EDGE_MIDPOINT_STATION_ID: Readonly<Record<EdgeSide, EdgeStationId>> = Object.freeze({
@@ -332,6 +347,15 @@ export interface EdgeMarkerState {
   readonly flash: number;
   readonly hidden: boolean;
   /**
+   * How full the diamond's interior is, 0..1 (MAZER-VIS-030). Optional: absent = empty (a standalone icon, the rest ring).
+   * The interior is the player's colour.
+   */
+  readonly fill?: number;
+  /** grow: the fill rises from the inner tip (the beam coming in); drain: it retreats to the outer tip (the beam leaving). */
+  readonly fillMode?: DiamondFillMode;
+  /** Reduced motion: the interior crossfades by alpha instead of sweeping. */
+  readonly fillCrossfade?: boolean;
+  /**
    * The border colour: the live trail colour (`resolveTrailPaletteBorderColor`). Optional only so a standalone
    * icon (the Guide legend) can omit it and get the static trail gradient's start colour; the board always sets it.
    */
@@ -347,8 +371,11 @@ export interface EdgeMarkerStateInput {
   readonly timeMs: number;
   readonly reducedMotion: boolean;
   readonly energizedIds?: ReadonlySet<number>;
-  /** Per-station ring lighting 0..1 indexed by id (resolveEdgeRingEnergies). */
-  readonly ringEnergies?: ReadonlyArray<number>;
+  /** Per-station interior fill 0..1 indexed by id (resolveEdgeRingFills). */
+  readonly fills?: ReadonlyArray<number>;
+  readonly fillMode?: DiamondFillMode;
+  /** Reduced motion: the interior crossfades by alpha instead of sweeping. */
+  readonly fillCrossfade?: boolean;
   /** Ring orbit phase in radians (timeline ringSpinRad: 2 pi = one lap, positive = clockwise). */
   readonly spinRad?: number;
   readonly flash?: EdgeWrapFlash | null;
@@ -397,17 +424,24 @@ export const resolveEdgeMarkerStates = (input: EdgeMarkerStateInput): ReadonlyAr
   const flashLive = !input.reducedMotion && input.flash != null && flashProgress < 1 && input.timeMs >= input.flash.startedAtMs;
   return STATION_IDS.map((id) => {
     // Reduced motion: nothing animates, so nothing lights up either.
-    const ring = input.reducedMotion ? 0 : clampUnit(input.ringEnergies?.[id] ?? 0);
-    const energy = input.reducedMotion ? 0 : Math.max(ring, (input.energizedIds?.has(id) ?? false) ? 1 : 0);
+    // Reduced motion: nothing pulses, so the wrap-end lighting and the flash stay off; the interior fill is a state
+    // crossfade (MOTION_REDUCED_MS.crossfade) and is allowed.
+    const fill = clampUnit(input.fills?.[id] ?? 0);
+    const energy = input.reducedMotion ? 0 : ((input.energizedIds?.has(id) ?? false) ? 1 : 0);
     const energized = energy > 0;
     const flash = flashLive && (input.flash?.ids.includes(id) ?? false) ? 1 - flashProgress : 0;
+    // The crossfade interior carries its own alpha; the border does not brighten with it (reduced motion: nothing pulses).
+    const brighten = Math.max(energy, input.fillCrossfade === true ? 0 : fill, flash > 0 ? 1 : 0);
     return {
       id,
-      alpha: energized || flash > 0
-        ? idleAlpha + ((EDGE_MARKER_ENERGIZED_ALPHA - idleAlpha) * Math.max(energy, flash > 0 ? 1 : 0))
+      alpha: brighten > 0
+        ? idleAlpha + ((EDGE_MARKER_ENERGIZED_ALPHA - idleAlpha) * brighten)
         : idleAlpha,
       energized,
       energy,
+      fill,
+      fillMode: input.fillMode ?? 'grow',
+      fillCrossfade: input.fillCrossfade === true,
       spinRad: input.reducedMotion || !Number.isFinite(input.spinRad) ? 0 : (input.spinRad ?? 0),
       flash,
       hidden: input.hiddenIds?.has(id) ?? false,
@@ -506,6 +540,17 @@ export const drawEdgeMarker = (
     return;
   }
   const outline = resolveEdgeMarkerVertices(station, 1);
+  if ((state.fill ?? 0) > 0) {
+    drawDiamondFill(graphics, {
+      center: { x: station.x, y: station.y },
+      crossfade: state.fillCrossfade === true,
+      fill: state.fill ?? 0,
+      halfHeight: EDGE_MARKER_HALF_HEIGHT,
+      inwardAngle: station.inwardAngle,
+      mode: state.fillMode ?? 'grow',
+      vertices: outline
+    });
+  }
   if (state.energized || state.flash > 0) {
     // Player-coloured core: a smaller kite inside the outline.
     tracePolygon(graphics, resolveEdgeMarkerVertices(station, 0.5));
@@ -547,51 +592,41 @@ export const drawEdgeMarkers = (
 };
 
 export interface EdgeRingLifecycle {
-  /** inward = arrival (diamonds -> spawn tile), outward = departure (player -> diamonds). */
+  /** inward = arrival (diamonds -> spawn tile, they DRAIN), outward = departure (player -> diamonds, they FILL). */
   readonly direction: EdgeBeamDirection;
-  /** Timeline laserProgress (intro.laserProgress / outro.laserProgress), 0..1. */
-  readonly laserProgress: number;
-  /** Timeline ringEnergy envelope, 0..1 (1 while active, fading to 0 at the end). */
-  readonly ringEnergy: number;
+  /** Master laser clock in ms (timeline `laserClockMs`); negative before the beams leave. */
+  readonly clockMs: number;
+  /**
+   * Timeline `ringFill`: how full the ring is before any beam leaves (inward: 1 after a deconstruct, charging on a cold
+   * start) / the reduced-motion crossfade level (both directions). 0 for a full-motion outward lifecycle.
+   */
+  readonly ringFill: number;
+  /** Reduced motion: no beams, the whole ring crossfades (`ringFill` is the crossfade level). */
+  readonly crossfade?: boolean;
 }
 
-/** Fraction of the beam flight over which a departing beam brightens the diamond it reaches. */
-export const EDGE_RING_LANDING_RAMP = 0.2;
-/** Fraction of the beam flight over which an arriving diamond brightens after it fires. */
-export const EDGE_RING_FIRE_RAMP = 0.2;
 /**
- * Arrival lighting floor: all 8 diamonds are lit (at this fraction of full energy) for the whole
- * build, while the ring orbits and before any beam leaves; firing brightens a diamond to 1.
- */
-export const EDGE_RING_BUILD_LIT = 0.6;
-
-const smoothUnit = (value: number): number => {
-  const x = clampUnit(value);
-  return x * x * (3 - (2 * x));
-};
-
-/**
- * Per-station lighting (index = station id) derived from each beam's own
- * progress and the ring-wide envelope:
- * - arrival (inward): all 8 diamonds are lit (EDGE_RING_BUILD_LIT) from the start of the build
- *   while the ring orbits, brighten to full as their own beam fires (the beams leave only after the
- *   build is complete) and the envelope fades all 8 out together after the landing;
- * - departure (outward): a diamond lights as the player's beam REACHES it
- *   (progress -> 1) and stays lit until the envelope fades at the end.
+ * Per-station interior fill (index = station id), derived from each beam's own contact/release instant
+ * (edgeBeamTimeline.ts):
+ * - departure (outward): diamond i fills from EXACTLY its beam's contact, 0 -> 1 over EDGE_BEAM_PULSE_MS, and stays full;
+ * - arrival (inward): diamond i is at `ringFill` (full after a deconstruct) until EXACTLY its beam leaves, then drains
+ *   1 -> 0 over EDGE_BEAM_PULSE_MS and stays empty;
+ * - reduced motion (`crossfade`): all 8 equal `ringFill`, no per-beam timing.
  * Null lifecycle = at rest = all zero.
  */
-export const resolveEdgeRingEnergies = (
+export const resolveEdgeRingFills = (
   lifecycle: EdgeRingLifecycle | null,
   count = EDGE_STATION_COUNT
 ): ReadonlyArray<number> => Array.from({ length: count }, (_, index) => {
   if (lifecycle === null) {
     return 0;
   }
-  const progress = resolveEdgeBeamProgress(clampUnit(lifecycle.laserProgress), index, count);
-  const own = lifecycle.direction === 'inward'
-    ? EDGE_RING_BUILD_LIT + ((1 - EDGE_RING_BUILD_LIT) * (progress > 0 ? smoothUnit(progress / EDGE_RING_FIRE_RAMP) : 0))
-    : smoothUnit((progress - (1 - EDGE_RING_LANDING_RAMP)) / EDGE_RING_LANDING_RAMP);
-  return own * clampUnit(lifecycle.ringEnergy);
+  const ring = clampUnit(lifecycle.ringFill);
+  if (lifecycle.crossfade === true) {
+    return ring;
+  }
+  const pulse = resolveEdgeBeamPulse(lifecycle.direction, lifecycle.clockMs, index, count, ring);
+  return lifecycle.direction === 'outward' ? Math.max(ring, pulse.diamondFill) : pulse.diamondFill;
 });
 
 export interface SpawnSparkle {
@@ -602,19 +637,15 @@ export interface SpawnSparkle {
 }
 
 /**
- * Beam progress for diamond `index` of `count`, derived ONLY from the master
- * timeline's laserProgress. Beams are staggered by at most
- * INTRO_BEAM_STAGGER_MS across the ring and every beam still lands exactly
- * when the master laser does.
+ * Head position 0..1 of beam `index` of `count`, derived ONLY from the master timeline's laserProgress. Beams are
+ * staggered by at most INTRO_BEAM_STAGGER_MS across the ring and every head still lands exactly when the master laser
+ * does. (The shipped flight, unchanged; edgeBeamTimeline.ts owns it.)
  */
-export const resolveEdgeBeamProgress = (laserProgress: number, index: number, count = EDGE_STATION_COUNT): number => {
-  const stagger = INTRO_BEAM_STAGGER_MS / INTRO_LASER_MS;
-  const offset = count > 1 ? (Math.max(0, Math.min(count - 1, index)) / (count - 1)) * stagger : 0;
-  const local = (laserProgress - offset) / (1 - stagger);
-  return Math.max(0, Math.min(1, local));
-};
+export const resolveEdgeBeamProgress = (laserProgress: number, index: number, count = EDGE_STATION_COUNT): number => (
+  resolveBeamHeadFromMaster(laserProgress, index, count)
+);
 
-export type EdgeBeamDirection = 'inward' | 'outward';
+export type { EdgeBeamDirection };
 
 export interface EdgeBeamsInput {
   /** Each diamond's CURRENT position (resolveOrbitingEdgeStations); the rest layout while the ring is parked. */
@@ -623,20 +654,33 @@ export interface EdgeBeamsInput {
   readonly focus: EdgePoint;
   /** inward: diamonds -> focus (build). outward: focus -> diamonds (deconstruct). */
   readonly direction: EdgeBeamDirection;
-  /** introTimeline laserProgress (intro) or OutroState.laserProgress (outro), 0..1. */
+  /** introTimeline laserProgress (intro) or OutroState.laserProgress (outro), 0..1. Only used when `clockMs` is absent. */
   readonly laserProgress: number;
   /** introTimeline spawnPop, 0..1 (inward only). */
   readonly spawnPop: number;
+  /** Master laser clock in ms (same clock as the ring fill). Derived from `laserProgress` when absent. */
+  readonly clockMs?: number;
+  /** Backing scale, so line ends and widths land on whole device pixels. Default 1. */
+  readonly devicePixelRatio?: number;
 }
 
 export interface EdgeBeam {
   readonly id: EdgeStationId;
+  /** Path source and target. The diamond end is the exact point where the beam meets the diamond OUTLINE (the contact point). */
   readonly from: EdgePoint;
   readonly to: EdgePoint;
+  /** The head position on the path (`progress` along from -> to). */
   readonly tip: EdgePoint;
+  /** The tail position on the path (`tail` along from -> to). */
+  readonly tailPoint: EdgePoint;
   readonly progress: number;
-  /** True while the head is travelling (0 < progress < 1). */
+  readonly tail: number;
+  /** The contact point on the diamond outline. */
+  readonly contact: EdgePoint;
+  /** True while any part of the pulse is on the path (head has left, tail has not yet arrived). */
   readonly firing: boolean;
+  /** 0..1 over the fill/drain window of this diamond (the contact ripple clock); 0 outside it. */
+  readonly rippleProgress: number;
 }
 
 export interface EdgeBeamsGeometry {
@@ -646,25 +690,45 @@ export interface EdgeBeamsGeometry {
   readonly sparkles: ReadonlyArray<SpawnSparkle>;
 }
 
+const lerpPoint = (a: EdgePoint, b: EdgePoint, t: number): EdgePoint => ({ x: a.x + ((b.x - a.x) * t), y: a.y + ((b.y - a.y) * t) });
+
+const resolveBeamClockMs = (input: EdgeBeamsInput): number => (
+  input.clockMs !== undefined && Number.isFinite(input.clockMs)
+    ? input.clockMs
+    : EDGE_BEAM_FLIGHT_MS * inverseSmoothstep(Math.max(0, Math.min(1, input.laserProgress)))
+);
+
 export const resolveEdgeBeams = (input: EdgeBeamsInput): EdgeBeamsGeometry => {
   const laserProgress = Math.max(0, Math.min(1, input.laserProgress));
+  const clockMs = resolveBeamClockMs(input);
   const pop = Math.max(0, Math.min(1, input.spawnPop));
   const firingIds = new Set<number>();
+  const count = input.stations.length;
   const beams = input.stations.map((station, index): EdgeBeam => {
-    const progress = resolveEdgeBeamProgress(laserProgress, index, input.stations.length);
-    const from = input.direction === 'inward' ? { x: station.x, y: station.y } : input.focus;
-    const to = input.direction === 'inward' ? input.focus : { x: station.x, y: station.y };
-    const firing = progress > 0 && progress < 1;
-    if (firing) {
+    const centre = { x: station.x, y: station.y };
+    const contact = resolveOutlineExitPoint(resolveEdgeMarkerVertices(station, 1), centre, input.focus);
+    const from = input.direction === 'inward' ? contact : input.focus;
+    const to = input.direction === 'inward' ? input.focus : contact;
+    const pulse = resolveEdgeBeamPulse(input.direction, clockMs, index, count);
+    const times = resolveBeamTimes(index, count);
+    const windowStart = input.direction === 'inward' ? times.launchMs : times.contactMs;
+    const rippleProgress = clockMs > windowStart && clockMs < windowStart + EDGE_BEAM_PULSE_MS
+      ? (clockMs - windowStart) / EDGE_BEAM_PULSE_MS
+      : 0;
+    if (pulse.visible) {
       firingIds.add(station.id);
     }
     return {
       id: station.id,
       from,
       to,
-      tip: { x: from.x + ((to.x - from.x) * progress), y: from.y + ((to.y - from.y) * progress) },
-      progress,
-      firing
+      tip: lerpPoint(from, to, pulse.head),
+      tailPoint: lerpPoint(from, to, resolveBeamTail(clockMs, index, count)),
+      progress: pulse.head,
+      tail: pulse.tail,
+      contact,
+      firing: pulse.visible,
+      rippleProgress
     };
   });
   const sparkles: SpawnSparkle[] = [];
@@ -683,19 +747,17 @@ export const resolveEdgeBeams = (input: EdgeBeamsInput): EdgeBeamsGeometry => {
   return { beams, firingIds, sparkles };
 };
 
-/** One beam per diamond (3 px glow + 1 px core + head dot), plus the landing poof. */
+/** One comet pulse per diamond (bloom + tapered gradient body + pulsing head + contact ripple), plus the landing poof. */
 export const drawEdgeBeams = (graphics: EdgeGraphics, input: EdgeBeamsInput): EdgeBeamsGeometry => {
   const geometry = resolveEdgeBeams(input);
+  const dpr = input.devicePixelRatio ?? 1;
+  const clockMs = resolveBeamClockMs(input);
   for (const beam of geometry.beams) {
     if (!beam.firing) {
       continue;
     }
-    graphics.lineStyle(SPAWN_LASER_GLOW_PX, PLAYER_COLOR, EDGE_BEAM_ALPHA * 0.35);
-    graphics.lineBetween(beam.from.x, beam.from.y, beam.tip.x, beam.tip.y);
-    graphics.lineStyle(SPAWN_LASER_CORE_PX, PLAYER_COLOR, EDGE_BEAM_ALPHA);
-    graphics.lineBetween(beam.from.x, beam.from.y, beam.tip.x, beam.tip.y);
-    graphics.fillStyle(PLAYER_COLOR, EDGE_BEAM_ALPHA);
-    graphics.fillCircle(beam.tip.x, beam.tip.y, 2.5);
+    drawBeamPulse(graphics, { clockMs, devicePixelRatio: dpr, headPoint: beam.tip, tailPoint: beam.tailPoint });
+    drawContactRipple(graphics, beam.contact, beam.rippleProgress, dpr);
   }
   geometry.sparkles.forEach((sparkle) => {
     graphics.lineStyle(1, PLAYER_COLOR, sparkle.alpha);

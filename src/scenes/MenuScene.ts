@@ -107,7 +107,7 @@ import {
   drawEdgeMarker,
   drawEdgeMarkers,
   resolveEdgeMarkerStates,
-  resolveEdgeRingEnergies,
+  resolveEdgeRingFills,
   resolveEdgeStations,
   resolveWrapEndStationIds,
   resolveWrapFlashStationIds,
@@ -8516,6 +8516,8 @@ export class MenuScene extends Phaser.Scene {
       const outro = this.resolveLegacyOutroState(time);
       if (outro !== null) {
         firingIds = drawEdgeBeams(this.spawnLaserGraphics, {
+          clockMs: outro.laserClockMs,
+          devicePixelRatio: this.resolveBoardTileBackingScale(),
           direction: 'outward',
           focus,
           laserProgress: outro.laserProgress,
@@ -8524,6 +8526,8 @@ export class MenuScene extends Phaser.Scene {
         }).firingIds;
       } else if (spawnBurst.active) {
         firingIds = drawEdgeBeams(this.spawnLaserGraphics, {
+          clockMs: spawnBurst.clockMs,
+          devicePixelRatio: this.resolveBoardTileBackingScale(),
           direction: 'inward',
           focus,
           laserProgress: spawnBurst.travelProgress,
@@ -8554,27 +8558,30 @@ export class MenuScene extends Phaser.Scene {
     time: number,
     spawnBurst: ReturnType<typeof this.resolveLegacyPlayerSpawnBurstState>
   ): { lifecycle: EdgeRingLifecycle | null; spinRad: number } {
-    if (this.prefersLegacyReducedMotion() || this.overlay !== 'none') {
+    if (this.overlay !== 'none') {
       return { lifecycle: null, spinRad: 0 };
     }
+    // Reduced motion keeps the lifecycle (the diamonds crossfade full/empty, no beams, no orbit).
+    const crossfade = this.prefersLegacyReducedMotion();
     const outro = this.resolveLegacyOutroState(time);
-    if (outro !== null && !outro.done) {
+    if (outro !== null) {
+      // Held (full) after the outro is done, until the next intro takes over: no empty frame at the seam.
       return {
-        lifecycle: { direction: 'outward', laserProgress: outro.laserProgress, ringEnergy: outro.ringEnergy },
+        lifecycle: { clockMs: outro.laserClockMs, crossfade, direction: 'outward', ringFill: outro.ringFill },
         spinRad: outro.ringSpinRad
       };
     }
     const intro = this.resolveLegacyEdgeRingIntroState(time);
     if (intro !== null && !intro.done) {
       return {
-        lifecycle: { direction: 'inward', laserProgress: intro.laserProgress, ringEnergy: intro.ringEnergy },
+        lifecycle: { clockMs: intro.laserClockMs, crossfade, direction: 'inward', ringFill: intro.ringFill },
         spinRad: intro.ringSpinRad
       };
     }
-    if (outro === null && intro === null && spawnBurst.active) {
-      // Arrival without an intro clock (never expected): keep the beams diamonds lit while they fly.
+    if (!crossfade && outro === null && intro === null && spawnBurst.active) {
+      // Arrival without an intro clock (never expected): the beams still drain full diamonds as they fly.
       return {
-        lifecycle: { direction: 'inward', laserProgress: spawnBurst.travelProgress, ringEnergy: 1 },
+        lifecycle: { clockMs: spawnBurst.clockMs, direction: 'inward', ringFill: 1 },
         spinRad: 0
       };
     }
@@ -8613,7 +8620,9 @@ export class MenuScene extends Phaser.Scene {
         energizedIds,
         flash: this.edgeMarkerWrapFlash,
         reducedMotion,
-        ringEnergies: resolveEdgeRingEnergies(this.edgeRing.lifecycle),
+        fillCrossfade: this.edgeRing.lifecycle?.crossfade === true,
+        fillMode: this.edgeRing.lifecycle?.direction === 'inward' ? 'drain' : 'grow',
+        fills: resolveEdgeRingFills(this.edgeRing.lifecycle),
         spinRad: this.edgeRing.spinRad,
         timeMs: time,
         // The border is the live trail colour: the trail head's own palette sample (trailPalette.ts).
@@ -9250,9 +9259,10 @@ export class MenuScene extends Phaser.Scene {
     flashProgress: number;
     markerRevealAlpha: number;
     travelProgress: number;
+    clockMs: number;
   } {
     if (this.playerSpawnBurstStartedAtMs === null) {
-      return { active: false, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
+      return { active: false, clockMs: 0, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
     }
 
     // Same pause-aware correction resolveLegacyPlayerTransferState applies
@@ -9267,10 +9277,10 @@ export class MenuScene extends Phaser.Scene {
     if (elapsedMs < 0) {
       // Armed but the beams have not left yet (they leave when the BUILD completes, a long way into the
       // intro): the player has not arrived, so its marker stays hidden until the landing.
-      return { active: false, flashProgress: 0, markerRevealAlpha: 0, travelProgress: 0 };
+      return { active: false, clockMs: elapsedMs, flashProgress: 0, markerRevealAlpha: 0, travelProgress: 0 };
     }
     if (elapsedMs >= totalMs) {
-      return { active: false, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
+      return { active: false, clockMs: elapsedMs, flashProgress: 0, markerRevealAlpha: 1, travelProgress: 1 };
     }
 
     // The laser is a pure function of time since it left its station
@@ -9278,6 +9288,7 @@ export class MenuScene extends Phaser.Scene {
     const laser = resolveSpawnLaser(elapsedMs);
     return {
       active: true,
+      clockMs: elapsedMs,
       flashProgress: laser.spawnPop,
       markerRevealAlpha: laser.markerRevealed ? 1 : 0,
       travelProgress: laser.laserProgress
@@ -11578,7 +11589,7 @@ export class MenuScene extends Phaser.Scene {
         drawEdgeMarker(
           graphics,
           { id: 1, inwardAngle: Math.PI / 2, isCorner: false, side: 'top', x: centerX, y: centerY },
-          { alpha: 0.95, energized: false, energy: 0, flash: 0, hidden: false, id: 1, spinRad: 0 }
+          { alpha: 0.95, energized: false, energy: 0, fill: 0.6, fillMode: 'grow', flash: 0, hidden: false, id: 1, spinRad: 0 }
         );
         return;
       case 'level-numeral': {
