@@ -34,8 +34,11 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import {
+  INTRO_BEAM_PULSE_MS,
   INTRO_BEAM_STAGGER_MS,
   INTRO_BUILD_START_MS,
+  OUTRO_HANDOFF_MS,
+  OUTRO_LASER_MS,
   INTRO_RING_CHARGE_MS,
   OUTRO_RING_ORBIT_START_MS,
   INTRO_LASER_MS,
@@ -46,10 +49,12 @@ import {
   resolveIntroLaserEndMs,
   resolveIntroLaserStartMs,
   resolveIntroRevealEndMs,
+  resolveOutroRemoveMs,
   resolveOutroTotalMs
 } from '../../src/render/introTimeline';
 import { resolveTeleportAnchorPoses } from '../../src/render/teleportAnchorPose';
 import {
+  EDGE_BEAM_COUNT,
   EDGE_BEAM_FLIGHT_MS,
   EDGE_BEAM_PULSE_MS,
   resolveBeamHead,
@@ -741,6 +746,21 @@ describe('ring fill and spin over the intro / outro timelines (per frame)', () =
     expect(restRecorder.lineColors).toEqual(Array.from({ length: 8 }, () => border));
   });
 
+  test('orbit start is derived from the master laser clock: the instant the last beam is fully absorbed (600 ms at the shipped timings)', () => {
+    const times = Array.from({ length: EDGE_BEAM_COUNT }, (_, index) => resolveBeamTimes(index));
+    const lastTailArrivesMs = Math.max(...times.map((time) => time.tailArrivesMs));
+    expect(OUTRO_RING_ORBIT_START_MS).toBeCloseTo(lastTailArrivesMs, 9);
+    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_LASER_MS + INTRO_BEAM_PULSE_MS);
+    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_LASER_MS + EDGE_BEAM_PULSE_MS);
+    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_TILES_START_MS + EDGE_BEAM_PULSE_MS);
+    // Unchanged at the current timings, and the ring is still parked at the last diamond's full instant.
+    expect(OUTRO_RING_ORBIT_START_MS).toBe(600);
+    expect(resolveIntroDeconstruct(OUTRO_RING_ORBIT_START_MS, FULL).ringSpinRad).toBe(0);
+    expect(resolveIntroDeconstruct(OUTRO_RING_ORBIT_START_MS + 1, FULL).ringSpinRad).not.toBe(0);
+    // Total outro length does not depend on the orbit start.
+    expect(resolveOutroTotalMs(TILES)).toBe(OUTRO_TILES_START_MS + resolveOutroRemoveMs(TILES) + OUTRO_HANDOFF_MS);
+  });
+
   test('orbit phase: parked while the beams fly and are absorbed, then one full lap (build clockwise, deconstruct counter-clockwise), exactly 0 at both ends', () => {
     const introEnd = resolveIntroRevealEndMs(TILES);
     const outroEnd = resolveOutroTotalMs(TILES);
@@ -749,7 +769,7 @@ describe('ring fill and spin over the intro / outro timelines (per frame)', () =
       { label: 'outro', startMs: OUTRO_RING_ORBIT_START_MS, end: outroEnd, sign: -1, phaseAt: (ms: number) => resolveIntroDeconstruct(ms, FULL).ringSpinRad }
     ];
     void CYCLE;
-    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_TILES_START_MS + EDGE_BEAM_PULSE_MS);
+    // Derived from the master laser clock (MAZER-VIS-032), not pinned: see the derivation test below.
     for (const { label, startMs, end, sign, phaseAt } of cases) {
       // Parked (an exact 0 -> the rest layout) for the whole beam flight, so every beam fires from / lands on a rest station.
       for (let ms = 0; ms <= startMs; ms += 1) {

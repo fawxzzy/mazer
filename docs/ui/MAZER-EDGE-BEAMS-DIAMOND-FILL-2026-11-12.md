@@ -95,3 +95,5 @@ So a beam-active frame costs about 1.7 to 1.8 ms at 4x CPU (was about 0.35 ms) a
 ## Not checked
 
 A real phone (touch device, real GPU, real DPR); a real-time review of the animation by the owner (only frame strips and tests); Safari / WebKit; 120 Hz displays.
+
+MAZER-VIS-032: `OUTRO_RING_ORBIT_START_MS` is no longer a literal 600 ms. It is derived from the master laser clock as `OUTRO_LASER_MS + INTRO_BEAM_PULSE_MS` (the last head lands, then its tail runs one pulse further; `EDGE_BEAM_PULSE_MS` re-exports `INTRO_BEAM_PULSE_MS`), so it follows the laser length and the diamond pulse. At the shipped timings it is still 600 ms and no duration or input unlock moves; a test checks it equals the last beam's `tailArrivesMs`.

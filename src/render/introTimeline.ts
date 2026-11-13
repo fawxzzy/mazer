@@ -125,6 +125,12 @@ export const INTRO_LASER_END_MS = INTRO_LASER_START_MS + INTRO_LASER_MS;
 /** Beams stagger by at most this much across the 8 diamonds (every beam still lands by the laser end). */
 export const INTRO_BEAM_STAGGER_MS = MOTION_STAGGER_BEAM_TOTAL_MS;
 /**
+ * How long a beam's tail trails its head on the master laser clock (edgeBeamTimeline.ts re-exports it as
+ * EDGE_BEAM_PULSE_MS). It is the 200 ms diamond fill/drain pulse and lives here, next to the laser length, so the
+ * outro orbit start below is derived from the same clock instead of restating 600 ms.
+ */
+export const INTRO_BEAM_PULSE_MS = MOTION_DURATION_MS.base;
+/**
  * @deprecated Pre-reorder timeline (beams first, maze appears as they land). The Wave 1B design tokens
  * (motion.durationMs.reveal = INTRO_REVEAL_END_MS - INTRO_REVEAL_START_MS) still cite these constants and
  * that wave owns tokens.ts/tokens.css/the evidence contract, so they keep their old values. The timeline
@@ -177,11 +183,12 @@ export const OUTRO_LASER_MS = MOTION_DURATION_MS.long;
 export const OUTRO_EDGE_PATHS_OFF_MS = OUTRO_LASER_MS;
 export const OUTRO_TILES_START_MS = OUTRO_EDGE_PATHS_OFF_MS;
 /**
- * The ring starts to circulate once the last beam has been fully absorbed: the last head lands at OUTRO_LASER_MS and its
- * tail runs one base step (edgeBeamTimeline.ts EDGE_BEAM_PULSE_MS) further, so the diamonds hold still while they fill.
- * The orbit still ends with the outro, so no total duration moves.
+ * The ring starts to circulate once the last beam has been fully absorbed, derived from the master laser clock: the last
+ * head lands at OUTRO_LASER_MS (the laser length) and its tail runs one INTRO_BEAM_PULSE_MS further (the last diamond is
+ * then full), so the diamonds hold still while they fill. 600 ms at the shipped timings; it follows the laser length and
+ * the pulse if either ever changes. The orbit still ends with the outro, so no total duration moves.
  */
-export const OUTRO_RING_ORBIT_START_MS = OUTRO_TILES_START_MS + MOTION_DURATION_MS.base;
+export const OUTRO_RING_ORBIT_START_MS = OUTRO_LASER_MS + INTRO_BEAM_PULSE_MS;
 export const OUTRO_REMOVE_MIN_MS = 1800;
 export const OUTRO_REMOVE_MAX_MS = 3000;
 export const OUTRO_DIGIT_IN_MS = MOTION_DURATION_MS.slow;
