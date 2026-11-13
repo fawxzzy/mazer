@@ -1,28 +1,28 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_b6711ca8a861",
+  "export_id": "pbe_mazer_owner_registry_6b7b7e3b237b",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:b6711ca8a861cb4be3f2f2a4d0680acc5477cf62faf76e92bcc9f76dad075a3f",
-  "generated_at": "2026-11-13T00:05:00.000Z",
+  "source_revision": "sha256:6b7b7e3b237b330726c6a0dd40b7383b2836bead04244c88d41a6ab966c9b530",
+  "generated_at": "2026-11-13T01:30:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:a6c009c648c1c78b5aab072b831c91d01ba507f07790e2d1d90334511a988232",
-      "observed_at": "2026-11-13T00:05:00.000Z"
+      "revision": "sha256:d1d7adc6c617cb962bf36936dc65faa79c7548594c43fa32d08a8a7f2ad0210d",
+      "observed_at": "2026-11-13T01:30:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
       "kind": "markdown",
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
-      "revision": "sha256:450fa5231533681461781f7d0ce7fa7da01e90bd1fe861836e24dbaa9e60e902",
-      "observed_at": "2026-11-13T00:05:00.000Z"
+      "revision": "sha256:a67753ce27c71dbfb2582900208e7e00de72cc64dcbd0fcb71de2ead073b30a1",
+      "observed_at": "2026-11-13T01:30:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-13T00:05:00.000Z"
+      "observed_at": "2026-11-13T01:30:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-13T00:05:00.000Z"
+      "observed_at": "2026-11-13T01:30:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-13T00:05:00.000Z"
+      "observed_at": "2026-11-13T01:30:00.000Z"
     }
   ],
   "cards": [
@@ -59,15 +59,15 @@
         "card_id": "MAZER-2D-001",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Maintain the mobile-clean 2D shipping baseline",
-        "description": "Keep the current Phaser maze readable, responsive, mechanically faithful, and regression-safe across supported desktop and mobile play.",
+        "title": "Maintain the mobile-clean 2D shipping baseline: evidence rule and stale reference fixed",
+        "description": "Keep the current Phaser maze readable, responsive, mechanically faithful, and regression-safe across supported desktop and mobile play. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #474 (merged as 472b2eb2) fixed a stale demo-build reference and recorded the visual-baseline archival note so production claims stay tied to exact reviewed source. The card is an ongoing baseline; It stays active, not review: it is an ongoing baseline and the export tests need one active card as a lifecycle fixture.",
         "card_type": "reliability",
         "lifecycle": "in-progress",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-09-14T22:54:28.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/docs/current-truth.md#active-lane",
         "extensions": {
           "owner_status": "active",
@@ -78,11 +78,11 @@
         "source_id": "mazer-current-truth",
         "source_ref": "repos/mazer/docs/current-truth.md#active-lane",
         "source_status": "current",
-        "source_updated_at": "2026-09-14T22:54:28.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Keep the current Phaser maze readable, responsive, mechanically faithful, and regression-safe across supported desktop and mobile play.",
-        "objective": "Keep the current Phaser maze readable, responsive, mechanically faithful, and regression-safe across supported desktop and mobile play.",
+        "summary": "Keep the current Phaser maze readable, responsive, mechanically faithful, and regression-safe across supported desktop and mobile play. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #474 (merged as 472b2eb2) fixed a stale demo-build reference and recorded the visual-baseline archival note so production claims stay tied to exact reviewed source. The card is an ongoing baseline; It stays active, not review: it is an ongoing baseline and the export tests need one active card as a lifecycle fixture.",
+        "objective": "Keep the current Phaser maze readable, responsive, mechanically faithful, and regression-safe across supported desktop and mobile play. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #474 (merged as 472b2eb2) fixed a stale demo-build reference and recorded the visual-baseline archival note so production claims stay tied to exact reviewed source. The card is an ongoing baseline; It stays active, not review: it is an ongoing baseline and the export tests need one active card as a lifecycle fixture.",
         "acceptance_criteria": [
           "The active mechanics and mobile contract stays at its verified baseline without reopening retired screenshot parity.",
           "Menu, gameplay, progression, input, and generation regressions fail deterministic repository checks.",
@@ -737,26 +737,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-012_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-012",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Retire dead Mazer sign-up code (username-editor half done in PR #450)",
-        "description": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Not started.",
+        "title": "Retire dead Mazer sign-up code: PRs #485 and #486 (stacked) open for review",
+        "description": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #485 (head 97641156, Wave 5C) removes the unreachable in-app sign-up mode and its tests; stacked PR #486 (head ea75d622, Wave 3B) removes five copy rows nothing reads. No shown copy changes. CI was red only on the stale generated work report check (also red on main), not on these changes. No browser run; nothing on a real phone. Follow-ups: MAZER-ACCT-038 and MAZER-UI-023.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-011"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T12:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-012",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -764,15 +764,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-012",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T12:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Not started.",
-        "objective": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Not started.",
+        "summary": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #485 (head 97641156, Wave 5C) removes the unreachable in-app sign-up mode and its tests; stacked PR #486 (head ea75d622, Wave 3B) removes five copy rows nothing reads. No shown copy changes. CI was red only on the stale generated work report check (also red on main), not on these changes. No browser run; nothing on a real phone. Follow-ups: MAZER-ACCT-038 and MAZER-UI-023.",
+        "objective": "Only the sign-up branch remains. The username-editor half is DONE in PR #450: the editor was built and the dead account-username-editor code was removed. What is left is the unreachable sign-up mode of the Mazer auth form (Mazer sign-up is an OAuth hand-off to the account site); remove it together with its tests and copy. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #485 (head 97641156, Wave 5C) removes the unreachable in-app sign-up mode and its tests; stacked PR #486 (head ea75d622, Wave 3B) removes five copy rows nothing reads. No shown copy changes. CI was red only on the stale generated work report check (also red on main), not on these changes. No browser run; nothing on a real phone. Follow-ups: MAZER-ACCT-038 and MAZER-UI-023.",
         "acceptance_criteria": [
-          "The unreachable sign-up form mode and its copy are removed",
+          "The unreachable sign-up form mode and its copy are removed: PR #485 and #486 open",
           "The username-editor half is already done in PR #450 (dead code removed)",
-          "Tests and the message inventory still pass with no change to shown copy"
+          "Tests and the message inventory still pass with no change to shown copy: pass locally, CI red only on the stale work report"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -1321,26 +1321,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-023_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-023",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Account-site sign-out can land on the login page instead of Mazer",
-        "description": "Code-read only, not reproduced: on the account site the sign-out event handler in usePortalSession can send the player to the login page before the return to Mazer runs. Proposed fix: a signing-out flag that stops the event handler racing the return. Separate design question: signing out on the account site does not end the Mazer sign-in session. Not started.",
+        "title": "Account-site sign-out no longer races to login: merged, not live until aliases move",
+        "description": "Code-read only, not reproduced: on the account site the sign-out event handler in usePortalSession can send the player to the login page before the return to Mazer runs. Proposed fix: a signing-out flag that stops the event handler racing the return. Separate design question: signing out on the account site does not end the Mazer sign-in session. Update 2026-11-13: FawxzzyWeb PR #130 (merged as 15ee11a1) adds a signing-out flag so the sign-out event handler no longer races the return to Mazer. MERGED-NOT-DEPLOYED to the live site until the production aliases are moved to the new build. Checked in tests only, not on a real phone. The separate design question (signing out on the account site does not end the Mazer sign-in) remains open.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-001"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-023",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1348,15 +1348,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-023",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Code-read only, not reproduced: on the account site the sign-out event handler in usePortalSession can send the player to the login page before the return to Mazer runs. Proposed fix: a signing-out flag that stops the event handler racing the return. Separate design question: signing out on the account site does not end the Mazer sign-in session. Not started.",
-        "objective": "Code-read only, not reproduced: on the account site the sign-out event handler in usePortalSession can send the player to the login page before the return to Mazer runs. Proposed fix: a signing-out flag that stops the event handler racing the return. Separate design question: signing out on the account site does not end the Mazer sign-in session. Not started.",
+        "summary": "Code-read only, not reproduced: on the account site the sign-out event handler in usePortalSession can send the player to the login page before the return to Mazer runs. Proposed fix: a signing-out flag that stops the event handler racing the return. Separate design question: signing out on the account site does not end the Mazer sign-in session. Update 2026-11-13: FawxzzyWeb PR #130 (merged as 15ee11a1) adds a signing-out flag so the sign-out event handler no longer races the return to Mazer. MERGED-NOT-DEPLOYED to the live site until the production aliases are moved to the new build. Checked in tests only, not on a real phone. The separate design question (signing out on the account site does not end the Mazer sign-in) remains open.",
+        "objective": "Code-read only, not reproduced: on the account site the sign-out event handler in usePortalSession can send the player to the login page before the return to Mazer runs. Proposed fix: a signing-out flag that stops the event handler racing the return. Separate design question: signing out on the account site does not end the Mazer sign-in session. Update 2026-11-13: FawxzzyWeb PR #130 (merged as 15ee11a1) adds a signing-out flag so the sign-out event handler no longer races the return to Mazer. MERGED-NOT-DEPLOYED to the live site until the production aliases are moved to the new build. Checked in tests only, not on a real phone. The separate design question (signing out on the account site does not end the Mazer sign-in) remains open.",
         "acceptance_criteria": [
-          "The race is reproduced or ruled out in a headless run",
-          "Signing out from the account site returns to Mazer when a Mazer return is pending",
-          "A test covers the sign-out ordering"
+          "The race is reproduced or ruled out in a headless run: ruled out by test only",
+          "Signing out from the account site returns to Mazer when a Mazer return is pending: PR #130 merged, not live",
+          "A test covers the sign-out ordering: done"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -1484,15 +1484,15 @@
         "card_id": "MAZER-ACCT-026",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Harden the username sign-in lockout (v4): live, real sign-in check pending",
-        "description": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. NOT verified: a live end-to-end username sign-in on version 12 (no real sign-in was run on the live site) and the live per-client behavior. Known limits are tracked privately. Kept in review: deployed, but nothing is checked by a real sign-in or on a real phone.",
+        "title": "Username sign-in lockout (v4) live and sign-in verified; v5 proposal open, not applied",
+        "description": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. Update 2026-11-13: the coordinator verified a live sign-in with both sign-in methods (by username and by the account’s other method) after version 12; the live per-client behavior is not separately verified. Known limits are tracked privately. Kept in review: deployed and checked by the coordinator’s live sign-in, but not on a real phone. PROPOSAL ONLY, NOT MERGED, SQL NOT APPLIED: FawxzzyWeb PR #133 (lockout v5) adds failures-only check and record functions keyed by username and client, with no forwarded-address header, on top of the live v4. Nothing of v5 is live.",
         "card_type": "reliability",
         "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-13T00:05:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-026",
         "extensions": {
           "owner_status": "review",
@@ -1503,11 +1503,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-026",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T00:05:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. NOT verified: a live end-to-end username sign-in on version 12 (no real sign-in was run on the live site) and the live per-client behavior. Known limits are tracked privately. Kept in review: deployed, but nothing is checked by a real sign-in or on a real phone.",
-        "objective": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. NOT verified: a live end-to-end username sign-in on version 12 (no real sign-in was run on the live site) and the live per-client behavior. Known limits are tracked privately. Kept in review: deployed, but nothing is checked by a real sign-in or on a real phone.",
+        "summary": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. Update 2026-11-13: the coordinator verified a live sign-in with both sign-in methods (by username and by the account’s other method) after version 12; the live per-client behavior is not separately verified. Known limits are tracked privately. Kept in review: deployed and checked by the coordinator’s live sign-in, but not on a real phone. PROPOSAL ONLY, NOT MERGED, SQL NOT APPLIED: FawxzzyWeb PR #133 (lockout v5) adds failures-only check and record functions keyed by username and client, with no forwarded-address header, on top of the live v4. Nothing of v5 is live.",
+        "objective": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. Update 2026-11-13: the coordinator verified a live sign-in with both sign-in methods (by username and by the account’s other method) after version 12; the live per-client behavior is not separately verified. Known limits are tracked privately. Kept in review: deployed and checked by the coordinator’s live sign-in, but not on a real phone. PROPOSAL ONLY, NOT MERGED, SQL NOT APPLIED: FawxzzyWeb PR #133 (lockout v5) adds failures-only check and record functions keyed by username and client, with no forwarded-address header, on top of the live v4. Nothing of v5 is live.",
         "acceptance_criteria": [
           "A wrong-try flood no longer blocks the right password from the real owner",
           "The new counter keys and caps are chosen by the owner and tested on a throwaway database",
@@ -1635,24 +1635,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-029_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-029",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Map the username-taken and generic database errors on the account site and Fitness",
-        "description": "A taken username and a generic database error during sign-up or rename reach the player as unclear copy on the account site and on Fitness sign-up and rename. Plan: map both to plain messages. Open question for the owner: how much a message may disclose about whether a username exists.",
+        "title": "Taken username named on the account site: merged, not live; Fitness patch proposed as text",
+        "description": "A taken username and a generic database error during sign-up or rename reach the player as unclear copy on the account site and on Fitness sign-up and rename. Plan: map both to plain messages. Open question for the owner: how much a message may disclose about whether a username exists. Update 2026-11-13: FawxzzyWeb PR #130 (merged as 15ee11a1) shows \"That username is taken. Pick another one.\" inline on the account site; a duplicate-account notice and a generic database error still read as neutral text. MERGED-NOT-DEPLOYED until the production aliases are moved. Caveat: that message only appears if the before-user-created hook is registered at the provider, which is UNKNOWN (MAZER-ACCT-028). The Fitness side is not changed: a patch for the raw sign-up error text (the auth actions file of the Fitness app) is proposed as text only.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-029",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1660,15 +1660,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-029",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "A taken username and a generic database error during sign-up or rename reach the player as unclear copy on the account site and on Fitness sign-up and rename. Plan: map both to plain messages. Open question for the owner: how much a message may disclose about whether a username exists.",
-        "objective": "A taken username and a generic database error during sign-up or rename reach the player as unclear copy on the account site and on Fitness sign-up and rename. Plan: map both to plain messages. Open question for the owner: how much a message may disclose about whether a username exists.",
+        "summary": "A taken username and a generic database error during sign-up or rename reach the player as unclear copy on the account site and on Fitness sign-up and rename. Plan: map both to plain messages. Open question for the owner: how much a message may disclose about whether a username exists. Update 2026-11-13: FawxzzyWeb PR #130 (merged as 15ee11a1) shows \"That username is taken. Pick another one.\" inline on the account site; a duplicate-account notice and a generic database error still read as neutral text. MERGED-NOT-DEPLOYED until the production aliases are moved. Caveat: that message only appears if the before-user-created hook is registered at the provider, which is UNKNOWN (MAZER-ACCT-028). The Fitness side is not changed: a patch for the raw sign-up error text (the auth actions file of the Fitness app) is proposed as text only.",
+        "objective": "A taken username and a generic database error during sign-up or rename reach the player as unclear copy on the account site and on Fitness sign-up and rename. Plan: map both to plain messages. Open question for the owner: how much a message may disclose about whether a username exists. Update 2026-11-13: FawxzzyWeb PR #130 (merged as 15ee11a1) shows \"That username is taken. Pick another one.\" inline on the account site; a duplicate-account notice and a generic database error still read as neutral text. MERGED-NOT-DEPLOYED until the production aliases are moved. Caveat: that message only appears if the before-user-created hook is registered at the provider, which is UNKNOWN (MAZER-ACCT-028). The Fitness side is not changed: a patch for the raw sign-up error text (the auth actions file of the Fitness app) is proposed as text only.",
         "acceptance_criteria": [
-          "The owner decides how much a taken-username message may disclose",
-          "Both errors map to plain copy on the account site and Fitness",
-          "Tests cover the mapping on each surface"
+          "The owner decides how much a taken-username message may disclose: the account site now names it; owner sign-off still open",
+          "Both errors map to plain copy on the account site and Fitness: account site done (PR #130), Fitness proposed as text only",
+          "Tests cover the mapping on each surface: account site covered"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -1792,26 +1792,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-032_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-032",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Ellipsize a long header name instead of hiding it",
-        "description": "The header identity label hides a name that does not fit instead of cutting it with an ellipsis, so a long name leaves the header blank. Plan: ellipsize the name. Not started.",
+        "title": "A long header name is ellipsized instead of hidden: merged and live, device check pending",
+        "description": "The header identity label hides a name that does not fit instead of cutting it with an ellipsis, so a long name leaves the header blank. Plan: ellipsize the name. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #470: the header name is always shown and cut with an ellipsis; it is hidden only when not even one character plus the ellipsis fits. Layout tests cover narrow widths. Device check pending, see the verify steps.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-021"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-032",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1819,15 +1819,16 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-032",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "The header identity label hides a name that does not fit instead of cutting it with an ellipsis, so a long name leaves the header blank. Plan: ellipsize the name. Not started.",
-        "objective": "The header identity label hides a name that does not fit instead of cutting it with an ellipsis, so a long name leaves the header blank. Plan: ellipsize the name. Not started.",
+        "summary": "The header identity label hides a name that does not fit instead of cutting it with an ellipsis, so a long name leaves the header blank. Plan: ellipsize the name. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #470: the header name is always shown and cut with an ellipsis; it is hidden only when not even one character plus the ellipsis fits. Layout tests cover narrow widths. Device check pending, see the verify steps.",
+        "objective": "The header identity label hides a name that does not fit instead of cutting it with an ellipsis, so a long name leaves the header blank. Plan: ellipsize the name. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #470: the header name is always shown and cut with an ellipsis; it is hidden only when not even one character plus the ellipsis fits. Layout tests cover narrow widths. Device check pending, see the verify steps.",
         "acceptance_criteria": [
-          "A 15-character name that does not fit is shown cut with an ellipsis",
-          "A short name is unchanged",
-          "A layout test covers narrow widths"
+          "A 15-character name that does not fit is shown cut with an ellipsis: PR #470 merged and deployed, headless only",
+          "A short name is unchanged: tested",
+          "A layout test covers narrow widths: done",
+          "Real-device check with a long name: open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -1845,26 +1846,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-033_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-033",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Confirm whether a rename updates the sign-in name used by the header",
-        "description": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts.",
+        "title": "Header follows the saved profile name after a reload: PR #487 open for review",
+        "description": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (head 058f842b, OPEN, NOT MERGED, not deployed) reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked in a headless browser with a mocked profile call only. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
         "card_type": "research",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-021"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-033",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1872,15 +1873,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-033",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts.",
-        "objective": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts.",
+        "summary": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (head 058f842b, OPEN, NOT MERGED, not deployed) reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked in a headless browser with a mocked profile call only. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
+        "objective": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (head 058f842b, OPEN, NOT MERGED, not deployed) reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked in a headless browser with a mocked profile call only. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
         "acceptance_criteria": [
-          "The header after a rename plus reload is checked and written down",
-          "If it reverts to the old name the rename updates the stored sign-in name",
-          "A test covers the reload case"
+          "The header after a rename plus reload is checked and written down: yes, it reverted (live)",
+          "If it reverts to the old name the rename updates the stored sign-in name: not chosen; PR #487 reads the profile name instead",
+          "A test covers the reload case: PR #487, open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -2005,26 +2006,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-037_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-037",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Warm the account-service check on Welcome so the first Sign in tap pays no extra delay",
-        "description": "MAZER-ACCT-036 added a 4 second pre-flight probe before Sign in leaves the app; measured, the first tap costs 100 to 250 ms more and taps inside the 30 second cache window cost nothing. Proposal: run the same probe quietly when Welcome appears so the cache is already warm at the first tap. Needs a change to the Welcome scene (MenuScene, Wave 5C, a hot file), must never show a failure line by itself, and must not turn a slow-but-up service into a blocked Sign in. Not started.",
+        "title": "Welcome warms the account-service check so Sign in is quick: live, device check open",
+        "description": "MAZER-ACCT-036 added a 4 second pre-flight probe before Sign in leaves the app; measured, the first tap costs 100 to 250 ms more and taps inside the 30 second cache window cost nothing. Proposal: run the same probe quietly when Welcome appears so the cache is already warm at the first tap. Needs a change to the Welcome scene (MenuScene, Wave 5C, a hot file), must never show a failure line by itself, and must not turn a slow-but-up service into a blocked Sign in. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #470: the Welcome screen runs the 4 second provider probe quietly when it appears and reuses the 30 second success cache. A failed warm-up shows nothing; only a Sign in tap shows the failure line. Measured with a mocked 230 ms probe: the first tap cost fell from 100 to 250 ms to 10 to 40 ms. Not measured against a slow-but-up real service on a phone.",
         "card_type": "feature",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-036"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T23:55:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-037",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -2032,15 +2033,69 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-037",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T23:55:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "MAZER-ACCT-036 added a 4 second pre-flight probe before Sign in leaves the app; measured, the first tap costs 100 to 250 ms more and taps inside the 30 second cache window cost nothing. Proposal: run the same probe quietly when Welcome appears so the cache is already warm at the first tap. Needs a change to the Welcome scene (MenuScene, Wave 5C, a hot file), must never show a failure line by itself, and must not turn a slow-but-up service into a blocked Sign in. Not started.",
-        "objective": "MAZER-ACCT-036 added a 4 second pre-flight probe before Sign in leaves the app; measured, the first tap costs 100 to 250 ms more and taps inside the 30 second cache window cost nothing. Proposal: run the same probe quietly when Welcome appears so the cache is already warm at the first tap. Needs a change to the Welcome scene (MenuScene, Wave 5C, a hot file), must never show a failure line by itself, and must not turn a slow-but-up service into a blocked Sign in. Not started.",
+        "summary": "MAZER-ACCT-036 added a 4 second pre-flight probe before Sign in leaves the app; measured, the first tap costs 100 to 250 ms more and taps inside the 30 second cache window cost nothing. Proposal: run the same probe quietly when Welcome appears so the cache is already warm at the first tap. Needs a change to the Welcome scene (MenuScene, Wave 5C, a hot file), must never show a failure line by itself, and must not turn a slow-but-up service into a blocked Sign in. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #470: the Welcome screen runs the 4 second provider probe quietly when it appears and reuses the 30 second success cache. A failed warm-up shows nothing; only a Sign in tap shows the failure line. Measured with a mocked 230 ms probe: the first tap cost fell from 100 to 250 ms to 10 to 40 ms. Not measured against a slow-but-up real service on a phone.",
+        "objective": "MAZER-ACCT-036 added a 4 second pre-flight probe before Sign in leaves the app; measured, the first tap costs 100 to 250 ms more and taps inside the 30 second cache window cost nothing. Proposal: run the same probe quietly when Welcome appears so the cache is already warm at the first tap. Needs a change to the Welcome scene (MenuScene, Wave 5C, a hot file), must never show a failure line by itself, and must not turn a slow-but-up service into a blocked Sign in. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #470: the Welcome screen runs the 4 second provider probe quietly when it appears and reuses the 30 second success cache. A failed warm-up shows nothing; only a Sign in tap shows the failure line. Measured with a mocked 230 ms probe: the first tap cost fell from 100 to 250 ms to 10 to 40 ms. Not measured against a slow-but-up real service on a phone.",
         "acceptance_criteria": [
-          "The probe runs when Welcome appears and reuses the existing 30 second success cache",
-          "A failed warm-up shows nothing; only a Sign in tap shows the failure line",
-          "The first Sign in tap after Welcome has no measurable extra delay when the service is up (measured before and after)"
+          "The probe runs when Welcome appears and reuses the existing 30 second success cache: PR #470 merged and deployed, headless only",
+          "A failed warm-up shows nothing; only a Sign in tap shows the failure line: tested",
+          "The first Sign in tap after Welcome has no measurable extra delay when the service is up: mocked 230 ms probe, 10 to 40 ms measured",
+          "Real-device check: open"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-038_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-038",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Retire the remaining dead sign-in form helpers and sign-up sentinels",
+        "description": "Follow-up to MAZER-ACCT-012 (PR #485 and #486, open). The sign-up sentinels and the already-registered mapping in the feedback resolver were kept on purpose because they classify raw provider text and are pinned by tests, and some sign-in form helpers may now have no caller. Plan: prove each unreachable, then delete with its tests. Not started.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-012"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-13T01:30:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-038",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-038",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
+      },
+      "content": {
+        "summary": "Follow-up to MAZER-ACCT-012 (PR #485 and #486, open). The sign-up sentinels and the already-registered mapping in the feedback resolver were kept on purpose because they classify raw provider text and are pinned by tests, and some sign-in form helpers may now have no caller. Plan: prove each unreachable, then delete with its tests. Not started.",
+        "objective": "Follow-up to MAZER-ACCT-012 (PR #485 and #486, open). The sign-up sentinels and the already-registered mapping in the feedback resolver were kept on purpose because they classify raw provider text and are pinned by tests, and some sign-in form helpers may now have no caller. Plan: prove each unreachable, then delete with its tests. Not started.",
+        "acceptance_criteria": [
+          "Each remaining helper or sentinel is proven unreachable or kept with a reason",
+          "Unreachable ones are deleted with their tests",
+          "No change to shown copy"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -2064,18 +2119,18 @@
         "card_id": "MAZER-AI-001",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Finish the configurable AI runner and run-corpus calibration",
-        "description": "The previous project board tracked an AI runner that a human can configure, plus a corpus of recorded runs used to calibrate run quality. The runner is nearly done and a first corpus packet exists on main. Remaining gap: calibration is unfinished, and any remote retention of runs would need a provider-side step.",
+        "title": "AI runner calibration: per-band thresholds and checker landed, retention not built",
+        "description": "The previous project board tracked an AI runner that a human can configure, plus a corpus of recorded runs used to calibrate run quality. The runner is nearly done and a first corpus packet exists on main. Remaining gap: calibration is unfinished, and any remote retention of runs would need a provider-side step. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #479 (merged as b6676ace) added per-band calibration thresholds and a checker; the three baselines are unchanged, so no drift. Remote run retention is not built and is recommended dropped. Finding: 68 of 75 seed-pack cases over-deliver complexity against their band. Criteria met except retention, which waits on the owner decision to drop it.",
         "card_type": "research",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-AI-001",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -2083,15 +2138,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-AI-001",
         "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "The previous project board tracked an AI runner that a human can configure, plus a corpus of recorded runs used to calibrate run quality. The runner is nearly done and a first corpus packet exists on main. Remaining gap: calibration is unfinished, and any remote retention of runs would need a provider-side step.",
-        "objective": "The previous project board tracked an AI runner that a human can configure, plus a corpus of recorded runs used to calibrate run quality. The runner is nearly done and a first corpus packet exists on main. Remaining gap: calibration is unfinished, and any remote retention of runs would need a provider-side step.",
+        "summary": "The previous project board tracked an AI runner that a human can configure, plus a corpus of recorded runs used to calibrate run quality. The runner is nearly done and a first corpus packet exists on main. Remaining gap: calibration is unfinished, and any remote retention of runs would need a provider-side step. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #479 (merged as b6676ace) added per-band calibration thresholds and a checker; the three baselines are unchanged, so no drift. Remote run retention is not built and is recommended dropped. Finding: 68 of 75 seed-pack cases over-deliver complexity against their band. Criteria met except retention, which waits on the owner decision to drop it.",
+        "objective": "The previous project board tracked an AI runner that a human can configure, plus a corpus of recorded runs used to calibrate run quality. The runner is nearly done and a first corpus packet exists on main. Remaining gap: calibration is unfinished, and any remote retention of runs would need a provider-side step. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #479 (merged as b6676ace) added per-band calibration thresholds and a checker; the three baselines are unchanged, so no drift. Remote run retention is not built and is recommended dropped. Finding: 68 of 75 seed-pack cases over-deliver complexity against their band. Criteria met except retention, which waits on the owner decision to drop it.",
         "acceptance_criteria": [
-          "A configurable AI runner can play a generated level end to end",
-          "Run corpus calibration thresholds are documented and reproducible",
-          "Any remote run retention is explicitly approved before it is built"
+          "A configurable AI runner can play a generated level end to end: yes",
+          "Run corpus calibration thresholds are documented and reproducible: PR #479 merged",
+          "Any remote run retention is explicitly approved before it is built: not built; recommended drop, pending the owner"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -2846,18 +2901,18 @@
         "card_id": "MAZER-DATA-004",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Finish the offline-first play, sync and conflict contract",
-        "description": "A completion outbox and monotonic merge exist on main. The proposal for coins, inventory and checkpoint hierarchy is unsigned, and server parts are provider-gated.",
+        "title": "Offline-first contract: proof fixtures landed, owner signing and device test open",
+        "description": "A completion outbox and monotonic merge exist on main. The proposal for coins, inventory and checkpoint hierarchy is unsigned, and server parts are provider-gated. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #476 (merged as 8bc01637) added proof fixtures for reorder, duplicate and storage-failure cases, a coverage matrix and an offline flush section. The coin and inventory fixtures are not buildable yet. Open: the owner signing the contract, a device airplane-mode test, and the server parts, which stay blocked on provider approval.",
         "card_type": "architecture",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-DATA-004",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -2865,15 +2920,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-DATA-004",
         "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "A completion outbox and monotonic merge exist on main. The proposal for coins, inventory and checkpoint hierarchy is unsigned, and server parts are provider-gated.",
-        "objective": "A completion outbox and monotonic merge exist on main. The proposal for coins, inventory and checkpoint hierarchy is unsigned, and server parts are provider-gated.",
+        "summary": "A completion outbox and monotonic merge exist on main. The proposal for coins, inventory and checkpoint hierarchy is unsigned, and server parts are provider-gated. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #476 (merged as 8bc01637) added proof fixtures for reorder, duplicate and storage-failure cases, a coverage matrix and an offline flush section. The coin and inventory fixtures are not buildable yet. Open: the owner signing the contract, a device airplane-mode test, and the server parts, which stay blocked on provider approval.",
+        "objective": "A completion outbox and monotonic merge exist on main. The proposal for coins, inventory and checkpoint hierarchy is unsigned, and server parts are provider-gated. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #476 (merged as 8bc01637) added proof fixtures for reorder, duplicate and storage-failure cases, a coverage matrix and an offline flush section. The coin and inventory fixtures are not buildable yet. Open: the owner signing the contract, a device airplane-mode test, and the server parts, which stay blocked on provider approval.",
         "acceptance_criteria": [
-          "Outbox and merge are documented and tested",
-          "Owner signs or amends the proposal",
-          "Server parts have approval"
+          "Outbox and merge are documented and tested: proof fixtures landed (PR #476)",
+          "Owner signs or amends the proposal: open",
+          "Server parts have approval: blocked"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -4087,7 +4142,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "No one-tile dead-end stubs in generated mazes",
-        "description": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open.",
+        "description": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no single tiles so far\". The ladder-end judgement and the preview levels 150, 218 and 300 are still unchecked.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "high",
@@ -4096,7 +4151,7 @@
           "MAZER-PROG-013"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T23:30:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-006",
         "extensions": {
           "owner_status": "review",
@@ -4107,16 +4162,70 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-006",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T23:30:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open.",
-        "objective": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open.",
+        "summary": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no single tiles so far\". The ladder-end judgement and the preview levels 150, 218 and 300 are still unchecked.",
+        "objective": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no single tiles so far\". The ladder-end judgement and the preview levels 150, 218 and 300 are still unchecked.",
         "acceptance_criteria": [
           "No generated ladder maze (levels 2 and up) has a dead-end branch shorter than 2 cells",
           "Felt-difficulty number unchanged by every stub edit; AI runner solves 340 of 340",
           "Phone preview of levels 150, 218 and 300 shows no single-cell nubs and solves normally",
           "Owner accepts the ladder ending at level 218 and the lower late difficulty"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-gen-007_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-GEN-007",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Straighter ladder mazes: less pointless snaking, rising ladder extended: PR #484 open",
+        "description": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). OPEN, NOT MERGED, NOT DEPLOYED; PR #484 (head 316acd0a) now also carries a density fill that spends the freed cells on short side branches and breaks long empty halls, so the floor is back within 2 to 6 percent of the old maze and the largest blank patch is at or under the old one on most bands; known issues stated in the PR: the fill reads as a comb in places and the largest blank patch is slightly worse at level 150. Zero one-tile stubs and the AI runner solves 340 of 340 at the first head. CI was red only on the stale generated work report check. Headless browser and tests only; nothing checked on a real phone. If it lands, the preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
+        "card_type": "feature",
+        "lifecycle": "in-progress",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-GEN-006"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-13T01:30:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-007",
+        "extensions": {
+          "owner_status": "in_progress",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-007",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
+      },
+      "content": {
+        "summary": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). OPEN, NOT MERGED, NOT DEPLOYED; PR #484 (head 316acd0a) now also carries a density fill that spends the freed cells on short side branches and breaks long empty halls, so the floor is back within 2 to 6 percent of the old maze and the largest blank patch is at or under the old one on most bands; known issues stated in the PR: the fill reads as a comb in places and the largest blank patch is slightly worse at level 150. Zero one-tile stubs and the AI runner solves 340 of 340 at the first head. CI was red only on the stale generated work report check. Headless browser and tests only; nothing checked on a real phone. If it lands, the preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
+        "objective": "Owner request: reduce the pointless snaking in generated mazes. Measured: pointless snaking (a long run of 10 or more cells with 4 or more tight corners) held 31 to 47 percent of the floor on levels 20 to 218 and above; PR #484 cuts it to 3 to 14 percent by lowering the route share of the felt tuner and making carved branches keep their heading. The strictly rising ladder would extend to level 288 (was 218). OPEN, NOT MERGED, NOT DEPLOYED; PR #484 (head 316acd0a) now also carries a density fill that spends the freed cells on short side branches and breaks long empty halls, so the floor is back within 2 to 6 percent of the old maze and the largest blank patch is at or under the old one on most bands; known issues stated in the PR: the fill reads as a comb in places and the largest blank patch is slightly worse at level 150. Zero one-tile stubs and the AI runner solves 340 of 340 at the first head. CI was red only on the stale generated work report check. Headless browser and tests only; nothing checked on a real phone. If it lands, the preview jump list (MAZER-QA-007) and the ladder length (MAZER-PROG-019) follow.",
+        "acceptance_criteria": [
+          "Pointless-snaking share falls sharply on every band: measured 31-47 to 3-14 percent at the first head",
+          "No one-tile stubs; every ladder maze solvable: 340 of 340 at the first head",
+          "The blank patches are filled or the owner accepts them: density fill added at head 316acd0a, comb look open for the owner",
+          "Merged, deployed and checked on a real phone: open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -4346,18 +4455,18 @@
         "card_id": "MAZER-GOV-005",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Keep the visual proof discipline current",
-        "description": "The board tracked the practice of proving visual changes with captured evidence. It is near complete; the rule is ongoing governance.",
+        "title": "Visual proof discipline: PR template line and repo pointer landed",
+        "description": "The board tracked the practice of proving visual changes with captured evidence. It is near complete; the rule is ongoing governance. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #474 (merged as 472b2eb2) added a visual-evidence line to the pull request template, a pointer to it from the agent guide, fixed a stale demo-build reference and added an archival note to the visual baseline index. A governance rule, kept in review until a visual change ships under it.",
         "card_type": "governance",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GOV-005",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -4365,15 +4474,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GOV-005",
         "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "The board tracked the practice of proving visual changes with captured evidence. It is near complete; the rule is ongoing governance.",
-        "objective": "The board tracked the practice of proving visual changes with captured evidence. It is near complete; the rule is ongoing governance.",
+        "summary": "The board tracked the practice of proving visual changes with captured evidence. It is near complete; the rule is ongoing governance. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #474 (merged as 472b2eb2) added a visual-evidence line to the pull request template, a pointer to it from the agent guide, fixed a stale demo-build reference and added an archival note to the visual baseline index. A governance rule, kept in review until a visual change ships under it.",
+        "objective": "The board tracked the practice of proving visual changes with captured evidence. It is near complete; the rule is ongoing governance. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #474 (merged as 472b2eb2) added a visual-evidence line to the pull request template, a pointer to it from the agent guide, fixed a stale demo-build reference and added an archival note to the visual baseline index. A governance rule, kept in review until a visual change ships under it.",
         "acceptance_criteria": [
-          "Visual changes ship with captured evidence",
-          "Baselines are regenerated when visuals change",
-          "The rule is stated in the repo docs"
+          "Visual changes ship with captured evidence: template line landed (PR #474)",
+          "Baselines are regenerated when visuals change: unchanged rule",
+          "The rule is stated in the repo docs: done"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -4544,24 +4653,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-gov-009_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-GOV-009",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Stabilise load-sensitive tests",
-        "description": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Not started.",
+        "title": "Stabilise load-sensitive tests: PR #489 open for review",
+        "description": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #489 (head 8fed98b4) is test-side only: a vitest config with a 60 second default timeout, named heavy tests raised, half the logical CPUs as workers (CI keeps one), a setup file that yields after slow tests, an async runtime-eval test, and a trail frame-cost test that asserts the work instead of wall-clock time. Measured on one machine: one run with no load went from 4 failed tests to 0, and three runs at once went from 16 to 20 failed to 0 failed with exit 0. The remaining wall-clock asserts did not fail in any run and were left alone (follow-up suggested). CI was red on the stale generated work report check.",
         "card_type": "reliability",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-11T12:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GOV-009",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -4569,15 +4678,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GOV-009",
         "source_status": "current",
-        "source_updated_at": "2026-11-11T12:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Not started.",
-        "objective": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Not started.",
+        "summary": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #489 (head 8fed98b4) is test-side only: a vitest config with a 60 second default timeout, named heavy tests raised, half the logical CPUs as workers (CI keeps one), a setup file that yields after slow tests, an async runtime-eval test, and a trail frame-cost test that asserts the work instead of wall-clock time. Measured on one machine: one run with no load went from 4 failed tests to 0, and three runs at once went from 16 to 20 failed to 0 failed with exit 0. The remaining wall-clock asserts did not fail in any run and were left alone (follow-up suggested). CI was red on the stale generated work report check.",
+        "objective": "Some tests pass alone every time but fail under parallel load: the endpoint tile pixel test at tile 25.44 and device pixel ratio 3, and vitest worker task-update timeouts. Plan: find the load sensitivity and make them deterministic. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED. PR #489 (head 8fed98b4) is test-side only: a vitest config with a 60 second default timeout, named heavy tests raised, half the logical CPUs as workers (CI keeps one), a setup file that yields after slow tests, an async runtime-eval test, and a trail frame-cost test that asserts the work instead of wall-clock time. Measured on one machine: one run with no load went from 4 failed tests to 0, and three runs at once went from 16 to 20 failed to 0 failed with exit 0. The remaining wall-clock asserts did not fail in any run and were left alone (follow-up suggested). CI was red on the stale generated work report check.",
         "acceptance_criteria": [
-          "The endpoint tile pixel test at tile 25.44 and device pixel ratio 3 passes under parallel load",
-          "Vitest worker task-update timeouts no longer fail full runs",
-          "Three consecutive full parallel runs pass without a rerun"
+          "The endpoint tile pixel test at tile 25.44 and device pixel ratio 3 passes under parallel load: PR #489, one machine",
+          "Vitest worker task-update timeouts no longer fail full runs: PR #489, one machine",
+          "Three consecutive full parallel runs pass without a rerun: measured three at once, 0 failed each"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -4915,18 +5024,18 @@
         "card_id": "MAZER-HAZ-007",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Complete the turn-synchronous world simulation beyond the player phase",
-        "description": "A world turn host and contract exist on main with tests, and the board marked the card completed. In truth only the host and player movement phase are done; enemy, projectile, item, duration and collision handlers are intentionally unintegrated. Status kept honest as in progress.",
+        "title": "Turn-synchronous simulation: phase status table landed, only the player phase is live",
+        "description": "A world turn host and contract exist on main with tests, and the board marked the card completed. In truth only the host and player movement phase are done; enemy, projectile, item, duration and collision handlers are intentionally unintegrated. Status kept honest as in progress. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #472 (merged as e69bd0f9) added a Phase Status table to the world turn contract: only player-movement is LIVE and the six other phases are DEFERRED pending MAZER-HAZ-002; a test pins the table to the registered handlers. Still the owner decision whether hazards and enemies will be activated.",
         "card_type": "architecture",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-007",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -4934,15 +5043,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-007",
         "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "A world turn host and contract exist on main with tests, and the board marked the card completed. In truth only the host and player movement phase are done; enemy, projectile, item, duration and collision handlers are intentionally unintegrated. Status kept honest as in progress.",
-        "objective": "A world turn host and contract exist on main with tests, and the board marked the card completed. In truth only the host and player movement phase are done; enemy, projectile, item, duration and collision handlers are intentionally unintegrated. Status kept honest as in progress.",
+        "summary": "A world turn host and contract exist on main with tests, and the board marked the card completed. In truth only the host and player movement phase are done; enemy, projectile, item, duration and collision handlers are intentionally unintegrated. Status kept honest as in progress. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #472 (merged as e69bd0f9) added a Phase Status table to the world turn contract: only player-movement is LIVE and the six other phases are DEFERRED pending MAZER-HAZ-002; a test pins the table to the registered handlers. Still the owner decision whether hazards and enemies will be activated.",
+        "objective": "A world turn host and contract exist on main with tests, and the board marked the card completed. In truth only the host and player movement phase are done; enemy, projectile, item, duration and collision handlers are intentionally unintegrated. Status kept honest as in progress. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #472 (merged as e69bd0f9) added a Phase Status table to the world turn contract: only player-movement is LIVE and the six other phases are DEFERRED pending MAZER-HAZ-002; a test pins the table to the registered handlers. Still the owner decision whether hazards and enemies will be activated.",
         "acceptance_criteria": [
-          "Host and player phase tests exist (read, not re-run)",
-          "Each remaining handler is integrated or explicitly deferred",
-          "The contract lists which phases are live"
+          "Host and player phase tests exist: yes",
+          "Each remaining handler is integrated or explicitly deferred: explicitly deferred in the table, pending the owner decision",
+          "The contract lists which phases are live: PR #472 merged, test-pinned"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5483,16 +5592,16 @@
     {
       "idempotency_key": "pbk_mazer_mazer-motion-006_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-MOTION-006",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Migrate scene motion constants to the motion scale",
-        "description": "PR #425 has landed (merged and deployed 2026-11-12), so the scene own motion constants can move onto the motion scale module. The ones whose values are identical are mechanical; any differing value stays an owner decision (MAZER-MOTION-007). Still waits on MAZER-MOTION-001 (in review) and MAZER-MOTION-004 (in review). Not started.",
+        "title": "Scene motion constants read the motion scale, values unchanged: merged and live",
+        "description": "PR #425 has landed (merged and deployed 2026-11-12), so the scene own motion constants can move onto the motion scale module. The ones whose values are identical are mechanical; any differing value stays an owner decision (MAZER-MOTION-007). Still waits on MAZER-MOTION-001 (in review) and MAZER-MOTION-004 (in review). Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #471 moved the scene constants whose values were identical onto the scale (the 2400 ms blink twice, the 420 ms caret emphasis and the goal beacon period) with values pinned unchanged and no visible change. The constants that differ from the scale (2600, 3400, 2200, 340, 1500, 3200, 1150, 5200, 500 and 1800 ms) are listed for MAZER-MOTION-007 and were not changed.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
@@ -5500,10 +5609,10 @@
           "MAZER-MOTION-004"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T12:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-006",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5511,15 +5620,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-006",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T12:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "PR #425 has landed (merged and deployed 2026-11-12), so the scene own motion constants can move onto the motion scale module. The ones whose values are identical are mechanical; any differing value stays an owner decision (MAZER-MOTION-007). Still waits on MAZER-MOTION-001 (in review) and MAZER-MOTION-004 (in review). Not started.",
-        "objective": "PR #425 has landed (merged and deployed 2026-11-12), so the scene own motion constants can move onto the motion scale module. The ones whose values are identical are mechanical; any differing value stays an owner decision (MAZER-MOTION-007). Still waits on MAZER-MOTION-001 (in review) and MAZER-MOTION-004 (in review). Not started.",
+        "summary": "PR #425 has landed (merged and deployed 2026-11-12), so the scene own motion constants can move onto the motion scale module. The ones whose values are identical are mechanical; any differing value stays an owner decision (MAZER-MOTION-007). Still waits on MAZER-MOTION-001 (in review) and MAZER-MOTION-004 (in review). Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #471 moved the scene constants whose values were identical onto the scale (the 2400 ms blink twice, the 420 ms caret emphasis and the goal beacon period) with values pinned unchanged and no visible change. The constants that differ from the scale (2600, 3400, 2200, 340, 1500, 3200, 1150, 5200, 500 and 1800 ms) are listed for MAZER-MOTION-007 and were not changed.",
+        "objective": "PR #425 has landed (merged and deployed 2026-11-12), so the scene own motion constants can move onto the motion scale module. The ones whose values are identical are mechanical; any differing value stays an owner decision (MAZER-MOTION-007). Still waits on MAZER-MOTION-001 (in review) and MAZER-MOTION-004 (in review). Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #471 moved the scene constants whose values were identical onto the scale (the 2400 ms blink twice, the 420 ms caret emphasis and the goal beacon period) with values pinned unchanged and no visible change. The constants that differ from the scale (2600, 3400, 2200, 340, 1500, 3200, 1150, 5200, 500 and 1800 ms) are listed for MAZER-MOTION-007 and were not changed.",
         "acceptance_criteria": [
-          "Scene constants with identical values read from the motion scale",
-          "No value changes and no visible change",
-          "Constants that differ from the scale are listed for MAZER-MOTION-007, not changed"
+          "Scene constants with identical values read from the motion scale: PR #471 merged and deployed",
+          "No value changes and no visible change: pinned by tests",
+          "Constants that differ from the scale are listed for MAZER-MOTION-007, not changed: done"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5643,26 +5752,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-motion-009_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-MOTION-009",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Move the teleport transfer to the shared reduced-motion crossfade",
-        "description": "MAZER-MOTION-005 added one 200 ms reduced-motion crossfade, MOTION_REDUCED_MS.crossfade. The teleport transfer presentation still reads a read-only alias, teleportCrossfade. Plan: point the teleport transfer at the shared value and delete the alias in the wave 4D-B edit. Not started.",
+        "title": "The teleport transfer reads the shared 200 ms crossfade, alias deleted: merged and live",
+        "description": "MAZER-MOTION-005 added one 200 ms reduced-motion crossfade, MOTION_REDUCED_MS.crossfade. The teleport transfer presentation still reads a read-only alias, teleportCrossfade. Plan: point the teleport transfer at the shared value and delete the alias in the wave 4D-B edit. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #475: the teleport transfer reads MOTION_REDUCED_MS.crossfade (200 ms) and the teleportCrossfade alias is deleted; the design sync test and theme contract are updated. Same value, so no visible change is expected.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-MOTION-005"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-009",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5670,15 +5779,66 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-009",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "MAZER-MOTION-005 added one 200 ms reduced-motion crossfade, MOTION_REDUCED_MS.crossfade. The teleport transfer presentation still reads a read-only alias, teleportCrossfade. Plan: point the teleport transfer at the shared value and delete the alias in the wave 4D-B edit. Not started.",
-        "objective": "MAZER-MOTION-005 added one 200 ms reduced-motion crossfade, MOTION_REDUCED_MS.crossfade. The teleport transfer presentation still reads a read-only alias, teleportCrossfade. Plan: point the teleport transfer at the shared value and delete the alias in the wave 4D-B edit. Not started.",
+        "summary": "MAZER-MOTION-005 added one 200 ms reduced-motion crossfade, MOTION_REDUCED_MS.crossfade. The teleport transfer presentation still reads a read-only alias, teleportCrossfade. Plan: point the teleport transfer at the shared value and delete the alias in the wave 4D-B edit. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #475: the teleport transfer reads MOTION_REDUCED_MS.crossfade (200 ms) and the teleportCrossfade alias is deleted; the design sync test and theme contract are updated. Same value, so no visible change is expected.",
+        "objective": "MAZER-MOTION-005 added one 200 ms reduced-motion crossfade, MOTION_REDUCED_MS.crossfade. The teleport transfer presentation still reads a read-only alias, teleportCrossfade. Plan: point the teleport transfer at the shared value and delete the alias in the wave 4D-B edit. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #475: the teleport transfer reads MOTION_REDUCED_MS.crossfade (200 ms) and the teleportCrossfade alias is deleted; the design sync test and theme contract are updated. Same value, so no visible change is expected.",
         "acceptance_criteria": [
-          "The teleport transfer reads MOTION_REDUCED_MS.crossfade",
-          "The teleportCrossfade alias is deleted",
-          "Design sync test and theme contract updated"
+          "The teleport transfer reads MOTION_REDUCED_MS.crossfade: PR #475 merged and deployed",
+          "The teleportCrossfade alias is deleted: done",
+          "Design sync test and theme contract updated: done"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-motion-010_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-MOTION-010",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Delete or bind the unused tuning value menu.status.pulseDurationMs",
+        "description": "The tuning value menu.status.pulseDurationMs has no reader. Plan: either bind it to the pulse that should use it or delete it, with the tests that pin it. Not started.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-13T01:30:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-010",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-010",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
+      },
+      "content": {
+        "summary": "The tuning value menu.status.pulseDurationMs has no reader. Plan: either bind it to the pulse that should use it or delete it, with the tests that pin it. Not started.",
+        "objective": "The tuning value menu.status.pulseDurationMs has no reader. Plan: either bind it to the pulse that should use it or delete it, with the tests that pin it. Not started.",
+        "acceptance_criteria": [
+          "The value is bound to a reader or deleted",
+          "No visible change unless the owner chooses a binding",
+          "Tuning tests pass"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5911,14 +6071,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Cut canvas redraw cost: trail gate merged and live; backdrop bake still open",
-        "description": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) AND deployed to production (main 34b428fd, later builds include it): the play trail is rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Finding: while standing still the trail was rebuilt in full on every redraw, its cost grows with route length and plateaus at level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93 ms to 39 ms (a headless proxy, not a phone). Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Device check pending: open a level 300 preview (previewLevel 300), stand still 10 seconds (should be smooth), then walk continuously (may still stutter). Still open: bake the backdrop, raise the throttle floor, and attach a real-device frame trace. Kept in review: deployed, checked only in headless Chromium, not on a real phone.",
+        "description": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) AND deployed to production (main 34b428fd, later builds include it): the play trail is rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Finding: while standing still the trail was rebuilt in full on every redraw, its cost grows with route length and plateaus at level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93 ms to 39 ms (a headless proxy, not a phone). Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Device check pending: open a level 300 preview (previewLevel 300), stand still 10 seconds (should be smooth), then walk continuously (may still stutter). Still open: bake the backdrop, raise the throttle floor, and attach a real-device frame trace. Kept in review: deployed, checked only in headless Chromium, not on a real phone. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no more lag I think\". Still phone-unverified: no frame trace and no timed check.",
         "card_type": "reliability",
         "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-12T23:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-002",
         "extensions": {
           "owner_status": "review",
@@ -5929,11 +6089,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-002",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T23:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) AND deployed to production (main 34b428fd, later builds include it): the play trail is rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Finding: while standing still the trail was rebuilt in full on every redraw, its cost grows with route length and plateaus at level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93 ms to 39 ms (a headless proxy, not a phone). Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Device check pending: open a level 300 preview (previewLevel 300), stand still 10 seconds (should be smooth), then walk continuously (may still stutter). Still open: bake the backdrop, raise the throttle floor, and attach a real-device frame trace. Kept in review: deployed, checked only in headless Chromium, not on a real phone.",
-        "objective": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) AND deployed to production (main 34b428fd, later builds include it): the play trail is rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Finding: while standing still the trail was rebuilt in full on every redraw, its cost grows with route length and plateaus at level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93 ms to 39 ms (a headless proxy, not a phone). Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Device check pending: open a level 300 preview (previewLevel 300), stand still 10 seconds (should be smooth), then walk continuously (may still stutter). Still open: bake the backdrop, raise the throttle floor, and attach a real-device frame trace. Kept in review: deployed, checked only in headless Chromium, not on a real phone.",
+        "summary": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) AND deployed to production (main 34b428fd, later builds include it): the play trail is rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Finding: while standing still the trail was rebuilt in full on every redraw, its cost grows with route length and plateaus at level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93 ms to 39 ms (a headless proxy, not a phone). Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Device check pending: open a level 300 preview (previewLevel 300), stand still 10 seconds (should be smooth), then walk continuously (may still stutter). Still open: bake the backdrop, raise the throttle floor, and attach a real-device frame trace. Kept in review: deployed, checked only in headless Chromium, not on a real phone. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no more lag I think\". Still phone-unverified: no frame trace and no timed check.",
+        "objective": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) AND deployed to production (main 34b428fd, later builds include it): the play trail is rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Finding: while standing still the trail was rebuilt in full on every redraw, its cost grows with route length and plateaus at level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93 ms to 39 ms (a headless proxy, not a phone). Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Device check pending: open a level 300 preview (previewLevel 300), stand still 10 seconds (should be smooth), then walk continuously (may still stutter). Still open: bake the backdrop, raise the throttle floor, and attach a real-device frame trace. Kept in review: deployed, checked only in headless Chromium, not on a real phone. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no more lag I think\". Still phone-unverified: no frame trace and no timed check.",
         "acceptance_criteria": [
           "Trail rebuilt only when it can differ and the shortest route memoised: PR #459 merged and deployed (34b428fd), headless only",
           "Backdrop is baked or cached and static screens stop reallocating: open",
@@ -6014,7 +6174,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Cheaper trail while walking: draft PR #461 needs an owner decision, no pixel parity",
-        "description": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged.",
+        "description": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged. Owner informal feedback 2026-11-12 evening, NOT a formal check: \"no more lag I think\". Draft PR #461 stays unmerged; recommended to close it, since the lag no longer shows.",
         "card_type": "reliability",
         "lifecycle": "blocked",
         "priority": "medium",
@@ -6023,7 +6183,7 @@
           "MAZER-PERF-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T23:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-004",
         "extensions": {
           "owner_status": "blocked",
@@ -6034,11 +6194,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-004",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T23:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged.",
-        "objective": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged.",
+        "summary": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged. Owner informal feedback 2026-11-12 evening, NOT a formal check: \"no more lag I think\". Draft PR #461 stays unmerged; recommended to close it, since the lag no longer shows.",
+        "objective": "DRAFT PR #461 (head 476e5cf2, CI not started, not merged) splits the trail into a cached older part and a rebuilt tail. It cuts walking frame cost about 1.3 to 2 times (headless proxy, not a phone). Pixel parity with a full rebuild is impossible, because the trail colour changes everywhere every tick: on long routes colour, sheen and breath would step every 250 ms to 1 s instead of moving smoothly. This changes how the game looks, so it needs an OWNER decision after a phone check. Options: A ship it as is; B cap the cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker (recommended as the follow-up). Blocked on the owner decision; nothing merged. Owner informal feedback 2026-11-12 evening, NOT a formal check: \"no more lag I think\". Draft PR #461 stays unmerged; recommended to close it, since the lag no longer shows.",
         "acceptance_criteria": [
           "Walking frame cost on a long route is measured before and after: measured in the draft, about 1.3 to 2 times cheaper, headless proxy",
           "Pixel parity with a full rebuild is not possible with a tail-split cache; the owner chooses among options A to D after a phone check: open",
@@ -6060,26 +6220,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-perf-005_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PERF-005",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Cheaper long-trail bloom without dimming the halo",
-        "description": "On a long route the trail bloom is a large share of the remaining redraw cost. Plan: find a cheaper way to draw the bloom that keeps the halo as bright as today. Not started.",
+        "title": "Cheaper long-trail bloom: measured in PR #488, change needs an owner pixel review",
+        "description": "On a long route the trail bloom is a large share of the remaining redraw cost. Plan: find a cheaper way to draw the bloom that keeps the halo as bright as today. Update 2026-11-13: PR #488 (open, not merged) adds a measurement script and written findings only; no bloom pixels changed. A cheaper bloom conflicts with the draft trail change (PR #461) and needs an owner pixel review before any build.",
         "card_type": "reliability",
-        "lifecycle": "planning",
+        "lifecycle": "in-progress",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-PERF-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-005",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "in_progress",
           "public_safe": true
         }
       },
@@ -6087,15 +6247,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-005",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "On a long route the trail bloom is a large share of the remaining redraw cost. Plan: find a cheaper way to draw the bloom that keeps the halo as bright as today. Not started.",
-        "objective": "On a long route the trail bloom is a large share of the remaining redraw cost. Plan: find a cheaper way to draw the bloom that keeps the halo as bright as today. Not started.",
+        "summary": "On a long route the trail bloom is a large share of the remaining redraw cost. Plan: find a cheaper way to draw the bloom that keeps the halo as bright as today. Update 2026-11-13: PR #488 (open, not merged) adds a measurement script and written findings only; no bloom pixels changed. A cheaper bloom conflicts with the draft trail change (PR #461) and needs an owner pixel review before any build.",
+        "objective": "On a long route the trail bloom is a large share of the remaining redraw cost. Plan: find a cheaper way to draw the bloom that keeps the halo as bright as today. Update 2026-11-13: PR #488 (open, not merged) adds a measurement script and written findings only; no bloom pixels changed. A cheaper bloom conflicts with the draft trail change (PR #461) and needs an owner pixel review before any build.",
         "acceptance_criteria": [
-          "Bloom cost on a long route is measured and written down",
-          "The halo is not visibly dimmer in a before and after capture",
-          "Trail pixel baselines stay unchanged or are updated deliberately"
+          "Bloom cost on a long route is measured and written down: PR #488, open",
+          "The halo is not visibly dimmer in a before and after capture: not built",
+          "Trail pixel baselines stay unchanged or are updated deliberately: not built"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -6166,26 +6326,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-perf-007_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PERF-007",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Throttle the wrap-glow full-board redraw under full motion",
-        "description": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Not started.",
+        "title": "Wrap-dock glow redraw on the shared 33 ms schedule: PR #488 open for review",
+        "description": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check.",
         "card_type": "reliability",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-PERF-003"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-007",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -6193,15 +6353,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-007",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Not started.",
-        "objective": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Not started.",
+        "summary": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check.",
+        "objective": "Under full motion on the wrap levels (levels 6 to 145) the wrap glow triggers a full-board redraw. Reduced motion already shares one 45 ms schedule (MAZER-PERF-003). Plan: throttle the full-motion redraw the same way without a visible step. Update 2026-11-13: OPEN FOR REVIEW, NOT MERGED, NOT DEPLOYED. PR #488 (head bea7b1ef) puts the wrap-dock glow on the trail shared colour-redraw schedule (33 ms at full motion; reduced motion unchanged at 45 ms), so it no longer redraws the whole dynamic board every frame. Measured in headless Chromium on a wrap level: dynamic-board redraws per second 60 to about 36 (phone size) and 60 to about 35 (desktop size). Flagged for an owner eye: the sheen band crossing the trail head now steps up to 20 of 255 instead of 11. Nothing on a real phone. CI was red on the stale generated work report check.",
         "acceptance_criteria": [
-          "The full-motion wrap-glow redraw cost is measured on a wrap level",
-          "The redraw rate is lowered with no visible colour stepping",
-          "Reduced motion and non-wrap levels are unchanged"
+          "The full-motion wrap-glow redraw cost is measured on a wrap level: PR #488, headless",
+          "The redraw rate is lowered with no visible colour stepping: lowered; the sheen step rises from 11 to 20 of 255, flagged for the owner",
+          "Reduced motion and non-wrap levels are unchanged: tested"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -7109,24 +7269,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-prog-016_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PROG-016",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Move touchSprint progression diagnostics to the progression diagnostics section",
-        "description": "After the constant-speed change (PR #449) the touchSprint diagnostics fields are no longer speed inputs, so they belong with the progression diagnostics instead. This is Wave 1C work: the menu diagnostics file belongs to one UI wave and must not be mixed with other waves in one change. Not started.",
+        "title": "Touch sprint diagnostics now live in the progression section: merged and live, review",
+        "description": "After the constant-speed change (PR #449) the touchSprint diagnostics fields are no longer speed inputs, so they belong with the progression diagnostics instead. This is Wave 1C work: the menu diagnostics file belongs to one UI wave and must not be mixed with other waves in one change. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 added the player evidence fields to the progression diagnostics section and PR #473 stopped the menu scene emitting the old touchSprint progression fields. No gameplay or speed change; diagnostics only.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-12T12:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-016",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -7134,15 +7294,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-016",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T12:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "After the constant-speed change (PR #449) the touchSprint diagnostics fields are no longer speed inputs, so they belong with the progression diagnostics instead. This is Wave 1C work: the menu diagnostics file belongs to one UI wave and must not be mixed with other waves in one change. Not started.",
-        "objective": "After the constant-speed change (PR #449) the touchSprint diagnostics fields are no longer speed inputs, so they belong with the progression diagnostics instead. This is Wave 1C work: the menu diagnostics file belongs to one UI wave and must not be mixed with other waves in one change. Not started.",
+        "summary": "After the constant-speed change (PR #449) the touchSprint diagnostics fields are no longer speed inputs, so they belong with the progression diagnostics instead. This is Wave 1C work: the menu diagnostics file belongs to one UI wave and must not be mixed with other waves in one change. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 added the player evidence fields to the progression diagnostics section and PR #473 stopped the menu scene emitting the old touchSprint progression fields. No gameplay or speed change; diagnostics only.",
+        "objective": "After the constant-speed change (PR #449) the touchSprint diagnostics fields are no longer speed inputs, so they belong with the progression diagnostics instead. This is Wave 1C work: the menu diagnostics file belongs to one UI wave and must not be mixed with other waves in one change. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 added the player evidence fields to the progression diagnostics section and PR #473 stopped the menu scene emitting the old touchSprint progression fields. No gameplay or speed change; diagnostics only.",
         "acceptance_criteria": [
-          "The touchSprint fields move to the progression diagnostics section",
-          "No gameplay or speed behavior changes",
-          "Diagnostics tests pass and the Wave 1C one-wave rule is respected"
+          "The touchSprint fields moved to the progression diagnostics section: PR #469 and #473 merged and deployed (headless only)",
+          "No gameplay or speed behavior changes: none intended, tests pass",
+          "Diagnostics tests pass and the Wave 1C one-wave rule is respected: PR #469 and #473 each carry one wave"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -7160,26 +7320,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-prog-017_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PROG-017",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Pin every emitted sign-in failure code to the class map with a test",
-        "description": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014), and MAZER-ACCT-036 added provider_unreachable (code oauth-failure:provider_unreachable) for a down account service. Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code, including provider_unreachable, and fails when one is missing from the class map. Not started.",
+        "title": "Every sign-in failure code is pinned to the class map by a test: merged and live, review",
+        "description": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014), and MAZER-ACCT-036 added provider_unreachable (code oauth-failure:provider_unreachable) for a down account service. Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code, including provider_unreachable, and fails when one is missing from the class map. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 statically scans the sign-in paths for every emitted failure code, including provider_unreachable, and fails when one has no class map entry. It runs in the normal verify workflow. Sign-in itself was verified live after this deploy; this change is a test only.",
         "card_type": "automation",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-014"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T23:55:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-017",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -7187,15 +7347,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-017",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T23:55:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014), and MAZER-ACCT-036 added provider_unreachable (code oauth-failure:provider_unreachable) for a down account service. Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code, including provider_unreachable, and fails when one is missing from the class map. Not started.",
-        "objective": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014), and MAZER-ACCT-036 added provider_unreachable (code oauth-failure:provider_unreachable) for a down account service. Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code, including provider_unreachable, and fails when one is missing from the class map. Not started.",
+        "summary": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014), and MAZER-ACCT-036 added provider_unreachable (code oauth-failure:provider_unreachable) for a down account service. Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code, including provider_unreachable, and fails when one is missing from the class map. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 statically scans the sign-in paths for every emitted failure code, including provider_unreachable, and fails when one has no class map entry. It runs in the normal verify workflow. Sign-in itself was verified live after this deploy; this change is a test only.",
+        "objective": "Sign-in failures now record codes in diagnostics (MAZER-ACCT-014), and MAZER-ACCT-036 added provider_unreachable (code oauth-failure:provider_unreachable) for a down account service. Nothing stops a new code being emitted without an entry in the failure class map. Plan: add a test that lists every emitted code, including provider_unreachable, and fails when one is missing from the class map. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 statically scans the sign-in paths for every emitted failure code, including provider_unreachable, and fails when one has no class map entry. It runs in the normal verify workflow. Sign-in itself was verified live after this deploy; this change is a test only.",
         "acceptance_criteria": [
-          "The test collects every code the sign-in paths can emit",
-          "It fails when a code has no class map entry",
-          "It runs in the normal verify workflow"
+          "The test collects every code the sign-in paths can emit: PR #469 merged and deployed",
+          "It fails when a code has no class map entry: done (static scan)",
+          "It runs in the normal verify workflow: done"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -7213,24 +7373,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-prog-018_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PROG-018",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Test every database change on a faithful scratch Postgres 17 and pin the live hash",
-        "description": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Not started.",
+        "description": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Update 2026-11-13: work has started and a worker is running. Not merged, and no pull request yet at the time of this sync.",
         "card_type": "automation",
-        "lifecycle": "planning",
+        "lifecycle": "in-progress",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-12T23:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-018",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "in_progress",
           "public_safe": true
         }
       },
@@ -7238,11 +7398,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-018",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T23:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Not started.",
-        "objective": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Not started.",
+        "summary": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Update 2026-11-13: work has started and a worker is running. Not merged, and no pull request yet at the time of this sync.",
+        "objective": "Process rule from the 2026-11-12 database work: every SQL proposal is tested on a faithful scratch Postgres 17 and reviewed independently before the owner approves it, and any hash guard pins the md5 of the LIVE function body, not the repository copy (the live body had CRLF line endings, the repository blob LF, and a first guard would have aborted on production). Tooling to build: a reusable scratch Postgres harness and a read-only preimage query pack, both documented in the repository docs. Also record that the production SQL runner role cannot drop or disable triggers on the auth users table, so rollbacks use DROP FUNCTION with CASCADE. Update 2026-11-13: work has started and a worker is running. Not merged, and no pull request yet at the time of this sync.",
         "acceptance_criteria": [
           "The rule is written in the repository docs and referenced by the SQL proposal checklist",
           "A reusable scratch Postgres 17 harness runs an applied file plus its rollback",
@@ -7846,18 +8006,18 @@
         "card_id": "MAZER-QA-006",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Finish cross-viewport UI reliability and layout persistence",
-        "description": "Two board cards cover UI reliability across viewports and browser layout persistence; packets from July exist. Both are partly done and remain open.",
+        "title": "Cross-viewport reliability: viewport matrix and presets landed, rotate check pending",
+        "description": "Two board cards cover UI reliability across viewports and browser layout persistence; packets from July exist. Both are partly done and remain open. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #480 (merged as 62f36472) wrote the supported viewport matrix and added the presets 320, 360, 390, 430, 768, 1440 and phone landscape to the layout matrix. Recommended to drop the layout persistence criterion (nothing to persist since Board Zoom was removed); that stays an owner decision. The device rotate check is pending.",
         "card_type": "reliability",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-006",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -7865,15 +8025,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-006",
         "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Two board cards cover UI reliability across viewports and browser layout persistence; packets from July exist. Both are partly done and remain open.",
-        "objective": "Two board cards cover UI reliability across viewports and browser layout persistence; packets from July exist. Both are partly done and remain open.",
+        "summary": "Two board cards cover UI reliability across viewports and browser layout persistence; packets from July exist. Both are partly done and remain open. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #480 (merged as 62f36472) wrote the supported viewport matrix and added the presets 320, 360, 390, 430, 768, 1440 and phone landscape to the layout matrix. Recommended to drop the layout persistence criterion (nothing to persist since Board Zoom was removed); that stays an owner decision. The device rotate check is pending.",
+        "objective": "Two board cards cover UI reliability across viewports and browser layout persistence; packets from July exist. Both are partly done and remain open. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #480 (merged as 62f36472) wrote the supported viewport matrix and added the presets 320, 360, 390, 430, 768, 1440 and phone landscape to the layout matrix. Recommended to drop the layout persistence criterion (nothing to persist since Board Zoom was removed); that stays an owner decision. The device rotate check is pending.",
         "acceptance_criteria": [
-          "UI holds across the supported viewport matrix",
-          "Layout state survives reload",
-          "Real-device checks are recorded"
+          "UI holds across the supported viewport matrix: matrix and presets landed (PR #480)",
+          "Layout state survives reload: recommended dropped, pending the owner",
+          "Real-device checks are recorded: rotate check pending"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -7891,26 +8051,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-qa-007_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-QA-007",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Replace the 268 checkpoint in the level preview jump list with 218",
-        "description": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Not started.",
+        "title": "The level preview jump list now offers 218 instead of 268: merged and live, review",
+        "description": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 ends the preview checkpoints at 218, the end of the strictly rising ladder, and updates the tests that name it. If the straighter-maze change (MAZER-GEN-007, PR #484, not merged) lands, the ladder end moves again and this list must follow.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-GEN-006"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T23:30:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-007",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -7918,15 +8078,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-007",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T23:30:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Not started.",
-        "objective": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Not started.",
+        "summary": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 ends the preview checkpoints at 218, the end of the strictly rising ladder, and updates the tests that name it. If the straighter-maze change (MAZER-GEN-007, PR #484, not merged) lands, the ladder end moves again and this list must follow.",
+        "objective": "The level preview jump list still offers 268 as the end-of-fringe checkpoint. After the no-stub rule (MAZER-GEN-006) the strictly rising ladder ends at level 218, so 268 is now a plateau level. The preview clamps harmlessly, but the checkpoint should say 218. Plan: change the list, update any test that names it. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #469 ends the preview checkpoints at 218, the end of the strictly rising ladder, and updates the tests that name it. If the straighter-maze change (MAZER-GEN-007, PR #484, not merged) lands, the ladder end moves again and this list must follow.",
         "acceptance_criteria": [
-          "The jump list offers 218 as the end-of-fringe checkpoint",
-          "No remaining reference to 268 as a ladder end in the preview list",
-          "Tests that name the checkpoint pass"
+          "The jump list offers 218 as the end-of-fringe checkpoint: PR #469 merged and deployed",
+          "No remaining reference to 268 as a ladder end in the preview list: done",
+          "Tests that name the checkpoint pass: done"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -9033,26 +9193,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-ui-013_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-UI-013",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Move scene colors onto the shared theme values",
-        "description": "About 290 hard-coded color values exist in the game code and only 5 match the theme; there are 5 different near-black backgrounds, 3 greens for energy and 2 mints. The plan is to map each to a theme value or a named material extension and add a lint so new stray colors fail. Not started; large because the menu scene file is huge.",
+        "title": "Off-theme colour ratchet landed: new stray colour literals now fail, no source edits",
+        "description": "About 290 hard-coded color values exist in the game code and only 5 match the theme; there are 5 different near-black backgrounds, 3 greens for energy and 2 mints. The plan is to map each to a theme value or a named material extension and add a lint so new stray colors fail. Not started; large because the menu scene file is huge. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #481 (merged as 98f867e7) added a ratchet that fails when new off-theme colour literals appear and pinned the near-black 02080f; no source files were edited, so the existing stray colours remain and are not migrated yet.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-UI-012"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-06T00:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-013",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -9060,15 +9220,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-013",
         "source_status": "current",
-        "source_updated_at": "2026-11-06T00:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "About 290 hard-coded color values exist in the game code and only 5 match the theme; there are 5 different near-black backgrounds, 3 greens for energy and 2 mints. The plan is to map each to a theme value or a named material extension and add a lint so new stray colors fail. Not started; large because the menu scene file is huge.",
-        "objective": "About 290 hard-coded color values exist in the game code and only 5 match the theme; there are 5 different near-black backgrounds, 3 greens for energy and 2 mints. The plan is to map each to a theme value or a named material extension and add a lint so new stray colors fail. Not started; large because the menu scene file is huge.",
+        "summary": "About 290 hard-coded color values exist in the game code and only 5 match the theme; there are 5 different near-black backgrounds, 3 greens for energy and 2 mints. The plan is to map each to a theme value or a named material extension and add a lint so new stray colors fail. Not started; large because the menu scene file is huge. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #481 (merged as 98f867e7) added a ratchet that fails when new off-theme colour literals appear and pinned the near-black 02080f; no source files were edited, so the existing stray colours remain and are not migrated yet.",
+        "objective": "About 290 hard-coded color values exist in the game code and only 5 match the theme; there are 5 different near-black backgrounds, 3 greens for energy and 2 mints. The plan is to map each to a theme value or a named material extension and add a lint so new stray colors fail. Not started; large because the menu scene file is huge. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #481 (merged as 98f867e7) added a ratchet that fails when new off-theme colour literals appear and pinned the near-black 02080f; no source files were edited, so the existing stray colours remain and are not migrated yet.",
         "acceptance_criteria": [
-          "Hard-coded visible colors are mapped to theme values or named extensions",
-          "A lint check flags new off-theme color literals",
-          "Page, manifest and boot colors share one near-black"
+          "Hard-coded visible colors are mapped to theme values or named extensions: not done; the ratchet freezes the count",
+          "A lint check flags new off-theme color literals: PR #481 merged",
+          "Page, manifest and boot colors share one near-black: pinned"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -9353,20 +9513,20 @@
         "card_id": "MAZER-UI-019",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Complete the full UI rework migration on the new standards",
-        "description": "UI component and layout standards are on main as registries. The full migration is under separately owned wave governance and remains open.",
+        "title": "UI rework migration: wave status report landed, umbrella to split pending the owner",
+        "description": "UI component and layout standards are on main as registries. The full migration is under separately owned wave governance and remains open. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #482 (merged as d5a29cee) is a read-only wave status report: the contracts layer is done, the migration layer (wave 3 and later) is not started, the DOM primitives are unused in production, and the menu scene is 16.6 thousand lines. The card stays an umbrella; the owner decision is whether to split it into children (menu scene decomposition, Wave 6 proof surfaces, future-phaser retirement).",
         "card_type": "migration",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [
           "MAZER-GOV-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-019",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -9374,15 +9534,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-019",
         "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "UI component and layout standards are on main as registries. The full migration is under separately owned wave governance and remains open.",
-        "objective": "UI component and layout standards are on main as registries. The full migration is under separately owned wave governance and remains open.",
+        "summary": "UI component and layout standards are on main as registries. The full migration is under separately owned wave governance and remains open. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #482 (merged as d5a29cee) is a read-only wave status report: the contracts layer is done, the migration layer (wave 3 and later) is not started, the DOM primitives are unused in production, and the menu scene is 16.6 thousand lines. The card stays an umbrella; the owner decision is whether to split it into children (menu scene decomposition, Wave 6 proof surfaces, future-phaser retirement).",
+        "objective": "UI component and layout standards are on main as registries. The full migration is under separately owned wave governance and remains open. Merged to main, no player-visible change, so there is nothing to deploy-check. PR #482 (merged as d5a29cee) is a read-only wave status report: the contracts layer is done, the migration layer (wave 3 and later) is not started, the DOM primitives are unused in production, and the menu scene is 16.6 thousand lines. The card stays an umbrella; the owner decision is whether to split it into children (menu scene decomposition, Wave 6 proof surfaces, future-phaser retirement).",
         "acceptance_criteria": [
-          "Registries exist on main",
-          "Remaining waves are tracked by their owner",
-          "Each wave carries visual proof"
+          "Registries exist on main: yes",
+          "Remaining waves are tracked by their owner: status report landed (PR #482)",
+          "Each wave carries visual proof: not yet"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -9458,7 +9618,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Route auth, sync, username and boot errors into the message toast",
-        "description": "The toast from MAZER-UI-018 draws the message queue, but auth, sync, username and boot errors are still not routed into it. Owner decision needed first: remote sync is deliberately silent, so showing sync failures changes that stance. Not started.",
+        "description": "The toast from MAZER-UI-018 draws the message queue, but auth, sync, username and boot errors are still not routed into it. Owner decision needed first: remote sync is deliberately silent, so showing sync failures changes that stance. Update 2026-11-13: not built. The decision is narrowed to a recommendation for the owner: keep sync silent, show boot errors on the splash, and toast only the service-worker warning that the offline cache could not update. Still planning until the owner decides.",
         "card_type": "governance",
         "lifecycle": "planning",
         "priority": "low",
@@ -9467,7 +9627,7 @@
           "MAZER-UI-018"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-11T12:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-021",
         "extensions": {
           "owner_status": "planning",
@@ -9478,11 +9638,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-021",
         "source_status": "current",
-        "source_updated_at": "2026-11-11T12:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "The toast from MAZER-UI-018 draws the message queue, but auth, sync, username and boot errors are still not routed into it. Owner decision needed first: remote sync is deliberately silent, so showing sync failures changes that stance. Not started.",
-        "objective": "The toast from MAZER-UI-018 draws the message queue, but auth, sync, username and boot errors are still not routed into it. Owner decision needed first: remote sync is deliberately silent, so showing sync failures changes that stance. Not started.",
+        "summary": "The toast from MAZER-UI-018 draws the message queue, but auth, sync, username and boot errors are still not routed into it. Owner decision needed first: remote sync is deliberately silent, so showing sync failures changes that stance. Update 2026-11-13: not built. The decision is narrowed to a recommendation for the owner: keep sync silent, show boot errors on the splash, and toast only the service-worker warning that the offline cache could not update. Still planning until the owner decides.",
+        "objective": "The toast from MAZER-UI-018 draws the message queue, but auth, sync, username and boot errors are still not routed into it. Owner decision needed first: remote sync is deliberately silent, so showing sync failures changes that stance. Update 2026-11-13: not built. The decision is narrowed to a recommendation for the owner: keep sync silent, show boot errors on the splash, and toast only the service-worker warning that the offline cache could not update. Still planning until the owner decides.",
         "acceptance_criteria": [
           "Owner decides which of auth, sync, username and boot errors are shown",
           "Approved errors reach the toast with friendly copy",
@@ -9540,6 +9700,59 @@
           "Offline notice strings live in the message module copy tables (PR #436)",
           "Inventory test still pins the rows and keeps them unique",
           "No change to the shown copy: strings, ids and tone are unchanged"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-023_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-023",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Narrow the menu diagnostics form mode to login only (wave 1C)",
+        "description": "Follow-up to MAZER-ACCT-012. Once the in-app sign-up mode is gone (PR #485 and #486, open), the menu diagnostics form mode can only be login. Plan: narrow its type to login only. This is a wave 1C file and must not be mixed with other waves in one change. Not started.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-012"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-13T01:30:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-023",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-023",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
+      },
+      "content": {
+        "summary": "Follow-up to MAZER-ACCT-012. Once the in-app sign-up mode is gone (PR #485 and #486, open), the menu diagnostics form mode can only be login. Plan: narrow its type to login only. This is a wave 1C file and must not be mixed with other waves in one change. Not started.",
+        "objective": "Follow-up to MAZER-ACCT-012. Once the in-app sign-up mode is gone (PR #485 and #486, open), the menu diagnostics form mode can only be login. Plan: narrow its type to login only. This is a wave 1C file and must not be mixed with other waves in one change. Not started.",
+        "acceptance_criteria": [
+          "The diagnostics form mode type is login only",
+          "The change carries only wave 1C files",
+          "Diagnostics tests pass and the wave 1C one-wave rule is respected"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -10930,26 +11143,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-027_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-027",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Delete the unused backdrop glyph generators in their own wave",
-        "description": "Follow-up to MAZER-VIS-017. The pure shard, rune and sigil generators in the backdrop module are unused but remain because that file belongs to a different wave than the scene file. Plan: delete them in their own pull request, together with the pinned source assertions and the shard-count tests. Not started.",
+        "title": "Unused backdrop shard, glass shard and rune generators deleted: merged and live",
+        "description": "Follow-up to MAZER-VIS-017. The pure shard, rune and sigil generators in the backdrop module are unused but remain because that file belongs to a different wave than the scene file. Plan: delete them in their own pull request, together with the pinned source assertions and the shard-count tests. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #477 deleted the unused backdrop shard, glass shard and rune generators with their pinned source assertions and shard-count tests. Star backdrop behaviour and raster baselines are unchanged.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-VIS-017"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-11T12:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-027",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -10957,15 +11170,15 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-027",
         "source_status": "current",
-        "source_updated_at": "2026-11-11T12:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "Follow-up to MAZER-VIS-017. The pure shard, rune and sigil generators in the backdrop module are unused but remain because that file belongs to a different wave than the scene file. Plan: delete them in their own pull request, together with the pinned source assertions and the shard-count tests. Not started.",
-        "objective": "Follow-up to MAZER-VIS-017. The pure shard, rune and sigil generators in the backdrop module are unused but remain because that file belongs to a different wave than the scene file. Plan: delete them in their own pull request, together with the pinned source assertions and the shard-count tests. Not started.",
+        "summary": "Follow-up to MAZER-VIS-017. The pure shard, rune and sigil generators in the backdrop module are unused but remain because that file belongs to a different wave than the scene file. Plan: delete them in their own pull request, together with the pinned source assertions and the shard-count tests. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #477 deleted the unused backdrop shard, glass shard and rune generators with their pinned source assertions and shard-count tests. Star backdrop behaviour and raster baselines are unchanged.",
+        "objective": "Follow-up to MAZER-VIS-017. The pure shard, rune and sigil generators in the backdrop module are unused but remain because that file belongs to a different wave than the scene file. Plan: delete them in their own pull request, together with the pinned source assertions and the shard-count tests. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #477 deleted the unused backdrop shard, glass shard and rune generators with their pinned source assertions and shard-count tests. Star backdrop behaviour and raster baselines are unchanged.",
         "acceptance_criteria": [
-          "The unused backdrop glyph generators are removed in their own wave",
-          "Pinned source assertions and shard-count tests are removed",
-          "Star backdrop behaviour and raster baselines are unchanged"
+          "The unused backdrop glyph generators are removed in their own wave: PR #477 merged and deployed",
+          "Pinned source assertions and shard-count tests are removed: done",
+          "Star backdrop behaviour and raster baselines are unchanged: baselines pass unchanged"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -10983,26 +11196,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-028_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-028",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Morph the player ring between cap and chip shape instead of popping",
-        "description": "The player ring now follows the cap-tile shape on start and goal tiles (MAZER-VIS-023) but switches between the cap and chip shape abruptly at the halfway point when the player enters or leaves such a tile. Plan: blend the ring between the two shapes. Not started.",
+        "title": "The player ring morphs between cap and chip shape, no pop: live, device check pending",
+        "description": "The player ring now follows the cap-tile shape on start and goal tiles (MAZER-VIS-023) but switches between the cap and chip shape abruptly at the halfway point when the player enters or leaves such a tile. Plan: blend the ring between the two shapes. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #478: the ring blends between the cap and chip shape across the start and goal tile instead of switching at the halfway point; reduced motion collapses the morph.",
         "card_type": "feature",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-VIS-023"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-028",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -11010,15 +11223,16 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-028",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "The player ring now follows the cap-tile shape on start and goal tiles (MAZER-VIS-023) but switches between the cap and chip shape abruptly at the halfway point when the player enters or leaves such a tile. Plan: blend the ring between the two shapes. Not started.",
-        "objective": "The player ring now follows the cap-tile shape on start and goal tiles (MAZER-VIS-023) but switches between the cap and chip shape abruptly at the halfway point when the player enters or leaves such a tile. Plan: blend the ring between the two shapes. Not started.",
+        "summary": "The player ring now follows the cap-tile shape on start and goal tiles (MAZER-VIS-023) but switches between the cap and chip shape abruptly at the halfway point when the player enters or leaves such a tile. Plan: blend the ring between the two shapes. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #478: the ring blends between the cap and chip shape across the start and goal tile instead of switching at the halfway point; reduced motion collapses the morph.",
+        "objective": "The player ring now follows the cap-tile shape on start and goal tiles (MAZER-VIS-023) but switches between the cap and chip shape abruptly at the halfway point when the player enters or leaves such a tile. Plan: blend the ring between the two shapes. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #478: the ring blends between the cap and chip shape across the start and goal tile instead of switching at the halfway point; reduced motion collapses the morph.",
         "acceptance_criteria": [
-          "The ring blends smoothly between cap and chip shape across the tile",
-          "No frame shows a corner poking past the dead-end disc",
-          "Pixel baselines for the marker are updated deliberately"
+          "The ring blends smoothly between cap and chip shape across the tile: PR #478 merged and deployed, headless only",
+          "No frame shows a corner poking past the dead-end disc: tested frame by frame",
+          "Pixel baselines for the marker are updated deliberately: done",
+          "Real-device check: open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -11036,16 +11250,16 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-029_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-029",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Make the trail head follow the wall-bump nudge of the marker",
-        "description": "A blocked move nudges the player marker about 2 px (MAZER-MOTION-003), but the trail head, now snapped to the resting centre of the marker (MAZER-VIS-025), does not follow the nudge. Plan: apply the same nudge to the trail head. Not started.",
+        "title": "The trail head follows the marker wall-bump nudge: merged and live, device check pending",
+        "description": "A blocked move nudges the player marker about 2 px (MAZER-MOTION-003), but the trail head, now snapped to the resting centre of the marker (MAZER-VIS-025), does not follow the nudge. Plan: apply the same nudge to the trail head. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #478: the trail head follows the marker wall-bump nudge through a head-only offset; reduced motion collapses it. Known quirk: a bump perpendicular to the last trail segment skews that segment by up to 2 px for about 110 ms.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
@@ -11053,10 +11267,10 @@
           "MAZER-VIS-025"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-13T01:30:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-029",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -11064,15 +11278,67 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-029",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
       },
       "content": {
-        "summary": "A blocked move nudges the player marker about 2 px (MAZER-MOTION-003), but the trail head, now snapped to the resting centre of the marker (MAZER-VIS-025), does not follow the nudge. Plan: apply the same nudge to the trail head. Not started.",
-        "objective": "A blocked move nudges the player marker about 2 px (MAZER-MOTION-003), but the trail head, now snapped to the resting centre of the marker (MAZER-VIS-025), does not follow the nudge. Plan: apply the same nudge to the trail head. Not started.",
+        "summary": "A blocked move nudges the player marker about 2 px (MAZER-MOTION-003), but the trail head, now snapped to the resting centre of the marker (MAZER-VIS-025), does not follow the nudge. Plan: apply the same nudge to the trail head. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #478: the trail head follows the marker wall-bump nudge through a head-only offset; reduced motion collapses it. Known quirk: a bump perpendicular to the last trail segment skews that segment by up to 2 px for about 110 ms.",
+        "objective": "A blocked move nudges the player marker about 2 px (MAZER-MOTION-003), but the trail head, now snapped to the resting centre of the marker (MAZER-VIS-025), does not follow the nudge. Plan: apply the same nudge to the trail head. Merged and deployed on main 62f36472 (production build fawxzzy-mazer-4djzxfozs, previous build fawxzzy-mazer-ldk3ncpod), checked only in headless Chromium and tests, not on a real phone. PR #478: the trail head follows the marker wall-bump nudge through a head-only offset; reduced motion collapses it. Known quirk: a bump perpendicular to the last trail segment skews that segment by up to 2 px for about 110 ms.",
         "acceptance_criteria": [
-          "The trail head moves with the marker during a wall bump",
-          "No sliver of trail shows beside the marker during the nudge",
-          "Trail pixel baselines stay unchanged at rest"
+          "The trail head moves with the marker during a wall bump: PR #478 merged and deployed, headless only",
+          "No sliver of trail shows beside the marker during the nudge: tested, with the 2 px perpendicular quirk noted",
+          "Trail pixel baselines stay unchanged at rest: yes",
+          "Real-device check: open"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-030_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-030",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Redesign the diamond lasers and fill and drain the diamond with the beam",
+        "description": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond. This is teleport presentation work in wave 4D-B. Work has started and a worker is running; no pull request yet, nothing built, nothing merged.",
+        "card_type": "feature",
+        "lifecycle": "in-progress",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-13T01:30:00.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-030",
+        "extensions": {
+          "owner_status": "in_progress",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-030",
+        "source_status": "current",
+        "source_updated_at": "2026-11-13T01:30:00.000Z"
+      },
+      "content": {
+        "summary": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond. This is teleport presentation work in wave 4D-B. Work has started and a worker is running; no pull request yet, nothing built, nothing merged.",
+        "objective": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond. This is teleport presentation work in wave 4D-B. Work has started and a worker is running; no pull request yet, nothing built, nothing merged.",
+        "acceptance_criteria": [
+          "The diamond lasers are redesigned: open",
+          "The beam fills and drains the diamond: open",
+          "Reduced motion and pixel baselines are handled deliberately: open"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -11143,9 +11409,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 212,
-    "exported_public_card_count": 212,
-    "exported_open_card_count": 104,
+    "stable_identity_count": 217,
+    "exported_public_card_count": 217,
+    "exported_open_card_count": 109,
     "exported_completed_card_count": 92,
     "exported_deferred_card_count": 16,
     "imported_research_candidate_count": 0,

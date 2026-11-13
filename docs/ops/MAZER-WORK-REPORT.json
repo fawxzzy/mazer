@@ -3,26 +3,26 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-12T23:55:00.000Z"
+    "registryUpdatedAt": "2026-11-13T01:30:00.000Z"
   },
   "counters": {
-    "total": 212,
-    "open": 104,
+    "total": 217,
+    "open": 109,
     "completed": 92,
     "deferred": 16,
     "buckets": {
-      "needs-you": 53,
-      "in-review": 6,
-      "blocked": 30,
-      "ready": 11,
-      "in-progress": 4,
+      "needs-you": 58,
+      "in-review": 18,
+      "blocked": 21,
+      "ready": 6,
+      "in-progress": 6,
       "unclassified": 0,
       "deferred": 16,
       "completed": 92
     },
     "needsYou": {
-      "decisions": 32,
-      "checks": 21
+      "decisions": 33,
+      "checks": 25
     },
     "completedByTier": {
       "device": 0,
@@ -35,7 +35,7 @@
       "Zac": 4,
       "provider": 2,
       "device": 1,
-      "other-card": 23,
+      "other-card": 14,
       "unknown": 0
     }
   },
@@ -67,14 +67,14 @@
       },
       {
         "id": "MAZER-UI-019",
-        "title": "Complete the full UI rework migration on the new standards",
-        "status": "in_progress",
+        "title": "UI rework migration: wave status report landed, umbrella to split pending the owner",
+        "status": "review",
         "priority": "high",
         "kind": "decision",
         "ask": "Is the UI rework still one umbrella, or split into child cards (MenuScene decomposition, Wave 6 proof surfaces, future-phaser retirement) with this card closed?",
         "recommendation": "Auditor recommendation: split into children and keep the umbrella as planning only until the acceptance matrix is evaluated.",
-        "context": "MenuScene is about 16,600 lines (11,748 at Wave 0A) and decomposition has not started; Wave 6 and the nine-point Definition of Complete were never evaluated.",
-        "prs": "",
+        "context": "The wave status report landed (PR #482): contracts layer done, migration layer not started, the menu scene is about 16,600 lines.",
+        "prs": "#482",
         "verify": []
       },
       {
@@ -121,26 +121,38 @@
       },
       {
         "id": "MAZER-ACCT-023",
-        "title": "Account-site sign-out can land on the login page instead of Mazer",
-        "status": "planning",
+        "title": "Account-site sign-out no longer races to login: merged, not live until aliases move",
+        "status": "review",
         "priority": "medium",
         "kind": "decision",
         "ask": "Should signing out on the account site also end the Mazer session?",
         "recommendation": "Fix the race first; decide the session question as a separate step.",
         "context": "The race fix needs no decision, but whether account-site sign-out should also end the Mazer session is a design choice.",
-        "prs": "",
+        "prs": "FawxzzyWeb#130",
         "verify": []
       },
       {
         "id": "MAZER-ACCT-026",
-        "title": "Harden the username sign-in lockout (v4)",
-        "status": "planning",
+        "title": "Username sign-in lockout (v4) live and sign-in verified; v5 proposal open, not applied",
+        "status": "review",
         "priority": "medium",
         "kind": "decision",
-        "ask": "Pick the v4 counter design (key, cap, failures only).",
-        "recommendation": "Key by username plus client, count failures only, drop the forwarded-address fallback, raise the aggregate cap.",
-        "context": "Choosing the counter key and caps is a trade-off between lockout and brute-force protection.",
-        "prs": "",
+        "ask": "Review the v5 proposal (FawxzzyWeb PR #133) and decide whether its exact SQL may be applied.",
+        "recommendation": "Review the differences from live v4 first; nothing is applied until you approve the exact SQL.",
+        "context": "v4 is live and a coordinator sign-in check passed. FawxzzyWeb PR #133 (v5) is an open proposal: failures-only check and record, keyed by username and client, no forwarded-address header; its SQL is not applied.",
+        "prs": "FawxzzyWeb#129",
+        "verify": []
+      },
+      {
+        "id": "MAZER-AI-001",
+        "title": "AI runner calibration: per-band thresholds and checker landed, retention not built",
+        "status": "review",
+        "priority": "medium",
+        "kind": "decision",
+        "ask": "Drop remote run retention, or approve it as a separate provider-side step?",
+        "recommendation": "Drop it: the seed-pack runner is enough.",
+        "context": "Thresholds and checker landed (PR #479) with no baseline drift; remote run retention is not built.",
+        "prs": "#479",
         "verify": []
       },
       {
@@ -157,19 +169,19 @@
       },
       {
         "id": "MAZER-DATA-004",
-        "title": "Finish the offline-first play, sync and conflict contract",
-        "status": "in_progress",
+        "title": "Offline-first contract: proof fixtures landed, owner signing and device test open",
+        "status": "review",
         "priority": "medium",
         "kind": "decision",
-        "ask": "Sign or amend the 7 decisions in the offline sync contract: tier order, what a checkpoint means, coin and inventory ledger, outbox bounds and wording, entitlement grace, guest-to-account transfer, required device proofs.",
-        "recommendation": "Auditor recommendation: approve the tier order as drafted, define a checkpoint as a completed level only for now, keep coins and inventory local-first, authorise no server work yet.",
-        "context": "The offline sync contract draft is unsigned (7 open decisions); coin and inventory tiers exist only as a proposal; server parts are provider-gated.",
-        "prs": "",
+        "ask": "Sign or amend the offline sync contract, and run the airplane-mode check on a phone.",
+        "recommendation": "Sign the contract as written for the client part; keep server parts blocked until approved.",
+        "context": "Proof fixtures landed (PR #476); the owner contract signing, a device airplane-mode test and the provider-gated server parts are open.",
+        "prs": "#476",
         "verify": [
           {
-            "step": "On the iPhone installed app, signed in: turn on airplane mode, complete a level, force-quit, reopen offline, then turn airplane mode off and wait 10 seconds.",
-            "where": "installed-app",
-            "expected": "Progress is kept offline; one saved-offline notice; after reconnect the outbox flushes once and the level matches on a second device with no duplicate."
+            "step": "Play a level with airplane mode on, then turn the network back on and wait.",
+            "where": "phone",
+            "expected": "Progress is kept and flushes once the network returns, with no duplicate or lost completion."
           }
         ]
       },
@@ -211,14 +223,14 @@
       },
       {
         "id": "MAZER-HAZ-007",
-        "title": "Complete the turn-synchronous world simulation beyond the player phase",
-        "status": "in_progress",
+        "title": "Turn-synchronous simulation: phase status table landed, only the player phase is live",
+        "status": "review",
         "priority": "medium",
         "kind": "decision",
         "ask": "Will hazards and enemies be activated, and must they run through the turn host?",
         "recommendation": "Auditor recommendation: defer all non-player phases explicitly until hazards have a shipped product contract, then mark the card completed with a caveat once a deferral table lands.",
-        "context": "Only the player movement phase uses the turn host; enemy, projectile, pickup, item, duration and collision handlers are unintegrated and have had no commits since 2026-07-14.",
-        "prs": "",
+        "context": "The Phase Status table landed (PR #472): only the player movement phase is live and six other phases are deferred pending MAZER-HAZ-002; whether hazards and enemies are activated is the owner decision.",
+        "prs": "#472",
         "verify": []
       },
       {
@@ -240,7 +252,7 @@
         "priority": "medium",
         "kind": "decision",
         "ask": "After a phone check, choose: A ship as is; B cap cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker.",
-        "recommendation": "D as the follow-up; the draft stays unmerged until you choose.",
+        "recommendation": "Close draft PR #461: the owner reports no more lag; revisit only if lag returns (option D stays the follow-up).",
         "context": "Draft PR #461 (head 476e5cf2, CI not started, not merged) cuts walking frame cost about 1.3 to 2 times but cannot keep pixel parity: trail colour, sheen and breath would step every 250 ms to 1 s on long routes.",
         "prs": "#461",
         "verify": []
@@ -265,14 +277,14 @@
       },
       {
         "id": "MAZER-QA-006",
-        "title": "Finish cross-viewport UI reliability and layout persistence",
-        "status": "in_progress",
+        "title": "Cross-viewport reliability: viewport matrix and presets landed, rotate check pending",
+        "status": "review",
         "priority": "medium",
         "kind": "decision",
         "ask": "With Board Zoom removed and the board size frozen, is any layout persistence still wanted, or should that criterion be dropped?",
         "recommendation": "Auditor recommendation: drop the persistence criterion; keep the viewport matrix and the device check.",
-        "context": "Layout persistence has no defined state to persist (Board Zoom was removed) and the supported viewport matrix is not written down.",
-        "prs": "",
+        "context": "The viewport matrix and presets landed (PR #480); the layout persistence criterion has no state to persist.",
+        "prs": "#480",
         "verify": [
           {
             "step": "On the iPhone installed app: open the menu, rotate portrait to landscape and back mid-play, and open Settings and Guide in each orientation.",
@@ -325,14 +337,14 @@
       },
       {
         "id": "MAZER-ACCT-029",
-        "title": "Map the username-taken and generic database errors on the account site and Fitness",
-        "status": "planning",
+        "title": "Taken username named on the account site: merged, not live; Fitness patch proposed as text",
+        "status": "review",
         "priority": "low",
         "kind": "decision",
         "ask": "Is it acceptable for the account site and Fitness to say a username is taken?",
         "recommendation": "Yes for sign-up, since the leaderboard already shows names; keep the generic error vague.",
         "context": "A plain taken-username message tells a visitor that the name exists.",
-        "prs": "",
+        "prs": "FawxzzyWeb#130",
         "verify": []
       },
       {
@@ -438,7 +450,7 @@
         "priority": "low",
         "kind": "decision",
         "ask": "Which of auth, sync, username and boot errors should appear in the message toast?",
-        "recommendation": "Show auth, username and boot errors; keep remote sync silent.",
+        "recommendation": "Keep remote sync silent, show boot errors on the splash, and toast only the service-worker warning that the offline cache could not update.",
         "context": "Remote sync is deliberately silent today, so showing sync failures changes that stance.",
         "prs": "",
         "verify": []
@@ -886,6 +898,47 @@
         ]
       },
       {
+        "id": "MAZER-ACCT-032",
+        "title": "A long header name is ellipsized instead of hidden: merged and live, device check pending",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone, sign in with a long name and look at the header.",
+        "recommendation": "Accept if the name reads cut with an ellipsis and the header does not overflow.",
+        "context": "PR #470 is merged and deployed (62f36472) and checked in headless Chromium and tests only; nothing is checked on a real phone.",
+        "prs": "#470",
+        "verify": [
+          {
+            "step": "Sign in with an account whose name is 15 characters (or open a narrow window) and look at the header.",
+            "where": "phone",
+            "expected": "The name shows cut with an ellipsis; the header is never blank unless not even one character fits; a short name is unchanged."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-ACCT-037",
+        "title": "Welcome warms the account-service check so Sign in is quick: live, device check open",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone, leave Welcome idle for 2 to 5 seconds, then tap Sign in; then try airplane mode.",
+        "recommendation": "Accept if the tap goes straight to the account page and airplane mode shows no failure line until Sign in is tapped.",
+        "context": "PR #470 is merged and deployed (62f36472) and checked in headless Chromium with a mocked probe only; nothing is checked on a real phone.",
+        "prs": "#470",
+        "verify": [
+          {
+            "step": "Open Welcome, wait 2 to 5 seconds, then tap Sign in.",
+            "where": "phone",
+            "expected": "No pause before the account page opens."
+          },
+          {
+            "step": "Turn airplane mode on, open Welcome and wait 5 seconds without tapping.",
+            "where": "phone",
+            "expected": "No failure line appears until Sign in is tapped; then the plain failure line shows for several seconds."
+          }
+        ]
+      },
+      {
         "id": "MAZER-MOTION-005",
         "title": "One reduced-motion crossfade length of 200 ms: deployed, device check pending",
         "status": "review",
@@ -982,6 +1035,42 @@
             "step": "Walk a few tiles and stop, then look at where the trail ends under the player marker.",
             "where": "installed-app",
             "expected": "The trail ends exactly at the marker centre; no sliver of trail shows beside the marker."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-VIS-028",
+        "title": "The player ring morphs between cap and chip shape, no pop: live, device check pending",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone, walk the marker off and onto the start and goal tiles and watch the ring.",
+        "recommendation": "Accept if the ring eases between the two shapes with no pop.",
+        "context": "PR #478 is merged and deployed (62f36472) and checked in headless Chromium and tests only; nothing is checked on a real phone.",
+        "prs": "#478",
+        "verify": [
+          {
+            "step": "Walk the marker off the start tile and onto the goal tile and watch the ring shape.",
+            "where": "phone",
+            "expected": "The ring eases between the cap and chip shape across the tile with no pop and no corner poking out."
+          }
+        ]
+      },
+      {
+        "id": "MAZER-VIS-029",
+        "title": "The trail head follows the marker wall-bump nudge: merged and live, device check pending",
+        "status": "review",
+        "priority": "low",
+        "kind": "check",
+        "ask": "On your phone, bump into a wall and watch the end of the trail.",
+        "recommendation": "Accept if the trail end moves with the marker; note whether the 2 px skew on a sideways bump is visible.",
+        "context": "PR #478 is merged and deployed (62f36472) and checked in headless Chromium and tests only; nothing is checked on a real phone.",
+        "prs": "#478",
+        "verify": [
+          {
+            "step": "Walk into a wall and watch the trail end next to the marker.",
+            "where": "phone",
+            "expected": "The trail end follows the marker nudge with no sliver beside it; a bump perpendicular to the last segment may skew it by up to 2 px for a moment."
           }
         ]
       }
@@ -2043,6 +2132,30 @@
       "note": "Merged and deployed at main 24e15cc1 with no visible change. Criterion 3 (dead motion code) is not done and is carried by MAZER-MOTION-007; the scene constants move in MAZER-MOTION-006."
     },
     {
+      "id": "MAZER-UI-013",
+      "title": "Off-theme colour ratchet landed: new stray colour literals now fail, no source edits",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#481",
+      "note": "PR #481 merged: ratchet only. Migration of existing colours not started."
+    },
+    {
+      "id": "MAZER-ACCT-012",
+      "title": "Retire dead Mazer sign-up code: PRs #485 and #486 (stacked) open for review",
+      "status": "review",
+      "priority": "low",
+      "prs": "#485, #486",
+      "note": "PR #485 and #486 open for review, not merged."
+    },
+    {
+      "id": "MAZER-ACCT-033",
+      "title": "Header follows the saved profile name after a reload: PR #487 open for review",
+      "status": "review",
+      "priority": "low",
+      "prs": "#487",
+      "note": "PR #487 open for review, not merged, not deployed."
+    },
+    {
       "id": "MAZER-DOCS-001",
       "title": "Multi-target deployment architecture doc",
       "status": "review",
@@ -2051,12 +2164,84 @@
       "note": "Docs only, merged; open unknowns remain in the note and it is not reconciled with the Cyberdeck card."
     },
     {
+      "id": "MAZER-GOV-005",
+      "title": "Visual proof discipline: PR template line and repo pointer landed",
+      "status": "review",
+      "priority": "low",
+      "prs": "#474",
+      "note": "PR #474 merged (docs and template). Governance, no device surface."
+    },
+    {
+      "id": "MAZER-GOV-009",
+      "title": "Stabilise load-sensitive tests: PR #489 open for review",
+      "status": "review",
+      "priority": "low",
+      "prs": "#489",
+      "note": "PR #489 open for review, not merged."
+    },
+    {
+      "id": "MAZER-MOTION-006",
+      "title": "Scene motion constants read the motion scale, values unchanged: merged and live",
+      "status": "review",
+      "priority": "low",
+      "prs": "#471",
+      "note": "PR #471 merged and deployed (62f36472). No visible change by design."
+    },
+    {
+      "id": "MAZER-MOTION-009",
+      "title": "The teleport transfer reads the shared 200 ms crossfade, alias deleted: merged and live",
+      "status": "review",
+      "priority": "low",
+      "prs": "#475",
+      "note": "PR #475 merged and deployed (62f36472). Same 200 ms value, no visible change expected."
+    },
+    {
+      "id": "MAZER-PERF-007",
+      "title": "Wrap-dock glow redraw on the shared 33 ms schedule: PR #488 open for review",
+      "status": "review",
+      "priority": "low",
+      "prs": "#488",
+      "note": "PR #488 open for review, not merged."
+    },
+    {
+      "id": "MAZER-PROG-016",
+      "title": "Touch sprint diagnostics now live in the progression section: merged and live, review",
+      "status": "review",
+      "priority": "low",
+      "prs": "#469, #473",
+      "note": "PR #469 and #473 merged and deployed (62f36472). Diagnostics only, no device surface."
+    },
+    {
+      "id": "MAZER-PROG-017",
+      "title": "Every sign-in failure code is pinned to the class map by a test: merged and live, review",
+      "status": "review",
+      "priority": "low",
+      "prs": "#469",
+      "note": "PR #469 merged and deployed (62f36472). Test only, no device surface."
+    },
+    {
+      "id": "MAZER-QA-007",
+      "title": "The level preview jump list now offers 218 instead of 268: merged and live, review",
+      "status": "review",
+      "priority": "low",
+      "prs": "#469",
+      "note": "PR #469 merged and deployed (62f36472). The ladder end may move to 288 if PR #484 lands."
+    },
+    {
       "id": "MAZER-VIS-024",
       "title": "Make the marker diagnostics report the real block size: deployed",
       "status": "review",
       "priority": "low",
       "prs": "#458",
       "note": "Merged and deployed (PR #458); diagnostics only, kept in review with MAZER-VIS-023 and 025."
+    },
+    {
+      "id": "MAZER-VIS-027",
+      "title": "Unused backdrop shard, glass shard and rune generators deleted: merged and live",
+      "status": "review",
+      "priority": "low",
+      "prs": "#477",
+      "note": "PR #477 merged and deployed (62f36472). Deleted unused code, no visible change."
     }
   ],
   "blocked": {
@@ -2194,30 +2379,12 @@
         "derived": true
       },
       {
-        "id": "MAZER-ACCT-032",
-        "title": "Ellipsize a long header name instead of hiding it",
+        "id": "MAZER-ACCT-038",
+        "title": "Retire the remaining dead sign-in form helpers and sign-up sentinels",
         "status": "planning",
         "priority": "low",
         "kind": "dependency",
-        "ask": "Waits on MAZER-ACCT-021 (review).",
-        "derived": true
-      },
-      {
-        "id": "MAZER-ACCT-033",
-        "title": "Confirm whether a rename updates the sign-in name used by the header",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-ACCT-021 (review).",
-        "derived": true
-      },
-      {
-        "id": "MAZER-ACCT-037",
-        "title": "Warm the account-service check on Welcome so the first Sign in tap pays no extra delay",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-ACCT-036 (review).",
+        "ask": "Waits on MAZER-ACCT-012 (review).",
         "derived": true
       },
       {
@@ -2257,24 +2424,6 @@
         "derived": false
       },
       {
-        "id": "MAZER-MOTION-006",
-        "title": "Migrate scene motion constants to the motion scale",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-MOTION-001 and MAZER-MOTION-004 (both in review).",
-        "derived": false
-      },
-      {
-        "id": "MAZER-MOTION-009",
-        "title": "Move the teleport transfer to the shared reduced-motion crossfade",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-MOTION-005 (review).",
-        "derived": true
-      },
-      {
         "id": "MAZER-NATIVE-001",
         "title": "Plan the native app-store wrapper after web stabilization",
         "status": "planning",
@@ -2284,57 +2433,12 @@
         "derived": false
       },
       {
-        "id": "MAZER-PERF-005",
-        "title": "Cheaper long-trail bloom without dimming the halo",
+        "id": "MAZER-UI-023",
+        "title": "Narrow the menu diagnostics form mode to login only (wave 1C)",
         "status": "planning",
         "priority": "low",
         "kind": "dependency",
-        "ask": "Waits on MAZER-PERF-002 (review).",
-        "derived": true
-      },
-      {
-        "id": "MAZER-PERF-007",
-        "title": "Throttle the wrap-glow full-board redraw under full motion",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-PERF-003 (review).",
-        "derived": true
-      },
-      {
-        "id": "MAZER-PROG-017",
-        "title": "Pin every emitted sign-in failure code to the class map with a test",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-ACCT-014 (review).",
-        "derived": true
-      },
-      {
-        "id": "MAZER-QA-007",
-        "title": "Replace the 268 checkpoint in the level preview jump list with 218",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-GEN-006 (review).",
-        "derived": true
-      },
-      {
-        "id": "MAZER-VIS-028",
-        "title": "Morph the player ring between cap and chip shape instead of popping",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-VIS-023 (review).",
-        "derived": true
-      },
-      {
-        "id": "MAZER-VIS-029",
-        "title": "Make the trail head follow the wall-bump nudge of the marker",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-VIS-025 (review).",
+        "ask": "Waits on MAZER-ACCT-012 (review).",
         "derived": true
       }
     ],
@@ -2367,41 +2471,6 @@
         "warnings": []
       },
       {
-        "id": "MAZER-PROG-018",
-        "title": "Test every database change on a faithful scratch Postgres 17 and pin the live hash",
-        "status": "planning",
-        "priority": "medium",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-UI-013",
-        "title": "Move scene colors onto the shared theme values",
-        "status": "planning",
-        "priority": "medium",
-        "filesHint": [
-          "src/scenes/MenuScene.ts",
-          "src/theme/tokens.ts",
-          "src/render/palette.ts"
-        ],
-        "waves": [
-          "5C"
-        ],
-        "warnings": [
-          "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts"
-        ]
-      },
-      {
-        "id": "MAZER-ACCT-012",
-        "title": "Retire dead Mazer sign-up code (username-editor half done in PR #450)",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
         "id": "MAZER-ACCT-020",
         "title": "Fix the four account-site usernames longer than 15 characters",
         "status": "planning",
@@ -2411,14 +2480,11 @@
         "warnings": []
       },
       {
-        "id": "MAZER-GOV-009",
-        "title": "Stabilise load-sensitive tests",
+        "id": "MAZER-MOTION-010",
+        "title": "Delete or bind the unused tuning value menu.status.pulseDurationMs",
         "status": "planning",
         "priority": "low",
-        "filesHint": [
-          "tests/render/endpointTilePixels.test.ts",
-          "vitest.config.ts"
-        ],
+        "filesHint": [],
         "waves": [],
         "warnings": []
       },
@@ -2429,19 +2495,6 @@
         "priority": "low",
         "filesHint": [],
         "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-PROG-016",
-        "title": "Move touchSprint progression diagnostics to the progression diagnostics section",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [
-          "src/scenes/menuRuntimeDiagnostics.ts"
-        ],
-        "waves": [
-          "1C"
-        ],
         "warnings": []
       },
       {
@@ -2457,50 +2510,50 @@
           "5C"
         ],
         "warnings": [
-          "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts",
-          "overlaps MAZER-UI-013 on src/scenes/MenuScene.ts"
+          "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts"
         ]
-      },
-      {
-        "id": "MAZER-VIS-027",
-        "title": "Delete the unused backdrop glyph generators in their own wave",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [
-          "src/legacy-runtime/legacyMenuBackdrop.ts",
-          "tests/reset/legacy-menu-backdrop.test.ts"
-        ],
-        "waves": [],
-        "warnings": []
       }
     ],
     "menuSceneCards": [
       "MAZER-FLOW-001",
-      "MAZER-UI-013",
       "MAZER-UI-016"
     ]
   },
   "inProgress": [
     {
       "id": "MAZER-2D-001",
-      "title": "Maintain the mobile-clean 2D shipping baseline",
+      "title": "Maintain the mobile-clean 2D shipping baseline: evidence rule and stale reference fixed",
       "status": "active",
       "priority": "high",
-      "note": "Standing baseline lane; keep the regression checks green."
+      "note": "PR #474 merged (docs). Ongoing baseline card."
     },
     {
-      "id": "MAZER-AI-001",
-      "title": "Finish the configurable AI runner and run-corpus calibration",
+      "id": "MAZER-GEN-007",
+      "title": "Straighter ladder mazes: less pointless snaking, rising ladder extended: PR #484 open",
       "status": "in_progress",
       "priority": "medium",
-      "note": "Auditor recommendation, not a status change: stays in progress and an agent can finish it. Regenerate the three baselines after ladder v2 and report the drift, fix the known calibration script call, and add a threshold table per band. Open question for the owner, not blocking: is a human-configurable runner needed (auditor: the seed-pack runner is enough; drop remote run retention)."
+      "note": "PR #484 open, not merged; density fill added at head 316acd0a."
     },
     {
-      "id": "MAZER-GOV-005",
-      "title": "Keep the visual proof discipline current",
+      "id": "MAZER-PROG-018",
+      "title": "Test every database change on a faithful scratch Postgres 17 and pin the live hash",
+      "status": "in_progress",
+      "priority": "medium",
+      "note": "Worker running; no PR yet."
+    },
+    {
+      "id": "MAZER-VIS-030",
+      "title": "Redesign the diamond lasers and fill and drain the diamond with the beam",
+      "status": "in_progress",
+      "priority": "medium",
+      "note": "Worker running; no PR yet."
+    },
+    {
+      "id": "MAZER-PERF-005",
+      "title": "Cheaper long-trail bloom: measured in PR #488, change needs an owner pixel review",
       "status": "in_progress",
       "priority": "low",
-      "note": "Near complete; the rule is ongoing governance."
+      "note": "Measured in PR #488 (open). Cheaper bloom waits on an owner pixel review."
     },
     {
       "id": "MAZER-RUN-004",
@@ -2815,7 +2868,7 @@
       "sub": "no-device-surface"
     },
     "MAZER-UI-013": {
-      "bucket": "ready",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-UI-014": {
@@ -3135,7 +3188,7 @@
       "sub": null
     },
     "MAZER-GOV-005": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-DOCS-001": {
@@ -3143,8 +3196,8 @@
       "sub": null
     },
     "MAZER-AI-001": {
-      "bucket": "in-progress",
-      "sub": null
+      "bucket": "needs-you",
+      "sub": "decision"
     },
     "MAZER-AI-002": {
       "bucket": "blocked",
@@ -3267,7 +3320,7 @@
       "sub": "decision"
     },
     "MAZER-VIS-027": {
-      "bucket": "ready",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-GOV-007": {
@@ -3279,7 +3332,7 @@
       "sub": "no-device-surface"
     },
     "MAZER-GOV-009": {
-      "bucket": "ready",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-PWA-005": {
@@ -3287,8 +3340,8 @@
       "sub": "decision"
     },
     "MAZER-MOTION-006": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-MOTION-007": {
       "bucket": "needs-you",
@@ -3315,7 +3368,7 @@
       "sub": "headless"
     },
     "MAZER-ACCT-012": {
-      "bucket": "ready",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-ACCT-013": {
@@ -3367,7 +3420,7 @@
       "sub": null
     },
     "MAZER-PROG-016": {
-      "bucket": "ready",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-PERF-003": {
@@ -3383,36 +3436,36 @@
       "sub": "decision"
     },
     "MAZER-PERF-005": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "in-progress",
+      "sub": null
     },
     "MAZER-PERF-006": {
       "bucket": "needs-you",
       "sub": "decision"
     },
     "MAZER-PERF-007": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-PERF-008": {
       "bucket": "ready",
       "sub": null
     },
     "MAZER-VIS-028": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-VIS-029": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-MOTION-009": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-PROG-017": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-ACCT-023": {
       "bucket": "needs-you",
@@ -3451,19 +3504,19 @@
       "sub": "decision"
     },
     "MAZER-ACCT-032": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "needs-you",
+      "sub": "check"
     },
     "MAZER-ACCT-033": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-ACCT-034": {
       "bucket": "needs-you",
       "sub": "decision"
     },
     "MAZER-PROG-018": {
-      "bucket": "ready",
+      "bucket": "in-progress",
       "sub": null
     },
     "MAZER-GEN-006": {
@@ -3475,8 +3528,8 @@
       "sub": null
     },
     "MAZER-QA-007": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-PROG-019": {
       "bucket": "blocked",
@@ -3487,8 +3540,28 @@
       "sub": "check"
     },
     "MAZER-ACCT-037": {
+      "bucket": "needs-you",
+      "sub": "check"
+    },
+    "MAZER-GEN-007": {
+      "bucket": "in-progress",
+      "sub": null
+    },
+    "MAZER-VIS-030": {
+      "bucket": "in-progress",
+      "sub": null
+    },
+    "MAZER-UI-023": {
       "bucket": "blocked",
       "sub": "other-card"
+    },
+    "MAZER-ACCT-038": {
+      "bucket": "blocked",
+      "sub": "other-card"
+    },
+    "MAZER-MOTION-010": {
+      "bucket": "ready",
+      "sub": null
     }
   }
 }
