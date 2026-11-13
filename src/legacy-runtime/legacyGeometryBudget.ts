@@ -447,6 +447,39 @@ export const resolveGeometryBudgetRouteTarget = (level: number): number => {
   return Math.floor((target * GEOMETRY_BUDGET_ROUTE_SHARE_PERCENT) / 100);
 };
 
+// DENSITY FILL (MAZER-GEN-007, tuner lever 6). The straighter ladder needs fewer floor cells for the same felt number
+// (floor 415 -> 348 at level 50 on the phone board), which left blank patches and long empty halls. After the
+// felt number has landed, straight side branches the explorer does not pay for are carved until the maze holds
+// GEOMETRY_BUDGET_FILL_PERCENT of the floor the level's maze had before the change. The control points are the mean floor
+// cells of the old ladder (origin/main 1b2d8ebf, 50 seeds, phone and desktop averaged: scripts/analysis/
+// progression-winding-census.ts), then a straight line to the top class. The fill runs before the fringe, so the fringe takes what the fill leaves.
+const FILL_FLOOR_POINTS: readonly (readonly [number, number])[] = [
+  [10, 196], [20, 324], [50, 413], [100, 460], [150, 483], [198, 523], [283, 540]
+];
+export const GEOMETRY_BUDGET_FILL_PERCENT = 97;
+// The first level that is filled: levels 2 to 9 are whole mazes of one short route (82 to 150 floor cells), the tutorial
+// shape, and keep it.
+export const GEOMETRY_BUDGET_FILL_FIRST_LEVEL = 10;
+
+// Floor cells a maze of level N is filled up to (0 below GEOMETRY_BUDGET_FILL_FIRST_LEVEL; the fringe levels use the
+// felt saturation level's own, since their maze is that maze plus the fringe).
+export const resolveGeometryBudgetFillFloor = (level: number): number => {
+  const bounded = Math.trunc(Number.isFinite(level) ? level : 0);
+  if (bounded < GEOMETRY_BUDGET_FILL_FIRST_LEVEL) { return 0; }
+  const felt = Math.min(bounded, GEOMETRY_BUDGET_FELT_SATURATION_LEVEL);
+  const points = FILL_FLOOR_POINTS;
+  let value = points[points.length - 1]![1];
+  for (let index = 1; index < points.length; index += 1) {
+    const [toLevel, toValue] = points[index]!;
+    if (felt <= toLevel) {
+      const [fromLevel, fromValue] = points[index - 1]!;
+      value = fromValue + Math.floor(((toValue - fromValue) * (felt - fromLevel)) / (toLevel - fromLevel));
+      break;
+    }
+  }
+  return Math.floor((value * GEOMETRY_BUDGET_FILL_PERCENT) / 100);
+};
+
 // Longest deceptive branch the tuner carves in one move at level N: depth rises
 // with the level (8 cells at level 2 up to 40).
 export const resolveGeometryBudgetMaxBranch = (level: number): number => (

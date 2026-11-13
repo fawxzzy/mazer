@@ -2,6 +2,7 @@
 //   npx vite-node --script scripts/analysis/progression-winding-census.ts [--seeds=50] [--levels=1,20,50] [--json=out.json]
 import { writeFileSync } from 'node:fs';
 import { LADDER_BOARDS, generateLadderMaze, seedForIndex } from './lib/progressionLadderSampling';
+import { analyzeMazeDensity } from '../../src/legacy-runtime/legacyMazeDensity';
 import { analyzeMazeWinding } from '../../src/legacy-runtime/legacyMazeWinding';
 import { analyzeMazeDifficulty } from '../../src/legacy-runtime/legacyMazeDifficultyMetrics';
 import { measureFelt } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
@@ -14,7 +15,7 @@ const levels = arg('levels', '1,20,50,100,150,200,218,268,300,500,999').split(',
 const jsonOut = arg('json', '');
 const rows: Record<string, number | string>[] = [];
 
-console.log('level board    floor  runs  runCells longRun  turns hairpin zigzag tight wShare% tShare%  wRuns wCells(route/branch/link)  tortu  turn/10c  junc deadE  decis route  felt  bases off fringe ms');
+console.log('level board    floor  runs  runCells longRun  turns hairpin zigzag tight wShare% tShare%  wRuns wCells(route/branch/link)  tortu  turn/10c  junc deadE  decis route rect patch halls lHall  felt  bases off fringe ms');
 for (const level of levels) {
   for (const board of LADDER_BOARDS) {
     const acc: Record<string, number> = {};
@@ -27,6 +28,7 @@ for (const level of levels) {
       maxMs = Math.max(maxMs, performance.now() - t0);
       const w = analyzeMazeWinding(maze);
       const d = analyzeMazeDifficulty(maze);
+      const dn = analyzeMazeDensity(maze); add('rect', dn.emptyRectArea); add('patch', dn.blankPatches); add('halls', dn.hallCount); add('longHall', dn.longestHall);
       add('floor', w.floorCells); add('runs', w.runs.length); add('runCells', w.runCells); add('longestRun', w.longestRun);
       add('turns', w.totalTurns); add('hairpins', w.hairpins); add('zigzag', w.longestZigzag); add('tight', w.longestTight);
       add('share', w.windingCellShare); add('wRuns', w.windingRuns); add('wCells', w.windingCells);
@@ -41,8 +43,8 @@ for (const level of levels) {
     const ms = (performance.now() - started) / seeds;
     const m = (k: string) => (acc[k]! / seeds);
     const f = (k: string, n = 1) => m(k).toFixed(n);
-    rows.push({ level, board: board.name, seeds, floor: m('floor'), runs: m('runs'), runCells: m('runCells'), longestRun: m('longestRun'), turns: m('turns'), hairpins: m('hairpins'), zigzag: m('zigzag'), tight: m('tight'), windingShare: m('share') / 10, tortuousShare: m('tshare') / 10, windingRuns: m('wRuns'), windingCells: m('wCells'), wRoute: m('wRoute'), wBranch: m('wBranch'), wLink: m('wLink'), tortuosity: m('tortu') / 1000, turnPer10: m('dens') / 100, junctions: m('junc'), deadEnds: m('dead'), decisions: m('decis'), route: m('route'), felt: m('felt'), bases: m('bases'), offWindow: acc.off ?? 0, fringe: m('fringe'), ms, maxMs });
-    console.log(`${String(level).padStart(4)} ${board.name.padEnd(7)} ${f('floor').padStart(6)} ${f('runs').padStart(5)} ${f('runCells').padStart(7)} ${f('longestRun').padStart(6)} ${f('turns').padStart(6)} ${f('hairpins').padStart(6)} ${f('zigzag').padStart(5)} ${f('tight').padStart(5)} ${(m('share') / 10).toFixed(1).padStart(6)} ${(m('tshare') / 10).toFixed(1).padStart(6)} ${f('wRuns').padStart(5)}  ${f('wRoute', 0)}/${f('wBranch', 0)}/${f('wLink', 0)}  ${(m('tortu') / 1000).toFixed(2)}  ${(m('dens') / 100).toFixed(2)}  ${f('junc').padStart(5)} ${f('dead').padStart(5)} ${f('decis').padStart(6)} ${f('route', 0).padStart(5)} ${f('felt', 0).padStart(5)} ${f('bases')} ${acc.off} ${f('fringe', 0)} ${ms.toFixed(0)}(max ${maxMs.toFixed(0)})`);
+    rows.push({ level, board: board.name, seeds, floor: m('floor'), runs: m('runs'), runCells: m('runCells'), longestRun: m('longestRun'), turns: m('turns'), hairpins: m('hairpins'), zigzag: m('zigzag'), tight: m('tight'), windingShare: m('share') / 10, tortuousShare: m('tshare') / 10, windingRuns: m('wRuns'), windingCells: m('wCells'), wRoute: m('wRoute'), wBranch: m('wBranch'), wLink: m('wLink'), tortuosity: m('tortu') / 1000, turnPer10: m('dens') / 100, junctions: m('junc'), deadEnds: m('dead'), decisions: m('decis'), route: m('route'), emptyRect: m('rect'), blankPatches: m('patch'), halls: m('halls'), longestHall: m('longHall'), felt: m('felt'), bases: m('bases'), offWindow: acc.off ?? 0, fringe: m('fringe'), ms, maxMs });
+    console.log(`${String(level).padStart(4)} ${board.name.padEnd(7)} ${f('floor').padStart(6)} ${f('runs').padStart(5)} ${f('runCells').padStart(7)} ${f('longestRun').padStart(6)} ${f('turns').padStart(6)} ${f('hairpins').padStart(6)} ${f('zigzag').padStart(5)} ${f('tight').padStart(5)} ${(m('share') / 10).toFixed(1).padStart(6)} ${(m('tshare') / 10).toFixed(1).padStart(6)} ${f('wRuns').padStart(5)}  ${f('wRoute', 0)}/${f('wBranch', 0)}/${f('wLink', 0)}  ${(m('tortu') / 1000).toFixed(2)}  ${(m('dens') / 100).toFixed(2)}  ${f('junc').padStart(5)} ${f('dead').padStart(5)} ${f('decis').padStart(6)} ${f('route', 0).padStart(5)} ${f('rect').padStart(5)} ${f('patch')} ${f('halls')} ${f('longHall')} ${f('felt', 0).padStart(5)} ${f('bases')} ${acc.off} ${f('fringe', 0)} ${ms.toFixed(0)}(max ${maxMs.toFixed(0)})`);
   }
 }
 if (jsonOut) { writeFileSync(jsonOut, JSON.stringify(rows, null, 1)); }

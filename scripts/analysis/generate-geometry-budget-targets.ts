@@ -48,6 +48,7 @@ import {
   GEOMETRY_BUDGET_SATURATION_LEVEL,
   GEOMETRY_BUDGET_WINDOW,
   resolveGeometryBudgetCandidateSeed,
+  resolveGeometryBudgetFillFloor,
   resolveGeometryBudgetForks,
   resolveGeometryBudgetLoopPlan,
   resolveGeometryBudgetMaxBranch,
@@ -163,6 +164,8 @@ export const computeGeometryBudgetFringeCalibration = (ceiling: number): Geometr
         feltCeiling: ceiling,
         wrapPricePercent: FELT_WRAP_PRICE_PERCENT,
         straightBranches: true,
+        // The fill runs before the fringe (the fringe takes what is left of the pockets).
+        fillFloor: resolveGeometryBudgetFillFloor(level),
         // More than any maze holds: the cells placed are the capacity.
         fringeCells: 400
       });

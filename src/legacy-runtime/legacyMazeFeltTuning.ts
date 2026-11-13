@@ -47,6 +47,7 @@
 // Pure: no ambient randomness or clock, no floats, no I/O.
 
 import { FELT_VISION_CELLS, createFeltExplorer, type FeltRun } from './legacyMazeFeltDifficulty';
+import { HALL_MIN_CELLS } from './legacyMazeDensity';
 import { MIN_DEAD_END_BRANCH_CELLS, countStubTips, fixOneTileStubs, probeDeadEndBranch } from './legacyMazeStubs';
 import {
   LOOP_DECOY_MIN_CELLS,
@@ -123,6 +124,14 @@ export interface FeltTuningOptions {
   // not its shape, so the number lands exactly as before. Omit or false: byte-identical to the
   // tuner without the rule.
   readonly straightBranches?: boolean;
+  // Density fill (lever 6, MAZER-GEN-007): after the felt number has landed (and the fringe, if any), straight side
+  // branches of 2..FILL_MAX_BRANCH cells are carved off corridor and junction cells until the maze holds at least this
+  // many floor cells. Candidates are ranked by the room straight ahead (blank patches first) and by the length of the
+  // hall the host sits in (a long junction-free street first); each branch is kept only when the re-run explorer's
+  // step count is exactly unchanged, when it makes no one-tile stub, and (by construction: a branch keeps its
+  // heading, every cell touches only the cell before it) when it makes no 2x2 block and no turn at all. Omit or 0:
+  // byte-identical to the tuner without the lever (no random draw is made).
+  readonly fillFloor?: number;
   // Floor of the REVERSE felt value (the same explorer run from the goal to the start, minus the
   // same priced savings). A maze below it reports the shortfall in `windowDistance` (so the
   // restarts and then the next base are tried). 0 or omitted: no floor.
@@ -164,6 +173,8 @@ export interface FeltTuningResult {
   // Fringe stub cells added (lever 3) and the cells the request fell short by.
   readonly fringeTiles: { x: number; y: number }[];
   readonly fringeShortfall: number;
+  // Density fill (lever 6) cells added.
+  readonly fillTiles: { x: number; y: number }[];
   // One-tile stub rule (lever 5): cells opened to lengthen a stub, tips walled up, and stubs
   // neither move could fix (counted into windowDistance).
   readonly stubLengthened: { x: number; y: number }[];
@@ -216,6 +227,13 @@ export const FELT_LOOP_PRICE_PERCENT = 100;
 // scripts/analysis/progression-wrap-pricing.ts; see the contract section 2026-11-10 wrap fade.
 export const FELT_WRAP_PRICE_PERCENT = 100;
 export const FELT_TIE_SAMPLES = 6;
+// Density fill (lever 6): longest straight side branch, rounds of candidate ranking, explorer re-runs allowed in one
+// tune, and how far along a hall the host scan looks.
+export const FILL_MAX_BRANCH = 6;
+export const FILL_ROUNDS = 3;
+export const FILL_MAX_EVALS = 500;
+export const FILL_HALL_ROUNDS = 3;
+export const FILL_SPACING = 2;
 export const FELT_TIE_DEVIATION_LIMIT_PERCENT = 12;
 
 const createStream = (seed: number): (() => number) => {
@@ -751,6 +769,135 @@ const tuneOnce = (
     }
   }
 
+  // ---- Lever 6: density fill (MAZER-GEN-007), run before the fringe so the fringe takes what is left ------
+  // The straighter ladder needs fewer floor cells for the same felt number, which leaves long empty halls and
+  // blank patches. Spend cells the explorer does not pay for: straight side branches (a branch of at most
+  // FELT_VISION_CELLS cells is invisible to the explorer at a junction; a longer one is kept only when the explorer
+  // never tries it before the goal). Two passes: (1) break every straight hall of HALL_MIN_CELLS cells or more
+  // with a side branch near its middle, (2) fill toward the floor target, best blank patches first. Every branch is
+  // verified by a re-run (felt steps exactly unchanged), a branch is never hung on a cell next to a dead-end tip
+  // (that tip would become a one-tile stub), and a branch never turns, so the clutter measure cannot rise.
+  const fillTarget = Math.max(0, Math.trunc(options.fillFloor ?? 0));
+  const fillTiles: { x: number; y: number }[] = [];
+  if (fillTarget > 0 && !hopeless && windowGap(felt) === 0 && run.reachedGoal) {
+    const fillRand = createStream((seed ^ 0x3c6ef372) >>> 0);
+    const landedSteps = felt;
+    let floorNow = 0;
+    for (let cell = 0; cell < size; cell += 1) { floorNow += open[cell]!; }
+    let fillEvals = 0;
+    // A host next to a dead-end tip would turn that tip into a one-tile stub (the host becomes a junction).
+    const hostsATip = (cell: number): boolean => {
+      for (let d = 0; d < 4; d += 1) {
+        const next = explorer.neighbors[(cell * 4) + d]!;
+        if (open[next] === 1 && next !== startCell && next !== goalCell && openCount(next) === 1) { return true; }
+      }
+      return false;
+    };
+    // Straight room ahead of (host, d): cells that can be carved in a line, each touching only the one before.
+    const roomAhead = (host: number, d: number): number => {
+      let room = 0;
+      for (let cell = host + step[d]!; room < FILL_MAX_BRANCH && interior(cell) && open[cell] !== 1 && openCount(cell) === (room === 0 ? 1 : 0); cell += step[d]!) { room += 1; }
+      return room;
+    };
+    // Try a straight branch off `host` toward `d`: longest first, then the explorer vision limit, then the
+    // shortest legal one. Returns the cells added (0 when nothing was kept).
+    const tryBranch = (host: number, d: number): number => {
+      const entry = host + step[d]!;
+      if (!interior(host) || open[host] !== 1 || host === startCell || host === goalCell || openCount(host) < 2 || hostsATip(host)) { return 0; }
+      // No comb: another branch within FILL_SPACING cells along the same hall (on the entry row) rules this one out, so
+      // the teeth are never evenly packed side by side.
+      const along = d < 2 ? width : 1;
+      for (let k = 2; k <= FILL_SPACING; k += 1) {
+        if (open[entry + (k * along)] === 1 || open[entry - (k * along)] === 1) { return 0; }
+      }
+      const room = roomAhead(host, d);
+      // Varied lengths (a seeded pick between the shortest legal branch and the room ahead), then the explorer vision
+      // limit, then the shortest legal one.
+      const picked = room > MIN_DEAD_END_BRANCH_CELLS ? MIN_DEAD_END_BRANCH_CELLS + (fillRand() % (room - MIN_DEAD_END_BRANCH_CELLS + 1)) : room;
+      const lengths = [...new Set([picked, Math.min(room, FELT_VISION_CELLS), MIN_DEAD_END_BRANCH_CELLS])].filter((length) => length >= MIN_DEAD_END_BRANCH_CELLS && length <= room);
+      for (const length of lengths) {
+        if (fillEvals >= FILL_MAX_EVALS) { return 0; }
+        const carved: number[] = [];
+        for (let k = 0; k < length; k += 1) { const cell = entry + (k * step[d]!); open[cell] = 1; carved.push(cell); }
+        fillEvals += 1;
+        const after = evaluate();
+        if (after.reachedGoal && after.steps === landedSteps) {
+          carved.forEach((cell) => fillTiles.push(point(cell)));
+          return length;
+        }
+        carved.forEach((cell) => { open[cell] = 0; });
+      }
+      return 0;
+    };
+    // ---- pass 1: break the straight halls ----------------------------------------------------------
+    const inLine = (cell: number, axis: number): boolean => {
+      const side = axis === 1 ? width : 1;
+      return open[cell] === 1 && open[cell - axis] === 1 && open[cell + axis] === 1 && open[cell - side] !== 1 && open[cell + side] !== 1;
+    };
+    for (let round = 0; round < FILL_HALL_ROUNDS && fillEvals < FILL_MAX_EVALS; round += 1) {
+      const halls: { cells: number[]; axis: number }[] = [];
+      for (const axis of [1, width]) {
+        const outer = axis === 1 ? height : width;
+        const inner = axis === 1 ? width : height;
+        for (let o = 1; o < outer - 1; o += 1) {
+          let cells: number[] = [];
+          for (let i = 0; i <= inner; i += 1) {
+            const cell = axis === 1 ? (o * width) + i : (i * width) + o;
+            if (i < inner && i > 0 && i < inner - 1 && inLine(cell, axis)) { cells.push(cell); continue; }
+            if (cells.length >= HALL_MIN_CELLS) { halls.push({ cells, axis }); }
+            cells = [];
+          }
+        }
+      }
+      if (halls.length === 0) { break; }
+      let broke = 0;
+      for (const hall of halls) {
+        const middle = hall.cells.length >> 1;
+        // From the middle outward: the break that leaves the two halves shortest.
+        for (let offset = 0; offset < hall.cells.length; offset += 1) {
+          const index = middle + ((offset & 1) === 0 ? offset >> 1 : -((offset + 1) >> 1));
+          if (index < 2 || index > hall.cells.length - 3) { continue; }
+          const host = hall.cells[index]!;
+          const sides = hall.axis === 1 ? [2, 3] : [0, 1];
+          const ordered = roomAhead(host, sides[0]!) >= roomAhead(host, sides[1]!) ? sides : [sides[1]!, sides[0]!];
+          let done = false;
+          for (const d of ordered) {
+            const entry = host + step[d]!;
+            if (!interior(entry) || open[entry] === 1 || openCount(entry) !== 1) { continue; }
+            const added = tryBranch(host, d);
+            if (added > 0) { floorNow += added; broke += 1; done = true; break; }
+          }
+          if (done || fillEvals >= FILL_MAX_EVALS) { break; }
+        }
+      }
+      if (broke === 0) { break; }
+    }
+    // ---- pass 2: fill toward the floor target, the roomiest blank patches first -----------------------
+    for (let round = 0; round < FILL_ROUNDS && floorNow < fillTarget && fillEvals < FILL_MAX_EVALS; round += 1) {
+      const candidates: { key: number; score: number }[] = [];
+      for (let host = 0; host < size; host += 1) {
+        if (open[host] !== 1 || host === startCell || host === goalCell || !interior(host) || openCount(host) < 2 || hostsATip(host)) { continue; }
+        for (let d = 0; d < 4; d += 1) {
+          const entry = host + step[d]!;
+          if (!interior(entry) || open[entry] === 1 || openCount(entry) !== 1) { continue; }
+          const room = roomAhead(host, d);
+          if (room < MIN_DEAD_END_BRANCH_CELLS) { continue; }
+          candidates.push({ key: (host * 4) + d, score: (room * 4) + (fillRand() % 3) });
+        }
+      }
+      candidates.sort((left, right) => (right.score - left.score) || (left.key - right.key));
+      let progressed = false;
+      for (const candidate of candidates) {
+        if (floorNow >= fillTarget || fillEvals >= FILL_MAX_EVALS) { break; }
+        const added = tryBranch(candidate.key >> 2, candidate.key & 3);
+        if (added > 0) { floorNow += added; progressed = true; }
+      }
+      if (!progressed) { break; }
+    }
+    run = evaluate();
+    felt = run.steps;
+  }
+
   // ---- Lever 3: fringe (zero-felt-cost side stubs) ------------------------------------
   // Only on a landed maze. Candidates are (host, direction) pairs: a corridor or junction cell
   // (never a tip, the start or the goal) and an interior wall cell next to it whose only open
@@ -941,6 +1088,7 @@ const tuneOnce = (
     loopTiles: loopTiles.filter((tile) => open[(tile.y * width) + tile.x] === 1),
     fringeTiles,
     fringeShortfall,
+    fillTiles,
     stubLengthened,
     stubRemoved,
     stubRemaining,
