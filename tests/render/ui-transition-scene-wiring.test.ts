@@ -68,8 +68,9 @@ describe('MenuScene uses the eased UI transition at three call sites', () => {
     expect(source).toMatch(/Phaser\.Scenes\.Events\.SHUTDOWN, \(\) => \{\n\s+this\.uiTransitionGhost\?\.release\(\);/);
   });
 
-  test('the in-game loader pulse reads the shared loader period, not a private 420 ms divisor', () => {
-    expect(source).toContain('resolveUiLoaderPulse(time, this.prefersLegacyReducedMotion())');
+  test('the in-game loader is the shared app loader overlay, not a private 420 ms pulse', () => {
+    // MAZER-VIS-039 replaced the private diamond pulse with the one app loader (src/render/appLoader.ts).
+    expect(source).toContain('new AppLoaderOverlay(this');
     expect(source).not.toContain('Math.sin(time / 420)');
   });
 });
