@@ -21,6 +21,7 @@ import { MAZER_BOOT_SPLASH_MAX_AFTER_GAME_CREATE_MS } from './bootSplash';
 import { waitForMazerUiFonts } from './fontReadiness';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
+import { runMazerSignedOutHandoffAtBoot } from './signedOutHandoffBoot';
 import { initializeInstallSurface } from './installSurface';
 import { createMazerPhaserConfig } from './phaserConfig';
 import {
@@ -180,6 +181,10 @@ const boot = async (): Promise<void> => {
       onBlocked: () => markMazerBootStatus('splash-removed')
     });
   }
+
+  // MAZER-ACCT-040: a signed-out launch goes straight to the account host's sign-in
+  // page, before Phaser exists. Signed-in, bypass and failure cases fall through.
+  await runMazerSignedOutHandoffAtBoot(oauthCallbackRequested);
 
   // Bounded: a slow or failing remote account bootstrap must never keep the
   // player on a blank page. The game starts on cached / guest state instead.

@@ -23,6 +23,7 @@ import {
 import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';
 import { LEGACY_AUTH_FAILURE_CODES, type LegacyAuthFailureCode } from './legacyAuthFailureCodes';
 import { createMazerAuthFetch } from './legacyOAuthRefresh';
+import { recordMazerExplicitSignOut } from './legacySignedOutHandoff';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
 export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
@@ -1161,6 +1162,9 @@ export const signOutLegacyAuth = async (
 
     legacyAuthLastSessionSignature = null;
     markLegacyRememberedIdentityReauthRequired(authStorage ?? undefined);
+    // MAZER-ACCT-040: the player chose this. Launches stay on the Mazer sign-in
+    // screen (no automatic hand-off to the host) until they sign in again.
+    recordMazerExplicitSignOut(authStorage ?? undefined, Date.now());
 
     return {
       snapshot: createGuestSnapshot(true, {
