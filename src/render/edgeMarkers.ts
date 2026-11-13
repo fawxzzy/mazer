@@ -40,7 +40,13 @@
  *   never a fixed colour), and everything INSIDE it or fired out of it (the beam fill, the beams, the landing
  *   sparkles) is the player's colour, `PLAYER_COLOR`.
  *
- * Lasers and fill (MAZER-VIS-030): on departure the player fires a beam out to ALL 8 diamonds; each diamond FILLS with
+ * Size (MAZER-VIS-038): while the maze runs a diamond is EDGE_DIAMOND_REST_SCALE (50%) of its full size. It is scaled about
+ * its INNER tip (`anchorStationToInnerTip`), the point both beams attach to, so that point never moves: the outer tip
+ * pulls away from the screen edge instead. The diamond grows back to 100% over the departure beam's flight (exactly full at
+ * contact) and shrinks again once it is empty after the arrival beam has left (edgeBeamTimeline.ts); reduced motion keeps
+ * it at 50%, static.
+ *
+ * Lasers and fill (MAZER-VIS-030, VIS-038): on departure the player fires a beam out to ALL 8 diamonds; each diamond FILLS with
  * the player's colour from the exact instant its beam touches it (grows from its inner tip, full when the beam is fully
  * absorbed) and stays full through the deconstruct and the build. On arrival ALL 8 diamonds (orbiting, full, parked on
  * their rest stations once the build completes) fire a beam inward to the spawn tile and each DRAINS from the exact
@@ -48,8 +54,9 @@
  * fills from the inner tip outward and drains the other way round, leaving from the OUTER tip first, so the last of it
  * exits at the inner tip, toward where the laser shoots out. Each beam is a comet pulse (edgeBeamArt.ts:
  * bloom, tapered gradient body, bright pulsing head, a contact ripple), staggered by at most 60 ms across the ring and
- * derived only from the master laser clock (edgeBeamTimeline.ts), so menu and play can never disagree. Reduced motion:
- * no beam; the diamonds crossfade full/empty over the 200 ms crossfade.
+ * derived only from the master laser clock (edgeBeamTimeline.ts), so menu and play can never disagree. Both ends of a beam
+ * sit on the diamond's INNERMOST point (`resolveEdgeInnerTip`) and the beam stays attached there for the whole fill / the
+ * whole drain. Reduced motion: no beam; the diamonds crossfade full/empty over the 200 ms crossfade.
  *
  * Geometry and state are pure; the draw helpers only call the tiny Graphics
  * surface declared below (so they are testable without Phaser). Colours come
@@ -61,18 +68,18 @@ import { MOTION_DURATION_MS, MOTION_LOOP_MS } from './motionScale';
 import {
   EDGE_BEAM_FLIGHT_MS,
   EDGE_BEAM_PULSE_MS,
+  EDGE_DIAMOND_REST_SCALE,
   inverseSmoothstep,
   resolveBeamHeadFromMaster,
-  resolveBeamTail,
   resolveBeamTimes,
   resolveEdgeBeamPulse,
+  resolveEdgeDiamondScale,
   type EdgeBeamDirection
 } from './edgeBeamTimeline';
 import {
   drawBeamPulse,
   drawContactRipple,
-  drawDiamondFill,
-  resolveOutlineExitPoint
+  drawDiamondFill
 } from './edgeBeamArt';
 
 export type EdgeSide = 'top' | 'right' | 'bottom' | 'left';
@@ -337,6 +344,30 @@ export const resolveEdgeMarkerVertices = (
   ];
 };
 
+/** The diamond's INNERMOST point: the tip that faces the board (full-size geometry; scale-independent, see anchorStationToInnerTip). */
+export const resolveEdgeInnerTip = (station: Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>): EdgePoint => ({
+  x: station.x + (Math.cos(station.inwardAngle) * EDGE_MARKER_HALF_HEIGHT),
+  y: station.y + (Math.sin(station.inwardAngle) * EDGE_MARKER_HALF_HEIGHT)
+});
+
+/**
+ * The station a diamond drawn at `scale` (0..1 of full size) occupies when it is scaled about its INNER tip: the centre
+ * moves along the long axis so the inner tip stays exactly where it was. Draw the kite with
+ * `resolveEdgeMarkerVertices(anchorStationToInnerTip(station, scale), scale)`. Scale 1 returns the station untouched.
+ */
+export const anchorStationToInnerTip = <T extends Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>>(station: T, scale: number): T => {
+  const level = Number.isFinite(scale) ? Math.max(0, Math.min(1, scale)) : 1;
+  if (level === 1) {
+    return station;
+  }
+  const shift = EDGE_MARKER_HALF_HEIGHT * (1 - level);
+  return {
+    ...station,
+    x: station.x + (Math.cos(station.inwardAngle) * shift),
+    y: station.y + (Math.sin(station.inwardAngle) * shift)
+  };
+};
+
 export interface EdgeMarkerState {
   readonly id: EdgeStationId;
   readonly alpha: number;
@@ -355,6 +386,11 @@ export interface EdgeMarkerState {
   readonly fill?: number;
   /** Reduced motion: the interior crossfades by alpha instead of sweeping. */
   readonly fillCrossfade?: boolean;
+  /**
+   * Size of the diamond as a fraction of full size (MAZER-VIS-038), scaled about its inner tip. Optional: absent = 1
+   * (a standalone icon such as the Guide legend); the board sets it from `resolveEdgeRingScales`.
+   */
+  readonly scale?: number;
   /**
    * The border colour: the live trail colour (`resolveTrailPaletteBorderColor`). Optional only so a standalone
    * icon (the Guide legend) can omit it and get the static trail gradient's start colour; the board always sets it.
@@ -375,6 +411,8 @@ export interface EdgeMarkerStateInput {
   readonly fills?: ReadonlyArray<number>;
   /** Reduced motion: the interior crossfades by alpha instead of sweeping. */
   readonly fillCrossfade?: boolean;
+  /** Per-station size 0..1 indexed by id (resolveEdgeRingScales). Absent = full size (1). */
+  readonly scales?: ReadonlyArray<number>;
   /** Ring orbit phase in radians (timeline ringSpinRad: 2 pi = one lap, positive = clockwise). */
   readonly spinRad?: number;
   readonly flash?: EdgeWrapFlash | null;
@@ -440,6 +478,7 @@ export const resolveEdgeMarkerStates = (input: EdgeMarkerStateInput): ReadonlyAr
       energy,
       fill,
       fillCrossfade: input.fillCrossfade === true,
+      scale: input.scales?.[id] === undefined ? 1 : clampUnit(input.scales[id] as number),
       spinRad: input.reducedMotion || !Number.isFinite(input.spinRad) ? 0 : (input.spinRad ?? 0),
       flash,
       hidden: input.hiddenIds?.has(id) ?? false,
@@ -537,13 +576,15 @@ export const drawEdgeMarker = (
   if (state.hidden) {
     return;
   }
-  const outline = resolveEdgeMarkerVertices(station, 1);
+  const scale = state.scale ?? 1;
+  const anchored = anchorStationToInnerTip(station, scale);
+  const outline = resolveEdgeMarkerVertices(anchored, scale);
   if ((state.fill ?? 0) > 0) {
     drawDiamondFill(graphics, {
-      center: { x: station.x, y: station.y },
+      center: { x: anchored.x, y: anchored.y },
       crossfade: state.fillCrossfade === true,
       fill: state.fill ?? 0,
-      halfHeight: EDGE_MARKER_HALF_HEIGHT,
+      halfHeight: EDGE_MARKER_HALF_HEIGHT * scale,
       inwardAngle: station.inwardAngle,
       vertices: outline
     });
@@ -617,6 +658,21 @@ export const resolveEdgeRingFills = (
   return lifecycle.direction === 'outward' ? Math.max(ring, pulse.diamondFill) : pulse.diamondFill;
 });
 
+/**
+ * Per-station size 0..1 (index = station id): the MAZER-VIS-038 size cycle (edgeBeamTimeline.ts `resolveEdgeDiamondScale`).
+ * Null lifecycle (at rest, the maze is running) and the reduced-motion crossfade lifecycle both give the fixed rest size
+ * EDGE_DIAMOND_REST_SCALE: reduced motion keeps the diamonds static at 50% (the same size the maze runs at) and only
+ * crossfades the interior colour.
+ */
+export const resolveEdgeRingScales = (
+  lifecycle: EdgeRingLifecycle | null,
+  count = EDGE_STATION_COUNT
+): ReadonlyArray<number> => Array.from({ length: count }, (_, index) => (
+  lifecycle === null || lifecycle.crossfade === true
+    ? EDGE_DIAMOND_REST_SCALE
+    : resolveEdgeDiamondScale(lifecycle.direction, lifecycle.clockMs, index, count, clampUnit(lifecycle.ringFill))
+));
+
 export interface SpawnSparkle {
   readonly x: number;
   readonly y: number;
@@ -654,7 +710,7 @@ export interface EdgeBeamsInput {
 
 export interface EdgeBeam {
   readonly id: EdgeStationId;
-  /** Path source and target. The diamond end is the exact point where the beam meets the diamond OUTLINE (the contact point). */
+  /** Path source and target. The diamond end is the diamond's INNERMOST point (its inner tip), both directions. */
   readonly from: EdgePoint;
   readonly to: EdgePoint;
   /** The head position on the path (`progress` along from -> to). */
@@ -663,10 +719,12 @@ export interface EdgeBeam {
   readonly tailPoint: EdgePoint;
   readonly progress: number;
   readonly tail: number;
-  /** The contact point on the diamond outline. */
+  /** The contact point: the diamond's inner tip (the same point as the diamond end of the path). */
   readonly contact: EdgePoint;
-  /** True while any part of the pulse is on the path (head has left, tail has not yet arrived). */
+  /** True while any part of the beam is on the path (head has left, tail has not yet run in). */
   readonly firing: boolean;
+  /** True while the tail is still held at the source: the diamond is still filling (departure) / draining (arrival). */
+  readonly connected: boolean;
   /** 0..1 over the fill/drain window of this diamond (the contact ripple clock); 0 outside it. */
   readonly rippleProgress: number;
 }
@@ -693,8 +751,7 @@ export const resolveEdgeBeams = (input: EdgeBeamsInput): EdgeBeamsGeometry => {
   const firingIds = new Set<number>();
   const count = input.stations.length;
   const beams = input.stations.map((station, index): EdgeBeam => {
-    const centre = { x: station.x, y: station.y };
-    const contact = resolveOutlineExitPoint(resolveEdgeMarkerVertices(station, 1), centre, input.focus);
+    const contact = resolveEdgeInnerTip(station);
     const from = input.direction === 'inward' ? contact : input.focus;
     const to = input.direction === 'inward' ? input.focus : contact;
     const pulse = resolveEdgeBeamPulse(input.direction, clockMs, index, count);
@@ -711,11 +768,12 @@ export const resolveEdgeBeams = (input: EdgeBeamsInput): EdgeBeamsGeometry => {
       from,
       to,
       tip: lerpPoint(from, to, pulse.head),
-      tailPoint: lerpPoint(from, to, resolveBeamTail(clockMs, index, count)),
+      tailPoint: lerpPoint(from, to, pulse.tail),
       progress: pulse.head,
       tail: pulse.tail,
       contact,
       firing: pulse.visible,
+      connected: pulse.connected,
       rippleProgress
     };
   });
@@ -735,7 +793,7 @@ export const resolveEdgeBeams = (input: EdgeBeamsInput): EdgeBeamsGeometry => {
   return { beams, firingIds, sparkles };
 };
 
-/** One comet pulse per diamond (bloom + tapered gradient body + pulsing head + contact ripple), plus the landing poof. */
+/** One beam per diamond (bloom + ramped body + flowing stream + pulsing head + contact ripple), plus the landing poof. */
 export const drawEdgeBeams = (graphics: EdgeGraphics, input: EdgeBeamsInput): EdgeBeamsGeometry => {
   const geometry = resolveEdgeBeams(input);
   const dpr = input.devicePixelRatio ?? 1;
@@ -744,7 +802,14 @@ export const drawEdgeBeams = (graphics: EdgeGraphics, input: EdgeBeamsInput): Ed
     if (!beam.firing) {
       continue;
     }
-    drawBeamPulse(graphics, { clockMs, devicePixelRatio: dpr, headPoint: beam.tip, tailPoint: beam.tailPoint });
+    drawBeamPulse(graphics, {
+      clockMs,
+      devicePixelRatio: dpr,
+      headPoint: beam.tip,
+      tailPoint: beam.tailPoint,
+      // An outgoing beam is attached to its diamond's tip until the drain is over: glow there.
+      tailPort: input.direction === 'inward' && beam.connected
+    });
     drawContactRipple(graphics, beam.contact, beam.rippleProgress, dpr);
   }
   geometry.sparkles.forEach((sparkle) => {

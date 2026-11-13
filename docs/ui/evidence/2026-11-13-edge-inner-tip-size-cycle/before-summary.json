@@ -1,0 +1,50 @@
+[
+  {
+    "cfg": "phone-390x844",
+    "reduced": false,
+    "files": [
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-phone-390x844-departure-strip.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-phone-390x844-arrival-strip.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-phone-390x844-departure-full.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-phone-390x844-arrival-full.png"
+    ],
+    "errors": [],
+    "restShot": "before-phone-390x844-rest-play.png"
+  },
+  {
+    "cfg": "phone-390x844",
+    "reduced": true,
+    "files": [
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-phone-390x844-reduced-motion-departure-strip.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-phone-390x844-reduced-motion-arrival-strip.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-phone-390x844-reduced-motion-departure-full.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-phone-390x844-reduced-motion-arrival-full.png"
+    ],
+    "errors": [],
+    "restShot": "before-phone-390x844-rm-rest-play.png"
+  },
+  {
+    "cfg": "desktop-1280x720",
+    "reduced": false,
+    "files": [
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-desktop-1280x720-departure-strip.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-desktop-1280x720-arrival-strip.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-desktop-1280x720-departure-full.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-desktop-1280x720-arrival-full.png"
+    ],
+    "errors": [],
+    "restShot": "before-desktop-1280x720-rest-play.png"
+  },
+  {
+    "cfg": "desktop-1280x720",
+    "reduced": true,
+    "files": [
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-desktop-1280x720-reduced-motion-departure-strip.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-desktop-1280x720-reduced-motion-arrival-strip.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-desktop-1280x720-reduced-motion-departure-full.png",
+      "docs/ui/evidence/2026-11-13-edge-inner-tip-size-cycle/before-desktop-1280x720-reduced-motion-arrival-full.png"
+    ],
+    "errors": [],
+    "restShot": "before-desktop-1280x720-rm-rest-play.png"
+  }
+]

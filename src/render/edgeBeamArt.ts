@@ -9,11 +9,14 @@
  *   and the last of it exits at the inner tip, toward where the outgoing laser shoots out. One shape function, one
  *   direction, so a diamond can never show two different fills. A one-pixel bright front line sits on the cut while it
  *   moves. Reduced motion: no sweeping front, the whole interior crossfades by alpha instead.
- * - Beam: a comet of one colour (the player's, trailPalette.PLAYER_COLOR). A soft bloom (two wide, low-alpha strokes),
- *   a body whose alpha ramps up toward the head and whose width tapers from a hair at the tail to ~2 px at the head
- *   (the ramp is a stack of nested spans, so there is no seam and no per-segment overdraw), and a bright pulsing head.
- *   The ends sit on the diamond OUTLINE (the exact contact point), not its centre: the head touches the diamond at the
- *   very instant the fill starts, and leaves it at the very instant the drain starts.
+ * - Beam (MAZER-VIS-038): one colour (the player's, trailPalette.PLAYER_COLOR). A beam is a steady STREAM between its
+ *   source end (tail) and sink end (head): a soft bloom (two wide, low-alpha strokes), a body whose alpha ramps up toward the
+ *   head (a few nested spans, so no seam and no per-segment overdraw), short bright dashes that flow tail -> head at a fixed
+ *   px/s speed (so the beam visibly keeps flowing while it is attached), and a pulsing head. While the beam is still
+ *   attached at its source end (a diamond that is still draining) the tail end gets a pulsing port glow too. Both ends sit
+ *   on the diamond's INNERMOST point (the tip that faces the board; edgeMarkers.ts `resolveEdgeInnerTip`), snapped to a
+ *   device pixel: the head touches the diamond at the very instant the fill starts and the tail stays on it until the
+ *   drain is over. The layer counts are small on purpose (the cost was five times the old beam): see BEAM_*_LAYERS.
  * - Contact ripple: one thin ring on the contact point, growing and fading over the pulse window.
  * - Crisp on fractional DPR: line ends and widths snap to the device pixel grid (`snapToDevice`).
  *
@@ -46,14 +49,14 @@ export const DIAMOND_FILL_ALPHA = 0.82;
 /** The fill front line and the beam head are this far from PLAYER_COLOR toward white. */
 export const BEAM_HOT_MIX = 0.55;
 export const BEAM_PEAK_ALPHA = 0.95;
-export const BEAM_BODY_LAYERS = 14;
+export const BEAM_BODY_LAYERS = 5;
 export const BEAM_BODY_MIN_WIDTH_PX = 1;
 export const BEAM_BODY_MAX_WIDTH_PX = 2;
 export const BEAM_BLOOM_OUTER_PX = 9;
 export const BEAM_BLOOM_OUTER_ALPHA = 0.2;
 export const BEAM_BLOOM_INNER_PX = 5;
 export const BEAM_BLOOM_INNER_ALPHA = 0.36;
-export const BEAM_BLOOM_LAYERS = 8;
+export const BEAM_BLOOM_LAYERS = 3;
 export const BEAM_HEAD_RADIUS_PX = 2.2;
 export const BEAM_HEAD_HALO_RADIUS_PX = 5.5;
 export const BEAM_HEAD_PULSE_PX = 0.7;
@@ -62,7 +65,14 @@ export const BEAM_HEAD_PULSE_PERIOD_MS = 120;
 export const RIPPLE_START_RADIUS_PX = 4;
 export const RIPPLE_END_RADIUS_PX = 15;
 export const RIPPLE_PEAK_ALPHA = 0.55;
-export const RIPPLE_SEGMENTS = 20;
+export const RIPPLE_SEGMENTS = 14;
+/** The stream: short bright dashes flowing tail -> head (never more than BEAM_STREAM_MAX_DASHES per beam). */
+export const BEAM_STREAM_DASH_PX = 9;
+export const BEAM_STREAM_MIN_SPACING_PX = 56;
+export const BEAM_STREAM_MAX_DASHES = 8;
+export const BEAM_STREAM_SPEED_PX_PER_S = 260;
+export const BEAM_STREAM_ALPHA = 0.85;
+export const BEAM_PORT_HALO_RADIUS_PX = 4.5;
 
 const WHITE: number = cyberArcadeMaterial.rail.white;
 
@@ -149,39 +159,6 @@ export const resolveDiamondFillShape = (
   return { polygon, front };
 };
 
-/**
- * Where the ray from `center` toward `toward` leaves the (convex, centre-containing) outline: the exact contact point
- * of a beam with a diamond. Falls back to `center` when the ray is degenerate.
- */
-export const resolveOutlineExitPoint = (
-  vertices: ReadonlyArray<ArtPoint>,
-  center: ArtPoint,
-  toward: ArtPoint
-): ArtPoint => {
-  const dx = toward.x - center.x;
-  const dy = toward.y - center.y;
-  if (Math.hypot(dx, dy) < 1e-9) {
-    return center;
-  }
-  let best = Number.POSITIVE_INFINITY;
-  for (let index = 0; index < vertices.length; index += 1) {
-    const p = vertices[index] as ArtPoint;
-    const q = vertices[(index + 1) % vertices.length] as ArtPoint;
-    const ex = q.x - p.x;
-    const ey = q.y - p.y;
-    const denom = (dx * ey) - (dy * ex);
-    if (Math.abs(denom) < 1e-12) {
-      continue;
-    }
-    const t = (((p.x - center.x) * ey) - ((p.y - center.y) * ex)) / denom;
-    const u = (((p.x - center.x) * dy) - ((p.y - center.y) * dx)) / denom;
-    if (t > 1e-9 && u >= -1e-9 && u <= 1 + 1e-9 && t < best) {
-      best = t;
-    }
-  }
-  return Number.isFinite(best) ? { x: center.x + (dx * best), y: center.y + (dy * best) } : center;
-};
-
 const tracePolygon = (graphics: ArtGraphics, polygon: ReadonlyArray<ArtPoint>): void => {
   graphics.beginPath();
   polygon.forEach((point, index) => {
@@ -240,14 +217,32 @@ export const resolveLayerStart = (index: number, layers: number): number => (
 );
 
 export interface BeamPulseDraw {
+  /** The source end of the visible beam (the tail; the diamond's inner tip while an outgoing beam is still draining it). */
   readonly tailPoint: ArtPoint;
+  /** The leading end (the head; the diamond's inner tip once an incoming beam has landed). */
   readonly headPoint: ArtPoint;
-  /** Laser clock in ms: only used to pulse the head. */
+  /** Laser clock in ms: only used to flow the stream and pulse the head/port. */
   readonly clockMs: number;
   readonly devicePixelRatio: number;
+  /** True while the tail is still held at the source (a diamond is still being fed or emptied): draws the pulsing port glow on the tail end. */
+  readonly tailPort?: boolean;
 }
 
-/** One laser pulse: bloom, tapered gradient body, hot lead and a pulsing head. PLAYER_COLOR family only. */
+/** Where the stream's dashes start along a beam of `length` css px at laser clock `clockMs` (distances from the tail). */
+export const resolveStreamDashStarts = (length: number, clockMs: number): number[] => {
+  if (!(length > 1)) {
+    return [];
+  }
+  const spacing = Math.max(BEAM_STREAM_MIN_SPACING_PX, length / BEAM_STREAM_MAX_DASHES);
+  const travelled = (((Number.isFinite(clockMs) ? clockMs : 0) * BEAM_STREAM_SPEED_PX_PER_S) / 1000) % spacing;
+  const starts: number[] = [];
+  for (let start = travelled; start < length && starts.length < BEAM_STREAM_MAX_DASHES; start += spacing) {
+    starts.push(start);
+  }
+  return starts;
+};
+
+/** One beam: bloom, ramped body, flowing stream dashes and a pulsing head (and port while attached). PLAYER_COLOR family only. */
 export const drawBeamPulse = (graphics: ArtGraphics, input: BeamPulseDraw): void => {
   const dpr = input.devicePixelRatio;
   const tail = { x: snapToDevice(input.tailPoint.x, dpr), y: snapToDevice(input.tailPoint.y, dpr) };
@@ -256,7 +251,10 @@ export const drawBeamPulse = (graphics: ArtGraphics, input: BeamPulseDraw): void
     x: tail.x + ((head.x - tail.x) * fraction),
     y: tail.y + ((head.y - tail.y) * fraction)
   });
-  // Always the same fixed set of strokes per pulse (a zero-length one paints nothing), so a pulse is a constant-size group of draw calls.
+  const clock = Number.isFinite(input.clockMs) ? input.clockMs : 0;
+  const pulse = 0.5 + (0.5 * Math.sin((clock / BEAM_HEAD_PULSE_PERIOD_MS) * Math.PI * 2));
+  const hot = mixPaletteRgb(PLAYER_COLOR, WHITE, BEAM_HOT_MIX);
+  // A fixed set of strokes per beam (a zero-length one paints nothing), so a beam is a constant-size group of draw calls.
   // Bloom: two wide, low-alpha gradients under the body.
   for (const [width, peak] of [[BEAM_BLOOM_OUTER_PX, BEAM_BLOOM_OUTER_ALPHA], [BEAM_BLOOM_INNER_PX, BEAM_BLOOM_INNER_ALPHA]] as const) {
     const alpha = resolveLayerAlpha(peak, BEAM_BLOOM_LAYERS);
@@ -266,7 +264,7 @@ export const drawBeamPulse = (graphics: ArtGraphics, input: BeamPulseDraw): void
       graphics.lineBetween(from.x, from.y, head.x, head.y);
     }
   }
-  // Body: alpha ramps toward the head, width tapers tail -> head.
+  // Body: alpha ramps toward the head (a steady stream, never thinner than one layer), width tapers tail -> head.
   const bodyAlpha = resolveLayerAlpha(BEAM_PEAK_ALPHA, BEAM_BODY_LAYERS);
   for (let layer = 0; layer < BEAM_BODY_LAYERS; layer += 1) {
     const taper = BEAM_BODY_LAYERS > 1 ? layer / (BEAM_BODY_LAYERS - 1) : 1;
@@ -278,14 +276,24 @@ export const drawBeamPulse = (graphics: ArtGraphics, input: BeamPulseDraw): void
     const from = spanFrom(resolveLayerStart(layer, BEAM_BODY_LAYERS));
     graphics.lineBetween(from.x, from.y, head.x, head.y);
   }
-  // Hot lead: a one-device-pixel bright line over the last third of the pulse.
-  const lead = spanFrom(0.66);
-  graphics.lineStyle(snapWidthToDevice(1, dpr), mixPaletteRgb(PLAYER_COLOR, WHITE, BEAM_HOT_MIX), 0.9);
-  graphics.lineBetween(lead.x, lead.y, head.x, head.y);
-  const pulse = 0.5 + (0.5 * Math.sin(((Number.isFinite(input.clockMs) ? input.clockMs : 0) / BEAM_HEAD_PULSE_PERIOD_MS) * Math.PI * 2));
+  // Stream: bright dashes flowing tail -> head, one device pixel wide.
+  const length = Math.hypot(head.x - tail.x, head.y - tail.y);
+  if (length > 1) {
+    graphics.lineStyle(snapWidthToDevice(1, dpr), hot, BEAM_STREAM_ALPHA);
+    for (const start of resolveStreamDashStarts(length, clock)) {
+      const end = Math.min(length, start + BEAM_STREAM_DASH_PX);
+      const a = spanFrom(start / length);
+      const b = spanFrom(end / length);
+      graphics.lineBetween(a.x, a.y, b.x, b.y);
+    }
+  }
+  if (input.tailPort === true) {
+    graphics.fillStyle(PLAYER_COLOR, 0.3);
+    graphics.fillCircle(tail.x, tail.y, BEAM_PORT_HALO_RADIUS_PX + (BEAM_HEAD_PULSE_PX * (1 - pulse)));
+  }
   graphics.fillStyle(PLAYER_COLOR, 0.28);
   graphics.fillCircle(head.x, head.y, BEAM_HEAD_HALO_RADIUS_PX + (BEAM_HEAD_PULSE_PX * pulse));
-  graphics.fillStyle(mixPaletteRgb(PLAYER_COLOR, WHITE, BEAM_HOT_MIX), BEAM_PEAK_ALPHA);
+  graphics.fillStyle(hot, BEAM_PEAK_ALPHA);
   graphics.fillCircle(head.x, head.y, BEAM_HEAD_RADIUS_PX + (BEAM_HEAD_PULSE_PX * pulse * 0.5));
 };
 

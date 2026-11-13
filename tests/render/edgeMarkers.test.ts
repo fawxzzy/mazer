@@ -5,6 +5,7 @@ import {
   EDGE_MARKER_IDLE_ALPHA_MIN,
   EDGE_MARKER_IDLE_PERIOD_MS,
   EDGE_MARKER_FLASH_MS,
+  EDGE_MARKER_HALF_HEIGHT,
   EDGE_MARKER_MAX_EXTENT_PX,
   EDGE_MARKER_MIN_INSET_PX,
   EDGE_MIDPOINT_STATION_ID,
@@ -12,6 +13,9 @@ import {
   drawEdgeMarker,
   drawEdgeMarkers,
   drawEdgeBeams,
+  anchorStationToInnerTip,
+  resolveEdgeInnerTip,
+  resolveEdgeRingScales,
   resolveEdgeMarkerIdleAlpha,
   resolveEdgeStationNormalExtent,
   resolveEdgeRingFills,
@@ -35,6 +39,7 @@ import { resolve } from 'node:path';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import {
   INTRO_BEAM_PULSE_MS,
+  INTRO_BEAM_RETRACT_MS,
   INTRO_BEAM_STAGGER_MS,
   INTRO_BUILD_START_MS,
   OUTRO_HANDOFF_MS,
@@ -57,12 +62,14 @@ import {
   EDGE_BEAM_COUNT,
   EDGE_BEAM_FLIGHT_MS,
   EDGE_BEAM_PULSE_MS,
+  EDGE_BEAM_RETRACT_MS,
+  EDGE_DIAMOND_REST_SCALE,
   resolveBeamHead,
   resolveBeamTimes,
   resolveDiamondDrainFromOutgoing,
   resolveDiamondFillFromIncoming
 } from '../../src/render/edgeBeamTimeline';
-import { BEAM_BLOOM_OUTER_PX, BEAM_HOT_MIX, snapToDevice, snapWidthToDevice } from '../../src/render/edgeBeamArt';
+import { BEAM_BLOOM_LAYERS, BEAM_BLOOM_OUTER_PX, BEAM_BODY_LAYERS, BEAM_HOT_MIX, BEAM_STREAM_MAX_DASHES, snapToDevice, snapWidthToDevice } from '../../src/render/edgeBeamArt';
 import { MOTION_REDUCED_MS } from '../../src/render/motionScale';
 import { mixPaletteRgb } from '../../src/render/trailPalette';
 
@@ -452,16 +459,24 @@ describe('all-8 beams (arrival and departure)', () => {
     expect([...mid.firingIds].sort()).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
 
-  test('arrival: pulses run diamond outline -> spawn tile; departure: player -> diamond outline (the mirror)', () => {
+  test('arrival: beams run diamond INNER TIP -> spawn tile; departure: player -> diamond inner tip (the mirror)', () => {
     const inward = resolveEdgeBeams({ direction: 'inward', focus, laserProgress: 0.5, spawnPop: 0, stations });
     const outward = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 0.5, spawnPop: 0, stations });
     stations.forEach((station, index) => {
       const vertices = resolveEdgeMarkerVertices(station, 1);
       const contact = inward.beams[index]?.contact as { x: number; y: number };
-      // The diamond end of the path is the exact contact point on the diamond OUTLINE, not its centre.
+      // The diamond end of the path is the INNERMOST point of the diamond (the tip facing the board): the kite's first
+      // vertex, exactly, in both directions, not an outline-crossing point and not the centre.
       expect(outward.beams[index]?.contact).toEqual(contact);
-      expect(Math.hypot(contact.x - station.x, contact.y - station.y)).toBeLessThanOrEqual(EDGE_MARKER_MAX_EXTENT_PX);
-      expect(isOnPolygonEdge(vertices, contact), `station ${index}`).toBe(true);
+      expect(contact).toEqual(resolveEdgeInnerTip(station));
+      expect(contact.x).toBeCloseTo((vertices[0] as { x: number }).x, 9);
+      expect(contact.y).toBeCloseTo((vertices[0] as { y: number }).y, 9);
+      expect(Math.hypot(contact.x - station.x, contact.y - station.y)).toBeCloseTo(EDGE_MARKER_HALF_HEIGHT, 9);
+      // It is the vertex nearest the focus (the one that faces the board), and the beam never crosses the kite's body.
+      const nearest = vertices.reduce((best, vertex) => (
+        Math.hypot(vertex.x - focus.x, vertex.y - focus.y) < Math.hypot(best.x - focus.x, best.y - focus.y) ? vertex : best
+      ));
+      expect(nearest, `station ${index}`).toEqual(vertices[0]);
       expect(inward.beams[index]?.from).toEqual(contact);
       expect(inward.beams[index]?.to).toEqual(focus);
       expect(outward.beams[index]?.from).toEqual(focus);
@@ -497,16 +512,21 @@ describe('all-8 beams (arrival and departure)', () => {
 
   test('each pulse draws a bloom, a tapered gradient body, a head and a ripple, all in the player colour family (palette tokens only)', () => {
     const recorder = makeRecorder();
-    // 150 ms into the laser: every head has left (the latest at 96 ms), no tail yet.
+    // 150 ms into the laser: every head has left (the latest at 98 ms), every diamond is still draining (the earliest drain ends at 200 ms).
     drawEdgeBeams(recorder, { direction: 'inward', focus, laserProgress: 0, spawnPop: 0, stations, clockMs: 150 });
-    // 8 beams x (16 bloom + 14 body + 1 lead) = 248 lines, widths from 1 up to the 9 px bloom, one head per beam.
-    expect(recorder.lineBetweenCount).toBe(8 * 31);
+    // 8 beams x (2 x 3 bloom + 5 body) = 88 lines plus the flowing stream dashes (at most 8 per beam), widths from 1 up to
+    // the 9 px bloom, a halo + core head per beam plus the port glow on the diamond end (still attached): 3 circles per beam.
+    const base = 8 * (2 * BEAM_BLOOM_LAYERS + BEAM_BODY_LAYERS);
+    expect(recorder.lineBetweenCount).toBeGreaterThanOrEqual(base + 8);
+    expect(recorder.lineBetweenCount).toBeLessThanOrEqual(base + (8 * BEAM_STREAM_MAX_DASHES));
     expect(Math.max(...recorder.lineWidths)).toBe(BEAM_BLOOM_OUTER_PX);
     expect(Math.min(...recorder.lineWidths)).toBe(1);
     expect(recorder.lineColors.every((color) => color === PLAYER_COLOR || color === HOT)).toBe(true);
-    expect(recorder.lineColors.filter((color) => color === PLAYER_COLOR).length).toBe(8 * 17);
+    // lineColors has one entry per lineStyle call: 2 bloom widths + one per body layer and the contact ripple ring in the player colour, one hot stream style.
+    expect(recorder.lineColors.filter((color) => color === PLAYER_COLOR).length).toBe(8 * (2 + BEAM_BODY_LAYERS + 1));
+    expect(recorder.lineColors.filter((color) => color === HOT).length).toBe(8);
     expect(recorder.fillColors.every((color) => color === PLAYER_COLOR || color === HOT)).toBe(true);
-    expect(recorder.circles).toHaveLength(16);
+    expect(recorder.circles).toHaveLength(24);
   });
 
   test('crisp on fractional DPR: line ends sit on a device pixel centre and widths are whole device pixels', () => {
@@ -526,7 +546,8 @@ describe('all-8 beams (arrival and departure)', () => {
   test('nothing draws before launch or after the tails have landed', () => {
     const recorder = makeRecorder();
     drawEdgeBeams(recorder, { direction: 'outward', focus, laserProgress: 0, spawnPop: 0, stations, clockMs: 0 });
-    drawEdgeBeams(recorder, { direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations, clockMs: EDGE_BEAM_FLIGHT_MS + EDGE_BEAM_PULSE_MS });
+    const lastGoneMs = Math.max(...Array.from({ length: EDGE_BEAM_COUNT }, (_, index) => resolveBeamTimes(index).tailArrivesMs));
+    drawEdgeBeams(recorder, { direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations, clockMs: lastGoneMs });
     expect(recorder.lineBetweenCount).toBe(0);
   });
 });
@@ -601,7 +622,7 @@ describe('ring fill and spin over the intro / outro timelines (per frame)', () =
         }
       }
       expect(firstFill, `diamond ${index} first fill`).toBe(Math.floor(times.contactMs) + 1);
-      expect(fullAt, `diamond ${index} full`).toBe(Math.ceil(times.tailArrivesMs));
+      expect(fullAt, `diamond ${index} full`).toBe(Math.ceil(times.fillEndMs));
     }
     // The ring is full once every beam is absorbed and stays full through the deconstruct, to the very last frame.
     const total = resolveOutroTotalMs(TILES);
@@ -746,15 +767,15 @@ describe('ring fill and spin over the intro / outro timelines (per frame)', () =
     expect(restRecorder.lineColors).toEqual(Array.from({ length: 8 }, () => border));
   });
 
-  test('orbit start is derived from the master laser clock: the instant the last beam is fully absorbed (600 ms at the shipped timings)', () => {
+  test('orbit start is derived from the master laser clock: the instant the last beam has let go (720 ms at the shipped timings)', () => {
     const times = Array.from({ length: EDGE_BEAM_COUNT }, (_, index) => resolveBeamTimes(index));
     const lastTailArrivesMs = Math.max(...times.map((time) => time.tailArrivesMs));
     expect(OUTRO_RING_ORBIT_START_MS).toBeCloseTo(lastTailArrivesMs, 9);
-    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_LASER_MS + INTRO_BEAM_PULSE_MS);
-    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_LASER_MS + EDGE_BEAM_PULSE_MS);
-    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_TILES_START_MS + EDGE_BEAM_PULSE_MS);
-    // Unchanged at the current timings, and the ring is still parked at the last diamond's full instant.
-    expect(OUTRO_RING_ORBIT_START_MS).toBe(600);
+    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_LASER_MS + INTRO_BEAM_PULSE_MS + INTRO_BEAM_RETRACT_MS);
+    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_LASER_MS + EDGE_BEAM_PULSE_MS + EDGE_BEAM_RETRACT_MS);
+    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_TILES_START_MS + EDGE_BEAM_PULSE_MS + EDGE_BEAM_RETRACT_MS);
+    // 600 ms before MAZER-VIS-038 (the beam let go when the fill ended); the retract after the last fill moves it to 720.
+    expect(OUTRO_RING_ORBIT_START_MS).toBe(720);
     expect(resolveIntroDeconstruct(OUTRO_RING_ORBIT_START_MS, FULL).ringSpinRad).toBe(0);
     expect(resolveIntroDeconstruct(OUTRO_RING_ORBIT_START_MS + 1, FULL).ringSpinRad).not.toBe(0);
     // Total outro length does not depend on the orbit start.
@@ -1069,5 +1090,115 @@ describe('colour contract: border = live trail colour, inside = player colour (o
     expect(scene).toContain('trailHeadDistanceTiles: this.trailPaletteHead.distanceTiles');
     expect(scene).toContain('trailTimeMs: this.trailPaletteHead.timeMs');
     expect(scene).toContain('trailAnimated: this.trailPaletteHead.animated');
+  });
+});
+
+describe('diamond size and inner-tip attachment (MAZER-VIS-038)', () => {
+  const FULL = { reducedMotion: false, tileCount: 300 } as const;
+
+  test('anchorStationToInnerTip scales about the inner tip: the tip never moves, the outer tip pulls in, scale 1 is the station itself', () => {
+    for (const viewport of VIEWPORTS) {
+      for (const station of resolveEdgeStations(viewport)) {
+        const tip = resolveEdgeInnerTip(station);
+        expect(anchorStationToInnerTip(station, 1)).toBe(station);
+        for (const scale of [0.5, 0.75, 0.2, 0]) {
+          const vertices = resolveEdgeMarkerVertices(anchorStationToInnerTip(station, scale), scale);
+          expect(vertices[0]?.x).toBeCloseTo(tip.x, 9);
+          expect(vertices[0]?.y).toBeCloseTo(tip.y, 9);
+          const outer = vertices[2] as { x: number; y: number };
+          expect(Math.hypot(outer.x - tip.x, outer.y - tip.y)).toBeCloseTo(2 * EDGE_MARKER_HALF_HEIGHT * scale, 9);
+        }
+        // At 50% the whole kite is inside the full-size one (it only shrank toward the tip), so it can never clip where the full one did not.
+        const half = resolveEdgeMarkerVertices(anchorStationToInnerTip(station, 0.5), 0.5);
+        const full = resolveEdgeMarkerVertices(station, 1);
+        for (const vertex of half) {
+          const axis = { x: Math.cos(station.inwardAngle), y: Math.sin(station.inwardAngle) };
+          const along = ((vertex.x - station.x) * axis.x) + ((vertex.y - station.y) * axis.y);
+          expect(along).toBeLessThanOrEqual(EDGE_MARKER_HALF_HEIGHT + 1e-9);
+          expect(along).toBeGreaterThanOrEqual(-1e-9);
+        }
+        expect(Math.max(...half.map((v) => v.x))).toBeLessThanOrEqual(Math.max(...full.map((v) => v.x)) + 1e-9);
+        expect(Math.min(...half.map((v) => v.x))).toBeGreaterThanOrEqual(Math.min(...full.map((v) => v.x)) - 1e-9);
+        expect(Math.max(...half.map((v) => v.y))).toBeLessThanOrEqual(Math.max(...full.map((v) => v.y)) + 1e-9);
+        expect(Math.min(...half.map((v) => v.y))).toBeGreaterThanOrEqual(Math.min(...full.map((v) => v.y)) - 1e-9);
+      }
+    }
+  });
+
+  test('beam paths never cross the kite body: from the inner tip, the path to anywhere on the board leaves the kite\'s tip wedge', () => {
+    // The kite is a wedge at its tip of half-angle atan(7 / 8) (from the tip to the (2, +-7) shoulders) opening toward the OUTER
+    // tip (-axis). A path from the tip leaves it, never running through the body, when it is steeper than that wedge.
+    const wedge = Math.atan2(7, EDGE_MARKER_HALF_HEIGHT - 2);
+    for (const viewport of VIEWPORTS) {
+      const stations = resolveEdgeStations(viewport);
+      // Anywhere on the board except the outermost 10 % of the width/height around a diamond (a player standing within ~39 px of the
+      // screen edge, on the diamond's axis, is the one documented exception: the beam then runs through the kite to its tip).
+      const points = [0.1, 0.5, 0.9].flatMap((fx) => [0.1, 0.5, 0.9].map((fy) => ({ x: viewport.width * fx, y: viewport.height * fy })));
+      for (const station of stations) {
+        const tip = resolveEdgeInnerTip(station);
+        const back = { x: -Math.cos(station.inwardAngle), y: -Math.sin(station.inwardAngle) };
+        for (const focus of points) {
+          const length = Math.hypot(focus.x - tip.x, focus.y - tip.y);
+          const angle = Math.acos(Math.max(-1, Math.min(1, (((focus.x - tip.x) * back.x) + ((focus.y - tip.y) * back.y)) / length)));
+          expect(angle, `${viewport.width}x${viewport.height} station ${station.id} focus ${focus.x},${focus.y}`).toBeGreaterThan(wedge);
+        }
+      }
+    }
+  });
+
+  test('resolveEdgeRingScales: 50% at rest and in the reduced-motion crossfade (fixed size, no size animation); grows on departure, holds 100% through the build, shrinks per diamond after the drain', () => {
+    expect(resolveEdgeRingScales(null)).toEqual(Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE));
+    // Reduced motion: whatever the clock or the crossfade level, every diamond stays at 50%.
+    for (const ringFill of [0, 0.3, 1]) {
+      for (const direction of ['outward', 'inward'] as const) {
+        expect(resolveEdgeRingScales({ direction, clockMs: 250, ringFill, crossfade: true })).toEqual(Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE));
+      }
+    }
+    // Full motion departure: from 50% at the goal to 100% at each diamond's own contact.
+    expect(resolveEdgeRingScales({ direction: 'outward', clockMs: 0, ringFill: 0 })).toEqual(Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE));
+    for (let index = 0; index < 8; index += 1) {
+      const times = resolveBeamTimes(index);
+      expect(resolveEdgeRingScales({ direction: 'outward', clockMs: times.contactMs, ringFill: 0 })[index]).toBe(1);
+      expect(resolveEdgeRingScales({ direction: 'outward', clockMs: times.contactMs / 2, ringFill: 0 })[index]).toBeCloseTo(0.75, 9);
+    }
+    // The whole deconstruct after the beams: 100%, to the last frame; the whole build before the beams: 100%.
+    const outroEnd = resolveOutroTotalMs(300);
+    expect(resolveEdgeRingScales({ direction: 'outward', clockMs: outroEnd, ringFill: 0 })).toEqual(Array.from({ length: 8 }, () => 1));
+    for (const ms of [0, 1000, resolveIntroRevealEndMs(300) - 1]) {
+      const intro = resolveIntro(ms, { ...FULL, digitAlreadyVisible: true });
+      expect(resolveEdgeRingScales({ direction: 'inward', clockMs: intro.laserClockMs, ringFill: intro.ringFill })).toEqual(Array.from({ length: 8 }, () => 1));
+    }
+    // After the beams left: per diamond, back to 50% once that diamond is empty plus the shrink.
+    const doneIntro = resolveIntro(resolveIntroLaserStartMs(300) + 760, { ...FULL, digitAlreadyVisible: true });
+    expect(resolveEdgeRingScales({ direction: 'inward', clockMs: doneIntro.laserClockMs, ringFill: doneIntro.ringFill })).toEqual(Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE));
+  });
+
+  test('markers drawn at 50% are anchored on the inner tip, carry the scale in their state, and the default (no scales) stays full size for standalone icons', () => {
+    const stations = resolveEdgeStations({ width: 390, height: 844 });
+    const half = resolveEdgeMarkerStates({ reducedMotion: false, scales: resolveEdgeRingScales(null), timeMs: 0 });
+    expect(half.every((state) => state.scale === EDGE_DIAMOND_REST_SCALE)).toBe(true);
+    expect(resolveEdgeMarkerStates({ reducedMotion: false, timeMs: 0 }).every((state) => state.scale === 1)).toBe(true);
+    const recorder = makeRecorder();
+    drawEdgeMarkers(recorder, stations, half);
+    expect(recorder.calls.filter((call) => call === 'strokePath')).toHaveLength(8);
+    // The border stroke stays one css px at any size; the fill (when present) is clipped to the smaller kite, one fillPath per diamond.
+    expect(recorder.lineWidths).toEqual(Array.from({ length: 8 }, () => 1));
+  });
+
+  test('the scene feeds the ring size to the markers (thin MenuScene wiring)', () => {
+    const scene = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+    expect(scene).toContain('scales: resolveEdgeRingScales(this.edgeRing.lifecycle),');
+  });
+
+  test('the tip is an exact vertex at every orbit phase too (the ring orbits at full size, anchored the same way)', () => {
+    const viewport = { width: 390, height: 844 };
+    for (const phase of [0.3, 1.1, 2.7, 4.4, 5.9]) {
+      for (const station of resolveOrbitingEdgeStations(viewport, phase)) {
+        const tip = resolveEdgeInnerTip(station);
+        const vertices = resolveEdgeMarkerVertices(station, 1);
+        expect(vertices[0]?.x).toBeCloseTo(tip.x, 9);
+        expect(vertices[0]?.y).toBeCloseTo(tip.y, 9);
+      }
+    }
   });
 });

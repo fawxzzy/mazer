@@ -2,6 +2,8 @@
 
 Status: implemented 2026-11-13 on branch `claude/mazer-vis-033-20261113`, on top of MAZER-VIS-030 (`docs/ui/MAZER-EDGE-BEAMS-DIAMOND-FILL-2026-11-12.md`). Source, unit, pixel and headless-Chromium evidence only; NOT checked on a real phone.
 
+Amended 2026-11-13 by MAZER-VIS-038 (`docs/ui/MAZER-EDGE-INNER-TIP-SIZE-CYCLE-2026-11-13.md`): the diamonds are 50% of their size while the maze runs (scaled about the inner tip) and the corner-clipping candidate in section 3 is therefore smaller by half; the layout itself is unchanged and the device check is still open.
+
 Owner requests, one PR:
 
 1. "I see two different fills on the diamonds when my beams shoot out to them. Remove the old instant green fill that does not touch the diamond borders; keep the new fill that grows as the laser enters and touches the border."
