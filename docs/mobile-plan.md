@@ -13,7 +13,7 @@
 - Enable service worker only in production builds/deploys.
 
 ## Asset policy
-- The only authoritative icon artwork is `src/brand/source-art/mazer-app-icon-master.png`, the FawxzzyWeb site Mazer image, locked to SHA-256 `91764e546b8c1488b3d48baeda927ae18600b088178e190244fb9d8ce35e2440` (MAZER-VIS-039, docs/ops/MAZER-APP-IMAGE-SOURCE-2026-11-13.md).
+- The only authoritative icon artwork is `src/brand/source-art/mazer-app-icon-master.png`, locked to SHA-256 `ede90e596682795d10f97bed615071ca1f60e08e290eacf1ea143006df914d78`.
 - Run `npm run brand:icons` to generate these repository-owned delivery assets:
   - `/public/favicon.ico`
   - `/public/icons/mazer-app-icon.ico`
