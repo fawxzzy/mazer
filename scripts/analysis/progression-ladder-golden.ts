@@ -32,9 +32,11 @@ if (process.argv.includes('--write')) {
   const existing = JSON.parse(readFileSync(fixturePath, 'utf8')) as typeof document;
   let changed = 0;
   for (const name of Object.keys(golden)) {
+    const levels: string[] = [];
     for (const level of Object.keys(golden[name]!)) {
-      if (existing.hashes[name]?.[level] !== golden[name]![level]) { changed += 1; }
+      if (existing.hashes[name]?.[level] !== golden[name]![level]) { changed += 1; levels.push(level); }
     }
+    if (levels.length > 0) { console.log(`  ${name}: levels ${levels.join(', ')}`); }
   }
   console.log(changed === 0 ? 'golden fixture is current' : `${changed} level hashes differ from the fixture`);
   if (changed > 0) { process.exitCode = 1; }

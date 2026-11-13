@@ -8,6 +8,7 @@ import {
 } from '../../src/legacy-runtime/legacyGeometryBudget';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 import { createFeltExplorer, measureFelt } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
+import { findFloorIslands } from '../../src/legacy-runtime/legacyMazeIslands';
 import {
   MIN_DEAD_END_BRANCH_CELLS,
   collectDeadEndBranches,
@@ -240,10 +241,10 @@ describe('no one-tile stubs in any generated ladder maze', () => {
           expect(maze.grid[maze.goal.y]![maze.goal.x], label).toBe(true);
           expect(maze.solutionPath[0], label).toEqual(maze.start);
           expect(maze.solutionPath[maze.solutionPath.length - 1], label).toEqual(maze.goal);
-          // The goal is reachable from the start over open floor (torus steps). NOTE: about 6 percent of
-          // generated mazes already carry a small unreachable floor island on origin/main (measured, same
-          // seeds before and after this rule), so "every floor cell is reachable" is deliberately not asserted.
+          // The goal is reachable from the start over open floor (torus steps), and so is EVERY floor tile
+          // (MAZER-GEN-005: no orphan islands; the dedicated sweep is tests/reset/legacy-maze-islands.test.ts).
           expect(reachableFloor(maze).has((maze.goal.y * maze.width) + maze.goal.x), label).toBe(true);
+          expect(findFloorIslands(maze).islands, label).toEqual([]);
           // The explorer solves it (the felt number is a solved run).
           expect(measureFelt(maze).steps, label).toBeGreaterThan(0);
           // The rule needs no last-resort edit.

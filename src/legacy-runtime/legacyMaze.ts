@@ -1,5 +1,6 @@
 import { clampInteger } from './legacyDefaults';
 import { LAST_BUDGET_LEVEL } from './legacyGeometryBudget';
+import { fillFloorIslands } from './legacyMazeIslands';
 import { resolveLegacyMenuSnapshotBlueprint } from './legacyMenuSnapshot';
 import { legacyTuning } from '../config/tuning';
 
@@ -190,6 +191,15 @@ export interface LegacyMazeSnapshot {
   stubStats?: {
     lengthened: number;
     removed: number;
+    forced: number;
+  };
+  // Floor-island rule (legacyMazeIslands.ts, MAZER-GEN-005): floor tiles the start cannot reach were walled
+  // up. base = cells walled at the end of the base build (a wrap spoke that could not join the maze);
+  // dropped = cells a ceiling-dropped loop connector orphaned (stretch detours hung on it); forced =
+  // cells the last-resort sweep at the end of the tune walled up (expected 0). Absent when none.
+  islandStats?: {
+    base: number;
+    dropped: number;
     forced: number;
   };
   // Reverse-solve resistance of a ladder maze (legacyGeometryBudget.ts, the double lure): the felt
@@ -3016,6 +3026,10 @@ export const createLegacyMaze = (
       (shortcutStats.qualityReinforcementCreated ?? 0) + finalReinforcementStats.created
     );
   }
+  // MAZER-GEN-005: floor the start cannot reach (a mandatory wrap spoke chosen on a column with no floor
+  // runs the whole column and never joins the maze) is walled back up. The route, start and goal are
+  // untouched: an unreachable cell is by definition off every route.
+  const baseIslandCells = fillFloorIslands({ width: normalizedWidth, height: normalizedHeight, grid, start }).length;
   playableTopologyStats.reachableFloors = resolveReachableFloorDistances(grid, start).size;
   playableTopologyStats.resolvedGoalDistance = Math.max(0, solutionPath.length - 1);
   const wrapTopologyDiagnostics = resolveLegacyWrapTopologyDiagnostics({
@@ -3058,7 +3072,8 @@ export const createLegacyMaze = (
     playableTopologyStats,
     routeQualityStats,
     shortcutsCreated: shortcutStats.created,
-    shortcutStats
+    shortcutStats,
+    ...(baseIslandCells > 0 ? { islandStats: { base: baseIslandCells, dropped: 0, forced: 0 } } : {})
   };
 };
 
