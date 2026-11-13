@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_ef9e410f158c",
+  "export_id": "pbe_mazer_owner_registry_b6711ca8a861",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:ef9e410f158c341759677fd260ca1b87caa81eabae09448e93e371397a9a6da3",
-  "generated_at": "2026-11-12T23:55:00.000Z",
+  "source_revision": "sha256:b6711ca8a861cb4be3f2f2a4d0680acc5477cf62faf76e92bcc9f76dad075a3f",
+  "generated_at": "2026-11-13T00:05:00.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:d923ba59bf6344c57c3fc5bb051da5da2a5e8537b37f18ecf83075d1c96b2541",
-      "observed_at": "2026-11-12T23:55:00.000Z"
+      "revision": "sha256:a6c009c648c1c78b5aab072b831c91d01ba507f07790e2d1d90334511a988232",
+      "observed_at": "2026-11-13T00:05:00.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:450fa5231533681461781f7d0ce7fa7da01e90bd1fe861836e24dbaa9e60e902",
-      "observed_at": "2026-11-12T23:55:00.000Z"
+      "observed_at": "2026-11-13T00:05:00.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-12T23:55:00.000Z"
+      "observed_at": "2026-11-13T00:05:00.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-12T23:55:00.000Z"
+      "observed_at": "2026-11-13T00:05:00.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-12T23:55:00.000Z"
+      "observed_at": "2026-11-13T00:05:00.000Z"
     }
   ],
   "cards": [
@@ -1478,24 +1478,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-026_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-026",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
-        "title": "Harden the username sign-in lockout (v4)",
-        "description": "Eleven wrong tries lock a username and also block the correct sign-in details for 15 minutes, so anyone can lock another player out of username sign-in. This existed in v2 and is more visible now that v3 reports it. Mitigation ideas: key the failure counter by username plus client, count failures only, drop the forwarded-address fallback, raise the per-username aggregate cap. Not started; any database change needs the owner approval of the exact SQL.",
+        "title": "Harden the username sign-in lockout (v4): live, real sign-in check pending",
+        "description": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. NOT verified: a live end-to-end username sign-in on version 12 (no real sign-in was run on the live site) and the live per-client behavior. Known limits are tracked privately. Kept in review: deployed, but nothing is checked by a real sign-in or on a real phone.",
         "card_type": "reliability",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-12T20:00:00.000Z",
+        "updated_at": "2026-11-13T00:05:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-026",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -1503,11 +1503,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-026",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T20:00:00.000Z"
+        "source_updated_at": "2026-11-13T00:05:00.000Z"
       },
       "content": {
-        "summary": "Eleven wrong tries lock a username and also block the correct sign-in details for 15 minutes, so anyone can lock another player out of username sign-in. This existed in v2 and is more visible now that v3 reports it. Mitigation ideas: key the failure counter by username plus client, count failures only, drop the forwarded-address fallback, raise the per-username aggregate cap. Not started; any database change needs the owner approval of the exact SQL.",
-        "objective": "Eleven wrong tries lock a username and also block the correct sign-in details for 15 minutes, so anyone can lock another player out of username sign-in. This existed in v2 and is more visible now that v3 reports it. Mitigation ideas: key the failure counter by username plus client, count failures only, drop the forwarded-address fallback, raise the per-username aggregate cap. Not started; any database change needs the owner approval of the exact SQL.",
+        "summary": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. NOT verified: a live end-to-end username sign-in on version 12 (no real sign-in was run on the live site) and the live per-client behavior. Known limits are tracked privately. Kept in review: deployed, but nothing is checked by a real sign-in or on a real phone.",
+        "objective": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. NOT verified: a live end-to-end username sign-in on version 12 (no real sign-in was run on the live site) and the live per-client behavior. Known limits are tracked privately. Kept in review: deployed, but nothing is checked by a real sign-in or on a real phone.",
         "acceptance_criteria": [
           "A wrong-try flood no longer blocks the right password from the real owner",
           "The new counter keys and caps are chosen by the owner and tested on a throwaway database",
