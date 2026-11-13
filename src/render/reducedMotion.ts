@@ -18,6 +18,8 @@
  *   - the bleed-dock glow's travelling band (held at its peak, colour still shifting)
  *   - backdrop star drift and twinkle, sparkles, the AI option-tile pulse, loading pulses, the touch-stick anchor orbit
  *   - the intro/outro reveal, which becomes a short crossfade
+ *   - the Start hand-off, overlay open/close and boot splash fade (MAZER-MOTION-002): one 200 ms crossfade, no outward drift;
+ *     the loading pulse (splash dot, in-game "Signing you in" diamond) is held lit
  * Anything not listed above is not gated.
  */
 

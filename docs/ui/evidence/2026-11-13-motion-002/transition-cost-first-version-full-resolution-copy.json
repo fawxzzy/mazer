@@ -1,0 +1,154 @@
+[
+ {
+  "profile": "390x844@3",
+  "throttle": 1,
+  "cover": "off (pre-change path)",
+  "frameIntervalMs": {
+   "n": 167,
+   "mean": 29.29,
+   "p95": 43.5,
+   "max": 58.8
+  },
+  "over33ms": 57,
+  "over50ms": 1,
+  "tapToReturnMs": {
+   "n": 8,
+   "mean": 33.75,
+   "p95": 42,
+   "max": 42
+  }
+ },
+ {
+  "profile": "390x844@3",
+  "throttle": 1,
+  "cover": "on",
+  "frameIntervalMs": {
+   "n": 151,
+   "mean": 32.62,
+   "p95": 60.9,
+   "max": 102.7
+  },
+  "over33ms": 53,
+  "over50ms": 18,
+  "tapToReturnMs": {
+   "n": 8,
+   "mean": 39.38,
+   "p95": 48,
+   "max": 48
+  }
+ },
+ {
+  "profile": "390x844@3",
+  "throttle": 4,
+  "cover": "off (pre-change path)",
+  "frameIntervalMs": {
+   "n": 31,
+   "mean": 175.65,
+   "p95": 358.7,
+   "max": 418.6
+  },
+  "over33ms": 29,
+  "over50ms": 25,
+  "tapToReturnMs": {
+   "n": 8,
+   "mean": 195,
+   "p95": 239,
+   "max": 239
+  }
+ },
+ {
+  "profile": "390x844@3",
+  "throttle": 4,
+  "cover": "on",
+  "frameIntervalMs": {
+   "n": 30,
+   "mean": 185.22,
+   "p95": 340.4,
+   "max": 450.1
+  },
+  "over33ms": 29,
+  "over50ms": 26,
+  "tapToReturnMs": {
+   "n": 8,
+   "mean": 202.5,
+   "p95": 242,
+   "max": 242
+  }
+ },
+ {
+  "profile": "1280x720@1",
+  "throttle": 1,
+  "cover": "off (pre-change path)",
+  "frameIntervalMs": {
+   "n": 292,
+   "mean": 16.63,
+   "p95": 21.1,
+   "max": 59.2
+  },
+  "over33ms": 1,
+  "over50ms": 1,
+  "tapToReturnMs": {
+   "n": 8,
+   "mean": 9.63,
+   "p95": 22,
+   "max": 22
+  }
+ },
+ {
+  "profile": "1280x720@1",
+  "throttle": 1,
+  "cover": "on",
+  "frameIntervalMs": {
+   "n": 285,
+   "mean": 17.02,
+   "p95": 23.5,
+   "max": 44.9
+  },
+  "over33ms": 4,
+  "over50ms": 0,
+  "tapToReturnMs": {
+   "n": 8,
+   "mean": 10.13,
+   "p95": 22,
+   "max": 22
+  }
+ },
+ {
+  "profile": "1280x720@1",
+  "throttle": 4,
+  "cover": "off (pre-change path)",
+  "frameIntervalMs": {
+   "n": 71,
+   "mean": 71.99,
+   "p95": 119.3,
+   "max": 200.9
+  },
+  "over33ms": 67,
+  "over50ms": 53,
+  "tapToReturnMs": {
+   "n": 8,
+   "mean": 74.38,
+   "p95": 96,
+   "max": 96
+  }
+ },
+ {
+  "profile": "1280x720@1",
+  "throttle": 4,
+  "cover": "on",
+  "frameIntervalMs": {
+   "n": 70,
+   "mean": 71.65,
+   "p95": 142.7,
+   "max": 180.8
+  },
+  "over33ms": 65,
+  "over50ms": 51,
+  "tapToReturnMs": {
+   "n": 8,
+   "mean": 74.5,
+   "p95": 110,
+   "max": 110
+  }
+ }
+]
