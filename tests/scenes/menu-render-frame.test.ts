@@ -1961,7 +1961,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain('if (advanceMazerSharedAuthMutationEpoch() === null)');
     expect(authSource).toContain('if (advanceMazerAuthMutationEpoch() === null)');
     expect(authSource).not.toContain('runLegacyAuthJsSessionMutation');
-    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\([^,]+, async \(\) => \{/g)).toHaveLength(3);
+    expect(authSource.match(/return runLegacyAuthDirectSessionMutation\([^,]+, async \(\) => \{/g)).toHaveLength(2);
     expect(authSource).not.toContain('runLegacyAuthInternallyLockedMutation');
     expect(authSource).toContain("const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;");
     expect(authSource).toContain('if (key === auth.storageKey && originalStorage.getItem(key) !== null) {');
@@ -1978,7 +1978,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain('if (!isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey)) {');
     expect(menuSceneSource).toContain('await signOutLegacyAuth(this.authSnapshot)');
     expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
-    expect(authSource.match(/runLegacyAbortableCredentialRequest\(/g)).toHaveLength(3);
+    expect(authSource.match(/runLegacyAbortableCredentialRequest\(/g)).toHaveLength(2);
     expect(authSource).toContain('LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS = 10_000');
     expect(authSource).toContain('sessionResult = await client.auth.getSession();');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");
@@ -2355,7 +2355,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('Guest mode is active. Sign in to keep account progress separate.');
   });
 
-  test('owns password recovery as an opaque game-pausing auth state without changing login or signup', () => {
+  test('owns password recovery as an opaque game-pausing auth state without changing login', () => {
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const vercelConfig = JSON.parse(readFileSync(resolve(process.cwd(), 'vercel.json'), 'utf8')) as {
@@ -2393,7 +2393,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain(
       "this.overlayGraphics.fillStyle(this.overlay === 'auth' ? cyberArcadeMaterial.substrate.field : 0x02040a, this.overlay === 'auth' ? 1 : 0.82);"
     );
-    expect(menuSceneSource).toContain("this.authForm.mode === 'signup'");
+    expect(menuSceneSource).not.toContain("this.authForm.mode === 'signup'");
+    expect(menuSceneSource).not.toContain('signUpLegacyAuth');
     expect(menuSceneSource).toContain('signInLegacyAuth(this.authForm.email, this.authForm.password)');
   });
 

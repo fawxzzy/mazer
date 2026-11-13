@@ -127,9 +127,6 @@ export const resolveLegacyAuthBottomFeedbackLabel = (
   if (normalizedError === LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured) {
     return 'Account access unavailable';
   }
-  if (normalizedError === LEGACY_AUTH_MESSAGE_COPY.signupNotConfigured) {
-    return 'Account creation unavailable';
-  }
   if (normalizedError === LEGACY_AUTH_MESSAGE_COPY.passwordResetNotConfigured) {
     return 'Password reset unavailable';
   }
@@ -160,12 +157,6 @@ export const resolveLegacyAuthBottomFeedbackLabel = (
   if (message.tone === 'error') {
     return 'Could not finish — try again';
   }
-  if (message.copy === LEGACY_AUTH_MESSAGE_COPY.verifyEmail) {
-    return 'Check your email';
-  }
-  if (message.copy === LEGACY_AUTH_MESSAGE_COPY.accountCreated) {
-    return 'Account created';
-  }
 
   return message.copy.replace(/\.$/, '');
 };
@@ -175,8 +166,7 @@ type LegacyAuthPresentationState =
   | 'authenticated'
   | 'fresh-sign-in'
   | 'reauth-required'
-  | 'remembered-identity'
-  | 'signup';
+  | 'remembered-identity';
 
 // One priority-ordered classification instead of two parallel 5-way ternary
 // chains (title and helper used to re-derive the same branch order
@@ -185,13 +175,11 @@ const resolveLegacyAuthPresentationState = ({
   accountUnavailable,
   authenticated,
   hasRememberedIdentity,
-  isSignup,
   requiresReauthentication
 }: {
   accountUnavailable: boolean;
   authenticated: boolean;
   hasRememberedIdentity: boolean;
-  isSignup: boolean;
   requiresReauthentication: boolean;
 }): LegacyAuthPresentationState => {
   if (authenticated) {
@@ -199,9 +187,6 @@ const resolveLegacyAuthPresentationState = ({
   }
   if (accountUnavailable) {
     return 'account-unavailable';
-  }
-  if (isSignup) {
-    return 'signup';
   }
   if (requiresReauthentication) {
     return 'reauth-required';
@@ -224,8 +209,6 @@ const resolveLegacyAuthTitleAndHelper = (
       return { helper: '', title: 'Account' };
     case 'account-unavailable':
       return { helper: '', title: 'Welcome' };
-    case 'signup':
-      return { helper: '', title: 'Create Account' };
     case 'reauth-required':
       return { helper: '', title: 'Welcome' };
     case 'remembered-identity':
@@ -244,7 +227,6 @@ const resolveLegacyAuthTitleAndHelper = (
 export const resolveLegacyAuthPresentation = (
   input: LegacyAuthPresentationInput
 ): LegacyAuthPresentation => {
-  const isSignup = input.mode === 'signup';
   const hasRememberedIdentity = input.rememberedIdentity !== null;
   const requiresReauthentication = input.rememberedIdentity?.sessionState === 'reauth-required';
   const authenticated = input.snapshot.status === 'authenticated';
@@ -253,17 +235,16 @@ export const resolveLegacyAuthPresentation = (
     accountUnavailable,
     authenticated,
     hasRememberedIdentity,
-    isSignup,
     requiresReauthentication
   });
   const { helper, title } = resolveLegacyAuthTitleAndHelper(state);
 
   return {
-    alternateActionLabel: isSignup ? 'Log in' : 'Create account',
+    alternateActionLabel: 'Create account',
     emailLabel: 'Email',
     helper,
     passwordLabel: 'Password',
-    primaryActionLabel: isSignup ? 'Create account' : 'Sign in',
+    primaryActionLabel: 'Sign in',
     recoveryActionLabel: 'Reset password',
     title
   };
