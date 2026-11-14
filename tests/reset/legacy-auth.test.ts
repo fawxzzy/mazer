@@ -10,7 +10,6 @@ import {
   LegacyAuthJsLockAcquireTimeoutError,
   LegacyAuthJsLockUnavailableError,
   buildLegacyRememberedIdentityState,
-  captureLegacyPasswordRecoveryBootUrlState,
   clearLegacyPasswordRecoveryUrl,
   createEmptyLegacyAuthFormState,
   createLegacyAuthSessionSnapshot,
@@ -33,7 +32,6 @@ import {
   resolveLegacyPasswordRecoveryRedirectUrl,
   resolveLegacyPasswordRecoveryUrlState,
   resolveLegacyPasswordUpdateSubmitState,
-  resolveLegacyAuthAccountLabel,
   resolveLegacyAuthConfig,
   resolveLegacyAuthInvalidFields,
   resolveLegacyAuthScopedStorageKey,
@@ -725,14 +723,9 @@ describe('legacy auth runtime', () => {
     })).toEqual({ hasProviderError: true, requested: false });
   });
 
-  test('retains a real recovery callback through auth bootstrap URL cleanup', () => {
-    expect(captureLegacyPasswordRecoveryBootUrlState({
-      hash: '#access_token=secret&type=recovery',
-      pathname: '/update-password',
-      search: ''
-    })).toEqual({ hasProviderError: false, requested: true });
+  test('reads the recovery callback from the live URL only', () => {
     expect(readLegacyPasswordRecoveryBootUrlState({
-      hash: '',
+      hash: '#access_token=secret&type=recovery',
       pathname: '/update-password',
       search: ''
     })).toEqual({ hasProviderError: false, requested: true });
@@ -1102,19 +1095,5 @@ describe('legacy auth runtime', () => {
     expect(guestStorage?.getItem(baseKey)).toBe('guest-state');
     expect(userStorage?.getItem(baseKey)).toBe('user-state');
     expect(storage.getItem(baseKey)).toBeNull();
-  });
-
-  test('keeps account labels player-facing and compact', () => {
-    expect(resolveLegacyAuthAccountLabel(createSnapshot())).toBe('Guest');
-    expect(resolveLegacyAuthAccountLabel(createSnapshot({
-      configured: false,
-      status: 'unavailable'
-    }))).toBe('Guest');
-    expect(resolveLegacyAuthAccountLabel(createSnapshot({
-      displayName: 'Maze Runner',
-      email: 'runner@example.com',
-      status: 'authenticated',
-      userId: 'user-123'
-    }))).toBe('Maze Runner');
   });
 });

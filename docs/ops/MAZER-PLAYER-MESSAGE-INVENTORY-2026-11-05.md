@@ -62,7 +62,7 @@ no feedback. `saveLegacyAccountUsername` also contains a duplicate of
 
 F5. **Dormant message code (no runtime consumer in `src/`).** `resolveLegacyOverlayToggleMessage`,
 `resolveLegacyOverlayMovementSpeedMessage`, `resolveLegacyOverlayFieldCommitMessage`,
-`LEGACY_OVERLAY_MESSAGE_COPY`, `resolveLegacyAuthBottomFeedbackLabel` (tests only), and the DOM
+`LEGACY_OVERLAY_MESSAGE_COPY`, and the DOM
 `createStatusBanner` primitive (`src/ui/dom/StatusBanner.ts`, exported, tested, never mounted). The
 `source: 'overlay'` and `source: 'diagnostics'` members of `LegacyPlayerMessageSource` have no live
 producer except `'overlay'` for `Progression reset.`.
@@ -330,7 +330,7 @@ Ordered by dependency. Owners per section 1. Each item names the guard row it wi
 | P6 | Surface username availability and save failures as messages; reuse `usernameTaken` instead of the duplicate | 5C + 3B | Silent failures (F4) | delete the duplicate row |
 | P7 | Decide on remote-sync visibility. Default: keep silent (recorded decision); optionally surface only a persistent failure after retries | Zac (product) | F3 is deliberate; do not change by accident | would flip the `silent sync` pin |
 | P8 | Decide a fatal boot-error fallback (a plain DOM line from `resolveLegacyBootMessage`) | 5C + Zac | F7: a failed boot shows nothing | flips the boot pin |
-| P9 | Delete or wire the dormant resolvers (`resolveLegacyOverlay*Message`, `resolveLegacyAuthBottomFeedbackLabel`) | 3B | Dead surface area (F5) | flips the dormant pins |
+| P9 | Delete or wire the dormant resolvers (`resolveLegacyOverlay*Message`; `resolveLegacyAuthBottomFeedbackLabel` was deleted by MAZER-ACCT-038) | 3B | Dead surface area (F5) | flips the dormant pins |
 | P10 | Visual QA per the card: failed login, failed create, fetch failure, success, logout, at phone and desktop sizes (`npm run visual:ui-surfaces`) | whoever lands P1-P2 | The card's proof plan | none |
 | P11 | Rename the label builder to Rank wording (or gate the visual-diagnostics payload) and update the two label tests | legacyProgression lane | Removes the last `Skill` literal and the always-on DOM attribute | the vocabulary guard stays green |
 
