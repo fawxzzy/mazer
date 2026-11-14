@@ -81,6 +81,8 @@ The app itself only calls `registration.update()` once per page load, so a long-
 4. **The precache also ships the dev/QA entry pages.** `proof-surfaces`, `visual-proof`, `watch-pass-*`, `planet3d`, `future-phaser` and their chunks (about 300 KiB on disk) are in every player's precache, and the legacy cleanup worker `sw.js` is in it too. Not a bug; a trim candidate for whoever owns `vite.config.ts` (Wave 5C).
 5. **Signed-out visitors cannot play offline** (the sign-in gate stays locked; a signed-out launch stops on the fallback screen with the existing line, see check 11). The proof reaches level 1 offline through the fixture / `?previewLevel=1` routes, not through a real saved session, so "a signed-in player reopens the installed app offline" is proven only up to that fixture.
 
+> Update (MAZER-PWA-007, 2026-11-14): the gate matrix below is the OLD 18-row table. It is now 29 rows under the always-on policy and the proof has 21 checks; see `docs/ops/MAZER-INSTALL-GATE-ALWAYS-ON-2026-11-14.md`.
+
 ## Install gate: current behaviour (no change)
 
 Observed on the production build, headless, `mazer-proof.localhost` unless noted. "Gate on first boot" is the gate's decision during the first boot of the page.

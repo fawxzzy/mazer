@@ -180,33 +180,50 @@ export const summarizeByPath = (requests, appOrigin) => {
 };
 
 /**
- * Install-gate behaviour matrix: what the gate does in each context today.
- * `expect` is what src/boot/installPolicy.ts + installGate.ts say; the proof
- * script observes the real build and `evaluateGateRow` compares the two.
- * Describes current behaviour only; it does not endorse it (the policy
- * itself is an open owner decision).
+ * Install-gate behaviour matrix (MAZER-PWA-007: the gate is ALWAYS ON in a browser tab).
+ * `expect` is what src/boot/installPolicy.ts + installGate.ts say; the proof script observes the real
+ * production build served off-localhost (mazer-proof.localhost) and `evaluateGateRow` compares the two.
+ * Rules the table pins: a non-installed visit is blocked whatever the URL carries (previewLevel, autoSignIn,
+ * authFixture, an OAuth callback, a hash), on every UA class (tablets and in-app browsers included) and in every
+ * display mode that is not an installed display context; only localhost and a real installed display signal open
+ * the app. Installed contexts use ?autoSignIn=0 here unless the row is about a callback: this table is about the
+ * install gate, and a signed-out standalone launch would otherwise leave for the account host after the gate.
  */
-// MAZER-ACCT-040: installed (standalone) contexts use ?autoSignIn=0 here: this table is about the install
-// gate, and a signed-out standalone launch would otherwise leave for the account host after the gate.
 export const INSTALL_GATE_SCENARIOS = Object.freeze([
+  // Local development: the only runtime exemption.
   { id: 'localhost-browser', label: 'Browser tab on localhost / 127.0.0.1', host: 'localhost', display: 'browser', ua: 'desktop-chromium', path: '/', expect: { blocked: false } },
+  { id: 'localhost-preview-level', label: 'Browser tab on 127.0.0.1, ?previewLevel=1 (dev)', host: 'localhost', display: 'browser', ua: 'desktop-chromium', path: '/?previewLevel=1', expect: { blocked: false } },
   { id: 'localhost-forced', label: 'Browser tab on 127.0.0.1 with ?forceInstallGate=1', host: 'localhost', display: 'browser', ua: 'desktop-chromium', path: '/?forceInstallGate=1', expect: { blocked: true, mode: 'manual-desktop-chromium' } },
+  // Every browser class, plain tab.
   { id: 'browser-desktop-chromium', label: 'Browser tab, desktop Chrome / Edge', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/', expect: { blocked: true, mode: 'manual-desktop-chromium' } },
   { id: 'browser-desktop-firefox', label: 'Browser tab, desktop Firefox', host: 'public', display: 'browser', ua: 'desktop-firefox', path: '/', expect: { blocked: true, mode: 'manual-desktop-other' } },
   { id: 'browser-desktop-safari', label: 'Browser tab, desktop Safari', host: 'public', display: 'browser', ua: 'desktop-safari', path: '/', expect: { blocked: true, mode: 'manual-desktop-other' } },
   { id: 'browser-android', label: 'Browser tab, Android Chrome', host: 'public', display: 'browser', ua: 'android', path: '/', expect: { blocked: true, mode: 'manual-android' } },
+  { id: 'browser-android-tablet', label: 'Browser tab, Android tablet Chrome', host: 'public', display: 'browser', ua: 'android-tablet', path: '/', expect: { blocked: true, mode: 'manual-android' } },
+  { id: 'browser-android-in-app', label: 'In-app browser on Android (Instagram WebView)', host: 'public', display: 'browser', ua: 'android-in-app', path: '/', expect: { blocked: true, mode: 'in-app-browser' } },
   { id: 'browser-ios', label: 'Browser tab, iPhone Safari', host: 'public', display: 'browser', ua: 'ios', path: '/', expect: { blocked: true, mode: 'manual-ios' } },
+  { id: 'browser-ipad', label: 'Browser tab, iPad Safari', host: 'public', display: 'browser', ua: 'ipad', path: '/', expect: { blocked: true, mode: 'manual-ios' } },
   { id: 'browser-ios-in-app', label: 'In-app browser on iPhone (Instagram)', host: 'public', display: 'browser', ua: 'ios-in-app', path: '/', expect: { blocked: true, mode: 'in-app-browser' } },
+  // Install events and display modes that are not an installed app.
   { id: 'browser-install-prompt', label: 'Browser tab that fires beforeinstallprompt', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/', event: 'beforeinstallprompt', expect: { blocked: true, mode: 'prompt-available' } },
   { id: 'browser-app-installed-event', label: 'Browser tab after an appinstalled event', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/', event: 'appinstalled', expect: { blocked: true, mode: 'installed-open-app' } },
   { id: 'browser-fullscreen-only', label: 'Browser tab in plain display-mode: fullscreen (F11)', host: 'public', display: 'fullscreen', ua: 'desktop-chromium', path: '/', expect: { blocked: true, mode: 'manual-desktop-chromium' } },
+  { id: 'browser-android-referrer', label: 'Android Chrome tab opened by another app (android-app:// referrer, display browser)', host: 'public', display: 'android-referrer', ua: 'android', path: '/', expect: { blocked: true, mode: 'manual-android' } },
+  // URL forms that used to bypass the gate (or that someone might try): none works in a tab.
+  { id: 'route-level-preview', label: 'Browser tab, ?previewLevel=1 (QA sandbox route)', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/?previewLevel=1', expect: { blocked: true, mode: 'manual-desktop-chromium' } },
+  { id: 'route-auth-fixture', label: 'Browser tab, ?runtimeDiagnostics=1&authFixture=authenticated', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/?runtimeDiagnostics=1&authFixture=authenticated', expect: { blocked: true, mode: 'manual-desktop-chromium' } },
+  { id: 'route-auto-sign-in-off', label: 'Browser tab, ?autoSignIn=0', host: 'public', display: 'browser', ua: 'android', path: '/?autoSignIn=0', expect: { blocked: true, mode: 'manual-android' } },
+  { id: 'route-oauth-error', label: 'Browser tab, OAuth callback request (?error=access_denied)', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/?error=access_denied', expect: { blocked: true, mode: 'manual-desktop-chromium' } },
+  { id: 'route-oauth-code', label: 'Browser tab, OAuth callback request (?code=...&state=...)', host: 'public', display: 'browser', ua: 'ios', path: '/?code=qa-code&state=qa-state', expect: { blocked: true, mode: 'manual-ios' } },
+  { id: 'route-hash-params', label: 'Browser tab, hash parameters (#previewLevel=1&code=x&state=y)', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/#previewLevel=1&code=qa-code&state=qa-state', expect: { blocked: true, mode: 'manual-desktop-chromium' } },
+  // Installed contexts: the only ways in (real display-mode signals).
   { id: 'standalone-matchmedia', label: 'Installed app, display-mode: standalone', host: 'public', display: 'standalone', ua: 'desktop-chromium', path: '/?autoSignIn=0', expect: { blocked: false } },
   { id: 'standalone-minimal-ui', label: 'Installed app, display-mode: minimal-ui', host: 'public', display: 'minimal-ui', ua: 'desktop-chromium', path: '/?autoSignIn=0', expect: { blocked: false } },
   { id: 'standalone-wco', label: 'Installed desktop app, display-mode: window-controls-overlay', host: 'public', display: 'window-controls-overlay', ua: 'desktop-chromium', path: '/?autoSignIn=0', expect: { blocked: false } },
   { id: 'standalone-ios', label: 'iPhone home-screen app (navigator.standalone)', host: 'public', display: 'navigator-standalone', ua: 'ios', path: '/?autoSignIn=0', expect: { blocked: false } },
-  { id: 'standalone-android-referrer', label: 'Android WebAPK launch (android-app:// referrer)', host: 'public', display: 'android-referrer', ua: 'android', path: '/?autoSignIn=0', expect: { blocked: false } },
-  { id: 'route-level-preview', label: 'Browser tab, ?previewLevel=1 (QA sandbox route)', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/?previewLevel=1', expect: { blocked: false } },
-  { id: 'route-oauth-callback', label: 'Browser tab, OAuth callback request (?error=access_denied)', host: 'public', display: 'browser', ua: 'desktop-chromium', path: '/?error=access_denied', expect: { blocked: false } }
+  { id: 'standalone-android-webapk', label: 'Android WebAPK / TWA (display-mode: standalone, Android UA)', host: 'public', display: 'standalone', ua: 'android', path: '/?autoSignIn=0', expect: { blocked: false } },
+  { id: 'standalone-oauth-return', label: 'Installed app, OAuth callback return (?error=access_denied)', host: 'public', display: 'standalone', ua: 'android', path: '/?error=access_denied', expect: { blocked: false } },
+  { id: 'standalone-ios-oauth-return', label: 'iPhone home-screen app, OAuth callback return (?code=...&state=...)', host: 'public', display: 'navigator-standalone', ua: 'ios', path: '/?code=qa-code&state=qa-state', expect: { blocked: false } }
 ]);
 
 /** observed = { blocked: boolean, mode: string|null, booted: boolean } */

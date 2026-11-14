@@ -186,8 +186,9 @@ canvas:focus-visible {
 .mazer-install-gate-brand {
   border-radius: 20%;
   display: block;
-  height: 48px;
-  width: 48px;
+  height: 72px;
+  margin: 0 auto;
+  width: 72px;
 }
 
 .mazer-install-gate-title {

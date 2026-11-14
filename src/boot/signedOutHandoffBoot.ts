@@ -17,6 +17,7 @@ import {
 import { hasLegacyStoredAuthSession } from '../legacy-runtime/legacyAuthGateResolution';
 import { isLegacyLevelPreviewRoute } from '../legacy-runtime/legacyLevelPreview';
 import { isLegacyRuntimeDiagnosticsAuthFixtureRoute } from '../legacy-runtime/legacyRemoteProgression';
+import { clearMazerHostSignOutAttempt } from '../legacy-runtime/legacyHostSignOut';
 import {
   MAZER_AUTO_HANDOFF_NAVIGATION_TIMEOUT_MS,
   isMazerAutoHandoffOptedOut,
@@ -43,13 +44,18 @@ export const runMazerSignedOutHandoffAtBoot = async (
   oauthCallbackRequested: boolean
 ): Promise<'continue'> => {
   const localStorage = safeStorage(() => window.localStorage);
+  const hasStoredSession = hasLegacyStoredAuthSession(localStorage);
+  if (hasStoredSession) {
+    // MAZER-ACCT-042: signed in again, so the next explicit Sign out may leave for the host once more.
+    clearMazerHostSignOutAttempt(safeStorage(() => window.sessionStorage));
+  }
   const result = await runMazerSignedOutHandoff({
     authFixtureRoute: isLegacyRuntimeDiagnosticsAuthFixtureRoute(window.location.search),
     begin: async () => {
       markMazerBootStatus('shared-account-redirect');
       return beginMazerOAuthAuthorization();
     },
-    hasStoredSession: hasLegacyStoredAuthSession(localStorage),
+    hasStoredSession,
     isLocalhost: LOCAL_HOSTNAMES.includes(window.location.hostname),
     levelPreviewRequested: isLegacyLevelPreviewRoute(window.location.search),
     localStorage,

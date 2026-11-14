@@ -486,6 +486,10 @@ import {
   type LegacyAuthSessionSnapshot,
   type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
+import {
+  MAZER_HOST_SIGN_OUT_NAVIGATION_TIMEOUT_MS,
+  runMazerHostSignOutInBrowser
+} from '../legacy-runtime/legacyHostSignOut';
 import { LEGACY_AUTH_FAILURE_CODES } from '../legacy-runtime/legacyAuthFailureCodes';
 import { resolveLegacyAuthFeedbackExpiresAtMs } from '../legacy-runtime/legacyAuthFeedbackLifetime';
 import {
@@ -14307,7 +14311,16 @@ export class MenuScene extends Phaser.Scene {
     this.authSubmitting = true;
     this.uiDirty = true;
     const result = await signOutLegacyAuth(this.authSnapshot);
-    this.authSubmitting = false;
+    // MAZER-ACCT-042: after a real local sign-out, also end the account-host session (one guarded navigation,
+    // falls back to local-only when the endpoint is missing or unreachable).
+    const hostSignOut = await runMazerHostSignOutInBrowser(result.snapshot.status);
+    this.authSubmitting = hostSignOut.status === 'navigating';
+    if (hostSignOut.status === 'navigating') {
+      window.setTimeout(() => {
+        this.authSubmitting = false;
+        this.uiDirty = true;
+      }, MAZER_HOST_SIGN_OUT_NAVIGATION_TIMEOUT_MS);
+    }
     this.authForm = createEmptyLegacyAuthFormState(
       'login',
       readLegacyRememberedIdentity(this.resolveBrowserLocalStorage())

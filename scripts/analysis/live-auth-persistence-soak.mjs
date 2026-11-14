@@ -1,3 +1,4 @@
+import { emulateInstalledApp, isLocalDevelopmentHost } from './lib/installed-app-emulation.mjs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFile, writeFile } from 'node:fs/promises';
@@ -641,6 +642,10 @@ export const createGuardedAuthPersistenceContext = async ({
     serviceWorkers: executionPlan.serviceWorkers,
     viewport: MOBILE_VIEWPORT
   });
+  if (!isLocalDevelopmentHost(new URL(resolvedBaseUrl).hostname)) {
+    // MAZER-PWA-007: the install gate is always on off-localhost; run as an emulated installed app.
+    await emulateInstalledApp(context);
+  }
   await context.route('**/*', async (route) => {
     const request = route.request();
     const requestSummary = {

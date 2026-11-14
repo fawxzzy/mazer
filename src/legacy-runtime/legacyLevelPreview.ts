@@ -11,7 +11,8 @@
  *    which every remote layer already treats as ineligible (no Supabase
  *    client, no RPC, no outbox), so complete-level / initialize / reset /
  *    settings / leaderboard writes cannot fire;
- *  - the account bootstrap, install gate and auth client are skipped at boot.
+ *  - the account bootstrap and auth client are skipped at boot. The install gate is NOT skipped (MAZER-PWA-007):
+ *    in a browser tab this route shows the gate like every other URL; QA drives it from an emulated installed app.
  *
  * Rank is NOT an input: it is derived from the level's target complexity
  * (`resolveLegacyProgressionRank`), so the route takes the level only.

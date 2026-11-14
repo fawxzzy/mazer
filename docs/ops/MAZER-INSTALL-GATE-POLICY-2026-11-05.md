@@ -1,5 +1,7 @@
 # Mazer Install Gate Policy
 
+> Superseded in part by `docs/ops/MAZER-INSTALL-GATE-ALWAYS-ON-2026-11-14.md` (MAZER-PWA-007): the previewLevel and OAuth-callback bypasses, the `android-app://` referrer signal and the matching "not blocked" rows below no longer exist. The gate now applies to every non-installed visit off localhost.
+
 Date: 2026-11-05
 Lane: Mazer install gate (UI rework Wave 5C owns `installGate.ts`, `main.ts`, `index.html`, `base.css`)
 Code: `src/boot/installPolicy.ts` (pure policy), `src/boot/installSurface.ts` (live runtime facts), `src/boot/installGate.ts` (overlay + copy), `src/boot/main.ts` (boot wiring)
