@@ -208,6 +208,12 @@ import {
   type LegacyRuntimeMode
 } from '../legacy-runtime/legacyOverlayRouting';
 import {
+  clearScopedLegacyAttemptSeed,
+  createLegacyAttemptSeedContext,
+  readScopedLegacyAttemptSeed,
+  writeScopedLegacyAttemptSeed
+} from '../legacy-runtime/legacyAttemptSeed';
+import {
   DEFAULT_LEGACY_RUNTIME_SEED,
   createLegacyRuntimeRandomSeed,
   resolveInitialLegacyRuntimeSeed
@@ -5768,6 +5774,14 @@ export class MenuScene extends Phaser.Scene {
         : prefetched?.seed ?? this.createFreshLegacyPlayGenerationSeed()
       : undefined;
     const generationScale = this.resolveLegacyProgressionScaleForMode(mode);
+    if (mode === 'play' && !this.explicitRuntimeMazeSeed && seedOverride !== undefined) {
+      writeScopedLegacyAttemptSeed(
+        this.resolveBrowserLocalStorage(), this.authSnapshot, createLegacyAttemptSeedContext(
+          this.resolveLegacyBoardAspectRatioForMode('play', this.resolveLegacyProgressionScaleForMode('play')),
+          this.progressionState.tracks.player
+        ), seedOverride
+      );
+    }
     this.applyGenerationRequest(
         createLegacyGenerationRequest({
           aspectRatio: this.resolveLegacyBoardAspectRatioForMode(mode, generationScale),
@@ -5876,6 +5890,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createFreshLegacyPlayGenerationSeed(): number {
+    const savedAttemptSeed = readScopedLegacyAttemptSeed(
+      this.resolveBrowserLocalStorage(), this.authSnapshot, createLegacyAttemptSeedContext(
+          this.resolveLegacyBoardAspectRatioForMode('play', this.resolveLegacyProgressionScaleForMode('play')),
+          this.progressionState.tracks.player
+        )
+    );
+    if (savedAttemptSeed !== null) {
+      return savedAttemptSeed;
+    }
     const playerTrack = this.progressionState.tracks.player;
     const completedCyclesSeed = resolveLegacyProgressionOrdinalSeedComponent(playerTrack.completedCycles, 1_000_003);
     const levelSeed = resolveLegacyProgressionOrdinalSeedComponent(playerTrack.level, 1_000_033);
@@ -14187,6 +14210,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.progressionState = effects.state;
+    clearScopedLegacyAttemptSeed(this.resolveBrowserLocalStorage(), this.authSnapshot);
     this.loadPersistedMazeCycleTelemetryHistory();
     this.resetLegacyWorldTurnHost();
     this.setLatestOverlayMessage(createLegacyPlayerMessage({
@@ -14663,6 +14687,7 @@ export class MenuScene extends Phaser.Scene {
         latestReceipt,
         this.maze
       );
+      clearScopedLegacyAttemptSeed(this.resolveBrowserLocalStorage(), this.authSnapshot);
       void writeLegacyRemoteCompletion(
         completionAuthSnapshot,
         previousProgressionState,
