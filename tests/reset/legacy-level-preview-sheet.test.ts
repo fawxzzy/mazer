@@ -25,8 +25,7 @@ describe('settings sheet: Level Preview section (pause only, opt-in)', () => {
   test('the default pause and menu sheets are unchanged without the option', () => {
     const pause = buildLegacySettingsSheetPlan({ context: 'pause', height: 844, settingsExpanded: true, width: 390 });
     expect(pause.items.map((item) => item.model.id)).toEqual([
-      'resume', 'settings-disclosure', 'how-to-play', 'display-heading', 'trail-fade', 'trail-shine',
-      'animated-background', 'reduce-motion', 'reduce-motion-note', 'haptics', 'quit-to-menu'
+      'resume', 'settings-disclosure', 'how-to-play', 'reduce-motion', 'haptics', 'quit-to-menu'
     ]);
     const withIgnoredOption = buildLegacySettingsSheetPlan({
       context: 'menu', height: 844, levelPreview: preview(100), signedIn: true, width: 390

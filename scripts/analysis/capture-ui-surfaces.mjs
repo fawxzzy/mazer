@@ -46,13 +46,12 @@ const EXPECTED_GOAL_CORE_COLOR = 0xff405d;
 const EXPECTED_TRAIL_SHINE_COLOR = 0xf1faf6;
 const EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe9fff1;
 const INLINE_STATE_TEXT_LABELS = Object.freeze([
-  'Animated Background',
   'High Contrast',
   'Camera Follow',
   'Control Style',
   'Smart Steering',
-  'Trail Fade',
-  'Trail Shine'
+  'Reduce Motion',
+  'Haptics'
 ]);
 // MAZER-ACCT-043: Mazer keeps no account screen. The forced signed-out state is the failure fallback of the hand-off
 // (MenuScene buildAuthOverlay, drawn from legacyAccountStatusState.ts): the loader icon, ONE status line and ONE
@@ -1329,7 +1328,7 @@ export const evaluateAuthStatusAnatomy = (surface) => {
 };
 
 // Settings is ONE shared sheet (menu + pause, PR #386): a title, a `How to play`
-// row that opens the Guide sub-view, a Display group (toggles only; the zoom slider was removed 2026-11-06) and,
+// row that opens the Guide sub-view, the Reduce Motion and Haptics rows, each with a description line under it (Trail Fade, Trail Shine and Animated Background were removed in MAZER-UI-026; the zoom slider on 2026-11-06) and,
 // in the menu context, an Account section. Every label below is a row label in
 // src/legacy-runtime/legacySettingsSheetPlan.ts; tests/reset/ui-surface-capture-script.test.mjs
 // asserts each one still exists in buildLegacySettingsSheetModel, so a renamed or
@@ -1338,9 +1337,8 @@ export const evaluateAuthStatusAnatomy = (surface) => {
 // owned by the sheet header and changes independently of the rows.
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
   'How to play',
-  'Trail Fade',
-  'Trail Shine',
-  'Animated Background'
+  'Reduce Motion',
+  'Haptics'
 ]);
 
 // The Guide sub-view opened from the `How to play` row (legacyGuideContent.ts).
@@ -1384,9 +1382,8 @@ const PAUSE_CARD_EXPECTED_LABELS = Object.freeze([
   'Quit to Menu'
 ]);
 const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([
-  'Trail Fade',
-  'Trail Shine',
-  'Animated Background'
+  'Reduce Motion',
+  'Haptics'
 ]);
 
 // Account section of the Settings sheet (menu context, signed in): Reset
@@ -2732,10 +2729,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         controlMode: 'stick',
         darkMode: false,
         movementSpeed: 0.38,
-        toggleAnimatedBackdrop: true,
-        toggleCameraFollow: true,
-        toggleTrailFade: true,
-        toggleTrailPulse: true
+        toggleCameraFollow: true
       });
     }
     await seedTopologyFixture(page, topologyFixture);

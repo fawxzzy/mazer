@@ -18,10 +18,7 @@ export interface LegacyGameTogglePreferences {
   darkMode: boolean;
   hapticsEnabled: boolean;
   movementSpeed: number;
-  toggleAnimatedBackdrop: boolean;
   toggleReducedMotion: boolean;
-  toggleTrailFade: boolean;
-  toggleTrailPulse: boolean;
 }
 
 const isControlMode = (value: unknown): value is LegacyControlMode => (
@@ -73,10 +70,7 @@ const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Parti
     'darkMode',
     'hapticsEnabled',
     'movementSpeed',
-    'toggleAnimatedBackdrop',
-    'toggleReducedMotion',
-    'toggleTrailFade',
-    'toggleTrailPulse'
+    'toggleReducedMotion'
   ] satisfies Array<keyof LegacyGameTogglePreferences>;
 
   if (!presentKeys.some(hasOwn)) {
@@ -101,10 +95,7 @@ export const pickLegacyGameTogglePreferences = (
   darkMode: settings.darkMode,
   hapticsEnabled: settings.hapticsEnabled,
   movementSpeed: normalizeLegacyMovementSpeed(settings.movementSpeed),
-  toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop,
-  toggleReducedMotion: settings.toggleReducedMotion,
-  toggleTrailFade: settings.toggleTrailFade,
-  toggleTrailPulse: settings.toggleTrailPulse
+  toggleReducedMotion: settings.toggleReducedMotion
 });
 
 export const normalizeLegacyGameTogglePreferences = (
@@ -120,10 +111,7 @@ export const normalizeLegacyGameTogglePreferences = (
       : Number(value?.movementSpeed),
     clampNumber(fallback.movementSpeed, LEGACY_MOVEMENT_SPEED_MIN, LEGACY_MOVEMENT_SPEED_MAX)
   ),
-  toggleAnimatedBackdrop: normalizeBoolean(value?.toggleAnimatedBackdrop, fallback.toggleAnimatedBackdrop),
-  toggleReducedMotion: normalizeBoolean(value?.toggleReducedMotion, fallback.toggleReducedMotion),
-  toggleTrailFade: normalizeBoolean(value?.toggleTrailFade, fallback.toggleTrailFade),
-  toggleTrailPulse: normalizeBoolean(value?.toggleTrailPulse, fallback.toggleTrailPulse)
+  toggleReducedMotion: normalizeBoolean(value?.toggleReducedMotion, fallback.toggleReducedMotion)
 });
 
 export const mergeLegacyGameTogglePreferences = (
@@ -226,13 +214,25 @@ export const migrateLegacyGameToggleSettingsToGuestScope = (
 };
 
 /**
- * Board Zoom was removed (the board size is frozen by product decision). A
- * `camScale` value stored by an older build is never read back into settings,
- * but this strips the dead key from storage so no tool or later build can
- * resurrect it. Best effort: storage failures are swallowed like every other
- * preference write.
+ * Keys a past build stored in the scoped game-toggle blob (and the account profile `settings` JSON) for settings
+ * that no longer exist. They are never read back into settings and never written again:
+ *   - `camScale`: Board Zoom, removed because the board size is frozen.
+ *   - `toggleTrailFade`, `toggleTrailPulse`, `toggleAnimatedBackdrop` (MAZER-UI-026): the Trail Fade, Trail Shine
+ *     and Animated Background rows, removed because Reduce Motion now decides all three
+ *     (see src/render/reducedMotion.ts, "Retired Display switches").
  */
-export const scrubRemovedCameraZoomFromGameToggleStorage = (
+export const RETIRED_GAME_TOGGLE_KEYS: readonly string[] = Object.freeze([
+  'camScale',
+  'toggleAnimatedBackdrop',
+  'toggleTrailFade',
+  'toggleTrailPulse'
+]);
+
+/**
+ * Strips the retired keys from the stored blob so no tool or later build can resurrect them. Best effort:
+ * storage failures are swallowed like every other preference write. Returns whether anything was removed.
+ */
+export const scrubRetiredGameToggleKeysFromStorage = (
   storage: Pick<Storage, 'getItem' | 'setItem'> | undefined
 ): boolean => {
   if (!storage) {
@@ -246,19 +246,43 @@ export const scrubRemovedCameraZoomFromGameToggleStorage = (
     }
 
     const parsed = JSON.parse(raw) as unknown;
-    if (
-      parsed === null
-      || typeof parsed !== 'object'
-      || Array.isArray(parsed)
-      || !Object.prototype.hasOwnProperty.call(parsed, 'camScale')
-    ) {
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return false;
+    }
+    const record = parsed as Record<string, unknown>;
+    const retiredPresent = RETIRED_GAME_TOGGLE_KEYS.filter((key) => Object.prototype.hasOwnProperty.call(record, key));
+    if (retiredPresent.length === 0) {
       return false;
     }
 
-    const { camScale: _removedCameraZoom, ...rest } = parsed as Record<string, unknown>;
+    const rest = Object.fromEntries(Object.entries(record).filter(([key]) => !RETIRED_GAME_TOGGLE_KEYS.includes(key)));
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify(rest));
     return true;
   } catch {
     return false;
+  }
+};
+
+/**
+ * Account sync keeps a fingerprint (the JSON of the picked preferences) to tell "this device changed a setting"
+ * from "the server changed it". A fingerprint stored by an older build still lists the retired keys, so it is
+ * canonicalised here; otherwise the first load after this change would see a phantom local edit and overwrite
+ * the account's settings with this device's. Anything that does not parse is returned unchanged.
+ */
+export const canonicalizeGameToggleFingerprint = (fingerprint: string): string => {
+  try {
+    const parsed = JSON.parse(fingerprint) as unknown;
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return fingerprint;
+    }
+    const record = parsed as Record<string, unknown>;
+    if (!RETIRED_GAME_TOGGLE_KEYS.some((key) => Object.prototype.hasOwnProperty.call(record, key))) {
+      return fingerprint;
+    }
+    return JSON.stringify(Object.fromEntries(
+      Object.entries(record).filter(([key]) => !RETIRED_GAME_TOGGLE_KEYS.includes(key))
+    ));
+  } catch {
+    return fingerprint;
   }
 };

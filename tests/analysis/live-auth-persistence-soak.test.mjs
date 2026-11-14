@@ -17,7 +17,8 @@ import {
   createFixtureSettingsRestorePlan,
   evaluateFixtureSettingsCleanup,
   evaluateFixtureSettingsIsolation,
-  evaluateTrailShineChangedStatePersistence,
+  evaluateHapticsChangedStatePersistence,
+  readHapticsFromStoredSettings,
   assertAuthPersistenceClosedBrowserBoundary,
   assertAuthPersistenceNavigationOrigin,
   isExternalMutationRequest,
@@ -37,7 +38,7 @@ import {
   summarizeAuthPersistenceSurface,
   summarizeAuthPersistenceSoak,
   verifyReadOnlyServiceWorkerAssets,
-  resolveTrailShineUiState,
+  resolveHapticsUiState,
   surfaceMatchesAuthPersistenceExpectation
 } from '../../scripts/analysis/live-auth-persistence-soak.mjs';
 
@@ -104,7 +105,7 @@ const passingSteps = [
   'signed-out-shared-account-contract',
   'diagnostics-fixture-entry',
   'diagnostics-fixture-options',
-  'diagnostics-fixture-trail-shine-changed',
+  'diagnostics-fixture-haptics-changed',
   'authenticated-reload',
   'authenticated-options-reload',
   'diagnostics-fixture-play',
@@ -131,13 +132,13 @@ const currentSignedOutSurface = {
 };
 
 const fixtureSettingsPreimage = Object.freeze({
-  authenticated: '{"toggleTrailPulse":true}',
-  guest: '{"toggleTrailPulse":false,"volume":0.25}',
-  unscoped: '{"toggleTrailPulse":true,"volume":0.5}'
+  authenticated: '{"hapticsEnabled":true}',
+  guest: '{"hapticsEnabled":false,"volume":0.25}',
+  unscoped: '{"hapticsEnabled":true,"volume":0.5}'
 });
 const fixtureSettingsChanged = Object.freeze({
   ...fixtureSettingsPreimage,
-  authenticated: '{"toggleTrailPulse":false}'
+  authenticated: '{"hapticsEnabled":false}'
 });
 
 describe('live auth persistence soak contract', () => {
@@ -578,21 +579,21 @@ describe('live auth persistence soak contract', () => {
     expect(source).toContain("id: 'signed-out-shared-account-contract'");
     expect(source).not.toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Sign in'");
     // Pause card: Resume / Settings / Quit to Menu, Settings collapsed on open;
-    // Trail Shine is only reachable after the Settings row is clicked.
+    // Haptics is only reachable after the Settings row is clicked.
     expect(source).toContain("buttons: ['Back', 'Resume', 'Settings', 'Quit to Menu']");
-    expect(source).toContain("forbiddenButtons: ['Trail Shine', 'Guide', 'Main Menu']");
-    expect(source).toContain("buttons: ['Back', 'Resume', 'Settings', 'Trail Shine', 'Quit to Menu'], mode: 'play', overlay: 'pause'");
+    expect(source).toContain("forbiddenButtons: ['Haptics', 'Guide', 'Main Menu']");
+    expect(source).toContain("buttons: ['Back', 'Resume', 'Settings', 'Haptics', 'Quit to Menu'], mode: 'play', overlay: 'pause'");
     expect(source).toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Settings')");
-    expect(source).not.toContain("'Back', 'Guide', 'Trail Shine', 'Main Menu'");
+    expect(source).not.toContain("'Back', 'Guide', 'Haptics', 'Main Menu'");
     // Options has no profile icon; the main-menu Account control is the only account entry.
-    expect(source).toContain("buttons: ['Trail Shine'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'");
-    expect(source).not.toContain("buttons: ['Trail Shine', 'Account']");
+    expect(source).toContain("buttons: ['Haptics'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'");
+    expect(source).not.toContain("buttons: ['Haptics', 'Account']");
     expect(source).toContain("id: 'diagnostics-fixture-account'");
     expect(source).toContain("buttons: ['Start', 'Settings', 'Account'], mode: 'menu', overlay: 'none'");
     expect(source).not.toContain("buttons: ['Account'], mode: 'menu', overlay: 'options'");
     expect(source).not.toContain("buttons: ['username', 'Reset progress', 'Sign out']");
-    expect(source).toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Trail Shine'");
-    expect(source).toContain('evaluateTrailShineChangedStatePersistence({');
+    expect(source).toContain("findVisualButtonCenter((await readDiagnostics(page)).visual, 'Haptics'");
+    expect(source).toContain('evaluateHapticsChangedStatePersistence({');
     expect(source).toContain('fixture_settings_restore');
     expect(source).toContain('(visual?.buttons ?? [])');
     expect(source).not.toContain('visual?.runtime?.buttons');
@@ -607,50 +608,51 @@ describe('live auth persistence soak contract', () => {
     expect(source).toContain('forbiddenButtons: RETIRED_LOCAL_AUTH_CONTROLS');
   });
 
-  test('requires an opposite Trail Shine state in runtime and visible UI before and after reload', () => {
-    const passing = evaluateTrailShineChangedStatePersistence({
-      initialRuntime: true,
+  test('requires an opposite Haptics state in the visible UI before and after reload', () => {
+    const passing = evaluateHapticsChangedStatePersistence({
       initialUi: true,
-      changedRuntime: false,
       changedUi: false,
-      reloadedRuntime: false,
       reloadedUi: false
     });
     expect(passing).toMatchObject({
       pass: true,
       expectedChanged: false,
-      changed: { runtime: false, ui: false },
-      reloaded: { runtime: false, ui: false }
+      changed: { ui: false },
+      reloaded: { ui: false }
     });
   });
 
   test('rejects no-op persistence and same-default-before-and-after evidence', () => {
     const sameDefault = {
-      initialRuntime: true,
       initialUi: true,
-      changedRuntime: true,
       changedUi: true,
-      reloadedRuntime: true,
       reloadedUi: true
     };
-    expect(evaluateTrailShineChangedStatePersistence(sameDefault).pass).toBe(false);
-    expect(evaluateTrailShineChangedStatePersistence({
+    expect(evaluateHapticsChangedStatePersistence(sameDefault).pass).toBe(false);
+    expect(evaluateHapticsChangedStatePersistence({
       ...sameDefault,
-      changedRuntime: false,
       changedUi: false,
-      reloadedRuntime: true,
       reloadedUi: true
     }).pass).toBe(false);
+    expect(evaluateHapticsChangedStatePersistence({ ...sameDefault, initialUi: null }).pass).toBe(false);
   });
 
-  test('derives the visible Trail Shine state from labels inside the actual control bounds', () => {
+  test('reads the stored Haptics key only from the fixture settings JSON', () => {
+    expect(readHapticsFromStoredSettings('{"hapticsEnabled":false}')).toBe(false);
+    expect(readHapticsFromStoredSettings('{"hapticsEnabled":true,"volume":0.5}')).toBe(true);
+    expect(readHapticsFromStoredSettings('{"toggleTrailPulse":true}')).toBe(null);
+    expect(readHapticsFromStoredSettings('not json')).toBe(null);
+    expect(readHapticsFromStoredSettings(null)).toBe(null);
+  });
+
+  test('derives the visible Haptics state from labels inside the actual control bounds', () => {
     const createVisual = (text) => ({
-      buttons: [{ text: 'Trail Shine', bounds: { left: 10, right: 210, top: 20, bottom: 80 } }],
+      buttons: [{ text: 'Haptics', bounds: { left: 10, right: 210, top: 20, bottom: 80 } }],
       textLabels: [{ text, bounds: { centerX: 180, centerY: 50 } }]
     });
-    expect(resolveTrailShineUiState(createVisual('On'))).toBe(true);
-    expect(resolveTrailShineUiState(createVisual('Trail Shine: Off'))).toBe(false);
-    expect(resolveTrailShineUiState({
+    expect(resolveHapticsUiState(createVisual('On'))).toBe(true);
+    expect(resolveHapticsUiState(createVisual('Haptics: Off'))).toBe(false);
+    expect(resolveHapticsUiState({
       ...createVisual('On'),
       textLabels: [{ text: 'On', bounds: { centerX: 300, centerY: 50 } }]
     })).toBe(null);
@@ -662,10 +664,10 @@ describe('live auth persistence soak contract', () => {
       key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
       value: null
     });
-    expect(createFixtureSettingsRestorePlan({ authenticated: '{"toggleTrailPulse":false}' })).toEqual({
+    expect(createFixtureSettingsRestorePlan({ authenticated: '{"hapticsEnabled":false}' })).toEqual({
       action: 'set',
       key: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
-      value: '{"toggleTrailPulse":false}'
+      value: '{"hapticsEnabled":false}'
     });
     expect(FIXTURE_SETTINGS_STORAGE_KEYS).toEqual({
       authenticated: AUTHENTICATED_FIXTURE_SETTINGS_STORAGE_KEY,
@@ -679,7 +681,7 @@ describe('live auth persistence soak contract', () => {
       preimage: fixtureSettingsPreimage,
       changed: fixtureSettingsChanged,
       reloaded: fixtureSettingsChanged,
-      expectedTrailShine: false
+      expectedHaptics: false
     })).toEqual({
       pass: true,
       expectedKeyChanged: true,
@@ -705,7 +707,7 @@ describe('live auth persistence soak contract', () => {
       preimage: fixtureSettingsPreimage,
       changed: fixtureSettingsChanged,
       reloaded: fixtureSettingsPreimage,
-      expectedTrailShine: false
+      expectedHaptics: false
     })).toMatchObject({
       pass: false,
       expectedKeyChanged: true,
@@ -717,13 +719,13 @@ describe('live auth persistence soak contract', () => {
   test('rejects mutation of the guest key instead of the authenticated fixture key', () => {
     const wrongKeyMutation = {
       ...fixtureSettingsPreimage,
-      guest: '{"toggleTrailPulse":true,"volume":0.25}'
+      guest: '{"hapticsEnabled":true,"volume":0.25}'
     };
     expect(evaluateFixtureSettingsIsolation({
       preimage: fixtureSettingsPreimage,
       changed: wrongKeyMutation,
       reloaded: wrongKeyMutation,
-      expectedTrailShine: false
+      expectedHaptics: false
     })).toMatchObject({
       pass: false,
       expectedKeyChanged: false,
@@ -742,7 +744,7 @@ describe('live auth persistence soak contract', () => {
         preimage: fixtureSettingsPreimage,
         changed: collateralMutation,
         reloaded: collateralMutation,
-        expectedTrailShine: false
+        expectedHaptics: false
       })).toMatchObject({ pass: false, [`${collateralKey}ByteIdentical`]: false });
     }
   });

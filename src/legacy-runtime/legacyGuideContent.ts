@@ -19,7 +19,7 @@
  * `shared-with-board` means that is true today; `todo-wiring` means it is not
  * yet and names the lane that must close it. No behavior here: pure data.
  */
-import { LEGACY_SETTINGS_GROUP_ROWS } from './legacySettingsSheetPlan';
+import { REDUCED_MOTION_SETTING_LABEL } from '../render/reducedMotion';
 
 export type LegacyGuideContext = 'menu' | 'pause';
 
@@ -87,7 +87,6 @@ export interface LegacyGuideKeyBinding {
   expectedAction: 'move' | 'pause' | 'quit' | null;
 }
 
-const TRAIL_FADE_LABEL = LEGACY_SETTINGS_GROUP_ROWS.find((row) => row.id === 'trail-fade')?.label ?? 'Trail Fade';
 
 export const LEGACY_GUIDE_TITLE = 'How to play';
 export const LEGACY_GUIDE_CLOSE_LABEL = 'Got it';
@@ -161,7 +160,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'trail',
-    text: `A shimmering, colour-shifting line is your route. ${TRAIL_FADE_LABEL} in Settings fades old trail.`
+    text: `A shimmering, colour-shifting line is your route. ${REDUCED_MOTION_SETTING_LABEL} in Settings calms it.`
   },
   {
     heading: 'Wrap',

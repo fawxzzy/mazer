@@ -41,6 +41,8 @@ import {
   resolveReducedMotionSource,
   resolveTrailColourTimeMs,
   resolveTrailMotionPlan,
+  resolveBackdropMotion,
+  TRAIL_TAIL_FADE,
   type ReducedMotionSource
 } from '../render/reducedMotion';
 import { alignBoundsToWholePixels, alignCameraToWholePixels } from '../render/pixelAlignment';
@@ -284,7 +286,6 @@ import {
 import {
   advanceLegacyMenuDemoFrame,
   createLegacyMenuDemoBootstrap,
-  resolveLegacyMenuDemoTrail,
   type LegacyMenuDemoAdvance
 } from '../legacy-runtime/legacyMenuDemoLifecycle';
 import {
@@ -323,6 +324,7 @@ import {
   LEGACY_SETTINGS_SIZES,
   buildLegacySettingsSheetPlan,
   isLegacySettingsItemFullyVisible,
+  resolveLegacySettingsDescriptionScreenRect,
   resolveLegacySettingsItemScreenRect,
   type LegacySettingsCommand,
   type LegacySettingsContext,
@@ -412,7 +414,7 @@ import {
   LEGACY_GAME_TOGGLE_STORAGE_KEY,
   migrateLegacyGameToggleSettingsToGuestScope,
   readLegacyGameToggleSettings,
-  scrubRemovedCameraZoomFromGameToggleStorage,
+  scrubRetiredGameToggleKeysFromStorage,
   writeLegacyGameToggleSettings
 } from '../legacy-runtime/legacyGameTogglePreferences';
 import {
@@ -2137,7 +2139,7 @@ export class MenuScene extends Phaser.Scene {
   // real call. Reset alongside trailShineLapStartedAtMs at the same
   // fresh-run sites.
   private trailShineLapCycleLength = 0;
-  // Trail Fade bounds this.trail to its most recent TRAIL_FADE_TAIL points,
+  // A trail-tail fade (retired as a setting, TRAIL_TAIL_FADE) bounds this.trail to its most recent TRAIL_FADE_TAIL points,
   // so the visible path's own origin (resolveLegacyPlayPerfectPathTrail's
   // first point) slides forward over time instead of staying pinned at
   // maze.start. Without correction, every cell's color would re-derive from
@@ -3526,7 +3528,7 @@ export class MenuScene extends Phaser.Scene {
     const averageFrameMs = this.resolveRuntimeAverageFrameMs();
     const starCount = this.stars.length;
     const backdropSignatureCount = starCount;
-    const movingBackdropActorCount = this.settings.toggleAnimatedBackdrop && !this.prefersLegacyReducedMotion()
+    const movingBackdropActorCount = resolveBackdropMotion(this.prefersLegacyReducedMotion())
       ? starCount
       : 0;
     const telemetrySummary = summarizeTelemetrySemantics([]);
@@ -3568,7 +3570,7 @@ export class MenuScene extends Phaser.Scene {
       optionalRetargetCount: 0
     };
     const movementSpeedProfile = this.resolveLegacyPlayMovementSpeedProfile();
-    const trailSegmentCap = this.settings.toggleTrailFade
+    const trailSegmentCap = TRAIL_TAIL_FADE
       ? TRAIL_FADE_TAIL
       : Math.max(this.trail.length, this.menuDemoConfig?.behavior.trailMaxLength ?? this.trail.length);
     const boardOffset = this.resolveBoardOffset();
@@ -3626,9 +3628,9 @@ export class MenuScene extends Phaser.Scene {
       },
       gameToggles: {
         animatedBackdrop: {
-          enabled: this.settings.toggleAnimatedBackdrop,
-          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
-          stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'
+          enabled: resolveBackdropMotion(this.prefersLegacyReducedMotion()),
+          switchIsOn: resolveBackdropMotion(this.prefersLegacyReducedMotion()),
+          stateText: resolveBackdropMotion(this.prefersLegacyReducedMotion()) ? 'Animated' : 'Stagnant'
         },
         controlMode: {
           mode: this.settings.controlMode,
@@ -3642,15 +3644,18 @@ export class MenuScene extends Phaser.Scene {
           label: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
           value: normalizeLegacyMovementSpeed(this.settings.movementSpeed)
         },
+        // The Trail Fade, Trail Shine and Animated Background switches are retired (MAZER-UI-026); these three keys
+        // stay in the diagnostics shape (it is a Wave 1C contract) as read-only readouts of the EFFECTIVE state
+        // that Reduce Motion now decides.
         trailFade: {
-          enabled: this.settings.toggleTrailFade,
-          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
-          stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'
+          enabled: TRAIL_TAIL_FADE,
+          switchIsOn: TRAIL_TAIL_FADE,
+          stateText: TRAIL_TAIL_FADE ? 'On' : 'Off'
         },
         trailPulse: {
-          enabled: this.settings.toggleTrailPulse,
-          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
-          stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'
+          enabled: this.resolveLegacyTrailMotionPlan().shineVisible,
+          switchIsOn: this.resolveLegacyTrailMotionPlan().shineVisible,
+          stateText: this.resolveLegacyTrailMotionPlan().shineVisible ? 'On' : 'Off'
         }
       },
       play: {
@@ -3998,7 +4003,7 @@ export class MenuScene extends Phaser.Scene {
       resources: {
         activeTweens: 0,
         activeTimers: 0,
-        animatedBackdropEnabled: this.settings.toggleAnimatedBackdrop,
+        animatedBackdropEnabled: resolveBackdropMotion(this.prefersLegacyReducedMotion()),
         backdropDirty: this.backdropDirty,
         boardDynamicDirty: this.boardDynamicDirty,
         boardPathDirty: this.boardPathDirty,
@@ -4319,12 +4324,6 @@ export class MenuScene extends Phaser.Scene {
     if (lowerKey === 'q' && this.mode === 'play' && this.overlay === 'pause' && !this.settingsGuideOpen) {
       event.preventDefault();
       this.pressLegacyQuitToMenu();
-      return true;
-    }
-
-    if (lowerKey === 't' && this.mode === 'play' && (this.overlay === 'none' || this.overlay === 'pause')) {
-      event.preventDefault();
-      this.applyOverlayToggleFieldChange('toggleTrailFade');
       return true;
     }
 
@@ -5717,7 +5716,7 @@ export class MenuScene extends Phaser.Scene {
       const menuTrack = resolveLegacyGenerationTrack(this.progressionState, 'menu');
       const bootstrap = createLegacyMenuDemoBootstrap(
         this.maze,
-        this.settings.toggleTrailFade,
+        TRAIL_TAIL_FADE,
         TRAIL_FADE_TAIL,
         {
           aiSkillLevel: resolveLegacyProgressionLevel(menuTrack.targetComplexity),
@@ -6940,7 +6939,7 @@ export class MenuScene extends Phaser.Scene {
       this.menuDemoEpisode,
       this.menuDemoState,
       this.menuDemoConfig,
-      this.settings.toggleTrailFade,
+      TRAIL_TAIL_FADE,
       TRAIL_FADE_TAIL
     );
     if (nextFrame.shouldRegenerateMaze) {
@@ -7109,7 +7108,7 @@ export class MenuScene extends Phaser.Scene {
       trail: this.trail,
       deltaX: move.deltaX,
       deltaY: move.deltaY,
-      toggleTrailFade: this.settings.toggleTrailFade,
+      toggleTrailFade: TRAIL_TAIL_FADE,
       trailFadeTail: TRAIL_FADE_TAIL
     });
     if (!nextStep.moved) {
@@ -7242,7 +7241,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private updateStars(time: number, delta: number): void {
-    if (this.stars.length === 0 || !this.settings.toggleAnimatedBackdrop || this.prefersLegacyReducedMotion()) {
+    if (this.stars.length === 0 || !resolveBackdropMotion(this.prefersLegacyReducedMotion())) {
       this.backdropAccumulatedDeltaMs = 0;
       this.backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
       // Reduced motion / Still stop the drift and twinkle, never colour: the rainbow stars keep shifting through the
@@ -7276,7 +7275,7 @@ export class MenuScene extends Phaser.Scene {
     this.backdropGraphics.fillStyle(cyberArcadeMaterial.substrate.field, 1);
     this.backdropGraphics.fillRect(0, 0, width, height);
     const palette = resolveLegacyMenuBackdropPalette(this.settings.darkMode);
-    const backdropMotionEnabled = this.settings.toggleAnimatedBackdrop && !this.prefersLegacyReducedMotion();
+    const backdropMotionEnabled = resolveBackdropMotion(this.prefersLegacyReducedMotion());
     const animationTime = backdropMotionEnabled ? this.time.now : 0;
     for (const star of this.stars) {
       const pixelX = Math.round(star.x * width);
@@ -7435,7 +7434,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyTrailMotionPlan(): ReturnType<typeof resolveTrailMotionPlan> {
-    return resolveTrailMotionPlan(this.settings.toggleTrailPulse, this.prefersLegacyReducedMotion());
+    return resolveTrailMotionPlan(this.prefersLegacyReducedMotion());
   }
 
   private drawStaticBoard(): void {
@@ -9895,7 +9894,7 @@ export class MenuScene extends Phaser.Scene {
       originY,
       tileSize,
       alphaMultiplier,
-      styleKey: `${this.boardTileStyle}|${this.boardZoomContainer.scaleX}|${this.boardZoomContainer.scaleY}|${gateSnappedOrigin?.x ?? ''},${gateSnappedOrigin?.y ?? ''}|${this.resolveBoardTileBackingScale()}|${this.settings.toggleTrailFade ? 1 : 0}|${gateMotionPlan.shineVisible ? 1 : 0}|${gateMotionPlan.colourDrifts ? 1 : 0}|${headNudge.x},${headNudge.y}`
+      styleKey: `${this.boardTileStyle}|${this.boardZoomContainer.scaleX}|${this.boardZoomContainer.scaleY}|${gateSnappedOrigin?.x ?? ''},${gateSnappedOrigin?.y ?? ''}|${this.resolveBoardTileBackingScale()}|${TRAIL_TAIL_FADE ? 1 : 0}|${gateMotionPlan.shineVisible ? 1 : 0}|${gateMotionPlan.colourDrifts ? 1 : 0}|${headNudge.x},${headNudge.y}`
     };
     if (this.trailDrawRecord !== null) {
       observeTrailFrameCost(this.trailDrawRecord, time);
@@ -9988,7 +9987,7 @@ export class MenuScene extends Phaser.Scene {
     // alphaMultiplier) -- no age gradient. Trail Fade ON: the existing
     // smooth age/distance opacity, continuous by distance so there is no
     // per-cell alpha step.
-    const trailFadeEnabled = this.settings.toggleTrailFade;
+    const trailFadeEnabled = TRAIL_TAIL_FADE;
     let perfStrokeSegmentCount = 0;
 
     // Style is computed once per segment, then drawn in two SEPARATE
@@ -11332,23 +11331,11 @@ export class MenuScene extends Phaser.Scene {
         this.runLegacySettingsCommand(model.command);
       }
     };
+    this.paintLegacySettingsDescription(plan, item, scrollOffset);
 
     switch (model.kind) {
       case 'heading':
         this.createLegacySheetHeading(rect, model.label, item.stateFontSize);
-        return;
-      case 'note':
-        this.addLegacySheetWrappedText(
-          model.label,
-          rect.left - 8,
-          centerY,
-          rect.width,
-          '#9fb6c9',
-          item.stateFontSize,
-          item.stateFontSize - 1,
-          item.labelMaxLines,
-          { alpha: 0.85 }
-        );
         return;
       case 'action':
         this.uiButtons.push(this.createLegacyAuthActionButton(
@@ -11395,7 +11382,31 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // Section heading ("DISPLAY", "ACCOUNT"): small caps label plus a hairline.
+  // The muted description under a setting row's control (every setting row has one: see the DESCRIPTION RULE in
+  // legacySettingsSheetPlan.ts). Same look the Reduce Motion note always had: 13 px, #9fb6c9 at 0.85.
+  private paintLegacySettingsDescription(
+    plan: LegacySettingsSheetPlan,
+    item: LegacySettingsPlanItem,
+    scrollOffset: number
+  ): void {
+    const rect = resolveLegacySettingsDescriptionScreenRect(plan, item, scrollOffset);
+    if (rect === null || item.description === null) {
+      return;
+    }
+    this.addLegacySheetWrappedText(
+      item.description.text,
+      rect.left - 8,
+      rect.top + (rect.height / 2),
+      rect.width,
+      '#9fb6c9',
+      item.description.fontSize,
+      item.description.fontSize - 1,
+      item.description.maxLines,
+      { alpha: 0.85 }
+    );
+  }
+
+  // Section heading ("ACCOUNT"): small caps label plus a hairline.
   private createLegacySheetHeading(rect: LegacySettingsRect, copy: string, fontSize: number): void {
     const centerY = rect.top + Math.round(rect.height / 2);
     const label = this.padLegacyCompactUiText(this.add.text(rect.left - 8, centerY, copy.toUpperCase(), {
@@ -14224,17 +14235,6 @@ export class MenuScene extends Phaser.Scene {
       this.resetLegacyPlayInputBuffer();
       this.hudDirty = true;
     }
-    if (fieldId === 'toggleTrailPulse') {
-      this.legacyPlayTrailPulseNextFrameAtMs = 0;
-    }
-    if (fieldId === 'toggleTrailFade' && this.mode === 'menu' && this.menuDemoState !== null && this.menuDemoEpisode !== null) {
-      this.trail = resolveLegacyMenuDemoTrail(
-        this.menuDemoState,
-        this.menuDemoEpisode.raster.width,
-        this.settings.toggleTrailFade,
-        TRAIL_FADE_TAIL
-      );
-    }
 
     if (result.affectsBackdrop) {
       this.backdropDirty = true;
@@ -14262,8 +14262,8 @@ export class MenuScene extends Phaser.Scene {
     );
     const scopedStorage = this.resolveLegacyGameToggleStorage();
     this.settings = readLegacyGameToggleSettings(scopedStorage, LEGACY_DEFAULTS);
-    // Board Zoom was removed: drop the zoom key an older build stored so a player cannot stay zoomed.
-    scrubRemovedCameraZoomFromGameToggleStorage(scopedStorage);
+    // Removed settings (Board Zoom; Trail Fade, Trail Shine, Animated Background): drop the keys an older build stored.
+    scrubRetiredGameToggleKeysFromStorage(scopedStorage);
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
   }
 

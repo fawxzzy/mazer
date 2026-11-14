@@ -273,9 +273,9 @@ describe('legacy player-facing message system', () => {
   });
 
   test('maps overlay setting confirmations into the shared message contract', () => {
-    expect(resolveLegacyOverlayToggleMessage('Trail Fade', 'Off')).toMatchObject({
-      copy: 'Trail Fade: Off.',
-      id: 'overlay.toggle.trail-fade',
+    expect(resolveLegacyOverlayToggleMessage('Haptics', 'Off')).toMatchObject({
+      copy: 'Haptics: Off.',
+      id: 'overlay.toggle.haptics',
       source: 'overlay',
       tone: 'success'
     });

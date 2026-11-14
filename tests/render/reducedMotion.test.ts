@@ -19,6 +19,8 @@ import {
   resolveReducedMotion,
   REDUCED_MOTION_BLEED_GLOW_PROGRESS,
   resolveReducedMotionSource,
+  resolveBackdropMotion,
+  TRAIL_TAIL_FADE,
   resolveTrailColourTimeMs,
   resolveTrailMotionPlan
 } from '../../src/render/reducedMotion';
@@ -54,19 +56,27 @@ describe('reduced motion resolution', () => {
 
 describe('owner rule: reduced motion stops movement and pulsing, never colour', () => {
   test('the trail motion plan separates the shine/breath (movement) from the hue drift (colour)', () => {
-    // Trail Shine on: reduced motion stops the shine but the colour keeps drifting.
-    expect(resolveTrailMotionPlan(true, false)).toEqual({ shineVisible: true, colourDrifts: true });
-    expect(resolveTrailMotionPlan(true, true)).toEqual({ shineVisible: false, colourDrifts: true });
-    // Trail Shine off is the player's own static-trail choice and still holds both, reduced motion or not.
-    expect(resolveTrailMotionPlan(false, false)).toEqual({ shineVisible: false, colourDrifts: false });
-    expect(resolveTrailMotionPlan(false, true)).toEqual({ shineVisible: false, colourDrifts: false });
+    // Reduce Motion is the only switch (MAZER-UI-026): off = full shine, on = shine stopped; the colour always drifts.
+    expect(resolveTrailMotionPlan(false)).toEqual({ shineVisible: true, colourDrifts: true });
+    expect(resolveTrailMotionPlan(true)).toEqual({ shineVisible: false, colourDrifts: true });
   });
 
-  test('the colour time is the live colour clock whenever the colour drifts, else one fixed phase', () => {
-    const reduced = resolveTrailMotionPlan(true, true);
-    expect([0, 700, 98765].map((t) => resolveTrailColourTimeMs(t, reduced))).toEqual([0, 700, 98765]);
-    const staticTrail = resolveTrailMotionPlan(false, true);
-    expect([0, 700, 98765].map((t) => resolveTrailColourTimeMs(t, staticTrail))).toEqual([0, 0, 0]);
+  test('the retired Display switches follow Reduce Motion: backdrop motion = !reduced, trail fade pinned off', () => {
+    expect(resolveBackdropMotion(false)).toBe(true);
+    expect(resolveBackdropMotion(true)).toBe(false);
+    expect(TRAIL_TAIL_FADE).toBe(false);
+    // the retired settings no longer exist on the settings object
+    for (const key of ['toggleTrailFade', 'toggleTrailPulse', 'toggleAnimatedBackdrop']) {
+      expect(Object.keys(LEGACY_DEFAULTS)).not.toContain(key);
+      expect(Object.keys(copyLegacySettings(LEGACY_DEFAULTS))).not.toContain(key);
+    }
+  });
+
+  test('the colour time is always the live colour clock (colour never stops), under reduced motion or not', () => {
+    for (const reducedMotion of [false, true]) {
+      const plan = resolveTrailMotionPlan(reducedMotion);
+      expect([0, 700, 98765].map((t) => resolveTrailColourTimeMs(t, plan))).toEqual([0, 700, 98765]);
+    }
   });
 
   test('the bleed-dock band holds at its lit peak under reduced motion and still travels otherwise', () => {
@@ -78,7 +88,7 @@ describe('owner rule: reduced motion stops movement and pulsing, never colour', 
 
   test('under reduced motion the trail, edge-marker border and dock glow colours still change with the colour clock, while shine and swell are still', () => {
     const out = { core: 0, glow: 0, wave: 0, sheen: 0 };
-    const plan = resolveTrailMotionPlan(true, true);
+    const plan = resolveTrailMotionPlan(true);
     const cores = new Set<number>();
     for (let t = 0; t < 8000; t += 500) {
       const time = resolveTrailColourTimeMs(t, plan);
@@ -115,17 +125,16 @@ describe('Reduce Motion setting', () => {
 
   test('an older stored blob without the key reads as System', () => {
     const storage = new MemoryStorage();
-    storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({ controlMode: 'arrows', toggleTrailPulse: false }));
+    storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({ controlMode: 'arrows', toggleTrailPulse: false, toggleTrailFade: true, toggleAnimatedBackdrop: false }));
     const settings = readLegacyGameToggleSettings(storage);
     expect(settings.toggleReducedMotion).toBe(false);
     expect(settings.controlMode).toBe('arrows');
   });
 
-  test('both Settings sheets list the toggle and a note that says it stops movement and pulsing and colours keep shifting', () => {
+  test('both Settings sheets list the toggle with its rule text as the description under it', () => {
     const ids = LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id);
-    const at = ids.indexOf('reduce-motion');
-    expect(at).toBeGreaterThan(-1);
-    expect(ids.slice(at, at + 2)).toEqual(['reduce-motion', 'reduce-motion-note']);
+    expect(ids).toContain('reduce-motion');
+    expect(ids).not.toContain('reduce-motion-note');
     for (const word of ['Stops movement and pulsing', 'trail shine', 'blinking icons', 'Colours keep shifting', 'Gameplay is unchanged', 'System']) {
       expect(REDUCED_MOTION_SETTING_NOTE).toContain(word);
     }
@@ -134,11 +143,10 @@ describe('Reduce Motion setting', () => {
     for (const viewport of [{ height: 568, width: 320 }, { height: 844, width: 390 }, { height: 720, width: 1280 }]) {
       for (const context of ['menu', 'pause'] as const) {
         const plan = buildLegacySettingsSheetPlan({ context, settingsExpanded: true, signedIn: true, ...viewport });
-        const note = plan.items.find((item) => item.model.id === 'reduce-motion-note')!;
         const toggle = plan.items.find((item) => item.model.id === 'reduce-motion')!;
-        expect(note.interactive).toBe(false);
         expect(toggle.interactive).toBe(true);
-        expect(note.rect.top).toBeGreaterThan(toggle.rect.top);
+        expect(toggle.description?.text).toBe(REDUCED_MOTION_SETTING_NOTE);
+        expect(toggle.description!.rect.top).toBeGreaterThanOrEqual(toggle.rect.top + toggle.rect.height);
       }
     }
   });
