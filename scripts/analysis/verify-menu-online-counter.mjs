@@ -25,8 +25,9 @@ import { launchPreviewServer, stopPreviewServer } from '../visual/preview-server
 import { createCaptureOutputDirectory } from './capture-world-identity-ui-evidence.mjs';
 import { waitForAuthenticatedFixtureReady } from './capture-ui-surfaces.mjs';
 
-// The counter chips are mint-white (rim) over a mint fill; count bright minty pixels.
-const INK_FLOOR = [150, 200, 190];
+// The counter is a mint dot plus muted light text (a copy of the website counter, MAZER-UI-033); count any
+// pixel whose brightest channel clears the floor. The released-vs-shown differential cancels the backdrop.
+const INK_FLOOR = [110, 110, 110];
 const MIN_COUNTER_DELTA_PIXELS = 40;
 
 const LAYOUTS = [
@@ -78,7 +79,7 @@ const measureSlot = (page, slot, floor) => page.evaluate(({ box, colorFloor }) =
   let maxY = -Infinity;
   for (let i = 0; i < w * h; i += 1) {
     const o = i * 4;
-    if (data[o + 3] > 200 && data[o] >= colorFloor[0] && data[o + 1] >= colorFloor[1] && data[o + 2] >= colorFloor[2]) {
+    if (data[o + 3] > 200 && Math.max(data[o], data[o + 1], data[o + 2]) >= colorFloor[0]) {
       ink += 1;
       const x = i % w;
       const y = Math.floor(i / w);
