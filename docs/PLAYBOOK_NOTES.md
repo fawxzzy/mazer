@@ -220,6 +220,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: `legacyControlHint.ts` now holds a pure resolver (`resolveLegacyControlHintInput`): touch is the default, a computer-looking device (fine pointer plus hover, not mobile, not standalone) starts with a neutral line, and the last real input (pointerType on pointerdown, trusted keydown) switches the visible copy between touch, mouse and keys wording (instant text swap, only while visible, never re-shows after the ack). Copy is two short lines (how to move, then the goal). The Guide Move row and the accessibility description were reworded touch-first with the keyboard as a secondary mention.
 - WHY it changed: the game is played on touch screens, and computers can drag too; the old copy was picked by a single coarse-pointer check and said arrow keys on devices that misreported.
 - Rule: copy is chosen from observed input, not a device guess; the device guess only seeds the first frame.
+
+## 2026-11-14 - MAZER-UI-031 slice 2 colour literals
+- WHAT changed: the board midnight-rainbow ramp moved from `boardRenderer.ts` to `palette.ts`; the legacy iridescent midnight stops, fallback pink and black moved from `legacyIridescentMaterial.ts` to `trailPalette.ts`; off-theme baseline lowered by exactly 14 (off-token 280 to 266, total 355 to 341).
+- WHY it changed: second slice of the stray-colour migration; values and order identical (pinned by `tests/render/ui-031-slice2-palette-values.test.ts`), no visible change.
 - Status: Applied
 
 ## 2026-11-14 - MAZER-MOTION-011 overlay rise and stagger
