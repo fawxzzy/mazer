@@ -1667,7 +1667,8 @@ const setQaPreferences = async (page, options) => {
       ...existing,
       controlMode: inputMethod === 'stick' ? 'stick' : 'arrows',
       movementSpeed,
-      toggleAnimatedBackdrop: false
+      // MAZER-UI-026: the Animated Background setting was removed; a still backdrop is Reduce Motion.
+      toggleReducedMotion: true
     }));
   }, {
     inputMethod: options.inputMethod,

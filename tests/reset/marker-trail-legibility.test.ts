@@ -112,8 +112,9 @@ describe('trail wiring in the scene', () => {
     expect(MENU_SCENE).not.toContain('LEGACY_NAV_CORE_TRAIL_CALM_ENERGY_STOPS');
   });
 
-  test('the Trail Fade and Trail Shine switches still gate the age fade and the shine (Trail Shine is also the pulse switch)', () => {
-    expect(MENU_SCENE).toContain('const trailFadeEnabled = this.settings.toggleTrailFade;');
+  test('the trail-tail fade is pinned off (Trail Fade retired) and Reduce Motion alone gates the shine', () => {
+    expect(MENU_SCENE).toContain('const trailFadeEnabled = TRAIL_TAIL_FADE;');
+    expect(MENU_SCENE).not.toContain('this.settings.toggleTrailFade');
     expect(MENU_SCENE).toContain('const shineEnabled = trailMotionPlan.shineVisible;');
     expect(MENU_SCENE).toContain('const trailAnimated = shineEnabled;');
   });

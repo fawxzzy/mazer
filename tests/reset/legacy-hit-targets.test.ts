@@ -135,7 +135,6 @@ describe('legacy hit targets (Wave 5C)', () => {
       'menu-header-leaderboard',
       'menu-header-settings',
       'play-pause',
-      'settings-row-animated-background',
       'settings-row-back-to-menu',
       'settings-row-haptics',
       'settings-row-how-to-play',
@@ -144,9 +143,7 @@ describe('legacy hit targets (Wave 5C)', () => {
       'settings-row-reset-progress',
       'settings-row-resume',
       'settings-row-settings-disclosure',
-      'settings-row-sign-out',
-      'settings-row-trail-fade',
-      'settings-row-trail-shine'
+      'settings-row-sign-out'
     ]);
   });
 });

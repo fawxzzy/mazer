@@ -40,7 +40,7 @@ const simulateRedraws = (
  * through resolveTrailColourTimeMs, motion stopped), over every phase of the 8-tile sweep.
  */
 const maxColourStep = (redrawTimes: readonly number[]): { core: number; glow: number } => {
-  const plan = resolveTrailMotionPlan(true, true);
+  const plan = resolveTrailMotionPlan(true);
   let core = 0;
   let glow = 0;
   for (let distanceTiles = 0; distanceTiles < 8; distanceTiles += 0.05) {
@@ -122,7 +122,7 @@ describe('trail colour-only redraw cadence (MAZER-PERF-003)', () => {
 
   it('the colour is never held still: every redraw time sees a changed hue except at the sweep turn-around', () => {
     const redraws = simulateRedraws(true, 1000 / 60, 7200);
-    const plan = resolveTrailMotionPlan(true, true);
+    const plan = resolveTrailMotionPlan(true);
     let unchanged = 0;
     let previous = -1;
     for (const time of redraws) {
@@ -134,7 +134,7 @@ describe('trail colour-only redraw cadence (MAZER-PERF-003)', () => {
   });
 
   it('a throttled reduced-motion redraw still follows the colour clock, not a frozen time', () => {
-    const plan = resolveTrailMotionPlan(true, true);
+    const plan = resolveTrailMotionPlan(true);
     expect(resolveTrailColourTimeMs(1234, plan)).toBe(1234);
   });
 

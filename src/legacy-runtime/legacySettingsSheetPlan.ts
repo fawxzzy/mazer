@@ -15,9 +15,18 @@
  *                                back arrow: the primary top row IS the exit.
  *   - whether the Settings group is a collapsed disclosure (pause) or the
  *     always-open body (menu).
- * Everything inside the Settings group (How to play, Display heading, Board
- * Trail Fade, Trail Shine, Animated Background, Reduce Motion + its note) is the SAME row spec
- * with the SAME geometry, so the surfaces cannot drift apart again.
+ * Everything inside the Settings group (How to play, Display heading, Reduce
+ * Motion, Haptics) is the SAME row spec with the SAME geometry, so the surfaces
+ * cannot drift apart again.
+ *
+ * DESCRIPTION RULE (MAZER-UI-026): every SETTING row (each row of the Settings
+ * group and of the Account section) is {label, control, description}. The
+ * description is a short, plain-words, muted line under the row's control that
+ * says what the row does and what happens on/off. It is a REQUIRED field of
+ * `LegacySettingsSettingRowModel`, so a setting row cannot be added without one
+ * (the type, `settingRow()` and the plan test all enforce it). Chrome rows (the
+ * exits Resume / Back to Menu / Quit to Menu, disclosures, headings, the rotate
+ * notice, the Level Preview jump rows) are not settings and carry none.
  *
  * Pure: no Phaser, no DOM, no storage, no network, no wiring. A later lane
  * paints this plan from MenuScene (replacing buildOptionsOverlay's body and
@@ -51,9 +60,6 @@ export type LegacySettingsContext = 'menu' | 'pause';
 
 /** Setting keys the scene already persists (legacyOverlayToggleFields). */
 export type LegacySettingsToggleKey =
-  | 'toggleTrailFade'
-  | 'toggleTrailPulse'
-  | 'toggleAnimatedBackdrop'
   | 'toggleReducedMotion'
   | 'hapticsEnabled';
 
@@ -63,12 +69,7 @@ export type LegacySettingsRowId =
   | 'back-to-menu'
   | 'settings-disclosure'
   | 'how-to-play'
-  | 'display-heading'
-  | 'trail-fade'
-  | 'trail-shine'
-  | 'animated-background'
   | 'reduce-motion'
-  | 'reduce-motion-note'
   | 'haptics'
   | 'account-heading'
   | 'reset-progress'
@@ -84,7 +85,6 @@ export type LegacySettingsRowKind =
   | 'disclosure'
   | 'nav'
   | 'heading'
-  | 'note'
   | 'toggle';
 
 export type LegacySettingsEmphasis = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'danger-outline';
@@ -102,7 +102,7 @@ export type LegacySettingsCommand =
   | { type: 'PREVIEW_JUMP'; level: number }
   | { type: 'TOGGLE_PREVIEW_LEVELS' };
 
-export interface LegacySettingsRowModel {
+interface LegacySettingsRowBase {
   id: LegacySettingsRowId;
   kind: LegacySettingsRowKind;
   label: string;
@@ -118,14 +118,40 @@ export interface LegacySettingsRowModel {
   gapBefore: number | null;
 }
 
-export interface LegacySettingsSectionModel {
-  id: 'pause-notice' | 'pause-top' | 'menu-top' | 'settings' | 'account' | 'pause-bottom' | 'preview' | 'preview-jump';
+/** A row that edits or opens a setting: REQUIRES a plain-words description (see DESCRIPTION RULE above). */
+export interface LegacySettingsSettingRowModel extends LegacySettingsRowBase {
+  role: 'setting';
+  /** Short muted line under the control: what the row does, what on/off means. Never empty. */
+  description: string;
+}
+
+/** Sheet chrome (exits, disclosures, headings, notices, preview jumps): not a setting, no description. */
+export interface LegacySettingsChromeRowModel extends LegacySettingsRowBase {
+  role: 'chrome';
+  description: null;
+}
+
+export type LegacySettingsRowModel = LegacySettingsSettingRowModel | LegacySettingsChromeRowModel;
+
+interface LegacySettingsSectionBase {
   /** Disclosure label (collapsible) or heading text. Null = no header. */
   title: string | null;
   collapsible: boolean;
   collapsedByDefault: boolean;
-  rows: readonly LegacySettingsRowModel[];
 }
+
+/** The Settings group and the Account section can only hold setting rows, so only described rows. */
+export interface LegacySettingsSettingSectionModel extends LegacySettingsSectionBase {
+  id: 'settings' | 'account';
+  rows: readonly LegacySettingsSettingRowModel[];
+}
+
+export interface LegacySettingsChromeSectionModel extends LegacySettingsSectionBase {
+  id: 'pause-notice' | 'pause-top' | 'menu-top' | 'pause-bottom' | 'preview' | 'preview-jump';
+  rows: readonly LegacySettingsChromeRowModel[];
+}
+
+export type LegacySettingsSectionModel = LegacySettingsSettingSectionModel | LegacySettingsChromeSectionModel;
 
 export interface LegacySettingsSheetModel {
   context: LegacySettingsContext;
@@ -168,12 +194,15 @@ export interface LegacySettingsModelOptions {
 /* Row vocabulary (shared by both contexts)                            */
 /* ------------------------------------------------------------------ */
 
+type LegacySettingsRowExtra = Partial<Omit<LegacySettingsRowBase, 'id' | 'kind' | 'label'>>;
+
+/** Sheet chrome row (no description). Settings use `settingRow`. */
 const row = (
   id: LegacySettingsRowId,
   kind: LegacySettingsRowKind,
   label: string,
-  extra: Partial<Omit<LegacySettingsRowModel, 'id' | 'kind' | 'label'>> = {}
-): LegacySettingsRowModel => Object.freeze({
+  extra: LegacySettingsRowExtra = {}
+): LegacySettingsChromeRowModel => Object.freeze({
   command: null,
   emphasis: null,
   gapBefore: null,
@@ -181,33 +210,73 @@ const row = (
   onLabel: null,
   settingKey: null,
   ...extra,
+  description: null,
   id,
   kind,
-  label
+  label,
+  role: 'chrome' as const
+});
+
+/**
+ * Longest description, in characters. New descriptions aim for about 60 (two lines at the compact card width);
+ * Reduce Motion keeps its long, owner-approved rule text (about 150 chars, five lines at the narrowest card), the
+ * longest any row may be.
+ */
+export const LEGACY_SETTINGS_DESCRIPTION_MAX_CHARS = 160;
+
+/** The only way to make a setting row: the description is a required argument. */
+const settingRow = (
+  id: LegacySettingsRowId,
+  kind: LegacySettingsRowKind,
+  label: string,
+  description: string,
+  extra: LegacySettingsRowExtra = {}
+): LegacySettingsSettingRowModel => Object.freeze({
+  command: null,
+  emphasis: null,
+  gapBefore: null,
+  offLabel: null,
+  onLabel: null,
+  settingKey: null,
+  ...extra,
+  description,
+  id,
+  kind,
+  label,
+  role: 'setting' as const
+});
+
+/**
+ * Plain-words descriptions (what it does, what on/off means). Reduce Motion's own copy lives next to the rule it
+ * describes (REDUCED_MOTION_SETTING_NOTE). Pinned by tests: non-empty, <= LEGACY_SETTINGS_DESCRIPTION_MAX_CHARS.
+ */
+export const LEGACY_SETTINGS_DESCRIPTIONS = Object.freeze({
+  haptics: 'Buzzes on steps, wall bumps and wins. Silent with Reduce Motion, and on iPhone.',
+  howToPlay: 'Controls, the goal, and what each icon means.',
+  resetProgress: 'Sets your level back to 1. Asks you to confirm first.',
+  signOut: 'Signs this device out. Your progress stays on your account.'
 });
 
 /**
  * The Settings group. IDENTICAL object list in both contexts. Labels and
  * state words are today's shipping copy (createFeatureControlRows).
  */
-export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsRowModel[] = Object.freeze([
-  row('how-to-play', 'nav', 'How to play', { command: { type: 'OPEN_GUIDE' }, emphasis: 'secondary' }),
-  row('display-heading', 'heading', 'Display'),
-  row('trail-fade', 'toggle', 'Trail Fade', { offLabel: 'Off', onLabel: 'On', settingKey: 'toggleTrailFade' }),
-  row('trail-shine', 'toggle', 'Trail Shine', { offLabel: 'Off', onLabel: 'On', settingKey: 'toggleTrailPulse' }),
-  row('animated-background', 'toggle', 'Animated Background', {
-    offLabel: 'Still',
-    onLabel: 'Animated',
-    settingKey: 'toggleAnimatedBackdrop'
+export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsSettingRowModel[] = Object.freeze([
+  settingRow('how-to-play', 'nav', 'How to play', LEGACY_SETTINGS_DESCRIPTIONS.howToPlay, {
+    command: { type: 'OPEN_GUIDE' },
+    emphasis: 'secondary'
   }),
-  row('reduce-motion', 'toggle', REDUCED_MOTION_SETTING_LABEL, {
+  settingRow('reduce-motion', 'toggle', REDUCED_MOTION_SETTING_LABEL, REDUCED_MOTION_SETTING_NOTE, {
     offLabel: REDUCED_MOTION_SETTING_OFF_LABEL,
     onLabel: REDUCED_MOTION_SETTING_ON_LABEL,
     settingKey: 'toggleReducedMotion'
   }),
-  row('reduce-motion-note', 'note', REDUCED_MOTION_SETTING_NOTE),
   // Vibration on phones that support it (not iOS Safari: no navigator.vibrate there, so the row changes nothing).
-  row('haptics', 'toggle', 'Haptics', { offLabel: 'Off', onLabel: 'On', settingKey: 'hapticsEnabled' })
+  settingRow('haptics', 'toggle', 'Haptics', LEGACY_SETTINGS_DESCRIPTIONS.haptics, {
+    offLabel: 'Off',
+    onLabel: 'On',
+    settingKey: 'hapticsEnabled'
+  })
 ]);
 
 /** Separation between Reset progress and Sign out (spacing token 24). */
@@ -297,14 +366,14 @@ export const buildLegacySettingsSheetModel = (
     };
   }
 
-  const accountRows: LegacySettingsRowModel[] = [
-    row('reset-progress', 'action', 'Reset progress', {
+  const accountRows: LegacySettingsSettingRowModel[] = [
+    settingRow('reset-progress', 'action', 'Reset progress', LEGACY_SETTINGS_DESCRIPTIONS.resetProgress, {
       command: { type: 'BEGIN_RESET_PROGRESS' },
       emphasis: 'danger-outline'
     })
   ];
   if (options.signedIn === true) {
-    accountRows.push(row('sign-out', 'action', 'Sign out', {
+    accountRows.push(settingRow('sign-out', 'action', 'Sign out', LEGACY_SETTINGS_DESCRIPTIONS.signOut, {
       command: { type: 'SIGN_OUT' },
       emphasis: 'danger',
       gapBefore: LEGACY_SETTINGS_DANGER_SEPARATION
@@ -362,10 +431,18 @@ export const LEGACY_SETTINGS_SIZES = Object.freeze({
   rowHeight: 52,
   /** Non-interactive heading row. */
   headingHeight: 24,
-  /** Non-interactive wrapped helper note under a toggle (13 px, up to 5 lines at the compact card width). */
-  noteHeight: 88,
-  noteLineHeight: 17,
-  noteMaxLines: 5,
+  /**
+   * The muted description under a setting row's control (13 px, the style the Reduce Motion note always had).
+   * Non-interactive text that sits OUTSIDE the control, so the control's hit target is unchanged. Its height is
+   * lines x descriptionLineHeight, with the line count estimated from descriptionCharWidth (a deliberately wide
+   * average glyph, so the reserved block is never shorter than the wrapped text).
+   */
+  descriptionFontSize: FONT.small,
+  descriptionLineHeight: 17,
+  descriptionMaxLines: 5,
+  descriptionCharWidth: 6.5,
+  /** Gap between a control and its description, and between the description and whatever follows (spacing token 4). */
+  descriptionGap: SPACING[0] ?? 4,
   /** Switch graphic (the whole row is the hit target). */
   switchHeight: 24,
   switchWidth: LEGACY_UI_MIN_TOUCH_TARGET,
@@ -418,10 +495,22 @@ export interface LegacySettingsRowParts {
   chevron: LegacySettingsRect | null;
 }
 
+export interface LegacySettingsPlanDescription {
+  text: string;
+  /** Estimated wrapped line count (1..descriptionMaxLines). */
+  lines: number;
+  fontSize: number;
+  maxLines: number;
+  /** Text block rect in card-body content space (scroll offset 0), directly under the control. */
+  rect: LegacySettingsRect;
+}
+
 export interface LegacySettingsPlanItem {
   model: LegacySettingsRowModel;
-  /** Row rect in card-body content space (scroll offset 0). */
+  /** CONTROL rect in card-body content space (scroll offset 0); this is the hit target. */
   rect: LegacySettingsRect;
+  /** The description block under the control, or null for chrome rows. */
+  description: LegacySettingsPlanDescription | null;
   interactive: boolean;
   parts: LegacySettingsRowParts;
   labelFontSize: number;
@@ -490,14 +579,32 @@ const rowHeightOf = (model: LegacySettingsRowModel): number => {
       return LEGACY_SETTINGS_SIZES.rowHeight;
     case 'heading':
       return LEGACY_SETTINGS_SIZES.headingHeight;
-    case 'note':
-      return LEGACY_SETTINGS_SIZES.noteHeight;
     default:
       return model.kind satisfies never;
   }
 };
 
-const isInteractiveKind = (kind: LegacySettingsRowKind): boolean => kind !== 'heading' && kind !== 'note';
+const isInteractiveKind = (kind: LegacySettingsRowKind): boolean => kind !== 'heading';
+
+/**
+ * Greedy word-wrap line count for a description at a given text width, using the wide average glyph width so the
+ * plan reserves at least as much height as the painter's real wrapping needs. Pure and deterministic.
+ */
+export const estimateLegacySettingsDescriptionLines = (text: string, textWidth: number): number => {
+  const budget = Math.max(1, Math.floor(textWidth / LEGACY_SETTINGS_SIZES.descriptionCharWidth));
+  let lines = 1;
+  let used = 0;
+  for (const word of text.split(/\s+/).filter((w) => w.length > 0)) {
+    const need = used === 0 ? word.length : used + 1 + word.length;
+    if (need <= budget || used === 0) {
+      used = need;
+    } else {
+      lines += 1;
+      used = word.length;
+    }
+  }
+  return lines;
+};
 
 /** Inner part layout of one row, relative to the row's own rect (left/top are ROW-LOCAL). */
 const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: number): LegacySettingsRowParts => {
@@ -530,7 +637,6 @@ const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: n
     }
     case 'action':
     case 'heading':
-    case 'note':
       return { ...none, label: rectOf(pad, 0, Math.max(1, width - (pad * 2)), height) };
     default:
       return model.kind satisfies never;
@@ -609,10 +715,30 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
       cursor += gapBefore;
       const rect = rectOf(0, cursor, rowWidth, height);
       cursor += height;
+      let description: LegacySettingsPlanDescription | null = null;
+      if (rowModel.description !== null) {
+        // Text starts at the control's left edge and wraps 16 px short of its right edge (the painter's text padding).
+        const lines = Math.min(
+          s.descriptionMaxLines,
+          estimateLegacySettingsDescriptionLines(rowModel.description, Math.max(1, rowWidth - 16))
+        );
+        const blockTop = cursor + s.descriptionGap;
+        const blockHeight = lines * s.descriptionLineHeight;
+        description = {
+          fontSize: s.descriptionFontSize,
+          lines,
+          maxLines: s.descriptionMaxLines,
+          rect: rectOf(0, blockTop, rowWidth, blockHeight),
+          text: rowModel.description
+        };
+        // The block plus one more token gap below it belong to this row, so the next row never crowds it.
+        cursor = blockTop + blockHeight + s.descriptionGap;
+      }
       return {
+        description,
         interactive: isInteractiveKind(rowModel.kind),
         labelFontSize: s.labelFontSize,
-        labelMaxLines: rowModel.kind === 'heading' ? 1 : rowModel.kind === 'note' ? s.noteMaxLines : s.labelMaxLines,
+        labelMaxLines: rowModel.kind === 'heading' ? 1 : s.labelMaxLines,
         model: rowModel,
         parts: resolveRowParts(rowModel, rowWidth, height),
         rect,
@@ -679,15 +805,36 @@ export const resolveLegacySettingsItemScreenRect = (
   );
 };
 
-/** Whether an item is fully inside the body viewport at a scroll offset (drawable and tappable). */
+/** Screen-space rect of an item's description block for a given scroll offset, or null when the row has none. */
+export const resolveLegacySettingsDescriptionScreenRect = (
+  plan: LegacySettingsSheetPlan,
+  item: LegacySettingsPlanItem,
+  scrollOffset = 0
+): LegacySettingsRect | null => {
+  if (item.description === null) {
+    return null;
+  }
+  const offset = Math.min(plan.maxScrollOffset, Math.max(0, scrollOffset));
+  return rectOf(
+    plan.bodyViewport.left + item.description.rect.left,
+    plan.bodyViewport.top + item.description.rect.top - offset,
+    item.description.rect.width,
+    item.description.rect.height
+  );
+};
+
+/** Whether an item (control AND its description) is fully inside the body viewport at a scroll offset (drawable and tappable). */
 export const isLegacySettingsItemFullyVisible = (
   plan: LegacySettingsSheetPlan,
   item: LegacySettingsPlanItem,
   scrollOffset = 0
 ): boolean => {
   const rect = resolveLegacySettingsItemScreenRect(plan, item, scrollOffset);
+  const bottom = item.description === null
+    ? rect.top + rect.height
+    : resolveLegacySettingsDescriptionScreenRect(plan, item, scrollOffset)!.top + item.description.rect.height;
   return rect.top >= plan.bodyViewport.top
-    && rect.top + rect.height <= plan.bodyViewport.top + plan.bodyViewport.height;
+    && bottom <= plan.bodyViewport.top + plan.bodyViewport.height;
 };
 
 /** Viewports every plan must hold at (the audit set). */

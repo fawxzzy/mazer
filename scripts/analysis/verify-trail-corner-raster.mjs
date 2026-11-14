@@ -130,8 +130,8 @@ const setSceneState = async (page, { maze, player, trail }) => {
     scene.applyLegacyReducedMotionPreference(true);
     scene.trailAnimationElapsedMs = 0;
     scene.trailShineLapStartedAtMs = 0;
-    scene.settings.toggleTrailFade = false;
-    scene.settings.toggleTrailPulse = false;
+    // MAZER-UI-026: Trail Fade / Trail Shine are no longer settings. Trail fade is fixed off and the shine band
+    // is held still by the reduced-motion preference applied above.
     scene.menuStaticDrawLifecyclePhase = 'settled';
     scene.menuStaticDrawRowsVisible = null;
     scene.menuStaticDrawTilesVisible = null;

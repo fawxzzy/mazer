@@ -17,6 +17,7 @@ import {
 } from './legacyDefaults';
 import {
   LEGACY_GAME_TOGGLE_STORAGE_KEY,
+  canonicalizeGameToggleFingerprint,
   mergeLegacyGameTogglePreferences,
   normalizeLegacyGameTogglePreferences,
   pickLegacyGameTogglePreferences,
@@ -231,7 +232,7 @@ const readAccountSyncMetadata = (
         ? parsed.progressionUpdatedAt
         : null,
       settingsFingerprint: typeof parsed.settingsFingerprint === 'string'
-        ? parsed.settingsFingerprint
+        ? canonicalizeGameToggleFingerprint(parsed.settingsFingerprint)
         : null,
       settingsRevision: typeof parsed.settingsRevision === 'number'
         ? normalizeRevision(parsed.settingsRevision)

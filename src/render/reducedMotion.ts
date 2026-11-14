@@ -52,19 +52,35 @@ export const resolveMenuBlinkPhase = (timeMs: number, periodMs: number, reducedM
 /**
  * What the trail animates. Two independent gates, so reduced motion can stop movement without stopping colour:
  *   - `shineVisible`: the travelling shine / sheen band, the swell and the width breathing (MOVEMENT).
- *     On only when the Trail Shine setting is on and reduced motion is off.
- *   - `colourDrifts`: the hue sweep that follows the colour clock (COLOUR). On whenever the Trail Shine setting is
- *     on, reduced motion or not. Trail Shine OFF is the player's own choice of a static trail and still holds it.
+ *     On whenever reduced motion is off.
+ *   - `colourDrifts`: the hue sweep that follows the colour clock (COLOUR). Always on, reduced motion or not.
+ *
+ * Retired Display switches (MAZER-UI-026). Settings used to carry three more rows, Trail Fade, Trail Shine and
+ * Animated Background. Reduce Motion now decides all three; there is no independent switch and a value stored
+ * by an older build is ignored (see RETIRED_GAME_TOGGLE_KEYS). The mapping, exactly as the app behaves:
+ *   - Trail Shine (was default On): the shine band and its breathing follow Reduce Motion (`shineVisible`);
+ *     the colour drift stays on in both states, as the Reduce Motion rule above already said.
+ *   - Animated Background (was default Animated): drift and twinkle follow Reduce Motion
+ *     (`resolveBackdropMotion`); Reduce Motion is the old "Still", and the colours keep shifting.
+ *   - Trail Fade (was default Off): the whole route stays drawn at one even brightness in BOTH states
+ *     (`TRAIL_TAIL_FADE`). It never was a motion effect: ON cut the route down to the last few tiles, which hides
+ *     where you have been, so it is not tied to Reduce Motion. This keeps what every player sees today.
  */
 export interface TrailMotionPlan {
   readonly shineVisible: boolean;
   readonly colourDrifts: boolean;
 }
 
-export const resolveTrailMotionPlan = (trailShineSetting: boolean, reducedMotion: boolean): TrailMotionPlan => ({
-  shineVisible: trailShineSetting && !reducedMotion,
-  colourDrifts: trailShineSetting
+export const resolveTrailMotionPlan = (reducedMotion: boolean): TrailMotionPlan => ({
+  shineVisible: !reducedMotion,
+  colourDrifts: true
 });
+
+/** Whether the backdrop stars drift and twinkle. Reduce Motion holds them still (colour keeps shifting). */
+export const resolveBackdropMotion = (reducedMotion: boolean): boolean => !reducedMotion;
+
+/** Trail Fade retired: the trail is never cut to a short fading tail. See "Retired Display switches" above. */
+export const TRAIL_TAIL_FADE = false;
 
 /** Time fed to the trail's hue sweep: the colour clock while the colour drifts, otherwise one fixed phase (0). */
 export const resolveTrailColourTimeMs = (colourClockMs: number, plan: TrailMotionPlan): number => (

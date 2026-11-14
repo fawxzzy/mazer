@@ -389,11 +389,11 @@ const normalizedLabelsMatchExactly = (actual, expected) => {
     && actualLabels.every((label, index) => label === expectedLabels[index]);
 };
 
-export const resolveTrailShineUiState = (visual) => {
-  const trailShineButton = (visual?.buttons ?? []).find(
-    (button) => normalizeControlLabel(button?.text) === 'trail shine'
+export const resolveHapticsUiState = (visual) => {
+  const hapticsButton = (visual?.buttons ?? []).find(
+    (button) => normalizeControlLabel(button?.text) === 'haptics'
   );
-  if (!trailShineButton?.bounds) {
+  if (!hapticsButton?.bounds) {
     return null;
   }
 
@@ -403,52 +403,49 @@ export const resolveTrailShineUiState = (visual) => {
       const centerY = label?.bounds?.centerY;
       return Number.isFinite(centerX)
         && Number.isFinite(centerY)
-        && centerX >= trailShineButton.bounds.left
-        && centerX <= trailShineButton.bounds.right
-        && centerY >= trailShineButton.bounds.top
-        && centerY <= trailShineButton.bounds.bottom;
+        && centerX >= hapticsButton.bounds.left
+        && centerX <= hapticsButton.bounds.right
+        && centerY >= hapticsButton.bounds.top
+        && centerY <= hapticsButton.bounds.bottom;
     })
     .map((label) => normalizeControlLabel(label.text));
 
-  if (labelsWithinButton.some((label) => label === 'on' || label === 'trail shine: on')) {
+  if (labelsWithinButton.some((label) => label === 'on' || label === 'haptics: on')) {
     return true;
   }
-  if (labelsWithinButton.some((label) => label === 'off' || label === 'trail shine: off')) {
+  if (labelsWithinButton.some((label) => label === 'off' || label === 'haptics: off')) {
     return false;
   }
   return null;
 };
 
-export const evaluateTrailShineChangedStatePersistence = ({
-  initialRuntime,
+// The Haptics probe reads the visible switch state (the On/Off word inside the control bounds). The runtime
+// diagnostics no longer carry a haptics readout; the stored hapticsEnabled key is checked separately by
+// evaluateFixtureSettingsIsolation and readHapticsFromStoredSettings.
+export const evaluateHapticsChangedStatePersistence = ({
   initialUi,
-  changedRuntime,
   changedUi,
-  reloadedRuntime,
   reloadedUi
 }) => {
-  const expectedChanged = typeof initialRuntime === 'boolean' ? !initialRuntime : null;
+  const expectedChanged = typeof initialUi === 'boolean' ? !initialUi : null;
   return {
     pass: expectedChanged !== null
-      && initialUi === initialRuntime
-      && changedRuntime === expectedChanged
       && changedUi === expectedChanged
-      && reloadedRuntime === expectedChanged
       && reloadedUi === expectedChanged,
-    initial: { runtime: initialRuntime, ui: initialUi },
+    initial: { ui: initialUi },
     expectedChanged,
-    changed: { runtime: changedRuntime, ui: changedUi },
-    reloaded: { runtime: reloadedRuntime, ui: reloadedUi }
+    changed: { ui: changedUi },
+    reloaded: { ui: reloadedUi }
   };
 };
 
-const readTrailShineFromStoredSettings = (value) => {
+export const readHapticsFromStoredSettings = (value) => {
   if (typeof value !== 'string') {
     return null;
   }
   try {
     const parsed = JSON.parse(value);
-    return typeof parsed?.toggleTrailPulse === 'boolean' ? parsed.toggleTrailPulse : null;
+    return typeof parsed?.hapticsEnabled === 'boolean' ? parsed.hapticsEnabled : null;
   } catch {
     return null;
   }
@@ -458,12 +455,12 @@ export const evaluateFixtureSettingsIsolation = ({
   preimage,
   changed,
   reloaded,
-  expectedTrailShine
+  expectedHaptics
 }) => {
   const expectedKeyChanged = changed.authenticated !== preimage.authenticated;
   const expectedKeyPersisted = reloaded.authenticated === changed.authenticated;
-  const changedValueMatches = readTrailShineFromStoredSettings(changed.authenticated) === expectedTrailShine;
-  const reloadedValueMatches = readTrailShineFromStoredSettings(reloaded.authenticated) === expectedTrailShine;
+  const changedValueMatches = readHapticsFromStoredSettings(changed.authenticated) === expectedHaptics;
+  const reloadedValueMatches = readHapticsFromStoredSettings(reloaded.authenticated) === expectedHaptics;
   const guestByteIdentical = changed.guest === preimage.guest && reloaded.guest === preimage.guest;
   const unscopedByteIdentical = changed.unscoped === preimage.unscoped
     && reloaded.unscoped === preimage.unscoped;
@@ -723,8 +720,7 @@ export const summarizeAuthPersistenceSurface = ({ runtime, visual }) => ({
   buttons: (visual?.buttons ?? []).map((button) => button.text),
   mode: visual?.runtime?.mode ?? null,
   overlay: visual?.runtime?.overlay ?? null,
-  trailShineEnabled: runtime?.gameToggles?.trailPulse?.enabled ?? null,
-  trailShineUiEnabled: resolveTrailShineUiState(visual),
+  hapticsUiEnabled: resolveHapticsUiState(visual),
   userIdPresent: runtime?.auth?.userIdPresent === true
 });
 
@@ -768,21 +764,20 @@ const waitForSurface = async (page, expected) => {
   return summarizeAuthPersistenceSurface(await readDiagnostics(page));
 };
 
-const waitForTrailShineState = async (page, enabled, expectedSurface) => {
+const waitForHapticsState = async (page, enabled, expectedSurface) => {
   const deadline = Date.now() + TIMEOUT_MS;
   let observed = null;
   while (Date.now() < deadline) {
     observed = summarizeAuthPersistenceSurface(await readDiagnostics(page));
     if (
       surfaceMatchesAuthPersistenceExpectation(observed, expectedSurface)
-      && observed.trailShineEnabled === enabled
-      && observed.trailShineUiEnabled === enabled
+      && observed.hapticsUiEnabled === enabled
     ) {
       return observed;
     }
     await page.waitForTimeout(25);
   }
-  throw new Error(`trail_shine_state_timeout:${JSON.stringify({ enabled, expectedSurface, observed })}`);
+  throw new Error(`haptics_state_timeout:${JSON.stringify({ enabled, expectedSurface, observed })}`);
 };
 
 const captureFailureState = async ({
@@ -964,7 +959,7 @@ export const summarizeAuthPersistenceSoak = (
     'signed-out-shared-account-contract',
     'diagnostics-fixture-entry',
     'diagnostics-fixture-options',
-    'diagnostics-fixture-trail-shine-changed',
+    'diagnostics-fixture-haptics-changed',
     'authenticated-reload',
     'authenticated-options-reload',
     'diagnostics-fixture-play',
@@ -1218,38 +1213,33 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     enterPhase('diagnostics-fixture-options');
     await openOptionsViaQa(page);
     const optionsSurface = await waitForSurface(page, {
-      authenticated: true, buttons: ['Trail Shine'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'
+      authenticated: true, buttons: ['Haptics'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'
     });
-    const initialTrailShine = optionsSurface.trailShineEnabled;
-    if (typeof initialTrailShine !== 'boolean') {
-      throw new Error('trail_shine_diagnostic_missing');
-    }
-    if (optionsSurface.trailShineUiEnabled !== initialTrailShine) {
-      throw new Error('trail_shine_initial_ui_runtime_mismatch');
+    const initialHaptics = optionsSurface.hapticsUiEnabled;
+    if (typeof initialHaptics !== 'boolean') {
+      throw new Error('haptics_ui_state_missing');
     }
     steps.push({
       id: 'diagnostics-fixture-options',
       pass: optionsSurface.userIdPresent
-        && optionsSurface.trailShineEnabled === initialTrailShine
-        && optionsSurface.trailShineUiEnabled === initialTrailShine,
+        && optionsSurface.hapticsUiEnabled === initialHaptics,
       surface: optionsSurface,
       fixtureOnly: true
     });
 
-    enterPhase('diagnostics-fixture-trail-shine-changed');
-    const changedTrailShine = !initialTrailShine;
-    const trailShinePoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Trail Shine');
+    enterPhase('diagnostics-fixture-haptics-changed');
+    const changedHaptics = !initialHaptics;
+    const hapticsPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Haptics');
     fixtureSettingsTouched = true;
-    await page.mouse.click(trailShinePoint.x, trailShinePoint.y);
-    const changedOptionsSurface = await waitForTrailShineState(page, changedTrailShine, {
-      authenticated: true, buttons: ['Trail Shine'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'
+    await page.mouse.click(hapticsPoint.x, hapticsPoint.y);
+    const changedOptionsSurface = await waitForHapticsState(page, changedHaptics, {
+      authenticated: true, buttons: ['Haptics'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'
     });
     const changedSettingsSnapshot = await readFixtureSettingsStorageSnapshot(page);
     steps.push({
-      id: 'diagnostics-fixture-trail-shine-changed',
+      id: 'diagnostics-fixture-haptics-changed',
       pass: changedOptionsSurface.userIdPresent
-        && changedOptionsSurface.trailShineEnabled === changedTrailShine
-        && changedOptionsSurface.trailShineUiEnabled === changedTrailShine,
+        && changedOptionsSurface.hapticsUiEnabled === changedHaptics,
       surface: changedOptionsSurface,
       fixtureOnly: true
     });
@@ -1263,27 +1253,25 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     const reloadedSettingsSnapshot = await readFixtureSettingsStorageSnapshot(page);
     steps.push({
       id: 'authenticated-reload',
-      pass: authenticatedReload.userIdPresent && authenticatedReload.trailShineEnabled === changedTrailShine,
+      pass: authenticatedReload.userIdPresent
+        && readHapticsFromStoredSettings(reloadedSettingsSnapshot.authenticated) === changedHaptics,
       surface: authenticatedReload
     });
 
     await openOptionsViaQa(page);
-    const authenticatedOptionsReload = await waitForTrailShineState(page, changedTrailShine, {
-      authenticated: true, buttons: ['Trail Shine'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'
+    const authenticatedOptionsReload = await waitForHapticsState(page, changedHaptics, {
+      authenticated: true, buttons: ['Haptics'], forbiddenButtons: ['Account'], mode: 'menu', overlay: 'options'
     });
-    const changedStatePersistence = evaluateTrailShineChangedStatePersistence({
-      initialRuntime: initialTrailShine,
-      initialUi: optionsSurface.trailShineUiEnabled,
-      changedRuntime: changedOptionsSurface.trailShineEnabled,
-      changedUi: changedOptionsSurface.trailShineUiEnabled,
-      reloadedRuntime: authenticatedOptionsReload.trailShineEnabled,
-      reloadedUi: authenticatedOptionsReload.trailShineUiEnabled
+    const changedStatePersistence = evaluateHapticsChangedStatePersistence({
+      initialUi: optionsSurface.hapticsUiEnabled,
+      changedUi: changedOptionsSurface.hapticsUiEnabled,
+      reloadedUi: authenticatedOptionsReload.hapticsUiEnabled
     });
     const fixtureSettingsIsolation = evaluateFixtureSettingsIsolation({
       preimage: fixtureSettingsPreimage,
       changed: changedSettingsSnapshot,
       reloaded: reloadedSettingsSnapshot,
-      expectedTrailShine: changedTrailShine
+      expectedHaptics: changedHaptics
     });
     steps.push({
       id: 'authenticated-options-reload',
@@ -1317,26 +1305,25 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     });
     enterPhase('authenticated-pause-reentry');
     await openPauseViaQa(page);
-    // The pause card opens with Settings collapsed, so the Trail Shine
+    // The pause card opens with Settings collapsed, so the Haptics
     // control only exists after the Settings row is opened.
     const authenticatedPauseCollapsed = await waitForSurface(page, {
       authenticated: true,
       buttons: ['Back', 'Resume', 'Settings', 'Quit to Menu'],
-      forbiddenButtons: ['Trail Shine', 'Guide', 'Main Menu'],
+      forbiddenButtons: ['Haptics', 'Guide', 'Main Menu'],
       mode: 'play',
       overlay: 'pause'
     });
     const pauseSettingsPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Settings');
     await page.mouse.click(pauseSettingsPoint.x, pauseSettingsPoint.y);
-    const authenticatedPauseReentry = await waitForTrailShineState(page, changedTrailShine, {
-      authenticated: true, buttons: ['Back', 'Resume', 'Settings', 'Trail Shine', 'Quit to Menu'], mode: 'play', overlay: 'pause'
+    const authenticatedPauseReentry = await waitForHapticsState(page, changedHaptics, {
+      authenticated: true, buttons: ['Back', 'Resume', 'Settings', 'Haptics', 'Quit to Menu'], mode: 'play', overlay: 'pause'
     });
     steps.push({
       id: 'authenticated-pause-reentry',
       collapsedSurface: authenticatedPauseCollapsed,
       pass: authenticatedPauseReentry.userIdPresent
-        && authenticatedPauseReentry.trailShineEnabled === changedTrailShine
-        && authenticatedPauseReentry.trailShineUiEnabled === changedTrailShine,
+        && authenticatedPauseReentry.hapticsUiEnabled === changedHaptics,
       surface: authenticatedPauseReentry
     });
     screenshots.authenticatedPause = resolveAuthPersistenceArtifactPath(outputDir, label, '-authenticated-pause.png');
@@ -1368,9 +1355,11 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     const reentry = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
+    const reentrySettingsSnapshot = await readFixtureSettingsStorageSnapshot(page);
     steps.push({
       id: 'fixture-reentry',
-      pass: reentry.userIdPresent && reentry.trailShineEnabled === changedTrailShine,
+      pass: reentry.userIdPresent
+        && readHapticsFromStoredSettings(reentrySettingsSnapshot.authenticated) === changedHaptics,
       surface: reentry,
       fixtureOnly: true
     });
@@ -1399,7 +1388,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
       label,
       generatedAt: new Date().toISOString(),
       fixtureOnly: true,
-      note: 'This verifies the exact current signed-out shared-account entry surface and an opposite fixture-local Trail Shine value through the real Settings control, reload, gameplay, Pause, Account, and re-entry without credentials, external settings/session writes, or retired local-auth controls. The mutation-safe browser is intentionally uncontrolled: installed service-worker activation, controller-change reload, and cache-runtime behavior are outside this result; protected runs verify worker assets only through the separately recorded read-only static contract.',
+      note: 'This verifies the exact current signed-out shared-account entry surface and an opposite fixture-local Haptics value through the real Settings control, reload, gameplay, Pause, Account, and re-entry without credentials, external settings/session writes, or retired local-auth controls. The mutation-safe browser is intentionally uncontrolled: installed service-worker activation, controller-change reload, and cache-runtime behavior are outside this result; protected runs verify worker assets only through the separately recorded read-only static contract.',
       viewport: MOBILE_VIEWPORT,
       deviceScaleFactor: MOBILE_DPR,
       result,
@@ -1414,7 +1403,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
         serviceWorkerCoverage: summarizeAuthPersistenceServiceWorkerCoverage(executionPlan)
       },
       fixtureSettings: {
-        changedFromDefault: changedTrailShine !== initialTrailShine,
+        changedFromDefault: changedHaptics !== initialHaptics,
         storageIsolation: fixtureSettingsIsolation,
         cleanupEvidencePath,
         storageScope: fixtureSettingsCleanup.storageScope,

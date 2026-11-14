@@ -347,11 +347,11 @@ describe('UI surface generic readiness evaluation', () => {
       runtime: { auth: { status: 'guest' } },
       visual: {
         runtime: { mode: 'menu', overlay: 'options' },
-        textLabels: [{ text: 'Camera Follow: On' }, { text: 'Trail Fade' }]
+        textLabels: [{ text: 'Camera Follow: On' }, { text: 'Haptics' }]
       },
       mode: 'menu',
       overlay: 'options',
-      expectedLabels: ['Camera Follow', 'Trail Fade']
+      expectedLabels: ['Camera Follow', 'Haptics']
     });
     expect(withStateSuffix.state.missingLabels).toEqual([]);
     expect(withStateSuffix.ready).toBe(true);
@@ -1002,7 +1002,7 @@ describe('UI surface capture script contract', () => {
     // Pause card: Resume / Settings / Quit to Menu with Settings collapsed on
     // open; no Guide. The toggles are asserted after a real Settings click.
     expect(source).toContain("const PAUSE_CARD_EXPECTED_LABELS = Object.freeze([\n  'Paused',\n  'Resume',\n  'Settings',\n  'Quit to Menu'\n]);");
-    expect(source).toContain("const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([\n  'Trail Fade',\n  'Trail Shine',\n  'Animated Background'\n]);");
+    expect(source).toContain("const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([\n  'Reduce Motion',\n  'Haptics'\n]);");
     expect(source).toContain('hasLabels(surfaces.pause, PAUSE_CARD_EXPECTED_LABELS)');
     expect(source).toContain("!hasLabels(surfaces.pause, ['GUIDE'])");
     expect(source).toContain('hasLabels(surfaces.pauseBottom, PAUSE_SETTINGS_EXPECTED_LABELS)');

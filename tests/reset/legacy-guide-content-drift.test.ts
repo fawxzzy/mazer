@@ -152,11 +152,14 @@ describe('guide copy only names things that exist', () => {
     expect(read('src/render/trailPalette.ts')).toMatch(/export const sampleIridescentTrail/);
   });
 
-  test('Trail row names the Settings toggle by its live label', () => {
-    const fade = LEGACY_SETTINGS_GROUP_ROWS.find((r) => r.id === 'trail-fade')!;
-    expect(fade.kind).toBe('toggle');
-    expect(row('trail').text).toContain(fade.label);
+  test('Trail row names the Settings toggle by its live label, and no Guide row names a removed setting', () => {
+    const reduceMotion = LEGACY_SETTINGS_GROUP_ROWS.find((r) => r.id === 'reduce-motion')!;
+    expect(reduceMotion.kind).toBe('toggle');
+    expect(row('trail').text).toContain(reduceMotion.label);
     expect(row('trail').text).toMatch(/in Settings/);
+    for (const removed of ['Trail Fade', 'Trail Shine', 'Animated Background']) {
+      expect(LEGACY_GUIDE_ROWS.map((r) => r.text).join(' ')).not.toContain(removed);
+    }
   });
 
   test('Goal is a star: the Chip marker module draws a star path and the scene calls it for the board and the Guide', () => {

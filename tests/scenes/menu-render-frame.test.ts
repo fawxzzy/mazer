@@ -823,7 +823,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
     expect(menuSceneSource).not.toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
     expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars(createBackdropStarRandom()).slice(0, LEGACY_MENU_STAR_COUNT);');
-    expect(menuSceneSource).toContain('const backdropMotionEnabled = this.settings.toggleAnimatedBackdrop && !this.prefersLegacyReducedMotion();');
+    expect(menuSceneSource).toContain('const backdropMotionEnabled = resolveBackdropMotion(this.prefersLegacyReducedMotion());');
     expect(backdropSource).toContain("LEGACY_MENU_BACKDROP_STAR_MOTION = 'radial-warp'");
     expect(backdropSource).toContain("LEGACY_MENU_BACKDROP_MOTION_PROFILE = 'visible-parallax-warp'");
     expect(backdropSource).toContain('resolveLegacyMenuBackdropWarpVector');
@@ -1021,7 +1021,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // per-tile dock fill and bleed-strip images are gone.
     expect(menuSceneSource).not.toContain('drawLegacyPathBorderDock');
     expect(menuSceneSource).toContain('docks.push({ x, y, side });');
-    expect(menuSceneSource).toContain('this.trail = resolveLegacyMenuDemoTrail(');
+    // The live Trail Fade toggle that re-cut the demo trail is gone; the demo trail comes from the bootstrap/advance frames.
+    expect(menuSceneSource).toContain('this.trail = nextFrame.trail;');
     expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(');
     expect(menuSceneSource).toContain('const mazeTileSize = mazeRenderFrame.tileSize;');
     expect(menuSceneSource).toContain('pathSource: Pick<LegacyMazeSnapshot, \'grid\' | \'width\' | \'height\'>,');
@@ -1445,9 +1446,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // each switch position through the canonical resolver.
     expect(menuSceneSource).toContain('const checked = resolveLegacyOverlayToggleSwitchIsOn(fieldId, this.settings);');
     const planSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacySettingsSheetPlan.ts'), 'utf8');
-    expect(planSource).toContain("settingKey: 'toggleTrailFade'");
-    expect(planSource).toContain("settingKey: 'toggleTrailPulse'");
-    expect(planSource).toContain("settingKey: 'toggleAnimatedBackdrop'");
+    expect(planSource).toContain("settingKey: 'toggleReducedMotion'");
+    expect(planSource).toContain("settingKey: 'hapticsEnabled'");
+    expect(planSource).not.toContain('toggleTrailFade');
+    expect(planSource).not.toContain('toggleTrailPulse');
+    expect(planSource).not.toContain('toggleAnimatedBackdrop');
     // Play touch movement only has one control scheme now (the floating
     // stick), so the settings list no longer surfaces a meaningless
     // arrows-vs-stick row for it -- the underlying resolver keeps the
