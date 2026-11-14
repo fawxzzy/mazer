@@ -16,30 +16,30 @@ const methodSource = (signature: string): string => {
   return scene.slice(start, scene.indexOf('\n  }\n', start));
 };
 
-describe('MenuScene wiring: header identity replaces the bottom Welcome block', () => {
+describe('MenuScene wiring: the header identity label is retired (MAZER-UI-024)', () => {
   test('no "Welcome" text object is created anywhere in the menu front door', () => {
     expect(scene).not.toContain("'Welcome'");
     expect(scene).not.toContain('"Welcome"');
     expect(scene).not.toContain('createLegacyAuthenticatedWelcomeIdentity');
   });
 
-  test('the identity label is anchored at the profile icon, not at the Start button', () => {
-    const identity = methodSource('private createLegacyHeaderIdentityLabel(): void');
-    expect(identity).not.toContain('centerButtonX');
-    expect(identity).not.toContain('centerButtonY');
-    expect(identity).not.toContain('buttonHeight');
-    expect(identity).toContain('placement.anchor.x, placement.anchor.y');
-    // signed out / guest -> no label
-    expect(identity).toContain("this.authSnapshot.status === 'authenticated'");
-    expect(identity).toContain('if (username.length === 0) {\n      return;');
+  test('the username label is no longer built in the menu front door; the online counter is drawn instead', () => {
+    expect(scene).not.toContain('createLegacyHeaderIdentityLabel');
+    expect(scene).not.toContain('resolveLegacyHeaderIdentityPlacement');
+    expect(scene).toContain('this.drawLegacyMenuPresenceCounter(time);');
   });
 
-  test('is created in the menu front door right after the profile icon (menu mode, no overlay only)', () => {
-    const profileCall = scene.indexOf('this.createLegacyMenuProfileButton(');
-    const identityCall = scene.indexOf('this.createLegacyHeaderIdentityLabel();');
-    expect(profileCall).toBeGreaterThan(0);
-    expect(identityCall).toBeGreaterThan(profileCall);
-    expect(identityCall - profileCall).toBeLessThan(400);
+  test('the leaderboard icon holds the leading slot and the profile icon sits beside the settings cog (slot 1)', () => {
+    const leaderboardButton = methodSource('private createLegacyMenuLeaderboardButton(onClick: () => void): UiButton');
+    const leaderboardDraw = methodSource('private drawLegacyMenuLeaderboardIcon(time: number): void');
+    const profileButton = methodSource('private createLegacyMenuProfileButton(onClick: () => void): UiButton');
+    for (const source of [leaderboardButton, leaderboardDraw]) {
+      expect(source).toContain("placement: 'leading'");
+      expect(source).not.toContain('slot: 1');
+    }
+    expect(profileButton).toContain("placement: 'trailing'");
+    expect(profileButton).toContain('slot: 1');
+    expect(profileButton).not.toContain("placement: 'leading'");
   });
 });
 

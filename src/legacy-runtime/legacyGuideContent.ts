@@ -30,7 +30,8 @@ export type LegacyGuideGlyph =
   | 'touch-stick'
   | 'trail-swatch'
   | 'edge-marker'
-  | 'level-numeral';
+  | 'level-numeral'
+  | 'online-count';
 
 export type LegacyGuideIconStatus = 'shared-with-board' | 'guide-local' | 'todo-wiring';
 
@@ -61,7 +62,7 @@ export interface LegacyGuideIconSpec {
 }
 
 export interface LegacyGuideRow {
-  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'levels';
+  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'levels' | 'online';
   heading: string;
   text: string;
   icon: LegacyGuideIconSpec;
@@ -189,6 +190,20 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
     },
     id: 'levels',
     text: 'Clears show your clear time and level. Harder mazes add shortcuts and loops.'
+  },
+  {
+    heading: 'Online',
+    icon: {
+      badge: 'circle',
+      boardDraw: { module: 'src/scenes/MenuScene.ts', symbol: 'drawLegacyPresenceGlyphWord' },
+      chipDraw: null,
+      glyph: 'online-count',
+      lane: null,
+      reasonId: 'online-count-calls-menu-counter-chip-draw',
+      status: 'shared-with-board'
+    },
+    id: 'online',
+    text: 'The number by the top-left icon is how many players are in Mazer right now.'
   }
 ]);
 

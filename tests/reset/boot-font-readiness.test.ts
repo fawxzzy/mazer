@@ -77,11 +77,13 @@ describe('Space Grotesk delivery wiring', () => {
     expect(main.indexOf('await uiFontReady;')).toBeLessThan(main.indexOf('new Phaser.Game('));
   });
 
-  test('draws the header identity label with the token UI face, not the auth fallback stack', () => {
+  test('MAZER-UI-024: the menu header no longer builds a Text label (the username label is gone); the online counter is tile-glyph chips with no font dependency', () => {
     const menu = read('src/scenes/MenuScene.ts');
-    const start = menu.indexOf('private createLegacyHeaderIdentityLabel()');
-    const block = menu.slice(start, start + 900);
-    expect(block).toContain('fontFamily: LEGACY_UI_FONT_FAMILY');
-    expect(block).not.toContain('LEGACY_AUTH_UI_FONT_FAMILY');
+    expect(menu).not.toContain('createLegacyHeaderIdentityLabel');
+    const start = menu.indexOf('private drawLegacyMenuPresenceCounter(time: number): void');
+    const block = menu.slice(start, start + 2600);
+    expect(start).toBeGreaterThan(0);
+    expect(block).not.toContain('this.add.text');
+    expect(block).not.toContain('fontFamily');
   });
 });

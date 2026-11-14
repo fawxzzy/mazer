@@ -157,10 +157,8 @@ describe('MAZER-ACCT-033: the header keeps the saved name after a reload', () =>
 describe('scene wiring (source pins)', () => {
   const menu = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n?/g, '\n');
 
-  test('the header label still reads the auth snapshot name; a rename and every auth refresh are patched into it', () => {
-    const start = menu.indexOf('private createLegacyHeaderIdentityLabel(): void {');
-    expect(start).toBeGreaterThan(0);
-    expect(menu.slice(start, start + 700)).toContain("this.authSnapshot.canonicalUsername?.trim() ?? ''");
+  test('MAZER-UI-024: the main-menu header no longer shows the name; a rename and every auth refresh are still patched into the auth snapshot the leaderboard and account surfaces read', () => {
+    expect(menu).not.toContain('private createLegacyHeaderIdentityLabel(): void {');
     expect(menu.split('this.authSnapshot = applyLegacyUsernameRenameToSnapshot(this.authSnapshot, this.accountUsernameRename);').length - 1).toBe(2);
   });
 

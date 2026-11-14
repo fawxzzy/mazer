@@ -309,11 +309,9 @@ import {
   shouldRereadLegacyUsernameAfterProfileCreate,
   type LegacyUsernameRename
 } from '../legacy-runtime/legacyAccountUsernameState';
-import {
-  LEGACY_HEADER_IDENTITY_LABEL_NAME,
-  LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX,
-  resolveLegacyHeaderIdentityPlacement
-} from '../legacy-runtime/legacyHeaderIdentityPlacement';
+import { LegacyPresenceController } from '../legacy-runtime/legacyPresenceController';
+import { formatOnlineGlyph } from '../legacy-runtime/legacyPresenceContract';
+import { resolveLegacyPresenceCounterPlacement } from '../legacy-runtime/legacyPresenceCounterLayout';
 import {
   LEGACY_UI_COMPACT_BREAKPOINT,
   resolveLegacyOverlayPanelLayout,
@@ -1296,6 +1294,8 @@ interface LegacyTrailPerfDiagnostics {
 
 interface LegacyQaDiagnosticsApi {
   movePlayPlayer(move: string): LegacyQaMoveResult;
+  /** MAZER-UI-024: force the menu "online" count for screenshots (null = unknown, undefined = release); no network. */
+  setPresenceCount(count: number | null | undefined): void;
   getTrailPerfDiagnostics(): LegacyTrailPerfDiagnostics | null;
   /** Player-facing Settings action; the internal overlay id remains options. */
   openSettingsOverlay(): LegacyQaOverlayResult;
@@ -1559,6 +1559,11 @@ const LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS = 5200;
 // the one lit rim is the same hue lightened toward white, so small cells stay solid and legible.
 const LEGACY_WORDMARK_CHIP_FILL_CANVAS_MIX = 0.12;
 const LEGACY_WORDMARK_CHIP_RIM_LIGHTEN = 0.4;
+// MAZER-UI-024 menu "online" counter chips: the number in lit Mazer mint, the word ONLINE dimmer.
+const LEGACY_PRESENCE_CHIP_FILL = cyberArcadeMaterial.rail.mint;
+const LEGACY_PRESENCE_CHIP_RIM = mixLegacyIridescentColor(cyberArcadeMaterial.rail.mint, boardMaterial.white, 0.6);
+const LEGACY_PRESENCE_WORD_FILL = mixLegacyIridescentColor(cyberArcadeMaterial.rail.mint, boardMaterial.void, 0.7);
+const LEGACY_PRESENCE_WORD_RIM = mixLegacyIridescentColor(cyberArcadeMaterial.rail.mint, boardMaterial.void, 0.4);
 // One frame's worth of defer (at 60fps) for the goal-reached maze precompute
 // (applyLegacyWorldTurnPlayerMovement) -- just enough for the arrival
 // frame's render to happen before the still-blocking build runs, with
@@ -1709,6 +1714,8 @@ export class MenuScene extends Phaser.Scene {
   // replacement for account entry.
   private authGateAwaitingResolution = true;
   private authGateLocked = false;
+  // MAZER-UI-024: menu "online now" counter (legacyPresenceController.ts). No session while signed out.
+  private readonly presence = new LegacyPresenceController({ now: () => this.time.now });
   private guestPlayGranted = false;
   private playerMessageToastGraphics!: Phaser.GameObjects.Graphics;
   // MAZER-MOTION-002: fading snapshot cover for Start / overlay open / overlay close (src/render/uiTransition.ts).
@@ -2627,6 +2634,7 @@ export class MenuScene extends Phaser.Scene {
       }
       this.authUnsubscribe?.();
       this.authUnsubscribe = null;
+      this.presence.stop();
       this.destroyLegacyAuthNativeInput();
       this.destroyAccountUsernameNativeInput();
       this.detachRuntimeDiagnostics();
@@ -2857,6 +2865,7 @@ export class MenuScene extends Phaser.Scene {
 
     window.__MAZER_QA__ = {
       movePlayPlayer: (move: string): LegacyQaMoveResult => this.handleLegacyQaPlayMove(move),
+      setPresenceCount: (count: number | null | undefined): void => this.presence.setQaCount(count),
       openSettingsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenSettingsOverlay(),
       openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay(),
       openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay(),
@@ -3352,6 +3361,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.advanceLegacyMenuStaticDrawStage(time);
+    this.tickLegacyPresence(time);
     if (this.mode === 'menu' && this.playStartMazePrefetchPrimed === false && !this.authGateAwaitingResolution) {
       this.primeLegacyPlayStartMazePrefetch();
     }
@@ -9061,6 +9071,7 @@ export class MenuScene extends Phaser.Scene {
     // trail that reaches that corner, not a z-index.
     this.drawLegacyMenuSettingsCog(time);
     this.drawLegacyMenuLeaderboardIcon(time);
+    this.drawLegacyMenuPresenceCounter(time);
     this.boardDynamicDirty = false;
   }
 
@@ -9605,12 +9616,8 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  // Shares the settings cog's header slot on the same (trailing) side via
-  // slot 1, flowing inward from it with the header-control system's own
-  // built-in spacing -- the LVL badge already occupies the leading side, so
-  // pairing leaderboard with settings on the trailing side (rather than the
-  // brief's abstract leading/trailing split) is the one that doesn't
-  // collide with existing, load-bearing UI.
+  // MAZER-UI-024: the leaderboard icon holds the LEADING header slot (top-left) and the profile icon
+  // sits beside the settings cog on the trailing side (slot 1); they used to be the other way round.
   private drawLegacyMenuLeaderboardIcon(time: number): void {
     if (this.mode !== 'menu' || this.overlay !== 'none') {
       this.headerLeaderboardIconImage.setVisible(false);
@@ -9622,10 +9629,9 @@ export class MenuScene extends Phaser.Scene {
       height: this.layout.height,
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
-      placement: 'trailing',
+      placement: 'leading',
       safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
-      slot: 1,
       width: this.layout.width
     });
     // Same blink/grow-shrink pulse the procedural bar-chart glyph had --
@@ -9644,6 +9650,76 @@ export class MenuScene extends Phaser.Scene {
       desiredSize,
       blinkAlpha
     );
+  }
+
+  // MAZER-UI-024: presence runs only while signed in (menu or play); the counter redraws only on change.
+  private tickLegacyPresence(time: number): void {
+    this.presence.setSignedIn(this.authSnapshot.status === 'authenticated');
+    if (this.mode === 'menu' && this.presence.needsRedraw(time, this.prefersLegacyReducedMotion())) {
+      this.boardDynamicDirty = true;
+    }
+  }
+
+  // MAZER-UI-024: the live "N online" counter, where the signed-in username used to be (right of the
+  // leading header icon, left of the inline title). Tile glyph chips in one calm mint, an optional pulse dot
+  // (only with Reduce Motion off), drawn into the dynamic board layer after the header icons like they are.
+  // Geometry and the fit tiers live in legacyPresenceCounterLayout.ts; the count easing in legacyPresenceDisplay.ts.
+  private drawLegacyMenuPresenceCounter(time: number): void {
+    if (this.mode !== 'menu' || this.overlay !== 'none') {
+      return;
+    }
+    const reducedMotion = this.prefersLegacyReducedMotion();
+    const frame = this.presence.frame(time, reducedMotion);
+    if (!frame.visible || frame.value === null) {
+      return;
+    }
+    const placement = resolveLegacyPresenceCounterPlacement({
+      layout: this.layout,
+      showDot: !reducedMotion,
+      text: formatOnlineGlyph(frame.value)
+    });
+    if (!placement.visible || placement.number === null) {
+      return;
+    }
+    const graphics = this.boardDynamicGraphics;
+    if (placement.dot !== null) {
+      const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, false);
+      graphics.fillStyle(LEGACY_PRESENCE_CHIP_FILL, frame.alpha * (0.35 + (phase * 0.65)));
+      graphics.fillCircle(placement.dot.centerX, placement.dot.centerY, placement.dot.radius);
+    }
+    const { number, word } = placement;
+    this.drawLegacyPresenceGlyphWord(graphics, number.text, number.left + (number.width / 2), number.top + (number.height / 2), placement.cell, frame.alpha, true);
+    if (word !== null) {
+      this.drawLegacyPresenceGlyphWord(graphics, word.text, word.left + (word.width / 2), word.top + (word.height / 2), placement.cell, frame.alpha, false);
+    }
+  }
+
+  // One word of chip cells for the menu counter (and its Guide icon): the number is the lit part, the word ONLINE the
+  // quiet label. Draws into the caller's graphics without clearing it.
+  private drawLegacyPresenceGlyphWord(
+    graphics: Phaser.GameObjects.Graphics,
+    text: string,
+    centerX: number,
+    centerY: number,
+    cellSize: number,
+    alpha: number,
+    lit: boolean
+  ): void {
+    const glyphLayout = resolveLegacyGlyphWordLayout(text, centerX, centerY, cellSize);
+    const geometry = resolveChipGridGeometry({
+      cellSize: glyphLayout.cellSize,
+      columns: glyphLayout.columns,
+      grid: glyphLayout.grid,
+      left: glyphLayout.left,
+      rows: glyphLayout.rows,
+      top: glyphLayout.top
+    });
+    const colors = lit
+      ? { fill: LEGACY_PRESENCE_CHIP_FILL, rim: LEGACY_PRESENCE_CHIP_RIM }
+      : { fill: LEGACY_PRESENCE_WORD_FILL, rim: LEGACY_PRESENCE_WORD_RIM };
+    for (const cell of glyphLayout.cells) {
+      drawChipCell(graphics, geometry, glyphLayout.left, glyphLayout.top, cell.column, cell.row, colors, alpha);
+    }
   }
 
   private resolveLegacyPlayElapsedMs(): number {
@@ -11013,7 +11089,6 @@ export class MenuScene extends Phaser.Scene {
         this.uiButtons.push(this.createLegacyMenuProfileButton(
           () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
         ));
-        this.createLegacyHeaderIdentityLabel();
       }
 
       this.uiDirty = false;
@@ -11663,6 +11738,7 @@ export class MenuScene extends Phaser.Scene {
         case 'trail-swatch': return playerPalette.trailColor;
         case 'edge-marker': return cyberArcadeMaterial.rail.cyan;
         case 'level-numeral': return playerPalette.playerCoreColor;
+        case 'online-count': return LEGACY_PRESENCE_CHIP_FILL;
       }
     };
     // The body scrolls under a geometry mask (the guide is pure text and icons), so a row that is
@@ -11856,6 +11932,13 @@ export class MenuScene extends Phaser.Scene {
         const cellSize = clamp(Math.floor((badgeRadius * 2 - 3) / Math.max(7, columns)), 2, 5);
         const layout = resolveLegacyGlyphWordLayout(word, centerX, centerY, cellSize);
         this.drawLegacyGlyphWordTileBlock(graphics, layout, 0, 1, 1, false);
+        return;
+      }
+      case 'online-count': {
+        // The menu counter's own chip draw (drawLegacyPresenceGlyphWord), a sample two-digit number.
+        const columns = resolveLegacyGlyphWordLayout('12', 0, 0, 1).columns;
+        const cellSize = clamp(Math.floor((badgeRadius * 2 - 3) / Math.max(7, columns)), 2, 3);
+        this.drawLegacyPresenceGlyphWord(graphics, '12', centerX, centerY, cellSize, 1, true);
         return;
       }
     }
@@ -14703,10 +14786,9 @@ export class MenuScene extends Phaser.Scene {
       height: this.layout.height,
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
-      placement: 'trailing',
+      placement: 'leading',
       safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
-      slot: 1,
       width: this.layout.width
     });
     const hit = resolveLegacyMinHitRect(rect, this.layout);
@@ -14760,9 +14842,10 @@ export class MenuScene extends Phaser.Scene {
       height: this.layout.height,
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
-      placement: 'leading',
+      placement: 'trailing',
       safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
+      slot: 1,
       width: this.layout.width
     });
     const hit = resolveLegacyMinHitRect(frame, this.layout);
@@ -14928,50 +15011,6 @@ export class MenuScene extends Phaser.Scene {
     this.leaderboardSelfRank = selfRankResult.selfRank;
     this.leaderboardStatus = pageResult.entries.length === 0 ? 'empty' : 'ready';
     this.uiDirty = true;
-  }
-
-  // Header identity: the verified canonical username, top-left, immediately
-  // right of the profile icon (replaces the old greeting + username pair
-  // that sat above the Start button). Geometry comes from
-  // resolveLegacyHeaderIdentityPlacement: the real profile-icon frame, the
-  // real title footprint (not an assumed width), ellipsized to the room
-  // between them, shortened/hidden on a tight header (the edge diamonds sit
-  // behind it at fixed positions). Signed out / guest / no username -> no label at all.
-  // Depth 3 like the other menu controls: above the board, below overlays.
-  private createLegacyHeaderIdentityLabel(): void {
-    const username = this.authSnapshot.status === 'authenticated'
-      ? this.authSnapshot.canonicalUsername?.trim() ?? ''
-      : '';
-    if (username.length === 0) {
-      return;
-    }
-
-    // No stroke/halo/plate (audit finding 1); 2 px padding keeps descenders.
-    // Text resolution stays at the baseline: n > 1 paints glyphs n times larger
-    // under this Canvas renderer (render/textCrispness.ts).
-    const label = this.add.text(0, 0, username, {
-      color: '#d7f7ee',
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '14px',
-      padding: { top: LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX, bottom: LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX }
-    }).setOrigin(0, 0.5).setDepth(3).setVisible(false);
-    const placement = resolveLegacyHeaderIdentityPlacement({
-      layout: this.layout,
-      measure: (value, fontPx) => label.setFontSize(fontPx).setText(value).width,
-      measureHeight: (fontPx) => label.setFontSize(fontPx).setText(username).height,
-      username
-    });
-    if (!placement.visible || placement.anchor === null) {
-      label.destroy();
-      return;
-    }
-    label
-      .setName(LEGACY_HEADER_IDENTITY_LABEL_NAME)
-      .setFontSize(placement.identity.fontPx)
-      .setText(placement.identity.displayText)
-      .setPosition(placement.anchor.x, placement.anchor.y)
-      .setVisible(true);
-    this.uiTexts.push(label);
   }
 
   private createLegacySignedOutOAuthFailure(): void {

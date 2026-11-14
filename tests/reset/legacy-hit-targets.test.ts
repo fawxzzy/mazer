@@ -43,8 +43,9 @@ const enumerateHitZones = (viewport: { height: number; width: number }): HitZone
     width: menuLayout.width
   };
   const headerZones = [
-    ['menu-header-account', { ...headerInput, placement: 'leading' as const }],
-    ['menu-header-leaderboard', { ...headerInput, placement: 'trailing' as const, slot: 1 }],
+    // MAZER-UI-024: leaderboard leads (top-left); the account icon sits beside the settings cog.
+    ['menu-header-account', { ...headerInput, placement: 'trailing' as const, slot: 1 }],
+    ['menu-header-leaderboard', { ...headerInput, placement: 'leading' as const }],
     ['menu-header-settings', { ...headerInput, placement: 'trailing' as const }]
   ] as const;
   for (const [name, input] of headerZones) {

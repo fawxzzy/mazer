@@ -34,8 +34,9 @@ const measureHeader = (
     sizeScale: layout.headerIconScale,
     width: layout.width
   };
-  const account = resolveLegacyHeaderControlFrame({ ...base, placement: 'leading' });
-  const leaderboard = resolveLegacyHeaderControlFrame({ ...base, placement: 'trailing', slot: 1 });
+  // MAZER-UI-024: the leaderboard icon leads; the account (profile) icon sits beside the settings cog.
+  const leaderboard = resolveLegacyHeaderControlFrame({ ...base, placement: 'leading' });
+  const account = resolveLegacyHeaderControlFrame({ ...base, placement: 'trailing', slot: 1 });
   const settings = resolveLegacyHeaderControlFrame({ ...base, placement: 'trailing' });
   return { account, layout, leaderboard, settings };
 };
@@ -51,12 +52,12 @@ describe('header edge padding (Wave 5C)', () => {
     expect(resolveLegacyHeaderEdgeInset(100)).toBe(LEGACY_HEADER_EDGE_INSET_MIN_PX);
   });
 
-  test('left (profile) and right (settings) controls mirror at the same edge gap on every viewport', () => {
+  test('left (leaderboard) and right (settings) controls mirror at the same edge gap on every viewport', () => {
     const rows: string[] = [];
     for (const viewport of VIEWPORTS) {
-      const { account, settings } = measureHeader(viewport);
+      const { leaderboard, settings } = measureHeader(viewport);
       const edge = resolveLegacyHeaderEdgeInset(viewport.width);
-      const leftGap = account.left;
+      const leftGap = leaderboard.left;
       const rightGap = viewport.width - settings.right;
       rows.push(`${viewport.width}: left ${leftGap} right ${rightGap} (edge ${edge})`);
       expect(leftGap).toBe(edge);
@@ -65,7 +66,7 @@ describe('header edge padding (Wave 5C)', () => {
     }
     // 390 is the reference phone: at least 16px on both edges.
     const phone = measureHeader({ height: 844, width: 390 });
-    expect(phone.account.left).toBeGreaterThanOrEqual(16);
+    expect(phone.leaderboard.left).toBeGreaterThanOrEqual(16);
     expect(390 - phone.settings.right).toBeGreaterThanOrEqual(16);
     expect(rows).toHaveLength(VIEWPORTS.length);
   });
@@ -80,7 +81,7 @@ describe('header edge padding (Wave 5C)', () => {
         expect(hit.left).toBeGreaterThanOrEqual(0);
         expect(hit.right).toBeLessThanOrEqual(viewport.width);
       }
-      expect(leaderboard.right).toBeLessThanOrEqual(settings.left);
+      expect(account.right).toBeLessThanOrEqual(settings.left);
     }
   });
 
@@ -89,9 +90,9 @@ describe('header edge padding (Wave 5C)', () => {
     const flat = measureHeader(viewport);
     const notched = measureHeader(viewport, { left: 47, right: 47 });
     expect(notched.layout.headerSafeInset).toEqual({ left: 47, right: 47 });
-    expect(notched.account.left).toBe(flat.account.left + 47);
+    expect(notched.leaderboard.left).toBe(flat.leaderboard.left + 47);
     expect(viewport.width - notched.settings.right).toBe((viewport.width - flat.settings.right) + 47);
-    expect(notched.account.left).toBeGreaterThanOrEqual(47 + LEGACY_HEADER_EDGE_INSET_MIN_PX);
+    expect(notched.leaderboard.left).toBeGreaterThanOrEqual(47 + LEGACY_HEADER_EDGE_INSET_MIN_PX);
   });
 
   test('the in-play pause glyph sits on the same edge gap as the menu settings control', () => {
