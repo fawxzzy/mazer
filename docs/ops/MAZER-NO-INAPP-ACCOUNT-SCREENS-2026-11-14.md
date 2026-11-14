@@ -94,10 +94,7 @@ state used by diagnostics and re-auth, the OAuth hand-off and its failure catego
 
 ## Follow-ups not done here
 
-- Wave 3B (`legacyPlayerMessage.ts`): `resolveLegacyPasswordRecoveryError`, `resolveLegacyAuthValidationMessage` and the
-  copy rows `loginReady`, `enterEmail`, `passwordMinimum`, `passwordMismatch`, `passwordRecoveryInvalid`,
-  `passwordRecoveryUpdated`, `passwordResetNotConfigured`, `passwordResetSent`, `emailInvalid`, `passwordPolicy` now have no caller.
-  They are a separate PR because that file belongs to a different integrator wave.
+- Wave 3B (`legacyPlayerMessage.ts`): done by MAZER-ACCT-044. `resolveLegacyPasswordRecoveryError`, `resolveLegacyAuthValidationMessage` and the copy rows `loginReady`, `enterEmail`, `passwordMinimum`, `passwordMismatch`, `passwordRecoveryInvalid`, `passwordRecoveryUpdated`, `passwordResetNotConfigured`, `passwordResetSent` are deleted with their tests and inventory rows. `emailInvalid` and `passwordPolicy` stay: `resolveLegacyAuthFeedbackMessage` still maps provider error text to them (diagnostics only).
 - Wave 0C: `scripts/analysis/capture-ui-surfaces.mjs` still expects the Welcome labels; separate PR for the same reason.
 - Wave 1C: `formMode` and `invalidFields` in the runtime diagnostics are published as constants until the diagnostics
   type drops them.

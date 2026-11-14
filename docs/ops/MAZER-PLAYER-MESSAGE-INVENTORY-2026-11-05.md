@@ -98,10 +98,8 @@ All are typed `LegacyPlayerMessage` (`copy`, `durationMs` default 2400 ms, `id`,
 
 | Resolver / site | id | source | tone | Producer (file) | Shown to player? |
 | --- | --- | --- | --- | --- | --- |
-| `resolveLegacyAuthValidationMessage` | `auth.validation.ready` / `.blocked` | auth | success / warning | MenuScene `resolveLegacyCurrentAuthMessage` | diagnostics only (F1) |
 | `resolveLegacyAuthFeedbackMessage` (error) | `auth.feedback.error` | auth | error | MenuScene `armLegacyAuthFeedbackMessage`, presentation | diagnostics only; render uses raw snapshot (F2) |
 | `resolveLegacyAuthFeedbackMessage` (info) | `auth.feedback.info` | auth | success | same | diagnostics only |
-| `resolveLegacyPasswordRecoveryError` | none (returns copy) | n/a | n/a | MenuScene password recovery | **Yes**: copy is stored in `passwordRecoveryFeedback` and drawn at `MenuScene.ts:14138` |
 | `resolveLegacyBootMessage` | `boot.error` / `boot.service-worker-error` | boot | error / warning | `bootStatus.ts` | no (F7) |
 | `resolveLegacyRemoteSyncMessage` | `remote.<ctx>.failed` / `.guest` / `.missing-client` | progression | warning / info / warning | `legacyRemoteProgression.ts` | no (F3) |
 | `publishLegacyRemoteSyncException` inline | `remote.<ctx>.exception` | progression | warning | MenuScene | no (F3) |

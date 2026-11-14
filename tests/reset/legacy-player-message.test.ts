@@ -8,8 +8,6 @@ import {
   enqueueLegacyPlayerMessage,
   expireLegacyPlayerMessageQueue,
   resolveLegacyAuthFeedbackMessage,
-  resolveLegacyPasswordRecoveryError,
-  resolveLegacyAuthValidationMessage,
   resolveLegacyBootMessage,
   resolveLegacyOverlayFieldCommitMessage,
   resolveLegacyOverlayMovementSpeedMessage,
@@ -43,19 +41,7 @@ describe('legacy player-facing message system', () => {
     })).toBeNull();
   });
 
-  test('maps auth validation and feedback into fitness-style message tones', () => {
-    expect(resolveLegacyAuthValidationMessage(LEGACY_AUTH_MESSAGE_COPY.loginReady, true)).toMatchObject({
-      copy: LEGACY_AUTH_MESSAGE_COPY.loginReady,
-      id: 'auth.validation.ready',
-      source: 'auth',
-      tone: 'success'
-    });
-    expect(resolveLegacyAuthValidationMessage(LEGACY_AUTH_MESSAGE_COPY.enterEmail, false)).toMatchObject({
-      copy: LEGACY_AUTH_MESSAGE_COPY.enterEmail,
-      id: 'auth.validation.blocked',
-      source: 'auth',
-      tone: 'warning'
-    });
+  test('maps auth feedback into fitness-style message tones', () => {
     expect(resolveLegacyAuthFeedbackMessage('Invalid login credentials', null)).toMatchObject({
       copy: 'That email and password do not match. Check them or use Forgot Password.',
       id: 'auth.feedback.error',
@@ -74,24 +60,6 @@ describe('legacy player-facing message system', () => {
       id: 'auth.feedback.info',
       source: 'auth',
       tone: 'success'
-    });
-  });
-
-  test('keeps password recovery errors categorical while retaining technical detail off-screen', () => {
-    expect(resolveLegacyPasswordRecoveryError('Auth session missing!')).toEqual({
-      copy: 'This reset link is invalid or has expired. Request a new link.',
-      requiresNewLink: true,
-      technicalDetail: 'Auth session missing!'
-    });
-    expect(resolveLegacyPasswordRecoveryError('Weak password')).toEqual({
-      copy: 'Choose a different, stronger password that meets the account security requirements.',
-      requiresNewLink: false,
-      technicalDetail: 'Weak password'
-    });
-    expect(resolveLegacyPasswordRecoveryError('Failed to fetch')).toEqual({
-      copy: 'Account service is unreachable. Try again shortly.',
-      requiresNewLink: false,
-      technicalDetail: 'Failed to fetch'
     });
   });
 

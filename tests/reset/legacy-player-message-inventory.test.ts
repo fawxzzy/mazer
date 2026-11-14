@@ -437,6 +437,8 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
       'LEGACY_AUTH_MESSAGE_COPY',
       'LEGACY_BOOT_MESSAGE_COPY',
       'LEGACY_OAUTH_FAILURE_MESSAGE_COPY',
+      // MAZER-ACCT-044 transition table (previous generic spelling); delete with the shim.
+      'LEGACY_OAUTH_PREVIOUS_COPY',
       'LEGACY_REMOTE_MESSAGE_COPY',
       'LEGACY_OFFLINE_MESSAGE_COPY',
       'LEGACY_OVERLAY_MESSAGE_COPY'
