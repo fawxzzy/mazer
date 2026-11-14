@@ -13,6 +13,7 @@ import {
   resolveIntentSemanticTag
 } from '../mazer-core/intent/IntentFeed';
 import { palette } from './palette';
+import { TYPE_BODY_FACE } from './typeScale';
 import { applyTextResolution, resolveHudTextResolution } from './textCrispness';
 import { resolveSceneViewport } from './viewport';
 
@@ -577,7 +578,7 @@ export const createIntentFeedHud = (
     hintText: options.palette?.hud.hintText ?? palette.hud.hintText
   };
   const root = scene.add.container(0, 0).setDepth(10.6).setVisible(false);
-  const intentFontFamily = '"Bahnschrift SemiCondensed", "Trebuchet MS", "Segoe UI", sans-serif';
+  const intentFontFamily = TYPE_BODY_FACE;
   const initialResolution = resolveHudTextResolution(resolveSceneViewport(scene));
   const status = applyTextResolution(scene.add.text(0, 0, '', {
     color: `#${colors.accent.toString(16).padStart(6, '0')}`,

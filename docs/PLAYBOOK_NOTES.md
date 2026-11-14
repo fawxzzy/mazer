@@ -243,3 +243,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: overlays popped in with no rise or stagger. The hook runs after update on purpose: an in-update hook let freshly rebuilt objects render one frame at rest (a flash), found in a headless frame probe.
 - Rule: effects on objects that `rebuildUi` recreates must be a pure function of elapsed time applied after the rebuild, never state stored on the objects. Panel borders and toggles live on the shared overlay Graphics, so they stay static; only labels and row fills move.
 - Status: Applied (review); headless only (Chromium 390x844, 360x740, 412x915 and WebKit iPhone 15 Pro and SE, Reduce Motion on and off), no real-device fps.
+
+## 2026-11-14 - MAZER-UI-010 surface migration 3: intent feed uses the body face
+- WHAT changed: `intentFontFamily` in `src/render/intentFeedRenderer.ts` moves from the `Bahnschrift SemiCondensed, Trebuchet MS, Segoe UI` stack to `TYPE_BODY_FACE`; that stack leaves `LEGACY_FONT_STACKS` in `tests/render/type-scale-ratchet.test.ts`.
+- WHY it changed: MAZER-UI-010 retires legacy font stacks one surface per PR. Bahnschrift is a Windows-only face, so the intent feed rendered in a different font per platform. Sizes come from `legacyTuning` and are unchanged; every line already word-wraps to its slot width, so the wider body face reflows instead of clipping.
+- Rule: a Windows-only face in canvas text is a cross-platform inconsistency, not a style; migrate it to the scale face.
+- Status: Applied (review); source proof only, the intent feed was not opened in a browser, so the wrapped layout in Space Grotesk is unchecked visually.

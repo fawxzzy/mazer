@@ -83,7 +83,6 @@ const LEGACY_OFF_SCALE_SIZES_PX = [1, 9, 11, 13, 15, 18] as const;
 /** Font stacks still in shipped source besides the two scale faces. Same shrink-only rule. */
 const LEGACY_FONT_STACKS = [
   'Segoe UI Variable, Helvetica Neue, Arial, sans-serif',
-  'Bahnschrift SemiCondensed, Trebuchet MS, Segoe UI, sans-serif',
   'Courier New, monospace',
   'IBM Plex Mono, ui-monospace, monospace'
 ] as const;
