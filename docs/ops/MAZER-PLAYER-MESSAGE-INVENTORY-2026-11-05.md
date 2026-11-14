@@ -7,6 +7,13 @@ Status: READ-ONLY audit plus guard tests. No runtime behavior was changed.
 Audited base: `origin/main` `1670c8af`. Line numbers below are as of that base and are for
 orientation only; the guard tests key on string literals and call shapes, never on line numbers.
 
+Update 2026-11-14 (MAZER-ACCT-043): Mazer keeps no account screen. The Welcome/sign-in screen, the Account
+overlay, the in-scene password-recovery form and the credential submit path were deleted; the one account state
+Mazer draws is the failure fallback of the hand-off (icon, one status line, one Try again button, see
+`docs/ops/MAZER-NO-INAPP-ACCOUNT-SCREENS-2026-11-14.md`). The rows for the deleted strings are gone from section 4,
+five rows for `legacyAccountStatusState.ts` replace them, and the raw-info render site no longer exists. Findings F2,
+F6 (presentation helper strings) and F9 below describe code that is deleted; they are kept as history.
+
 Guards that pin this document:
 
 - `tests/reset/legacy-player-message-inventory.test.ts` pins the literal inventory in section 4 and the
@@ -123,21 +130,13 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | file:line | String (or key) | Via module | Tone / source | Kind | Recommended routing |
 | --- | --- | --- | --- | --- | --- |
 | `src/scenes/MenuScene.ts:2703` | `Signing you in…` | no | info / auth | raw-status | Copy key in auth table; render on the message surface |
-| `src/scenes/MenuScene.ts:14171` | `{account}\nManage your profile and account from the shared Fawxzzy account portal.` | no | n/a (helper) | raw-static | Keep as screen helper |
-| `src/scenes/MenuScene.ts:16054` | `Request timed out.` | no (diverges, F9) | error / auth | raw-status | Auth table key `requestTimedOut`; render the resolved message |
 | `src/scenes/MenuScene.ts:17346` | `Progression reset.` | yes (inline copy) | success / progression | routed-inline | Move copy into a progression copy table; add a render surface |
 | `src/scenes/MenuScene.ts:17547` | `Runtime diagnostics authenticated fixture.` | no | n/a | fixture | None (QA fixture) |
 | `src/boot/accessibilitySurface.ts:100` | `Use Arrow keys or WASD to move through the maze. Press Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.` | no | n/a | static | None (a11y description) |
 | `src/boot/accessibilitySurface.ts:109` | `Mazer is ready.` | no | info | static | Live region never updated; candidate sink for the message surface announcements |
 | `src/legacy-runtime/legacyAccountPortal.ts:23` | `Account connection unavailable. Return to Mazer and try again.` | no | error / auth | raw-status | Auth table key `accountConnectionUnavailable`; it is drawn directly at `MenuScene.ts:17128` and via F2 |
 | `src/legacy-runtime/legacyAuth.ts:763` | `Account connected.` | no | success / auth | raw-status | Auth table key `accountConnected`; no render site today (info on the snapshot) |
-| `src/legacy-runtime/legacyAuth.ts:1024` | `A previous password update is still pending. Please wait before trying a different password.` | mapped | n/a | technical | Stays internal; mapped by `resolveLegacyPasswordRecoveryError` |
-| `src/legacy-runtime/legacyAuth.ts:1033` | `Failed to update password. Please try again.` | mapped | n/a | technical | Stays internal; mapped |
-| `src/legacy-runtime/legacyAuth.ts:1053` | `Password update timed out.` | mapped | n/a | technical | Stays internal; mapped |
 | `src/legacy-runtime/legacyAuth.ts:1447` | `That username is already taken.` | no (duplicate) | error / auth | duplicate-unrendered | Use `LEGACY_AUTH_MESSAGE_COPY.usernameTaken` and render it (F4) |
-| `src/legacy-runtime/legacyAuthPresentation.ts:98` | `Checking your reset link…` | no | info / auth | raw-status | Message surface or keep as presentation helper after 3B decides |
-| `src/legacy-runtime/legacyAuthPresentation.ts:100` | `Choose a new password.` | no | info / auth | raw-status | same |
-| `src/legacy-runtime/legacyAuthPresentation.ts:102` | `Updating your password…` | no | info / auth | raw-status | same |
 | `src/legacy-runtime/legacyLeaderboard.ts:49` | `The leaderboard is not available right now.` | no | error / system | parallel-mapper | Fold into the message module |
 | `src/legacy-runtime/legacyLeaderboard.ts:68` | `Could not reach the leaderboard. Check your connection and try again.` | no | error / system | parallel-mapper | Fold into the message module |
 | `src/legacy-runtime/legacyLeaderboard.ts:71` | `The leaderboard is not set up yet.` | no | warning / system | parallel-mapper | Fold into the message module |
@@ -167,10 +166,6 @@ The lane branches that added `legacyAuthScreenView.ts`, `legacyLeaderboardView.t
 
 | file | String | Kind | Recommended routing |
 | --- | --- | --- | --- |
-| `src/legacy-runtime/legacyAuthScreenView.ts` | `Still opening. Continue in your browser or try again.` | duplicate-unrendered | auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands |
-| `src/legacy-runtime/legacyAuthScreenView.ts` | `Opening…` | raw-status | dock label while the OAuth redirect is in flight; bounded to `LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS` (10 s), then `Sign in` + browser notice |
-| `src/legacy-runtime/legacyAuthScreenView.ts` | `Loading…` | duplicate-unrendered | auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands |
-| `src/legacy-runtime/legacyAuthScreenView.ts` | `Signing you in…` | duplicate-unrendered | auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands |
 | `src/legacy-runtime/legacyLeaderboardView.ts` | `Could not reach the leaderboard. Check your connection and try again.` | technical | source error string matched (never shown) so the leaderboard view-model can choose its designed state; the designed copy replaces it (2026-11-06 leaderboard redesign) |
 | `src/legacy-runtime/legacyLeaderboardView.ts` | `The leaderboard is not set up yet.` | technical | source error string matched (never shown) so the leaderboard view-model can choose its designed state; the designed copy replaces it (2026-11-06 leaderboard redesign) |
 | `src/legacy-runtime/legacyLeaderboardView.ts` | `Clear a maze to put your name on the board.` | raw-static | Leaderboard empty state body; rendered by the MenuScene leaderboard sheet (2026-11-06 redesign); fold into the message module later |
@@ -349,6 +344,11 @@ Pure modules, not rendered until the Settings wiring lane lands (`docs/ui/MAZER-
 
 | file | String | Kind | Recommended routing |
 | --- | --- | --- | --- |
+| `src/legacy-runtime/legacyAccountStatusState.ts` | `Loading…` | duplicate-unrendered | gate-cover copy table (the loader label is drawn by MenuScene from `resolveLegacyAuthLoadingCopy`); MAZER-ACCT-043 |
+| `src/legacy-runtime/legacyAccountStatusState.ts` | `Opening…` | raw-status | Try again button label while the hand-off is in flight; bounded to `LEGACY_ACCOUNT_STATUS_OPENING_TIMEOUT_MS` (10 s); MAZER-ACCT-043 |
+| `src/legacy-runtime/legacyAccountStatusState.ts` | `You are signed out.` | raw-status | failure-fallback status line after an explicit sign-out or a return without a session; MAZER-ACCT-043 |
+| `src/legacy-runtime/legacyAccountStatusState.ts` | `Signing you in…` | duplicate-unrendered | gate-cover copy table (the loader label is drawn by MenuScene from `resolveLegacyAuthLoadingCopy`); MAZER-ACCT-043 |
+| `src/legacy-runtime/legacyAccountStatusState.ts` | `Still opening. Try again.` | raw-status | failure-fallback status line once the Opening timeout elapsed; MAZER-ACCT-043 |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Reach the star to clear the maze.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `An arrow on the first tile points the way you set off.` | static | Guide Start row copy (added with the Chip board wiring); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `You are the green rounded block inside a bright ring.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |

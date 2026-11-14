@@ -17,9 +17,6 @@
   "color/tone.error": [
    {
     "file": "src/legacy-runtime/legacyPlayerMessage.ts"
-   },
-   {
-    "file": "src/scenes/MenuScene.ts"
    }
   ],
   "color/tone.info": [
@@ -70,9 +67,6 @@
    },
    {
     "file": "index.html"
-   },
-   {
-    "file": "src/scenes/MenuScene.ts"
    }
   ],
   "legacy/color/text.gate": [
@@ -95,7 +89,7 @@
   ],
   "legacy/color/text.hint": [
    {
-    "file": "src/scenes/MenuScene.ts"
+    "file": "src/theme/tokens.css"
    }
   ],
   "legacy/color/text.title": [
@@ -335,7 +329,7 @@
   ],
   "motion/easing/functions/sineInOut": [
    {
-    "file": "src/scenes/MenuScene.ts",
+    "file": "src/render/boardRenderer.ts",
     "pattern": "ease: MOTION_PHASER_EASE_SINE_IN_OUT"
    }
   ],
@@ -347,7 +341,7 @@
   ],
   "legacy/fontSizePx/caption": [
    {
-    "file": "src/scenes/MenuScene.ts",
+    "file": "src/future-runtime/phaser/scene.ts",
     "pattern": "fontSize: '11px'"
    }
   ],

@@ -65,7 +65,6 @@ describe('legacy pause lifecycle', () => {
     expect(pauseOverlaySource).toContain("case 'RETURN_HOME':");
     expect(pauseOverlaySource).toContain("case 'TOGGLE_SETTINGS_GROUP':");
     expect(menuSceneSource).toContain("this.createLegacyAuthActionButton(");
-    expect(menuSceneSource).toContain("() => this.openOverlay('confirm-progression-reset')");
     expect(menuSceneSource).toContain('this.playCyclePath = [copyPoint(result.nextPlayer)];');
     expect(menuSceneSource).toContain('this.playCycleResetUsed = true;');
     expect(menuSceneSource).toContain('this.playStartedAtMs = this.time.now;');

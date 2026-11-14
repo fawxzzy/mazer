@@ -10,8 +10,6 @@ import {
   LegacyAuthJsLockAcquireTimeoutError,
   LegacyAuthJsLockUnavailableError,
   buildLegacyRememberedIdentityState,
-  clearLegacyPasswordRecoveryUrl,
-  createEmptyLegacyAuthFormState,
   createLegacyAuthSessionSnapshot,
   createLegacyAuthScopedStorage,
   deriveLegacyRememberedIdentityDisplayName,
@@ -20,29 +18,17 @@ import {
   isLegacyPersistedAuthSessionRemoved,
   invokeLegacyLocalSignOutWithTimeout,
   markLegacyRememberedIdentityReauthRequired,
-  normalizeLegacyAuthEmail,
   readLegacyRememberedIdentityState,
-  readLegacyRememberedIdentity,
   readLegacyPersistedAuthSessionSnapshot,
   readLegacyAuthSessionSnapshot,
-  readLegacyPasswordRecoveryBootUrlState,
   reconcileLegacyAuthStorageSession,
-  resolveLegacyPasswordRecoveryCleanUrl,
-  resolveLegacyPasswordRecoveryEnterAction,
-  resolveLegacyPasswordRecoveryRedirectUrl,
-  resolveLegacyPasswordRecoveryUrlState,
-  resolveLegacyPasswordUpdateSubmitState,
   resolveLegacyAuthConfig,
-  resolveLegacyAuthInvalidFields,
   resolveLegacyAuthScopedStorageKey,
   resolveLegacyAuthStorageScope,
-  resolveLegacyAuthSubmitState,
   runLegacyAbortableCredentialRequest,
   runLegacyAuthJsLock,
   syncLegacyRememberedIdentityFromAuthenticatedSession,
-  updateLegacyPasswordWithClient,
   writeLegacyRememberedIdentityState,
-  writeLegacyRememberedIdentity,
   type LegacyAuthSessionSnapshot
 } from '../../src/legacy-runtime/legacyAuth';
 import {
@@ -197,79 +183,6 @@ describe('legacy auth runtime', () => {
     await expect(oauth).resolves.toEqual({ status: 'completed', value: undefined });
     await expect(refresh).resolves.toBe('refreshed');
     expect(events).toEqual(['oauth-start', 'oauth-end', 'refresh']);
-  });
-
-  test('serializes public password mutations on the admitted master client storage lock', async () => {
-    for (const projectRef of ['bxtcuhkotumitoqtrcej']) {
-      const lockManager = new NamedLockHarness();
-      const storageKey = `sb-${projectRef}-auth-token`;
-      const signInWithPassword = vi.fn(async () => ({
-        data: { session: null },
-        error: null
-      }));
-      const authClient = {
-        auth: {
-          fetch: vi.fn() as unknown as typeof fetch,
-          getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
-          onAuthStateChange: vi.fn(() => ({
-            data: { subscription: { unsubscribe: vi.fn() } }
-          })),
-          signInWithPassword,
-          storageKey
-        }
-      };
-
-      vi.resetModules();
-      vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-key');
-      vi.stubEnv('VITE_SUPABASE_URL', `https://${projectRef}.supabase.co`);
-      vi.stubGlobal('navigator', { locks: lockManager });
-      vi.stubGlobal('window', {
-        addEventListener: vi.fn(),
-        localStorage: new MemoryStorage(),
-        location: { pathname: '/' },
-        sessionStorage: new MemoryStorage()
-      });
-      vi.doMock('@supabase/supabase-js', () => ({
-        createClient: vi.fn(() => authClient)
-      }));
-
-      try {
-        const freshAuth = await import('../../src/legacy-runtime/legacyAuth');
-        const freshPortal = await import('../../src/legacy-runtime/legacyAccountPortal');
-        expect(freshAuth.resolveLegacyAuthConfig()).toEqual({
-          anonKey: 'anon-key',
-          url: `https://${projectRef}.supabase.co`
-        });
-        await expect(freshAuth.getLegacyAuthClient()).resolves.not.toBeNull();
-        let releaseCurrentWriter!: () => void;
-        const currentWriter = freshPortal.runMazerExclusiveAuthMutation(async () => {
-          await new Promise<void>((resolve) => { releaseCurrentWriter = resolve; });
-        }, lockManager, `lock:${storageKey}`);
-        await vi.waitFor(() => expect(releaseCurrentWriter).toBeTypeOf('function'));
-
-        await expect(Promise.all([
-          freshAuth.signInLegacyAuth('player@example.test', 'secret1'),
-          freshAuth.signInLegacyAuth('second@example.test', 'secret1')
-        ])).resolves.toEqual([
-          { snapshot: expect.objectContaining({ status: 'unavailable' }) },
-          { snapshot: expect.objectContaining({ status: 'unavailable' }) }
-        ]);
-        expect(signInWithPassword).not.toHaveBeenCalled();
-
-        releaseCurrentWriter();
-        await expect(currentWriter).resolves.toMatchObject({ status: 'completed' });
-        await expect(freshAuth.signInLegacyAuth(
-          'player@example.test',
-          'secret1'
-        )).resolves.toHaveProperty('snapshot');
-        expect(signInWithPassword).toHaveBeenCalledOnce();
-      } finally {
-        vi.doUnmock('@supabase/supabase-js');
-        vi.unstubAllEnvs();
-        vi.unstubAllGlobals();
-        vi.resetModules();
-      }
-    }
   });
 
   test('bounds queued auth-js acquisition and classifies the real timeout', async () => {
@@ -628,251 +541,12 @@ describe('legacy auth runtime', () => {
     expect(buildScript).toContain('loadLocalViteEnv();');
   });
 
-  test('keeps form readiness strict enough for login', () => {
-    const form = createEmptyLegacyAuthFormState('login');
-
-    expect(resolveLegacyAuthSubmitState(form, false)).toEqual({
-      canSubmit: false,
-      reason: 'Account access is unavailable right now. Try again shortly.'
-    });
-    expect(resolveLegacyAuthSubmitState({
-      ...form,
-      email: 'player@example.com',
-      password: 'secret1'
-    }, true)).toEqual({
-      canSubmit: true,
-      reason: null
-    });
-    expect(resolveLegacyAuthSubmitState({
-      ...form,
-      email: 'player',
-      password: 'secret1'
-    }, true).reason).toBe('Enter an email.');
-    expect(resolveLegacyAuthSubmitState({
-      ...form,
-      email: 'player@example.com',
-      password: 'short'
-    }, true).reason).toBe('Password needs 6+ characters.');
-
-    expect(resolveLegacyAuthInvalidFields(form)).toEqual(['email', 'password']);
-  });
-
-  test('binds password reset email callbacks to the exact recovery route', () => {
-    expect(resolveLegacyPasswordRecoveryRedirectUrl('https://mazer.fawxzzy.com')).toBe(
-      'https://mazer.fawxzzy.com/update-password'
-    );
-    expect(resolveLegacyPasswordRecoveryRedirectUrl('https://mazer.fawxzzy.com/')).toBe(
-      'https://mazer.fawxzzy.com/update-password'
-    );
-    expect(resolveLegacyPasswordRecoveryCleanUrl('https://mazer.fawxzzy.com', 'invalid')).toBe(
-      'https://mazer.fawxzzy.com/update-password'
-    );
-    expect(resolveLegacyPasswordRecoveryCleanUrl('https://mazer.fawxzzy.com', 'continue')).toBe(
-      'https://mazer.fawxzzy.com/'
-    );
-  });
-
   test('enables Supabase URL-session detection only on the legacy recovery route', () => {
     expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/update-password' })).toBe(true);
     expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/update-password/' })).toBe(true);
     expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/' })).toBe(false);
     expect(isLegacyPasswordRecoveryRuntimeLocation({ pathname: '/privacy' })).toBe(false);
     expect(isLegacyPasswordRecoveryRuntimeLocation(undefined)).toBe(false);
-  });
-
-  test('recognizes direct recovery paths and categorical provider failures without exposing details', () => {
-    expect(resolveLegacyPasswordRecoveryUrlState({
-      hash: '#access_token=secret',
-      pathname: '/update-password',
-      search: ''
-    })).toEqual({ hasProviderError: false, requested: true });
-    expect(resolveLegacyPasswordRecoveryUrlState({
-      hash: '#code=secret&type=recovery',
-      pathname: '/update-password',
-      search: ''
-    })).toEqual({ hasProviderError: false, requested: true });
-    expect(resolveLegacyPasswordRecoveryUrlState({
-      hash: '#type=signup',
-      pathname: '/update-password',
-      search: ''
-    })).toEqual({ hasProviderError: false, requested: false });
-    expect(resolveLegacyPasswordRecoveryUrlState({
-      hash: '#type=recovery',
-      pathname: '/update-password',
-      search: ''
-    })).toEqual({ hasProviderError: false, requested: false });
-    expect(resolveLegacyPasswordRecoveryUrlState({
-      hash: '#',
-      pathname: '/update-password',
-      search: '?code=secret'
-    })).toEqual({ hasProviderError: false, requested: true });
-    expect(resolveLegacyPasswordRecoveryUrlState({
-      hash: '',
-      pathname: '/update-password',
-      search: ''
-    })).toEqual({ hasProviderError: false, requested: false });
-    expect(resolveLegacyPasswordRecoveryUrlState({
-      hash: '#error=access_denied&error_code=otp_expired&error_description=secret-detail',
-      pathname: '/update-password',
-      search: ''
-    })).toEqual({ hasProviderError: true, requested: true });
-    expect(resolveLegacyPasswordRecoveryUrlState({
-      hash: '',
-      pathname: '/',
-      search: '?error_code=otp_expired'
-    })).toEqual({ hasProviderError: true, requested: false });
-  });
-
-  test('reads the recovery callback from the live URL only', () => {
-    expect(readLegacyPasswordRecoveryBootUrlState({
-      hash: '#access_token=secret&type=recovery',
-      pathname: '/update-password',
-      search: ''
-    })).toEqual({ hasProviderError: false, requested: true });
-
-    clearLegacyPasswordRecoveryUrl('continue');
-    expect(readLegacyPasswordRecoveryBootUrlState({
-      hash: '',
-      pathname: '/update-password',
-      search: ''
-    })).toEqual({ hasProviderError: false, requested: false });
-  });
-
-  test('updates a password only when both policy-valid fields match', async () => {
-    const updateUser = vi.fn(async () => ({ error: null }));
-    const client = { auth: { updateUser } };
-
-    expect(resolveLegacyPasswordUpdateSubmitState('short', 'short', true)).toEqual({
-      canSubmit: false,
-      invalidFields: ['password'],
-      reason: 'Password needs 6+ characters.'
-    });
-    expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret2', true)).toEqual({
-      canSubmit: false,
-      invalidFields: ['confirmPassword'],
-      reason: 'Passwords do not match.'
-    });
-    expect(await updateLegacyPasswordWithClient(client, 'short', 'short')).toEqual({
-      error: 'Password needs 6+ characters.',
-      ok: false
-    });
-    expect(await updateLegacyPasswordWithClient(client, 'secret1', 'secret2')).toEqual({
-      error: 'Passwords do not match.',
-      ok: false
-    });
-    expect(updateUser).not.toHaveBeenCalled();
-
-    await expect(updateLegacyPasswordWithClient(client, 'secret1', 'secret1')).resolves.toEqual({
-      error: null,
-      ok: true
-    });
-    expect(updateUser).toHaveBeenCalledOnce();
-    expect(updateUser).toHaveBeenCalledWith({ password: 'secret1' });
-  });
-
-  test('advances Enter from the first recovery field and reserves submission for valid confirmation', () => {
-    expect(resolveLegacyPasswordRecoveryEnterAction('password')).toBeNull();
-    expect(resolveLegacyPasswordRecoveryEnterAction('password', true)).toBe('focus-confirmation');
-    expect(resolveLegacyPasswordRecoveryEnterAction('confirmPassword', true)).toBe('submit');
-    expect(resolveLegacyPasswordRecoveryEnterAction('email', true)).toBeNull();
-    expect(resolveLegacyPasswordRecoveryEnterAction('displayName', true)).toBeNull();
-
-    expect(resolveLegacyPasswordUpdateSubmitState('secret1', '', true).canSubmit).toBe(false);
-    expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret2', true).canSubmit).toBe(false);
-    expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret1', true).canSubmit).toBe(true);
-  });
-
-  test('bounds recovery-password updates and shares an unresolved mutation with manual retry', async () => {
-    let settleUpdate: ((value: { error: null }) => void) | null = null;
-    const timeoutClient = {
-      auth: {
-        updateUser: vi.fn(async () => new Promise<{ error: null }>((resolve) => {
-          settleUpdate = resolve;
-        }))
-      }
-    };
-    const timeoutResult = await updateLegacyPasswordWithClient(timeoutClient, 'secret1', 'secret1', {
-      timeoutMs: 1
-    });
-    expect(timeoutResult.ok).toBe(false);
-    expect(timeoutResult.error).toBe('Password update timed out.');
-    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
-
-    const retry = updateLegacyPasswordWithClient(timeoutClient, 'secret1', 'secret1', { timeoutMs: 100 });
-    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
-
-    await expect(updateLegacyPasswordWithClient(timeoutClient, 'secret2', 'secret2', {
-      timeoutMs: 100
-    })).resolves.toEqual({
-      error: 'A previous password update is still pending. Please wait before trying a different password.',
-      ok: false
-    });
-    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
-
-    settleUpdate?.({ error: null });
-    await expect(retry).resolves.toEqual({ error: null, ok: true });
-    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
-
-    const rejectClient = {
-      auth: { updateUser: vi.fn(async () => Promise.reject(new Error('bad network'))) }
-    };
-    const rejectResult = await updateLegacyPasswordWithClient(rejectClient, 'secret1', 'secret1', {
-      timeoutMs: 1
-    });
-    expect(rejectResult.ok).toBe(false);
-    expect(rejectResult.error).toBe('bad network');
-    expect(rejectClient.auth.updateUser).toHaveBeenCalledOnce();
-  });
-
-  test('normalizes remembered identity without making it required for guest play', () => {
-    const storage = new MemoryStorage();
-
-    expect(readLegacyRememberedIdentity(undefined)).toBe('');
-    writeLegacyRememberedIdentity(storage, ' Player@Example.COM ');
-
-    expect(JSON.parse(storage.getItem(LEGACY_AUTH_REMEMBERED_IDENTITY_KEY) ?? '{}')).toMatchObject({
-      displayName: 'Player',
-      email: 'player@example.com',
-      sessionState: 'reauth-required'
-    });
-    expect(readLegacyRememberedIdentity(storage)).toBe('player@example.com');
-    expect(normalizeLegacyAuthEmail(' Player@Example.COM ')).toBe('player@example.com');
-  });
-
-  test('keeps fitness-style remembered login state for persistent re-entry', () => {
-    const storage = new MemoryStorage();
-
-    expect(deriveLegacyRememberedIdentityDisplayName('runner@example.test')).toBe('Runner');
-    expect(buildLegacyRememberedIdentityState({
-      email: ' Runner@Example.TEST ',
-      updatedAt: '2026-07-09T12:00:00.000Z'
-    })).toEqual({
-      displayName: 'Runner',
-      email: 'runner@example.test',
-      sessionState: 'reauth-required',
-      updatedAt: '2026-07-09T12:00:00.000Z'
-    });
-
-    writeLegacyRememberedIdentityState(storage, {
-      displayName: 'Maze Runner',
-      email: 'runner@example.com',
-      sessionState: 'ready',
-      updatedAt: '2026-07-09T12:01:00.000Z'
-    });
-    expect(readLegacyRememberedIdentityState(storage)).toEqual({
-      displayName: 'Maze Runner',
-      email: 'runner@example.com',
-      sessionState: 'ready',
-      updatedAt: '2026-07-09T12:01:00.000Z'
-    });
-
-    const reauthState = markLegacyRememberedIdentityReauthRequired(storage);
-    expect(reauthState).toMatchObject({
-      displayName: 'Maze Runner',
-      email: 'runner@example.com',
-      sessionState: 'reauth-required'
-    });
-    expect(readLegacyRememberedIdentity(storage)).toBe('runner@example.com');
   });
 
   test('syncs remembered identity from authenticated sessions without storing tokens', () => {

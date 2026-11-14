@@ -160,10 +160,10 @@ describe('sign-in pre-flight warm-up (MAZER-ACCT-037)', () => {
     expect(await tap).toEqual({ proceed: true, reason: 'ok', status: 200 });
   });
 
-  test('wiring: Welcome calls the warm-up, the tap path still runs its own pre-flight and nothing awaits the warm-up', () => {
+  test('wiring: the failure fallback calls the warm-up, the tap path still runs its own pre-flight and nothing awaits the warm-up', () => {
     const scene = readFileSync(resolve(__dirname, '../../src/scenes/MenuScene.ts'), 'utf8');
-    const entry = scene.slice(scene.indexOf('private buildSharedAccountEntrySection('));
-    const body = entry.slice(0, entry.indexOf('private runLegacyAuthScreenRoute('));
+    const entry = scene.slice(scene.indexOf('private buildAuthOverlay('));
+    const body = entry.slice(0, entry.indexOf('private drawLegacyAccountStatusIcon('));
     expect(body).toContain('warmMazerProviderPreflight();');
     expect(body).not.toMatch(/await\s+warmMazerProviderPreflight/);
 
