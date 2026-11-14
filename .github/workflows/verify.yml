@@ -191,3 +191,35 @@ jobs:
           npm run ai:navigation:acceptance -- --seed-start="$seed_start" --seed-end="$seed_end"
         env:
           matrix_shard: ${{ matrix.shard }}
+
+  playbook-clean-environment:
+    name: Playbook clean-environment validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PLAYBOOK_OFFICIAL_FALLBACK_SPEC: https://github.com/fawxzzy/playbook/releases/download/v0.54.1/playbook-cli-0.54.1.tgz
+      PLAYBOOK_OFFICIAL_FALLBACK_SHA256: 6fb915baaa0837c70a942c60caaf110ba56abee6dd722de8a686b4757e768ba1
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          # Full history so Playbook verify can diff against origin/main (notes-on-changes rule).
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Acquire Playbook runtime from the canonical official distribution
+        run: node scripts/playbook-runtime.mjs --install-official-fallback
+
+      - name: Run Playbook verify
+        run: |
+          unset PLAYBOOK_BIN
+          npm run playbook:verify

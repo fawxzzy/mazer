@@ -18,6 +18,8 @@
     "verify:fast:tests": "node ./scripts/verify/run-fast-verify.mjs --skip-lint",
     "verify:fast:all": "node ./scripts/verify/run-fast-verify.mjs --all",
     "verify:local": "node ./scripts/verify/run-playbook-local-verify.mjs",
+    "playbook:verify": "node scripts/playbook-runtime.mjs verify",
+    "playbook-runtime:install-official-fallback": "node scripts/playbook-runtime.mjs --install-official-fallback",
     "health": "node ./scripts/gates/future-lane-health.mjs",
     "legacy:extract": "node ./scripts/legacy/extract-legacy-truth.mjs",
     "gate:future-lane": "node ./scripts/gates/future-lane-health.mjs",

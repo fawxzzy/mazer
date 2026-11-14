@@ -31,3 +31,6 @@ pnpm-debug.log*
 
 .env*.local
 .vercel
+
+# Playbook runtime state/cache (written by scripts/playbook-runtime.mjs)
+/.playbook/
