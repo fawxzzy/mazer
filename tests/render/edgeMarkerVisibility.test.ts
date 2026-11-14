@@ -1,11 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import {
-  EDGE_MARKER_STROKE_PX,
   EDGE_STATION_COUNT,
   drawEdgeMarkers,
+  resolveEdgeMarkerPaintedPolygon,
   resolveEdgeMarkerStates,
-  resolveEdgeMarkerVertices,
   resolveEdgeStations,
   resolveOrbitingEdgeStations,
   type EdgeGraphics,
@@ -18,7 +17,7 @@ import {
  * @3, 412x915 @2.625, 1280x720 @2, 1440x900 @2). The owner reported that only 6 of the 8 diamonds showed in a played
  * game (the two bottom corners missing). Headless Chromium never reproduced it (all 8 paint at every viewport, board and
  * DPR tried, see docs/ui/MAZER-EDGE-BEAMS-DIAMOND-FILL-2026-11-12.md), so this pins what can be pinned: every diamond
- * rect (outline plus half a stroke) lies inside the canvas in css and device px, is not occluded by the board
+ * rect (the painted outline, miter join included) lies inside the canvas in css and device px, is not occluded by the board
  * rectangle, and is actually drawn (not hidden, not culled).
  */
 interface Rect { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number }
@@ -33,13 +32,13 @@ const SHIPPED = [
 ] as const;
 
 const rectOf = (station: Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>): Rect => {
-  const vertices = resolveEdgeMarkerVertices(station, 1);
-  const half = EDGE_MARKER_STROKE_PX / 2;
+  // The PAINTED outline (the stroke's miter join included): the exact bounding box of what the canvas shows.
+  const painted = resolveEdgeMarkerPaintedPolygon(station);
   return {
-    left: Math.min(...vertices.map((vertex) => vertex.x)) - half,
-    top: Math.min(...vertices.map((vertex) => vertex.y)) - half,
-    right: Math.max(...vertices.map((vertex) => vertex.x)) + half,
-    bottom: Math.max(...vertices.map((vertex) => vertex.y)) + half
+    left: Math.min(...painted.map((vertex) => vertex.x)),
+    top: Math.min(...painted.map((vertex) => vertex.y)),
+    right: Math.max(...painted.map((vertex) => vertex.x)),
+    bottom: Math.max(...painted.map((vertex) => vertex.y))
   };
 };
 
@@ -94,10 +93,10 @@ describe('all 8 edge diamonds are visible on the canvas in play (MAZER-VIS-033)'
       expect(rect.right, `${label} right`).toBeLessThanOrEqual(config.width + 1e-9);
       expect(rect.bottom, `${label} bottom`).toBeLessThanOrEqual(config.height + 1e-9);
       // ...and in device px of the canvas backing store (ceil(css * dpr)), with the stroke snapped outward.
-      expect(Math.floor(rect.left * config.dpr), `${label} device left`).toBeGreaterThanOrEqual(0);
-      expect(Math.floor(rect.top * config.dpr), `${label} device top`).toBeGreaterThanOrEqual(0);
-      expect(Math.ceil(rect.right * config.dpr), `${label} device right`).toBeLessThanOrEqual(backing.width);
-      expect(Math.ceil(rect.bottom * config.dpr), `${label} device bottom`).toBeLessThanOrEqual(backing.height);
+      expect(Math.floor((rect.left + 1e-9) * config.dpr), `${label} device left`).toBeGreaterThanOrEqual(0);
+      expect(Math.floor((rect.top + 1e-9) * config.dpr), `${label} device top`).toBeGreaterThanOrEqual(0);
+      expect(Math.ceil((rect.right - 1e-9) * config.dpr), `${label} device right`).toBeLessThanOrEqual(backing.width);
+      expect(Math.ceil((rect.bottom - 1e-9) * config.dpr), `${label} device bottom`).toBeLessThanOrEqual(backing.height);
       // The board is drawn above the diamonds. A top or bottom diamond must be entirely clear of its rectangle. (The left and
       // right middle diamonds share the screen edge with a phone board that is as wide as the screen, whose bleed margin
       // reaches past it; the board is translucent there, so those two are only held to the canvas rule above.)

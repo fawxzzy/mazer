@@ -8662,7 +8662,8 @@ export class MenuScene extends Phaser.Scene {
   // asks. The stations are fixed positions that depend on the viewport size
   // ONLY (no safe area, no header-control avoidance): the kites sit behind all UI.
   private resolveLegacyEdgeStations(): ReadonlyArray<EdgeStation> {
-    return resolveEdgeStations({ width: this.layout.width, height: this.layout.height });
+    // The painted canvas ends at round(css * resolution) / resolution: the diamonds' outer tips touch THAT edge (MAZER-VIS-043).
+    return resolveEdgeStations({ width: this.layout.width, height: this.layout.height }, resolveMazerCanvasResolution());
   }
 
   // All 8 beams, both directions, in one place. Drawn into spawnLaserGraphics

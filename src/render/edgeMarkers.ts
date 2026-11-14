@@ -40,11 +40,18 @@
  *   never a fixed colour), and everything INSIDE it or fired out of it (the beam fill, the beams, the landing
  *   sparkles) is the player's colour, `PLAYER_COLOR`.
  *
- * Size (MAZER-VIS-038): while the maze runs a diamond is EDGE_DIAMOND_REST_SCALE (50%) of its full size. It is scaled about
- * its INNER tip (`anchorStationToInnerTip`), the point both beams attach to, so that point never moves: the outer tip
- * pulls away from the screen edge instead. The diamond grows back to 100% over the departure beam's flight (exactly full at
- * contact) and shrinks again once it is empty after the arrival beam has left (edgeBeamTimeline.ts); reduced motion keeps
- * it at 50%, static.
+ * Size (MAZER-VIS-038, anchor changed by MAZER-VIS-043): while the maze runs a diamond is EDGE_DIAMOND_REST_SCALE (50%) of
+ * its full size. It is scaled about its OUTER tip (`anchorStationToOuterTip`), so the outer tip stays on the screen edge at every
+ * size (50%, 100% and in between); the INNER tip, the point both beams attach to, moves inward as the diamond grows and back
+ * outward as it shrinks (`resolveEdgeInnerTip(station, scale)`, recomputed every frame from the current scale). The diamond grows back
+ * to 100% over the departure beam's flight (exactly full at contact) and shrinks again once it is empty after the arrival beam has
+ * left (edgeBeamTimeline.ts); reduced motion keeps it at 50%, static.
+ *
+ * Placement (MAZER-VIS-043): every diamond sits fully inside the canvas with its OUTER tip touching the screen edge: the painted
+ * bounding box (outline plus the miter join of a 1 px stroke, `resolveEdgeMarkerPaintedPolygon`) touches the edge exactly and
+ * never crosses it. The four edge midpoints point straight in. The four corner diamonds point along the corner diagonal, touch the
+ * top / bottom edge with their outer tip and sit EDGE_MARKER_CORNER_CLEARANCE_PX along that edge from the corner, so a rounded
+ * display corner of up to that radius does not cut them (a tip exactly on the corner point is cut by any rounded corner).
  *
  * Lasers and fill (MAZER-VIS-030, VIS-038): on departure the player fires a beam out to ALL 8 diamonds; each diamond FILLS with
  * the player's colour from the exact instant its beam touches it (grows from its inner tip, full when the beam is fully
@@ -105,7 +112,12 @@ export const EDGE_STATION_COUNT = 8;
 export const EDGE_MARKER_HALF_WIDTH = 7;
 export const EDGE_MARKER_HALF_HEIGHT = 10;
 export const EDGE_MARKER_STROKE_PX = 1;
-export const EDGE_MARKER_MIN_INSET_PX = 12;
+/**
+ * Radius, in css px, of the rounded display corner a corner diamond must clear: the farthest painted point of a corner diamond
+ * along the top / bottom edge is this far from the screen corner. 56 css px covers the rounded corners of the iPhone 12 to 15 Pro
+ * class (about 47 to 55); a bigger radius still trims the nearest sliver (documented in docs/ui/MAZER-EDGE-INNER-TIP-SIZE-CYCLE-2026-11-13.md).
+ */
+export const EDGE_MARKER_CORNER_CLEARANCE_PX = 56;
 export const EDGE_MARKER_IDLE_PERIOD_MS = MOTION_LOOP_MS.drift;
 export const EDGE_MARKER_IDLE_ALPHA_MIN = 0.45;
 export const EDGE_MARKER_IDLE_ALPHA_MAX = 0.6;
@@ -123,8 +135,15 @@ export const EDGE_MIDPOINT_STATION_ID: Readonly<Record<EdgeSide, EdgeStationId>>
 
 const STATION_IDS: ReadonlyArray<EdgeStationId> = [0, 1, 2, 3, 4, 5, 6, 7];
 
-/** Farthest any kite vertex (or its stroke) can be from the station centre, in any rotation. */
-export const EDGE_MARKER_MAX_EXTENT_PX = EDGE_MARKER_HALF_HEIGHT + (EDGE_MARKER_STROKE_PX / 2);
+/**
+ * How far the miter join of the stroke at the OUTER (and inner) tip paints beyond the vertex, along the long axis: half a stroke
+ * over the sine of the tip's half-angle (the shoulders sit 2 px along and 7 px across from the centre, so the half-angle at the
+ * outer tip is atan(7 / 12)). Canvas strokes join with 'miter' (limit 10) by default and Phaser Graphics does not change it.
+ */
+export const EDGE_MARKER_TIP_PAINT_PX = (EDGE_MARKER_STROKE_PX / 2) / Math.sin(Math.atan2(EDGE_MARKER_HALF_WIDTH, EDGE_MARKER_HALF_HEIGHT + 2));
+
+/** Farthest any painted pixel (outline plus the miter tip) can be from the station centre, in any rotation. */
+export const EDGE_MARKER_MAX_EXTENT_PX = EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX;
 
 /**
  * The one perimeter parametrization every consumer shares: index/8 of the way
@@ -184,39 +203,59 @@ const OUTWARD_NORMAL: Readonly<Record<EdgeSide, EdgePoint>> = Object.freeze({
 });
 
 /**
- * How far the kite (at its REST orientation, plus half a stroke) reaches from
- * its centre toward the outside of the edge it is flush with. 10.5 px for an
- * edge midpoint, ~7.57 px for a 45 degree corner kite.
+ * How far the PAINTED kite (outline plus the miter join of the stroke, `resolveEdgeMarkerPaintedPolygon`) at its REST orientation
+ * reaches from its centre toward the outside of the edge it is flush with: 11 px for an edge midpoint, ~7.8 px for a 45 degree
+ * corner kite. Centre = edge - this, so the painted tip touches the edge exactly.
  */
 export const resolveEdgeStationNormalExtent = (id: EdgeStationId): number => (
   resolveEdgeKiteOutwardReach(INWARD_ANGLE[id], STATION_SIDE[id])
 );
 
-/** Reach (plus half a stroke) of a kite pointing `inwardAngle` toward the outside of `side`. */
+/** Painted reach of a kite pointing `inwardAngle` toward the outside of `side` (see resolveEdgeStationNormalExtent). */
 const resolveEdgeKiteOutwardReach = (inwardAngle: number, side: EdgeSide): number => {
   const normal = OUTWARD_NORMAL[side];
-  const reach = resolveEdgeMarkerVertices({ x: 0, y: 0, inwardAngle })
-    .reduce((max, vertex) => Math.max(max, (vertex.x * normal.x) + (vertex.y * normal.y)), 0);
-  return reach + (EDGE_MARKER_STROKE_PX / 2);
+  return resolveEdgeMarkerPaintedPolygon({ x: 0, y: 0, inwardAngle })
+    .reduce((max, vertex) => Math.max(max, (vertex.x * normal.x) + (vertex.y * normal.y)), Number.NEGATIVE_INFINITY);
 };
 
 /**
- * The eight stations for a viewport: pure function of width/height only. Along
- * the edge: the shared perimeter parametrization of the rectangle inset by
- * EDGE_MARKER_MIN_INSET_PX. Across it: flush (outer tip on the screen edge).
+ * The along-the-edge distance from the screen corner to the CENTRE of a corner diamond (the inset of the perimeter rectangle the
+ * stations are laid on): the farthest painted point of the corner diamond toward the screen corner is
+ * EDGE_MARKER_CORNER_CLEARANCE_PX from it. A 45 degree corner kite paints ~7.8 px to either side of its centre, so ~63.8 px.
  */
-export const resolveEdgeStations = (viewport: EdgeViewport): ReadonlyArray<EdgeStation> => {
-  const inset = EDGE_MARKER_MIN_INSET_PX;
+export const resolveEdgeCornerInset = (): number => (
+  EDGE_MARKER_CORNER_CLEARANCE_PX + resolveEdgeKiteOutwardReach(INWARD_ANGLE[0], 'left')
+);
+
+/**
+ * The extent of a canvas axis that is actually painted, in world (css) px: the backing store is `round(css * dpr)` device px and the
+ * context is scaled by `dpr`, so the last visible world coordinate is `round(css * dpr) / dpr`. Equal to `css` at dpr 1 (integer sizes).
+ */
+export const resolveEdgeVisibleExtent = (cssPx: number, devicePixelRatio = 1): number => (
+  devicePixelRatio > 0 && Number.isFinite(devicePixelRatio) && cssPx > 0
+    ? Math.max(1, Math.round(cssPx * devicePixelRatio)) / devicePixelRatio
+    : cssPx
+);
+
+/**
+ * The eight stations for a viewport: pure function of width/height (and the device pixel ratio, which only decides where the
+ * backing store ends). Along the edge: the shared perimeter parametrization of the rectangle inset by `resolveEdgeCornerInset()`
+ * (the corner diamonds clear a rounded display corner). Across it: flush, the painted outer tip exactly on the VISIBLE screen edge.
+ */
+export const resolveEdgeStations = (viewport: EdgeViewport, devicePixelRatio = 1): ReadonlyArray<EdgeStation> => {
+  const width = resolveEdgeVisibleExtent(viewport.width, devicePixelRatio);
+  const height = resolveEdgeVisibleExtent(viewport.height, devicePixelRatio);
+  const inset = resolveEdgeCornerInset();
   const left = inset;
-  const right = Math.max(left, viewport.width - inset);
+  const right = Math.max(left, width - inset);
   const top = inset;
-  const bottom = Math.max(top, viewport.height - inset);
+  const bottom = Math.max(top, height - inset);
   return STATION_IDS.map((id) => {
     const along = resolveEdgeStationPosition(id, left, right, top, bottom);
     const side = STATION_SIDE[id];
     const extent = resolveEdgeStationNormalExtent(id);
-    const x = side === 'left' ? extent : side === 'right' ? viewport.width - extent : along.x;
-    const y = side === 'top' ? extent : side === 'bottom' ? viewport.height - extent : along.y;
+    const x = side === 'left' ? extent : side === 'right' ? width - extent : along.x;
+    const y = side === 'top' ? extent : side === 'bottom' ? height - extent : along.y;
     return {
       id,
       x,
@@ -274,7 +313,7 @@ export const resolveOrbitingEdgeStation = (
   const u = (s - (2 * sideIndex)) / 2;
   const angle = ((s + 1) * Math.PI) / 4;
   const reach = resolveEdgeKiteOutwardReach(angle, side);
-  const inset = EDGE_MARKER_MIN_INSET_PX;
+  const inset = resolveEdgeCornerInset();
   const left = inset;
   const right = Math.max(left, viewport.width - inset);
   const cornerReach = resolveEdgeStationNormalExtent(0);
@@ -344,18 +383,12 @@ export const resolveEdgeMarkerVertices = (
   ];
 };
 
-/** The diamond's INNERMOST point: the tip that faces the board (full-size geometry; scale-independent, see anchorStationToInnerTip). */
-export const resolveEdgeInnerTip = (station: Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>): EdgePoint => ({
-  x: station.x + (Math.cos(station.inwardAngle) * EDGE_MARKER_HALF_HEIGHT),
-  y: station.y + (Math.sin(station.inwardAngle) * EDGE_MARKER_HALF_HEIGHT)
-});
-
 /**
- * The station a diamond drawn at `scale` (0..1 of full size) occupies when it is scaled about its INNER tip: the centre
- * moves along the long axis so the inner tip stays exactly where it was. Draw the kite with
- * `resolveEdgeMarkerVertices(anchorStationToInnerTip(station, scale), scale)`. Scale 1 returns the station untouched.
+ * The station a diamond drawn at `scale` (0..1 of full size) occupies when it is scaled about its OUTER tip: the centre slides
+ * along the long axis toward the outer tip so the outer-tip vertex never moves (it stays on the screen edge at every size). Draw the
+ * kite with `resolveEdgeMarkerVertices(anchorStationToOuterTip(station, scale), scale)`. Scale 1 returns the station itself.
  */
-export const anchorStationToInnerTip = <T extends Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>>(station: T, scale: number): T => {
+export const anchorStationToOuterTip = <T extends Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>>(station: T, scale: number): T => {
   const level = Number.isFinite(scale) ? Math.max(0, Math.min(1, scale)) : 1;
   if (level === 1) {
     return station;
@@ -363,9 +396,58 @@ export const anchorStationToInnerTip = <T extends Pick<EdgeStation, 'x' | 'y' | 
   const shift = EDGE_MARKER_HALF_HEIGHT * (1 - level);
   return {
     ...station,
-    x: station.x + (Math.cos(station.inwardAngle) * shift),
-    y: station.y + (Math.sin(station.inwardAngle) * shift)
+    x: station.x - (Math.cos(station.inwardAngle) * shift),
+    y: station.y - (Math.sin(station.inwardAngle) * shift)
   };
+};
+
+/**
+ * The diamond's INNERMOST point: the tip that faces the board, for a diamond drawn at `scale` (default 1 = full size) and anchored on
+ * its outer tip (anchorStationToOuterTip). It moves inward as the diamond grows and outward as it shrinks, so beam endpoints must
+ * pass the CURRENT scale: at scale 1 this is the full-size kite's vertex 0.
+ */
+export const resolveEdgeInnerTip = (station: Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>, scale = 1): EdgePoint => {
+  const level = Number.isFinite(scale) ? Math.max(0, Math.min(1, scale)) : 1;
+  const along = -EDGE_MARKER_HALF_HEIGHT + (2 * EDGE_MARKER_HALF_HEIGHT * level);
+  return {
+    x: station.x + (Math.cos(station.inwardAngle) * along),
+    y: station.y + (Math.sin(station.inwardAngle) * along)
+  };
+};
+
+/**
+ * The outer boundary of the PAINTED kite: the outline polygon with the stroke's miter joins (half a stroke outward on every edge,
+ * adjacent offset edges intersected). Its bounding box is the diamond's true painted bounding box. `scale` is the same scale
+ * as `resolveEdgeMarkerVertices`; the stroke stays EDGE_MARKER_STROKE_PX at every size.
+ */
+export const resolveEdgeMarkerPaintedPolygon = (
+  station: Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>,
+  scale = 1
+): ReadonlyArray<EdgePoint> => {
+  const vertices = resolveEdgeMarkerVertices(station, scale);
+  const half = EDGE_MARKER_STROKE_PX / 2;
+  const area = vertices.reduce((sum, a, index) => {
+    const b = vertices[(index + 1) % vertices.length] as EdgePoint;
+    return sum + ((a.x * b.y) - (b.x * a.y));
+  }, 0);
+  const sign = area >= 0 ? 1 : -1;
+  const outwardNormal = (from: EdgePoint, to: EdgePoint): EdgePoint => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    return { x: (sign * dy) / length, y: (-sign * dx) / length };
+  };
+  return vertices.map((vertex, index) => {
+    const previous = vertices[(index + vertices.length - 1) % vertices.length] as EdgePoint;
+    const next = vertices[(index + 1) % vertices.length] as EdgePoint;
+    const n1 = outwardNormal(previous, vertex);
+    const n2 = outwardNormal(vertex, next);
+    const denominator = 1 + (n1.x * n2.x) + (n1.y * n2.y);
+    if (denominator < 0.02) {
+      return { x: vertex.x + (n1.x * half), y: vertex.y + (n1.y * half) };
+    }
+    return { x: vertex.x + (((n1.x + n2.x) * half) / denominator), y: vertex.y + (((n1.y + n2.y) * half) / denominator) };
+  });
 };
 
 export interface EdgeMarkerState {
@@ -387,7 +469,7 @@ export interface EdgeMarkerState {
   /** Reduced motion: the interior crossfades by alpha instead of sweeping. */
   readonly fillCrossfade?: boolean;
   /**
-   * Size of the diamond as a fraction of full size (MAZER-VIS-038), scaled about its inner tip. Optional: absent = 1
+   * Size of the diamond as a fraction of full size (MAZER-VIS-038), scaled about its OUTER tip (MAZER-VIS-043). Optional: absent = 1
    * (a standalone icon such as the Guide legend); the board sets it from `resolveEdgeRingScales`.
    */
   readonly scale?: number;
@@ -577,7 +659,7 @@ export const drawEdgeMarker = (
     return;
   }
   const scale = state.scale ?? 1;
-  const anchored = anchorStationToInnerTip(station, scale);
+  const anchored = anchorStationToOuterTip(station, scale);
   const outline = resolveEdgeMarkerVertices(anchored, scale);
   if ((state.fill ?? 0) > 0) {
     drawDiamondFill(graphics, {
@@ -719,7 +801,7 @@ export interface EdgeBeam {
   readonly tailPoint: EdgePoint;
   readonly progress: number;
   readonly tail: number;
-  /** The contact point: the diamond's inner tip (the same point as the diamond end of the path). */
+  /** The contact point: the diamond's inner tip at its CURRENT size (the same point as the diamond end of the path). */
   readonly contact: EdgePoint;
   /** True while any part of the beam is on the path (head has left, tail has not yet run in). */
   readonly firing: boolean;
@@ -751,7 +833,9 @@ export const resolveEdgeBeams = (input: EdgeBeamsInput): EdgeBeamsGeometry => {
   const firingIds = new Set<number>();
   const count = input.stations.length;
   const beams = input.stations.map((station, index): EdgeBeam => {
-    const contact = resolveEdgeInnerTip(station);
+    // The diamond grows/shrinks about its OUTER tip, so the inner tip moves: follow the diamond's current size every frame.
+    const scale = resolveEdgeDiamondScale(input.direction, clockMs, index, count);
+    const contact = resolveEdgeInnerTip(station, scale);
     const from = input.direction === 'inward' ? contact : input.focus;
     const to = input.direction === 'inward' ? input.focus : contact;
     const pulse = resolveEdgeBeamPulse(input.direction, clockMs, index, count);
