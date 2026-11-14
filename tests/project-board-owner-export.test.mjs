@@ -153,7 +153,7 @@ test("validates stable dependency relationships and preserves deterministic dedu
       value.workItems.find((item) => item.id === "MAZER-DATA-001").dependencies = ["MAZER-AUTH-QA-001"];
     }],
     ["lifecycle-crossing cycle", (value) => {
-      value.workItems.find((item) => item.id === "MAZER-2D-001").dependencies = ["MAZER-PLANET-001"];
+      value.workItems.find((item) => item.id === "MAZER-2D-001").dependencies = ["MAZER-NATIVE-001"];
     }],
   ]) {
     const cyclic = structuredClone(registry);
@@ -1059,7 +1059,7 @@ test("requires canonical calendar-valid UTC timestamps without coercion", () => 
     );
   }
 
-  for (const id of ["MAZER-DATA-001", "MAZER-PLANET-001"]) {
+  for (const id of ["MAZER-DATA-001", "MAZER-NATIVE-001"]) {
     const malformed = structuredClone(registry);
     malformed.workItems.find((item) => item.id === id).updatedAt = true;
     assert.throws(

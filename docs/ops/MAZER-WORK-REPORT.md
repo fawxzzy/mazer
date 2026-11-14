@@ -8,24 +8,24 @@ Last board sync: 2026-11-14 (122 board events applied in total). Work that lande
 
 ## At a glance
 
-- **250 cards**: 121 completed, 95 open, 34 deferred.
-- **Needs you now: 36** (8 decisions, 28 phone or device checks).
+- **241 cards**: 121 completed, 94 open, 26 deferred.
+- **Needs you now: 35** (7 decisions, 28 phone or device checks).
 - Completed by proof: 0 verified on a device, 43 headless-only, 35 tests or capture frames only, 43 with no device surface, 0 with no evidence recorded.
 
 | Bucket | Cards |
 | --- | ---: |
-| 1. Needs you now | 36 |
+| 1. Needs you now | 35 |
 | 2. Completed | 121 |
 | 3. In review | 35 |
 | 4. Blocked | 6 |
 | 5. Ready to build | 5 |
 | 6. In progress | 1 |
-| 7. Deferred | 34 |
+| 7. Deferred | 26 |
 | 8. Unclassified | 12 |
 
 ## 1. Needs you now
 
-### Decisions (8)
+### Decisions (7)
 
 - [ ] `MAZER-HAZ-002` Sign or reject the endless hazard product contract (high, blocked)
   - Ask: Sign or reject the endless hazard contract (obstacles, enemies and items in phases)?
@@ -49,9 +49,6 @@ Last board sync: 2026-11-14 (122 board events applied in total). Work that lande
 - [ ] `MAZER-PWA-005` Provide approved app icon art with proper corners and a clean screenshot capture route (low)
   - Ask: Provide approved app icon art with proper corners (or say to keep the current icon).
   - Recommendation: Supply a master without baked corners; the build agent then regenerates the icons, the hash verifier and clean screenshots.
-- [ ] `MAZER-TOOLS-001` Define a handcrafted asset authoring and import workflow (low)
-  - Ask: Do you want a handcrafted-asset import workflow, and in which file format?
-  - Recommendation: Park it as deferred; no open card depends on it.
 
 ### Phone and device checks (28)
 
@@ -432,28 +429,20 @@ Long-running lanes. Audit the current state before assigning any of it to a work
 - `MAZER-ACCT-034` Optionally backfill the stored display name for already renamed profiles: The backfill overwrites names players may have chosen on purpose.
 - `MAZER-AI-002` Add AI-assisted maze completion with spendable hints: Waits on the economy contract.
 - `MAZER-AUDIO-002` Compose and wire original Mazer music from the music-language brief: Music waits for the sound toggle to exist.
-- `MAZER-CAM-001` Add a play camera zoom and minimap (deferred): Camera zoom and minimap deferred; board size is frozen.
 - `MAZER-CHAL-001` Add shared-seed daily and weekly challenges: Shared seed challenges need a provider change and the contracts first.
 - `MAZER-ECON-002` Add coin pickups, inventory and a data-driven cosmetic catalog: No coin or inventory code exists; waits on the economy contract.
 - `MAZER-ECON-003` Define account entitlements and store checkout: Entitlements and checkout need the economy contract and policy decisions.
-- `MAZER-GEN-003` Extract the maze pattern engine and batch generator as contracts: Both extraction candidates need a refactor of the shared maze core first.
 - `MAZER-HAZ-006` Add usable items and the invisibility cloak (covered by the hazard phases): Covered by the unsigned hazard contract.
 - `MAZER-HAZ-008` Plan hazard introduction and contact moments: Covered by the unsigned hazard contract.
-- `MAZER-MODE-001` Build the moving procedural maze mode (deferred): Moving maze mode deferred by the owner.
-- `MAZER-MODE-002` Plan multiplayer and endless survival mode (deferred): Multiplayer and endless survival deferred by the owner.
 - `MAZER-NATIVE-001` Plan the native app-store wrapper after web stabilization: Web first and installed web app only.
-- `MAZER-PATH-001` Define a diagonal path graph contract (deferred): Diagonal path graph deferred by the owner.
 - `MAZER-PERF-005` Cheaper long-trail bloom: measured in PR #488, change needs an owner pixel review: No lag now; the change would alter pixels.
 - `MAZER-PERF-006` Cap the trail canvas backing resolution on 3x phones: No lag now; the cap would soften the trail.
 - `MAZER-PROG-007` Add milestone moments for levels past rank S: Milestone moments past rank S wait on the ladder and hazard work.
-- `MAZER-RUN-002` Show run quality to the player after a run (deferred): Player-facing run quality display deferred by the owner.
 - `MAZER-RUN-003` Decide how run quality gates leaderboard and achievement entries: Leaderboard admission is a provider-side change and the priority is low.
 - `MAZER-RUN-004` Build the shared run status panel: Wiring touches the contended menu scene; low priority.
-- `MAZER-SOCIAL-001` Define social profiles, friends and events (deferred): Social profiles, friends and events deferred by the owner.
 - `MAZER-UI-016` Frame the game on desktop instead of stretching the phone layout: Phone first and install gated.
 - `MAZER-VIS-031` Lower the edge beam draw-call count if a phone hitches: Conditional on a phone hitch.
 - `MAZER-CYBERDECK-001` Retain Cyberdeck research as planning evidence: Kept as planning evidence only; no Cyberdeck build is approved.
-- `MAZER-PLANET-001` Research a rotating planet maze: Parked research; not current product work.
 
 ## 8. Unclassified
 
