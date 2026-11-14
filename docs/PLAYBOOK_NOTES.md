@@ -211,6 +211,13 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: a tap anywhere on the front door started a run or opened Login; only the wordmark and its margin should.
 - Rule: tap tests inside and outside the zone live in `tests/legacy-runtime/legacy-front-door-hit-zone.test.ts`. Button chrome is not yet drawn from the kit (`chromeViaKit` is false for all); surfaces migrate one per PR.
 - Status: Applied (review)
+
+## 2026-11-14 - MAZER-VIS-044 corner diamonds in the 4 corners
+- WHAT changed: new `src/render/edgeCornerAnchor.ts` (pure); `edgeMarkers.ts` now puts each corner diamond's painted outer tip ON the corner of the view (0 css px from BOTH edges) at every viewport size; they scale about that tip. Before, they sat ~56 px along the top/bottom edge (pushed in). Orbit top/bottom travel eases into the corner. `EDGE_MARKER_CORNER_CLEARANCE_PX` removed.
+- WHY it changed: owner requirement 2026-11-14: corner diamonds always in the actual corners, expanded or shrunk. A physically rounded display corner may trim the very tip: accepted.
+- Rule: corner diamonds are exempt from VIS-043 "touch the edge midline"; offset measured by `measureEdgeCornerOffset` (`tests/render/edgeCornerAnchor.test.ts`). MenuScene unchanged. Not checked on a real phone.
+- Status: Applied
+
 ## 2026-11-14 - MAZER-UI-033 online counter is a copy of the website counter
 - WHAT changed: the menu online counter now reads dot, number, "online" (e.g. `7 online`) in muted 13px text with an 8px pulsing dot, like the website header; idle = dim dot alone; count text is the website format (`1.2k`, `12k`), no uppercase K. New `src/render/presenceCounterView.ts`; layout in `legacyPresenceCounterLayout.ts`; small MenuScene edit (draw call + one field); Guide Online row copy updated.
 - WHY it changed: the chip-glyph counter was far larger than the old username text, lacked the label on phones and did not match the website.

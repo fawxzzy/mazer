@@ -1,3 +1,4 @@
+import { resolveEdgeCornerTipInset } from '../../src/render/edgeCornerAnchor';
 import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuPathTitleOrbitPose } from '../../src/legacy-runtime/legacyMenuTitle';
 import {
@@ -7,7 +8,6 @@ import {
   EDGE_MARKER_FLASH_MS,
   EDGE_MARKER_HALF_HEIGHT,
   EDGE_MARKER_MAX_EXTENT_PX,
-  EDGE_MARKER_CORNER_CLEARANCE_PX,
   EDGE_MARKER_TIP_PAINT_PX,
   resolveEdgeCornerInset,
   resolveEdgeMarkerPaintedPolygon,
@@ -103,7 +103,7 @@ const MIRROR_VIEWPORTS = [
 ] as const;
 
 describe('edge marker stations', () => {
-  test.each(VIEWPORTS)('all 8 kites rest fully inside a $width x $height viewport with the PAINTED outer tip touching the screen edge', (viewport) => {
+  test.each(VIEWPORTS)('all 8 kites rest fully inside a $width x $height viewport with the PAINTED outer tip touching the screen edge (corner diamonds: in the corner, 0 px inset, MAZER-VIS-044)', (viewport) => {
     const stations = resolveEdgeStations(viewport);
     expect(stations).toHaveLength(EDGE_STATION_COUNT);
     for (const station of stations) {
@@ -126,7 +126,13 @@ describe('edge marker stations', () => {
         left: bounds.left,
         right: viewport.width - bounds.right
       };
-      expect(gaps[station.side], `station ${station.id} gap to ${station.side}`).toBeCloseTo(0, 9);
+      if (station.isCorner) {
+        // MAZER-VIS-044: the same distance from BOTH edges of the screen corner it sits in.
+        expect(Math.min(gaps.top, gaps.bottom), `station ${station.id} vertical corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(), 9);
+        expect(Math.min(gaps.left, gaps.right), `station ${station.id} horizontal corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(), 9);
+      } else {
+        expect(gaps[station.side], `station ${station.id} gap to ${station.side}`).toBeCloseTo(0, 9);
+      }
       // Any orientation stays within the max extent of the centre.
       for (let degrees = 0; degrees < 360; degrees += 15) {
         for (const vertex of resolveEdgeMarkerPaintedPolygon({ ...station, inwardAngle: (degrees * Math.PI) / 180 })) {
@@ -166,29 +172,24 @@ describe('edge marker stations', () => {
     }
   });
 
-  test.each(VIEWPORTS)('corner diamonds clear a rounded display corner of $width x $height: every painted point lies inside a rounded rectangle of the clearance radius', (viewport) => {
-    const radius = EDGE_MARKER_CORNER_CLEARANCE_PX;
-    const inside = (point: { x: number; y: number }): boolean => {
-      const cx = point.x < radius ? radius : point.x > viewport.width - radius ? viewport.width - radius : point.x;
-      const cy = point.y < radius ? radius : point.y > viewport.height - radius ? viewport.height - radius : point.y;
-      return Math.hypot(point.x - cx, point.y - cy) <= radius + 1e-9;
-    };
-    for (const station of resolveEdgeStations(viewport)) {
-      for (const point of resolveEdgeMarkerPaintedPolygon(station)) {
-        expect(inside(point), `station ${station.id} point ${point.x.toFixed(2)},${point.y.toFixed(2)}`).toBe(true);
-      }
-    }
-    // The corner station sits exactly the clearance from the screen corner (painted), along its edge.
+  test.each(VIEWPORTS)('the corner diamond of $width x $height has its painted outer tip ON the screen corner (0 px from both edges)', (viewport) => {
     const corner = resolveEdgeStations(viewport)[0] as { x: number; y: number; inwardAngle: number };
-    expect(Math.min(...resolveEdgeMarkerPaintedPolygon(corner).map((point) => point.x))).toBeCloseTo(radius, 9);
+    const cornerPaint = resolveEdgeMarkerPaintedPolygon(corner);
+    expect(Math.min(...cornerPaint.map((point) => point.x))).toBeCloseTo(0, 9);
+    expect(Math.min(...cornerPaint.map((point) => point.y))).toBeCloseTo(0, 9);
     expect(corner.x).toBeCloseTo(resolveEdgeCornerInset(), 9);
+    expect(corner.y).toBeCloseTo(resolveEdgeCornerInset(), 9);
   });
 
-  test('fixed positions: top row is inset / w/2 / w-inset (the corner diamonds clear a rounded corner) and the layout depends on the viewport size and the resolution ONLY', () => {
+  test('fixed positions: top row is inset / w/2 / w-inset (the corner diamonds sit in the corners, MAZER-VIS-044) and the layout depends on the viewport size and the resolution ONLY', () => {
     const inset = resolveEdgeCornerInset();
-    expect(inset).toBeCloseTo(EDGE_MARKER_CORNER_CLEARANCE_PX + ((10 + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2), 9);
+    expect(inset).toBeCloseTo((10 + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2, 9);
+    expect(inset).toBeLessThan(8);
     const stations = resolveEdgeStations({ width: 390, height: 844 });
     expect(stations[0]?.x).toBeCloseTo(inset, 9);
+    expect(stations[0]?.y).toBeCloseTo(inset, 9);
+    expect(stations[4]?.x).toBeCloseTo(390 - inset, 9);
+    expect(stations[4]?.y).toBeCloseTo(844 - inset, 9);
     expect(stations[1]?.x).toBeCloseTo(195, 9);
     expect(stations[2]?.x).toBeCloseTo(390 - inset, 9);
     const extent = 10 + EDGE_MARKER_TIP_PAINT_PX;
@@ -938,7 +939,7 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
     expect((back[3] as { y: number }).y).toBeLessThan((rest[3] as { y: number }).y);
   });
 
-  test.each(ORBIT_VIEWPORTS)('no painted kite pixel (outline plus miter) ever leaves the viewport at any phase at $width x $height; top/bottom travel is flush', (viewport) => {
+  test.each(ORBIT_VIEWPORTS)('no painted kite pixel (outline plus miter) ever leaves the viewport at any phase at $width x $height; top/bottom travel is flush at the side midpoint and eases into the corner anchor', (viewport) => {
     let flushSamples = 0;
     for (let index = 0; index <= 2400; index += 1) {
       const phase = (index / 2400) * Math.PI * 2;
@@ -953,17 +954,18 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
         expect(minY, label).toBeGreaterThanOrEqual(-1e-9);
         expect(maxX, label).toBeLessThanOrEqual(viewport.width + 1e-9);
         expect(maxY, label).toBeLessThanOrEqual(viewport.height + 1e-9);
+        const cornerLift = resolveEdgeCornerInset() - resolveEdgeStationNormalExtent(0);
         if (station.side === 'top') {
-          expect(minY, label).toBeCloseTo(0, 9);
-          flushSamples += 1;
+          expect(minY, label).toBeLessThanOrEqual(cornerLift + 1e-9);
+          if (Math.abs(minY) < 1e-9) flushSamples += 1;
         }
         if (station.side === 'bottom') {
-          expect(viewport.height - maxY, label).toBeCloseTo(0, 9);
-          flushSamples += 1;
+          expect(viewport.height - maxY, label).toBeLessThanOrEqual(cornerLift + 1e-9);
+          if (Math.abs(viewport.height - maxY) < 1e-9) flushSamples += 1;
         }
       }
     }
-    expect(flushSamples).toBeGreaterThan(2000);
+    expect(flushSamples).toBeGreaterThan(8);
   }, 120_000);
 
   test.each(ORBIT_VIEWPORTS)('the path is continuous (no teleporting, angle swings smoothly through the corners) at $width x $height', (viewport) => {

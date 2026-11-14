@@ -26,7 +26,7 @@
  *     beam stays attached until the fill is complete), then the maze dissolves and the next maze arrives;
  *   - while the maze runs every diamond is 50% of its full size (a fixed size in reduced motion, no size animation);
  *   - EVERY diamond's PAINTED outer tip touches the visible screen edge (within 0.5 device px, never past it) at every size, and
- *     the four corner diamonds clear a 56 css px rounded display corner (MAZER-VIS-043); the real canvas pixels agree (the diamond
+ *     the four corner diamonds sit in the screen corners (MAZER-VIS-044); the real canvas pixels agree (the diamond
  *     layer's own pixel footprint, read back with the layer hidden and shown on the same frame, reaches the last device row/column);
  *   - the transfer lifecycle still runs outbound -> stored -> delivering ->
  *     complete -> input unlocked again, via real accepted moves only;
@@ -119,7 +119,6 @@ const INNER_TIP_REACH_PX = 10;
 // A 1 px stroke joins with a miter: the outer tip paints 0.5 / sin(atan(7 / 12)) px beyond its vertex along the kite axis (45 degree corner kites:
 // that times cos 45 toward the top / bottom edge). Mirrors edgeMarkers.ts EDGE_MARKER_TIP_PAINT_PX (an acceptance number, not imported).
 const TIP_PAINT_PX = 0.5 / Math.sin(Math.atan2(7, 12));
-const CORNER_CLEARANCE_PX = 56;
 const STATION_SIDE = ['top', 'top', 'top', 'right', 'bottom', 'bottom', 'bottom', 'left'];
 const ALL_STATION_IDS = [0, 1, 2, 3, 4, 5, 6, 7];
 // A diamond counts as lit when its stroke alpha is above the idle breathing maximum (0.6).
@@ -1045,10 +1044,17 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
     return side === 'top' ? box.minY <= 1 : side === 'bottom' ? box.maxY >= probe.h - 2 : side === 'left' ? box.minX <= 1 : box.maxX >= probe.w - 2;
   };
   check(`${label}: real canvas pixels (layer shown vs hidden on the same frame): each diamond's footprint reaches the last two device rows/columns of its edge (${probe.w}x${probe.h} px)`, ALL_STATION_IDS.every(touches), JSON.stringify(probe.boxes));
-  const clearance = Math.floor(CORNER_CLEARANCE_PX * probe.res) - 1;
+  // MAZER-VIS-044: the four corner diamonds sit ON the screen corner (footprint within the last two device px of BOTH edges).
+  const inCorner = (id) => {
+    const box = footprint(id)?.box;
+    if (!box) { return false; }
+    const horizontal = id === 0 || id === 6 ? box.minX <= 1 : box.maxX >= probe.w - 2;
+    const vertical = id === 0 || id === 2 ? box.minY <= 1 : box.maxY >= probe.h - 2;
+    return horizontal && vertical;
+  };
   check(
-    `${label}: real canvas pixels: the four corner diamonds clear a ${CORNER_CLEARANCE_PX} css px rounded display corner (footprint at least ${clearance} device px from the corner along the edge)`,
-    [0, 6].every((id) => (footprint(id)?.box?.minX ?? -1) >= clearance) && [2, 4].every((id) => (footprint(id)?.box?.maxX ?? Infinity) <= probe.w - clearance),
+    `${label}: real canvas pixels: the four corner diamonds sit in the screen corners (footprint reaches the last two device px of both edges)`,
+    [0, 2, 4, 6].every(inCorner),
     JSON.stringify(probe.boxes.filter((b) => b.id % 2 === 0))
   );
   const legalMove = await resolveLegalMove(h.page);

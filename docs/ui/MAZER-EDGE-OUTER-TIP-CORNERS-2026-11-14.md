@@ -32,3 +32,6 @@ A real phone (real GPU, real corner radius and its curve: iOS uses a continuous 
 ## Wave ownership
 
 `MenuScene.ts` (Wave 5C): `resolveLegacyEdgeStations` passes `resolveMazerCanvasResolution()` (a single line). All logic is in `src/render/edgeMarkers.ts`; no `package.json`, registry, `exports/**` or `docs/current-truth.md` change.
+
+## Superseded for corners (MAZER-VIS-044, 2026-11-14)
+Owner requirement: the four corner diamonds sit ON the actual screen corner (0 px inset), not 56 px along the edge. Section 4 above (the clearance inset and its documented limit) no longer applies; edge midpoint diamonds are unchanged.
