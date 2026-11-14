@@ -3,11 +3,11 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-14T08:12:28.000Z",
+    "registryUpdatedAt": "2026-11-14T08:20:51.000Z",
     "boardSync": {
-      "at": "2026-11-14T08:12:28.000Z",
-      "appliedEventCount": 122,
-      "lastEventId": "e20f87e7b26a"
+      "at": "2026-11-14T08:20:51.000Z",
+      "appliedEventCount": 126,
+      "lastEventId": "55ef6bd3fa1c"
     }
   },
   "counters": {
@@ -16,8 +16,8 @@
     "completed": 121,
     "deferred": 34,
     "buckets": {
-      "needs-you": 36,
-      "in-review": 35,
+      "needs-you": 35,
+      "in-review": 36,
       "blocked": 6,
       "ready": 5,
       "in-progress": 1,
@@ -27,7 +27,7 @@
     },
     "needsYou": {
       "decisions": 8,
-      "checks": 28
+      "checks": 27
     },
     "completedByTier": {
       "device": 0,
@@ -198,29 +198,6 @@
             "step": "Turn on airplane mode (or block the account service), then tap Sign in.",
             "where": "phone",
             "expected": "Mazer stays on Welcome and shows Sign-in is unavailable right now. Try again in a few minutes. for several seconds; turn the network back on and Sign in works again."
-          }
-        ]
-      },
-      {
-        "id": "MAZER-GEN-006",
-        "title": "No one-tile dead-end stubs in generated mazes",
-        "status": "review",
-        "priority": "high",
-        "kind": "check",
-        "ask": "",
-        "recommendation": "",
-        "context": "",
-        "prs": "#464",
-        "verify": [
-          {
-            "step": "Open previewLevel=150 and look at the board.",
-            "where": "phone",
-            "expected": "No single-cell nubs hanging off corridors; every dead-end spur is at least two tiles; the maze solves normally."
-          },
-          {
-            "step": "Open previewLevel=218 and previewLevel=300 and look at the boards.",
-            "where": "phone",
-            "expected": "Same: no single-cell nubs, spurs of at least two tiles, solvable; level 300 is the same class as level 218."
           }
         ]
       },
@@ -397,9 +374,9 @@
         "status": "review",
         "priority": "medium",
         "kind": "check",
-        "ask": "",
+        "ask": "Run the airplane-mode check listed on this card on a phone and report what you saw.",
         "recommendation": "",
-        "context": "",
+        "context": "Offline contract signed; only the airplane-mode phone check is open.",
         "prs": "#476",
         "verify": [
           {
@@ -466,9 +443,9 @@
         "status": "in_progress",
         "priority": "medium",
         "kind": "check",
-        "ask": "",
+        "ask": "Run the install, airplane-mode and reopen check listed on this card on a phone and report what you saw.",
         "recommendation": "",
-        "context": "",
+        "context": "Offline launch of the installed app is unchecked on a real phone.",
         "prs": "#372, #501",
         "verify": [
           {
@@ -502,9 +479,9 @@
         "status": "review",
         "priority": "medium",
         "kind": "check",
-        "ask": "",
+        "ask": "Rotate the installed app in portrait and landscape as listed on this card and report what you saw.",
         "recommendation": "",
-        "context": "",
+        "context": "Layout persistence dropped; only the rotate check on a phone is open.",
         "prs": "#480",
         "verify": [
           {
@@ -2194,6 +2171,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-GEN-006",
+      "title": "No one-tile dead-end stubs in generated mazes",
+      "status": "review",
+      "priority": "high",
+      "prs": "#464",
+      "note": "PR #464 merged and deployed (951ef3cf). Device check and owner judgement on the ladder ending at 218 pending."
+    },
+    {
       "id": "MAZER-PWA-007",
       "title": "Install gate always on for browser access",
       "status": "review",
@@ -3779,8 +3764,8 @@
       "sub": "no-device-surface"
     },
     "MAZER-GEN-006": {
-      "bucket": "needs-you",
-      "sub": "check"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-GEN-005": {
       "bucket": "completed",

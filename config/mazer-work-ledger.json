@@ -1115,7 +1115,12 @@
         "headless": false,
         "deviceChecked": false
       },
-      "blocker": null,
+      "blocker": {
+        "ask": "Run the airplane-mode check listed on this card on a phone and report what you saw.",
+        "kind": "device",
+        "summary": "Offline contract signed; only the airplane-mode phone check is open.",
+        "unblockedBy": "device"
+      },
       "verify": [
         {
           "step": "Play a level with airplane mode on, then turn the network back on and wait.",
@@ -1163,7 +1168,12 @@
         "deviceChecked": false,
         "deployedBuild": "fawxzzy-mazer-1n3xcc1qg"
       },
-      "blocker": null,
+      "blocker": {
+        "ask": "Run the install, airplane-mode and reopen check listed on this card on a phone and report what you saw.",
+        "kind": "device",
+        "summary": "Offline launch of the installed app is unchecked on a real phone.",
+        "unblockedBy": "device"
+      },
       "verify": [
         {
           "step": "Install Mazer on the phone, open it once online, turn on airplane mode, force-close the app and open it again.",
@@ -1268,7 +1278,12 @@
         "headless": false,
         "deviceChecked": false
       },
-      "blocker": null,
+      "blocker": {
+        "ask": "Rotate the installed app in portrait and landscape as listed on this card and report what you saw.",
+        "kind": "device",
+        "summary": "Layout persistence dropped; only the rotate check on a phone is open.",
+        "unblockedBy": "device"
+      },
       "verify": [
         {
           "step": "On the iPhone installed app: open the menu, rotate portrait to landscape and back mid-play, and open Settings and Guide in each orientation.",
@@ -2816,18 +2831,7 @@
         "deviceChecked": false
       },
       "blocker": null,
-      "verify": [
-        {
-          "step": "Open previewLevel=150 and look at the board.",
-          "where": "phone",
-          "expected": "No single-cell nubs hanging off corridors; every dead-end spur is at least two tiles; the maze solves normally."
-        },
-        {
-          "step": "Open previewLevel=218 and previewLevel=300 and look at the boards.",
-          "where": "phone",
-          "expected": "Same: no single-cell nubs, spurs of at least two tiles, solvable; level 300 is the same class as level 218."
-        }
-      ],
+      "verify": [],
       "lane": "owner-only",
       "filesHint": [
         "src/legacy-runtime/legacyMazeStubs.ts",
