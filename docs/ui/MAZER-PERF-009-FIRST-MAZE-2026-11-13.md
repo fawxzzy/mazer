@@ -86,11 +86,15 @@ software canvas rendering, see below; it is shown to be honest about what is lef
   it costs 2-5 ms at 1x and 19-29 ms at 4x, and measured through the worker it installed 0.8 to 2 s LATER at 4x for
   that 25 ms job (worker start-up plus waiting for a frame); from level 3 on the main-thread cost is 165 to 960 ms at
   4x, which is what the worker removes (`isLegacyBootPlayMazeCheapToBuildInline`). `startPlayMode` itself drops from 120-150 ms to 23-47 ms (install only).
-- What still runs on the main thread: the throwaway menu placeholder. It is now the instant straight corridor, but its
-  cost is the generator's first-call cost on a cold main thread (module code compiled lazily on first use), not the
-  maze: 6-17 ms at 1x and 42-92 ms at 4x, independent of level (a hot call takes 2 to 5 ms). **That is above "a few ms"
-  at 4x.** Removing it needs the placeholder to avoid the generator entirely (a prebuilt literal snapshot), which
-  touches the maze snapshot contract; left as a follow-up rather than guessed at.
+- What still runs on the main thread: the throwaway menu placeholder. With the worker building it is the instant
+  straight corridor. In the preview sandbox the menu (AI) track sits at level 1, so the old placeholder was a
+  corridor too and the table shows no gain there; for an account whose AI track is high the old placeholder is a full
+  menu-level maze (node, hot: 458 ms phone board and 70 ms desktop board at level 100, against 2.4 to 4.5 ms for the
+  corridor), which is what the corridor replaces. What is left is the generator's first-call cost on a cold main
+  thread (module code compiled lazily on first use): 6 to 17 ms at 1x and 34 to 92 ms at 4x, independent of level, and
+  in the last 4x sample 90 ms with the worker starting alongside it on a loaded machine against 34 to 47 ms without.
+  **That is above "a few ms" at 4x.** Removing it needs the placeholder to avoid the generator entirely (a prebuilt
+  literal snapshot), which touches the maze snapshot contract; left as a follow-up rather than guessed at.
 - Cost: time until the play maze is installed. At 1x it is the same within noise (level 100, medians 1136 to 1232 ms on
   the phone viewport, 739 to 721 ms on desktop). At 4x it is 0.8 to 1.5 s later (5024 to 5859 ms phone, 3245 to 4717 ms
   desktop, noisy machine) because the start waits for the worker (start-up, generation, and the next frame of a slow
