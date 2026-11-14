@@ -18,9 +18,13 @@
  * read as movement):
  *  - the hue gradient is short and quick: a full out-and-back sweep spans 8 tiles and drifts past a fixed point in
  *    3.6 s, so on a phone a full cyan-to-apricot gradient is about 120 px long and visibly flows along the trail;
- *  - a SHEEN band travels toward the player (a narrow, sharp bright band, 9 tiles apart, about 6 tiles a second). Where
+ *  - a SHEEN band travels toward the player (a narrow, sharp bright band, 9 tiles apart, about 3 tiles a second). Where
  *    it passes, the core eases toward white AND the hue is refracted a fraction of a sweep ahead, like light on an oil
  *    film, so the highlight is also a visible colour change rather than just a brighter patch;
+ *  - MAZER-VIS-037: the band is bounded so no core channel moves more than TRAIL_COLOUR_MAX_CORE_STEP (8 of 255) between
+ *    two redraws at the 33 ms full-motion cadence. It used to step up to 20 (peak lift 0.55, ridge = cosine^5, 6 tiles a
+ *    second, hue refraction 0.2); it is now softer and slower (peak lift 0.35, ridge = cosine^3, 3 tiles a second,
+ *    refraction 0.05). Pinned in tests/render/trail-sheen-colour-step.test.ts.
  *  - the broad slow swell of the old pulse stays, gentler, under the sheen.
  * Nothing in the lift terms darkens the core: lifts only mix toward white, so the resting colour at the (shifted) hue
  * position is the contrast floor.
@@ -73,12 +77,12 @@ export const TRAIL_PULSE_REDUCED_LEVEL = 0.35;
 
 /** Sheen band: distance between bands in tiles, and the time one band takes to travel one spacing (toward the player). */
 export const TRAIL_SHEEN_SPACING_TILES = 9;
-export const TRAIL_SHEEN_PERIOD_MS = 1500;
+export const TRAIL_SHEEN_PERIOD_MS = 3000;
 /** At the band's peak the core is eased this far toward white, and the bloom this far toward the core. */
-export const TRAIL_SHEEN_CORE_LIFT_MAX = 0.55;
+export const TRAIL_SHEEN_CORE_LIFT_MAX = 0.35;
 export const TRAIL_SHEEN_GLOW_LIFT_MAX = 0.5;
 /** At the band's peak the hue is read this much of a sweep AHEAD (refraction): the band carries its own colour. */
-export const TRAIL_SHEEN_HUE_SHIFT = 0.2;
+export const TRAIL_SHEEN_HUE_SHIFT = 0.05;
 
 export interface IridescentTrailSample {
   /** Crisp core colour at this point (resting colour plus the swell and sheen lifts). */
@@ -127,13 +131,13 @@ export const resolveTrailPulseWave = (distanceTiles: number, timeMs: number): nu
 );
 
 /**
- * Sheen band level 0..1 at a trail distance (tiles) and time: a narrow ridge (the raised cosine to the fifth power)
+ * Sheen band level 0..1 at a trail distance (tiles) and time: a narrow ridge (the raised cosine cubed)
  * travelling toward the player (+distance).
  */
 export const resolveTrailSheen = (distanceTiles: number, timeMs: number): number => {
   const base = 0.5 + (0.5 * Math.cos(2 * Math.PI * ((distanceTiles / TRAIL_SHEEN_SPACING_TILES) - (timeMs / TRAIL_SHEEN_PERIOD_MS))));
   const squared = base * base;
-  return squared * squared * base;
+  return squared * base;
 };
 
 /**

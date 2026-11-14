@@ -199,7 +199,7 @@ describe('iridescent trail: the shift is clearly visible (owner feedback: too su
     // narrow: more than 3/4 of the trail has less than 25% of the peak
     let dim = 0; let total = 0;
     for (let d = 0; d < TRAIL_SHEEN_SPACING_TILES; d += 0.05) { total += 1; if (resolveTrailSheen(d, 0) < 0.25) dim += 1; }
-    expect(dim / total).toBeGreaterThan(0.6);
+    expect(dim / total).toBeGreaterThan(0.5); // VIS-037: ridge is cosine^3 now (was ^5, > 0.6)
     // the band is a visible colour change: inside the band the core is much paler than just outside it
     const out = { core: 0, glow: 0, wave: 0, sheen: 0 };
     let peakD = 0;
@@ -208,7 +208,7 @@ describe('iridescent trail: the shift is clearly visible (owner feedback: too su
     const outside = sampleIridescentTrail(peakD + (TRAIL_SHEEN_SPACING_TILES / 2), 0, false, out).core;
     const lum = (c: number): number => { const [r, g, b] = channels(c); return (0.299 * r) + (0.587 * g) + (0.114 * b); };
     expect(lum(inside)).toBeGreaterThan(lum(outside) + 15);
-    expect(TRAIL_SHEEN_CORE_LIFT_MAX).toBeGreaterThanOrEqual(0.4);
+    expect(TRAIL_SHEEN_CORE_LIFT_MAX).toBeGreaterThanOrEqual(0.3); // VIS-037: was 0.4 (peak 0.55)
   });
 
   test('reduced motion has no sheen at all (a static gradient)', () => {
