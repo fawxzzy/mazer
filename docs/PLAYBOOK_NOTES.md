@@ -206,7 +206,7 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: 7 font stacks and 11 sizes drift across surfaces; the ratchet stops new off-scale sizes/stacks while surfaces migrate one PR each.
 - Rule: Land the scale and a shrink-only allowlist ratchet before migrating surfaces. No surface changed in this PR.
 - Status: Applied (review)
-## 2026-11-14 - MAZER-UI-033 online counter size and label
-- WHAT changed: the menu online counter number is now 14px tall (chip cell 2, the old username text height) with a small ONLINE label (cell 1) stacked under it on every phone width; tiers are number+label, number alone, then hidden. One-line MenuScene edit (label cell).
-- WHY it changed: the number (cell 3) was too large and the label never fit beside it on phones.
+## 2026-11-14 - MAZER-UI-033 online counter is a copy of the website counter
+- WHAT changed: the menu online counter now reads dot, number, "online" (e.g. `7 online`) in muted 13px text with an 8px pulsing dot, like the website header; idle = dim dot alone; count text is the website format (`1.2k`, `12k`), no uppercase K. New `src/render/presenceCounterView.ts`; layout in `legacyPresenceCounterLayout.ts`; small MenuScene edit (draw call + one field); Guide Online row copy updated.
+- WHY it changed: the chip-glyph counter was far larger than the old username text, lacked the label on phones and did not match the website.
 - Status: Applied

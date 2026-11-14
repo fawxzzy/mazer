@@ -37,11 +37,14 @@ twice; a hidden tab does not count. Not a visitor total, not an account count.
 The first presence sync arrives before this tab has joined and reports 0; it is never shown.
 
 ## Look
-Tile glyph font (the 5x7 chip cells the wordmark uses), lit mint number, quieter word `ONLINE` when there is room, optional small
-pulse dot (only when Reduce Motion is off and there is room). Every digit advances the same width (tabular), the number is anchored
-to the leading icon so growing counts extend to the right. Fit tiers (`legacyPresenceCounterLayout.ts`, MAZER-UI-033): number at 14px (cell 2) with ONLINE (cell 1) stacked under it, then
-number alone at cell 2, at cell 1, otherwise hidden. It never overlaps the icon or the title. Counts of 1,000 or more read `1K`, `12K`
-(capped `99K`) because the tile font has no punctuation; the website shows `1.2k`.
+An exact copy of the website header counter (FawxzzyWeb `site-nav__presence`), left to right: a round dot, the number, the word `online`
+(`7 online`). Number and word are one muted 13px UI-font text (web 0.82rem). The dot is 8px (web 0.5rem), 7px from the text, accent
+colour with a soft glow, pulsing opacity 1 -> 0.55 -> 1 over 2.6s; static under Reduce Motion. Signed in but no count yet (or the count
+is zero, unknown, errored): the dim dot alone (opacity 0.35), no number and no word. Signed out: nothing is drawn. Count text is the
+website's `formatOnline`: `7`, `999`, `1.2k`, `12k` (lower-case k); there is no uppercase K glyph or other abbreviation.
+Fit tiers (`legacyPresenceCounterLayout.ts`, MAZER-UI-033), first that fits wins: dot + `N online`, dot + `N`, dot alone, otherwise
+hidden. The slot ends 4px before the drawn MAZER wordmark, so the title never moves and nothing overlaps the icon or the title.
+View: `src/render/presenceCounterView.ts` (Text + dot Graphics).
 
 ## Header order
 Leaderboard icon top-left (leading), the counter beside it, the MAZER title centred, then the profile icon and the settings cog on the
@@ -51,7 +54,7 @@ and the account portal. `legacyHeaderIdentity*.ts` is left in place (still unit-
 ## Known limits
 - The channel is public: anyone holding the public key can join it and inflate the number. It is a casual indicator, not a measurement.
 - Realtime connection quotas are shared across the Supabase project; past them the counter simply disappears.
-- The tile font has no `.` or `,`, so 1,234 is shown as `1K`.
+- The number never shows a thousands separator; 1,234 reads `1.2k` as on the website.
 - Changing the definition (for example dedupe per browser) needs a reviewed identifier and retention contract.
 
 ## Code

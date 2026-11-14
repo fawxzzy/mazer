@@ -2,12 +2,20 @@ import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import { resolveLegacyHeaderControlFrame } from '../../src/legacy-runtime/legacyHeaderControl';
 import {
+  LEGACY_PRESENCE_DOT_DIAMETER_PX,
+  LEGACY_PRESENCE_DOT_GAP_PX,
   LEGACY_PRESENCE_ICON_GAP_PX,
+  LEGACY_PRESENCE_IDLE_DOT_ALPHA,
+  LEGACY_PRESENCE_PULSE_MS,
   LEGACY_PRESENCE_TITLE_GAP_PX,
   resolveLegacyPresenceCounterLayout,
-  resolveLegacyPresenceCounterPlacement
+  resolveLegacyPresenceCounterPlacement,
+  resolveLegacyPresenceDotAlpha
 } from '../../src/legacy-runtime/legacyPresenceCounterLayout';
-import { formatOnlineGlyph } from '../../src/legacy-runtime/legacyPresenceContract';
+import { formatOnline } from '../../src/legacy-runtime/legacyPresenceContract';
+
+// 13px UI font stand-in: about 7px per character.
+const measure = (value: string): number => value.length * 7;
 
 const VIEWPORTS = [
   { height: 568, width: 320 },
@@ -17,11 +25,10 @@ const VIEWPORTS = [
   { height: 932, width: 430 },
   { height: 720, width: 1280 }
 ] as const;
-
 const COUNTS = [1, 7, 42, 999, 1234, 12345];
 
-describe('MAZER-UI-024 presence counter layout', () => {
-  test('never overlaps the leading icon or the title, never leaves the viewport, on every phone and desktop width and count', () => {
+describe('MAZER-UI-033 presence counter layout (copy of the website header counter)', () => {
+  test('never overlaps the leading icon or the title and never leaves the viewport, at every width and count', () => {
     for (const viewport of VIEWPORTS) {
       const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 49, 'menu');
       const leading = resolveLegacyHeaderControlFrame({
@@ -33,96 +40,84 @@ describe('MAZER-UI-024 presence counter layout', () => {
         sizeScale: layout.headerIconScale,
         width: layout.width
       });
-      for (const count of COUNTS) {
-        for (const showDot of [true, false]) {
-          const placement = resolveLegacyPresenceCounterPlacement({ layout, showDot, text: formatOnlineGlyph(count) });
-          const label = `${viewport.width}x${viewport.height} n=${count} dot=${showDot}`;
-          expect(placement.slotLeft, label).toBe(leading.right + LEGACY_PRESENCE_ICON_GAP_PX);
-          if (!placement.visible) {
-            continue;
-          }
-          expect(placement.number, label).not.toBeNull();
-          const left = placement.dot ? placement.dot.centerX - placement.dot.radius : placement.number!.left;
-          expect(left, label).toBeGreaterThanOrEqual(leading.right + LEGACY_PRESENCE_ICON_GAP_PX);
-          expect(placement.right, label).toBeLessThanOrEqual(placement.slotRight);
-          expect(placement.right, label).toBeLessThanOrEqual(viewport.width - 8);
-          // The number (+ label) block is vertically centred on the leading icon.
-          const blockBottom = placement.word ? placement.word.top + placement.word.height : placement.number!.top + placement.number!.height;
-          const centre = (placement.number!.top + blockBottom) / 2;
-          expect(Math.abs(centre - leading.centerY), label).toBeLessThanOrEqual(1);
+      for (const count of [null, ...COUNTS]) {
+        const placement = resolveLegacyPresenceCounterPlacement({ countText: formatOnline(count), layout, measure });
+        const label = `${viewport.width}x${viewport.height} n=${count}`;
+        expect(placement.slotLeft, label).toBe(leading.right + LEGACY_PRESENCE_ICON_GAP_PX);
+        if (!placement.visible) {
+          continue;
         }
+        expect(placement.dot!.centerX - placement.dot!.radius, label).toBeGreaterThanOrEqual(placement.slotLeft);
+        expect(placement.right, label).toBeLessThanOrEqual(placement.slotRight);
+        expect(placement.right, label).toBeLessThanOrEqual(viewport.width - 8);
+        expect(Math.abs(placement.dot!.centerY - leading.centerY), label).toBeLessThanOrEqual(1);
       }
     }
   });
 
-  test('the title never moves: the slot right limit is the inline title left edge minus the gap', () => {
-    const layout = resolveLegacyMenuLayout(390, 844, 50, 49, 49, 'menu');
-    const placement = resolveLegacyPresenceCounterPlacement({ layout, showDot: true, text: '7' });
-    expect(placement.slotRight).toBeLessThan(layout.titleX);
-    expect(placement.slotRight).toBeGreaterThan(placement.slotLeft);
-    expect(LEGACY_PRESENCE_TITLE_GAP_PX).toBeGreaterThan(0);
-  });
-
-  test('every phone width shows the number at the old username text height with the small ONLINE label under it', () => {
+  test('the title never moves: the slot ends before the drawn MAZER wordmark', () => {
     for (const [width, height] of [[360, 740], [390, 844], [412, 915]]) {
-      const phone = resolveLegacyMenuLayout(width, height, 50, 49, 49, 'menu');
-      for (const text of ['7', '42', '999', '99K']) {
-        const placement = resolveLegacyPresenceCounterPlacement({ layout: phone, showDot: false, text });
-        const label = `${width} ${text}`;
-        expect(placement.visible, label).toBe(true);
-        expect(placement.number!.height, label).toBe(14);
-        expect(placement.word?.text, label).toBe('ONLINE');
-        expect(placement.word!.height, label).toBe(7);
-        expect(placement.word!.top, label).toBeGreaterThanOrEqual(placement.number!.top + placement.number!.height);
-        expect(placement.word!.left, label).toBe(placement.number!.left);
-      }
+      const layout = resolveLegacyMenuLayout(width, height, 50, 49, 49, 'menu');
+      const placement = resolveLegacyPresenceCounterPlacement({ countText: '7', layout, measure });
+      expect(placement.slotRight).toBeLessThan(layout.titleX);
+      expect(placement.slotRight).toBeGreaterThan(placement.slotLeft);
     }
-    const desktop = resolveLegacyMenuLayout(1280, 720, 50, 49, 49, 'menu');
-    const wide = resolveLegacyPresenceCounterPlacement({ layout: desktop, showDot: true, text: '1234' });
-    expect(wide.visible).toBe(true);
-    expect(wide.word?.text).toBe('ONLINE');
   });
 
-  test('tiers: number + label, number alone at cell 2, number alone at cell 1, then hidden', () => {
-    const base = { centerY: 40, leadingRight: 50, showDot: false, text: '7', viewportWidth: 2000 };
-    const at = (room: number) => resolveLegacyPresenceCounterLayout({ ...base, titleLeft: 50 + 8 + room + 8 });
-    const wordWidth = 35;
-    expect(at(wordWidth)).toMatchObject({ cell: 2, visible: true });
-    expect(at(wordWidth).word).not.toBeNull();
-    expect(at(wordWidth - 1)).toMatchObject({ cell: 2, visible: true });
-    expect(at(wordWidth - 1).word).toBeNull();
-    expect(at(10)).toMatchObject({ cell: 2, visible: true });
-    expect(at(9)).toMatchObject({ cell: 1, visible: true });
-    expect(at(4).visible).toBe(false);
+  test('live reads dot, number, word left to right: "7 online"', () => {
+    const placement = resolveLegacyPresenceCounterPlacement({
+      countText: '7',
+      layout: resolveLegacyMenuLayout(1280, 720, 50, 49, 49, 'menu'),
+      measure
+    });
+    expect(placement.text?.value).toBe('7 online');
+    expect(placement.text!.left).toBe(placement.slotLeft + LEGACY_PRESENCE_DOT_DIAMETER_PX + LEGACY_PRESENCE_DOT_GAP_PX);
+    expect(placement.dot!.radius * 2).toBe(8);
+  });
+
+  test('idle (no count) is the dim dot alone: no number and no word', () => {
+    for (const countText of [null, undefined, '', ' ']) {
+      const layout = resolveLegacyPresenceCounterLayout({
+        centerY: 40, countText, leadingRight: 50, measure, titleLeft: 400, viewportWidth: 800
+      });
+      expect(layout.visible).toBe(true);
+      expect(layout.text).toBeNull();
+      expect(layout.dot).not.toBeNull();
+    }
+  });
+
+  test('count text the website does not use is never drawn (no K glyph, no commas)', () => {
+    for (const countText of ['1K', '12K', '1,234', 'x', '-', '0 online']) {
+      const layout = resolveLegacyPresenceCounterLayout({
+        centerY: 40, countText, leadingRight: 50, measure, titleLeft: 400, viewportWidth: 800
+      });
+      expect(layout.text, countText).toBeNull();
+    }
+    expect(resolveLegacyPresenceCounterLayout({
+      centerY: 40, countText: '1.2k', leadingRight: 50, measure, titleLeft: 400, viewportWidth: 800
+    }).text?.value).toBe('1.2k online');
+  });
+
+  test('tiers: dot + "N online", then dot + "N", then the dot alone, then hidden', () => {
+    const base = { centerY: 40, countText: '7', leadingRight: 50, measure, viewportWidth: 2000 };
+    const at = (room: number) => resolveLegacyPresenceCounterLayout({ ...base, titleLeft: 50 + LEGACY_PRESENCE_ICON_GAP_PX + room + LEGACY_PRESENCE_TITLE_GAP_PX });
+    const chrome = LEGACY_PRESENCE_DOT_DIAMETER_PX + LEGACY_PRESENCE_DOT_GAP_PX;
+    expect(at(chrome + measure('7 online')).text?.value).toBe('7 online');
+    expect(at(chrome + measure('7 online') - 1).text?.value).toBe('7');
+    expect(at(chrome + measure('7') - 1).text).toBeNull();
+    expect(at(chrome + measure('7') - 1).visible).toBe(true);
+    expect(at(LEGACY_PRESENCE_DOT_DIAMETER_PX - 1).visible).toBe(false);
     expect(at(0).visible).toBe(false);
   });
 
-  test('the pulse dot is dropped before the number is when room is tight, and absent when asked (Reduce Motion)', () => {
-    const base = { centerY: 40, leadingRight: 50, text: '12', viewportWidth: 2000 };
-    const tight = resolveLegacyPresenceCounterLayout({ ...base, showDot: true, titleLeft: 50 + 8 + 22 + 8 });
-    expect(tight).toMatchObject({ visible: true, cell: 2 });
-    expect(tight.dot).toBeNull();
-    const roomy = resolveLegacyPresenceCounterLayout({ ...base, showDot: true, titleLeft: 50 + 8 + 35 + 12 + 8 });
-    expect(roomy.dot).not.toBeNull();
-    const reduced = resolveLegacyPresenceCounterLayout({ ...base, showDot: false, titleLeft: 50 + 8 + 400 });
-    expect(reduced.dot).toBeNull();
-  });
-
-  test('hidden for null, empty, zero-like or non-glyph text (nothing is drawn, never a dash)', () => {
-    for (const text of [null, undefined, '', ' ', 'x', '1.2k', '1,234', '-', '0 online']) {
-      expect(resolveLegacyPresenceCounterLayout({ centerY: 40, leadingRight: 50, showDot: true, text, titleLeft: 300, viewportWidth: 390 }).visible, String(text)).toBe(false);
+  test('dot opacity: idle 0.35, live pulses 1 -> 0.55 -> 1 over 2.6s, static 1 under Reduce Motion', () => {
+    expect(resolveLegacyPresenceDotAlpha(false, 1300, false)).toBe(LEGACY_PRESENCE_IDLE_DOT_ALPHA);
+    expect(resolveLegacyPresenceDotAlpha(false, 1300, true)).toBe(LEGACY_PRESENCE_IDLE_DOT_ALPHA);
+    expect(resolveLegacyPresenceDotAlpha(true, 0, false)).toBeCloseTo(1, 6);
+    expect(resolveLegacyPresenceDotAlpha(true, LEGACY_PRESENCE_PULSE_MS / 2, false)).toBeCloseTo(0.55, 6);
+    expect(resolveLegacyPresenceDotAlpha(true, LEGACY_PRESENCE_PULSE_MS, false)).toBeCloseTo(1, 6);
+    for (const time of [0, 400, 1300, 2000]) {
+      expect(resolveLegacyPresenceDotAlpha(true, time, true)).toBe(1);
     }
-  });
-
-  test('digits are tabular: every digit advances the same width, so a changing value moves nothing to its left', () => {
-    const widths = ['1', '4', '7', '8'].map((digit) => resolveLegacyPresenceCounterLayout({
-      centerY: 40, leadingRight: 50, showDot: true, text: digit, titleLeft: 400, viewportWidth: 800
-    }).number!.width);
-    expect(new Set(widths).size).toBe(1);
-    const a = resolveLegacyPresenceCounterLayout({ centerY: 40, leadingRight: 50, showDot: true, text: '11', titleLeft: 400, viewportWidth: 800 });
-    const b = resolveLegacyPresenceCounterLayout({ centerY: 40, leadingRight: 50, showDot: true, text: '88', titleLeft: 400, viewportWidth: 800 });
-    expect(a.number!.left).toBe(b.number!.left);
-    expect(a.number!.width).toBe(b.number!.width);
-    expect(a.dot).toEqual(b.dot);
   });
 });

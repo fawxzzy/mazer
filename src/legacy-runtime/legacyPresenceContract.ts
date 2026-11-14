@@ -108,17 +108,3 @@ export const formatOnline = (count: number | null | undefined): string | null =>
   }
   return `${Math.floor(count / 1000)}k`;
 };
-
-/**
- * Text for the tile glyph font (letters and digits only, no punctuation): 1..999 verbatim,
- * then whole thousands (`1K`, `12K`), capped at `99K`. A zero or unknown count is null.
- */
-export const formatOnlineGlyph = (count: number | null | undefined): string | null => {
-  if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 1) {
-    return null;
-  }
-  if (count < 1000) {
-    return String(count);
-  }
-  return `${Math.min(99, Math.floor(count / 1000))}K`;
-};

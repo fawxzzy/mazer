@@ -367,9 +367,9 @@ describe('the scene paints exactly what the guide data declares', () => {
     expect(icon).toContain('drawEdgeMarker(');
     // levels: the dot-matrix wordmark chip renderer, same as the level announcer.
     expect(icon).toContain('this.drawLegacyGlyphWordTileBlock(graphics, layout, 0, 1, 1, false)');
-    // online: the menu counter's own chip-word draw (MAZER-UI-024), shared by the counter and the Guide icon.
+    // online: the Guide icon is a chip-word sample; the counter itself is the web-style dot + text (MAZER-UI-033).
     expect(icon).toContain("this.drawLegacyPresenceGlyphWord(graphics, '12',");
-    expect(method('private drawLegacyMenuPresenceCounter(time: number): void')).toContain('this.drawLegacyPresenceGlyphWord(');
+    expect(method('private drawLegacyMenuPresenceCounter(time: number): void')).toContain('view.draw(this.boardDynamicGraphics');
     // you: the board's own marker draw (src/render/playerMarker.ts: block, keyline, ring, accent stroke), frozen for the icon,
     // the same function fillLegacyPlayerMarkerTile calls for the human player and for the menu demo's AI.
     expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('drawPlayerMarker(graphics, frame, {');
