@@ -459,6 +459,11 @@ import {
 } from '../legacy-runtime/legacyMazeGenerationJob';
 import { createLegacyMazeWorkerHost } from '../legacy-runtime/legacyMazeWorkerClient';
 import {
+  LegacyBootPlayMazeHold,
+  isLegacyBootPlayMazeCheapToBuildInline,
+  shouldStartLegacyBootPlayMazeEarly
+} from '../legacy-runtime/legacyBootPlayMazeHold';
+import {
   checkLegacyUsernameAvailable,
   createLegacyAuthScopedStorage,
   createLegacyGuestAuthSnapshot,
@@ -1862,6 +1867,8 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-PERF-008: the next play-start maze, built in a worker while the menu is idle (taken in rebuildMaze).
   private playStartMazeSlotInstance: LegacyMazePrefetchSlot | null = null;
   private playStartMazePrefetchPrimed = false;
+  // MAZER-PERF-009: the direct-to-play boot's first maze, built in the same worker slot (see legacyBootPlayMazeHold.ts).
+  private readonly bootPlayMazeHold = new LegacyBootPlayMazeHold();
   // Created on first use (a worker is only spawned when a build actually starts).
   private get deconstructResetMazeSlot(): LegacyMazePrefetchSlot {
     this.deconstructResetMazeSlotInstance ??= new LegacyMazePrefetchSlot(createLegacyMazeWorkerHost());
@@ -2491,6 +2498,15 @@ export class MenuScene extends Phaser.Scene {
     // the usual menu placeholder -- immediately, no demo-hold delay, when
     // a play start is still pending, since it's about to be replaced
     // anyway the moment auth resolves.
+    // MAZER-PERF-009: with the first play maze building in the worker, this placeholder is only ever seen under
+    // the loader cover for a moment before play replaces it, so it is the instant straight corridor (2 to 5 ms
+    // instead of 70 to 460 ms) rather than a full menu-level maze.
+    const bootPlayMazeBuilding = this.mode !== 'play'
+      && shouldStartLegacyBootPlayMazeEarly({
+        authGateLocked: this.authGateLocked,
+        pendingBootPlayStart: this.pendingBootPlayStart
+      })
+      && this.bootPlayMazeHold.begin(this.createLegacyBootPlayMazeHoldHost());
     if (this.mode !== 'play') {
       const menuGenerationScale = this.resolveLegacyProgressionScaleForMode('menu');
       this.applyGenerationRequest(
@@ -2498,7 +2514,7 @@ export class MenuScene extends Phaser.Scene {
           aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu', menuGenerationScale),
           currentSeed: this.mazeSeed,
           dueAtMs: this.time.now,
-          generationProfile: this.resolveLegacyMazeGenerationProfileForMode('menu'),
+          generationProfile: bootPlayMazeBuilding ? { layout: 'corridor' } : this.resolveLegacyMazeGenerationProfileForMode('menu'),
           mode: 'menu',
           queuedAtMs: this.time.now,
           reason: 'boot-menu',
@@ -3191,9 +3207,11 @@ export class MenuScene extends Phaser.Scene {
     // play boot (e.g. the "Play Mazer" home-screen shortcut) while signed
     // out should land in play mode once signed in, not before.
     if (this.pendingBootPlayStart && !this.authGateAwaitingResolution && !this.authGateLocked) {
-      this.pendingBootPlayStart = false;
-      this.startPlayMode();
-      this.rebuildUi();
+      if (!this.holdLegacyBootPlayStart(time)) {
+        this.pendingBootPlayStart = false;
+        this.startPlayMode();
+        this.rebuildUi();
+      }
     }
     this.syncLegacyAuthOpeningTimeout(time);
     this.syncLegacyAuthGateLoadingScreen(time);
@@ -3265,6 +3283,7 @@ export class MenuScene extends Phaser.Scene {
       this.mode === 'menu'
       && !this.authGateAwaitingResolution
       && !this.authGateLocked
+      && !this.pendingBootPlayStart
       && this.pendingGenerationRequest === null
       && this.pendingResetRequest === null
     ) {
@@ -3273,7 +3292,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.advanceLegacyMenuStaticDrawStage(time);
     this.tickLegacyPresence(time);
-    if (this.mode === 'menu' && this.playStartMazePrefetchPrimed === false && !this.authGateAwaitingResolution) {
+    if (this.mode === 'menu' && this.playStartMazePrefetchPrimed === false && !this.authGateAwaitingResolution && !this.pendingBootPlayStart) {
       this.primeLegacyPlayStartMazePrefetch();
     }
     if (
@@ -5824,12 +5843,43 @@ export class MenuScene extends Phaser.Scene {
     }
     this.playStartMazePrefetchPrimed = false;
     this.deconstructResetMazeSlot.warm();
-    if (this.explicitRuntimeMazeSeed || this.playStartMazeSlotInstance === null) {
+    if (this.playStartMazeSlotInstance === null) {
       return null;
     }
-    return this.playStartMazeSlotInstance.take(
+    const parked = this.playStartMazeSlotInstance.take(
       resolveLegacyMazeGenerationJobKey(this.createLegacyPlayStartMazeJobInput(undefined))
     );
+    // A pinned seed (?seed=) only ever takes the maze that was built for exactly that seed.
+    return parked !== null && this.explicitRuntimeMazeSeed && parked.seed !== this.mazeSeed ? null : parked;
+  }
+
+  // MAZER-PERF-009: the direct-to-play boot's first maze, started in the worker as soon as the inputs are
+  // known (create) so the first play start has nothing left to build on the main thread.
+  private createLegacyBootPlayMazeHoldHost() {
+    const slot = this.playStartMazeSlot;
+    // A straight-corridor start (level 1) is cheaper to build inline than to wait for the worker.
+    const inline = isLegacyBootPlayMazeCheapToBuildInline(this.resolveLegacyMazeGenerationProfileForMode('play'));
+    return {
+      get available() { return !inline && slot.available; },
+      start: (): boolean => {
+        const input = this.createLegacyPlayStartMazeJobInput(
+          this.explicitRuntimeMazeSeed ? this.mazeSeed : this.createFreshLegacyPlayGenerationSeed()
+        );
+        return slot.start(input, resolveLegacyMazeGenerationJobKey(input));
+      },
+      status: () => slot.peekStatus()
+    };
+  }
+
+  // True while the pending direct-to-play start must wait for that worker maze (the loader cover stays up).
+  private holdLegacyBootPlayStart(time: number): boolean {
+    if (this.mode !== 'menu') {
+      // Play already started another way (Enter on the placeholder): nothing left to start or wait for.
+      this.bootPlayMazeHold.release();
+      this.pendingBootPlayStart = false;
+      return true;
+    }
+    return this.bootPlayMazeHold.holds(time, this.createLegacyBootPlayMazeHoldHost());
   }
 
   // MAZER-PERF-008: while the menu is idle, start the next play-start maze in a worker (a random seed,
@@ -14872,8 +14922,9 @@ export class MenuScene extends Phaser.Scene {
   private syncLegacyAuthGateLoadingScreen(time: number): void {
     // The cover is the shared app loader: it fades in (never pops), holds, and fades out over the live scene. While the
     // HTML boot splash is still up the cover starts opaque so the splash fades out over an identical frame.
+    // MAZER-PERF-009: the cover also stays up while the direct-to-play start waits for its worker-built maze.
     const loaderAlpha = this.appLoader?.sync(
-      this.authGateAwaitingResolution,
+      this.authGateAwaitingResolution || this.bootPlayMazeHold.waiting,
       time,
       this.prefersLegacyReducedMotion(),
       this.layout.width,
@@ -14884,6 +14935,16 @@ export class MenuScene extends Phaser.Scene {
       if (this.authGateLoadingBlocker !== null) {
         this.authGateLoadingBlocker.destroy();
         this.authGateLoadingBlocker = null;
+      }
+      if (this.bootPlayMazeHold.waiting) {
+        // MAZER-PERF-009: held for the worker-built maze, auth is already resolved: neutral label, centred under the icon.
+        const holdLayout = this.appLoader?.currentLayout;
+        this.authGateLoadingText
+          .setText(resolveLegacyAuthLoadingCopy({ awaitingResolution: false, callbackInProgress: false, hasSession: false }))
+          .setPosition(
+            Math.round(holdLayout?.centreX ?? this.layout.width / 2),
+            Math.round(holdLayout?.labelCentreY ?? this.layout.height / 2)
+          );
       }
       // The input shield is gone at once; the label leaves with the cover's fade.
       this.authGateLoadingText.setAlpha(loaderAlpha).setVisible(loaderAlpha > 0);

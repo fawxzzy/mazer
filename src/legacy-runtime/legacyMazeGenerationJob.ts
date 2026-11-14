@@ -165,6 +165,11 @@ export class LegacyMazePrefetchSlot {
     void this.host.available;
   }
 
+  /** MAZER-PERF-009: where the parked build stands (null when nothing is parked), without taking it. */
+  public peekStatus(): LegacyMazeBackgroundBuildStatus | null {
+    return this.entry?.build.status ?? null;
+  }
+
   /** The seed of the parked build when its label matches, without taking it (the maze can arrive later). */
   public peekSeed(label: string): number | null {
     return this.entry !== null && this.entry.label === label ? this.entry.build.input.seed : null;

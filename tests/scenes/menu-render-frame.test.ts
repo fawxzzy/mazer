@@ -2561,9 +2561,12 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
   for (const name of noops) scene[name] = vi.fn();
   const demo = vi.fn();
   const startPlay = vi.fn(() => { scene.mode = 'play'; });
+  // MAZER-PERF-009: true while the direct-to-play start waits for its worker-built maze.
+  const holdBootPlay = vi.fn(() => false);
   scene.updateMenuDemo = demo;
   scene.startPlayMode = startPlay;
-  return { scene, demo, startPlay, tick: (time = 1000) => runUpdate.call(scene, time, 16) };
+  scene.holdLegacyBootPlayStart = holdBootPlay;
+  return { scene, demo, startPlay, holdBootPlay, tick: (time = 1000) => runUpdate.call(scene, time, 16) };
 };
 
 describe('menu demo authentication boundary', () => {
@@ -2592,6 +2595,29 @@ describe('menu demo authentication boundary', () => {
     expect(frame.scene.pendingBootPlayStart).toBe(false);
     expect(frame.scene.mode).toBe('play');
     expect(frame.demo).not.toHaveBeenCalled();
+  });
+
+  test('MAZER-PERF-009: holds a pending direct-to-play start (no demo, no prime) until its worker maze is ready', () => {
+    const frame = createFrameHarness({ pendingBootPlayStart: true });
+    frame.holdBootPlay.mockReturnValue(true);
+    for (let tick = 0; tick < 30; tick += 1) frame.tick(tick * 16);
+    expect(frame.holdBootPlay).toHaveBeenCalledTimes(30);
+    expect(frame.startPlay).not.toHaveBeenCalled();
+    expect(frame.scene.pendingBootPlayStart).toBe(true);
+    expect(frame.demo).not.toHaveBeenCalled();
+    frame.holdBootPlay.mockReturnValue(false);
+    frame.tick(600);
+    expect(frame.startPlay).toHaveBeenCalledTimes(1);
+    expect(frame.scene.pendingBootPlayStart).toBe(false);
+    expect(frame.demo).not.toHaveBeenCalled();
+  });
+
+  test('MAZER-PERF-009: the hold is never consulted while the gate is locked or still resolving', () => {
+    for (const overrides of [{ authGateLocked: true }, { authGateAwaitingResolution: true }]) {
+      const frame = createFrameHarness({ pendingBootPlayStart: true, ...overrides });
+      frame.tick();
+      expect(frame.holdBootPlay).not.toHaveBeenCalled();
+    }
   });
 
   test('keeps a slow real-auth startup inert across frames, then enters play once', () => {
