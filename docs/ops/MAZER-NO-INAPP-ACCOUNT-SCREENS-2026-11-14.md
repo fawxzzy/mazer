@@ -66,9 +66,7 @@ Loop guard and explicit-sign-out semantics are unchanged: `legacySignedOutHandof
 redirect by itself, and still stays on this state after an explicit sign-out or a return inside the attempt window.
 `?autoSignIn=0` still opts a boot out of the automatic hand-off (QA of this state).
 
-Known wording issue (not changed here): the generic connection line (`MAZER_OAUTH_SAFE_ERROR_MESSAGE`) says "Return to
-Mazer and try again", which reads oddly inside Mazer. It is pinned by tests and shared with the host return path, so
-it is a copy decision for the owner.
+Wording issue (fixed by MAZER-ACCT-044): the generic connection line (`MAZER_OAUTH_SAFE_ERROR_MESSAGE`) used to say "Return to Mazer and try again", which read oddly inside Mazer. It now reads "Could not reach your account. Try again." (the constant and `LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic`; the two edits shipped as a Wave 3B and a Wave 5C PR).
 
 ## Evidence
 
@@ -94,10 +92,7 @@ state used by diagnostics and re-auth, the OAuth hand-off and its failure catego
 
 ## Follow-ups not done here
 
-- Wave 3B (`legacyPlayerMessage.ts`): `resolveLegacyPasswordRecoveryError`, `resolveLegacyAuthValidationMessage` and the
-  copy rows `loginReady`, `enterEmail`, `passwordMinimum`, `passwordMismatch`, `passwordRecoveryInvalid`,
-  `passwordRecoveryUpdated`, `passwordResetNotConfigured`, `passwordResetSent`, `emailInvalid`, `passwordPolicy` now have no caller.
-  They are a separate PR because that file belongs to a different integrator wave.
+- Wave 3B (`legacyPlayerMessage.ts`): done by MAZER-ACCT-044. `resolveLegacyPasswordRecoveryError`, `resolveLegacyAuthValidationMessage` and the copy rows `loginReady`, `enterEmail`, `passwordMinimum`, `passwordMismatch`, `passwordRecoveryInvalid`, `passwordRecoveryUpdated`, `passwordResetNotConfigured`, `passwordResetSent` are deleted with their tests and inventory rows. `emailInvalid` and `passwordPolicy` stay: `resolveLegacyAuthFeedbackMessage` still maps provider error text to them (diagnostics only).
 - Wave 0C: `scripts/analysis/capture-ui-surfaces.mjs` still expects the Welcome labels; separate PR for the same reason.
 - Wave 1C: `formMode` and `invalidFields` in the runtime diagnostics are published as constants until the diagnostics
   type drops them.

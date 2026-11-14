@@ -1029,7 +1029,7 @@ describe('forced account failure fallback anatomy check (MAZER-ACCT-043)', () =>
     buttons: buttons.map((text) => ({ text })),
     textLabels: labels.map((text) => ({ text }))
   });
-  const goodLabels = ['Account connection unavailable. Return to Mazer and try again.', 'Try again'];
+  const goodLabels = ['Could not reach your account. Try again.', 'Try again'];
   const goodButtons = ['Try again'];
 
   test('passes for the fallback: one Try again button and a status line', () => {

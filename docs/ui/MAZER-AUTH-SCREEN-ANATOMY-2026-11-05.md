@@ -75,7 +75,7 @@ A real `errorMessage` always wins the banner over the generic unavailable fallba
 ### Copy (stable strings)
 
 Every existing error string is passed through unchanged (trimmed only), including
-`MAZER_OAUTH_SAFE_ERROR_MESSAGE` = `Account connection unavailable. Return to Mazer and try again.` (re-exported
+`MAZER_OAUTH_SAFE_ERROR_MESSAGE` = `Could not reach your account. Try again.` (re-exported
 from `legacyAuthScreenView.ts`; a test pins it against `legacyAccountPortal.ts` and sweeps every
 `LEGACY_AUTH_MESSAGE_COPY` value). New strings live in `LEGACY_AUTH_SCREEN_COPY`: `MAZER`, `Welcome`, `Sign in`,
 `Opening`, `Signing in`, `Create Account`, `Reset Password`, `Privacy Policy`, `Terms of Service`, `Loading…`,

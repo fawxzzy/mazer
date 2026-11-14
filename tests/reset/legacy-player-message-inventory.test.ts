@@ -103,7 +103,7 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/boot/installGate.ts', literal: 'Race through endless mazes, straight from your home screen.', kind: 'static', route: 'install gate value line (all install cards, with a static mini-maze mark); active; none (install pitch)' },
   { file: 'src/boot/installGate.ts', literal: 'Link copied. Paste it into Safari or Chrome.', kind: 'static', route: 'install gate Copy link confirmation (role=status under the button); active; none (feedback to the Copy link click)' },
   { file: 'src/boot/installGate.ts', literal: 'Could not copy the link. Copy the address from your browser instead.', kind: 'static', route: 'install gate Copy link failure notice (role=status under the button); active; none' },
-  { file: 'src/legacy-runtime/legacyAccountPortal.ts', literal: 'Account connection unavailable. Return to Mazer and try again.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.accountConnectionUnavailable; today rendered directly in two places' },
+  { file: 'src/legacy-runtime/legacyAccountPortal.ts', literal: 'Could not reach your account. Try again.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.accountConnectionUnavailable; today rendered directly in two places' },
   { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'Account connected.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.accountConnected (info is set on the snapshot with no render site)' },
   { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'That username is already taken.', kind: 'duplicate-unrendered', route: 'duplicate of LEGACY_AUTH_MESSAGE_COPY.usernameTaken; save result error is never rendered' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'The leaderboard is not available right now.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
@@ -437,6 +437,8 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
       'LEGACY_AUTH_MESSAGE_COPY',
       'LEGACY_BOOT_MESSAGE_COPY',
       'LEGACY_OAUTH_FAILURE_MESSAGE_COPY',
+      // MAZER-ACCT-044 transition table (previous generic spelling); delete with the shim.
+      'LEGACY_OAUTH_PREVIOUS_COPY',
       'LEGACY_REMOTE_MESSAGE_COPY',
       'LEGACY_OFFLINE_MESSAGE_COPY',
       'LEGACY_OVERLAY_MESSAGE_COPY'

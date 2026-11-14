@@ -55,17 +55,9 @@ export const LEGACY_AUTH_MESSAGE_COPY = {
   accountUnavailable: 'Account service is unavailable right now. Try again shortly.',
   authUnavailable: 'Account access is unavailable right now. Try again shortly.',
   emailInvalid: 'Enter a valid email address.',
-  enterEmail: 'Enter an email.',
   loginNotConfigured: 'Account access is unavailable right now. Try again shortly.',
-  loginReady: 'Details look good. Sign in when you are ready.',
   networkUnavailable: 'Account service is unreachable. Try again shortly.',
-  passwordMinimum: 'Password needs 6+ characters.',
-  passwordMismatch: 'Passwords do not match.',
   passwordPolicy: 'Choose a different, stronger password that meets the account security requirements.',
-  passwordRecoveryInvalid: 'This reset link is invalid or has expired. Request a new link.',
-  passwordRecoveryUpdated: 'Password updated. You can continue to Mazer.',
-  passwordResetNotConfigured: 'Password reset is unavailable right now. Try again shortly.',
-  passwordResetSent: 'Password reset email sent.',
   usernameInvalid: 'Use 2-15 letters, numbers, periods, underscores, or hyphens.',
   usernameTaken: 'That username is already taken.',
   signedIn: 'Signed in.',
@@ -80,11 +72,19 @@ export const LEGACY_OAUTH_FAILURE_MESSAGE_COPY = {
   cancelled: 'Sign-in did not finish. Choose Sign in to try again.',
   connection: 'Mazer could not finish connecting to your account. Try again in a moment.',
   contextLost: 'Sign-in came back to a different screen than where you started. Open Mazer from your home screen icon and try again.',
-  generic: 'Account connection unavailable. Return to Mazer and try again.',
+  generic: 'Could not reach your account. Try again.',
   providerUnreachable: 'Sign-in is unavailable right now. Try again in a few minutes.',
   session: 'Your account could not be confirmed. Try signing in again.',
   storage: 'This browser is blocking what Mazer needs to sign in. Turn off private browsing or allow site data, then try again.',
   timedOut: 'Sign-in took too long. Choose Sign in to start again.'
+} as const;
+
+// MAZER-ACCT-044 transition: the generic row was reworded here (integrator Wave 3B) while the one-size
+// constant MAZER_OAUTH_SAFE_ERROR_MESSAGE lives in legacyAccountPortal.ts (Wave 5C), so the two edits ship
+// as separate PRs. Until the constant follows, a snapshot can still carry the previous spelling; it is
+// player-safe and is shown as the generic row. Delete this once legacyAccountPortal.ts has the new line.
+const LEGACY_OAUTH_PREVIOUS_COPY = {
+  generic: 'Account connection unavailable. Return to Mazer and try again.'
 } as const;
 
 export type LegacyOAuthFailureClass = keyof typeof LEGACY_OAUTH_FAILURE_MESSAGE_COPY;
@@ -225,7 +225,8 @@ export const isLegacyOAuthFailureCopy = (copy: string | null | undefined): boole
   const trimmed = copy?.trim();
   return trimmed !== undefined
     && trimmed.length > 0
-    && (Object.values(LEGACY_OAUTH_FAILURE_MESSAGE_COPY) as string[]).includes(trimmed);
+    && ((Object.values(LEGACY_OAUTH_FAILURE_MESSAGE_COPY) as string[]).includes(trimmed)
+      || trimmed === LEGACY_OAUTH_PREVIOUS_COPY.generic);
 };
 
 export const resolveLegacyOAuthFailureMessage = (
@@ -272,16 +273,6 @@ export const resolveLegacyPlayerMessageColor = (
   message: Pick<LegacyPlayerMessage, 'tone'>
 ): string => LEGACY_PLAYER_MESSAGE_COLORS[message.tone];
 
-export const resolveLegacyAuthValidationMessage = (
-  copy: string | null,
-  canSubmit: boolean
-): LegacyPlayerMessage | null => createLegacyPlayerMessage({
-  copy,
-  id: canSubmit ? 'auth.validation.ready' : 'auth.validation.blocked',
-  source: 'auth',
-  tone: canSubmit ? 'success' : 'warning'
-});
-
 export const resolveLegacyAuthFeedbackMessage = (
   error: string | null | undefined,
   info: string | null | undefined,
@@ -293,7 +284,7 @@ export const resolveLegacyAuthFeedbackMessage = (
     // specific; pass it through instead of re-matching it as provider text.
     if (isLegacyOAuthFailureCopy(rawError)) {
       return createLegacyPlayerMessage({
-        copy: rawError,
+        copy: rawError === LEGACY_OAUTH_PREVIOUS_COPY.generic ? LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic : rawError,
         durationMs: LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS,
         id: 'auth.feedback.error',
         source: 'auth',
@@ -366,34 +357,6 @@ export const resolveLegacyAuthFeedbackMessage = (
     source: 'auth',
     tone: 'success'
   });
-};
-
-export const resolveLegacyPasswordRecoveryError = (
-  error: string | null | undefined
-): { copy: string; requiresNewLink: boolean; technicalDetail: string | null } => {
-  const rawError = error?.trim() ?? '';
-  const normalizedError = rawError.toLowerCase();
-  const requiresNewLink = normalizedError.includes('expired')
-    || normalizedError.includes('invalid token')
-    || normalizedError.includes('invalid jwt')
-    || normalizedError.includes('session missing')
-    || normalizedError.includes('session_not_found')
-    || normalizedError.includes('otp_expired');
-
-  if (requiresNewLink) {
-    return {
-      copy: LEGACY_AUTH_MESSAGE_COPY.passwordRecoveryInvalid,
-      requiresNewLink: true,
-      technicalDetail: rawError || null
-    };
-  }
-
-  return {
-    copy: resolveLegacyAuthFeedbackMessage(rawError, null)?.copy
-      ?? LEGACY_AUTH_MESSAGE_COPY.accountUnavailable,
-    requiresNewLink: false,
-    technicalDetail: rawError || null
-  };
 };
 
 export const resolveLegacyBootMessage = (
