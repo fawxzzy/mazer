@@ -27,8 +27,8 @@ import {
 
 /** The overlay id the scene routes on (LegacyOverlayKind). Kept. */
 export const LEGACY_LEADERBOARD_OVERLAY_ID = 'leaderboard' as const;
-/** Header icon asset that is KEPT by the redesign (served from public/). */
-export const LEGACY_LEADERBOARD_ICON_ASSET_PATH = 'assets/hud/hud-leaderboard.webp';
+/** Header icon asset (the leaderboard glyph of the shared HUD icon atlas, served from public/). */
+export const LEGACY_LEADERBOARD_ICON_ASSET_PATH = 'assets/hud/hud-icons.webp';
 
 /** Players loaded and shown: the top N, one request, scrolled (no pager). Must stay <= LEGACY_LEADERBOARD_MAX_PAGE_SIZE (100). */
 export const LEGACY_LEADERBOARD_TOP_N = 50;

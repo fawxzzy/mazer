@@ -72,9 +72,9 @@ describe('evaluateOfflineRequests', () => {
   });
 
   test('a failed app request fails the proof', () => {
-    const result = evaluateOfflineRequests([ok('/'), ok('/assets/hud/hud-profile.webp', { failed: 'net::ERR_INTERNET_DISCONNECTED', fromServiceWorker: false })], ORIGIN);
+    const result = evaluateOfflineRequests([ok('/'), ok('/assets/hud/hud-icons.webp', { failed: 'net::ERR_INTERNET_DISCONNECTED', fromServiceWorker: false })], ORIGIN);
     expect(result.pass).toBe(false);
-    expect(result.appFailures).toEqual([{ url: `${ORIGIN}/assets/hud/hud-profile.webp`, reason: 'net::ERR_INTERNET_DISCONNECTED' }]);
+    expect(result.appFailures).toEqual([{ url: `${ORIGIN}/assets/hud/hud-icons.webp`, reason: 'net::ERR_INTERNET_DISCONNECTED' }]);
   });
 
   test('an HTTP error status counts as a failure', () => {
@@ -98,7 +98,7 @@ describe('evaluateOfflineRequests', () => {
   });
 
   test('network attempts: only the worker background paths are allowed', () => {
-    expect(findUnexpectedNetworkAttempts(['/app-sw.js', '/workbox-edd508a6.js', '/assets/hud/hud-profile.webp?v=1', '/fonts/mazer-tile-font/mazer-font-atlas.json'])).toEqual([]);
+    expect(findUnexpectedNetworkAttempts(['/app-sw.js', '/workbox-edd508a6.js', '/assets/hud/hud-icons.webp?v=1', '/fonts/mazer-tile-font/mazer-font-atlas.json'])).toEqual([]);
     expect(findUnexpectedNetworkAttempts(['/assets/main-abc.js', '/index.html'])).toEqual(['/assets/main-abc.js', '/index.html']);
   });
 
@@ -230,7 +230,12 @@ describe('service worker configuration the proof depends on', () => {
   test('every public file BootScene preloads is covered by the boot-art runtime cache', () => {
     const boot = read('src/scenes/BootScene.ts');
     const urls = [...boot.matchAll(/['`](\/(?:assets|fonts)\/[^'`?$]+)/g)].map((match) => match[1]);
-    expect(urls.length).toBeGreaterThanOrEqual(5);
+    // The HUD icon atlas URL is an imported constant (src/render/hudIconAtlas.ts), not a literal in BootScene.
+    expect(boot).toContain('HUD_ICON_ATLAS_PUBLIC_URL');
+    const atlasUrl = /HUD_ICON_ATLAS_PUBLIC_URL = '([^']+)'/.exec(read('src/render/hudIconAtlas.ts'))?.[1];
+    expect(atlasUrl).toBeTruthy();
+    urls.push(atlasUrl);
+    expect(urls.length).toBeGreaterThanOrEqual(3);
     for (const url of urls) {
       expect(url.startsWith('/assets/hud/') || url.startsWith('/fonts/mazer-tile-font/'), url).toBe(true);
     }
