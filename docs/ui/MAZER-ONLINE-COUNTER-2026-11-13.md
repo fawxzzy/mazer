@@ -39,8 +39,8 @@ The first presence sync arrives before this tab has joined and reports 0; it is 
 ## Look
 Tile glyph font (the 5x7 chip cells the wordmark uses), lit mint number, quieter word `ONLINE` when there is room, optional small
 pulse dot (only when Reduce Motion is off and there is room). Every digit advances the same width (tabular), the number is anchored
-to the leading icon so growing counts extend to the right. Fit tiers (`legacyPresenceCounterLayout.ts`): number + ONLINE at cell 3, at cell 2,
-number alone at cell 3, at cell 2, otherwise hidden. It never overlaps the icon or the title. Counts of 1,000 or more read `1K`, `12K`
+to the leading icon so growing counts extend to the right. Fit tiers (`legacyPresenceCounterLayout.ts`, MAZER-UI-033): number at 14px (cell 2) with ONLINE (cell 1) stacked under it, then
+number alone at cell 2, at cell 1, otherwise hidden. It never overlaps the icon or the title. Counts of 1,000 or more read `1K`, `12K`
 (capped `99K`) because the tile font has no punctuation; the website shows `1.2k`.
 
 ## Header order
