@@ -156,3 +156,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the trail core stepped up to 20 of 255 per 33 ms redraw where the sheen crosses (13 at 20 ms); it now steps at most 8 (the bound PERF-007 set for the dock glow). A stateless palette bound is the only option without per-vertex state; it visibly softens the sheen, so the owner confirms on a phone.
 - Rule: Bound a colour step at its source (the palette) when the redraw rate cannot rise.
 - Status: Applied (review)
+
+## 2026-11-14 - MAZER-ACCT-031 sign-in failure code line
+- WHAT changed: The player message toast row now appends one `Code: <short_code>` line for auth error messages (`src/legacy-runtime/legacyAuthFailureCodeLine.ts`, used by `legacyPlayerMessageToast.ts`). Only the leading known code token of `technicalDetail` is read.
+- WHY it changed: A player report of a sign-in failure could not be told apart from another failure; the ACCT-014 codes were diagnostics-only.
+- Rule: the line is snake_case code only, never provider text, email, name or id.
+- Status: Applied

@@ -2,6 +2,7 @@ import {
   resolveLegacyPlayerMessageColor,
   type LegacyQueuedPlayerMessage
 } from './legacyPlayerMessage';
+import { resolveLegacyAuthFailureCodeLine } from './legacyAuthFailureCodeLine';
 
 /**
  * Pure view-model for the player message toast (MAZER-UI-018).
@@ -19,6 +20,8 @@ export const LEGACY_PLAYER_MESSAGE_TOAST_MAX_WIDTH = 420;
 
 export interface LegacyPlayerMessageToastRow {
   alpha: number;
+  /** MAZER-ACCT-031: the small failure-code line, already included in `copy`. */
+  codeLine: string | null;
   color: string;
   copy: string;
   id: string;
@@ -56,12 +59,17 @@ export const resolveLegacyPlayerMessageToastFrame = (
   maxWidth: resolveLegacyPlayerMessageToastMaxWidth(viewportWidth),
   rows: [...queue]
     .sort((left, right) => right.sequence - left.sequence)
-    .map((entry) => ({
-      alpha: resolveLegacyPlayerMessageToastAlpha(entry, nowMs),
-      color: resolveLegacyPlayerMessageColor(entry.message),
-      copy: entry.message.copy,
-      id: entry.message.id,
-      tone: entry.message.tone
-    }))
+    .map((entry) => {
+      const codeLine = resolveLegacyAuthFailureCodeLine(entry.message);
+      return {
+        alpha: resolveLegacyPlayerMessageToastAlpha(entry, nowMs),
+        codeLine,
+        color: resolveLegacyPlayerMessageColor(entry.message),
+        copy: codeLine === null ? entry.message.copy : `${entry.message.copy}
+${codeLine}`,
+        id: entry.message.id,
+        tone: entry.message.tone
+      };
+    })
     .filter((row) => row.alpha > 0)
 });
