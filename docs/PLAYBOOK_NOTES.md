@@ -236,6 +236,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: new `src/legacy-runtime/legacyStoredUsername.ts` holds the 2-15 character pattern and `sanitizeStoredLegacyUsername`; `legacyAuth.ts` uses it so a username read from stored account metadata that breaks the limit never becomes canonicalUsername or the display name (display falls back to the email local part). No stored name is rewritten or shortened.
 - WHY it changed: the client trusted `user_metadata.username` as read, so an over-limit name stored before the database check existed was still shown and used. The database constraint and the existing over-limit names are account-site/database scope and are reported to the owner, not changed here.
 - Evidence: `tests/reset/legacy-stored-username.test.ts`, `legacy-auth.test.ts`, `legacy-leaderboard-username-editor.test.ts`.
+
+## 2026-11-14 - MAZER-UI-030 offline cache warning toast
+- WHAT changed: new `src/boot/serviceWorkerCacheWarning.ts` carries one friendly warning (existing `service-worker-error` boot copy) from the page to the message toast; `main.ts` raises it on a failed service-worker install or an online registration error; `MenuScene.ts` subscribes with one line; inventory doc row and test pin it.
+- WHY it changed: an offline-cache update failure was invisible. The Workbox worker cannot post a custom message, so the page watches the registration. Sync failures stay silent and boot errors stay on the splash; offline registration errors are expected and stay silent.
+- Evidence: `tests/reset/ui-030-sw-cache-warning.test.ts`, `tests/reset/legacy-player-message-inventory.test.ts`, headless phone emulation (390x844, 360x740).
 - Status: Applied
 
 ## 2026-11-14 - Off-theme colour ratchet baseline refresh
