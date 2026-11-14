@@ -23,7 +23,7 @@ Owner request (verbatim): "the diamonds on the bottom corners are clipping off s
 
 ## Simulated phones (headless, touch, mobile UA, standalone emulation) with a rounded-corner mask
 
-PHONES_PLACEHOLDER
+Headless Chromium (Playwright), touch, iPhone mobile user agent, home-screen (standalone) emulation via navigator.standalone and a display-mode matchMedia override, dev server; menu with `?runtimeDiagnostics=1&authFixture=authenticated`. Viewports 390x844 @ DPR 3, 360x740 @ 2.625, 412x915 @ 2.625, each with Reduce Motion off and on, each at the 50% rest size and at 100% (forced inward lifecycle before the beams leave), each with a 48 css px rounded-corner mask overlay (magenta = cut away). Result: all 8 diamonds are fully inside the canvas with the outer tip on the edge (top row, bottom row, left, right midpoints), and the four corner diamonds sit clear of the 48 px corner mask at both sizes; no page errors. Key frames: `390x844-dpr3-50pct-mask48.png` and `390x844-dpr3-100pct-mask48.png` in `docs/ui/evidence/2026-11-14-edge-corner-outer-tip/`.
 
 ## Not checked
 
