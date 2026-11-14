@@ -2504,7 +2504,6 @@ export class MenuScene extends Phaser.Scene {
     const bootPlayMazeBuilding = this.mode !== 'play'
       && shouldStartLegacyBootPlayMazeEarly({
         authGateLocked: this.authGateLocked,
-        passwordRecoveryActive: this.isLegacyPasswordRecoveryActive(),
         pendingBootPlayStart: this.pendingBootPlayStart
       })
       && this.bootPlayMazeHold.begin(this.createLegacyBootPlayMazeHoldHost());

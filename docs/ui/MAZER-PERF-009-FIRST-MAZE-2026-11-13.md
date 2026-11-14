@@ -50,7 +50,7 @@ The play maze cost grows with the level (level 1 is a straight corridor: 5 ms at
 
 - The signed-out redirect to the account host runs in `src/boot/main.ts` BEFORE Phaser exists, so a launch that is about
   to redirect never constructs the scene and never starts a worker. Inside the scene the early start additionally
-  requires `!authGateLocked` (a locked gate is the first-time signed-out Welcome screen) and no password recovery.
+  requires `!authGateLocked` (a locked gate is a signed-out visitor on the failure state).
   A direct-to-play start whose gate is still locked no longer starts the idle prefetch worker either (it used to).
 - Backgrounding: the worker keeps running; the hold is evaluated in `update`, which does not run while the page is
   frozen. On return the maze is ready (taken) or, past the stall bound, the start runs synchronously exactly as before.
@@ -73,28 +73,29 @@ the session (nothing else generates before play starts).
 | 390x844 @3 | previewLevel=100 | 1x | worker | 11 (10-14) | **0** | 279 |
 | 390x844 @3 | previewLevel=100 | 4x | sync (off) | 92 (71-141) | 621 (333-1010) | 2188 |
 | 390x844 @3 | previewLevel=100 | 4x | worker | 50 (47-53) | **0** | 1628 |
-| 390x844 @3 | mode=play (level 1) | 4x | sync (off) | 57 (56-92) | 25 (19-29) | 1558 |
-| 390x844 @3 | mode=play (level 1) | 4x | worker | 72 (53-92) | **0** | 1941 |
 | 1280x720 @1 | previewLevel=100 | 1x | sync (off) | 11 (11-12) | 105 (49-134) | 311 |
 | 1280x720 @1 | previewLevel=100 | 1x | worker | 9 (6-17) | **0** | 157 |
 | 1280x720 @1 | previewLevel=100 | 4x | sync (off) | 71 (35-73) | 217 (129-455) | 1375 |
 | 1280x720 @1 | previewLevel=100 | 4x | worker | 52 (42-76) | **0** | 1003 |
-| 1280x720 @1 | mode=play (level 1) | 4x | sync (off) | 43 (35-50) | 11 (11-15) | 728 |
-| 1280x720 @1 | mode=play (level 1) | 4x | worker | 50 (44-90) | **0** | 985 |
 
 ("Longest task" is every task up to 2.5 s after the play maze installs, so it is dominated by the board bake and
 software canvas rendering, see below; it is shown to be honest about what is left, not as a generation number.)
 
-- The play maze no longer runs on the main thread on any measured route, level, viewport or CPU rate: 0 ms where it was
-  86-1010 ms at level 100 (4x: 333-1010 ms). `startPlayMode` itself drops from 120-150 ms to 23-47 ms (install only).
+- The play maze no longer runs on the main thread at level 100 on any measured route, viewport or CPU rate: 0 ms where
+  it was 86-1010 ms (4x: 333-1010 ms). Level 1 (the straight tutorial corridor) stays a synchronous start on purpose:
+  it costs 2-5 ms at 1x and 19-29 ms at 4x, and measured through the worker it installed 0.8 to 2 s LATER at 4x for
+  that 25 ms job (worker start-up plus waiting for a frame); from level 3 on the main-thread cost is 165 to 960 ms at
+  4x, which is what the worker removes (`isLegacyBootPlayMazeCheapToBuildInline`). `startPlayMode` itself drops from 120-150 ms to 23-47 ms (install only).
 - What still runs on the main thread: the throwaway menu placeholder. It is now the instant straight corridor, but its
   cost is the generator's first-call cost on a cold main thread (module code compiled lazily on first use), not the
   maze: 6-17 ms at 1x and 42-92 ms at 4x, independent of level (a hot call takes 2 to 5 ms). **That is above "a few ms"
   at 4x.** Removing it needs the placeholder to avoid the generator entirely (a prebuilt literal snapshot), which
   touches the maze snapshot contract; left as a follow-up rather than guessed at.
-- Time to the play maze being installed is about the same or slightly later than the old synchronous path in a quiet
-  run (the player waits for the worker behind the loader instead of staring at a frozen frame); frames stay alive
-  while it builds.
+- Cost: time until the play maze is installed. At 1x it is the same within noise (level 100, medians 1136 to 1232 ms on
+  the phone viewport, 739 to 721 ms on desktop). At 4x it is 0.8 to 1.5 s later (5024 to 5859 ms phone, 3245 to 4717 ms
+  desktop, noisy machine) because the start waits for the worker (start-up, generation, and the next frame of a slow
+  main thread) behind the loader instead of freezing for the generation. Frames stay alive while it builds; the trade
+  is a longer wait for no blocked frame, and only on a slow device.
 - Stall bound: in some runs under heavy machine load (other jobs saturating the CPU, 4x on top) the worker had not
   answered after 6 s, and the start fell back to the synchronous build as designed (observed as `play` generations on
   the main thread in those runs). The bound trades a longer wait on a starved worker against cancelling a slow but

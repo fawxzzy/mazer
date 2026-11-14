@@ -202,12 +202,11 @@ describe('boot play maze hold (MAZER-PERF-009)', () => {
     }
   });
 
-  test('the early start needs a direct-to-play boot, an unlocked gate and no password recovery', () => {
-    const base = { authGateLocked: false, passwordRecoveryActive: false, pendingBootPlayStart: true };
+  test('the early start needs a direct-to-play boot and an unlocked gate', () => {
+    const base = { authGateLocked: false, pendingBootPlayStart: true };
     expect(shouldStartLegacyBootPlayMazeEarly(base)).toBe(true);
     expect(shouldStartLegacyBootPlayMazeEarly({ ...base, pendingBootPlayStart: false })).toBe(false);
     expect(shouldStartLegacyBootPlayMazeEarly({ ...base, authGateLocked: true })).toBe(false);
-    expect(shouldStartLegacyBootPlayMazeEarly({ ...base, passwordRecoveryActive: true })).toBe(false);
   });
 });
 

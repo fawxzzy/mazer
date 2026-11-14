@@ -113,16 +113,15 @@ export class LegacyBootPlayMazeHold {
 
 /**
  * Whether the scene may start the early build at create time: a direct-to-play boot, the sign-in
- * gate not locked (a locked gate is a first-time signed-out visitor: the Welcome screen, no play
+ * gate not locked (a locked gate is a signed-out visitor on the failure state, no play
  * start, no reason to generate). The hand-off redirect for signed-out launches runs before Phaser
  * exists, so by the time a scene is asking, a redirecting launch is already gone.
  */
 export const shouldStartLegacyBootPlayMazeEarly = (input: {
   authGateLocked: boolean;
-  passwordRecoveryActive: boolean;
   pendingBootPlayStart: boolean;
 }): boolean => (
-  input.pendingBootPlayStart && !input.authGateLocked && !input.passwordRecoveryActive
+  input.pendingBootPlayStart && !input.authGateLocked
 );
 
 /**
