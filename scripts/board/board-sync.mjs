@@ -236,6 +236,22 @@ export function applyPlan(repoRoot, plan) {
   }
 }
 
+// Same two checks CI runs as "Deterministic public owner export". Runs only where the test file exists (a repo checkout).
+export const OWNER_EXPORT_CHECKS = [
+  { label: "tests/project-board-owner-export.test.mjs", args: ["--test", "tests/project-board-owner-export.test.mjs"] },
+  { label: "export-project-board-owner.mjs --check", args: ["scripts/export-project-board-owner.mjs", "--check"] },
+];
+
+export function runOwnerExportPreflight(repoRoot) {
+  if (!fs.existsSync(path.join(repoRoot, "tests/project-board-owner-export.test.mjs"))) return { skipped: true, failures: [] };
+  const failures = [];
+  for (const check of OWNER_EXPORT_CHECKS) {
+    try { execFileSync(process.execPath, check.args, { cwd: repoRoot, encoding: "utf8", stdio: "pipe" }); }
+    catch (error) { failures.push({ label: check.label, output: `${error.stdout ?? ""}${error.stderr ?? ""}`.trim() }); }
+  }
+  return { skipped: false, failures };
+}
+
 // ---- status / check ---------------------------------------------------------------------------------------------------
 
 export function computeStatus(repoRoot, options = {}, nowMs = Date.now()) {
@@ -327,7 +343,7 @@ function eventFromArgs(args) {
   return event;
 }
 
-export function runBoardSync(argv, repoRoot = process.cwd(), out = (line) => process.stdout.write(`${line}\n`)) {
+export function runBoardSync(argv, repoRoot = process.cwd(), out = (line) => process.stdout.write(`${line}\n`), deps = {}) {
   const args = parseArgs(argv);
   const command = args._[0];
   const options = { eventFiles: args.eventFiles, remote: args.remote ?? "origin", noRemote: Boolean(args["no-remote"]), maxEvents: args["max-events"] ? Number(args["max-events"]) : undefined, maxDays: args["max-days"] ? Number(args["max-days"]) : undefined };
@@ -348,7 +364,19 @@ export function runBoardSync(argv, repoRoot = process.cwd(), out = (line) => pro
     out(formatPlan(plan));
     if (plan.errors.length) return 2;
     if (command === "apply" && plan.outputs) {
+      // Preflight: write, run the CI owner-export checks on the result, and restore every file if they fail.
+      const snapshot = Object.keys(plan.outputs).map((rel) => { const file = path.join(repoRoot, rel); return [file, fs.existsSync(file) ? fs.readFileSync(file) : null]; });
       applyPlan(repoRoot, plan);
+      const pre = (deps.ownerExportPreflight ?? runOwnerExportPreflight)(repoRoot);
+      if (pre.failures.length) {
+        for (const [file, content] of snapshot) { if (content === null) fs.rmSync(file, { force: true }); else fs.writeFileSync(file, content); }
+        out(`board-sync: REFUSED, the owner export check (the one CI runs) fails on the folded result; every file restored, nothing left written`);
+        for (const f of pre.failures) { out(`  - ${f.label}:`); for (const line of f.output.split("\n").slice(0, 25)) out(`      ${line}`); }
+        out("Fix the event text with a corrective event (wording), then run apply again.");
+        return 2;
+      }
+      if (pre.skipped) out("board-sync: owner export preflight skipped (tests/project-board-owner-export.test.mjs not present here)");
+      else out("board-sync: owner export preflight passed (same checks as CI)");
       out(`board-sync: wrote ${Object.keys(plan.outputs).join(", ")}`);
       out("Next: commit those files in one pull request, wait for the Owner export check, merge, then run `web --web <FawxzzyWeb worktree> --write` and the Web checks.");
     } else if (command === "plan") out("(dry run: nothing written; run apply to write)");
