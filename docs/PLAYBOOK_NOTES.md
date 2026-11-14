@@ -131,3 +131,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: Mazer had playbook.config.json and `verify:local` but no pinned runtime and no CI gate, so `playbook verify` was not reproducible.
 - Rule: Playbook runtime is acquired only via the pinned release URL + digest; bump both together. No deploy surface touched (vercel.json unchanged).
 - Status: Applied
+
+## 2026-11-14 - MAZER-FLOW-016 resume the same maze after quit or reload
+- WHAT changed: `src/legacy-runtime/legacyAttemptSeed.ts` saves the play-attempt maze seed (keyed on level, completed cycles and board aspect, scoped per account) when a play maze is built; `MenuScene.ts` reads it in `createFreshLegacyPlayGenerationSeed`, writes it in `rebuildMaze`, and clears it on completion and on reset progress.
+- WHY it changed: quitting or reloading mid-level re-rolled the maze, so quitting was a free re-roll (owner decision 2026-11-14).
+- Status: Applied
