@@ -1,4 +1,9 @@
 import { cyberArcadeMaterial } from '../render/cyberArcadeMaterial';
+import {
+  LEGACY_IRIDESCENT_BLACK,
+  LEGACY_IRIDESCENT_MIDNIGHT_STOPS_VALUE,
+  LEGACY_IRIDESCENT_PATH_FALLBACK_PINK
+} from '../render/trailPalette';
 
 export const LEGACY_IRIDESCENT_PATH_CORE_CONTRAST_COLOR = cyberArcadeMaterial.path.core;
 /**
@@ -17,14 +22,7 @@ export const LEGACY_TRAIL_SHINE_EDGE_COLOR = cyberArcadeMaterial.shine.edge;
 // saturated/brighter version of each stop (was capped near 0x8c per
 // channel; now reaches ~0xe0) after players asked for the player's own
 // rainbow shift to be more vibrant and easier to notice against the board.
-export const LEGACY_IRIDESCENT_MIDNIGHT_STOPS = [
-  0x8b2fe0,
-  0x4a2fe0,
-  0x2f7fe0,
-  0x2fe0c0,
-  0x2fe06a,
-  0xe02f9c
-] as const;
+export const LEGACY_IRIDESCENT_MIDNIGHT_STOPS = LEGACY_IRIDESCENT_MIDNIGHT_STOPS_VALUE;
 
 export const LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS = 6400;
 
@@ -87,7 +85,7 @@ export const resolveLegacyPathSafeIridescentColor = (
     return fallback;
   }
 
-  return 0xff61c7;
+  return LEGACY_IRIDESCENT_PATH_FALLBACK_PINK;
 };
 
 export const resolveLegacyIridescentMidnightColor = (
@@ -157,4 +155,4 @@ export const resolveLegacyIridescentPlayerCoreColor = (
 export const resolveLegacyIridescentPlayerAccentColor = (
   _timeMs: number,
   anchorColor: number = LEGACY_IRIDESCENT_GREEN_ANCHOR
-): number => mixLegacyIridescentColor(anchorColor, 0x000000, 0.25);
+): number => mixLegacyIridescentColor(anchorColor, LEGACY_IRIDESCENT_BLACK, 0.25);
