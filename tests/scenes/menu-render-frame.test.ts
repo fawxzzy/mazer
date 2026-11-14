@@ -1090,8 +1090,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.hasLegacyBleedOffGlowPendingFrame() && this.isLegacyColourRedrawDue(time)');
     expect(menuSceneSource).toContain('this.resolveLegacyPlayPerfectPathTrail()');
     expect(menuSceneSource).not.toContain('private resolveLegacyPointPathSource(');
-    expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start', time);");
-    expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal', time);");
+    expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha * markerRevealAlpha, 'start', time);");
+    expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha * markerRevealAlpha, 'goal', time);");
     expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;');
@@ -1127,8 +1127,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(renderedPlayerPoint');
     // The cast appears when the beams land (the maze is still growing out of
     // the spawn tile), not at the end of the build.
-    expect(menuSceneSource).toContain('const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== \'building\'');
-    expect(menuSceneSource).toContain('(this.resolveLegacyIntroState(time)?.laserProgress ?? 0) >= 1');
+    // MAZER-VIS-040: they now fade in over that beam flight (mazeRevealTimeline.ts) instead of snapping in at its end.
+    expect(menuSceneSource).toContain('const markerRevealAlpha = resolveMazeMarkerAlpha(this.resolveLegacyMazeRevealClock(time));');
+    expect(menuSceneSource).toContain('const markersBuiltIn = markerRevealAlpha > 0;');
     // both surfaces call the one marker with the same arguments (no mode flag, no per-surface alpha)
     expect(menuSceneSource.split('this.fillLegacyPlayerMarkerTile(renderedPlayerPoint, mazeLeft, mazeTop, mazeTileSize, playerAlpha, time);').length - 1).toBe(2);
     expect(menuSceneSource).toContain('this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, this.resolveLegacyPlayerVisualMoveDurationMs());');
