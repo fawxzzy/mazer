@@ -147,7 +147,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'guide-local'
     },
     id: 'move',
-    text: 'Touch and hold anywhere, then drag the way you want to go. Let go to stop.'
+    text: 'Touch and drag anywhere to move. With a mouse, click and drag. Let go to stop.'
   },
   {
     heading: 'Your trail',

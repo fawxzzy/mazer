@@ -179,7 +179,7 @@ describe('guide copy only names things that exist', () => {
   });
 
   test('Move: touch uses the floating stick that spawns where the thumb lands, and there is no control-style toggle to contradict it', () => {
-    expect(row('move').text).toMatch(/Touch and hold anywhere/);
+    expect(row('move').text).toMatch(/Touch and drag anywhere to move\. With a mouse, click and drag/);
     expect(MENU_SCENE).toMatch(/playFloatingStickOrigin/);
     expect(MENU_SCENE).toMatch(/private handleLegacyPlayTouchControl\(/);
     expect(MENU_SCENE).toMatch(/private drawLegacyPlayTouchStick\(/);

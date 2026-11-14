@@ -205,8 +205,19 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: Added `src/render/typeScale.ts` (roles, sizes, weights, 12 px body floor), `docs/ui/MAZER-TYPE-SCALE.md`, self-hosted Oxanium (`public/fonts/oxanium/`, OFL) with a lazy `@font-face` and precache entry, and `tests/render/type-scale-ratchet.test.ts`.
 - WHY it changed: 7 font stacks and 11 sizes drift across surfaces; the ratchet stops new off-scale sizes/stacks while surfaces migrate one PR each.
 - Rule: Land the scale and a shrink-only allowlist ratchet before migrating surfaces. No surface changed in this PR.
+
+## 2026-11-14 - MAZER-UI-015 button kit and explicit front-door hit zone
+- WHAT changed: Added `src/legacy-runtime/legacyButtonKit.ts` (primary, secondary, ghost, danger, icon variants with a 44 px minimum, a toggle-row spec and a per-button variant map) and `src/legacy-runtime/legacyFrontDoorHitZone.ts`. The front-door Start/Login wordmark now uses an explicit generous hit zone instead of the full screen (`MenuScene.createButton` option `fullScreenHitArea` became `explicitHitZone`).
+- WHY it changed: a tap anywhere on the front door started a run or opened Login; only the wordmark and its margin should.
+- Rule: tap tests inside and outside the zone live in `tests/legacy-runtime/legacy-front-door-hit-zone.test.ts`. Button chrome is not yet drawn from the kit (`chromeViaKit` is false for all); surfaces migrate one per PR.
 - Status: Applied (review)
 ## 2026-11-14 - MAZER-UI-033 online counter is a copy of the website counter
 - WHAT changed: the menu online counter now reads dot, number, "online" (e.g. `7 online`) in muted 13px text with an 8px pulsing dot, like the website header; idle = dim dot alone; count text is the website format (`1.2k`, `12k`), no uppercase K. New `src/render/presenceCounterView.ts`; layout in `legacyPresenceCounterLayout.ts`; small MenuScene edit (draw call + one field); Guide Online row copy updated.
 - WHY it changed: the chip-glyph counter was far larger than the old username text, lacked the label on phones and did not match the website.
+
+
+## 2026-11-14 - Touch-first level 1 control hint that follows the input actually used
+- WHAT changed: `legacyControlHint.ts` now holds a pure resolver (`resolveLegacyControlHintInput`): touch is the default, a computer-looking device (fine pointer plus hover, not mobile, not standalone) starts with a neutral line, and the last real input (pointerType on pointerdown, trusted keydown) switches the visible copy between touch, mouse and keys wording (instant text swap, only while visible, never re-shows after the ack). Copy is two short lines (how to move, then the goal). The Guide Move row and the accessibility description were reworded touch-first with the keyboard as a secondary mention.
+- WHY it changed: the game is played on touch screens, and computers can drag too; the old copy was picked by a single coarse-pointer check and said arrow keys on devices that misreported.
+- Rule: copy is chosen from observed input, not a device guess; the device guess only seeds the first frame.
 - Status: Applied
