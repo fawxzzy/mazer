@@ -222,7 +222,6 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: the menu online counter now reads dot, number, "online" (e.g. `7 online`) in muted 13px text with an 8px pulsing dot, like the website header; idle = dim dot alone; count text is the website format (`1.2k`, `12k`), no uppercase K. New `src/render/presenceCounterView.ts`; layout in `legacyPresenceCounterLayout.ts`; small MenuScene edit (draw call + one field); Guide Online row copy updated.
 - WHY it changed: the chip-glyph counter was far larger than the old username text, lacked the label on phones and did not match the website.
 
-
 ## 2026-11-14 - Touch-first level 1 control hint that follows the input actually used
 - WHAT changed: `legacyControlHint.ts` now holds a pure resolver (`resolveLegacyControlHintInput`): touch is the default, a computer-looking device (fine pointer plus hover, not mobile, not standalone) starts with a neutral line, and the last real input (pointerType on pointerdown, trusted keydown) switches the visible copy between touch, mouse and keys wording (instant text swap, only while visible, never re-shows after the ack). Copy is two short lines (how to move, then the goal). The Guide Move row and the accessibility description were reworded touch-first with the keyboard as a secondary mention.
 - WHY it changed: the game is played on touch screens, and computers can drag too; the old copy was picked by a single coarse-pointer check and said arrow keys on devices that misreported.
@@ -241,6 +240,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: new `src/boot/serviceWorkerCacheWarning.ts` carries one friendly warning (existing `service-worker-error` boot copy) from the page to the message toast; `main.ts` raises it on a failed service-worker install or an online registration error; `MenuScene.ts` subscribes with one line; inventory doc row and test pin it.
 - WHY it changed: an offline-cache update failure was invisible. The Workbox worker cannot post a custom message, so the page watches the registration. Sync failures stay silent and boot errors stay on the splash; offline registration errors are expected and stay silent.
 - Evidence: `tests/reset/ui-030-sw-cache-warning.test.ts`, `tests/reset/legacy-player-message-inventory.test.ts`, headless phone emulation (390x844, 360x740).
+
+## 2026-11-14 - MAZER-UI-028 per-wave proof surfaces
+- WHAT changed: new `docs/contracts/mazer-ui-rework-wave-proof-surfaces.v1.json` lists the surfaces each integrator-owned UI wave changes and where its capture lives; `tests/architecture/ui-wave-proof-surfaces-contract.test.ts` fails a wave marked done (registry completed or proof.done) without a committed capture (image + metadata.json) unless it is on a shrink-only waiver list (3A only).
+- WHY it changed: waves were being called done with no committed visual proof. Docs and test only; no runtime change.
+- Evidence: the new test and `decision-registry-contract.test.ts`. Known gaps: Wave 0C claims `capture-auth-capability-surfaces.mjs`, which is not on main; no wave capture is committed yet.
 - Status: Applied
 
 ## 2026-11-14 - Off-theme colour ratchet baseline refresh
@@ -262,3 +266,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Status: Applied (review); source proof only, nothing visual changes until part 2.
 
 - Board fold ordering (2026-11-14): scripts/board/board-events.mjs now applies a card's `new` event before its other events whatever the ts, and allows `new` with status completed when completedProblems passes. WHY: valid pending events were refused as tooling gaps (status sorted before new; no-runtime card created completed). Rule: events stay append-only, fix ordering in the fold. Status: Applied (review), source proof only.
+
+## 2026-11-14 - MAZER-VIS-011 (part 2 of 2) one outline HUD icon atlas replaces three bitmaps
+- WHAT changed: `public/assets/hud/hud-icons.webp` (5,612 B, eight outline glyphs) replaces the three 1254 px HUD WebPs (1,019,276 B); `scripts/assets/build-hud-icon-atlas.mjs` generates it and replaces `build-hud-icon-webp.mjs`. `BootScene` preloads the atlas and bakes the three existing texture keys as 128x128 canvases (white glyph recoloured to `semantic.info` with `source-in`, the same pattern the tile font uses). Boot payload budgets, preload list and service-worker/offline-shell examples follow. `tests/architecture/hud-icon-atlas.test.ts` pins layout parity, bounds, byte budget and shipped-equals-rendered.
+- WHY it changed: the three bitmaps were three illustration styles at about 6.3 MB decoded each; the card asks for one family with close, check, info, share and install glyphs. Part 1 (MenuScene crop, PR 564) must be on main first: this part assumes `MenuScene` crops 128 px textures to the shared glyph box.
+- Rule: a generated asset ships with a test that re-renders it and compares decoded pixels, so a hand-edited or stale binary fails CI.
+- Status: Applied (review); headless Chromium 390x844 and WebKit iPhone 15 Pro and SE screenshots only, no safe-area insets, nothing checked on a real phone. Visible change: header icons are now cyan outline glyphs instead of teal illustrations.
+

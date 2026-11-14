@@ -292,7 +292,7 @@ export function foldEvents({ registry: registryIn, ledger: ledgerIn, events, app
     let card = byId.get(event.card);
     const creating = event.new !== undefined;
     if (creating) {
-      if (card) problems.push("new card id already exists in the registry");
+      if (card) { warnings.push(`${where(item)} ${event.card}: duplicate new for ${event.card} ignored; recreate under a fresh id`); skipped.push({ id: event.id, card: event.card, reason: "duplicate new ignored" }); continue; }
       for (const dep of event.new.dependencies ?? []) if (!byId.has(dep)) problems.push(`dependency ${dep} is not a registry card`);
     } else if (!card) problems.push("card is not in the registry (create it with a `new` block)");
     if (problems.length) { errors.push(...problems.map((p) => `${where(item)} ${event.card}: ${p}`)); continue; }

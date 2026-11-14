@@ -221,14 +221,14 @@ describe('service worker controller reload', () => {
   test('selects only the same-origin boot art the page already loaded', () => {
     const origin = 'https://mazer.fawxzzy.com';
     expect(selectMazerBootArtUrls([
-      `${origin}/assets/hud/hud-profile.webp`,
-      `${origin}/assets/hud/hud-profile.webp`,
+      `${origin}/assets/hud/hud-icons.webp`,
+      `${origin}/assets/hud/hud-icons.webp`,
       `${origin}/fonts/mazer-tile-font/mazer-font-atlas.json`,
       `${origin}/assets/main-abc.js`,
       'https://example.com/assets/hud/other.webp',
       'not a url'
     ], origin)).toEqual([
-      `${origin}/assets/hud/hud-profile.webp`,
+      `${origin}/assets/hud/hud-icons.webp`,
       `${origin}/fonts/mazer-tile-font/mazer-font-atlas.json`
     ]);
   });
