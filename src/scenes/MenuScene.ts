@@ -172,6 +172,7 @@ import {
 } from '../domain/ai';
 import type { MazeEpisode } from '../domain/maze';
 import { markMazerBootStatus } from '../boot/bootStatus';
+import { subscribeServiceWorkerCacheWarning } from '../boot/serviceWorkerCacheWarning';
 import {
   WorldTurnHost,
   type WorldTurnHostState,
@@ -2564,6 +2565,8 @@ export class MenuScene extends Phaser.Scene {
         this.uiDirty = true;
       });
       this.installLegacyOfflineCompletionFlush();
+      // MAZER-UI-030: the offline cache warning is the only service worker message that becomes a toast.
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, subscribeServiceWorkerCacheWarning((message) => this.pushLegacyPlayerMessage(message)));
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.uiTransitionGhost?.release();
