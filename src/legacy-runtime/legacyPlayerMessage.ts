@@ -51,13 +51,7 @@ export const LEGACY_PLAYER_MESSAGE_COLORS: Record<LegacyPlayerMessageTone, strin
   warning: '#ffcf91'
 };
 
-// Stable server/client sentinels for the Before User Created username gate.
-// Player copy is resolved below; raw provider text remains technical detail.
-export const LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL = 'MAZER_SIGNUP_USERNAME_INVALID';
-export const LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL = 'MAZER_SIGNUP_USERNAME_TAKEN';
-
 export const LEGACY_AUTH_MESSAGE_COPY = {
-  accountRecovery: 'Account setup could not be completed. Try signing in or use Forgot Password.',
   accountUnavailable: 'Account service is unavailable right now. Try again shortly.',
   authUnavailable: 'Account access is unavailable right now. Try again shortly.',
   emailInvalid: 'Enter a valid email address.',
@@ -70,7 +64,6 @@ export const LEGACY_AUTH_MESSAGE_COPY = {
   passwordPolicy: 'Choose a different, stronger password that meets the account security requirements.',
   passwordRecoveryInvalid: 'This reset link is invalid or has expired. Request a new link.',
   passwordRecoveryUpdated: 'Password updated. You can continue to Mazer.',
-  passwordResetEmailRequired: 'Enter an email before reset.',
   passwordResetNotConfigured: 'Password reset is unavailable right now. Try again shortly.',
   passwordResetSent: 'Password reset email sent.',
   usernameInvalid: 'Use 2-15 letters, numbers, periods, underscores, or hyphens.',
@@ -343,23 +336,17 @@ export const resolveLegacyAuthFeedbackMessage = (
       || normalizedError.includes('password must contain');
     const copy = isNetworkError
       ? LEGACY_AUTH_MESSAGE_COPY.networkUnavailable
-      : normalizedError.includes(LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL.toLowerCase())
-        ? LEGACY_AUTH_MESSAGE_COPY.usernameInvalid
-        : normalizedError.includes(LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL.toLowerCase())
-          ? LEGACY_AUTH_MESSAGE_COPY.usernameTaken
-          : isInvalidEmail
-            ? LEGACY_AUTH_MESSAGE_COPY.emailInvalid
-            : isPasswordPolicyError
-              ? LEGACY_AUTH_MESSAGE_COPY.passwordPolicy
-              : normalizedError.includes('invalid login credentials') || normalizedError.includes('invalid credentials')
-                ? 'That email and password do not match. Check them or use Forgot Password.'
-                : normalizedError.includes('email not confirmed')
-                  ? 'Confirm your email, then sign in again.'
-                  : normalizedError.includes('rate limit')
-                    ? 'Too many attempts. Wait a moment, then try again.'
-                    : normalizedError.includes('already registered')
-                      ? LEGACY_AUTH_MESSAGE_COPY.accountRecovery
-                      : LEGACY_AUTH_MESSAGE_COPY.accountUnavailable;
+      : isInvalidEmail
+        ? LEGACY_AUTH_MESSAGE_COPY.emailInvalid
+        : isPasswordPolicyError
+          ? LEGACY_AUTH_MESSAGE_COPY.passwordPolicy
+          : normalizedError.includes('invalid login credentials') || normalizedError.includes('invalid credentials')
+            ? 'That email and password do not match. Check them or use Forgot Password.'
+            : normalizedError.includes('email not confirmed')
+              ? 'Confirm your email, then sign in again.'
+              : normalizedError.includes('rate limit')
+                ? 'Too many attempts. Wait a moment, then try again.'
+                : LEGACY_AUTH_MESSAGE_COPY.accountUnavailable;
     const bootCodeDetail = typeof errorCode === 'string' && LEGACY_AUTH_BOOT_FAILURE_CODES.has(errorCode)
       ? resolveLegacyOAuthFailureTechnicalDetail(errorCode)
       : null;
