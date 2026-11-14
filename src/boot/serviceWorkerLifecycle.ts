@@ -17,6 +17,17 @@ export interface MazerServiceWorkerControllerReloadRuntime {
    * loaded it before the worker existed, so without this the offline cache would stay empty until a second launch.
    */
   warmBootArt?: () => void;
+  /**
+   * MAZER-PWA-006 deferred update. When present, an UPDATE (not the first install) does not reload a visible or
+   * mid-run page: it waits until the page is hidden AND `isSafeToReload()` (no run in progress), because in-memory run
+   * state is not restored after a reload. A page that never becomes safe keeps its session; the next launch loads
+   * the new build from the already-updated precache. Absent: reload at once (the pre-PWA-006 behaviour).
+   */
+  deferReload?: {
+    isHidden: () => boolean;
+    isSafeToReload: () => boolean;
+    addHiddenListener: (listener: () => void) => void;
+  };
 }
 
 /** Same-origin paths the worker's boot-art runtime cache covers; keep in step with vite.config.ts (a test pins it). */
@@ -60,17 +71,32 @@ export const installMazerServiceWorkerControllerReload = (
   // controlled.
   let claimedByFirstInstall = !runtime.controlledAtBoot;
   let reloaded = false;
+  let updatePending = false;
   runtime.addControllerChangeListener(() => {
     if (claimedByFirstInstall) {
       claimedByFirstInstall = false;
       runtime.warmBootArt?.();
       return;
     }
-    if (reloaded) {
+    if (reloaded || updatePending) {
       return;
     }
-    reloaded = true;
-    runtime.reload();
+    const defer = runtime.deferReload;
+    if (!defer) {
+      reloaded = true;
+      runtime.reload();
+      return;
+    }
+    updatePending = true;
+    const tryReload = (): void => {
+      if (reloaded || !defer.isHidden() || !defer.isSafeToReload()) {
+        return;
+      }
+      reloaded = true;
+      runtime.reload();
+    };
+    defer.addHiddenListener(tryReload);
+    tryReload();
   });
   return runtime.controlledAtBoot;
 };
