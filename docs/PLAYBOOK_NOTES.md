@@ -142,4 +142,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 ## 2026-11-14 - MAZER-FLOW-016 resume the same maze after quit or reload
 - WHAT changed: `src/legacy-runtime/legacyAttemptSeed.ts` saves the play-attempt maze seed (keyed on level, completed cycles and board aspect, scoped per account) when a play maze is built; `MenuScene.ts` reads it in `createFreshLegacyPlayGenerationSeed`, writes it in `rebuildMaze`, and clears it on completion and on reset progress.
 - WHY it changed: quitting or reloading mid-level re-rolled the maze, so quitting was a free re-roll (owner decision 2026-11-14).
+
+## 2026-11-14 MAZER-VIS-042: loader hardening (mirrors the Fitness loader)
+
+- WHAT changed: `src/boot/bootSplash.ts` holds the splash stage hidden when the exit starts before the 150 ms show delay (no icon ghost) and removes a splash the CSS failsafe already hid instead of fading it; `index.html` gains the 8000 ms CSS boot failsafe; `src/render/appLoaderOverlay.ts` settles hidden on a frame error, on scene shutdown/destroy and after the 15000 ms wait ceiling; `src/render/appLoader.ts` pins `LOADER_BOOT_FAILSAFE_MS` and `LOADER_WAIT_CEILING_MS`. Tests: `tests/reset/loader-hardening.test.ts`.
+- WHY it changed: The Fitness rebuild found three bugs (icon ghost on a sub-150 ms load, failsafe-hidden cover flashing back, an error or early unmount leaving an opaque cover); Mazer shares the loader and needed the same guarantees.
+- Rule: A cover can only be opaque while something is provably waiting; every exit path (error, unmount, ceiling, failsafe) settles it hidden.
 - Status: Applied
