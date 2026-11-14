@@ -121,12 +121,7 @@ describe('boot sign-in failure codes', () => {
     })).readSnapshot();
     expect(quarantined.errorCode).not.toBe(readFailed.errorCode);
     expect(quarantined.error).toBe(readFailed.error);
-    // MAZER-ACCT-044 transition: the snapshot constant may still carry the previous generic spelling
-    // until the Wave 5C PR lands; both spellings render as the generic row.
-    expect([
-      LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic,
-      'Account connection unavailable. Return to Mazer and try again.'
-    ]).toContain(quarantined.error);
+    expect(quarantined.error).toBe(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic);
   });
 
   test('a callback failure from the same boot keeps its own copy and code over the generic ones', async () => {

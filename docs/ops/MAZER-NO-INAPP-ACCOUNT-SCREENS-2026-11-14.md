@@ -66,9 +66,7 @@ Loop guard and explicit-sign-out semantics are unchanged: `legacySignedOutHandof
 redirect by itself, and still stays on this state after an explicit sign-out or a return inside the attempt window.
 `?autoSignIn=0` still opts a boot out of the automatic hand-off (QA of this state).
 
-Known wording issue (not changed here): the generic connection line (`MAZER_OAUTH_SAFE_ERROR_MESSAGE`) says "Return to
-Mazer and try again", which reads oddly inside Mazer. It is pinned by tests and shared with the host return path, so
-it is a copy decision for the owner.
+Wording issue (fixed by MAZER-ACCT-044): the generic connection line (`MAZER_OAUTH_SAFE_ERROR_MESSAGE`) used to say "Return to Mazer and try again", which read oddly inside Mazer. It now reads "Could not reach your account. Try again." (the constant and `LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic`; the two edits shipped as a Wave 3B and a Wave 5C PR).
 
 ## Evidence
 
