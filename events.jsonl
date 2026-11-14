@@ -159,3 +159,4 @@
 {"card":"MAZER-MOTION-008","id":"95530b72035b","status":"planning","text":"Owner phone pass, tracked in the single phone checklist; nothing to build.","ts":"2026-11-14T16:49:40Z","v":1}
 {"card":"MAZER-QA-001","id":"e430f834bd21","status":"planning","text":"Owner phone pass, tracked in the single phone checklist; nothing to build.","ts":"2026-11-14T16:49:44Z","v":1}
 {"card":"MAZER-VIS-018","id":"fc6b0796ec84","status":"planning","text":"Owner phone pass, tracked in the single phone checklist; nothing to build.","ts":"2026-11-14T16:49:49Z","v":1}
+{"card":"MAZER-DATA-002","id":"6e9ab41512da","status":"deferred_candidate","text":"Parked: later, until a server cap change is wanted (phase 2).","ts":"2026-11-14T21:40:00Z","v":1}
