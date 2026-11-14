@@ -1,8 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import sharp from 'sharp';
 import { describe, expect, test } from 'vitest';
-import { HUD_ICON_SOURCES } from '../../scripts/assets/build-hud-icon-webp.mjs';
+import { HUD_ICON_ATLAS_PUBLIC_URL } from '../../src/render/hudIconAtlas';
 
 // Boot payload budget (2026-11-06 PNG diet). Mazer is a PWA played on phones: everything BootScene
 // preloads is on the first-load critical path, and everything the build copies out of public/ lands
@@ -18,11 +17,12 @@ const sizeOf = (path: string): number => statSync(resolve(root, path)).size;
 const bootSource = read('src/scenes/BootScene.ts');
 const menuSource = read('src/scenes/MenuScene.ts');
 
-// Measured 2026-11-06 after the diet: 1,050,310 B across the 5 preloaded files. ~5% headroom.
-const BOOT_PRELOAD_BUDGET_BYTES = 1_100_000;
-const BOOT_PRELOAD_SINGLE_FILE_BUDGET_BYTES = 560_000;
-// public/assets is exactly the boot preload set (see the "no unreferenced weight" test).
-const PUBLIC_ASSETS_BUDGET_BYTES = 1_100_000;
+// Measured 2026-11-06 after the diet: 1,050,310 B across 5 preloaded files. Measured 2026-11-14 after MAZER-VIS-011 (the three
+// 1254 px HUD bitmaps became one 5.8 KB outline-icon atlas): 36,700 B across 3 preloaded files. ~60% headroom.
+const BOOT_PRELOAD_BUDGET_BYTES = 60_000;
+const BOOT_PRELOAD_SINGLE_FILE_BUDGET_BYTES = 40_000;
+// public/assets is exactly the boot preload set (see the "no unreferenced weight" test): now the one HUD icon atlas.
+const PUBLIC_ASSETS_BUDGET_BYTES = 100_000;
 // Measured 2026-11-13 after MAZER-VIS-039 (the site's pixel-art Mazer image became the one app icon): 1,740,528 B (was 2,257,957 B on
 // 2026-11-11, 2,681,017 B on 2026-11-06) of icons/favicons/font listed in vite.config.ts includeAssets (precached, not on the boot
 // network path). Regenerate with scripts/brand/generate-mazer-icons.mjs; the budget follows the measurement down.
@@ -46,7 +46,8 @@ const resolveBootPreloads = (): BootPreload[] => {
   for (const match of bootSource.matchAll(/this\.load\.(\w+)\(\s*[A-Z_]+\s*,\s*(`[^`]*`|[A-Z_]+|'[^']*')\s*\)/g)) {
     let url = match[2];
     if (url.startsWith('`')) {
-      url = url.slice(1, -1).replace('${MAZER_VFX_ASSET_CACHE_BUST}', BOOT_CACHE_BUST);
+      url = url.slice(1, -1).replace('${MAZER_VFX_ASSET_CACHE_BUST}', BOOT_CACHE_BUST)
+      .replace('${HUD_ICON_ATLAS_PUBLIC_URL}', HUD_ICON_ATLAS_PUBLIC_URL);
     } else if (url.startsWith("'")) {
       url = url.slice(1, -1);
     } else {
@@ -65,12 +66,10 @@ const walk = (dir: string): string[] => readdirSync(resolve(root, dir), { withFi
 describe('boot preload list', () => {
   const preloads = resolveBootPreloads();
 
-  test('is the tile-font atlas (+ JSON) and the three HUD icons, and nothing unresolved', () => {
+  test('is the tile-font atlas (+ JSON) and the one HUD icon atlas, and nothing unresolved', () => {
     expect(preloads.some((entry) => entry.url.startsWith('UNRESOLVED'))).toBe(false);
     expect(preloads.map((entry) => entry.publicPath).sort()).toEqual([
-      'public/assets/hud/hud-leaderboard.webp',
-      'public/assets/hud/hud-profile.webp',
-      'public/assets/hud/hud-settings.webp',
+      'public/assets/hud/hud-icons.webp',
       'public/fonts/mazer-tile-font/mazer-font-atlas-mask.png',
       'public/fonts/mazer-tile-font/mazer-font-atlas.json'
     ]);
@@ -113,13 +112,16 @@ describe('public/assets carries no unreferenced weight', () => {
     expect(total).toBeLessThanOrEqual(PUBLIC_ASSETS_BUDGET_BYTES);
   });
 
-  test('the retired art stays gone (starfield, floor tile, bleed strip, trail, goal-star frames, diamonds, old HUD PNGs)', () => {
+  test('the retired art stays gone (starfield, floor tile, bleed strip, trail, goal-star frames, diamonds, old HUD PNGs and their 1254 px WebP derivatives)', () => {
     for (const retired of [
       'public/assets/vfx',
       'public/assets/tiles',
       'public/assets/hud/hud-profile.png',
       'public/assets/hud/hud-leaderboard.png',
-      'public/assets/hud/hud-settings.png'
+      'public/assets/hud/hud-settings.png',
+      'public/assets/hud/hud-profile.webp',
+      'public/assets/hud/hud-leaderboard.webp',
+      'public/assets/hud/hud-settings.webp'
     ]) {
       expect(existsSync(resolve(root, retired)), retired).toBe(false);
     }
@@ -191,50 +193,5 @@ describe('BootScene preloads only what the first frame draws', () => {
 
   test('draws the board through the baked tile layer instead', () => {
     expect(menuSource).toContain('new BoardTileLayer(this, this.boardTileLayerTextureKey)');
-  });
-});
-
-describe('HUD icon WebP derivatives are render-identical to the original art', () => {
-  const metricsConstants: Record<string, string> = {
-    'hud-profile': 'MAZER_HUD_PROFILE_ICON_METRICS',
-    'hud-leaderboard': 'MAZER_HUD_LEADERBOARD_ICON_METRICS',
-    'hud-settings': 'MAZER_HUD_SETTINGS_ICON_METRICS'
-  };
-
-  test.each(Object.entries(HUD_ICON_SOURCES))('%s: 1254x1254, transparent outside the crop, visible bounds equal the crop', async (name, { crop }) => {
-    const { data, info } = await sharp(resolve(root, `public/assets/hud/${name}.webp`)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    expect({ width: info.width, height: info.height }).toEqual({ width: 1254, height: 1254 });
-    let minX = info.width;
-    let minY = info.height;
-    let maxX = -1;
-    let maxY = -1;
-    let nonTransparentOutsideCrop = 0;
-    for (let y = 0; y < info.height; y += 1) {
-      for (let x = 0; x < info.width; x += 1) {
-        const alpha = data[(y * info.width + x) * 4 + 3];
-        const inside = x >= crop.x && x < crop.x + crop.width && y >= crop.y && y < crop.y + crop.height;
-        if (!inside && alpha !== 0) {
-          nonTransparentOutsideCrop += 1;
-        }
-        if (alpha > 1) {
-          minX = Math.min(minX, x);
-          minY = Math.min(minY, y);
-          maxX = Math.max(maxX, x);
-          maxY = Math.max(maxY, y);
-        }
-      }
-    }
-    expect(nonTransparentOutsideCrop).toBe(0);
-    expect({ x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 }).toEqual(crop);
-  });
-
-  test.each(Object.entries(metricsConstants))('%s crop constants in MenuScene match the shipped asset (when MenuScene still crops it)', (name, constant) => {
-    const match = new RegExp(`${constant}[^=]*=\\s*\\{([^}]*)\\}`).exec(menuSource);
-    if (!match) {
-      return; // MenuScene no longer crops this icon: nothing to keep in sync.
-    }
-    const field = (key: string): number => Number(new RegExp(`${key}:\\s*(\\d+)`).exec(match[1])?.[1]);
-    const crop = HUD_ICON_SOURCES[name as keyof typeof HUD_ICON_SOURCES].crop;
-    expect({ x: field('bboxX'), y: field('bboxY'), width: field('bboxWidth'), height: field('bboxHeight') }).toEqual(crop);
   });
 });

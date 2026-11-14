@@ -131,6 +131,21 @@ close variants of art already covered by `edge-diamond-iridescent.png` /
   visually inspecting the asset's proportions, not pixel-measured -- may
   need a calibration pass once verified against a live screenshot.
 
+## HUD icon atlas (2026-11-14, MAZER-VIS-011): supersedes the three bitmaps below
+
+`public/assets/hud/hud-icons.webp` replaces `hud-profile.webp`, `hud-leaderboard.webp` and
+`hud-settings.webp` (1,019,276 B, three illustration styles, 1254x1254 each). It is generated, not
+drawn: `node scripts/assets/build-hud-icon-atlas.mjs` renders eight outline glyphs (profile,
+leaderboard, settings, close, check, info, share, install) as white 8 px round-cap strokes in
+128 px cells (4 columns, 512x256) inside a shared 96 px glyph box, lossless WebP, 5,612 B.
+No third-party artwork is involved, so there is no source bundle or SHA-256 table for it.
+`BootScene` loads the atlas and bakes the three legacy texture keys as 128x128 canvases tinted
+`semantic.info` (#6BE8E1), so `MenuScene` still asks for the same keys and crops them to the
+shared glyph box (`src/render/hudIconAtlas.ts`). Decoded textures drop from about 6.3 MB each to
+64 KB each. `tests/architecture/hud-icon-atlas.test.ts` pins the layout, the byte budget and
+that the shipped file equals a fresh render. The section below is kept as history of the
+retired bitmaps; its regenerate command no longer exists.
+
 ## Third asset batch (2026-08-29): HUD icons
 
 User-supplied `mazer-hud-icons-source-bundle.zip`, with its own
