@@ -125,3 +125,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: Edge-flush maths must use the painted extent (stroke join included) and the painted canvas size (backing store rounding, resolution cap), not the outline vertex and the css size.
 - Evidence: `docs/ui/MAZER-EDGE-OUTER-TIP-CORNERS-2026-11-14.md`.
 - Status: Applied
+
+## 2026-11-14 - Playbook verify runtime bridge and CI job
+- WHAT changed: Added `scripts/playbook-runtime.mjs` (same pinned bridge as fawxzzy-fitness: Playbook CLI v0.54.1 release tarball + SHA-256), `npm run playbook:verify`, `playbook-runtime:install-official-fallback`, `/.playbook/` gitignore, and one `Playbook clean-environment validation` job in `.github/workflows/verify.yml`.
+- WHY it changed: Mazer had playbook.config.json and `verify:local` but no pinned runtime and no CI gate, so `playbook verify` was not reproducible.
+- Rule: Playbook runtime is acquired only via the pinned release URL + digest; bump both together. No deploy surface touched (vercel.json unchanged).
+- Status: Applied
