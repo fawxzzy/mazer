@@ -35,6 +35,10 @@ export const LOADER_MIN_HOLD_MS = 350;
 export const LOADER_FADE_IN_MS = MOTION_DURATION_MS.base;
 export const LOADER_FADE_OUT_MS = MOTION_DURATION_MS.slow;
 /** The ring and icon breathe once per beat, the same period as every other loop (MOTION_LOOP_MS.beat). */
+/** Boot failsafe (index.html, CSS only): if scripts never take over, the opaque boot splash removes itself after this long (300 ms fade). Same value as the Fitness loader. */
+export const LOADER_BOOT_FAILSAFE_MS = 8000;
+/** A wait older than this stops holding the cover (the in-game AppLoaderOverlay treats it as over), so a stalled gate cannot pin the opaque cover. Same value as Fitness. */
+export const LOADER_WAIT_CEILING_MS = 15000;
 export const LOADER_PULSE_PERIOD_MS = MOTION_LOOP_MS.beat;
 
 /** Icon size: 30% of the short side, clamped. The iOS launch image uses the same 30% of the width (portrait). */

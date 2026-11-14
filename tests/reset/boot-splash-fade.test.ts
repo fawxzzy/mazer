@@ -144,7 +144,8 @@ describe('index.html splash loader is on the shared loader timeline (MAZER-VIS-0
 
   test('the fade-in animation is on the stage, never on the root, so the root fade-out is not overridden', () => {
     expect(html).toMatch(/#mazer-boot-splash \{[^}]*background: #02080f/);
-    expect(html.match(/#mazer-boot-splash \{[^}]*\}/)?.[0]).not.toMatch(/animation/);
+    // Only the delayed failsafe (8 s, no backwards fill) may run on the root; the fade-in never does.
+    expect(html.match(/#mazer-boot-splash \{[^}]*\}/)?.[0].replace(/animation: mazer-boot-splash-failsafe[^;]*;/, '')).not.toMatch(/animation/);
     expect(html).toContain(`id="${MAZER_BOOT_SPLASH_STAGE_ID}"`);
     expect(html).toContain(`@keyframes ${MAZER_BOOT_SPLASH_FADE_IN_ANIMATION}`);
   });

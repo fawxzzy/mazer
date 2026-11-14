@@ -1,6 +1,6 @@
 import { designTokens } from '../theme/tokens';
 import { resolveBootSplashFadeMs } from '../render/uiTransition';
-import { resolveBootSplashExitDelayMs } from '../render/appLoader';
+import { LOADER_SHOW_DELAY_MS, resolveBootSplashExitDelayMs } from '../render/appLoader';
 
 /**
  * Static boot splash (the markup lives in index.html, inside #app, so the
@@ -21,14 +21,19 @@ export const MAZER_BOOT_SPLASH_MAX_AFTER_GAME_CREATE_MS = 10_000;
 export const MAZER_BOOT_SPLASH_NEUTRAL_MESSAGE = 'Loading…';
 export const MAZER_BOOT_SPLASH_SIGN_IN_MESSAGE = 'Signing you in…';
 
+/** The root's CSS failsafe animation (index.html): it fades the splash out after LOADER_BOOT_FAILSAFE_MS when scripts never took over. */
+export const MAZER_BOOT_SPLASH_FAILSAFE_ANIMATION = 'mazer-boot-splash-failsafe';
+
 export interface BootSplashStyleLike {
   opacity: string;
+  animation?: string;
   pointerEvents: string;
   transition: string;
 }
 
 export interface BootSplashAnimationLike {
   animationName?: string;
+  playState?: string;
   currentTime: unknown;
 }
 
@@ -101,7 +106,8 @@ const exitingSplashes = new WeakSet<object>();
 
 /** How long the splash's loader animation has been running (including its delay), and whether it was the instant hand-off one. */
 const readSplashShownClock = (documentRef?: BootSplashDocumentLike): { elapsedMs: number | null; instant: boolean } => {
-  const animations = resolveDocument(documentRef)?.getElementById(MAZER_BOOT_SPLASH_STAGE_ID)?.getAnimations?.() ?? [];
+  const animations = (resolveDocument(documentRef)?.getElementById(MAZER_BOOT_SPLASH_STAGE_ID)?.getAnimations?.() ?? [])
+    .filter((animation) => animation.animationName !== MAZER_BOOT_SPLASH_FAILSAFE_ANIMATION);
   const fadeIn = animations.find((animation) => (
     animation.animationName === MAZER_BOOT_SPLASH_FADE_IN_ANIMATION
     || animation.animationName === MAZER_BOOT_SPLASH_INSTANT_ANIMATION
@@ -133,12 +139,29 @@ export const fadeOutMazerBootSplash = (options: FadeOutBootSplashOptions = {}): 
   if (exitingSplashes.has(splash)) {
     return true;
   }
+  // A late start after the CSS failsafe already hid the splash: settle straight to removed. Fading it would transition
+  // from the style's own opacity 1 and flash the cover back opaque before fading it out again.
+  if ((splash.getAnimations?.() ?? []).some((animation) => (
+    animation.animationName === MAZER_BOOT_SPLASH_FAILSAFE_ANIMATION && animation.playState === 'finished'
+  ))) {
+    splash.remove();
+    return true;
+  }
   exitingSplashes.add(splash);
 
   const style = splash.style;
   const schedule = options.schedule ?? ((callback: () => void, delayMs: number) => setTimeout(callback, delayMs));
   const durationMs = resolveBootSplashFadeMs(options.reducedMotion ?? readSystemPrefersReducedMotion());
   const startFade = (): void => {
+    // Fast load: the stage never became visible. Hold it hidden, or its pending CSS fade-in would ghost the icon in
+    // while the cover fades out.
+    if (!stageEverShown) {
+      const stage = resolveDocument(options.documentRef)?.getElementById(MAZER_BOOT_SPLASH_STAGE_ID);
+      if (stage?.style) {
+        stage.style.animation = 'none';
+        stage.style.opacity = '0';
+      }
+    }
     style.pointerEvents = 'none';
     style.transition = `opacity ${durationMs}ms ${designTokens.motion.easing.css.standard}`;
     splash.getBoundingClientRect?.();
@@ -148,6 +171,7 @@ export const fadeOutMazerBootSplash = (options: FadeOutBootSplashOptions = {}): 
 
   const shown = readSplashShownClock(options.documentRef);
   const holdMs = resolveBootSplashExitDelayMs(shown.elapsedMs, shown.instant);
+  const stageEverShown = shown.instant || (shown.elapsedMs !== null && shown.elapsedMs >= LOADER_SHOW_DELAY_MS);
   if (holdMs > 0) {
     schedule(startFade, holdMs);
   } else {
