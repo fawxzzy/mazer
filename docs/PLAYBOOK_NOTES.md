@@ -207,8 +207,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: Land the scale and a shrink-only allowlist ratchet before migrating surfaces. No surface changed in this PR.
 - Status: Applied (review)
 
-## 2026-11-14 - MAZER-VIS-044 corner diamonds anchored in the 4 corners
-- WHAT changed: new `src/render/edgeCornerAnchor.ts` (pure); `edgeMarkers.ts` now pins each corner diamond's outer tip on the corner diagonal, ~16.4 css px from BOTH screen edges (where the diagonal meets a 56 px rounded display corner), at every viewport size; they scale about that tip. Before, they sat ~56 px along the top/bottom edge, drifting inward. Orbit top/bottom travel eases into the corner anchor.
-- WHY it changed: owner request 2026-11-14 ("diamonds in the 4 corners should be kept anchored into the corners, expanded or shrunk").
-- Rule: corner diamonds are exempt from VIS-043 "touch the edge"; their offset is measured by `measureEdgeCornerOffset` (`tests/render/edgeCornerAnchor.test.ts`). MenuScene unchanged. Not checked on a real phone.
+## 2026-11-14 - MAZER-VIS-044 corner diamonds in the 4 corners
+- WHAT changed: new `src/render/edgeCornerAnchor.ts` (pure); `edgeMarkers.ts` now puts each corner diamond's painted outer tip ON the corner of the view (0 css px from BOTH edges) at every viewport size; they scale about that tip. Before, they sat ~56 px along the top/bottom edge (pushed in). Orbit top/bottom travel eases into the corner. `EDGE_MARKER_CORNER_CLEARANCE_PX` removed.
+- WHY it changed: owner requirement 2026-11-14: corner diamonds always in the actual corners, expanded or shrunk. A physically rounded display corner may trim the very tip: accepted.
+- Rule: corner diamonds are exempt from VIS-043 "touch the edge midline"; offset measured by `measureEdgeCornerOffset` (`tests/render/edgeCornerAnchor.test.ts`). MenuScene unchanged. Not checked on a real phone.
 - Status: Applied

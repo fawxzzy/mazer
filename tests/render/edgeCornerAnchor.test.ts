@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { resolveMazerCanvasResolution } from '../../src/boot/canvasResolution';
 import { EDGE_DIAMOND_REST_SCALE } from '../../src/render/edgeBeamTimeline';
 import {
-  EDGE_CORNER_DISPLAY_RADIUS_PX,
   measureEdgeCornerOffset,
   resolveEdgeCornerTipInset
 } from '../../src/render/edgeCornerAnchor';
@@ -15,8 +14,8 @@ import {
 } from '../../src/render/edgeMarkers';
 
 /**
- * MAZER-VIS-044: the four corner diamonds stay anchored snug in their screen corners at every viewport size, expanded or shrunk:
- * the painted outer tip is the same distance (~16.4 css px, the rounded-display-corner arc on the diagonal) from BOTH edges at
+ * MAZER-VIS-044: the four corner diamonds stay anchored in their screen corners at every viewport size, expanded or shrunk:
+ * the painted outer tip is ON the corner (0 css px from BOTH edges) at
  * every size, DPR, and diamond scale; nothing drifts inward along an edge as the view gets bigger or smaller.
  */
 const VIEWPORTS = [
@@ -34,11 +33,8 @@ const CORNERS = ['top-left', 'top-right', 'bottom-right', 'bottom-left'] as cons
 const SCALES = [EDGE_DIAMOND_REST_SCALE, 0.75, 1] as const;
 
 describe('corner diamonds are anchored in the 4 screen corners (MAZER-VIS-044)', () => {
-  test('the tip inset is the point where the corner diagonal meets the display-corner arc, ~16.4 px', () => {
-    expect(resolveEdgeCornerTipInset()).toBeCloseTo(EDGE_CORNER_DISPLAY_RADIUS_PX * (1 - Math.SQRT1_2), 12);
-    expect(resolveEdgeCornerTipInset()).toBeGreaterThan(16);
-    expect(resolveEdgeCornerTipInset()).toBeLessThan(17);
-    expect(resolveEdgeCornerTipInset(0)).toBe(0);
+  test('the tip inset is 0: the outer tip touches the screen corner', () => {
+    expect(resolveEdgeCornerTipInset()).toBe(0);
   });
 
   test.each(VIEWPORTS)('$name: every corner diamond is the same distance from both edges at 50%, 75% and 100% size', (viewport) => {

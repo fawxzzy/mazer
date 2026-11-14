@@ -50,8 +50,8 @@
  * Placement (MAZER-VIS-043): every diamond sits fully inside the canvas with its OUTER tip touching the screen edge: the painted
  * bounding box (outline plus the miter join of a 1 px stroke, `resolveEdgeMarkerPaintedPolygon`) touches the edge exactly and
  * never crosses it. The four edge midpoints point straight in. The four corner diamonds point along the corner diagonal with their outer tip
- * pinned ~16.4 px from BOTH edges (MAZER-VIS-044, edgeCornerAnchor.ts): snug in the corner at every viewport size, clear of a
- * rounded display corner (a tip exactly on the corner point is cut by any rounded corner), scaled about that tip.
+ * ON the corner of the view, 0 px from BOTH edges (MAZER-VIS-044, edgeCornerAnchor.ts): in the actual corner at every viewport
+ * size, scaled about that tip (a physically rounded display corner may trim the very tip: accepted by the owner).
  *
  * Lasers and fill (MAZER-VIS-030, VIS-038): on departure the player fires a beam out to ALL 8 diamonds; each diamond FILLS with
  * the player's colour from the exact instant its beam touches it (grows from its inner tip, full when the beam is fully
@@ -70,7 +70,7 @@
  * exclusively from the trail palette (trailPalette.ts) and cyberArcadeMaterial tokens.
  */
 import { isLegacyWrappedStepTransition } from '../legacy-runtime/legacyMaze';
-import { EDGE_CORNER_DISPLAY_RADIUS_PX, resolveEdgeCornerTipInset } from './edgeCornerAnchor';
+import { resolveEdgeCornerTipInset } from './edgeCornerAnchor';
 import { PLAYER_COLOR, resolveTrailPaletteBorderColor } from './trailPalette';
 import { MOTION_DURATION_MS, MOTION_LOOP_MS } from './motionScale';
 import {
@@ -113,12 +113,7 @@ export const EDGE_STATION_COUNT = 8;
 export const EDGE_MARKER_HALF_WIDTH = 7;
 export const EDGE_MARKER_HALF_HEIGHT = 10;
 export const EDGE_MARKER_STROKE_PX = 1;
-/**
- * Radius, in css px, of the rounded display corner a corner diamond must clear (edgeCornerAnchor.ts). Its outer tip is pinned to the
- * point where the corner diagonal meets that arc (about 16.4 px from both edges), so the diamond is snug in the corner at every
- * viewport size and the arc never cuts it (MAZER-VIS-044; before it sat this far along the top / bottom edge).
- */
-export const EDGE_MARKER_CORNER_CLEARANCE_PX = EDGE_CORNER_DISPLAY_RADIUS_PX;
+
 export const EDGE_MARKER_IDLE_PERIOD_MS = MOTION_LOOP_MS.drift;
 export const EDGE_MARKER_IDLE_ALPHA_MIN = 0.45;
 export const EDGE_MARKER_IDLE_ALPHA_MAX = 0.6;
@@ -221,8 +216,8 @@ const resolveEdgeKiteOutwardReach = (inwardAngle: number, side: EdgeSide): numbe
 
 /**
  * The distance, on BOTH axes, from the screen corner to the CENTRE of a corner diamond (the inset of the perimeter rectangle the
- * stations are laid on): the painted outer tip sits resolveEdgeCornerTipInset() (~16.4 px) from both edges and a 45 degree corner
- * kite paints ~7.8 px to either side of its centre, so ~24.2 px. Constant at every viewport size.
+ * stations are laid on): the painted outer tip sits resolveEdgeCornerTipInset() (0 px) from both edges and a 45 degree corner
+ * kite paints ~7.8 px to either side of its centre, so ~7.8 px. Constant at every viewport size.
  */
 export const resolveEdgeCornerInset = (): number => (
   resolveEdgeCornerTipInset() + resolveEdgeKiteOutwardReach(INWARD_ANGLE[0], 'left')
@@ -241,7 +236,7 @@ export const resolveEdgeVisibleExtent = (cssPx: number, devicePixelRatio = 1): n
 /**
  * The eight stations for a viewport: pure function of width/height (and the device pixel ratio, which only decides where the
  * backing store ends). Along the edge: the shared perimeter parametrization of the rectangle inset by `resolveEdgeCornerInset()`
- * (the corner diamonds clear a rounded display corner). Across it: flush, the painted outer tip exactly on the VISIBLE screen edge.
+ * (the corner diamonds sit in the corners). Across it: flush, the painted outer tip exactly on the VISIBLE screen edge.
  */
 export const resolveEdgeStations = (viewport: EdgeViewport, devicePixelRatio = 1): ReadonlyArray<EdgeStation> => {
   const width = resolveEdgeVisibleExtent(viewport.width, devicePixelRatio);
