@@ -100,7 +100,8 @@ All are typed `LegacyPlayerMessage` (`copy`, `durationMs` default 2400 ms, `id`,
 | --- | --- | --- | --- | --- | --- |
 | `resolveLegacyAuthFeedbackMessage` (error) | `auth.feedback.error` | auth | error | MenuScene `armLegacyAuthFeedbackMessage`, presentation | diagnostics only; render uses raw snapshot (F2) |
 | `resolveLegacyAuthFeedbackMessage` (info) | `auth.feedback.info` | auth | success | same | diagnostics only |
-| `resolveLegacyBootMessage` | `boot.error` / `boot.service-worker-error` | boot | error / warning | `bootStatus.ts` | no (F7) |
+| `resolveLegacyBootMessage` | `boot.error` | boot | error | `bootStatus.ts` | no, stays on the splash (F7; decision 2026-11-14) |
+| `resolveLegacyBootMessage` | `boot.service-worker-error` | boot | warning | `bootStatus.ts`, `serviceWorkerCacheWarning.ts` (MAZER-UI-030) | yes: the message toast, once per page load, online only; the only service worker message that is a toast. Remote sync (F3) stays silent |
 | `resolveLegacyRemoteSyncMessage` | `remote.<ctx>.failed` / `.guest` / `.missing-client` | progression | warning / info / warning | `legacyRemoteProgression.ts` | no (F3) |
 | `publishLegacyRemoteSyncException` inline | `remote.<ctx>.exception` | progression | warning | MenuScene | no (F3) |
 | `createLegacyPlayerMessage` inline | `progression.player.reset` | progression | success | MenuScene `resetLegacyPlayerProgression` | diagnostics only |
