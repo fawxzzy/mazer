@@ -705,3 +705,13 @@ describe('menu runtime diagnostics', () => {
     }
   });
 });
+
+describe('menu runtime diagnostics auth form mode (MAZER-UI-023)', () => {
+  test('the diagnostics form mode type is login only: the in-app sign-up mode is gone', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(resolve(process.cwd(), 'src/scenes/menuRuntimeDiagnostics.ts'), 'utf8');
+    expect(source).toContain("formMode: 'login';");
+    expect(source).not.toContain("'signup'");
+  });
+});
