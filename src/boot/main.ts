@@ -15,6 +15,7 @@ import {
 } from '../legacy-runtime/legacyAccountPortal';
 import { bootstrapLegacyRemoteAccountStateForRoute } from '../legacy-runtime/legacyRemoteProgression';
 import { installMazerAccessibilitySurface } from './accessibilitySurface';
+import { installLegacyControlHint } from '../render/legacyControlHintOverlay';
 import { runBoundedAccountBootstrap } from './bootAccountBootstrap';
 import { MAZER_BOOT_SPLASH_MAX_AFTER_GAME_CREATE_MS } from './bootSplash';
 import { waitForMazerUiFonts } from './fontReadiness';
@@ -197,6 +198,7 @@ const boot = async (): Promise<void> => {
   game = new Phaser.Game(createMazerPhaserConfig(viewportGeometry.getSnapshot().fullBleed));
   attachMazerGameToWindow(game);
   installMazerAccessibilitySurface(document, game.canvas);
+  installLegacyControlHint(window, game);
   viewportGeometry.subscribe((geometry) => {
     if (game) {
       syncMazerGameToViewport(game, geometry);
