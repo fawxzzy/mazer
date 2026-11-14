@@ -1,0 +1,79 @@
+{
+  "card": "MAZER-ACCT-033",
+  "base": "https://mazer.fawxzzy.com",
+  "mode": "rename",
+  "newName": "qa-ren-1113",
+  "ranAt": "2026-11-14T00:46:27.683Z",
+  "note": "headless only, not checked on a real phone",
+  "results": [
+    {
+      "viewport": "desktop-1280x720",
+      "steps": [
+        {
+          "step": "signed in",
+          "header": "mzr-qa-1112",
+          "leaderboardYouRow": "mzr-qa-1112"
+        },
+        {
+          "step": "after save, same session",
+          "leaderboardYouRow": "qa-ren-1113",
+          "header": "qa-ren-1113"
+        },
+        {
+          "step": "after reload",
+          "header": "qa-ren-1113",
+          "leaderboardYouRow": "qa-ren-1113"
+        },
+        {
+          "step": "restored and read back after reload",
+          "header": "mzr-qa-1112",
+          "leaderboardYouRow": "mzr-qa-1112"
+        }
+      ],
+      "checks": [
+        {
+          "check": "header shows the saved name (read-only)",
+          "pass": true,
+          "detail": "header \"mzr-qa-1112\" vs You row \"mzr-qa-1112\""
+        },
+        {
+          "check": "save reached the profile (rename request succeeded)",
+          "pass": true,
+          "detail": "200 POST /rest/v1/rpc/mazer_set_username"
+        },
+        {
+          "check": "header follows the rename in the same session",
+          "pass": true,
+          "detail": "header \"qa-ren-1113\""
+        },
+        {
+          "check": "header shows the new name after reload (MAZER-ACCT-033)",
+          "pass": true,
+          "detail": "header \"qa-ren-1113\""
+        },
+        {
+          "check": "header did not revert to the old sign-in name after reload",
+          "pass": true,
+          "detail": "header \"qa-ren-1113\""
+        },
+        {
+          "check": "leaderboard You row shows the new name after reload",
+          "pass": true,
+          "detail": "You row \"qa-ren-1113\""
+        },
+        {
+          "check": "QA name restored (read back after reload)",
+          "pass": true,
+          "detail": "You row \"mzr-qa-1112\", header \"mzr-qa-1112\""
+        }
+      ],
+      "consoleErrors": [],
+      "renameRequests": [
+        "200 POST /rest/v1/rpc/mazer_set_username",
+        "200 POST /rest/v1/rpc/mazer_set_username"
+      ],
+      "restored": true,
+      "pass": true
+    }
+  ]
+}
