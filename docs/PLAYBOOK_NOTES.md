@@ -168,6 +168,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: The player message toast row now appends one `Code: <short_code>` line for auth error messages (`src/legacy-runtime/legacyAuthFailureCodeLine.ts`, used by `legacyPlayerMessageToast.ts`). Only the leading known code token of `technicalDetail` is read.
 - WHY it changed: A player report of a sign-in failure could not be told apart from another failure; the ACCT-014 codes were diagnostics-only.
 - Rule: the line is snake_case code only, never provider text, email, name or id.
+
+## 2026-11-14 - Remove unused trail pulse-sweep motion helper (MAZER-MOTION-007)
+- WHAT changed: Deleted `resolveLegacyTrailPulseSweepMotion`, `LegacyTrailPulseSweepMotion` and `LEGACY_TRAIL_PULSE_SWEEP_PERIOD_MS` from `src/legacy-runtime/legacyAnimationCadence.ts`.
+- WHY it changed: Zero references in src, tests, scripts and docs (repo-wide grep); the live trail shine uses `resolveLegacyTrailShineMotion`, unchanged. No loop or duration changed.
 - Status: Applied
 
 ## 2026-11-14 - MAZER-UI-032 diagnostics type cleanup
