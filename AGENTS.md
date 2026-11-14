@@ -20,3 +20,10 @@
 - Keep scene wiring explicit in `src/boot/phaserConfig.ts`.
 - Avoid introducing service worker behavior that can stale localhost development.
 - Any SQL proposal (a file under `supabase/migrations/` or a proposal for a production database change) follows `docs/ops/MAZER-SQL-CHANGE-PROCESS.md`: tested on a faithful scratch PostgreSQL 17 (`scripts/db-scratch/`), any hash guard pins the md5 of the LIVE function body, independent review, and an owner box naming the sha256 of the exact apply file. Production database writes stay approval-gated.
+
+## Playbook
+- The `Playbook verify` check (workflow `.github/workflows/playbook-verify.yml`) runs the Playbook repository-governance `verify` on every pull request. It is separate from `npm run verify` and `npm run verify:local`; all must pass.
+- Run it locally: `npm run playbook:install` once (downloads the pinned Playbook release asset and checks its SHA-256 into the git-ignored `.playbook/runtime/`), then `npm run playbook:verify`. For repo orientation run `npm run playbook:index` then `npm run playbook:ai-context`. The bridge's own tests are `npm run playbook:test`.
+- Mazer's `playbook.config.json` adds a repo rule (`requireNotesOnChanges`): any change under `src/**`, `scripts/**` or `tests/**` must also touch `docs/PLAYBOOK_NOTES.md`. If `Playbook verify` fails on that rule, add a WHAT/WHY/Evidence entry to the notes file in the same PR.
+- Nothing is installed globally and no Playbook package is added to `package.json`; `scripts/playbook-runtime.mjs` is a thin bridge that resolves and runs the pinned runtime. Never commit anything under `.playbook/` except the tracked `.playbook/.gitignore` and `.playbook/README.md`.
+- The pinned version, release URL and SHA-256 live only in `scripts/playbook-runtime.mjs` (`DEFAULT_PLAYBOOK_VERSION`, `DEFAULT_OFFICIAL_FALLBACK_SHA256`). Bump them there and nowhere else (CI reads the same defaults).
