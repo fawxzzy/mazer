@@ -295,7 +295,7 @@ describe('install surface runtime', () => {
     });
   });
 
-  test('installed display modes and the Android app referrer are recognised as standalone; bare fullscreen is not', () => {
+  test('installed display modes are recognised as standalone; an android-app:// referrer and bare fullscreen are not', () => {
     for (const query of ['(display-mode: minimal-ui)', '(display-mode: window-controls-overlay)']) {
       resetInstallSurfaceRuntimeForTests();
       const runtime = new FakeWindow(false);
@@ -304,9 +304,9 @@ describe('install surface runtime', () => {
     }
 
     resetInstallSurfaceRuntimeForTests();
-    const twaRuntime = new FakeWindow(false);
-    twaRuntime.document = { referrer: 'android-app://com.example.mazer' };
-    expect(initializeInstallSurface(twaRuntime)).toMatchObject({ standalone: true });
+    const referrerTab = new FakeWindow(false);
+    referrerTab.document = { referrer: 'android-app://com.example.mazer' };
+    expect(initializeInstallSurface(referrerTab)).toMatchObject({ standalone: false, mode: 'manual' });
 
     resetInstallSurfaceRuntimeForTests();
     const fullscreenTab = new FakeWindow(false);

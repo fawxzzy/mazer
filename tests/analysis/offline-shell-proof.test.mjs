@@ -117,7 +117,8 @@ describe('install gate scenarios agree with the pure policy', () => {
     'minimal-ui': true,
     'window-controls-overlay': true,
     'navigator-standalone': true,
-    'android-referrer': true
+    // MAZER-PWA-007: an android-app:// referrer is not an installed signal (display stays browser).
+    'android-referrer': false
   };
 
   test('every display value is one the policy knows', () => {
@@ -130,15 +131,19 @@ describe('install gate scenarios agree with the pure policy', () => {
     expect(INSTALLED_DISPLAY_MODE_QUERIES).not.toContain('(display-mode: fullscreen)');
   });
 
-  test.each(INSTALL_GATE_SCENARIOS.filter((scenario) => scenario.host === 'public' && !scenario.path.includes('?')))(
+  // The proof's UA keys that are not policy classes (tablets map to their phone class).
+  const POLICY_CLASS_BY_PROOF_UA = { ipad: 'ios', 'android-tablet': 'android' };
+
+  // The URL (query, hash) is deliberately NOT an input of the decision: every public row, route rows included,
+  // must match the policy computed from display + UA + install event alone.
+  test.each(INSTALL_GATE_SCENARIOS.filter((scenario) => scenario.host === 'public'))(
     '$id: expectation matches resolveInstallGateDecision',
     (scenario) => {
       const decision = resolveInstallGateDecision({
         standalone: STANDALONE_BY_DISPLAY[scenario.display],
         isLocalhost: false,
         forceGate: false,
-        bypassRoute: false,
-        userAgentClass: scenario.ua,
+        userAgentClass: POLICY_CLASS_BY_PROOF_UA[scenario.ua] ?? scenario.ua,
         hasDeferredPrompt: scenario.event === 'beforeinstallprompt',
         appInstalled: scenario.event === 'appinstalled'
       });
@@ -148,6 +153,26 @@ describe('install gate scenarios agree with the pure policy', () => {
       }
     }
   );
+
+  test('the matrix covers the required forms (MAZER-PWA-007)', () => {
+    const rows = INSTALL_GATE_SCENARIOS;
+    const blocked = rows.filter((row) => row.host === 'public' && row.expect.blocked);
+    for (const needle of ['previewLevel=1', 'authFixture=authenticated', 'autoSignIn=0', 'error=access_denied', 'code=qa-code', '#previewLevel']) {
+      expect(blocked.some((row) => row.path.includes(needle)), needle).toBe(true);
+    }
+    for (const ua of ['desktop-chromium', 'desktop-firefox', 'desktop-safari', 'android', 'android-tablet', 'android-in-app', 'ios', 'ipad', 'ios-in-app']) {
+      expect(blocked.some((row) => row.ua === ua && row.display === 'browser'), ua).toBe(true);
+    }
+    expect(blocked.some((row) => row.display === 'fullscreen')).toBe(true);
+    // Every route-style row on a public host is blocked unless the display context is an installed one.
+    for (const row of rows.filter((candidate) => candidate.host === 'public' && /[?#]/.test(candidate.path))) {
+      if (STANDALONE_BY_DISPLAY[row.display] !== true && row.display !== 'browser') {
+        continue;
+      }
+      expect(row.expect.blocked, row.id).toBe(STANDALONE_BY_DISPLAY[row.display] !== true);
+    }
+    expect(rows.length).toBeGreaterThanOrEqual(28);
+  });
 
   test('scenario ids are unique', () => {
     const ids = INSTALL_GATE_SCENARIOS.map((scenario) => scenario.id);

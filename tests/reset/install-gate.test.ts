@@ -130,20 +130,14 @@ describe('Mazer install gate', () => {
     expect(resolveMazerInstallGateDecision(standaloneState)).toMatchObject({ blocked: false, reason: 'standalone' });
   });
 
-  test('bypasses the install gate for recovery, OAuth callbacks, legal routes, and plain localhost', () => {
+  test('boot exempts only plain localhost, legal routes and password recovery (both redirect off Mazer)', () => {
     const base = {
       forceInstallGate: false,
       isLocalhostRuntime: false,
       legalRouteRequested: false,
-      oauthCallbackAccepted: false,
-      oauthCallbackRequested: false,
       passwordRecoveryRequested: false
     };
     expect(shouldRunMazerInstallGateForBoot({ ...base, passwordRecoveryRequested: true })).toBe(false);
-    expect(shouldRunMazerInstallGateForBoot({ ...base, oauthCallbackAccepted: true, oauthCallbackRequested: true })).toBe(false);
-    // A five-to-fifteen-minute portal return is expired by the Mazer pending
-    // deadline. It must still reach Mazer's retry/error UI, not an install gate.
-    expect(shouldRunMazerInstallGateForBoot({ ...base, oauthCallbackRequested: true })).toBe(false);
     expect(shouldRunMazerInstallGateForBoot({ ...base, legalRouteRequested: true })).toBe(false);
     expect(shouldRunMazerInstallGateForBoot({ ...base, isLocalhostRuntime: true })).toBe(false);
     expect(shouldRunMazerInstallGateForBoot(base)).toBe(true);
@@ -317,18 +311,14 @@ describe('Mazer install gate', () => {
     expect(mainSource).toContain('initializeInstallSurface(window);');
     expect(mainSource).toContain('!passwordRecoveryRouteRequested');
     expect(mainSource).toContain('captureAndScrubMazerOAuthCallback(window.location, window.history)');
-    expect(mainSource).toContain("oauthCallbackAccepted = result.status === 'connected';");
-    expect(mainSource).toContain('oauthCallbackAccepted,');
-    expect(mainSource).toContain('oauthCallbackRequested,');
     expect(mainSource).toContain("window.location.replace(buildMazerAccountPortalUrl('reset-password'))");
     expect(mainSource).toContain('window.location.replace(buildMazerLegalUrl(legalRoute))');
     expect(mainSource.indexOf('captureAndScrubMazerOAuthCallback(window.location, window.history)')).toBeLessThan(
       mainSource.indexOf("markMazerBootStatus('boot-start')")
     );
-    expect(mainSource.indexOf('initializeInstallSurface(window);')).toBeLessThan(
-      mainSource.indexOf('await consumeMazerOAuthCallback(')
-    );
-    expect(mainSource.indexOf('await consumeMazerOAuthCallback(')).toBeLessThan(installGateCallIndex);
+    expect(mainSource.indexOf('initializeInstallSurface(window);')).toBeLessThan(installGateCallIndex);
+    // MAZER-PWA-007: the gate runs BEFORE the OAuth callback is exchanged, so a browser tab never holds a session.
+    expect(installGateCallIndex).toBeLessThan(mainSource.indexOf('await consumeMazerOAuthCallback('));
     expect(mainSource).toContain('shouldRunMazerInstallGateForBoot({');
     expect(cssSource).toContain(`#${MAZER_INSTALL_GATE_OVERLAY_ID}`);
     expect(cssSource).toContain('"Space Grotesk", ui-sans-serif, system-ui');

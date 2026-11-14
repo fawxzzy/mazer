@@ -2,12 +2,15 @@
  * Install policy: the single, pure decision for "may this browsing context
  * run Mazer, and if not, what does the player need to be told?".
  *
- * Policy (docs/ops/MAZER-INSTALL-GATE-POLICY-2026-11-05.md): Mazer only runs
- * from an installed surface (home-screen / desktop app). Every other visit
- * is blocked on every platform, with two documented exceptions: local
- * development (localhost, unless ?forceInstallGate=1 opts back in) and
- * account-flow routes that must complete wherever they started (legal pages,
- * OAuth callback, password recovery).
+ * Policy (docs/ops/MAZER-INSTALL-GATE-POLICY-2026-11-05.md, tightened by
+ * docs/ops/MAZER-INSTALL-GATE-ALWAYS-ON-2026-11-14.md): Mazer only runs from
+ * an installed surface (home-screen / desktop app). EVERY other visit is
+ * blocked, on every platform, in every form, whatever the query string or
+ * hash says. There is exactly one exception: local development (localhost /
+ * 127.0.0.1 / ::1, unless ?forceInstallGate=1 opts back in). Nothing a URL can
+ * carry (previewLevel, autoSignIn, authFixture, an OAuth callback, ...) lifts
+ * the gate; the only runtime signal that does is a real installed display
+ * context (detectInstalledDisplayContext).
  *
  * This module is deliberately free of DOM / window access so the whole truth
  * table can be pinned by unit tests. installSurface.ts feeds it facts from
@@ -20,6 +23,7 @@ export type InstallUserAgentClass =
   | 'desktop-firefox'
   | 'desktop-other'
   | 'android'
+  | 'android-in-app'
   | 'ios'
   | 'ios-in-app';
 
@@ -32,7 +36,7 @@ export type InstallGateMode =
   | 'in-app-browser'
   | 'installed-open-app';
 
-export type InstallGateAllowReason = 'standalone' | 'localhost' | 'bypass-route';
+export type InstallGateAllowReason = 'standalone' | 'localhost';
 
 export interface InstallGateDecisionInput {
   /** The page is running inside an installed app surface (see detectInstalledDisplayContext). */
@@ -40,8 +44,6 @@ export interface InstallGateDecisionInput {
   isLocalhost: boolean;
   /** ?forceInstallGate=1 -- opts localhost back into the gate for testing. */
   forceGate: boolean;
-  /** Legal route, OAuth callback request, or password recovery. */
-  bypassRoute: boolean;
   userAgentClass: InstallUserAgentClass;
   /** A beforeinstallprompt event has been captured and not yet consumed. */
   hasDeferredPrompt: boolean;
@@ -64,10 +66,6 @@ export const resolveInstallGateDecision = (input: InstallGateDecisionInput): Ins
     return { blocked: false, mode: 'open', copyKey: null, reason: 'standalone' };
   }
 
-  if (input.bypassRoute) {
-    return { blocked: false, mode: 'open', copyKey: null, reason: 'bypass-route' };
-  }
-
   if (input.isLocalhost && !input.forceGate) {
     return { blocked: false, mode: 'open', copyKey: null, reason: 'localhost' };
   }
@@ -81,9 +79,9 @@ const resolveBlockedInstallGateMode = (input: InstallGateDecisionInput): Install
     return 'installed-open-app';
   }
 
-  // iOS in-app browsers cannot install at all, so even a stray deferred
-  // prompt (which iOS never fires) must not turn this into an install card.
-  if (input.userAgentClass === 'ios-in-app') {
+  // In-app browsers (iOS and Android) cannot install at all, so even a stray
+  // deferred prompt must not turn this into an install card.
+  if (input.userAgentClass === 'ios-in-app' || input.userAgentClass === 'android-in-app') {
     return 'in-app-browser';
   }
 
@@ -125,6 +123,15 @@ export const isIOSInAppBrowserUserAgent = (facts: InstallUserAgentFacts): boolea
   detectIOSFromUserAgentFacts(facts) && IN_APP_BROWSER_PATTERN.test(facts.userAgent ?? '')
 );
 
+// Android in-app browsers / WebViews: Instagram, Facebook (FB_IAB), TikTok, Messenger, ... and the generic
+// WebView token ("; wv)"). They are not Chrome and expose no install path.
+const ANDROID_IN_APP_BROWSER_PATTERN =
+  /(Instagram|FBAN|FBAV|FB_IAB|Messenger|TikTok|musical_ly|BytedanceWebview|Snapchat|Twitter|LinkedInApp|Pinterest|Discord|WhatsApp|Telegram|MicroMessenger|Line\/|;\s*wv\))/i;
+
+export const isAndroidInAppBrowserUserAgent = (facts: InstallUserAgentFacts): boolean => (
+  /android/i.test(facts.userAgent ?? '') && ANDROID_IN_APP_BROWSER_PATTERN.test(facts.userAgent ?? '')
+);
+
 export const classifyInstallUserAgent = (facts: InstallUserAgentFacts | undefined): InstallUserAgentClass => {
   if (!facts) {
     return 'desktop-other';
@@ -136,7 +143,7 @@ export const classifyInstallUserAgent = (facts: InstallUserAgentFacts | undefine
 
   const userAgent = facts.userAgent ?? '';
   if (/android/i.test(userAgent)) {
-    return 'android';
+    return isAndroidInAppBrowserUserAgent(facts) ? 'android-in-app' : 'android';
   }
 
   if (/firefox\//i.test(userAgent)) {
@@ -160,11 +167,10 @@ export interface InstalledDisplayContextFacts {
   /** navigator.standalone (iOS home-screen apps). */
   navigatorStandalone?: boolean;
   matchMedia?: (query: string) => { matches: boolean };
-  referrer?: string;
 }
 
 /**
- * Display modes that mean "running as an installed app". Plain
+ * Display modes that mean "running as an installed app" (a tab never reports any of these). Plain
  * `display-mode: fullscreen` is intentionally NOT included: it also matches a
  * normal browser tab put into F11 / Fullscreen-API fullscreen, which would
  * let anyone unlock the gate with one key press. Mazer's manifest asks for
@@ -186,10 +192,9 @@ export const detectInstalledDisplayContext = (facts: InstalledDisplayContextFact
     return true;
   }
 
-  // Android Trusted Web Activity / WebAPK launches report this referrer.
-  if ((facts.referrer ?? '').startsWith('android-app://')) {
-    return true;
-  }
+  // NOT a signal: an `android-app://` referrer. Other Android apps (the Google app, mail clients, ...) set it on
+  // ordinary Chrome tabs they open, so it would unlock the gate for a browser visit. A WebAPK / Trusted Web
+  // Activity reports `display-mode: standalone`, which is the real signal and is checked below.
 
   for (const query of INSTALLED_DISPLAY_MODE_QUERIES) {
     try {

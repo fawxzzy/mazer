@@ -13,7 +13,6 @@ import {
   resolveMazerLegalRoute,
   type MazerOAuthClient
 } from '../legacy-runtime/legacyAccountPortal';
-import { isLegacyLevelPreviewRoute } from '../legacy-runtime/legacyLevelPreview';
 import { bootstrapLegacyRemoteAccountStateForRoute } from '../legacy-runtime/legacyRemoteProgression';
 import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { runBoundedAccountBootstrap } from './bootAccountBootstrap';
@@ -148,30 +147,17 @@ const boot = async (): Promise<void> => {
     window.sessionStorage.removeItem(LOCALHOST_SW_RESET_KEY);
   }
 
-  let oauthCallbackAccepted = false;
-  if (oauthCallback !== null) {
-    // The only stage whose splash says "Signing you in": a callback token
-    // exchange (bounded by MAZER_OAUTH_TOKEN_TIMEOUT_MS) is really running.
-    markMazerBootStatus('oauth-exchange');
-    const result = await consumeMazerOAuthCallback(oauthCallback, async () => (
-      await getLegacyAuthClient() as unknown as MazerOAuthClient | null
-    ));
-    oauthCallbackAccepted = result.status === 'connected';
-  }
-
-  // The install gate is meaningless during local dev (no real production
-  // URL to install, and localhost PWA installs behave strangely) -- it'd
-  // otherwise block every single local test run behind a screen with
-  // nothing useful to do. ?forceInstallGate=1 opts back in when the gate
-  // itself is what needs testing.
+  // MAZER-PWA-007: the install gate runs BEFORE anything else that Mazer does with the URL. In a browser tab
+  // nothing in the query string or hash lifts it (no previewLevel, autoSignIn, authFixture or OAuth callback
+  // exemption), and a callback that lands in a non-installed tab is NOT exchanged: the gate shows instead, so a
+  // browser tab never ends up holding a Mazer session. Only local development (localhost, unless
+  // ?forceInstallGate=1) and the legal / password-recovery routes (which redirected above) skip it. The gate
+  // only resolves when the page itself is an installed display context; installed launches resolve at once.
   const forceInstallGate = new URLSearchParams(window.location.search).get('forceInstallGate') === '1';
   if (shouldRunMazerInstallGateForBoot({
     forceInstallGate,
     isLocalhostRuntime: isLocalhostRuntime(),
     legalRouteRequested: legalRoute !== null,
-    levelPreviewRequested: isLegacyLevelPreviewRoute(window.location.search),
-    oauthCallbackAccepted,
-    oauthCallbackRequested,
     passwordRecoveryRequested: passwordRecoveryRouteRequested
   })) {
     markMazerBootStatus('install-gate-checking');
@@ -180,6 +166,15 @@ const boot = async (): Promise<void> => {
     await runMazerInstallGate(document, {
       onBlocked: () => markMazerBootStatus('splash-removed')
     });
+  }
+
+  if (oauthCallback !== null) {
+    // The only stage whose splash says "Signing you in": a callback token
+    // exchange (bounded by MAZER_OAUTH_TOKEN_TIMEOUT_MS) is really running.
+    markMazerBootStatus('oauth-exchange');
+    await consumeMazerOAuthCallback(oauthCallback, async () => (
+      await getLegacyAuthClient() as unknown as MazerOAuthClient | null
+    ));
   }
 
   // MAZER-ACCT-040: a signed-out launch goes straight to the account host's sign-in

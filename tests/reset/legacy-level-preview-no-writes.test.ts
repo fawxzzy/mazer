@@ -91,17 +91,16 @@ describe('level preview never reaches the remote layer or real storage', () => {
     expect(sandbox.getItem('mazer.progression.v1')).toBe('{"x":1}');
   });
 
-  test('install gate: bypassed only for the preview flag, unchanged otherwise', () => {
+  test('install gate: the preview flag no longer lifts it (MAZER-PWA-007); only localhost does', () => {
     const base = {
       forceInstallGate: false,
       isLocalhostRuntime: false,
       legalRouteRequested: false,
-      oauthCallbackAccepted: false,
-      oauthCallbackRequested: false,
       passwordRecoveryRequested: false
     };
     expect(shouldRunMazerInstallGateForBoot(base)).toBe(true);
-    expect(shouldRunMazerInstallGateForBoot({ ...base, levelPreviewRequested: false })).toBe(true);
-    expect(shouldRunMazerInstallGateForBoot({ ...base, levelPreviewRequested: true })).toBe(false);
+    // The context type has no preview input at all: an extra key cannot change the answer.
+    expect(shouldRunMazerInstallGateForBoot({ ...base, levelPreviewRequested: true } as typeof base)).toBe(true);
+    expect(shouldRunMazerInstallGateForBoot({ ...base, isLocalhostRuntime: true })).toBe(false);
   });
 });

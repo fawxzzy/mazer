@@ -203,6 +203,7 @@ PR #372 (deterministic install gate, boot splash and bounded account bootstrap) 
 | `src/boot/installGate.ts` | `Click the install icon at the end of the address bar, or open the browser menu and choose Install Mazer.` | static | install gate step, manual-desktop-chromium mode; active; none (install instructions) |
 | `src/boot/installGate.ts` | `Confirm the install.` | static | install gate step, manual-desktop-chromium mode; active; none (install instructions) |
 | `src/boot/installGate.ts` | `Open Mazer from your desktop or Start menu.` | static | install gate step, manual-desktop-chromium mode; active; none (install instructions) |
+| `src/boot/installGate.ts` | `Mazer only runs as an installed app, not in a browser tab. Chrome, Edge and Safari on a Mac can install it.` | static | install gate subtitle, manual-desktop-other mode (Firefox, Safari, unknown desktop browsers); active; none (install instructions) |
 | `src/boot/installGate.ts` | `Open this page in Chrome or Edge. In Safari, choose File, then Add to Dock.` | static | install gate step, manual-desktop-other mode; active; none (install instructions) |
 | `src/boot/installGate.ts` | `In Chrome or Edge, click the install icon in the address bar.` | static | install gate step, manual-desktop-other mode; active; none (install instructions) |
 | `src/boot/installGate.ts` | `Open Mazer from your desktop, Start menu or Dock.` | static | install gate step, manual-desktop-other mode; active; none (install instructions) |

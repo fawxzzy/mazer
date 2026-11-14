@@ -118,8 +118,7 @@ const resolveStandaloneState = (runtime: InstallSurfaceWindowLike | undefined): 
   const matchMedia = runtime.matchMedia;
   return detectInstalledDisplayContext({
     navigatorStandalone: runtime.navigator?.standalone,
-    matchMedia: matchMedia ? (query) => matchMedia.call(runtime, query) : undefined,
-    referrer: runtime.document?.referrer
+    matchMedia: matchMedia ? (query) => matchMedia.call(runtime, query) : undefined
   });
 };
 

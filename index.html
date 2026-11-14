@@ -48,6 +48,20 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="preload" href="/fonts/space-grotesk/space-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <title>Mazer</title>
+    <!-- MAZER-ACCT-042: arriving from the account host or with OAuth callback parameters, the splash loader shows at
+         once (no 150 ms delay) so the host loader -> Mazer loader hand-off has no dark gap. Twin of
+         src/boot/loaderHandoff.ts (pinned by tests/reset/loader-handoff.test.ts). -->
+    <script>
+      (function () {
+        try {
+          var referrer = document.referrer || '';
+          var search = location.search || '';
+          if (referrer.indexOf('https://account.fawxzzy.com/') === 0 || /[?&](code|state|error|error_description)=/.test(search)) {
+            document.documentElement.setAttribute('data-mazer-loader', 'instant');
+          }
+        } catch (error) { /* ordinary cold open */ }
+      })();
+    </script>
     <!-- Static boot splash: paints before any script or the CSS bundle loads so
          the page is never blank. Removed explicitly by src/boot/bootSplash.ts
          (driven by bootStatus). Colors mirror the install gate / theme-color. -->
@@ -71,6 +85,13 @@
         opacity: 0;
         animation: mazer-boot-splash-in 200ms ease 150ms both;
       }
+      /* Hand-off from the account host (or an OAuth callback load): the stage is visible from the first paint. The
+         infinite no-op animation only keeps an animation clock running for src/boot/bootSplash.ts (minimum hold). */
+      html[data-mazer-loader="instant"] #mazer-boot-splash .mazer-boot-splash-stage {
+        opacity: 1;
+        animation: mazer-boot-splash-instant 1s linear infinite;
+      }
+      @keyframes mazer-boot-splash-instant { from { opacity: 1; } to { opacity: 1; } }
       /* A static soft glow behind the icon (never animated, so no repaint per frame). */
       #mazer-boot-splash .mazer-boot-splash-stage::before {
         content: ""; position: absolute; inset: -70%;

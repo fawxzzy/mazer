@@ -7,29 +7,27 @@ import {
 } from './installPolicy';
 
 export interface MazerInstallGateBootContext {
+  /** `?forceInstallGate=1`: opts localhost back into the gate. It can only make the gate stricter. */
   forceInstallGate: boolean;
   isLocalhostRuntime: boolean;
+  /** Legal route (/privacy, /terms): redirected to the account host before Mazer renders anything. */
   legalRouteRequested: boolean;
-  /** Dev/QA Level Preview route (?previewLevel=N): sandboxed, so it is never install-gated. */
-  levelPreviewRequested?: boolean;
-  oauthCallbackAccepted: boolean;
-  oauthCallbackRequested: boolean;
+  /** Password recovery route: redirected to the account host before Mazer renders anything. */
   passwordRecoveryRequested: boolean;
 }
 
 /**
- * Boot-level bypasses (the route/host half of the install policy; the
- * runtime half -- standalone, platform, prompt availability -- lives in
- * resolveInstallGateDecision). Localhost is exempt unless ?forceInstallGate=1;
- * legal routes, any OAuth callback request and password recovery must finish
- * wherever they started, so they are never blocked.
+ * Boot-level exemptions (MAZER-PWA-007, docs/ops/MAZER-INSTALL-GATE-ALWAYS-ON-2026-11-14.md). Mazer content is
+ * ALWAYS behind the gate in a browser tab, whatever the query string or hash carries: there is deliberately no
+ * input for `previewLevel`, `autoSignIn`, `authFixture`, an OAuth callback, a display-mode query or a user agent
+ * here. The only exemptions are
+ *  - local development (localhost / 127.0.0.1 / ::1), unless ?forceInstallGate=1, and
+ *  - the legal and password-recovery routes, which never draw Mazer: boot redirects them to the account host.
+ * What lifts the gate in a tab is only an installed display context (resolveInstallGateDecision `standalone`).
  */
 export const shouldRunMazerInstallGateForBoot = (context: MazerInstallGateBootContext): boolean => (
   (!context.isLocalhostRuntime || context.forceInstallGate)
   && !context.legalRouteRequested
-  && context.levelPreviewRequested !== true
-  && !context.oauthCallbackAccepted
-  && !context.oauthCallbackRequested
   && !context.passwordRecoveryRequested
 );
 
@@ -81,6 +79,8 @@ export interface MazerInstallGateCopy {
 
 const INSTALL_TITLE = 'Install Mazer';
 const INSTALL_SUBTITLE = 'Mazer only runs as an installed app, not in a browser tab.';
+/** Firefox and unknown desktop browsers cannot install web apps at all, so the card says why and where to go. */
+const DESKTOP_OTHER_SUBTITLE = 'Mazer only runs as an installed app, not in a browser tab. Chrome, Edge and Safari on a Mac can install it.';
 const INSTALL_VALUE_LINE = 'Race through endless mazes, straight from your home screen.';
 
 /** Shown under the Copy link button once the copy attempt has finished. */
@@ -122,7 +122,7 @@ export const MAZER_INSTALL_GATE_COPY: Readonly<Record<InstallGateMode, MazerInst
   },
   'manual-desktop-other': {
     title: INSTALL_TITLE,
-    subtitle: INSTALL_SUBTITLE,
+    subtitle: DESKTOP_OTHER_SUBTITLE,
     valueLine: INSTALL_VALUE_LINE,
     steps: [
       'Open this page in Chrome or Edge. In Safari, choose File, then Add to Dock.',
@@ -188,9 +188,8 @@ export const resolveMazerInstallGateCopy = (mode: InstallGateMode): MazerInstall
 );
 
 /**
- * Feeds the live install-surface facts into the pure policy. Route and host
- * bypasses are decided once at boot (shouldRunMazerInstallGateForBoot), so
- * they are fixed to "not bypassed" here: once the gate is running, the only
+ * Feeds the live install-surface facts into the pure policy. The host exemption is decided once at boot
+ * (shouldRunMazerInstallGateForBoot), so it is fixed to "not exempt" here: once the gate is running, the only
  * thing that can lift it is the page actually becoming standalone.
  */
 export const resolveMazerInstallGateDecision = (state: InstallSurfaceState): InstallGateDecision => (
@@ -198,7 +197,6 @@ export const resolveMazerInstallGateDecision = (state: InstallSurfaceState): Ins
     standalone: state.standalone,
     isLocalhost: false,
     forceGate: false,
-    bypassRoute: false,
     userAgentClass: state.platform,
     hasDeferredPrompt: state.canPrompt,
     appInstalled: state.installed && !state.standalone
@@ -299,7 +297,7 @@ export const installMazerInstallGate = (
 
     overlay.innerHTML = `
       <div class="mazer-install-gate-card">
-        <img class="mazer-install-gate-brand" alt="Mazer" width="48" height="48" decoding="sync" src="${MAZER_BOOT_LOADER_ICON_DATA_URI}" />
+        <img class="mazer-install-gate-brand" alt="Mazer" width="72" height="72" decoding="sync" src="${MAZER_BOOT_LOADER_ICON_DATA_URI}" />
         <h1 class="mazer-install-gate-title">${escapeHtml(copy.title)}</h1>
         <p class="mazer-install-gate-subtitle">${escapeHtml(copy.subtitle)}</p>
         ${renderValueHtml(copy.valueLine)}

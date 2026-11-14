@@ -1,3 +1,4 @@
+import { emulateInstalledApp, isLocalDevelopmentHost } from './lib/installed-app-emulation.mjs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFile, readFile, writeFile } from 'node:fs/promises';
@@ -2020,6 +2021,10 @@ export const runLivePlayQa = async (options = {}) => {
     enterPhase('browser');
     browser = await chromium.launch({ headless: options.headless !== false });
     context = await browser.newContext(browserContextOptions);
+    if (!isLocalDevelopmentHost(new URL(resolvedBaseUrl).hostname)) {
+      // MAZER-PWA-007: the install gate is always on off-localhost; run as an emulated installed app.
+      await emulateInstalledApp(context);
+    }
     if (options.protectedDeployment === true) {
       if (!productionAcceptanceContract) {
         throw new Error('live_play_protected_deployment_requires_production_acceptance');

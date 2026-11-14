@@ -81,15 +81,16 @@ describe('MAZER-ACCT-040 explicit sign-out intent', () => {
 describe('MAZER-ACCT-040 boot wiring (source contract)', () => {
   const main = readFileSync(resolve(__dirname, '../../src/boot/main.ts'), 'utf8');
 
-  test('the hand-off runs after the OAuth callback and the install gate, before the account bootstrap and the Phaser game', () => {
+  test('the hand-off runs after the install gate and the OAuth callback (MAZER-PWA-007: gate first), before the account bootstrap and the Phaser game', () => {
     const callback = main.indexOf('await consumeMazerOAuthCallback(');
     const gate = main.indexOf('await runMazerInstallGate(');
     const handoff = main.indexOf('await runMazerSignedOutHandoffAtBoot(oauthCallbackRequested)');
     const bootstrap = main.indexOf('await runBoundedAccountBootstrap(');
     const game = main.indexOf('new Phaser.Game(');
     expect(callback).toBeGreaterThan(-1);
-    expect(gate).toBeGreaterThan(callback);
-    expect(handoff).toBeGreaterThan(gate);
+    expect(gate).toBeGreaterThan(-1);
+    expect(callback).toBeGreaterThan(gate);
+    expect(handoff).toBeGreaterThan(callback);
     expect(bootstrap).toBeGreaterThan(handoff);
     expect(game).toBeGreaterThan(bootstrap);
   });

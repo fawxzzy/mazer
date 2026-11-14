@@ -8,7 +8,7 @@
  * documented rewrites, must-revalidate caching) on `mazer-proof.localhost`,
  * which Chromium resolves to loopback and treats as a secure context but which
  * the app does NOT treat as localhost, so the production service worker
- * registers and the install gate runs exactly as on mazer.fawxzzy.com.
+ * registers and the install gate (always on since MAZER-PWA-007) runs exactly as on mazer.fawxzzy.com.
  *
  * Proves, with Playwright / headless Chromium:
  *   1. first online load registers /app-sw.js, claims the page and precaches the shell
@@ -68,7 +68,10 @@ const USER_AGENTS = Object.freeze({
   'desktop-safari': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
   android: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
   ios: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-  'ios-in-app': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 330.0.0.0'
+  'ios-in-app': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 330.0.0.0',
+  ipad: 'Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+  'android-tablet': 'Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+  'android-in-app': 'Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36 Instagram 330.0.0.0 Android'
 });
 
 const CONTENT_TYPES = Object.freeze({
@@ -205,7 +208,7 @@ const newContext = async (browser, { display = 'browser', ua = 'desktop-chromium
     viewport,
     reducedMotion: 'reduce',
     userAgent: USER_AGENTS[ua],
-    ...(ua === 'ios' || ua === 'android' || ua === 'ios-in-app' ? { hasTouch: true } : {})
+    ...(['ios', 'ipad', 'android', 'android-tablet', 'android-in-app', 'ios-in-app'].includes(ua) ? { hasTouch: true } : {})
   });
   await context.addInitScript(displayInitScript, display);
   await context.addInitScript(bootStageRecorder);
@@ -674,9 +677,11 @@ const runInstallGateMatrix = async ({ browser, server, distA, checks, findings, 
   checks.push(makeCheck('gate-blocked-tab-registers-no-service-worker', blockedTabs.every((row) => row.serviceWorkerRegistrations === 0),
     `gated contexts with a registration: ${JSON.stringify(blockedTabs.filter((row) => row.serviceWorkerRegistrations !== 0).map((row) => row.id))}`));
   const reloadRows = rows.filter((row) => row.reloadedAfterBoot);
-  for (const row of reloadRows.filter((candidate) => candidate.gateAfterReload)) {
-    findings.push(`${row.label}: the first boot bypasses the install gate (callback/QA route), registers the service worker, and the claim-time reload then lands on the install gate because the callback parameters were already scrubbed from the URL. Only reachable in a non-installed tab on a first-ever service-worker install (an installed app should already have the worker; not checked on a device).`);
-  }
+  // MAZER-PWA-007: no gated row may ever have booted the game, and no installed row may show the gate after a reload.
+  checks.push(makeCheck('gate-never-boots-behind-the-gate', rows.filter((row) => row.blocked).every((row) => !row.booted),
+    `gated rows that booted: ${JSON.stringify(rows.filter((row) => row.blocked && row.booted).map((row) => row.id))}`));
+  checks.push(makeCheck('installed-rows-never-show-the-gate-after-reload', reloadRows.every((row) => !row.gateAfterReload),
+    `installed rows with the gate after a reload: ${JSON.stringify(reloadRows.filter((row) => row.gateAfterReload).map((row) => row.id))}`));
   evidence.installGateReloadedRows = reloadRows.map((row) => ({ id: row.id, gateShownAfterReload: row.gateAfterReload }));
   evidence.installGate = rows;
   evidence.installGateTableMarkdown = formatGateTableMarkdown(rows.map((row) => ({ ...row })));
