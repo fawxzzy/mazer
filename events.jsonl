@@ -162,3 +162,4 @@
 {"card":"MAZER-DATA-002","id":"6e9ab41512da","status":"deferred_candidate","text":"Parked: later, until a server cap change is wanted (phase 2).","ts":"2026-11-14T21:40:00Z","v":1}
 {"card":"MAZER-DATA-003","id":"a7203eb59c37","status":"deferred_candidate","text":"Parked: later, needs provider approval; outbox half to be verified first.","ts":"2026-11-14T21:40:00Z","v":1}
 {"card":"MAZER-PWA-005","id":"7a22e1acfc0e","status":"deferred_candidate","text":"Parked: later, waits on owner-approved icon art with clean corners.","ts":"2026-11-14T21:40:00Z","v":1}
+{"card":"MAZER-QA-002","id":"f1f685ee7fcd","status":"planning","text":"Folded into the single phone checklist card (QA-009); owner device pass pending.","ts":"2026-11-14T21:40:00Z","v":1}
