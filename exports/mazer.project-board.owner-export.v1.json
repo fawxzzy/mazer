@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_8d5b9df99070",
+  "export_id": "pbe_mazer_owner_registry_38f555f70f0e",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:8d5b9df99070e3ffdc400de1f296ae2d87dd376a56c8b265e3248a6b6cea5136",
-  "generated_at": "2026-11-13T21:02:25.000Z",
+  "source_revision": "sha256:38f555f70f0e8f1c294cfb43f5a60261b86cb2a668bf04b373e3a3b80e1265dc",
+  "generated_at": "2026-11-14T06:34:01.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:2dfe033343f4a93d1c6990a4422ee2247f70af7981ddbcb36c7d03f61d768a11",
-      "observed_at": "2026-11-13T21:02:25.000Z"
+      "revision": "sha256:53e90f1d29787ffff1f865ca174b0b1523eb342aa94f33fba903002be1b4ecf1",
+      "observed_at": "2026-11-14T06:34:01.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:a67753ce27c71dbfb2582900208e7e00de72cc64dcbd0fcb71de2ead073b30a1",
-      "observed_at": "2026-11-13T21:02:25.000Z"
+      "observed_at": "2026-11-14T06:34:01.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-13T21:02:25.000Z"
+      "observed_at": "2026-11-14T06:34:01.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-13T21:02:25.000Z"
+      "observed_at": "2026-11-14T06:34:01.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-13T21:02:25.000Z"
+      "observed_at": "2026-11-14T06:34:01.000Z"
     }
   ],
   "cards": [
@@ -1853,7 +1853,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Header follows the saved profile name after reload: PR #487 merged and live, recheck open",
-        "description": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (merge 24f7daee) is MERGED AND DEPLOYED (live from production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl): it reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked before merge in a headless browser with a mocked profile call only. After deploy only sign-in was checked; the rename plus reload case was NOT re-run on the deployed build. No independent review is recorded. Nothing on a real phone. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
+        "description": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (merge 24f7daee) is MERGED AND DEPLOYED (live from production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl): it reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked before merge in a headless browser with a mocked profile call only. After deploy only sign-in was checked; the rename plus reload case was NOT re-run on the deployed build. No independent review is recorded. Nothing on a real phone. Not changed: the sign-in name itself, which is a shared identity decision for the owner. Board update 2026-11-14: Live headless recheck on the deployed build passed at phone and desktop sizes: after a rename and a reload the header and the leaderboard row follow the saved name; the QA name was restored. PR #519 merged (3a3db6fc). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
         "card_type": "research",
         "lifecycle": "review",
         "priority": "low",
@@ -1862,7 +1862,7 @@
           "MAZER-ACCT-021"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T12:00:00.000Z",
+        "updated_at": "2026-11-14T06:33:58.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-033",
         "extensions": {
           "owner_status": "review",
@@ -1873,11 +1873,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-033",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T12:00:00.000Z"
+        "source_updated_at": "2026-11-14T06:33:58.000Z"
       },
       "content": {
-        "summary": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (merge 24f7daee) is MERGED AND DEPLOYED (live from production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl): it reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked before merge in a headless browser with a mocked profile call only. After deploy only sign-in was checked; the rename plus reload case was NOT re-run on the deployed build. No independent review is recorded. Nothing on a real phone. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
-        "objective": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (merge 24f7daee) is MERGED AND DEPLOYED (live from production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl): it reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked before merge in a headless browser with a mocked profile call only. After deploy only sign-in was checked; the rename plus reload case was NOT re-run on the deployed build. No independent review is recorded. Nothing on a real phone. Not changed: the sign-in name itself, which is a shared identity decision for the owner.",
+        "summary": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (merge 24f7daee) is MERGED AND DEPLOYED (live from production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl): it reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked before merge in a headless browser with a mocked profile call only. After deploy only sign-in was checked; the rename plus reload case was NOT re-run on the deployed build. No independent review is recorded. Nothing on a real phone. Not changed: the sign-in name itself, which is a shared identity decision for the owner. Board update 2026-11-14: Live headless recheck on the deployed build passed at phone and desktop sizes: after a rename and a reload the header and the leaderboard row follow the saved name; the QA name was restored. PR #519 merged (3a3db6fc). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The header follows a rename in the same session (MAZER-ACCT-021). Not confirmed: whether the rename also updates the stored sign-in name, which decides what the header shows after a reload. Plan: rename, reload and read the header, then fix if it reverts. Update 2026-11-13: FINDING CONFIRMED live on production with the standing test account: after a rename and a reload the header reverted to the old sign-in name while the leaderboard showed the new one (the account was renamed back through the same screen; no account was created). Cause: the header reads the sign-in name, a rename updates only the profile name. PR #487 (merge 24f7daee) is MERGED AND DEPLOYED (live from production build fawxzzy-mazer-dyhmua9v6, also on fawxzzy-mazer-dq6f32ysl): it reads the saved profile name once after sign-in so the header matches the leaderboard after a reload. Checked before merge in a headless browser with a mocked profile call only. After deploy only sign-in was checked; the rename plus reload case was NOT re-run on the deployed build. No independent review is recorded. Nothing on a real phone. Not changed: the sign-in name itself, which is a shared identity decision for the owner. Board update 2026-11-14: Live headless recheck on the deployed build passed at phone and desktop sizes: after a rename and a reload the header and the leaderboard row follow the saved name; the QA name was restored. PR #519 merged (3a3db6fc). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The header after a rename plus reload is checked and written down: yes, it reverted (live, before the fix)",
           "If it reverts to the old name the rename updates the stored sign-in name: not chosen; PR #487 reads the profile name instead",
@@ -2061,26 +2061,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-acct-038_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-ACCT-038",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Retire the remaining dead sign-in form helpers and sign-up sentinels",
-        "description": "Follow-up to MAZER-ACCT-012 (PR #485 and #486, open). The sign-up sentinels and the already-registered mapping in the feedback resolver were kept on purpose because they classify raw provider text and are pinned by tests, and some sign-in form helpers may now have no caller. Plan: prove each unreachable, then delete with its tests. Not started.",
+        "description": "Follow-up to MAZER-ACCT-012 (PR #485 and #486, open). The sign-up sentinels and the already-registered mapping in the feedback resolver were kept on purpose because they classify raw provider text and are pinned by tests, and some sign-in form helpers may now have no caller. Plan: prove each unreachable, then delete with its tests. Not started. Board update 2026-11-14: Merged and deployed; dead sign-in helpers and sign-up sentinels deleted with their tests; no shown copy changed. PR #516 merged (e975c93f), PR #517 merged (371f4c02). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-012"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-14T06:33:46.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-038",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -2088,11 +2088,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-038",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-14T06:33:46.000Z"
       },
       "content": {
-        "summary": "Follow-up to MAZER-ACCT-012 (PR #485 and #486, open). The sign-up sentinels and the already-registered mapping in the feedback resolver were kept on purpose because they classify raw provider text and are pinned by tests, and some sign-in form helpers may now have no caller. Plan: prove each unreachable, then delete with its tests. Not started.",
-        "objective": "Follow-up to MAZER-ACCT-012 (PR #485 and #486, open). The sign-up sentinels and the already-registered mapping in the feedback resolver were kept on purpose because they classify raw provider text and are pinned by tests, and some sign-in form helpers may now have no caller. Plan: prove each unreachable, then delete with its tests. Not started.",
+        "summary": "Follow-up to MAZER-ACCT-012 (PR #485 and #486, open). The sign-up sentinels and the already-registered mapping in the feedback resolver were kept on purpose because they classify raw provider text and are pinned by tests, and some sign-in form helpers may now have no caller. Plan: prove each unreachable, then delete with its tests. Not started. Board update 2026-11-14: Merged and deployed; dead sign-in helpers and sign-up sentinels deleted with their tests; no shown copy changed. PR #516 merged (e975c93f), PR #517 merged (371f4c02). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Follow-up to MAZER-ACCT-012 (PR #485 and #486, open). The sign-up sentinels and the already-registered mapping in the feedback resolver were kept on purpose because they classify raw provider text and are pinned by tests, and some sign-in form helpers may now have no caller. Plan: prove each unreachable, then delete with its tests. Not started. Board update 2026-11-14: Merged and deployed; dead sign-in helpers and sign-up sentinels deleted with their tests; no shown copy changed. PR #516 merged (e975c93f), PR #517 merged (371f4c02). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Each remaining helper or sentinel is proven unreachable or kept with a reason",
           "Unreachable ones are deleted with their tests",
@@ -2121,14 +2121,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Test the account reset flow end to end",
-        "description": "The account site reset flow was tested headlessly: request form validation, the generic response for unknown addresses, busy states, bogus and expired link landings and open-redirect probes all pass. Dead recovery links now offer a request-a-new-link action. The emailed-link leg, known-address timing and the Mazer round trip after a real reset are not verified and need a phone run. Board update 2026-11-13: Headless test merged on the site side (PR 150) with two dead-end fixes; not live yet. The emailed-link leg, known-address timing and the Mazer round trip need the owner phone run; dashboard checks need the owner. FawxzzyWeb PR #150 merged (d867fceb). Merged, not deployed. Checked only in headless Chromium, not on a real phone.",
+        "description": "The account site reset flow was tested headlessly: request form validation, the generic response for unknown addresses, busy states, bogus and expired link landings and open-redirect probes all pass. Dead recovery links now offer a request-a-new-link action. The emailed-link leg, known-address timing and the Mazer round trip after a real reset are not verified and need a phone run. Board update 2026-11-13: Headless test merged on the site side (PR 150) with two dead-end fixes; not live yet. The emailed-link leg, known-address timing and the Mazer round trip need the owner phone run; dashboard checks need the owner. FawxzzyWeb PR #150 merged (d867fceb). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-14: Dead-link fix deployed; headless test report merged. Owner confirmed the reset request message arrives; completing a reset from the emailed link and signing in with the new details is still to be checked on a phone. FawxzzyWeb PR #150 merged (d867fceb). Deployed: production build fawxzzyweb-r73je21xy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "reliability",
         "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-13T20:33:55.000Z",
+        "updated_at": "2026-11-14T06:34:01.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-039",
         "extensions": {
           "owner_status": "review",
@@ -2139,11 +2139,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-039",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T20:33:55.000Z"
+        "source_updated_at": "2026-11-14T06:34:01.000Z"
       },
       "content": {
-        "summary": "The account site reset flow was tested headlessly: request form validation, the generic response for unknown addresses, busy states, bogus and expired link landings and open-redirect probes all pass. Dead recovery links now offer a request-a-new-link action. The emailed-link leg, known-address timing and the Mazer round trip after a real reset are not verified and need a phone run. Board update 2026-11-13: Headless test merged on the site side (PR 150) with two dead-end fixes; not live yet. The emailed-link leg, known-address timing and the Mazer round trip need the owner phone run; dashboard checks need the owner. FawxzzyWeb PR #150 merged (d867fceb). Merged, not deployed. Checked only in headless Chromium, not on a real phone.",
-        "objective": "The account site reset flow was tested headlessly: request form validation, the generic response for unknown addresses, busy states, bogus and expired link landings and open-redirect probes all pass. Dead recovery links now offer a request-a-new-link action. The emailed-link leg, known-address timing and the Mazer round trip after a real reset are not verified and need a phone run. Board update 2026-11-13: Headless test merged on the site side (PR 150) with two dead-end fixes; not live yet. The emailed-link leg, known-address timing and the Mazer round trip need the owner phone run; dashboard checks need the owner. FawxzzyWeb PR #150 merged (d867fceb). Merged, not deployed. Checked only in headless Chromium, not on a real phone.",
+        "summary": "The account site reset flow was tested headlessly: request form validation, the generic response for unknown addresses, busy states, bogus and expired link landings and open-redirect probes all pass. Dead recovery links now offer a request-a-new-link action. The emailed-link leg, known-address timing and the Mazer round trip after a real reset are not verified and need a phone run. Board update 2026-11-13: Headless test merged on the site side (PR 150) with two dead-end fixes; not live yet. The emailed-link leg, known-address timing and the Mazer round trip need the owner phone run; dashboard checks need the owner. FawxzzyWeb PR #150 merged (d867fceb). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-14: Dead-link fix deployed; headless test report merged. Owner confirmed the reset request message arrives; completing a reset from the emailed link and signing in with the new details is still to be checked on a phone. FawxzzyWeb PR #150 merged (d867fceb). Deployed: production build fawxzzyweb-r73je21xy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The account site reset flow was tested headlessly: request form validation, the generic response for unknown addresses, busy states, bogus and expired link landings and open-redirect probes all pass. Dead recovery links now offer a request-a-new-link action. The emailed-link leg, known-address timing and the Mazer round trip after a real reset are not verified and need a phone run. Board update 2026-11-13: Headless test merged on the site side (PR 150) with two dead-end fixes; not live yet. The emailed-link leg, known-address timing and the Mazer round trip need the owner phone run; dashboard checks need the owner. FawxzzyWeb PR #150 merged (d867fceb). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-14: Dead-link fix deployed; headless test report merged. Owner confirmed the reset request message arrives; completing a reset from the emailed link and signing in with the new details is still to be checked on a phone. FawxzzyWeb PR #150 merged (d867fceb). Deployed: production build fawxzzyweb-r73je21xy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Request form, generic response and error states behave as designed on the live site",
           "A real emailed link completes a reset and the account signs in to Mazer with the new details by username and by address",
@@ -2199,6 +2199,159 @@
           "Signed-out launch reaches the account sign-in with no Mazer sign-in flash and signed-in launches do not redirect",
           "Failed, denied and cancelled returns and offline land on the fallback with no loop",
           "Owner confirms on a phone, including cancel-then-return and Sign out then relaunch"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-041_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-041",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Account pages never scroll, host sign-out endpoint, reset ends other sessions",
+        "description": "Account pages fit the viewport with no page scroll (the cause was a 100vh body against a 100dvh screen on iOS). The account site now has a sign-out endpoint that ends this browser session and redirects only to Mazer or the account host, plus a capability ping for Mazer. A completed reset now also ends the account other sessions. Board update 2026-11-14: Merged and deployed on the site (PR 156); headless only. Ping verified live: 204 with the Mazer origin only. iPhone checks pending. FawxzzyWeb PR #156 merged (8ffcd193). Deployed: production build fawxzzyweb-geuv4lbht. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-14T06:33:27.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-041",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-041",
+        "source_status": "current",
+        "source_updated_at": "2026-11-14T06:33:27.000Z"
+      },
+      "content": {
+        "summary": "Account pages fit the viewport with no page scroll (the cause was a 100vh body against a 100dvh screen on iOS). The account site now has a sign-out endpoint that ends this browser session and redirects only to Mazer or the account host, plus a capability ping for Mazer. A completed reset now also ends the account other sessions. Board update 2026-11-14: Merged and deployed on the site (PR 156); headless only. Ping verified live: 204 with the Mazer origin only. iPhone checks pending. FawxzzyWeb PR #156 merged (8ffcd193). Deployed: production build fawxzzyweb-geuv4lbht. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Account pages fit the viewport with no page scroll (the cause was a 100vh body against a 100dvh screen on iOS). The account site now has a sign-out endpoint that ends this browser session and redirects only to Mazer or the account host, plus a capability ping for Mazer. A completed reset now also ends the account other sessions. Board update 2026-11-14: Merged and deployed on the site (PR 156); headless only. Ping verified live: 204 with the Mazer origin only. iPhone checks pending. FawxzzyWeb PR #156 merged (8ffcd193). Deployed: production build fawxzzyweb-geuv4lbht. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "No account route scrolls at rest at phone sizes and the sign-up error list scrolls inside its card only",
+          "The sign-out endpoint redirects only to the allowlist and the ping answers 204 for Mazer only",
+          "Owner confirms on an iPhone including keyboard open and sign-out from the installed app"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-042_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-042",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "No pending text screen between host sign-in and the Mazer loader",
+        "description": "The gray One moment pending card on the account authorize page is replaced by a dark page with the Mazer app icon in the same look as the Mazer loader, and the Mazer loader now appears instantly when it is reached from the account host or with sign-in parameters, so the hand-off has no dark gap. Board update 2026-11-14: Merged and deployed on both sides (site PR 156, Mazer PR 518); the screen recording shows no text loading screen between Sign in and the Mazer loader. Phone check pending. FawxzzyWeb PR #156 merged (8ffcd193), PR #518 merged (ff190bd5). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-14T06:33:31.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-042",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-042",
+        "source_status": "current",
+        "source_updated_at": "2026-11-14T06:33:31.000Z"
+      },
+      "content": {
+        "summary": "The gray One moment pending card on the account authorize page is replaced by a dark page with the Mazer app icon in the same look as the Mazer loader, and the Mazer loader now appears instantly when it is reached from the account host or with sign-in parameters, so the hand-off has no dark gap. Board update 2026-11-14: Merged and deployed on both sides (site PR 156, Mazer PR 518); the screen recording shows no text loading screen between Sign in and the Mazer loader. Phone check pending. FawxzzyWeb PR #156 merged (8ffcd193), PR #518 merged (ff190bd5). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The gray One moment pending card on the account authorize page is replaced by a dark page with the Mazer app icon in the same look as the Mazer loader, and the Mazer loader now appears instantly when it is reached from the account host or with sign-in parameters, so the hand-off has no dark gap. Board update 2026-11-14: Merged and deployed on both sides (site PR 156, Mazer PR 518); the screen recording shows no text loading screen between Sign in and the Mazer loader. Phone check pending. FawxzzyWeb PR #156 merged (8ffcd193), PR #518 merged (ff190bd5). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "No text loading screen between pressing Sign in and the Mazer loader",
+          "Host loader to Mazer loader has no dark gap or icon blink",
+          "Owner confirms on a phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-043_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-043",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "No Mazer account screens: only account.fawxzzy.com screens",
+        "description": "The Welcome screen, the Account overlay, the in-app recovery form and the whole in-app sign-in form path are deleted. The only account state drawn in Mazer is a failure card in the loader look: app icon, one status line and one Try again button. Sign-in, account settings and sign-out live on the account site. Board update 2026-11-14: Merged and deployed; headless only. About 3600 lines of in-app account screens deleted. Leaderboard Edit name stays until the host rename of the Mazer profile is proven. PR #522 merged (853a26c0). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-14T06:33:35.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-043",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-043",
+        "source_status": "current",
+        "source_updated_at": "2026-11-14T06:33:35.000Z"
+      },
+      "content": {
+        "summary": "The Welcome screen, the Account overlay, the in-app recovery form and the whole in-app sign-in form path are deleted. The only account state drawn in Mazer is a failure card in the loader look: app icon, one status line and one Try again button. Sign-in, account settings and sign-out live on the account site. Board update 2026-11-14: Merged and deployed; headless only. About 3600 lines of in-app account screens deleted. Leaderboard Edit name stays until the host rename of the Mazer profile is proven. PR #522 merged (853a26c0). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The Welcome screen, the Account overlay, the in-app recovery form and the whole in-app sign-in form path are deleted. The only account state drawn in Mazer is a failure card in the loader look: app icon, one status line and one Try again button. Sign-in, account settings and sign-out live on the account site. Board update 2026-11-14: Merged and deployed; headless only. About 3600 lines of in-app account screens deleted. Leaderboard Edit name stays until the host rename of the Mazer profile is proven. PR #522 merged (853a26c0). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "No in-app screen for sign-in, sign-up, account settings or recovery remains",
+          "Failure card shows only when the hand-off cannot run and Try again re-runs it",
+          "Leaderboard name edit decision recorded (keep until the host rename is proven)"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -6011,24 +6164,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-motion-010_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-MOTION-010",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Delete or bind the unused tuning value menu.status.pulseDurationMs",
-        "description": "The tuning value menu.status.pulseDurationMs has no reader. Plan: either bind it to the pulse that should use it or delete it, with the tests that pin it. Not started.",
+        "description": "The tuning value menu.status.pulseDurationMs has no reader. Plan: either bind it to the pulse that should use it or delete it, with the tests that pin it. Not started. Board update 2026-11-14: Merged and deployed; unread tuning values deleted, a test fails if one comes back; no runtime change. PR #519 merged (3a3db6fc). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-14T06:33:54.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-010",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -6036,11 +6189,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-010",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-14T06:33:54.000Z"
       },
       "content": {
-        "summary": "The tuning value menu.status.pulseDurationMs has no reader. Plan: either bind it to the pulse that should use it or delete it, with the tests that pin it. Not started.",
-        "objective": "The tuning value menu.status.pulseDurationMs has no reader. Plan: either bind it to the pulse that should use it or delete it, with the tests that pin it. Not started.",
+        "summary": "The tuning value menu.status.pulseDurationMs has no reader. Plan: either bind it to the pulse that should use it or delete it, with the tests that pin it. Not started. Board update 2026-11-14: Merged and deployed; unread tuning values deleted, a test fails if one comes back; no runtime change. PR #519 merged (3a3db6fc). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The tuning value menu.status.pulseDurationMs has no reader. Plan: either bind it to the pulse that should use it or delete it, with the tests that pin it. Not started. Board update 2026-11-14: Merged and deployed; unread tuning values deleted, a test fails if one comes back; no runtime change. PR #519 merged (3a3db6fc). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The value is bound to a reader or deleted",
           "No visible change unless the owner chooses a binding",
@@ -6636,26 +6789,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-perf-009_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PERF-009",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Prefetch or time-slice the first maze of a session",
-        "description": "Boot straight into play, previewLevel and the Play Mazer shortcut still generate the first maze synchronously (100 to 900 ms at 4x CPU). Also investigate the post-install render and bake long task seen once at 4x.",
+        "description": "Boot straight into play, previewLevel and the Play Mazer shortcut still generate the first maze synchronously (100 to 900 ms at 4x CPU). Also investigate the post-install render and bake long task seen once at 4x. Board update 2026-11-14: Merged and deployed; headless only. First maze is built in the worker behind the loader: 0 main-thread generation at level 100. A short placeholder cost remains at 4x. PR #524 merged (3456fb68). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
         "card_type": "reliability",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-PERF-008"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T17:26:34.000Z",
+        "updated_at": "2026-11-14T06:33:42.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-009",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -6663,11 +6816,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-009",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T17:26:34.000Z"
+        "source_updated_at": "2026-11-14T06:33:42.000Z"
       },
       "content": {
-        "summary": "Boot straight into play, previewLevel and the Play Mazer shortcut still generate the first maze synchronously (100 to 900 ms at 4x CPU). Also investigate the post-install render and bake long task seen once at 4x.",
-        "objective": "Boot straight into play, previewLevel and the Play Mazer shortcut still generate the first maze synchronously (100 to 900 ms at 4x CPU). Also investigate the post-install render and bake long task seen once at 4x.",
+        "summary": "Boot straight into play, previewLevel and the Play Mazer shortcut still generate the first maze synchronously (100 to 900 ms at 4x CPU). Also investigate the post-install render and bake long task seen once at 4x. Board update 2026-11-14: Merged and deployed; headless only. First maze is built in the worker behind the loader: 0 main-thread generation at level 100. A short placeholder cost remains at 4x. PR #524 merged (3456fb68). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Boot straight into play, previewLevel and the Play Mazer shortcut still generate the first maze synchronously (100 to 900 ms at 4x CPU). Also investigate the post-install render and bake long task seen once at 4x. Board update 2026-11-14: Merged and deployed; headless only. First maze is built in the worker behind the loader: 0 main-thread generation at level 100. A short placeholder cost remains at 4x. PR #524 merged (3456fb68). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "First maze no longer blocks a frame for more than a few ms at 4x",
           "Maze output stays identical for the same seed",
@@ -8090,6 +8243,59 @@
           "Dev and QA pages and the legacy service worker script are out of the precache",
           "Update behaviour on deploy is decided and documented",
           "Mid-level restore after the reload is measured"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-pwa-007_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PWA-007",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Install gate always on for browser access",
+        "description": "In production every non-installed browser access shows the install gate: no query parameter, hash, sign-in return or user agent lifts it. Android in-app browsers get a copy-the-link card. QA drives builds by emulating an installed app. Board update 2026-11-14: Merged and deployed; headless only. Install gate is always on in production; offline proof 21 of 21. Plain Safari or Chrome check on the phone pending. PR #518 merged (ff190bd5). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-PWA-004"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-14T06:33:38.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PWA-007",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PWA-007",
+        "source_status": "current",
+        "source_updated_at": "2026-11-14T06:33:38.000Z"
+      },
+      "content": {
+        "summary": "In production every non-installed browser access shows the install gate: no query parameter, hash, sign-in return or user agent lifts it. Android in-app browsers get a copy-the-link card. QA drives builds by emulating an installed app. Board update 2026-11-14: Merged and deployed; headless only. Install gate is always on in production; offline proof 21 of 21. Plain Safari or Chrome check on the phone pending. PR #518 merged (ff190bd5). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
+        "objective": "In production every non-installed browser access shows the install gate: no query parameter, hash, sign-in return or user agent lifts it. Android in-app browsers get a copy-the-link card. QA drives builds by emulating an installed app. Board update 2026-11-14: Merged and deployed; headless only. Install gate is always on in production; offline proof 21 of 21. Plain Safari or Chrome check on the phone pending. PR #518 merged (ff190bd5). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Gate shows for every browser class, display mode and URL form off localhost",
+          "Installed contexts including iOS home screen and Android app keep working",
+          "Owner confirms the gate in plain Safari or Chrome on the phone"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -10132,26 +10338,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-ui-023_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-UI-023",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Narrow the menu diagnostics form mode to login only (wave 1C)",
-        "description": "Follow-up to MAZER-ACCT-012. Once the in-app sign-up mode is gone (PR #485 and #486, open), the menu diagnostics form mode can only be login. Plan: narrow its type to login only. This is a wave 1C file and must not be mixed with other waves in one change. Not started.",
+        "description": "Follow-up to MAZER-ACCT-012. Once the in-app sign-up mode is gone (PR #485 and #486, open), the menu diagnostics form mode can only be login. Plan: narrow its type to login only. This is a wave 1C file and must not be mixed with other waves in one change. Not started. Board update 2026-11-14: Merged and deployed; the diagnostics form mode type is login only. PR #521 merged (ec171d61). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-012"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-13T01:30:00.000Z",
+        "updated_at": "2026-11-14T06:33:50.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-023",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -10159,15 +10365,170 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-023",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T01:30:00.000Z"
+        "source_updated_at": "2026-11-14T06:33:50.000Z"
       },
       "content": {
-        "summary": "Follow-up to MAZER-ACCT-012. Once the in-app sign-up mode is gone (PR #485 and #486, open), the menu diagnostics form mode can only be login. Plan: narrow its type to login only. This is a wave 1C file and must not be mixed with other waves in one change. Not started.",
-        "objective": "Follow-up to MAZER-ACCT-012. Once the in-app sign-up mode is gone (PR #485 and #486, open), the menu diagnostics form mode can only be login. Plan: narrow its type to login only. This is a wave 1C file and must not be mixed with other waves in one change. Not started.",
+        "summary": "Follow-up to MAZER-ACCT-012. Once the in-app sign-up mode is gone (PR #485 and #486, open), the menu diagnostics form mode can only be login. Plan: narrow its type to login only. This is a wave 1C file and must not be mixed with other waves in one change. Not started. Board update 2026-11-14: Merged and deployed; the diagnostics form mode type is login only. PR #521 merged (ec171d61). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Follow-up to MAZER-ACCT-012. Once the in-app sign-up mode is gone (PR #485 and #486, open), the menu diagnostics form mode can only be login. Plan: narrow its type to login only. This is a wave 1C file and must not be mixed with other waves in one change. Not started. Board update 2026-11-14: Merged and deployed; the diagnostics form mode type is login only. PR #521 merged (ec171d61). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The diagnostics form mode type is login only",
           "The change carries only wave 1C files",
           "Diagnostics tests pass and the wave 1C one-wave rule is respected"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-024_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-024",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Online counter in the main menu, profile and leaderboard icons swapped",
+        "description": "The main menu header shows a live N online count in the spot where the username was, using Supabase Realtime presence on its own public channel. Signed-in visible tabs only, one anonymous connection per tab, nothing stored, nothing drawn when zero or unknown. The leaderboard icon moved to the top left and the profile icon sits beside the settings cog. Board update 2026-11-14: Merged and deployed; headless only. Live count showed 1 in the signed-in launch recording, which is the first live check of the channel. Owner phone check pending. PR #520 merged (42a67ac5). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-14T06:33:08.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-024",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-024",
+        "source_status": "current",
+        "source_updated_at": "2026-11-14T06:33:08.000Z"
+      },
+      "content": {
+        "summary": "The main menu header shows a live N online count in the spot where the username was, using Supabase Realtime presence on its own public channel. Signed-in visible tabs only, one anonymous connection per tab, nothing stored, nothing drawn when zero or unknown. The leaderboard icon moved to the top left and the profile icon sits beside the settings cog. Board update 2026-11-14: Merged and deployed; headless only. Live count showed 1 in the signed-in launch recording, which is the first live check of the channel. Owner phone check pending. PR #520 merged (42a67ac5). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The main menu header shows a live N online count in the spot where the username was, using Supabase Realtime presence on its own public channel. Signed-in visible tabs only, one anonymous connection per tab, nothing stored, nothing drawn when zero or unknown. The leaderboard icon moved to the top left and the profile icon sits beside the settings cog. Board update 2026-11-14: Merged and deployed; headless only. Live count showed 1 in the signed-in launch recording, which is the first live check of the channel. Owner phone check pending. PR #520 merged (42a67ac5). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Counter shows in the menu header and never overlaps the icons or title",
+          "Count is anonymous, aggregate only, stops when hidden or signed out",
+          "Owner confirms the layout and the live count on a phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-025_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-025",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Privacy text names the live Mazer online count",
+        "description": "The account site privacy text now states that signed-in Mazer players with the game visible are counted as one anonymous connection per tab, only the total is shown, nothing is stored and no name or account id is sent. Board update 2026-11-14: Merged on the site side (PR 158) and deployed with the site build; headless and unit tests only. FawxzzyWeb PR #158 merged (0f4a5a11). Deployed: production build fawxzzyweb-geuv4lbht. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "documentation",
+        "lifecycle": "review",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-UI-024"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-14T06:33:12.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-025",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-025",
+        "source_status": "current",
+        "source_updated_at": "2026-11-14T06:33:12.000Z"
+      },
+      "content": {
+        "summary": "The account site privacy text now states that signed-in Mazer players with the game visible are counted as one anonymous connection per tab, only the total is shown, nothing is stored and no name or account id is sent. Board update 2026-11-14: Merged on the site side (PR 158) and deployed with the site build; headless and unit tests only. FawxzzyWeb PR #158 merged (0f4a5a11). Deployed: production build fawxzzyweb-geuv4lbht. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The account site privacy text now states that signed-in Mazer players with the game visible are counted as one anonymous connection per tab, only the total is shown, nothing is stored and no name or account id is sent. Board update 2026-11-14: Merged on the site side (PR 158) and deployed with the site build; headless and unit tests only. FawxzzyWeb PR #158 merged (0f4a5a11). Deployed: production build fawxzzyweb-geuv4lbht. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Platform and Mazer privacy text carry the sentence",
+          "Version and date bumped with the repo convention",
+          "Legal text tests pin the claims"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-026_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-026",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Settings: three rows removed and a description line required on every row",
+        "description": "Trail Fade, Trail Shine and Animated Background are removed from Settings. Reduce Motion alone decides trail shine and background motion and Trail Fade is fixed off. Every setting row now needs a short description line like Reduce Motion has, enforced by the row type and a test. Board update 2026-11-14: Merged and deployed; headless only. Three rows removed, every row has a description line; Trail Fade pinned off by the coordinator. PR #525 merged (227753c7). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-14T06:33:16.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-026",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-026",
+        "source_status": "current",
+        "source_updated_at": "2026-11-14T06:33:16.000Z"
+      },
+      "content": {
+        "summary": "Trail Fade, Trail Shine and Animated Background are removed from Settings. Reduce Motion alone decides trail shine and background motion and Trail Fade is fixed off. Every setting row now needs a short description line like Reduce Motion has, enforced by the row type and a test. Board update 2026-11-14: Merged and deployed; headless only. Three rows removed, every row has a description line; Trail Fade pinned off by the coordinator. PR #525 merged (227753c7). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Trail Fade, Trail Shine and Animated Background are removed from Settings. Reduce Motion alone decides trail shine and background motion and Trail Fade is fixed off. Every setting row now needs a short description line like Reduce Motion has, enforced by the row type and a test. Board update 2026-11-14: Merged and deployed; headless only. Three rows removed, every row has a description line; Trail Fade pinned off by the coordinator. PR #525 merged (227753c7). Deployed: production build fawxzzy-mazer-d6in8php0. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "The three rows are gone and old stored values are ignored safely",
+          "Every setting row has a non-empty description that fits at phone sizes",
+          "Owner confirms the sheet on a phone"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -12241,6 +12602,110 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-vis-040_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-040",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Smooth maze build-in and build-out",
+        "description": "The maze builds in and out through a per-cell eased reveal (700 ms fade per cell on the existing build order) instead of hard steps. Edge docks and markers fade on the same clock and Reduce Motion gets a 200 ms board crossfade. Total timing and input unlock are unchanged. Board update 2026-11-14: Merged and deployed; headless only. Hard pops on the maze layer went from about 200 frames to 0; recorded signed-in launch shows the soft reveal. PR #523 merged (e831d146). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-14T06:33:20.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-040",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-040",
+        "source_status": "current",
+        "source_updated_at": "2026-11-14T06:33:20.000Z"
+      },
+      "content": {
+        "summary": "The maze builds in and out through a per-cell eased reveal (700 ms fade per cell on the existing build order) instead of hard steps. Edge docks and markers fade on the same clock and Reduce Motion gets a 200 ms board crossfade. Total timing and input unlock are unchanged. Board update 2026-11-14: Merged and deployed; headless only. Hard pops on the maze layer went from about 200 frames to 0; recorded signed-in launch shows the soft reveal. PR #523 merged (e831d146). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The maze builds in and out through a per-cell eased reveal (700 ms fade per cell on the existing build order) instead of hard steps. Edge docks and markers fade on the same clock and Reduce Motion gets a 200 ms board crossfade. Total timing and input unlock are unchanged. Board update 2026-11-14: Merged and deployed; headless only. Hard pops on the maze layer went from about 200 frames to 0; recorded signed-in launch shows the soft reveal. PR #523 merged (e831d146). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "No hard pixel pops on the maze layer during build-in or build-out",
+          "Timing and input unlock unchanged and frame cost not worse",
+          "Owner confirms the reveal looks smooth on a phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-041_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-041",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "End star spins slowly and stays visible under the player",
+        "description": "The goal star turns once every 14 s about its centre (static under Reduce Motion) and is always drawn, including when the player stands on it: the player marker draws over it with a translucent core so the star shows through. Board update 2026-11-14: Merged and deployed; headless only. One revolution per 14 s, static under Reduce Motion, star stays under the player marker. PR #515 merged (83b1ca96). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-VIS-034"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-14T06:33:24.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-041",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-041",
+        "source_status": "current",
+        "source_updated_at": "2026-11-14T06:33:24.000Z"
+      },
+      "content": {
+        "summary": "The goal star turns once every 14 s about its centre (static under Reduce Motion) and is always drawn, including when the player stands on it: the player marker draws over it with a translucent core so the star shows through. Board update 2026-11-14: Merged and deployed; headless only. One revolution per 14 s, static under Reduce Motion, star stays under the player marker. PR #515 merged (83b1ca96). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The goal star turns once every 14 s about its centre (static under Reduce Motion) and is always drawn, including when the player stands on it: the player marker draws over it with a translucent core so the star shows through. Board update 2026-11-14: Merged and deployed; headless only. One revolution per 14 s, static under Reduce Motion, star stays under the player marker. PR #515 merged (83b1ca96). Deployed: production build fawxzzy-mazer-dfh38rip1. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Star spins smoothly without wobble and stops under Reduce Motion",
+          "Star stays visible with the player on it",
+          "Owner confirms the overlap look on a phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-world-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -12296,9 +12761,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 234,
-    "exported_public_card_count": 234,
-    "exported_open_card_count": 125,
+    "stable_identity_count": 243,
+    "exported_public_card_count": 243,
+    "exported_open_card_count": 134,
     "exported_completed_card_count": 93,
     "exported_deferred_card_count": 16,
     "imported_research_candidate_count": 0,
