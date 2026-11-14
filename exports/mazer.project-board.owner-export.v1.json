@@ -1,11 +1,11 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_50f71f651258",
+  "export_id": "pbe_mazer_owner_registry_ad255d8df18b",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:50f71f651258d4065e2401cddd75d85242597b36b9ffaeaa5071b6b22c8f9e37",
+  "source_revision": "sha256:ad255d8df18b2e74cde17a980176db6b14b03b34033c3414802e517f90397992",
   "generated_at": "2026-11-14T08:20:51.000Z",
   "sources": [
     {
@@ -13,7 +13,7 @@
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:903c35c4537facf1242732197212d57c520f5c4d9f988600ae18b08fea83620c",
+      "revision": "sha256:5c41dbd31d46bce24fbbf53b2dcdf87b3aef464bec0b8253258cc531b896e896",
       "observed_at": "2026-11-14T08:20:51.000Z"
     },
     {
@@ -2734,57 +2734,6 @@
       }
     },
     {
-      "idempotency_key": "pbk_mazer_mazer-cam-001_v1",
-      "record_kind": "project-work",
-      "record_status": "candidate",
-      "record": {
-        "contract_version": "atlas.card-record.v2",
-        "card_id": "MAZER-CAM-001",
-        "project_id": "mazer",
-        "board_id": "discordos:project-feedback:mazer",
-        "title": "Add a play camera zoom and minimap (deferred)",
-        "description": "The board asked for a play camera zoom with a minimap. The owner deferred the zoom lever; a zoom option normaliser existed at base, and the Board Zoom setting was later removed because board size is frozen. No minimap exists.",
-        "card_type": "feature",
-        "lifecycle": "intake",
-        "priority": "low",
-        "owner": "mazer",
-        "dependencies": [],
-        "board_version": 1,
-        "updated_at": "2026-11-06T00:00:00.000Z",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CAM-001",
-        "extensions": {
-          "owner_status": "deferred_candidate",
-          "public_safe": true
-        }
-      },
-      "source": {
-        "source_id": "mazer-owner-work-registry",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CAM-001",
-        "source_status": "current",
-        "source_updated_at": "2026-11-06T00:00:00.000Z"
-      },
-      "content": {
-        "summary": "The board asked for a play camera zoom with a minimap. The owner deferred the zoom lever; a zoom option normaliser existed at base, and the Board Zoom setting was later removed because board size is frozen. No minimap exists.",
-        "objective": "The board asked for a play camera zoom with a minimap. The owner deferred the zoom lever; a zoom option normaliser existed at base, and the Board Zoom setting was later removed because board size is frozen. No minimap exists.",
-        "acceptance_criteria": [
-          "Owner reopens the item explicitly",
-          "Any zoom keeps the board readable on small screens",
-          "A minimap decision is recorded separately"
-        ],
-        "discoveries": [],
-        "next_actions": [],
-        "blockers": [],
-        "evidence": [
-          "repos/mazer/config/mazer-owner-work-registry.json"
-        ]
-      },
-      "relationships": {
-        "parent_card_id": null,
-        "duplicate_of": null,
-        "superseded_by": null
-      }
-    },
-    {
       "idempotency_key": "pbk_mazer_mazer-chal-001_v1",
       "record_kind": "project-work",
       "record_status": "candidate",
@@ -4391,57 +4340,6 @@
       }
     },
     {
-      "idempotency_key": "pbk_mazer_mazer-gen-003_v1",
-      "record_kind": "project-work",
-      "record_status": "candidate",
-      "record": {
-        "contract_version": "atlas.card-record.v2",
-        "card_id": "MAZER-GEN-003",
-        "project_id": "mazer",
-        "board_id": "discordos:project-feedback:mazer",
-        "title": "Extract the maze pattern engine and batch generator as contracts",
-        "description": "Deferred: Two maze modules, the pattern engine and the batch generator, were documented as extraction candidates with inputs, outputs and lifecycle rules. Both still depend on the oversized shared maze core. The doc's own readiness verdict is refactor first: give each a dedicated source boundary and contract tests before promoting either.",
-        "card_type": "architecture",
-        "lifecycle": "intake",
-        "priority": "low",
-        "owner": "mazer",
-        "dependencies": [],
-        "board_version": 1,
-        "updated_at": "2026-04-11T00:00:00.000Z",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-003",
-        "extensions": {
-          "owner_status": "deferred_candidate",
-          "public_safe": true
-        }
-      },
-      "source": {
-        "source_id": "mazer-owner-work-registry",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-003",
-        "source_status": "current",
-        "source_updated_at": "2026-04-11T00:00:00.000Z"
-      },
-      "content": {
-        "summary": "Deferred: Two maze modules, the pattern engine and the batch generator, were documented as extraction candidates with inputs, outputs and lifecycle rules. Both still depend on the oversized shared maze core. The doc's own readiness verdict is refactor first: give each a dedicated source boundary and contract tests before promoting either.",
-        "objective": "Deferred: Two maze modules, the pattern engine and the batch generator, were documented as extraction candidates with inputs, outputs and lifecycle rules. Both still depend on the oversized shared maze core. The doc's own readiness verdict is refactor first: give each a dedicated source boundary and contract tests before promoting either.",
-        "acceptance_criteria": [
-          "Each module has its own source boundary",
-          "Each module has dedicated contract tests independent of the shared core",
-          "Descendants stay framed as modern extractions, not legacy recoveries"
-        ],
-        "discoveries": [],
-        "next_actions": [],
-        "blockers": [],
-        "evidence": [
-          "repos/mazer/config/mazer-owner-work-registry.json"
-        ]
-      },
-      "relationships": {
-        "parent_card_id": null,
-        "duplicate_of": null,
-        "superseded_by": null
-      }
-    },
-    {
       "idempotency_key": "pbk_mazer_mazer-gen-004_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -5689,108 +5587,6 @@
       }
     },
     {
-      "idempotency_key": "pbk_mazer_mazer-mode-001_v1",
-      "record_kind": "project-work",
-      "record_status": "candidate",
-      "record": {
-        "contract_version": "atlas.card-record.v2",
-        "card_id": "MAZER-MODE-001",
-        "project_id": "mazer",
-        "board_id": "discordos:project-feedback:mazer",
-        "title": "Build the moving procedural maze mode (deferred)",
-        "description": "Four board cards covered a moving maze mode: the mode itself, lane correction, one-tile lane snap and assisted-motion proof. No moving-maze code exists and the owner deferred the whole set; they are merged here as one deliverable.",
-        "card_type": "feature",
-        "lifecycle": "intake",
-        "priority": "low",
-        "owner": "mazer",
-        "dependencies": [],
-        "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MODE-001",
-        "extensions": {
-          "owner_status": "deferred_candidate",
-          "public_safe": true
-        }
-      },
-      "source": {
-        "source_id": "mazer-owner-work-registry",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MODE-001",
-        "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
-      },
-      "content": {
-        "summary": "Four board cards covered a moving maze mode: the mode itself, lane correction, one-tile lane snap and assisted-motion proof. No moving-maze code exists and the owner deferred the whole set; they are merged here as one deliverable.",
-        "objective": "Four board cards covered a moving maze mode: the mode itself, lane correction, one-tile lane snap and assisted-motion proof. No moving-maze code exists and the owner deferred the whole set; they are merged here as one deliverable.",
-        "acceptance_criteria": [
-          "Owner reopens the item",
-          "Lane correction contract is written before code",
-          "Assisted motion is proven on a real device"
-        ],
-        "discoveries": [],
-        "next_actions": [],
-        "blockers": [],
-        "evidence": [
-          "repos/mazer/config/mazer-owner-work-registry.json"
-        ]
-      },
-      "relationships": {
-        "parent_card_id": null,
-        "duplicate_of": null,
-        "superseded_by": null
-      }
-    },
-    {
-      "idempotency_key": "pbk_mazer_mazer-mode-002_v1",
-      "record_kind": "project-work",
-      "record_status": "candidate",
-      "record": {
-        "contract_version": "atlas.card-record.v2",
-        "card_id": "MAZER-MODE-002",
-        "project_id": "mazer",
-        "board_id": "discordos:project-feedback:mazer",
-        "title": "Plan multiplayer and endless survival mode (deferred)",
-        "description": "Two board cards covered a multiplayer foundation and an endless multiplayer survival mode. Neither is started; the owner deferred both and they are merged into one card.",
-        "card_type": "feature",
-        "lifecycle": "intake",
-        "priority": "low",
-        "owner": "mazer",
-        "dependencies": [],
-        "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MODE-002",
-        "extensions": {
-          "owner_status": "deferred_candidate",
-          "public_safe": true
-        }
-      },
-      "source": {
-        "source_id": "mazer-owner-work-registry",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MODE-002",
-        "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
-      },
-      "content": {
-        "summary": "Two board cards covered a multiplayer foundation and an endless multiplayer survival mode. Neither is started; the owner deferred both and they are merged into one card.",
-        "objective": "Two board cards covered a multiplayer foundation and an endless multiplayer survival mode. Neither is started; the owner deferred both and they are merged into one card.",
-        "acceptance_criteria": [
-          "Owner reopens the item",
-          "A multiplayer foundation contract exists before code",
-          "Single-player progression is unaffected"
-        ],
-        "discoveries": [],
-        "next_actions": [],
-        "blockers": [],
-        "evidence": [
-          "repos/mazer/config/mazer-owner-work-registry.json"
-        ]
-      },
-      "relationships": {
-        "parent_card_id": null,
-        "duplicate_of": null,
-        "superseded_by": null
-      }
-    },
-    {
       "idempotency_key": "pbk_mazer_mazer-motion-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -6425,57 +6221,6 @@
       }
     },
     {
-      "idempotency_key": "pbk_mazer_mazer-path-001_v1",
-      "record_kind": "project-work",
-      "record_status": "candidate",
-      "record": {
-        "contract_version": "atlas.card-record.v2",
-        "card_id": "MAZER-PATH-001",
-        "project_id": "mazer",
-        "board_id": "discordos:project-feedback:mazer",
-        "title": "Define a diagonal path graph contract (deferred)",
-        "description": "The board held a card for allowing diagonal movement in the path graph, barely started. The owner deferred it.",
-        "card_type": "architecture",
-        "lifecycle": "intake",
-        "priority": "low",
-        "owner": "mazer",
-        "dependencies": [],
-        "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PATH-001",
-        "extensions": {
-          "owner_status": "deferred_candidate",
-          "public_safe": true
-        }
-      },
-      "source": {
-        "source_id": "mazer-owner-work-registry",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PATH-001",
-        "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
-      },
-      "content": {
-        "summary": "The board held a card for allowing diagonal movement in the path graph, barely started. The owner deferred it.",
-        "objective": "The board held a card for allowing diagonal movement in the path graph, barely started. The owner deferred it.",
-        "acceptance_criteria": [
-          "Owner reopens the item",
-          "A contract specifies solvability with diagonals",
-          "Existing levels are unaffected"
-        ],
-        "discoveries": [],
-        "next_actions": [],
-        "blockers": [],
-        "evidence": [
-          "repos/mazer/config/mazer-owner-work-registry.json"
-        ]
-      },
-      "relationships": {
-        "parent_card_id": null,
-        "duplicate_of": null,
-        "superseded_by": null
-      }
-    },
-    {
       "idempotency_key": "pbk_mazer_mazer-perf-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -6988,59 +6733,6 @@
         "blockers": [],
         "evidence": [
           "repos/mazer/config/mazer-owner-work-registry.json"
-        ]
-      },
-      "relationships": {
-        "parent_card_id": null,
-        "duplicate_of": null,
-        "superseded_by": null
-      }
-    },
-    {
-      "idempotency_key": "pbk_mazer_mazer-planet-001_v1",
-      "record_kind": "project-work",
-      "record_status": "candidate",
-      "record": {
-        "contract_version": "atlas.card-record.v2",
-        "card_id": "MAZER-PLANET-001",
-        "project_id": "mazer",
-        "board_id": "discordos:project-feedback:mazer",
-        "title": "Research a rotating planet maze",
-        "description": "Deferred: retain the parked planet-maze research sequence without presenting it as current product work.",
-        "card_type": "research",
-        "lifecycle": "intake",
-        "priority": null,
-        "owner": "mazer",
-        "dependencies": [
-          "MAZER-2D-001"
-        ],
-        "board_version": 1,
-        "updated_at": "2026-04-16T00:00:00.000Z",
-        "source_ref": "repos/mazer/docs/roadmap.md#parked-future-lane",
-        "extensions": {
-          "owner_status": "deferred_candidate",
-          "public_safe": true
-        }
-      },
-      "source": {
-        "source_id": "mazer-roadmap",
-        "source_ref": "repos/mazer/docs/roadmap.md#parked-future-lane",
-        "source_status": "current",
-        "source_updated_at": "2026-04-16T00:00:00.000Z"
-      },
-      "content": {
-        "summary": "Deferred: retain the parked planet-maze research sequence without presenting it as current product work.",
-        "objective": "Deferred: retain the parked planet-maze research sequence without presenting it as current product work.",
-        "acceptance_criteria": [
-          "A separate spike proves clarity.",
-          "A separate spike proves orientation.",
-          "Integration requires a future owner decision."
-        ],
-        "discoveries": [],
-        "next_actions": [],
-        "blockers": [],
-        "evidence": [
-          "repos/mazer/docs/roadmap.md"
         ]
       },
       "relationships": {
@@ -8931,59 +8623,6 @@
       }
     },
     {
-      "idempotency_key": "pbk_mazer_mazer-run-002_v1",
-      "record_kind": "project-work",
-      "record_status": "candidate",
-      "record": {
-        "contract_version": "atlas.card-record.v2",
-        "card_id": "MAZER-RUN-002",
-        "project_id": "mazer",
-        "board_id": "discordos:project-feedback:mazer",
-        "title": "Show run quality to the player after a run (deferred)",
-        "description": "A player-facing results display for run quality was deferred by the owner.",
-        "card_type": "feature",
-        "lifecycle": "intake",
-        "priority": "low",
-        "owner": "mazer",
-        "dependencies": [
-          "MAZER-RUN-001"
-        ],
-        "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-RUN-002",
-        "extensions": {
-          "owner_status": "deferred_candidate",
-          "public_safe": true
-        }
-      },
-      "source": {
-        "source_id": "mazer-owner-work-registry",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-RUN-002",
-        "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
-      },
-      "content": {
-        "summary": "A player-facing results display for run quality was deferred by the owner.",
-        "objective": "A player-facing results display for run quality was deferred by the owner.",
-        "acceptance_criteria": [
-          "Owner reopens the item",
-          "Results display uses the shared status panel",
-          "No ranking is implied without a decision"
-        ],
-        "discoveries": [],
-        "next_actions": [],
-        "blockers": [],
-        "evidence": [
-          "repos/mazer/config/mazer-owner-work-registry.json"
-        ]
-      },
-      "relationships": {
-        "parent_card_id": null,
-        "duplicate_of": null,
-        "superseded_by": null
-      }
-    },
-    {
       "idempotency_key": "pbk_mazer_mazer-run-003_v1",
       "record_kind": "project-work",
       "record_status": "candidate",
@@ -9139,57 +8778,6 @@
       }
     },
     {
-      "idempotency_key": "pbk_mazer_mazer-social-001_v1",
-      "record_kind": "project-work",
-      "record_status": "candidate",
-      "record": {
-        "contract_version": "atlas.card-record.v2",
-        "card_id": "MAZER-SOCIAL-001",
-        "project_id": "mazer",
-        "board_id": "discordos:project-feedback:mazer",
-        "title": "Define social profiles, friends and events (deferred)",
-        "description": "The board had a contract card for social profiles, friends and events. Not started; deferred by the owner.",
-        "card_type": "architecture",
-        "lifecycle": "intake",
-        "priority": "low",
-        "owner": "mazer",
-        "dependencies": [],
-        "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-SOCIAL-001",
-        "extensions": {
-          "owner_status": "deferred_candidate",
-          "public_safe": true
-        }
-      },
-      "source": {
-        "source_id": "mazer-owner-work-registry",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-SOCIAL-001",
-        "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
-      },
-      "content": {
-        "summary": "The board had a contract card for social profiles, friends and events. Not started; deferred by the owner.",
-        "objective": "The board had a contract card for social profiles, friends and events. Not started; deferred by the owner.",
-        "acceptance_criteria": [
-          "Owner reopens the item",
-          "A contract defines profile visibility rules",
-          "Server parts get explicit provider approval"
-        ],
-        "discoveries": [],
-        "next_actions": [],
-        "blockers": [],
-        "evidence": [
-          "repos/mazer/config/mazer-owner-work-registry.json"
-        ]
-      },
-      "relationships": {
-        "parent_card_id": null,
-        "duplicate_of": null,
-        "superseded_by": null
-      }
-    },
-    {
       "idempotency_key": "pbk_mazer_mazer-teleport-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -9234,57 +8822,6 @@
         "blockers": [],
         "evidence": [
           "repos/mazer/docs/current-truth.md"
-        ]
-      },
-      "relationships": {
-        "parent_card_id": null,
-        "duplicate_of": null,
-        "superseded_by": null
-      }
-    },
-    {
-      "idempotency_key": "pbk_mazer_mazer-tools-001_v1",
-      "record_kind": "project-work",
-      "record_status": "candidate",
-      "record": {
-        "contract_version": "atlas.card-record.v2",
-        "card_id": "MAZER-TOOLS-001",
-        "project_id": "mazer",
-        "board_id": "discordos:project-feedback:mazer",
-        "title": "Define a handcrafted asset authoring and import workflow",
-        "description": "The board wanted a workflow for authoring and importing handcrafted art assets. Not started and awaiting an owner decision.",
-        "card_type": "automation",
-        "lifecycle": "planning",
-        "priority": "low",
-        "owner": "mazer",
-        "dependencies": [],
-        "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-TOOLS-001",
-        "extensions": {
-          "owner_status": "planning",
-          "public_safe": true
-        }
-      },
-      "source": {
-        "source_id": "mazer-owner-work-registry",
-        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-TOOLS-001",
-        "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
-      },
-      "content": {
-        "summary": "The board wanted a workflow for authoring and importing handcrafted art assets. Not started and awaiting an owner decision.",
-        "objective": "The board wanted a workflow for authoring and importing handcrafted art assets. Not started and awaiting an owner decision.",
-        "acceptance_criteria": [
-          "The import path is documented",
-          "Assets are validated on import",
-          "The owner approves the format"
-        ],
-        "discoveries": [],
-        "next_actions": [],
-        "blockers": [],
-        "evidence": [
-          "repos/mazer/config/mazer-owner-work-registry.json"
         ]
       },
       "relationships": {
@@ -13132,11 +12669,11 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 250,
-    "exported_public_card_count": 250,
-    "exported_open_card_count": 95,
+    "stable_identity_count": 241,
+    "exported_public_card_count": 241,
+    "exported_open_card_count": 94,
     "exported_completed_card_count": 121,
-    "exported_deferred_card_count": 34,
+    "exported_deferred_card_count": 26,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
     "discordos_role": "provenance-and-board-identity-only",

@@ -118,19 +118,6 @@
       "lane": null,
       "filesHint": []
     },
-    "MAZER-PLANET-001": {
-      "evidence": null,
-      "blocker": {
-        "kind": "deferred-by-owner",
-        "summary": "Parked research; not current product work.",
-        "unblockedBy": "Zac",
-        "ask": "Say if the planet-maze research should come back.",
-        "recommendation": "Leave deferred."
-      },
-      "verify": [],
-      "lane": null,
-      "filesHint": []
-    },
     "MAZER-CYBERDECK-001": {
       "evidence": null,
       "blocker": {
@@ -738,19 +725,6 @@
     "MAZER-GEN-004": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 404}], "headless": false, "deviceChecked": false},
       "blocker": null,
-      "verify": [],
-      "lane": null,
-      "filesHint": []
-    },
-    "MAZER-GEN-003": {
-      "evidence": null,
-      "blocker": {
-        "kind": "deferred-by-owner",
-        "summary": "Both extraction candidates need a refactor of the shared maze core first.",
-        "unblockedBy": "Zac",
-        "ask": "Say if the maze-core refactor should be scheduled.",
-        "recommendation": "Leave deferred."
-      },
       "verify": [],
       "lane": null,
       "filesHint": []
@@ -1411,19 +1385,6 @@
       "lane": null,
       "filesHint": []
     },
-    "MAZER-RUN-002": {
-      "evidence": null,
-      "blocker": {
-        "kind": "deferred-by-owner",
-        "summary": "Player-facing run quality display deferred by the owner.",
-        "unblockedBy": "Zac",
-        "ask": "Say if run quality should be shown to the player.",
-        "recommendation": "Leave deferred."
-      },
-      "verify": [],
-      "lane": null,
-      "filesHint": []
-    },
     "MAZER-RUN-003": {
       "evidence": null,
       "blocker": {
@@ -1495,71 +1456,6 @@
       "lane": "owner-only",
       "filesHint": []
     },
-    "MAZER-CAM-001": {
-      "evidence": null,
-      "blocker": {
-        "kind": "deferred-by-owner",
-        "summary": "Camera zoom and minimap deferred; board size is frozen.",
-        "unblockedBy": "Zac",
-        "ask": "Say if zoom should come back.",
-        "recommendation": "Leave deferred."
-      },
-      "verify": [],
-      "lane": null,
-      "filesHint": []
-    },
-    "MAZER-PATH-001": {
-      "evidence": null,
-      "blocker": {
-        "kind": "deferred-by-owner",
-        "summary": "Diagonal path graph deferred by the owner.",
-        "unblockedBy": "Zac",
-        "ask": "Say if diagonal movement should come back.",
-        "recommendation": "Leave deferred."
-      },
-      "verify": [],
-      "lane": null,
-      "filesHint": []
-    },
-    "MAZER-MODE-001": {
-      "evidence": null,
-      "blocker": {
-        "kind": "deferred-by-owner",
-        "summary": "Moving maze mode deferred by the owner.",
-        "unblockedBy": "Zac",
-        "ask": "Say if a moving maze mode should come back.",
-        "recommendation": "Leave deferred."
-      },
-      "verify": [],
-      "lane": null,
-      "filesHint": []
-    },
-    "MAZER-MODE-002": {
-      "evidence": null,
-      "blocker": {
-        "kind": "deferred-by-owner",
-        "summary": "Multiplayer and endless survival deferred by the owner.",
-        "unblockedBy": "Zac",
-        "ask": "Say if multiplayer should come back.",
-        "recommendation": "Leave deferred."
-      },
-      "verify": [],
-      "lane": null,
-      "filesHint": []
-    },
-    "MAZER-SOCIAL-001": {
-      "evidence": null,
-      "blocker": {
-        "kind": "deferred-by-owner",
-        "summary": "Social profiles, friends and events deferred by the owner.",
-        "unblockedBy": "Zac",
-        "ask": "Say if social features should come back.",
-        "recommendation": "Leave deferred."
-      },
-      "verify": [],
-      "lane": null,
-      "filesHint": []
-    },
     "MAZER-CHAL-001": {
       "evidence": null,
       "blocker": {
@@ -1568,19 +1464,6 @@
         "recommendation": "Leave deferred.",
         "summary": "Shared seed challenges need a provider change and the contracts first.",
         "unblockedBy": "other-card"
-      },
-      "verify": [],
-      "lane": "owner-only",
-      "filesHint": []
-    },
-    "MAZER-TOOLS-001": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "Not started; needs an owner decision on the asset format.",
-        "unblockedBy": "Zac",
-        "ask": "Do you want a handcrafted-asset import workflow, and in which file format?",
-        "recommendation": "Park it as deferred; no open card depends on it."
       },
       "verify": [],
       "lane": "owner-only",
