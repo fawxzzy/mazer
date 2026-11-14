@@ -151,3 +151,4 @@
 {"card":"MAZER-CHAL-001","id":"1cc991f00187","status":"deferred_candidate","text":"Deferred by owner call on 2026-11-14: parked until the economy and hazard contracts settle.","ts":"2026-11-14T16:49:04Z","v":1}
 {"card":"MAZER-RUN-003","id":"d6698e6bceb6","status":"deferred_candidate","text":"Deferred by owner call on 2026-11-14: parked until the leaderboard rule is decided; low priority.","ts":"2026-11-14T16:49:09Z","v":1}
 {"card":"MAZER-RUN-004","id":"83016ca0ad04","status":"deferred_candidate","text":"Deferred by owner call on 2026-11-14: parked until the menu scene carve-out lands, then wire the run panel.","ts":"2026-11-14T16:49:13Z","v":1}
+{"card":"MAZER-ACCT-016","id":"58b2f0fc86c9","status":"deferred_candidate","text":"Deferred: waiting on the family member's answers; nothing to build meanwhile.","ts":"2026-11-14T16:49:17Z","v":1}
