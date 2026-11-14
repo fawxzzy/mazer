@@ -146,3 +146,4 @@
 {"card":"MAZER-ACCT-034","id":"39fcddf67cfd","status":"deferred_candidate","text":"Deferred: the stored display name backfill would overwrite names players may have chosen; not planned.","ts":"2026-11-14T16:48:28Z","v":1}
 {"card":"MAZER-NATIVE-001","id":"3fdcf6a905fb","status":"deferred_candidate","text":"Deferred: web first, installed web app only; a native wrapper is not planned.","ts":"2026-11-14T16:48:37Z","v":1}
 {"card":"MAZER-UI-016","id":"fa74d1f366a1","status":"deferred_candidate","text":"Deferred: desktop framing is parked until the phone layout work settles.","ts":"2026-11-14T16:48:45Z","v":1}
+{"card":"MAZER-AI-002","id":"9b3527ae251b","status":"deferred_candidate","text":"Deferred by owner call on 2026-11-14: parked until the shop and economy contract is signed.","ts":"2026-11-14T16:48:52Z","v":1}
