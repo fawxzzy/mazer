@@ -148,3 +148,4 @@
 {"card":"MAZER-UI-016","id":"fa74d1f366a1","status":"deferred_candidate","text":"Deferred: desktop framing is parked until the phone layout work settles.","ts":"2026-11-14T16:48:45Z","v":1}
 {"card":"MAZER-AI-002","id":"9b3527ae251b","status":"deferred_candidate","text":"Deferred by owner call on 2026-11-14: parked until the shop and economy contract is signed.","ts":"2026-11-14T16:48:52Z","v":1}
 {"card":"MAZER-AUDIO-002","id":"b84d7784c439","status":"deferred_candidate","text":"Deferred by owner call on 2026-11-14: parked until sound effects ship and the shell audio setting returns.","ts":"2026-11-14T16:48:58Z","v":1}
+{"card":"MAZER-CHAL-001","id":"1cc991f00187","status":"deferred_candidate","text":"Deferred by owner call on 2026-11-14: parked until the economy and hazard contracts settle.","ts":"2026-11-14T16:49:04Z","v":1}
