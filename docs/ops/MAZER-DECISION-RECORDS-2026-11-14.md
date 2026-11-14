@@ -171,3 +171,15 @@ Card action: MAZER-UI-020 completes on this record. MAZER-VIS-012 stays open as 
 ## Reversal
 
 Say "overrule MAZER-XXX-NNN" for any decision above. Reversal is a new board event plus, where a build card already exists, a status change on it; nothing in this record is irreversible and nothing here touched code or data.
+
+## Addendum 2026-11-14: owner-only decisions signed ("yes to all")
+
+Later the same day the owner answered "yes to all" to the list of owner-only decisions. This addendum supersedes the "Not decided here" rows for MAZER-HAZ-002 and the "not touched" line for its merged cards; the other "Not decided here" rows (DATA-002, DATA-003, ACCT-020/026/027/028) are NOT covered by it and stay open.
+
+| Card | Decision recorded | Where |
+| --- | --- | --- |
+| MAZER-HAZ-002 | Hazard product contract, phase 1, signed. Docs and tests only; no hazard code, nothing player-visible. | `docs/research/MAZER_HAZARD_CONTRACT_PHASE1_2026-11-14.md` |
+| MAZER-PROG-019 | The strictly rising geometry ladder ends and hazards take over after it; folded into HAZ-002. The card text says 218; source says 288 (after MAZER-GEN-007), longer, so the acceptance stands. | same file, "Where the hazard budget starts" |
+| MAZER-PROG-005 | Lever after the plateau chosen: hazards (not a bigger board). The card text says the budget starts at 388; that is the removed mastery tier, the rule is `level - GEOMETRY_BUDGET_SATURATION_LEVEL` (288 today). | same file |
+
+Reversal: say "overrule MAZER-HAZ-002". Nothing here changed code, config, the board registry or any database.

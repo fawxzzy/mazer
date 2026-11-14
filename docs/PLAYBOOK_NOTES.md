@@ -189,3 +189,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: the 8 Navigation Core ENERGY stop literals moved from `navigationCoreTrail.ts` into `trailPalette.ts` (a colour-definition file) as `NAVIGATION_CORE_TRAIL_ENERGY_STOPS`, re-exported from the old path; off-theme baseline lowered by exactly 8 (288 to 280 off-token, 363 to 355 total); design-token evidence file pointers updated.
 - WHY it changed: first slice of the stray-colour migration; values and order are identical (pinned by `tests/render/navigation-core-energy-stops.test.ts`), so no visible change.
 - Status: Applied
+
+## 2026-11-14 - MAZER-HAZ-002 hazard contract phase 1 signed (docs and tests only)
+- WHAT changed: Added `docs/research/MAZER_HAZARD_CONTRACT_PHASE1_2026-11-14.md` (the 2026-11-05 draft plus a signature record: owner "yes to all", 2026-11-14), a decision-record addendum, world-turn contract wording, and `tests/architecture/hazard-contract-signed.test.ts`.
+- WHY it changed: the owner decided to sign phase 1 and accept that the geometry ladder ends (MAZER-PROG-019, MAZER-PROG-005); the repo needed the signature and the hazard-budget start rule on record.
+- Rule: the hazard budget start is symbolic (`level - GEOMETRY_BUDGET_SATURATION_LEVEL`, 288 on main); the 388 and 218 on older cards are stale. The hazard layer stays dormant; signing enabled no code.
+- Status: Applied
