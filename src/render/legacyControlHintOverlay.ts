@@ -125,7 +125,7 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
     Object.assign(node.style, {
       position: 'fixed', left: '50%', transform: 'translateX(-50%)',
       bottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
-      maxWidth: 'calc(100vw - 32px)', padding: '6px 14px', whiteSpace: 'pre-line', borderRadius: '16px',
+      width: 'max-content', maxWidth: 'calc(100vw - 32px)', padding: '6px 14px', whiteSpace: 'pre-line', borderRadius: '16px',
       background: 'rgba(8, 12, 28, 0.82)', border: '1px solid rgba(183, 242, 255, 0.45)',
       color: 'rgb(232, 251, 255)', font: '600 13px/1.3 system-ui, sans-serif', textAlign: 'center',
       pointerEvents: 'none', userSelect: 'none', zIndex: '5', opacity: '0'
