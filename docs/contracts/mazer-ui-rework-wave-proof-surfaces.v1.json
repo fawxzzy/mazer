@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "card": "MAZER-UI-028",
+  "title": "Mazer UI rework: per-wave visual proof surfaces",
+  "rule": "A UI rework wave cannot be called done (registry status completed, or proof.done true here) until it lists the surfaces it changes and a headless capture of each is committed under its evidenceDir with a metadata.json. A done wave without a committed capture must appear in waivers; waivers may only shrink, never grow.",
+  "captureStandard": "docs/PLAYBOOK_VISUAL_EVIDENCE.md",
+  "evidenceRoot": "docs/ui/evidence/waves",
+  "defaultViewports": ["390x844", "1280x720"],
+  "waivers": [
+    {
+      "wave": "3A",
+      "reason": "Completed (PR #343) before this manifest existed. Its capture is owed: run scripts/analysis/capture-ui-surfaces.mjs headless and commit the packet under docs/ui/evidence/waves/3A, then delete this waiver."
+    }
+  ],
+  "notes": [
+    "scripts/analysis/capture-auth-capability-surfaces.mjs is still the path Wave 0C claims in the decision registry but the file is not on main; Wave 0C therefore points at capture-ui-surfaces.mjs until the claim is reconciled.",
+    "Waves 0A, 0B, 1A, 2A, 2B, 2C, 3C, 4A-4C, 5A and 5D are not in the integrator ownership table; they get a row here when they are first assigned a wave owner."
+  ],
+  "waves": [
+    {
+      "wave": "0C",
+      "title": "Measured baseline",
+      "surfaces": [
+        { "id": "menu-phone-desktop-baseline", "description": "Menu at phone and desktop sizes, the DPR/backing-store baseline.", "captureScript": "scripts/analysis/capture-ui-surfaces.mjs" }
+      ],
+      "proof": { "status": "not-captured", "done": false, "evidenceDir": null }
+    },
+    {
+      "wave": "1B",
+      "title": "Semantic tokens",
+      "surfaces": [
+        { "id": "menu-token-colours", "description": "Menu and sheets painted with the shared theme tokens.", "captureScript": "scripts/analysis/capture-ui-surfaces.mjs" }
+      ],
+      "proof": { "status": "not-captured", "done": false, "evidenceDir": null }
+    },
+    {
+      "wave": "1C",
+      "title": "Diagnostics",
+      "surfaces": [
+        { "id": "runtime-diagnostics-observe", "description": "Versioned runtime diagnostics read from a live menu.", "captureScript": "scripts/analysis/capture-runtime-observe.mjs" }
+      ],
+      "proof": { "status": "not-captured", "done": false, "evidenceDir": null }
+    },
+    {
+      "wave": "3A",
+      "title": "Command bridge",
+      "surfaces": [
+        { "id": "menu-commands", "description": "Menu, options and pause driven through the shared command bridge.", "captureScript": "scripts/analysis/capture-ui-surfaces.mjs" }
+      ],
+      "proof": { "status": "not-captured", "done": true, "evidenceDir": null }
+    },
+    {
+      "wave": "3B",
+      "title": "Auth messages",
+      "surfaces": [
+        { "id": "message-toast", "description": "The player message toast over the menu and the sign-in gate.", "captureScript": "scripts/analysis/capture-ui-surfaces.mjs" }
+      ],
+      "proof": { "status": "not-captured", "done": false, "evidenceDir": null }
+    },
+    {
+      "wave": "4D-A",
+      "title": "Navigation Core v1",
+      "surfaces": [
+        { "id": "navigation-core-trail-glow-halo", "description": "Trail, player glow and goal halo in play.", "captureScript": "scripts/analysis/capture-wave4d-a-evidence.mjs" }
+      ],
+      "proof": { "status": "not-captured", "done": false, "evidenceDir": null }
+    },
+    {
+      "wave": "4D-B",
+      "title": "Teleport v1",
+      "surfaces": [
+        { "id": "teleport-anchor-pose", "description": "Teleport anchors and transfer presentation.", "captureScript": "scripts/analysis/capture-teleport-anchor-pose-evidence.mjs" }
+      ],
+      "proof": { "status": "not-captured", "done": false, "evidenceDir": null }
+    },
+    {
+      "wave": "4E",
+      "title": "World identity",
+      "surfaces": [
+        { "id": "menu-backdrop-starfield", "description": "Menu backdrop starfield and ambient world presentation.", "captureScript": "scripts/analysis/capture-world-identity-ui-evidence.mjs" }
+      ],
+      "proof": { "status": "not-captured", "done": false, "evidenceDir": null }
+    },
+    {
+      "wave": "5B",
+      "title": "System / PWA",
+      "surfaces": [
+        { "id": "pwa-install-screenshots", "description": "Install screenshots and splash surfaces.", "captureScript": "scripts/analysis/capture-pwa-screenshots.mjs" }
+      ],
+      "proof": { "status": "not-captured", "done": false, "evidenceDir": null }
+    },
+    {
+      "wave": "5C",
+      "title": "Shared-account OAuth consumer",
+      "surfaces": [
+        { "id": "auth-gate-and-sheets", "description": "Sign-in gate, account card, leaderboard and pause sheets.", "captureScript": "scripts/analysis/capture-ui-surfaces.mjs" }
+      ],
+      "proof": { "status": "not-captured", "done": false, "evidenceDir": null }
+    },
+    {
+      "wave": "6",
+      "title": "Satellite surfaces (not yet in the ownership table)",
+      "surfaces": [
+        { "id": "proof-surfaces-gallery", "description": "The internal proof-surfaces gallery page.", "captureScript": "scripts/analysis/capture-ui-surfaces.mjs" }
+      ],
+      "proof": { "status": "not-captured", "done": false, "evidenceDir": null }
+    }
+  ]
+}
