@@ -130,4 +130,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: Added `scripts/playbook-runtime.mjs` (same pinned bridge as fawxzzy-fitness: Playbook CLI v0.54.1 release tarball + SHA-256), `npm run playbook:verify`, `playbook-runtime:install-official-fallback`, `/.playbook/` gitignore, and one `Playbook clean-environment validation` job in `.github/workflows/verify.yml`.
 - WHY it changed: Mazer had playbook.config.json and `verify:local` but no pinned runtime and no CI gate, so `playbook verify` was not reproducible.
 - Rule: Playbook runtime is acquired only via the pinned release URL + digest; bump both together. No deploy surface touched (vercel.json unchanged).
+
+## 2026-11-14 MAZER-FLOW-001: one-time control hint on level 1
+
+- WHAT changed: new `src/legacy-runtime/legacyControlHint.ts` (pure rules and copy) and `src/render/legacyControlHintOverlay.ts` (a non-interactive DOM line), installed from `src/boot/main.ts`. It shows only in play, on level 1, with no overlay, for a device that has not acknowledged it, and dismisses on the first arrow/WASD key or a drag (or after 12 s). Acknowledgement uses the previously unused tutorial ack store under the fixed id `device` in localStorage, so it is per device and never touches the account database. Reduced motion makes the fade instant.
+- WHY it changed: Nothing taught movement or the goal; the Guide is collapsed inside Settings. MenuScene.ts is untouched (the overlay reads the scene structurally) to avoid conflicts with parallel waves.
+- Rule: New player-facing copy needs a pinned row in the message inventory test and doc.
+- Evidence: `tests/legacy-runtime/legacy-control-hint.test.ts`, headless phone-emulation screenshots (not a real device).
 - Status: Applied
