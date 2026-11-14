@@ -218,3 +218,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the game is played on touch screens, and computers can drag too; the old copy was picked by a single coarse-pointer check and said arrow keys on devices that misreported.
 - Rule: copy is chosen from observed input, not a device guess; the device guess only seeds the first frame.
 - Status: Applied
+
+## 2026-11-14 - MAZER-MOTION-011 overlay rise and stagger
+- WHAT changed: added `src/render/uiEntrance.ts` (pure plan: an 8 px rise, rows staggered inside a 60 ms budget, 200 ms crossfade with no movement under Reduce Motion) and `src/render/uiEntranceDriver.ts` (applies it to the live overlay objects each frame and restores them exactly at rest). `MenuScene.ts` gets a small hook: `begin` in `openOverlay` when the overlay kind changes, and a POST_UPDATE `applyUiEntrance` so every `rebuildUi` path has already run.
+- WHY it changed: overlays popped in with no rise or stagger. The hook runs after update on purpose: an in-update hook let freshly rebuilt objects render one frame at rest (a flash), found in a headless frame probe.
+- Rule: effects on objects that `rebuildUi` recreates must be a pure function of elapsed time applied after the rebuild, never state stored on the objects. Panel borders and toggles live on the shared overlay Graphics, so they stay static; only labels and row fills move.
+- Status: Applied (review); headless only (Chromium 390x844, 360x740, 412x915 and WebKit iPhone 15 Pro and SE, Reduce Motion on and off), no real-device fps.

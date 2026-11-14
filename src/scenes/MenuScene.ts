@@ -50,6 +50,7 @@ import { AppLoaderOverlay } from '../render/appLoaderOverlay';
 import { isMazerBootSplashPresent } from '../boot/bootSplash';
 import { resolveUiTransitionPlan, type UiTransitionKind } from '../render/uiTransition';
 import { UiTransitionGhost } from '../render/uiTransitionGhost';
+import { UiEntranceDriver } from '../render/uiEntranceDriver';
 import { PlayerLocatorState } from '../render/playerLocator';
 import { stepTrailColourRedraw } from '../render/trailColourRedraw';
 import {
@@ -1689,6 +1690,8 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-MOTION-002: fading snapshot cover for Start / overlay open / overlay close (src/render/uiTransition.ts).
   private uiTransitionGhost: UiTransitionGhost | null = null;
   private uiTransitionSuppressed = false;
+  // MAZER-MOTION-011: the rise and stagger an overlay panel enters with (reduced motion: a 200 ms crossfade).
+  private readonly uiEntrance = new UiEntranceDriver();
   private playerMessageToastTexts: Phaser.GameObjects.Text[] = [];
   private authGateLoadingText!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
@@ -2425,6 +2428,9 @@ export class MenuScene extends Phaser.Scene {
     this.playerSpawnBurstGraphics = this.add.graphics();
     this.spawnLaserGraphics = this.add.graphics();
     this.uiTransitionGhost = new UiTransitionGhost(this, 'mazer-ui-transition-ghost', LEGACY_PLAYER_MESSAGE_TOAST_DEPTH - 1);
+    // MAZER-MOTION-011: after update (every rebuildUi path has run) so freshly built objects never show one frame at rest.
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this));
     this.playerMessageToastGraphics = this.add.graphics()
       .setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH)
       .setVisible(false);
@@ -2798,6 +2804,21 @@ export class MenuScene extends Phaser.Scene {
     } finally {
       this.uiTransitionSuppressed = previous;
     }
+  }
+
+  private applyUiEntrance(): void {
+    if (!this.uiEntrance.active) {
+      return;
+    }
+    if (this.overlay === null) {
+      this.uiEntrance.cancel();
+      return;
+    }
+    this.uiEntrance.update(this.time.now, [
+      ...this.uiGraphics,
+      ...this.uiButtons.map((button) => button.background),
+      ...this.uiTexts.filter((text) => text.active && text.getData('hud') !== true)
+    ]);
   }
 
   // MAZER-MOTION-002: snapshot what is on screen, then ease it out over the already-final live scene. Never delays
@@ -14049,6 +14070,7 @@ export class MenuScene extends Phaser.Scene {
     // MAZER-MOTION-002: snapshot the screen as it is (the canvas holds the last frame until the next render).
     if (kind !== previousOverlay) {
       this.beginUiTransition('overlay-open');
+      this.uiEntrance.begin(this.time.now, this.prefersLegacyReducedMotion());
     }
     if (kind === 'pause') {
       this.pauseSettingsExpanded = false;
