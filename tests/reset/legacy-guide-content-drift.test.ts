@@ -55,7 +55,7 @@ const exportsOf = (module: string): Record<string, unknown> | null => {
 
 describe('guide structure', () => {
   test('rows are unique, ordered and short enough to wrap in two lines at 14px on 320 wide', () => {
-    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'levels']);
+    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'levels', 'online']);
     expect(new Set(LEGACY_GUIDE_ROWS.map((r) => r.id)).size).toBe(LEGACY_GUIDE_ROWS.length);
     for (const r of LEGACY_GUIDE_ROWS) {
       expect(r.heading.length, r.id).toBeLessThanOrEqual(12);
@@ -152,11 +152,14 @@ describe('guide copy only names things that exist', () => {
     expect(read('src/render/trailPalette.ts')).toMatch(/export const sampleIridescentTrail/);
   });
 
-  test('Trail row names the Settings toggle by its live label', () => {
-    const fade = LEGACY_SETTINGS_GROUP_ROWS.find((r) => r.id === 'trail-fade')!;
-    expect(fade.kind).toBe('toggle');
-    expect(row('trail').text).toContain(fade.label);
+  test('Trail row names the Settings toggle by its live label, and no Guide row names a removed setting', () => {
+    const reduceMotion = LEGACY_SETTINGS_GROUP_ROWS.find((r) => r.id === 'reduce-motion')!;
+    expect(reduceMotion.kind).toBe('toggle');
+    expect(row('trail').text).toContain(reduceMotion.label);
     expect(row('trail').text).toMatch(/in Settings/);
+    for (const removed of ['Trail Fade', 'Trail Shine', 'Animated Background']) {
+      expect(LEGACY_GUIDE_ROWS.map((r) => r.text).join(' ')).not.toContain(removed);
+    }
   });
 
   test('Goal is a star: the Chip marker module draws a star path and the scene calls it for the board and the Guide', () => {
@@ -323,9 +326,9 @@ describe('guide icons are tied to the draw functions the board uses', () => {
     }
   });
 
-  test('Chip wiring closed every chip-wiring todo: goal, start, you, trail, wrap and levels share a board draw; only move is guide-local', () => {
+  test('Chip wiring closed every chip-wiring todo: goal, start, you, trail, wrap, levels and online share a board draw; only move is guide-local', () => {
     const byStatus = (status: string): string[] => LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === status).map((r) => r.id);
-    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'levels']);
+    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'levels', 'online']);
     expect(byStatus('guide-local')).toEqual(['move']);
     expect(byStatus('todo-wiring')).toEqual([]);
     expect(LEGACY_GUIDE_ROWS.filter((r) => r.icon.lane === 'chip-wiring').map((r) => r.id)).toEqual([]);
@@ -349,7 +352,7 @@ describe('the scene paints exactly what the guide data declares', () => {
   test('icons declared shared-with-board call the board draw function itself, not a copy', () => {
     const icon = method('private drawLegacyGuideIcon(');
     const shared = LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === 'shared-with-board');
-    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'levels']);
+    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'levels', 'online']);
     // goal and start: one helper that paints a chip tile and then calls drawBoardMarkers itself.
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'goal',");
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'start',");
@@ -364,6 +367,9 @@ describe('the scene paints exactly what the guide data declares', () => {
     expect(icon).toContain('drawEdgeMarker(');
     // levels: the dot-matrix wordmark chip renderer, same as the level announcer.
     expect(icon).toContain('this.drawLegacyGlyphWordTileBlock(graphics, layout, 0, 1, 1, false)');
+    // online: the menu counter's own chip-word draw (MAZER-UI-024), shared by the counter and the Guide icon.
+    expect(icon).toContain("this.drawLegacyPresenceGlyphWord(graphics, '12',");
+    expect(method('private drawLegacyMenuPresenceCounter(time: number): void')).toContain('this.drawLegacyPresenceGlyphWord(');
     // you: the board's own marker draw (src/render/playerMarker.ts: block, keyline, ring, accent stroke), frozen for the icon,
     // the same function fillLegacyPlayerMarkerTile calls for the human player and for the menu demo's AI.
     expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('drawPlayerMarker(graphics, frame, {');

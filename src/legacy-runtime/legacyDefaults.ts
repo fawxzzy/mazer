@@ -12,9 +12,6 @@ export interface LegacySettings {
   pathColor: LegacyLinearColor;
   wallColor: LegacyLinearColor;
   darkMode: boolean;
-  toggleTrailFade: boolean;
-  toggleTrailPulse: boolean;
-  toggleAnimatedBackdrop: boolean;
   hapticsEnabled: boolean;
   /** Settings > Reduce Motion: true forces reduced motion on; false defers to the device setting. */
   toggleReducedMotion: boolean;
@@ -35,9 +32,6 @@ export const LEGACY_DEFAULTS: LegacySettings = {
     b: 0.067708
   },
   darkMode: true,
-  toggleTrailFade: false,
-  toggleTrailPulse: true,
-  toggleAnimatedBackdrop: true,
   hapticsEnabled: true,
   toggleReducedMotion: false,
   controlMode: 'stick'
@@ -91,9 +85,6 @@ export const copyLegacySettings = (settings: LegacySettings): LegacySettings => 
   pathColor: { ...settings.pathColor },
   wallColor: { ...settings.wallColor },
   darkMode: settings.darkMode,
-  toggleTrailFade: settings.toggleTrailFade,
-  toggleTrailPulse: settings.toggleTrailPulse ?? true,
-  toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop ?? LEGACY_DEFAULTS.toggleAnimatedBackdrop,
   hapticsEnabled: settings.hapticsEnabled ?? LEGACY_DEFAULTS.hapticsEnabled,
   toggleReducedMotion: settings.toggleReducedMotion ?? LEGACY_DEFAULTS.toggleReducedMotion,
   controlMode: settings.controlMode

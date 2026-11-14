@@ -19,7 +19,7 @@
  * `shared-with-board` means that is true today; `todo-wiring` means it is not
  * yet and names the lane that must close it. No behavior here: pure data.
  */
-import { LEGACY_SETTINGS_GROUP_ROWS } from './legacySettingsSheetPlan';
+import { REDUCED_MOTION_SETTING_LABEL } from '../render/reducedMotion';
 
 export type LegacyGuideContext = 'menu' | 'pause';
 
@@ -30,7 +30,8 @@ export type LegacyGuideGlyph =
   | 'touch-stick'
   | 'trail-swatch'
   | 'edge-marker'
-  | 'level-numeral';
+  | 'level-numeral'
+  | 'online-count';
 
 export type LegacyGuideIconStatus = 'shared-with-board' | 'guide-local' | 'todo-wiring';
 
@@ -61,7 +62,7 @@ export interface LegacyGuideIconSpec {
 }
 
 export interface LegacyGuideRow {
-  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'levels';
+  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'levels' | 'online';
   heading: string;
   text: string;
   icon: LegacyGuideIconSpec;
@@ -86,7 +87,6 @@ export interface LegacyGuideKeyBinding {
   expectedAction: 'move' | 'pause' | 'quit' | null;
 }
 
-const TRAIL_FADE_LABEL = LEGACY_SETTINGS_GROUP_ROWS.find((row) => row.id === 'trail-fade')?.label ?? 'Trail Fade';
 
 export const LEGACY_GUIDE_TITLE = 'How to play';
 export const LEGACY_GUIDE_CLOSE_LABEL = 'Got it';
@@ -160,7 +160,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'trail',
-    text: `A shimmering, colour-shifting line is your route. ${TRAIL_FADE_LABEL} in Settings fades old trail.`
+    text: `A shimmering, colour-shifting line is your route. ${REDUCED_MOTION_SETTING_LABEL} in Settings calms it.`
   },
   {
     heading: 'Wrap',
@@ -189,6 +189,20 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
     },
     id: 'levels',
     text: 'Clears show your clear time and level. Harder mazes add shortcuts and loops.'
+  },
+  {
+    heading: 'Online',
+    icon: {
+      badge: 'circle',
+      boardDraw: { module: 'src/scenes/MenuScene.ts', symbol: 'drawLegacyPresenceGlyphWord' },
+      chipDraw: null,
+      glyph: 'online-count',
+      lane: null,
+      reasonId: 'online-count-calls-menu-counter-chip-draw',
+      status: 'shared-with-board'
+    },
+    id: 'online',
+    text: 'The number by the top-left icon is how many players are in Mazer right now.'
   }
 ]);
 

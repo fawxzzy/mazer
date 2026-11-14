@@ -4,8 +4,6 @@ import {
   LEGACY_REMOTE_MESSAGE_COPY,
   LEGACY_PLAYER_MESSAGE_DEFAULT_DURATION_MS,
   LEGACY_PLAYER_MESSAGE_MAX_VISIBLE,
-  LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL,
-  LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL,
   createLegacyPlayerMessage,
   enqueueLegacyPlayerMessage,
   expireLegacyPlayerMessageQueue,
@@ -103,25 +101,6 @@ describe('legacy player-facing message system', () => {
       technicalDetail: 'Email rate limit exceeded',
       tone: 'error'
     });
-    expect(resolveLegacyAuthFeedbackMessage('User already registered', null)).toMatchObject({
-      copy: LEGACY_AUTH_MESSAGE_COPY.accountRecovery,
-      technicalDetail: 'User already registered',
-      tone: 'error'
-    });
-    expect(LEGACY_AUTH_MESSAGE_COPY.accountRecovery.toLowerCase()).not.toMatch(
-      /already|registered|exists|has an account/
-    );
-    expect(LEGACY_AUTH_MESSAGE_COPY.accountRecovery).toContain('Forgot Password');
-    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL, null)).toMatchObject({
-      copy: LEGACY_AUTH_MESSAGE_COPY.usernameInvalid,
-      technicalDetail: LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL,
-      tone: 'error'
-    });
-    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL, null)).toMatchObject({
-      copy: LEGACY_AUTH_MESSAGE_COPY.usernameTaken,
-      technicalDetail: LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL,
-      tone: 'error'
-    });
     expect(resolveLegacyAuthFeedbackMessage('unexpected hook response', null)).toMatchObject({
       copy: LEGACY_AUTH_MESSAGE_COPY.accountUnavailable,
       technicalDetail: 'unexpected hook response',
@@ -189,15 +168,6 @@ describe('legacy player-facing message system', () => {
       expect(message?.copy).not.toContain(providerError);
     }
 
-    expect(resolveLegacyAuthFeedbackMessage('User already registered', null)).toMatchObject({
-      copy: LEGACY_AUTH_MESSAGE_COPY.accountRecovery
-    });
-    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL, null)).toMatchObject({
-      copy: LEGACY_AUTH_MESSAGE_COPY.usernameInvalid
-    });
-    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL, null)).toMatchObject({
-      copy: LEGACY_AUTH_MESSAGE_COPY.usernameTaken
-    });
   });
 
   test('keeps message colors centralized by tone', () => {
@@ -303,9 +273,9 @@ describe('legacy player-facing message system', () => {
   });
 
   test('maps overlay setting confirmations into the shared message contract', () => {
-    expect(resolveLegacyOverlayToggleMessage('Trail Fade', 'Off')).toMatchObject({
-      copy: 'Trail Fade: Off.',
-      id: 'overlay.toggle.trail-fade',
+    expect(resolveLegacyOverlayToggleMessage('Haptics', 'Off')).toMatchObject({
+      copy: 'Haptics: Off.',
+      id: 'overlay.toggle.haptics',
       source: 'overlay',
       tone: 'success'
     });

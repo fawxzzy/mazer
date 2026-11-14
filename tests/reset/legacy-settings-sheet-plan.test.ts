@@ -1,18 +1,22 @@
 import { describe, expect, test } from 'vitest';
 import {
   LEGACY_SETTINGS_DANGER_SEPARATION,
+  LEGACY_SETTINGS_DESCRIPTION_MAX_CHARS,
   LEGACY_SETTINGS_GROUP_ROWS,
   LEGACY_SETTINGS_PLAN_VIEWPORTS,
   LEGACY_SETTINGS_SIZES,
   buildLegacySettingsSheetModel,
   buildLegacySettingsSheetPlan,
+  estimateLegacySettingsDescriptionLines,
   isLegacySettingsItemFullyVisible,
   resolveLegacySettingsItemScreenRect,
   type LegacySettingsPlanInput,
   type LegacySettingsRect,
+  type LegacySettingsSettingRowModel,
   type LegacySettingsSheetPlan
 } from '../../src/legacy-runtime/legacySettingsSheetPlan';
 import { LEGACY_UI_MIN_TOUCH_TARGET } from '../../src/legacy-runtime/legacyUiStandards';
+import { REDUCED_MOTION_SETTING_NOTE } from '../../src/render/reducedMotion';
 import { designTokens } from '../../src/theme/tokens';
 
 const overlaps = (a: LegacySettingsRect, b: LegacySettingsRect): boolean => (
@@ -49,16 +53,7 @@ describe('settings sheet model', () => {
     const pauseGroup = pause.sections.find((section) => section.id === 'settings')!;
     expect(menuGroup.rows).toBe(LEGACY_SETTINGS_GROUP_ROWS);
     expect(pauseGroup.rows).toBe(LEGACY_SETTINGS_GROUP_ROWS);
-    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual([
-      'how-to-play',
-      'display-heading',
-      'trail-fade',
-      'trail-shine',
-      'animated-background',
-      'reduce-motion',
-      'reduce-motion-note',
-      'haptics'
-    ]);
+    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['how-to-play', 'reduce-motion', 'haptics']);
   });
 
   test('titles, overlay ids and collapse behaviour per context', () => {
@@ -138,9 +133,6 @@ describe('settings sheet model', () => {
   test('toggle state words are separate from labels and keep today\'s copy', () => {
     const toggles = LEGACY_SETTINGS_GROUP_ROWS.filter((r) => r.kind === 'toggle');
     expect(toggles.map((r) => [r.label, r.onLabel, r.offLabel])).toEqual([
-      ['Trail Fade', 'On', 'Off'],
-      ['Trail Shine', 'On', 'Off'],
-      ['Animated Background', 'Animated', 'Still'],
       ['Reduce Motion', 'On', 'System'],
       ['Haptics', 'On', 'Off']
     ]);
@@ -160,11 +152,27 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
       ['pause collapsed', plan('pause', viewport, { settingsExpanded: false })]
     ];
 
-    test.each(cases)('%s: items never overlap each other or their own parts', (_label, p) => {
+    test.each(cases)('%s: items and their descriptions never overlap each other or their own parts', (_label, p) => {
+      // A row's footprint is its control plus its description block.
+      const footprint = (item: LegacySettingsSheetPlan['items'][number]): LegacySettingsRect => ({
+        ...item.rect,
+        height: item.description === null
+          ? item.rect.height
+          : (item.description.rect.top + item.description.rect.height) - item.rect.top
+      });
       for (let i = 0; i < p.items.length; i += 1) {
         for (let j = i + 1; j < p.items.length; j += 1) {
-          expect(overlaps(p.items[i]!.rect, p.items[j]!.rect), `${p.items[i]!.model.id} vs ${p.items[j]!.model.id}`).toBe(false);
+          expect(overlaps(footprint(p.items[i]!), footprint(p.items[j]!)), `${p.items[i]!.model.id} vs ${p.items[j]!.model.id}`).toBe(false);
         }
+      }
+      for (const item of p.items.filter((i) => i.description !== null)) {
+        const d = item.description!;
+        expect(d.rect.top, `${item.model.id} description sits under its control`).toBeGreaterThanOrEqual(item.rect.top + item.rect.height);
+        expect(d.rect.left).toBe(item.rect.left);
+        expect(d.rect.width).toBe(item.rect.width);
+        expect(d.lines).toBeGreaterThanOrEqual(1);
+        expect(d.lines).toBeLessThanOrEqual(LEGACY_SETTINGS_SIZES.descriptionMaxLines);
+        expect(d.rect.height).toBe(d.lines * LEGACY_SETTINGS_SIZES.descriptionLineHeight);
       }
       for (const item of p.items) {
         const local: LegacySettingsRect = { height: item.rect.height, left: 0, top: 0, width: item.rect.width };
@@ -193,12 +201,12 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
         expect(item.rect.height, `${item.model.id} height`).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
         expect(item.rect.width, `${item.model.id} width`).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
       }
-      // Headings and the helper note are the only non-interactive rows.
-      expect(p.items.filter((i) => !i.interactive).every((i) => i.model.kind === 'heading' || i.model.kind === 'note')).toBe(true);
+      // Headings are the only non-interactive rows (a description is text under a control, not a row).
+      expect(p.items.filter((i) => !i.interactive).every((i) => i.model.kind === 'heading')).toBe(true);
     });
 
     test.each(cases)('%s: label fonts never shrink below the body token and labels may wrap', (_label, p) => {
-      for (const item of p.items.filter((i) => i.model.kind !== 'note')) {
+      for (const item of p.items) {
         expect(item.labelFontSize).toBeGreaterThanOrEqual(designTokens.legacy.fontSizePx.body);
         expect(item.labelMaxLines).toBe(item.model.kind === 'heading' ? 1 : 2);
         expect(item.labelMaxLines * LEGACY_SETTINGS_SIZES.labelLineHeight).toBeLessThanOrEqual(item.rect.height);
@@ -226,18 +234,23 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
           expect(isLegacySettingsItemFullyVisible(p, item, 0), `${item.model.id} fully visible`).toBe(true);
         }
       }
-      // Last item is flush with the end of the content.
+      // Last item (control + its description + one token gap) is flush with the end of the content.
       const last = p.items.at(-1)!;
-      expect(last.rect.top + last.rect.height).toBe(p.contentHeight);
+      const lastBottom = last.description === null
+        ? last.rect.top + last.rect.height
+        : last.description.rect.top + last.description.rect.height + LEGACY_SETTINGS_SIZES.descriptionGap;
+      expect(lastBottom).toBe(p.contentHeight);
       const lastScreen = resolveLegacySettingsItemScreenRect(p, last, p.maxScrollOffset);
       expect(lastScreen.top + lastScreen.height).toBeLessThanOrEqual(p.bodyViewport.top + p.bodyViewport.height);
+      expect(isLegacySettingsItemFullyVisible(p, last, p.maxScrollOffset), 'last item reachable at max scroll').toBe(true);
     });
 
     test('Reset progress is separated from Sign out by the danger separation token and both are tappable apart', () => {
       const p = plan('menu', viewport);
       const reset = p.items.find((i) => i.model.id === 'reset-progress')!;
       const signOut = p.items.find((i) => i.model.id === 'sign-out')!;
-      const gap = signOut.rect.top - (reset.rect.top + reset.rect.height);
+      // Reset progress carries a description under it, so the gap is measured from the end of that block.
+      const gap = signOut.rect.top - (reset.description!.rect.top + reset.description!.rect.height);
       expect(LEGACY_SETTINGS_DANGER_SEPARATION).toBeGreaterThanOrEqual(24);
       expect(designTokens.spacingPx).toContain(LEGACY_SETTINGS_DANGER_SEPARATION);
       expect(gap).toBeGreaterThanOrEqual(LEGACY_SETTINGS_DANGER_SEPARATION);
@@ -287,12 +300,7 @@ describe('settings sheet plan specifics', () => {
       'resume',
       'settings-disclosure',
       'how-to-play',
-      'display-heading',
-      'trail-fade',
-      'trail-shine',
-      'animated-background',
       'reduce-motion',
-      'reduce-motion-note',
       'haptics',
       'quit-to-menu'
     ]);
@@ -304,12 +312,7 @@ describe('settings sheet plan specifics', () => {
     expect(p.items.map((i) => i.model.id)).toEqual([
       'back-to-menu',
       'how-to-play',
-      'display-heading',
-      'trail-fade',
-      'trail-shine',
-      'animated-background',
       'reduce-motion',
-      'reduce-motion-note',
       'haptics',
       'account-heading',
       'reset-progress',
@@ -385,20 +388,14 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
     }
   });
 
-  test('at 320x568 the expanded Pause card (now with the Haptics row) overflows the 552 panel and uses the scroll rail', () => {
-    const plan = buildLegacySettingsSheetPlan({ context: 'pause', height: 568, settingsExpanded: true, signedIn: true, width: 320 });
-    // Before the header reserve was freed: panel.height 552 minus 52 = 500 available. Now: all 552.
-    expect(plan.panel.height).toBe(552);
-    // Board Zoom's removal had let the expanded pause card fit at 538. The Haptics toggle row (MAZER-CTRL-001) and
-    // the Reduce Motion toggle + helper note (MAZER-MOTION-004) make the natural card taller than the panel,
-    // so the card fills the panel and scrolls (the rail is expected).
-    expect(plan.naturalCardHeight).toBe(754);
-    expect(plan.card.height).toBe(plan.panel.height);
-    expect(plan.scrollable).toBe(true);
-    // The signed-in menu sheet is still 590 tall at 320x568: it genuinely overflows and keeps the rail.
+  test('at 320x568 the expanded Pause card and the signed-in menu sheet fill the panel and scroll when they overflow', () => {
+    const pause = buildLegacySettingsSheetPlan({ context: 'pause', height: 568, settingsExpanded: true, signedIn: true, width: 320 });
+    expect(pause.panel.height).toBe(552);
+    expect(pause.card.height).toBe(Math.min(pause.naturalCardHeight, pause.panel.height));
+    expect(pause.scrollable).toBe(pause.naturalCardHeight > pause.panel.height);
     const menu = buildLegacySettingsSheetPlan({ context: 'menu', height: 568, signedIn: true, width: 320 });
-    expect(menu.card.height).toBe(menu.panel.height);
-    expect(menu.scrollable).toBe(true);
+    expect(menu.card.height).toBe(Math.min(menu.naturalCardHeight, menu.panel.height));
+    expect(menu.scrollable).toBe(menu.naturalCardHeight > menu.panel.height);
   });
 
   test('the scroll rail appears only when the content truly overflows the body', () => {
@@ -411,17 +408,103 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
         }
       }
     }
-    // 390x844 and 1280x720 hold the whole menu sheet without a rail now that the reserve is gone.
+    // Removing three toggle rows more than pays for the description lines: the signed-in menu sheet fits
+    // 390x844 and 412x915 without a rail; the short 360x740 and 320x568 phones scroll it.
     expect(plan('menu', { height: 844, width: 390 }).scrollable).toBe(false);
-    // The Reduce Motion toggle + note (156 px) tip the signed-in menu sheet over 720 px tall: it scrolls there now.
-    expect(plan('menu', { height: 720, width: 1280 }).scrollable).toBe(true);
+    expect(plan('menu', { height: 915, width: 412 }).scrollable).toBe(false);
+    expect(plan('menu', { height: 740, width: 360 }).scrollable).toBe(true);
   });
 
-  test('at 320 wide the label column still holds a 14 px "Background" on its own line', () => {
+  test('at 320 wide the Reduce Motion label column still holds its widest word and the state column holds "System"', () => {
     const plan = buildLegacySettingsSheetPlan({ context: 'menu', height: 568, signedIn: true, width: 320 });
-    const toggle = plan.items.find((item) => item.model.id === 'animated-background')!;
-    // "Background" at 14 px is about 78 px wide; the label column must not be narrower.
+    const toggle = plan.items.find((item) => item.model.id === 'reduce-motion')!;
     expect(toggle.parts.label.width).toBeGreaterThanOrEqual(88);
     expect(toggle.parts.state!.width).toBeGreaterThanOrEqual(58);
+  });
+});
+
+describe('settings row description rule (MAZER-UI-026)', () => {
+  const everyModel = [
+    buildLegacySettingsSheetModel('menu', { signedIn: true }),
+    buildLegacySettingsSheetModel('pause', {
+      levelPreview: { checkpoints: [1, 10], level: 5, maxLevel: 20, minLevel: 1 },
+      quitConfirmArmed: true,
+      rotatePrompt: true
+    })
+  ];
+  const settingRows = everyModel.flatMap((model) => model.sections)
+    .filter((section) => section.id === 'settings' || section.id === 'account')
+    .flatMap((section) => section.rows);
+
+  test('the Settings group and the Account section have rows (so the checks below are not vacuous)', () => {
+    expect(settingRows.map((r) => r.id)).toEqual(expect.arrayContaining(['how-to-play', 'reduce-motion', 'haptics', 'reset-progress', 'sign-out']));
+  });
+
+  test('every setting row has a non-empty plain-words description within the length rule', () => {
+    for (const row of settingRows) {
+      expect(row.role, row.id).toBe('setting');
+      expect(typeof row.description, `${row.id} description`).toBe('string');
+      expect(row.description.trim().length, `${row.id} description is empty`).toBeGreaterThan(0);
+      expect(row.description.length, `${row.id} description too long`).toBeLessThanOrEqual(LEGACY_SETTINGS_DESCRIPTION_MAX_CHARS);
+      expect(row.description, `${row.id} description is a sentence`).toMatch(/[.]$/);
+    }
+  });
+
+  test('sheet chrome rows (exits, disclosures, headings, notices, preview jumps) are not settings and carry no description', () => {
+    const chrome = everyModel.flatMap((model) => model.sections)
+      .filter((section) => section.id !== 'settings' && section.id !== 'account')
+      .flatMap((section) => section.rows);
+    expect(chrome.length).toBeGreaterThan(0);
+    for (const row of chrome) {
+      expect(row.role, row.id).toBe('chrome');
+      expect(row.description, row.id).toBeNull();
+    }
+  });
+
+  test('every described row wraps to at most the line cap at every audited width, in both contexts', () => {
+    const viewports = [...LEGACY_SETTINGS_PLAN_VIEWPORTS, { height: 740, width: 360 }, { height: 915, width: 412 }];
+    for (const { height, width } of viewports) {
+      for (const context of ['menu', 'pause'] as const) {
+        const p = buildLegacySettingsSheetPlan({ context, height, settingsExpanded: true, signedIn: true, width });
+        const described = p.items.filter((item) => item.model.role === 'setting');
+        expect(described.length).toBeGreaterThan(0);
+        for (const item of described) {
+          expect(item.description, `${item.model.id} ${context} ${width}x${height}`).not.toBeNull();
+          expect(item.description!.lines).toBeLessThanOrEqual(LEGACY_SETTINGS_SIZES.descriptionMaxLines);
+          expect(estimateLegacySettingsDescriptionLines(item.model.description!, item.rect.width - 16))
+            .toBeLessThanOrEqual(LEGACY_SETTINGS_SIZES.descriptionMaxLines);
+        }
+      }
+    }
+  });
+
+  test('the muted description keeps the Reduce Motion note look: 13 px (the small token) and a 17 px line', () => {
+    expect(LEGACY_SETTINGS_SIZES.descriptionFontSize).toBe(designTokens.legacy.fontSizePx.small);
+    expect(LEGACY_SETTINGS_SIZES.descriptionLineHeight).toBe(17);
+    expect(designTokens.spacingPx).toContain(LEGACY_SETTINGS_SIZES.descriptionGap);
+  });
+
+  test('Reduce Motion carries its own rule text as its description (the old separate note row is gone)', () => {
+    const reduceMotion = LEGACY_SETTINGS_GROUP_ROWS.find((r) => r.id === 'reduce-motion')!;
+    expect(reduceMotion.description).toBe(REDUCED_MOTION_SETTING_NOTE);
+    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).not.toContain('reduce-motion-note');
+  });
+
+  test('the retired Display switches have no row, no setting key and no label anywhere in the sheet', () => {
+    const rows = everyModel.flatMap((model) => model.sections).flatMap((section) => section.rows);
+    for (const retired of ['Trail Fade', 'Trail Shine', 'Animated Background']) {
+      expect(rows.map((r) => r.label)).not.toContain(retired);
+    }
+    expect([...new Set(rows.map((r) => r.settingKey).filter((k) => k !== null))].sort())
+      .toEqual(['hapticsEnabled', 'toggleReducedMotion']);
+  });
+
+  test('a row without a description cannot be typed as a setting row (compile-time rule)', () => {
+    // @ts-expect-error description is required on a setting row
+    const missing: LegacySettingsSettingRowModel = {
+      command: null, emphasis: null, gapBefore: null, id: 'haptics', kind: 'toggle', label: 'X',
+      offLabel: null, onLabel: null, role: 'setting', settingKey: null
+    };
+    expect(missing.description).toBeUndefined();
   });
 });

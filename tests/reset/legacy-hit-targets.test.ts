@@ -43,8 +43,9 @@ const enumerateHitZones = (viewport: { height: number; width: number }): HitZone
     width: menuLayout.width
   };
   const headerZones = [
-    ['menu-header-account', { ...headerInput, placement: 'leading' as const }],
-    ['menu-header-leaderboard', { ...headerInput, placement: 'trailing' as const, slot: 1 }],
+    // MAZER-UI-024: leaderboard leads (top-left); the account icon sits beside the settings cog.
+    ['menu-header-account', { ...headerInput, placement: 'trailing' as const, slot: 1 }],
+    ['menu-header-leaderboard', { ...headerInput, placement: 'leading' as const }],
     ['menu-header-settings', { ...headerInput, placement: 'trailing' as const }]
   ] as const;
   for (const [name, input] of headerZones) {
@@ -134,7 +135,6 @@ describe('legacy hit targets (Wave 5C)', () => {
       'menu-header-leaderboard',
       'menu-header-settings',
       'play-pause',
-      'settings-row-animated-background',
       'settings-row-back-to-menu',
       'settings-row-haptics',
       'settings-row-how-to-play',
@@ -143,9 +143,7 @@ describe('legacy hit targets (Wave 5C)', () => {
       'settings-row-reset-progress',
       'settings-row-resume',
       'settings-row-settings-disclosure',
-      'settings-row-sign-out',
-      'settings-row-trail-fade',
-      'settings-row-trail-shine'
+      'settings-row-sign-out'
     ]);
   });
 });
@@ -165,17 +163,12 @@ describe('MenuScene interactive-zone inventory', () => {
   // without listing it here fails this test, which forces a deliberate size
   // review (>= 44 px effective, or a documented non-touch/full-screen zone).
   const EXPECTED_INTERACTIVE_SITES: Record<string, string> = {
-    createAuthFieldBox: 'auth field: full-width row',
-    createAuthFooterLink: 'auth footer link row',
-    createAuthScreenLink: 'auth screen link: row height = LEGACY_AUTH_SCREEN_LINK_ROW_HEIGHT (44)',
     createButton: 'generic button; front-door Start/Login use the full-screen zone',
-    createLegacyAuthActionButton: 'auth action button (44+)',
-    createLegacyAuthPasswordVisibilityButton: 'password visibility toggle: size passed by caller',
+    createLegacyAuthActionButton: 'account failure fallback: the one Try again button (44+)',
     createLegacyLeaderboardEditNameHit: 'leaderboard You row: the whole pinned row (full card width x 56 px) is the Edit name target',
     createLegacyMenuLeaderboardButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
     createLegacyMenuProfileButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
     createLegacyMenuSettingsCogButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
-    createOverlayBackChevronButton: 'back chevron (72x64): leaderboard and account overlays (the settings and guide sheets have none: the primary top row / Got it is the exit)',
     createToggleSwitchRow: 'toggle card (52+)'
   };
 

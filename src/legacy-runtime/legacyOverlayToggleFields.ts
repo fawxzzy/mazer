@@ -4,13 +4,10 @@ import {
 } from './legacyDefaults';
 
 export type LegacyOverlayToggleFieldId =
-  | 'toggleTrailFade'
-  | 'toggleTrailPulse'
-  | 'toggleAnimatedBackdrop'
   | 'hapticsEnabled'
   | 'toggleReducedMotion'
   | 'controlMode';
-export type LegacyOverlayToggleStateText = 'On' | 'Off' | 'Arrows' | 'Stick' | 'Animated' | 'Stagnant' | 'System';
+export type LegacyOverlayToggleStateText = 'On' | 'Off' | 'Arrows' | 'Stick' | 'System';
 
 export interface LegacyOverlayToggleFieldApplyResult {
   settings: LegacySettings;
@@ -31,12 +28,8 @@ export const resolveLegacyOverlayToggleStateText = (
   value: boolean
 ): LegacyOverlayToggleStateText | null => {
   switch (fieldId) {
-    case 'toggleTrailFade':
-    case 'toggleTrailPulse':
     case 'hapticsEnabled':
       return value ? 'On' : 'Off';
-    case 'toggleAnimatedBackdrop':
-      return value ? 'Animated' : 'Stagnant';
     case 'toggleReducedMotion':
       return value ? 'On' : 'System';
     case 'controlMode':
@@ -51,12 +44,6 @@ export const resolveLegacyOverlayToggleSwitchIsOn = (
   settings: LegacySettings
 ): boolean => {
   switch (fieldId) {
-    case 'toggleTrailFade':
-      return settings.toggleTrailFade;
-    case 'toggleTrailPulse':
-      return settings.toggleTrailPulse;
-    case 'toggleAnimatedBackdrop':
-      return settings.toggleAnimatedBackdrop;
     case 'hapticsEnabled':
       return settings.hapticsEnabled;
     case 'toggleReducedMotion':
@@ -87,42 +74,6 @@ export const applyLegacyOverlayToggleField = (
   const nextSettings = copyLegacySettings(settings);
 
   switch (fieldId) {
-    case 'toggleTrailFade': {
-      nextSettings.toggleTrailFade = !nextSettings.toggleTrailFade;
-      const trailFadeDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
-      return {
-        settings: nextSettings,
-        affectsBackdrop: false,
-        affectsBoardStatic: false,
-        affectsBoardDynamic: true,
-        switchIsOn: trailFadeDisplayState.switchIsOn,
-        stateText: trailFadeDisplayState.stateText
-      };
-    }
-    case 'toggleTrailPulse': {
-      nextSettings.toggleTrailPulse = !nextSettings.toggleTrailPulse;
-      const trailPulseDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
-      return {
-        settings: nextSettings,
-        affectsBackdrop: false,
-        affectsBoardStatic: false,
-        affectsBoardDynamic: true,
-        switchIsOn: trailPulseDisplayState.switchIsOn,
-        stateText: trailPulseDisplayState.stateText
-      };
-    }
-    case 'toggleAnimatedBackdrop': {
-      nextSettings.toggleAnimatedBackdrop = !nextSettings.toggleAnimatedBackdrop;
-      const animatedBackdropDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
-      return {
-        settings: nextSettings,
-        affectsBackdrop: true,
-        affectsBoardStatic: false,
-        affectsBoardDynamic: false,
-        switchIsOn: animatedBackdropDisplayState.switchIsOn,
-        stateText: animatedBackdropDisplayState.stateText
-      };
-    }
     case 'hapticsEnabled': {
       nextSettings.hapticsEnabled = !nextSettings.hapticsEnabled;
       const hapticsDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);

@@ -8,6 +8,7 @@ import {
   type LegacyMazeGenerationProfile,
   type LegacyPoint
 } from './legacyMaze';
+import { timeLegacyMazeGeneration } from './legacyGenerationTiming';
 import {
   GEOMETRY_BUDGET_BASE_CANDIDATES,
   GEOMETRY_BUDGET_WINDOW,
@@ -970,7 +971,7 @@ const selectLegacyRuntimeMazeForMode = (
   };
 };
 
-export const createLegacyRuntimeMazeForMode = (
+const generateLegacyRuntimeMazeForMode = (
   mode: LegacyGenerationMode,
   scale: number,
   seed: number,
@@ -999,6 +1000,19 @@ export const createLegacyRuntimeMazeForMode = (
     }
   };
 };
+
+// MAZER-PERF-009: the same call as before, recorded as a User Timing measure on the thread that ran it.
+export const createLegacyRuntimeMazeForMode = (
+  mode: LegacyGenerationMode,
+  scale: number,
+  seed: number,
+  generationProfile?: Partial<LegacyMazeGenerationProfile> | null,
+  selectionOptions: LegacyGenerationSelectionOptions = {},
+  aspectRatio = 1
+): LegacyMazeSnapshot => timeLegacyMazeGeneration(
+  { mode, scale },
+  () => generateLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile, selectionOptions, aspectRatio)
+);
 
 export const stepLegacyGenerationSeed = (seed: number): number => (seed + 1) >>> 0;
 

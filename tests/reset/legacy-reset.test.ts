@@ -274,9 +274,12 @@ describe('legacy reset lane', () => {
     expect(LEGACY_DEFAULTS.movementSpeed).toBe(0.04);
     expect(linearColorToHex(LEGACY_DEFAULTS.pathColor)).toBe('#797978');
     expect(linearColorToHex(LEGACY_DEFAULTS.wallColor)).toBe('#4a4a4a');
-    expect(LEGACY_DEFAULTS.toggleTrailPulse).toBe(true);
+    // Trail Fade, Trail Shine and Animated Background are no longer settings (MAZER-UI-026): Reduce Motion decides them.
+    expect(LEGACY_DEFAULTS).not.toHaveProperty('toggleTrailPulse');
+    expect(LEGACY_DEFAULTS).not.toHaveProperty('toggleTrailFade');
+    expect(LEGACY_DEFAULTS).not.toHaveProperty('toggleAnimatedBackdrop');
+    expect(LEGACY_DEFAULTS.toggleReducedMotion).toBe(false);
     expect(LEGACY_DEFAULTS.darkMode).toBe(true);
-    expect(LEGACY_DEFAULTS.toggleAnimatedBackdrop).toBe(true);
   });
 
   test('builds a solvable legacy maze snapshot', () => {
@@ -771,9 +774,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
     expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars(createBackdropStarRandom()).slice(0, LEGACY_MENU_STAR_COUNT);');
     expect(menuSceneSource).not.toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
-    expect(menuSceneSource).toContain('if (this.stars.length === 0 || !this.settings.toggleAnimatedBackdrop || this.prefersLegacyReducedMotion()) {');
+    expect(menuSceneSource).toContain('if (this.stars.length === 0 || !resolveBackdropMotion(this.prefersLegacyReducedMotion())) {');
     expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(cyberArcadeMaterial.substrate.field, 1);');
-    expect(menuSceneSource).toContain('animatedBackdropEnabled: this.settings.toggleAnimatedBackdrop');
+    expect(menuSceneSource).toContain('animatedBackdropEnabled: resolveBackdropMotion(this.prefersLegacyReducedMotion())');
     expect(menuSceneSource).toContain('backdropDirty: this.backdropDirty');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropPalette');
     // MAZER-VIS-017: the angular shard/rune/sigil drawing is deleted; only round stars are drawn.
@@ -1073,7 +1076,8 @@ describe('legacy reset lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const toggleFieldSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayToggleFields.ts'), 'utf8');
 
-    expect(toggleFieldSource).toContain("| 'toggleAnimatedBackdrop'");
+    expect(toggleFieldSource).not.toContain('toggleAnimatedBackdrop');
+    expect(toggleFieldSource).toContain("| 'toggleReducedMotion'");
     expect(toggleFieldSource).toContain('resolveLegacyOverlayToggleStateText');
     expect(toggleFieldSource).toContain('resolveLegacyOverlayToggleSwitchIsOn');
     // Wiring lane (2026-11-06): the rows come from the shared plan (legacySettingsSheetPlan.ts) and are
@@ -1083,10 +1087,11 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private createToggleSwitchRow(');
     expect(menuSceneSource).toContain('private paintLegacySettingsItem(');
     expect(menuSceneSource).not.toContain("label: 'Camera Follow'");
-    expect(planSource).toContain("row('trail-fade', 'toggle', 'Trail Fade'");
-    expect(planSource).toContain("row('trail-shine', 'toggle', 'Trail Shine'");
-    expect(planSource).toContain("row('animated-background', 'toggle', 'Animated Background'");
-    expect(planSource).toContain("offLabel: 'Still'");
+    expect(planSource).toContain("settingRow('reduce-motion', 'toggle', REDUCED_MOTION_SETTING_LABEL");
+    expect(planSource).toContain("settingRow('haptics', 'toggle', 'Haptics'");
+    expect(planSource).not.toContain("'Trail Fade'");
+    expect(planSource).not.toContain("'Trail Shine'");
+    expect(planSource).not.toContain("'Animated Background'");
     expect(menuSceneSource).not.toContain("label: 'High Contrast'");
     // Play touch movement only has one control scheme now -- the floating
     // stick that spawns wherever the player touches down (see

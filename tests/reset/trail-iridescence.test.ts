@@ -349,10 +349,10 @@ describe('iridescent trail with motion stopped (reduced motion, or Trail Shine o
     expect(cores.size).toBeGreaterThanOrEqual(14);
   });
 
-  test('the scene splits the trail into a MOVEMENT gate (shine, breath: off under reduced motion) and a COLOUR gate (hue drift: only Trail Shine off holds it)', () => {
+  test('the scene splits the trail into a MOVEMENT gate (shine, breath: off under reduced motion) and a COLOUR gate (hue drift: always on)', () => {
     expect(MENU_SCENE).toContain('const trailAnimated = shineEnabled;');
     expect(MENU_SCENE).toContain('resolveTrailBreath(animationTime, !trailAnimated)');
-    expect(MENU_SCENE).toContain('return resolveTrailMotionPlan(this.settings.toggleTrailPulse, this.prefersLegacyReducedMotion());');
+    expect(MENU_SCENE).toContain('return resolveTrailMotionPlan(this.prefersLegacyReducedMotion());');
     expect(MENU_SCENE).toContain('const trailColourTimeMs = resolveTrailColourTimeMs(animationTime, trailMotionPlan);');
     // the continuous-redraw cadence runs while the COLOUR drifts, so it keeps running under reduced motion
     expect(MENU_SCENE).toContain('const active = this.isLegacyTrailColourDrifting() && this.overlay === \'none\' && this.trail.length > 1;');

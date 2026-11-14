@@ -73,8 +73,6 @@ const MENU = 'src/scenes/MenuScene.ts';
  */
 const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: MENU, literal: 'Signing you in…', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY + message surface (auth gate loading)' },
-  { file: MENU, literal: '{}\nManage your profile and account from the shared Fawxzzy account portal.', kind: 'raw-static', route: 'keep as screen helper copy' },
-  { file: MENU, literal: 'Request timed out.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.requestTimedOut, error tone (today diverges from the routed copy for the same event)' },
   { file: MENU, literal: 'Progression reset.', kind: 'routed-inline', route: 'move copy into LEGACY_PROGRESSION_MESSAGE_COPY; id progression.player.reset already routed' },
   { file: MENU, literal: 'Runtime diagnostics authenticated fixture.', kind: 'fixture', route: 'none (QA fixture)' },
   { file: 'src/boot/accessibilitySurface.ts', literal: 'Use Arrow keys or WASD to move through the maze. Press Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.', kind: 'static', route: 'none (static a11y description)' },
@@ -107,13 +105,7 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/boot/installGate.ts', literal: 'Could not copy the link. Copy the address from your browser instead.', kind: 'static', route: 'install gate Copy link failure notice (role=status under the button); active; none' },
   { file: 'src/legacy-runtime/legacyAccountPortal.ts', literal: 'Account connection unavailable. Return to Mazer and try again.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.accountConnectionUnavailable; today rendered directly in two places' },
   { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'Account connected.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.accountConnected (info is set on the snapshot with no render site)' },
-  { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'A previous password update is still pending. Please wait before trying a different password.', kind: 'technical', route: 'mapped by resolveLegacyPasswordRecoveryError; never rendered verbatim' },
-  { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'Failed to update password. Please try again.', kind: 'technical', route: 'mapped by resolveLegacyPasswordRecoveryError; never rendered verbatim' },
-  { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'Password update timed out.', kind: 'technical', route: 'mapped by resolveLegacyPasswordRecoveryError; never rendered verbatim' },
   { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'That username is already taken.', kind: 'duplicate-unrendered', route: 'duplicate of LEGACY_AUTH_MESSAGE_COPY.usernameTaken; save result error is never rendered' },
-  { file: 'src/legacy-runtime/legacyAuthPresentation.ts', literal: 'Checking your reset link…', kind: 'raw-status', route: 'password-recovery presentation helper; render through message surface' },
-  { file: 'src/legacy-runtime/legacyAuthPresentation.ts', literal: 'Choose a new password.', kind: 'raw-status', route: 'password-recovery presentation helper; render through message surface' },
-  { file: 'src/legacy-runtime/legacyAuthPresentation.ts', literal: 'Updating your password…', kind: 'raw-status', route: 'password-recovery presentation helper; render through message surface' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'The leaderboard is not available right now.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'Could not reach the leaderboard. Check your connection and try again.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'The leaderboard is not set up yet.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
@@ -122,17 +114,23 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/ui/dom/MazerSwitch.ts', literal: 'Off', kind: 'static', route: 'primitive state label' },
   { file: 'src/ui/dom/StatusBanner.ts', literal: 'Info', kind: 'static', route: 'primitive tone label' },
   { file: 'src/ui/dom/StatusBanner.ts', literal: 'Error', kind: 'static', route: 'primitive tone label' },
-  { file: 'src/legacy-runtime/legacyAuthScreenView.ts', literal: 'Still opening. Continue in your browser or try again.', kind: 'duplicate-unrendered', route: 'auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands' },
-  { file: 'src/legacy-runtime/legacyAuthScreenView.ts', literal: 'Opening…', kind: 'raw-status', route: 'dock label while the OAuth redirect is in flight; bounded to LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS (10 s), then Sign in + browser notice' },
-  { file: 'src/legacy-runtime/legacyAuthScreenView.ts', literal: 'Loading…', kind: 'duplicate-unrendered', route: 'auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands' },
-  { file: 'src/legacy-runtime/legacyAuthScreenView.ts', literal: 'Signing you in…', kind: 'duplicate-unrendered', route: 'auth-screen view-model copy table (rendered by the MenuScene Welcome screen); route through the message module when the render surface lands' },
+  { file: 'src/legacy-runtime/legacyAccountStatusState.ts', literal: 'Loading…', kind: 'duplicate-unrendered', route: 'gate-cover copy table (the loader label is drawn by MenuScene from resolveLegacyAuthLoadingCopy); MAZER-ACCT-043' },
+  { file: 'src/legacy-runtime/legacyAccountStatusState.ts', literal: 'Opening…', kind: 'raw-status', route: 'Try again button label while the hand-off is in flight; bounded to LEGACY_ACCOUNT_STATUS_OPENING_TIMEOUT_MS; MAZER-ACCT-043' },
+  { file: 'src/legacy-runtime/legacyAccountStatusState.ts', literal: 'You are signed out.', kind: 'raw-status', route: 'failure-fallback status line after an explicit sign-out or a return without a session; MAZER-ACCT-043' },
+  { file: 'src/legacy-runtime/legacyAccountStatusState.ts', literal: 'Signing you in…', kind: 'duplicate-unrendered', route: 'gate-cover copy table (the loader label is drawn by MenuScene from resolveLegacyAuthLoadingCopy); MAZER-ACCT-043' },
+  { file: 'src/legacy-runtime/legacyAccountStatusState.ts', literal: 'Still opening. Try again.', kind: 'raw-status', route: 'failure-fallback status line once the Opening timeout elapsed; MAZER-ACCT-043' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Reach the star to clear the maze.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'An arrow on the first tile points the way you set off.', kind: 'static', route: 'Guide (How to play) sheet row copy (Start row, added with the Chip board wiring); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'You are the green rounded block inside a bright ring.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Touch and hold anywhere, then drag the way you want to go. Let go to stop.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
-  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'A shimmering, colour-shifting line is your route. {} in Settings fades old trail.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
+  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'A shimmering, colour-shifting line is your route. {} in Settings calms it.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Some mazes wrap around open edges. Trail-coloured edge diamonds fill as beams hit.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
+  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'The number by the top-left icon is how many players are in Mazer right now.', kind: 'static', route: 'Guide (How to play) sheet row copy for the menu online counter (MAZER-UI-024); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Clears show your clear time and level. Harder mazes add shortcuts and loops.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
+  { file: 'src/legacy-runtime/legacySettingsSheetPlan.ts', literal: 'Buzzes on steps, wall bumps and wins. Silent with Reduce Motion, and on iPhone.', kind: 'static', route: 'Settings sheet description under the Haptics row (MAZER-UI-026); every setting row must carry one' },
+  { file: 'src/legacy-runtime/legacySettingsSheetPlan.ts', literal: 'Controls, the goal, and what each icon means.', kind: 'static', route: 'Settings sheet description under the How to play row (MAZER-UI-026); every setting row must carry one' },
+  { file: 'src/legacy-runtime/legacySettingsSheetPlan.ts', literal: 'Sets your level back to 1. Asks you to confirm first.', kind: 'static', route: 'Settings sheet description under the Reset progress row (MAZER-UI-026); every setting row must carry one' },
+  { file: 'src/legacy-runtime/legacySettingsSheetPlan.ts', literal: 'Signs this device out. Your progress stays on your account.', kind: 'static', route: 'Settings sheet description under the Sign out row (MAZER-UI-026); every setting row must carry one' },
   { file: 'src/legacy-runtime/legacyProgressionResetFlow.ts', literal: 'Your level and leaderboard standing go back to Level 1. Your account, username and settings stay as they are. This can’t be undone.', kind: 'static', route: 'Reset progress confirm/status copy; rendered by the shared Settings reset card (MenuScene.buildProgressionResetConfirmationOverlay); fold into the message module later' },
   { file: 'src/legacy-runtime/legacyProgressionResetFlow.ts', literal: 'Connect to the internet to reset your account progress.', kind: 'static', route: 'Reset progress confirm/status copy; rendered by the shared Settings reset card (MenuScene.buildProgressionResetConfirmationOverlay); fold into the message module later' },
   { file: 'src/legacy-runtime/legacyProgressionResetFlow.ts', literal: 'Your account is still loading. Try again in a moment.', kind: 'static', route: 'Reset progress confirm/status copy; rendered by the shared Settings reset card (MenuScene.buildProgressionResetConfirmationOverlay); fold into the message module later' },
@@ -489,8 +487,8 @@ describe('message-system structure the inventory depends on', { timeout: GUARD_T
 
   test('auth feedback is rendered from the raw snapshot, not from the resolved message', () => {
     const menu = srcText(MENU);
-    // The Welcome screen feeds the raw snapshot into the auth-screen view-model
-    // (error) and draws the optional info line; each raw site appears once.
+    // The failure fallback feeds the raw snapshot error into the status view-model; each raw site appears once.
+    // The raw info line is gone with the Welcome screen (MAZER-ACCT-043): the fallback draws one status line only.
     expect(
       menu.split('errorMessage: this.authSnapshot.error,').length - 1,
       'The raw auth error render site changed. Update the inventory doc (section: raw render sites).'
@@ -498,7 +496,7 @@ describe('message-system structure the inventory depends on', { timeout: GUARD_T
     expect(
       menu.split('this.authSnapshot.info?.trim()').length - 1,
       'The raw auth info render site changed. Update the inventory doc (section: raw render sites).'
-    ).toBe(1);
+    ).toBe(0);
   });
 
   test('remote sync results are deliberately silent for players', () => {
@@ -544,7 +542,6 @@ describe('message-system structure the inventory depends on', { timeout: GUARD_T
       { name: 'resolveLegacyOverlayMovementSpeedMessage', excluded: [MESSAGE_MODULE] },
       { name: 'resolveLegacyOverlayFieldCommitMessage', excluded: [MESSAGE_MODULE] },
       { name: 'LEGACY_OVERLAY_MESSAGE_COPY', excluded: [MESSAGE_MODULE] },
-      { name: 'resolveLegacyAuthBottomFeedbackLabel', excluded: ['src/legacy-runtime/legacyAuthPresentation.ts'] },
       { name: 'createStatusBanner', excluded: ['src/ui/dom/StatusBanner.ts', 'src/ui/dom/index.ts'] }
     ];
     for (const { name, excluded } of dormant) {

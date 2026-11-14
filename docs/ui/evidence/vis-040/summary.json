@@ -1,0 +1,1162 @@
+{
+ "before": {
+  "perf-change-phone390-cpu1": {
+   "label": "perf-change-phone390-cpu1",
+   "scenario": "change",
+   "fakeClock": false,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "tilesBefore=371",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 167,
+   "durationMs": 8466,
+   "frameDtMs": {
+    "median": 50,
+    "p95": 66.7,
+    "max": 233.3
+   },
+   "jsCostMs": {
+    "mean": 11.48,
+    "p95": 15.2,
+    "max": 23.4
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "perf-change-phone390-cpu4": {
+   "label": "perf-change-phone390-cpu4",
+   "scenario": "change",
+   "fakeClock": false,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "tilesBefore=377",
+   "errors": [],
+   "cpuThrottle": 4,
+   "frames": 19,
+   "durationMs": 9450,
+   "frameDtMs": {
+    "median": 383.4,
+    "p95": 2666.5,
+    "max": 2666.5
+   },
+   "jsCostMs": {
+    "mean": 77.953,
+    "p95": 201,
+    "max": 201
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "perf-start-desktop-cpu1": {
+   "label": "perf-start-desktop-cpu1",
+   "scenario": "start",
+   "fakeClock": false,
+   "profile": "desktop",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 188,
+   "durationMs": 3817,
+   "frameDtMs": {
+    "median": 16.7,
+    "p95": 33.4,
+    "max": 50
+   },
+   "jsCostMs": {
+    "mean": 8.105,
+    "p95": 10.8,
+    "max": 21.1
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "perf-start-phone390-cpu1": {
+   "label": "perf-start-phone390-cpu1",
+   "scenario": "start",
+   "fakeClock": false,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 68,
+   "durationMs": 3583,
+   "frameDtMs": {
+    "median": 50,
+    "p95": 66.7,
+    "max": 66.8
+   },
+   "jsCostMs": {
+    "mean": 15.297,
+    "p95": 22.3,
+    "max": 33.5
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "perf-start-phone390-cpu4": {
+   "label": "perf-start-phone390-cpu4",
+   "scenario": "start",
+   "fakeClock": false,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 4,
+   "frames": 6,
+   "durationMs": 1900,
+   "frameDtMs": {
+    "median": 283.3,
+    "p95": 583.3,
+    "max": 583.3
+   },
+   "jsCostMs": {
+    "mean": 176.317,
+    "p95": 484,
+    "max": 484
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "perf-start-phone412-cpu1": {
+   "label": "perf-start-phone412-cpu1",
+   "scenario": "start",
+   "fakeClock": false,
+   "profile": "phone412",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 77,
+   "durationMs": 3767,
+   "frameDtMs": {
+    "median": 50,
+    "p95": 66.7,
+    "max": 66.7
+   },
+   "jsCostMs": {
+    "mean": 17.701,
+    "p95": 27.4,
+    "max": 31.5
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "pop-change-desktop": {
+   "label": "pop-change-desktop",
+   "scenario": "change",
+   "fakeClock": true,
+   "profile": "desktop",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "tilesBefore=370",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 524,
+   "durationMs": 8368,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.00727,
+    "popFrames": 365,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.02505,
+    "meanChangedFrac": 0.00326,
+    "maxDelta": 243,
+    "framesWithAnyPop": 502
+   },
+   "layer": {
+    "maxPopFrac": 0.00611,
+    "popFrames": 96,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 389,
+    "maxChangedFrac": 0.00895,
+    "meanChangedFrac": 0.00099,
+    "maxDelta": 231
+   },
+   "cast": {
+    "maxPopPx": 1004,
+    "framesWithPop": 11,
+    "maxChangedPx": 3823,
+    "maxDelta": 243
+   },
+   "outside": {
+    "maxPopPx": 2290,
+    "framesPopOver40px": 424,
+    "maxDelta": 243
+   }
+  },
+  "pop-change-phone390-reduce": {
+   "label": "pop-change-phone390-reduce",
+   "scenario": "change",
+   "fakeClock": true,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": true,
+   "note": "tilesBefore=370",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 93,
+   "durationMs": 1472,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.28077,
+    "popFrames": 3,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.34001,
+    "meanChangedFrac": 0.00771,
+    "maxDelta": 247,
+    "framesWithAnyPop": 13
+   },
+   "layer": {
+    "maxPopFrac": 0.2206,
+    "popFrames": 2,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 2,
+    "maxChangedFrac": 0.25453,
+    "meanChangedFrac": 0.00548,
+    "maxDelta": 231
+   },
+   "cast": {
+    "maxPopPx": 1142,
+    "framesWithPop": 2,
+    "maxChangedPx": 1757,
+    "maxDelta": 231
+   },
+   "outside": {
+    "maxPopPx": 467,
+    "framesPopOver40px": 2,
+    "maxDelta": 247
+   }
+  },
+  "pop-change-phone390": {
+   "label": "pop-change-phone390",
+   "scenario": "change",
+   "fakeClock": true,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "tilesBefore=414",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 524,
+   "durationMs": 8368,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.01121,
+    "popFrames": 424,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.03914,
+    "meanChangedFrac": 0.00805,
+    "maxDelta": 247,
+    "framesWithAnyPop": 496
+   },
+   "layer": {
+    "maxPopFrac": 0.0056,
+    "popFrames": 38,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 390,
+    "maxChangedFrac": 0.0088,
+    "meanChangedFrac": 0.0011,
+    "maxDelta": 231
+   },
+   "cast": {
+    "maxPopPx": 333,
+    "framesWithPop": 13,
+    "maxChangedPx": 1173,
+    "maxDelta": 242
+   },
+   "outside": {
+    "maxPopPx": 1127,
+    "framesPopOver40px": 408,
+    "maxDelta": 247
+   }
+  },
+  "pop-start-desktop": {
+   "label": "pop-start-desktop",
+   "scenario": "start",
+   "fakeClock": true,
+   "profile": "desktop",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 269,
+   "durationMs": 4288,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.00438,
+    "popFrames": 189,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.0188,
+    "meanChangedFrac": 0.00326,
+    "maxDelta": 243,
+    "framesWithAnyPop": 261
+   },
+   "layer": {
+    "maxPopFrac": 0.00599,
+    "popFrames": 1,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 201,
+    "maxChangedFrac": 0.00877,
+    "meanChangedFrac": 0.00092,
+    "maxDelta": 231
+   },
+   "cast": {
+    "maxPopPx": 344,
+    "framesWithPop": 47,
+    "maxChangedPx": 3990,
+    "maxDelta": 243
+   },
+   "outside": {
+    "maxPopPx": 2285,
+    "framesPopOver40px": 218,
+    "maxDelta": 244
+   }
+  },
+  "pop-start-phone360": {
+   "label": "pop-start-phone360",
+   "scenario": "start",
+   "fakeClock": true,
+   "profile": "phone360",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 269,
+   "durationMs": 4288,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.00897,
+    "popFrames": 215,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.03266,
+    "meanChangedFrac": 0.00901,
+    "maxDelta": 244,
+    "framesWithAnyPop": 263
+   },
+   "layer": {
+    "maxPopFrac": 0.00588,
+    "popFrames": 1,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 201,
+    "maxChangedFrac": 0.00851,
+    "meanChangedFrac": 0.00112,
+    "maxDelta": 231
+   },
+   "cast": {
+    "maxPopPx": 254,
+    "framesWithPop": 46,
+    "maxChangedPx": 2071,
+    "maxDelta": 243
+   },
+   "outside": {
+    "maxPopPx": 1115,
+    "framesPopOver40px": 202,
+    "maxDelta": 244
+   }
+  },
+  "pop-start-phone390-reduce": {
+   "label": "pop-start-phone390-reduce",
+   "scenario": "start",
+   "fakeClock": true,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": true,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 50,
+   "durationMs": 784,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.00048,
+    "popFrames": 0,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.0103,
+    "meanChangedFrac": 0.00048,
+    "maxDelta": 225,
+    "framesWithAnyPop": 10
+   },
+   "layer": {
+    "maxPopFrac": 0,
+    "popFrames": 0,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 0,
+    "maxChangedFrac": 0,
+    "meanChangedFrac": 0,
+    "maxDelta": 0
+   },
+   "cast": {
+    "maxPopPx": 100,
+    "framesWithPop": 1,
+    "maxChangedPx": 2372,
+    "maxDelta": 180
+   },
+   "outside": {
+    "maxPopPx": 31,
+    "framesPopOver40px": 0,
+    "maxDelta": 225
+   }
+  },
+  "pop-start-phone390": {
+   "label": "pop-start-phone390",
+   "scenario": "start",
+   "fakeClock": true,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 269,
+   "durationMs": 4288,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.00759,
+    "popFrames": 214,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.02771,
+    "meanChangedFrac": 0.00776,
+    "maxDelta": 243,
+    "framesWithAnyPop": 261
+   },
+   "layer": {
+    "maxPopFrac": 0.00546,
+    "popFrames": 1,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 201,
+    "maxChangedFrac": 0.00856,
+    "meanChangedFrac": 0.00104,
+    "maxDelta": 231
+   },
+   "cast": {
+    "maxPopPx": 283,
+    "framesWithPop": 42,
+    "maxChangedPx": 2435,
+    "maxDelta": 242
+   },
+   "outside": {
+    "maxPopPx": 1131,
+    "framesPopOver40px": 204,
+    "maxDelta": 243
+   }
+  },
+  "pop-start-phone412": {
+   "label": "pop-start-phone412",
+   "scenario": "start",
+   "fakeClock": true,
+   "profile": "phone412",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 269,
+   "durationMs": 4288,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.00702,
+    "popFrames": 212,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.02505,
+    "meanChangedFrac": 0.00714,
+    "maxDelta": 244,
+    "framesWithAnyPop": 263
+   },
+   "layer": {
+    "maxPopFrac": 0.00571,
+    "popFrames": 1,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 201,
+    "maxChangedFrac": 0.00886,
+    "meanChangedFrac": 0.00109,
+    "maxDelta": 231
+   },
+   "cast": {
+    "maxPopPx": 218,
+    "framesWithPop": 48,
+    "maxChangedPx": 2595,
+    "maxDelta": 242
+   },
+   "outside": {
+    "maxPopPx": 1130,
+    "framesPopOver40px": 206,
+    "maxDelta": 244
+   }
+  }
+ },
+ "after": {
+  "perf-change-phone390-cpu1": {
+   "label": "perf-change-phone390-cpu1",
+   "scenario": "change",
+   "fakeClock": false,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "tilesBefore=373",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 211,
+   "durationMs": 8450,
+   "frameDtMs": {
+    "median": 33.4,
+    "p95": 50.1,
+    "max": 166.7
+   },
+   "jsCostMs": {
+    "mean": 9.061,
+    "p95": 14.8,
+    "max": 28.6
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "perf-change-phone390-cpu4": {
+   "label": "perf-change-phone390-cpu4",
+   "scenario": "change",
+   "fakeClock": false,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "tilesBefore=376",
+   "errors": [],
+   "cpuThrottle": 4,
+   "frames": 11,
+   "durationMs": 10400,
+   "frameDtMs": {
+    "median": 749.9,
+    "p95": 4299.9,
+    "max": 4299.9
+   },
+   "jsCostMs": {
+    "mean": 78.755,
+    "p95": 185.1,
+    "max": 185.1
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "perf-start-desktop-cpu1": {
+   "label": "perf-start-desktop-cpu1",
+   "scenario": "start",
+   "fakeClock": false,
+   "profile": "desktop",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 189,
+   "durationMs": 3950,
+   "frameDtMs": {
+    "median": 16.7,
+    "p95": 33.4,
+    "max": 33.4
+   },
+   "jsCostMs": {
+    "mean": 8.428,
+    "p95": 11.6,
+    "max": 19.8
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "perf-start-phone390-cpu1": {
+   "label": "perf-start-phone390-cpu1",
+   "scenario": "start",
+   "fakeClock": false,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 96,
+   "durationMs": 3917,
+   "frameDtMs": {
+    "median": 33.4,
+    "p95": 50.1,
+    "max": 50.1
+   },
+   "jsCostMs": {
+    "mean": 11.62,
+    "p95": 16.8,
+    "max": 20.5
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "perf-start-phone390-cpu4": {
+   "label": "perf-start-phone390-cpu4",
+   "scenario": "start",
+   "fakeClock": false,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 4,
+   "frames": 9,
+   "durationMs": 2017,
+   "frameDtMs": {
+    "median": 266.6,
+    "p95": 333.4,
+    "max": 333.4
+   },
+   "jsCostMs": {
+    "mean": 93.122,
+    "p95": 198.8,
+    "max": 198.8
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "perf-start-phone412-cpu1": {
+   "label": "perf-start-phone412-cpu1",
+   "scenario": "start",
+   "fakeClock": false,
+   "profile": "phone412",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 76,
+   "durationMs": 3800,
+   "frameDtMs": {
+    "median": 50,
+    "p95": 66.7,
+    "max": 83.4
+   },
+   "jsCostMs": {
+    "mean": 18.849,
+    "p95": 28.4,
+    "max": 33.7
+   },
+   "board": null,
+   "layer": null,
+   "cast": null,
+   "outside": null
+  },
+  "pop-change-desktop": {
+   "label": "pop-change-desktop",
+   "scenario": "change",
+   "fakeClock": true,
+   "profile": "desktop",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "tilesBefore=371",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 524,
+   "durationMs": 8368,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.00781,
+    "popFrames": 25,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.02402,
+    "meanChangedFrac": 0.00197,
+    "maxDelta": 245,
+    "framesWithAnyPop": 500
+   },
+   "layer": {
+    "maxPopFrac": 0,
+    "popFrames": 0,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 0,
+    "maxChangedFrac": 0.00112,
+    "meanChangedFrac": 0.00003,
+    "maxDelta": 29
+   },
+   "cast": {
+    "maxPopPx": 1144,
+    "framesWithPop": 54,
+    "maxChangedPx": 4060,
+    "maxDelta": 243
+   },
+   "outside": {
+    "maxPopPx": 2281,
+    "framesPopOver40px": 432,
+    "maxDelta": 245
+   }
+  },
+  "pop-change-phone390-reduce": {
+   "label": "pop-change-phone390-reduce",
+   "scenario": "change",
+   "fakeClock": true,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": true,
+   "note": "tilesBefore=371",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 93,
+   "durationMs": 1472,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.01081,
+    "popFrames": 3,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.05051,
+    "meanChangedFrac": 0.00805,
+    "maxDelta": 247,
+    "framesWithAnyPop": 13
+   },
+   "layer": {
+    "maxPopFrac": 0,
+    "popFrames": 0,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 0,
+    "maxChangedFrac": 0.02744,
+    "meanChangedFrac": 0.00605,
+    "maxDelta": 20
+   },
+   "cast": {
+    "maxPopPx": 371,
+    "framesWithPop": 2,
+    "maxChangedPx": 1188,
+    "maxDelta": 232
+   },
+   "outside": {
+    "maxPopPx": 34,
+    "framesPopOver40px": 0,
+    "maxDelta": 247
+   }
+  },
+  "pop-change-phone390": {
+   "label": "pop-change-phone390",
+   "scenario": "change",
+   "fakeClock": true,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "tilesBefore=370",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 524,
+   "durationMs": 8368,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.00626,
+    "popFrames": 400,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.02887,
+    "meanChangedFrac": 0.0065,
+    "maxDelta": 246,
+    "framesWithAnyPop": 495
+   },
+   "layer": {
+    "maxPopFrac": 0,
+    "popFrames": 0,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 0,
+    "maxChangedFrac": 0.0016,
+    "meanChangedFrac": 0.00003,
+    "maxDelta": 29
+   },
+   "cast": {
+    "maxPopPx": 278,
+    "framesWithPop": 14,
+    "maxChangedPx": 1059,
+    "maxDelta": 242
+   },
+   "outside": {
+    "maxPopPx": 1127,
+    "framesPopOver40px": 405,
+    "maxDelta": 246
+   }
+  },
+  "pop-start-desktop": {
+   "label": "pop-start-desktop",
+   "scenario": "start",
+   "fakeClock": true,
+   "profile": "desktop",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 269,
+   "durationMs": 4288,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.0022,
+    "popFrames": 11,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.01783,
+    "meanChangedFrac": 0.00194,
+    "maxDelta": 243,
+    "framesWithAnyPop": 260
+   },
+   "layer": {
+    "maxPopFrac": 0,
+    "popFrames": 0,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 0,
+    "maxChangedFrac": 0.00111,
+    "meanChangedFrac": 0.00003,
+    "maxDelta": 29
+   },
+   "cast": {
+    "maxPopPx": 358,
+    "framesWithPop": 47,
+    "maxChangedPx": 1416,
+    "maxDelta": 243
+   },
+   "outside": {
+    "maxPopPx": 2284,
+    "framesPopOver40px": 220,
+    "maxDelta": 244
+   }
+  },
+  "pop-start-phone360": {
+   "label": "pop-start-phone360",
+   "scenario": "start",
+   "fakeClock": true,
+   "profile": "phone360",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 269,
+   "durationMs": 4288,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.00752,
+    "popFrames": 198,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.03561,
+    "meanChangedFrac": 0.00766,
+    "maxDelta": 244,
+    "framesWithAnyPop": 261
+   },
+   "layer": {
+    "maxPopFrac": 0,
+    "popFrames": 0,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 0,
+    "maxChangedFrac": 0.0017,
+    "meanChangedFrac": 0.0001,
+    "maxDelta": 32
+   },
+   "cast": {
+    "maxPopPx": 196,
+    "framesWithPop": 47,
+    "maxChangedPx": 649,
+    "maxDelta": 243
+   },
+   "outside": {
+    "maxPopPx": 1115,
+    "framesPopOver40px": 202,
+    "maxDelta": 244
+   }
+  },
+  "pop-start-phone390-reduce": {
+   "label": "pop-start-phone390-reduce",
+   "scenario": "start",
+   "fakeClock": true,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": true,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 50,
+   "durationMs": 784,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.00048,
+    "popFrames": 0,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.03536,
+    "meanChangedFrac": 0.00608,
+    "maxDelta": 224,
+    "framesWithAnyPop": 10
+   },
+   "layer": {
+    "maxPopFrac": 0,
+    "popFrames": 0,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 0,
+    "maxChangedFrac": 0.02555,
+    "meanChangedFrac": 0.00495,
+    "maxDelta": 20
+   },
+   "cast": {
+    "maxPopPx": 105,
+    "framesWithPop": 1,
+    "maxChangedPx": 2367,
+    "maxDelta": 183
+   },
+   "outside": {
+    "maxPopPx": 31,
+    "framesPopOver40px": 0,
+    "maxDelta": 224
+   }
+  },
+  "pop-start-phone390": {
+   "label": "pop-start-phone390",
+   "scenario": "start",
+   "fakeClock": true,
+   "profile": "phone390",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 269,
+   "durationMs": 4288,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.00622,
+    "popFrames": 196,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.02619,
+    "meanChangedFrac": 0.00637,
+    "maxDelta": 242,
+    "framesWithAnyPop": 260
+   },
+   "layer": {
+    "maxPopFrac": 0,
+    "popFrames": 0,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 0,
+    "maxChangedFrac": 0.00148,
+    "meanChangedFrac": 0.00003,
+    "maxDelta": 29
+   },
+   "cast": {
+    "maxPopPx": 178,
+    "framesWithPop": 46,
+    "maxChangedPx": 808,
+    "maxDelta": 242
+   },
+   "outside": {
+    "maxPopPx": 1129,
+    "framesPopOver40px": 205,
+    "maxDelta": 242
+   }
+  },
+  "pop-start-phone412": {
+   "label": "pop-start-phone412",
+   "scenario": "start",
+   "fakeClock": true,
+   "profile": "phone412",
+   "level": 40,
+   "reduceMotion": false,
+   "note": "",
+   "errors": [],
+   "cpuThrottle": 1,
+   "frames": 269,
+   "durationMs": 4288,
+   "frameDtMs": {
+    "median": 16,
+    "p95": 16,
+    "max": 16
+   },
+   "jsCostMs": {
+    "mean": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "board": {
+    "maxPopFrac": 0.0056,
+    "popFrames": 194,
+    "popFrameThreshold": 0.0015,
+    "maxChangedFrac": 0.0237,
+    "meanChangedFrac": 0.00585,
+    "maxDelta": 247,
+    "framesWithAnyPop": 264
+   },
+   "layer": {
+    "maxPopFrac": 0,
+    "popFrames": 0,
+    "popFrameThreshold": 0.0015,
+    "framesWithAnyPop": 0,
+    "maxChangedFrac": 0.00429,
+    "meanChangedFrac": 0.00013,
+    "maxDelta": 34
+   },
+   "cast": {
+    "maxPopPx": 185,
+    "framesWithPop": 51,
+    "maxChangedPx": 888,
+    "maxDelta": 247
+   },
+   "outside": {
+    "maxPopPx": 1130,
+    "framesPopOver40px": 205,
+    "maxDelta": 247
+   }
+  }
+ }
+}

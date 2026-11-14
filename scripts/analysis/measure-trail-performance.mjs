@@ -9,7 +9,7 @@
  * ?runtimeDiagnostics=1), walks a real long route, and records real
  * geometry-build/draw/total frame times across the required matrix:
  * desktop normal scale, a real 390x844 DPR3 mobile/touch viewport, Trail
- * Fade on/off, and Trail Shine on/off. (Tile size itself is always a
+ * Shine on/off (Reduce Motion off/on; Trail Fade is no longer a setting). (Tile size itself is always a
  * continuously computed float derived from the current viewport and maze
  * dimensions -- see resolveLegacyMazeRenderFrame -- so "compact" and
  * "fractional" tile sizes are simply whatever the smaller/odd-dimension
@@ -322,13 +322,14 @@ const configureViewportAndSettings = async (page, config) => {
   if (config.viewport) {
     await page.setViewportSize(config.viewport);
   }
-  if (config.toggleTrailFade !== undefined || config.toggleTrailShine !== undefined) {
-    await page.evaluate(({ toggleTrailFade, toggleTrailShine }) => {
+  // MAZER-UI-026: Trail Fade and Trail Shine are no longer settings. Trail fade is fixed off (TRAIL_TAIL_FADE) and
+  // the shine band is visible exactly when Reduce Motion is off, so "shine on/off" sets Reduce Motion.
+  if (config.toggleTrailShine !== undefined) {
+    await page.evaluate(({ toggleTrailShine }) => {
       const scene = window.__MAZER_GAME__?.scene?.getScene('MenuScene');
       if (!scene) return;
-      if (toggleTrailFade !== undefined) scene.settings.toggleTrailFade = toggleTrailFade;
-      if (toggleTrailShine !== undefined) scene.settings.toggleTrailPulse = toggleTrailShine;
-    }, { toggleTrailFade: config.toggleTrailFade, toggleTrailShine: config.toggleTrailShine });
+      scene.settings.toggleReducedMotion = !toggleTrailShine;
+    }, { toggleTrailShine: config.toggleTrailShine });
   }
 };
 
@@ -412,20 +413,14 @@ const runOneConfig = async (browser, baseUrl, config) => {
 
   // Assert the workload actually exercised what this config claims to
   // measure, instead of reporting whatever rendered length happened to
-  // result. Trail Fade ON structurally bounds the retained/rendered path
-  // to its truncation window (TRAIL_FADE_TAIL, 16 points) regardless of how
-  // long the walk was, so its bar is "the window is actually full," not an
-  // absolute segment count; Trail Fade OFF retains full history, so a real
-  // long-route workload is expected and asserted directly.
-  const workload = config.toggleTrailFade
-    ? {
-      expectation: `Trail Fade ON: at least 16 accepted moves (fills the retained-tail window) and a non-trivial rendered path`,
-      met: acceptedMoves >= 16 && (trailCpuCost?.strokeSegmentCount ?? 0) >= 3
-    }
-    : {
-      expectation: `Trail Fade OFF: at least ${MIN_REQUIRED_STROKE_SEGMENTS} rendered stroke segments (a real long-route stress case, not a short net-displacement path)`,
-      met: (trailCpuCost?.strokeSegmentCount ?? 0) >= MIN_REQUIRED_STROKE_SEGMENTS
-    };
+  // result. Trail Fade is fixed off (the full history is retained), so a real
+  // long-route workload is expected and asserted directly. (The Trail Fade ON
+  // branch, which only asserted the 16-point truncation window, was dropped
+  // with the setting in MAZER-UI-026.)
+  const workload = {
+    expectation: `Trail Fade OFF: at least ${MIN_REQUIRED_STROKE_SEGMENTS} rendered stroke segments (a real long-route stress case, not a short net-displacement path)`,
+    met: (trailCpuCost?.strokeSegmentCount ?? 0) >= MIN_REQUIRED_STROKE_SEGMENTS
+  };
 
   return {
     name: config.name,
@@ -453,10 +448,10 @@ const CONFIGS = [
   { name: 'mobile-390x844-dpr3', viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, demanding: true },
   { name: 'compact-viewport-small-tiles', viewport: { width: 480, height: 360 }, deviceScaleFactor: 1 },
   { name: 'fractional-viewport-odd-dims', viewport: { width: 977, height: 653 }, deviceScaleFactor: 1 },
-  { name: 'trail-fade-off', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, toggleTrailFade: false, toggleTrailShine: true },
-  { name: 'trail-fade-on', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, toggleTrailFade: true, toggleTrailShine: true },
-  { name: 'trail-shine-off', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, toggleTrailFade: true, toggleTrailShine: false },
-  { name: 'trail-shine-on', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, toggleTrailFade: true, toggleTrailShine: true }
+  // The trail-fade-off / trail-fade-on configs were dropped in MAZER-UI-026 (Trail Fade is no longer a setting).
+  // Shine on/off now means Reduce Motion off/on.
+  { name: 'trail-shine-off', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, toggleTrailShine: false },
+  { name: 'trail-shine-on', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, toggleTrailShine: true }
 ];
 
 const main = async () => {

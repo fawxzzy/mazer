@@ -40,7 +40,6 @@ describe('player message copy rows', () => {
     }).toMatchInlineSnapshot(`
       {
         "auth": {
-          "accountRecovery": "Account setup could not be completed. Try signing in or use Forgot Password.",
           "accountUnavailable": "Account service is unavailable right now. Try again shortly.",
           "authUnavailable": "Account access is unavailable right now. Try again shortly.",
           "emailInvalid": "Enter a valid email address.",
@@ -53,7 +52,6 @@ describe('player message copy rows', () => {
           "passwordPolicy": "Choose a different, stronger password that meets the account security requirements.",
           "passwordRecoveryInvalid": "This reset link is invalid or has expired. Request a new link.",
           "passwordRecoveryUpdated": "Password updated. You can continue to Mazer.",
-          "passwordResetEmailRequired": "Enter an email before reset.",
           "passwordResetNotConfigured": "Password reset is unavailable right now. Try again shortly.",
           "passwordResetSent": "Password reset email sent.",
           "signedIn": "Signed in.",

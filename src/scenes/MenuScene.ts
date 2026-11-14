@@ -21,7 +21,10 @@ import {
   type BoardTileReveal,
   resolveBoardTileStyleFromSearch
 } from '../render/boardTileLayer';
+import { MazeRevealDriver, resolveMazeMarkerAlpha, type MazeRevealClock } from '../render/mazeRevealDriver';
 import { centerOfCell, drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
+import { resolvePlayerCoreAlphaScale, shouldDrawEndpointMarker } from '../render/endpointMarkerLayering';
+import { isGoalStarSpinning, resolveGoalStarRotation } from '../render/goalStarSpin';
 import {
   resolveBleedGlowColor,
   resolveBleedGlowEnvelope,
@@ -31,13 +34,15 @@ import {
 import { BleedGlowColourSmoother } from '../render/bleedGlowColourStep';
 import { BOARD_MARKER_MIN_CSS, BOARD_TILE_GEOMETRY, boardMaterial, type BoardTileStyleId } from '../render/boardTileStyle';
 import { drawGoalBeacon } from '../render/goalBeacon';
-import { MOTION_LOOP_MS, MOTION_PHASER_EASE_SINE_IN_OUT, MOTION_UI_MS } from '../render/motionScale';
+import { MOTION_LOOP_MS } from '../render/motionScale';
 import {
   resolveMenuBlinkPhase,
   resolveReducedMotion,
   resolveReducedMotionSource,
   resolveTrailColourTimeMs,
   resolveTrailMotionPlan,
+  resolveBackdropMotion,
+  TRAIL_TAIL_FADE,
   type ReducedMotionSource
 } from '../render/reducedMotion';
 import { alignBoundsToWholePixels, alignCameraToWholePixels } from '../render/pixelAlignment';
@@ -100,7 +105,7 @@ import {
 } from '../render/navigationCoreTrail';
 import { resolveTrailGridPathWithHead } from '../render/trailHeadPath';
 import { buildDeviceSnappedTrailPath } from '../render/trailDeviceSnap';
-import { createPlayerRingMorph, resolvePlayerMarkerEndpointMorph } from '../render/playerRingMorph';
+import { createPlayerRingMorph, resolveEndpointRingBlend, resolvePlayerMarkerEndpointMorph } from '../render/playerRingMorph';
 import { TrailPerfectPathCache } from '../render/trailPerfectPathCache';
 import { observeTrailFrameCost, shouldRebuildTrail, type TrailDrawRecord } from '../render/trailRedrawGate';
 import {
@@ -281,7 +286,6 @@ import {
 import {
   advanceLegacyMenuDemoFrame,
   createLegacyMenuDemoBootstrap,
-  resolveLegacyMenuDemoTrail,
   type LegacyMenuDemoAdvance
 } from '../legacy-runtime/legacyMenuDemoLifecycle';
 import {
@@ -307,11 +311,9 @@ import {
   shouldRereadLegacyUsernameAfterProfileCreate,
   type LegacyUsernameRename
 } from '../legacy-runtime/legacyAccountUsernameState';
-import {
-  LEGACY_HEADER_IDENTITY_LABEL_NAME,
-  LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX,
-  resolveLegacyHeaderIdentityPlacement
-} from '../legacy-runtime/legacyHeaderIdentityPlacement';
+import { LegacyPresenceController } from '../legacy-runtime/legacyPresenceController';
+import { formatOnlineGlyph } from '../legacy-runtime/legacyPresenceContract';
+import { resolveLegacyPresenceCounterPlacement } from '../legacy-runtime/legacyPresenceCounterLayout';
 import {
   LEGACY_UI_COMPACT_BREAKPOINT,
   resolveLegacyOverlayPanelLayout,
@@ -322,6 +324,7 @@ import {
   LEGACY_SETTINGS_SIZES,
   buildLegacySettingsSheetPlan,
   isLegacySettingsItemFullyVisible,
+  resolveLegacySettingsDescriptionScreenRect,
   resolveLegacySettingsItemScreenRect,
   type LegacySettingsCommand,
   type LegacySettingsContext,
@@ -411,7 +414,7 @@ import {
   LEGACY_GAME_TOGGLE_STORAGE_KEY,
   migrateLegacyGameToggleSettingsToGuestScope,
   readLegacyGameToggleSettings,
-  scrubRemovedCameraZoomFromGameToggleStorage,
+  scrubRetiredGameToggleKeysFromStorage,
   writeLegacyGameToggleSettings
 } from '../legacy-runtime/legacyGameTogglePreferences';
 import {
@@ -458,33 +461,23 @@ import {
 } from '../legacy-runtime/legacyMazeGenerationJob';
 import { createLegacyMazeWorkerHost } from '../legacy-runtime/legacyMazeWorkerClient';
 import {
+  LegacyBootPlayMazeHold,
+  isLegacyBootPlayMazeCheapToBuildInline,
+  shouldStartLegacyBootPlayMazeEarly
+} from '../legacy-runtime/legacyBootPlayMazeHold';
+import {
   checkLegacyUsernameAvailable,
-  clearLegacyPasswordRecoveryUrl,
-  createEmptyLegacyAuthFormState,
   createLegacyAuthScopedStorage,
   createLegacyGuestAuthSnapshot,
   readLegacyAccountUsername,
   readLegacyAuthSessionSnapshot,
-  readLegacyRememberedIdentity,
   readLegacyRememberedIdentityState,
-  readLegacyPasswordRecoveryBootUrlState,
-  normalizeLegacyAuthEmail,
-  resolveLegacyPasswordRecoveryEnterAction,
-  resolveLegacyPasswordUpdateSubmitState,
-  resolveLegacyAuthInvalidFields,
   resolveLegacyAuthScopedStorageKey,
-  resolveLegacyAuthSubmitState,
   saveLegacyAccountUsername,
-  signInLegacyAuth,
   signOutLegacyAuth,
   subscribeLegacyAuthState,
   syncLegacyRememberedIdentityFromAuthenticatedSession,
-  updateLegacyPassword,
-  writeLegacyRememberedIdentity,
-  type LegacyAuthFieldId,
-  type LegacyAuthFormState,
-  type LegacyAuthSessionSnapshot,
-  type LegacyAuthStatus
+  type LegacyAuthSessionSnapshot
 } from '../legacy-runtime/legacyAuth';
 import {
   MAZER_HOST_SIGN_OUT_NAVIGATION_TIMEOUT_MS,
@@ -497,15 +490,8 @@ import {
   beginMazerOAuthAuthorization,
   installMazerOAuthPageShowRecovery,
   navigateToMazerAccountPortal,
-  navigateToMazerLegalPortal,
   warmMazerProviderPreflight
 } from '../legacy-runtime/legacyAccountPortal';
-import {
-  createLegacyPasswordRecoveryState,
-  resolveLegacyPasswordRecoveryEntry,
-  resolveLegacyPasswordRecoveryPresentation,
-  type LegacyPasswordRecoveryState
-} from '../legacy-runtime/legacyAuthPresentation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
 import {
   fetchLegacyLeaderboardPage,
@@ -548,13 +534,13 @@ import {
 } from '../legacy-runtime/legacyLeaderboardView';
 import { readLegacyLeaderboardFixtureShape } from '../legacy-runtime/legacyLeaderboardFixture';
 import {
-  LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS,
-  buildLegacyAuthScreenViewModel,
-  resolveLegacyAuthLoadingCopy,
-  resolveLegacyAuthScreenLayout,
-  type LegacyAuthScreenLink,
-  type LegacyAuthScreenRect
-} from '../legacy-runtime/legacyAuthScreenView';
+  LEGACY_ACCOUNT_STATUS_OPENING_TIMEOUT_MS,
+  resolveLegacyAccountStatus,
+  resolveLegacyAccountStatusLayout,
+  resolveLegacyAuthLoadingCopy
+} from '../legacy-runtime/legacyAccountStatusState';
+import { LOADER_RING_REDUCED_ALPHA, LOADER_RING_REDUCED_SCALE } from '../render/appLoader';
+import { MAZER_LOADER_ICON_TEXTURE_KEY, MAZER_LOADER_RING_TEXTURE_KEY } from '../render/appLoaderOverlay';
 import {
   hasLegacyStoredAuthSession,
   resolveLegacyAuthGateInitialState
@@ -564,7 +550,6 @@ import {
   isLegacyPlayAccessAllowed
 } from '../legacy-runtime/legacyGuestAccess';
 import {
-  LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_REMOTE_MESSAGE_COPY,
   createLegacyPlayerMessage,
   enqueueLegacyPlayerMessage,
@@ -574,8 +559,6 @@ import {
   isLegacyOAuthFailureCopy,
   resolveLegacyAuthFeedbackMessage,
   resolveLegacyOAuthFailureCopy,
-  resolveLegacyPasswordRecoveryError,
-  resolveLegacyAuthValidationMessage,
   type LegacyQueuedPlayerMessage,
   type LegacyPlayerMessage
 } from '../legacy-runtime/legacyPlayerMessage';
@@ -879,7 +862,6 @@ interface MenuSceneVisualDiagnostics {
     pendingCompletionCount: number;
     recoveredCompletionCount: number;
   };
-  authAction: LegacyAuthActionDiagnostics | null;
   layout: {
     buttonHeight: number;
     buttonLayout: LegacyMenuLayout['buttonLayout'];
@@ -1208,20 +1190,6 @@ interface MenuSceneVisualDiagnostics {
   };
 }
 
-interface LegacyAuthActionDiagnostics {
-  canSubmit: boolean | null;
-  emailPresent: boolean;
-  error: string | null;
-  info: string | null;
-  invalidFields: LegacyAuthFieldId[];
-  mode: LegacyAuthFormState['mode'];
-  passwordLength: number;
-  reason: string | null;
-  sequence: number;
-  stage: 'started' | 'blocked' | 'submitting' | 'result' | 'exception';
-  status: LegacyAuthStatus | null;
-}
-
 interface LegacyQaMoveResult {
   accepted: boolean;
   lifecycleLocked: boolean;
@@ -1298,6 +1266,8 @@ interface LegacyTrailPerfDiagnostics {
 
 interface LegacyQaDiagnosticsApi {
   movePlayPlayer(move: string): LegacyQaMoveResult;
+  /** MAZER-UI-024: force the menu "online" count for screenshots (null = unknown, undefined = release); no network. */
+  setPresenceCount(count: number | null | undefined): void;
   getTrailPerfDiagnostics(): LegacyTrailPerfDiagnostics | null;
   /** Player-facing Settings action; the internal overlay id remains options. */
   openSettingsOverlay(): LegacyQaOverlayResult;
@@ -1350,13 +1320,6 @@ const MENU_BUTTON_ALPHA = 0.34;
 const LEGACY_UI_FONT_FAMILY = cyberArcadeMaterial.typography.ui;
 const LEGACY_AUTH_UI_FONT_FAMILY = '"Segoe UI Variable", "Helvetica Neue", Arial, sans-serif';
 const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
-// Unambiguously above every other depth used in the scene (everything else
-// is either default 0 or the shared "3" a couple of unrelated corner
-// controls also use) -- the overlay back chevron sits in the same general
-// top-right corner as play mode's always-present fixed pause-cog touch
-// region, and a tied/lower depth there is exactly what made the chevron
-// "difficult to click": nothing else should ever be able to out-rank it.
-const LEGACY_OVERLAY_BACK_CHEVRON_DEPTH = 1000;
 // Higher than literally everything else, including overlays -- the boot-
 // time loading screen (while the auth gate's first snapshot is still
 // unresolved) has to sit above the menu front door, since that content
@@ -1365,14 +1328,6 @@ const LEGACY_AUTH_GATE_LOADING_DEPTH = 5000;
 // Player message toast: above the auth gate so errors raised on it stay readable.
 const LEGACY_PLAYER_MESSAGE_TOAST_DEPTH = LEGACY_AUTH_GATE_LOADING_DEPTH + 10;
 const LEGACY_PLAYER_MESSAGE_TOAST_ROW_POOL = 3;
-// Mirrors Fitness's own login-pending timeout: if the Supabase call never
-// settles (seen live -- the button flips to "Working" and never recovers,
-// with no thrown error to catch), the submit button must still come back
-// to life so the player isn't permanently stuck. A late response that
-// eventually does arrive is still applied when it lands (see
-// handleLegacyAuthSubmit's attempt-id guard) -- this only bounds how long
-// the UI waits before letting the player try again.
-const LEGACY_AUTH_SUBMIT_TIMEOUT_MS = 12000;
 // Extra forgiveness beyond the chevron's own drawn touch-target size when
 // resolving which hit box a tap belongs to first -- corner buttons are
 // statistically the hardest to land a precise tap on.
@@ -1561,6 +1516,11 @@ const LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS = 5200;
 // the one lit rim is the same hue lightened toward white, so small cells stay solid and legible.
 const LEGACY_WORDMARK_CHIP_FILL_CANVAS_MIX = 0.12;
 const LEGACY_WORDMARK_CHIP_RIM_LIGHTEN = 0.4;
+// MAZER-UI-024 menu "online" counter chips: the number in lit Mazer mint, the word ONLINE dimmer.
+const LEGACY_PRESENCE_CHIP_FILL = cyberArcadeMaterial.rail.mint;
+const LEGACY_PRESENCE_CHIP_RIM = mixLegacyIridescentColor(cyberArcadeMaterial.rail.mint, boardMaterial.white, 0.6);
+const LEGACY_PRESENCE_WORD_FILL = mixLegacyIridescentColor(cyberArcadeMaterial.rail.mint, boardMaterial.void, 0.7);
+const LEGACY_PRESENCE_WORD_RIM = mixLegacyIridescentColor(cyberArcadeMaterial.rail.mint, boardMaterial.void, 0.4);
 // One frame's worth of defer (at 60fps) for the goal-reached maze precompute
 // (applyLegacyWorldTurnPlayerMovement) -- just enough for the arrival
 // frame's render to happen before the still-blocking build runs, with
@@ -1711,6 +1671,8 @@ export class MenuScene extends Phaser.Scene {
   // replacement for account entry.
   private authGateAwaitingResolution = true;
   private authGateLocked = false;
+  // MAZER-UI-024: menu "online now" counter (legacyPresenceController.ts). No session while signed out.
+  private readonly presence = new LegacyPresenceController({ now: () => this.time.now });
   private guestPlayGranted = false;
   private playerMessageToastGraphics!: Phaser.GameObjects.Graphics;
   // MAZER-MOTION-002: fading snapshot cover for Start / overlay open / overlay close (src/render/uiTransition.ts).
@@ -1729,16 +1691,7 @@ export class MenuScene extends Phaser.Scene {
   // regardless of timing; the actual overlay/UI mutation happens once in
   // update(), which is guaranteed to run only after create() has returned.
   private pendingAuthGateTransition = false;
-  private authForm: LegacyAuthFormState = createEmptyLegacyAuthFormState('login');
-  private passwordRecoveryState: LegacyPasswordRecoveryState = createLegacyPasswordRecoveryState();
-  private passwordRecoveryUrlState = readLegacyPasswordRecoveryBootUrlState();
-  private passwordRecoveryFeedback: string | null = null;
-  private activeAuthField: LegacyAuthFieldId | null = null;
-  private authNativeInput: HTMLInputElement | null = null;
-  private authNativeInputField: LegacyAuthFieldId | null = null;
-  private authNativeInputHandler: ((event: Event) => void) | null = null;
-  private authNativeKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
-  private authPasswordVisible = false;
+  private accountStatusImages: Phaser.GameObjects.Image[] = [];
   private authAccountHydrationSequence = 0;
   private authSubmitting = false;
   // OAuth hand-off bookkeeping for the bounded `Opening…` dock label: -1 =
@@ -1748,8 +1701,6 @@ export class MenuScene extends Phaser.Scene {
   // True only when the gate was raised because a session is being resolved
   // (see legacyAuthGateResolution.ts); drives the loading-cover copy.
   private authGateHasSessionEvidence = false;
-  private authSubmitAttemptId = 0;
-  private authInvalidFields: ReadonlySet<LegacyAuthFieldId> = new Set();
   private menuLeaderboardActive = false;
   private menuProfileActive = false;
   // Pause card: the collapsible Settings section (collapsed on every open).
@@ -1829,8 +1780,6 @@ export class MenuScene extends Phaser.Scene {
   private remoteSettingsSyncQueue: Promise<void> = Promise.resolve();
   private remoteSettingsSyncTimer: ReturnType<typeof setTimeout> | null = null;
   private latestOverlayMessage: LegacyPlayerMessage | null = null;
-  private latestAuthActionDiagnostics: LegacyAuthActionDiagnostics | null = null;
-  private authActionDiagnosticsSequence = 0;
   private latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
   private latestOverlayMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
   private playerMessageQueue: LegacyQueuedPlayerMessage[] = [];
@@ -1924,6 +1873,8 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-PERF-008: the next play-start maze, built in a worker while the menu is idle (taken in rebuildMaze).
   private playStartMazeSlotInstance: LegacyMazePrefetchSlot | null = null;
   private playStartMazePrefetchPrimed = false;
+  // MAZER-PERF-009: the direct-to-play boot's first maze, built in the same worker slot (see legacyBootPlayMazeHold.ts).
+  private readonly bootPlayMazeHold = new LegacyBootPlayMazeHold();
   // Created on first use (a worker is only spawned when a build actually starts).
   private get deconstructResetMazeSlot(): LegacyMazePrefetchSlot {
     this.deconstructResetMazeSlotInstance ??= new LegacyMazePrefetchSlot(createLegacyMazeWorkerHost());
@@ -1974,6 +1925,8 @@ export class MenuScene extends Phaser.Scene {
   private boardTileLayerTextureKey: string | null = null;
   private boardTileRankOrder: LegacyPoint[] | null = null;
   private boardTileRankGrid: Int32Array | null = null;
+  // MAZER-VIS-040: the soft build / deconstruct front (mazeRevealTimeline.ts); null outside a full-motion reveal.
+  private readonly mazeReveal = new MazeRevealDriver();
   private boardTileDockMaze: LegacyMazeSnapshot | null = null;
   private boardTileDocks: BoardTileDock[] = [];
   private boardTileDockOwners: Uint8Array | null = null;
@@ -2190,7 +2143,7 @@ export class MenuScene extends Phaser.Scene {
   // real call. Reset alongside trailShineLapStartedAtMs at the same
   // fresh-run sites.
   private trailShineLapCycleLength = 0;
-  // Trail Fade bounds this.trail to its most recent TRAIL_FADE_TAIL points,
+  // A trail-tail fade (retired as a setting, TRAIL_TAIL_FADE) bounds this.trail to its most recent TRAIL_FADE_TAIL points,
   // so the visible path's own origin (resolveLegacyPlayPerfectPathTrail's
   // first point) slides forward over time instead of staying pinned at
   // maze.start. Without correction, every cell's color would re-derive from
@@ -2373,21 +2326,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.levelPreviewLevel !== null) {
       this.pendingBootPlayStart = true;
     }
-    this.passwordRecoveryUrlState = readLegacyPasswordRecoveryBootUrlState();
-    this.passwordRecoveryState = resolveLegacyPasswordRecoveryEntry(
-      createLegacyPasswordRecoveryState(),
-      {
-        authenticated: false,
-        bootstrapComplete: false,
-        event: 'BOOTSTRAP_PATH',
-        hasProviderError: this.passwordRecoveryUrlState.hasProviderError,
-        pathRequested: this.passwordRecoveryUrlState.requested
-      }
-    );
-    if (this.passwordRecoveryState.phase === 'error') {
-      clearLegacyPasswordRecoveryUrl('invalid');
-    }
-    this.loadPersistedLegacyAuthForm();
+    this.loadPersistedLegacyAuthSnapshot();
     this.loadPersistedLegacyGameToggleSettings();
     this.loadPersistedMazeCycleTelemetryHistory();
     this.loadPersistedLegacyProgressionState();
@@ -2565,6 +2504,15 @@ export class MenuScene extends Phaser.Scene {
     // the usual menu placeholder -- immediately, no demo-hold delay, when
     // a play start is still pending, since it's about to be replaced
     // anyway the moment auth resolves.
+    // MAZER-PERF-009: with the first play maze building in the worker, this placeholder is only ever seen under
+    // the loader cover for a moment before play replaces it, so it is the instant straight corridor (2 to 5 ms
+    // instead of 70 to 460 ms) rather than a full menu-level maze.
+    const bootPlayMazeBuilding = this.mode !== 'play'
+      && shouldStartLegacyBootPlayMazeEarly({
+        authGateLocked: this.authGateLocked,
+        pendingBootPlayStart: this.pendingBootPlayStart
+      })
+      && this.bootPlayMazeHold.begin(this.createLegacyBootPlayMazeHoldHost());
     if (this.mode !== 'play') {
       const menuGenerationScale = this.resolveLegacyProgressionScaleForMode('menu');
       this.applyGenerationRequest(
@@ -2572,7 +2520,7 @@ export class MenuScene extends Phaser.Scene {
           aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu', menuGenerationScale),
           currentSeed: this.mazeSeed,
           dueAtMs: this.time.now,
-          generationProfile: this.resolveLegacyMazeGenerationProfileForMode('menu'),
+          generationProfile: bootPlayMazeBuilding ? { layout: 'corridor' } : this.resolveLegacyMazeGenerationProfileForMode('menu'),
           mode: 'menu',
           queuedAtMs: this.time.now,
           reason: 'boot-menu',
@@ -2629,7 +2577,7 @@ export class MenuScene extends Phaser.Scene {
       }
       this.authUnsubscribe?.();
       this.authUnsubscribe = null;
-      this.destroyLegacyAuthNativeInput();
+      this.presence.stop();
       this.destroyAccountUsernameNativeInput();
       this.detachRuntimeDiagnostics();
       this.detachLegacyPlayFocusGuards();
@@ -2859,6 +2807,7 @@ export class MenuScene extends Phaser.Scene {
 
     window.__MAZER_QA__ = {
       movePlayPlayer: (move: string): LegacyQaMoveResult => this.handleLegacyQaPlayMove(move),
+      setPresenceCount: (count: number | null | undefined): void => this.presence.setQaCount(count),
       openSettingsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenSettingsOverlay(),
       openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay(),
       openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay(),
@@ -3243,29 +3192,20 @@ export class MenuScene extends Phaser.Scene {
       // simplification -- not a behavior change -- that keeps a single
       // call site, matching the test's actual intent (one place responsible
       // for the HUD teardown that enterForcedLegacyAuthOverlay() performs).
-      if (
-        (this.isLegacyPasswordRecoveryActive() || this.authGateLocked)
-        && this.overlay !== 'auth'
-      ) {
+      if (this.authGateLocked && this.overlay !== 'auth') {
         this.enterForcedLegacyAuthOverlay();
         this.uiDirty = true;
         this.rebuildUi();
       } else if (!this.authGateLocked && !this.authGateAwaitingResolution && this.overlay === 'auth') {
-        if (this.isLegacyPasswordRecoveryActive()) {
-          this.uiDirty = true;
-          this.rebuildUi();
-        } else {
-          // Signed in successfully (or a guest-play grant was issued) -- if
-          // the auth overlay is still open because the gate put it there,
-          // let it close now that there's nothing left to gate on. An
-          // unconfigured backend (authSnapshot.status === 'unavailable')
-          // does NOT reach this branch: authGateLocked stays true for it
-          // (see applyLegacyAuthSnapshot), same as a real signed-out guest --
-          // confirmed live, the gate correctly locks either way.
-          this.overlay = 'none';
-          this.uiDirty = true;
-          this.rebuildUi();
-        }
+        // Signed in successfully (or a guest-play grant was issued) -- if
+        // the status state is still open because the gate put it there,
+        // let it close now that there's nothing left to gate on. An
+        // unconfigured backend (authSnapshot.status === 'unavailable')
+        // does NOT reach this branch: authGateLocked stays true for it
+        // (see applyLegacyAuthSnapshot), same as a real signed-out guest.
+        this.overlay = 'none';
+        this.uiDirty = true;
+        this.rebuildUi();
       }
     }
     // pendingBootPlayStart intentionally stays pending (not cleared) until
@@ -3273,9 +3213,11 @@ export class MenuScene extends Phaser.Scene {
     // play boot (e.g. the "Play Mazer" home-screen shortcut) while signed
     // out should land in play mode once signed in, not before.
     if (this.pendingBootPlayStart && !this.authGateAwaitingResolution && !this.authGateLocked) {
-      this.pendingBootPlayStart = false;
-      this.startPlayMode();
-      this.rebuildUi();
+      if (!this.holdLegacyBootPlayStart(time)) {
+        this.pendingBootPlayStart = false;
+        this.startPlayMode();
+        this.rebuildUi();
+      }
     }
     this.syncLegacyAuthOpeningTimeout(time);
     this.syncLegacyAuthGateLoadingScreen(time);
@@ -3347,6 +3289,7 @@ export class MenuScene extends Phaser.Scene {
       this.mode === 'menu'
       && !this.authGateAwaitingResolution
       && !this.authGateLocked
+      && !this.pendingBootPlayStart
       && this.pendingGenerationRequest === null
       && this.pendingResetRequest === null
     ) {
@@ -3354,7 +3297,8 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.advanceLegacyMenuStaticDrawStage(time);
-    if (this.mode === 'menu' && this.playStartMazePrefetchPrimed === false && !this.authGateAwaitingResolution) {
+    this.tickLegacyPresence(time);
+    if (this.mode === 'menu' && this.playStartMazePrefetchPrimed === false && !this.authGateAwaitingResolution && !this.pendingBootPlayStart) {
       this.primeLegacyPlayStartMazePrefetch();
     }
     if (
@@ -3381,6 +3325,12 @@ export class MenuScene extends Phaser.Scene {
       this.hudDirty = true;
     }
     if (this.hasLegacyPlayTrailPulsePendingFrame(time)) {
+      this.boardDynamicDirty = true;
+    }
+    // The goal star turns slowly (goalStarSpin.ts): the star is painted into boardDynamicGraphics, so an idle board
+    // needs the dynamic redraw to keep it moving. It rides the same colour-redraw cadence as the trail, so it adds no
+    // second schedule. Reduce Motion: the star is static, nothing to redraw.
+    if (this.hasGoalStarSpinPendingFrame(time)) {
       this.boardDynamicDirty = true;
     }
     // Player locator: a find-me ping on spawn / unpause / next level and after the player idles. It only forces
@@ -3582,7 +3532,7 @@ export class MenuScene extends Phaser.Scene {
     const averageFrameMs = this.resolveRuntimeAverageFrameMs();
     const starCount = this.stars.length;
     const backdropSignatureCount = starCount;
-    const movingBackdropActorCount = this.settings.toggleAnimatedBackdrop && !this.prefersLegacyReducedMotion()
+    const movingBackdropActorCount = resolveBackdropMotion(this.prefersLegacyReducedMotion())
       ? starCount
       : 0;
     const telemetrySummary = summarizeTelemetrySemantics([]);
@@ -3624,7 +3574,7 @@ export class MenuScene extends Phaser.Scene {
       optionalRetargetCount: 0
     };
     const movementSpeedProfile = this.resolveLegacyPlayMovementSpeedProfile();
-    const trailSegmentCap = this.settings.toggleTrailFade
+    const trailSegmentCap = TRAIL_TAIL_FADE
       ? TRAIL_FADE_TAIL
       : Math.max(this.trail.length, this.menuDemoConfig?.behavior.trailMaxLength ?? this.trail.length);
     const boardOffset = this.resolveBoardOffset();
@@ -3665,8 +3615,9 @@ export class MenuScene extends Phaser.Scene {
         displayName: this.authSnapshot.displayName,
         email: this.authSnapshot.email,
         emailPresent: this.authSnapshot.email !== null,
-        formMode: this.authForm.mode,
-        invalidFields: [...this.authInvalidFields],
+        // MAZER-ACCT-043: the credential form is gone; these two stay as constants until the 1C diagnostics type drops them.
+        formMode: 'login',
+        invalidFields: [],
         rememberedIdentity: rememberedAuthIdentity,
         status: this.authSnapshot.status,
         userIdPresent: this.authSnapshot.userId !== null,
@@ -3681,9 +3632,9 @@ export class MenuScene extends Phaser.Scene {
       },
       gameToggles: {
         animatedBackdrop: {
-          enabled: this.settings.toggleAnimatedBackdrop,
-          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
-          stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'
+          enabled: resolveBackdropMotion(this.prefersLegacyReducedMotion()),
+          switchIsOn: resolveBackdropMotion(this.prefersLegacyReducedMotion()),
+          stateText: resolveBackdropMotion(this.prefersLegacyReducedMotion()) ? 'Animated' : 'Stagnant'
         },
         controlMode: {
           mode: this.settings.controlMode,
@@ -3697,15 +3648,18 @@ export class MenuScene extends Phaser.Scene {
           label: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
           value: normalizeLegacyMovementSpeed(this.settings.movementSpeed)
         },
+        // The Trail Fade, Trail Shine and Animated Background switches are retired (MAZER-UI-026); these three keys
+        // stay in the diagnostics shape (it is a Wave 1C contract) as read-only readouts of the EFFECTIVE state
+        // that Reduce Motion now decides.
         trailFade: {
-          enabled: this.settings.toggleTrailFade,
-          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
-          stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'
+          enabled: TRAIL_TAIL_FADE,
+          switchIsOn: TRAIL_TAIL_FADE,
+          stateText: TRAIL_TAIL_FADE ? 'On' : 'Off'
         },
         trailPulse: {
-          enabled: this.settings.toggleTrailPulse,
-          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
-          stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'
+          enabled: this.resolveLegacyTrailMotionPlan().shineVisible,
+          switchIsOn: this.resolveLegacyTrailMotionPlan().shineVisible,
+          stateText: this.resolveLegacyTrailMotionPlan().shineVisible ? 'On' : 'Off'
         }
       },
       play: {
@@ -4053,7 +4007,7 @@ export class MenuScene extends Phaser.Scene {
       resources: {
         activeTweens: 0,
         activeTimers: 0,
-        animatedBackdropEnabled: this.settings.toggleAnimatedBackdrop,
+        animatedBackdropEnabled: resolveBackdropMotion(this.prefersLegacyReducedMotion()),
         backdropDirty: this.backdropDirty,
         boardDynamicDirty: this.boardDynamicDirty,
         boardPathDirty: this.boardPathDirty,
@@ -4348,7 +4302,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (
       this.overlay !== 'none'
-      && (this.handleOverlayFieldInput(event) || this.handleLegacyAuthFieldInput(event) || this.handleLeaderboardUsernameEditorKey(event))
+      && (this.handleOverlayFieldInput(event) || this.handleLeaderboardUsernameEditorKey(event))
     ) {
       event.preventDefault();
       return true;
@@ -4374,12 +4328,6 @@ export class MenuScene extends Phaser.Scene {
     if (lowerKey === 'q' && this.mode === 'play' && this.overlay === 'pause' && !this.settingsGuideOpen) {
       event.preventDefault();
       this.pressLegacyQuitToMenu();
-      return true;
-    }
-
-    if (lowerKey === 't' && this.mode === 'play' && (this.overlay === 'none' || this.overlay === 'pause')) {
-      event.preventDefault();
-      this.applyOverlayToggleFieldChange('toggleTrailFade');
       return true;
     }
 
@@ -5599,44 +5547,6 @@ export class MenuScene extends Phaser.Scene {
     return true;
   }
 
-  private handleLegacyAuthFieldInput(event: KeyboardEvent): boolean {
-    if (this.overlay !== 'auth' || this.activeAuthField === null) {
-      return false;
-    }
-
-    if (event.key === 'Enter') {
-      if (this.isLegacyPasswordRecoveryActive()) {
-        void this.handleLegacyPasswordRecoveryPrimaryAction();
-      } else {
-        void this.handleLegacyAuthSubmit();
-      }
-      return true;
-    }
-
-    if (event.key === 'Escape') {
-      this.activeAuthField = null;
-      this.uiDirty = true;
-      return true;
-    }
-
-    if (event.key === 'Tab') {
-      this.selectNextLegacyAuthField(event.shiftKey ? -1 : 1);
-      return true;
-    }
-
-    if (event.key === 'Backspace') {
-      this.updateLegacyAuthFieldDraft(this.activeAuthField, (value) => value.slice(0, -1));
-      return true;
-    }
-
-    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) {
-      return false;
-    }
-
-    this.updateLegacyAuthFieldDraft(this.activeAuthField, (value) => `${value}${event.key}`);
-    return true;
-  }
-
   private refreshLayout(): void {
     const viewportGeometry = readMazerViewportGeometry();
     // The canvas itself is full-bleed (no safe-area reduction) so background
@@ -5810,7 +5720,7 @@ export class MenuScene extends Phaser.Scene {
       const menuTrack = resolveLegacyGenerationTrack(this.progressionState, 'menu');
       const bootstrap = createLegacyMenuDemoBootstrap(
         this.maze,
-        this.settings.toggleTrailFade,
+        TRAIL_TAIL_FADE,
         TRAIL_FADE_TAIL,
         {
           aiSkillLevel: resolveLegacyProgressionLevel(menuTrack.targetComplexity),
@@ -5936,12 +5846,43 @@ export class MenuScene extends Phaser.Scene {
     }
     this.playStartMazePrefetchPrimed = false;
     this.deconstructResetMazeSlot.warm();
-    if (this.explicitRuntimeMazeSeed || this.playStartMazeSlotInstance === null) {
+    if (this.playStartMazeSlotInstance === null) {
       return null;
     }
-    return this.playStartMazeSlotInstance.take(
+    const parked = this.playStartMazeSlotInstance.take(
       resolveLegacyMazeGenerationJobKey(this.createLegacyPlayStartMazeJobInput(undefined))
     );
+    // A pinned seed (?seed=) only ever takes the maze that was built for exactly that seed.
+    return parked !== null && this.explicitRuntimeMazeSeed && parked.seed !== this.mazeSeed ? null : parked;
+  }
+
+  // MAZER-PERF-009: the direct-to-play boot's first maze, started in the worker as soon as the inputs are
+  // known (create) so the first play start has nothing left to build on the main thread.
+  private createLegacyBootPlayMazeHoldHost() {
+    const slot = this.playStartMazeSlot;
+    // A straight-corridor start (level 1) is cheaper to build inline than to wait for the worker.
+    const inline = isLegacyBootPlayMazeCheapToBuildInline(this.resolveLegacyMazeGenerationProfileForMode('play'));
+    return {
+      get available() { return !inline && slot.available; },
+      start: (): boolean => {
+        const input = this.createLegacyPlayStartMazeJobInput(
+          this.explicitRuntimeMazeSeed ? this.mazeSeed : this.createFreshLegacyPlayGenerationSeed()
+        );
+        return slot.start(input, resolveLegacyMazeGenerationJobKey(input));
+      },
+      status: () => slot.peekStatus()
+    };
+  }
+
+  // True while the pending direct-to-play start must wait for that worker maze (the loader cover stays up).
+  private holdLegacyBootPlayStart(time: number): boolean {
+    if (this.mode !== 'menu') {
+      // Play already started another way (Enter on the placeholder): nothing left to start or wait for.
+      this.bootPlayMazeHold.release();
+      this.pendingBootPlayStart = false;
+      return true;
+    }
+    return this.bootPlayMazeHold.holds(time, this.createLegacyBootPlayMazeHoldHost());
   }
 
   // MAZER-PERF-008: while the menu is idle, start the next play-start maze in a worker (a random seed,
@@ -6152,6 +6093,17 @@ export class MenuScene extends Phaser.Scene {
   // is added by callers.
   private resolveLegacyMenuStaticDeconstructDurationMs(): number {
     return this.prefersLegacyReducedMotion() ? 0 : resolveOutroTilesEndMs(this.menuStaticDrawTileOrder.length);
+  }
+
+  private resolveLegacyMazeRevealClock(time: number): MazeRevealClock {
+    return {
+      phase: this.menuStaticDrawLifecyclePhase,
+      introStartedAtMs: this.introStartedAtMs,
+      deconstructStartedAtMs: this.menuStaticDeconstructStartedAtMs,
+      time,
+      tileCount: this.menuStaticDrawTileOrder.length,
+      reducedMotion: this.prefersLegacyReducedMotion()
+    };
   }
 
   // The one place the building phase's time-derived presentation state is
@@ -6703,6 +6655,10 @@ export class MenuScene extends Phaser.Scene {
   // stretching the intro, and the tile reveal, bleed docks, level digit,
   // spawn laser and input unlock can never drift apart.
   private advanceLegacyMenuStaticDrawStage(time: number): void {
+    if (this.mazeReveal.update(this.resolveLegacyMazeRevealClock(time))) {
+      this.boardPathDirty = true;
+      this.boardDynamicDirty = true;
+    }
     if (this.menuStaticDrawRowsVisible === null && this.menuStaticDrawTilesVisible === null) {
       return;
     }
@@ -6987,7 +6943,7 @@ export class MenuScene extends Phaser.Scene {
       this.menuDemoEpisode,
       this.menuDemoState,
       this.menuDemoConfig,
-      this.settings.toggleTrailFade,
+      TRAIL_TAIL_FADE,
       TRAIL_FADE_TAIL
     );
     if (nextFrame.shouldRegenerateMaze) {
@@ -7156,7 +7112,7 @@ export class MenuScene extends Phaser.Scene {
       trail: this.trail,
       deltaX: move.deltaX,
       deltaY: move.deltaY,
-      toggleTrailFade: this.settings.toggleTrailFade,
+      toggleTrailFade: TRAIL_TAIL_FADE,
       trailFadeTail: TRAIL_FADE_TAIL
     });
     if (!nextStep.moved) {
@@ -7289,7 +7245,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private updateStars(time: number, delta: number): void {
-    if (this.stars.length === 0 || !this.settings.toggleAnimatedBackdrop || this.prefersLegacyReducedMotion()) {
+    if (this.stars.length === 0 || !resolveBackdropMotion(this.prefersLegacyReducedMotion())) {
       this.backdropAccumulatedDeltaMs = 0;
       this.backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
       // Reduced motion / Still stop the drift and twinkle, never colour: the rainbow stars keep shifting through the
@@ -7323,7 +7279,7 @@ export class MenuScene extends Phaser.Scene {
     this.backdropGraphics.fillStyle(cyberArcadeMaterial.substrate.field, 1);
     this.backdropGraphics.fillRect(0, 0, width, height);
     const palette = resolveLegacyMenuBackdropPalette(this.settings.darkMode);
-    const backdropMotionEnabled = this.settings.toggleAnimatedBackdrop && !this.prefersLegacyReducedMotion();
+    const backdropMotionEnabled = resolveBackdropMotion(this.prefersLegacyReducedMotion());
     const animationTime = backdropMotionEnabled ? this.time.now : 0;
     for (const star of this.stars) {
       const pixelX = Math.round(star.x * width);
@@ -7482,7 +7438,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyTrailMotionPlan(): ReturnType<typeof resolveTrailMotionPlan> {
-    return resolveTrailMotionPlan(this.settings.toggleTrailPulse, this.prefersLegacyReducedMotion());
+    return resolveTrailMotionPlan(this.prefersLegacyReducedMotion());
   }
 
   private drawStaticBoard(): void {
@@ -7921,6 +7877,7 @@ export class MenuScene extends Phaser.Scene {
       boardLeft: mazeRenderFrame.boardLeft,
       boardTop: mazeRenderFrame.boardTop,
       reveal: this.resolveBoardTileReveal(),
+      alpha: this.mazeReveal.boardAlpha,
       visible: true
     });
 
@@ -7969,6 +7926,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveBoardTileReveal(): BoardTileReveal {
+    const softReveal = this.mazeReveal.resolveBoardReveal(
+      this.boardTileRankGrid, this.boardTileDockOwners, this.maze.width, this.maze.height
+    );
+    if (softReveal !== null) {
+      return softReveal;
+    }
+    if (this.mazeReveal.crossfading) {
+      return { kind: 'all' };
+    }
     const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
     const rowLimit = this.resolveLegacyMenuStaticDrawRowLimit();
     const edgeShown = this.legacyEdgePathsVisible;
@@ -8980,18 +8946,19 @@ export class MenuScene extends Phaser.Scene {
     // above).
     // The beams fire after the build is complete and land at resolveIntroLaserEndMs
     // (== input unlock), so the cast (player/start/goal) appears at landing.
-    const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== 'building'
-      || (this.resolveLegacyIntroState(time)?.laserProgress ?? 0) >= 1;
+    // MAZER-VIS-040: the cast fades in over the beam flight (alpha only) instead of snapping in at the landing.
+    const markerRevealAlpha = resolveMazeMarkerAlpha(this.resolveLegacyMazeRevealClock(time));
+    const markersBuiltIn = markerRevealAlpha > 0;
     const playerSpawnBurst = this.resolveLegacyPlayerSpawnBurstState(time);
     const playerTransferEnergy = this.resolveLegacyPlayerTransferState(time);
     // Drawn after the trail (not before) so the start/goal tiles always sit
     // on top of the trail's coloring instead of getting painted over
     // whenever the trail passes through those cells.
     if (markersBuiltIn && markerDeconstructAlpha > 0 && this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
-      this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start', time);
+      this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha * markerRevealAlpha, 'start', time);
     }
     if (markersBuiltIn && markerDeconstructAlpha > 0 && this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
-      this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal', time);
+      this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha * markerRevealAlpha, 'goal', time);
     }
 
     if (this.mode === 'menu' && menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
@@ -9057,6 +9024,7 @@ export class MenuScene extends Phaser.Scene {
     // trail that reaches that corner, not a z-index.
     this.drawLegacyMenuSettingsCog(time);
     this.drawLegacyMenuLeaderboardIcon(time);
+    this.drawLegacyMenuPresenceCounter(time);
     this.boardDynamicDirty = false;
   }
 
@@ -9601,12 +9569,8 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  // Shares the settings cog's header slot on the same (trailing) side via
-  // slot 1, flowing inward from it with the header-control system's own
-  // built-in spacing -- the LVL badge already occupies the leading side, so
-  // pairing leaderboard with settings on the trailing side (rather than the
-  // brief's abstract leading/trailing split) is the one that doesn't
-  // collide with existing, load-bearing UI.
+  // MAZER-UI-024: the leaderboard icon holds the LEADING header slot (top-left) and the profile icon
+  // sits beside the settings cog on the trailing side (slot 1); they used to be the other way round.
   private drawLegacyMenuLeaderboardIcon(time: number): void {
     if (this.mode !== 'menu' || this.overlay !== 'none') {
       this.headerLeaderboardIconImage.setVisible(false);
@@ -9618,10 +9582,9 @@ export class MenuScene extends Phaser.Scene {
       height: this.layout.height,
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
-      placement: 'trailing',
+      placement: 'leading',
       safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
-      slot: 1,
       width: this.layout.width
     });
     // Same blink/grow-shrink pulse the procedural bar-chart glyph had --
@@ -9640,6 +9603,76 @@ export class MenuScene extends Phaser.Scene {
       desiredSize,
       blinkAlpha
     );
+  }
+
+  // MAZER-UI-024: presence runs only while signed in (menu or play); the counter redraws only on change.
+  private tickLegacyPresence(time: number): void {
+    this.presence.setSignedIn(this.authSnapshot.status === 'authenticated');
+    if (this.mode === 'menu' && this.presence.needsRedraw(time, this.prefersLegacyReducedMotion())) {
+      this.boardDynamicDirty = true;
+    }
+  }
+
+  // MAZER-UI-024: the live "N online" counter, where the signed-in username used to be (right of the
+  // leading header icon, left of the inline title). Tile glyph chips in one calm mint, an optional pulse dot
+  // (only with Reduce Motion off), drawn into the dynamic board layer after the header icons like they are.
+  // Geometry and the fit tiers live in legacyPresenceCounterLayout.ts; the count easing in legacyPresenceDisplay.ts.
+  private drawLegacyMenuPresenceCounter(time: number): void {
+    if (this.mode !== 'menu' || this.overlay !== 'none') {
+      return;
+    }
+    const reducedMotion = this.prefersLegacyReducedMotion();
+    const frame = this.presence.frame(time, reducedMotion);
+    if (!frame.visible || frame.value === null) {
+      return;
+    }
+    const placement = resolveLegacyPresenceCounterPlacement({
+      layout: this.layout,
+      showDot: !reducedMotion,
+      text: formatOnlineGlyph(frame.value)
+    });
+    if (!placement.visible || placement.number === null) {
+      return;
+    }
+    const graphics = this.boardDynamicGraphics;
+    if (placement.dot !== null) {
+      const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, false);
+      graphics.fillStyle(LEGACY_PRESENCE_CHIP_FILL, frame.alpha * (0.35 + (phase * 0.65)));
+      graphics.fillCircle(placement.dot.centerX, placement.dot.centerY, placement.dot.radius);
+    }
+    const { number, word } = placement;
+    this.drawLegacyPresenceGlyphWord(graphics, number.text, number.left + (number.width / 2), number.top + (number.height / 2), placement.cell, frame.alpha, true);
+    if (word !== null) {
+      this.drawLegacyPresenceGlyphWord(graphics, word.text, word.left + (word.width / 2), word.top + (word.height / 2), placement.cell, frame.alpha, false);
+    }
+  }
+
+  // One word of chip cells for the menu counter (and its Guide icon): the number is the lit part, the word ONLINE the
+  // quiet label. Draws into the caller's graphics without clearing it.
+  private drawLegacyPresenceGlyphWord(
+    graphics: Phaser.GameObjects.Graphics,
+    text: string,
+    centerX: number,
+    centerY: number,
+    cellSize: number,
+    alpha: number,
+    lit: boolean
+  ): void {
+    const glyphLayout = resolveLegacyGlyphWordLayout(text, centerX, centerY, cellSize);
+    const geometry = resolveChipGridGeometry({
+      cellSize: glyphLayout.cellSize,
+      columns: glyphLayout.columns,
+      grid: glyphLayout.grid,
+      left: glyphLayout.left,
+      rows: glyphLayout.rows,
+      top: glyphLayout.top
+    });
+    const colors = lit
+      ? { fill: LEGACY_PRESENCE_CHIP_FILL, rim: LEGACY_PRESENCE_CHIP_RIM }
+      : { fill: LEGACY_PRESENCE_WORD_FILL, rim: LEGACY_PRESENCE_WORD_RIM };
+    for (const cell of glyphLayout.cells) {
+      drawChipCell(graphics, geometry, glyphLayout.left, glyphLayout.top, cell.column, cell.row, colors, alpha);
+    }
   }
 
   private resolveLegacyPlayElapsedMs(): number {
@@ -9865,7 +9898,7 @@ export class MenuScene extends Phaser.Scene {
       originY,
       tileSize,
       alphaMultiplier,
-      styleKey: `${this.boardTileStyle}|${this.boardZoomContainer.scaleX}|${this.boardZoomContainer.scaleY}|${gateSnappedOrigin?.x ?? ''},${gateSnappedOrigin?.y ?? ''}|${this.resolveBoardTileBackingScale()}|${this.settings.toggleTrailFade ? 1 : 0}|${gateMotionPlan.shineVisible ? 1 : 0}|${gateMotionPlan.colourDrifts ? 1 : 0}|${headNudge.x},${headNudge.y}`
+      styleKey: `${this.boardTileStyle}|${this.boardZoomContainer.scaleX}|${this.boardZoomContainer.scaleY}|${gateSnappedOrigin?.x ?? ''},${gateSnappedOrigin?.y ?? ''}|${this.resolveBoardTileBackingScale()}|${TRAIL_TAIL_FADE ? 1 : 0}|${gateMotionPlan.shineVisible ? 1 : 0}|${gateMotionPlan.colourDrifts ? 1 : 0}|${headNudge.x},${headNudge.y}`
     };
     if (this.trailDrawRecord !== null) {
       observeTrailFrameCost(this.trailDrawRecord, time);
@@ -9958,7 +9991,7 @@ export class MenuScene extends Phaser.Scene {
     // alphaMultiplier) -- no age gradient. Trail Fade ON: the existing
     // smooth age/distance opacity, continuous by distance so there is no
     // per-cell alpha step.
-    const trailFadeEnabled = this.settings.toggleTrailFade;
+    const trailFadeEnabled = TRAIL_TAIL_FADE;
     let perfStrokeSegmentCount = 0;
 
     // Style is computed once per segment, then drawn in two SEPARATE
@@ -10215,7 +10248,9 @@ export class MenuScene extends Phaser.Scene {
   // sits directly on the baked tile with no box behind it, centred from the layer's device-snapped board origin
   // and tile geometry (boardTileLayer.endpointTiles; the start tile carries the arrow's direction, the first step
   // of the solution path). They are drawn in boardDynamicGraphics, over the trail. Start is hidden while the player
-  // stands on it (the player marker is the start). The goal beacon (a halo, goalBeaconGraphics) is separate.
+  // stands on it (the player marker is the start); the goal star is ALWAYS drawn and the player marker, painted after
+  // it, draws over it (endpointMarkerLayering.ts, MAZER-VIS-041). The goal star turns slowly (goalStarSpin.ts). The goal
+  // beacon (a halo, goalBeaconGraphics) is separate.
   private fillPlayDynamicMarkerTile(
     point: LegacyPoint,
     originX: number,
@@ -10225,7 +10260,7 @@ export class MenuScene extends Phaser.Scene {
     kind: 'start' | 'goal',
     time?: number
   ): void {
-    if (kind === 'start' && this.player.x === point.x && this.player.y === point.y) {
+    if (!shouldDrawEndpointMarker(kind, this.player.x === point.x && this.player.y === point.y)) {
       return;
     }
     const origin = this.boardTileLayer.snappedOrigin ?? { x: originX, y: originY };
@@ -10262,13 +10297,10 @@ export class MenuScene extends Phaser.Scene {
       startTile: endpointTiles.start,
       goalTile: endpointTiles.goal,
       phase,
-      reducedMotion: this.prefersLegacyReducedMotion()
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      // The slow spin (goalStarSpin.ts): from the shared scene clock; 0 (tip up, static) under Reduce Motion.
+      goalStarRotation: kind === 'goal' ? resolveGoalStarRotation(time ?? 0, this.prefersLegacyReducedMotion()) : 0
     };
-    // The player standing on the goal covers the star; the star's keyline would poke out around the player's rounded
-    // square as dark spikes, so (like the start marker) the goal glyph yields to the player. The beacon stays.
-    if (kind === 'goal' && this.player.x === point.x && this.player.y === point.y) {
-      return;
-    }
     // Chip: the star / play arrow straight onto the baked tile (no pad, no badge: nothing is painted under the trail
     // any more); Trace: its own marker artwork. Both go through the same call.
     drawBoardMarkers(context, markerInput);
@@ -10334,6 +10366,10 @@ export class MenuScene extends Phaser.Scene {
       // On the start / goal (dead-end cap) tile the ring follows the tile's rounded shape, morphing while gliding on or off.
       tileCornerRadii: endpointMorph.radii,
       tileCornerBlend: endpointMorph.blend,
+      // Over the goal the core is translucent so the star (always drawn, under the marker) shows through.
+      coreAlphaScale: resolvePlayerCoreAlphaScale(
+        this.maze.goal ? resolveEndpointRingBlend(point.x, point.y, this.maze.goal, reducedMotion) : 0
+      ),
       pingStartMs: this.playerLocatorState.activePingStartMs,
       reducedMotion
     });
@@ -10740,6 +10776,16 @@ export class MenuScene extends Phaser.Scene {
     return step.due;
   }
 
+  private hasGoalStarSpinPendingFrame(time: number): boolean {
+    if (!isGoalStarSpinning(this.prefersLegacyReducedMotion()) || this.overlay !== 'none' || !this.maze?.goal) {
+      return false;
+    }
+    if (this.menuStaticDrawLifecyclePhase !== 'idle' && this.menuStaticDrawLifecyclePhase !== 'settled') {
+      return false;
+    }
+    return this.isLegacyColourRedrawDue(time);
+  }
+
   // Movement no longer has a fixed on-screen widget at all -- the board is
   // full-bleed (see legacyMenuLayout.ts's useFloatingTouchControls) and a
   // stick only appears, centered exactly where the touch landed, while a
@@ -10996,7 +11042,6 @@ export class MenuScene extends Phaser.Scene {
         this.uiButtons.push(this.createLegacyMenuProfileButton(
           () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
         ));
-        this.createLegacyHeaderIdentityLabel();
       }
 
       this.uiDirty = false;
@@ -11290,23 +11335,11 @@ export class MenuScene extends Phaser.Scene {
         this.runLegacySettingsCommand(model.command);
       }
     };
+    this.paintLegacySettingsDescription(plan, item, scrollOffset);
 
     switch (model.kind) {
       case 'heading':
         this.createLegacySheetHeading(rect, model.label, item.stateFontSize);
-        return;
-      case 'note':
-        this.addLegacySheetWrappedText(
-          model.label,
-          rect.left - 8,
-          centerY,
-          rect.width,
-          '#9fb6c9',
-          item.stateFontSize,
-          item.stateFontSize - 1,
-          item.labelMaxLines,
-          { alpha: 0.85 }
-        );
         return;
       case 'action':
         this.uiButtons.push(this.createLegacyAuthActionButton(
@@ -11353,7 +11386,31 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // Section heading ("DISPLAY", "ACCOUNT"): small caps label plus a hairline.
+  // The muted description under a setting row's control (every setting row has one: see the DESCRIPTION RULE in
+  // legacySettingsSheetPlan.ts). Same look the Reduce Motion note always had: 13 px, #9fb6c9 at 0.85.
+  private paintLegacySettingsDescription(
+    plan: LegacySettingsSheetPlan,
+    item: LegacySettingsPlanItem,
+    scrollOffset: number
+  ): void {
+    const rect = resolveLegacySettingsDescriptionScreenRect(plan, item, scrollOffset);
+    if (rect === null || item.description === null) {
+      return;
+    }
+    this.addLegacySheetWrappedText(
+      item.description.text,
+      rect.left - 8,
+      rect.top + (rect.height / 2),
+      rect.width,
+      '#9fb6c9',
+      item.description.fontSize,
+      item.description.fontSize - 1,
+      item.description.maxLines,
+      { alpha: 0.85 }
+    );
+  }
+
+  // Section heading ("ACCOUNT"): small caps label plus a hairline.
   private createLegacySheetHeading(rect: LegacySettingsRect, copy: string, fontSize: number): void {
     const centerY = rect.top + Math.round(rect.height / 2);
     const label = this.padLegacyCompactUiText(this.add.text(rect.left - 8, centerY, copy.toUpperCase(), {
@@ -11646,6 +11703,7 @@ export class MenuScene extends Phaser.Scene {
         case 'trail-swatch': return playerPalette.trailColor;
         case 'edge-marker': return cyberArcadeMaterial.rail.cyan;
         case 'level-numeral': return playerPalette.playerCoreColor;
+        case 'online-count': return LEGACY_PRESENCE_CHIP_FILL;
       }
     };
     // The body scrolls under a geometry mask (the guide is pure text and icons), so a row that is
@@ -11839,6 +11897,13 @@ export class MenuScene extends Phaser.Scene {
         const cellSize = clamp(Math.floor((badgeRadius * 2 - 3) / Math.max(7, columns)), 2, 5);
         const layout = resolveLegacyGlyphWordLayout(word, centerX, centerY, cellSize);
         this.drawLegacyGlyphWordTileBlock(graphics, layout, 0, 1, 1, false);
+        return;
+      }
+      case 'online-count': {
+        // The menu counter's own chip draw (drawLegacyPresenceGlyphWord), a sample two-digit number.
+        const columns = resolveLegacyGlyphWordLayout('12', 0, 0, 1).columns;
+        const cellSize = clamp(Math.floor((badgeRadius * 2 - 3) / Math.max(7, columns)), 2, 3);
+        this.drawLegacyPresenceGlyphWord(graphics, '12', centerX, centerY, cellSize, 1, true);
         return;
       }
     }
@@ -12545,263 +12610,65 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  // MAZER-ACCT-043: Mazer keeps no account screen (sign-in, sign-up, account settings, credentials, session and
+  // sign-out live on account.fawxzzy.com). This is only the failure fallback of the hand-off, drawn in the shared
+  // loader's visual language: app icon + halo, ONE status line, ONE `Try again` button. No title, marker, fields,
+  // rail or legal row, and no sign-in / sign-up wording. Logic: src/legacy-runtime/legacyAccountStatusState.ts.
   private buildAuthOverlay(): void {
-    const panel = this.resolveOverlayPanelFrame();
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const centerX = panel.centerX;
-    if (this.isLegacyPasswordRecoveryActive()) {
-      this.buildPasswordRecoveryOverlay(panel, stacked);
-      return;
-    }
-    const rowY = panel.top + (panel.height * 0.42);
-
-    // No way out while the full auth gate has this locked -- handleBackAction
-    // already refuses to close it too (defense in depth for Escape), but
-    // the button itself shouldn't even suggest there's a way back.
-    if (!(this.authGateLocked && this.overlay === 'auth')) {
-      this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    }
-    this.createAuthWordmark(panel.top + (stacked ? 42 : 48));
-    this.createOverlayTitle(this.buildLegacyAuthScreenModel().title ?? 'Account', panel.top + (stacked ? 103 : 110));
-
-    if (this.authSnapshot.status === 'authenticated') {
-      this.buildAuthenticatedAccountSection(panel, stacked, rowY);
-      return;
-    }
-
-    this.buildSharedAccountEntrySection(panel, stacked, centerX);
-    this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
-  }
-
-  private buildLegacyAuthScreenModel(): ReturnType<typeof buildLegacyAuthScreenViewModel> {
-    return buildLegacyAuthScreenViewModel({
-      awaitingResolution: false,
-      compact: this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT,
-      errorMessage: this.authSnapshot.error,
-      hasCallbackInProgress: false,
-      status: this.authSnapshot.status,
-      submitting: this.authSubmitting || this.authOpeningTimedOut,
-      submittingElapsedMs: this.authOpeningTimedOut ? LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS : 0
-    });
-  }
-
-  // Welcome entry card (shared auth-surface family anatomy): marker + title
-  // are drawn by buildAuthOverlay; this draws the optional status banner, the
-  // `Create Account | Reset Password` rail, the legal row and ONE full-width
-  // bottom-dock `Sign in`. No subtitle, no guest/skip/close action.
-  private buildSharedAccountEntrySection(
-    panel: OverlayPanelFrame,
-    stacked: boolean,
-    centerX: number
-  ): void {
     // MAZER-ACCT-037: quiet, throttled, never shows anything (see the module).
     warmMazerProviderPreflight();
-    const model = this.buildLegacyAuthScreenModel();
-    const layout = resolveLegacyAuthScreenLayout(this.layout.width, this.layout.height, readMazerViewportGeometry().safeArea);
-    const material = cyberArcadeMaterial;
-
-    const infoCopy = this.authSnapshot.status === 'unavailable' ? '' : (this.authSnapshot.info?.trim() ?? '');
-    const banner = model.banner ?? (infoCopy.length > 0 ? { copy: infoCopy, tone: 'info' as const } : null);
-    if (banner !== null) {
+    const panel = this.resolveOverlayPanelFrame();
+    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
+    const status = resolveLegacyAccountStatus({
+      errorMessage: this.authSnapshot.error,
+      openingTimedOut: this.authOpeningTimedOut,
+      status: this.authSnapshot.status,
+      submitting: this.authSubmitting
+    });
+    const layout = resolveLegacyAccountStatusLayout(this.layout.width, this.layout.height, readMazerViewportGeometry().safeArea);
+    this.drawLegacyAccountStatusIcon(layout.loader);
+    if (status.line.length > 0) {
       this.createAuthInfoText(
-        banner.copy,
-        layout.body.top + (layout.body.height / 2),
+        status.line,
+        Math.round(layout.loader.labelCentreY),
         panel,
-        toCyberArcadeCssHex(banner.tone === 'error' ? material.signal.goal : material.rail.muted),
+        toCyberArcadeCssHex(status.tone === 'error' ? cyberArcadeMaterial.signal.goal : cyberArcadeMaterial.rail.muted),
         stacked ? 14 : 16
       );
     }
+    this.uiButtons.push(this.createLegacyAuthActionButton(
+      layout.button.left + (layout.button.width / 2),
+      layout.button.top + (layout.button.height / 2),
+      layout.button.width,
+      layout.button.height,
+      status.button.label,
+      () => { void this.handleSharedAccountAuthorization(); },
+      'primary',
+      undefined,
+      { disabled: status.button.disabled }
+    ));
+    this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
+  }
 
-    const drawLinkRow = (
-      row: typeof layout.rail,
-      links: readonly LegacyAuthScreenLink<string>[],
-      color: number
-    ): void => {
-      links.forEach((link, index) => {
-        const rect = row.items[index];
-        if (rect) {
-          this.createAuthScreenLink(rect, index === 0 ? 'end' : 'start', link.label, color, link.disabled, () => this.runLegacyAuthScreenRoute(link.route));
+  // The loader's icon and halo as still images (the halo is the reduced-motion pose). Whole css px, see pixelAlignment.ts.
+  private drawLegacyAccountStatusIcon(loader: ReturnType<typeof resolveLegacyAccountStatusLayout>['loader']): void {
+    if (!this.textures.exists(MAZER_LOADER_ICON_TEXTURE_KEY) || !this.textures.exists(MAZER_LOADER_RING_TEXTURE_KEY)) {
+      // addBase64 decodes asynchronously: rebuild once the icon is there (a flag set here would be cleared by this build).
+      this.time.delayedCall(120, () => {
+        if (this.overlay === 'auth') {
+          this.uiDirty = true;
         }
       });
-      this.overlayGraphics.lineStyle(1, color, 0.55);
-      this.overlayGraphics.lineBetween(centerX, row.divider.top, centerX, row.divider.top + row.divider.height);
-    };
-    drawLinkRow(layout.rail, model.secondaryRail, material.rail.cyan);
-    drawLinkRow(layout.legal, model.legalRow, material.rail.muted);
-
-    const dock = model.primaryDock;
-    if (dock !== null) {
-      this.uiButtons.push(this.createLegacyAuthActionButton(
-        layout.dock.left + (layout.dock.width / 2),
-        layout.dock.top + (layout.dock.height / 2),
-        layout.dock.width,
-        layout.dock.height,
-        dock.label,
-        () => this.runLegacyAuthScreenRoute('oauth-authorize'),
-        'primary'
-      ));
+      return;
     }
-  }
-
-  private runLegacyAuthScreenRoute(route: LegacyAuthScreenLink<string>['route']): void {
-    switch (route) {
-      // Create Account shares the OAuth hand-off: the account host has no
-      // sign-up deep link (LoginPanel keeps `intent` in React state only).
-      case 'oauth-authorize':
-        void this.handleSharedAccountAuthorization();
-        return;
-      case 'account-host-reset':
-        this.navigateToSharedAccountRoute('reset-password');
-        return;
-      case 'legal-privacy':
-        navigateToMazerLegalPortal('privacy');
-        return;
-      case 'legal-terms':
-        navigateToMazerLegalPortal('terms');
-        return;
-    }
-  }
-
-  // A text link with a full-rect (44px tall) hit area. `end` right-aligns the
-  // label to the rect so the left item of a `A | B` row hugs the divider.
-  private createAuthScreenLink(
-    rect: LegacyAuthScreenRect,
-    align: 'end' | 'start',
-    text: string,
-    color: number,
-    disabled: boolean,
-    onClick: () => void
-  ): void {
-    const fontSize = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT ? 14 : 15;
-    const x = align === 'end' ? rect.left + rect.width - 20 : rect.left + 20;
-    const y = rect.top + (rect.height / 2);
-    const label = this.fitLegacyUiTextToWidth(
-      this.padLegacyCompactUiText(this.add.text(x, y, text, {
-        color: toCyberArcadeCssHex(color),
-        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-        fontSize: `${fontSize}px`
-      })),
-      rect.width - 12,
-      fontSize,
-      11
-    ).setOrigin(align === 'end' ? 1 : 0, 0.5).setAlpha(disabled ? 0.4 : 0.9);
-    this.uiTexts.push(label);
-
-    const background = this.add.rectangle(rect.left + (rect.width / 2), y, rect.width, rect.height, 0x000000, 0.001);
-    const setActive = (active: boolean): void => {
-      label.setAlpha(disabled ? 0.4 : (active ? 1 : 0.9));
-    };
-    if (!disabled) {
-      background.setInteractive({ useHandCursor: true });
-      background.on('pointerover', () => setActive(true));
-      background.on('pointerout', () => setActive(false));
-      background.on('pointerdown', onClick);
-    }
-    this.uiButtons.push({
-      background,
-      bounds: createVisualRect(rect.left, rect.top, rect.width, rect.height),
-      label,
-      setActive,
-      text,
-      destroy: () => {
-        background.destroy();
-        label.destroy();
-      }
-    });
-  }
-
-  private isLegacyPasswordRecoveryActive(): boolean {
-    return this.passwordRecoveryState.phase !== 'inactive';
-  }
-
-  private buildPasswordRecoveryOverlay(panel: OverlayPanelFrame, stacked: boolean): void {
-    const presentation = resolveLegacyPasswordRecoveryPresentation(this.passwordRecoveryState);
-    const fieldWidth = Math.min(panel.width - 32, 280);
-    const fieldHeight = 54;
-    const startY = panel.top + (panel.height * 0.42);
-
-    this.createAuthWordmark(panel.top + (stacked ? 42 : 48));
-    this.createOverlayTitle(presentation.title, panel.top + (stacked ? 103 : 110));
-
-    if (this.passwordRecoveryState.phase === 'ready' || this.passwordRecoveryState.phase === 'submitting') {
-      this.createAuthFieldBox(
-        panel.centerX,
-        startY,
-        fieldWidth,
-        fieldHeight,
-        'password',
-        this.authForm.password.length === 0 ? '' : this.maskLegacyAuthPassword('password'),
-        this.authForm.password.length === 0
-      );
-      this.createAuthFieldBox(
-        panel.centerX,
-        startY + 68,
-        fieldWidth,
-        fieldHeight,
-        'confirmPassword',
-        this.authForm.confirmPassword.length === 0 ? '' : this.maskLegacyAuthPassword('confirmPassword'),
-        this.authForm.confirmPassword.length === 0
-      );
-    }
-
-    const helper = this.passwordRecoveryFeedback ?? presentation.helper;
-    if (helper) {
-      this.createAuthInfoText(
-        helper,
-        this.passwordRecoveryState.phase === 'ready' || this.passwordRecoveryState.phase === 'submitting'
-          ? startY + 124
-          : startY,
-        panel,
-        this.passwordRecoveryState.phase === 'error' || this.passwordRecoveryFeedback ? '#ff9d9d' : '#d7f7ee',
-        stacked ? 13 : 14
-      );
-    }
-
-    if (presentation.primaryActionLabel) {
-      this.createLegacyBottomActionBar(
-        panel,
-        stacked,
-        {
-          onClick: () => { void this.handleLegacyPasswordRecoveryPrimaryAction(); },
-          text: presentation.primaryActionLabel,
-          tone: 'primary'
-        }
-      );
-    }
-  }
-
-  private buildAuthenticatedAccountSection(
-    panel: OverlayPanelFrame,
-    stacked: boolean,
-    startY: number
-  ): void {
-    const accountLabel = this.authSnapshot.displayName ?? this.authSnapshot.email ?? 'Connected account';
-    this.createAuthInfoText(
-      `${accountLabel}\nManage your profile and account from the shared Fawxzzy account portal.`,
-      startY,
-      panel,
-      '#d7f7ee',
-      stacked ? 14 : 16
-    );
-
-    // Match the auth-screen hierarchy: the lower-frequency destructive action
-    // is a compact text control above one full-width primary dock action.
-    this.createAuthFooterLink(
-      panel.centerX,
-      panel.top + panel.height - 104,
-      'Reset progress',
-      () => this.dispatchUiBridgeCommand(
-        { type: 'OPEN_MODAL', modal: 'confirm-reset-progress' },
-        () => this.openOverlay('confirm-progression-reset')
-      ),
-      '#ff9bb5'
-    );
-    this.createLegacyBottomActionBar(
-      panel,
-      stacked,
-      { onClick: () => this.navigateToSharedAccountRoute('account'), text: 'Account', tone: 'primary' },
-      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }
-    );
+    const x = Math.round(loader.centreX);
+    const y = Math.round(loader.centreY);
+    const ring = this.add.image(x, y, MAZER_LOADER_RING_TEXTURE_KEY).setOrigin(0.5, 0.5).setDepth(3);
+    ring.setScale((loader.iconSizePx / (ring.width || loader.iconSizePx)) * LOADER_RING_REDUCED_SCALE)
+      .setAlpha(LOADER_RING_REDUCED_ALPHA);
+    const icon = this.add.image(x, y, MAZER_LOADER_ICON_TEXTURE_KEY).setOrigin(0.5, 0.5).setDepth(3);
+    icon.setScale(loader.iconSizePx / (icon.width || loader.iconSizePx));
+    this.accountStatusImages.push(ring, icon);
   }
 
   // MAZER-ACCT-019: one extra username read per signed-in user after the profile bootstrap, only
@@ -13205,45 +13072,6 @@ export class MenuScene extends Phaser.Scene {
     this.accountUsernameNativeKeyDownHandler = null;
   }
 
-  private createAuthFooterLink(
-    x: number,
-    y: number,
-    text: string,
-    onClick: () => void,
-    color = '#72e0bf'
-  ): void {
-    const fontSize = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT ? 13 : 14;
-    const label = this.padLegacyCompactUiText(this.add.text(x, y, text, {
-      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-      fontSize: `${fontSize}px`,
-      color
-    })).setOrigin(0.5).setAlpha(0.82);
-    this.uiTexts.push(label);
-
-    const hitWidth = label.displayWidth + 24;
-    const hitHeight = label.displayHeight + 16;
-    const background = this.add.rectangle(x, y, hitWidth, hitHeight, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    const setActive = (active: boolean): void => {
-      label.setAlpha(active ? 1 : 0.82);
-    };
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', onClick);
-
-    this.uiButtons.push({
-      background,
-      bounds: createVisualRect(x - (hitWidth / 2), y - (hitHeight / 2), hitWidth, hitHeight),
-      label,
-      setActive,
-      text,
-      destroy: () => {
-        background.destroy();
-        label.destroy();
-      }
-    });
-  }
-
   private resolveLegacyCurrentAuthMessage(): LegacyPlayerMessage | null {
     const feedbackMessage = resolveLegacyAuthFeedbackMessage(
       this.authSnapshot.error,
@@ -13258,10 +13086,7 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }
 
-    const submitState = resolveLegacyAuthSubmitState(this.authForm, this.authSnapshot.configured);
-    const validationCopy = submitState.reason ?? LEGACY_AUTH_MESSAGE_COPY.loginReady;
-
-    return resolveLegacyAuthValidationMessage(validationCopy, submitState.canSubmit);
+    return null;
   }
 
   private resolveVisibleLegacyPlayerMessages(): LegacyPlayerMessage[] {
@@ -13568,656 +13393,6 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  // Fitness's bottom action bar: one or two pill buttons pinned to the very
-  // bottom edge of the surface, a smaller "secondary" action on the left
-  // and a larger "primary" action on the right (a single action just fills
-  // the full width). Reuses createLegacyAuthActionButton for the actual
-  // pill chrome -- this only owns the shared bottom-anchored split layout.
-  private createLegacyBottomActionBar(
-    panel: OverlayPanelFrame,
-    stacked: boolean,
-    primary: { onClick: () => void; text: string; tone: 'danger' | 'primary' | 'secondary' },
-    secondary: { onClick: () => void; text: string; tone: 'danger' | 'primary' | 'secondary' } | null = null
-  ): void {
-    const panelBottom = panel.top + panel.height;
-    const barHeight = this.overlay === 'auth' ? 56 : (stacked ? 48 : 52);
-    const barY = panelBottom - (this.overlay === 'auth' ? 16 : (stacked ? 20 : 24)) - (barHeight / 2);
-    const sideMargin = this.overlay === 'auth' ? 16 : (stacked ? 20 : 28);
-    const barLeft = panel.left + sideMargin;
-    const barWidth = panel.width - (sideMargin * 2);
-
-    if (secondary === null) {
-      this.uiButtons.push(this.createLegacyAuthActionButton(
-        barLeft + (barWidth / 2),
-        barY,
-        barWidth,
-        barHeight,
-        primary.text,
-        primary.onClick,
-        primary.tone
-      ));
-      return;
-    }
-
-    const gap = 10;
-    const secondaryWidth = Math.round(barWidth * 0.34);
-    const primaryWidth = barWidth - secondaryWidth - gap;
-    const secondaryX = barLeft + (secondaryWidth / 2);
-    const primaryX = barLeft + secondaryWidth + gap + (primaryWidth / 2);
-
-    // Both buttons share one font size, not each fit independently to its
-    // own width -- the secondary slot is much narrower than the primary
-    // one, so independently-fit text (e.g. "Account" squeezed into the
-    // narrow slot next to "Menu" sitting comfortably at full size in the
-    // wide one) reads as visibly inconsistent even though both start from
-    // the same height-based base size. Measured against each button's own
-    // width via a throwaway text object, then the smaller (more
-    // constrained) of the two wins for both.
-    const baseFontSize = Math.max(15, Math.min(22, Math.round(barHeight * 0.4)));
-    const measureFitFontSize = (text: string, availableWidth: number): number => {
-      const probe = this.add.text(0, 0, text, {
-        fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: `${baseFontSize}px`
-      });
-      this.fitLegacyUiTextToWidth(probe, availableWidth - 32, baseFontSize, 12);
-      const fitSize = String(probe.style.fontSize);
-      probe.destroy();
-      return Number.parseInt(fitSize, 10) || baseFontSize;
-    };
-    const sharedFontSize = Math.min(
-      measureFitFontSize(secondary.text, secondaryWidth),
-      measureFitFontSize(primary.text, primaryWidth)
-    );
-
-    this.uiButtons.push(
-      this.createLegacyAuthActionButton(secondaryX, barY, secondaryWidth, barHeight, secondary.text, secondary.onClick, secondary.tone, sharedFontSize),
-      this.createLegacyAuthActionButton(primaryX, barY, primaryWidth, barHeight, primary.text, primary.onClick, primary.tone, sharedFontSize)
-    );
-  }
-
-  private createAuthFieldBox(
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    fieldId: LegacyAuthFieldId,
-    value: string,
-    placeholder: boolean
-  ): void {
-    const isActive = this.activeAuthField === fieldId;
-    const fieldLabel = fieldId === 'displayName'
-      ? 'DISPLAY NAME'
-      : fieldId === 'confirmPassword'
-        ? 'CONFIRM PASSWORD'
-        : fieldId === 'password'
-        ? 'PASSWORD'
-        : 'EMAIL';
-    const hasPasswordToggle = fieldId === 'password' || fieldId === 'confirmPassword';
-    const contentLeft = x - (width / 2) + 18;
-    const contentRightInset = hasPasswordToggle ? 54 : 16;
-    const valueWidth = width - 18 - contentRightInset;
-    const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    background.on('pointerdown', () => this.selectLegacyAuthField(fieldId, { height, width, x, y }));
-    if (isActive) {
-      this.positionLegacyAuthNativeInput(fieldId, { height, width, x, y });
-    }
-
-    const isInvalid = this.authInvalidFields.has(fieldId);
-    const borderColor = isInvalid
-      ? 0xff7d7d
-      : isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
-    const borderAlpha = isInvalid ? 1 : isActive ? 0.95 : 0.68;
-    const border = this.add.graphics();
-    const left = x - (width / 2);
-    const right = x + (width / 2);
-    const top = y - (height / 2);
-    const bottom = y + (height / 2);
-    const radius = Math.min(18, height * 0.36);
-    const labelWidth = Math.max(58, (fieldLabel.length * 7) + 18);
-    const labelRight = right - radius - 8;
-    const gapStart = labelRight - labelWidth - 7;
-    const gapEnd = labelRight + 7;
-    border.lineStyle(1, borderColor, borderAlpha);
-    border.beginPath();
-    border.moveTo(left + radius, top);
-    border.lineTo(gapStart, top);
-    border.moveTo(gapEnd, top);
-    border.lineTo(right - radius, top);
-    border.arc(right - radius, top + radius, radius, -Math.PI / 2, 0);
-    border.lineTo(right, bottom - radius);
-    border.arc(right - radius, bottom - radius, radius, 0, Math.PI / 2);
-    border.lineTo(left + radius, bottom);
-    border.arc(left + radius, bottom - radius, radius, Math.PI / 2, Math.PI);
-    border.lineTo(left, top + radius);
-    border.arc(left + radius, top + radius, radius, Math.PI, (Math.PI * 3) / 2);
-    border.strokePath();
-
-    const eyebrow = this.padLegacyCompactUiText(this.add.text(labelRight - (labelWidth / 2), top, fieldLabel, {
-      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-      fontSize: '11px',
-      color: isInvalid ? '#ff7d7d' : isActive ? '#72e0bf' : '#9bcdbd'
-    })).setOrigin(0.5);
-    this.uiTexts.push(eyebrow);
-    const valueFontSize = 14;
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(contentLeft, y + (height * 0.14), value, {
-      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-      fontSize: `${valueFontSize}px`,
-      color: placeholder ? '#7894a0' : (isActive ? '#72e0bf' : '#ecfff5')
-    })), valueWidth, valueFontSize, valueFontSize).setOrigin(0, 0.5);
-    const caret = isActive
-      ? this.add.rectangle(
-        placeholder ? contentLeft + 5 : Math.min(x + (width / 2) - contentRightInset + 2, label.x + label.displayWidth + 6),
-        y + (height * 0.14),
-        Math.max(2, Math.round(width * 0.006)),
-        Math.max(16, Math.round(height * 0.34)),
-        LEGACY_PLAY_TOUCH_ACCENT,
-        0.98
-      ).setOrigin(0.5)
-      : null;
-    if (caret) {
-      this.tweens.add({
-        targets: caret,
-        alpha: 0.18,
-        duration: MOTION_UI_MS.emphasis,
-        ease: MOTION_PHASER_EASE_SINE_IN_OUT,
-        yoyo: true,
-        repeat: -1
-      });
-    }
-
-    this.uiButtons.push({
-      background,
-      bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height),
-      label,
-      setActive: () => undefined,
-      text: fieldId,
-      destroy: () => {
-        if (caret) {
-          this.tweens.killTweensOf(caret);
-          caret.destroy();
-        }
-        border.destroy();
-        background.destroy();
-        label.destroy();
-      }
-    });
-    if (hasPasswordToggle) {
-      this.uiButtons.push(this.createLegacyAuthPasswordVisibilityButton(
-        x + (width / 2) - 27,
-        y,
-        Math.max(34, Math.round(height * 0.76))
-      ));
-    }
-  }
-
-  private createLegacyAuthPasswordVisibilityButton(x: number, y: number, size: number): UiButton {
-    const icon = this.add.graphics();
-    const drawIcon = (active: boolean): void => {
-      icon.clear();
-      const iconViewportSize = 20;
-      const iconScale = iconViewportSize / 24;
-      icon.lineStyle(2.15 * iconScale, LEGACY_PLAY_TOUCH_ACCENT, active ? 1 : 0.82);
-      const point = (px: number, py: number) => new Phaser.Math.Vector2(
-        x + ((px - 12) * iconScale),
-        y + ((py - 12) * iconScale)
-      );
-      const eyeSegments = [
-        new Phaser.Curves.CubicBezier(point(2, 12), point(4.5, 8), point(7.8, 6), point(12, 6)),
-        new Phaser.Curves.CubicBezier(point(12, 6), point(16.2, 6), point(19.5, 8), point(22, 12)),
-        new Phaser.Curves.CubicBezier(point(22, 12), point(19.5, 16), point(16.2, 18), point(12, 18)),
-        new Phaser.Curves.CubicBezier(point(12, 18), point(7.8, 18), point(4.5, 16), point(2, 12))
-      ];
-      const eyePoints = eyeSegments.flatMap((segment, index) => segment.getPoints(8).slice(index === 0 ? 0 : 1));
-      icon.strokePoints(eyePoints, true, true);
-      icon.strokeCircle(x, y, 3 * iconScale);
-      if (!this.authPasswordVisible) {
-        icon.lineBetween(x - (8 * iconScale), y - (8 * iconScale), x + (8 * iconScale), y + (8 * iconScale));
-      }
-    };
-    drawIcon(false);
-    const background = this.add.rectangle(x, y, size, size, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    const label = this.add.text(x, y, '', { fontFamily: LEGACY_UI_FONT_FAMILY, fontSize: '1px' }).setVisible(false);
-    const setActive = (active: boolean): void => {
-      drawIcon(active);
-    };
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', () => this.toggleLegacyAuthPasswordVisibility());
-
-    return {
-      background,
-      bounds: createVisualRect(x - (size / 2), y - (size / 2), size, size),
-      label,
-      setActive,
-      text: this.authPasswordVisible ? 'Hide password' : 'Show password',
-      destroy: () => {
-        icon.destroy();
-        background.destroy();
-        label.destroy();
-      }
-    };
-  }
-
-  private selectLegacyAuthField(
-    fieldId: LegacyAuthFieldId,
-    bounds?: { height: number; width: number; x: number; y: number }
-  ): void {
-    this.activeAuthField = fieldId;
-    if (bounds) {
-      this.positionLegacyAuthNativeInput(fieldId, bounds);
-    }
-    this.uiDirty = true;
-  }
-
-  private createLegacyAuthNativeInput(fieldId: LegacyAuthFieldId): HTMLInputElement | null {
-    if (typeof document === 'undefined' || typeof window === 'undefined') {
-      return null;
-    }
-
-    if (this.authNativeInput && this.authNativeInputField === fieldId) {
-      return this.authNativeInput;
-    }
-
-    this.destroyLegacyAuthNativeInput();
-    const input = document.createElement('input');
-    const isPasswordField = fieldId === 'password' || fieldId === 'confirmPassword';
-    input.type = isPasswordField ? 'password' : fieldId === 'email' ? 'email' : 'text';
-    input.autocomplete = isPasswordField
-      ? (this.isLegacyPasswordRecoveryActive() ? 'new-password' : 'current-password')
-      : fieldId === 'email' ? 'email' : 'name';
-    input.inputMode = fieldId === 'email' ? 'email' : 'text';
-    input.enterKeyHint = fieldId === 'password' && this.isLegacyPasswordRecoveryActive() ? 'next' : isPasswordField ? 'done' : 'next';
-    input.autocapitalize = fieldId === 'displayName' ? 'words' : 'none';
-    input.spellcheck = false;
-    input.setAttribute('aria-label', fieldId === 'displayName' ? 'display name' : fieldId);
-    input.setAttribute('data-mazer-auth-input', fieldId);
-    input.value = this.authForm[fieldId];
-    Object.assign(input.style, {
-      position: 'fixed',
-      zIndex: '2147483647',
-      opacity: '0.01',
-      background: 'transparent',
-      color: 'transparent',
-      caretColor: 'transparent',
-      border: '0',
-      outline: '0',
-      padding: '0',
-      margin: '0'
-    });
-
-    this.authNativeInputHandler = () => {
-      this.authForm = {
-        ...this.authForm,
-        [fieldId]: input.value
-      };
-      this.authInvalidFields = new Set(
-        [...this.authInvalidFields].filter((invalidField) => invalidField !== fieldId)
-      );
-      this.authSnapshot = {
-        ...this.authSnapshot,
-        error: null,
-        info: null
-      };
-      this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
-      this.passwordRecoveryFeedback = null;
-      this.clearQueuedLegacyPlayerMessagesBySource('auth');
-      this.uiDirty = true;
-    };
-    this.authNativeKeyDownHandler = (event: KeyboardEvent) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        event.stopPropagation();
-        if (this.isLegacyPasswordRecoveryActive()) {
-          const recoveryEnterAction = resolveLegacyPasswordRecoveryEnterAction(
-            fieldId,
-            this.passwordRecoveryUrlState.requested
-          );
-          if (recoveryEnterAction === 'focus-confirmation') {
-            this.selectLegacyAuthField('confirmPassword');
-          } else if (recoveryEnterAction === 'submit') {
-            void this.handleLegacyPasswordRecoveryPrimaryAction();
-          }
-        } else {
-          void this.handleLegacyAuthSubmit();
-        }
-        return;
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        this.activeAuthField = null;
-        this.destroyLegacyAuthNativeInput();
-        this.uiDirty = true;
-        return;
-      }
-      if (event.key === 'Tab') {
-        event.preventDefault();
-        this.selectNextLegacyAuthField(event.shiftKey ? -1 : 1);
-      }
-    };
-    input.addEventListener('input', this.authNativeInputHandler);
-    input.addEventListener('keydown', this.authNativeKeyDownHandler);
-    document.body.appendChild(input);
-    this.authNativeInput = input;
-    this.authNativeInputField = fieldId;
-    return input;
-  }
-
-  private syncLegacyAuthNativeInputValue(): void {
-    if (!this.authNativeInput || this.authNativeInputField === null) {
-      return;
-    }
-
-    this.authForm = {
-      ...this.authForm,
-      [this.authNativeInputField]: this.authNativeInput.value
-    };
-  }
-
-  private recordLegacyAuthActionDiagnostics(
-    input: Pick<LegacyAuthActionDiagnostics, 'stage'> & Partial<Omit<LegacyAuthActionDiagnostics, 'sequence' | 'stage'>>
-  ): void {
-    this.authActionDiagnosticsSequence += 1;
-    this.latestAuthActionDiagnostics = {
-      canSubmit: input.canSubmit ?? null,
-      emailPresent: input.emailPresent ?? normalizeLegacyAuthEmail(this.authForm.email).includes('@'),
-      error: input.error ?? null,
-      info: input.info ?? null,
-      invalidFields: [...this.authInvalidFields],
-      mode: input.mode ?? this.authForm.mode,
-      passwordLength: input.passwordLength ?? this.authForm.password.length,
-      reason: input.reason ?? null,
-      sequence: this.authActionDiagnosticsSequence,
-      stage: input.stage,
-      status: input.status ?? this.authSnapshot.status
-    };
-    this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
-  }
-
-  private positionLegacyAuthNativeInput(
-    fieldId: LegacyAuthFieldId,
-    bounds: { height: number; width: number; x: number; y: number }
-  ): void {
-    const input = this.createLegacyAuthNativeInput(fieldId);
-    const canvas = this.game.canvas;
-    if (!input || !canvas) {
-      return;
-    }
-
-    input.type = fieldId === 'password' || fieldId === 'confirmPassword'
-      ? (this.authPasswordVisible ? 'text' : 'password')
-      : fieldId === 'email' ? 'email' : 'text';
-    input.value = this.authForm[fieldId];
-    const rect = canvas.getBoundingClientRect();
-    const cssRect = resolveLegacyAuthInputCssRect(bounds, rect, this.layout);
-    input.style.left = `${cssRect.left}px`;
-    input.style.top = `${cssRect.top}px`;
-    // Keep the canvas eye control outside the native input hit target so the
-    // password visibility affordance remains tappable on mobile browsers.
-    const passwordToggleReserve = fieldId === 'password' || fieldId === 'confirmPassword'
-      ? Math.max(30, Math.round(cssRect.height * 0.92))
-      : 0;
-    input.style.width = `${Math.max(1, cssRect.width - passwordToggleReserve)}px`;
-    input.style.height = `${cssRect.height}px`;
-    window.setTimeout(() => input.focus({ preventScroll: true }), 0);
-  }
-
-  private destroyLegacyAuthNativeInput(): void {
-    if (this.authNativeInput) {
-      if (this.authNativeInputHandler) {
-        this.authNativeInput.removeEventListener('input', this.authNativeInputHandler);
-      }
-      if (this.authNativeKeyDownHandler) {
-        this.authNativeInput.removeEventListener('keydown', this.authNativeKeyDownHandler);
-      }
-      this.authNativeInput.remove();
-    }
-    this.authNativeInput = null;
-    this.authNativeInputField = null;
-    this.authNativeInputHandler = null;
-    this.authNativeKeyDownHandler = null;
-  }
-
-  private selectNextLegacyAuthField(direction: -1 | 1): void {
-    const fields: LegacyAuthFieldId[] = this.isLegacyPasswordRecoveryActive()
-      ? ['password', 'confirmPassword']
-      : ['email', 'password'];
-    const currentIndex = Math.max(0, fields.indexOf(this.activeAuthField ?? 'email'));
-    const nextIndex = (currentIndex + direction + fields.length) % fields.length;
-    this.activeAuthField = fields[nextIndex] ?? fields[0] ?? null;
-    this.uiDirty = true;
-  }
-
-  private updateLegacyAuthFieldDraft(
-    fieldId: LegacyAuthFieldId,
-    update: (value: string) => string
-  ): void {
-    const maxLengthByField: Record<LegacyAuthFieldId, number> = {
-      displayName: 32,
-      email: 96,
-      password: 72,
-      confirmPassword: 72
-    };
-    const nextValue = update(this.authForm[fieldId]).slice(0, maxLengthByField[fieldId]);
-    this.authForm = {
-      ...this.authForm,
-      [fieldId]: nextValue
-    };
-    this.authInvalidFields = new Set(
-      [...this.authInvalidFields].filter((invalidField) => invalidField !== fieldId)
-    );
-    if (this.authNativeInput && this.authNativeInputField === fieldId && this.authNativeInput.value !== nextValue) {
-      this.authNativeInput.value = nextValue;
-    }
-    this.authSnapshot = {
-      ...this.authSnapshot,
-      error: null,
-      info: null
-    };
-    this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
-    this.passwordRecoveryFeedback = null;
-    this.clearQueuedLegacyPlayerMessagesBySource('auth');
-    this.uiDirty = true;
-  }
-
-  private maskLegacyAuthPassword(fieldId: 'confirmPassword' | 'password' = 'password'): string {
-    const password = this.authForm[fieldId];
-    if (password.length === 0) {
-      return 'Enter password';
-    }
-
-    return this.authPasswordVisible
-      ? password
-      : '*'.repeat(Math.min(24, password.length));
-  }
-
-  private toggleLegacyAuthPasswordVisibility(): void {
-    this.authPasswordVisible = !this.authPasswordVisible;
-    if (
-      this.authNativeInput
-      && (this.authNativeInputField === 'password' || this.authNativeInputField === 'confirmPassword')
-    ) {
-      this.authNativeInput.type = this.authPasswordVisible ? 'text' : 'password';
-    }
-    this.uiDirty = true;
-  }
-
-  private async handleLegacyPasswordRecoveryPrimaryAction(): Promise<void> {
-    if (this.passwordRecoveryState.phase === 'success') {
-      this.passwordRecoveryState = createLegacyPasswordRecoveryState();
-      this.passwordRecoveryFeedback = null;
-      clearLegacyPasswordRecoveryUrl('continue');
-      this.closeLegacyAuthOverlayToMainMenu();
-      return;
-    }
-
-    if (this.passwordRecoveryState.phase === 'error') {
-      this.passwordRecoveryState = createLegacyPasswordRecoveryState();
-      this.passwordRecoveryFeedback = null;
-      this.authForm = {
-        ...this.authForm,
-        confirmPassword: '',
-        mode: 'login',
-        password: ''
-      };
-      this.authInvalidFields = new Set();
-      this.activeAuthField = this.authForm.email.length > 0 ? 'password' : 'email';
-      this.destroyLegacyAuthNativeInput();
-      clearLegacyPasswordRecoveryUrl('continue');
-      this.uiDirty = true;
-      return;
-    }
-
-    if (this.passwordRecoveryState.phase !== 'ready' || this.authSubmitting) {
-      return;
-    }
-
-    this.syncLegacyAuthNativeInputValue();
-    const submitState = resolveLegacyPasswordUpdateSubmitState(
-      this.authForm.password,
-      this.authForm.confirmPassword,
-      this.authSnapshot.configured
-    );
-    this.authInvalidFields = new Set(submitState.invalidFields);
-    if (!submitState.canSubmit) {
-      this.passwordRecoveryFeedback = submitState.reason;
-      this.activeAuthField = submitState.invalidFields[0] ?? 'password';
-      this.uiDirty = true;
-      return;
-    }
-
-    this.authSubmitting = true;
-    this.passwordRecoveryFeedback = null;
-    this.passwordRecoveryState = { error: null, phase: 'submitting' };
-    this.uiDirty = true;
-
-    let result: Awaited<ReturnType<typeof updateLegacyPassword>>;
-    try {
-      result = await updateLegacyPassword(this.authForm.password);
-    } catch (error) {
-      result = {
-        error: error instanceof Error ? error.message : String(error),
-        ok: false
-      };
-    }
-
-    this.authSubmitting = false;
-    if (result.ok) {
-      this.authForm = {
-        ...this.authForm,
-        confirmPassword: '',
-        password: ''
-      };
-      this.authInvalidFields = new Set();
-      this.activeAuthField = null;
-      this.destroyLegacyAuthNativeInput();
-      this.passwordRecoveryState = { error: null, phase: 'success' };
-      clearLegacyPasswordRecoveryUrl('continue');
-      this.uiDirty = true;
-      return;
-    }
-
-    const feedback = resolveLegacyPasswordRecoveryError(result.error);
-    this.passwordRecoveryFeedback = feedback.copy;
-    this.passwordRecoveryState = feedback.requiresNewLink
-      ? { error: feedback.copy, phase: 'error' }
-      : { error: null, phase: 'ready' };
-    if (feedback.requiresNewLink) {
-      this.authInvalidFields = new Set();
-      this.activeAuthField = null;
-      this.destroyLegacyAuthNativeInput();
-      clearLegacyPasswordRecoveryUrl('invalid');
-    }
-    this.uiDirty = true;
-  }
-
-  private async handleLegacyAuthSubmit(): Promise<void> {
-    if (this.authSubmitting) {
-      return;
-    }
-
-    // Choosing the account form ends any temporary guest admission before
-    // validation or a provider call begins. Otherwise a guest grant from an
-    // earlier play session can survive a failed/unavailable sign-in and leave
-    // the game looking as though the submitted credentials entered guest
-    // mode. Account submission must either establish an authenticated session
-    // or keep the auth gate closed.
-    this.revokeLegacyGuestPlayGrant();
-    this.syncLegacyAuthNativeInputValue();
-    this.recordLegacyAuthActionDiagnostics({ stage: 'started' });
-    this.authInvalidFields = new Set(resolveLegacyAuthInvalidFields(this.authForm));
-    const submitState = resolveLegacyAuthSubmitState(this.authForm, this.authSnapshot.configured);
-    if (!submitState.canSubmit) {
-      this.recordLegacyAuthActionDiagnostics({
-        canSubmit: false,
-        reason: submitState.reason,
-        stage: 'blocked'
-      });
-      if (this.authInvalidFields.size === 0) {
-        this.authSnapshot = {
-          ...this.authSnapshot,
-          error: submitState.reason,
-          info: null
-        };
-        this.armLegacyAuthFeedbackMessage();
-      } else {
-        this.authSnapshot = {
-          ...this.authSnapshot,
-          error: null,
-          info: null
-        };
-        this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
-        this.clearQueuedLegacyPlayerMessagesBySource('auth');
-      }
-      this.uiDirty = true;
-      return;
-    }
-
-    this.authInvalidFields = new Set();
-    this.authSubmitting = true;
-    this.uiDirty = true;
-    this.recordLegacyAuthActionDiagnostics({
-      canSubmit: true,
-      stage: 'submitting'
-    });
-    writeLegacyRememberedIdentity(this.resolveBrowserLocalStorage(), this.authForm.email);
-
-    const attemptId = ++this.authSubmitAttemptId;
-    const authCall = signInLegacyAuth(this.authForm.email, this.authForm.password);
-
-    // Whatever authCall eventually does, apply it once it settles -- the
-    // attemptId guard inside makes this a no-op if a newer submit already
-    // started (or a real response already landed) by the time it resolves.
-    void authCall.then(
-      (result) => this.applyLegacyAuthSubmitResult(attemptId, result, null),
-      (error) => this.applyLegacyAuthSubmitResult(attemptId, null, error)
-    );
-
-    const timedOut = await Promise.race<boolean>([
-      authCall.then(() => false, () => false),
-      new Promise<boolean>((resolve) => {
-        this.time.delayedCall(LEGACY_AUTH_SUBMIT_TIMEOUT_MS, () => resolve(true));
-      })
-    ]);
-
-    if (timedOut && attemptId === this.authSubmitAttemptId && this.authSubmitting) {
-      this.recordLegacyAuthActionDiagnostics({
-        error: 'submit-timeout',
-        stage: 'exception',
-        status: this.authSnapshot.status
-      });
-      this.authSubmitting = false;
-      this.authSnapshot = {
-        ...this.authSnapshot,
-        error: 'Request timed out.',
-        info: null
-      };
-      this.armLegacyAuthFeedbackMessage();
-      this.uiDirty = true;
-    }
-  }
-
   private handleLegacyGuestPlay(): void {
     // An authenticated player already has an account-scoped progression lane;
     // this control only exits a sign-in form for the local guest scope. It
@@ -14235,8 +13410,6 @@ export class MenuScene extends Phaser.Scene {
     this.guestPlayGranted = true;
     this.authGateLocked = false;
     this.pendingAuthGateTransition = false;
-    this.activeAuthField = null;
-    this.destroyLegacyAuthNativeInput();
     this.closeLeaderboardUsernameEditor();
     this.startPlayMode();
     this.rebuildUi();
@@ -14254,60 +13427,11 @@ export class MenuScene extends Phaser.Scene {
     this.authGateLocked = this.authSnapshot.status !== 'authenticated';
   }
 
-  private applyLegacyAuthSubmitResult(
-    attemptId: number,
-    result: Awaited<ReturnType<typeof signInLegacyAuth>> | null,
-    error: unknown
-  ): void {
-    if (attemptId !== this.authSubmitAttemptId) {
-      return;
-    }
-
-    this.authSubmitting = false;
-    this.authInvalidFields = new Set();
-
-    if (result === null) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.authSnapshot = {
-        ...this.authSnapshot,
-        error: message,
-        info: null
-      };
-      this.recordLegacyAuthActionDiagnostics({
-        error: message,
-        stage: 'exception',
-        status: this.authSnapshot.status
-      });
-      this.armLegacyAuthFeedbackMessage();
-      this.uiDirty = true;
-      return;
-    }
-
-    this.authForm = {
-      ...this.authForm,
-      password: result.snapshot.status === 'authenticated' ? '' : this.authForm.password
-    };
-    this.recordLegacyAuthActionDiagnostics({
-      error: result.snapshot.error,
-      info: result.snapshot.info,
-      stage: 'result',
-      status: result.snapshot.status
-    });
-    const shouldReturnToMainMenuAfterLogin = this.authForm.mode === 'login'
-      && result.snapshot.status === 'authenticated';
-    this.applyLegacyAuthSnapshot(result.snapshot);
-    if (shouldReturnToMainMenuAfterLogin) {
-      this.closeLegacyAuthOverlayToMainMenu();
-    }
-    this.uiDirty = true;
-  }
-
   private async handleLegacyAuthSignOut(): Promise<void> {
     if (this.authSubmitting) {
       return;
     }
 
-    this.syncLegacyAuthNativeInputValue();
     this.authSubmitting = true;
     this.uiDirty = true;
     const result = await signOutLegacyAuth(this.authSnapshot);
@@ -14321,12 +13445,6 @@ export class MenuScene extends Phaser.Scene {
         this.uiDirty = true;
       }, MAZER_HOST_SIGN_OUT_NAVIGATION_TIMEOUT_MS);
     }
-    this.authForm = createEmptyLegacyAuthFormState(
-      'login',
-      readLegacyRememberedIdentity(this.resolveBrowserLocalStorage())
-    );
-    this.authInvalidFields = new Set();
-    this.activeAuthField = null;
     this.applyLegacyAuthSnapshot(result.snapshot);
     this.uiDirty = true;
   }
@@ -14366,16 +13484,6 @@ export class MenuScene extends Phaser.Scene {
     this.activeInputField = null;
   }
 
-  private createAuthWordmark(y: number): void {
-    const label = this.padLegacyCompactUiText(this.add.text(this.layout.width / 2, y, 'MAZER', {
-      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
-      fontSize: '14px',
-      color: '#3ddbd4',
-      letterSpacing: 4
-    })).setOrigin(0.5).setAlpha(1).setDepth(3);
-    this.uiTexts.push(label);
-  }
-
   private createOverlayTitle(text: string, y: number): void {
     const fontSize = this.overlay === 'auth' ? 48 : (this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT ? 24 : (this.layout.width < 480 ? 28 : 34));
     const label = this.padLegacyUiText(this.add.text(
@@ -14388,91 +13496,6 @@ export class MenuScene extends Phaser.Scene {
       color: this.overlay === 'auth' ? '#f5f5f7' : '#6bc96f'
     })).setOrigin(0.5).setDepth(3);
     this.uiTexts.push(label);
-  }
-
-  private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton {
-    const size = Math.max(
-      cyberArcadeMaterial.controls.minimumTouchTarget,
-      this.layout.width < 480 ? 42 : 46
-    );
-    // Always top-right, tucked into the corner with a small fixed margin --
-    // matches the app-wide back-button placement pattern (no title text to
-    // vertically align against, so it hugs the panel edge instead).
-    const x = panel.left + panel.width - Math.round(size * 0.86);
-    const y = panel.top + 8 + Math.round(size / 2);
-    const chrome = this.add.graphics();
-    // No ring, panel, or background tint behind the arrow -- just the
-    // chevron itself. The invisible hit rectangle below still uses the full
-    // accessible touch-target size, but the visible glyph is drawn much
-    // smaller within it -- per feedback the enlarged arrow read as way too
-    // big next to the rest of the UI.
-    const drawChevronChrome = (active: boolean): void => {
-      chrome.clear();
-      const chevronInset = Math.round(size * 0.22);
-      const chevronLeft = x - Math.round(size * 0.03);
-      chrome.lineStyle(Math.max(2.5, Math.round(size * 0.075)), active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON, active ? 1 : 0.94);
-      chrome.beginPath();
-      chrome.moveTo(chevronLeft + chevronInset, y - chevronInset);
-      chrome.lineTo(chevronLeft - chevronInset, y);
-      chrome.lineTo(chevronLeft + chevronInset, y + chevronInset);
-      chrome.strokePath();
-    };
-
-    drawChevronChrome(false);
-    // Real-device input showed the old target registering below the visible
-    // arrow, so this keeps a wider, lower-weighted envelope than the glyph
-    // itself -- but hitPadBottom was cut from 24 to 8: at 24 this control's
-    // own hit rect reached far enough down to overlap the Guide dropdown
-    // header's hit rect on several overlays (Options/Pause both stack the
-    // Guide card immediately below this button), so a tap aimed at the top
-    // of the Guide bar could land on Back instead and exit the overlay --
-    // reported twice. A smaller bottom pad still comfortably beats the bare
-    // glyph while clearing that overlap.
-    const hitPadTop = 12;
-    const hitPadBottom = 8;
-    const hitPadSides = 14;
-    const hitLeft = x - (size / 2) - hitPadSides;
-    const hitTop = y - (size / 2) - hitPadTop;
-    const hitWidth = size + (hitPadSides * 2);
-    const hitHeight = size + hitPadTop + hitPadBottom;
-    const background = this.add.rectangle(
-      hitLeft + (hitWidth / 2),
-      hitTop + (hitHeight / 2),
-      hitWidth,
-      hitHeight,
-      0x000000,
-      0.001
-    );
-    chrome.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
-    background.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
-    background.setInteractive({ useHandCursor: true });
-    this.overlayBackChevronAction = onClick;
-    const label = this.padLegacyUiText(this.add.text(x, y, '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '1px',
-      color: MENU_TEXT_COLOR
-    })).setOrigin(0.5).setAlpha(0).setDepth(3);
-    this.overlayBackChevronBounds = createVisualRect(hitLeft, hitTop, hitWidth, hitHeight);
-
-    const setActive = (active: boolean): void => {
-      drawChevronChrome(active);
-    };
-
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-
-    return {
-      background,
-      bounds: this.overlayBackChevronBounds,
-      label,
-      setActive,
-      text: 'Back',
-      destroy: () => {
-        chrome.destroy();
-        background.destroy();
-        label.destroy();
-      }
-    };
   }
 
   private createButton(
@@ -14695,10 +13718,9 @@ export class MenuScene extends Phaser.Scene {
       height: this.layout.height,
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
-      placement: 'trailing',
+      placement: 'leading',
       safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
-      slot: 1,
       width: this.layout.width
     });
     const hit = resolveLegacyMinHitRect(rect, this.layout);
@@ -14752,9 +13774,10 @@ export class MenuScene extends Phaser.Scene {
       height: this.layout.height,
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
-      placement: 'leading',
+      placement: 'trailing',
       safeArea: this.layout.headerSafeInset,
       sizeScale: this.layout.headerIconScale,
+      slot: 1,
       width: this.layout.width
     });
     const hit = resolveLegacyMinHitRect(frame, this.layout);
@@ -14882,6 +13905,11 @@ export class MenuScene extends Phaser.Scene {
     }
     this.uiTexts = this.uiTexts.filter((text) => text.active);
 
+    for (const image of this.accountStatusImages) {
+      image.destroy();
+    }
+    this.accountStatusImages = [];
+
     this.overlayGuideGraphics?.destroy();
     this.overlayGuideGraphics = null;
   }
@@ -14920,50 +13948,6 @@ export class MenuScene extends Phaser.Scene {
     this.leaderboardSelfRank = selfRankResult.selfRank;
     this.leaderboardStatus = pageResult.entries.length === 0 ? 'empty' : 'ready';
     this.uiDirty = true;
-  }
-
-  // Header identity: the verified canonical username, top-left, immediately
-  // right of the profile icon (replaces the old greeting + username pair
-  // that sat above the Start button). Geometry comes from
-  // resolveLegacyHeaderIdentityPlacement: the real profile-icon frame, the
-  // real title footprint (not an assumed width), ellipsized to the room
-  // between them, shortened/hidden on a tight header (the edge diamonds sit
-  // behind it at fixed positions). Signed out / guest / no username -> no label at all.
-  // Depth 3 like the other menu controls: above the board, below overlays.
-  private createLegacyHeaderIdentityLabel(): void {
-    const username = this.authSnapshot.status === 'authenticated'
-      ? this.authSnapshot.canonicalUsername?.trim() ?? ''
-      : '';
-    if (username.length === 0) {
-      return;
-    }
-
-    // No stroke/halo/plate (audit finding 1); 2 px padding keeps descenders.
-    // Text resolution stays at the baseline: n > 1 paints glyphs n times larger
-    // under this Canvas renderer (render/textCrispness.ts).
-    const label = this.add.text(0, 0, username, {
-      color: '#d7f7ee',
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '14px',
-      padding: { top: LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX, bottom: LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX }
-    }).setOrigin(0, 0.5).setDepth(3).setVisible(false);
-    const placement = resolveLegacyHeaderIdentityPlacement({
-      layout: this.layout,
-      measure: (value, fontPx) => label.setFontSize(fontPx).setText(value).width,
-      measureHeight: (fontPx) => label.setFontSize(fontPx).setText(username).height,
-      username
-    });
-    if (!placement.visible || placement.anchor === null) {
-      label.destroy();
-      return;
-    }
-    label
-      .setName(LEGACY_HEADER_IDENTITY_LABEL_NAME)
-      .setFontSize(placement.identity.fontPx)
-      .setText(placement.identity.displayText)
-      .setPosition(placement.anchor.x, placement.anchor.y)
-      .setVisible(true);
-    this.uiTexts.push(label);
   }
 
   private createLegacySignedOutOAuthFailure(): void {
@@ -15051,13 +14035,6 @@ export class MenuScene extends Phaser.Scene {
     if (previousOverlay === 'confirm-progression-reset' && kind !== 'confirm-progression-reset') {
       this.progressionResetState = INITIAL_LEGACY_PROGRESSION_RESET_STATE;
     }
-    if (previousOverlay === 'auth' && kind !== 'auth') {
-      // Leaving Account for anything else (not just an explicit close) must
-      // tear down its native DOM input first -- otherwise it stays mounted
-      // and focused at the auth layer's high z-index underneath whatever
-      // overlay opens next (e.g. Account -> Reset Progress).
-      this.destroyLegacyAuthNativeInput();
-    }
     if (previousOverlay === 'leaderboard' && kind !== 'leaderboard') {
       this.closeLeaderboardUsernameEditor();
     }
@@ -15078,22 +14055,6 @@ export class MenuScene extends Phaser.Scene {
       // Fresh open: drop the previous standing so a stale You row never shows while loading.
       this.leaderboardSelfRank = null;
       void this.loadLeaderboard();
-    }
-    if (kind === 'auth') {
-      // Opening account entry from a guest play session is an explicit change
-      // of intent. Re-lock immediately so neither a form validation failure
-      // nor a provider error can leave a stale guest grant in control.
-      this.revokeLegacyGuestPlayGrant();
-      const rememberedIdentity = readLegacyRememberedIdentity(this.resolveBrowserLocalStorage());
-      this.authForm = {
-        ...this.authForm,
-        email: this.authForm.email || rememberedIdentity
-      };
-      this.activeAuthField = this.authSnapshot.status === 'authenticated'
-        ? null
-        : this.authForm.email.length > 0
-          ? 'password'
-          : 'email';
     }
     this.resetLegacyOverlayScrollState();
     this.activeInputField = null;
@@ -15133,9 +14094,6 @@ export class MenuScene extends Phaser.Scene {
     if (this.overlay === 'options' || this.overlay === 'pause') {
       this.commitAllOverlayFields();
     }
-    if (this.overlay === 'auth') {
-      this.destroyLegacyAuthNativeInput();
-    }
     if (this.overlay === 'leaderboard') {
       this.closeLeaderboardUsernameEditor();
     }
@@ -15147,7 +14105,6 @@ export class MenuScene extends Phaser.Scene {
       this.overlay = returnOverlay;
       this.overlayReturn = 'none';
       this.activeInputField = null;
-      this.activeAuthField = null;
       this.titleGraphics.setVisible(false);
       this.boardDynamicDirty = true;
       this.uiDirty = true;
@@ -15159,7 +14116,6 @@ export class MenuScene extends Phaser.Scene {
     const showMenuTitle = this.mode === 'menu';
     this.titleGraphics.setVisible(showMenuTitle);
     this.activeInputField = null;
-    this.activeAuthField = null;
     if (this.mode === 'play') {
       this.resetLegacyPlayInputBuffer();
       this.clearPlayHudImmediately();
@@ -15170,23 +14126,6 @@ export class MenuScene extends Phaser.Scene {
       this.publishInteractionDiagnostics();
     }
     this.uiBridge?.refreshProjection('overlay-close');
-  }
-
-  private closeLegacyAuthOverlayToMainMenu(): void {
-    this.destroyLegacyAuthNativeInput();
-    this.resetLegacyOverlayScrollState();
-    if (this.mode !== 'menu') {
-      this.enterMenuMode();
-      return;
-    }
-
-    this.overlay = 'none';
-    this.overlayReturn = 'none';
-    this.activeInputField = null;
-    this.activeAuthField = null;
-    this.titleGraphics.setVisible(true);
-    this.boardDynamicDirty = true;
-    this.uiDirty = true;
   }
 
   private applyLegacyPauseCommand(command: LegacyPauseCommand): void {
@@ -15309,17 +14248,6 @@ export class MenuScene extends Phaser.Scene {
       this.resetLegacyPlayInputBuffer();
       this.hudDirty = true;
     }
-    if (fieldId === 'toggleTrailPulse') {
-      this.legacyPlayTrailPulseNextFrameAtMs = 0;
-    }
-    if (fieldId === 'toggleTrailFade' && this.mode === 'menu' && this.menuDemoState !== null && this.menuDemoEpisode !== null) {
-      this.trail = resolveLegacyMenuDemoTrail(
-        this.menuDemoState,
-        this.menuDemoEpisode.raster.width,
-        this.settings.toggleTrailFade,
-        TRAIL_FADE_TAIL
-      );
-    }
 
     if (result.affectsBackdrop) {
       this.backdropDirty = true;
@@ -15347,22 +14275,19 @@ export class MenuScene extends Phaser.Scene {
     );
     const scopedStorage = this.resolveLegacyGameToggleStorage();
     this.settings = readLegacyGameToggleSettings(scopedStorage, LEGACY_DEFAULTS);
-    // Board Zoom was removed: drop the zoom key an older build stored so a player cannot stay zoomed.
-    scrubRemovedCameraZoomFromGameToggleStorage(scopedStorage);
+    // Removed settings (Board Zoom; Trail Fade, Trail Shine, Animated Background): drop the keys an older build stored.
+    scrubRetiredGameToggleKeysFromStorage(scopedStorage);
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
   }
 
-  private loadPersistedLegacyAuthForm(): void {
-    const rememberedIdentity = readLegacyRememberedIdentity(this.resolveBrowserLocalStorage());
+  private loadPersistedLegacyAuthSnapshot(): void {
     this.authSnapshot = readLegacyBootstrappedAuthSnapshot() ?? createLegacyGuestAuthSnapshot();
-    this.authForm = createEmptyLegacyAuthFormState('login', rememberedIdentity);
   }
 
   private async initializeLegacyAuth(): Promise<void> {
     const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();
     if (runtimeAuthFixtureSnapshot) {
       this.applyLegacyAuthSnapshot(runtimeAuthFixtureSnapshot);
-      this.applyLegacyPasswordRecoveryEntry(runtimeAuthFixtureSnapshot, 'BOOTSTRAP_PATH', true);
       return;
     }
 
@@ -15388,51 +14313,10 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
       this.applyLegacyAuthSnapshot(snapshot);
-      if (event === 'PASSWORD_RECOVERY') {
-        this.applyLegacyPasswordRecoveryEntry(snapshot, 'PASSWORD_RECOVERY', true);
-      }
     });
 
     const snapshot = await readLegacyAuthSessionSnapshot();
     this.applyLegacyAuthSnapshot(snapshot);
-    this.applyLegacyPasswordRecoveryEntry(snapshot, 'BOOTSTRAP_PATH', true);
-  }
-
-  private applyLegacyPasswordRecoveryEntry(
-    snapshot: LegacyAuthSessionSnapshot,
-    event: 'BOOTSTRAP_PATH' | 'PASSWORD_RECOVERY',
-    bootstrapComplete: boolean
-  ): void {
-    const nextState = resolveLegacyPasswordRecoveryEntry(this.passwordRecoveryState, {
-      authenticated: snapshot.status === 'authenticated',
-      bootstrapComplete,
-      event,
-      hasProviderError: this.passwordRecoveryUrlState.hasProviderError,
-      pathRequested: this.passwordRecoveryUrlState.requested
-    });
-    if (nextState === this.passwordRecoveryState) {
-      return;
-    }
-
-    this.passwordRecoveryState = nextState;
-    this.passwordRecoveryFeedback = null;
-    if (this.isLegacyPasswordRecoveryActive()) {
-      this.enterForcedLegacyAuthOverlay();
-      this.overlayReturn = 'none';
-      this.authForm = {
-        ...this.authForm,
-        confirmPassword: '',
-        password: ''
-      };
-      this.authInvalidFields = new Set();
-      this.activeAuthField = nextState.phase === 'ready' ? 'password' : null;
-      this.destroyLegacyAuthNativeInput();
-      if (nextState.phase === 'error') {
-        clearLegacyPasswordRecoveryUrl('invalid');
-      }
-    }
-    this.pendingAuthGateTransition = true;
-    this.uiDirty = true;
   }
 
   private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null {
@@ -15486,19 +14370,8 @@ export class MenuScene extends Phaser.Scene {
     if (snapshot.email !== null) {
       if (snapshot.status === 'authenticated') {
         syncLegacyRememberedIdentityFromAuthenticatedSession(this.resolveBrowserLocalStorage(), snapshot);
-      } else {
-        writeLegacyRememberedIdentity(this.resolveBrowserLocalStorage(), snapshot.email);
       }
-      this.authForm = {
-        ...this.authForm,
-        email: snapshot.email
-      };
     }
-    if (snapshot.status === 'authenticated') {
-      this.activeAuthField = null;
-      this.destroyLegacyAuthNativeInput();
-    }
-
     if (previousUserId !== snapshot.userId) {
       // Signed out, or a different account signed in on the same session --
       // either way, any loaded/drafted username belonged to the PREVIOUS
@@ -15990,7 +14863,7 @@ export class MenuScene extends Phaser.Scene {
     // Full auth gate: no back-chevron, no Escape key, no route around this
     // -- the account overlay can only close by actually signing in (see
     // pendingAuthGateTransition in update()).
-    if ((this.authGateLocked || this.isLegacyPasswordRecoveryActive()) && this.overlay === 'auth') {
+    if (this.authGateLocked && this.overlay === 'auth') {
       return;
     }
     // The username editor sits on top of the Leaderboard sheet: back cancels it first.
@@ -16036,7 +14909,7 @@ export class MenuScene extends Phaser.Scene {
   // nothing is reachable during this window without auditing every place
   // create()'s own boot sequence might otherwise make a button clickable.
   // Bounded `Opening…`: the label only claims progress while the redirect is
-  // in flight. After LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS the hand-off is
+  // in flight. After LEGACY_ACCOUNT_STATUS_OPENING_TIMEOUT_MS the hand-off is
   // released (authSubmitting cleared, otherwise the retry would be inert) and
   // the screen shows the browser notice with an enabled `Sign in`.
   private syncLegacyAuthOpeningTimeout(time: number): void {
@@ -16051,7 +14924,7 @@ export class MenuScene extends Phaser.Scene {
       this.authOpeningStartedAtMs = time;
       return;
     }
-    if (time - this.authOpeningStartedAtMs >= LEGACY_AUTH_SCREEN_OPENING_TIMEOUT_MS) {
+    if (time - this.authOpeningStartedAtMs >= LEGACY_ACCOUNT_STATUS_OPENING_TIMEOUT_MS) {
       this.authOpeningStartedAtMs = null;
       this.authSubmitting = false;
       this.authOpeningTimedOut = true;
@@ -16062,8 +14935,9 @@ export class MenuScene extends Phaser.Scene {
   private syncLegacyAuthGateLoadingScreen(time: number): void {
     // The cover is the shared app loader: it fades in (never pops), holds, and fades out over the live scene. While the
     // HTML boot splash is still up the cover starts opaque so the splash fades out over an identical frame.
+    // MAZER-PERF-009: the cover also stays up while the direct-to-play start waits for its worker-built maze.
     const loaderAlpha = this.appLoader?.sync(
-      this.authGateAwaitingResolution,
+      this.authGateAwaitingResolution || this.bootPlayMazeHold.waiting,
       time,
       this.prefersLegacyReducedMotion(),
       this.layout.width,
@@ -16074,6 +14948,16 @@ export class MenuScene extends Phaser.Scene {
       if (this.authGateLoadingBlocker !== null) {
         this.authGateLoadingBlocker.destroy();
         this.authGateLoadingBlocker = null;
+      }
+      if (this.bootPlayMazeHold.waiting) {
+        // MAZER-PERF-009: held for the worker-built maze, auth is already resolved: neutral label, centred under the icon.
+        const holdLayout = this.appLoader?.currentLayout;
+        this.authGateLoadingText
+          .setText(resolveLegacyAuthLoadingCopy({ awaitingResolution: false, callbackInProgress: false, hasSession: false }))
+          .setPosition(
+            Math.round(holdLayout?.centreX ?? this.layout.width / 2),
+            Math.round(holdLayout?.labelCentreY ?? this.layout.height / 2)
+          );
       }
       // The input shield is gone at once; the label leaves with the cover's fade.
       this.authGateLoadingText.setAlpha(loaderAlpha).setVisible(loaderAlpha > 0);
@@ -16700,7 +15584,6 @@ export class MenuScene extends Phaser.Scene {
         pendingCompletionCount: this.latestRemoteSyncResult?.pendingCompletionCount ?? 0,
         recoveredCompletionCount: this.latestRemoteSyncResult?.recoveredCompletionCount ?? 0
       },
-      authAction: this.latestAuthActionDiagnostics,
       layout: {
         buttonHeight: this.layout.buttonHeight,
         buttonLayout: this.layout.buttonLayout,

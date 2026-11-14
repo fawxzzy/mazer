@@ -95,7 +95,7 @@ const buildMazeSnapshot = (spec) => {
   };
 };
 
-const setSceneState = async (page, { maze, player, trail, hasPlayerEverLeftStart, reducedMotion, toggleTrailFade, toggleTrailShine }) => {
+const setSceneState = async (page, { maze, player, trail, hasPlayerEverLeftStart, reducedMotion, toggleTrailShine }) => {
   await page.evaluate((cfg) => {
     const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
     if (cfg.maze) scene.maze = cfg.maze;
@@ -105,8 +105,9 @@ const setSceneState = async (page, { maze, player, trail, hasPlayerEverLeftStart
     }
     if (cfg.trail) scene.trail = cfg.trail;
     if (cfg.hasPlayerEverLeftStart !== undefined) scene.hasPlayerEverLeftStart = cfg.hasPlayerEverLeftStart;
-    if (cfg.toggleTrailFade !== undefined) scene.settings.toggleTrailFade = cfg.toggleTrailFade;
-    if (cfg.toggleTrailShine !== undefined) scene.settings.toggleTrailPulse = cfg.toggleTrailShine;
+    // MAZER-UI-026: the Trail Fade and Trail Shine settings were removed. Trail fade is fixed off (TRAIL_TAIL_FADE)
+    // and the shine band is visible exactly when Reduce Motion is off, so "shine on/off" now sets Reduce Motion.
+    if (cfg.toggleTrailShine !== undefined) scene.settings.toggleReducedMotion = !cfg.toggleTrailShine;
     if (cfg.reducedMotion !== undefined) scene.applyLegacyReducedMotionPreference(cfg.reducedMotion);
     // Force the maze's own tile-by-tile "reveal" animation to fully
     // settled -- without this, a synthetic maze swapped in mid-script
@@ -124,7 +125,7 @@ const setSceneState = async (page, { maze, player, trail, hasPlayerEverLeftStart
     scene.boardStaticDirty = true;
     scene.boardPathDirty = true;
     scene.boardDynamicDirty = true;
-  }, { maze, player, trail, hasPlayerEverLeftStart, reducedMotion, toggleTrailFade, toggleTrailShine });
+  }, { maze, player, trail, hasPlayerEverLeftStart, reducedMotion, toggleTrailShine });
 };
 
 const setTrailClock = async (page, { elapsedMs, lapStartedAtMs }) => {
@@ -348,7 +349,6 @@ const main = async () => {
           player: straightSpec.goal,
           trail: straightPath(),
           hasPlayerEverLeftStart: true,
-          toggleTrailFade: true,
           toggleTrailShine: true,
           reducedMotion: false
         });
@@ -491,21 +491,7 @@ const main = async () => {
         panels.push(await labelPng(buf, 'Goal adjacent to player (both tiles shown)', 480));
       }
 
-      // Trail Fade off / on
-      for (const toggleTrailFade of [false, true]) {
-        const maze = buildMazeSnapshot(straightSpec);
-        await setSceneState(page, {
-          maze,
-          player: straightSpec.goal,
-          trail: straightPath(),
-          toggleTrailFade,
-          toggleTrailShine: false
-        });
-        await stepFrames(page);
-        const frame = await getBoardFrame(page);
-        const buf = await captureCanvasRegionPng(page, straightRegion(frame));
-        panels.push(await labelPng(buf, `Trail Fade ${toggleTrailFade ? 'ON' : 'OFF'}`, 640));
-      }
+      // (The Trail Fade off / on panels were dropped in MAZER-UI-026: Trail Fade is no longer a setting.)
 
       // Trail Shine off / on
       for (const toggleTrailShine of [false, true]) {
@@ -514,7 +500,6 @@ const main = async () => {
           maze,
           player: straightSpec.goal,
           trail: straightPath(),
-          toggleTrailFade: true,
           toggleTrailShine,
           reducedMotion: false
         });
@@ -522,7 +507,7 @@ const main = async () => {
         await stepFrames(page);
         const frame = await getBoardFrame(page);
         const buf = await captureCanvasRegionPng(page, straightRegion(frame));
-        panels.push(await labelPng(buf, `Trail Shine ${toggleTrailShine ? 'ON' : 'OFF'}`, 640));
+        panels.push(await labelPng(buf, `Trail Shine ${toggleTrailShine ? 'ON (Reduce Motion off)' : 'OFF (Reduce Motion on)'}`, 640));
       }
 
       // Reduced motion
@@ -532,7 +517,6 @@ const main = async () => {
           maze,
           player: straightSpec.goal,
           trail: straightPath(),
-          toggleTrailFade: true,
           toggleTrailShine: true,
           reducedMotion: true
         });
