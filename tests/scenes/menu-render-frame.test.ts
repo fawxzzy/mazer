@@ -1197,8 +1197,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private handleLegacyPlayTouchControl');
     expect(menuSceneSource).toContain("|| this.overlay !== 'none'");
     expect(menuSceneSource).toContain("// The fixed play controls must not intercept an overlay action.");
-    expect(menuSceneSource).toContain('private handleOverlayBackChevronPointerDown(pointer: Phaser.Input.Pointer): boolean');
-    expect(menuSceneSource).toContain('this.overlayBackChevronAction();');
+    // The overlay back-chevron plumbing had no producer after the redesign and was removed (MAZER-ACCT-044).
+    expect(menuSceneSource).not.toContain('handleOverlayBackChevronPointerDown');
+    expect(menuSceneSource).not.toContain('overlayBackChevronAction');
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchControls(');
     expect(menuSceneSource).toContain('private resolveLegacyPlayActiveTouchControls()');
     expect(menuSceneSource).toContain('activeControls: this.resolveLegacyPlayActiveTouchControls()');

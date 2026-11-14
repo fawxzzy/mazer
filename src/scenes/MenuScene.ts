@@ -1331,7 +1331,6 @@ const LEGACY_PLAYER_MESSAGE_TOAST_ROW_POOL = 3;
 // Extra forgiveness beyond the chevron's own drawn touch-target size when
 // resolving which hit box a tap belongs to first -- corner buttons are
 // statistically the hardest to land a precise tap on.
-const LEGACY_OVERLAY_BACK_CHEVRON_PRIORITY_PADDING = 10;
 const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 // Pulse period for the classic "PRESS START" blink -- see
@@ -2062,8 +2061,6 @@ export class MenuScene extends Phaser.Scene {
   private uiTexts: Phaser.GameObjects.Text[] = [];
   private uiGraphics: Phaser.GameObjects.Graphics[] = [];
   private uiButtons: UiButton[] = [];
-  private overlayBackChevronBounds: VisualRect | null = null;
-  private overlayBackChevronAction: (() => void) | null = null;
   // Menu Settings only: the card rect; a tap outside it (the dimmed scrim) closes the sheet.
   private overlayScrimCloseBounds: VisualRect | null = null;
   private overlayGuideBounds: VisualRect | null = null;
@@ -4191,9 +4188,6 @@ export class MenuScene extends Phaser.Scene {
       if (this.recoverTapAfterUiRebuild(pointer, currentlyOver.length)) {
         return;
       }
-      if (this.handleOverlayBackChevronPointerDown(pointer)) {
-        return;
-      }
       if (this.handleOverlayScrimPointerDown(pointer, currentlyOver.length)) {
         return;
       }
@@ -4575,31 +4569,6 @@ export class MenuScene extends Phaser.Scene {
     return this.setLegacyOverlayScrollOffset(this.overlayScrollOffset + (Math.sign(deltaY) * wheelStep));
   }
 
-  // One scene-level route owns the back action. Phaser's object hit testing
-  // and the fixed pause-control fallback disagree on the top-right canvas
-  // edge on some real devices, so leaving the callback on the invisible
-  // rectangle made the visible arrow's upper half unreliable.
-  private handleOverlayBackChevronPointerDown(pointer: Phaser.Input.Pointer): boolean {
-    if (
-      this.overlay === 'none'
-      || this.overlayBackChevronBounds === null
-      || this.overlayBackChevronAction === null
-    ) {
-      return false;
-    }
-    const point = this.resolveLegacyInputPointerPoint(pointer);
-    if (!this.isPointInVisualRect(
-      this.overlayBackChevronBounds,
-      point.x,
-      point.y,
-      LEGACY_OVERLAY_BACK_CHEVRON_PRIORITY_PADDING
-    )) {
-      return false;
-    }
-    this.overlayBackChevronAction();
-    return true;
-  }
-
   // Menu Settings and the Leaderboard have no Close pill: besides the primary Back to Menu row and
   // Escape, a tap on the dimmed scrim outside the card closes them. Only the
   // un-covered scrim counts (nothing under the pointer, outside the card), and
@@ -4670,9 +4639,6 @@ export class MenuScene extends Phaser.Scene {
       this.overlayScrollGestureLockPointerId = pointerId;
       return false;
     }
-    // A back-chevron tap never reaches here at all now -- isPointerOnOverlayBackChevron
-    // (checked first in installInput's pointerdown handler, with generous
-    // padding) claims it before the scroll rail's own hit test gets a look.
     const onViewport = this.isPointInVisualRect(this.overlayScrollViewportBounds, point.x, point.y, 0);
     const onRail = this.isPointInVisualRect(this.overlayScrollTrackBounds, point.x, point.y, 20);
     if (!onViewport && !onRail) {
@@ -10979,8 +10945,6 @@ export class MenuScene extends Phaser.Scene {
     this.uiRebuiltAtFrame = this.game.getFrame();
     this.overlayGraphics.clear();
     this.clearUi();
-    this.overlayBackChevronBounds = null;
-    this.overlayBackChevronAction = null;
     this.overlayScrimCloseBounds = null;
     this.overlayGuideBounds = null;
     this.overlayScrollViewportBounds = null;
@@ -15637,7 +15601,7 @@ export class MenuScene extends Phaser.Scene {
       },
       touchControls,
       overlayUi: {
-        backChevron: cloneVisualRect(this.overlayBackChevronBounds),
+        backChevron: null,
         guidePanel: cloneVisualRect(this.overlayGuideBounds),
         latestAuthMessage: this.latestAuthMessage,
         latestMessage: this.latestOverlayMessage,

@@ -66,7 +66,7 @@ describe('tap recovery after a UI rebuild (Wave 5C)', () => {
     expect(pointerDown.indexOf('this.recoverTapAfterUiRebuild(pointer, currentlyOver.length)'))
       .toBeGreaterThan(-1);
     expect(pointerDown.indexOf('this.recoverTapAfterUiRebuild('))
-      .toBeLessThan(pointerDown.indexOf('this.handleOverlayBackChevronPointerDown(pointer)'));
+      .toBeLessThan(pointerDown.indexOf('this.handleOverlayScrimPointerDown(pointer, currentlyOver.length)'));
     expect(source).toContain("target.background.emit('pointerdown', pointer, pointer.x, pointer.y, pointer.event);");
   });
 });

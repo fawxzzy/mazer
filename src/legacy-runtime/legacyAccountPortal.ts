@@ -37,7 +37,7 @@ export const MAZER_OAUTH_PENDING_TTL_MS = 900_000;
 export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
 export const MAZER_OAUTH_SESSION_LOCK_MAX_WAIT_MS = MAZER_OAUTH_TOKEN_TIMEOUT_MS;
 export const MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS = 60_000;
-export const MAZER_OAUTH_SAFE_ERROR_MESSAGE = 'Account connection unavailable. Return to Mazer and try again.';
+export const MAZER_OAUTH_SAFE_ERROR_MESSAGE = 'Could not reach your account. Try again.';
 
 const MAZER_OAUTH_CALLBACK_KEYS = ['code', 'state', 'error', 'error_description'] as const;
 const MAZER_OAUTH_TOKEN_RESPONSE_MAX_BYTES = 16_384;

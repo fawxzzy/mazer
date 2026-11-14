@@ -132,7 +132,7 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | `src/scenes/MenuScene.ts:17547` | `Runtime diagnostics authenticated fixture.` | no | n/a | fixture | None (QA fixture) |
 | `src/boot/accessibilitySurface.ts:100` | `Use Arrow keys or WASD to move through the maze. Press Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.` | no | n/a | static | None (a11y description) |
 | `src/boot/accessibilitySurface.ts:109` | `Mazer is ready.` | no | info | static | Live region never updated; candidate sink for the message surface announcements |
-| `src/legacy-runtime/legacyAccountPortal.ts:23` | `Account connection unavailable. Return to Mazer and try again.` | no | error / auth | raw-status | Auth table key `accountConnectionUnavailable`; it is drawn directly at `MenuScene.ts:17128` and via F2 |
+| `src/legacy-runtime/legacyAccountPortal.ts:23` | `Could not reach your account. Try again.` | no | error / auth | raw-status | Auth table key `accountConnectionUnavailable`; it is drawn directly at `MenuScene.ts:17128` and via F2 |
 | `src/legacy-runtime/legacyAuth.ts:763` | `Account connected.` | no | success / auth | raw-status | Auth table key `accountConnected`; no render site today (info on the snapshot) |
 | `src/legacy-runtime/legacyAuth.ts:1447` | `That username is already taken.` | no (duplicate) | error / auth | duplicate-unrendered | Use `LEGACY_AUTH_MESSAGE_COPY.usernameTaken` and render it (F4) |
 | `src/legacy-runtime/legacyLeaderboard.ts:49` | `The leaderboard is not available right now.` | no | error / system | parallel-mapper | Fold into the message module |
