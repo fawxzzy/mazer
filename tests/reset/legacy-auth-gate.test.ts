@@ -26,26 +26,22 @@ describe('legacy full auth gate', () => {
     expect(menuSceneSource).toContain('private handleLegacyQaStartGuestPlayMode(): LegacyQaOverlayResult {');
   });
 
-  test('draws the Welcome entry card from the auth-screen view-model: one dock, rail + legal rows, no guest action', () => {
+  test('draws the failure fallback from the status view-model: loader icon, one line, ONE Try again button, no guest action', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
       .replace(/\r\n/g, '\n');
-    const formStart = menuSceneSource.indexOf('  private buildSharedAccountEntrySection(');
-    const formEnd = menuSceneSource.indexOf('  private isLegacyPasswordRecoveryActive(', formStart);
-    const formSource = menuSceneSource.slice(formStart, formEnd);
+    const start = menuSceneSource.indexOf('  private buildAuthOverlay(): void {');
+    const end = menuSceneSource.indexOf('  private drawLegacyAccountStatusIcon(', start);
+    const overlaySource = menuSceneSource.slice(start, end);
 
-    // One full-width dock from layout.dock; labels come from the view-model.
-    expect(formSource).not.toContain('this.createLegacyBottomActionBar(');
-    expect(formSource).toContain('model.primaryDock');
-    expect(formSource).toContain('layout.dock.width');
-    expect(formSource.match(/createLegacyAuthActionButton\(/g)).toHaveLength(1);
-    expect(formSource).toContain("'primary'");
-    expect(formSource).not.toContain("'secondary'");
-    expect(formSource).not.toContain("text: 'Create account'");
-    expect(formSource).toContain("() => this.runLegacyAuthScreenRoute('oauth-authorize')");
-    expect(formSource).toContain('this.handleSharedAccountAuthorization()');
-    expect(formSource).not.toContain('Play as guest');
-    expect(formSource).not.toContain('handleLegacyGuestPlay');
-    expect(formSource).not.toContain('handleLegacyAuthSubmit');
+    expect(overlaySource).toContain('resolveLegacyAccountStatus({');
+    expect(overlaySource).toContain('status.button.label');
+    expect(overlaySource).toContain('layout.button.width');
+    expect(overlaySource.match(/createLegacyAuthActionButton\(/g)).toHaveLength(1);
+    expect(overlaySource).toContain("'primary'");
+    expect(overlaySource).toContain('void this.handleSharedAccountAuthorization()');
+    for (const gone of ['Play as guest', 'handleLegacyGuestPlay', 'handleLegacyAuthSubmit', 'Create', 'Privacy', 'Welcome']) {
+      expect(overlaySource).not.toContain(gone);
+    }
   });
 
   test('halts gameplay and ambient updates while the forced auth screen is open', () => {
@@ -83,20 +79,13 @@ describe('legacy full auth gate', () => {
     expect(applySnapshotSource).toContain('this.enterForcedLegacyAuthOverlay();');
   });
 
-  test('revokes a prior guest grant before returning to menu, account entry, or credential submission', () => {
+  test('revokes a prior guest grant before returning to the menu while signed out', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
-    const submitStart = menuSceneSource.indexOf('  private async handleLegacyAuthSubmit(): Promise<void> {');
-    const submitSource = menuSceneSource.slice(submitStart, menuSceneSource.indexOf('  private handleLegacyGuestPlay(): void {', submitStart));
-    const openOverlayStart = menuSceneSource.indexOf('  private openOverlay(kind: OverlayKind): void {');
-    const openOverlaySource = menuSceneSource.slice(openOverlayStart, menuSceneSource.indexOf('  private closeOverlay(): void {', openOverlayStart));
     const enterMenuStart = menuSceneSource.indexOf('  private enterMenuMode(): void {');
     const enterMenuSource = menuSceneSource.slice(enterMenuStart, menuSceneSource.indexOf('  private startPlayMode(): void {', enterMenuStart));
     const revokeStart = menuSceneSource.indexOf('  private revokeLegacyGuestPlayGrant(): void {');
-    const revokeSource = menuSceneSource.slice(revokeStart, menuSceneSource.indexOf('  private applyLegacyAuthSubmitResult(', revokeStart));
+    const revokeSource = menuSceneSource.slice(revokeStart, revokeStart + 600);
 
-    expect(submitSource).toContain('this.revokeLegacyGuestPlayGrant();');
-    expect(openOverlaySource).toContain("if (kind === 'auth') {");
-    expect(openOverlaySource).toContain('this.revokeLegacyGuestPlayGrant();');
     expect(enterMenuSource).toContain("if (this.authSnapshot.status !== 'authenticated') {");
     expect(enterMenuSource).toContain('this.revokeLegacyGuestPlayGrant();');
     expect(revokeSource).toContain('this.guestPlayGranted = false;');
@@ -140,11 +129,11 @@ describe('legacy full auth gate', () => {
     const pendingBlockSource = menuSceneSource.slice(updateStart, pendingBlockEnd);
 
     expect(pendingBlockSource.match(/this\.enterForcedLegacyAuthOverlay\(\);/g)).toHaveLength(1);
-    expect(pendingBlockSource).toContain('(this.isLegacyPasswordRecoveryActive() || this.authGateLocked)');
+    expect(pendingBlockSource).toContain("if (this.authGateLocked && this.overlay !== 'auth') {");
     // Ordering matters: the combined open-gate condition must come before
     // the close branch, so the two remain mutually exclusive on a single
     // pendingAuthGateTransition tick.
-    const openGateAt = pendingBlockSource.indexOf('(this.isLegacyPasswordRecoveryActive() || this.authGateLocked)');
+    const openGateAt = pendingBlockSource.indexOf("if (this.authGateLocked && this.overlay !== 'auth') {");
     const closeGateAt = pendingBlockSource.indexOf("} else if (!this.authGateLocked && !this.authGateAwaitingResolution && this.overlay === 'auth') {");
     expect(openGateAt).toBeGreaterThanOrEqual(0);
     expect(closeGateAt).toBeGreaterThan(openGateAt);
@@ -165,11 +154,10 @@ describe('legacy full auth gate', () => {
     expect(loadingScreenSnippet).toContain('this.authGateLoadingBlocker = null;');
   });
 
-  test('the loading screen blocks input at a depth above every overlay, including the back chevron', () => {
+  test('the loading screen blocks input at a depth above every overlay', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const LEGACY_AUTH_GATE_LOADING_DEPTH = 5000;');
-    expect(menuSceneSource).toContain('const LEGACY_OVERLAY_BACK_CHEVRON_DEPTH = 1000;');
     expect(menuSceneSource).toContain('this.authGateLoadingBlocker.setDepth(LEGACY_AUTH_GATE_LOADING_DEPTH);');
     expect(menuSceneSource).toContain('this.authGateLoadingBlocker.setInteractive();');
   });

@@ -13,7 +13,7 @@ import { buildLegacySettingsSheetModel } from '../../src/legacy-runtime/legacySe
 import {
   collectGuideTextContainmentIssues,
   collectMenuControlSpacingIssues,
-  evaluateAuthWelcomeAnatomy,
+  evaluateAuthStatusAnatomy,
   isFixedCardWithoutScroll,
   evaluateAuthenticatedFixtureReadiness,
   evaluateStandaloneFirstVisibleHomeReadiness,
@@ -1024,36 +1024,36 @@ describe('UI surface capture script contract', () => {
   });
 });
 
-describe('forced auth screen anatomy check (Welcome entry card)', () => {
+describe('forced account failure fallback anatomy check (MAZER-ACCT-043)', () => {
   const surface = (labels, buttons) => ({
     buttons: buttons.map((text) => ({ text })),
     textLabels: labels.map((text) => ({ text }))
   });
-  const goodLabels = ['MAZER', 'Welcome', 'Create Account', 'Reset Password', 'Privacy Policy', 'Terms of Service', 'Sign in'];
-  const goodButtons = ['Create Account', 'Reset Password', 'Privacy Policy', 'Terms of Service', 'Sign in'];
+  const goodLabels = ['Account connection unavailable. Return to Mazer and try again.', 'Try again'];
+  const goodButtons = ['Try again'];
 
-  test('passes for the Welcome anatomy: one Sign in dock, no subtitle, no guest/skip/back', () => {
-    expect(evaluateAuthWelcomeAnatomy(surface(goodLabels, goodButtons))).toEqual({ failures: [], pass: true });
+  test('passes for the fallback: one Try again button and a status line', () => {
+    expect(evaluateAuthStatusAnatomy(surface(goodLabels, goodButtons))).toEqual({ failures: [], pass: true });
   });
 
-  test('an in-flight Opening… dock still counts as the single dock', () => {
-    const buttons = goodButtons.map((text) => (text === 'Sign in' ? 'Opening…' : text));
-    expect(evaluateAuthWelcomeAnatomy(surface(goodLabels, buttons)).pass).toBe(true);
+  test('an in-flight Opening… button still counts as the single button', () => {
+    expect(evaluateAuthStatusAnatomy(surface(goodLabels, ['Opening…'])).pass).toBe(true);
   });
 
   test.each([
-    ['legacy Account title', [...goodLabels.filter((l) => l !== 'Welcome'), 'Account'], goodButtons, ['missing-title-Welcome', 'legacy-title-Account']],
-    ['subtitle paragraph', [...goodLabels, 'Use your shared Fawxzzy account to keep progression, settings, and leaderboard identity connected.'], goodButtons, ['subtitle-paragraph-present']],
-    ['two docks', goodLabels, [...goodButtons, 'Sign in'], ['sign-in-dock-count=2']],
-    ['no dock', goodLabels, goodButtons.filter((b) => b !== 'Sign in'), ['sign-in-dock-count=0']],
-    ['guest action', goodLabels, [...goodButtons, 'Play as guest'], ['forbidden-guest-skip-close-or-back-action']],
-    ['back chevron', goodLabels, [...goodButtons, 'Back'], ['forbidden-guest-skip-close-or-back-action']]
+    ['old Welcome title', [...goodLabels, 'Welcome'], goodButtons, ['account-title-or-marker-present']],
+    ['old marker', [...goodLabels, 'MAZER'], goodButtons, ['account-title-or-marker-present']],
+    ['create account link', [...goodLabels, 'Create Account'], [...goodButtons, 'Create Account'], ['extra-buttons-present', 'account-wording-present']],
+    ['two retry buttons', goodLabels, [...goodButtons, 'Try again'], ['retry-button-count=2']],
+    ['no button', goodLabels, [], ['retry-button-count=0']],
+    ['guest action', goodLabels, [...goodButtons, 'Play as guest'], ['extra-buttons-present', 'forbidden-guest-skip-close-or-back-action']],
+    ['back chevron', goodLabels, [...goodButtons, 'Back'], ['extra-buttons-present', 'forbidden-guest-skip-close-or-back-action']]
   ])('fails closed on %s', (_name, labels, buttons, failures) => {
-    expect(evaluateAuthWelcomeAnatomy(surface(labels, buttons))).toEqual({ failures, pass: false });
+    expect(evaluateAuthStatusAnatomy(surface(labels, buttons))).toEqual({ failures, pass: false });
   });
 
   test('a missing surface fails instead of passing vacuously', () => {
-    expect(evaluateAuthWelcomeAnatomy(undefined).pass).toBe(false);
+    expect(evaluateAuthStatusAnatomy(undefined).pass).toBe(false);
   });
 });
 

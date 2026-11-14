@@ -54,20 +54,11 @@ const INLINE_STATE_TEXT_LABELS = Object.freeze([
   'Trail Fade',
   'Trail Shine'
 ]);
-// The two inline auth field labels were removed here (2026-09-15): the
-// signed-out auth overlay has no inline credential fields (Mazer authenticates
-// through the account host's OAuth flow). 2026-11-05: the forced screen was
-// rebuilt to the shared auth-surface family anatomy (MenuScene
-// buildSharedAccountEntrySection, drawn from legacyAuthScreenView.ts): marker,
-// `Welcome`, NO subtitle, a `Create Account | Reset Password` rail, a
-// `Privacy Policy | Terms of Service` legal row and ONE full-width bottom-dock
-// `Sign in`. These are the labels that structure exposes as buttons.
+// MAZER-ACCT-043: Mazer keeps no account screen. The forced signed-out state is the failure fallback of the hand-off
+// (MenuScene buildAuthOverlay, drawn from legacyAccountStatusState.ts): the loader icon, ONE status line and ONE
+// `Try again` button. The button is the only label the structure exposes.
 const AUTH_EXPECTED_LABELS = Object.freeze([
-  'Sign in',
-  'Create Account',
-  'Reset Password',
-  'Privacy Policy',
-  'Terms of Service'
+  'Try again'
 ]);
 
 const buildExpectedTextLabelDescriptors = (expectedLabels) => (
@@ -1312,25 +1303,24 @@ export const hasTextLabels = (surface, expectedLabels) => {
   return hasExpectedTextLabels(labels, expectedLabels);
 };
 
-// The forced signed-out auth screen follows the shared auth-surface family
-// anatomy: `Welcome` (never `Account`), no subtitle paragraph, ONE bottom-dock
-// `Sign in` button, and no guest / skip / close / back action.
-export const evaluateAuthWelcomeAnatomy = (surface) => {
+// The forced signed-out state is the failure fallback (MAZER-ACCT-043): no title, marker, rail, legal row or account
+// wording, ONE `Try again` (or in-flight `Opening…`) button and no guest / skip / close / back action.
+export const evaluateAuthStatusAnatomy = (surface) => {
   const labels = collectTextLabels(surface);
   const buttonTexts = (surface?.buttons ?? []).map((button) => button?.text);
   const failures = [];
-  if (!labels.includes('Welcome')) {
-    failures.push('missing-title-Welcome');
+  const retryCount = buttonTexts.filter((text) => text === 'Try again' || text === 'Opening…').length;
+  if (retryCount !== 1) {
+    failures.push(`retry-button-count=${retryCount}`);
   }
-  if (labels.includes('Account')) {
-    failures.push('legacy-title-Account');
+  if (buttonTexts.length !== retryCount) {
+    failures.push('extra-buttons-present');
   }
-  if (labels.some((label) => typeof label === 'string' && /shared fawxzzy account|keep progression/i.test(label))) {
-    failures.push('subtitle-paragraph-present');
+  if (labels.some((label) => typeof label === 'string' && /^(welcome|account|mazer)$/i.test(label))) {
+    failures.push('account-title-or-marker-present');
   }
-  const signInCount = buttonTexts.filter((text) => text === 'Sign in' || text === 'Opening…').length;
-  if (signInCount !== 1) {
-    failures.push(`sign-in-dock-count=${signInCount}`);
+  if (labels.some((label) => typeof label === 'string' && /sign in|sign up|create account|password|privacy|terms/i.test(label))) {
+    failures.push('account-wording-present');
   }
   if (buttonTexts.some((text) => typeof text === 'string' && /guest|skip|later|close|back/i.test(text))) {
     failures.push('forbidden-guest-skip-close-or-back-action');
@@ -1881,6 +1871,7 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
     'Log out',
     'Login',
     'Sign in',
+    'Try again',
     'Menu',
     'Settings',
     'Reset',
@@ -1908,6 +1899,7 @@ const collectButtonLabelFillIssues = (surfaceId, surface) => (surface?.buttons ?
     'Log out',
     'Login',
     'Sign in',
+    'Try again',
     'Menu',
     'Settings',
     'Reset',
@@ -2353,10 +2345,10 @@ const buildSurfaceChecks = ({
     createCheck(
       'auth-welcome-anatomy',
       surfaces.auth.captured === true
-        ? evaluateAuthWelcomeAnatomy(surfaces.auth).pass
+        ? evaluateAuthStatusAnatomy(surfaces.auth).pass
         : surfaces.auth.skipped === true,
       surfaces.auth.captured === true
-        ? `failures=${evaluateAuthWelcomeAnatomy(surfaces.auth).failures.join(',') || 'none'}`
+        ? `failures=${evaluateAuthStatusAnatomy(surfaces.auth).failures.join(',') || 'none'}`
         : `skipped=${surfaces.auth.skipped === true} reason=${surfaces.auth.reason ?? 'missing'}`
     ),
     createCheck(

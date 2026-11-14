@@ -8,7 +8,7 @@ import {
   shouldAwaitLegacyAuthResolution,
   type LegacyAuthGateResolutionInput
 } from '../../src/legacy-runtime/legacyAuthGateResolution';
-import { resolveLegacyAuthLoadingCopy } from '../../src/legacy-runtime/legacyAuthScreenView';
+import { resolveLegacyAuthLoadingCopy } from '../../src/legacy-runtime/legacyAccountStatusState';
 
 const input = (overrides: Partial<LegacyAuthGateResolutionInput> = {}): LegacyAuthGateResolutionInput => ({
   authFixtureRoute: false,

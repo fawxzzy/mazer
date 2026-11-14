@@ -30,8 +30,7 @@ describe('scene motion constants on the motion scale (before == after)', () => {
     // before the migration: const LEGACY_WORDMARK_SPARKLE_CYCLE_MS = 2400;
     expect(readConst('LEGACY_WORDMARK_SPARKLE_CYCLE_MS')).toBe('MOTION_LOOP_MS.blink');
     expect(MOTION_LOOP_MS.blink).toBe(2400);
-    // before the migration: the text-caret tween read `duration: 420, ease: 'Sine.easeInOut'`.
-    expect(menuSource).toMatch(/duration: MOTION_UI_MS\.emphasis,\s+ease: MOTION_PHASER_EASE_SINE_IN_OUT,/);
+    // The text-caret tween that read these two went with the credential form (MAZER-ACCT-043); the scale values stay pinned.
     expect(MOTION_UI_MS.emphasis).toBe(420);
     expect(MOTION_PHASER_EASE_SINE_IN_OUT).toBe('Sine.easeInOut');
     // before the migration: GOAL_BEACON.pulsePeriodMs was 2400.
