@@ -171,9 +171,12 @@ canvas:focus-visible {
   width: auto;
 }
 
+/* MAZER-VIS-012: the gate paints the shared near-black (legacy bg.page, same as the boot splash and the game) with a
+   calmer static glow. The old teal gate colour (legacy bg.gate, #031F20) is retired from this rule; its registry token
+   is kept for the token-registry owner to retire. */
 #mazer-install-gate-overlay {
   align-items: center;
-  background: radial-gradient(circle at 50% 34%, rgba(36, 210, 204, 0.10), transparent 40%), #031f20;
+  background: radial-gradient(circle at 50% 34%, rgba(36, 210, 204, 0.06), transparent 40%), var(--mazer-token-legacy-color-bg-page, #02080f);
   color: #d7fff8;
   display: grid;
   inset: 0;
