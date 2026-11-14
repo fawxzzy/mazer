@@ -1366,6 +1366,7 @@ const OPTIONS_GUIDE_EXPECTED_LABELS = Object.freeze([
   'Your trail',
   'Wrap',
   'Levels',
+  'Online',
   'Got it'
 ]);
 const OPTIONS_GUIDE_OPEN_LABEL = 'How to play';

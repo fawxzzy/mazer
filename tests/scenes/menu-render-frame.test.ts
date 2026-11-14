@@ -1684,7 +1684,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     );
     expect(menuSceneSource).not.toContain('createLegacyMenuUsernameButton');
     expect(menuSceneSource).not.toContain('drawLegacyMenuUsernameLabel');
-    expect(profileButtonSource).toContain("placement: 'leading'");
+    // MAZER-UI-024: the profile icon now sits beside the settings cog (trailing slot 1); the leaderboard icon leads.
+    expect(profileButtonSource).toContain("placement: 'trailing'");
+    expect(profileButtonSource).toContain('slot: 1');
     expect(profileButtonSource).toContain('sizeScale: this.layout.headerIconScale');
     expect(profileButtonSource).toContain('const hit = resolveLegacyMinHitRect(frame, this.layout);');
     expect(profileButtonSource).toContain('bounds: hitBounds');
@@ -1872,31 +1874,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.resolveLegacyProgressionStorageKey()');
   });
 
-  test('shows the verified master username in the header, right of the profile icon, without a bottom Welcome block', () => {
+  test('MAZER-UI-024: the header username label is gone (the online counter took its spot); no bottom Welcome block either', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
-    const identitySource = menuSceneSource.slice(
-      menuSceneSource.indexOf('private createLegacyHeaderIdentityLabel(): void'),
-      menuSceneSource.indexOf('private createLegacySignedOutOAuthFailure(): void')
-    );
 
-    // The old bottom-of-menu Welcome + username pair is gone entirely.
+    // The old bottom-of-menu Welcome + username pair is gone entirely, and so is the header label that replaced it.
     expect(menuSceneSource).not.toContain('createLegacyAuthenticatedWelcomeIdentity');
     expect(menuSceneSource).not.toContain("'Welcome', {");
-    expect(identitySource).not.toContain('Welcome');
-    expect(identitySource).not.toContain('centerButtonY');
-    // The header label is created right after the profile icon.
-    expect(menuSceneSource).toContain('this.createLegacyHeaderIdentityLabel();');
-    expect(identitySource).toContain("this.authSnapshot.canonicalUsername?.trim() ?? ''");
-    expect(identitySource).toContain('resolveLegacyHeaderIdentityPlacement({');
-    expect(identitySource).not.toContain('edgeStations');
-    expect(identitySource).toContain('layout: this.layout,');
-    // Left-anchored and vertically centered like the placement contract says;
-    // depth 3 = above the board, below the modal overlays.
-    expect(identitySource).toContain('.setOrigin(0, 0.5).setDepth(3)');
-    expect(identitySource).toContain('.setName(LEGACY_HEADER_IDENTITY_LABEL_NAME)');
-    expect(identitySource).not.toContain('accountUsernameSavedValue');
-    expect(identitySource).not.toContain('authSnapshot.email');
-    expect(identitySource).not.toContain('readLegacyAccountUsername');
+    expect(menuSceneSource).not.toContain('createLegacyHeaderIdentityLabel');
+    expect(menuSceneSource).not.toContain('LEGACY_HEADER_IDENTITY_LABEL_NAME');
+    expect(menuSceneSource).not.toContain('resolveLegacyHeaderIdentityPlacement');
+    // The username is still read for the leaderboard and account surfaces, never for the main-menu header.
+    expect(menuSceneSource).toContain('canonicalUsername');
   });
 
   test('records the Fitness account-surface reuse contract without coupling Phaser to Fitness React components', () => {
@@ -2671,7 +2659,7 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
     'settleLegacyPlayerTransferEnergy', 'isLegacyMenuHandoffAnimationActive',
     'hasLegacyMenuTitleAnimationPendingFrame', 'drawBackdrop', 'drawStaticBoard',
     'drawBoardPaths', 'drawDynamicBoard', 'drawHud', 'rebuildUi',
-    'publishVisualDiagnostics', 'publishRuntimeDiagnostics'
+    'publishVisualDiagnostics', 'publishRuntimeDiagnostics', 'tickLegacyPresence'
   ];
   for (const name of noops) scene[name] = vi.fn();
   const demo = vi.fn();

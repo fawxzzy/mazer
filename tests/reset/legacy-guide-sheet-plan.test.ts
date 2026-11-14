@@ -19,6 +19,7 @@ const MEASURED_HEIGHTS = [
   resolveLegacyGuideRowHeight(3),
   resolveLegacyGuideRowHeight(3),
   resolveLegacyGuideRowHeight(2),
+  resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideKeyboardLineHeight(2)
 ];
 

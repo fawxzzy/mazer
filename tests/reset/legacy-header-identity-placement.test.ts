@@ -156,20 +156,13 @@ describe('header identity placement (username top-left, right of the profile ico
     expect(source).not.toContain('edgeStations');
   });
 
-  test('label style: no stroke / halo / plate, padded against descender clipping, Text resolution left at the baseline', () => {
+  test('MAZER-UI-024: the scene no longer builds the label (the online counter took its spot); the module stays for its own geometry contract', () => {
     expect(LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX).toBeGreaterThanOrEqual(2);
 
     const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
-    const start = source.indexOf('private createLegacyHeaderIdentityLabel(): void {');
-    const body = source.slice(start, source.indexOf('\n  }\n', start)).replace(/\/\/.*$/gm, '');
-    expect(body).toContain('this.add.text(0, 0, username, {');
-    expect(body).not.toMatch(/stroke/i);
-    expect(body).not.toMatch(/backgroundColor|setBackgroundColor|\.rectangle\(|fillRect|add\.graphics/);
-    expect(body).toContain('padding: { top: LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX, bottom: LEGACY_HEADER_IDENTITY_LABEL_PADDING_Y_PX }');
-    // setResolution(n > 1) paints glyphs n times larger under this Canvas renderer (render/textCrispness.ts).
-    expect(body).not.toContain('setResolution');
-    expect(body).not.toContain('devicePixelRatio');
-    // The padded box is what the placement measures, so it still fits the profile icon band.
+    expect(source).not.toContain('createLegacyHeaderIdentityLabel');
+    expect(source).not.toContain('legacyHeaderIdentityPlacement');
+    // The placement still fits the leading icon band for the geometry callers that remain.
     for (const { width, height } of VIEWPORTS) {
       const { placement } = place(width, height, 'qa-player');
       expect(placement.visible).toBe(true);
