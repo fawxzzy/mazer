@@ -211,10 +211,16 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: a tap anywhere on the front door started a run or opened Login; only the wordmark and its margin should.
 - Rule: tap tests inside and outside the zone live in `tests/legacy-runtime/legacy-front-door-hit-zone.test.ts`. Button chrome is not yet drawn from the kit (`chromeViaKit` is false for all); surfaces migrate one per PR.
 - Status: Applied (review)
+
+## 2026-11-14 - MAZER-VIS-044 corner diamonds in the 4 corners
+- WHAT changed: new `src/render/edgeCornerAnchor.ts` (pure); `edgeMarkers.ts` now puts each corner diamond's painted outer tip ON the corner of the view (0 css px from BOTH edges) at every viewport size; they scale about that tip. Before, they sat ~56 px along the top/bottom edge (pushed in). Orbit top/bottom travel eases into the corner. `EDGE_MARKER_CORNER_CLEARANCE_PX` removed.
+- WHY it changed: owner requirement 2026-11-14: corner diamonds always in the actual corners, expanded or shrunk. A physically rounded display corner may trim the very tip: accepted.
+- Rule: corner diamonds are exempt from VIS-043 "touch the edge midline"; offset measured by `measureEdgeCornerOffset` (`tests/render/edgeCornerAnchor.test.ts`). MenuScene unchanged. Not checked on a real phone.
+- Status: Applied
+
 ## 2026-11-14 - MAZER-UI-033 online counter is a copy of the website counter
 - WHAT changed: the menu online counter now reads dot, number, "online" (e.g. `7 online`) in muted 13px text with an 8px pulsing dot, like the website header; idle = dim dot alone; count text is the website format (`1.2k`, `12k`), no uppercase K. New `src/render/presenceCounterView.ts`; layout in `legacyPresenceCounterLayout.ts`; small MenuScene edit (draw call + one field); Guide Online row copy updated.
 - WHY it changed: the chip-glyph counter was far larger than the old username text, lacked the label on phones and did not match the website.
-
 
 ## 2026-11-14 - Touch-first level 1 control hint that follows the input actually used
 - WHAT changed: `legacyControlHint.ts` now holds a pure resolver (`resolveLegacyControlHintInput`): touch is the default, a computer-looking device (fine pointer plus hover, not mobile, not standalone) starts with a neutral line, and the last real input (pointerType on pointerdown, trusted keydown) switches the visible copy between touch, mouse and keys wording (instant text swap, only while visible, never re-shows after the ack). Copy is two short lines (how to move, then the goal). The Guide Move row and the accessibility description were reworded touch-first with the keyboard as a secondary mention.
@@ -224,6 +230,22 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 ## 2026-11-14 - MAZER-UI-031 slice 2 colour literals
 - WHAT changed: the board midnight-rainbow ramp moved from `boardRenderer.ts` to `palette.ts`; the legacy iridescent midnight stops, fallback pink and black moved from `legacyIridescentMaterial.ts` to `trailPalette.ts`; off-theme baseline lowered by exactly 14 (off-token 280 to 266, total 355 to 341).
 - WHY it changed: second slice of the stray-colour migration; values and order identical (pinned by `tests/render/ui-031-slice2-palette-values.test.ts`), no visible change.
+
+## 2026-11-14 - MAZER-ACCT-020/030 stored username limit (client half)
+- WHAT changed: new `src/legacy-runtime/legacyStoredUsername.ts` holds the 2-15 character pattern and `sanitizeStoredLegacyUsername`; `legacyAuth.ts` uses it so a username read from stored account metadata that breaks the limit never becomes canonicalUsername or the display name (display falls back to the email local part). No stored name is rewritten or shortened.
+- WHY it changed: the client trusted `user_metadata.username` as read, so an over-limit name stored before the database check existed was still shown and used. The database constraint and the existing over-limit names are account-site/database scope and are reported to the owner, not changed here.
+- Evidence: `tests/reset/legacy-stored-username.test.ts`, `legacy-auth.test.ts`, `legacy-leaderboard-username-editor.test.ts`.
+
+## 2026-11-14 - MAZER-UI-030 offline cache warning toast
+- WHAT changed: new `src/boot/serviceWorkerCacheWarning.ts` carries one friendly warning (existing `service-worker-error` boot copy) from the page to the message toast; `main.ts` raises it on a failed service-worker install or an online registration error; `MenuScene.ts` subscribes with one line; inventory doc row and test pin it.
+- WHY it changed: an offline-cache update failure was invisible. The Workbox worker cannot post a custom message, so the page watches the registration. Sync failures stay silent and boot errors stay on the splash; offline registration errors are expected and stay silent.
+- Evidence: `tests/reset/ui-030-sw-cache-warning.test.ts`, `tests/reset/legacy-player-message-inventory.test.ts`, headless phone emulation (390x844, 360x740).
+- Status: Applied
+
+## 2026-11-14 - Off-theme colour ratchet baseline refresh
+- WHAT changed: regenerated `tests/fixtures/off-theme-color-baseline.json` with `MAZER_UPDATE_OFF_THEME_BASELINE=1`. Counts only went down (files 29 to 28, offToken 266 to 234, total 341 to 299 after merging main with UI-031 slice 2); `legacyMenuBackdrop.ts` left the list.
+- WHY it changed: about 32 stray literals had already left main without the baseline being lowered, so the ratchet allowed regressions up to the old numbers.
+- Rule: a PR that removes stray colours lowers the baseline in the same PR. If two baseline PRs are open, the second one regenerates after the first merges.
 - Status: Applied
 
 ## 2026-11-14 - MAZER-MOTION-011 overlay rise and stagger
@@ -243,3 +265,4 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the three bitmaps were three illustration styles at about 6.3 MB decoded each; the card asks for one family with close, check, info, share and install glyphs. Part 1 (MenuScene crop, PR 564) must be on main first: this part assumes `MenuScene` crops 128 px textures to the shared glyph box.
 - Rule: a generated asset ships with a test that re-renders it and compares decoded pixels, so a hand-edited or stale binary fails CI.
 - Status: Applied (review); headless Chromium 390x844 and WebKit iPhone 15 Pro and SE screenshots only, no safe-area insets, nothing checked on a real phone. Visible change: header icons are now cyan outline glyphs instead of teal illustrations.
+

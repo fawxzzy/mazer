@@ -29,6 +29,11 @@ import {
   installMazerServiceWorkerControllerReload,
   selectMazerBootArtUrls
 } from './serviceWorkerLifecycle';
+import {
+  reportServiceWorkerCacheWarning,
+  shouldWarnAboutServiceWorkerError,
+  watchServiceWorkerInstallFailure
+} from './serviceWorkerCacheWarning';
 import { installMazerViewportGeometry, syncMazerGameToViewport } from './viewportGeometry';
 
 const LOCALHOST_SW_RESET_KEY = 'mazer:localhost-sw-reset:v1';
@@ -88,10 +93,18 @@ const registerProductionServiceWorker = (): void => {
     readyState: document.readyState,
     addLoadListener: (listener) => window.addEventListener('load', listener, { once: true }),
     register: 'serviceWorker' in navigator
-      ? async (scriptUrl) => navigator.serviceWorker.register(scriptUrl)
+      ? async (scriptUrl) => {
+        const registration = await navigator.serviceWorker.register(scriptUrl);
+        // MAZER-UI-030: a worker whose install (precache download) fails is the offline-cache warning.
+        watchServiceWorkerInstallFailure(registration, () => reportServiceWorkerCacheWarning('service worker install failed'));
+        return registration;
+      }
       : null
   }, (message) => {
     markMazerBootStatus('service-worker-error', message);
+    if (shouldWarnAboutServiceWorkerError(navigator.onLine)) {
+      reportServiceWorkerCacheWarning(message);
+    }
   });
 
   if (!isLocalhostRuntime() && 'serviceWorker' in navigator) {

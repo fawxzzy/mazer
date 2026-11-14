@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { resolveMazerCanvasResolution } from '../../src/boot/canvasResolution';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import {
-  EDGE_MARKER_CORNER_CLEARANCE_PX,
   EDGE_STATION_COUNT,
   anchorStationToOuterTip,
   drawEdgeMarker,
@@ -13,6 +12,7 @@ import {
   type EdgeMarkerState,
   type EdgeStation
 } from '../../src/render/edgeMarkers';
+import { measureEdgeCornerOffset, resolveEdgeCornerTipInset } from '../../src/render/edgeCornerAnchor';
 import { EDGE_DIAMOND_REST_SCALE } from '../../src/render/edgeBeamTimeline';
 import { RasterContext } from './support/rasterContext';
 
@@ -26,7 +26,7 @@ import { RasterContext } from './support/rasterContext';
  * Three layers: (1) the exact painted bounding box (outline plus the stroke's miter join) lies inside the visible canvas and touches
  * its edge within 0.5 device px; (2) real pixels: a software rasteriser draws the real `drawEdgeMarker` with the real context scale
  * and not one lit pixel lies beyond the canvas border, while the last two device rows/columns at the edge ARE lit; (3) the corner
- * diamonds clear a rounded display corner of EDGE_MARKER_CORNER_CLEARANCE_PX.
+ * diamonds sit ON the screen corner (0 px from both edges, MAZER-VIS-044).
  */
 const VIEWPORTS = [
   { name: 'phone 390x844', width: 390, height: 844, mazeWidth: 25, mazeHeight: 51 },
@@ -65,6 +65,7 @@ const stateAt = (station: EdgeStation, scale: number, fill = 0): EdgeMarkerState
   alpha: 1, energized: false, energy: 0, fill, flash: 0, hidden: false, id: station.id, scale, spinRad: 0
 });
 
+// MAZER-VIS-044: the four corner diamonds are exempt from "touches the edge": they sit ON the corner (0 px inset) instead.
 describe('every edge diamond touches the screen edge with its outer tip and nothing leaves the canvas (MAZER-VIS-043)', () => {
   for (const viewport of VIEWPORTS) {
     for (const dpr of DPRS) {
@@ -98,6 +99,15 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
             expect(bounds.right * resolution, `${text} right`).toBeLessThanOrEqual(backing.width + 1e-6);
             expect(bounds.bottom * resolution, `${text} bottom`).toBeLessThanOrEqual(backing.height + 1e-6);
             // Touching the edge the station sits on, within half a device pixel (and never past it, checked above).
+            if (station.isCorner) {
+              // MAZER-VIS-044: a corner diamond is pinned snug in its corner, the same distance from BOTH edges at every size.
+              const corner = (['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const)[station.id / 2] as 'top-left';
+              const offset = measureEdgeCornerOffset(painted, corner, { width: visibleWidth, height: visibleHeight });
+              const tipInset = resolveEdgeCornerTipInset();
+              expect(Math.abs(offset.horizontal - tipInset) * resolution, `${text} horizontal corner offset`).toBeLessThanOrEqual(0.5);
+              expect(Math.abs(offset.vertical - tipInset) * resolution, `${text} vertical corner offset`).toBeLessThanOrEqual(0.5);
+              continue;
+            }
             const gapDevice = {
               top: bounds.top * resolution,
               left: bounds.left * resolution,
@@ -126,11 +136,15 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
             drawEdgeMarker(new Graphics(ctx), station, stateAt(station, scale, scale === 1 ? 0 : 0.5));
             let beyond = 0;
             let nearEdge = 0;
+            let lit = 0;
+            let nearCorner = 0;
             for (let py = 0; py < size; py += 1) {
               for (let px = 0; px < size; px += 1) {
                 if ((ctx.data[(((py * size) + px) * 4) + 3] ?? 0) === 0) continue;
+                lit += 1;
                 const dx = originX + px;
                 const dy = originY + py;
+                if (Math.min(dx, backing.width - 1 - dx) <= 2 && Math.min(dy, backing.height - 1 - dy) <= 2) nearCorner += 1;
                 if (dx < 0 || dy < 0 || dx >= backing.width || dy >= backing.height) beyond += 1;
                 const distance = {
                   top: dy,
@@ -143,39 +157,16 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
             }
             const text = `${label} station ${station.id} scale ${scale}`;
             expect(beyond, `${text} pixels beyond the canvas`).toBe(0);
+            if (station.isCorner) {
+              // Corner diamonds touch the corner point, not an edge midline: they must still be drawn (lit pixels in the window).
+              expect(lit, `${text} lit pixels`).toBeGreaterThan(0);
+              expect(nearCorner, `${text} lit pixels within 3 device px of both edges (the tip is in the corner)`).toBeGreaterThan(0);
+              continue;
+            }
             expect(nearEdge, `${text} pixels on the last two device rows/columns of ${station.side}`).toBeGreaterThan(0);
           }
         }
       });
     }
   }
-
-  test('corner diamonds stay clear of a rounded display corner of the clearance radius at 50%, 75% and 100%, at every viewport', () => {
-    const radius = EDGE_MARKER_CORNER_CLEARANCE_PX;
-    for (const viewport of VIEWPORTS) {
-      const inside = (point: { x: number; y: number }): boolean => {
-        const cx = point.x < radius ? radius : point.x > viewport.width - radius ? viewport.width - radius : point.x;
-        const cy = point.y < radius ? radius : point.y > viewport.height - radius ? viewport.height - radius : point.y;
-        return Math.hypot(point.x - cx, point.y - cy) <= radius + 1e-9;
-      };
-      for (const station of resolveEdgeStations({ width: viewport.width, height: viewport.height })) {
-        for (const scale of SCALES) {
-          for (const point of resolveEdgeMarkerPaintedPolygon(anchorStationToOuterTip(station, scale), scale)) {
-            expect(inside(point), `${viewport.name} station ${station.id} scale ${scale} ${point.x.toFixed(2)},${point.y.toFixed(2)}`).toBe(true);
-          }
-        }
-      }
-    }
-  });
-
-  test('a corner diamond is NOT clear of a corner rounder than the clearance: the documented limit', () => {
-    // 56 css px covers the iPhone 12 to 15 Pro class (47 to 55). A 62 px corner (some newer phones) still trims the nearest sliver of the bottom corner tip.
-    const radius = 62;
-    const viewport = { width: 390, height: 844 };
-    const bottomLeft = resolveEdgeStations(viewport)[6] as EdgeStation;
-    const cx = radius;
-    const cy = viewport.height - radius;
-    const cut = resolveEdgeMarkerPaintedPolygon(bottomLeft).filter((point) => point.x < radius && point.y > cy && Math.hypot(point.x - cx, point.y - cy) > radius);
-    expect(cut.length).toBeGreaterThan(0);
-  });
 });
