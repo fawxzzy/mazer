@@ -69,10 +69,6 @@
       "offToken": 1,
       "total": 1
     },
-    "src/render/navigationCoreTrail.ts": {
-      "offToken": 8,
-      "total": 8
-    },
     "src/render/phaserTileContext.ts": {
       "offToken": 3,
       "total": 3
@@ -154,7 +150,6 @@
     "src/render/boardRenderer.ts",
     "src/visual-proof/readability.ts",
     "src/legacy-runtime/legacyIridescentMaterial.ts",
-    "src/render/navigationCoreTrail.ts",
     "src/proof-surfaces/styles.css",
     "src/visual-proof/styles.css",
     "src/visual-proof/main.ts",
@@ -168,8 +163,8 @@
   ],
   "schemaVersion": 1,
   "totals": {
-    "files": 32,
-    "offToken": 288,
-    "total": 363
+    "files": 31,
+    "offToken": 280,
+    "total": 355
   }
 }

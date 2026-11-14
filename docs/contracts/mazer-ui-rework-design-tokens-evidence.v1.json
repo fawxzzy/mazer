@@ -127,12 +127,12 @@
   ],
   "legacy/color/goal.magenta": [
    {
-    "file": "src/render/navigationCoreTrail.ts"
+    "file": "src/render/trailPalette.ts"
    }
   ],
   "legacy/color/goal.violet": [
    {
-    "file": "src/render/navigationCoreTrail.ts"
+    "file": "src/render/trailPalette.ts"
    }
   ],
   "legacy/spacingPx/rowGapCompact": [
