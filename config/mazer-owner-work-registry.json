@@ -4,21 +4,21 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-14T06:34:01.000Z",
+  "updatedAt": "2026-11-14T06:37:59.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 243,
+    "stableIdentityCount": 244,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 134,
+    "openCardCount": 135,
     "completedCardCount": 93,
     "deferredCardCount": 16,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out.",
     "boardSync": {
-      "at": "2026-11-14T06:34:01.000Z",
-      "appliedEventCount": 59,
-      "lastEventId": "fb270896761c"
+      "at": "2026-11-14T06:37:59.000Z",
+      "appliedEventCount": 60,
+      "lastEventId": "d0f668d54b1a"
     }
   },
   "workItems": [
@@ -4467,6 +4467,25 @@
         "Gate shows for every browser class, display mode and URL form off localhost",
         "Installed contexts including iOS home screen and Android app keep working",
         "Owner confirms the gate in plain Safari or Chrome on the phone"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-042",
+      "status": "planning",
+      "updatedAt": "2026-11-14T06:37:59.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-042",
+      "title": "Mirror the Fitness loader hardening in the Mazer loader",
+      "description": "The Fitness loader rebuild is live and shares the same timing numbers (150 ms delay, 350 ms hold, 200 ms in, 300 ms out, 1200 ms pulse). It also fixed three bugs worth checking in Mazer: the icon ghosting in while the cover fades out on a load faster than 150 ms, a late start letting a failsafe-hidden cover flash back opaque, and an error in the frame callback or an early unmount leaving an opaque cover. Also consider a boot failsafe and a wait ceiling.",
+      "cardType": "reliability",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-VIS-039"
+      ],
+      "acceptanceCriteria": [
+        "Each of the three Fitness bugs is checked against the Mazer splash and cover with a test",
+        "A failsafe guarantees the cover can never stay opaque after an error or a stalled wait",
+        "Mazer and Fitness loader timing constants stay identical and are pinned in both repos"
       ]
     }
   ]

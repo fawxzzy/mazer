@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_38f555f70f0e",
+  "export_id": "pbe_mazer_owner_registry_f94174fda05b",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:38f555f70f0e8f1c294cfb43f5a60261b86cb2a668bf04b373e3a3b80e1265dc",
-  "generated_at": "2026-11-14T06:34:01.000Z",
+  "source_revision": "sha256:f94174fda05b19ef82e15d3341c2e3a88cd1dbf02f618bdad2f62d37083da9be",
+  "generated_at": "2026-11-14T06:37:59.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:53e90f1d29787ffff1f865ca174b0b1523eb342aa94f33fba903002be1b4ecf1",
-      "observed_at": "2026-11-14T06:34:01.000Z"
+      "revision": "sha256:bbe4719f50f81b7d7711563614fb3b567de7755dada303bacf8534431439dac2",
+      "observed_at": "2026-11-14T06:37:59.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:a67753ce27c71dbfb2582900208e7e00de72cc64dcbd0fcb71de2ead073b30a1",
-      "observed_at": "2026-11-14T06:34:01.000Z"
+      "observed_at": "2026-11-14T06:37:59.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-14T06:34:01.000Z"
+      "observed_at": "2026-11-14T06:37:59.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-14T06:34:01.000Z"
+      "observed_at": "2026-11-14T06:37:59.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-14T06:34:01.000Z"
+      "observed_at": "2026-11-14T06:37:59.000Z"
     }
   ],
   "cards": [
@@ -12706,6 +12706,59 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-vis-042_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-042",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Mirror the Fitness loader hardening in the Mazer loader",
+        "description": "The Fitness loader rebuild is live and shares the same timing numbers (150 ms delay, 350 ms hold, 200 ms in, 300 ms out, 1200 ms pulse). It also fixed three bugs worth checking in Mazer: the icon ghosting in while the cover fades out on a load faster than 150 ms, a late start letting a failsafe-hidden cover flash back opaque, and an error in the frame callback or an early unmount leaving an opaque cover. Also consider a boot failsafe and a wait ceiling.",
+        "card_type": "reliability",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-VIS-039"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-14T06:37:59.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-042",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-042",
+        "source_status": "current",
+        "source_updated_at": "2026-11-14T06:37:59.000Z"
+      },
+      "content": {
+        "summary": "The Fitness loader rebuild is live and shares the same timing numbers (150 ms delay, 350 ms hold, 200 ms in, 300 ms out, 1200 ms pulse). It also fixed three bugs worth checking in Mazer: the icon ghosting in while the cover fades out on a load faster than 150 ms, a late start letting a failsafe-hidden cover flash back opaque, and an error in the frame callback or an early unmount leaving an opaque cover. Also consider a boot failsafe and a wait ceiling.",
+        "objective": "The Fitness loader rebuild is live and shares the same timing numbers (150 ms delay, 350 ms hold, 200 ms in, 300 ms out, 1200 ms pulse). It also fixed three bugs worth checking in Mazer: the icon ghosting in while the cover fades out on a load faster than 150 ms, a late start letting a failsafe-hidden cover flash back opaque, and an error in the frame callback or an early unmount leaving an opaque cover. Also consider a boot failsafe and a wait ceiling.",
+        "acceptance_criteria": [
+          "Each of the three Fitness bugs is checked against the Mazer splash and cover with a test",
+          "A failsafe guarantees the cover can never stay opaque after an error or a stalled wait",
+          "Mazer and Fitness loader timing constants stay identical and are pinned in both repos"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-world-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -12761,9 +12814,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 243,
-    "exported_public_card_count": 243,
-    "exported_open_card_count": 134,
+    "stable_identity_count": 244,
+    "exported_public_card_count": 244,
+    "exported_open_card_count": 135,
     "exported_completed_card_count": 93,
     "exported_deferred_card_count": 16,
     "imported_research_candidate_count": 0,
