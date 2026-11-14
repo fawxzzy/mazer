@@ -206,3 +206,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: 7 font stacks and 11 sizes drift across surfaces; the ratchet stops new off-scale sizes/stacks while surfaces migrate one PR each.
 - Rule: Land the scale and a shrink-only allowlist ratchet before migrating surfaces. No surface changed in this PR.
 - Status: Applied (review)
+
+
+## 2026-11-14 - Touch-first level 1 control hint that follows the input actually used
+- WHAT changed: `legacyControlHint.ts` now holds a pure resolver (`resolveLegacyControlHintInput`): touch is the default, a computer-looking device (fine pointer plus hover, not mobile, not standalone) starts with a neutral line, and the last real input (pointerType on pointerdown, trusted keydown) switches the visible copy between touch, mouse and keys wording (instant text swap, only while visible, never re-shows after the ack). Copy is two short lines (how to move, then the goal). The Guide Move row and the accessibility description were reworded touch-first with the keyboard as a secondary mention.
+- WHY it changed: the game is played on touch screens, and computers can drag too; the old copy was picked by a single coarse-pointer check and said arrow keys on devices that misreported.
+- Rule: copy is chosen from observed input, not a device guess; the device guess only seeds the first frame.
+- Status: Applied
