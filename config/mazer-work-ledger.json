@@ -21,29 +21,42 @@
       "note": "PR #474 merged (docs). Ongoing baseline card."
     },
     "MAZER-WORLD-001": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "Open-ended maintenance lane with no finish line; its text predates Chip tiles, diamonds and the Nov 10 render fixes.",
-        "unblockedBy": "Zac",
-        "ask": "Close World Identity as a completed lane (new work ships as discrete render cards) or keep it as a standing maintenance bucket?",
-        "recommendation": "Auditor recommendation: close with a caveat and open one card per concrete defect; an in-progress card with no finish line hides real state."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 411,
+            "mergedSha": "4596027c"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 416,
+            "mergedSha": "a983f2de"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1"
       },
+      "blocker": null,
       "verify": [
-        {"step":"On the iPhone installed app, open the menu and play on the current build; watch the backdrop stars, end markers and trail for 30 seconds.","where":"installed-app","expected":"No strobing recolour, no image or vector misalignment, the end star is centred and the trail does not shake (PR #416 fixes)."}
+        {
+          "step": "On the iPhone installed app, open the menu and play on the current build; watch the backdrop stars, end markers and trail for 30 seconds.",
+          "where": "installed-app",
+          "expected": "No strobing recolour, no image or vector misalignment, the end star is centred and the trail does not shake (PR #416 fixes)."
+        }
       ],
       "lane": "long-running",
-      "filesHint": [],
-      "note": "Auditor recommendation, not a status change: completed-with-caveat. Shipped work is real and recent (PR #411, PR #416); device confirmation of PR #416 is not recorded; remaining criteria are standing rules."
+      "filesHint": []
     },
     "MAZER-NATIVE-001": {
       "evidence": null,
       "blocker": {
-        "kind": "dependency",
-        "summary": "The native wrapper starts only after the web baseline is stable and independently verified.",
-        "unblockedBy": "other-card",
-        "ask": "Waits on the real-phone verification in MAZER-QA-001.",
-        "recommendation": "Do not start before MAZER-QA-001 is closed."
+        "ask": "Say if a native wrapper is wanted.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Web first and installed web app only.",
+        "unblockedBy": "Zac"
       },
       "verify": [],
       "lane": "long-running",
@@ -262,13 +275,7 @@
     },
     "MAZER-VIS-012": {
       "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "Three visual dialects exist (game, install and sign-in pages, account portal); this is the backdrop pick in MAZER-UI-020.",
-        "unblockedBy": "Zac",
-        "ask": "Approve one near-black canvas colour across boot, install gate and sign-in, with a calmer gate starfield, the app icon on the install screen and a dot-matrix wordmark on boot?",
-        "recommendation": "Approve it; portal alignment is tracked as a separate card in another repo."
-      },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": []
@@ -395,10 +402,19 @@
     },
     "MAZER-UI-016": {
       "evidence": null,
-      "blocker": null,
+      "blocker": {
+        "ask": "Say if desktop framing matters.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Phone first and install gated.",
+        "unblockedBy": "Zac"
+      },
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": ["src/scenes/MenuScene.ts","src/legacy-runtime/legacyMenuLayout.ts"]
+      "filesHint": [
+        "src/scenes/MenuScene.ts",
+        "src/legacy-runtime/legacyMenuLayout.ts"
+      ]
     },
     "MAZER-UI-017": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 429}], "deployedBuild": "b640f1da", "headless": true, "deviceChecked": false},
@@ -426,42 +442,52 @@
         "headless": false,
         "deviceChecked": null
       },
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "The wave status report landed (PR #482): contracts layer done, migration layer not started, the menu scene is about 16,600 lines.",
-        "unblockedBy": "Zac",
-        "ask": "Is the UI rework still one umbrella, or split into child cards (MenuScene decomposition, Wave 6 proof surfaces, future-phaser retirement) with this card closed?",
-        "recommendation": "Auditor recommendation: split into children and keep the umbrella as planning only until the acceptance matrix is evaluated."
-      },
+      "blocker": null,
       "verify": [],
       "lane": "long-running",
       "filesHint": [
         "docs/architecture/MAZER-UI-REWORK-DECISION-REGISTRY.md",
         "docs/contracts/mazer-ui-rework-decision-registry.v1.json",
         "config/mazer-owner-work-registry.json"
-      ],
-      "note": "PR #482 merged: status report. Owner decision to split into children open."
+      ]
     },
     "MAZER-UI-020": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "Six design picks are unrecorded (display font, quit confirm, START style, icon construction, backdrop, play HUD) and four graphics cards wait on them.",
-        "unblockedBy": "Zac",
-        "ask": "Do you want the build agent to record the six design picks on its own judgement, or do you want to choose them yourself?",
-        "recommendation": "Say \"go\" so the build agent records each pick with its reason (quit confirm is already shipped as MAZER-FLOW-005); that unblocks MAZER-UI-010, UI-015, VIS-011 and VIS-012."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 530,
+            "mergedSha": "9a5d0924f54c1f245e9542996e1bbb8e76621a31"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
       },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": []
     },
     "MAZER-MOTION-001": {
-      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 441, "mergedSha": "975e4ff2"}], "deployedBuild": "24e15cc1", "headless": true, "deviceChecked": false},
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 441,
+            "mergedSha": "975e4ff2"
+          }
+        ],
+        "deployedBuild": "24e15cc1",
+        "headless": false,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
-      "filesHint": ["src/theme/tokens.ts","src/scenes/MenuScene.ts"],
-      "note": "Merged and deployed at main 24e15cc1 with no visible change. Criterion 3 (dead motion code) is not done and is carried by MAZER-MOTION-007; the scene constants move in MAZER-MOTION-006."
+      "filesHint": [
+        "src/theme/tokens.ts",
+        "src/scenes/MenuScene.ts"
+      ]
     },
     "MAZER-MOTION-002": {
       "evidence": {
@@ -504,13 +530,7 @@
         "headless": true,
         "deviceChecked": false
       },
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "PR #425 is merged and live. Under reduced motion the dock travelling band and the touch-stick anchor orbit are held still, which is a judgement call; the shared crossfade length is carried by MAZER-MOTION-005.",
-        "unblockedBy": "Zac",
-        "ask": "Under Reduce Motion, keep the dock travelling band and the touch-stick anchor orbit held still, or let either one move?",
-        "recommendation": "Keep both held still; colour still shifts, so the dock and stick stay lively without movement."
-      },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": [],
@@ -631,14 +651,18 @@
       "filesHint": []
     },
     "MAZER-PROG-006": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "On a 390 phone at level 99 the tile is about 6.5 px, so the player and goal are tiny.",
-        "unblockedBy": "Zac",
-        "ask": "Should the game set a minimum tile size for very large boards, or explicitly defer zoom?",
-        "recommendation": "Defer explicitly and record it, since board size and zoom are frozen."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 530,
+            "mergedSha": "9a5d0924f54c1f245e9542996e1bbb8e76621a31"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
       },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": []
@@ -659,11 +683,11 @@
     "MAZER-PROG-008": {
       "evidence": null,
       "blocker": {
-        "kind": "dependency",
-        "summary": "Feature gating by level and the content-band manifest wait on the hazard and economy decisions.",
-        "unblockedBy": "other-card",
-        "ask": "Nothing to answer yet: decide MAZER-HAZ-002 and MAZER-ECON-001 first.",
-        "recommendation": "Leave it blocked until both are decided."
+        "ask": "Waits on MAZER-HAZ-002 and MAZER-ECON-001.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Feature gating by level waits on the hazard and economy decisions.",
+        "unblockedBy": "other-card"
       },
       "verify": [],
       "lane": "owner-only",
@@ -815,21 +839,14 @@
         "headless": false,
         "deviceChecked": null
       },
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "The Phase Status table landed (PR #472): only the player movement phase is live and six other phases are deferred pending MAZER-HAZ-002; whether hazards and enemies are activated is the owner decision.",
-        "unblockedBy": "Zac",
-        "ask": "Will hazards and enemies be activated, and must they run through the turn host?",
-        "recommendation": "Auditor recommendation: defer all non-player phases explicitly until hazards have a shipped product contract, then mark the card completed with a caveat once a deferral table lands."
-      },
+      "blocker": null,
       "verify": [],
       "lane": "long-running",
       "filesHint": [
         "docs/architecture/MAZER-WORLD-TURN-CONTRACT.md",
         "tests/architecture/world-turn-contract.test.ts",
         "src/mazer-core/world/WorldTurnHost.ts"
-      ],
-      "note": "PR #472 merged: phase status table, test-pinned. Completion waits on the owner decision."
+      ]
     },
     "MAZER-HAZ-008": {
       "evidence": null,
@@ -880,14 +897,18 @@
       "filesHint": []
     },
     "MAZER-FLOW-006": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "Quitting or reloading today discards the attempt, so the next Start is a free re-roll.",
-        "unblockedBy": "Zac",
-        "ask": "When a player quits or reloads mid-level, should the same maze resume or should the next Start roll a new maze?",
-        "recommendation": "Resume the same maze so quitting is not a free re-roll (needs seed plumbing)."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 530,
+            "mergedSha": "9a5d0924f54c1f245e9542996e1bbb8e76621a31"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
       },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": []
@@ -921,14 +942,18 @@
       "filesHint": []
     },
     "MAZER-FLOW-011": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "After a goal input is locked about 2.5 s; an earlier unlock touches the timer, pacing and AI scoring.",
-        "unblockedBy": "Zac",
-        "ask": "When should input unlock after reaching the goal: as now (about 2.5 s), at 75 percent of the reveal, or when the beams land plus a margin?",
-        "recommendation": "Keep the current unlock: you twice said build and deconstruct felt too fast."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 530,
+            "mergedSha": "9a5d0924f54c1f245e9542996e1bbb8e76621a31"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
       },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": []
@@ -948,21 +973,31 @@
       "filesHint": []
     },
     "MAZER-AUDIO-001": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "There is no audio anywhere in the game and no sound setting.",
-        "unblockedBy": "Zac",
-        "ask": "Should Mazer have sound at all, and should it default to on or off?",
-        "recommendation": "Allow small synthesized effects behind a Settings toggle, default off."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 530,
+            "mergedSha": "9a5d0924f54c1f245e9542996e1bbb8e76621a31"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
       },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": []
     },
     "MAZER-AUDIO-002": {
       "evidence": null,
-      "blocker": null,
+      "blocker": {
+        "ask": "Waits on MAZER-AUDIO-003.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Music waits for the sound toggle to exist.",
+        "unblockedBy": "other-card"
+      },
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": []
@@ -989,14 +1024,22 @@
       "filesHint": []
     },
     "MAZER-ACCT-002": {
-      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 280},{"repo": "fawxzzy/mazer", "number": 281}], "headless": false, "deviceChecked": false},
-      "blocker": {
-        "kind": "provider",
-        "summary": "The client PR #281 conflicts with main and must not ship until the matching provider-side username hook is live and proven.",
-        "unblockedBy": "provider",
-        "ask": "Confirm the provider-side sign-up username hook is live and proven; then PR #281 is rebased and finished.",
-        "recommendation": "Do not ship #281 before the hook is proven live."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 280,
+            "mergedSha": "cc90f4cb"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 281
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
       },
+      "blocker": null,
       "verify": [],
       "lane": "long-running",
       "filesHint": []
@@ -1017,11 +1060,11 @@
     "MAZER-ACCT-004": {
       "evidence": null,
       "blocker": {
-        "kind": "provider",
-        "summary": "A reset counter on the server needs an approved database change; held since 2026-11-06.",
-        "unblockedBy": "Zac",
-        "ask": "Approve a database change that adds a reset counter, or accept the residual risk for version one?",
-        "recommendation": "Accept the residual risk for version one and keep this on hold."
+        "ask": "Say if the reset counter should be built after version one.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Version one accepts the residual cross-device reset risk.",
+        "unblockedBy": "Zac"
       },
       "verify": [],
       "lane": "owner-only",
@@ -1072,15 +1115,13 @@
         "headless": false,
         "deviceChecked": false
       },
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "Proof fixtures landed (PR #476); the owner contract signing, a device airplane-mode test and the provider-gated server parts are open.",
-        "unblockedBy": "Zac",
-        "ask": "Sign or amend the offline sync contract, and run the airplane-mode check on a phone.",
-        "recommendation": "Sign the contract as written for the client part; keep server parts blocked until approved."
-      },
+      "blocker": null,
       "verify": [
-        {"step":"Play a level with airplane mode on, then turn the network back on and wait.","where":"phone","expected":"Progress is kept and flushes once the network returns, with no duplicate or lost completion."}
+        {
+          "step": "Play a level with airplane mode on, then turn the network back on and wait.",
+          "where": "phone",
+          "expected": "Progress is kept and flushes once the network returns, with no duplicate or lost completion."
+        }
       ],
       "lane": "owner-only",
       "filesHint": [
@@ -1122,13 +1163,7 @@
         "deviceChecked": false,
         "deployedBuild": "fawxzzy-mazer-1n3xcc1qg"
       },
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "The install gate blocks boot in some install modes without a skip, which clashes with enforcing access by entitlement.",
-        "unblockedBy": "Zac",
-        "ask": "Should the install gate stay mandatory in install modes where it blocks boot, given access is meant to be enforced by entitlement?",
-        "recommendation": "Keep the gate as shipped until entitlements exist (MAZER-ECON-003), then revisit."
-      },
+      "blocker": null,
       "verify": [
         {
           "step": "Install Mazer on the phone, open it once online, turn on airplane mode, force-close the app and open it again.",
@@ -1233,15 +1268,13 @@
         "headless": false,
         "deviceChecked": false
       },
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "The viewport matrix and presets landed (PR #480); the layout persistence criterion has no state to persist.",
-        "unblockedBy": "Zac",
-        "ask": "With Board Zoom removed and the board size frozen, is any layout persistence still wanted, or should that criterion be dropped?",
-        "recommendation": "Auditor recommendation: drop the persistence criterion; keep the viewport matrix and the device check."
-      },
+      "blocker": null,
       "verify": [
-        {"step":"On the iPhone installed app: open the menu, rotate portrait to landscape and back mid-play, and open Settings and Guide in each orientation.","where":"installed-app","expected":"Play pauses on the flip and refits, no clipped panels or purple bars, tap targets reachable, state intact after rotating back."}
+        {
+          "step": "On the iPhone installed app: open the menu, rotate portrait to landscape and back mid-play, and open Settings and Guide in each orientation.",
+          "where": "installed-app",
+          "expected": "Play pauses on the flip and refits, no clipped panels or purple bars, tap targets reachable, state intact after rotating back."
+        }
       ],
       "lane": "long-running",
       "filesHint": [
@@ -1272,12 +1305,21 @@
       "filesHint": []
     },
     "MAZER-GOV-004": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 434,
+            "mergedSha": "db582456"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
-      "filesHint": [],
-      "note": "Mazer PR #434 and FawxzzyWeb PR #119 (the previous refresh) are merged and the card text now says so; left in review for the owner to close."
+      "filesHint": []
     },
     "MAZER-GOV-005": {
       "evidence": {
@@ -1294,16 +1336,24 @@
       "blocker": null,
       "verify": [],
       "lane": "long-running",
-      "filesHint": [],
-      "note": "PR #474 merged (docs and template). Governance, no device surface."
+      "filesHint": []
     },
     "MAZER-DOCS-001": {
-      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 405}], "headless": false, "deviceChecked": null},
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 405,
+            "mergedSha": "ccb59428"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
-      "filesHint": [],
-      "note": "Docs only, merged; open unknowns remain in the note and it is not reconciled with the Cyberdeck card."
+      "filesHint": []
     },
     "MAZER-AI-001": {
       "evidence": {
@@ -1317,25 +1367,24 @@
         "headless": false,
         "deviceChecked": null
       },
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "Thresholds and checker landed (PR #479) with no baseline drift; remote run retention is not built.",
-        "unblockedBy": "Zac",
-        "ask": "Drop remote run retention, or approve it as a separate provider-side step?",
-        "recommendation": "Drop it: the seed-pack runner is enough."
-      },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": [
         "scripts/analysis/ai-runner-calibration.ts",
         "scripts/analysis/lib/ai-run-seed-pack-runner.ts",
         "tests/fixtures/ai-run-seed-packs/baselines"
-      ],
-      "note": "PR #479 merged. Open only the retention decision."
+      ]
     },
     "MAZER-AI-002": {
       "evidence": null,
-      "blocker": null,
+      "blocker": {
+        "ask": "Waits on MAZER-ECON-001.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Waits on the economy contract.",
+        "unblockedBy": "other-card"
+      },
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": []
@@ -1363,11 +1412,11 @@
     "MAZER-RUN-003": {
       "evidence": null,
       "blocker": {
-        "kind": "provider",
-        "summary": "Leaderboard admission is server-side (provider change); the achievement rule is an owner decision.",
-        "unblockedBy": "provider",
-        "ask": "Decide the achievement quality rule; leaderboard admission needs a provider change.",
-        "recommendation": "Leave blocked: low priority and the leaderboard side is provider-gated."
+        "ask": "Say if run quality should gate entries later.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Leaderboard admission is a provider-side change and the priority is low.",
+        "unblockedBy": "Zac"
       },
       "verify": [],
       "lane": "owner-only",
@@ -1375,20 +1424,31 @@
     },
     "MAZER-RUN-004": {
       "evidence": null,
-      "blocker": null,
+      "blocker": {
+        "ask": "Say if the run status panel is wanted.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Wiring touches the contended menu scene; low priority.",
+        "unblockedBy": "Zac"
+      },
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": ["src/legacy-runtime/legacyRunStatusViewModel.ts","src/scenes/MenuScene.ts","src/legacy-runtime/legacyUiStandards.ts","tests/reset/legacy-run-status-view-model.test.ts"],
+      "filesHint": [
+        "src/legacy-runtime/legacyRunStatusViewModel.ts",
+        "src/scenes/MenuScene.ts",
+        "src/legacy-runtime/legacyUiStandards.ts",
+        "tests/reset/legacy-run-status-view-model.test.ts"
+      ],
       "note": "Auditor recommendation, not a status change: planning, low priority. Only the pure view model exists and no scene uses it; wiring it touches the menu scene file, which contends with MAZER-UI-019. After wiring, compare the menu and in-play panels on a phone."
     },
     "MAZER-ECON-001": {
       "evidence": null,
       "blocker": {
-        "kind": "owner-decision",
-        "summary": "The draft contract for coins, shop and random items is unsigned; most not-started economy cards depend on it.",
-        "unblockedBy": "Zac",
-        "ask": "Sign or reject the shop and random-item economy draft contract?",
-        "recommendation": "Defer signing until the hazard contract is settled; no Phase 1 work depends on it."
+        "ask": "Waits on MAZER-HAZ-002.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Economy signing waits until the hazard contract is settled.",
+        "unblockedBy": "other-card"
       },
       "verify": [],
       "lane": "owner-only",
@@ -1397,11 +1457,11 @@
     "MAZER-ECON-002": {
       "evidence": null,
       "blocker": {
-        "kind": "dependency",
+        "ask": "Waits on MAZER-ECON-001.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
         "summary": "No coin or inventory code exists; waits on the economy contract.",
-        "unblockedBy": "other-card",
-        "ask": "Waits on the MAZER-ECON-001 sign-off.",
-        "recommendation": "Leave blocked until MAZER-ECON-001 is decided."
+        "unblockedBy": "other-card"
       },
       "verify": [],
       "lane": "owner-only",
@@ -1410,11 +1470,11 @@
     "MAZER-ECON-003": {
       "evidence": null,
       "blocker": {
-        "kind": "dependency",
-        "summary": "Needs the economy contract plus provider and policy decisions; no checkout library is installed.",
-        "unblockedBy": "other-card",
-        "ask": "Waits on the MAZER-ECON-001 sign-off.",
-        "recommendation": "Leave blocked until MAZER-ECON-001 is decided."
+        "ask": "Waits on MAZER-ECON-001.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Entitlements and checkout need the economy contract and policy decisions.",
+        "unblockedBy": "other-card"
       },
       "verify": [],
       "lane": "owner-only",
@@ -1488,11 +1548,11 @@
     "MAZER-CHAL-001": {
       "evidence": null,
       "blocker": {
-        "kind": "owner-decision",
-        "summary": "The server seed and leaderboard parts would need a provider change.",
-        "unblockedBy": "Zac",
-        "ask": "Do you want shared-seed daily and weekly challenges, and at what cadence?",
-        "recommendation": "Park until the economy and hazard contracts are settled."
+        "ask": "Waits on MAZER-ECON-001 and MAZER-HAZ-002.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Shared seed challenges need a provider change and the contracts first.",
+        "unblockedBy": "other-card"
       },
       "verify": [],
       "lane": "owner-only",
@@ -1665,21 +1725,23 @@
         "prs": [
           {
             "repo": "fawxzzy/mazer",
-            "number": 485
+            "number": 485,
+            "mergedSha": "8f72a4df"
           },
           {
             "repo": "fawxzzy/mazer",
-            "number": 486
+            "number": 486,
+            "mergedSha": "e1e70709"
           }
         ],
-        "headless": false,
-        "deviceChecked": false
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-dq6f32ysl"
       },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": [],
-      "note": "PR #485 and #486 open for review, not merged."
+      "filesHint": []
     },
     "MAZER-ACCT-013": {
       "evidence": null,
@@ -1778,25 +1840,29 @@
     "MAZER-ACCT-016": {
       "evidence": null,
       "blocker": {
-        "kind": "owner-decision",
-        "summary": "The Galaxy S21 sign-in failure has no confirmed cause; the answers decide which candidate is real.",
-        "unblockedBy": "Zac",
-        "ask": "Please ask her: (1) Did she open Mazer from the home-screen icon, and was it Chrome she installed it from? (2) Where did she see the words about a session: the Create Account form or inside the game, and as close to word for word as possible? (3) Did a browser or address bar appear on top of the app? (4) Did she use a username or the account address, and try several times in a row (the username limit is 15 minutes)? (5) Roughly what time did she try, before or after the sign-in fixes at about midday on 2026-11-11?",
-        "recommendation": "Relay her answers on this card; do not guess a cause before then."
+        "ask": "Reopen if the player reports it again.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "All candidate causes were fixed or replaced since the report.",
+        "unblockedBy": "Zac"
       },
       "verify": [],
       "lane": "owner-only",
       "filesHint": []
     },
     "MAZER-UI-021": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "Remote sync is deliberately silent today, so showing sync failures changes that stance.",
-        "unblockedBy": "Zac",
-        "ask": "Which of auth, sync, username and boot errors should appear in the message toast?",
-        "recommendation": "Keep remote sync silent, show boot errors on the splash, and toast only the service-worker warning that the offline cache could not update."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 530,
+            "mergedSha": "9a5d0924f54c1f245e9542996e1bbb8e76621a31"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
       },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": []
@@ -1900,7 +1966,7 @@
           }
         ],
         "deployedBuild": "476c4789",
-        "headless": true,
+        "headless": false,
         "deviceChecked": null
       },
       "blocker": null,
@@ -1910,8 +1976,7 @@
         "src/render/playerMarker.ts",
         "src/scenes/menuRuntimeDiagnostics.ts",
         "tests/scenes/menu-runtime-diagnostics.test.ts"
-      ],
-      "note": "Merged and deployed (PR #458); diagnostics only, kept in review with MAZER-VIS-023 and 025."
+      ]
     },
     "MAZER-VIS-025": {
       "evidence": {
@@ -1949,18 +2014,21 @@
       "note": "Merged and deployed (PR #458); kept in review until a phone check."
     },
     "MAZER-VIS-026": {
-      "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "The ring is now tile-sized: on 8 px tiles it is a thin ring that shows only from 2x displays, and the find-me ping finds the player.",
-        "unblockedBy": "Zac",
-        "ask": "On dense boards, accept the thin player ring, or add a screen-pixel floor on the glow only?",
-        "recommendation": "Accept: the ring now matches the end tiles and the find-me ping still finds the player. The alternative is a screen-pixel floor on the glow only."
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 530,
+            "mergedSha": "9a5d0924f54c1f245e9542996e1bbb8e76621a31"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
       },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
-      "filesHint": [],
-      "note": "At 8 px tiles the old ring was 22 px across; nothing is broken, it is a look decision."
+      "filesHint": []
     },
     "MAZER-VIS-027": {
       "evidence": {
@@ -1972,7 +2040,7 @@
           }
         ],
         "deployedBuild": "62f36472",
-        "headless": true,
+        "headless": false,
         "deviceChecked": null
       },
       "blocker": null,
@@ -1981,8 +2049,7 @@
       "filesHint": [
         "src/legacy-runtime/legacyMenuBackdrop.ts",
         "tests/reset/legacy-menu-backdrop.test.ts"
-      ],
-      "note": "PR #477 merged and deployed (62f36472). Deleted unused code, no visible change."
+      ]
     },
     "MAZER-GOV-007": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 440, "mergedSha": "6d5532f7"}], "deployedBuild": "24e15cc1", "headless": false, "deviceChecked": null},
@@ -2042,7 +2109,7 @@
           }
         ],
         "deployedBuild": "62f36472",
-        "headless": true,
+        "headless": false,
         "deviceChecked": null
       },
       "blocker": null,
@@ -2052,18 +2119,11 @@
         "src/scenes/MenuScene.ts",
         "src/render/motionScale.ts",
         "src/theme/tokens.ts"
-      ],
-      "note": "PR #471 merged and deployed (62f36472). No visible change by design."
+      ]
     },
     "MAZER-MOTION-007": {
       "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "Some loops and durations are off the motion scale and some motion code is dead; each move changes how something looks.",
-        "unblockedBy": "Zac",
-        "ask": "Decide which off-scale loops and durations move onto the motion scale and which stay as they are.",
-        "recommendation": "Decide value by value with before and after captures; anything you do not name stays unchanged. Then sweep the dead motion code."
-      },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": [],
@@ -2260,7 +2320,7 @@
           }
         ],
         "deployedBuild": "62f36472",
-        "headless": true,
+        "headless": false,
         "deviceChecked": null
       },
       "blocker": null,
@@ -2268,8 +2328,7 @@
       "lane": "agent-buildable",
       "filesHint": [
         "src/scenes/menuRuntimeDiagnostics.ts"
-      ],
-      "note": "PR #469 and #473 merged and deployed (62f36472). Diagnostics only, no device surface."
+      ]
     },
     "MAZER-PERF-003": {
       "evidence": {
@@ -2338,11 +2397,11 @@
         "deviceChecked": false
       },
       "blocker": {
-        "kind": "owner-decision",
-        "summary": "Draft PR #461 (head 476e5cf2, CI not started, not merged) cuts walking frame cost about 1.3 to 2 times but cannot keep pixel parity: trail colour, sheen and breath would step every 250 ms to 1 s on long routes.",
-        "unblockedBy": "Zac",
-        "ask": "After a phone check, choose: A ship as is; B cap cache epochs at 500 ms; C keep the smooth colour and accept the lag; D staggered per-chunk recolour or an OffscreenCanvas worker.",
-        "recommendation": "Close draft PR #461: the owner reports no more lag; revisit only if lag returns (option D stays the follow-up)."
+        "ask": "Say if lag returns.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "The owner reports no more lag; the draft cache change cannot keep pixel parity.",
+        "unblockedBy": "Zac"
       },
       "verify": [],
       "lane": "owner-only",
@@ -2360,7 +2419,13 @@
         "headless": true,
         "deviceChecked": false
       },
-      "blocker": null,
+      "blocker": {
+        "ask": "Reopen only if lag returns.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "No lag now; the change would alter pixels.",
+        "unblockedBy": "Zac"
+      },
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": [],
@@ -2369,11 +2434,11 @@
     "MAZER-PERF-006": {
       "evidence": null,
       "blocker": {
-        "kind": "owner-decision",
-        "summary": "A lower backing resolution could soften the trail on 3x phones.",
-        "unblockedBy": "Zac",
-        "ask": "Review the trail pixels on your 3x phone once the cap is built and approve or reject it.",
-        "recommendation": "Build it behind the cap and look at one level before deciding."
+        "ask": "Reopen only if lag returns.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "No lag now; the cap would soften the trail.",
+        "unblockedBy": "Zac"
       },
       "verify": [],
       "lane": "owner-only",
@@ -2480,7 +2545,7 @@
           }
         ],
         "deployedBuild": "62f36472",
-        "headless": true,
+        "headless": false,
         "deviceChecked": null
       },
       "blocker": null,
@@ -2488,8 +2553,7 @@
       "lane": "agent-buildable",
       "filesHint": [
         "src/theme/tokens.ts"
-      ],
-      "note": "PR #475 merged and deployed (62f36472). Same 200 ms value, no visible change expected."
+      ]
     },
     "MAZER-PROG-017": {
       "evidence": {
@@ -2501,14 +2565,13 @@
           }
         ],
         "deployedBuild": "62f36472",
-        "headless": true,
+        "headless": false,
         "deviceChecked": null
       },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": [],
-      "note": "PR #469 merged and deployed (62f36472). Test only, no device surface."
+      "filesHint": []
     },
     "MAZER-ACCT-023": {
       "evidence": {
@@ -2639,13 +2702,7 @@
         "headless": false,
         "deviceChecked": false
       },
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "A plain taken-username message tells a visitor that the name exists.",
-        "unblockedBy": "Zac",
-        "ask": "Is it acceptable for the account site and Fitness to say a username is taken?",
-        "recommendation": "Yes for sign-up, since the leaderboard already shows names; keep the generic error vague."
-      },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": [],
@@ -2660,13 +2717,7 @@
     },
     "MAZER-ACCT-031": {
       "evidence": null,
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "Showing a code is a copy and privacy choice.",
-        "unblockedBy": "Zac",
-        "ask": "Pick where a short failure code may be shown to a player.",
-        "recommendation": "A small line under the failure message with the short code only."
-      },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": []
@@ -2724,23 +2775,32 @@
     "MAZER-ACCT-034": {
       "evidence": null,
       "blocker": {
-        "kind": "owner-decision",
-        "summary": "Backfilling overwrites display names players may have chosen on purpose.",
-        "unblockedBy": "Zac",
-        "ask": "Run the optional display name backfill, or leave the old values?",
-        "recommendation": "Do not run it."
+        "ask": "Say if the backfill should ever run.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "The backfill overwrites names players may have chosen on purpose.",
+        "unblockedBy": "Zac"
       },
       "verify": [],
       "lane": "owner-only",
       "filesHint": []
     },
     "MAZER-PROG-018": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 491,
+            "mergedSha": "6b944ca4"
+          }
+        ],
+        "headless": false,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": [],
-      "note": "Worker running; no PR yet."
+      "filesHint": []
     },
     "MAZER-GEN-006": {
       "evidence": {
@@ -2755,13 +2815,7 @@
         "headless": true,
         "deviceChecked": false
       },
-      "blocker": {
-        "kind": "device",
-        "summary": "PR #464 is merged and deployed (951ef3cf) and checked in headless Chromium and tests only; nothing is checked on a real phone, and the shorter rising ladder (ends at level 218, was 268) needs the owner judgement.",
-        "unblockedBy": "Zac",
-        "ask": "On your phone, open previewLevel=150, 218 and 300 and look at the board: no single-cell nubs hanging off corridors, every dead-end spur at least two tiles, the maze solves normally. Then say whether the shorter rising ladder and lower late difficulty feel acceptable.",
-        "recommendation": "Accept the minimum of 2 and the ladder ending at level 218; let the hazard layer (MAZER-HAZ-002) supply difficulty past it."
-      },
+      "blocker": null,
       "verify": [
         {
           "step": "Open previewLevel=150 and look at the board.",
@@ -2810,14 +2864,13 @@
           }
         ],
         "deployedBuild": "62f36472",
-        "headless": true,
-        "deviceChecked": false
+        "headless": false,
+        "deviceChecked": null
       },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": [],
-      "note": "PR #469 merged and deployed (62f36472). The ladder end may move to 288 if PR #484 lands."
+      "filesHint": []
     },
     "MAZER-PROG-019": {
       "evidence": null,
@@ -3086,8 +3139,8 @@
             "mergedSha": "28e67ee0"
           }
         ],
-        "headless": true,
-        "deviceChecked": false,
+        "headless": false,
+        "deviceChecked": null,
         "deployedBuild": "fawxzzy-mazer-o9hufd7kf"
       },
       "blocker": null,
@@ -3128,8 +3181,8 @@
             "mergedSha": "22b97c23"
           }
         ],
-        "headless": true,
-        "deviceChecked": false,
+        "headless": false,
+        "deviceChecked": null,
         "deployedBuild": "fawxzzy-mazer-1n3xcc1qg"
       },
       "blocker": null,
@@ -3422,6 +3475,61 @@
     "MAZER-VIS-042": {
       "evidence": null,
       "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-027": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-028": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-029": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-016": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-AUDIO-003": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-030": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-031": {
+      "evidence": null,
+      "blocker": {
+        "ask": "Reopen if the phone pass shows a hitch.",
+        "kind": "deferred-by-owner",
+        "recommendation": "Leave deferred.",
+        "summary": "Conditional on a phone hitch.",
+        "unblockedBy": "device"
+      },
       "verify": [],
       "lane": null,
       "filesHint": []
