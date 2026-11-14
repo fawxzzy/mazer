@@ -211,3 +211,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: a tap anywhere on the front door started a run or opened Login; only the wordmark and its margin should.
 - Rule: tap tests inside and outside the zone live in `tests/legacy-runtime/legacy-front-door-hit-zone.test.ts`. Button chrome is not yet drawn from the kit (`chromeViaKit` is false for all); surfaces migrate one per PR.
 - Status: Applied (review)
+
+
+## 2026-11-14 - Touch-first level 1 control hint that follows the input actually used
+- WHAT changed: `legacyControlHint.ts` now holds a pure resolver (`resolveLegacyControlHintInput`): touch is the default, a computer-looking device (fine pointer plus hover, not mobile, not standalone) starts with a neutral line, and the last real input (pointerType on pointerdown, trusted keydown) switches the visible copy between touch, mouse and keys wording (instant text swap, only while visible, never re-shows after the ack). Copy is two short lines (how to move, then the goal). The Guide Move row and the accessibility description were reworded touch-first with the keyboard as a secondary mention.
+- WHY it changed: the game is played on touch screens, and computers can drag too; the old copy was picked by a single coarse-pointer check and said arrow keys on devices that misreported.
+- Rule: copy is chosen from observed input, not a device guess; the device guess only seeds the first frame.
+- Status: Applied

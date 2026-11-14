@@ -12,6 +12,10 @@ import {
   isLegacyControlHintMoveKey,
   resolveLegacyControlHintCopy,
   resolveLegacyControlHintFadeMs,
+  resolveLegacyControlHintInput,
+  classifyLegacyControlHintPointer,
+  type LegacyControlHintDeviceFacts,
+  type LegacyControlHintObservedInput,
   shouldShowLegacyControlHint,
   type LegacyControlHintFacts
 } from '../legacy-runtime/legacyControlHint.ts';
@@ -60,6 +64,36 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
   let shownAt = 0;
   let dragStart: { x: number; y: number } | null = null;
   let done = store.isAcknowledged(LEGACY_CONTROL_HINT_TOKEN);
+  let lastInput: LegacyControlHintObservedInput | null = null;
+
+  const media = (query: string): boolean => {
+    try { return win.matchMedia?.(query).matches === true; } catch { return false; }
+  };
+  const readDevice = (): LegacyControlHintDeviceFacts => {
+    const nav = win.navigator as Navigator & { standalone?: boolean };
+    return {
+      coarsePointer: media('(pointer: coarse)'),
+      finePointer: media('(pointer: fine)'),
+      hoverCapable: media('(hover: hover)'),
+      maxTouchPoints: nav.maxTouchPoints,
+      standalone: media('(display-mode: standalone)') || nav.standalone === true,
+      userAgent: nav.userAgent,
+      lastInput
+    };
+  };
+  const currentCopy = (): string => resolveLegacyControlHintCopy(resolveLegacyControlHintInput(readDevice()));
+  /** Instant text swap (never animated, so Reduce Motion needs no special case); only while the line is visible. */
+  const refreshCopy = (): void => {
+    if (el === null) return;
+    const copy = currentCopy();
+    if (el.textContent !== copy) el.textContent = copy;
+  };
+  const noteInput = (kind: LegacyControlHintObservedInput | null): void => {
+    if (kind === null || kind === lastInput) return;
+    lastInput = kind;
+    refreshCopy();
+  };
+
 
   const scene = (): SceneView | null => (game.scene.getScene('MenuScene') as SceneView | null) ?? null;
   const reduced = (): boolean => {
@@ -86,12 +120,12 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
   const show = (): void => {
     const node = doc.createElement('div');
     node.id = LEGACY_CONTROL_HINT_ELEMENT_ID;
-    node.textContent = resolveLegacyControlHintCopy(win.matchMedia?.('(pointer: coarse)').matches === true);
+    node.textContent = currentCopy();
     node.setAttribute('aria-hidden', 'true');
     Object.assign(node.style, {
       position: 'fixed', left: '50%', transform: 'translateX(-50%)',
       bottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
-      maxWidth: 'calc(100vw - 32px)', padding: '6px 12px', whiteSpace: 'nowrap', borderRadius: '999px',
+      width: 'max-content', maxWidth: 'calc(100vw - 32px)', padding: '6px 14px', whiteSpace: 'pre-line', borderRadius: '16px',
       background: 'rgba(8, 12, 28, 0.82)', border: '1px solid rgba(183, 242, 255, 0.45)',
       color: 'rgb(232, 251, 255)', font: '600 13px/1.3 system-ui, sans-serif', textAlign: 'center',
       pointerEvents: 'none', userSelect: 'none', zIndex: '5', opacity: '0'
@@ -105,9 +139,13 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
   };
 
   const onKey = (event: KeyboardEvent): void => {
+    if (event.isTrusted && event.key.length > 0 && event.key !== 'Unidentified') noteInput('keys');
     if (el !== null && isLegacyControlHintMoveKey(event.key)) hide(true);
   };
-  const onDown = (event: PointerEvent): void => { dragStart = { x: event.clientX, y: event.clientY }; };
+  const onDown = (event: PointerEvent): void => {
+    noteInput(classifyLegacyControlHintPointer(event.pointerType));
+    dragStart = { x: event.clientX, y: event.clientY };
+  };
   const onMove = (event: PointerEvent): void => {
     if (el === null || dragStart === null) return;
     if (isLegacyControlHintDrag(event.clientX - dragStart.x, event.clientY - dragStart.y)) hide(true);
