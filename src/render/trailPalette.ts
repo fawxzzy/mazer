@@ -60,6 +60,25 @@ export const IRIDESCENT_TRAIL_GLOW_STOPS = Object.freeze([
   0xff8a3d
 ] as const);
 
+// Navigation Core v1's own ENERGY palette (read directly out of the frozen
+// reference's embedded generator, docs/assets/reference/navigation-core-v1/
+// mazer-navigation-core-v1-approved.html: `ENERGY = [...]`) -- cyan, blue,
+// violet, magenta dominant; red, orange, yellow brief accents; green a
+// transition tone, exactly as the visual contract describes, and in this
+// exact cyclic order. Never the old LEGACY_IRIDESCENT_MIDNIGHT_STOPS
+// palette, which doesn't match this contract (different hues, no true
+// cool/warm weighting).
+export const NAVIGATION_CORE_TRAIL_ENERGY_STOPS = [
+  0x00d4ff,
+  0x2f8bff,
+  0x8b3ff0,
+  0xe030c0,
+  0xff3d5c,
+  0xff8a2f,
+  0xffd23d,
+  0x3de07a
+] as const;
+
 /** One full sweep (stop 0 out to the last stop and back) spans this many tiles of trail. */
 export const IRIDESCENT_TRAIL_TILES_PER_SWEEP = 8;
 /** ...and one full sweep drifts past a fixed point on the trail in this many ms. */

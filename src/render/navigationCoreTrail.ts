@@ -1,5 +1,6 @@
 import type { LegacyPoint } from '../legacy-runtime/legacyMaze';
 import { resolveLegacyIridescentMidnightColor } from '../legacy-runtime/legacyIridescentMaterial';
+import { NAVIGATION_CORE_TRAIL_ENERGY_STOPS } from './trailPalette';
 
 // Pure geometry/color/shine math for Navigation Core v1's continuous player
 // trail (docs/assets/reference/navigation-core-v1/). Deliberately has no
@@ -326,24 +327,9 @@ export function resampleTrailVertices(vertices: readonly TrailVertex[], interval
   return result;
 }
 
-// Navigation Core v1's own ENERGY palette (read directly out of the frozen
-// reference's embedded generator, docs/assets/reference/navigation-core-v1/
-// mazer-navigation-core-v1-approved.html: `ENERGY = [...]`) -- cyan, blue,
-// violet, magenta dominant; red, orange, yellow brief accents; green a
-// transition tone, exactly as the visual contract describes, and in this
-// exact cyclic order. Never the old LEGACY_IRIDESCENT_MIDNIGHT_STOPS
-// palette, which doesn't match this contract (different hues, no true
-// cool/warm weighting).
-export const NAVIGATION_CORE_TRAIL_ENERGY_STOPS = [
-  0x00d4ff,
-  0x2f8bff,
-  0x8b3ff0,
-  0xe030c0,
-  0xff3d5c,
-  0xff8a2f,
-  0xffd23d,
-  0x3de07a
-] as const;
+// MAZER-UI-031: the Navigation Core v1 ENERGY palette now lives in trailPalette.ts (a colour-definition file);
+// re-exported here so existing importers keep working.
+export { NAVIGATION_CORE_TRAIL_ENERGY_STOPS };
 
 export interface TrailColorOptions {
   /** Path distance (px) representing one full trip around the palette cycle. */
