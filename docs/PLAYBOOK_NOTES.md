@@ -260,3 +260,5 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: MAZER-VIS-011 replaces three 1254 px HUD bitmaps (1.0 MB, three styles) with one scripted outline-icon atlas. `BootScene.ts` (Wave 4D-A) and `MenuScene.ts` (Wave 5C) cannot ship in one change set (the integrator-wave tests reject mixed waves), so the MenuScene half lands first and is a safe no-op; the BootScene and asset swap follows as part 2.
 - Rule: when a change needs files from two registered waves, split it so each PR is a no-op or a pure superset on the other side's current state, and say which half is which in both PRs.
 - Status: Applied (review); source proof only, nothing visual changes until part 2.
+
+- Board fold ordering (2026-11-14): scripts/board/board-events.mjs now applies a card's `new` event before its other events whatever the ts, and allows `new` with status completed when completedProblems passes. WHY: valid pending events were refused as tooling gaps (status sorted before new; no-runtime card created completed). Rule: events stay append-only, fix ordering in the fold. Status: Applied (review), source proof only.
