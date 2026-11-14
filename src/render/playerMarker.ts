@@ -242,6 +242,11 @@ export interface PlayerMarkerDrawInput {
   tileCornerRadii?: LocatorTileRadii | null;
   /** 0..1 share of the cap shape on those corners while gliding on or off the tile (playerRingMorph.ts); omitted = 1. */
   tileCornerBlend?: number;
+  /**
+   * Multiplier (0..1, default 1) on the core fill's alpha only: below 1 while the marker is over the goal star, so the
+   * star shows through the core (endpointMarkerLayering.ts). Ring, keyline and accent stroke are not touched.
+   */
+  coreAlphaScale?: number;
 }
 
 /**
@@ -277,7 +282,7 @@ export const drawPlayerMarker = (
   const top = frame.centerY - frame.coreHalfHeight;
   const width = frame.coreHalfWidth * 2;
   const height = frame.coreHalfHeight * 2;
-  g.fillStyle(input.coreColor, alpha);
+  g.fillStyle(input.coreColor, alpha * Math.max(0, Math.min(1, input.coreAlphaScale ?? 1)));
   g.fillRoundedRect(left, top, width, height, frame.coreCornerRadius);
   g.lineStyle(frame.accentStrokeCss, PLAYER_MARKER.accentColor, Math.min(PLAYER_MARKER.accentAlpha, alpha * PLAYER_MARKER.accentAlpha));
   g.strokeRoundedRect(left, top, width, height, frame.coreCornerRadius);

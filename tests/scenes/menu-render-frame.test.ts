@@ -2579,7 +2579,7 @@ describe('Chip wiring: start/goal markers, trail underlay, board layer', () => {
     expect(body).toContain("start: kind === 'start' ? point : undefined");
     expect(body).toContain("goal: kind === 'goal' ? point : undefined");
     // the start marker yields to the player standing on it
-    expect(body).toContain("kind === 'start' && this.player.x === point.x && this.player.y === point.y");
+    expect(body).toContain('shouldDrawEndpointMarker(kind, this.player.x === point.x && this.player.y === point.y)');
   });
 
   test('the board style flag defaults to Chip and reads ?tileStyle= through the shared resolver', () => {
@@ -2667,7 +2667,7 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
     'expireLegacyPlayerMessages', 'drawLegacyPlayerMessageToast', 'updateStars', 'advanceLegacyOverlayScrollMomentum',
     'holdLegacyPlayMazeLifecycleDuringPause', 'updateLegacyFlowFeedback', 'advanceLegacyMenuStaticDrawStage',
     'isLegacyMenuBuildPrerollActive', 'hasLegacyPlayTrailPulsePendingFrame',
-    'hasLegacyBleedOffGlowPendingFrame', 'hasLegacyPlayerVisualMotionPendingFrame', 'updateLegacyPlayerLocator',
+    'hasLegacyBleedOffGlowPendingFrame', 'hasGoalStarSpinPendingFrame', 'hasLegacyPlayerVisualMotionPendingFrame', 'updateLegacyPlayerLocator',
     'settleLegacyPlayerTransferEnergy', 'isLegacyMenuHandoffAnimationActive',
     'hasLegacyMenuTitleAnimationPendingFrame', 'drawBackdrop', 'drawStaticBoard',
     'drawBoardPaths', 'drawDynamicBoard', 'drawHud', 'rebuildUi',

@@ -334,8 +334,10 @@ describe('end (goal) marker', () => {
     expect(body).toContain('goalTile: endpointTiles.goal');
     expect(body).toContain('drawBoardMarkers(context, markerInput);');
     expect(body).not.toContain('endpointLayer');
-    // the goal glyph yields to the player standing on it (the keyline would otherwise poke out as dark spikes)
-    expect(body).toContain("kind === 'goal' && this.player.x === point.x && this.player.y === point.y");
+    // MAZER-VIS-041: the goal star no longer yields to the player standing on it (the player marker is painted over it);
+    // only the start does, through the shared rule (tests/render/endpointMarkerLayering.test.ts)
+    expect(body).toContain('shouldDrawEndpointMarker(kind, this.player.x === point.x && this.player.y === point.y)');
+    expect(body).not.toContain("kind === 'goal' && this.player.x === point.x && this.player.y === point.y");
     expect(body).not.toContain("drawBoardMarkers(underContext");
   });
 });
