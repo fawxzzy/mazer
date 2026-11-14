@@ -37,10 +37,6 @@
       "offToken": 1,
       "total": 1
     },
-    "src/legacy-runtime/legacyIridescentMaterial.ts": {
-      "offToken": 8,
-      "total": 8
-    },
     "src/legacy-runtime/legacyMenuBackdrop.ts": {
       "offToken": 16,
       "total": 21
@@ -56,10 +52,6 @@
     "src/proof-surfaces/styles.css": {
       "offToken": 9,
       "total": 9
-    },
-    "src/render/boardRenderer.ts": {
-      "offToken": 6,
-      "total": 6
     },
     "src/render/boardTileLayer.ts": {
       "offToken": 1,
@@ -147,9 +139,7 @@
     "src/visual-proof/trail/TrailRenderer.ts",
     "src/watch-pass-preview/styles.css",
     "src/watch-pass-setup/styles.css",
-    "src/render/boardRenderer.ts",
     "src/visual-proof/readability.ts",
-    "src/legacy-runtime/legacyIridescentMaterial.ts",
     "src/proof-surfaces/styles.css",
     "src/visual-proof/styles.css",
     "src/visual-proof/main.ts",
@@ -163,8 +153,8 @@
   ],
   "schemaVersion": 1,
   "totals": {
-    "files": 31,
-    "offToken": 280,
-    "total": 355
+    "files": 29,
+    "offToken": 266,
+    "total": 341
   }
 }

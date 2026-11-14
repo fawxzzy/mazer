@@ -3,7 +3,7 @@ import type { DemoBoardTelegraph, DemoTrailStep, DemoWalkerCue } from '../domain
 import type { MazeEpisode } from '../domain/maze';
 import { legacyTuning } from '../config/tuning';
 import { getNeighborIndex, isTileFloor, isTilePath, resolveDirectionBetween, xFromIndex, yFromIndex } from '../domain/maze';
-import { getRelativeLuminance, palette, resolveLocalBoardSupportColors, type LocalBoardContrastMode } from './palette';
+import { MIDNIGHT_RAINBOW_STOPS, getRelativeLuminance, palette, resolveLocalBoardSupportColors, type LocalBoardContrastMode } from './palette';
 import { resolveSceneViewport } from './viewport';
 import { MOTION_PHASER_EASE_SINE_IN_OUT } from './motionScale';
 
@@ -178,14 +178,7 @@ export const isPointInsideTileArrivalRegion = (
 
 const MIN_BOARD_SIZE = 24;
 const ANIMATION_TIME_WRAP_MS = 600_000;
-const MIDNIGHT_RAINBOW_STOPS = [
-  0x1e1238,
-  0x35206a,
-  0x6d2fb0,
-  0xb83f98,
-  0xf28d4c,
-  0x23b4ad
-] as const;
+
 const createEmptyTrailRenderDiagnostics = (): TrailRenderDiagnostics => ({
   cue: 'explore',
   trailStart: 0,

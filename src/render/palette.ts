@@ -835,3 +835,13 @@ export const applyPresentationContrastFloors = (input: PresentationPalette): Pre
 };
 
 export const palette: PresentationPalette = applyPresentationContrastFloors(basePalette);
+
+/** MAZER-UI-031 slice 2: the board midnight-rainbow ramp (moved verbatim from boardRenderer.ts). */
+export const MIDNIGHT_RAINBOW_STOPS = [
+  0x1e1238,
+  0x35206a,
+  0x6d2fb0,
+  0xb83f98,
+  0xf28d4c,
+  0x23b4ad
+] as const;
