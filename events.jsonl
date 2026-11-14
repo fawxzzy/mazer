@@ -154,3 +154,4 @@
 {"card":"MAZER-ACCT-016","id":"58b2f0fc86c9","status":"deferred_candidate","text":"Deferred: waiting on the family member's answers; nothing to build meanwhile.","ts":"2026-11-14T16:49:17Z","v":1}
 {"card":"MAZER-PWA-005","id":"5705e9a5d0cb","status":"deferred_candidate","text":"Deferred by owner call on 2026-11-14: parked until approved icon art with clean corners exists.","ts":"2026-11-14T16:49:22Z","v":1}
 {"card":"MAZER-VIS-031","id":"08ab0ce9d712","status":"deferred_candidate","text":"Deferred: only revisit if a phone shows a hitch at level change.","ts":"2026-11-14T16:49:26Z","v":1}
+{"card":"MAZER-ACCT-003","id":"beab8ce6a09c","status":"planning","text":"Owner phone pass, tracked in the single phone checklist; nothing to build.","ts":"2026-11-14T16:49:30Z","v":1}
