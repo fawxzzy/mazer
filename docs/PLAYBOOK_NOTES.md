@@ -243,6 +243,12 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Evidence: `tests/reset/ui-030-sw-cache-warning.test.ts`, `tests/reset/legacy-player-message-inventory.test.ts`, headless phone emulation (390x844, 360x740).
 - Status: Applied
 
+## 2026-11-14 - Off-theme colour ratchet baseline refresh
+- WHAT changed: regenerated `tests/fixtures/off-theme-color-baseline.json` with `MAZER_UPDATE_OFF_THEME_BASELINE=1`. Counts only went down (files 29 to 28, offToken 266 to 234, total 341 to 299 after merging main with UI-031 slice 2); `legacyMenuBackdrop.ts` left the list.
+- WHY it changed: about 32 stray literals had already left main without the baseline being lowered, so the ratchet allowed regressions up to the old numbers.
+- Rule: a PR that removes stray colours lowers the baseline in the same PR. If two baseline PRs are open, the second one regenerates after the first merges.
+- Status: Applied
+
 ## 2026-11-14 - MAZER-MOTION-011 overlay rise and stagger
 - WHAT changed: added `src/render/uiEntrance.ts` (pure plan: an 8 px rise, rows staggered inside a 60 ms budget, 200 ms crossfade with no movement under Reduce Motion) and `src/render/uiEntranceDriver.ts` (applies it to the live overlay objects each frame and restores them exactly at rest). `MenuScene.ts` gets a small hook: `begin` in `openOverlay` when the overlay kind changes, and a POST_UPDATE `applyUiEntrance` so every `rebuildUi` path has already run.
 - WHY it changed: overlays popped in with no rise or stagger. The hook runs after update on purpose: an in-update hook let freshly rebuilt objects render one frame at rest (a flash), found in a headless frame probe.
