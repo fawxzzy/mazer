@@ -231,6 +231,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 ## 2026-11-14 - MAZER-UI-031 slice 2 colour literals
 - WHAT changed: the board midnight-rainbow ramp moved from `boardRenderer.ts` to `palette.ts`; the legacy iridescent midnight stops, fallback pink and black moved from `legacyIridescentMaterial.ts` to `trailPalette.ts`; off-theme baseline lowered by exactly 14 (off-token 280 to 266, total 355 to 341).
 - WHY it changed: second slice of the stray-colour migration; values and order identical (pinned by `tests/render/ui-031-slice2-palette-values.test.ts`), no visible change.
+
+## 2026-11-14 - MAZER-ACCT-020/030 stored username limit (client half)
+- WHAT changed: new `src/legacy-runtime/legacyStoredUsername.ts` holds the 2-15 character pattern and `sanitizeStoredLegacyUsername`; `legacyAuth.ts` uses it so a username read from stored account metadata that breaks the limit never becomes canonicalUsername or the display name (display falls back to the email local part). No stored name is rewritten or shortened.
+- WHY it changed: the client trusted `user_metadata.username` as read, so an over-limit name stored before the database check existed was still shown and used. The database constraint and the existing over-limit names are account-site/database scope and are reported to the owner, not changed here.
+- Evidence: `tests/reset/legacy-stored-username.test.ts`, `legacy-auth.test.ts`, `legacy-leaderboard-username-editor.test.ts`.
 - Status: Applied
 
 ## 2026-11-14 - MAZER-MOTION-011 overlay rise and stagger
