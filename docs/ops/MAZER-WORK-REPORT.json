@@ -3,16 +3,16 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-14T06:34:01.000Z",
+    "registryUpdatedAt": "2026-11-14T06:37:59.000Z",
     "boardSync": {
-      "at": "2026-11-14T06:34:01.000Z",
-      "appliedEventCount": 59,
-      "lastEventId": "fb270896761c"
+      "at": "2026-11-14T06:37:59.000Z",
+      "appliedEventCount": 60,
+      "lastEventId": "d0f668d54b1a"
     }
   },
   "counters": {
-    "total": 243,
-    "open": 134,
+    "total": 244,
+    "open": 135,
     "completed": 93,
     "deferred": 16,
     "buckets": {
@@ -21,7 +21,7 @@
       "blocked": 18,
       "ready": 3,
       "in-progress": 3,
-      "unclassified": 3,
+      "unclassified": 4,
       "deferred": 16,
       "completed": 93
     },
@@ -2903,6 +2903,13 @@
       "status": "planning",
       "priority": "low",
       "lane": null
+    },
+    {
+      "id": "MAZER-VIS-042",
+      "title": "Mirror the Fitness loader hardening in the Mazer loader",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
     }
   ],
   "cards": {
@@ -3876,6 +3883,10 @@
     },
     "MAZER-PWA-007": {
       "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-042": {
+      "bucket": "unclassified",
       "sub": null
     }
   }
