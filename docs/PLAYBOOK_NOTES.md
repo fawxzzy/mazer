@@ -143,3 +143,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: `src/legacy-runtime/legacyAttemptSeed.ts` saves the play-attempt maze seed (keyed on level, completed cycles and board aspect, scoped per account) when a play maze is built; `MenuScene.ts` reads it in `createFreshLegacyPlayGenerationSeed`, writes it in `rebuildMaze`, and clears it on completion and on reset progress.
 - WHY it changed: quitting or reloading mid-level re-rolled the maze, so quitting was a free re-roll (owner decision 2026-11-14).
 - Status: Applied
+
+## 2026-11-14 - MAZER-UI-032 diagnostics type cleanup
+- WHAT changed: `menuRuntimeDiagnostics.ts` types narrowed: auth `invalidFields` is `never[]`, latest message `source`/`tone` use the player message types, `trailModeCounts` keys are `DemoTrailMode`.
+- WHY it changed: UI-023 narrowed formMode only; the remaining loose types admitted values production never produces.
+- Rule: no runtime change; MenuScene unchanged (Wave 5C).
+- Status: Applied
