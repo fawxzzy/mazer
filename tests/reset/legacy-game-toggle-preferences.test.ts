@@ -42,6 +42,7 @@ describe('legacy game toggle preferences', () => {
       darkMode: true,
       hapticsEnabled: true,
       movementSpeed: 0.04,
+      soundEnabled: false,
       toggleReducedMotion: false
     });
   });
@@ -63,6 +64,7 @@ describe('legacy game toggle preferences', () => {
       darkMode: true,
       hapticsEnabled: true,
       movementSpeed: 0.82,
+      soundEnabled: false,
       toggleReducedMotion: true
     });
   });
@@ -90,6 +92,7 @@ describe('legacy game toggle preferences', () => {
       darkMode: true,
       hapticsEnabled: true,
       movementSpeed: 0.33,
+      soundEnabled: false,
       toggleReducedMotion: true
     });
   });
@@ -157,7 +160,7 @@ describe('legacy game toggle preferences', () => {
   test('account sync: the picked preferences (what is pushed to the profile) carry none of the removed keys, and older/newer payloads both read', () => {
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
     expect(Object.keys(pickLegacyGameTogglePreferences(settings)).sort()).toEqual([
-      'controlMode', 'darkMode', 'hapticsEnabled', 'movementSpeed', 'toggleReducedMotion'
+      'controlMode', 'darkMode', 'hapticsEnabled', 'movementSpeed', 'soundEnabled', 'toggleReducedMotion'
     ]);
     // an older client's profile JSON (with the removed keys) merges without error and without leaking them
     const merged = mergeLegacyGameTogglePreferences(settings, {
@@ -294,6 +297,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'arrows',
       darkMode: false,
       hapticsEnabled: true,
+      soundEnabled: false,
       movementSpeed: 0.72,
       toggleReducedMotion: true
     });

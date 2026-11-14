@@ -53,7 +53,7 @@ describe('settings sheet model', () => {
     const pauseGroup = pause.sections.find((section) => section.id === 'settings')!;
     expect(menuGroup.rows).toBe(LEGACY_SETTINGS_GROUP_ROWS);
     expect(pauseGroup.rows).toBe(LEGACY_SETTINGS_GROUP_ROWS);
-    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['how-to-play', 'reduce-motion', 'haptics']);
+    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['how-to-play', 'reduce-motion', 'haptics', 'sound']);
   });
 
   test('titles, overlay ids and collapse behaviour per context', () => {
@@ -134,7 +134,8 @@ describe('settings sheet model', () => {
     const toggles = LEGACY_SETTINGS_GROUP_ROWS.filter((r) => r.kind === 'toggle');
     expect(toggles.map((r) => [r.label, r.onLabel, r.offLabel])).toEqual([
       ['Reduce Motion', 'On', 'System'],
-      ['Haptics', 'On', 'Off']
+      ['Haptics', 'On', 'Off'],
+      ['Sound effects', 'On', 'Off']
     ]);
     for (const toggle of toggles) {
       expect(toggle.label).not.toContain(':');
@@ -302,6 +303,7 @@ describe('settings sheet plan specifics', () => {
       'how-to-play',
       'reduce-motion',
       'haptics',
+      'sound',
       'quit-to-menu'
     ]);
   });
@@ -314,6 +316,7 @@ describe('settings sheet plan specifics', () => {
       'how-to-play',
       'reduce-motion',
       'haptics',
+      'sound',
       'account-heading',
       'reset-progress',
       'sign-out'
@@ -437,7 +440,7 @@ describe('settings row description rule (MAZER-UI-026)', () => {
     .flatMap((section) => section.rows);
 
   test('the Settings group and the Account section have rows (so the checks below are not vacuous)', () => {
-    expect(settingRows.map((r) => r.id)).toEqual(expect.arrayContaining(['how-to-play', 'reduce-motion', 'haptics', 'reset-progress', 'sign-out']));
+    expect(settingRows.map((r) => r.id)).toEqual(expect.arrayContaining(['how-to-play', 'reduce-motion', 'haptics', 'sound', 'reset-progress', 'sign-out']));
   });
 
   test('every setting row has a non-empty plain-words description within the length rule', () => {
@@ -496,7 +499,7 @@ describe('settings row description rule (MAZER-UI-026)', () => {
       expect(rows.map((r) => r.label)).not.toContain(retired);
     }
     expect([...new Set(rows.map((r) => r.settingKey).filter((k) => k !== null))].sort())
-      .toEqual(['hapticsEnabled', 'toggleReducedMotion']);
+      .toEqual(['hapticsEnabled', 'soundEnabled', 'toggleReducedMotion']);
   });
 
   test('a row without a description cannot be typed as a setting row (compile-time rule)', () => {

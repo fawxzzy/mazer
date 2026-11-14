@@ -55,7 +55,7 @@ const exportsOf = (module: string): Record<string, unknown> | null => {
 
 describe('guide structure', () => {
   test('rows are unique, ordered and short enough to wrap in two lines at 14px on 320 wide', () => {
-    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'levels', 'online']);
+    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'levels', 'online', 'sound']);
     expect(new Set(LEGACY_GUIDE_ROWS.map((r) => r.id)).size).toBe(LEGACY_GUIDE_ROWS.length);
     for (const r of LEGACY_GUIDE_ROWS) {
       expect(r.heading.length, r.id).toBeLessThanOrEqual(12);
@@ -326,10 +326,10 @@ describe('guide icons are tied to the draw functions the board uses', () => {
     }
   });
 
-  test('Chip wiring closed every chip-wiring todo: goal, start, you, trail, wrap, levels and online share a board draw; only move is guide-local', () => {
+  test('Chip wiring closed every chip-wiring todo: goal, start, you, trail, wrap, levels and online share a board draw; move and sound are guide-local', () => {
     const byStatus = (status: string): string[] => LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === status).map((r) => r.id);
     expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'levels', 'online']);
-    expect(byStatus('guide-local')).toEqual(['move']);
+    expect(byStatus('guide-local')).toEqual(['move', 'sound']);
     expect(byStatus('todo-wiring')).toEqual([]);
     expect(LEGACY_GUIDE_ROWS.filter((r) => r.icon.lane === 'chip-wiring').map((r) => r.id)).toEqual([]);
   });

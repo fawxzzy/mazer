@@ -61,7 +61,8 @@ export type LegacySettingsContext = 'menu' | 'pause';
 /** Setting keys the scene already persists (legacyOverlayToggleFields). */
 export type LegacySettingsToggleKey =
   | 'toggleReducedMotion'
-  | 'hapticsEnabled';
+  | 'hapticsEnabled'
+  | 'soundEnabled';
 
 export type LegacySettingsRowId =
   | 'rotate-notice'
@@ -71,6 +72,7 @@ export type LegacySettingsRowId =
   | 'how-to-play'
   | 'reduce-motion'
   | 'haptics'
+  | 'sound'
   | 'account-heading'
   | 'reset-progress'
   | 'sign-out'
@@ -252,6 +254,7 @@ const settingRow = (
  */
 export const LEGACY_SETTINGS_DESCRIPTIONS = Object.freeze({
   haptics: 'Buzzes on steps, wall bumps and wins. Silent with Reduce Motion, and on iPhone.',
+  sound: 'Small chirps on steps, wall bumps and wins. Off until you turn it on.',
   howToPlay: 'Controls, the goal, and what each icon means.',
   resetProgress: 'Sets your level back to 1. Asks you to confirm first.',
   signOut: 'Signs this device out. Your progress stays on your account.'
@@ -276,6 +279,13 @@ export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsSettingRowModel[
     offLabel: 'Off',
     onLabel: 'On',
     settingKey: 'hapticsEnabled'
+  }),
+  // Small synthesized effects (src/legacy-runtime/legacySoundEffects.ts). Default off; the audio engine is only
+  // created after the player turns it on.
+  settingRow('sound', 'toggle', 'Sound effects', LEGACY_SETTINGS_DESCRIPTIONS.sound, {
+    offLabel: 'Off',
+    onLabel: 'On',
+    settingKey: 'soundEnabled'
   })
 ]);
 

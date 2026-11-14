@@ -17,6 +17,7 @@ export interface LegacyGameTogglePreferences {
   controlMode: LegacyControlMode;
   darkMode: boolean;
   hapticsEnabled: boolean;
+  soundEnabled: boolean;
   movementSpeed: number;
   toggleReducedMotion: boolean;
 }
@@ -69,6 +70,7 @@ const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Parti
     'controlMode',
     'darkMode',
     'hapticsEnabled',
+    'soundEnabled',
     'movementSpeed',
     'toggleReducedMotion'
   ] satisfies Array<keyof LegacyGameTogglePreferences>;
@@ -94,6 +96,7 @@ export const pickLegacyGameTogglePreferences = (
   controlMode: settings.controlMode,
   darkMode: settings.darkMode,
   hapticsEnabled: settings.hapticsEnabled,
+  soundEnabled: settings.soundEnabled,
   movementSpeed: normalizeLegacyMovementSpeed(settings.movementSpeed),
   toggleReducedMotion: settings.toggleReducedMotion
 });
@@ -105,6 +108,7 @@ export const normalizeLegacyGameTogglePreferences = (
   controlMode: isControlMode(value?.controlMode) ? value.controlMode : fallback.controlMode,
   darkMode: normalizeBoolean(value?.darkMode, fallback.darkMode),
   hapticsEnabled: normalizeBoolean(value?.hapticsEnabled, fallback.hapticsEnabled),
+  soundEnabled: normalizeBoolean(value?.soundEnabled, fallback.soundEnabled),
   movementSpeed: normalizeLegacyMovementSpeed(
     typeof value?.movementSpeed === 'number'
       ? value.movementSpeed
@@ -276,12 +280,20 @@ export const canonicalizeGameToggleFingerprint = (fingerprint: string): string =
       return fingerprint;
     }
     const record = parsed as Record<string, unknown>;
-    if (!RETIRED_GAME_TOGGLE_KEYS.some((key) => Object.prototype.hasOwnProperty.call(record, key))) {
+    const hasOwn = (key: string): boolean => Object.prototype.hasOwnProperty.call(record, key);
+    const hasRetired = RETIRED_GAME_TOGGLE_KEYS.some(hasOwn);
+    // A fingerprint stored before Sound effects existed has no soundEnabled: add the default in the picked key
+    // position so the first load of the new build is not a phantom local edit.
+    const missingSound = hasOwn('hapticsEnabled') && !hasOwn('soundEnabled');
+    if (!hasRetired && !missingSound) {
       return fingerprint;
     }
-    return JSON.stringify(Object.fromEntries(
-      Object.entries(record).filter(([key]) => !RETIRED_GAME_TOGGLE_KEYS.includes(key))
-    ));
+    const entries = Object.entries(record).filter(([key]) => !RETIRED_GAME_TOGGLE_KEYS.includes(key));
+    if (missingSound) {
+      const at = entries.findIndex(([key]) => key === 'hapticsEnabled');
+      entries.splice(at + 1, 0, ['soundEnabled', LEGACY_DEFAULTS.soundEnabled]);
+    }
+    return JSON.stringify(Object.fromEntries(entries));
   } catch {
     return fingerprint;
   }

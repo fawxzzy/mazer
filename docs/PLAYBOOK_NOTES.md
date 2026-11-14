@@ -178,4 +178,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: `menuRuntimeDiagnostics.ts` types narrowed: auth `invalidFields` is `never[]`, latest message `source`/`tone` use the player message types, `trailModeCounts` keys are `DemoTrailMode`.
 - WHY it changed: UI-023 narrowed formMode only; the remaining loose types admitted values production never produces.
 - Rule: no runtime change; MenuScene unchanged (Wave 5C).
+## 2026-11-14 - MAZER-AUDIO-003 sound effects toggle (default off)
+- WHAT changed: new `src/legacy-runtime/legacySoundEffects.ts` (lazy Web Audio chirps, throttled, no-op when off or unsupported) and `src/render/guideSoundGlyph.ts` (Guide speaker icon); `soundEnabled` setting (default false) added to defaults, toggle preferences, overlay toggle fields and a Settings row; Guide gained a Sound row. MenuScene.ts: glyph case plus four one-line play hooks (step, wall bump, goal, toggle on), per the coordinator ruling.
+- WHY it changed: owner decision 2026-11-14 allows small synthesized effects behind a Settings toggle that defaults to off.
+- Rule: no AudioContext is constructed until the setting is on; audio unlock on a real phone is NOT verified (card criterion, device check owed).
+- Evidence: `tests/reset/legacy-sound-effects.test.ts`, headless phone-emulation check (0 AudioContexts while off, 1 after toggle on).
 - Status: Applied
