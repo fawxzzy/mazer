@@ -3,25 +3,25 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-13T21:02:25.000Z",
+    "registryUpdatedAt": "2026-11-14T06:34:01.000Z",
     "boardSync": {
-      "at": "2026-11-13T21:02:25.000Z",
-      "appliedEventCount": 35,
-      "lastEventId": "14d59f5f37d6"
+      "at": "2026-11-14T06:34:01.000Z",
+      "appliedEventCount": 59,
+      "lastEventId": "fb270896761c"
     }
   },
   "counters": {
-    "total": 234,
-    "open": 125,
+    "total": 243,
+    "open": 134,
     "completed": 93,
     "deferred": 16,
     "buckets": {
       "needs-you": 58,
-      "in-review": 36,
-      "blocked": 20,
-      "ready": 4,
+      "in-review": 49,
+      "blocked": 18,
+      "ready": 3,
       "in-progress": 3,
-      "unclassified": 4,
+      "unclassified": 3,
       "deferred": 16,
       "completed": 93
     },
@@ -40,7 +40,7 @@
       "Zac": 4,
       "provider": 2,
       "device": 1,
-      "other-card": 13,
+      "other-card": 11,
       "unknown": 0
     }
   },
@@ -2132,12 +2132,44 @@
       "note": ""
     },
     {
+      "id": "MAZER-ACCT-041",
+      "title": "Account pages never scroll, host sign-out endpoint, reset ends other sessions",
+      "status": "review",
+      "priority": "high",
+      "prs": "FawxzzyWeb#156",
+      "note": ""
+    },
+    {
+      "id": "MAZER-ACCT-042",
+      "title": "No pending text screen between host sign-in and the Mazer loader",
+      "status": "review",
+      "priority": "high",
+      "prs": "FawxzzyWeb#156, #518",
+      "note": ""
+    },
+    {
+      "id": "MAZER-ACCT-043",
+      "title": "No Mazer account screens: only account.fawxzzy.com screens",
+      "status": "review",
+      "priority": "high",
+      "prs": "#522",
+      "note": ""
+    },
+    {
       "id": "MAZER-GOV-004",
       "title": "Retire the previous project board and refresh this one from all prior discussion",
       "status": "review",
       "priority": "high",
       "prs": "",
       "note": "Mazer PR #434 and FawxzzyWeb PR #119 (the previous refresh) are merged and the card text now says so; left in review for the owner to close."
+    },
+    {
+      "id": "MAZER-PWA-007",
+      "title": "Install gate always on for browser access",
+      "status": "review",
+      "priority": "high",
+      "prs": "#518",
+      "note": ""
     },
     {
       "id": "MAZER-ACCT-024",
@@ -2228,6 +2260,14 @@
       "note": "PR #481 merged: ratchet only. Migration of existing colours not started."
     },
     {
+      "id": "MAZER-UI-024",
+      "title": "Online counter in the main menu, profile and leaderboard icons swapped",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#520",
+      "note": ""
+    },
+    {
       "id": "MAZER-VIS-030",
       "title": "Edge diamonds fill on beam contact, drain on release: merged and live, phone check pending",
       "status": "review",
@@ -2260,6 +2300,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-VIS-040",
+      "title": "Smooth maze build-in and build-out",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#523",
+      "note": ""
+    },
+    {
       "id": "MAZER-ACCT-012",
       "title": "Retire dead Mazer sign-up code: PRs #485 and #486 merged and live, review pending",
       "status": "review",
@@ -2272,8 +2320,16 @@
       "title": "Header follows the saved profile name after reload: PR #487 merged and live, recheck open",
       "status": "review",
       "priority": "low",
-      "prs": "#487",
+      "prs": "#487, #519",
       "note": "PR #487 open for review, not merged, not deployed."
+    },
+    {
+      "id": "MAZER-ACCT-038",
+      "title": "Retire the remaining dead sign-in form helpers and sign-up sentinels",
+      "status": "review",
+      "priority": "low",
+      "prs": "#516, #517",
+      "note": ""
     },
     {
       "id": "MAZER-DOCS-001",
@@ -2308,6 +2364,14 @@
       "note": "PR #475 merged and deployed (62f36472). Same 200 ms value, no visible change expected."
     },
     {
+      "id": "MAZER-MOTION-010",
+      "title": "Delete or bind the unused tuning value menu.status.pulseDurationMs",
+      "status": "review",
+      "priority": "low",
+      "prs": "#519",
+      "note": ""
+    },
+    {
       "id": "MAZER-PERF-007",
       "title": "Wrap-dock glow redraw on the shared 33 ms schedule: PR #488 open for review",
       "status": "review",
@@ -2321,6 +2385,14 @@
       "status": "review",
       "priority": "low",
       "prs": "#503",
+      "note": ""
+    },
+    {
+      "id": "MAZER-PERF-009",
+      "title": "Prefetch or time-slice the first maze of a session",
+      "status": "review",
+      "priority": "low",
+      "prs": "#524",
       "note": ""
     },
     {
@@ -2353,6 +2425,30 @@
       "status": "review",
       "priority": "low",
       "prs": "#502",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-023",
+      "title": "Narrow the menu diagnostics form mode to login only (wave 1C)",
+      "status": "review",
+      "priority": "low",
+      "prs": "#521",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-025",
+      "title": "Privacy text names the live Mazer online count",
+      "status": "review",
+      "priority": "low",
+      "prs": "FawxzzyWeb#158",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-026",
+      "title": "Settings: three rows removed and a description line required on every row",
+      "status": "review",
+      "priority": "low",
+      "prs": "#525",
       "note": ""
     },
     {
@@ -2401,6 +2497,14 @@
       "status": "review",
       "priority": "low",
       "prs": "#502",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-041",
+      "title": "End star spins slowly and stays visible under the player",
+      "status": "review",
+      "priority": "low",
+      "prs": "#515",
       "note": ""
     }
   ],
@@ -2530,15 +2634,6 @@
         "derived": true
       },
       {
-        "id": "MAZER-ACCT-038",
-        "title": "Retire the remaining dead sign-in form helpers and sign-up sentinels",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-ACCT-012 (review).",
-        "derived": true
-      },
-      {
         "id": "MAZER-AI-002",
         "title": "Add AI-assisted maze completion with spendable hints",
         "status": "planning",
@@ -2582,15 +2677,6 @@
         "kind": "dependency",
         "ask": "Waits on the real-phone verification in MAZER-QA-001.",
         "derived": false
-      },
-      {
-        "id": "MAZER-UI-023",
-        "title": "Narrow the menu diagnostics form mode to login only (wave 1C)",
-        "status": "planning",
-        "priority": "low",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-ACCT-012 (review).",
-        "derived": true
       }
     ],
     "unknown": []
@@ -2615,15 +2701,6 @@
       {
         "id": "MAZER-ACCT-020",
         "title": "Fix the four account-site usernames longer than 15 characters",
-        "status": "planning",
-        "priority": "low",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-MOTION-010",
-        "title": "Delete or bind the unused tuning value menu.status.pulseDurationMs",
         "status": "planning",
         "priority": "low",
         "filesHint": [],
@@ -2806,13 +2883,6 @@
     }
   ],
   "unclassified": [
-    {
-      "id": "MAZER-PERF-009",
-      "title": "Prefetch or time-slice the first maze of a session",
-      "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
     {
       "id": "MAZER-PWA-006",
       "title": "Trim dev pages from the precache and decide update behaviour on deploy",
@@ -3693,15 +3763,15 @@
       "sub": null
     },
     "MAZER-UI-023": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-ACCT-038": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-MOTION-010": {
-      "bucket": "ready",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-031": {
@@ -3749,7 +3819,7 @@
       "sub": null
     },
     "MAZER-PERF-009": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-PERF-010": {
@@ -3769,6 +3839,42 @@
       "sub": null
     },
     "MAZER-VIS-038": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-ACCT-043": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-UI-024": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-UI-025": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-UI-026": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-040": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-041": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-ACCT-041": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-ACCT-042": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-PWA-007": {
       "bucket": "in-review",
       "sub": null
     }

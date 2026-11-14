@@ -2704,10 +2704,16 @@
           {
             "repo": "fawxzzy/mazer",
             "number": 487
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 519,
+            "mergedSha": "3a3db6fc"
           }
         ],
         "headless": true,
-        "deviceChecked": false
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1"
       },
       "blocker": null,
       "verify": [],
@@ -2921,7 +2927,18 @@
       "note": "Worker running; no PR yet."
     },
     "MAZER-UI-023": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 521,
+            "mergedSha": "ec171d61"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1"
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
@@ -2930,14 +2947,41 @@
       ]
     },
     "MAZER-ACCT-038": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 516,
+            "mergedSha": "e975c93f"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 517,
+            "mergedSha": "371f4c02"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1"
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
       "filesHint": []
     },
     "MAZER-MOTION-010": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 519,
+            "mergedSha": "3a3db6fc"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1"
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
@@ -3101,7 +3145,18 @@
       "filesHint": []
     },
     "MAZER-PERF-009": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 524,
+            "mergedSha": "3456fb68"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-d6in8php0"
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
@@ -3135,7 +3190,8 @@
           }
         ],
         "headless": true,
-        "deviceChecked": false
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzyweb-r73je21xy"
       },
       "blocker": null,
       "verify": [],
@@ -3190,6 +3246,173 @@
         "headless": true,
         "deviceChecked": false,
         "deployedBuild": "fawxzzy-mazer-1hf3yrduh"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ACCT-043": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 522,
+            "mergedSha": "853a26c0"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-024": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 520,
+            "mergedSha": "42a67ac5"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-025": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/FawxzzyWeb",
+            "number": 158,
+            "mergedSha": "0f4a5a11"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzyweb-geuv4lbht"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-026": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 525,
+            "mergedSha": "227753c7"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-d6in8php0"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-040": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 523,
+            "mergedSha": "e831d146"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-041": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 515,
+            "mergedSha": "83b1ca96"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ACCT-041": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/FawxzzyWeb",
+            "number": 156,
+            "mergedSha": "8ffcd193"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzyweb-geuv4lbht"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ACCT-042": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/FawxzzyWeb",
+            "number": 156,
+            "mergedSha": "8ffcd193"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 518,
+            "mergedSha": "ff190bd5"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-d6in8php0"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PWA-007": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 518,
+            "mergedSha": "ff190bd5"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-d6in8php0"
       },
       "blocker": null,
       "verify": [],
