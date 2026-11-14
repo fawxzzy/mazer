@@ -24,6 +24,7 @@ import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding
 import { LEGACY_AUTH_FAILURE_CODES, type LegacyAuthFailureCode } from './legacyAuthFailureCodes';
 import { createMazerAuthFetch } from './legacyOAuthRefresh';
 import { recordMazerExplicitSignOut } from './legacySignedOutHandoff';
+import { LEGACY_STORED_USERNAME_PATTERN, sanitizeStoredLegacyUsername } from './legacyStoredUsername';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
 export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
@@ -333,7 +334,7 @@ export const createLegacyGuestAuthSnapshot = (
 const resolveDisplayName = (user: User): string | null => {
   const metadata = user.user_metadata;
   const candidates = [
-    typeof metadata.username === 'string' ? metadata.username : null,
+    sanitizeStoredLegacyUsername(metadata.username),
     typeof metadata.display_name === 'string' ? metadata.display_name : null,
     typeof metadata.full_name === 'string' ? metadata.full_name : null,
     user.email?.split('@')[0] ?? null
@@ -343,10 +344,8 @@ const resolveDisplayName = (user: User): string | null => {
 };
 
 const resolveCanonicalUsername = (user: User): string | null => {
-  const username = user.user_metadata.username;
-  return typeof username === 'string' && username.trim().length > 0
-    ? username.trim()
-    : null;
+  // MAZER-ACCT-020: stored metadata is untrusted; a name over the limit is not presented as the username.
+  return sanitizeStoredLegacyUsername(user.user_metadata.username);
 };
 
 export const createLegacyAuthSessionSnapshot = (
@@ -909,7 +908,7 @@ export const createLegacyAuthScopedStorage = (
 // chars, alphanumeric plus ._- ) -- same shape as Fitness's own username
 // pattern, for instant client-side feedback before ever calling the
 // availability RPC.
-export const LEGACY_USERNAME_PATTERN = /^[A-Za-z0-9._-]{2,15}$/;
+export const LEGACY_USERNAME_PATTERN = LEGACY_STORED_USERNAME_PATTERN;
 
 export const readLegacyAccountUsername = async (
   userId: string
