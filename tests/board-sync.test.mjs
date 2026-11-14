@@ -117,6 +117,22 @@ test("new cards: unique id, known dependencies, three criteria, counts recompute
   assert.match(fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-B-001", { new: { ...neu, title: "x".repeat(91) } })]).errors.join(), /max 90/);
 });
 
+test("a card's new event is applied before its other events regardless of ts; new may be completed with valid evidence", () => {
+  const neu = { title: "New thing", description: "Plan text.", cardType: "feature", priority: "low", dependencies: [], acceptanceCriteria: ["one", "two", "three"] };
+  const reg = registry([card("MAZER-A-001")]);
+  const late = fold(reg, [
+    base("2026-11-13T00:00:00Z", "MAZER-B-001", { status: "review" }),
+    base("2026-11-13T00:00:05Z", "MAZER-B-001", { status: "planning", new: neu }),
+  ]);
+  assert.deepEqual(late.errors, []);
+  assert.equal(late.registry.workItems.at(-1).status, "review");
+  assert.equal(fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-B-001", { status: "review" })]).errors.length, 1);
+  const noRuntime = fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-B-001", { status: "completed", new: neu, evidence: { prs: [{ repo: M, number: 7, mergedSha: "abcdef12" }], headless: false, deviceChecked: null } })]);
+  assert.deepEqual(noRuntime.errors, []);
+  assert.equal(noRuntime.registry.workItems.at(-1).status, "completed");
+  assert.match(fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-B-001", { status: "completed", new: neu })]).errors.join(), /completed needs evidence/);
+});
+
 test("one bad event blocks the whole fold: nothing partial", () => {
   const reg = registry([card("MAZER-A-001"), card("MAZER-B-001")]);
   const r = fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-A-001", { status: "review" }), base("2026-11-13T00:00:01Z", "MAZER-B-001", { status: "completed" })]);

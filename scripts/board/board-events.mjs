@@ -270,6 +270,17 @@ export function foldEvents({ registry: registryIn, ledger: ledgerIn, events, app
     candidates.push({ ...item, event: { ...event, id } });
   }
   candidates.sort((a, b) => (a.event.ts < b.event.ts ? -1 : a.event.ts > b.event.ts ? 1 : 0));
+  // A card's `new` event is applied before any other event for the same card, whatever the timestamps say.
+  const newByCard = new Map();
+  for (const item of candidates) if (item.event.new !== undefined && !newByCard.has(item.event.card)) newByCard.set(item.event.card, item);
+  const ordered = [];
+  const placed = new Set();
+  for (const item of candidates) {
+    const creator = newByCard.get(item.event.card);
+    if (creator && !placed.has(creator)) { ordered.push(creator); placed.add(creator); }
+    if (!placed.has(item)) { ordered.push(item); placed.add(item); }
+  }
+  candidates.splice(0, candidates.length, ...ordered);
 
   const byId = new Map(registry.workItems.map((card) => [card.id, card]));
   const record = (id) => { if (!changes.has(id)) changes.set(id, { card: id, from: byId.get(id)?.status ?? null, to: null, events: 0, created: false }); return changes.get(id); };
@@ -283,7 +294,6 @@ export function foldEvents({ registry: registryIn, ledger: ledgerIn, events, app
     if (creating) {
       if (card) problems.push("new card id already exists in the registry");
       for (const dep of event.new.dependencies ?? []) if (!byId.has(dep)) problems.push(`dependency ${dep} is not a registry card`);
-      if (event.status === "completed") problems.push("a new card cannot be created as completed");
     } else if (!card) problems.push("card is not in the registry (create it with a `new` block)");
     if (problems.length) { errors.push(...problems.map((p) => `${where(item)} ${event.card}: ${p}`)); continue; }
 
