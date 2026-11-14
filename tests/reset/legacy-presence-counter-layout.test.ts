@@ -46,8 +46,9 @@ describe('MAZER-UI-024 presence counter layout', () => {
           expect(left, label).toBeGreaterThanOrEqual(leading.right + LEGACY_PRESENCE_ICON_GAP_PX);
           expect(placement.right, label).toBeLessThanOrEqual(placement.slotRight);
           expect(placement.right, label).toBeLessThanOrEqual(viewport.width - 8);
-          // Vertically centred on the leading icon.
-          const centre = placement.number!.top + (placement.number!.height / 2);
+          // The number (+ label) block is vertically centred on the leading icon.
+          const blockBottom = placement.word ? placement.word.top + placement.word.height : placement.number!.top + placement.number!.height;
+          const centre = (placement.number!.top + blockBottom) / 2;
           expect(Math.abs(centre - leading.centerY), label).toBeLessThanOrEqual(1);
         }
       }
@@ -62,10 +63,19 @@ describe('MAZER-UI-024 presence counter layout', () => {
     expect(LEGACY_PRESENCE_TITLE_GAP_PX).toBeGreaterThan(0);
   });
 
-  test('a 390 wide phone shows 0..3 digit numbers (not 4+ characters); desktop adds the word ONLINE', () => {
-    const phone = resolveLegacyMenuLayout(390, 844, 50, 49, 49, 'menu');
-    for (const text of ['7', '42', '999']) {
-      expect(resolveLegacyPresenceCounterPlacement({ layout: phone, showDot: true, text }).visible, text).toBe(true);
+  test('every phone width shows the number at the old username text height with the small ONLINE label under it', () => {
+    for (const [width, height] of [[360, 740], [390, 844], [412, 915]]) {
+      const phone = resolveLegacyMenuLayout(width, height, 50, 49, 49, 'menu');
+      for (const text of ['7', '42', '999', '99K']) {
+        const placement = resolveLegacyPresenceCounterPlacement({ layout: phone, showDot: false, text });
+        const label = `${width} ${text}`;
+        expect(placement.visible, label).toBe(true);
+        expect(placement.number!.height, label).toBe(14);
+        expect(placement.word?.text, label).toBe('ONLINE');
+        expect(placement.word!.height, label).toBe(7);
+        expect(placement.word!.top, label).toBeGreaterThanOrEqual(placement.number!.top + placement.number!.height);
+        expect(placement.word!.left, label).toBe(placement.number!.left);
+      }
     }
     const desktop = resolveLegacyMenuLayout(1280, 720, 50, 49, 49, 'menu');
     const wide = resolveLegacyPresenceCounterPlacement({ layout: desktop, showDot: true, text: '1234' });
@@ -73,19 +83,17 @@ describe('MAZER-UI-024 presence counter layout', () => {
     expect(wide.word?.text).toBe('ONLINE');
   });
 
-  test('tiers: word at cell 3, word at cell 2, number only at cell 3, number only at cell 2, then hidden', () => {
+  test('tiers: number + label, number alone at cell 2, number alone at cell 1, then hidden', () => {
     const base = { centerY: 40, leadingRight: 50, showDot: false, text: '7', viewportWidth: 2000 };
     const at = (room: number) => resolveLegacyPresenceCounterLayout({ ...base, titleLeft: 50 + 8 + room + 8 });
-    const wordCell3 = 5 * 3 + 8 + (35 * 3);
-    const wordCell2 = 5 * 2 + 8 + (35 * 2);
-    expect(at(wordCell3)).toMatchObject({ cell: 3, visible: true });
-    expect(at(wordCell3).word).not.toBeNull();
-    expect(at(wordCell3 - 1)).toMatchObject({ cell: 2, visible: true });
-    expect(at(wordCell3 - 1).word).not.toBeNull();
-    expect(at(wordCell2 - 1)).toMatchObject({ cell: 3, visible: true });
-    expect(at(wordCell2 - 1).word).toBeNull();
-    expect(at(14)).toMatchObject({ cell: 2, visible: true });
-    expect(at(9).visible).toBe(false);
+    const wordWidth = 35;
+    expect(at(wordWidth)).toMatchObject({ cell: 2, visible: true });
+    expect(at(wordWidth).word).not.toBeNull();
+    expect(at(wordWidth - 1)).toMatchObject({ cell: 2, visible: true });
+    expect(at(wordWidth - 1).word).toBeNull();
+    expect(at(10)).toMatchObject({ cell: 2, visible: true });
+    expect(at(9)).toMatchObject({ cell: 1, visible: true });
+    expect(at(4).visible).toBe(false);
     expect(at(0).visible).toBe(false);
   });
 
@@ -94,7 +102,7 @@ describe('MAZER-UI-024 presence counter layout', () => {
     const tight = resolveLegacyPresenceCounterLayout({ ...base, showDot: true, titleLeft: 50 + 8 + 22 + 8 });
     expect(tight).toMatchObject({ visible: true, cell: 2 });
     expect(tight.dot).toBeNull();
-    const roomy = resolveLegacyPresenceCounterLayout({ ...base, showDot: true, titleLeft: 50 + 8 + 33 + 12 + 8 });
+    const roomy = resolveLegacyPresenceCounterLayout({ ...base, showDot: true, titleLeft: 50 + 8 + 35 + 12 + 8 });
     expect(roomy.dot).not.toBeNull();
     const reduced = resolveLegacyPresenceCounterLayout({ ...base, showDot: false, titleLeft: 50 + 8 + 400 });
     expect(reduced.dot).toBeNull();

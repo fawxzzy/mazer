@@ -9641,7 +9641,7 @@ export class MenuScene extends Phaser.Scene {
     const { number, word } = placement;
     this.drawLegacyPresenceGlyphWord(graphics, number.text, number.left + (number.width / 2), number.top + (number.height / 2), placement.cell, frame.alpha, true);
     if (word !== null) {
-      this.drawLegacyPresenceGlyphWord(graphics, word.text, word.left + (word.width / 2), word.top + (word.height / 2), placement.cell, frame.alpha, false);
+      this.drawLegacyPresenceGlyphWord(graphics, word.text, word.left + (word.width / 2), word.top + (word.height / 2), word.cell, frame.alpha, false);
     }
   }
 

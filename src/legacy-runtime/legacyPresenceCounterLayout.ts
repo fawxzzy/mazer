@@ -6,10 +6,10 @@
  * built from the tile glyph font (5x7 chip cells, see legacyMenuTitle.ts) so it reads as the same
  * material as the wordmark. Pure: no Phaser, no DOM.
  *
- * Fit tiers, tried in order, first that fits wins: the number plus the word ONLINE at cell 3, then
- * at cell 2, then the number alone at cell 3, then at cell 2. A pulse dot is added to a tier only
- * when it also fits. When not even a one-digit number at cell 2 fits, the counter is hidden;
- * it never overlaps the icon or the title.
+ * Look (MAZER-UI-033): the number is 14px tall (chip cell 2, the same height as the old 14px username text) with a
+ * small ONLINE label (cell 1) stacked directly under it, both left-aligned, the pair centred on the icon's centre
+ * line. Fit tiers, first that fits wins: number + label, number alone at cell 2, number alone at cell 1. A pulse dot
+ * is added only when it also fits. When nothing fits the counter is hidden; it never overlaps the icon or the title.
  */
 import { resolveLegacyHeaderControlFrame } from './legacyHeaderControl';
 import { resolveLegacyGlyphWordColumns, resolveLegacyMenuPathTitleLayout, resolveLegacyMenuTitleFontSize } from './legacyMenuTitle';
@@ -19,8 +19,9 @@ export const LEGACY_PRESENCE_ICON_GAP_PX = 8;
 export const LEGACY_PRESENCE_TITLE_GAP_PX = 8;
 export const LEGACY_PRESENCE_DOT_DIAMETER_PX = 6;
 export const LEGACY_PRESENCE_DOT_GAP_PX = 6;
-export const LEGACY_PRESENCE_WORD_GAP_PX = 8;
-export const LEGACY_PRESENCE_CELL_SIZES: readonly number[] = Object.freeze([3, 2]);
+export const LEGACY_PRESENCE_NUMBER_CELL = 2;
+export const LEGACY_PRESENCE_WORD_CELL = 1;
+export const LEGACY_PRESENCE_WORD_STACK_GAP_PX = 3;
 /** Phaser object name for QA lookups. */
 export const LEGACY_PRESENCE_COUNTER_NAME = 'header-online-counter';
 
@@ -37,7 +38,7 @@ export interface LegacyPresenceCounterLayout {
   /** Pulse dot centre and radius, or null when it does not fit (or Reduce Motion asked for none). */
   readonly dot: { readonly centerX: number; readonly centerY: number; readonly radius: number } | null;
   readonly number: (LegacyPresenceRect & { readonly text: string }) | null;
-  readonly word: (LegacyPresenceRect & { readonly text: string }) | null;
+  readonly word: (LegacyPresenceRect & { readonly text: string; readonly cell: number }) | null;
   /** Right edge of everything drawn (== left when hidden). */
   readonly right: number;
   /** Left bound of the free slot and its right limit, for tests and diagnostics. */
@@ -86,24 +87,27 @@ export const resolveLegacyPresenceCounterLayout = (
   const wordColumns = resolveLegacyGlyphWordColumns(LEGACY_PRESENCE_WORD);
   const dotWidth = LEGACY_PRESENCE_DOT_DIAMETER_PX + LEGACY_PRESENCE_DOT_GAP_PX;
 
-  const tiers: Array<{ cell: number; word: boolean }> = [];
-  for (const withWord of [true, false]) {
-    for (const cell of LEGACY_PRESENCE_CELL_SIZES) {
-      tiers.push({ cell, word: withWord });
-    }
-  }
+  // Tiers: number (cell 2, the height of the old 14px username text) with the small ONLINE label stacked
+  // under it (cell 1); then the number alone at cell 2; then the number alone at cell 1.
+  const tiers: Array<{ cell: number; word: boolean }> = [
+    { cell: LEGACY_PRESENCE_NUMBER_CELL, word: true },
+    { cell: LEGACY_PRESENCE_NUMBER_CELL, word: false },
+    { cell: LEGACY_PRESENCE_WORD_CELL, word: false }
+  ];
   for (const tier of tiers) {
     const numberWidth = numberColumns * tier.cell;
-    const wordWidth = tier.word ? LEGACY_PRESENCE_WORD_GAP_PX + (wordColumns * tier.cell) : 0;
-    const bare = numberWidth + wordWidth;
+    const wordWidth = tier.word ? wordColumns * LEGACY_PRESENCE_WORD_CELL : 0;
+    const bare = Math.max(numberWidth, wordWidth);
     const withDot = input.showDot ? bare + dotWidth : null;
     const useDot = withDot !== null && withDot <= room;
     const total = useDot ? (withDot as number) : bare;
     if (total > room) {
       continue;
     }
-    const height = 7 * tier.cell;
-    const top = Math.round(input.centerY - (height / 2));
+    const numberHeight = 7 * tier.cell;
+    const wordHeight = 7 * LEGACY_PRESENCE_WORD_CELL;
+    const blockHeight = tier.word ? numberHeight + LEGACY_PRESENCE_WORD_STACK_GAP_PX + wordHeight : numberHeight;
+    const blockTop = Math.round(input.centerY - (blockHeight / 2));
     let cursor = slotLeft;
     let dot: LegacyPresenceCounterLayout['dot'] = null;
     if (useDot) {
@@ -114,15 +118,18 @@ export const resolveLegacyPresenceCounterLayout = (
       };
       cursor += dotWidth;
     }
-    const number = { height, left: cursor, text, top, width: numberWidth };
-    cursor += numberWidth;
-    let word: LegacyPresenceCounterLayout['word'] = null;
-    if (tier.word) {
-      cursor += LEGACY_PRESENCE_WORD_GAP_PX;
-      word = { height, left: cursor, text: LEGACY_PRESENCE_WORD, top, width: wordColumns * tier.cell };
-      cursor += wordColumns * tier.cell;
-    }
-    return { cell: tier.cell, dot, number, right: cursor, slotLeft, slotRight, visible: true, word };
+    const number = { height: numberHeight, left: cursor, text, top: blockTop, width: numberWidth };
+    const word = tier.word
+      ? {
+        cell: LEGACY_PRESENCE_WORD_CELL,
+        height: wordHeight,
+        left: cursor,
+        text: LEGACY_PRESENCE_WORD,
+        top: blockTop + numberHeight + LEGACY_PRESENCE_WORD_STACK_GAP_PX,
+        width: wordWidth
+      }
+      : null;
+    return { cell: tier.cell, dot, number, right: cursor + bare, slotLeft, slotRight, visible: true, word };
   }
   return HIDDEN(slotLeft, slotRight);
 };
