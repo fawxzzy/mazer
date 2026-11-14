@@ -194,6 +194,12 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: Added `docs/research/MAZER_HAZARD_CONTRACT_PHASE1_2026-11-14.md` (the 2026-11-05 draft plus a signature record: owner "yes to all", 2026-11-14), a decision-record addendum, world-turn contract wording, and `tests/architecture/hazard-contract-signed.test.ts`.
 - WHY it changed: the owner decided to sign phase 1 and accept that the geometry ladder ends (MAZER-PROG-019, MAZER-PROG-005); the repo needed the signature and the hazard-budget start rule on record.
 - Rule: the hazard budget start is symbolic (`level - GEOMETRY_BUDGET_SATURATION_LEVEL`, 288 on main); the 388 and 218 on older cards are stale. The hazard layer stays dormant; signing enabled no code.
+
+## 2026-11-14 - MAZER-QA-009 headless phone sweep and ordered device checklist
+- WHAT changed: new `scripts/visual/phone-emulation-sweep.mjs` (Chromium phone profiles, Reduce Motion on/off, faked standalone, visibilitychange/offline, rAF sampling, level 60/100/190 load, CDP touch, ACCT-013 pending-window cases), `docs/ops/MAZER-PHONE-CHECKLIST.md` (ordered real-device steps only), `docs/ops/MAZER-QA-009-HEADLESS-PHONE-SWEEP-2026-11-14.md` (per-card record), and `tests/architecture/phone-checklist-contract.test.ts`.
+- WHY it changed: so the cards that waited on a phone check only wait on what a headless run genuinely cannot prove.
+- Rule: a headless run is source proof only; nothing here was run on a real phone, and display-mode must be faked by an init script because CDP cannot set it.
+- Rule: an ACCT-013 style callback test must be served on the canonical origin or the app correctly reports invalid_state.
 - Status: Applied
 ## 2026-11-14 - MAZER-UI-010 type scale, display face and ratchet (PR 1)
 - WHAT changed: Added `src/render/typeScale.ts` (roles, sizes, weights, 12 px body floor), `docs/ui/MAZER-TYPE-SCALE.md`, self-hosted Oxanium (`public/fonts/oxanium/`, OFL) with a lazy `@font-face` and precache entry, and `tests/render/type-scale-ratchet.test.ts`.
