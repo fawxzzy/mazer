@@ -18,7 +18,7 @@ const bootSource = read('src/scenes/BootScene.ts');
 const menuSource = read('src/scenes/MenuScene.ts');
 
 // Measured 2026-11-06 after the diet: 1,050,310 B across 5 preloaded files. Measured 2026-11-14 after MAZER-VIS-011 (the three
-// 1254 px HUD bitmaps became one 5.8 KB outline-icon atlas): 36,700 B across 3 preloaded files. ~60% headroom.
+// 1254 px HUD bitmaps became one 5.8 KB outline-icon atlas): 36,646 B across 3 preloaded files. ~60% headroom.
 const BOOT_PRELOAD_BUDGET_BYTES = 60_000;
 const BOOT_PRELOAD_SINGLE_FILE_BUDGET_BYTES = 40_000;
 // public/assets is exactly the boot preload set (see the "no unreferenced weight" test): now the one HUD icon atlas.
