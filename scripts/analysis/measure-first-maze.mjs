@@ -36,13 +36,22 @@ const outFile = arg('out', '');
 const MOBILE_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36';
 
 const INSTALL_OBSERVERS = () => {
-  const perf = { longtasks: [], installedAt: null, installedMode: null, gaps: [], scenePolls: 0 };
+  const perf = { longtasks: [], generations: [], installedAt: null, installedMode: null, gaps: [], scenePolls: 0 };
   window.__perf = perf;
   try {
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) perf.longtasks.push({ start: entry.startTime, duration: entry.duration });
     }).observe({ type: 'longtask', buffered: true });
   } catch { /* longtask unsupported */ }
+  // MAZER-PERF-009: every maze generation that ran SYNCHRONOUSLY on this (main) thread; a worker generation records
+  // into the worker's own timeline and never appears here.
+  try {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.name === 'mazer:maze-generation') perf.generations.push({ start: entry.startTime, duration: entry.duration, mode: entry.detail?.mode ?? null });
+      }
+    }).observe({ type: 'measure', buffered: true });
+  } catch { /* measure observer unsupported */ }
   let last = null;
   const tick = (t) => {
     const game = window.__MAZER_GAME__;
@@ -171,6 +180,9 @@ try {
           level: data.level,
           installedAtMs: Math.round(data.perf.installedAt),
           longTasks: tasks.map((t) => ({ at: Math.round(t.start), ms: Math.round(t.duration) })),
+          // Main-thread generation (ms): the frame-blocking cost the first maze still pays here.
+          mainThreadGenerations: data.perf.generations.map((g) => ({ mode: g.mode, at: Math.round(g.start), ms: Math.round(g.duration) })),
+          mainThreadPlayGenerationMs: data.perf.generations.filter((g) => g.mode === 'play').reduce((sum, g) => sum + g.duration, 0) | 0,
           longestTaskMs: tasks.reduce((m, t) => Math.max(m, Math.round(t.duration)), 0),
           worstRafGapMs: Math.round(worstGap),
           // The task that straddles / follows the install (the first-maze cost): the longest task starting within 1.5 s before the install.
