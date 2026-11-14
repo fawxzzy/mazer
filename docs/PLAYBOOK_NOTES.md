@@ -254,3 +254,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: overlays popped in with no rise or stagger. The hook runs after update on purpose: an in-update hook let freshly rebuilt objects render one frame at rest (a flash), found in a headless frame probe.
 - Rule: effects on objects that `rebuildUi` recreates must be a pure function of elapsed time applied after the rebuild, never state stored on the objects. Panel borders and toggles live on the shared overlay Graphics, so they stay static; only labels and row fills move.
 - Status: Applied (review); headless only (Chromium 390x844, 360x740, 412x915 and WebKit iPhone 15 Pro and SE, Reduce Motion on and off), no real-device fps.
+
+## 2026-11-14 - MAZER-VIS-011 (part 1 of 2) HUD icon crop follows the texture it draws
+- WHAT changed: Added `src/render/hudIconAtlas.ts` (the outline-icon atlas layout: 128 px cells, 4 columns, glyph box 16..112, eight glyph names) and made `MenuScene.applyLegacyHudIconFrame` crop a texture that is exactly `HUD_ICON_CELL_PX` wide to that shared glyph box, keeping the existing 1254 px bitmap crops for everything else. No asset changes, so rendering on today's art is unchanged.
+- WHY it changed: MAZER-VIS-011 replaces three 1254 px HUD bitmaps (1.0 MB, three styles) with one scripted outline-icon atlas. `BootScene.ts` (Wave 4D-A) and `MenuScene.ts` (Wave 5C) cannot ship in one change set (the integrator-wave tests reject mixed waves), so the MenuScene half lands first and is a safe no-op; the BootScene and asset swap follows as part 2.
+- Rule: when a change needs files from two registered waves, split it so each PR is a no-op or a pure superset on the other side's current state, and say which half is which in both PRs.
+- Status: Applied (review); source proof only, nothing visual changes until part 2.

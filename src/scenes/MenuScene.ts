@@ -21,6 +21,7 @@ import {
   type BoardTileReveal,
   resolveBoardTileStyleFromSearch
 } from '../render/boardTileLayer';
+import { HUD_ICON_CELL_PX, HUD_ICON_GLYPH_BOX } from '../render/hudIconAtlas';
 import { MazeRevealDriver, resolveMazeMarkerAlpha, type MazeRevealClock } from '../render/mazeRevealDriver';
 import { centerOfCell, drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
 import { resolvePlayerCoreAlphaScale, shouldDrawEndpointMarker } from '../render/endpointMarkerLayering';
@@ -1586,6 +1587,16 @@ interface LegacyHudIconSourceMetrics {
 const MAZER_HUD_PROFILE_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 729, bboxWidth: 615, bboxX: 320, bboxY: 268 };
 const MAZER_HUD_LEADERBOARD_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 524, bboxWidth: 692, bboxX: 281, bboxY: 359 };
 const MAZER_HUD_SETTINGS_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 828, bboxWidth: 807, bboxX: 221, bboxY: 204 };
+// MAZER-VIS-011: the outline-icon atlas replaces those bitmaps. BootScene (Wave 4D-A, a separate PR) bakes
+// each icon into a HUD_ICON_CELL_PX square texture with every glyph inside HUD_ICON_GLYPH_BOX, so one crop
+// serves all three. applyLegacyHudIconFrame picks it by texture width: the 1254 px bitmaps above keep their
+// own crops until that PR lands, so this change is a no-op on today's assets and nothing is half-switched.
+const MAZER_HUD_BAKED_ICON_METRICS: LegacyHudIconSourceMetrics = {
+  bboxHeight: HUD_ICON_GLYPH_BOX.height,
+  bboxWidth: HUD_ICON_GLYPH_BOX.width,
+  bboxX: HUD_ICON_GLYPH_BOX.x,
+  bboxY: HUD_ICON_GLYPH_BOX.y
+};
 // Wave 4D-B QA-only Teleport anchor-pose preview: the logical anchor footprint
 // side (32 px) the pure pose/clearance resolver is asked about. Nothing is
 // rendered at this size any more; the diamonds are the procedural kites.
@@ -10962,10 +10973,11 @@ export class MenuScene extends Phaser.Scene {
       image.setVisible(false);
       return;
     }
-    const scale = desiredSize / Math.max(metrics.bboxWidth, metrics.bboxHeight);
+    const crop = image.width === HUD_ICON_CELL_PX ? MAZER_HUD_BAKED_ICON_METRICS : metrics;
+    const scale = desiredSize / Math.max(crop.bboxWidth, crop.bboxHeight);
     image
-      .setCrop(metrics.bboxX, metrics.bboxY, metrics.bboxWidth, metrics.bboxHeight)
-      .setDisplaySize(metrics.bboxWidth * scale, metrics.bboxHeight * scale)
+      .setCrop(crop.bboxX, crop.bboxY, crop.bboxWidth, crop.bboxHeight)
+      .setDisplaySize(crop.bboxWidth * scale, crop.bboxHeight * scale)
       .setPosition(centerX, centerY)
       .setAlpha(alpha)
       .setVisible(true);
