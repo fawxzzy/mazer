@@ -164,3 +164,4 @@
 {"card":"MAZER-PWA-005","id":"7a22e1acfc0e","status":"deferred_candidate","text":"Parked: later, waits on owner-approved icon art with clean corners.","ts":"2026-11-14T21:40:00Z","v":1}
 {"card":"MAZER-QA-002","id":"f1f685ee7fcd","status":"planning","text":"Folded into the single phone checklist card (QA-009); owner device pass pending.","ts":"2026-11-14T21:40:00Z","v":1}
 {"card":"MAZER-PROG-005","id":"45ac997474fa","status":"planning","text":"Needs owner decision: same as the hazard contract (HAZ-002); not started.","ts":"2026-11-14T21:40:00Z","v":1}
+{"card":"MAZER-PROG-019","id":"5b8969cd8afc","status":"planning","text":"Needs owner decision: is a ladder ending at level 218 acceptable? Not started.","ts":"2026-11-14T21:40:00Z","v":1}
