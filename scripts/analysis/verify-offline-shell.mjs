@@ -563,8 +563,24 @@ const runVersionUpdate = async ({ browser, server, distA, distB, checks, finding
     const registration = await navigator.serviceWorker.getRegistration();
     await registration.update();
   }).catch(() => { /* the page may be reloaded mid-evaluate by the controller change */ });
+  // MAZER-PWA-006 deferred update: the new worker takes over, but a visible page and a hidden page that is mid-run
+  // both keep their session. Only hidden AND idle (menu, no run) reloads onto the new build.
+  await sleep(4000);
+  const reloadedWhileVisible = mainFrameNavigations.length > navigationsBeforeUpdate;
+  const hidePage = () => page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await hidePage();
+  await sleep(2500);
+  const reloadedWhileHiddenMidRun = mainFrameNavigations.length > navigationsBeforeUpdate;
+  const sentinelWhileDeferred = await page.evaluate(() => window.__proofSessionSentinel ?? null);
+  const hiddenAt = Date.now();
+  // Simulate the run ending (private mode flag, QA-only), then hide again.
+  await page.evaluate(() => { window.__MAZER_GAME__.scene.getScene('MenuScene').mode = 'menu'; });
+  await hidePage();
   await pollPage(page, () => window.__MAZER_OFFLINE_PROOF_BUILD__ === 'B', 'build B running in the page', { timeoutMs: 60_000 });
-  const reloadDelayMs = Date.now() - reloadedAt;
+  const reloadDelayMs = Date.now() - hiddenAt;
   await gameReady(page);
   await sleep(1500);
   const after = await readServiceWorkerState(page);
@@ -588,6 +604,8 @@ const runVersionUpdate = async ({ browser, server, distA, distB, checks, finding
   const mainAssetsBefore = (cacheBefore.caches.find((cache) => cache.name.includes('precache'))?.keys ?? []).map((url) => normalizeCacheKeyUrl(url, origin)).filter((path) => /\/assets\/main-[^/]+\.js$/.test(path));
   const mainAssetsAfter = (cacheAfter.caches.find((cache) => cache.name.includes('precache'))?.keys ?? []).map((url) => normalizeCacheKeyUrl(url, origin)).filter((path) => /\/assets\/main-[^/]+\.js$/.test(path));
 
+  checks.push(makeCheck('update-deferred-while-visible-and-mid-run', !reloadedWhileVisible && !reloadedWhileHiddenMidRun && sentinelWhileDeferred === 'build-a-session',
+    `reloaded while visible+playing=${reloadedWhileVisible}; reloaded while hidden mid-run=${reloadedWhileHiddenMidRun}; in-memory sentinel kept=${sentinelWhileDeferred}`));
   checks.push(makeCheck('update-new-build-takes-over', before.buildMarker === null && after.buildMarker === 'B' && after.registrations.length === 1,
     `marker before=${before.buildMarker} after=${after.buildMarker}; main bundle before=${JSON.stringify(mainAssetsBefore)} after=${JSON.stringify(mainAssetsAfter)}`));
   checks.push(makeCheck('update-old-precache-removed', mainAssetsAfter.length === 1 && !mainAssetsAfter.some((path) => mainAssetsBefore.includes(path)),
@@ -597,9 +615,7 @@ const runVersionUpdate = async ({ browser, server, distA, distB, checks, finding
   checks.push(makeCheck('update-no-page-errors', log.pageErrors.length === 0, `page errors: ${JSON.stringify(log.pageErrors)}`));
 
   // Documented behaviour, not a pass/fail on "does not interrupt": it does.
-  findings.push(reloadedDuringSession
-    ? `Deploying a new build RELOADS a running session: skipWaiting + clientsClaim activate the new worker at once and serviceWorkerLifecycle.ts reloads the page on controllerchange (observed ${reloadDelayMs} ms after the update check; the page's in-memory state was lost: sentinel ${JSON.stringify(sentinelAfter)}, mode after ${JSON.stringify(afterPlayerState.mode)}). In-memory run state is lost; whether saved progress restores a mid-level position was not measured. The shell is never left half-updated (old precache removed, new one complete).`
-    : 'A new build did not reload the running session in this run.');
+  findings.push(`MAZER-PWA-006 deferred update: a new build activates its worker at once but the running page is NOT reloaded while visible or mid-run (visible reload=${reloadedWhileVisible}, hidden mid-run reload=${reloadedWhileHiddenMidRun}); once hidden and idle it reloads onto the new build (${reloadDelayMs} ms after hide). Mid-level restore: after the reload the scene is in ${JSON.stringify(afterPlayerState.mode)} and the in-memory run is not restored (sentinel after reload ${JSON.stringify(sentinelAfter)}), because the endless checkpoint store is not wired; this is why a mid-run reload is deferred. The shell is never left half-updated (old precache removed, new one complete).`);
   evidence.versionUpdate = {
     startedPlay: started?.accepted === true,
     movedBeforeUpdate: beforeMove.moved,

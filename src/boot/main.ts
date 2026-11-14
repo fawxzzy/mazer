@@ -73,6 +73,15 @@ const resetLocalhostServiceWorkers = async (): Promise<boolean> => {
   return changed;
 };
 
+// Set once the Phaser game exists; the deferred-update reload (MAZER-PWA-006) asks it whether a run is active.
+let gameForUpdateIdleCheck: Phaser.Game | null = null;
+
+const isGameIdleForUpdate = (): boolean => {
+  // MenuScene keeps its run state in a private `mode` ('menu' when no run is active); anything unknown counts as busy.
+  const scene = gameForUpdateIdleCheck?.scene.getScene('MenuScene') as unknown as { mode?: string } | null | undefined;
+  return scene?.mode === 'menu';
+};
+
 const registerProductionServiceWorker = (): void => {
   installMazerProductionServiceWorker({
     hostname: window.location.hostname,
@@ -90,6 +99,11 @@ const registerProductionServiceWorker = (): void => {
       controlledAtBoot: navigator.serviceWorker.controller !== null,
       addControllerChangeListener: (listener) => navigator.serviceWorker.addEventListener('controllerchange', listener),
       reload: () => window.location.reload(),
+      deferReload: {
+        isHidden: () => document.visibilityState === 'hidden',
+        isSafeToReload: isGameIdleForUpdate,
+        addHiddenListener: (listener) => document.addEventListener('visibilitychange', listener)
+      },
       warmBootArt: () => {
         // First install: the worker now controls this page, so re-requesting the boot art through it (the browser's
         // HTTP cache answers the network part) fills the offline runtime cache without reloading the page.
@@ -204,6 +218,7 @@ const boot = async (): Promise<void> => {
       syncMazerGameToViewport(game, geometry);
     }
   });
+  gameForUpdateIdleCheck = game;
   registerProductionServiceWorker();
   markMazerBootStatus('game-created');
   // Bounded: if MenuScene never reports in, the splash still comes off so the

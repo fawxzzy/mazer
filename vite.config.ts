@@ -54,6 +54,14 @@ export default defineConfig({
       },
       workbox: {
         cacheId: 'mazer-v1',
+        // MAZER-PWA-006: the install download is the offline game shell only. Dev/QA entry pages, the chunks only they
+        // use, and the legacy cleanup worker (public/sw.js) stay on the network; offline they fall back to index.html.
+        globIgnores: [
+          'sw.js',
+          '{proof-surfaces,visual-proof,watch-pass-preview,watch-pass-paywall,watch-pass-setup,planet3d,future-phaser}.html',
+          'assets/{proof-surfaces,visual-proof,watch-pass-preview,watch-pass-paywall,watch-pass-setup,planet3d,future-phaser}-*',
+          'assets/{snapshotCard,RuntimeAdapterBridge,preferences,IntentBus}-*'
+        ],
         // Versioned icon URLs map to Workbox's content-revisioned precache
         // entries instead of bypassing the offline install assets.
         ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^v$/],
