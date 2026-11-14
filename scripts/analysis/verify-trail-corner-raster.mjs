@@ -131,7 +131,10 @@ const setSceneState = async (page, { maze, player, trail }) => {
     scene.trailAnimationElapsedMs = 0;
     scene.trailShineLapStartedAtMs = 0;
     // MAZER-UI-026: Trail Fade / Trail Shine are no longer settings. Trail fade is fixed off and the shine band
-    // is held still by the reduced-motion preference applied above.
+    // is held still by the reduced-motion preference applied above. The trail HUE now always drifts with the colour
+    // clock (it used to be held at phase 0 by Trail Shine off), so freeze that clock too: this check is only about
+    // corner stroke geometry and must raster the same pixels on every run.
+    scene.advanceLegacyTrailAnimationClock = () => 0;
     scene.menuStaticDrawLifecyclePhase = 'settled';
     scene.menuStaticDrawRowsVisible = null;
     scene.menuStaticDrawTilesVisible = null;
