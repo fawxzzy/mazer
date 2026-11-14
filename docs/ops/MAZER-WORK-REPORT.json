@@ -11,22 +11,22 @@
     }
   },
   "counters": {
-    "total": 250,
-    "open": 95,
+    "total": 241,
+    "open": 94,
     "completed": 121,
-    "deferred": 34,
+    "deferred": 26,
     "buckets": {
-      "needs-you": 35,
+      "needs-you": 34,
       "in-review": 36,
       "blocked": 6,
       "ready": 5,
       "in-progress": 1,
       "unclassified": 12,
-      "deferred": 34,
+      "deferred": 26,
       "completed": 121
     },
     "needsYou": {
-      "decisions": 8,
+      "decisions": 7,
       "checks": 27
     },
     "completedByTier": {
@@ -133,18 +133,6 @@
         "ask": "Provide approved app icon art with proper corners (or say to keep the current icon).",
         "recommendation": "Supply a master without baked corners; the build agent then regenerates the icons, the hash verifier and clean screenshots.",
         "context": "The icon master has baked black corners and new icon art is owner-gated; screenshots carry a small preview label.",
-        "prs": "",
-        "verify": []
-      },
-      {
-        "id": "MAZER-TOOLS-001",
-        "title": "Define a handcrafted asset authoring and import workflow",
-        "status": "planning",
-        "priority": "low",
-        "kind": "decision",
-        "ask": "Do you want a handcrafted-asset import workflow, and in which file format?",
-        "recommendation": "Park it as deferred; no open card depends on it.",
-        "context": "Not started; needs an owner decision on the asset format.",
         "prs": "",
         "verify": []
       }
@@ -2676,14 +2664,6 @@
       "waitsOn": "other-card"
     },
     {
-      "id": "MAZER-CAM-001",
-      "title": "Add a play camera zoom and minimap (deferred)",
-      "status": "deferred_candidate",
-      "priority": "low",
-      "why": "Camera zoom and minimap deferred; board size is frozen.",
-      "waitsOn": "Zac"
-    },
-    {
       "id": "MAZER-CHAL-001",
       "title": "Add shared-seed daily and weekly challenges",
       "status": "deferred_candidate",
@@ -2708,14 +2688,6 @@
       "waitsOn": "other-card"
     },
     {
-      "id": "MAZER-GEN-003",
-      "title": "Extract the maze pattern engine and batch generator as contracts",
-      "status": "deferred_candidate",
-      "priority": "low",
-      "why": "Both extraction candidates need a refactor of the shared maze core first.",
-      "waitsOn": "Zac"
-    },
-    {
       "id": "MAZER-HAZ-006",
       "title": "Add usable items and the invisibility cloak (covered by the hazard phases)",
       "status": "deferred_candidate",
@@ -2732,35 +2704,11 @@
       "waitsOn": "other-card"
     },
     {
-      "id": "MAZER-MODE-001",
-      "title": "Build the moving procedural maze mode (deferred)",
-      "status": "deferred_candidate",
-      "priority": "low",
-      "why": "Moving maze mode deferred by the owner.",
-      "waitsOn": "Zac"
-    },
-    {
-      "id": "MAZER-MODE-002",
-      "title": "Plan multiplayer and endless survival mode (deferred)",
-      "status": "deferred_candidate",
-      "priority": "low",
-      "why": "Multiplayer and endless survival deferred by the owner.",
-      "waitsOn": "Zac"
-    },
-    {
       "id": "MAZER-NATIVE-001",
       "title": "Plan the native app-store wrapper after web stabilization",
       "status": "deferred_candidate",
       "priority": "low",
       "why": "Web first and installed web app only.",
-      "waitsOn": "Zac"
-    },
-    {
-      "id": "MAZER-PATH-001",
-      "title": "Define a diagonal path graph contract (deferred)",
-      "status": "deferred_candidate",
-      "priority": "low",
-      "why": "Diagonal path graph deferred by the owner.",
       "waitsOn": "Zac"
     },
     {
@@ -2788,14 +2736,6 @@
       "waitsOn": "other-card"
     },
     {
-      "id": "MAZER-RUN-002",
-      "title": "Show run quality to the player after a run (deferred)",
-      "status": "deferred_candidate",
-      "priority": "low",
-      "why": "Player-facing run quality display deferred by the owner.",
-      "waitsOn": "Zac"
-    },
-    {
       "id": "MAZER-RUN-003",
       "title": "Decide how run quality gates leaderboard and achievement entries",
       "status": "deferred_candidate",
@@ -2809,14 +2749,6 @@
       "status": "deferred_candidate",
       "priority": "low",
       "why": "Wiring touches the contended menu scene; low priority.",
-      "waitsOn": "Zac"
-    },
-    {
-      "id": "MAZER-SOCIAL-001",
-      "title": "Define social profiles, friends and events (deferred)",
-      "status": "deferred_candidate",
-      "priority": "low",
-      "why": "Social profiles, friends and events deferred by the owner.",
       "waitsOn": "Zac"
     },
     {
@@ -2841,14 +2773,6 @@
       "status": "deferred_candidate",
       "priority": null,
       "why": "Kept as planning evidence only; no Cyberdeck build is approved.",
-      "waitsOn": "Zac"
-    },
-    {
-      "id": "MAZER-PLANET-001",
-      "title": "Research a rotating planet maze",
-      "status": "deferred_candidate",
-      "priority": null,
-      "why": "Parked research; not current product work.",
       "waitsOn": "Zac"
     }
   ],
@@ -2982,10 +2906,6 @@
     "MAZER-AUTH-QA-001": {
       "bucket": "completed",
       "sub": "headless"
-    },
-    "MAZER-PLANET-001": {
-      "bucket": "deferred",
-      "sub": null
     },
     "MAZER-CYBERDECK-001": {
       "bucket": "deferred",
@@ -3239,10 +3159,6 @@
       "bucket": "completed",
       "sub": "source-only"
     },
-    "MAZER-GEN-003": {
-      "bucket": "deferred",
-      "sub": null
-    },
     "MAZER-HAZ-001": {
       "bucket": "completed",
       "sub": "no-device-surface"
@@ -3451,10 +3367,6 @@
       "bucket": "completed",
       "sub": "no-device-surface"
     },
-    "MAZER-RUN-002": {
-      "bucket": "deferred",
-      "sub": null
-    },
     "MAZER-RUN-003": {
       "bucket": "deferred",
       "sub": null
@@ -3475,33 +3387,9 @@
       "bucket": "deferred",
       "sub": null
     },
-    "MAZER-CAM-001": {
-      "bucket": "deferred",
-      "sub": null
-    },
-    "MAZER-PATH-001": {
-      "bucket": "deferred",
-      "sub": null
-    },
-    "MAZER-MODE-001": {
-      "bucket": "deferred",
-      "sub": null
-    },
-    "MAZER-MODE-002": {
-      "bucket": "deferred",
-      "sub": null
-    },
-    "MAZER-SOCIAL-001": {
-      "bucket": "deferred",
-      "sub": null
-    },
     "MAZER-CHAL-001": {
       "bucket": "deferred",
       "sub": null
-    },
-    "MAZER-TOOLS-001": {
-      "bucket": "needs-you",
-      "sub": "decision"
     },
     "MAZER-REPO-HYGIENE-001": {
       "bucket": "completed",
