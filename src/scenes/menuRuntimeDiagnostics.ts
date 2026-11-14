@@ -3,6 +3,8 @@ import type { TelemetryEvent, TelemetrySemanticSummary } from '../telemetry';
 import type { MazeCycleTelemetryDiagnostics } from '../legacy-runtime/mazeCycleTelemetry';
 import type { LegacyProgressionDiagnostics } from '../legacy-runtime/legacyProgression';
 import type { HumanInputTimingSnapshot } from '../input-human';
+import type { LegacyPlayerMessage } from '../legacy-runtime/legacyPlayerMessage';
+import type { DemoTrailMode } from '../domain/ai/demoWalker';
 import {
   createMenuCaptureMetadataDiagnosticsV1,
   parseMenuCaptureMetadataDiagnosticsV1
@@ -133,7 +135,8 @@ export interface MenuSceneRuntimeDiagnostics {
     email: string | null;
     emailPresent: boolean;
     formMode: 'login';
-    invalidFields: string[];
+    /** The credential form is gone (MAZER-ACCT-043): production only ever publishes an empty list. */
+    invalidFields: never[];
     rememberedIdentity: {
       displayName: string;
       email: string;
@@ -145,8 +148,8 @@ export interface MenuSceneRuntimeDiagnostics {
     latestMessage: {
       copy: string;
       id: string;
-      source: string;
-      tone: string;
+      source: LegacyPlayerMessage['source'];
+      tone: LegacyPlayerMessage['tone'];
     } | null;
   };
   gameToggles?: {
@@ -405,7 +408,7 @@ export interface MenuSceneRuntimeDiagnostics {
       cueCounts: Partial<Record<string, number>>;
       routeLength: number;
       segmentCount: number;
-      trailModeCounts: Partial<Record<string, number>>;
+      trailModeCounts: Partial<Record<DemoTrailMode, number>>;
       traverseMs: number;
     };
   };
