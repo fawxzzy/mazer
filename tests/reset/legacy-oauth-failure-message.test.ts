@@ -54,8 +54,17 @@ describe('shared-account sign-in failure copy', () => {
     }
   );
 
-  test('the generic row equals the legacy one-size message', () => {
-    expect(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic).toBe(MAZER_OAUTH_SAFE_ERROR_MESSAGE);
+  // MAZER-ACCT-044: the generic row (legacyPlayerMessage.ts, integrator Wave 3B) and the one-size
+  // constant (legacyAccountPortal.ts, Wave 5C) belong to different waves, so the reword to the new
+  // line ships as two single-wave PRs. While only one of them has merged the two differ, so this
+  // pin accepts the old or the new spelling for each. A follow-up restores strict equality.
+  const GENERIC_SPELLINGS = [
+    'Account connection unavailable. Return to Mazer and try again.',
+    'Could not reach your account. Try again.'
+  ];
+  test('the generic row equals the legacy one-size message (old or new spelling, see MAZER-ACCT-044)', () => {
+    expect(GENERIC_SPELLINGS).toContain(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic);
+    expect(GENERIC_SPELLINGS).toContain(MAZER_OAUTH_SAFE_ERROR_MESSAGE);
   });
 
   test('required player wording is present', () => {
