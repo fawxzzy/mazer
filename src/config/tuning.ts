@@ -1,81 +1,6 @@
-const createAmbientSkyTuning = () => ({
-  twinkleCount: 14,
-  twinkleAlphaMin: 0.08,
-  twinkleAlphaMax: 0.22,
-  twinklePulseDurationMinMs: 3600,
-  twinklePulseDurationMaxMs: 9800,
-  twinkleDriftRangePx: 5,
-  driftMoteCount: 5,
-  driftMoteAlphaMin: 0.03,
-  driftMoteAlphaMax: 0.08,
-  driftMoteSpeedPxPerSecMin: 0.22,
-  driftMoteSpeedPxPerSecMax: 0.46,
-  hazeLayerCount: 2,
-  hazeAlphaMin: 0.035,
-  hazeAlphaMax: 0.08,
-  hazeDriftRangePx: 10,
-  hazeDriftDurationMinMs: 76000,
-  hazeDriftDurationMaxMs: 160000,
-  shootingStar: {
-    minIntervalMs: 26000,
-    maxIntervalMs: 42000,
-    durationMinMs: 1200,
-    durationMaxMs: 2100,
-    lengthMinPx: 48,
-    lengthMaxPx: 72,
-    alphaMin: 0.14,
-    alphaMax: 0.28
-  },
-  comet: {
-    minIntervalMs: 62000,
-    maxIntervalMs: 98000,
-    durationMinMs: 2200,
-    durationMaxMs: 3400,
-    lengthMinPx: 64,
-    lengthMaxPx: 112,
-    alphaMin: 0.14,
-    alphaMax: 0.24
-  },
-  satellite: {
-    minIntervalMs: 108000,
-    maxIntervalMs: 168000,
-    durationMinMs: 4200,
-    durationMaxMs: 6800,
-    alphaMin: 0.1,
-    alphaMax: 0.16,
-    blinkDurationMinMs: 560,
-    blinkDurationMaxMs: 1100
-  },
-  ufo: {
-    minIntervalMs: 220000,
-    maxIntervalMs: 320000,
-    durationMinMs: 4800,
-    durationMaxMs: 7600,
-    alphaMin: 0.08,
-    alphaMax: 0.14,
-    blinkDurationMinMs: 480,
-    blinkDurationMaxMs: 980
-  },
-  clearZone: {
-    boardPadTiles: 2.6,
-    titlePadPx: 18,
-    installPadPx: 18,
-    mobilePadPx: 16,
-    obsPadPx: 28
-  }
-} as const);
-
-let ambientSkyTuningCache: ReturnType<typeof createAmbientSkyTuning> | undefined;
-
-const resolveAmbientSkyTuning = () => {
-  ambientSkyTuningCache ??= createAmbientSkyTuning();
-  return ambientSkyTuningCache;
-};
-
 export const legacyTuning = {
   board: {
     // Legacy C++ truth (`MazerGameModeBase::SetupGrid`): default `_Scale` when unset.
-    legacyScale: 50,
     scale: 50,
     // Legacy C++ truth (`MazerGameModeBase`): checkpoint scalar used in count formula.
     checkPointModifier: 0.35,
@@ -108,16 +33,13 @@ export const legacyTuning = {
     },
     tile: {
       floorInsetRatio: 0.1,
-      floorOuterAlpha: 1,
       floorInsetAlpha: 0.92,
       floorSheenAlpha: 0.14,
       wallAlpha: 1,
-      wallGridAlpha: 0.34,
       floorGridAlpha: 0.05,
       bevelRatio: 0.08,
       floorHighlightAlpha: 0.22,
-      floorShadowAlpha: 0.16,
-      wallEdgeAlpha: 0.24
+      floorShadowAlpha: 0.16
     },
     goalPulse: {
       basePulse: 0.98,
@@ -165,8 +87,7 @@ export const legacyTuning = {
       targetBracketInsetRatio: 0.14,
       targetBracketLengthRatio: 0.18,
       targetBracketAlpha: 0.82,
-      targetTileAlpha: 0.16,
-      maxLength: 30
+      targetTileAlpha: 0.16
     },
     actor: {
       shadowAlpha: 0.76,
@@ -220,12 +141,6 @@ export const legacyTuning = {
   menu: {
     layout: {
       narrowBreakpoint: 620,
-      boardScaleNarrow: 0.95,
-      boardScaleWide: 0.978,
-      topReserveRatio: 0.078,
-      topReserveMinPx: 84,
-      bottomPaddingPx: 30,
-      sidePaddingPx: 16,
       smallMazeMaxSpanTiles: 25,
       mediumMazeMaxSpanTiles: 39,
       smallMazeMaxSafeOccupancyWide: 0.74,
@@ -234,32 +149,6 @@ export const legacyTuning = {
       mediumMazeMaxSafeOccupancyCompact: 0.92,
       smallMazeMaxTilePxWide: 18,
       smallMazeMaxTilePxCompact: 14
-    },
-    title: {
-      text: 'Mazer',
-      fontScaleToBoard: 0.094,
-      yOffsetRatioFromBoardTop: 0.11,
-      alpha: 0.8,
-      strokePx: 3,
-      shadowBlur: 10,
-      pulseMinAlpha: 0.72,
-      pulseMaxAlpha: 0.86,
-      pulseDurationMs: 3200,
-      plateWidthRatio: 0.34,
-      plateHeightRatio: 0.082,
-      plateHeightMinPx: 44,
-      plateHeightMaxPx: 58,
-      plateAlpha: 0.1
-    },
-    status: {
-      insetY: 16,
-      fontPx: 11,
-      compactFontPx: 10,
-      minWidthPx: 124,
-      maxWidthRatio: 0.34,
-      heightPx: 22,
-      compactHeightPx: 20,
-      pulseDurationMs: 1200
     },
     intentFeed: {
       insetXPx: 18,
@@ -283,20 +172,14 @@ export const legacyTuning = {
       paddingXPx: 20,
       paddingYPx: 10,
       compactPaddingYPx: 8,
-      headerHeightPx: 18,
-      compactHeaderHeightPx: 15,
       lineHeightPx: 24,
       compactLineHeightPx: 20,
       entryGapPx: 4,
       compactEntryGapPx: 2,
-      headerFontPx: 10,
-      compactHeaderFontPx: 9,
       statusFontPx: 16,
       compactStatusFontPx: 14,
       entryFontPx: 15,
       compactEntryFontPx: 13,
-      riskFontPx: 11,
-      compactRiskFontPx: 10,
       summaryMaxChars: 40,
       compactSummaryMaxChars: 30,
       statusMaxChars: 40,
@@ -313,30 +196,15 @@ export const legacyTuning = {
       compactUpwardDriftPx: 8,
       lineAlphaScales: [1, 0.72, 0.5, 0.32, 0.18],
       occlusionPadPx: 36,
-      anchorSizePx: 56,
       boardGapPx: 12,
       installGapPx: 12,
       commentaryRailEnabled: false,
-      commentaryRailGapPx: 18,
       commentaryRailMinViewportWidthPx: 960,
       commentaryRailMinViewportHeightPx: 620,
       commentaryRailMinAspectRatio: 1.2,
       desktopBottomWidthPx: 780,
       desktopBottomMinWidthPx: 500,
-      desktopBottomMaxWidthRatio: 0.6,
-      compactThreeThoughtMinHeightPx: 760,
-      compactThreeThoughtMinWidthPx: 360,
-      microThoughtMinHeightPx: 620,
-      microThoughtMinWidthPx: 768,
-      microThoughtThirdMinHeightPx: 900,
-      microThoughtThirdMinWidthPx: 1280
-    },
-    signalPriority: {
-      trailFillAlphaScale: 0.76,
-      trailGlowAlphaScale: 0.82,
-      trailCoreAlphaScale: 0.9,
-      goalGlowAlphaScale: 0.94,
-      actorHaloAlphaScale: 1.26
+      desktopBottomMaxWidthRatio: 0.6
     },
     runtime: {
       diagnosticsPublishIntervalMs: 1500,
@@ -372,101 +240,6 @@ export const legacyTuning = {
         throttled: 1,
         hidden: 0
       }
-    },
-    utilityButton: {
-      insetTopPx: 16,
-      insetSidePx: 16,
-      sizePx: 32,
-      hitSizePx: 40,
-      alpha: 0.58,
-      introRisePx: 4,
-      introDurationMs: 180,
-      introDelayMs: 86
-    },
-    starfield: {
-      cloudCount: 10,
-      cloudRadiusMin: 160,
-      cloudRadiusMax: 360,
-      cloudAlphaMin: 0.05,
-      cloudAlphaMax: 0.15,
-      starCount: 460,
-      starRadiusMin: 0.5,
-      starRadiusMax: 2.2,
-      starAlphaMin: 0.22,
-      starAlphaMax: 0.98,
-      starsDriftRangePx: 14,
-      starsDriftDurationMs: 15000,
-      vignetteAlpha: 0.38,
-      vignetteBandRatio: 0.18
-    },
-    get ambientSky() {
-      return resolveAmbientSkyTuning();
-    }
-  },
-  game: {
-    layout: {
-      compactBreakpoint: 620,
-      boardScaleWide: 0.94,
-      boardScaleNarrow: 0.985,
-      topReservePx: 62,
-      compactTopReservePx: 50,
-      bottomPaddingPx: 20,
-      sidePaddingPx: 14
-    }
-  },
-  hud: {
-    compactBreakpoint: 620,
-    ultraCompactBreakpoint: 420,
-    panelY: 34,
-    panelHeight: 66,
-    compactPanelHeight: 58,
-    ultraCompactPanelHeight: 54,
-    panelInsetX: 22,
-    compactPanelInsetX: 14,
-    ultraCompactPanelInsetX: 10,
-    panelMaxWidth: 960,
-    panelAlpha: 0.78,
-    panelShadowOffsetY: 7,
-    panelShadowAlpha: 0.3,
-    contentPaddingX: 24,
-    compactContentPaddingX: 14,
-    ultraCompactContentPaddingX: 10,
-    primaryTextY: 10,
-    compactPrimaryTextY: 8,
-    ultraCompactPrimaryTextY: 7,
-    secondaryTextY: 33,
-    compactSecondaryTextY: 27,
-    ultraCompactSecondaryTextY: 23,
-    lineY: 56,
-    compactLineY: 48,
-    ultraCompactLineY: 42,
-    lineInsetX: 56,
-    compactLineInsetX: 28,
-    ultraCompactLineInsetX: 18,
-    arrowPulseMinAlpha: 0.66,
-    arrowPulseMaxAlpha: 0.9,
-    arrowPulseDurationMs: 1300,
-    timerFontPx: 20,
-    compactTimerFontPx: 16,
-    ultraCompactTimerFontPx: 14,
-    arrowFontPx: 19,
-    compactArrowFontPx: 15,
-    ultraCompactArrowFontPx: 13,
-    hintFontPx: 11,
-    compactHintFontPx: 10,
-    ultraCompactHintFontPx: 9
-  },
-  overlays: {
-    listSpacingPx: 54,
-    intro: {
-      pauseScaleStart: 0.98,
-      winScaleStart: 0.975,
-      panelDurationMs: 176,
-      buttonRisePausePx: 6,
-      buttonRiseWinPx: 8,
-      buttonDurationMs: 156,
-      buttonDelayStartMs: 74,
-      buttonDelayStepMs: 42
     }
   },
   demo: {
@@ -482,35 +255,9 @@ export const legacyTuning = {
       branchResumeMs: 138,
       // Ambient shell should linger at the solved end-state long enough to read the full route.
       goalHoldMs: 3900,
-      resetHoldMs: 620,
-      goalPulseMs: 90,
-      heroRefreshMs: 70
-    },
-    ritual: {
-      decisionSlowdownFactor: 0.78,
-      decisionWindowStartRatio: 0.74,
-      decisionWindowEndRatio: 0.96,
-      failReflectionRatio: 0.76,
-      failCardAlpha: 0.84,
-      retryCardAlpha: 0.66,
-      cardWidthRatio: 0.58,
-      cardMinWidthPx: 180,
-      cardMaxWidthPx: 320,
-      cardHeightPx: 70,
-      cardTitleFontPx: 15,
-      cardSubtitleFontPx: 11
+      resetHoldMs: 620
     },
     lifecycle: {
-      buildPrerollRatio: 0.18,
-      buildRevealStartRatio: 0.05,
-      buildRevealEndRatio: 0.88,
-      settleInRatio: 0.24,
-      clearHoldRatio: 0.4,
-      eraseStartRatio: 0.76,
-      minClearHoldMs: 300,
-      minReflectionBeatMs: 300,
-      minEraseWipeMs: 420,
-      visualArrivalSettleMs: 180,
       exitArrivalInsetRatio: 0.18,
       reducedMotionChunkSize: 5
     },
