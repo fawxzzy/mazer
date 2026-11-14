@@ -143,3 +143,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: `src/legacy-runtime/legacyAttemptSeed.ts` saves the play-attempt maze seed (keyed on level, completed cycles and board aspect, scoped per account) when a play maze is built; `MenuScene.ts` reads it in `createFreshLegacyPlayGenerationSeed`, writes it in `rebuildMaze`, and clears it on completion and on reset progress.
 - WHY it changed: quitting or reloading mid-level re-rolled the maze, so quitting was a free re-roll (owner decision 2026-11-14).
 - Status: Applied
+
+## 2026-11-14 MAZER-VIS-037: trail core colour step bounded at the sheen crossing
+
+- WHAT changed: `src/render/trailPalette.ts` sheen band softened and slowed (peak core lift 0.55 to 0.35, ridge cosine^5 to cosine^3, period 1500 to 3000 ms so 6 to 3 tiles a second, hue refraction 0.2 to 0.05). Tests: new `tests/render/trail-sheen-colour-step.test.ts`; `tests/reset/trail-iridescence.test.ts` and `tests/render/bleed-glow-colour-step.test.ts` thresholds updated.
+- WHY it changed: the trail core stepped up to 20 of 255 per 33 ms redraw where the sheen crosses (13 at 20 ms); it now steps at most 8 (the bound PERF-007 set for the dock glow). A stateless palette bound is the only option without per-vertex state; it visibly softens the sheen, so the owner confirms on a phone.
+- Rule: Bound a colour step at its source (the palette) when the redraw rate cannot rise.
+- Status: Applied (review)
