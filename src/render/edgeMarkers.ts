@@ -49,9 +49,9 @@
  *
  * Placement (MAZER-VIS-043): every diamond sits fully inside the canvas with its OUTER tip touching the screen edge: the painted
  * bounding box (outline plus the miter join of a 1 px stroke, `resolveEdgeMarkerPaintedPolygon`) touches the edge exactly and
- * never crosses it. The four edge midpoints point straight in. The four corner diamonds point along the corner diagonal, touch the
- * top / bottom edge with their outer tip and sit EDGE_MARKER_CORNER_CLEARANCE_PX along that edge from the corner, so a rounded
- * display corner of up to that radius does not cut them (a tip exactly on the corner point is cut by any rounded corner).
+ * never crosses it. The four edge midpoints point straight in. The four corner diamonds point along the corner diagonal with their outer tip
+ * pinned ~16.4 px from BOTH edges (MAZER-VIS-044, edgeCornerAnchor.ts): snug in the corner at every viewport size, clear of a
+ * rounded display corner (a tip exactly on the corner point is cut by any rounded corner), scaled about that tip.
  *
  * Lasers and fill (MAZER-VIS-030, VIS-038): on departure the player fires a beam out to ALL 8 diamonds; each diamond FILLS with
  * the player's colour from the exact instant its beam touches it (grows from its inner tip, full when the beam is fully
@@ -70,6 +70,7 @@
  * exclusively from the trail palette (trailPalette.ts) and cyberArcadeMaterial tokens.
  */
 import { isLegacyWrappedStepTransition } from '../legacy-runtime/legacyMaze';
+import { EDGE_CORNER_DISPLAY_RADIUS_PX, resolveEdgeCornerTipInset } from './edgeCornerAnchor';
 import { PLAYER_COLOR, resolveTrailPaletteBorderColor } from './trailPalette';
 import { MOTION_DURATION_MS, MOTION_LOOP_MS } from './motionScale';
 import {
@@ -113,11 +114,11 @@ export const EDGE_MARKER_HALF_WIDTH = 7;
 export const EDGE_MARKER_HALF_HEIGHT = 10;
 export const EDGE_MARKER_STROKE_PX = 1;
 /**
- * Radius, in css px, of the rounded display corner a corner diamond must clear: the farthest painted point of a corner diamond
- * along the top / bottom edge is this far from the screen corner. 56 css px covers the rounded corners of the iPhone 12 to 15 Pro
- * class (about 47 to 55); a bigger radius still trims the nearest sliver (documented in docs/ui/MAZER-EDGE-INNER-TIP-SIZE-CYCLE-2026-11-13.md).
+ * Radius, in css px, of the rounded display corner a corner diamond must clear (edgeCornerAnchor.ts). Its outer tip is pinned to the
+ * point where the corner diagonal meets that arc (about 16.4 px from both edges), so the diamond is snug in the corner at every
+ * viewport size and the arc never cuts it (MAZER-VIS-044; before it sat this far along the top / bottom edge).
  */
-export const EDGE_MARKER_CORNER_CLEARANCE_PX = 56;
+export const EDGE_MARKER_CORNER_CLEARANCE_PX = EDGE_CORNER_DISPLAY_RADIUS_PX;
 export const EDGE_MARKER_IDLE_PERIOD_MS = MOTION_LOOP_MS.drift;
 export const EDGE_MARKER_IDLE_ALPHA_MIN = 0.45;
 export const EDGE_MARKER_IDLE_ALPHA_MAX = 0.6;
@@ -219,12 +220,12 @@ const resolveEdgeKiteOutwardReach = (inwardAngle: number, side: EdgeSide): numbe
 };
 
 /**
- * The along-the-edge distance from the screen corner to the CENTRE of a corner diamond (the inset of the perimeter rectangle the
- * stations are laid on): the farthest painted point of the corner diamond toward the screen corner is
- * EDGE_MARKER_CORNER_CLEARANCE_PX from it. A 45 degree corner kite paints ~7.8 px to either side of its centre, so ~63.8 px.
+ * The distance, on BOTH axes, from the screen corner to the CENTRE of a corner diamond (the inset of the perimeter rectangle the
+ * stations are laid on): the painted outer tip sits resolveEdgeCornerTipInset() (~16.4 px) from both edges and a 45 degree corner
+ * kite paints ~7.8 px to either side of its centre, so ~24.2 px. Constant at every viewport size.
  */
 export const resolveEdgeCornerInset = (): number => (
-  EDGE_MARKER_CORNER_CLEARANCE_PX + resolveEdgeKiteOutwardReach(INWARD_ANGLE[0], 'left')
+  resolveEdgeCornerTipInset() + resolveEdgeKiteOutwardReach(INWARD_ANGLE[0], 'left')
 );
 
 /**
@@ -254,15 +255,17 @@ export const resolveEdgeStations = (viewport: EdgeViewport, devicePixelRatio = 1
     const along = resolveEdgeStationPosition(id, left, right, top, bottom);
     const side = STATION_SIDE[id];
     const extent = resolveEdgeStationNormalExtent(id);
-    const x = side === 'left' ? extent : side === 'right' ? width - extent : along.x;
-    const y = side === 'top' ? extent : side === 'bottom' ? height - extent : along.y;
+    const isCorner = id % 2 === 0;
+    // Corners sit ON the inset rectangle's corners (snug on the diagonal); midpoints are flush with their edge.
+    const x = isCorner ? along.x : side === 'left' ? extent : side === 'right' ? width - extent : along.x;
+    const y = isCorner ? along.y : side === 'top' ? extent : side === 'bottom' ? height - extent : along.y;
     return {
       id,
       x,
       y,
       inwardAngle: INWARD_ANGLE[id],
       side,
-      isCorner: id % 2 === 0
+      isCorner
     };
   });
 };
@@ -317,21 +320,21 @@ export const resolveOrbitingEdgeStation = (
   const left = inset;
   const right = Math.max(left, viewport.width - inset);
   const cornerReach = resolveEdgeStationNormalExtent(0);
-  const topCornerY = cornerReach;
-  const bottomCornerY = viewport.height - cornerReach;
+  const topCornerY = inset;
+  const bottomCornerY = viewport.height - inset;
   // 0 at the side midpoint, 1 at its corners (squared: the kite stays flush for most of the side).
   const cornerBlend = ((2 * u) - 1) ** 2;
   let x: number;
   let y: number;
   if (side === 'top') {
     x = left + ((right - left) * u);
-    y = reach;
+    y = reach + ((inset - cornerReach) * cornerBlend);
   } else if (side === 'right') {
     x = viewport.width - (reach + (((viewport.width - right) - cornerReach) * cornerBlend));
     y = topCornerY + ((bottomCornerY - topCornerY) * u);
   } else if (side === 'bottom') {
     x = right + ((left - right) * u);
-    y = viewport.height - reach;
+    y = viewport.height - (reach + ((inset - cornerReach) * cornerBlend));
   } else {
     x = reach + ((left - cornerReach) * cornerBlend);
     y = bottomCornerY + ((topCornerY - bottomCornerY) * u);

@@ -13,6 +13,7 @@ import {
   type EdgeMarkerState,
   type EdgeStation
 } from '../../src/render/edgeMarkers';
+import { measureEdgeCornerOffset, resolveEdgeCornerTipInset } from '../../src/render/edgeCornerAnchor';
 import { EDGE_DIAMOND_REST_SCALE } from '../../src/render/edgeBeamTimeline';
 import { RasterContext } from './support/rasterContext';
 
@@ -65,6 +66,7 @@ const stateAt = (station: EdgeStation, scale: number, fill = 0): EdgeMarkerState
   alpha: 1, energized: false, energy: 0, fill, flash: 0, hidden: false, id: station.id, scale, spinRad: 0
 });
 
+// MAZER-VIS-044: the four corner diamonds are exempt from "touches the edge": they are pinned snug in the corner instead.
 describe('every edge diamond touches the screen edge with its outer tip and nothing leaves the canvas (MAZER-VIS-043)', () => {
   for (const viewport of VIEWPORTS) {
     for (const dpr of DPRS) {
@@ -98,6 +100,15 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
             expect(bounds.right * resolution, `${text} right`).toBeLessThanOrEqual(backing.width + 1e-6);
             expect(bounds.bottom * resolution, `${text} bottom`).toBeLessThanOrEqual(backing.height + 1e-6);
             // Touching the edge the station sits on, within half a device pixel (and never past it, checked above).
+            if (station.isCorner) {
+              // MAZER-VIS-044: a corner diamond is pinned snug in its corner, the same distance from BOTH edges at every size.
+              const corner = (['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const)[station.id / 2] as 'top-left';
+              const offset = measureEdgeCornerOffset(painted, corner, { width: visibleWidth, height: visibleHeight });
+              const tipInset = resolveEdgeCornerTipInset();
+              expect(Math.abs(offset.horizontal - tipInset) * resolution, `${text} horizontal corner offset`).toBeLessThanOrEqual(0.5);
+              expect(Math.abs(offset.vertical - tipInset) * resolution, `${text} vertical corner offset`).toBeLessThanOrEqual(0.5);
+              continue;
+            }
             const gapDevice = {
               top: bounds.top * resolution,
               left: bounds.left * resolution,
@@ -126,9 +137,11 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
             drawEdgeMarker(new Graphics(ctx), station, stateAt(station, scale, scale === 1 ? 0 : 0.5));
             let beyond = 0;
             let nearEdge = 0;
+            let lit = 0;
             for (let py = 0; py < size; py += 1) {
               for (let px = 0; px < size; px += 1) {
                 if ((ctx.data[(((py * size) + px) * 4) + 3] ?? 0) === 0) continue;
+                lit += 1;
                 const dx = originX + px;
                 const dy = originY + py;
                 if (dx < 0 || dy < 0 || dx >= backing.width || dy >= backing.height) beyond += 1;
@@ -143,6 +156,11 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
             }
             const text = `${label} station ${station.id} scale ${scale}`;
             expect(beyond, `${text} pixels beyond the canvas`).toBe(0);
+            if (station.isCorner) {
+              // Corner diamonds are anchored ~16.4 css px inside the corner, not flush: they must still be drawn (lit pixels in the window).
+              expect(lit, `${text} lit pixels`).toBeGreaterThan(0);
+              continue;
+            }
             expect(nearEdge, `${text} pixels on the last two device rows/columns of ${station.side}`).toBeGreaterThan(0);
           }
         }

@@ -206,3 +206,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: 7 font stacks and 11 sizes drift across surfaces; the ratchet stops new off-scale sizes/stacks while surfaces migrate one PR each.
 - Rule: Land the scale and a shrink-only allowlist ratchet before migrating surfaces. No surface changed in this PR.
 - Status: Applied (review)
+
+## 2026-11-14 - MAZER-VIS-044 corner diamonds anchored in the 4 corners
+- WHAT changed: new `src/render/edgeCornerAnchor.ts` (pure); `edgeMarkers.ts` now pins each corner diamond's outer tip on the corner diagonal, ~16.4 css px from BOTH screen edges (where the diagonal meets a 56 px rounded display corner), at every viewport size; they scale about that tip. Before, they sat ~56 px along the top/bottom edge, drifting inward. Orbit top/bottom travel eases into the corner anchor.
+- WHY it changed: owner request 2026-11-14 ("diamonds in the 4 corners should be kept anchored into the corners, expanded or shrunk").
+- Rule: corner diamonds are exempt from VIS-043 "touch the edge"; their offset is measured by `measureEdgeCornerOffset` (`tests/render/edgeCornerAnchor.test.ts`). MenuScene unchanged. Not checked on a real phone.
+- Status: Applied
