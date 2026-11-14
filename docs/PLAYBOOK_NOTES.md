@@ -162,3 +162,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: A player report of a sign-in failure could not be told apart from another failure; the ACCT-014 codes were diagnostics-only.
 - Rule: the line is snake_case code only, never provider text, email, name or id.
 - Status: Applied
+
+## 2026-11-14 - MAZER-UI-032 diagnostics type cleanup
+- WHAT changed: `menuRuntimeDiagnostics.ts` types narrowed: auth `invalidFields` is `never[]`, latest message `source`/`tone` use the player message types, `trailModeCounts` keys are `DemoTrailMode`.
+- WHY it changed: UI-023 narrowed formMode only; the remaining loose types admitted values production never produces.
+- Rule: no runtime change; MenuScene unchanged (Wave 5C).
+- Status: Applied
