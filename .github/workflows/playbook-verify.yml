@@ -1,0 +1,50 @@
+name: Playbook verify
+
+# Runs the real Playbook `verify` on every pull request (no path filter, so the check always reports).
+# The Playbook runtime is acquired by scripts/playbook-runtime.mjs from the pinned GitHub release asset and
+# checked against the SHA-256 recorded in that script (the only place the version, URL and digest live), so this
+# workflow carries no second copy of the pin and needs no consumer dependency install.
+#
+# Mazer's playbook.config.json adds a repo rule: a change under src/**, scripts/** or tests/** must also touch
+# docs/PLAYBOOK_NOTES.md. When this check fails with `requireNotesOnChanges`, add a WHAT/WHY/Evidence entry there.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  playbook-verify:
+    name: Playbook verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          # Full history so Playbook can resolve its diff base (origin/main).
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Bridge unit tests
+        run: npm run playbook:test
+
+      - name: Acquire the pinned Playbook runtime (SHA-256 verified)
+        run: npm run playbook:install
+
+      - name: Run Playbook verify (gate)
+        run: npm run playbook:verify
+
+      - name: Run Playbook index
+        run: npm run playbook:index
+
+      - name: Run Playbook ai-context
+        run: npm run playbook:ai-context
