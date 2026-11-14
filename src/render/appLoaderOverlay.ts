@@ -19,7 +19,8 @@ import {
   resolveLoaderPose,
   stepLoader,
   type LoaderLayout,
-  type LoaderMachine
+  type LoaderMachine,
+  LOADER_WAIT_CEILING_MS
 } from './appLoader';
 
 export const MAZER_LOADER_ICON_TEXTURE_KEY = 'mazer-loader-icon';
@@ -34,6 +35,7 @@ const RING_CORNER_RATIO = 0.22;
 export class AppLoaderOverlay {
   private machine: LoaderMachine = createLoaderMachine();
   private shownAtMs = 0;
+  private waitStartedAtMs: number | null = null;
   private backdrop: Phaser.GameObjects.Rectangle | null = null;
   private ring: Phaser.GameObjects.Image | null = null;
   private icon: Phaser.GameObjects.Image | null = null;
@@ -45,6 +47,16 @@ export class AppLoaderOverlay {
 
   constructor(private readonly scene: Phaser.Scene, private readonly depth: number) {
     this.ensureTextures();
+    // An early unmount (scene shutdown or destroy) must never leave the cover opaque or its objects dangling.
+    scene.events?.once?.('shutdown', () => this.settleHidden());
+    scene.events?.once?.('destroy', () => this.settleHidden());
+  }
+
+  /** Settle to idle and hidden at once (an error in a frame, an unmount, a stalled wait): the cover can never stay opaque. */
+  settleHidden(): void {
+    this.machine = createLoaderMachine();
+    this.waitStartedAtMs = null;
+    this.setVisible(false);
   }
 
   /** The current layout (centre, icon size, label line), for a caller that places its own label under the icon. */
@@ -58,6 +70,32 @@ export class AppLoaderOverlay {
    * Returns the loader opacity (0..1) so a caller can fade its own label with it.
    */
   sync(
+    active: boolean,
+    timeMs: number,
+    reducedMotion: boolean,
+    width: number,
+    height: number,
+    instant = false
+  ): number {
+    try {
+      // Wait ceiling: a wait older than LOADER_WAIT_CEILING_MS stops holding the cover (it fades out like any finished wait).
+      if (active) {
+        this.waitStartedAtMs ??= timeMs;
+        if (timeMs - this.waitStartedAtMs > LOADER_WAIT_CEILING_MS) {
+          active = false;
+        }
+      } else {
+        this.waitStartedAtMs = null;
+      }
+      return this.step(active, timeMs, reducedMotion, width, height, instant);
+    } catch (error) {
+      // A throwing frame must not leave an opaque cover behind; settle hidden, then let the caller see the error.
+      this.settleHidden();
+      throw error;
+    }
+  }
+
+  private step(
     active: boolean,
     timeMs: number,
     reducedMotion: boolean,

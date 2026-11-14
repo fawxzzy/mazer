@@ -79,7 +79,10 @@
         font-family: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
         /* 30% of the short side, 88..150 px: the same size and place as the iOS launch image and the in-game loader. */
         --mazer-loader-icon: clamp(88px, min(30vw, 30vh), 150px);
+        /* Boot failsafe (LOADER_BOOT_FAILSAFE_MS = 8000): if scripts never take over, the cover removes itself, CSS only. */
+        animation: mazer-boot-splash-failsafe 300ms ease 8000ms forwards;
       }
+      @keyframes mazer-boot-splash-failsafe { from { opacity: 1; } to { opacity: 0; visibility: hidden; pointer-events: none; } }
       #mazer-boot-splash .mazer-boot-splash-stage {
         position: relative; width: var(--mazer-loader-icon); height: var(--mazer-loader-icon);
         opacity: 0;
