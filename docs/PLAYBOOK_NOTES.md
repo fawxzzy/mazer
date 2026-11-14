@@ -195,3 +195,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the owner decided to sign phase 1 and accept that the geometry ladder ends (MAZER-PROG-019, MAZER-PROG-005); the repo needed the signature and the hazard-budget start rule on record.
 - Rule: the hazard budget start is symbolic (`level - GEOMETRY_BUDGET_SATURATION_LEVEL`, 288 on main); the 388 and 218 on older cards are stale. The hazard layer stays dormant; signing enabled no code.
 - Status: Applied
+## 2026-11-14 - MAZER-UI-010 type scale, display face and ratchet (PR 1)
+- WHAT changed: Added `src/render/typeScale.ts` (roles, sizes, weights, 12 px body floor), `docs/ui/MAZER-TYPE-SCALE.md`, self-hosted Oxanium (`public/fonts/oxanium/`, OFL) with a lazy `@font-face` and precache entry, and `tests/render/type-scale-ratchet.test.ts`.
+- WHY it changed: 7 font stacks and 11 sizes drift across surfaces; the ratchet stops new off-scale sizes/stacks while surfaces migrate one PR each.
+- Rule: Land the scale and a shrink-only allowlist ratchet before migrating surfaces. No surface changed in this PR.
+- Status: Applied (review)
