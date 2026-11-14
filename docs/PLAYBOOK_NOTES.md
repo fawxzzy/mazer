@@ -211,6 +211,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: a tap anywhere on the front door started a run or opened Login; only the wordmark and its margin should.
 - Rule: tap tests inside and outside the zone live in `tests/legacy-runtime/legacy-front-door-hit-zone.test.ts`. Button chrome is not yet drawn from the kit (`chromeViaKit` is false for all); surfaces migrate one per PR.
 - Status: Applied (review)
+## 2026-11-14 - MAZER-UI-033 online counter is a copy of the website counter
+- WHAT changed: the menu online counter now reads dot, number, "online" (e.g. `7 online`) in muted 13px text with an 8px pulsing dot, like the website header; idle = dim dot alone; count text is the website format (`1.2k`, `12k`), no uppercase K. New `src/render/presenceCounterView.ts`; layout in `legacyPresenceCounterLayout.ts`; small MenuScene edit (draw call + one field); Guide Online row copy updated.
+- WHY it changed: the chip-glyph counter was far larger than the old username text, lacked the label on phones and did not match the website.
 
 
 ## 2026-11-14 - Touch-first level 1 control hint that follows the input actually used

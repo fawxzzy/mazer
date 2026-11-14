@@ -324,7 +324,8 @@ import {
   type LegacyUsernameRename
 } from '../legacy-runtime/legacyAccountUsernameState';
 import { LegacyPresenceController } from '../legacy-runtime/legacyPresenceController';
-import { formatOnlineGlyph } from '../legacy-runtime/legacyPresenceContract';
+import { formatOnline } from '../legacy-runtime/legacyPresenceContract';
+import { PresenceCounterView } from '../render/presenceCounterView';
 import { resolveLegacyPresenceCounterPlacement } from '../legacy-runtime/legacyPresenceCounterLayout';
 import {
   LEGACY_UI_COMPACT_BREAKPOINT,
@@ -1957,6 +1958,7 @@ export class MenuScene extends Phaser.Scene {
   // boardZoomContainer, matching hudGraphics' own coordinate space.
   private touchSettingsCogIconImage!: Phaser.GameObjects.Image;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
+  private presenceView: PresenceCounterView | null = null;
   // Goal beacon (halo + ping): its own layer UNDER the trail canvas so the trail always sits on top of it.
   private goalBeaconGraphics!: Phaser.GameObjects.Graphics;
   // Find-me ping scheduler for the play-mode player locator (src/render/playerLocator.ts).
@@ -2389,6 +2391,7 @@ export class MenuScene extends Phaser.Scene {
     // Same real-2D-canvas approach as the player glow above, for the goal
     // star's own ambient halo -- see the field's own comment.
     this.boardDynamicGraphics = this.add.graphics();
+    this.presenceView = null;
     this.goalBeaconGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
     this.headerSettingsIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
@@ -9612,38 +9615,28 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // MAZER-UI-024: the live "N online" counter, where the signed-in username used to be (right of the
-  // leading header icon, left of the inline title). Tile glyph chips in one calm mint, an optional pulse dot
-  // (only with Reduce Motion off), drawn into the dynamic board layer after the header icons like they are.
-  // Geometry and the fit tiers live in legacyPresenceCounterLayout.ts; the count easing in legacyPresenceDisplay.ts.
+  // MAZER-UI-033: the website header counter, copied exactly: dot, number, "online" (src/render/presenceCounterView.ts).
+  // Live = pulsing dot + "7 online"; signed in but no count yet = dim dot alone; signed out = nothing.
   private drawLegacyMenuPresenceCounter(time: number): void {
-    if (this.mode !== 'menu' || this.overlay !== 'none') {
+    if (this.mode !== 'menu' || this.overlay !== 'none' || !this.presence.isActive()) {
+      this.presenceView?.hide();
       return;
     }
     const reducedMotion = this.prefersLegacyReducedMotion();
     const frame = this.presence.frame(time, reducedMotion);
-    if (!frame.visible || frame.value === null) {
-      return;
-    }
-    const placement = resolveLegacyPresenceCounterPlacement({
-      layout: this.layout,
-      showDot: !reducedMotion,
-      text: formatOnlineGlyph(frame.value)
+    const live = frame.visible && frame.value !== null;
+    this.presenceView ??= new PresenceCounterView(this, {
+      dotColor: LEGACY_PRESENCE_CHIP_FILL,
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      textColor: `#${cyberArcadeMaterial.rail.muted.toString(16).padStart(6, '0')}`
     });
-    if (!placement.visible || placement.number === null) {
-      return;
-    }
-    const graphics = this.boardDynamicGraphics;
-    if (placement.dot !== null) {
-      const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, false);
-      graphics.fillStyle(LEGACY_PRESENCE_CHIP_FILL, frame.alpha * (0.35 + (phase * 0.65)));
-      graphics.fillCircle(placement.dot.centerX, placement.dot.centerY, placement.dot.radius);
-    }
-    const { number, word } = placement;
-    this.drawLegacyPresenceGlyphWord(graphics, number.text, number.left + (number.width / 2), number.top + (number.height / 2), placement.cell, frame.alpha, true);
-    if (word !== null) {
-      this.drawLegacyPresenceGlyphWord(graphics, word.text, word.left + (word.width / 2), word.top + (word.height / 2), placement.cell, frame.alpha, false);
-    }
+    const view = this.presenceView;
+    const placement = resolveLegacyPresenceCounterPlacement({
+      countText: live ? formatOnline(frame.value) : null,
+      layout: this.layout,
+      measure: (value) => view.measure(value)
+    });
+    view.draw(this.boardDynamicGraphics, placement, { live, reducedMotion, textAlpha: frame.alpha, timeMs: time });
   }
 
   // One word of chip cells for the menu counter (and its Guide icon): the number is the lit part, the word ONLINE the
