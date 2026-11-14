@@ -3,11 +3,11 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-14T08:02:41.000Z",
+    "registryUpdatedAt": "2026-11-14T08:12:28.000Z",
     "boardSync": {
-      "at": "2026-11-14T08:02:41.000Z",
-      "appliedEventCount": 121,
-      "lastEventId": "d98b4856e0e6"
+      "at": "2026-11-14T08:12:28.000Z",
+      "appliedEventCount": 122,
+      "lastEventId": "e20f87e7b26a"
     }
   },
   "counters": {

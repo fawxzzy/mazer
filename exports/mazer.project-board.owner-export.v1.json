@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_65bcfce67fe4",
+  "export_id": "pbe_mazer_owner_registry_72a6b812d340",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:65bcfce67fe458a02056da911bb1cd3220b80324f8651a174c541b62ee500e40",
-  "generated_at": "2026-11-14T08:02:41.000Z",
+  "source_revision": "sha256:72a6b812d340b75985427f16b1d9be9af206e2d838004f8c9c4d2395976db69c",
+  "generated_at": "2026-11-14T08:12:28.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:a879ed465c8d345115c0f03d3fc19fe5976ddb0bde87b8d8f0519174b580860e",
-      "observed_at": "2026-11-14T08:02:41.000Z"
+      "revision": "sha256:b877af24e8ed024cd41399f6bdd5439d8ec857d8d9e63257356c9d5f7285c136",
+      "observed_at": "2026-11-14T08:12:28.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:a67753ce27c71dbfb2582900208e7e00de72cc64dcbd0fcb71de2ead073b30a1",
-      "observed_at": "2026-11-14T08:02:41.000Z"
+      "observed_at": "2026-11-14T08:12:28.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-14T08:02:41.000Z"
+      "observed_at": "2026-11-14T08:12:28.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-14T08:02:41.000Z"
+      "observed_at": "2026-11-14T08:12:28.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:b3d0cd0bd6f68a1f1824033ec143f9a385c54a6ad9346a827eecd091a0222721",
-      "observed_at": "2026-11-14T08:02:41.000Z"
+      "observed_at": "2026-11-14T08:12:28.000Z"
     }
   ],
   "cards": [
@@ -1907,7 +1907,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Optionally backfill the stored display name for already renamed profiles",
-        "description": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied. Board update 2026-11-14: Will not do, 2026-11-14: the stored display name backfill would overwrite names players may have chosen.",
+        "description": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied. Board update 2026-11-14: Will not do, 2026-11-14: the stored display name backfill would overwrite names players may have chosen. Board update 2026-11-14: Deferred: the stored display name backfill would overwrite names players may have chosen; not planned",
         "card_type": "migration",
         "lifecycle": "intake",
         "priority": "low",
@@ -1916,7 +1916,7 @@
           "MAZER-ACCT-025"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-14T08:02:16.000Z",
+        "updated_at": "2026-11-14T08:12:28.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-034",
         "extensions": {
           "owner_status": "deferred_candidate",
@@ -1927,11 +1927,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-034",
         "source_status": "current",
-        "source_updated_at": "2026-11-14T08:02:16.000Z"
+        "source_updated_at": "2026-11-14T08:12:28.000Z"
       },
       "content": {
-        "summary": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied. Board update 2026-11-14: Will not do, 2026-11-14: the stored display name backfill would overwrite names players may have chosen.",
-        "objective": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied. Board update 2026-11-14: Will not do, 2026-11-14: the stored display name backfill would overwrite names players may have chosen.",
+        "summary": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied. Board update 2026-11-14: Will not do, 2026-11-14: the stored display name backfill would overwrite names players may have chosen. Board update 2026-11-14: Deferred: the stored display name backfill would overwrite names players may have chosen; not planned",
+        "objective": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied. Board update 2026-11-14: Will not do, 2026-11-14: the stored display name backfill would overwrite names players may have chosen. Board update 2026-11-14: Deferred: the stored display name backfill would overwrite names players may have chosen; not planned",
         "acceptance_criteria": [
           "The owner decides to run the backfill or leave the old values",
           "If run, the exact file hash is approved first and the result is verified by readback",

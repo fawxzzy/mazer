@@ -4,7 +4,7 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-14T08:02:41.000Z",
+  "updatedAt": "2026-11-14T08:12:28.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
@@ -16,9 +16,9 @@
     "deferredCardCount": 34,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out.",
     "boardSync": {
-      "at": "2026-11-14T08:02:41.000Z",
-      "appliedEventCount": 121,
-      "lastEventId": "d98b4856e0e6"
+      "at": "2026-11-14T08:12:28.000Z",
+      "appliedEventCount": 122,
+      "lastEventId": "e20f87e7b26a"
     }
   },
   "workItems": [
@@ -3761,11 +3761,11 @@
     {
       "id": "MAZER-ACCT-034",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:02:16.000Z",
+      "updatedAt": "2026-11-14T08:12:28.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-034",
       "title": "Optionally backfill the stored display name for already renamed profiles",
-      "description": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied. Board update 2026-11-14: Will not do, 2026-11-14: the stored display name backfill would overwrite names players may have chosen.",
+      "description": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied. Board update 2026-11-14: Will not do, 2026-11-14: the stored display name backfill would overwrite names players may have chosen. Board update 2026-11-14: Deferred: the stored display name backfill would overwrite names players may have chosen; not planned",
       "cardType": "migration",
       "priority": "low",
       "dependencies": [
