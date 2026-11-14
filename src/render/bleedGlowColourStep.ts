@@ -3,7 +3,7 @@
  * colour-step risk at the sheen crossing. fix it").
  *
  * Cause. The dock glow is painted in the trail's own colour at the trail head (`resolveBleedGlowColor`). That colour
- * includes the travelling SHEEN: a narrow ridge (about 6 tiles a second) that lifts the core toward pearl and refracts
+ * includes the travelling SHEEN: a ridge (about 3 tiles a second since MAZER-VIS-037; it was 6) that lifts the core toward pearl and refracts
  * the hue as it passes the head. Before MAZER-PERF-007 the glow redrew every frame (60 Hz: up to 11 units of a channel
  * per redraw as the ridge crossed). On the shared 33 ms colour-redraw schedule the same ridge is sampled at about
  * 30 Hz, so the colour the glow shows jumps up to 20 units per redraw (up to 44 for the bloom, which the dock does not

@@ -95,10 +95,10 @@ describe('wrap-dock glow colour step at the sheen crossing', () => {
     expect(BLEED_GLOW_MAX_COLOUR_STEP).toBe(8);
   });
 
-  it('PRE-FIX: the raw trail-head colour on the shared 33 ms schedule steps far past the bound at the sheen crossing', () => {
+  it('since MAZER-VIS-037 the raw trail-head colour is itself within the bound on the shared 33 ms schedule (the smoother is now a backstop; it used to step 20+)', () => {
     for (const hz of DISPLAYS) {
       const pre = worst((startDistanceTiles) => run({ hz, durationMs: 8000, smooth: false, animated: true, startDistanceTiles }));
-      expect(pre.maxFrameStep, `${hz} Hz`).toBeGreaterThan(BLEED_GLOW_MAX_COLOUR_STEP * 2);
+      expect(pre.maxFrameStep, `${hz} Hz`).toBeLessThanOrEqual(BLEED_GLOW_MAX_COLOUR_STEP);
     }
   });
 
