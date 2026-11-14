@@ -243,3 +243,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: overlays popped in with no rise or stagger. The hook runs after update on purpose: an in-update hook let freshly rebuilt objects render one frame at rest (a flash), found in a headless frame probe.
 - Rule: effects on objects that `rebuildUi` recreates must be a pure function of elapsed time applied after the rebuild, never state stored on the objects. Panel borders and toggles live on the shared overlay Graphics, so they stay static; only labels and row fills move.
 - Status: Applied (review); headless only (Chromium 390x844, 360x740, 412x915 and WebKit iPhone 15 Pro and SE, Reduce Motion on and off), no real-device fps.
+
+## 2026-11-14 - MAZER-UI-010 surface migration 2: mechanic guide text uses the body face
+- WHAT changed: the `mechanic-guide` Phaser text in `src/render/boardRenderer.ts` moves from `"Courier New", monospace` to `TYPE_BODY_FACE` (first src consumer of `src/render/typeScale.ts`); the `Courier New, monospace` entry is removed from `LEGACY_FONT_STACKS` in `tests/render/type-scale-ratchet.test.ts`.
+- WHY it changed: MAZER-UI-010 retires legacy font stacks one surface per PR; this stack had exactly one user. Size (12 px, bold) is unchanged. The guide text only draws when a mechanic legend is shown, and the frozen look has no hazards, so no default game screen changes.
+- Rule: a font stack constant moves to the scale module's face constants, never to a new literal, and its entry leaves the shrink-only list in the same PR.
+- Status: Applied (review); source proof only, mechanic guide not opened in a browser.
