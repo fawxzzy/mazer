@@ -1888,7 +1888,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(normalizeSourceLineEndings(menuSceneSource.replaceAll('\n', '\r\n'))).toBe(menuSceneSource);
 
     expect(menuSceneSource).toContain('const LEGACY_AUTH_UI_FONT_FAMILY');
-    expect(menuSceneSource).toContain("this.overlay === 'auth' ? cyberArcadeMaterial.substrate.field : 0x02040a");
+    expect(menuSceneSource).toContain("this.overlay === 'auth' ? SHARED_BACKDROP_PHASER : 0x02040a");
     expect(menuSceneSource).toContain("&& this.overlay === 'none';");
     expect(menuSceneSource).toContain("fontFamily: unifiedAuthDockButton ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY");
     expect(menuSceneSource).not.toContain('EMAIL OR USERNAME');
@@ -2298,7 +2298,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(overlayPanelStart).toBeGreaterThanOrEqual(0);
     expect(overlayPanelEnd).toBeGreaterThan(overlayPanelStart);
-    expect(overlayPanelSource).toContain("this.overlayGraphics.fillStyle(this.overlay === 'auth' ? cyberArcadeMaterial.substrate.field : 0x02040a, this.overlay === 'auth' ? 1 : 0.82);");
+    expect(overlayPanelSource).toContain("this.overlayGraphics.fillStyle(this.overlay === 'auth' ? SHARED_BACKDROP_PHASER : 0x02040a, this.overlay === 'auth' ? 1 : 0.82);");
     expect(overlayPanelSource).toContain('this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);');
     expect(overlayPanelSource).not.toContain('drawLegacyCyberPanel');
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');
