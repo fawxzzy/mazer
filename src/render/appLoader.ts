@@ -273,9 +273,18 @@ export const resolveLoaderPose = (alpha: number, pulseTimeMs: number, reducedMot
  * so the only decision left to script is the exit: given how long that animation has run (`elapsedMs`, the CSS
  * animation's currentTime), how many ms to wait before the exit fade starts. Never shown yet (still inside the delay)
  * or unknown: 0, leave at once. Shown: wait out the rest of the minimum hold.
+ *
+ * `instant` (MAZER-ACCT-042, the hand-off from the account host's loader): the stage was visible from the first paint,
+ * so there is no show delay to subtract: the loader has been up for `elapsedMs` and only the minimum hold remains.
  */
-export const resolveBootSplashExitDelayMs = (elapsedMs: number | null): number => {
-  if (elapsedMs === null || !Number.isFinite(elapsedMs) || elapsedMs < LOADER_SHOW_DELAY_MS) {
+export const resolveBootSplashExitDelayMs = (elapsedMs: number | null, instant = false): number => {
+  if (elapsedMs === null || !Number.isFinite(elapsedMs)) {
+    return 0;
+  }
+  if (instant) {
+    return Math.max(0, LOADER_MIN_HOLD_MS - elapsedMs);
+  }
+  if (elapsedMs < LOADER_SHOW_DELAY_MS) {
     return 0;
   }
   return Math.max(0, LOADER_SHOW_DELAY_MS + LOADER_MIN_HOLD_MS - elapsedMs);

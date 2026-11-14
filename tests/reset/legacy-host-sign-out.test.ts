@@ -5,6 +5,7 @@ import {
   MAZER_HOST_SIGN_OUT_ATTEMPT_KEY,
   MAZER_HOST_SIGN_OUT_ATTEMPT_WINDOW_MS,
   MAZER_HOST_SIGN_OUT_PROBE_TIMEOUT_MS,
+  buildMazerHostSignOutPingUrl,
   buildMazerHostSignOutUrl,
   clearMazerHostSignOutAttempt,
   isMazerHostSignOutAttemptInFlight,
@@ -35,7 +36,7 @@ const makeDeps = (overrides: Partial<MazerHostSignOutDeps> & { probeResult?: Maz
   localStorage.setItem(MAZER_EXPLICIT_SIGN_OUT_KEY, JSON.stringify({ at: NOW - 100 }));
   const sessionStorage = new MemoryStorage();
   const navigate = vi.fn<(url: string) => void>();
-  const probe = vi.fn(async () => overrides.probeResult ?? 'reachable');
+  const probe = vi.fn(async () => overrides.probeResult ?? 'live');
   const deps: MazerHostSignOutDeps = {
     authStatus: 'guest',
     isLocalhost: false,
@@ -97,9 +98,12 @@ describe('runMazerHostSignOut', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  test('unreachable host: falls back to local-only sign-out, nothing navigates, no guard is left behind', async () => {
-    const { deps, navigate, sessionStorage } = makeDeps({ probeResult: 'unreachable' });
-    await expect(runMazerHostSignOut(deps)).resolves.toEqual({ status: 'skipped', reason: 'endpoint-unreachable' });
+  test.each([
+    ['unreachable host / network failure / timeout', 'unreachable', 'endpoint-unreachable'],
+    ['ping 404 (endpoint not deployed)', 'missing', 'endpoint-missing']
+  ] as const)('%s: falls back to local-only sign-out, nothing navigates, no guard is left behind', async (_label, probeResult, reason) => {
+    const { deps, navigate, sessionStorage } = makeDeps({ probeResult });
+    await expect(runMazerHostSignOut(deps)).resolves.toEqual({ status: 'skipped', reason });
     expect(navigate).not.toHaveBeenCalled();
     expect(sessionStorage.getItem(MAZER_HOST_SIGN_OUT_ATTEMPT_KEY)).toBeNull();
   });
@@ -140,8 +144,8 @@ describe('runMazerHostSignOut', () => {
   });
 });
 
-describe('probeMazerHostSignOutEndpoint (the reachability check)', () => {
-  const makeProbeDeps = (fetchImpl: (input: string, init: RequestInit) => Promise<unknown>) => {
+describe('probeMazerHostSignOutEndpoint (the capability ping)', () => {
+  const makeProbeDeps = (fetchImpl: (input: string, init: RequestInit) => Promise<{ status: number }>) => {
     const timers = new Map<number, () => void>();
     let nextId = 1;
     return {
@@ -155,33 +159,41 @@ describe('probeMazerHostSignOutEndpoint (the reachability check)', () => {
     };
   };
 
-  test('any response means reachable; the request is credential-less, no-cors, no-store and never reads a status', async () => {
-    const fetchSpy = vi.fn(async (_input: string, _init: RequestInit) => ({ type: 'opaque' }));
+  test('the ping URL and request match the FawxzzyWeb contract: HEAD, CORS, no credentials', async () => {
+    expect(buildMazerHostSignOutPingUrl()).toBe('https://account.fawxzzy.com/signout/ping');
+    const fetchSpy = vi.fn(async (_input: string, _init: RequestInit) => ({ status: 204 }));
     const { deps, pendingTimers } = makeProbeDeps(fetchSpy);
-    await expect(probeMazerHostSignOutEndpoint(deps)).resolves.toBe('reachable');
+    await expect(probeMazerHostSignOutEndpoint(deps)).resolves.toBe('live');
     expect(fetchSpy).toHaveBeenCalledWith(
-      'https://account.fawxzzy.com/signout?returnTo=https%3A%2F%2Fmazer.fawxzzy.com%2F',
-      { cache: 'no-store', credentials: 'omit', method: 'HEAD', mode: 'no-cors', redirect: 'follow' }
+      'https://account.fawxzzy.com/signout/ping',
+      { cache: 'no-store', credentials: 'omit', method: 'HEAD', mode: 'cors' }
     );
     expect(pendingTimers()).toBe(0);
   });
 
-  test('a rejected fetch (offline, DNS, blocked) is unreachable', async () => {
+  test('only 204 means live: 404 and every other status mean the endpoint is missing', async () => {
+    for (const status of [200, 301, 401, 404, 405, 500, 503]) {
+      const { deps } = makeProbeDeps(async () => ({ status }));
+      await expect(probeMazerHostSignOutEndpoint(deps), String(status)).resolves.toBe('missing');
+    }
+  });
+
+  test('a rejected fetch (offline, DNS, CORS failure) is unreachable', async () => {
     const { deps } = makeProbeDeps(async () => { throw new TypeError('Failed to fetch'); });
     await expect(probeMazerHostSignOutEndpoint(deps)).resolves.toBe('unreachable');
   });
 
-  test(`a fetch that never answers is unreachable after ${MAZER_HOST_SIGN_OUT_PROBE_TIMEOUT_MS} ms`, async () => {
+  test(`a ping that never answers is unreachable after ${MAZER_HOST_SIGN_OUT_PROBE_TIMEOUT_MS} ms`, async () => {
     const { deps, fireTimeouts } = makeProbeDeps(() => new Promise(() => undefined));
     const result = probeMazerHostSignOutEndpoint(deps);
     fireTimeouts();
     await expect(result).resolves.toBe('unreachable');
   });
 
-  test('redirect: manual is never used (Chromium rejects it together with no-cors, so every probe would read as unreachable)', () => {
+  test('the browser binding sends the ping through window.fetch with the same flags', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyHostSignOut.ts'), 'utf8');
-    expect(source).toContain("mode: 'no-cors', redirect: 'follow'");
-    expect(source.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/redirect:\s*'manual'/);
+    expect(source).toContain("method: 'HEAD', mode: 'cors'");
+    expect(source.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/no-cors|redirect:/);
   });
 });
 

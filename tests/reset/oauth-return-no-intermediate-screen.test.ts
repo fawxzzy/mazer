@@ -7,7 +7,7 @@ import {
   resolveMazerBootSplashMessage
 } from '../../src/boot/bootSplash';
 import { LEGACY_GUIDE_ROWS } from '../../src/legacy-runtime/legacyGuideContent';
-import { LEGACY_AUTH_SCREEN_COPY } from '../../src/legacy-runtime/legacyAuthScreenView';
+import { LEGACY_ACCOUNT_STATUS_COPY } from '../../src/legacy-runtime/legacyAccountStatusState';
 
 /**
  * MAZER-ACCT-042 (owner, 2026-11-13): "im still seeing a one moment, still pending screen when signing in just before
@@ -45,21 +45,19 @@ describe('the host-return sequence has no intermediate Mazer text screen (MAZER-
     expect(offenders).toEqual([]);
   });
 
-  test('"still pending" appears only in the technical password-update message, never on a sign-in surface', () => {
+  test('"still pending" appears nowhere in player-visible Mazer text (the old password-update message left with MAZER-ACCT-043)', () => {
     const hits = [...listFiles('src', '.ts'), 'index.html']
       .flatMap((file) => read(file).split('\n').map((line) => ({ file, line })))
       .filter(({ line }) => !isCommentLine(line) && /still pending/i.test(line));
-    expect(hits.map(({ file }) => file)).toEqual(['src/legacy-runtime/legacyAuth.ts']);
-    expect(hits[0]?.line).toContain('A previous password update is still pending. Please wait before trying a different password.');
+    expect(hits).toEqual([]);
   });
 
-  test('the player-message inventory (test pins and doc) lists no "One moment" row and one technical "still pending" row', () => {
+  test('the player-message inventory (test pins and doc) lists no "One moment" or "still pending" row', () => {
     for (const file of ['tests/reset/legacy-player-message-inventory.test.ts', 'docs/ops/MAZER-PLAYER-MESSAGE-INVENTORY-2026-11-05.md']) {
       const text = read(file);
       expect(/one moment/i.test(text), file).toBe(false);
-      const pendingRows = text.split('\n').filter((line) => /still pending/i.test(line));
-      expect(pendingRows.length, file).toBe(1);
-      expect(pendingRows[0], file).toContain('A previous password update is still pending');
+      const pendingRows = text.split('\n').filter((line) => /still pending/i.test(line) && !/removed|left with|MAZER-ACCT-043/i.test(line));
+      expect(pendingRows, file).toEqual([]);
     }
   });
 
@@ -83,18 +81,19 @@ describe('the host-return sequence has no intermediate Mazer text screen (MAZER-
     expect(read('index.html')).toContain('Loading&hellip;</p>');
   });
 
-  test('the scene never draws the callback-pending Welcome variant: the loader cover is the only pending state', () => {
+  test('the scene has no callback-pending Welcome variant any more (MAZER-ACCT-043): the loader cover is the only pending state', () => {
     const menu = read('src/scenes/MenuScene.ts');
-    expect(menu).toMatch(/hasCallbackInProgress:\s*false/);
-    expect(menu).not.toMatch(/hasCallbackInProgress:\s*(true|this\.)/);
+    expect(menu).not.toContain('hasCallbackInProgress');
+    expect(menu).not.toContain('legacyAuthScreenView');
     // The cover starts opaque under the HTML splash (no gap) and is the shared app loader.
     expect(menu).toContain('isMazerBootSplashPresent()');
     expect(menu).toContain('this.appLoader = new AppLoaderOverlay(');
   });
 
-  test('the OAuth failure path stays the one existing failure line (no extra "pending" copy was added)', () => {
-    expect(LEGACY_AUTH_SCREEN_COPY.signingIn).toBe('Signing you in…');
-    expect(LEGACY_AUTH_SCREEN_COPY.loading).toBe('Loading…');
+  test('the account status copy holds only the two loader labels as progress text (no pending sentence)', () => {
+    expect(LEGACY_ACCOUNT_STATUS_COPY.signingIn).toBe('Signing you in…');
+    expect(LEGACY_ACCOUNT_STATUS_COPY.loading).toBe('Loading…');
+    expect(/one moment|pending/i.test(JSON.stringify(LEGACY_ACCOUNT_STATUS_COPY))).toBe(false);
   });
 
   test('main.ts consumes the callback behind the splash, before Phaser exists, so the return never paints a Mazer screen first', () => {

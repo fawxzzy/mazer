@@ -12,17 +12,12 @@
  * button (legacySignedOutHandoff.ts, unchanged).
  *
  * Guard rails, all pinned by tests/reset/legacy-host-sign-out.test.ts:
- *  - FEATURE CHECK, two layers. (1) `MAZER_HOST_SIGN_OUT_ENABLED` is the kill switch (and the reason this must ship
- *    only AFTER the FawxzzyWeb endpoint is live: a page cannot tell a live endpoint from a 404, see below).
- *    (2) A reachability probe before leaving: a credential-less `no-cors` HEAD to the sign-out URL. Measured in
- *    headless Chromium (docs/ops/MAZER-INSTALL-GATE-ALWAYS-ON-2026-11-14.md): a reachable host answers with an
- *    `opaque` response whatever the status (302 followed, 404 and 500 all look the same to a cross-origin page), and an
- *    unreachable host (offline, DNS, blocked) REJECTS. `redirect: 'manual'` with `no-cors` is rejected by the
- *    browser itself, so a 404 CANNOT be told from a live redirect from inside Mazer. The probe carries no cookies
- *    (`credentials: 'omit'`), so it cannot end the session by itself; only the navigation does. An unreachable host
- *    falls back to the previous behaviour: local sign-out only, the player sits on the signed-out screen, nothing is
- *    stuck. A 404 that slips past (endpoint not deployed yet) would land the player on the host's own not-found page,
- *    which is why the endpoint must be live first, and why the kill switch exists.
+ *  - FEATURE CHECK, two layers. (1) `MAZER_HOST_SIGN_OUT_ENABLED` is the kill switch. (2) A capability ping before
+ *    leaving, per the FawxzzyWeb contract: `HEAD https://account.fawxzzy.com/signout/ping` with `mode: 'cors'`,
+ *    `credentials: 'omit'` (the host answers 204 with `Access-Control-Allow-Origin: https://mazer.fawxzzy.com`).
+ *    204 = the endpoint is live, go. 404 (or any other status), a network failure, a CORS failure or the
+ *    3 s timeout = fall back to the previous behaviour: local sign-out only, the player sits on the signed-out
+ *    screen, nothing is stuck. The ping carries no cookies and ends nothing; only the navigation does.
  *  - LOOP GUARD: one navigation per 15 minutes (the PKCE pending TTL used by the sign-in loop guard). The record is
  *    written to sessionStorage BEFORE leaving and cleared when a launch sees a stored session, so sign in -> Sign out
  *    -> sign in -> Sign out works every time but a bounce-back can never loop. Blocked storage = no navigation.
@@ -44,6 +39,8 @@ import {
 /** Kill switch: set to false to ship Mazer without the host sign-out (local sign-out only, as before). */
 export const MAZER_HOST_SIGN_OUT_ENABLED = true;
 export const MAZER_HOST_SIGN_OUT_PATH = '/signout';
+/** The capability ping (FawxzzyWeb): HEAD, CORS, credential-less; 204 means the sign-out endpoint is live. */
+export const MAZER_HOST_SIGN_OUT_PING_PATH = '/signout/ping';
 /** sessionStorage: `{ at: <epoch ms> }` written just before leaving for the host sign-out. */
 export const MAZER_HOST_SIGN_OUT_ATTEMPT_KEY = 'mazer.auth.host-signout-attempt.v1';
 export const MAZER_HOST_SIGN_OUT_ATTEMPT_WINDOW_MS = MAZER_AUTO_HANDOFF_ATTEMPT_WINDOW_MS;
@@ -51,6 +48,10 @@ export const MAZER_HOST_SIGN_OUT_ATTEMPT_WINDOW_MS = MAZER_AUTO_HANDOFF_ATTEMPT_
 export const MAZER_HOST_SIGN_OUT_PROBE_TIMEOUT_MS = 3_000;
 /** If the navigation has not taken the page away after this long, the screen is released (matches the sign-in hand-off). */
 export const MAZER_HOST_SIGN_OUT_NAVIGATION_TIMEOUT_MS = 10_000;
+
+export const buildMazerHostSignOutPingUrl = (): string => (
+  new URL(MAZER_HOST_SIGN_OUT_PING_PATH, MAZER_ACCOUNT_PORTAL_ORIGIN).toString()
+);
 
 export const buildMazerHostSignOutUrl = (): string => {
   const url = new URL(MAZER_HOST_SIGN_OUT_PATH, MAZER_ACCOUNT_PORTAL_ORIGIN);
@@ -66,13 +67,14 @@ export type MazerHostSignOutSkipReason =
   | 'attempt-in-flight'
   | 'storage-unavailable'
   | 'endpoint-unreachable'
+  | 'endpoint-missing'
   | 'navigation-failed';
 
 export type MazerHostSignOutResult =
   | { status: 'navigating' }
   | { status: 'skipped'; reason: MazerHostSignOutSkipReason };
 
-export type MazerHostSignOutProbeResult = 'reachable' | 'unreachable';
+export type MazerHostSignOutProbeResult = 'live' | 'missing' | 'unreachable';
 
 type ReadableStorage = Pick<Storage, 'getItem'>;
 type WritableStorage = Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>;
@@ -128,18 +130,18 @@ export const clearMazerHostSignOutAttempt = (
 };
 
 export interface MazerHostSignOutProbeDeps {
-  fetch(input: string, init: RequestInit): Promise<unknown>;
+  fetch(input: string, init: RequestInit): Promise<{ status: number }>;
   setTimeout(callback: () => void, delayMs: number): unknown;
   clearTimeout(handle: unknown): void;
 }
 
 /**
- * Is the account host reachable right now? Never throws. Any response (even an opaque one for a 404) = reachable;
- * a rejected or timed-out request = unreachable. See the header comment for why a status cannot be read.
+ * The capability ping. Never throws. 204 = `live`; any other status (404 = endpoint not deployed) = `missing`;
+ * a rejected fetch (offline, DNS, CORS failure) or the timeout = `unreachable`.
  */
 export const probeMazerHostSignOutEndpoint = async (
   deps: MazerHostSignOutProbeDeps,
-  url: string = buildMazerHostSignOutUrl()
+  url: string = buildMazerHostSignOutPingUrl()
 ): Promise<MazerHostSignOutProbeResult> => {
   let timer: unknown = null;
   const timeout = new Promise<'timeout'>((resolve) => {
@@ -147,10 +149,13 @@ export const probeMazerHostSignOutEndpoint = async (
   });
   try {
     const answer = await Promise.race([
-      deps.fetch(url, { cache: 'no-store', credentials: 'omit', method: 'HEAD', mode: 'no-cors', redirect: 'follow' }),
+      deps.fetch(url, { cache: 'no-store', credentials: 'omit', method: 'HEAD', mode: 'cors' }),
       timeout
     ]);
-    return answer === 'timeout' ? 'unreachable' : 'reachable';
+    if (answer === 'timeout') {
+      return 'unreachable';
+    }
+    return answer.status === 204 ? 'live' : 'missing';
   } catch {
     return 'unreachable';
   } finally {
@@ -192,8 +197,9 @@ export const runMazerHostSignOut = async (deps: MazerHostSignOutDeps): Promise<M
   if (isMazerHostSignOutAttemptInFlight(deps.sessionStorage, nowMs)) {
     return { status: 'skipped', reason: 'attempt-in-flight' };
   }
-  if (await deps.probe() !== 'reachable') {
-    return { status: 'skipped', reason: 'endpoint-unreachable' };
+  const probed = await deps.probe();
+  if (probed !== 'live') {
+    return { status: 'skipped', reason: probed === 'missing' ? 'endpoint-missing' : 'endpoint-unreachable' };
   }
   // Written BEFORE leaving: once the page is gone nothing else can write it. Blocked storage = no navigation,
   // because without the record nothing could stop a loop.

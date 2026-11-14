@@ -220,3 +220,33 @@ describe('layout and HTML splash hand-off', () => {
     expect(resolveBootSplashExitDelayMs(60_000)).toBe(0);
   });
 });
+
+describe('host-loader hand-off: the splash exit when the loader was shown instantly (MAZER-ACCT-042)', () => {
+  test('instant: no show delay to subtract, only the minimum hold remains', () => {
+    expect(resolveBootSplashExitDelayMs(0, true)).toBe(LOADER_MIN_HOLD_MS);
+    expect(resolveBootSplashExitDelayMs(100, true)).toBe(LOADER_MIN_HOLD_MS - 100);
+    expect(resolveBootSplashExitDelayMs(LOADER_MIN_HOLD_MS, true)).toBe(0);
+    expect(resolveBootSplashExitDelayMs(LOADER_MIN_HOLD_MS + 500, true)).toBe(0);
+  });
+
+  test('instant but the clock is unreadable: leave at once (never hang)', () => {
+    expect(resolveBootSplashExitDelayMs(null, true)).toBe(0);
+    expect(resolveBootSplashExitDelayMs(Number.NaN, true)).toBe(0);
+  });
+
+  test('an ordinary cold open is unchanged: still inside the 150 ms delay means nothing was shown, so leave at once', () => {
+    expect(resolveBootSplashExitDelayMs(LOADER_SHOW_DELAY_MS - 1)).toBe(0);
+    expect(resolveBootSplashExitDelayMs(LOADER_SHOW_DELAY_MS - 1, false)).toBe(0);
+    expect(resolveBootSplashExitDelayMs(LOADER_SHOW_DELAY_MS + 200)).toBe(LOADER_MIN_HOLD_MS - 200);
+    expect(LOADER_SHOW_DELAY_MS).toBe(150);
+  });
+
+  test('the in-game cover is opaque on the very first frame when told the splash is up (instant); without it nothing shows for 150 ms', () => {
+    const frame = stepLoader(createLoaderMachine(), true, 0, false, { instant: true });
+    expect(frame.visible).toBe(true);
+    expect(frame.alpha).toBe(1);
+    const ordinary = stepLoader(createLoaderMachine(), true, 0, false, {});
+    expect(ordinary.visible).toBe(false);
+    expect(stepLoader(ordinary.machine, true, LOADER_SHOW_DELAY_MS - 1, false, {}).visible).toBe(false);
+  });
+});

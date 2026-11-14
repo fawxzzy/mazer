@@ -14,6 +14,8 @@ export const MAZER_BOOT_SPLASH_TEXT_ID = 'mazer-boot-splash-text';
 /** The icon + ring + label block that fades in by CSS (index.html); its animation clock says how long the loader has been showing. */
 export const MAZER_BOOT_SPLASH_STAGE_ID = 'mazer-boot-splash-stage';
 export const MAZER_BOOT_SPLASH_FADE_IN_ANIMATION = 'mazer-boot-splash-in';
+/** The no-op animation the stage runs instead of the fade-in when the loader was handed over from the account host (index.html). */
+export const MAZER_BOOT_SPLASH_INSTANT_ANIMATION = 'mazer-boot-splash-instant';
 /** Upper bound on how long the splash may outlive game creation if MenuScene never reports in. */
 export const MAZER_BOOT_SPLASH_MAX_AFTER_GAME_CREATE_MS = 10_000;
 export const MAZER_BOOT_SPLASH_NEUTRAL_MESSAGE = 'Loading…';
@@ -97,11 +99,17 @@ const readSystemPrefersReducedMotion = (): boolean => (
 
 const exitingSplashes = new WeakSet<object>();
 
-/** How long the splash's fade-in animation has been running (including its delay), or null when unknown. */
-const readSplashShownElapsedMs = (documentRef?: BootSplashDocumentLike): number | null => {
+/** How long the splash's loader animation has been running (including its delay), and whether it was the instant hand-off one. */
+const readSplashShownClock = (documentRef?: BootSplashDocumentLike): { elapsedMs: number | null; instant: boolean } => {
   const animations = resolveDocument(documentRef)?.getElementById(MAZER_BOOT_SPLASH_STAGE_ID)?.getAnimations?.() ?? [];
-  const fadeIn = animations.find((animation) => animation.animationName === MAZER_BOOT_SPLASH_FADE_IN_ANIMATION) ?? animations[0];
-  return typeof fadeIn?.currentTime === 'number' ? fadeIn.currentTime : null;
+  const fadeIn = animations.find((animation) => (
+    animation.animationName === MAZER_BOOT_SPLASH_FADE_IN_ANIMATION
+    || animation.animationName === MAZER_BOOT_SPLASH_INSTANT_ANIMATION
+  )) ?? animations[0];
+  return {
+    elapsedMs: typeof fadeIn?.currentTime === 'number' ? fadeIn.currentTime : null,
+    instant: fadeIn?.animationName === MAZER_BOOT_SPLASH_INSTANT_ANIMATION
+  };
 };
 
 /**
@@ -138,7 +146,8 @@ export const fadeOutMazerBootSplash = (options: FadeOutBootSplashOptions = {}): 
     schedule(() => splash.remove(), durationMs);
   };
 
-  const holdMs = resolveBootSplashExitDelayMs(readSplashShownElapsedMs(options.documentRef));
+  const shown = readSplashShownClock(options.documentRef);
+  const holdMs = resolveBootSplashExitDelayMs(shown.elapsedMs, shown.instant);
   if (holdMs > 0) {
     schedule(startFade, holdMs);
   } else {
