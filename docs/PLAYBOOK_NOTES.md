@@ -179,3 +179,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: UI-023 narrowed formMode only; the remaining loose types admitted values production never produces.
 - Rule: no runtime change; MenuScene unchanged (Wave 5C).
 - Status: Applied
+
+## 2026-11-14 - MAZER-UI-031 slice 1 colour literals
+- WHAT changed: the 8 Navigation Core ENERGY stop literals moved from `navigationCoreTrail.ts` into `trailPalette.ts` (a colour-definition file) as `NAVIGATION_CORE_TRAIL_ENERGY_STOPS`, re-exported from the old path; off-theme baseline lowered by exactly 8 (288 to 280 off-token, 363 to 355 total); design-token evidence file pointers updated.
+- WHY it changed: first slice of the stray-colour migration; values and order are identical (pinned by `tests/render/navigation-core-energy-stops.test.ts`), so no visible change.
+- Status: Applied
