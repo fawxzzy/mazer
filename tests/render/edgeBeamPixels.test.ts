@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   EDGE_MARKER_HALF_HEIGHT,
   drawEdgeBeams,
-  anchorStationToInnerTip,
+  anchorStationToOuterTip,
   drawEdgeMarker,
   resolveEdgeInnerTip,
   resolveEdgeMarkerVertices,
@@ -10,7 +10,7 @@ import {
   type EdgeGraphics,
   type EdgeMarkerState
 } from '../../src/render/edgeMarkers';
-import { DIAMOND_FILL_ALPHA, resolveDiamondFillShape, snapToDevice } from '../../src/render/edgeBeamArt';
+import { DIAMOND_FILL_ALPHA, drawBeamPulse, resolveDiamondFillShape, snapToDevice } from '../../src/render/edgeBeamArt';
 import { EDGE_DIAMOND_REST_SCALE, resolveBeamTimes } from '../../src/render/edgeBeamTimeline';
 import { PLAYER_COLOR } from '../../src/render/trailPalette';
 import { RasterContext } from './support/rasterContext';
@@ -23,8 +23,9 @@ import { RasterContext } from './support/rasterContext';
  *  - one fill only: the wrap-end / wrap-flash cues never paint a second (core) shape inside the diamond;
  *  - the fill never paints outside the outline;
  *  - the beam, at its contact instant, ends exactly on the diamond's INNERMOST point (its inner tip), pixel-snapped, in both
- *    directions and at every DPR, at full size and at the 50% rest size (the tip does not move when the diamond scales);
- *  - at 50% the fill still lies inside the (smaller) outline.
+ *    directions and at every DPR, at full size and at 50% / 75% / 100% (the diamond scales about its OUTER tip, so the inner
+ *    tip moves and the beam endpoint is recomputed from the current size);
+ *  - at 50% / 75% the fill still lies inside the (smaller) outline.
  */
 class Graphics implements EdgeGraphics {
   constructor(private readonly ctx: RasterContext) {
@@ -180,7 +181,7 @@ describe('diamond interior fill on real pixels', () => {
   });
 });
 
-describe('beam endpoints on the inner tip, on real pixels (MAZER-VIS-038)', () => {
+describe('beam endpoints on the (moving) inner tip, on real pixels (MAZER-VIS-038, MAZER-VIS-043)', () => {
   const viewport = { width: 390, height: 844 };
   const stations = resolveEdgeStations(viewport);
   const focus = { x: 195, y: 422 };
@@ -241,62 +242,97 @@ describe('beam endpoints on the inner tip, on real pixels (MAZER-VIS-038)', () =
     }
   });
 
-  test.each(DPRS)('at DPR %s the inner tip does not move when the diamond scales to 50% and the kite still reaches it', (dpr) => {
+  test.each(DPRS)('at DPR %s the beam endpoint follows the moving inner tip at 50%%, 75%% and 100%%: the outer tip stays put, the tip pixel is lit by the kite and by the beam head', (dpr) => {
     for (const index of [1, 3, 5, 7, 0, 4]) {
       const station = stations[index]!;
-      const tip = resolveEdgeInnerTip(station);
-      const anchored = anchorStationToInnerTip(station, EDGE_DIAMOND_REST_SCALE);
-      const scaledOutline = resolveEdgeMarkerVertices(anchored, EDGE_DIAMOND_REST_SCALE);
-      // Exactly the same tip, half the length.
-      expect(scaledOutline[0]!.x).toBeCloseTo(tip.x, 9);
-      expect(scaledOutline[0]!.y).toBeCloseTo(tip.y, 9);
-      const outer = scaledOutline[2]!;
-      expect(Math.hypot(outer.x - tip.x, outer.y - tip.y)).toBeCloseTo(EDGE_MARKER_HALF_HEIGHT, 9);
-      // Rasterise the 50% kite stroke and the beam at contact: both paint the pixel that holds the tip.
-      const ctx = new RasterContext(Math.ceil(WINDOW * dpr), Math.ceil(WINDOW * dpr));
-      ctx.setTransform(dpr, 0, 0, dpr, -(station.x - (WINDOW / 2)) * dpr, -(station.y - (WINDOW / 2)) * dpr);
-      drawEdgeMarker(new Graphics(ctx), station, { ...stateFor(0), alpha: 1, id: station.id, scale: EDGE_DIAMOND_REST_SCALE });
-      const lit = (point: { x: number; y: number }): number => {
-        // the stroke is a 1 css px line: a pixel within one device pixel of the tip is lit
-        let best = 0;
-        for (let dy = -1; dy <= 1; dy += 1) {
-          for (let dx = -1; dx <= 1; dx += 1) {
-            const px = Math.floor((point.x - (station.x - (WINDOW / 2))) * dpr) + dx;
-            const py = Math.floor((point.y - (station.y - (WINDOW / 2))) * dpr) + dy;
-            best = Math.max(best, ctx.data[(((py * ctx.width) + px) * 4) + 3] ?? 0);
-          }
+      const fullOuter = resolveEdgeMarkerVertices(station, 1)[2]!;
+      let previousTip = null as null | { x: number; y: number };
+      for (const scale of [0.5, 0.75, 1]) {
+        const tip = resolveEdgeInnerTip(station, scale);
+        const scaledOutline = resolveEdgeMarkerVertices(anchorStationToOuterTip(station, scale), scale);
+        // The outer tip is fixed, the inner tip is vertex 0 of the scaled kite and moves toward the board as the kite grows.
+        expect(scaledOutline[2]!.x).toBeCloseTo(fullOuter.x, 9);
+        expect(scaledOutline[2]!.y).toBeCloseTo(fullOuter.y, 9);
+        expect(scaledOutline[0]!.x).toBeCloseTo(tip.x, 9);
+        expect(scaledOutline[0]!.y).toBeCloseTo(tip.y, 9);
+        expect(Math.hypot(tip.x - fullOuter.x, tip.y - fullOuter.y)).toBeCloseTo(2 * EDGE_MARKER_HALF_HEIGHT * scale, 9);
+        if (previousTip) {
+          expect(Math.hypot(tip.x - fullOuter.x, tip.y - fullOuter.y)).toBeGreaterThan(Math.hypot(previousTip.x - fullOuter.x, previousTip.y - fullOuter.y));
         }
-        return best;
-      };
-      expect(lit(tip), `kite tip ${index} dpr ${dpr}`).toBeGreaterThan(0);
-      const beam = rasteriseBeam(index, 'outward', resolveBeamTimes(index).contactMs, dpr);
-      expect(pixelAt(beam, station, tip, dpr)).toBeGreaterThan(0);
+        previousTip = tip;
+        // Rasterise the scaled kite stroke, and a beam whose head sits on the CURRENT tip: both paint the pixel that holds it.
+        const kite = new RasterContext(Math.ceil(WINDOW * dpr), Math.ceil(WINDOW * dpr));
+        kite.setTransform(dpr, 0, 0, dpr, -(station.x - (WINDOW / 2)) * dpr, -(station.y - (WINDOW / 2)) * dpr);
+        drawEdgeMarker(new Graphics(kite), station, { ...stateFor(0), alpha: 1, id: station.id, scale });
+        const lit = (ctx: RasterContext): number => {
+          // a stroke is ~1 css px wide: allow one device pixel of slack around the tip pixel
+          let best = 0;
+          for (let dy = -1; dy <= 1; dy += 1) {
+            for (let dx = -1; dx <= 1; dx += 1) {
+              const px = Math.floor((tip.x - (station.x - (WINDOW / 2))) * dpr) + dx;
+              const py = Math.floor((tip.y - (station.y - (WINDOW / 2))) * dpr) + dy;
+              best = Math.max(best, ctx.data[(((py * ctx.width) + px) * 4) + 3] ?? 0);
+            }
+          }
+          return best;
+        };
+        expect(lit(kite), `kite tip ${index} scale ${scale} dpr ${dpr}`).toBeGreaterThan(0);
+        const beam = new RasterContext(Math.ceil(WINDOW * dpr), Math.ceil(WINDOW * dpr));
+        beam.setTransform(dpr, 0, 0, dpr, -(station.x - (WINDOW / 2)) * dpr, -(station.y - (WINDOW / 2)) * dpr);
+        drawBeamPulse(new Graphics(beam), { clockMs: 0, devicePixelRatio: dpr, headPoint: tip, tailPoint: focus });
+        expect(pixelAt(beam, station, tip, dpr), `beam head ${index} scale ${scale} dpr ${dpr}`).toBeGreaterThan(0);
+        // The snapped endpoint is within half a device pixel of the tip on each axis.
+        expect(Math.abs(snapToDevice(tip.x, dpr) - tip.x)).toBeLessThanOrEqual((0.5 / dpr) + 1e-9);
+        expect(Math.abs(snapToDevice(tip.y, dpr) - tip.y)).toBeLessThanOrEqual((0.5 / dpr) + 1e-9);
+      }
     }
   });
 
-  test.each(DPRS)('at DPR %s at 50%% size the fill (rising and falling) stays inside the smaller outline and anchors on the inner tip', (dpr) => {
+  test.each(DPRS)('at DPR %s the real draw path lands the head on the full-size tip at contact and the tip is lit one frame before (no jump)', (dpr) => {
+    for (const index of [0, 1, 2, 3, 4, 5, 6, 7]) {
+      const station = stations[index]!;
+      const times = resolveBeamTimes(index);
+      const fullTip = resolveEdgeInnerTip(station, 1);
+      expect(pixelAt(rasteriseBeam(index, 'outward', times.contactMs, dpr), station, fullTip, dpr), `contact ${index} dpr ${dpr}`).toBeGreaterThan(0);
+      // 16 ms before contact the diamond is ~full already: the head is within a few px of the full-size tip, never far away.
+      const probe: EdgeGraphics = {
+        fillStyle: () => undefined, lineStyle: () => undefined, beginPath: () => undefined, moveTo: () => undefined,
+        lineTo: () => undefined, closePath: () => undefined, fillPath: () => undefined, strokePath: () => undefined,
+        fillCircle: () => undefined, lineBetween: () => undefined
+      };
+      const geometry = drawEdgeBeams(probe, { clockMs: times.contactMs - 16, devicePixelRatio: dpr, direction: 'outward', focus, laserProgress: 0, spawnPop: 0, stations });
+      const beam = geometry.beams[index]!;
+      expect(Math.hypot(beam.tip.x - fullTip.x, beam.tip.y - fullTip.y)).toBeLessThan(25);
+      expect(Math.hypot(beam.to.x - fullTip.x, beam.to.y - fullTip.y)).toBeLessThan(2);
+    }
+  });
+
+  test.each(DPRS)('at DPR %s at 50%% and 75%% size the fill (rising and falling) stays inside the smaller outline and anchors on its inner tip', (dpr) => {
     const station = { id: 1 as const, inwardAngle: Math.PI / 2, isCorner: false, side: 'top' as const, x: CENTER.x, y: CENTER.y };
-    const anchored = anchorStationToInnerTip(station, EDGE_DIAMOND_REST_SCALE);
-    const outline = resolveEdgeMarkerVertices(anchored, EDGE_DIAMOND_REST_SCALE);
-    const tipY = CENTER.y + EDGE_MARKER_HALF_HEIGHT;
-    for (const fill of [0.25, 0.5, 1]) {
-      const width = Math.ceil(SIZE * dpr);
-      const ctx = new RasterContext(width, width);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawEdgeMarker(new Graphics(ctx), station, { ...stateFor(fill), scale: EDGE_DIAMOND_REST_SCALE });
-      const points: Array<{ x: number; y: number }> = [];
-      for (let py = 0; py < width; py += 1) {
-        for (let px = 0; px < width; px += 1) {
-          if ((ctx.data[(((py * width) + px) * 4) + 3] ?? 0) > 0) points.push({ x: (px + 0.5) / dpr, y: (py + 0.5) / dpr });
+    for (const scale of [EDGE_DIAMOND_REST_SCALE, 0.75]) {
+      const anchored = anchorStationToOuterTip(station, scale);
+      const outline = resolveEdgeMarkerVertices(anchored, scale);
+      // outer tip fixed at CENTER.y - 10; inner tip (the larger y) at outer + 20 * scale
+      const tipY = (CENTER.y - EDGE_MARKER_HALF_HEIGHT) + (2 * EDGE_MARKER_HALF_HEIGHT * scale);
+      for (const fill of [0.25, 0.5, 1]) {
+        const width = Math.ceil(SIZE * dpr);
+        const ctx = new RasterContext(width, width);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        drawEdgeMarker(new Graphics(ctx), station, { ...stateFor(fill), scale });
+        const points: Array<{ x: number; y: number }> = [];
+        for (let py = 0; py < width; py += 1) {
+          for (let px = 0; px < width; px += 1) {
+            if ((ctx.data[(((py * width) + px) * 4) + 3] ?? 0) > 0) points.push({ x: (px + 0.5) / dpr, y: (py + 0.5) / dpr });
+          }
         }
+        expect(points.length, `scale ${scale} fill ${fill} dpr ${dpr}`).toBeGreaterThan(0);
+        for (const point of points) {
+          expect(insideConvex(outline, point, 0.75 + (1 / dpr)), `scale ${scale} fill ${fill} dpr ${dpr} at ${point.x},${point.y}`).toBe(true);
+        }
+        // Anchored on the inner tip of the scaled kite (the larger y), never beyond it.
+        expect(Math.max(...points.map((point) => point.y))).toBeLessThanOrEqual(tipY + (1 / dpr) + 0.5);
+        expect(Math.max(...points.map((point) => point.y))).toBeGreaterThan(tipY - 1.5);
       }
-      expect(points.length, `fill ${fill} dpr ${dpr}`).toBeGreaterThan(0);
-      for (const point of points) {
-        expect(insideConvex(outline, point, 0.75 + (1 / dpr)), `fill ${fill} dpr ${dpr} at ${point.x},${point.y}`).toBe(true);
-      }
-      // Anchored on the inner tip (the larger y), never beyond it.
-      expect(Math.max(...points.map((point) => point.y))).toBeLessThanOrEqual(tipY + (1 / dpr) + 0.5);
-      expect(Math.max(...points.map((point) => point.y))).toBeGreaterThan(tipY - 1.5);
     }
   });
 });

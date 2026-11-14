@@ -42,6 +42,11 @@ export class RasterContext implements TileBakeContext2D {
   globalAlpha = 1;
   /** Strokes are inert unless this is set (the bake's own strokes stay out of fill-only edge tests). */
   paintStrokes = false;
+  /**
+   * Opt-in: also paint the MITER wedge at every vertex of a stroked path (what a real canvas does with lineJoin 'miter', the default,
+   * miter limit 10). Off by default so every other raster test keeps its round-join semantics.
+   */
+  miterJoins = false;
   shadowBlur = 0;
   shadowColor = '';
 
@@ -197,6 +202,52 @@ export class RasterContext implements TileBakeContext2D {
             const cx = px + 0.5; const cy = py + 0.5;
             const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, (((cx - p[0]) * dx) + ((cy - p[1]) * dy)) / len2));
             if (Math.hypot(cx - (p[0] + (t * dx)), cy - (p[1] + (t * dy))) <= half) this.blend(px, py, color);
+          }
+        }
+      }
+    }
+    if (this.miterJoins) this.strokeMiterJoins(color, half);
+  }
+
+  /** The miter wedges of every stroked vertex (see `miterJoins`): the quad vertex, its two outer offset points and the miter point. */
+  private strokeMiterJoins(color: Rgba, half: number): void {
+    const MITER_LIMIT = 10;
+    for (const path of this.subpaths) {
+      const n = path.length;
+      if (n < 3) continue;
+      const closed = path[0]![0] === path[n - 1]![0] && path[0]![1] === path[n - 1]![1];
+      const joins: Array<[Point, Point, Point]> = [];
+      for (let i = 1; i < n - 1; i += 1) joins.push([path[i - 1]!, path[i]!, path[i + 1]!]);
+      if (closed && n > 3) joins.push([path[n - 2]!, path[0]!, path[1]!]);
+      for (const [a, v, b] of joins) {
+        const l1 = Math.hypot(v[0] - a[0], v[1] - a[1]); const l2 = Math.hypot(b[0] - v[0], b[1] - v[1]);
+        if (l1 === 0 || l2 === 0) continue;
+        const d1x = (v[0] - a[0]) / l1; const d1y = (v[1] - a[1]) / l1;
+        const d2x = (b[0] - v[0]) / l2; const d2y = (b[1] - v[1]) / l2;
+        const cross = (d1x * d2y) - (d1y * d2x);
+        if (Math.abs(cross) < 1e-9) continue;
+        const side = Math.sign(cross);
+        const n1x = side * d1y; const n1y = -side * d1x;
+        const n2x = side * d2y; const n2y = -side * d2x;
+        const denominator = 1 + (n1x * n2x) + (n1y * n2y);
+        if (denominator < 2 / (MITER_LIMIT * MITER_LIMIT)) continue;
+        const mx = v[0] + (((n1x + n2x) * half) / denominator);
+        const my = v[1] + (((n1y + n2y) * half) / denominator);
+        const quad: Point[] = [v, [v[0] + (n1x * half), v[1] + (n1y * half)], [mx, my], [v[0] + (n2x * half), v[1] + (n2y * half)]];
+        const minX = Math.max(0, Math.floor(Math.min(...quad.map((q) => q[0]))));
+        const maxX = Math.min(this.width - 1, Math.ceil(Math.max(...quad.map((q) => q[0]))));
+        const minY = Math.max(0, Math.floor(Math.min(...quad.map((q) => q[1]))));
+        const maxY = Math.min(this.height - 1, Math.ceil(Math.max(...quad.map((q) => q[1]))));
+        for (let py = minY; py <= maxY; py += 1) {
+          for (let px = minX; px <= maxX; px += 1) {
+            const cx = px + 0.5; const cy = py + 0.5;
+            let positive = 0; let negative = 0;
+            for (let k = 0; k < 4; k += 1) {
+              const p = quad[k]!; const q = quad[(k + 1) % 4]!;
+              const c = ((q[0] - p[0]) * (cy - p[1])) - ((q[1] - p[1]) * (cx - p[0]));
+              if (c > 1e-12) positive += 1; else if (c < -1e-12) negative += 1;
+            }
+            if (positive === 0 || negative === 0) this.blend(px, py, color);
           }
         }
       }

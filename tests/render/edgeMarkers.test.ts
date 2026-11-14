@@ -7,13 +7,16 @@ import {
   EDGE_MARKER_FLASH_MS,
   EDGE_MARKER_HALF_HEIGHT,
   EDGE_MARKER_MAX_EXTENT_PX,
-  EDGE_MARKER_MIN_INSET_PX,
+  EDGE_MARKER_CORNER_CLEARANCE_PX,
+  EDGE_MARKER_TIP_PAINT_PX,
+  resolveEdgeCornerInset,
+  resolveEdgeMarkerPaintedPolygon,
   EDGE_MIDPOINT_STATION_ID,
   EDGE_STATION_COUNT,
   drawEdgeMarker,
   drawEdgeMarkers,
   drawEdgeBeams,
-  anchorStationToInnerTip,
+  anchorStationToOuterTip,
   resolveEdgeInnerTip,
   resolveEdgeRingScales,
   resolveEdgeMarkerIdleAlpha,
@@ -64,6 +67,7 @@ import {
   EDGE_BEAM_PULSE_MS,
   EDGE_BEAM_RETRACT_MS,
   EDGE_DIAMOND_REST_SCALE,
+  resolveEdgeDiamondScale,
   resolveBeamHead,
   resolveBeamTimes,
   resolveDiamondDrainFromOutgoing,
@@ -99,52 +103,111 @@ const MIRROR_VIEWPORTS = [
 ] as const;
 
 describe('edge marker stations', () => {
-  test.each(VIEWPORTS)('all 8 kites rest fully inside a $width x $height viewport with the outer tip flush to its edge', (viewport) => {
+  test.each(VIEWPORTS)('all 8 kites rest fully inside a $width x $height viewport with the PAINTED outer tip touching the screen edge', (viewport) => {
     const stations = resolveEdgeStations(viewport);
     expect(stations).toHaveLength(EDGE_STATION_COUNT);
     for (const station of stations) {
-      const vertices = resolveEdgeMarkerVertices(station);
-      // Nothing clipped at rest (outline vertex +/- half a stroke)...
-      for (const vertex of vertices) {
-        expect(vertex.x - 0.5).toBeGreaterThanOrEqual(-1e-9);
-        expect(vertex.y - 0.5).toBeGreaterThanOrEqual(-1e-9);
-        expect(vertex.x + 0.5).toBeLessThanOrEqual(viewport.width + 1e-9);
-        expect(vertex.y + 0.5).toBeLessThanOrEqual(viewport.height + 1e-9);
-      }
-      // ...and the outer tip touches the screen edge the station sits on (0 px gap).
+      const painted = resolveEdgeMarkerPaintedPolygon(station);
+      const bounds = {
+        left: Math.min(...painted.map((vertex) => vertex.x)),
+        right: Math.max(...painted.map((vertex) => vertex.x)),
+        top: Math.min(...painted.map((vertex) => vertex.y)),
+        bottom: Math.max(...painted.map((vertex) => vertex.y))
+      };
+      // Nothing clipped at rest (outline plus the stroke's miter join)...
+      expect(bounds.left).toBeGreaterThanOrEqual(-1e-9);
+      expect(bounds.top).toBeGreaterThanOrEqual(-1e-9);
+      expect(bounds.right).toBeLessThanOrEqual(viewport.width + 1e-9);
+      expect(bounds.bottom).toBeLessThanOrEqual(viewport.height + 1e-9);
+      // ...and the outer tip touches the screen edge the station sits on (0 px gap, not past it).
       const gaps = {
-        top: Math.min(...vertices.map((vertex) => vertex.y)) - 0.5,
-        bottom: viewport.height - (Math.max(...vertices.map((vertex) => vertex.y)) + 0.5),
-        left: Math.min(...vertices.map((vertex) => vertex.x)) - 0.5,
-        right: viewport.width - (Math.max(...vertices.map((vertex) => vertex.x)) + 0.5)
+        top: bounds.top,
+        bottom: viewport.height - bounds.bottom,
+        left: bounds.left,
+        right: viewport.width - bounds.right
       };
       expect(gaps[station.side], `station ${station.id} gap to ${station.side}`).toBeCloseTo(0, 9);
       // Any orientation stays within the max extent of the centre.
       for (let degrees = 0; degrees < 360; degrees += 15) {
-        for (const vertex of resolveEdgeMarkerVertices({ ...station, inwardAngle: (degrees * Math.PI) / 180 }, 1)) {
+        for (const vertex of resolveEdgeMarkerPaintedPolygon({ ...station, inwardAngle: (degrees * Math.PI) / 180 })) {
           expect(Math.hypot(vertex.x - station.x, vertex.y - station.y)).toBeLessThanOrEqual(EDGE_MARKER_MAX_EXTENT_PX + 1e-9);
         }
       }
     }
-    expect(EDGE_MARKER_MAX_EXTENT_PX).toBeLessThanOrEqual(EDGE_MARKER_MIN_INSET_PX);
-    // Midpoint kites reach 10.5 px from the centre toward their edge; 45 degree corner kites ~7.57 px.
-    expect(resolveEdgeStationNormalExtent(1)).toBeCloseTo(10.5, 9);
-    expect(resolveEdgeStationNormalExtent(3)).toBeCloseTo(10.5, 9);
-    expect(resolveEdgeStationNormalExtent(0)).toBeCloseTo((10 * Math.SQRT1_2) + 0.5, 9);
+    // A 1 px stroke joins with a miter: the tip paints 0.5 / sin(atan(7 / 12)) = ~0.99 px beyond its vertex.
+    expect(EDGE_MARKER_TIP_PAINT_PX).toBeCloseTo(0.5 / Math.sin(Math.atan2(7, 12)), 9);
+    expect(EDGE_MARKER_MAX_EXTENT_PX).toBeCloseTo(10 + EDGE_MARKER_TIP_PAINT_PX, 9);
+    // Midpoint kites paint ~10.99 px from the centre toward their edge; 45 degree corner kites ~7.77 px.
+    expect(resolveEdgeStationNormalExtent(1)).toBeCloseTo(10 + EDGE_MARKER_TIP_PAINT_PX, 9);
+    expect(resolveEdgeStationNormalExtent(3)).toBeCloseTo(10 + EDGE_MARKER_TIP_PAINT_PX, 9);
+    expect(resolveEdgeStationNormalExtent(0)).toBeCloseTo((10 + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2, 9);
   });
 
-  test('fixed positions: top row is 12 / w/2 / w-12 and the layout depends on the viewport size ONLY', () => {
+  test('the painted polygon is the stroke\'s outer boundary: half a stroke outside every edge, miter at the vertices', () => {
+    const station = { x: 100, y: 100, inwardAngle: Math.PI / 2 };
+    const vertices = resolveEdgeMarkerVertices(station);
+    const painted = resolveEdgeMarkerPaintedPolygon(station);
+    expect(painted).toHaveLength(4);
+    painted.forEach((point, index) => {
+      const vertex = vertices[index] as { x: number; y: number };
+      // every painted corner is outside its vertex by the miter length of that corner
+      expect(Math.hypot(point.x - vertex.x, point.y - vertex.y)).toBeGreaterThan(0.5);
+      expect(Math.hypot(point.x - vertex.x, point.y - vertex.y)).toBeLessThan(1.05);
+    });
+    // distance from a painted edge to the outline edge is half a stroke
+    const distance = (a: { x: number; y: number }, b: { x: number; y: number }, c: { x: number; y: number }): number => (
+      Math.abs(((b.x - a.x) * (a.y - c.y)) - ((a.x - c.x) * (b.y - a.y))) / Math.hypot(b.x - a.x, b.y - a.y)
+    );
+    for (let index = 0; index < 4; index += 1) {
+      const a = vertices[index] as { x: number; y: number };
+      const b = vertices[(index + 1) % 4] as { x: number; y: number };
+      expect(distance(a, b, painted[index] as { x: number; y: number })).toBeCloseTo(0.5, 9);
+      expect(distance(a, b, painted[(index + 1) % 4] as { x: number; y: number })).toBeCloseTo(0.5, 9);
+    }
+  });
+
+  test.each(VIEWPORTS)('corner diamonds clear a rounded display corner of $width x $height: every painted point lies inside a rounded rectangle of the clearance radius', (viewport) => {
+    const radius = EDGE_MARKER_CORNER_CLEARANCE_PX;
+    const inside = (point: { x: number; y: number }): boolean => {
+      const cx = point.x < radius ? radius : point.x > viewport.width - radius ? viewport.width - radius : point.x;
+      const cy = point.y < radius ? radius : point.y > viewport.height - radius ? viewport.height - radius : point.y;
+      return Math.hypot(point.x - cx, point.y - cy) <= radius + 1e-9;
+    };
+    for (const station of resolveEdgeStations(viewport)) {
+      for (const point of resolveEdgeMarkerPaintedPolygon(station)) {
+        expect(inside(point), `station ${station.id} point ${point.x.toFixed(2)},${point.y.toFixed(2)}`).toBe(true);
+      }
+    }
+    // The corner station sits exactly the clearance from the screen corner (painted), along its edge.
+    const corner = resolveEdgeStations(viewport)[0] as { x: number; y: number; inwardAngle: number };
+    expect(Math.min(...resolveEdgeMarkerPaintedPolygon(corner).map((point) => point.x))).toBeCloseTo(radius, 9);
+    expect(corner.x).toBeCloseTo(resolveEdgeCornerInset(), 9);
+  });
+
+  test('fixed positions: top row is inset / w/2 / w-inset (the corner diamonds clear a rounded corner) and the layout depends on the viewport size and the resolution ONLY', () => {
+    const inset = resolveEdgeCornerInset();
+    expect(inset).toBeCloseTo(EDGE_MARKER_CORNER_CLEARANCE_PX + ((10 + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2), 9);
     const stations = resolveEdgeStations({ width: 390, height: 844 });
-    expect([stations[0]?.x, stations[1]?.x, stations[2]?.x]).toEqual([12, 195, 378]);
-    expect(stations[1]?.y).toBeCloseTo(10.5, 9);
-    expect(stations[5]?.y).toBeCloseTo(844 - 10.5, 9);
-    expect(stations[3]?.x).toBeCloseTo(390 - 10.5, 9);
-    expect(stations[7]?.x).toBeCloseTo(10.5, 9);
+    expect(stations[0]?.x).toBeCloseTo(inset, 9);
+    expect(stations[1]?.x).toBeCloseTo(195, 9);
+    expect(stations[2]?.x).toBeCloseTo(390 - inset, 9);
+    const extent = 10 + EDGE_MARKER_TIP_PAINT_PX;
+    expect(stations[1]?.y).toBeCloseTo(extent, 9);
+    expect(stations[5]?.y).toBeCloseTo(844 - extent, 9);
+    expect(stations[3]?.x).toBeCloseTo(390 - extent, 9);
+    expect(stations[7]?.x).toBeCloseTo(extent, 9);
     expect(stations[3]?.y).toBeCloseTo(422, 9);
     expect(stations[7]?.y).toBeCloseTo(422, 9);
     expect(resolveEdgeStations.length).toBe(1);
     const wide = resolveEdgeStations({ width: 1280, height: 720 });
-    expect([wide[0]?.x, wide[1]?.x, wide[2]?.x]).toEqual([12, 640, 1268]);
+    expect(wide[0]?.x).toBeCloseTo(inset, 9);
+    expect(wide[1]?.x).toBeCloseTo(640, 9);
+    expect(wide[2]?.x).toBeCloseTo(1280 - inset, 9);
+    // The painted canvas ends at round(css * resolution) / resolution: at 2.63 (the 2.625 resolution rounded to hundredths) 390 css px
+    // is a 1026 px backing store, i.e. 390.1141 px of world: the right midpoint's painted tip touches THAT edge.
+    const dpr = resolveEdgeStations({ width: 390, height: 844 }, 2.63);
+    expect((dpr[3] as { x: number }).x + extent).toBeCloseTo(1026 / 2.63, 9);
+    expect((dpr[5] as { y: number }).y + extent).toBeCloseTo(2220 / 2.63, 9);
   });
 
   test.each(MIRROR_VIEWPORTS)('layout is mirror-symmetric at $width x $height in the menu AND play layouts (bottom row is the reference)', (viewport) => {
@@ -177,7 +240,8 @@ describe('edge marker stations', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const start = source.indexOf('private resolveLegacyEdgeStations()');
     const body = source.slice(start, source.indexOf('\n  }', start));
-    expect(body).toContain('return resolveEdgeStations({ width: this.layout.width, height: this.layout.height });');
+    // The viewport size plus the canvas resolution (which only decides where the backing store ends): MAZER-VIS-043.
+    expect(body).toContain('return resolveEdgeStations({ width: this.layout.width, height: this.layout.height }, resolveMazerCanvasResolution());');
     expect(body).not.toContain('safeArea');
     expect(body).not.toContain('resolveHeaderControlRects');
     const markers = readFileSync(resolve(process.cwd(), 'src/render/edgeMarkers.ts'), 'utf8');
@@ -459,28 +523,41 @@ describe('all-8 beams (arrival and departure)', () => {
     expect([...mid.firingIds].sort()).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
 
-  test('arrival: beams run diamond INNER TIP -> spawn tile; departure: player -> diamond inner tip (the mirror)', () => {
+  test('arrival: beams run diamond INNER TIP -> spawn tile; departure: player -> diamond inner tip (the mirror); the tip follows the diamond\'s CURRENT size', () => {
     const inward = resolveEdgeBeams({ direction: 'inward', focus, laserProgress: 0.5, spawnPop: 0, stations });
     const outward = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 0.5, spawnPop: 0, stations });
     stations.forEach((station, index) => {
-      const vertices = resolveEdgeMarkerVertices(station, 1);
-      const contact = inward.beams[index]?.contact as { x: number; y: number };
-      // The diamond end of the path is the INNERMOST point of the diamond (the tip facing the board): the kite's first
-      // vertex, exactly, in both directions, not an outline-crossing point and not the centre.
-      expect(outward.beams[index]?.contact).toEqual(contact);
-      expect(contact).toEqual(resolveEdgeInnerTip(station));
-      expect(contact.x).toBeCloseTo((vertices[0] as { x: number }).x, 9);
-      expect(contact.y).toBeCloseTo((vertices[0] as { y: number }).y, 9);
-      expect(Math.hypot(contact.x - station.x, contact.y - station.y)).toBeCloseTo(EDGE_MARKER_HALF_HEIGHT, 9);
-      // It is the vertex nearest the focus (the one that faces the board), and the beam never crosses the kite's body.
-      const nearest = vertices.reduce((best, vertex) => (
-        Math.hypot(vertex.x - focus.x, vertex.y - focus.y) < Math.hypot(best.x - focus.x, best.y - focus.y) ? vertex : best
-      ));
-      expect(nearest, `station ${index}`).toEqual(vertices[0]);
-      expect(inward.beams[index]?.from).toEqual(contact);
+      const clock = 200; // laserProgress 0.5 on the master laser clock
+      const inScale = resolveEdgeDiamondScale('inward', clock, index);
+      const outScale = resolveEdgeDiamondScale('outward', clock, index);
+      const inContact = inward.beams[index]?.contact as { x: number; y: number };
+      const outContact = outward.beams[index]?.contact as { x: number; y: number };
+      // The diamond end of the path is the INNERMOST point of the diamond at its CURRENT size (it grows / shrinks about its OUTER tip,
+      // so the inner tip moves), in both directions, not an outline-crossing point and not the centre.
+      expect(inContact).toEqual(resolveEdgeInnerTip(station, inScale));
+      expect(outContact).toEqual(resolveEdgeInnerTip(station, outScale));
+      expect(outScale).toBeLessThan(1); // the departure diamond is still growing 200 ms in: the tip has NOT reached the full-size point yet
+      const outer = resolveEdgeMarkerVertices(station, 1)[2] as { x: number; y: number };
+      const vertices = resolveEdgeMarkerVertices(anchorStationToOuterTip(station, outScale), outScale);
+      expect(vertices[2]?.x).toBeCloseTo(outer.x, 9);
+      expect(vertices[2]?.y).toBeCloseTo(outer.y, 9);
+      expect(outContact.x).toBeCloseTo((vertices[0] as { x: number }).x, 9);
+      expect(outContact.y).toBeCloseTo((vertices[0] as { y: number }).y, 9);
+      expect(inward.beams[index]?.from).toEqual(inContact);
       expect(inward.beams[index]?.to).toEqual(focus);
       expect(outward.beams[index]?.from).toEqual(focus);
-      expect(outward.beams[index]?.to).toEqual(contact);
+      expect(outward.beams[index]?.to).toEqual(outContact);
+      // At the instant of contact (departure) the diamond is exactly full: the head lands exactly on the full-size inner tip, no jump.
+      const times = resolveBeamTimes(index);
+      const landed = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations, clockMs: times.contactMs }).beams[index] as { to: { x: number; y: number }; tip: { x: number; y: number } };
+      const full = resolveEdgeMarkerVertices(station, 1)[0] as { x: number; y: number };
+      expect(landed.to.x).toBeCloseTo(full.x, 9);
+      expect(landed.to.y).toBeCloseTo(full.y, 9);
+      expect(landed.tip.x).toBeCloseTo(full.x, 9);
+      expect(landed.tip.y).toBeCloseTo(full.y, 9);
+      // One frame earlier the target is already within a hair of it (continuous, not a jump).
+      const before = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations, clockMs: times.contactMs - 16 }).beams[index] as { to: { x: number; y: number } };
+      expect(Math.hypot(before.to.x - full.x, before.to.y - full.y)).toBeLessThan(2);
     });
   });
 
@@ -861,16 +938,16 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
     expect((back[3] as { y: number }).y).toBeLessThan((rest[3] as { y: number }).y);
   });
 
-  test.each(ORBIT_VIEWPORTS)('no kite vertex (plus half a stroke) ever leaves the viewport at any phase at $width x $height; top/bottom travel is flush', (viewport) => {
+  test.each(ORBIT_VIEWPORTS)('no painted kite pixel (outline plus miter) ever leaves the viewport at any phase at $width x $height; top/bottom travel is flush', (viewport) => {
     let flushSamples = 0;
     for (let index = 0; index <= 2400; index += 1) {
       const phase = (index / 2400) * Math.PI * 2;
       for (const station of resolveOrbitingEdgeStations(viewport, phase)) {
-        const vertices = resolveEdgeMarkerVertices(station);
-        const minX = Math.min(...vertices.map((vertex) => vertex.x)) - 0.5;
-        const maxX = Math.max(...vertices.map((vertex) => vertex.x)) + 0.5;
-        const minY = Math.min(...vertices.map((vertex) => vertex.y)) - 0.5;
-        const maxY = Math.max(...vertices.map((vertex) => vertex.y)) + 0.5;
+        const painted = resolveEdgeMarkerPaintedPolygon(station);
+        const minX = Math.min(...painted.map((vertex) => vertex.x));
+        const maxX = Math.max(...painted.map((vertex) => vertex.x));
+        const minY = Math.min(...painted.map((vertex) => vertex.y));
+        const maxY = Math.max(...painted.map((vertex) => vertex.y));
         const label = `phase ${phase} id ${station.id}`;
         expect(minX, label).toBeGreaterThanOrEqual(-1e-9);
         expect(minY, label).toBeGreaterThanOrEqual(-1e-9);
@@ -966,9 +1043,13 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
     const outward = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 0.5, spawnPop: 0, stations });
     expect(inward.beams).toHaveLength(8);
     stations.forEach((station, index) => {
-      // The diamond end is the contact point on the moving diamond's own outline.
-      expect(isOnPolygonEdge(resolveEdgeMarkerVertices(station, 1), inward.beams[index]?.from as { x: number; y: number })).toBe(true);
-      expect(isOnPolygonEdge(resolveEdgeMarkerVertices(station, 1), outward.beams[index]?.to as { x: number; y: number })).toBe(true);
+      // The diamond end is the inner tip of the moving diamond at its current size (a polygon vertex of that kite).
+      const inScale = resolveEdgeDiamondScale('inward', 200, index);
+      const outScale = resolveEdgeDiamondScale('outward', 200, index);
+      expect(inward.beams[index]?.from).toEqual(resolveEdgeInnerTip(station, inScale));
+      expect(outward.beams[index]?.to).toEqual(resolveEdgeInnerTip(station, outScale));
+      expect(isOnPolygonEdge(resolveEdgeMarkerVertices(anchorStationToOuterTip(station, inScale), inScale), inward.beams[index]?.from as { x: number; y: number })).toBe(true);
+      expect(isOnPolygonEdge(resolveEdgeMarkerVertices(anchorStationToOuterTip(station, outScale), outScale), outward.beams[index]?.to as { x: number; y: number })).toBe(true);
     });
   });
 
@@ -1093,34 +1174,44 @@ describe('colour contract: border = live trail colour, inside = player colour (o
   });
 });
 
-describe('diamond size and inner-tip attachment (MAZER-VIS-038)', () => {
+describe('diamond size (outer-tip anchored) and inner-tip attachment (MAZER-VIS-038, MAZER-VIS-043)', () => {
   const FULL = { reducedMotion: false, tileCount: 300 } as const;
 
-  test('anchorStationToInnerTip scales about the inner tip: the tip never moves, the outer tip pulls in, scale 1 is the station itself', () => {
+  test('anchorStationToOuterTip scales about the OUTER tip: the outer tip never moves (it stays on the screen edge), the inner tip moves in as the diamond grows, scale 1 is the station itself', () => {
     for (const viewport of VIEWPORTS) {
       for (const station of resolveEdgeStations(viewport)) {
-        const tip = resolveEdgeInnerTip(station);
-        expect(anchorStationToInnerTip(station, 1)).toBe(station);
-        for (const scale of [0.5, 0.75, 0.2, 0]) {
-          const vertices = resolveEdgeMarkerVertices(anchorStationToInnerTip(station, scale), scale);
-          expect(vertices[0]?.x).toBeCloseTo(tip.x, 9);
-          expect(vertices[0]?.y).toBeCloseTo(tip.y, 9);
-          const outer = vertices[2] as { x: number; y: number };
-          expect(Math.hypot(outer.x - tip.x, outer.y - tip.y)).toBeCloseTo(2 * EDGE_MARKER_HALF_HEIGHT * scale, 9);
+        const fullOuter = resolveEdgeMarkerVertices(station, 1)[2] as { x: number; y: number };
+        const fullInner = resolveEdgeInnerTip(station);
+        expect(anchorStationToOuterTip(station, 1)).toBe(station);
+        expect(resolveEdgeInnerTip(station, 1)).toEqual(fullInner);
+        let previousReach = 0;
+        for (const scale of [0, 0.2, 0.5, 0.75, 1]) {
+          const vertices = resolveEdgeMarkerVertices(anchorStationToOuterTip(station, scale), scale);
+          expect(vertices[2]?.x).toBeCloseTo(fullOuter.x, 9);
+          expect(vertices[2]?.y).toBeCloseTo(fullOuter.y, 9);
+          // vertex 0 IS the inner tip at that size, and resolveEdgeInnerTip reports it
+          const inner = resolveEdgeInnerTip(station, scale);
+          expect(vertices[0]?.x).toBeCloseTo(inner.x, 9);
+          expect(vertices[0]?.y).toBeCloseTo(inner.y, 9);
+          const length = Math.hypot((vertices[0] as { x: number }).x - fullOuter.x, (vertices[0] as { y: number }).y - fullOuter.y);
+          expect(length).toBeCloseTo(2 * EDGE_MARKER_HALF_HEIGHT * scale, 9);
+          expect(length).toBeGreaterThanOrEqual(previousReach - 1e-9);
+          previousReach = length;
         }
-        // At 50% the whole kite is inside the full-size one (it only shrank toward the tip), so it can never clip where the full one did not.
-        const half = resolveEdgeMarkerVertices(anchorStationToInnerTip(station, 0.5), 0.5);
-        const full = resolveEdgeMarkerVertices(station, 1);
-        for (const vertex of half) {
-          const axis = { x: Math.cos(station.inwardAngle), y: Math.sin(station.inwardAngle) };
-          const along = ((vertex.x - station.x) * axis.x) + ((vertex.y - station.y) * axis.y);
-          expect(along).toBeLessThanOrEqual(EDGE_MARKER_HALF_HEIGHT + 1e-9);
-          expect(along).toBeGreaterThanOrEqual(-1e-9);
+        // The inner tip at full size is the station's own vertex 0; at 50% it is the station centre (10 px from the outer tip).
+        expect(fullInner.x).toBeCloseTo((resolveEdgeMarkerVertices(station, 1)[0] as { x: number }).x, 9);
+        expect(resolveEdgeInnerTip(station, 0.5).x).toBeCloseTo(station.x, 9);
+        expect(resolveEdgeInnerTip(station, 0.5).y).toBeCloseTo(station.y, 9);
+        // Scaling toward the outer tip keeps the whole painted kite inside the full-size kite's footprint toward the edge, so it never leaves the screen.
+        for (const scale of [0.5, 0.75]) {
+          const painted = resolveEdgeMarkerPaintedPolygon(anchorStationToOuterTip(station, scale), scale);
+          for (const point of painted) {
+            expect(point.x).toBeGreaterThanOrEqual(-1e-9);
+            expect(point.y).toBeGreaterThanOrEqual(-1e-9);
+            expect(point.x).toBeLessThanOrEqual(viewport.width + 1e-9);
+            expect(point.y).toBeLessThanOrEqual(viewport.height + 1e-9);
+          }
         }
-        expect(Math.max(...half.map((v) => v.x))).toBeLessThanOrEqual(Math.max(...full.map((v) => v.x)) + 1e-9);
-        expect(Math.min(...half.map((v) => v.x))).toBeGreaterThanOrEqual(Math.min(...full.map((v) => v.x)) - 1e-9);
-        expect(Math.max(...half.map((v) => v.y))).toBeLessThanOrEqual(Math.max(...full.map((v) => v.y)) + 1e-9);
-        expect(Math.min(...half.map((v) => v.y))).toBeGreaterThanOrEqual(Math.min(...full.map((v) => v.y)) - 1e-9);
       }
     }
   });
@@ -1135,12 +1226,15 @@ describe('diamond size and inner-tip attachment (MAZER-VIS-038)', () => {
       // screen edge, on the diamond's axis, is the one documented exception: the beam then runs through the kite to its tip).
       const points = [0.1, 0.5, 0.9].flatMap((fx) => [0.1, 0.5, 0.9].map((fy) => ({ x: viewport.width * fx, y: viewport.height * fy })));
       for (const station of stations) {
-        const tip = resolveEdgeInnerTip(station);
+        // The path leaves the tip of the CURRENT size; the 50% tip (the centre) is the one nearest the edge, so check both.
         const back = { x: -Math.cos(station.inwardAngle), y: -Math.sin(station.inwardAngle) };
+        for (const scale of [1, 0.5]) {
+        const tip = resolveEdgeInnerTip(station, scale);
         for (const focus of points) {
           const length = Math.hypot(focus.x - tip.x, focus.y - tip.y);
           const angle = Math.acos(Math.max(-1, Math.min(1, (((focus.x - tip.x) * back.x) + ((focus.y - tip.y) * back.y)) / length)));
-          expect(angle, `${viewport.width}x${viewport.height} station ${station.id} focus ${focus.x},${focus.y}`).toBeGreaterThan(wedge);
+          expect(angle, `${viewport.width}x${viewport.height} station ${station.id} focus ${focus.x},${focus.y} scale ${scale}`).toBeGreaterThan(wedge);
+        }
         }
       }
     }
@@ -1173,7 +1267,7 @@ describe('diamond size and inner-tip attachment (MAZER-VIS-038)', () => {
     expect(resolveEdgeRingScales({ direction: 'inward', clockMs: doneIntro.laserClockMs, ringFill: doneIntro.ringFill })).toEqual(Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE));
   });
 
-  test('markers drawn at 50% are anchored on the inner tip, carry the scale in their state, and the default (no scales) stays full size for standalone icons', () => {
+  test('markers drawn at 50% are anchored on the outer tip, carry the scale in their state, and the default (no scales) stays full size for standalone icons', () => {
     const stations = resolveEdgeStations({ width: 390, height: 844 });
     const half = resolveEdgeMarkerStates({ reducedMotion: false, scales: resolveEdgeRingScales(null), timeMs: 0 });
     expect(half.every((state) => state.scale === EDGE_DIAMOND_REST_SCALE)).toBe(true);
@@ -1190,7 +1284,7 @@ describe('diamond size and inner-tip attachment (MAZER-VIS-038)', () => {
     expect(scene).toContain('scales: resolveEdgeRingScales(this.edgeRing.lifecycle),');
   });
 
-  test('the tip is an exact vertex at every orbit phase too (the ring orbits at full size, anchored the same way)', () => {
+  test('the full-size inner tip is an exact vertex at every orbit phase too (the ring orbits at full size)', () => {
     const viewport = { width: 390, height: 844 };
     for (const phase of [0.3, 1.1, 2.7, 4.4, 5.9]) {
       for (const station of resolveOrbitingEdgeStations(viewport, phase)) {

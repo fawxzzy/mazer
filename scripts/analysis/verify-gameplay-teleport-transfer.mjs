@@ -17,13 +17,17 @@
  *     spawn tile, each full diamond drains from the instant its beam leaves it and its beam stays attached
  *     to the tip until the drain is over) -- but ONLY AFTER
  *     the maze build is complete (the diamonds orbit, full size, during the build); each empty diamond then shrinks
- *     back to 50% of its size, anchored on its inner tip;
+ *     back to 50% of its size, anchored on its OUTER tip (MAZER-VIS-043: the outer tip stays on the screen edge at every
+ *     size, so the inner tip, where the beams attach, moves; the beam endpoint follows it every frame);
  *     the player appears at the beam landing and input unlocks there, 500 ms
  *     + the build length after the intro began;
  *   - DEPARTURE (goal reached -> deconstruct): the player fires a beam OUTWARD
  *     to ALL 8 diamonds (each diamond grows from 50% to 100% by the instant its beam touches its inner tip and the
  *     beam stays attached until the fill is complete), then the maze dissolves and the next maze arrives;
  *   - while the maze runs every diamond is 50% of its full size (a fixed size in reduced motion, no size animation);
+ *   - EVERY diamond's PAINTED outer tip touches the visible screen edge (within 0.5 device px, never past it) at every size, and
+ *     the four corner diamonds clear a 56 css px rounded display corner (MAZER-VIS-043); the real canvas pixels agree (the diamond
+ *     layer's own pixel footprint, read back with the layer hidden and shown on the same frame, reaches the last device row/column);
  *   - the transfer lifecycle still runs outbound -> stored -> delivering ->
  *     complete -> input unlocked again, via real accepted moves only;
  *   - reduced motion: no beams at all, the diamonds only crossfade full/empty (no sweep, no brightening), 200 ms unlock;
@@ -112,6 +116,11 @@ const KITE_FULL_LENGTH_PX = 20;
 const KITE_REST_LENGTH_PX = 10;
 const KITE_LENGTH_TOLERANCE_PX = 0.05;
 const INNER_TIP_REACH_PX = 10;
+// A 1 px stroke joins with a miter: the outer tip paints 0.5 / sin(atan(7 / 12)) px beyond its vertex along the kite axis (45 degree corner kites:
+// that times cos 45 toward the top / bottom edge). Mirrors edgeMarkers.ts EDGE_MARKER_TIP_PAINT_PX (an acceptance number, not imported).
+const TIP_PAINT_PX = 0.5 / Math.sin(Math.atan2(7, 12));
+const CORNER_CLEARANCE_PX = 56;
+const STATION_SIDE = ['top', 'top', 'top', 'right', 'bottom', 'bottom', 'bottom', 'left'];
 const ALL_STATION_IDS = [0, 1, 2, 3, 4, 5, 6, 7];
 // A diamond counts as lit when its stroke alpha is above the idle breathing maximum (0.6).
 const LIT_ALPHA_FLOOR = 0.62;
@@ -241,10 +250,18 @@ const installHarness = (page) => page.evaluate(({ BLOOM_OUTER_MIN_WIDTH_PX, POOF
       tilesVisible: scene.menuStaticDrawTilesVisible === null ? scene.menuStaticDrawTileOrder.length : scene.menuStaticDrawTilesVisible,
       playerReveal: scene.resolveLegacyPlayerSpawnBurstState(t).markerRevealAlpha,
       markerCount: edge.frame.length,
-      // Kite INNER TIP (vertex 0: the ring orbits the perimeter, so it moves during the intro/outro lap and is exactly parked
-      // otherwise; unlike the centroid it does not move when the diamond scales about it).
-      ring: edge.frame.map((marker) => (marker.vertices.length === 0 ? null : { x: marker.vertices[0].x, y: marker.vertices[0].y })),
+      // Kite OUTER TIP (vertex 2: the ring orbits the perimeter, so it moves during the intro/outro lap and is exactly parked
+      // otherwise; the diamond scales about it, so unlike the inner tip or the centroid it does not move when the size changes).
+      ring: edge.frame.map((marker) => (marker.vertices.length === 0 ? null : { x: marker.vertices[2].x, y: marker.vertices[2].y })),
+      // The visible extent of the canvas in world px: the backing store is round(css * resolution) and the context is scaled by the resolution
+      // (the DPR rounded to hundredths, capped at 3), so the painted world ends at canvas.width / resolution.
+      visible: (() => {
+        const canvas = document.querySelector('canvas');
+        const res = Math.min(3, Math.max(1, Math.round(window.devicePixelRatio * 100) / 100));
+        return canvas ? { w: canvas.width / res, h: canvas.height / res, res } : null;
+      })(),
       // Kite length tip -> outer tip, per marker: 20 css px at full size, 10 at the 50% rest size.
+      outerTips: edge.frame.map((marker) => (marker.vertices.length < 3 ? null : { x: marker.vertices[2].x, y: marker.vertices[2].y })),
       kiteLengths: edge.frame.map((marker) => (marker.vertices.length < 3 ? null : Math.hypot(marker.vertices[0].x - marker.vertices[2].x, marker.vertices[0].y - marker.vertices[2].y))),
       markerBounds: (() => {
         const all = edge.frame.flatMap((marker) => marker.vertices);
@@ -291,6 +308,39 @@ const installHarness = (page) => page.evaluate(({ BLOOM_OUTER_MIN_WIDTH_PX, POOF
       return { met: false, frames };
     },
     sampleNow: () => sample(),
+    // The diamond layer's own pixel footprint on the real canvas: read the canvas with the edge-marker layer shown and with it hidden (alpha 0) on
+    // the SAME frame time (the loop steps with a zero delta, so nothing else changes) and return the bounding box of the pixels that differ,
+    // per diamond, in device px.
+    edgePixelProbe: () => {
+      const scene = getScene();
+      const canvas = document.querySelector('canvas');
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width; const h = canvas.height;
+      const res = Math.min(3, Math.max(1, Math.round(window.devicePixelRatio * 100) / 100));
+      window.__MAZER_GAME__.loop.step(state.clock);
+      const shown = ctx.getImageData(0, 0, w, h).data;
+      const previousAlpha = scene.edgeMarkerGraphics.alpha;
+      scene.edgeMarkerGraphics.setAlpha(0);
+      window.__MAZER_GAME__.loop.step(state.clock);
+      const hidden = ctx.getImageData(0, 0, w, h).data;
+      scene.edgeMarkerGraphics.setAlpha(previousAlpha);
+      window.__MAZER_GAME__.loop.step(state.clock);
+      const boxes = scene.resolveLegacyEdgeStations().map((station) => {
+        const half = Math.ceil(30 * res);
+        const cx = Math.round(station.x * res); const cy = Math.round(station.y * res);
+        let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity; let count = 0;
+        for (let y = Math.max(0, cy - half); y < Math.min(h, cy + half); y += 1) {
+          for (let x = Math.max(0, cx - half); x < Math.min(w, cx + half); x += 1) {
+            const i = ((y * w) + x) * 4;
+            if (Math.abs(shown[i] - hidden[i]) > 6 || Math.abs(shown[i + 1] - hidden[i + 1]) > 6 || Math.abs(shown[i + 2] - hidden[i + 2]) > 6) {
+              count += 1; minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+            }
+          }
+        }
+        return { id: station.id, count, box: count === 0 ? null : { minX, minY, maxX, maxY } };
+      });
+      return { w, h, res, boxes };
+    },
     volleyCount: () => volley.count,
     resetVolley: () => { volley.count = 0; },
     resetCycleWatch: () => { state.sawDelivering = false; },
@@ -379,7 +429,11 @@ const beamStationId = (pair, stations, focus, direction, id) => {
 const KITE_REACH_PX = 11;
 
 /** The diamond's INNERMOST point (the tip facing the board) for a harness station: centre + 10 px along its inward axis. */
-const innerTipOf = (station) => ({ x: station.x + (Math.cos(station.a) * INNER_TIP_REACH_PX), y: station.y + (Math.sin(station.a) * INNER_TIP_REACH_PX) });
+const innerTipOf = (station, kiteLength = KITE_FULL_LENGTH_PX) => ({
+  // The diamond scales about its OUTER tip (kite length 20 at full size, 10 at rest): the inner tip is the outer tip + the current kite length along the axis.
+  x: station.x + (Math.cos(station.a) * (kiteLength - INNER_TIP_REACH_PX)),
+  y: station.y + (Math.sin(station.a) * (kiteLength - INNER_TIP_REACH_PX))
+});
 
 /** Longest run of consecutive frames for which `predicate(frame)` holds. */
 const longestRun = (frames, predicate) => {
@@ -407,7 +461,7 @@ const analyzeAttachment = (frames, direction) => {
       const station = frame.stations.find((s) => s.id === id);
       if (!pair || !station) { return false; }
       const tolerance = 1.01 / frame.dpr;
-      const tip = innerTipOf(station);
+      const tip = innerTipOf(station, frame.kiteLengths[id] ?? KITE_FULL_LENGTH_PX);
       if (direction === 'outward') {
         return dist({ x: pair[2], y: pair[3] }, tip) <= tolerance && dist({ x: pair[0], y: pair[1] }, frame.focus) <= Math.max(tolerance, 1.5);
       }
@@ -422,12 +476,41 @@ const analyzeAttachment = (frames, direction) => {
       const station = frame.stations.find((s) => s.id === id);
       if (pair && station) {
         const end = direction === 'outward' ? { x: pair[2], y: pair[3] } : { x: pair[0], y: pair[1] };
-        best = Math.min(best, dist(end, innerTipOf(station)));
+        best = Math.min(best, dist(end, innerTipOf(station, frame.kiteLengths[id] ?? KITE_FULL_LENGTH_PX)));
       }
     });
     maxErrors.push(best);
   }
   return { minAttachedFrames: Math.min(...runs), runs, worstTipError: Math.max(...maxErrors), maxErrors };
+};
+
+/**
+ * MAZER-VIS-043: the PAINTED outer tip of every diamond touches the visible screen edge it sits on, at every size and every frame in `frames`
+ * (never past it, never more than half a device pixel short of it). The outer tip is vertex 2 of the drawn kite; the miter join paints
+ * TIP_PAINT_PX beyond it along the axis (corner kites: toward the top / bottom edge by that times cos 45).
+ */
+const analyzeEdgeContact = (frames) => {
+  let worstShort = 0;
+  let worstPast = 0;
+  let checked = 0;
+  let worst = null;
+  for (const frame of frames) {
+    if (frame.visible === null || frame.outerTips === undefined) { continue; }
+    const half = 0.5 / frame.visible.res;
+    frame.outerTips.forEach((tip, id) => {
+      if (tip === null) { return; }
+      const side = STATION_SIDE[id];
+      const paint = id % 2 === 0 ? TIP_PAINT_PX * Math.SQRT1_2 : TIP_PAINT_PX;
+      const gap = side === 'top' ? tip.y - paint
+        : side === 'bottom' ? frame.visible.h - (tip.y + paint)
+          : side === 'left' ? tip.x - paint
+            : frame.visible.w - (tip.x + paint);
+      checked += 1;
+      if (gap < worstPast) { worstPast = gap; worst = { id, gap, age: frame.introAge ?? frame.outroAge }; }
+      if (gap > worstShort) { worstShort = gap; worst = { id, gap, age: frame.introAge ?? frame.outroAge }; }
+    });
+  }
+  return { ok: checked > 0 && worstPast >= -0.001 && worstShort <= (0.5 / (frames.find((f) => f.visible)?.visible.res ?? 1)) + 0.001, checked, worstShort, worstPast, worst };
 };
 
 /**
@@ -458,7 +541,7 @@ const analyzeKiteSize = (frames, kind, { buildEndAge = null, chargedAge = 0 } = 
         const order = frame.firing.indexOf(id);
         const pair = order >= 0 ? frame.beamPairs[order] : undefined;
         const station = frame.stations.find((s) => s.id === id);
-        const headOnTip = pair && station && dist({ x: pair[2], y: pair[3] }, innerTipOf(station)) <= 1.01 / frame.dpr;
+        const headOnTip = pair && station && dist({ x: pair[2], y: pair[3] }, innerTipOf(station, lengthOf(frame, id))) <= 1.01 / frame.dpr;
         if (headOnTip && !approx(length, KITE_FULL_LENGTH_PX)) { note('beam attached to a diamond that is not full size', { id, length, age: frame.outroAge }); }
         if (frame.outroAge !== null && frame.outroAge >= OUTRO_LASER_END_MS + FRAME_MS && !approx(length, KITE_FULL_LENGTH_PX)) { note('not full size after the last contact', { id, length, age: frame.outroAge }); }
       });
@@ -820,6 +903,8 @@ const assertArrival = (label, frames, stations, { reducedMotion = false, viewpor
   if (reducedMotion) {
     check(`${label}: reduced motion draws NO beam at all (no laser, no poof) during the whole build`, buildFrames.every((f) => f.firing.length === 0 && f.lineCount === 0), JSON.stringify(buildFrames.filter((f) => f.lineCount > 0).slice(0, 2)));
     check(`${label}: reduced motion never lights a diamond (the ring is completely static)`, buildFrames.every((f) => f.lit.length === 0 && f.markerCount === 8), JSON.stringify(buildFrames.filter((f) => f.lit.length > 0).slice(0, 2)));
+    const reducedBuildEdge = analyzeEdgeContact(buildFrames.filter((f) => f.markerCount === 8));
+    check(`${label}: reduced motion keeps every diamond's painted outer tip on the screen edge (fixed 50% size; ${reducedBuildEdge.checked} samples)`, reducedBuildEdge.ok, JSON.stringify(reducedBuildEdge));
     check(`${label}: reduced motion keeps every diamond at a FIXED 50% size through the build (no size animation)`, buildFrames.filter((f) => f.markerCount === 8).every((f) => f.kiteLengths.every((length) => approx(length, KITE_REST_LENGTH_PX))), JSON.stringify(buildFrames.find((f) => f.markerCount === 8 && f.kiteLengths.some((length) => !approx(length, KITE_REST_LENGTH_PX)))?.kiteLengths));
     check(
       `${label}: reduced-motion input unlocks at ~${INTRO_REDUCED_UNLOCK_MS} ms into the build, not before`,
@@ -842,7 +927,9 @@ const assertArrival = (label, frames, stations, { reducedMotion = false, viewpor
   const buildTiles = buildFrames[0]?.tiles ?? 0;
   check(`${label}: every arrival beam starts exactly on its diamond's INNER TIP (pixel snapped, within 1 device pixel) and stays attached there for the whole drain (>= ${Math.floor(PULSE_TAIL_MS / FRAME_MS) - 2} frames)`, a.attachment.worstTipError <= 1.01 / (buildFrames.find((f) => f.firing.length > 0)?.dpr ?? 1) && a.attachment.minAttachedFrames >= Math.floor(PULSE_TAIL_MS / FRAME_MS) - 2, JSON.stringify(a.attachment));
   const kitesArrival = analyzeKiteSize(buildFrames, 'arrival', { buildEndAge: introBuildEndMs(buildTiles), chargedAge: INTRO_BUILD_START_MS + INTRO_RING_CHARGE_MS + (3 * FRAME_MS) });
-  check(`${label}: the diamonds are 100% size through the build, hold it while their beam drains them, then each shrinks back to 50% (anchored on its tip) and rests at 50%`, kitesArrival.ok, JSON.stringify(kitesArrival.problems));
+  check(`${label}: the diamonds are 100% size through the build, hold it while their beam drains them, then each shrinks back to 50% (anchored on its OUTER tip) and rests at 50%`, kitesArrival.ok, JSON.stringify(kitesArrival.problems));
+  const arrivalEdge = analyzeEdgeContact(buildFrames.filter((f) => f.markerCount === 8 && f.introAge !== null && f.introAge >= introBuildEndMs(buildTiles)));
+  check(`${label}: through the beam launch, the drain and the shrink every diamond's PAINTED outer tip stays on the screen edge (never past it, within half a device pixel; ${arrivalEdge.checked} samples)`, arrivalEdge.ok, JSON.stringify(arrivalEdge));
   check(
     `${label}: the beams fire only AFTER the build completes, the heads land 400 ms later and every beam is gone within ${PULSE_TAIL_MS} ms more (${introBuildEndMs(buildTiles)}-${introLaserEndMs(buildTiles)}+${PULSE_TAIL_MS} ms, one frame of slack)`,
     a.firstAge !== null && a.firstAge >= introBuildEndMs(buildTiles) - FRAME_MS && a.lastAge <= introLaserEndMs(buildTiles) + PULSE_TAIL_MS + FRAME_MS,
@@ -887,6 +974,8 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
   if (reducedMotion) {
     check(`${label}: reduced motion draws no beam through the whole goal-reset cycle`, frames.every((f) => f.firing.length === 0 && f.lineCount === 0), JSON.stringify(frames.filter((f) => f.lineCount > 0).slice(0, 2)));
     check(`${label}: reduced motion never lights a diamond through the whole cycle`, frames.every((f) => f.lit.length === 0), JSON.stringify(frames.filter((f) => f.lit.length > 0).slice(0, 2)));
+    const reducedCycleEdge = analyzeEdgeContact(frames.filter((f) => f.markerCount === 8 && f.drawPhase !== undefined && f.ring.every(Boolean)));
+    check(`${label}: reduced motion keeps every diamond's painted outer tip on the screen edge through the whole cycle (${reducedCycleEdge.checked} samples)`, reducedCycleEdge.ok, JSON.stringify(reducedCycleEdge));
     check(`${label}: reduced motion keeps every diamond at a FIXED 50% size through the whole cycle (no size animation, ${frames.length} frames)`, frames.filter((f) => f.markerCount === 8).every((f) => f.kiteLengths.every((length) => approx(length, KITE_REST_LENGTH_PX))), JSON.stringify(frames.find((f) => f.markerCount === 8 && f.kiteLengths.some((length) => !approx(length, KITE_REST_LENGTH_PX)))?.kiteLengths));
   } else {
     const d = analyzeBeams(departure, stations, 'outward');
@@ -905,6 +994,8 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
       d.attachment.worstTipError <= 1.01 / (departure.find((f) => f.firing.length > 0)?.dpr ?? 1) && d.attachment.minAttachedFrames >= Math.floor(PULSE_TAIL_MS / FRAME_MS) - 2,
       JSON.stringify(d.attachment)
     );
+    const departureEdge = analyzeEdgeContact(departure.filter((f) => f.markerCount === 8 && f.outroAge <= DEPARTURE_BEAM_END_MS));
+    check(`${label}: while the diamonds grow 50% to 100% and hold, every diamond's PAINTED outer tip stays on the screen edge (never past it, within half a device pixel; ${departureEdge.checked} samples)`, departureEdge.ok, JSON.stringify(departureEdge));
     const kitesDeparture = analyzeKiteSize(departure, 'departure');
     check(`${label}: on goal the diamonds grow from 50% to 100%, are full size whenever their beam is attached, and stay full to the end of the deconstruct`, kitesDeparture.ok, JSON.stringify(kitesDeparture.problems));
     check(
@@ -943,6 +1034,23 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
     JSON.stringify({ firing: last.firing, lineCount: last.lineCount, lit: last.lit, player: last.player, start: last.start })
   );
   check(`${label}: with the maze running every diamond rests at 50% size (${KITE_REST_LENGTH_PX} px tip to outer tip)`, last.markerCount === 8 && last.kiteLengths.every((length) => approx(length, KITE_REST_LENGTH_PX)), JSON.stringify(last.kiteLengths));
+  const settledEdge = analyzeEdgeContact([last]);
+  check(`${label}: at rest (the maze running, 50% size) every diamond's painted outer tip is on the screen edge`, settledEdge.ok, JSON.stringify(settledEdge));
+  const probe = await h.page.evaluate(() => window.__mazerQa.edgePixelProbe());
+  const footprint = (id) => probe.boxes.find((b) => b.id === id);
+  const touches = (id) => {
+    const box = footprint(id)?.box;
+    if (!box) { return false; }
+    const side = STATION_SIDE[id];
+    return side === 'top' ? box.minY <= 1 : side === 'bottom' ? box.maxY >= probe.h - 2 : side === 'left' ? box.minX <= 1 : box.maxX >= probe.w - 2;
+  };
+  check(`${label}: real canvas pixels (layer shown vs hidden on the same frame): each diamond's footprint reaches the last two device rows/columns of its edge (${probe.w}x${probe.h} px)`, ALL_STATION_IDS.every(touches), JSON.stringify(probe.boxes));
+  const clearance = Math.floor(CORNER_CLEARANCE_PX * probe.res) - 1;
+  check(
+    `${label}: real canvas pixels: the four corner diamonds clear a ${CORNER_CLEARANCE_PX} css px rounded display corner (footprint at least ${clearance} device px from the corner along the edge)`,
+    [0, 6].every((id) => (footprint(id)?.box?.minX ?? -1) >= clearance) && [2, 4].every((id) => (footprint(id)?.box?.maxX ?? Infinity) <= probe.w - clearance),
+    JSON.stringify(probe.boxes.filter((b) => b.id % 2 === 0))
+  );
   const legalMove = await resolveLegalMove(h.page);
   if (legalMove !== null) {
     const after = await moveUntilAccepted(h.page, h.stepOnce, legalMove, 200);
