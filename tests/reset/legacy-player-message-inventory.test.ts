@@ -415,6 +415,19 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
     ).toEqual([]);
   });
 
+  test('MAZER-UI-030: only the offline cache warning is routed from the service worker to the toast', () => {
+    const doc = readSource('docs/ops/MAZER-PLAYER-MESSAGE-INVENTORY-2026-11-05.md');
+    expect(doc).toContain('`boot.service-worker-error`');
+    expect(doc).toContain('serviceWorkerCacheWarning.ts');
+    expect(readSource(MENU)).toContain('subscribeServiceWorkerCacheWarning(');
+    const main = readSource('src/boot/main.ts');
+    expect(main).toContain('reportServiceWorkerCacheWarning(');
+    // Boot errors stay on the splash; remote sync stays silent.
+    expect(readSource('src/boot/bootStatus.ts')).not.toContain('serviceWorkerCacheWarning');
+    expect(readSource('src/legacy-runtime/legacyRemoteProgression.ts')).not.toContain('serviceWorkerCacheWarning');
+    expect(LEGACY_BOOT_MESSAGE_COPY.serviceWorkerError).toBe('The offline cache could not update. The game can still run online.');
+  });
+
   test('routed copy tables are player-safe (no provider or internal wording)', () => {
     const tables = {
       LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY,

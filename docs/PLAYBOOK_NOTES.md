@@ -222,7 +222,6 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: the menu online counter now reads dot, number, "online" (e.g. `7 online`) in muted 13px text with an 8px pulsing dot, like the website header; idle = dim dot alone; count text is the website format (`1.2k`, `12k`), no uppercase K. New `src/render/presenceCounterView.ts`; layout in `legacyPresenceCounterLayout.ts`; small MenuScene edit (draw call + one field); Guide Online row copy updated.
 - WHY it changed: the chip-glyph counter was far larger than the old username text, lacked the label on phones and did not match the website.
 
-
 ## 2026-11-14 - Touch-first level 1 control hint that follows the input actually used
 - WHAT changed: `legacyControlHint.ts` now holds a pure resolver (`resolveLegacyControlHintInput`): touch is the default, a computer-looking device (fine pointer plus hover, not mobile, not standalone) starts with a neutral line, and the last real input (pointerType on pointerdown, trusted keydown) switches the visible copy between touch, mouse and keys wording (instant text swap, only while visible, never re-shows after the ack). Copy is two short lines (how to move, then the goal). The Guide Move row and the accessibility description were reworded touch-first with the keyboard as a secondary mention.
 - WHY it changed: the game is played on touch screens, and computers can drag too; the old copy was picked by a single coarse-pointer check and said arrow keys on devices that misreported.
@@ -236,6 +235,17 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: new `src/legacy-runtime/legacyStoredUsername.ts` holds the 2-15 character pattern and `sanitizeStoredLegacyUsername`; `legacyAuth.ts` uses it so a username read from stored account metadata that breaks the limit never becomes canonicalUsername or the display name (display falls back to the email local part). No stored name is rewritten or shortened.
 - WHY it changed: the client trusted `user_metadata.username` as read, so an over-limit name stored before the database check existed was still shown and used. The database constraint and the existing over-limit names are account-site/database scope and are reported to the owner, not changed here.
 - Evidence: `tests/reset/legacy-stored-username.test.ts`, `legacy-auth.test.ts`, `legacy-leaderboard-username-editor.test.ts`.
+
+## 2026-11-14 - MAZER-UI-030 offline cache warning toast
+- WHAT changed: new `src/boot/serviceWorkerCacheWarning.ts` carries one friendly warning (existing `service-worker-error` boot copy) from the page to the message toast; `main.ts` raises it on a failed service-worker install or an online registration error; `MenuScene.ts` subscribes with one line; inventory doc row and test pin it.
+- WHY it changed: an offline-cache update failure was invisible. The Workbox worker cannot post a custom message, so the page watches the registration. Sync failures stay silent and boot errors stay on the splash; offline registration errors are expected and stay silent.
+- Evidence: `tests/reset/ui-030-sw-cache-warning.test.ts`, `tests/reset/legacy-player-message-inventory.test.ts`, headless phone emulation (390x844, 360x740).
+- Status: Applied
+
+## 2026-11-14 - Off-theme colour ratchet baseline refresh
+- WHAT changed: regenerated `tests/fixtures/off-theme-color-baseline.json` with `MAZER_UPDATE_OFF_THEME_BASELINE=1`. Counts only went down (files 29 to 28, offToken 266 to 234, total 341 to 299 after merging main with UI-031 slice 2); `legacyMenuBackdrop.ts` left the list.
+- WHY it changed: about 32 stray literals had already left main without the baseline being lowered, so the ratchet allowed regressions up to the old numbers.
+- Rule: a PR that removes stray colours lowers the baseline in the same PR. If two baseline PRs are open, the second one regenerates after the first merges.
 - Status: Applied
 
 ## 2026-11-14 - MAZER-MOTION-011 overlay rise and stagger
@@ -249,3 +259,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: MAZER-UI-010 retires legacy font stacks one surface per PR; this stack had exactly one user. Size (12 px, bold) is unchanged. The guide text only draws when a mechanic legend is shown, and the frozen look has no hazards, so no default game screen changes.
 - Rule: a font stack constant moves to the scale module's face constants, never to a new literal, and its entry leaves the shrink-only list in the same PR.
 - Status: Applied (review); source proof only, mechanic guide not opened in a browser.
+
+## 2026-11-14 - MAZER-VIS-011 (part 1 of 2) HUD icon crop follows the texture it draws
+- WHAT changed: Added `src/render/hudIconAtlas.ts` (the outline-icon atlas layout: 128 px cells, 4 columns, glyph box 16..112, eight glyph names) and made `MenuScene.applyLegacyHudIconFrame` crop a texture that is exactly `HUD_ICON_CELL_PX` wide to that shared glyph box, keeping the existing 1254 px bitmap crops for everything else. No asset changes, so rendering on today's art is unchanged.
+- WHY it changed: MAZER-VIS-011 replaces three 1254 px HUD bitmaps (1.0 MB, three styles) with one scripted outline-icon atlas. `BootScene.ts` (Wave 4D-A) and `MenuScene.ts` (Wave 5C) cannot ship in one change set (the integrator-wave tests reject mixed waves), so the MenuScene half lands first and is a safe no-op; the BootScene and asset swap follows as part 2.
+- Rule: when a change needs files from two registered waves, split it so each PR is a no-op or a pure superset on the other side's current state, and say which half is which in both PRs.
+- Status: Applied (review); source proof only, nothing visual changes until part 2.
