@@ -21,6 +21,7 @@ import {
   type BoardTileReveal,
   resolveBoardTileStyleFromSearch
 } from '../render/boardTileLayer';
+import { MazeRevealDriver, resolveMazeMarkerAlpha, type MazeRevealClock } from '../render/mazeRevealDriver';
 import { centerOfCell, drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
 import { resolvePlayerCoreAlphaScale, shouldDrawEndpointMarker } from '../render/endpointMarkerLayering';
 import { isGoalStarSpinning, resolveGoalStarRotation } from '../render/goalStarSpin';
@@ -1979,6 +1980,8 @@ export class MenuScene extends Phaser.Scene {
   private boardTileLayerTextureKey: string | null = null;
   private boardTileRankOrder: LegacyPoint[] | null = null;
   private boardTileRankGrid: Int32Array | null = null;
+  // MAZER-VIS-040: the soft build / deconstruct front (mazeRevealTimeline.ts); null outside a full-motion reveal.
+  private readonly mazeReveal = new MazeRevealDriver();
   private boardTileDockMaze: LegacyMazeSnapshot | null = null;
   private boardTileDocks: BoardTileDock[] = [];
   private boardTileDockOwners: Uint8Array | null = null;
@@ -6168,6 +6171,17 @@ export class MenuScene extends Phaser.Scene {
     return this.prefersLegacyReducedMotion() ? 0 : resolveOutroTilesEndMs(this.menuStaticDrawTileOrder.length);
   }
 
+  private resolveLegacyMazeRevealClock(time: number): MazeRevealClock {
+    return {
+      phase: this.menuStaticDrawLifecyclePhase,
+      introStartedAtMs: this.introStartedAtMs,
+      deconstructStartedAtMs: this.menuStaticDeconstructStartedAtMs,
+      time,
+      tileCount: this.menuStaticDrawTileOrder.length,
+      reducedMotion: this.prefersLegacyReducedMotion()
+    };
+  }
+
   // The one place the building phase's time-derived presentation state is
   // resolved: tiles, level digit, bleed docks, spawn laser and input unlock
   // all read this instead of keeping their own counters or estimates. Null
@@ -6717,6 +6731,10 @@ export class MenuScene extends Phaser.Scene {
   // stretching the intro, and the tile reveal, bleed docks, level digit,
   // spawn laser and input unlock can never drift apart.
   private advanceLegacyMenuStaticDrawStage(time: number): void {
+    if (this.mazeReveal.update(this.resolveLegacyMazeRevealClock(time))) {
+      this.boardPathDirty = true;
+      this.boardDynamicDirty = true;
+    }
     if (this.menuStaticDrawRowsVisible === null && this.menuStaticDrawTilesVisible === null) {
       return;
     }
@@ -7935,6 +7953,7 @@ export class MenuScene extends Phaser.Scene {
       boardLeft: mazeRenderFrame.boardLeft,
       boardTop: mazeRenderFrame.boardTop,
       reveal: this.resolveBoardTileReveal(),
+      alpha: this.mazeReveal.boardAlpha,
       visible: true
     });
 
@@ -7983,6 +8002,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveBoardTileReveal(): BoardTileReveal {
+    const softReveal = this.mazeReveal.resolveBoardReveal(
+      this.boardTileRankGrid, this.boardTileDockOwners, this.maze.width, this.maze.height
+    );
+    if (softReveal !== null) {
+      return softReveal;
+    }
+    if (this.mazeReveal.crossfading) {
+      return { kind: 'all' };
+    }
     const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
     const rowLimit = this.resolveLegacyMenuStaticDrawRowLimit();
     const edgeShown = this.legacyEdgePathsVisible;
@@ -8994,18 +9022,19 @@ export class MenuScene extends Phaser.Scene {
     // above).
     // The beams fire after the build is complete and land at resolveIntroLaserEndMs
     // (== input unlock), so the cast (player/start/goal) appears at landing.
-    const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== 'building'
-      || (this.resolveLegacyIntroState(time)?.laserProgress ?? 0) >= 1;
+    // MAZER-VIS-040: the cast fades in over the beam flight (alpha only) instead of snapping in at the landing.
+    const markerRevealAlpha = resolveMazeMarkerAlpha(this.resolveLegacyMazeRevealClock(time));
+    const markersBuiltIn = markerRevealAlpha > 0;
     const playerSpawnBurst = this.resolveLegacyPlayerSpawnBurstState(time);
     const playerTransferEnergy = this.resolveLegacyPlayerTransferState(time);
     // Drawn after the trail (not before) so the start/goal tiles always sit
     // on top of the trail's coloring instead of getting painted over
     // whenever the trail passes through those cells.
     if (markersBuiltIn && markerDeconstructAlpha > 0 && this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
-      this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start', time);
+      this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha * markerRevealAlpha, 'start', time);
     }
     if (markersBuiltIn && markerDeconstructAlpha > 0 && this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
-      this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal', time);
+      this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha * markerRevealAlpha, 'goal', time);
     }
 
     if (this.mode === 'menu' && menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {

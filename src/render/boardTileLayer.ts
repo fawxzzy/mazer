@@ -36,6 +36,7 @@ import {
   type TileBakeContext2D,
   type TileBakeSurface
 } from './boardTileBake';
+import { resolveRevealMaskLength } from './boardRevealMask';
 import { toWholeImagePosition } from './pixelAlignment';
 import { resolveStartDirection, type StartDirection } from './startDirection';
 import {
@@ -230,13 +231,143 @@ export const composeBoardTileReveal = (
   return stats;
 };
 
+/** The subset of CanvasRenderingContext2D the soft reveal composite uses (adds alpha + a source rect). */
+export interface BoardSoftRevealContext2D extends Omit<BoardRevealContext2D, 'drawImage'> {
+  globalAlpha: number;
+  drawImage(image: unknown, dx: number, dy: number, dw: number, dh: number): void;
+  drawImage(
+    image: unknown, sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number
+  ): void;
+}
+
+/** Alpha steps of the soft reveal: a cell's alpha is rounded to k / SOFT_REVEAL_LEVELS (6.25 % per step). */
+export const SOFT_REVEAL_LEVELS = 16;
+
+export interface BoardSoftRevealInput {
+  layout: BoardTileLayout;
+  /** (cols + 2) x (rows + 2) cell alphas 0..255 (boardRevealMask.ts), the grid padded by one cell on every side. */
+  cellAlpha: Uint8ClampedArray;
+  /** 0..1 alpha of the wrap dock strips; ignored when the layout has no docks. */
+  dockAlpha: number;
+}
+
+export interface BoardSoftRevealStats {
+  /** drawImage calls of the whole baked canvas, one per alpha level in use (at most SOFT_REVEAL_LEVELS). */
+  levelDraws: number;
+  clipRects: number;
+  stripDraws: number;
+}
+
+/**
+ * Draws the board with a SOFT reveal onto `ctx` (device-pixel sized, cleared here). Every cell (floor, wall, and the
+ * pad ring one cell around the board) has its own alpha; cells are bucketed by that alpha rounded to 1/16 and each
+ * bucket is ONE clipped drawImage of the baked canvas at its globalAlpha (row runs merged into rects). So the cost is
+ * at most 16 draws whatever the maze size, never one per tile, and no full-frame pass: a full-size `destination-in`
+ * mask pass was measured to double the render cost in software raster, this does not. Cell edges are device-snapped
+ * (layout.xs / ys), so adjacent buckets never leave an antialiasing seam. The wrap dock strips (the margin outside
+ * the board rect) are drawn last at `dockAlpha`.
+ */
+export const composeBoardTileRevealSoft = (
+  ctx: BoardSoftRevealContext2D,
+  baked: unknown,
+  input: BoardSoftRevealInput
+): BoardSoftRevealStats => {
+  const { layout, cellAlpha, dockAlpha } = input;
+  const stats: BoardSoftRevealStats = { levelDraws: 0, clipRects: 0, stripDraws: 0 };
+  const scale = layout.scale;
+  const { cols, rows } = layout;
+  // Padded grid edges in layout px: one extra cell of the edge cell's own size on each side.
+  const xs: number[] = [layout.originX + layout.xs[0]! - (layout.xs[1]! - layout.xs[0]!)];
+  for (let x = 0; x <= cols; x += 1) xs.push(layout.originX + layout.xs[x]!);
+  xs.push(xs[cols + 1]! + (layout.xs[cols]! - layout.xs[cols - 1]!));
+  const ys: number[] = [layout.originY + layout.ys[0]! - (layout.ys[1]! - layout.ys[0]!)];
+  for (let y = 0; y <= rows; y += 1) ys.push(layout.originY + layout.ys[y]!);
+  ys.push(ys[rows + 1]! + (layout.ys[rows]! - layout.ys[rows - 1]!));
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, layout.pixelWidth, layout.pixelHeight);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+
+  const stride = cols + 2;
+  const buckets: Array<Array<[number, number, number]>> = Array.from({ length: SOFT_REVEAL_LEVELS + 1 }, () => []);
+  for (let py = 0; py < rows + 2; py += 1) {
+    let runStart = -1;
+    let runLevel = 0;
+    for (let px = 0; px <= stride; px += 1) {
+      const level = px < stride ? Math.round((cellAlpha[(py * stride) + px]! / 255) * SOFT_REVEAL_LEVELS) : 0;
+      if (px < stride && level === runLevel && runStart >= 0) {
+        continue;
+      }
+      if (runStart >= 0 && runLevel > 0) {
+        buckets[runLevel]!.push([py, runStart, px - 1]);
+      }
+      runStart = px < stride ? px : -1;
+      runLevel = level;
+    }
+  }
+
+  for (let level = 1; level <= SOFT_REVEAL_LEVELS; level += 1) {
+    const runs = buckets[level]!;
+    if (runs.length === 0) {
+      continue;
+    }
+    ctx.save();
+    ctx.beginPath();
+    for (const [py, px0, px1] of runs) {
+      ctx.rect(xs[px0]!, ys[py]!, xs[px1 + 1]! - xs[px0]!, ys[py + 1]! - ys[py]!);
+      stats.clipRects += 1;
+    }
+    ctx.clip();
+    ctx.globalAlpha = level / SOFT_REVEAL_LEVELS;
+    ctx.drawImage(baked, 0, 0, layout.width, layout.height);
+    ctx.restore();
+    stats.levelDraws += 1;
+  }
+
+  if (layout.docks.length > 0) {
+    // The margin strips around the board rect, disjoint so no pixel is drawn twice.
+    const boardRight = layout.originX + layout.boardWidth;
+    const boardBottom = layout.originY + layout.boardHeight;
+    const strips: Array<[number, number, number, number]> = [
+      [0, 0, layout.originX, layout.height],
+      [boardRight, 0, layout.width - boardRight, layout.height],
+      [layout.originX, 0, layout.boardWidth, layout.originY],
+      [layout.originX, boardBottom, layout.boardWidth, layout.height - boardBottom]
+    ];
+    ctx.save();
+    for (const [x, y, w, h] of strips) {
+      if (w <= 0 || h <= 0) {
+        continue;
+      }
+      const sx = Math.round(x * scale);
+      const sy = Math.round(y * scale);
+      const sw = Math.round(w * scale);
+      const sh = Math.round(h * scale);
+      ctx.clearRect(sx / scale, sy / scale, sw / scale, sh / scale);
+      if (dockAlpha > 0 && sw > 0 && sh > 0) {
+        ctx.globalAlpha = Math.min(1, dockAlpha);
+        ctx.drawImage(baked, sx, sy, sw, sh, sx / scale, sy / scale, sw / scale, sh / scale);
+        stats.stripDraws += 1;
+      }
+    }
+    ctx.restore();
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return stats;
+};
+
 /* ------------------------------------------------------------------------------------------ */
 /* board layer                                                                                */
 /* ------------------------------------------------------------------------------------------ */
 
 export type BoardTileReveal =
   | { kind: 'all' }
-  | { kind: 'cells'; key: string; isVisible: (x: number, y: number) => boolean; docksVisible: boolean };
+  | { kind: 'cells'; key: string; isVisible: (x: number, y: number) => boolean; docksVisible: boolean }
+  /**
+   * MAZER-VIS-040: the soft build / deconstruct. `fillMask` writes this frame's alpha (0..255) for the padded
+   * (cols + 2) x (rows + 2) cell grid (boardRevealMask.ts); the layer draws the bake once per alpha level.
+   */
+  | { kind: 'soft'; key: string; dockAlpha: number; fillMask: (alpha: Uint8ClampedArray) => void };
 
 export interface BoardTileLayerFrame {
   grid: ReadonlyArray<ReadonlyArray<boolean>>;
@@ -254,6 +385,8 @@ export interface BoardTileLayerFrame {
   boardLeft: number;
   boardTop: number;
   reveal: BoardTileReveal;
+  /** Whole-layer alpha (default 1): the reduced-motion crossfade of the board. */
+  alpha?: number;
   visible: boolean;
 }
 
@@ -292,6 +425,7 @@ export class BoardTileLayer {
   private endpoints: BoardTileEndpoints = { start: null, goal: null };
   private textureWidth = 0;
   private textureHeight = 0;
+  private softCellAlpha = new Uint8ClampedArray(0);
   /** Cumulative diagnostics (read by tests and the runtime diagnostics hook). */
   bakeCount = 0;
   lastBakeMs = 0;
@@ -356,7 +490,11 @@ export class BoardTileLayer {
     }
     const layout = this.layout!;
 
-    const revealKey = frame.reveal.kind === 'all' ? 'all' : `cells:${frame.reveal.key}:${frame.reveal.docksVisible ? 'd' : '-'}`;
+    const revealKey = frame.reveal.kind === 'all'
+      ? 'all'
+      : frame.reveal.kind === 'soft'
+        ? `soft:${frame.reveal.key}`
+        : `cells:${frame.reveal.key}:${frame.reveal.docksVisible ? 'd' : '-'}`;
     const composeKey = `${result.hash}|${revealKey}`;
     let composeMs = 0;
     let recomposed = false;
@@ -372,6 +510,12 @@ export class BoardTileLayer {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, result.pixelWidth, result.pixelHeight);
         ctx.drawImage(result.canvas, 0, 0);
+      } else if (frame.reveal.kind === 'soft') {
+        composeBoardTileRevealSoft(ctx as unknown as BoardSoftRevealContext2D, result.canvas, {
+          layout,
+          cellAlpha: this.fillSoftCellAlpha(layout.cols, layout.rows, frame.reveal.fillMask),
+          dockAlpha: frame.reveal.dockAlpha
+        });
       } else {
         composeBoardTileReveal(ctx, result.canvas, {
           layout,
@@ -394,10 +538,21 @@ export class BoardTileLayer {
     const top = toWholeImagePosition((Math.round(frame.boardTop * dpr) / dpr) - result.originY);
     this.image.setPosition(left, top);
     this.image.setDisplaySize(result.width, result.height);
+    this.image.setAlpha(frame.alpha ?? 1);
     this.image.setVisible(true);
     this.composedHash = result.hash;
     this.lastStats = { rebuilt, bakeMs, composeMs, recomposed };
     return this.lastStats;
+  }
+
+  /** This frame's padded (cols + 2) x (rows + 2) cell alphas, in one cached buffer. */
+  private fillSoftCellAlpha(cols: number, rows: number, fill: (alpha: Uint8ClampedArray) => void): Uint8ClampedArray {
+    const length = resolveRevealMaskLength(cols, rows);
+    if (this.softCellAlpha.length !== length) {
+      this.softCellAlpha = new Uint8ClampedArray(length);
+    }
+    fill(this.softCellAlpha);
+    return this.softCellAlpha;
   }
 
   /** Layout-px origin the layer last snapped the board to (so markers line up with the bake). */
