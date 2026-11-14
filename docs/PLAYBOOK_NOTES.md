@@ -218,3 +218,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the game is played on touch screens, and computers can drag too; the old copy was picked by a single coarse-pointer check and said arrow keys on devices that misreported.
 - Rule: copy is chosen from observed input, not a device guess; the device guess only seeds the first frame.
 - Status: Applied
+
+## 2026-11-14 - Off-theme colour ratchet baseline refresh
+- WHAT changed: regenerated `tests/fixtures/off-theme-color-baseline.json` with `MAZER_UPDATE_OFF_THEME_BASELINE=1`. Counts only went down (files 31 to 30, offToken 280 to 248, total 355 to 313); `legacyMenuBackdrop.ts` left the list.
+- WHY it changed: about 32 stray literals had already left main without the baseline being lowered, so the ratchet allowed regressions up to the old numbers.
+- Rule: a PR that removes stray colours lowers the baseline in the same PR. If two baseline PRs are open, the second one regenerates after the first merges.
+- Status: Applied

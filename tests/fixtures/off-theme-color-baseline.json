@@ -41,10 +41,6 @@
       "offToken": 8,
       "total": 8
     },
-    "src/legacy-runtime/legacyMenuBackdrop.ts": {
-      "offToken": 16,
-      "total": 21
-    },
     "src/legacy-runtime/legacyPlayerMessage.ts": {
       "offToken": 0,
       "total": 4
@@ -82,12 +78,12 @@
       "total": 2
     },
     "src/scenes/MenuScene.ts": {
-      "offToken": 68,
-      "total": 77
+      "offToken": 53,
+      "total": 57
     },
     "src/styles/base.css": {
-      "offToken": 18,
-      "total": 21
+      "offToken": 17,
+      "total": 20
     },
     "src/topology-proof/index.ts": {
       "offToken": 3,
@@ -154,7 +150,6 @@
     "src/visual-proof/styles.css",
     "src/visual-proof/main.ts",
     "src/future-runtime/planet3d/render.ts",
-    "src/legacy-runtime/legacyMenuBackdrop.ts",
     "src/future-runtime/phaser/scene.ts",
     "src/styles/base.css",
     "src/config/tuning.ts",
@@ -163,8 +158,8 @@
   ],
   "schemaVersion": 1,
   "totals": {
-    "files": 31,
-    "offToken": 280,
-    "total": 355
+    "files": 30,
+    "offToken": 248,
+    "total": 313
   }
 }
