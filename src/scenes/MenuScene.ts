@@ -312,6 +312,7 @@ import {
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import { resolveLegacyMinHitRect } from '../legacy-runtime/legacyHitTarget';
+import { resolveLegacyFrontDoorHitZone } from '../legacy-runtime/legacyFrontDoorHitZone';
 import {
   resolveLegacyTapRecoveryTarget,
   shouldRecoverLegacyTapAfterUiRebuild
@@ -11019,7 +11020,7 @@ export class MenuScene extends Phaser.Scene {
               this.layout.buttonHeight,
               'Login',
               () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface()),
-              { fullScreenHitArea: true }
+              { explicitHitZone: true }
             )
           );
           this.createLegacySignedOutOAuthFailure();
@@ -11032,7 +11033,7 @@ export class MenuScene extends Phaser.Scene {
               this.layout.buttonHeight,
               startLabel,
               () => this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode()),
-              { fullScreenHitArea: true }
+              { explicitHitZone: true }
             )
           );
         }
@@ -13512,7 +13513,7 @@ export class MenuScene extends Phaser.Scene {
     height: number,
     text: string,
     onClick: () => void,
-    options: { fullScreenHitArea?: boolean; labelRole?: LegacyUiLabelRole } = {}
+    options: { explicitHitZone?: boolean; labelRole?: LegacyUiLabelRole } = {}
   ): UiButton {
     const isMenuFrontDoor = this.mode === 'menu' && this.overlay === 'none';
     // Both the Start and Login front-door actions share the same borderless
@@ -13562,15 +13563,15 @@ export class MenuScene extends Phaser.Scene {
     // drawLegacyMenuFrontDoorGlyphButton, wired up below once the button's
     // final width/height are known).
 
-    // The primary front-door action (Login/Start) can optionally trade its
-    // normal button-sized tap target for the entire screen -- there's no
-    // maze interaction to protect on the front door, so tapping anywhere
-    // (background stars, the demo maze, empty space) should log in/start
-    // instead of requiring a precise tap on the small glyph word. Explicitly
-    // left at the default (lower) depth so the settings gear's own hit
-    // rectangle -- set to a higher depth below -- still wins on overlap.
-    const background = options.fullScreenHitArea === true
-      ? this.add.rectangle(this.layout.width / 2, this.layout.height / 2, this.layout.width, this.layout.height, 0x000000, 0.001)
+    // The primary front-door action (Login/Start) uses an explicit, generous hit
+    // zone around the wordmark (MAZER-UI-015; resolveLegacyFrontDoorHitZone), not
+    // the whole screen. Left at the default (lower) depth so the settings gear's
+    // own hit rectangle -- set to a higher depth below -- still wins on overlap.
+    const frontDoorHitZone = options.explicitHitZone === true
+      ? resolveLegacyFrontDoorHitZone(createVisualRect(x - (width / 2), y - (height / 2), width, height), this.layout)
+      : null;
+    const background = frontDoorHitZone !== null
+      ? this.add.rectangle(frontDoorHitZone.centerX, frontDoorHitZone.centerY, frontDoorHitZone.width, frontDoorHitZone.height, 0x000000, 0.001)
       : this.add.rectangle(x, y, width, height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     const textFitSize = Math.floor((width * (isMenuFrontDoor ? 1.08 : 1.45)) / Math.max(4, text.length));
@@ -13684,9 +13685,8 @@ export class MenuScene extends Phaser.Scene {
       0.001
     );
     background.setInteractive({ useHandCursor: true });
-    // The front-door Login/Start hit target now spans the full screen (see
-    // createButton's fullScreenHitArea) and would otherwise swallow taps on
-    // the gear -- a higher depth keeps this smaller, precise hit rectangle
+    // The front-door Login/Start hit zone (see createButton's explicitHitZone) can
+    // overlap the gear -- a higher depth keeps this smaller, precise hit rectangle
     // topmost so settings still opens instead of falling through to login.
     background.setDepth(3);
     const label = this.add.text(pauseRect.centerX, pauseRect.centerY, '', {

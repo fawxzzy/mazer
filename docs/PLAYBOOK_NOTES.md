@@ -205,4 +205,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: Added `src/render/typeScale.ts` (roles, sizes, weights, 12 px body floor), `docs/ui/MAZER-TYPE-SCALE.md`, self-hosted Oxanium (`public/fonts/oxanium/`, OFL) with a lazy `@font-face` and precache entry, and `tests/render/type-scale-ratchet.test.ts`.
 - WHY it changed: 7 font stacks and 11 sizes drift across surfaces; the ratchet stops new off-scale sizes/stacks while surfaces migrate one PR each.
 - Rule: Land the scale and a shrink-only allowlist ratchet before migrating surfaces. No surface changed in this PR.
+
+## 2026-11-14 - MAZER-UI-015 button kit and explicit front-door hit zone
+- WHAT changed: Added `src/legacy-runtime/legacyButtonKit.ts` (primary, secondary, ghost, danger, icon variants with a 44 px minimum, a toggle-row spec and a per-button variant map) and `src/legacy-runtime/legacyFrontDoorHitZone.ts`. The front-door Start/Login wordmark now uses an explicit generous hit zone instead of the full screen (`MenuScene.createButton` option `fullScreenHitArea` became `explicitHitZone`).
+- WHY it changed: a tap anywhere on the front door started a run or opened Login; only the wordmark and its margin should.
+- Rule: tap tests inside and outside the zone live in `tests/legacy-runtime/legacy-front-door-hit-zone.test.ts`. Button chrome is not yet drawn from the kit (`chromeViaKit` is false for all); surfaces migrate one per PR.
 - Status: Applied (review)
