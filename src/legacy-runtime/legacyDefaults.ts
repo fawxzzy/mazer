@@ -13,6 +13,8 @@ export interface LegacySettings {
   wallColor: LegacyLinearColor;
   darkMode: boolean;
   hapticsEnabled: boolean;
+  /** Settings > Sound effects (MAZER-AUDIO-003): small synthesized chirps; default off. */
+  soundEnabled: boolean;
   /** Settings > Reduce Motion: true forces reduced motion on; false defers to the device setting. */
   toggleReducedMotion: boolean;
   controlMode: LegacyControlMode;
@@ -33,6 +35,7 @@ export const LEGACY_DEFAULTS: LegacySettings = {
   },
   darkMode: true,
   hapticsEnabled: true,
+  soundEnabled: false,
   toggleReducedMotion: false,
   controlMode: 'stick'
 };
@@ -86,6 +89,7 @@ export const copyLegacySettings = (settings: LegacySettings): LegacySettings => 
   wallColor: { ...settings.wallColor },
   darkMode: settings.darkMode,
   hapticsEnabled: settings.hapticsEnabled ?? LEGACY_DEFAULTS.hapticsEnabled,
+  soundEnabled: settings.soundEnabled ?? LEGACY_DEFAULTS.soundEnabled,
   toggleReducedMotion: settings.toggleReducedMotion ?? LEGACY_DEFAULTS.toggleReducedMotion,
   controlMode: settings.controlMode
 });

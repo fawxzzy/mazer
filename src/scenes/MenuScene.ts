@@ -132,6 +132,11 @@ import {
   type EdgeStation,
   type EdgeWrapFlash
 } from '../render/edgeMarkers';
+import { drawGuideSoundGlyph } from '../render/guideSoundGlyph';
+import {
+  createLegacySoundEffects,
+  type LegacySoundEffectKind
+} from '../legacy-runtime/legacySoundEffects';
 import {
   INTRO_LASER_MS,
   INTRO_POP_MS,
@@ -5188,6 +5193,7 @@ export class MenuScene extends Phaser.Scene {
     if (shouldBuzzWallBump(now, this.lastWallBumpBuzzAtMs, false)) {
       this.lastWallBumpBuzzAtMs = now;
       this.triggerLegacyHapticPulse(LEGACY_HAPTIC_PATTERNS.wallBump);
+      this.playLegacySoundEffect('wallBump');
     }
   }
 
@@ -7162,6 +7168,7 @@ export class MenuScene extends Phaser.Scene {
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
       this.triggerLegacyHapticPulse([...LEGACY_HAPTIC_PATTERNS.goal]);
+      this.playLegacySoundEffect('goal');
       return {
         accepted: true,
         events: [{ type: 'player-reached-goal', entityId: 'player' }]
@@ -7170,6 +7177,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.boardDynamicDirty = true;
     this.triggerLegacyHapticPulse(LEGACY_HAPTIC_PATTERNS.step);
+    this.playLegacySoundEffect('step');
     return {
       accepted: true,
       events: [{ type: 'player-moved', entityId: 'player' }]
@@ -10444,6 +10452,13 @@ export class MenuScene extends Phaser.Scene {
 
   // Single shared entry point for vibration (src/legacy-runtime/legacyHaptics.ts). Honours Settings > Haptics and
   // reduced motion, and is a no-op where navigator.vibrate is missing (iOS Safari, most desktops).
+  private readonly legacySoundEffects = createLegacySoundEffects();
+
+  // Sound effects (src/legacy-runtime/legacySoundEffects.ts): gated by Settings > Sound effects, default off.
+  private playLegacySoundEffect(kind: LegacySoundEffectKind): void {
+    this.legacySoundEffects.play(kind, this.settings.soundEnabled, this.time.now);
+  }
+
   private triggerLegacyHapticPulse(pattern: LegacyHapticPattern): void {
     triggerLegacyHaptic({
       enabled: this.settings.hapticsEnabled,
@@ -11692,6 +11707,7 @@ export class MenuScene extends Phaser.Scene {
         case 'edge-marker': return cyberArcadeMaterial.rail.cyan;
         case 'level-numeral': return playerPalette.playerCoreColor;
         case 'online-count': return LEGACY_PRESENCE_CHIP_FILL;
+        case 'sound-speaker': return cyberArcadeMaterial.rail.cyan;
       }
     };
     // The body scrolls under a geometry mask (the guide is pure text and icons), so a row that is
@@ -11894,6 +11910,9 @@ export class MenuScene extends Phaser.Scene {
         this.drawLegacyPresenceGlyphWord(graphics, '12', centerX, centerY, cellSize, 1, true);
         return;
       }
+      case 'sound-speaker':
+        drawGuideSoundGlyph(graphics, centerX, centerY, badgeRadius * 0.9, accentColor);
+        return;
     }
   }
 
@@ -14233,6 +14252,9 @@ export class MenuScene extends Phaser.Scene {
     this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), result.settings);
     this.syncLegacyRemoteSettings();
     this.settleLegacyReducedMotionChange(wasReducedMotion);
+    if (fieldId === 'soundEnabled') {
+      this.playLegacySoundEffect('toggleOn');
+    }
     if (fieldId === 'controlMode') {
       this.resetLegacyPlayInputBuffer();
       this.hudDirty = true;

@@ -31,7 +31,8 @@ export type LegacyGuideGlyph =
   | 'trail-swatch'
   | 'edge-marker'
   | 'level-numeral'
-  | 'online-count';
+  | 'online-count'
+  | 'sound-speaker';
 
 export type LegacyGuideIconStatus = 'shared-with-board' | 'guide-local' | 'todo-wiring';
 
@@ -62,7 +63,7 @@ export interface LegacyGuideIconSpec {
 }
 
 export interface LegacyGuideRow {
-  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'levels' | 'online';
+  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'levels' | 'online' | 'sound';
   heading: string;
   text: string;
   icon: LegacyGuideIconSpec;
@@ -203,6 +204,20 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
     },
     id: 'online',
     text: 'The number by the top-left icon is how many players are in Mazer right now.'
+  },
+  {
+    heading: 'Sound',
+    icon: {
+      badge: 'circle',
+      boardDraw: null,
+      chipDraw: null,
+      glyph: 'sound-speaker',
+      lane: null,
+      reasonId: 'sound-speaker-guide-local-no-board-counterpart',
+      status: 'guide-local'
+    },
+    id: 'sound',
+    text: 'Sound is off until you turn it on in Settings. Then steps, bumps and wins chirp.'
   }
 ]);
 

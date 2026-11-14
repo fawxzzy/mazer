@@ -5,6 +5,7 @@ import {
 
 export type LegacyOverlayToggleFieldId =
   | 'hapticsEnabled'
+  | 'soundEnabled'
   | 'toggleReducedMotion'
   | 'controlMode';
 export type LegacyOverlayToggleStateText = 'On' | 'Off' | 'Arrows' | 'Stick' | 'System';
@@ -29,6 +30,7 @@ export const resolveLegacyOverlayToggleStateText = (
 ): LegacyOverlayToggleStateText | null => {
   switch (fieldId) {
     case 'hapticsEnabled':
+    case 'soundEnabled':
       return value ? 'On' : 'Off';
     case 'toggleReducedMotion':
       return value ? 'On' : 'System';
@@ -46,6 +48,8 @@ export const resolveLegacyOverlayToggleSwitchIsOn = (
   switch (fieldId) {
     case 'hapticsEnabled':
       return settings.hapticsEnabled;
+    case 'soundEnabled':
+      return settings.soundEnabled;
     case 'toggleReducedMotion':
       return settings.toggleReducedMotion;
     case 'controlMode':
@@ -84,6 +88,18 @@ export const applyLegacyOverlayToggleField = (
         affectsBoardDynamic: false,
         switchIsOn: hapticsDisplayState.switchIsOn,
         stateText: hapticsDisplayState.stateText
+      };
+    }
+    case 'soundEnabled': {
+      nextSettings.soundEnabled = !nextSettings.soundEnabled;
+      const soundDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
+      return {
+        settings: nextSettings,
+        affectsBackdrop: false,
+        affectsBoardStatic: false,
+        affectsBoardDynamic: false,
+        switchIsOn: soundDisplayState.switchIsOn,
+        stateText: soundDisplayState.stateText
       };
     }
     case 'toggleReducedMotion': {

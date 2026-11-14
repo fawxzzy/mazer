@@ -1355,6 +1355,7 @@ const OPTIONS_GUIDE_EXPECTED_LABELS = Object.freeze([
   'Wrap',
   'Levels',
   'Online',
+  'Sound',
   'Got it'
 ]);
 const OPTIONS_GUIDE_OPEN_LABEL = 'How to play';
