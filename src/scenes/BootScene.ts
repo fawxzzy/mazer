@@ -1,4 +1,11 @@
 import Phaser from 'phaser';
+import {
+  HUD_ICON_ATLAS_PUBLIC_URL,
+  HUD_ICON_CELL_PX,
+  HUD_ICON_NAMES,
+  resolveHudIconCell
+} from '../render/hudIconAtlas';
+import { designTokens } from '../theme/tokens';
 
 // The Mazer tile-font asset: a real raster atlas (5x7 dot-matrix glyphs,
 // white-on-transparent so it can be tinted per-character at runtime), the
@@ -44,13 +51,13 @@ export const resolveMazerTileFontRainbowTextureKey = (step: number): string => (
 // for what is left is pinned by tests/architecture/boot-payload-budget.test.ts;
 // add a preload only with a consumer and a budget line.
 // See the cache-busting comment in preload() below.
-const MAZER_VFX_ASSET_CACHE_BUST = 'v=20261106';
+const MAZER_VFX_ASSET_CACHE_BUST = 'v=20261114';
 
-// Real HUD icon source art (see docs/assets/mazer-vfx-source-provenance.md) --
-// the actual profile/leaderboard/settings icons, replacing the procedural
-// thin-line glyphs used until now. Shipped as lossless WebP (same 1254x1254
-// canvas and the same alpha > 1 bounds MenuScene crops to, so the rendered
-// pixels are unchanged); regenerate with scripts/assets/build-hud-icon-webp.mjs.
+// MAZER-VIS-011: the HUD icons are ONE small outline-icon atlas (src/render/hudIconAtlas.ts, built by
+// scripts/assets/build-hud-icon-atlas.mjs), white on transparent. It replaces three 1254 px bitmaps
+// (1.0 MB, three styles). BootScene.deriveHudIconTextures bakes the three the menu draws into the
+// textures below, tinted to one design token, so MenuScene still asks for them by these keys.
+export const MAZER_HUD_ATLAS_TEXTURE_KEY = 'mazerHudIconAtlas';
 export const MAZER_HUD_PROFILE_TEXTURE_KEY = 'mazerHudProfile';
 export const MAZER_HUD_LEADERBOARD_TEXTURE_KEY = 'mazerHudLeaderboard';
 export const MAZER_HUD_SETTINGS_TEXTURE_KEY = 'mazerHudSettings';
@@ -86,15 +93,56 @@ export class BootScene extends Phaser.Scene {
     // never had an entry for, so it always falls through to a real network
     // fetch. Bump the suffix whenever one of these specific files' content
     // changes again.
-    this.load.image(MAZER_HUD_PROFILE_TEXTURE_KEY, `/assets/hud/hud-profile.webp?${MAZER_VFX_ASSET_CACHE_BUST}`);
-    this.load.image(MAZER_HUD_LEADERBOARD_TEXTURE_KEY, `/assets/hud/hud-leaderboard.webp?${MAZER_VFX_ASSET_CACHE_BUST}`);
-    this.load.image(MAZER_HUD_SETTINGS_TEXTURE_KEY, `/assets/hud/hud-settings.webp?${MAZER_VFX_ASSET_CACHE_BUST}`);
+    this.load.image(MAZER_HUD_ATLAS_TEXTURE_KEY, `${HUD_ICON_ATLAS_PUBLIC_URL}?${MAZER_VFX_ASSET_CACHE_BUST}`);
   }
 
   public create(): void {
     this.registerMazerTileFontFrames(MAZER_TILE_FONT_TEXTURE_KEY);
     this.generateMazerTileFontRainbowVariants();
+    this.deriveHudIconTextures();
     this.scene.start('MenuScene');
+  }
+
+  // MAZER-VIS-011: names every glyph of the HUD icon atlas as a frame on the atlas texture, then bakes
+  // the three icons the menu draws into their own HUD_ICON_CELL_PX square textures, recoloured to one
+  // token ('source-in' fill, the same manual-canvas recolour the tile font uses). A missing or broken
+  // atlas leaves the textures absent; Phaser then draws its missing-texture placeholder for the icon
+  // images and nothing else is affected, so it is never fatal to booting.
+  private deriveHudIconTextures(): void {
+    if (!this.textures.exists(MAZER_HUD_ATLAS_TEXTURE_KEY)) {
+      return;
+    }
+    const atlas = this.textures.get(MAZER_HUD_ATLAS_TEXTURE_KEY);
+    const source = atlas.getSourceImage() as CanvasImageSource;
+    const tint = designTokens.color['semantic.info'];
+    const targets: ReadonlyArray<readonly [(typeof HUD_ICON_NAMES)[number], string]> = [
+      ['profile', MAZER_HUD_PROFILE_TEXTURE_KEY],
+      ['leaderboard', MAZER_HUD_LEADERBOARD_TEXTURE_KEY],
+      ['settings', MAZER_HUD_SETTINGS_TEXTURE_KEY]
+    ];
+    for (const name of HUD_ICON_NAMES) {
+      const cell = resolveHudIconCell(name);
+      if (!atlas.has(name)) {
+        atlas.add(name, 0, cell.x, cell.y, cell.width, cell.height);
+      }
+    }
+    for (const [name, key] of targets) {
+      if (this.textures.exists(key)) {
+        continue;
+      }
+      const cell = resolveHudIconCell(name);
+      const canvasTexture = this.textures.createCanvas(key, HUD_ICON_CELL_PX, HUD_ICON_CELL_PX);
+      const context = canvasTexture?.getContext();
+      if (!canvasTexture || !context) {
+        continue;
+      }
+      context.drawImage(source, cell.x, cell.y, cell.width, cell.height, 0, 0, HUD_ICON_CELL_PX, HUD_ICON_CELL_PX);
+      context.globalCompositeOperation = 'source-in';
+      context.fillStyle = tint;
+      context.fillRect(0, 0, HUD_ICON_CELL_PX, HUD_ICON_CELL_PX);
+      context.globalCompositeOperation = 'source-over';
+      canvasTexture.refresh();
+    }
   }
 
   // Registers each glyph (and its lowercase alias) as a named sub-frame on

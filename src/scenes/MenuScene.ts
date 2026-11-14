@@ -98,6 +98,7 @@ import {
   resolveBackdropRainbowColor,
   stepBackdropColourRedraw
 } from '../render/backdropStarHue';
+import { SHARED_BACKDROP_PHASER } from '../render/sharedBackdrop';
 import { drawChipCell, resolveChipGridGeometry } from '../render/chipTileGraphics';
 import { PhaserGraphicsTileContext } from '../render/phaserTileContext';
 import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameToViewport } from '../boot/viewportGeometry';
@@ -7312,9 +7313,10 @@ export class MenuScene extends Phaser.Scene {
   private drawBackdrop(): void {
     const { width, height } = this.layout;
     this.backdropGraphics.clear();
-    this.backdropGraphics.fillStyle(cyberArcadeMaterial.substrate.field, 1);
-    this.backdropGraphics.fillRect(0, 0, width, height);
+    // MAZER-VIS-012: the dark menu field and the opaque sign-in surface are the shared near-black (same as the boot splash).
     const palette = resolveLegacyMenuBackdropPalette(this.settings.darkMode);
+    this.backdropGraphics.fillStyle(this.settings.darkMode ? SHARED_BACKDROP_PHASER : palette.fieldColor, 1);
+    this.backdropGraphics.fillRect(0, 0, width, height);
     const backdropMotionEnabled = resolveBackdropMotion(this.prefersLegacyReducedMotion());
     const animationTime = backdropMotionEnabled ? this.time.now : 0;
     for (const star of this.stars) {
@@ -11113,7 +11115,7 @@ export class MenuScene extends Phaser.Scene {
     // that concern.
     // Auth is an intentionally opaque application surface. It must not compete
     // with the animated maze/menu content underneath the input controls.
-    this.overlayGraphics.fillStyle(this.overlay === 'auth' ? cyberArcadeMaterial.substrate.field : 0x02040a, this.overlay === 'auth' ? 1 : 0.82);
+    this.overlayGraphics.fillStyle(this.overlay === 'auth' ? SHARED_BACKDROP_PHASER : 0x02040a, this.overlay === 'auth' ? 1 : 0.82);
     this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);
   }
 

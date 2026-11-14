@@ -210,6 +210,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: Added `src/legacy-runtime/legacyButtonKit.ts` (primary, secondary, ghost, danger, icon variants with a 44 px minimum, a toggle-row spec and a per-button variant map) and `src/legacy-runtime/legacyFrontDoorHitZone.ts`. The front-door Start/Login wordmark now uses an explicit generous hit zone instead of the full screen (`MenuScene.createButton` option `fullScreenHitArea` became `explicitHitZone`).
 - WHY it changed: a tap anywhere on the front door started a run or opened Login; only the wordmark and its margin should.
 - Rule: tap tests inside and outside the zone live in `tests/legacy-runtime/legacy-front-door-hit-zone.test.ts`. Button chrome is not yet drawn from the kit (`chromeViaKit` is false for all); surfaces migrate one per PR.
+
+## 2026-11-14 - MAZER-VIS-012 one near-black backdrop across boot, install gate and sign-in
+- WHAT changed: Added `src/render/sharedBackdrop.ts` (the one shared constant, the registered `legacy.color.bg.page` #02080f). The install gate overlay in `src/styles/base.css` now paints that token (was its own teal #031f20) with a calmer static glow. `MenuScene` (one small edit in two backdrop spots) paints the dark menu field and the opaque auth surface from the same constant (was #03070b). `tests/render/shared-backdrop.test.ts` pins boot, gate, sign-in and the Phaser config to it; three source pins in `tests/scenes/menu-render-frame.test.ts` and `tests/reset/legacy-reset.test.ts` were updated for the new fill expression.
+- WHY it changed: boot, install gate and sign-in were three near-blacks (#02080f, #031f20, #03070b). Measured on boot, gate and sign-in at 390, 360 and 412 wide (Chromium) and iPhone 15 Pro and SE (WebKit): all three now read rgb(2, 8, 15).
+- Rule: pre-game surfaces take their background from `SHARED_BACKDROP_*`; `bg.canvas` stays the board surface token. The gate has no starfield (static HTML) and the sign-in surface is fully opaque, so the 'calmer gate starfield' criterion has nothing to calm; it needs an owner call if a visible gate starfield is wanted. The `legacy.color.bg.gate` token is now unused by CSS and kept (a comment cites it for the token evidence test) for the token-registry owner to retire.
 - Status: Applied (review)
 
 ## 2026-11-14 - MAZER-VIS-044 corner diamonds in the 4 corners
@@ -270,3 +275,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: MAZER-VIS-011 replaces three 1254 px HUD bitmaps (1.0 MB, three styles) with one scripted outline-icon atlas. `BootScene.ts` (Wave 4D-A) and `MenuScene.ts` (Wave 5C) cannot ship in one change set (the integrator-wave tests reject mixed waves), so the MenuScene half lands first and is a safe no-op; the BootScene and asset swap follows as part 2.
 - Rule: when a change needs files from two registered waves, split it so each PR is a no-op or a pure superset on the other side's current state, and say which half is which in both PRs.
 - Status: Applied (review); source proof only, nothing visual changes until part 2.
+
+## 2026-11-14 - MAZER-VIS-011 (part 2 of 2) one outline HUD icon atlas replaces three bitmaps
+- WHAT changed: `public/assets/hud/hud-icons.webp` (5,612 B, eight outline glyphs) replaces the three 1254 px HUD WebPs (1,019,276 B); `scripts/assets/build-hud-icon-atlas.mjs` generates it and replaces `build-hud-icon-webp.mjs`. `BootScene` preloads the atlas and bakes the three existing texture keys as 128x128 canvases (white glyph recoloured to `semantic.info` with `source-in`, the same pattern the tile font uses). Boot payload budgets, preload list and service-worker/offline-shell examples follow. `tests/architecture/hud-icon-atlas.test.ts` pins layout parity, bounds, byte budget and shipped-equals-rendered.
+- WHY it changed: the three bitmaps were three illustration styles at about 6.3 MB decoded each; the card asks for one family with close, check, info, share and install glyphs. Part 1 (MenuScene crop, PR 564) must be on main first: this part assumes `MenuScene` crops 128 px textures to the shared glyph box.
+- Rule: a generated asset ships with a test that re-renders it and compares decoded pixels, so a hand-edited or stale binary fails CI.
+- Status: Applied (review); headless Chromium 390x844 and WebKit iPhone 15 Pro and SE screenshots only, no safe-area insets, nothing checked on a real phone. Visible change: header icons are now cyan outline glyphs instead of teal illustrations.
+
