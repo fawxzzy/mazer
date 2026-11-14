@@ -86,6 +86,8 @@ Card text is published on the owner board, so every string an event can set must
 3. `config/mazer-board-events.jsonl`: the append-only archive of applied events (the audit trail and the idempotency key; a replay is a no-op).
 4. `exports/mazer.project-board.owner-export.v1.json` and `docs/ops/MAZER-WORK-REPORT.md` / `.json`, regenerated from the new registry and ledger by the existing generators.
 
+`apply` then runs the checks CI runs as "Deterministic public owner export" (`tests/project-board-owner-export.test.mjs` and `export-project-board-owner.mjs --check`) on the written result. If either fails it restores every file, prints the failing output and exits 2, so wording problems surface before the board pull request. `plan` does not run them (it writes nothing for the test to read).
+
 Card titles, acceptance criteria and long descriptions that need judgement stay manual edits (a normal pull request); the fold never rewrites them except through `title` and `new`.
 
 ## Trigger policy (when to sync)

@@ -9,7 +9,7 @@ import {
   appendUpdateLine, canonicalJson, completedProblems, dueStatus, eventId, foldEvents, KEEP_UPDATE_LINES, parseJsonl, validateEventShape, withId,
 } from "../scripts/board/board-events.mjs";
 import {
-  appendEvent, patchLedgerText, applyPlan, checkIntegrity, computePlan, computeStatus, flushLocal, formatPlan, localFallbackPath, readRemoteEvents, runBoardSync, serializeJson,
+  appendEvent, patchLedgerText, applyPlan, checkIntegrity, computePlan, computeStatus, flushLocal, runOwnerExportPreflight, formatPlan, localFallbackPath, readRemoteEvents, runBoardSync, serializeJson,
 } from "../scripts/board/board-sync.mjs";
 import { repinWeb, WEB_NEXT_COMMANDS } from "../scripts/board/web-repin.mjs";
 import { renderOutputs } from "../scripts/analysis/work-report.mjs";
@@ -236,6 +236,29 @@ test("an event the exporter rejects aborts apply before anything is written", ()
   assert.match(lines.join("\n"), /"secret or credential word" screen: "password"/);
   assert.equal(fs.readFileSync(path.join(dir, "config/mazer-owner-work-registry.json"), "utf8"), before);
   assert.equal(fs.existsSync(path.join(dir, "config/mazer-board-events.jsonl")), false);
+});
+
+test("apply runs the owner export preflight and restores every file when it fails", () => {
+  const dir = scratchRepo();
+  const reg = JSON.parse(fs.readFileSync(path.join(dir, "config/mazer-owner-work-registry.json"), "utf8"));
+  const events = demoEvents(dir, reg.workItems.find((c) => c.status === "review").id);
+  const files = ["config/mazer-owner-work-registry.json", "config/mazer-work-ledger.json"];
+  const before = files.map((f) => fs.readFileSync(path.join(dir, f), "utf8"));
+  const lines = [];
+  const failing = () => ({ skipped: false, failures: [{ label: "owner export test", output: "AssertionError: deferred wording" }] });
+  assert.equal(runBoardSync(["apply", "--events", events], dir, (l) => lines.push(l), { ownerExportPreflight: failing }), 2);
+  assert.match(lines.join("\n"), /REFUSED, the owner export check .* fails/);
+  assert.match(lines.join("\n"), /deferred wording/);
+  assert.deepEqual(files.map((f) => fs.readFileSync(path.join(dir, f), "utf8")), before, "registry and ledger restored");
+  assert.equal(fs.existsSync(path.join(dir, "config/mazer-board-events.jsonl")), false, "new archive removed");
+  assert.equal(fs.existsSync(path.join(dir, "exports/mazer.project-board.owner-export.v1.json")), false, "new export removed");
+  const ok = [];
+  assert.equal(runBoardSync(["apply", "--events", events], dir, (l) => ok.push(l), { ownerExportPreflight: () => ({ skipped: false, failures: [] }) }), 0);
+  assert.match(ok.join("\n"), /owner export preflight passed/);
+});
+
+test("the real preflight is skipped where the owner export test file is absent", () => {
+  assert.deepEqual(runOwnerExportPreflight(scratchRepo()), { skipped: true, failures: [] });
 });
 
 // ---- public-text screens (shared with tests/project-board-owner-export.test.mjs) ---------------------------------------------
