@@ -246,6 +246,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: new `src/boot/serviceWorkerCacheWarning.ts` carries one friendly warning (existing `service-worker-error` boot copy) from the page to the message toast; `main.ts` raises it on a failed service-worker install or an online registration error; `MenuScene.ts` subscribes with one line; inventory doc row and test pin it.
 - WHY it changed: an offline-cache update failure was invisible. The Workbox worker cannot post a custom message, so the page watches the registration. Sync failures stay silent and boot errors stay on the splash; offline registration errors are expected and stay silent.
 - Evidence: `tests/reset/ui-030-sw-cache-warning.test.ts`, `tests/reset/legacy-player-message-inventory.test.ts`, headless phone emulation (390x844, 360x740).
+
+## 2026-11-14 - MAZER-UI-028 per-wave proof surfaces
+- WHAT changed: new `docs/contracts/mazer-ui-rework-wave-proof-surfaces.v1.json` lists the surfaces each integrator-owned UI wave changes and where its capture lives; `tests/architecture/ui-wave-proof-surfaces-contract.test.ts` fails a wave marked done (registry completed or proof.done) without a committed capture (image + metadata.json) unless it is on a shrink-only waiver list (3A only).
+- WHY it changed: waves were being called done with no committed visual proof. Docs and test only; no runtime change.
+- Evidence: the new test and `decision-registry-contract.test.ts`. Known gaps: Wave 0C claims `capture-auth-capability-surfaces.mjs`, which is not on main; no wave capture is committed yet.
 - Status: Applied
 
 ## 2026-11-14 - Off-theme colour ratchet baseline refresh
