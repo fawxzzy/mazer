@@ -42,17 +42,17 @@ registered, and none may be registered until the gating contract is signed.
 | Order | Phase | Status | Gate |
 | --- | --- | --- | --- |
 | 1 | `player-movement` | LIVE | Registered by `MenuScene` at host construction. |
-| 2 | `enemy-movement` | DEFERRED | Pending MAZER-HAZ-002 (Phase 2 hazards contract, unsigned). |
-| 3 | `projectile-movement` | DEFERRED | Pending MAZER-HAZ-002. |
-| 4 | `pickups` | DEFERRED | Pending MAZER-HAZ-002. |
-| 5 | `item-effects` | DEFERRED | Pending MAZER-HAZ-002. |
-| 6 | `duration-expiry` | DEFERRED | Pending MAZER-HAZ-002. |
-| 7 | `collisions` | DEFERRED | Pending MAZER-HAZ-002. |
+| 2 | `enemy-movement` | DEFERRED | Held for its hazard packet; MAZER-HAZ-002 signed 2026-11-14 (phase 1), see the signed contract. |
+| 3 | `projectile-movement` | DEFERRED | Held for its hazard packet (MAZER-HAZ-002 signed 2026-11-14). |
+| 4 | `pickups` | DEFERRED | Held for its hazard packet (MAZER-HAZ-002 signed 2026-11-14). |
+| 5 | `item-effects` | DEFERRED | Held for its hazard packet (MAZER-HAZ-002 signed 2026-11-14). |
+| 6 | `duration-expiry` | DEFERRED | Held for its hazard packet (MAZER-HAZ-002 signed 2026-11-14). |
+| 7 | `collisions` | DEFERRED | Held for its hazard packet (MAZER-HAZ-002 signed 2026-11-14). |
 
 Only `player-movement` is live: 1 of 7 phases. The six deferred phases are an
 explicit decision, not an oversight. Phase 2 hazards stay held until
-MAZER-HAZ-002 is signed, and the board stays free of hazards, enemies, and
-obstacles until then. `tests/architecture/world-turn-contract.test.ts` keeps this
+its hazard packet lands under the signed contract (MAZER-HAZ-002, 2026-11-14), and the board stays free of hazards, enemies, and
+obstacles until then (signing enabled no code). `tests/architecture/world-turn-contract.test.ts` keeps this
 table equal to `WORLD_TURN_PHASES` and fails if `MenuScene` registers any phase
 other than `player-movement`. Wiring a deferred phase requires changing this
 table, that test, and the signed contract in the same change.
