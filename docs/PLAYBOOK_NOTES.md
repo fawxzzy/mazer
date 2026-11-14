@@ -211,6 +211,13 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: a tap anywhere on the front door started a run or opened Login; only the wordmark and its margin should.
 - Rule: tap tests inside and outside the zone live in `tests/legacy-runtime/legacy-front-door-hit-zone.test.ts`. Button chrome is not yet drawn from the kit (`chromeViaKit` is false for all); surfaces migrate one per PR.
 - Status: Applied (review)
+
+## 2026-11-14 - MAZER-VIS-044 corner diamonds in the 4 corners
+- WHAT changed: new `src/render/edgeCornerAnchor.ts` (pure); `edgeMarkers.ts` now puts each corner diamond's painted outer tip ON the corner of the view (0 css px from BOTH edges) at every viewport size; they scale about that tip. Before, they sat ~56 px along the top/bottom edge (pushed in). Orbit top/bottom travel eases into the corner. `EDGE_MARKER_CORNER_CLEARANCE_PX` removed.
+- WHY it changed: owner requirement 2026-11-14: corner diamonds always in the actual corners, expanded or shrunk. A physically rounded display corner may trim the very tip: accepted.
+- Rule: corner diamonds are exempt from VIS-043 "touch the edge midline"; offset measured by `measureEdgeCornerOffset` (`tests/render/edgeCornerAnchor.test.ts`). MenuScene unchanged. Not checked on a real phone.
+- Status: Applied
+
 ## 2026-11-14 - MAZER-UI-033 online counter is a copy of the website counter
 - WHAT changed: the menu online counter now reads dot, number, "online" (e.g. `7 online`) in muted 13px text with an 8px pulsing dot, like the website header; idle = dim dot alone; count text is the website format (`1.2k`, `12k`), no uppercase K. New `src/render/presenceCounterView.ts`; layout in `legacyPresenceCounterLayout.ts`; small MenuScene edit (draw call + one field); Guide Online row copy updated.
 - WHY it changed: the chip-glyph counter was far larger than the old username text, lacked the label on phones and did not match the website.
@@ -224,6 +231,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 ## 2026-11-14 - MAZER-UI-031 slice 2 colour literals
 - WHAT changed: the board midnight-rainbow ramp moved from `boardRenderer.ts` to `palette.ts`; the legacy iridescent midnight stops, fallback pink and black moved from `legacyIridescentMaterial.ts` to `trailPalette.ts`; off-theme baseline lowered by exactly 14 (off-token 280 to 266, total 355 to 341).
 - WHY it changed: second slice of the stray-colour migration; values and order identical (pinned by `tests/render/ui-031-slice2-palette-values.test.ts`), no visible change.
+
+## 2026-11-14 - MAZER-ACCT-020/030 stored username limit (client half)
+- WHAT changed: new `src/legacy-runtime/legacyStoredUsername.ts` holds the 2-15 character pattern and `sanitizeStoredLegacyUsername`; `legacyAuth.ts` uses it so a username read from stored account metadata that breaks the limit never becomes canonicalUsername or the display name (display falls back to the email local part). No stored name is rewritten or shortened.
+- WHY it changed: the client trusted `user_metadata.username` as read, so an over-limit name stored before the database check existed was still shown and used. The database constraint and the existing over-limit names are account-site/database scope and are reported to the owner, not changed here.
+- Evidence: `tests/reset/legacy-stored-username.test.ts`, `legacy-auth.test.ts`, `legacy-leaderboard-username-editor.test.ts`.
 - Status: Applied
 
 ## 2026-11-14 - Off-theme colour ratchet baseline refresh
