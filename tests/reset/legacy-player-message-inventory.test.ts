@@ -125,7 +125,7 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Touch and drag anywhere to move. With a mouse, click and drag. Let go to stop.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'A shimmering, colour-shifting line is your route. {} in Settings calms it.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Some mazes wrap around open edges. Trail-coloured edge diamonds fill as beams hit.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
-  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'The number by the top-left icon is how many players are in Mazer right now.', kind: 'static', route: 'Guide (How to play) sheet row copy for the menu online counter (MAZER-UI-024); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
+  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'The dot and number by the top-left icon show how many players are online right now.', kind: 'static', route: 'Guide (How to play) sheet row copy for the menu online counter (MAZER-UI-024); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Clears show your clear time and level. Harder mazes add shortcuts and loops.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyControlHint.ts', literal: 'Touch and drag anywhere to move.', kind: 'static', route: 'level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows' },
   { file: 'src/legacy-runtime/legacyControlHint.ts', literal: 'Click and drag, or use arrows / WASD.', kind: 'static', route: 'level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows' },
@@ -413,6 +413,19 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
       missing.map((entry) => `${entry.file} ${JSON.stringify(entry.literal)}`),
       'Inventory doc is missing pinned row(s); add them to the doc table.'
     ).toEqual([]);
+  });
+
+  test('MAZER-UI-030: only the offline cache warning is routed from the service worker to the toast', () => {
+    const doc = readSource('docs/ops/MAZER-PLAYER-MESSAGE-INVENTORY-2026-11-05.md');
+    expect(doc).toContain('`boot.service-worker-error`');
+    expect(doc).toContain('serviceWorkerCacheWarning.ts');
+    expect(readSource(MENU)).toContain('subscribeServiceWorkerCacheWarning(');
+    const main = readSource('src/boot/main.ts');
+    expect(main).toContain('reportServiceWorkerCacheWarning(');
+    // Boot errors stay on the splash; remote sync stays silent.
+    expect(readSource('src/boot/bootStatus.ts')).not.toContain('serviceWorkerCacheWarning');
+    expect(readSource('src/legacy-runtime/legacyRemoteProgression.ts')).not.toContain('serviceWorkerCacheWarning');
+    expect(LEGACY_BOOT_MESSAGE_COPY.serviceWorkerError).toBe('The offline cache could not update. The game can still run online.');
   });
 
   test('routed copy tables are player-safe (no provider or internal wording)', () => {

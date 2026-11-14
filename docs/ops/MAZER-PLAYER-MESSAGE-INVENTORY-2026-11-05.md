@@ -100,7 +100,8 @@ All are typed `LegacyPlayerMessage` (`copy`, `durationMs` default 2400 ms, `id`,
 | --- | --- | --- | --- | --- | --- |
 | `resolveLegacyAuthFeedbackMessage` (error) | `auth.feedback.error` | auth | error | MenuScene `armLegacyAuthFeedbackMessage`, presentation | diagnostics only; render uses raw snapshot (F2) |
 | `resolveLegacyAuthFeedbackMessage` (info) | `auth.feedback.info` | auth | success | same | diagnostics only |
-| `resolveLegacyBootMessage` | `boot.error` / `boot.service-worker-error` | boot | error / warning | `bootStatus.ts` | no (F7) |
+| `resolveLegacyBootMessage` | `boot.error` | boot | error | `bootStatus.ts` | no, stays on the splash (F7; decision 2026-11-14) |
+| `resolveLegacyBootMessage` | `boot.service-worker-error` | boot | warning | `bootStatus.ts`, `serviceWorkerCacheWarning.ts` (MAZER-UI-030) | yes: the message toast, once per page load, online only; the only service worker message that is a toast. Remote sync (F3) stays silent |
 | `resolveLegacyRemoteSyncMessage` | `remote.<ctx>.failed` / `.guest` / `.missing-client` | progression | warning / info / warning | `legacyRemoteProgression.ts` | no (F3) |
 | `publishLegacyRemoteSyncException` inline | `remote.<ctx>.exception` | progression | warning | MenuScene | no (F3) |
 | `createLegacyPlayerMessage` inline | `progression.player.reset` | progression | success | MenuScene `resetLegacyPlayerProgression` | diagnostics only |
@@ -354,7 +355,7 @@ Pure modules, not rendered until the Settings wiring lane lands (`docs/ui/MAZER-
 | `src/legacy-runtime/legacyGuideContent.ts` | `Touch and drag anywhere to move. With a mouse, click and drag. Let go to stop.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `A shimmering, colour-shifting line is your route. {} in Settings calms it.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Some mazes wrap around open edges. Trail-coloured edge diamonds fill as beams hit.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
-| `src/legacy-runtime/legacyGuideContent.ts` | `The number by the top-left icon is how many players are in Mazer right now.` | static | Guide row copy for the menu online counter (MAZER-UI-024); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `The dot and number by the top-left icon show how many players are online right now.` | static | Guide row copy for the menu online counter (MAZER-UI-024); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Clears show your clear time and level. Harder mazes add shortcuts and loops.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyControlHint.ts` | `Touch and drag anywhere to move.` | static | level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows |
 | `src/legacy-runtime/legacyControlHint.ts` | `Click and drag, or use arrows / WASD.` | static | level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows |

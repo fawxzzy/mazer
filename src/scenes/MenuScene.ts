@@ -21,6 +21,7 @@ import {
   type BoardTileReveal,
   resolveBoardTileStyleFromSearch
 } from '../render/boardTileLayer';
+import { HUD_ICON_CELL_PX, HUD_ICON_GLYPH_BOX } from '../render/hudIconAtlas';
 import { MazeRevealDriver, resolveMazeMarkerAlpha, type MazeRevealClock } from '../render/mazeRevealDriver';
 import { centerOfCell, drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
 import { resolvePlayerCoreAlphaScale, shouldDrawEndpointMarker } from '../render/endpointMarkerLayering';
@@ -50,6 +51,7 @@ import { AppLoaderOverlay } from '../render/appLoaderOverlay';
 import { isMazerBootSplashPresent } from '../boot/bootSplash';
 import { resolveUiTransitionPlan, type UiTransitionKind } from '../render/uiTransition';
 import { UiTransitionGhost } from '../render/uiTransitionGhost';
+import { UiEntranceDriver } from '../render/uiEntranceDriver';
 import { PlayerLocatorState } from '../render/playerLocator';
 import { stepTrailColourRedraw } from '../render/trailColourRedraw';
 import {
@@ -172,6 +174,7 @@ import {
 } from '../domain/ai';
 import type { MazeEpisode } from '../domain/maze';
 import { markMazerBootStatus } from '../boot/bootStatus';
+import { subscribeServiceWorkerCacheWarning } from '../boot/serviceWorkerCacheWarning';
 import {
   WorldTurnHost,
   type WorldTurnHostState,
@@ -325,7 +328,8 @@ import {
   type LegacyUsernameRename
 } from '../legacy-runtime/legacyAccountUsernameState';
 import { LegacyPresenceController } from '../legacy-runtime/legacyPresenceController';
-import { formatOnlineGlyph } from '../legacy-runtime/legacyPresenceContract';
+import { formatOnline } from '../legacy-runtime/legacyPresenceContract';
+import { PresenceCounterView } from '../render/presenceCounterView';
 import { resolveLegacyPresenceCounterPlacement } from '../legacy-runtime/legacyPresenceCounterLayout';
 import {
   LEGACY_UI_COMPACT_BREAKPOINT,
@@ -1584,6 +1588,16 @@ interface LegacyHudIconSourceMetrics {
 const MAZER_HUD_PROFILE_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 729, bboxWidth: 615, bboxX: 320, bboxY: 268 };
 const MAZER_HUD_LEADERBOARD_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 524, bboxWidth: 692, bboxX: 281, bboxY: 359 };
 const MAZER_HUD_SETTINGS_ICON_METRICS: LegacyHudIconSourceMetrics = { bboxHeight: 828, bboxWidth: 807, bboxX: 221, bboxY: 204 };
+// MAZER-VIS-011: the outline-icon atlas replaces those bitmaps. BootScene (Wave 4D-A, a separate PR) bakes
+// each icon into a HUD_ICON_CELL_PX square texture with every glyph inside HUD_ICON_GLYPH_BOX, so one crop
+// serves all three. applyLegacyHudIconFrame picks it by texture width: the 1254 px bitmaps above keep their
+// own crops until that PR lands, so this change is a no-op on today's assets and nothing is half-switched.
+const MAZER_HUD_BAKED_ICON_METRICS: LegacyHudIconSourceMetrics = {
+  bboxHeight: HUD_ICON_GLYPH_BOX.height,
+  bboxWidth: HUD_ICON_GLYPH_BOX.width,
+  bboxX: HUD_ICON_GLYPH_BOX.x,
+  bboxY: HUD_ICON_GLYPH_BOX.y
+};
 // Wave 4D-B QA-only Teleport anchor-pose preview: the logical anchor footprint
 // side (32 px) the pure pose/clearance resolver is asked about. Nothing is
 // rendered at this size any more; the diamonds are the procedural kites.
@@ -1690,6 +1704,8 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-MOTION-002: fading snapshot cover for Start / overlay open / overlay close (src/render/uiTransition.ts).
   private uiTransitionGhost: UiTransitionGhost | null = null;
   private uiTransitionSuppressed = false;
+  // MAZER-MOTION-011: the rise and stagger an overlay panel enters with (reduced motion: a 200 ms crossfade).
+  private readonly uiEntrance = new UiEntranceDriver();
   private playerMessageToastTexts: Phaser.GameObjects.Text[] = [];
   private authGateLoadingText!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
@@ -1958,6 +1974,7 @@ export class MenuScene extends Phaser.Scene {
   // boardZoomContainer, matching hudGraphics' own coordinate space.
   private touchSettingsCogIconImage!: Phaser.GameObjects.Image;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
+  private presenceView: PresenceCounterView | null = null;
   // Goal beacon (halo + ping): its own layer UNDER the trail canvas so the trail always sits on top of it.
   private goalBeaconGraphics!: Phaser.GameObjects.Graphics;
   // Find-me ping scheduler for the play-mode player locator (src/render/playerLocator.ts).
@@ -2390,6 +2407,7 @@ export class MenuScene extends Phaser.Scene {
     // Same real-2D-canvas approach as the player glow above, for the goal
     // star's own ambient halo -- see the field's own comment.
     this.boardDynamicGraphics = this.add.graphics();
+    this.presenceView = null;
     this.goalBeaconGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
     this.headerSettingsIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
@@ -2426,6 +2444,9 @@ export class MenuScene extends Phaser.Scene {
     this.playerSpawnBurstGraphics = this.add.graphics();
     this.spawnLaserGraphics = this.add.graphics();
     this.uiTransitionGhost = new UiTransitionGhost(this, 'mazer-ui-transition-ghost', LEGACY_PLAYER_MESSAGE_TOAST_DEPTH - 1);
+    // MAZER-MOTION-011: after update (every rebuildUi path has run) so freshly built objects never show one frame at rest.
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this));
     this.playerMessageToastGraphics = this.add.graphics()
       .setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH)
       .setVisible(false);
@@ -2556,6 +2577,8 @@ export class MenuScene extends Phaser.Scene {
         this.uiDirty = true;
       });
       this.installLegacyOfflineCompletionFlush();
+      // MAZER-UI-030: the offline cache warning is the only service worker message that becomes a toast.
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, subscribeServiceWorkerCacheWarning((message) => this.pushLegacyPlayerMessage(message)));
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.uiTransitionGhost?.release();
@@ -2799,6 +2822,21 @@ export class MenuScene extends Phaser.Scene {
     } finally {
       this.uiTransitionSuppressed = previous;
     }
+  }
+
+  private applyUiEntrance(): void {
+    if (!this.uiEntrance.active) {
+      return;
+    }
+    if (this.overlay === null) {
+      this.uiEntrance.cancel();
+      return;
+    }
+    this.uiEntrance.update(this.time.now, [
+      ...this.uiGraphics,
+      ...this.uiButtons.map((button) => button.background),
+      ...this.uiTexts.filter((text) => text.active && text.getData('hud') !== true)
+    ]);
   }
 
   // MAZER-MOTION-002: snapshot what is on screen, then ease it out over the already-final live scene. Never delays
@@ -9614,38 +9652,28 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // MAZER-UI-024: the live "N online" counter, where the signed-in username used to be (right of the
-  // leading header icon, left of the inline title). Tile glyph chips in one calm mint, an optional pulse dot
-  // (only with Reduce Motion off), drawn into the dynamic board layer after the header icons like they are.
-  // Geometry and the fit tiers live in legacyPresenceCounterLayout.ts; the count easing in legacyPresenceDisplay.ts.
+  // MAZER-UI-033: the website header counter, copied exactly: dot, number, "online" (src/render/presenceCounterView.ts).
+  // Live = pulsing dot + "7 online"; signed in but no count yet = dim dot alone; signed out = nothing.
   private drawLegacyMenuPresenceCounter(time: number): void {
-    if (this.mode !== 'menu' || this.overlay !== 'none') {
+    if (this.mode !== 'menu' || this.overlay !== 'none' || !this.presence.isActive()) {
+      this.presenceView?.hide();
       return;
     }
     const reducedMotion = this.prefersLegacyReducedMotion();
     const frame = this.presence.frame(time, reducedMotion);
-    if (!frame.visible || frame.value === null) {
-      return;
-    }
-    const placement = resolveLegacyPresenceCounterPlacement({
-      layout: this.layout,
-      showDot: !reducedMotion,
-      text: formatOnlineGlyph(frame.value)
+    const live = frame.visible && frame.value !== null;
+    this.presenceView ??= new PresenceCounterView(this, {
+      dotColor: LEGACY_PRESENCE_CHIP_FILL,
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      textColor: `#${cyberArcadeMaterial.rail.muted.toString(16).padStart(6, '0')}`
     });
-    if (!placement.visible || placement.number === null) {
-      return;
-    }
-    const graphics = this.boardDynamicGraphics;
-    if (placement.dot !== null) {
-      const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, false);
-      graphics.fillStyle(LEGACY_PRESENCE_CHIP_FILL, frame.alpha * (0.35 + (phase * 0.65)));
-      graphics.fillCircle(placement.dot.centerX, placement.dot.centerY, placement.dot.radius);
-    }
-    const { number, word } = placement;
-    this.drawLegacyPresenceGlyphWord(graphics, number.text, number.left + (number.width / 2), number.top + (number.height / 2), placement.cell, frame.alpha, true);
-    if (word !== null) {
-      this.drawLegacyPresenceGlyphWord(graphics, word.text, word.left + (word.width / 2), word.top + (word.height / 2), placement.cell, frame.alpha, false);
-    }
+    const view = this.presenceView;
+    const placement = resolveLegacyPresenceCounterPlacement({
+      countText: live ? formatOnline(frame.value) : null,
+      layout: this.layout,
+      measure: (value) => view.measure(value)
+    });
+    view.draw(this.boardDynamicGraphics, placement, { live, reducedMotion, textAlpha: frame.alpha, timeMs: time });
   }
 
   // One word of chip cells for the menu counter (and its Guide icon): the number is the lit part, the word ONLINE the
@@ -10947,10 +10975,11 @@ export class MenuScene extends Phaser.Scene {
       image.setVisible(false);
       return;
     }
-    const scale = desiredSize / Math.max(metrics.bboxWidth, metrics.bboxHeight);
+    const crop = image.width === HUD_ICON_CELL_PX ? MAZER_HUD_BAKED_ICON_METRICS : metrics;
+    const scale = desiredSize / Math.max(crop.bboxWidth, crop.bboxHeight);
     image
-      .setCrop(metrics.bboxX, metrics.bboxY, metrics.bboxWidth, metrics.bboxHeight)
-      .setDisplaySize(metrics.bboxWidth * scale, metrics.bboxHeight * scale)
+      .setCrop(crop.bboxX, crop.bboxY, crop.bboxWidth, crop.bboxHeight)
+      .setDisplaySize(crop.bboxWidth * scale, crop.bboxHeight * scale)
       .setPosition(centerX, centerY)
       .setAlpha(alpha)
       .setVisible(true);
@@ -14051,6 +14080,7 @@ export class MenuScene extends Phaser.Scene {
     // MAZER-MOTION-002: snapshot the screen as it is (the canvas holds the last frame until the next render).
     if (kind !== previousOverlay) {
       this.beginUiTransition('overlay-open');
+      this.uiEntrance.begin(this.time.now, this.prefersLegacyReducedMotion());
     }
     if (kind === 'pause') {
       this.pauseSettingsExpanded = false;

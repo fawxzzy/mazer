@@ -60,6 +60,11 @@ export class LegacyPresenceController {
     this.startSession();
   }
 
+  /** True while a signed-in session (or a QA count) is in play: the idle dim dot shows only then. */
+  public isActive(): boolean {
+    return this.signedIn || this.qaOverride;
+  }
+
   public isSessionActive(): boolean {
     return this.session !== null;
   }
