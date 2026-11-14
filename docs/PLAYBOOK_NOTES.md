@@ -148,6 +148,13 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: `src/boot/bootSplash.ts` holds the splash stage hidden when the exit starts before the 150 ms show delay (no icon ghost) and removes a splash the CSS failsafe already hid instead of fading it; `index.html` gains the 8000 ms CSS boot failsafe; `src/render/appLoaderOverlay.ts` settles hidden on a frame error, on scene shutdown/destroy and after the 15000 ms wait ceiling; `src/render/appLoader.ts` pins `LOADER_BOOT_FAILSAFE_MS` and `LOADER_WAIT_CEILING_MS`. Tests: `tests/reset/loader-hardening.test.ts`.
 - WHY it changed: The Fitness rebuild found three bugs (icon ghost on a sub-150 ms load, failsafe-hidden cover flashing back, an error or early unmount leaving an opaque cover); Mazer shares the loader and needed the same guarantees.
 - Rule: A cover can only be opaque while something is provably waiting; every exit path (error, unmount, ceiling, failsafe) settles it hidden.
+
+## 2026-11-14 MAZER-PWA-006: precache trimmed to the offline shell, update reload deferred
+
+- WHAT changed: `vite.config.ts` `workbox.globIgnores` drops the dev/QA pages, their chunks and the legacy `sw.js` from the precache (41 to 17 entries, about 301 KiB). `src/boot/serviceWorkerLifecycle.ts` gains an optional `deferReload` so an update reloads the page only when it is hidden and the menu scene is idle (wired in `src/boot/main.ts`); `scripts/analysis/verify-offline-shell.mjs` proves it (22 checks).
+- WHY it changed: a deploy reloaded a running session about 1.5 s after the update check and lost the in-memory run (mid-level restore is not wired); the install download carried about 300 KiB nobody needs offline.
+- Rule: The offline shell precache holds only what the game boots from; an update must never reload a visible or mid-run page.
+- Evidence: `docs/ops/MAZER-PWA-006-PRECACHE-TRIM-AND-UPDATE-2026-11-14.md`.
 - Status: Applied
 
 ## 2026-11-14 MAZER-VIS-037: trail core colour step bounded at the sheen crossing
