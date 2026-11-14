@@ -5,12 +5,10 @@ import {
   MAZER_PRESENCE_TRACK_PAYLOAD,
   countPresence,
   formatOnline,
-  formatOnlineGlyph,
   isBrowserSafePresenceKey,
   isMazerPresenceOrigin,
   resolvePresenceRealtimeUrl
 } from '../../src/legacy-runtime/legacyPresenceContract';
-import { isLegacyGlyphWordRenderable } from '../../src/legacy-runtime/legacyMenuTitle';
 
 const jwt = (role: string): string => {
   const encode = (value: object): string => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -69,22 +67,13 @@ describe('MAZER-UI-024 presence contract', () => {
     expect(MAZER_PRESENCE_TRACK_PAYLOAD).toEqual({ v: 1 });
   });
 
-  test('a zero, unknown or invalid count is never text (site style and glyph style)', () => {
+  test('a zero, unknown or invalid count is never text', () => {
     for (const bad of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, null, undefined]) {
       expect(formatOnline(bad)).toBeNull();
-      expect(formatOnlineGlyph(bad)).toBeNull();
     }
   });
 
   test('site-style text matches the website: 7, 999, 1.2k, 12k', () => {
     expect([1, 7, 999, 1000, 1234, 9999, 10000, 12345].map(formatOnline)).toEqual(['1', '7', '999', '1k', '1.2k', '9.9k', '10k', '12k']);
-  });
-
-  test('glyph text is letters and digits only, so the tile font can draw it: 1,234 reads 1K, capped at 99K', () => {
-    expect([1, 7, 999, 1000, 1234, 9999, 12345, 98765, 5000000].map(formatOnlineGlyph)).toEqual(['1', '7', '999', '1K', '1K', '9K', '12K', '98K', '99K']);
-    for (const count of [1, 7, 42, 999, 1000, 1234, 99999, 5000000]) {
-      expect(isLegacyGlyphWordRenderable(formatOnlineGlyph(count) as string)).toBe(true);
-    }
-    expect(isLegacyGlyphWordRenderable('ONLINE')).toBe(true);
   });
 });

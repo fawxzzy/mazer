@@ -50,6 +50,7 @@ import { AppLoaderOverlay } from '../render/appLoaderOverlay';
 import { isMazerBootSplashPresent } from '../boot/bootSplash';
 import { resolveUiTransitionPlan, type UiTransitionKind } from '../render/uiTransition';
 import { UiTransitionGhost } from '../render/uiTransitionGhost';
+import { UiEntranceDriver } from '../render/uiEntranceDriver';
 import { PlayerLocatorState } from '../render/playerLocator';
 import { stepTrailColourRedraw } from '../render/trailColourRedraw';
 import {
@@ -312,6 +313,7 @@ import {
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import { resolveLegacyMinHitRect } from '../legacy-runtime/legacyHitTarget';
+import { resolveLegacyFrontDoorHitZone } from '../legacy-runtime/legacyFrontDoorHitZone';
 import {
   resolveLegacyTapRecoveryTarget,
   shouldRecoverLegacyTapAfterUiRebuild
@@ -323,7 +325,8 @@ import {
   type LegacyUsernameRename
 } from '../legacy-runtime/legacyAccountUsernameState';
 import { LegacyPresenceController } from '../legacy-runtime/legacyPresenceController';
-import { formatOnlineGlyph } from '../legacy-runtime/legacyPresenceContract';
+import { formatOnline } from '../legacy-runtime/legacyPresenceContract';
+import { PresenceCounterView } from '../render/presenceCounterView';
 import { resolveLegacyPresenceCounterPlacement } from '../legacy-runtime/legacyPresenceCounterLayout';
 import {
   LEGACY_UI_COMPACT_BREAKPOINT,
@@ -1688,6 +1691,8 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-MOTION-002: fading snapshot cover for Start / overlay open / overlay close (src/render/uiTransition.ts).
   private uiTransitionGhost: UiTransitionGhost | null = null;
   private uiTransitionSuppressed = false;
+  // MAZER-MOTION-011: the rise and stagger an overlay panel enters with (reduced motion: a 200 ms crossfade).
+  private readonly uiEntrance = new UiEntranceDriver();
   private playerMessageToastTexts: Phaser.GameObjects.Text[] = [];
   private authGateLoadingText!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
@@ -1956,6 +1961,7 @@ export class MenuScene extends Phaser.Scene {
   // boardZoomContainer, matching hudGraphics' own coordinate space.
   private touchSettingsCogIconImage!: Phaser.GameObjects.Image;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
+  private presenceView: PresenceCounterView | null = null;
   // Goal beacon (halo + ping): its own layer UNDER the trail canvas so the trail always sits on top of it.
   private goalBeaconGraphics!: Phaser.GameObjects.Graphics;
   // Find-me ping scheduler for the play-mode player locator (src/render/playerLocator.ts).
@@ -2388,6 +2394,7 @@ export class MenuScene extends Phaser.Scene {
     // Same real-2D-canvas approach as the player glow above, for the goal
     // star's own ambient halo -- see the field's own comment.
     this.boardDynamicGraphics = this.add.graphics();
+    this.presenceView = null;
     this.goalBeaconGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
     this.headerSettingsIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
@@ -2424,6 +2431,9 @@ export class MenuScene extends Phaser.Scene {
     this.playerSpawnBurstGraphics = this.add.graphics();
     this.spawnLaserGraphics = this.add.graphics();
     this.uiTransitionGhost = new UiTransitionGhost(this, 'mazer-ui-transition-ghost', LEGACY_PLAYER_MESSAGE_TOAST_DEPTH - 1);
+    // MAZER-MOTION-011: after update (every rebuildUi path has run) so freshly built objects never show one frame at rest.
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this));
     this.playerMessageToastGraphics = this.add.graphics()
       .setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH)
       .setVisible(false);
@@ -2797,6 +2807,21 @@ export class MenuScene extends Phaser.Scene {
     } finally {
       this.uiTransitionSuppressed = previous;
     }
+  }
+
+  private applyUiEntrance(): void {
+    if (!this.uiEntrance.active) {
+      return;
+    }
+    if (this.overlay === null) {
+      this.uiEntrance.cancel();
+      return;
+    }
+    this.uiEntrance.update(this.time.now, [
+      ...this.uiGraphics,
+      ...this.uiButtons.map((button) => button.background),
+      ...this.uiTexts.filter((text) => text.active && text.getData('hud') !== true)
+    ]);
   }
 
   // MAZER-MOTION-002: snapshot what is on screen, then ease it out over the already-final live scene. Never delays
@@ -9611,38 +9636,28 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // MAZER-UI-024: the live "N online" counter, where the signed-in username used to be (right of the
-  // leading header icon, left of the inline title). Tile glyph chips in one calm mint, an optional pulse dot
-  // (only with Reduce Motion off), drawn into the dynamic board layer after the header icons like they are.
-  // Geometry and the fit tiers live in legacyPresenceCounterLayout.ts; the count easing in legacyPresenceDisplay.ts.
+  // MAZER-UI-033: the website header counter, copied exactly: dot, number, "online" (src/render/presenceCounterView.ts).
+  // Live = pulsing dot + "7 online"; signed in but no count yet = dim dot alone; signed out = nothing.
   private drawLegacyMenuPresenceCounter(time: number): void {
-    if (this.mode !== 'menu' || this.overlay !== 'none') {
+    if (this.mode !== 'menu' || this.overlay !== 'none' || !this.presence.isActive()) {
+      this.presenceView?.hide();
       return;
     }
     const reducedMotion = this.prefersLegacyReducedMotion();
     const frame = this.presence.frame(time, reducedMotion);
-    if (!frame.visible || frame.value === null) {
-      return;
-    }
-    const placement = resolveLegacyPresenceCounterPlacement({
-      layout: this.layout,
-      showDot: !reducedMotion,
-      text: formatOnlineGlyph(frame.value)
+    const live = frame.visible && frame.value !== null;
+    this.presenceView ??= new PresenceCounterView(this, {
+      dotColor: LEGACY_PRESENCE_CHIP_FILL,
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      textColor: `#${cyberArcadeMaterial.rail.muted.toString(16).padStart(6, '0')}`
     });
-    if (!placement.visible || placement.number === null) {
-      return;
-    }
-    const graphics = this.boardDynamicGraphics;
-    if (placement.dot !== null) {
-      const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, false);
-      graphics.fillStyle(LEGACY_PRESENCE_CHIP_FILL, frame.alpha * (0.35 + (phase * 0.65)));
-      graphics.fillCircle(placement.dot.centerX, placement.dot.centerY, placement.dot.radius);
-    }
-    const { number, word } = placement;
-    this.drawLegacyPresenceGlyphWord(graphics, number.text, number.left + (number.width / 2), number.top + (number.height / 2), placement.cell, frame.alpha, true);
-    if (word !== null) {
-      this.drawLegacyPresenceGlyphWord(graphics, word.text, word.left + (word.width / 2), word.top + (word.height / 2), placement.cell, frame.alpha, false);
-    }
+    const view = this.presenceView;
+    const placement = resolveLegacyPresenceCounterPlacement({
+      countText: live ? formatOnline(frame.value) : null,
+      layout: this.layout,
+      measure: (value) => view.measure(value)
+    });
+    view.draw(this.boardDynamicGraphics, placement, { live, reducedMotion, textAlpha: frame.alpha, timeMs: time });
   }
 
   // One word of chip cells for the menu counter (and its Guide icon): the number is the lit part, the word ONLINE the
@@ -11019,7 +11034,7 @@ export class MenuScene extends Phaser.Scene {
               this.layout.buttonHeight,
               'Login',
               () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface()),
-              { fullScreenHitArea: true }
+              { explicitHitZone: true }
             )
           );
           this.createLegacySignedOutOAuthFailure();
@@ -11032,7 +11047,7 @@ export class MenuScene extends Phaser.Scene {
               this.layout.buttonHeight,
               startLabel,
               () => this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode()),
-              { fullScreenHitArea: true }
+              { explicitHitZone: true }
             )
           );
         }
@@ -13512,7 +13527,7 @@ export class MenuScene extends Phaser.Scene {
     height: number,
     text: string,
     onClick: () => void,
-    options: { fullScreenHitArea?: boolean; labelRole?: LegacyUiLabelRole } = {}
+    options: { explicitHitZone?: boolean; labelRole?: LegacyUiLabelRole } = {}
   ): UiButton {
     const isMenuFrontDoor = this.mode === 'menu' && this.overlay === 'none';
     // Both the Start and Login front-door actions share the same borderless
@@ -13562,15 +13577,15 @@ export class MenuScene extends Phaser.Scene {
     // drawLegacyMenuFrontDoorGlyphButton, wired up below once the button's
     // final width/height are known).
 
-    // The primary front-door action (Login/Start) can optionally trade its
-    // normal button-sized tap target for the entire screen -- there's no
-    // maze interaction to protect on the front door, so tapping anywhere
-    // (background stars, the demo maze, empty space) should log in/start
-    // instead of requiring a precise tap on the small glyph word. Explicitly
-    // left at the default (lower) depth so the settings gear's own hit
-    // rectangle -- set to a higher depth below -- still wins on overlap.
-    const background = options.fullScreenHitArea === true
-      ? this.add.rectangle(this.layout.width / 2, this.layout.height / 2, this.layout.width, this.layout.height, 0x000000, 0.001)
+    // The primary front-door action (Login/Start) uses an explicit, generous hit
+    // zone around the wordmark (MAZER-UI-015; resolveLegacyFrontDoorHitZone), not
+    // the whole screen. Left at the default (lower) depth so the settings gear's
+    // own hit rectangle -- set to a higher depth below -- still wins on overlap.
+    const frontDoorHitZone = options.explicitHitZone === true
+      ? resolveLegacyFrontDoorHitZone(createVisualRect(x - (width / 2), y - (height / 2), width, height), this.layout)
+      : null;
+    const background = frontDoorHitZone !== null
+      ? this.add.rectangle(frontDoorHitZone.centerX, frontDoorHitZone.centerY, frontDoorHitZone.width, frontDoorHitZone.height, 0x000000, 0.001)
       : this.add.rectangle(x, y, width, height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     const textFitSize = Math.floor((width * (isMenuFrontDoor ? 1.08 : 1.45)) / Math.max(4, text.length));
@@ -13684,9 +13699,8 @@ export class MenuScene extends Phaser.Scene {
       0.001
     );
     background.setInteractive({ useHandCursor: true });
-    // The front-door Login/Start hit target now spans the full screen (see
-    // createButton's fullScreenHitArea) and would otherwise swallow taps on
-    // the gear -- a higher depth keeps this smaller, precise hit rectangle
+    // The front-door Login/Start hit zone (see createButton's explicitHitZone) can
+    // overlap the gear -- a higher depth keeps this smaller, precise hit rectangle
     // topmost so settings still opens instead of falling through to login.
     background.setDepth(3);
     const label = this.add.text(pauseRect.centerX, pauseRect.centerY, '', {
@@ -14049,6 +14063,7 @@ export class MenuScene extends Phaser.Scene {
     // MAZER-MOTION-002: snapshot the screen as it is (the canvas holds the last frame until the next render).
     if (kind !== previousOverlay) {
       this.beginUiTransition('overlay-open');
+      this.uiEntrance.begin(this.time.now, this.prefersLegacyReducedMotion());
     }
     if (kind === 'pause') {
       this.pauseSettingsExpanded = false;

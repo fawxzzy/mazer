@@ -205,6 +205,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: Added `src/render/typeScale.ts` (roles, sizes, weights, 12 px body floor), `docs/ui/MAZER-TYPE-SCALE.md`, self-hosted Oxanium (`public/fonts/oxanium/`, OFL) with a lazy `@font-face` and precache entry, and `tests/render/type-scale-ratchet.test.ts`.
 - WHY it changed: 7 font stacks and 11 sizes drift across surfaces; the ratchet stops new off-scale sizes/stacks while surfaces migrate one PR each.
 - Rule: Land the scale and a shrink-only allowlist ratchet before migrating surfaces. No surface changed in this PR.
+
+## 2026-11-14 - MAZER-UI-015 button kit and explicit front-door hit zone
+- WHAT changed: Added `src/legacy-runtime/legacyButtonKit.ts` (primary, secondary, ghost, danger, icon variants with a 44 px minimum, a toggle-row spec and a per-button variant map) and `src/legacy-runtime/legacyFrontDoorHitZone.ts`. The front-door Start/Login wordmark now uses an explicit generous hit zone instead of the full screen (`MenuScene.createButton` option `fullScreenHitArea` became `explicitHitZone`).
+- WHY it changed: a tap anywhere on the front door started a run or opened Login; only the wordmark and its margin should.
+- Rule: tap tests inside and outside the zone live in `tests/legacy-runtime/legacy-front-door-hit-zone.test.ts`. Button chrome is not yet drawn from the kit (`chromeViaKit` is false for all); surfaces migrate one per PR.
 - Status: Applied (review)
 
 ## 2026-11-14 - MAZER-VIS-044 corner diamonds in the 4 corners
@@ -212,3 +217,24 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: owner requirement 2026-11-14: corner diamonds always in the actual corners, expanded or shrunk. A physically rounded display corner may trim the very tip: accepted.
 - Rule: corner diamonds are exempt from VIS-043 "touch the edge midline"; offset measured by `measureEdgeCornerOffset` (`tests/render/edgeCornerAnchor.test.ts`). MenuScene unchanged. Not checked on a real phone.
 - Status: Applied
+
+## 2026-11-14 - MAZER-UI-033 online counter is a copy of the website counter
+- WHAT changed: the menu online counter now reads dot, number, "online" (e.g. `7 online`) in muted 13px text with an 8px pulsing dot, like the website header; idle = dim dot alone; count text is the website format (`1.2k`, `12k`), no uppercase K. New `src/render/presenceCounterView.ts`; layout in `legacyPresenceCounterLayout.ts`; small MenuScene edit (draw call + one field); Guide Online row copy updated.
+- WHY it changed: the chip-glyph counter was far larger than the old username text, lacked the label on phones and did not match the website.
+
+
+## 2026-11-14 - Touch-first level 1 control hint that follows the input actually used
+- WHAT changed: `legacyControlHint.ts` now holds a pure resolver (`resolveLegacyControlHintInput`): touch is the default, a computer-looking device (fine pointer plus hover, not mobile, not standalone) starts with a neutral line, and the last real input (pointerType on pointerdown, trusted keydown) switches the visible copy between touch, mouse and keys wording (instant text swap, only while visible, never re-shows after the ack). Copy is two short lines (how to move, then the goal). The Guide Move row and the accessibility description were reworded touch-first with the keyboard as a secondary mention.
+- WHY it changed: the game is played on touch screens, and computers can drag too; the old copy was picked by a single coarse-pointer check and said arrow keys on devices that misreported.
+- Rule: copy is chosen from observed input, not a device guess; the device guess only seeds the first frame.
+
+## 2026-11-14 - MAZER-UI-031 slice 2 colour literals
+- WHAT changed: the board midnight-rainbow ramp moved from `boardRenderer.ts` to `palette.ts`; the legacy iridescent midnight stops, fallback pink and black moved from `legacyIridescentMaterial.ts` to `trailPalette.ts`; off-theme baseline lowered by exactly 14 (off-token 280 to 266, total 355 to 341).
+- WHY it changed: second slice of the stray-colour migration; values and order identical (pinned by `tests/render/ui-031-slice2-palette-values.test.ts`), no visible change.
+- Status: Applied
+
+## 2026-11-14 - MAZER-MOTION-011 overlay rise and stagger
+- WHAT changed: added `src/render/uiEntrance.ts` (pure plan: an 8 px rise, rows staggered inside a 60 ms budget, 200 ms crossfade with no movement under Reduce Motion) and `src/render/uiEntranceDriver.ts` (applies it to the live overlay objects each frame and restores them exactly at rest). `MenuScene.ts` gets a small hook: `begin` in `openOverlay` when the overlay kind changes, and a POST_UPDATE `applyUiEntrance` so every `rebuildUi` path has already run.
+- WHY it changed: overlays popped in with no rise or stagger. The hook runs after update on purpose: an in-update hook let freshly rebuilt objects render one frame at rest (a flash), found in a headless frame probe.
+- Rule: effects on objects that `rebuildUi` recreates must be a pure function of elapsed time applied after the rebuild, never state stored on the objects. Panel borders and toggles live on the shared overlay Graphics, so they stay static; only labels and row fills move.
+- Status: Applied (review); headless only (Chromium 390x844, 360x740, 412x915 and WebKit iPhone 15 Pro and SE, Reduce Motion on and off), no real-device fps.

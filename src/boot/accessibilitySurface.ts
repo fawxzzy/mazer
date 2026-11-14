@@ -97,7 +97,7 @@ export const installMazerAccessibilitySurface = (
   const description = documentRef.createElement('p');
   description.id = MAZER_ACCESSIBILITY_DESCRIPTION_ID;
   description.className = 'mazer-accessibility-description';
-  description.textContent = 'Use Arrow keys or WASD to move through the maze. Press Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.';
+  description.textContent = 'Touch and drag anywhere to move through the maze. With a keyboard, use Arrow keys or WASD to move, Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.';
   surface.append(description);
 
   const status = documentRef.createElement('p');

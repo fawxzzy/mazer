@@ -27,9 +27,21 @@ export const LEGACY_CONTROL_HINT_REGISTRY: TutorialRegistry = Object.freeze({
   tokens: Object.freeze([LEGACY_CONTROL_HINT_TOKEN])
 });
 
-/** Same words as the Guide rows (touch: drag anywhere; keys: arrows or WASD; the star is the goal). */
-export const LEGACY_CONTROL_HINT_COPY_TOUCH = 'Drag anywhere to move. Reach the star.';
-export const LEGACY_CONTROL_HINT_COPY_KEYS = 'Arrow keys or WASD to move. Reach the star.';
+/**
+ * Two short lines max: line 1 how to move (worded for the input the player actually uses), line 2 the goal.
+ * Same words as the Guide Move and Goal rows. Each line fits 320 px at 13 px.
+ */
+export const LEGACY_CONTROL_HINT_GOAL_LINE = 'Reach the star to clear the maze.';
+export const LEGACY_CONTROL_HINT_MOVE_TOUCH = 'Touch and drag anywhere to move.';
+export const LEGACY_CONTROL_HINT_MOVE_MOUSE = 'Click and drag, or use arrows / WASD.';
+export const LEGACY_CONTROL_HINT_MOVE_KEYS = 'Arrow keys or WASD to move.';
+/** True on every device, shown before any input is seen on a device that may be a computer. */
+export const LEGACY_CONTROL_HINT_MOVE_NEUTRAL = 'Drag anywhere, or use arrows / WASD.';
+
+export const LEGACY_CONTROL_HINT_COPY_TOUCH = `${LEGACY_CONTROL_HINT_MOVE_TOUCH}\n${LEGACY_CONTROL_HINT_GOAL_LINE}`;
+export const LEGACY_CONTROL_HINT_COPY_MOUSE = `${LEGACY_CONTROL_HINT_MOVE_MOUSE}\n${LEGACY_CONTROL_HINT_GOAL_LINE}`;
+export const LEGACY_CONTROL_HINT_COPY_KEYS = `${LEGACY_CONTROL_HINT_MOVE_KEYS}\n${LEGACY_CONTROL_HINT_GOAL_LINE}`;
+export const LEGACY_CONTROL_HINT_COPY_NEUTRAL = `${LEGACY_CONTROL_HINT_MOVE_NEUTRAL}\n${LEGACY_CONTROL_HINT_GOAL_LINE}`;
 
 /** Auto-fade if the player never moves, so the line cannot linger. The hint is then considered seen. */
 export const LEGACY_CONTROL_HINT_MAX_VISIBLE_MS = 12000;
@@ -37,9 +49,64 @@ export const LEGACY_CONTROL_HINT_FADE_MS = 400;
 /** A touch/mouse drag shorter than this is a tap, not a move. */
 export const LEGACY_CONTROL_HINT_DRAG_THRESHOLD_PX = 8;
 
-export const resolveLegacyControlHintCopy = (coarsePointer: boolean): string => (
-  coarsePointer ? LEGACY_CONTROL_HINT_COPY_TOUCH : LEGACY_CONTROL_HINT_COPY_KEYS
+/** The kind of input a copy variant is worded for. `neutral` = true everywhere (no input seen yet on a possible computer). */
+export type LegacyControlHintInput = 'touch' | 'mouse' | 'keys' | 'neutral';
+/** An input kind actually observed from a real event. */
+export type LegacyControlHintObservedInput = 'touch' | 'mouse' | 'keys';
+
+/** Everything the presenter can observe about the device; every field is optional so a missing API means "no evidence". */
+export interface LegacyControlHintDeviceFacts {
+  /** matchMedia('(pointer: coarse)') */
+  readonly coarsePointer?: boolean;
+  /** matchMedia('(pointer: fine)') */
+  readonly finePointer?: boolean;
+  /** matchMedia('(hover: hover)') */
+  readonly hoverCapable?: boolean;
+  /** Installed / home-screen display mode (display-mode: standalone, or navigator.standalone). */
+  readonly standalone?: boolean;
+  readonly userAgent?: string;
+  /** navigator.maxTouchPoints; a hybrid laptop reports > 0 but is not touch-only, so it is not used as touch proof. */
+  readonly maxTouchPoints?: number;
+  /** The most recent real input (pointerType on pointerdown, trusted keydown), or null before any. */
+  readonly lastInput?: LegacyControlHintObservedInput | null;
+}
+
+const MOBILE_UA = /iPhone|iPad|iPod|Android|Mobile|CriOS|FxiOS/i;
+
+export const isLegacyControlHintMobileUserAgent = (userAgent: string | undefined): boolean => (
+  typeof userAgent === 'string' && MOBILE_UA.test(userAgent)
 );
+
+/** Pointer events map to an input kind: touch and pen count as touch; a mouse is a mouse. */
+export const classifyLegacyControlHintPointer = (pointerType: string): LegacyControlHintObservedInput | null => {
+  if (pointerType === 'touch' || pointerType === 'pen') return 'touch';
+  if (pointerType === 'mouse') return 'mouse';
+  return null;
+};
+
+/**
+ * The hint follows the input the player ACTUALLY uses: the last real input wins (touch, mouse or key), so a
+ * hybrid or a computer that drags gets matching wording. Before any input, touch is the default; the neutral
+ * line is used only on a device that positively looks like a computer (fine pointer with hover, not mobile, not
+ * standalone, no coarse primary pointer), which may be driven by mouse or keys.
+ */
+export const resolveLegacyControlHintInput = (facts: LegacyControlHintDeviceFacts): LegacyControlHintInput => {
+  if (facts.lastInput === 'touch' || facts.lastInput === 'mouse' || facts.lastInput === 'keys') return facts.lastInput;
+  const touchDevice = facts.coarsePointer === true
+    || facts.standalone === true
+    || isLegacyControlHintMobileUserAgent(facts.userAgent);
+  if (touchDevice) return 'touch';
+  return facts.finePointer === true && facts.hoverCapable === true ? 'neutral' : 'touch';
+};
+
+export const resolveLegacyControlHintCopy = (input: LegacyControlHintInput): string => {
+  switch (input) {
+    case 'keys': return LEGACY_CONTROL_HINT_COPY_KEYS;
+    case 'mouse': return LEGACY_CONTROL_HINT_COPY_MOUSE;
+    case 'neutral': return LEGACY_CONTROL_HINT_COPY_NEUTRAL;
+    default: return LEGACY_CONTROL_HINT_COPY_TOUCH;
+  }
+};
 
 export interface LegacyControlHintFacts {
   readonly mode: string;

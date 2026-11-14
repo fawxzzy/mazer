@@ -147,7 +147,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'guide-local'
     },
     id: 'move',
-    text: 'Touch and hold anywhere, then drag the way you want to go. Let go to stop.'
+    text: 'Touch and drag anywhere to move. With a mouse, click and drag. Let go to stop.'
   },
   {
     heading: 'Your trail',
@@ -203,7 +203,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'online',
-    text: 'The number by the top-left icon is how many players are in Mazer right now.'
+    text: 'The dot and number by the top-left icon show how many players are online right now.'
   },
   {
     heading: 'Sound',

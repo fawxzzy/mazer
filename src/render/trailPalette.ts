@@ -216,3 +216,15 @@ export const resolveTrailPaletteBorderColor = (
   timeMs: number,
   motionStopped: boolean
 ): number => sampleIridescentTrail(headDistanceTiles, timeMs, motionStopped, { core: 0, glow: 0, wave: 0, sheen: 0 }).core;
+
+// MAZER-UI-031 slice 2: legacy iridescent material colours (moved verbatim from legacyIridescentMaterial.ts).
+export const LEGACY_IRIDESCENT_MIDNIGHT_STOPS_VALUE = [
+  0x8b2fe0,
+  0x4a2fe0,
+  0x2f7fe0,
+  0x2fe0c0,
+  0x2fe06a,
+  0xe02f9c
+] as const;
+export const LEGACY_IRIDESCENT_PATH_FALLBACK_PINK = 0xff61c7;
+export const LEGACY_IRIDESCENT_BLACK = 0x000000;
