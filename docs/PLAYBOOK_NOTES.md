@@ -315,3 +315,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: three menu polish cards; the stars owner request was "same colours as the rainbow UI".
 - Rule: a colour that must match another surface imports that surface's palette module; a test compares the two, so a private tint fails CI.
 - Status: Applied (review); headless Chromium 390x844 and WebKit iPhone 15 Pro only, nothing checked on a real phone. MAZER-DEBT-002 (drop constant formMode/invalidFields) NOT done here: it must edit menuRuntimeDiagnostics.ts (Wave 1C) and MenuScene.ts (Wave 5C) together, which the integrator wave-mix test rejects; it needs its own split PR.
+
+## 2026-11-15 - board-events commits carry vercel.json so event pushes never build
+- WHAT changed: `pushLines` in `scripts/board/board-sync.mjs` now writes `vercel.json` (`{"git":{"deploymentEnabled":false}}`) into the tree of every `board-events` commit next to `events.jsonl`; `tests/board-sync.test.mjs` asserts the branch tree holds both files.
+- WHY it changed: the orphan branch held only `events.jsonl`, so Vercel built every event push: 154 failed git builds in 24h (147 Mazer, 7 Fitness) spent the shared 100/24h deploy cap.
+- Rule: a branch that must never deploy carries its own vercel.json; a one-off commit is not enough because `pushLines` rebuilds the tree on every push.
+- Status: Applied (review); tests pass. UNVERIFIED: Vercel docs do not say which commit's vercel.json is read, so confirm with `GET /v7/deployments?branch=board-events` after the next event push that no new deployment appears.
