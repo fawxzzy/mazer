@@ -363,7 +363,17 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: `scripts/playbook-runtime.mjs` `DEFAULT_PLAYBOOK_VERSION`, and the `Playbook clean-environment validation` job fallback URL and SHA-256 in `.github/workflows/verify.yml`, moved from the Playbook v0.54.1 release tarball to v0.74.0 (SHA-256 `6b0abf33835c57331f0ef471fef2a803e2cbabc1d673f528e62b2f5213462ac7`, hashed from the published release asset).
 - WHY it changed: v0.74.0 carries Playbook #74 (doctor tells product repos from consumer repos), so Mazer doctor runs stop reporting the Playbook product docs layout as errors.
 - Rule: version, URL and digest move together; no deploy surface touched.
+## 2026-11-15 - narrow phones (320-374 wide): corner diamonds capped instead of widening the gear inset (MAZER-UI-035 follow-up)
+- WHAT changed: under 375 css px wide the four corner diamonds still sit ON the screen corners but peak at 70% size (`EDGE_CORNER_NARROW_MAX_SCALE`, `resolveEdgeCornerMaxScale` in `edgeCornerAnchor.ts`; carried as `EdgeStation.maxScale`, honoured by `drawEdgeMarker` and `resolveEdgeBeams`). The 50% rest size is below the cap, so only the brief full-size pulse changes. The trailing header inset is unchanged there (title not shrunk); 375 and up are unchanged.
+- WHY it changed: at 320-374 the full-size top-right diamond touched the settings glyph (gap -1.9 css px at 320), and the UI-035 fix (wider gear inset) is unaffordable there because the title shrinks. Measured: the header already has almost no slack at 320, 368 and 374, so the diamond is the part that gives.
+- Rule: when two corner objects collide on a narrow phone, shrink the decorative one, never the title or the control; pin the cap in a test against the real layout.
+- Status: Applied (review); headless Chromium 320x568, 360x740, 375x812, 390x844 and WebKit iPhone SE / iPhone 15 Pro only, nothing checked on a real phone.
 
+## 2026-11-15 - visual-proof stray colour literals move into trailPalette (MAZER-UI-031, slice 4)
+- WHAT changed: `src/render/trailPalette.ts` gains `PROOF_*_CSS` constants; `src/visual-proof/readability.ts`, `scenarioLibrary.ts` and `trail/TrailRenderer.ts` import them instead of holding the hex strings. Values identical, no visual change. Off-theme ratchet offToken 227 to 214 (-13), total 292 to 279; three files drop out of the baseline. MenuScene.ts untouched.
+- WHY it changed: MAZER-UI-031 migrates stray literals one wave at a time; this slice is the internal visual-proof `.ts` files only so the wave-mix test stays green.
+- Note: MenuScene's baseline entry is looser than its real count (regenerating gives 51/55 vs 53/57); left as is for the MenuScene PR.
+- Status: headless gates only, nothing checked on a real phone.
 ## 2026-11-14 - Offline shell proof gets a nightly, non-blocking workflow
 - WHAT changed: new `.github/workflows/offline-shell-nightly.yml` (schedule 03:17 UTC + `workflow_dispatch`) runs `scripts/analysis/verify-offline-shell.mjs` (two production builds + headless Chromium) on ubuntu-24.04 and uploads the proof output as an artifact on failure. Also fixed a stale Wave 1C line in `docs/ops/MAZER-NO-INAPP-ACCOUNT-SCREENS-2026-11-14.md`.
 - WHY it changed: the script was fixed in #574 but no workflow ran it, which hid drift.

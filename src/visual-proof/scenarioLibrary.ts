@@ -1,3 +1,4 @@
+import { PROOF_SHELL_CORE_ACCENT_CSS, PROOF_SHELL_MIDDLE_ACCENT_CSS, PROOF_SHELL_OUTER_ACCENT_CSS } from '../render/trailPalette';
 type ShellId = 'outer' | 'middle' | 'core';
 
 // Fallback smoke fixtures only. Canonical proof truth lives in src/topology-proof.
@@ -101,9 +102,9 @@ export const STAGE_HEIGHT = 900;
 export const STAGE_CENTER = Object.freeze({ x: 800, y: 470 });
 
 const SHELLS: readonly ShellDefinition[] = Object.freeze([
-  { id: 'outer', label: 'Outer shell', radius: 286, thickness: 34, accent: '#5fe3ff', fill: 'rgba(23, 57, 74, 0.88)' },
-  { id: 'middle', label: 'Middle shell', radius: 204, thickness: 30, accent: '#84ffbe', fill: 'rgba(18, 49, 43, 0.84)' },
-  { id: 'core', label: 'Core ring', radius: 126, thickness: 28, accent: '#ffd678', fill: 'rgba(67, 43, 18, 0.88)' }
+  { id: 'outer', label: 'Outer shell', radius: 286, thickness: 34, accent: PROOF_SHELL_OUTER_ACCENT_CSS, fill: 'rgba(23, 57, 74, 0.88)' },
+  { id: 'middle', label: 'Middle shell', radius: 204, thickness: 30, accent: PROOF_SHELL_MIDDLE_ACCENT_CSS, fill: 'rgba(18, 49, 43, 0.84)' },
+  { id: 'core', label: 'Core ring', radius: 126, thickness: 28, accent: PROOF_SHELL_CORE_ACCENT_CSS, fill: 'rgba(67, 43, 18, 0.88)' }
 ]);
 
 const SHELL_INDEX = new Map(SHELLS.map((shell) => [shell.id, shell]));
