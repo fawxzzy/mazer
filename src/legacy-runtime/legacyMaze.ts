@@ -79,6 +79,15 @@ export interface LegacyMazeGenerationProfile {
   // seed-independent straight line: a single floor run on the center row
   // inside an all-wall border ring, start at one end and goal at the other.
   layout?: 'corridor';
+  // MAZER-GEN-021: when set (1..4), the carve is a planned JOURNEY instead of a random walk to random
+  // checkpoints: the start sits in one end band of the board's long axis, the goal in the opposite end band
+  // (far apart, on opposite halves of the cross axis), and this many legs of a serpentine route join them
+  // (legs 1 = a direct run, more legs = a longer winding walk with a turn at every waypoint). Absent (the default) keeps the legacy random checkpoints and the 1.5x floor exactly.
+  journeyLegs?: number;
+  // MAZER-GEN-021: true keeps the random checkpoint walk (dense, many branches: the main-menu attract loop) but
+  // starts it in one end band of the board's long axis, so the longest-path tip it ends on is far away. Ignored
+  // when journeyLegs is set (the journey plan then owns the start too).
+  journeyStart?: boolean;
   // Replaces the hardcoded lower clamp of 4 on requestedCheckpoints so low
   // bands can request as few as 1.
   minCheckpoints: number;
@@ -307,6 +316,7 @@ export interface LegacyMazeSnapshot {
 }
 
 const LEGACY_MIN_SCALE = 25;
+export const LEGACY_JOURNEY_MAX_LEGS = 4;
 const LEGACY_MAX_SCALE = 150;
 const LEGACY_MENU_MIN_SHORTCUT_COUNT = 6;
 const DEFAULT_LEGACY_MAZE_GENERATION_PROFILE: LegacyMazeGenerationProfile = {
@@ -349,6 +359,14 @@ export const normalizeLegacyMazeGenerationProfile = (
       ? { geometryBudgetLevel: profile.geometryBudgetLevel }
       : {}
   ),
+  // Same rule: only materialised for a valid journey leg count.
+  ...(
+    typeof profile?.journeyLegs === 'number' && Number.isInteger(profile.journeyLegs)
+    && profile.journeyLegs >= 1 && profile.journeyLegs <= LEGACY_JOURNEY_MAX_LEGS
+      ? { journeyLegs: profile.journeyLegs }
+      : {}
+  ),
+  ...(profile?.journeyStart === true ? { journeyStart: true } : {}),
   minCheckpoints: clampInteger(profile?.minCheckpoints ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.minCheckpoints, 1, 50),
   requiredOppositeBorderConnections: {
     horizontal: profile?.requiredOppositeBorderConnections?.horizontal ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.requiredOppositeBorderConnections.horizontal,
@@ -1179,6 +1197,42 @@ const normalizeLegacyOpenTwoByTwoFloorBlocks = (
   return removedTiles;
 };
 
+// MAZER-GEN-021: a goal that has to be re-placed (the original one is cut off or too close by route) goes to a tile
+// that is both a long route away AND far from the start on the board, not merely the single farthest tile by route,
+// which can sit right next to the start on a looping maze. Candidates are every reachable floor within
+// REBASE_ROUTE_SHARE of the longest route (and at least minDistance); the pick is the one farthest from the start
+// (Manhattan), then the longer route, then reading order, so it stays deterministic.
+const LEGACY_REBASE_ROUTE_SHARE = 0.7;
+
+const pickLegacySpanAwareGoal = (
+  entries: Iterable<{ distance: number; point: LegacyPoint }>,
+  start: LegacyPoint,
+  longest: { distance: number; point: LegacyPoint },
+  minDistance: number
+): { distance: number; point: LegacyPoint } => {
+  const floor = Math.max(minDistance, Math.floor(longest.distance * LEGACY_REBASE_ROUTE_SHARE));
+  let best = longest;
+  let bestSpan = Math.abs(longest.point.x - start.x) + Math.abs(longest.point.y - start.y);
+  for (const entry of entries) {
+    if (entry.distance < floor) {
+      continue;
+    }
+
+    const span = Math.abs(entry.point.x - start.x) + Math.abs(entry.point.y - start.y);
+    if (
+      span > bestSpan
+      || (span === bestSpan && entry.distance > best.distance)
+      || (span === bestSpan && entry.distance === best.distance
+        && (entry.point.y < best.point.y || (entry.point.y === best.point.y && entry.point.x < best.point.x)))
+    ) {
+      best = entry;
+      bestSpan = span;
+    }
+  }
+
+  return best;
+};
+
 const normalizeLegacyPlayableTopology = (
   grid: boolean[][],
   start: LegacyPoint,
@@ -1245,9 +1299,12 @@ const normalizeLegacyPlayableTopology = (
     originalGoalDistance === null
     || originalGoalDistance < Math.min(minPlayableRouteDistance, farthest.distance)
   );
-  const resolvedGoal = shouldRebaseGoal ? farthest.point : goal;
-  const resolvedGoalDistance = shouldRebaseGoal
-    ? farthest.distance
+  const rebased = shouldRebaseGoal
+    ? pickLegacySpanAwareGoal(reachable.values(), start, farthest, Math.min(minPlayableRouteDistance, farthest.distance))
+    : null;
+  const resolvedGoal = rebased !== null ? rebased.point : goal;
+  const resolvedGoalDistance = rebased !== null
+    ? rebased.distance
     : (originalGoalDistance ?? farthest.distance);
 
   return {
@@ -1516,19 +1573,22 @@ const reinforceLegacyRouteQuality = (
 
 const resolveFarthestReachableFloor = (
   grid: boolean[][],
-  start: LegacyPoint
+  start: LegacyPoint,
+  minDistance = 0
 ): { distance: number; point: LegacyPoint } => {
   let farthest = { distance: 0, point: clonePoint(start) };
+  const reachable = resolveReachableFloorDistances(grid, start);
 
-  for (const entry of resolveReachableFloorDistances(grid, start).values()) {
+  for (const entry of reachable.values()) {
     if (entry.distance > farthest.distance) {
       farthest = entry;
     }
   }
 
+  const picked = pickLegacySpanAwareGoal(reachable.values(), start, farthest, minDistance);
   return {
-    distance: farthest.distance,
-    point: clonePoint(farthest.point)
+    distance: picked.distance,
+    point: clonePoint(picked.point)
   };
 };
 
@@ -1548,7 +1608,7 @@ const resolveLegacyFinalRouteState = (
   let solutionPath = buildShortestPath(grid, start, resolvedGoal);
 
   if (solutionPath.length < minimumSolutionPathLength) {
-    const farthest = resolveFarthestReachableFloor(grid, start);
+    const farthest = resolveFarthestReachableFloor(grid, start, solutionPath.length);
     if (farthest.distance + 1 > solutionPath.length) {
       resolvedGoal = farthest.point;
       solutionPath = buildShortestPath(grid, start, resolvedGoal);
@@ -2534,6 +2594,83 @@ const backtrackLegacyPath = (
   return null;
 };
 
+// MAZER-GEN-021 journey plan: where a maze starts, which waypoints the carve walks through and where it ends.
+// The board's long axis is the journey axis (a phone board runs top to bottom, a desktop board left to right). The
+// start sits in one end band of it, the goal in the opposite end band and on the opposite half of the cross axis,
+// so start and goal are far apart by construction; the legs between them zigzag across the cross axis (a
+// serpentine), each waypoint a corner of the walk. Seeded: which end is the start, and every position.
+const JOURNEY_END_BAND_SHARE = 0.18;
+const JOURNEY_CROSS_EDGE_SHARE = 0.18;
+
+export interface LegacyJourneyPlan {
+  start: LegacyPoint;
+  // Waypoints in walk order; the last one is the goal.
+  waypoints: LegacyPoint[];
+}
+
+export const planLegacyJourney = (
+  width: number,
+  height: number,
+  legs: number,
+  rng: () => number
+): LegacyJourneyPlan => {
+  const alongIsY = height >= width;
+  const alongSize = alongIsY ? height : width;
+  const crossSize = alongIsY ? width : height;
+  // Interior cells only: 1 .. size - 2 (a border cell has no full neighbour context).
+  const alongSpan = alongSize - 2;
+  const crossSpan = crossSize - 2;
+  const band = Math.max(2, Math.round(alongSpan * JOURNEY_END_BAND_SHARE));
+  const edge = Math.max(2, Math.round(crossSpan * JOURNEY_CROSS_EDGE_SHARE));
+  const reversed = rng() < 0.5;
+  const pick = (low: number, size: number): number => low + Math.floor(rng() * Math.max(1, size));
+  // Along coordinates are chosen as if the start end were 1 and the goal end alongSize - 2, then mirrored.
+  const toPoint = (along: number, cross: number): LegacyPoint => {
+    const a = reversed ? (alongSize - 1 - along) : along;
+    return alongIsY ? { x: cross, y: a } : { x: a, y: cross };
+  };
+  const startCrossLow = rng() < 0.5;
+  const reach = edge + Math.floor(crossSpan * 0.25);
+  const sideCross = (low: boolean): number => (low ? pick(1, reach) : crossSize - 2 - pick(0, reach));
+  const start = toPoint(pick(1, band), sideCross(startCrossLow));
+  const waypoints: LegacyPoint[] = [];
+  for (let leg = 1; leg < legs; leg += 1) {
+    const along = 1 + Math.round((alongSpan - 1) * (leg / legs)) + Math.floor(rng() * 3) - 1;
+    // First waypoint on the side opposite the start, then alternating.
+    waypoints.push(toPoint(along, sideCross(startCrossLow === (leg % 2 === 0))));
+  }
+  const goalLow = legs % 2 === 0 ? startCrossLow : !startCrossLow;
+  waypoints.push(toPoint(alongSize - 2 - pick(0, band), sideCross(goalLow)));
+  return { start, waypoints };
+};
+
+// The nearest acceptable checkpoint tile to a planned waypoint (spiral by Chebyshev radius), or null.
+const resolveLegacyJourneyCheckpoint = (
+  width: number,
+  height: number,
+  pathMask: boolean[][],
+  start: LegacyPoint,
+  planned: LegacyPoint
+): LegacyPoint | null => {
+  const acceptable = (point: LegacyPoint): boolean => (
+    hasFullLegacyNeighborContext(width, height, point)
+    && !isSamePoint(point, start)
+    && !isAdjacentTo(point, start)
+    && !isPathAt(pathMask, point)
+    && !hasNeighboringPath(pathMask, point)
+  );
+  for (let radius = 0; radius <= 5; radius += 1) {
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) { continue; }
+        const point = { x: planned.x + dx, y: planned.y + dy };
+        if (acceptable(point)) { return point; }
+      }
+    }
+  }
+  return null;
+};
+
 const createLegacyCheckpointPathMaze = (
   width: number,
   height: number,
@@ -2546,7 +2683,7 @@ const createLegacyCheckpointPathMaze = (
   // dimension before (checkpoint budget, safety limits) -- the average of
   // width and height reduces to the exact old value when they're equal.
   const linearSize = (width + height) / 2;
-  const requestedCheckpoints = clampInteger(
+  const requestedCheckpoints = profile.journeyLegs !== undefined ? profile.journeyLegs : clampInteger(
     profile.checkpointCountOverride
       ?? Math.trunc((linearSize + (linearSize * legacyTuning.board.checkPointModifier)) * profile.checkpointCountMultiplier),
     profile.minCheckpoints,
@@ -2555,10 +2692,17 @@ const createLegacyCheckpointPathMaze = (
   const pathMask = createEmptyGrid(width, height);
   const pathTiles: LegacyPoint[] = [];
   const pathLengths = new Map<string, number>();
-  const randomStartIndex = Math.floor(rng() * (width * height));
-  const rawStart = { x: randomStartIndex % width, y: Math.floor(randomStartIndex / width) };
+  // 'legs': the plan IS the walk. 'ends': random checkpoints, then one last leg to the planned goal.
+  const journey = profile.journeyLegs === undefined && profile.journeyStart !== true
+    ? null
+    : planLegacyJourney(width, height, profile.journeyLegs ?? 1, rng);
+  const randomStartIndex = journey === null ? Math.floor(rng() * (width * height)) : 0;
+  const rawStart = journey?.start ?? { x: randomStartIndex % width, y: Math.floor(randomStartIndex / width) };
   const deterministicSafetyStart = !hasFullLegacyNeighborContext(width, height, rawStart);
   const start = deterministicSafetyStart ? { x: 1, y: 1 } : rawStart;
+  // journeyStart alone pins only the start: the walk stays the profile's random checkpoint walk.
+  const journeyWaypoints = profile.journeyLegs === undefined ? [] : (journey?.waypoints.slice() ?? []);
+  let journeyGoal: LegacyPoint | null = null;
   let current = clonePoint(start);
   let remainingCheckpoints = requestedCheckpoints;
   let acceptedCheckpoints = 0;
@@ -2575,7 +2719,14 @@ const createLegacyCheckpointPathMaze = (
   let lastDirection: LegacyPoint | null = null;
 
   while (remainingCheckpoints > 0 && safetyIterations < safetyIterationLimit) {
-    const checkpointResult = resolveLegacyCheckpoint(width, height, pathMask, start, remainingCheckpoints, rng);
+    const plannedWaypoint = journeyWaypoints.shift();
+    const journeyCheckpoint = plannedWaypoint === undefined
+      ? null
+      : resolveLegacyJourneyCheckpoint(width, height, pathMask, start, plannedWaypoint);
+    // A journey follows its plan; a waypoint with no acceptable tile near it falls back to the random pick.
+    const checkpointResult = journeyCheckpoint !== null
+      ? { checkpoint: journeyCheckpoint, remainingCheckpoints: remainingCheckpoints - 1 }
+      : resolveLegacyCheckpoint(width, height, pathMask, start, remainingCheckpoints, rng);
     remainingCheckpoints = checkpointResult.remainingCheckpoints;
     const checkpoint = checkpointResult.checkpoint;
     if (!checkpoint) {
@@ -2595,6 +2746,8 @@ const createLegacyCheckpointPathMaze = (
       pathLengths.set(keyForPoint(current), pathLengthCount);
 
       if (isSamePoint(current, checkpoint)) {
+        // The last waypoint reached is the goal of a journey.
+        journeyGoal = journey === null ? null : clonePoint(checkpoint);
         break;
       }
 
@@ -2627,6 +2780,10 @@ const createLegacyCheckpointPathMaze = (
     }
   }
 
+  if (journeyGoal !== null && !isSamePoint(journeyGoal, start)) {
+    goal = journeyGoal;
+    longestPathLength = Math.max(longestPathLength, pathLengthCount);
+  }
   if (isSamePoint(goal, start) && pathTiles.length > 1) {
     goal = pathTiles[pathTiles.length - 1] ?? start;
     longestPathLength = Math.max(longestPathLength, pathTiles.length - 1);

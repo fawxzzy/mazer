@@ -566,6 +566,8 @@ const createLegacyUnderTargetPressureProfile = (
 ): LegacyMazeGenerationProfile => {
   const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
   return normalizeLegacyMazeGenerationProfile({
+    journeyLegs: profile.journeyLegs,
+    journeyStart: profile.journeyStart,
     borderFeederTargetPerSide: Math.min(8, Math.max(2, (profile.borderFeederTargetPerSide ?? 0) + 1)),
     checkpointCountMultiplier: profile.checkpointCountMultiplier * 1.16,
     requiredOppositeBorderConnections: {
@@ -582,6 +584,8 @@ const createLegacyAdaptiveUnderTargetProfile = (
 ): LegacyMazeGenerationProfile => {
   const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
   return normalizeLegacyMazeGenerationProfile({
+    journeyLegs: profile.journeyLegs,
+    journeyStart: profile.journeyStart,
     borderFeederTargetPerSide: Math.min(8, Math.max(3, (profile.borderFeederTargetPerSide ?? 0) + 2)),
     checkpointCountMultiplier: profile.checkpointCountMultiplier * 1.28,
     requiredOppositeBorderConnections: {
