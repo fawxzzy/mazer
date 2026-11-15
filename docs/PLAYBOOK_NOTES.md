@@ -264,6 +264,12 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: effects on objects that `rebuildUi` recreates must be a pure function of elapsed time applied after the rebuild, never state stored on the objects. Panel borders and toggles live on the shared overlay Graphics, so they stay static; only labels and row fills move.
 - Status: Applied (review); headless only (Chromium 390x844, 360x740, 412x915 and WebKit iPhone 15 Pro and SE, Reduce Motion on and off), no real-device fps.
 
+## 2026-11-14 - MAZER-UI-010 surface migration 1: 11 px to the 12 px caption step
+- WHAT changed: the seven 11 px declarations in the three watch-pass pages' `styles.css` (uppercase eyebrow, KPI and meta labels; dev-only pages, excluded from the production build) moved to 12 px. `LEGACY_OFF_SCALE_SIZES_PX` in `tests/render/type-scale-ratchet.test.ts` shrank from `[1, 9, 11, 13, 15, 18]` to `[1, 9, 13, 15, 18]`.
+- WHY it changed: MAZER-UI-010 sets a 12 px body floor and the ratchet listed 9 and 11 as first to go. 9 stays: the two `fontSize: '9px'` badge label texts in `MenuScene.ts` are cited as evidence for the frozen `legacy.fontSizePx.micro` design token (`design-tokens-sync` fails if the literal disappears), and `MenuScene.ts` is Wave 5C. They are never given text today, so nothing renders at 9 px; retiring them needs the token owner to drop `micro`.
+- Rule: before migrating a literal, grep the design-token evidence file for it; a literal cited as token evidence is a token decision, not a type-scale edit.
+- Status: Applied (review); source proof only, watch-pass pages not opened in a browser.
+
 ## 2026-11-14 - MAZER-VIS-011 (part 1 of 2) HUD icon crop follows the texture it draws
 - WHAT changed: Added `src/render/hudIconAtlas.ts` (the outline-icon atlas layout: 128 px cells, 4 columns, glyph box 16..112, eight glyph names) and made `MenuScene.applyLegacyHudIconFrame` crop a texture that is exactly `HUD_ICON_CELL_PX` wide to that shared glyph box, keeping the existing 1254 px bitmap crops for everything else. No asset changes, so rendering on today's art is unchanged.
 - WHY it changed: MAZER-VIS-011 replaces three 1254 px HUD bitmaps (1.0 MB, three styles) with one scripted outline-icon atlas. `BootScene.ts` (Wave 4D-A) and `MenuScene.ts` (Wave 5C) cannot ship in one change set (the integrator-wave tests reject mixed waves), so the MenuScene half lands first and is a safe no-op; the BootScene and asset swap follows as part 2.
