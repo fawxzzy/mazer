@@ -92,3 +92,24 @@ describe('MAZER-PHONE-CHECKLIST.md', () => {
     expect(record).toContain('Nothing here was run on a real phone');
   });
 });
+
+describe('level checkpoint access (MAZER-QA-011)', () => {
+  it('defaults to 60, 100 and 190 and parses an explicit list', async () => {
+    const sweep = (await loadSweep()) as unknown as { parseCheckLevels: (raw?: unknown) => number[] };
+    expect(sweep.parseCheckLevels(undefined)).toEqual([60, 100, 190]);
+    expect(sweep.parseCheckLevels('5, 218')).toEqual([5, 218]);
+  });
+
+  it('rejects anything that is not a whole level 1-999', async () => {
+    const sweep = (await loadSweep()) as unknown as { parseCheckLevels: (raw?: unknown) => number[] };
+    for (const bad of ['0', '1000', '-3', '1.5', 'abc', '60,,100', '']) {
+      expect(() => sweep.parseCheckLevels(bad), bad).toThrow(/--levels/);
+    }
+  });
+
+  it('is documented in docs/ops', () => {
+    const doc = readFileSync(resolve(repoRoot, 'docs/ops/MAZER-QA-LEVEL-ACCESS.md'), 'utf8');
+    expect(doc).toContain('--levels 60,100,190');
+    expect(doc).toContain('previewLevel');
+  });
+});

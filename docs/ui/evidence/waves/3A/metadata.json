@@ -1,0 +1,172 @@
+{
+  "schema": "mazer-wave-capture.v1",
+  "wave": "3A",
+  "title": "Command bridge",
+  "surfaces": [
+    "menu-commands"
+  ],
+  "script": "scripts/analysis/capture-auth-capability-surfaces.mjs",
+  "headless": true,
+  "realPhone": false,
+  "liveAccount": false,
+  "route": "/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749",
+  "captures": [
+    {
+      "file": "menu-phone-390x844.png",
+      "label": "menu phone-390x844",
+      "viewport": "390x844",
+      "deviceScaleFactor": 2,
+      "via": "route",
+      "expected": {
+        "mode": "menu",
+        "overlay": "none"
+      },
+      "actual": {
+        "mode": "menu",
+        "overlay": "none"
+      },
+      "canvas": {
+        "width": 780,
+        "height": 1688,
+        "cssWidth": 390,
+        "cssHeight": 844
+      },
+      "devicePixelRatio": 2,
+      "url": "http://127.0.0.1:5193/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749",
+      "screenContract": {
+        "pass": true
+      }
+    },
+    {
+      "file": "options-phone-390x844.png",
+      "label": "options phone-390x844",
+      "viewport": "390x844",
+      "deviceScaleFactor": 2,
+      "via": "NAVIGATE",
+      "expected": {
+        "mode": "menu",
+        "overlay": "options"
+      },
+      "actual": {
+        "mode": "menu",
+        "overlay": "options"
+      },
+      "canvas": {
+        "width": 780,
+        "height": 1688,
+        "cssWidth": 390,
+        "cssHeight": 844
+      },
+      "devicePixelRatio": 2,
+      "url": "http://127.0.0.1:5193/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749",
+      "screenContract": {
+        "pass": true
+      }
+    },
+    {
+      "file": "pause-phone-390x844.png",
+      "label": "pause phone-390x844",
+      "viewport": "390x844",
+      "deviceScaleFactor": 2,
+      "via": "PAUSE_RUN",
+      "expected": {
+        "mode": "play",
+        "overlay": "pause"
+      },
+      "actual": {
+        "mode": "play",
+        "overlay": "pause"
+      },
+      "canvas": {
+        "width": 780,
+        "height": 1688,
+        "cssWidth": 390,
+        "cssHeight": 844
+      },
+      "devicePixelRatio": 2,
+      "url": "http://127.0.0.1:5193/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749",
+      "screenContract": {
+        "pass": true
+      }
+    },
+    {
+      "file": "menu-desktop-1280x720.png",
+      "label": "menu desktop-1280x720",
+      "viewport": "1280x720",
+      "deviceScaleFactor": 2,
+      "via": "route",
+      "expected": {
+        "mode": "menu",
+        "overlay": "none"
+      },
+      "actual": {
+        "mode": "menu",
+        "overlay": "none"
+      },
+      "canvas": {
+        "width": 2560,
+        "height": 1440,
+        "cssWidth": 1280,
+        "cssHeight": 720
+      },
+      "devicePixelRatio": 2,
+      "url": "http://127.0.0.1:5193/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749",
+      "screenContract": {
+        "pass": true
+      }
+    },
+    {
+      "file": "options-desktop-1280x720.png",
+      "label": "options desktop-1280x720",
+      "viewport": "1280x720",
+      "deviceScaleFactor": 2,
+      "via": "NAVIGATE",
+      "expected": {
+        "mode": "menu",
+        "overlay": "options"
+      },
+      "actual": {
+        "mode": "menu",
+        "overlay": "options"
+      },
+      "canvas": {
+        "width": 2560,
+        "height": 1440,
+        "cssWidth": 1280,
+        "cssHeight": 720
+      },
+      "devicePixelRatio": 2,
+      "url": "http://127.0.0.1:5193/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749",
+      "screenContract": {
+        "pass": true
+      }
+    },
+    {
+      "file": "pause-desktop-1280x720.png",
+      "label": "pause desktop-1280x720",
+      "viewport": "1280x720",
+      "deviceScaleFactor": 2,
+      "via": "PAUSE_RUN",
+      "expected": {
+        "mode": "play",
+        "overlay": "pause"
+      },
+      "actual": {
+        "mode": "play",
+        "overlay": "pause"
+      },
+      "canvas": {
+        "width": 2560,
+        "height": 1440,
+        "cssWidth": 1280,
+        "cssHeight": 720
+      },
+      "devicePixelRatio": 2,
+      "url": "http://127.0.0.1:5193/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749",
+      "screenContract": {
+        "pass": true
+      }
+    }
+  ],
+  "pass": true
+}

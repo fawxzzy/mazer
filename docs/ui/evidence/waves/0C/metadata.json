@@ -1,0 +1,68 @@
+{
+  "schema": "mazer-wave-capture.v1",
+  "wave": "0C",
+  "title": "Measured baseline",
+  "surfaces": [
+    "menu-phone-desktop-baseline"
+  ],
+  "script": "scripts/analysis/capture-auth-capability-surfaces.mjs",
+  "headless": true,
+  "realPhone": false,
+  "liveAccount": false,
+  "route": "/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749",
+  "captures": [
+    {
+      "file": "menu-phone-390x844.png",
+      "label": "menu phone-390x844",
+      "viewport": "390x844",
+      "deviceScaleFactor": 2,
+      "via": "route",
+      "expected": {
+        "mode": "menu",
+        "overlay": "none"
+      },
+      "actual": {
+        "mode": "menu",
+        "overlay": "none"
+      },
+      "canvas": {
+        "width": 780,
+        "height": 1688,
+        "cssWidth": 390,
+        "cssHeight": 844
+      },
+      "devicePixelRatio": 2,
+      "url": "http://127.0.0.1:5193/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749",
+      "screenContract": {
+        "pass": true
+      }
+    },
+    {
+      "file": "menu-desktop-1280x720.png",
+      "label": "menu desktop-1280x720",
+      "viewport": "1280x720",
+      "deviceScaleFactor": 2,
+      "via": "route",
+      "expected": {
+        "mode": "menu",
+        "overlay": "none"
+      },
+      "actual": {
+        "mode": "menu",
+        "overlay": "none"
+      },
+      "canvas": {
+        "width": 2560,
+        "height": 1440,
+        "cssWidth": 1280,
+        "cssHeight": 720
+      },
+      "devicePixelRatio": 2,
+      "url": "http://127.0.0.1:5193/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749",
+      "screenContract": {
+        "pass": true
+      }
+    }
+  ],
+  "pass": true
+}
