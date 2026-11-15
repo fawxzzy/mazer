@@ -81,6 +81,12 @@ export const LEGACY_HEADER_CORNER_DIAMOND_REACH_PX = 16;
 export const LEGACY_HEADER_CORNER_DIAMOND_GAP_PX = 4;
 
 /**
+ * Below this width the header row has no room to spare (the title already shrinks at 320: widening the gear inset there
+ * cut it from 123 to 82 px), so the narrow-phone inset stays as it was; 375 and up get the corner clearance.
+ */
+export const LEGACY_HEADER_CORNER_CLEARANCE_MIN_WIDTH_PX = 375;
+
+/**
  * MAZER-UI-035: the trailing (settings gear / in-play pause) edge inset that keeps the glyph off the top-right corner
  * diamond. A corner diamond grows to 100% and its painted box reaches LEGACY_HEADER_CORNER_DIAMOND_REACH_PX in from the
  * corner on both axes (edgeCornerAnchor.ts anchors its outer tip ON the corner; the diamonds do not move). The glyph
@@ -89,7 +95,7 @@ export const LEGACY_HEADER_CORNER_DIAMOND_GAP_PX = 4;
  */
 export const resolveLegacyHeaderTrailingEdgeInset = (viewportWidth: number, controlSize: number): number => Math.max(
   resolveLegacyHeaderEdgeInset(viewportWidth),
-  Math.ceil(
+  viewportWidth < LEGACY_HEADER_CORNER_CLEARANCE_MIN_WIDTH_PX ? 0 : Math.ceil(
     LEGACY_HEADER_CORNER_DIAMOND_REACH_PX
       + LEGACY_HEADER_CORNER_DIAMOND_GAP_PX
       + (controlSize * (LEGACY_HEADER_ICON_GLYPH_SCALE - 1) / 2)
