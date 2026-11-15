@@ -320,3 +320,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: dropping them touches Wave 1C diagnostics and Wave 5C MenuScene.ts together, which the integrator wave-mix test rejects. Order: diagnostics first (optional), MenuScene stops publishing second, then the fields are deleted.
 - Follow-up (PR 2, Wave 5C only): delete `formMode: 'login'` / `invalidFields: []` at `src/scenes/MenuScene.ts` ~3678; then PR 3 (Wave 1C) deletes the two type fields and the `menu-runtime-diagnostics.test.ts` ~305 fixture/714-728 assertions. Only consumers found: MenuScene, the type, that test (legacyAuth.ts formMode is an unrelated internal).
 - Status: Applied (review), headless only.
+
+
+## 2026-11-14 (offline shell proof script)
+
+- WHAT changed: `scripts/analysis/verify-offline-shell.mjs` now expects 3 boot-art cache entries (HUD icon atlas webp + tile-font atlas image + atlas json) instead of 5.
+- WHY it changed: MAZER-VIS-011 (#568) replaced the 3 separate HUD icon files with one atlas, so the `mazer-boot-art-v1` runtime cache can only ever hold 3 entries; the script waited for 5 and timed out ("boot art runtime cache populated", exit 2). Script bug, not a product regression: the service worker does cache the boot art.
+- Rule: a verify script that hard-codes an asset count must be updated in the same PR that changes the asset set. This script is not run by CI or any npm script (two production builds plus headless Chromium, minutes), which is how the drift went unseen.
+- Status: headless Chromium only, nothing checked on a real phone.

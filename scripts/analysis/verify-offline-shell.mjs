@@ -344,7 +344,7 @@ const readCacheStorage = (page) => page.evaluate(async () => {
 });
 
 const BOOT_ART_CACHE_PREFIX = 'mazer-boot-art';
-const BOOT_ART_EXPECTED_ENTRIES = 5; // 3 HUD icons + tile-font atlas image + atlas json
+const BOOT_ART_EXPECTED_ENTRIES = 3; // HUD icon atlas webp (MAZER-VIS-011, was 3 separate icons) + tile-font atlas image + atlas json
 
 const waitForBootArtCache = (page) => pollPage(page, async ({ prefix, expected }) => {
   const names = await caches.keys();
