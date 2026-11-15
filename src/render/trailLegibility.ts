@@ -29,7 +29,7 @@ export const TRAIL_GLOW_TILE_RATIO = 0.3;
 /** Glow (neon bloom) is at least this multiple of the core so it reads on dense boards too. */
 export const TRAIL_GLOW_MIN_CORE_MULTIPLE = 2.2;
 /** Bloom alpha as a share of the core alpha: 0.2 with the calm palette, 0.32 for the iridescent trail so the deep hues read around it. */
-export const TRAIL_GLOW_ALPHA_RATIO = 0.32;
+export const TRAIL_GLOW_ALPHA_RATIO = 0.5;
 
 export interface TrailWidths {
   coreWidth: number;
