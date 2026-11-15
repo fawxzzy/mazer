@@ -41,7 +41,8 @@ const safeStorage = (read: () => Storage): Storage | null => {
  * away); it stays pending while the page is leaving.
  */
 export const runMazerSignedOutHandoffAtBoot = async (
-  oauthCallbackRequested: boolean
+  oauthCallbackRequested: boolean,
+  returnNoticeRequested = false
 ): Promise<'continue'> => {
   const localStorage = safeStorage(() => window.localStorage);
   const hasStoredSession = hasLegacyStoredAuthSession(localStorage);
@@ -62,6 +63,7 @@ export const runMazerSignedOutHandoffAtBoot = async (
     now: () => Date.now(),
     oauthCallbackRequested,
     optedOut: isMazerAutoHandoffOptedOut(window.location.search),
+    returnNoticeRequested,
     recordFailure: recordMazerOAuthBootFailure,
     sessionQuarantined: isMazerOAuthSessionQuarantined(),
     sessionStorage: safeStorage(() => window.sessionStorage)

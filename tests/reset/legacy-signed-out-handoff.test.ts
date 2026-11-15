@@ -100,6 +100,7 @@ describe('decideMazerAutoHandoff', () => {
   test.each([
     ['signed-in', { hasStoredSession: true }],
     ['oauth-callback', { oauthCallbackRequested: true }],
+    ['return-notice', { returnNoticeRequested: true }],
     ['opted-out', { optedOut: true }],
     ['localhost', { isLocalhost: true }],
     ['level-preview', { levelPreviewRequested: true }],

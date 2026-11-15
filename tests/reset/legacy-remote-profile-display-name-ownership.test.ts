@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { getLegacyAuthClient } from '../../src/legacy-runtime/legacyAuth';
 import { LEGACY_DEFAULTS } from '../../src/legacy-runtime/legacyDefaults';
 import {
@@ -111,6 +111,11 @@ const stubSyncedDevice = (settingsRevision: number) => {
 
 beforeEach(() => {
   vi.mocked(getLegacyAuthClient).mockReset().mockResolvedValue(null);
+  vi.unstubAllGlobals();
+});
+
+// The verify run shares one thread: the last test's stubbed window must not leak into later files.
+afterEach(() => {
   vi.unstubAllGlobals();
 });
 

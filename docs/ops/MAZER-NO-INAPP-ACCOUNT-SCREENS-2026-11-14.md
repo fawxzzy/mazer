@@ -78,7 +78,15 @@ Loop guard and explicit-sign-out semantics are unchanged: `legacySignedOutHandof
 redirect by itself, and still stays on this state after an explicit sign-out or a return inside the attempt window.
 `?autoSignIn=0` still opts a boot out of the automatic hand-off (QA of this state).
 
-Wording issue (fixed by MAZER-ACCT-044): the generic connection line (`MAZER_OAUTH_SAFE_ERROR_MESSAGE`) used to say "Return to Mazer and try again", which read oddly inside Mazer. It then read "Could not reach your account. Try again." (the constant and `LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic`; the two edits shipped as a Wave 3B and a Wave 5C PR). Auth Surface v2 PR-A2 (Wave 3B) moved the generic row to the matrix line "Sign-in is unavailable right now. Try again in a minute."; the constant (Wave 5C) keeps the ACCT-044 spelling until its own PR and is shown as the generic row meanwhile (`resolveLegacyOAuthCurrentFailureCopy`).
+Host return notice (Auth Surface v2 follow-up): when the account host stops an authorization it sends the player back
+to `https://mazer.fawxzzy.com/?notice=expired` (expired, invalid or other-account request) or `?notice=unavailable`
+(account service or approval failure). Boot reads that closed key once (`src/legacy-runtime/legacyAuthReturnNotice.ts`),
+strips it from the address bar with `history.replaceState` like the callback scrub, records it as the held boot failure
+(`expired` -> `We could not finish signing you in. Sign in again.`, `unavailable` -> `Sign-in is unavailable right now.
+Try again in a minute.`) and stays on this state instead of leaving again (`return-notice` stay reason). Unknown or
+repeated values show nothing and are stripped; a callback on the same URL wins.
+
+Wording issue (fixed by MAZER-ACCT-044): the generic connection line (`MAZER_OAUTH_SAFE_ERROR_MESSAGE`) used to say "Return to Mazer and try again", which read oddly inside Mazer. It then read "Could not reach your account. Try again." (the constant and `LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic`; the two edits shipped as a Wave 3B and a Wave 5C PR). Auth Surface v2 PR-A2 (Wave 3B) moved the generic row to the matrix line "Sign-in is unavailable right now. Try again in a minute."; the Wave 5C follow-up then set the constant itself to that matrix line (`AUTH_SURFACE_MESSAGES['signin.unavailable']`). The ACCT-044 spelling is still mapped onto it for a snapshot written by an older build (`resolveLegacyOAuthCurrentFailureCopy`).
 
 ## Evidence
 
