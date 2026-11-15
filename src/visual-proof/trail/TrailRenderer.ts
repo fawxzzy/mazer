@@ -1,3 +1,4 @@
+import { PROOF_CUE_OUTLINE_CSS, PROOF_HEAD_FILL_CSS, PROOF_TRAIL_ACTIVE_CSS } from '../../render/trailPalette';
 import type { TrailSnapshot } from './TrailModel';
 
 export interface TrailPoint {
@@ -106,10 +107,10 @@ export const renderTrailMarkup = (
   const headRadius = options.headRadius ?? 12;
   const oldNodeRadius = options.oldNodeRadius ?? 7;
   const anchorRadius = options.anchorRadius ?? 6;
-  const activeStroke = options.activeStroke ?? '#1BCFEA';
+  const activeStroke = options.activeStroke ?? PROOF_TRAIL_ACTIVE_CSS;
   const oldStroke = options.oldStroke ?? 'rgba(27, 207, 234, 0.28)';
-  const outlineStroke = options.outlineStroke ?? '#03141A';
-  const headFill = options.headFill ?? '#f8fbff';
+  const outlineStroke = options.outlineStroke ?? PROOF_CUE_OUTLINE_CSS;
+  const headFill = options.headFill ?? PROOF_HEAD_FILL_CSS;
   const headStroke = options.headStroke ?? outlineStroke;
   const headStrokeWidth = options.headStrokeWidth ?? outlineWidth;
   const anchorFill = options.anchorFill ?? activeStroke;
