@@ -580,6 +580,7 @@ import {
   type LegacyPlayerMessage
 } from '../legacy-runtime/legacyPlayerMessage';
 import { resolveLegacyPlayerMessageToastFrame } from '../legacy-runtime/legacyPlayerMessageToast';
+import { getTypeScaleStep } from '../render/typeScale';
 import {
   hydrateLegacyRemoteAccountState,
   isLegacyRuntimeDiagnosticsAuthFixtureRoute,
@@ -1707,6 +1708,8 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-MOTION-011: the rise and stagger an overlay panel enters with (reduced motion: a 200 ms crossfade).
   private readonly uiEntrance = new UiEntranceDriver();
   private playerMessageToastTexts: Phaser.GameObjects.Text[] = [];
+  /** MAZER-UI-034: the small failure-code line under a toast, one per toast row. */
+  private playerMessageToastCodeTexts: Phaser.GameObjects.Text[] = [];
   private authGateLoadingText!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
   // MAZER-VIS-039: the one app loader (icon, ring, fade in/out) behind the `Signing you in…` cover (src/render/appLoader.ts).
@@ -2454,6 +2457,14 @@ export class MenuScene extends Phaser.Scene {
       this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
         fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: '14px',
+        color: '#ffffff',
+        align: 'center'
+      })).setOrigin(0.5, 0).setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH + 1).setVisible(false)
+    ));
+    this.playerMessageToastCodeTexts = Array.from({ length: LEGACY_PLAYER_MESSAGE_TOAST_ROW_POOL }, () => (
+      this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: `${getTypeScaleStep('caption').sizePx}px`,
         color: '#ffffff',
         align: 'center'
       })).setOrigin(0.5, 0).setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH + 1).setVisible(false)
@@ -13214,7 +13225,7 @@ export class MenuScene extends Phaser.Scene {
     graphics.clear();
     if (frame.rows.length === 0) {
       graphics.setVisible(false);
-      for (const text of this.playerMessageToastTexts) {
+      for (const text of [...this.playerMessageToastTexts, ...this.playerMessageToastCodeTexts]) {
         text.setVisible(false);
       }
       return;
@@ -13229,16 +13240,28 @@ export class MenuScene extends Phaser.Scene {
       : Math.round(safeArea.top + 156);
     this.playerMessageToastTexts.forEach((text, index) => {
       const row = frame.rows[index];
+      const codeText = this.playerMessageToastCodeTexts[index];
       if (!row) {
         text.setVisible(false);
+        codeText?.setVisible(false);
         return;
       }
 
       text.setWordWrapWidth(frame.maxWidth - (padX * 2));
-      text.setText(row.copy);
+      // MAZER-UI-034: the code line is its own caption-step text, under the message.
+      text.setText(row.codeLine === null ? row.copy : row.messageCopy);
       text.setColor(row.color);
-      const boxWidth = Math.round(Math.min(frame.maxWidth, text.width + (padX * 2)));
-      const boxHeight = Math.round(text.height + (padY * 2));
+      const hasCode = row.codeLine !== null && codeText !== undefined;
+      if (hasCode) {
+        codeText.setWordWrapWidth(frame.maxWidth - (padX * 2));
+        codeText.setText(row.codeLine ?? '');
+        codeText.setColor(row.color);
+      } else {
+        codeText?.setVisible(false);
+      }
+      const codeHeight = hasCode ? codeText.height : 0;
+      const boxWidth = Math.round(Math.min(frame.maxWidth, Math.max(text.width, hasCode ? codeText.width : 0) + (padX * 2)));
+      const boxHeight = Math.round(text.height + codeHeight + (padY * 2));
       const left = Math.round((width - boxWidth) / 2);
       const color = Phaser.Display.Color.HexStringToColor(row.color).color;
       graphics.fillStyle(0x070b14, 0.92 * row.alpha);
@@ -13246,6 +13269,9 @@ export class MenuScene extends Phaser.Scene {
       graphics.lineStyle(2, color, 0.9 * row.alpha);
       graphics.strokeRoundedRect(left, y, boxWidth, boxHeight, 10);
       text.setPosition(Math.round(left + (boxWidth / 2)), y + padY).setAlpha(row.alpha).setVisible(true);
+      if (hasCode) {
+        codeText.setPosition(Math.round(left + (boxWidth / 2)), Math.round(y + padY + text.height)).setAlpha(row.alpha * 0.85).setVisible(true);
+      }
       y += boxHeight + 8;
     });
   }
