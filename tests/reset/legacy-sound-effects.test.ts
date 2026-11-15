@@ -41,7 +41,7 @@ describe('createLegacySoundEffects', () => {
   test('never creates an audio context while the setting is off', () => {
     const factory = vi.fn(() => makeFakeContext().context);
     const effects = createLegacySoundEffects(factory);
-    expect(effects.play('step', false, 0)).toBe(false);
+    expect(effects.play('wallBump', false, 0)).toBe(false);
     expect(effects.play('goal', false, 100)).toBe(false);
     expect(factory).not.toHaveBeenCalled();
     expect(effects.hasContext()).toBe(false);
@@ -62,23 +62,23 @@ describe('createLegacySoundEffects', () => {
 
   test('resumes a suspended context (autoplay unlock on the first gesture)', () => {
     const fake = makeFakeContext('suspended');
-    createLegacySoundEffects(() => fake.context).play('step', true, 0);
+    createLegacySoundEffects(() => fake.context).play('wallBump', true, 0);
     expect(fake.raw.resume).toHaveBeenCalled();
   });
 
   test('throttles rapid repeats of the same kind only', () => {
     const fake = makeFakeContext();
     const effects = createLegacySoundEffects(() => fake.context);
-    expect(effects.play('step', true, 0)).toBe(true);
-    expect(effects.play('step', true, 10)).toBe(false);
-    expect(effects.play('wallBump', true, 10)).toBe(true);
-    expect(effects.play('step', true, 100)).toBe(true);
+    expect(effects.play('wallBump', true, 0)).toBe(true);
+    expect(effects.play('wallBump', true, 10)).toBe(false);
+    expect(effects.play('goal', true, 10)).toBe(true);
+    expect(effects.play('wallBump', true, 150)).toBe(true);
   });
 
   test('is a silent no-op without Web Audio or when audio calls throw', () => {
     const none = createLegacySoundEffects(() => null);
-    expect(none.play('step', true, 0)).toBe(false);
-    expect(none.play('step', true, 1000)).toBe(false);
+    expect(none.play('wallBump', true, 0)).toBe(false);
+    expect(none.play('wallBump', true, 1000)).toBe(false);
     const broken = makeFakeContext();
     broken.raw.createOscillator.mockImplementation(() => { throw new Error('blocked'); });
     expect(createLegacySoundEffects(() => broken.context).play('goal', true, 0)).toBe(false);
