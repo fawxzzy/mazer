@@ -6,14 +6,9 @@
   "captureStandard": "docs/PLAYBOOK_VISUAL_EVIDENCE.md",
   "evidenceRoot": "docs/ui/evidence/waves",
   "defaultViewports": ["390x844", "1280x720"],
-  "waivers": [
-    {
-      "wave": "3A",
-      "reason": "Completed (PR #343) before this manifest existed. Its capture is owed: run scripts/analysis/capture-ui-surfaces.mjs headless and commit the packet under docs/ui/evidence/waves/3A, then delete this waiver."
-    }
-  ],
+  "waivers": [],
   "notes": [
-    "scripts/analysis/capture-auth-capability-surfaces.mjs is still the path Wave 0C claims in the decision registry but the file is not on main; Wave 0C therefore points at capture-ui-surfaces.mjs until the claim is reconciled.",
+    "scripts/analysis/capture-auth-capability-surfaces.mjs (MAZER-GOV-014) now exists and is the capture script for Waves 0C and 3A; their packets are committed under docs/ui/evidence/waves/0C and 3A.",
     "Waves 0A, 0B, 1A, 2A, 2B, 2C, 3C, 4A-4C, 5A and 5D are not in the integrator ownership table; they get a row here when they are first assigned a wave owner."
   ],
   "waves": [
@@ -21,9 +16,9 @@
       "wave": "0C",
       "title": "Measured baseline",
       "surfaces": [
-        { "id": "menu-phone-desktop-baseline", "description": "Menu at phone and desktop sizes, the DPR/backing-store baseline.", "captureScript": "scripts/analysis/capture-ui-surfaces.mjs" }
+        { "id": "menu-phone-desktop-baseline", "description": "Menu at phone and desktop sizes, the DPR/backing-store baseline.", "captureScript": "scripts/analysis/capture-auth-capability-surfaces.mjs" }
       ],
-      "proof": { "status": "not-captured", "done": false, "evidenceDir": null }
+      "proof": { "status": "captured", "done": false, "evidenceDir": "docs/ui/evidence/waves/0C" }
     },
     {
       "wave": "1B",
@@ -45,9 +40,9 @@
       "wave": "3A",
       "title": "Command bridge",
       "surfaces": [
-        { "id": "menu-commands", "description": "Menu, options and pause driven through the shared command bridge.", "captureScript": "scripts/analysis/capture-ui-surfaces.mjs" }
+        { "id": "menu-commands", "description": "Menu, options and pause driven through the shared command bridge.", "captureScript": "scripts/analysis/capture-auth-capability-surfaces.mjs" }
       ],
-      "proof": { "status": "not-captured", "done": true, "evidenceDir": null }
+      "proof": { "status": "captured", "done": true, "evidenceDir": "docs/ui/evidence/waves/3A" }
     },
     {
       "wave": "3B",

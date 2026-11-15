@@ -21,7 +21,7 @@ const registry = readJson<{ integratorWaveOwnership: { assignments: { wave: stri
 );
 
 /** Wave ids that may be done without a committed capture today. Ratchet: this list only ever shrinks. */
-const MAX_WAIVED_WAVES: readonly string[] = ['3A'];
+const MAX_WAIVED_WAVES: readonly string[] = [];
 
 interface ProofProblem { wave: string; problem: string }
 
