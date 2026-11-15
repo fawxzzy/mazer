@@ -743,7 +743,9 @@ export interface LegacyMazeGenerationScaleContext {
 }
 
 const resolveLegacyMazeGenerationBaseProfileForProgression = (
-  trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number
+  trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number,
+  // MAZER-VIS-052: the main-menu demo reads the band switch below instead of the budget ladder.
+  skipGeometryBudget = false
 ): LegacyMazeGenerationProfile => {
   const profile = resolveLegacyProgressionDifficultyProfile(trackOrTargetComplexity);
   const targetComplexity = typeof trackOrTargetComplexity === 'number'
@@ -751,7 +753,7 @@ const resolveLegacyMazeGenerationBaseProfileForProgression = (
     : trackOrTargetComplexity.targetComplexity;
   // Levels 2..LAST_BUDGET_LEVEL: geometry comes from the budget ladder, not
   // from the band switch below (the band stays for labels and diagnostics).
-  const geometryBudgetLevel = resolveGeometryBudgetLevel(trackOrTargetComplexity);
+  const geometryBudgetLevel = skipGeometryBudget ? null : resolveGeometryBudgetLevel(trackOrTargetComplexity);
   if (geometryBudgetLevel !== null) {
     return resolveGeometryBudgetProfile(geometryBudgetLevel);
   }
@@ -950,11 +952,10 @@ const resolveLegacyMazeGenerationBaseProfileForProgression = (
   }
 };
 
-export const resolveLegacyMazeGenerationProfileForProgression = (
-  trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number,
+const applyLegacyMazeGenerationScaleContext = (
+  profile: LegacyMazeGenerationProfile,
   scaleContext?: LegacyMazeGenerationScaleContext
 ): LegacyMazeGenerationProfile => {
-  const profile = resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity);
   // Budget-ladder profiles carry their own feeder rungs and the board is
   // frozen, so the device-fraction feeder scaling does not apply to them.
   if (
@@ -983,6 +984,38 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
     ...profile,
     borderFeederTargetPerSide: deviceScaledFeederTarget
   };
+};
+
+export const resolveLegacyMazeGenerationProfileForProgression = (
+  trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number,
+  scaleContext?: LegacyMazeGenerationScaleContext
+): LegacyMazeGenerationProfile => applyLegacyMazeGenerationScaleContext(
+  resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity),
+  scaleContext
+);
+
+// MAZER-VIS-052: the MAIN MENU demo only. The budget ladder (levels 2+) sets
+// borderFeederTargetPerSide 0 and fades wrap corridors to none at level 140, so the
+// demo showed ~0-4 bleed-off openings. The demo is attract-loop art, not a calibrated
+// difficulty, so it reads the band profile (feeders + both border connections, band
+// held at its top past level 99) with no geometryBudgetLevel. Gameplay never calls this.
+export const resolveLegacyMenuDemoMazeGenerationProfileForProgression = (
+  trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number,
+  scaleContext?: LegacyMazeGenerationScaleContext
+): LegacyMazeGenerationProfile => {
+  const band = resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity, true);
+  // Early levels have no bleed-off in the band switch; keep the ladder's first wrap rung there.
+  if (!band.requiredOppositeBorderConnections.vertical && !band.requiredOppositeBorderConnections.horizontal) {
+    return applyLegacyMazeGenerationScaleContext(
+      resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity),
+      scaleContext
+    );
+  }
+  // Frozen board: at most one feeder per side keeps the top bands to roughly a dozen openings.
+  return applyLegacyMazeGenerationScaleContext(
+    { ...band, borderFeederTargetPerSide: Math.min(1, band.borderFeederTargetPerSide ?? 0) },
+    scaleContext
+  );
 };
 
 const resolveLegacyProgressionColorTier = (targetComplexity: number): number => (
