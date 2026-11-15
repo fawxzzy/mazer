@@ -232,49 +232,55 @@ export const composeBoardTileReveal = (
   return stats;
 };
 
-/** The subset of CanvasRenderingContext2D the soft reveal composite uses (adds alpha + a source rect). */
+/** The subset of CanvasRenderingContext2D the build / tear-down composite uses (a source rect for the dock strips; no alpha: nothing fades). */
 export interface BoardSoftRevealContext2D extends Omit<BoardRevealContext2D, 'drawImage'> {
-  globalAlpha: number;
   drawImage(image: unknown, dx: number, dy: number, dw: number, dh: number): void;
   drawImage(
     image: unknown, sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number
   ): void;
 }
 
-/** Alpha steps of the soft reveal: a cell's alpha is rounded to k / SOFT_REVEAL_LEVELS (6.25 % per step). */
-export const SOFT_REVEAL_LEVELS = 16;
-
 export interface BoardSoftRevealInput {
   layout: BoardTileLayout;
-  /** (cols + 2) x (rows + 2) cell alphas 0..255 (boardRevealMask.ts), the grid padded by one cell on every side. */
-  cellAlpha: Uint8ClampedArray;
-  /** 0..1 alpha of the wrap dock strips; ignored when the layout has no docks. */
-  dockAlpha: number;
+  /**
+   * (cols + 2) x (rows + 2) cell extents 0..255 (boardRevealMask.ts), the grid padded by one cell on every side.
+   * 255 = the whole cell is shown, 0 = nothing of it, in between = how much of the cell has grown so far.
+   */
+  cellExtent: Uint8ClampedArray;
+  /** The same padded grid: which side each cell grows from (boardRevealMask.ts computeParentDirections). Absent = every cell grows from its centre. */
+  parentSide?: Uint8Array;
+  /** 0..1 how far the wrap dock strips have slid out from the board edge; ignored when the layout has no docks. */
+  dockExtent: number;
 }
 
 export interface BoardSoftRevealStats {
-  /** drawImage calls of the whole baked canvas, one per alpha level in use (at most SOFT_REVEAL_LEVELS). */
-  levelDraws: number;
+  /** drawImage calls of the whole baked canvas: 1 whenever anything is shown (one clipped draw), whatever the maze size. */
+  bakeDraws: number;
+  /** Rects in the one clip path: merged runs of fully shown cells plus one per cell that is still growing. */
   clipRects: number;
   stripDraws: number;
 }
 
 /**
- * Draws the board with a SOFT reveal onto `ctx` (device-pixel sized, cleared here). Every cell (floor, wall, and the
- * pad ring one cell around the board) has its own alpha; cells are bucketed by that alpha rounded to 1/16 and each
- * bucket is ONE clipped drawImage of the baked canvas at its globalAlpha (row runs merged into rects). So the cost is
- * at most 16 draws whatever the maze size, never one per tile, and no full-frame pass: a full-size `destination-in`
- * mask pass was measured to double the render cost in software raster, this does not. Cell edges are device-snapped
- * (layout.xs / ys), so adjacent buckets never leave an antialiasing seam. The wrap dock strips (the margin outside
- * the board rect) are drawn last at `dockAlpha`.
+ * Draws the board while it BUILDS or TEARS DOWN onto `ctx` (device-pixel sized, cleared here), MAZER-MOTION-020.
+ * Nothing fades: every cell (floor, wall, and the pad ring one cell around the board) has an extent, and the baked
+ * board is drawn at full strength through ONE clip path made of the shown part of every cell. A fully shown cell
+ * contributes its whole rect (runs of them merge per row); a growing floor cell contributes the slice of its rect
+ * that starts at the side its BFS parent is on, so a corridor extrudes along its path like a drawn line and the
+ * rim and the fill of a tile always appear together (a faded tile showed its pale rim before its dark fill). A
+ * cell without a parent side (the spawn tile, walls, the pad ring) opens from its centre. The tear-down is the same
+ * thing run backwards. Cost: one clip path + one drawImage per recompose whatever the maze size (the old fade
+ * needed one draw per alpha level), no new bake, no per-tile draw. Edges are device-snapped, so neighbouring rects
+ * never leave an antialiasing seam. The wrap dock strips (the margin outside the board rect) slide out from the
+ * board edge at `dockExtent`, drawn last.
  */
 export const composeBoardTileRevealSoft = (
   ctx: BoardSoftRevealContext2D,
   baked: unknown,
   input: BoardSoftRevealInput
 ): BoardSoftRevealStats => {
-  const { layout, cellAlpha, dockAlpha } = input;
-  const stats: BoardSoftRevealStats = { levelDraws: 0, clipRects: 0, stripDraws: 0 };
+  const { layout, cellExtent, dockExtent, parentSide } = input;
+  const stats: BoardSoftRevealStats = { bakeDraws: 0, clipRects: 0, stripDraws: 0 };
   const scale = layout.scale;
   const { cols, rows } = layout;
   // Padded grid edges in layout px: one extra cell of the edge cell's own size on each side.
@@ -284,59 +290,82 @@ export const composeBoardTileRevealSoft = (
   const ys: number[] = [layout.originY + layout.ys[0]! - (layout.ys[1]! - layout.ys[0]!)];
   for (let y = 0; y <= rows; y += 1) ys.push(layout.originY + layout.ys[y]!);
   ys.push(ys[rows + 1]! + (layout.ys[rows]! - layout.ys[rows - 1]!));
+  const snapLength = (length: number): number => Math.round(length * scale) / scale;
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, layout.pixelWidth, layout.pixelHeight);
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
   const stride = cols + 2;
-  const buckets: Array<Array<[number, number, number]>> = Array.from({ length: SOFT_REVEAL_LEVELS + 1 }, () => []);
+  ctx.save();
+  ctx.beginPath();
   for (let py = 0; py < rows + 2; py += 1) {
     let runStart = -1;
-    let runLevel = 0;
     for (let px = 0; px <= stride; px += 1) {
-      const level = px < stride ? Math.round((cellAlpha[(py * stride) + px]! / 255) * SOFT_REVEAL_LEVELS) : 0;
-      if (px < stride && level === runLevel && runStart >= 0) {
+      const value = px < stride ? cellExtent[(py * stride) + px]! : 0;
+      if (value === 255) {
+        if (runStart < 0) {
+          runStart = px;
+        }
         continue;
       }
-      if (runStart >= 0 && runLevel > 0) {
-        buckets[runLevel]!.push([py, runStart, px - 1]);
+      if (runStart >= 0) {
+        ctx.rect(xs[runStart]!, ys[py]!, xs[px]! - xs[runStart]!, ys[py + 1]! - ys[py]!);
+        stats.clipRects += 1;
+        runStart = -1;
       }
-      runStart = px < stride ? px : -1;
-      runLevel = level;
+      if (value <= 0) {
+        continue;
+      }
+      const extent = value / 255;
+      const x0 = xs[px]!;
+      const y0 = ys[py]!;
+      const w = xs[px + 1]! - x0;
+      const h = ys[py + 1]! - y0;
+      const side = parentSide === undefined ? 0 : parentSide[(py * stride) + px]!;
+      let rx = x0;
+      let ry = y0;
+      let rw = w;
+      let rh = h;
+      if (side === 1 || side === 2) {
+        rw = snapLength(w * extent);
+        rx = side === 1 ? x0 : x0 + w - rw;
+      } else if (side === 3 || side === 4) {
+        rh = snapLength(h * extent);
+        ry = side === 3 ? y0 : y0 + h - rh;
+      } else {
+        rw = snapLength(w * extent);
+        rh = snapLength(h * extent);
+        rx = x0 + snapLength((w - rw) / 2);
+        ry = y0 + snapLength((h - rh) / 2);
+      }
+      if (rw > 0 && rh > 0) {
+        ctx.rect(rx, ry, rw, rh);
+        stats.clipRects += 1;
+      }
     }
   }
-
-  for (let level = 1; level <= SOFT_REVEAL_LEVELS; level += 1) {
-    const runs = buckets[level]!;
-    if (runs.length === 0) {
-      continue;
-    }
-    ctx.save();
-    ctx.beginPath();
-    for (const [py, px0, px1] of runs) {
-      ctx.rect(xs[px0]!, ys[py]!, xs[px1 + 1]! - xs[px0]!, ys[py + 1]! - ys[py]!);
-      stats.clipRects += 1;
-    }
+  if (stats.clipRects > 0) {
     ctx.clip();
-    ctx.globalAlpha = level / SOFT_REVEAL_LEVELS;
     ctx.drawImage(baked, 0, 0, layout.width, layout.height);
-    ctx.restore();
-    stats.levelDraws += 1;
+    stats.bakeDraws += 1;
   }
+  ctx.restore();
 
   if (layout.docks.length > 0) {
-    // The margin strips around the board rect, disjoint so no pixel is drawn twice.
+    // The margin strips around the board rect, disjoint so no pixel is drawn twice. Each slides out from the board edge.
     const boardRight = layout.originX + layout.boardWidth;
     const boardBottom = layout.originY + layout.boardHeight;
-    const strips: Array<[number, number, number, number]> = [
-      [0, 0, layout.originX, layout.height],
-      [boardRight, 0, layout.width - boardRight, layout.height],
-      [layout.originX, 0, layout.boardWidth, layout.originY],
-      [layout.originX, boardBottom, layout.boardWidth, layout.height - boardBottom]
+    const reach = Math.max(0, Math.min(1, dockExtent));
+    // [x, y, w, h, the strip's edge that touches the board: 'r' right, 'l' left, 'b' bottom, 't' top]
+    const strips: Array<[number, number, number, number, 'l' | 'r' | 't' | 'b']> = [
+      [0, 0, layout.originX, layout.height, 'r'],
+      [boardRight, 0, layout.width - boardRight, layout.height, 'l'],
+      [layout.originX, 0, layout.boardWidth, layout.originY, 'b'],
+      [layout.originX, boardBottom, layout.boardWidth, layout.height - boardBottom, 't']
     ];
     ctx.save();
-    for (const [x, y, w, h] of strips) {
+    for (const [x, y, w, h, anchor] of strips) {
       if (w <= 0 || h <= 0) {
         continue;
       }
@@ -345,9 +374,20 @@ export const composeBoardTileRevealSoft = (
       const sw = Math.round(w * scale);
       const sh = Math.round(h * scale);
       ctx.clearRect(sx / scale, sy / scale, sw / scale, sh / scale);
-      if (dockAlpha > 0 && sw > 0 && sh > 0) {
-        ctx.globalAlpha = Math.min(1, dockAlpha);
-        ctx.drawImage(baked, sx, sy, sw, sh, sx / scale, sy / scale, sw / scale, sh / scale);
+      // Shown slice in device px, anchored at the board edge.
+      let vx = sx;
+      let vy = sy;
+      let vw = sw;
+      let vh = sh;
+      if (anchor === 'r' || anchor === 'l') {
+        vw = Math.round(sw * reach);
+        vx = anchor === 'r' ? sx + sw - vw : sx;
+      } else {
+        vh = Math.round(sh * reach);
+        vy = anchor === 'b' ? sy + sh - vh : sy;
+      }
+      if (vw > 0 && vh > 0) {
+        ctx.drawImage(baked, vx, vy, vw, vh, vx / scale, vy / scale, vw / scale, vh / scale);
         stats.stripDraws += 1;
       }
     }
@@ -365,10 +405,11 @@ export type BoardTileReveal =
   | { kind: 'all' }
   | { kind: 'cells'; key: string; isVisible: (x: number, y: number) => boolean; docksVisible: boolean }
   /**
-   * MAZER-VIS-040: the soft build / deconstruct. `fillMask` writes this frame's alpha (0..255) for the padded
-   * (cols + 2) x (rows + 2) cell grid (boardRevealMask.ts); the layer draws the bake once per alpha level.
+   * MAZER-VIS-040 / MAZER-MOTION-020: the build / tear-down. `fillMask` writes this frame's cell extents (0..255, how much of
+   * each cell is shown) for the padded (cols + 2) x (rows + 2) grid (boardRevealMask.ts); `parentSide` says which side
+   * each cell grows from; the layer draws the bake once through a clip of the shown parts (no fade).
    */
-  | { kind: 'soft'; key: string; dockAlpha: number; fillMask: (alpha: Uint8ClampedArray) => void };
+  | { kind: 'soft'; key: string; dockExtent: number; parentSide?: Uint8Array; fillMask: (extent: Uint8ClampedArray) => void };
 
 export interface BoardTileLayerFrame {
   grid: ReadonlyArray<ReadonlyArray<boolean>>;
@@ -426,7 +467,7 @@ export class BoardTileLayer {
   private endpoints: BoardTileEndpoints = { start: null, goal: null };
   private textureWidth = 0;
   private textureHeight = 0;
-  private softCellAlpha = new Uint8ClampedArray(0);
+  private softCellExtent = new Uint8ClampedArray(0);
   /** Cumulative diagnostics (read by tests and the runtime diagnostics hook). */
   bakeCount = 0;
   lastBakeMs = 0;
@@ -514,8 +555,9 @@ export class BoardTileLayer {
       } else if (frame.reveal.kind === 'soft') {
         composeBoardTileRevealSoft(ctx as unknown as BoardSoftRevealContext2D, result.canvas, {
           layout,
-          cellAlpha: this.fillSoftCellAlpha(layout.cols, layout.rows, frame.reveal.fillMask),
-          dockAlpha: frame.reveal.dockAlpha
+          cellExtent: this.fillSoftCellExtent(layout.cols, layout.rows, frame.reveal.fillMask),
+          dockExtent: frame.reveal.dockExtent,
+          parentSide: frame.reveal.parentSide
         });
       } else {
         composeBoardTileReveal(ctx, result.canvas, {
@@ -546,14 +588,14 @@ export class BoardTileLayer {
     return this.lastStats;
   }
 
-  /** This frame's padded (cols + 2) x (rows + 2) cell alphas, in one cached buffer. */
-  private fillSoftCellAlpha(cols: number, rows: number, fill: (alpha: Uint8ClampedArray) => void): Uint8ClampedArray {
+  /** This frame's padded (cols + 2) x (rows + 2) cell extents, in one cached buffer. */
+  private fillSoftCellExtent(cols: number, rows: number, fill: (extent: Uint8ClampedArray) => void): Uint8ClampedArray {
     const length = resolveRevealMaskLength(cols, rows);
-    if (this.softCellAlpha.length !== length) {
-      this.softCellAlpha = new Uint8ClampedArray(length);
+    if (this.softCellExtent.length !== length) {
+      this.softCellExtent = new Uint8ClampedArray(length);
     }
-    fill(this.softCellAlpha);
-    return this.softCellAlpha;
+    fill(this.softCellExtent);
+    return this.softCellExtent;
   }
 
   /** Layout-px origin the layer last snapped the board to (so markers line up with the bake). */

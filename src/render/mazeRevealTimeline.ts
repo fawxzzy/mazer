@@ -1,18 +1,23 @@
 /**
- * Soft maze build-in / build-out (MAZER-VIS-040): one closed-form timeline for the whole maze.
+ * Maze build-in / build-out (MAZER-VIS-040, reworked by MAZER-MOTION-020): one closed-form timeline for the whole maze.
  *
- * Before: the floor was revealed by a rank MASK. `introTimeline.ts` counts `tilesVisible` up (build) or down
- * (deconstruct) in BFS order and the board showed exactly the first N cells, hard: every frame a handful of
- * cells went from fully absent to fully drawn (a tile pop of 100% alpha), the wrap docks switched on / off in
- * one frame, and the start / goal markers snapped from 0 to full when the beams landed.
+ * History: the floor was first revealed by a hard rank MASK (a handful of cells popped per frame), then (VIS-040)
+ * by a per-cell ALPHA fade on the BFS order. The owner did not like the fade: a half-faded tile showed its pale rim
+ * ahead of its dark fill (the thin white line), and a soft band of ghost tiles is not a build.
  *
- * Now: every floor cell has its OWN eased fade, positioned on the same BFS order, so the reveal front is a soft
- * band that is `MAZE_REVEAL_RAMP_MS` wide (700 ms at the shipped motion scale, a quarter of the build) instead
- * of one tile wide, and no cell ever changes by more than a small step per frame.
+ * Now nothing fades. Every floor cell has an EXTENT, 0 (nothing of it drawn) .. 1 (all of it), positioned on the same
+ * BFS order, and the board draws that part of the cell at full strength, growing from the side its BFS parent is on
+ * (boardTileLayer.ts composeBoardTileRevealSoft). Cells are staggered by their rank, so the corridors extrude along
+ * their paths like a line being drawn and the tear-down pulls them back to the start the same way.
  *
- *   cell with rank r of N (position p = r / (N - 1)), window [start, start + span]:
- *     build        alpha = smoothstep((t - (start + (span - ramp) * p)) / ramp)
- *     deconstruct  alpha = 1 - smoothstep((t - (start + (span - ramp) * (1 - p))) / ramp)
+ *   cell with rank r of N (position p = r / (N - 1)), window [start, start + span], per-cell wipe w = span / N:
+ *     build        extent = clamp((t - (start + (span - w) * p)) / w)             = clamp((t - start) / w - r)
+ *     deconstruct  extent = 1 - clamp((t - (start + (span - w) * (1 - p))) / w)   (the build run backwards)
+ *
+ * The wipe of one cell is exactly one rank step long, so cell r starts the instant cell r - 1 is whole. A cell's BFS
+ * parent always has a lower rank, so a cell never starts before its parent is complete: the drawn line has no gap
+ * in it at any instant, on any maze, and its tip advances at a constant speed (linear, no easing: an eased wipe
+ * stutters when it repeats every ~14 ms).
  *
  * The first cell starts at the window start and the LAST cell finishes exactly at the window end, so the build
  * is complete at `resolveIntroRevealEndMs` (the instant the beams leave, unchanged) and the deconstruct is empty
@@ -21,12 +26,13 @@
  * deconstruct 400 ms in, clamped to 1.8-3.0 s).
  *
  * The other things that used to pop ride the same clock, each on a motion-scale duration:
- *   - wrap docks (the atomic edge-path group): fade in over `MAZE_DOCK_FADE_MS` right after the build, fade out
- *     over the same length ending at the instant the edge paths switch off (400 ms into the deconstruct);
+ *   - wrap docks (the atomic edge-path group): slide out from the board edge right after the build over
+ *     `MAZE_DOCK_FADE_MS`, slide back over the same length ending at the instant the edge paths switch off
+ *     (400 ms into the deconstruct);
  *   - start / goal markers (alpha only, through a thin hook): fade in over the beam flight (the cast used to snap
- *     in when the beams landed).
+ *     in when the beams landed). Markers are sprites, not baked board art, so a fade has no rim to leak.
  * The strict 0/1 `bleedProgress` switch of `introTimeline.ts` is NOT changed: it still drives the edge-path
- * logic (trail, bleed glow, dock-owning cells); only the baked board's own alpha follows the ramps here.
+ * logic (trail, bleed glow, dock-owning cells); only the baked board's own extent follows the timeline here.
  *
  * Reduced motion: no front at all (`resolveMazeRevealFrame` returns null); the 200 ms crossfade of
  * `introTimeline.ts` is the whole effect. `introTimeline.ts` already computed its `boardAlpha` but nothing applied it:
@@ -50,14 +56,12 @@ import { MOTION_DURATION_MS, MOTION_EASING } from './motionScale';
 
 export type MazeRevealDirection = 'build' | 'deconstruct';
 
-/** Width of the soft front, in time: the "reveal" step of the motion scale (700 ms). */
-export const MAZE_REVEAL_RAMP_MS = MOTION_DURATION_MS.reveal;
-/** The wrap docks fade over this long (200 ms, the "base" step). */
+/** The wrap docks slide over this long (200 ms, the "base" step). */
 export const MAZE_DOCK_FADE_MS = MOTION_DURATION_MS.base;
 /** The start / goal markers fade in over the beam flight (INTRO_LASER_MS, the "long" step). */
 export const MAZE_MARKER_FADE_MS = INTRO_LASER_MS;
 
-const { smoothstep } = MOTION_EASING;
+const { smoothstep, easeOutCubic } = MOTION_EASING;
 
 const clamp01 = (value: number): number => (
   Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0
@@ -72,11 +76,11 @@ const normalizeElapsed = (value: number): number => (
 );
 
 export interface MazeRevealWindow {
-  /** Instant (ms, intro / deconstruct clock) the first cell starts to fade. */
+  /** Instant (ms, intro / deconstruct clock) the first cell starts to grow (build) or shrink (deconstruct). */
   readonly startMs: number;
-  /** Instant the last cell has finished fading (build: the build end; deconstruct: the tiles-gone instant). */
+  /** Instant the last cell has finished (build: the build end; deconstruct: the tiles-gone instant). */
   readonly endMs: number;
-  /** Length of one cell's fade. Never more than half the window. */
+  /** Length of one cell's wipe: the window divided by the cell count, so one cell starts as the previous one finishes. */
   readonly rampMs: number;
 }
 
@@ -84,7 +88,7 @@ export const resolveMazeRevealWindow = (direction: MazeRevealDirection, tileCoun
   const count = normalizeCount(tileCount);
   const startMs = direction === 'build' ? INTRO_BUILD_START_MS : OUTRO_TILES_START_MS;
   const spanMs = direction === 'build' ? resolveIntroRevealMs(count) : resolveOutroRemoveMs(count);
-  return { startMs, endMs: startMs + spanMs, rampMs: Math.min(MAZE_REVEAL_RAMP_MS, spanMs / 2) };
+  return { startMs, endMs: startMs + spanMs, rampMs: spanMs / Math.max(1, count) };
 };
 
 /** Where cell `rank` sits in the BFS order, 0 (the spawn tile) .. 1 (the last cell). */
@@ -92,8 +96,8 @@ export const resolveRankPosition = (rank: number, tileCount: number): number => 
   tileCount <= 1 ? 0 : clamp01(rank / (tileCount - 1))
 );
 
-/** Alpha 0..1 of the floor cell with BFS rank `rank` at `elapsedMs`. */
-export const resolveCellRevealAlpha = (
+/** How much (0..1) of the floor cell with BFS rank `rank` is shown at `elapsedMs`. */
+export const resolveCellRevealExtent = (
   direction: MazeRevealDirection,
   window: MazeRevealWindow,
   rank: number,
@@ -103,15 +107,18 @@ export const resolveCellRevealAlpha = (
   const position = resolveRankPosition(rank, tileCount);
   const travel = window.endMs - window.startMs - window.rampMs;
   const cellStartMs = window.startMs + (travel * (direction === 'build' ? position : 1 - position));
-  const progress = smoothstep(clamp01((normalizeElapsed(elapsedMs) - cellStartMs) / window.rampMs));
+  // Snap the last float crumbs so a finished cell is exactly 1 / 0 (the window ends are contracts) and a cell that
+  // has not started is exactly 0.
+  const raw = clamp01((normalizeElapsed(elapsedMs) - cellStartMs) / window.rampMs);
+  const progress = raw < 1e-9 ? 0 : (raw > 1 - 1e-9 ? 1 : raw);
   return direction === 'build' ? progress : 1 - progress;
 };
 
 /**
- * Fills `out[i]` with the alpha of every cell whose `ranks[i] >= 0` (a floor cell in the reveal order) and 0
- * for the others (walls: the board mask spreads their alpha from the floors around them).
+ * Fills `out[i]` with the extent of every cell whose `ranks[i] >= 0` (a floor cell in the reveal order) and 0
+ * for the others (walls: the board mask derives their extent from the floors around them).
  */
-export const fillMazeRevealCellAlpha = (
+export const fillMazeRevealCellExtent = (
   out: Float32Array,
   ranks: Int32Array,
   tileCount: number,
@@ -122,25 +129,26 @@ export const fillMazeRevealCellAlpha = (
   const count = Math.min(out.length, ranks.length);
   for (let index = 0; index < count; index += 1) {
     const rank = ranks[index]!;
-    out[index] = rank < 0 ? 0 : resolveCellRevealAlpha(direction, window, rank, tileCount, elapsedMs);
+    out[index] = rank < 0 ? 0 : resolveCellRevealExtent(direction, window, rank, tileCount, elapsedMs);
   }
 };
 
 /**
- * Alpha of the wrap docks (and of the border cells that own one). Build: 0 until the build ends, then a
- * `MAZE_DOCK_FADE_MS` fade (the beams fire at the same instant). Deconstruct: 1 until the fade starts, then a
- * fade that is exactly 0 when the edge paths switch off at OUTRO_EDGE_PATHS_OFF_MS.
+ * Extent (0..1) of the wrap docks (and of the border cells that own one): how far they have slid out from the board
+ * edge. Build: 0 until the build ends, then a `MAZE_DOCK_FADE_MS` slide (the beams fire at the same instant).
+ * Deconstruct: 1 until the slide-back starts, then a slide that is exactly 0 when the edge paths switch off at
+ * OUTRO_EDGE_PATHS_OFF_MS.
  */
-export const resolveDockRevealAlpha = (
+export const resolveDockRevealExtent = (
   direction: MazeRevealDirection,
   tileCount: number,
   elapsedMs: number
 ): number => {
   const elapsed = normalizeElapsed(elapsedMs);
   if (direction === 'build') {
-    return smoothstep(clamp01((elapsed - resolveIntroRevealEndMs(tileCount)) / MAZE_DOCK_FADE_MS));
+    return easeOutCubic(clamp01((elapsed - resolveIntroRevealEndMs(tileCount)) / MAZE_DOCK_FADE_MS));
   }
-  return 1 - smoothstep(clamp01((elapsed - (OUTRO_EDGE_PATHS_OFF_MS - MAZE_DOCK_FADE_MS)) / MAZE_DOCK_FADE_MS));
+  return easeOutCubic(1 - clamp01((elapsed - (OUTRO_EDGE_PATHS_OFF_MS - MAZE_DOCK_FADE_MS)) / MAZE_DOCK_FADE_MS));
 };
 
 /**
@@ -156,14 +164,14 @@ export interface MazeRevealFrame {
   readonly elapsedMs: number;
   readonly tileCount: number;
   readonly window: MazeRevealWindow;
-  /** 0..1 alpha of the wrap docks and their border cells. */
-  readonly dockAlpha: number;
+  /** 0..1 how far the wrap docks and their border cells have slid out. */
+  readonly dockExtent: number;
   /** Changes whenever anything this frame draws changes: lets the board layer skip an identical recompose. */
   readonly key: string;
 }
 
 /**
- * The soft reveal at `elapsedMs`, or null when the board is NOT in a soft reveal: reduced motion (the crossfade
+ * The build / tear-down frame at `elapsedMs`, or null when the board is NOT in a soft reveal: reduced motion (the crossfade
  * is the whole effect), nothing to reveal, the build finished and its docks have faded in, or the deconstruct has
  * emptied the board (the hard limit of 0 keeps it empty until the next maze).
  */
@@ -183,9 +191,9 @@ export const resolveMazeRevealFrame = (
   if (elapsed >= (direction === 'build' ? window.endMs + MAZE_DOCK_FADE_MS : window.endMs)) {
     return null;
   }
-  const dockAlpha = resolveDockRevealAlpha(direction, count, elapsed);
+  const dockExtent = resolveDockRevealExtent(direction, count, elapsed);
   // Nothing on the board changes after `contentEndMs`, so the key stops changing there: no recompose for an
-  // identical board. Sub-millisecond steps are finer than 8-bit alpha can show.
+  // identical board. A quarter of a millisecond is far finer than a device pixel of wipe at these speeds.
   const contentEndMs = direction === 'build' ? window.endMs + MAZE_DOCK_FADE_MS : window.endMs;
   const stamp = Math.round(Math.min(elapsed, contentEndMs) * 4);
   return {
@@ -193,7 +201,7 @@ export const resolveMazeRevealFrame = (
     elapsedMs: elapsed,
     tileCount: count,
     window,
-    dockAlpha,
+    dockExtent,
     key: `${direction}|${count}|${stamp}`
   };
 };
