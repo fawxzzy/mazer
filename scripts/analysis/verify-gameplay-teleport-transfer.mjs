@@ -120,6 +120,9 @@ const INNER_TIP_REACH_PX = 10;
 // that times cos 45 toward the top / bottom edge). Mirrors edgeMarkers.ts EDGE_MARKER_TIP_PAINT_PX (an acceptance number, not imported).
 const TIP_PAINT_PX = 0.5 / Math.sin(Math.atan2(7, 12));
 const STATION_SIDE = ['top', 'top', 'top', 'right', 'bottom', 'bottom', 'bottom', 'left'];
+// MAZER-VIS-054: a tall portrait phone (375 <= width < 500, height >= 780) slides each CORNER diamond's outer tip 16 css px in from both edges
+// (rounded display corners hide the corner itself). Mirrors src/render/edgeCornerAnchor.ts `resolveEdgeCornerTipInset`; every other viewport is 0.
+const cornerTipInset = (width, height) => (width >= 375 && width < 500 && height >= 780 ? 16 : 0);
 const ALL_STATION_IDS = [0, 1, 2, 3, 4, 5, 6, 7];
 // A diamond counts as lit when its stroke alpha is above the idle breathing maximum (0.6).
 const LIT_ALPHA_FLOOR = 0.62;
@@ -500,10 +503,12 @@ const analyzeEdgeContact = (frames) => {
       if (tip === null) { return; }
       const side = STATION_SIDE[id];
       const paint = id % 2 === 0 ? TIP_PAINT_PX * Math.SQRT1_2 : TIP_PAINT_PX;
-      const gap = side === 'top' ? tip.y - paint
+      const rawGap = side === 'top' ? tip.y - paint
         : side === 'bottom' ? frame.visible.h - (tip.y + paint)
           : side === 'left' ? tip.x - paint
             : frame.visible.w - (tip.x + paint);
+      // Corner diamonds (even ids) rest cornerTipInset in from the edge on a rounded-display phone, not on it (MAZER-VIS-054).
+      const gap = id % 2 === 0 ? rawGap - cornerTipInset(frame.visible.w, frame.visible.h) : rawGap;
       checked += 1;
       if (gap < worstPast) { worstPast = gap; worst = { id, gap, age: frame.introAge ?? frame.outroAge }; }
       if (gap > worstShort) { worstShort = gap; worst = { id, gap, age: frame.introAge ?? frame.outroAge }; }
@@ -1036,20 +1041,24 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
   const settledEdge = analyzeEdgeContact([last]);
   check(`${label}: at rest (the maze running, 50% size) every diamond's painted outer tip is on the screen edge`, settledEdge.ok, JSON.stringify(settledEdge));
   const probe = await h.page.evaluate(() => window.__mazerQa.edgePixelProbe());
+  const probeViewport = await h.page.evaluate(() => window.__mazerQa.viewport());
+  // Corner footprints may sit the VIS-054 tip inset (device px) in from the edge on a rounded-display phone.
+  const cornerSlack = cornerTipInset(probeViewport.width, probeViewport.height) * (probe.w / probeViewport.width);
   const footprint = (id) => probe.boxes.find((b) => b.id === id);
   const touches = (id) => {
     const box = footprint(id)?.box;
     if (!box) { return false; }
     const side = STATION_SIDE[id];
-    return side === 'top' ? box.minY <= 1 : side === 'bottom' ? box.maxY >= probe.h - 2 : side === 'left' ? box.minX <= 1 : box.maxX >= probe.w - 2;
+    const slack = id % 2 === 0 ? cornerSlack : 0;
+    return side === 'top' ? box.minY <= 1 + slack : side === 'bottom' ? box.maxY >= probe.h - 2 - slack : side === 'left' ? box.minX <= 1 : box.maxX >= probe.w - 2;
   };
   check(`${label}: real canvas pixels (layer shown vs hidden on the same frame): each diamond's footprint reaches the last two device rows/columns of its edge (${probe.w}x${probe.h} px)`, ALL_STATION_IDS.every(touches), JSON.stringify(probe.boxes));
-  // MAZER-VIS-044: the four corner diamonds sit ON the screen corner (footprint within the last two device px of BOTH edges).
+  // MAZER-VIS-044/054: the four corner diamonds sit in the screen corners (footprint within the last two device px of BOTH edges, plus the rounded-display tip inset).
   const inCorner = (id) => {
     const box = footprint(id)?.box;
     if (!box) { return false; }
-    const horizontal = id === 0 || id === 6 ? box.minX <= 1 : box.maxX >= probe.w - 2;
-    const vertical = id === 0 || id === 2 ? box.minY <= 1 : box.maxY >= probe.h - 2;
+    const horizontal = id === 0 || id === 6 ? box.minX <= 1 + cornerSlack : box.maxX >= probe.w - 2 - cornerSlack;
+    const vertical = id === 0 || id === 2 ? box.minY <= 1 + cornerSlack : box.maxY >= probe.h - 2 - cornerSlack;
     return horizontal && vertical;
   };
   check(
