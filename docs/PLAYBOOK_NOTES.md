@@ -321,3 +321,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the orphan branch held only `events.jsonl`, so Vercel built every event push: 154 failed git builds in 24h (147 Mazer, 7 Fitness) spent the shared 100/24h deploy cap.
 - Rule: a branch that must never deploy carries its own vercel.json; a one-off commit is not enough because `pushLines` rebuilds the tree on every push.
 - Status: Applied (review); tests pass. UNVERIFIED: Vercel docs do not say which commit's vercel.json is read, so confirm with `GET /v7/deployments?branch=board-events` after the next event push that no new deployment appears.
+
+## 2026-11-14 (offline shell proof script)
+
+- WHAT changed: `scripts/analysis/verify-offline-shell.mjs` now expects 3 boot-art cache entries (HUD icon atlas webp + tile-font atlas image + atlas json) instead of 5.
+- WHY it changed: MAZER-VIS-011 (#568) replaced the 3 separate HUD icon files with one atlas, so the `mazer-boot-art-v1` runtime cache can only ever hold 3 entries; the script waited for 5 and timed out ("boot art runtime cache populated", exit 2). Script bug, not a product regression: the service worker does cache the boot art.
+- Rule: a verify script that hard-codes an asset count must be updated in the same PR that changes the asset set. This script is not run by CI or any npm script (two production builds plus headless Chromium, minutes), which is how the drift went unseen.
+- Status: headless Chromium only, nothing checked on a real phone.
