@@ -2933,9 +2933,14 @@
             "repo": "fawxzzy/mazer",
             "number": 464,
             "mergedSha": "951ef3cf"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 603,
+            "mergedSha": "3c217c90"
           }
         ],
-        "deployedBuild": "951ef3cf",
+        "deployedBuild": "none",
         "headless": true,
         "deviceChecked": false
       },
@@ -4100,11 +4105,16 @@
             "repo": "fawxzzy/mazer",
             "number": 590,
             "mergedSha": "be2fff01"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 607,
+            "mergedSha": "a577c91e"
           }
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "hbvh1xpuf"
+        "deployedBuild": "none"
       },
       "blocker": null,
       "verify": [],
@@ -4177,7 +4187,13 @@
     },
     "MAZER-UI-050": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 598,
+            "mergedSha": "a4ab33e4"
+          }
+        ],
         "headless": true,
         "deviceChecked": false,
         "deployedBuild": "none"
@@ -4268,7 +4284,49 @@
     },
     "MAZER-VIS-055": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 602,
+            "mergedSha": "5023dd2a"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "none"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-056": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 604,
+            "mergedSha": "6aac131f"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "none"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-AUDIO-004": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 605,
+            "mergedSha": "74613f02"
+          }
+        ],
         "headless": true,
         "deviceChecked": false,
         "deployedBuild": "none"

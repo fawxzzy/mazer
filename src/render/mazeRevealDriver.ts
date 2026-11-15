@@ -9,6 +9,7 @@
 import { MazeRevealMaskBuilder } from './boardRevealMask';
 import type { BoardTileReveal } from './boardTileLayer';
 import {
+  resolveDockReachExtent,
   resolveMarkerRevealAlpha,
   resolveMazeRevealFrame,
   resolveReducedBoardFade,
@@ -101,7 +102,6 @@ export class MazeRevealDriver {
   /** The soft reveal for the board layer, or null when the board is not in one (use the hard / all paths). */
   resolveBoardReveal(
     ranks: Int32Array | null,
-    owners: Uint8Array | null,
     cols: number,
     rows: number
   ): BoardTileReveal | null {
@@ -112,9 +112,12 @@ export class MazeRevealDriver {
     return {
       kind: 'soft',
       key: frame.key,
-      dockExtent: frame.dockExtent,
+      // A bleed-off dock is one more stretch of line after the border cell that owns it (mazeRevealTimeline.ts).
+      dockReach: (x, y, lengthCells) => resolveDockReachExtent(
+        frame.direction, frame.window, ranks[(y * cols) + x] ?? -1, frame.tileCount, lengthCells, frame.elapsedMs
+      ),
       parentSide: this.mask.directions(ranks, cols, rows),
-      fillMask: (extent) => this.mask.fill(extent, frame, ranks, owners, cols, rows)
+      fillMask: (extent) => this.mask.fill(extent, frame, ranks, cols, rows)
     };
   }
 }
