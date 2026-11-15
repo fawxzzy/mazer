@@ -6,6 +6,7 @@ import { getNeighborIndex, isTileFloor, isTilePath, resolveDirectionBetween, xFr
 import { MIDNIGHT_RAINBOW_STOPS, getRelativeLuminance, palette, resolveLocalBoardSupportColors, type LocalBoardContrastMode } from './palette';
 import { resolveSceneViewport } from './viewport';
 import { MOTION_PHASER_EASE_SINE_IN_OUT } from './motionScale';
+import { TYPE_BODY_FACE } from './typeScale';
 
 export interface BoardLayout {
   boardX: number;
@@ -655,7 +656,7 @@ export class BoardRenderer {
     this.guideOverlay = this.scene.add.graphics();
     this.guideText = this.scene.add.text(0, 0, '', {
       color: `#${this.colors.board.topHighlight.toString(16).padStart(6, '0')}`,
-      fontFamily: '"Courier New", monospace',
+      fontFamily: TYPE_BODY_FACE,
       fontSize: '12px',
       fontStyle: 'bold'
     }).setOrigin(0, 0).setVisible(false);

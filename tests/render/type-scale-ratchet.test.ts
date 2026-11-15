@@ -86,7 +86,6 @@ const LEGACY_OFF_SCALE_SIZES_PX = [1, 9, 13, 15, 18] as const;
 const LEGACY_FONT_STACKS = [
   'Segoe UI Variable, Helvetica Neue, Arial, sans-serif',
   'Bahnschrift SemiCondensed, Trebuchet MS, Segoe UI, sans-serif',
-  'Courier New, monospace',
   'IBM Plex Mono, ui-monospace, monospace'
 ] as const;
 
