@@ -369,6 +369,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: when two corner objects collide on a narrow phone, shrink the decorative one, never the title or the control; pin the cap in a test against the real layout.
 - Status: Applied (review); headless Chromium 320x568, 360x740, 375x812, 390x844 and WebKit iPhone SE / iPhone 15 Pro only, nothing checked on a real phone.
 
+## 2026-11-15 - visual-proof stray colour literals move into trailPalette (MAZER-UI-031, slice 4)
+- WHAT changed: `src/render/trailPalette.ts` gains `PROOF_*_CSS` constants; `src/visual-proof/readability.ts`, `scenarioLibrary.ts` and `trail/TrailRenderer.ts` import them instead of holding the hex strings. Values identical, no visual change. Off-theme ratchet offToken 227 to 214 (-13), total 292 to 279; three files drop out of the baseline. MenuScene.ts untouched.
+- WHY it changed: MAZER-UI-031 migrates stray literals one wave at a time; this slice is the internal visual-proof `.ts` files only so the wave-mix test stays green.
+- Note: MenuScene's baseline entry is looser than its real count (regenerating gives 51/55 vs 53/57); left as is for the MenuScene PR.
+- Status: headless gates only, nothing checked on a real phone.
 ## 2026-11-14 - Offline shell proof gets a nightly, non-blocking workflow
 - WHAT changed: new `.github/workflows/offline-shell-nightly.yml` (schedule 03:17 UTC + `workflow_dispatch`) runs `scripts/analysis/verify-offline-shell.mjs` (two production builds + headless Chromium) on ubuntu-24.04 and uploads the proof output as an artifact on failure. Also fixed a stale Wave 1C line in `docs/ops/MAZER-NO-INAPP-ACCOUNT-SCREENS-2026-11-14.md`.
 - WHY it changed: the script was fixed in #574 but no workflow ran it, which hid drift.
