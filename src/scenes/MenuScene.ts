@@ -7238,7 +7238,6 @@ export class MenuScene extends Phaser.Scene {
 
     this.boardDynamicDirty = true;
     this.triggerLegacyHapticPulse(LEGACY_HAPTIC_PATTERNS.step);
-    this.playLegacySoundEffect('step');
     return {
       accepted: true,
       events: [{ type: 'player-moved', entityId: 'player' }]

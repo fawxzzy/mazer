@@ -389,3 +389,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: owner decision to make the tap target explicit. The first-run subline ("HOLD + SLIDE TO MOVE") is NOT included: no first-run flag exists (the guide lists `first-run-coach` as a pending owner decision). The in-app guide has no copy naming the menu Start label (its Start row is the board marker), so no guide change.
 - Rule: edge marker files untouched (MAZER-VIS-055 lane).
 - Status: headless 390x844 and 320x568 at DPR 3 viewed, no clipping; nothing checked on a real phone.
+
+## 2026-11-15 - MAZER-AUDIO: the per-tile step sound is removed
+- WHAT changed: `src/legacy-runtime/legacySoundEffects.ts` drops the `step` kind (tone and throttle gap); `MenuScene.ts` no longer plays it on a player move. Wall-bump, goal and toggle chirps and the step haptic are unchanged. The Sound setting description, the in-app guide row, the message inventory (test and doc) and the sound tests now say bumps and wins only.
+- WHY it changed: owner request, the chirp on every tile the player travels was unwanted.
+- Status: headless only (tsc and the three affected test files), nothing checked on a real phone.
