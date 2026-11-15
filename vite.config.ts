@@ -36,10 +36,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: false,
       manifestFilename: 'manifest.webmanifest',
+      // MAZER-PERF-011: icons/mazer-app-icon.png (934 KB, the manifest 'any' icon) is not listed here and is in
+      // workbox.globIgnores below (the glob would otherwise precache everything in dist). Served from public/, fetched on demand.
       includeAssets: [
         'favicon.ico',
         'icons/mazer-app-icon.ico',
-        'icons/mazer-app-icon.png',
         'icons/apple-touch-icon.png',
         'icons/icon-192.png',
         'icons/icon-512.png',
@@ -59,6 +60,7 @@ export default defineConfig({
         // use, and the legacy cleanup worker (public/sw.js) stay on the network; offline they fall back to index.html.
         globIgnores: [
           'sw.js',
+          'icons/mazer-app-icon.png',
           '{proof-surfaces,visual-proof,watch-pass-preview,watch-pass-paywall,watch-pass-setup,planet3d,future-phaser}.html',
           'assets/{proof-surfaces,visual-proof,watch-pass-preview,watch-pass-paywall,watch-pass-setup,planet3d,future-phaser}-*',
           'assets/{snapshotCard,RuntimeAdapterBridge,preferences,IntentBus}-*'
