@@ -331,6 +331,18 @@ Ordered by dependency. Owners per section 1. Each item names the guard row it wi
 
 Sequencing: P4 and P1 first (3B/3C), then P2 and P3 (5C), then P5 and P6, with P7 and P8 held for a decision.
 
+### 4e. Auth Surface v2 copy matrix (2026-11-15, PR-A)
+
+The status screen (`legacyAccountStatusState.ts`), loader and splash labels (`bootSplash.ts`, `index.html`), the
+install gate (`installGate.ts`) and the new boot-error screen (`bootErrorScreen.ts`, `surfaceMarkup.ts`) read every
+visible line from `src/brand/authSurfaceCopy.ts`, so their old pinned rows (`Loading…`, `Signing you in…`,
+`Opening…`, `You are signed out.`, `Still opening. Try again.`, the install subtitles, value line and steps) are
+removed from section 4d and the test pin. `tests/reset/auth-surface-copy-lint.test.ts` fails on any sentence in those
+files that is not in the module and on retired phrases (`Code: `, `Choose Sign in`, `Signing you in`, ...). The
+raw auth error render site now passes the snapshot error through `resolveLegacyAuthFeedbackMessage` before the
+status view-model, which maps it onto a matrix line. The toast `Code:` line is removed (the code stays in
+`technicalDetail`). The `legacyPlayerMessage.ts` failure rows are unchanged here (Wave 3B follow-up).
+
 ## 9. Not verified (UNKNOWN)
 
 - Whether the legacy password submit path (`handleLegacyAuthSubmit`) is reachable in the shipped
