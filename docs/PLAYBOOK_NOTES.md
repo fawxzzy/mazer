@@ -346,3 +346,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: MAZER-DEBT-002 PR 2 of 3 (Wave 5C only). The fields are already optional and deprecated since #575, so this is type-valid.
 - Follow-up (PR 3, Wave 1C): delete the two type fields in `src/scenes/menuRuntimeDiagnostics.ts` and the `tests/scenes/menu-runtime-diagnostics.test.ts` fixture/assertions.
 - Status: headless only.
+
+## 2026-11-14 (diagnostics auth formMode/invalidFields type fields deleted)
+
+- WHAT changed: `src/scenes/menuRuntimeDiagnostics.ts` (Wave 1C only) drops the deprecated optional `auth.formMode` / `auth.invalidFields`; `tests/scenes/menu-runtime-diagnostics.test.ts` loses the fixture line and asserts the source no longer mentions them. All consumers grepped (src, scripts, tests, docs): none remain.
+- WHY it changed: MAZER-DEBT-002 PR 3 of 3; MenuScene stopped publishing them in #579.
+- Status: headless only, nothing checked on a real phone.

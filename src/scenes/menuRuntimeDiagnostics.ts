@@ -134,11 +134,6 @@ export interface MenuSceneRuntimeDiagnostics {
     displayName: string | null;
     email: string | null;
     emailPresent: boolean;
-    /** @deprecated constant 'login' since MAZER-ACCT-043; no consumer reads it. MenuScene stops publishing it in MAZER-DEBT-002 PR 2, then this field is deleted. */
-    formMode?: 'login';
-    /** The credential form is gone (MAZER-ACCT-043): production only ever publishes an empty list. */
-    /** @deprecated always empty; same removal plan as formMode. */
-    invalidFields?: never[];
     rememberedIdentity: {
       displayName: string;
       email: string;
