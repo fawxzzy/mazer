@@ -3,27 +3,27 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-15T15:52:40.000Z",
+    "registryUpdatedAt": "2026-11-15T18:40:01.000Z",
     "boardSync": {
-      "at": "2026-11-15T15:52:40.000Z",
-      "appliedEventCount": 282,
-      "lastEventId": "09eff8851bdd"
+      "at": "2026-11-15T18:40:01.000Z",
+      "appliedEventCount": 290,
+      "lastEventId": "dc10087bf502"
     }
   },
   "counters": {
-    "total": 272,
-    "open": 118,
-    "completed": 124,
+    "total": 274,
+    "open": 121,
+    "completed": 123,
     "deferred": 30,
     "buckets": {
       "needs-you": 33,
-      "in-review": 73,
+      "in-review": 78,
       "blocked": 3,
       "ready": 0,
       "in-progress": 2,
-      "unclassified": 7,
+      "unclassified": 5,
       "deferred": 30,
-      "completed": 124
+      "completed": 123
     },
     "needsYou": {
       "decisions": 6,
@@ -31,7 +31,7 @@
     },
     "completedByTier": {
       "device": 0,
-      "headless": 46,
+      "headless": 45,
       "source-only": 35,
       "no-device-surface": 43,
       "unrecorded": 0
@@ -788,17 +788,6 @@
         "prs": "#588, #591",
         "deployedBuild": "hbvh1xpuf",
         "updatedAt": "2026-11-15T15:36:23.000Z"
-      },
-      {
-        "id": "MAZER-MOTION-020",
-        "title": "Replace the maze fade in and out with a smooth build and tear-down",
-        "status": "completed",
-        "priority": "high",
-        "date": "2026-11-15",
-        "tier": "headless",
-        "prs": "#590",
-        "deployedBuild": "hbvh1xpuf",
-        "updatedAt": "2026-11-15T15:36:17.000Z"
       },
       {
         "id": "MAZER-GEN-005",
@@ -2192,8 +2181,16 @@
       "title": "No one-tile dead-end stubs in generated mazes",
       "status": "review",
       "priority": "high",
-      "prs": "#464",
+      "prs": "#464, #603",
       "note": "PR #464 merged and deployed (951ef3cf). Device check and owner judgement on the ladder ending at 218 pending."
+    },
+    {
+      "id": "MAZER-MOTION-020",
+      "title": "Replace the maze fade in and out with a smooth build and tear-down",
+      "status": "review",
+      "priority": "high",
+      "prs": "#590, #607",
+      "note": ""
     },
     {
       "id": "MAZER-PROG-020",
@@ -2241,6 +2238,14 @@
       "status": "review",
       "priority": "medium",
       "prs": "FawxzzyWeb#150",
+      "note": ""
+    },
+    {
+      "id": "MAZER-AUDIO-004",
+      "title": "Gentler step sound and Sound on by default",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#605",
       "note": ""
     },
     {
@@ -2372,6 +2377,22 @@
       "note": ""
     },
     {
+      "id": "MAZER-UI-050",
+      "title": "Touch up the Start, Mazer title and Level text designs",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#598",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-056",
+      "title": "Online counter readability on the menu",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#604",
+      "note": ""
+    },
+    {
       "id": "MAZER-VIS-011",
       "title": "Regenerate the HUD icons as one matched set and atlas",
       "status": "review",
@@ -2449,6 +2470,14 @@
       "status": "review",
       "priority": "medium",
       "prs": "#587",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-055",
+      "title": "Edge marker redesign",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#602",
       "note": ""
     },
     {
@@ -3041,20 +3070,6 @@
     {
       "id": "MAZER-UI-027",
       "title": "Split the menu scene into smaller owned modules",
-      "status": "planning",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-050",
-      "title": "Touch up the Start, Mazer title and Level text designs",
-      "status": "planning",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-055",
-      "title": "Edge marker redesign",
       "status": "planning",
       "priority": "medium",
       "lane": null
@@ -4116,8 +4131,8 @@
       "sub": null
     },
     "MAZER-MOTION-020": {
-      "bucket": "completed",
-      "sub": "headless"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-VIS-050": {
       "bucket": "in-review",
@@ -4132,7 +4147,7 @@
       "sub": null
     },
     "MAZER-UI-050": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-GEN-020": {
@@ -4160,7 +4175,15 @@
       "sub": "headless"
     },
     "MAZER-VIS-055": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-UI-056": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-AUDIO-004": {
+      "bucket": "in-review",
       "sub": null
     }
   }
