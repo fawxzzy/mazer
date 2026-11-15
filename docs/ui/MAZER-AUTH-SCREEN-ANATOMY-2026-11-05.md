@@ -64,13 +64,15 @@ authenticated phases (the authenticated Account section is a different surface a
 
 ### Phases
 
+Labels below are the Auth Surface v2 wording (2026-11-15); the original spec wording is kept in brackets.
+
 | Phase | Trigger (inputs) | Dock | Banner |
 | ----- | ---------------- | ---- | ------ |
 | `loading` | `awaitingResolution` | none (loading copy only) | none |
 | `authenticated` | `status === 'authenticated'` | none | none |
-| `callback-pending` | `hasCallbackInProgress` | `Signing in`, disabled, pending | info: `Signing you in…` |
-| `opening` | `submitting`, elapsed < 10000 ms | `Opening…`, disabled, pending | none |
-| `opening-slow` | `submitting`, elapsed >= 10000 ms | `Sign in`, enabled (retry) | info: `Still opening. Continue in your browser or try again.` |
+| `callback-pending` | `hasCallbackInProgress` | `Signing in…`, disabled, pending | loader label `Signing in…` (was info banner `Signing you in…`) |
+| `opening` | `submitting`, elapsed < 10000 ms | `Signing in…` (was `Opening…`), disabled, pending | none |
+| `opening-slow` | `submitting`, elapsed >= 10000 ms | `Sign in`, enabled (retry) | error notice: `Sign-in took too long. Tap Sign in to try again.` (was info `Still opening. Continue in your browser or try again.`) |
 | `error` | non-empty `errorMessage`, or `status === 'unavailable'` | `Sign in`, enabled | error: message |
 | `entry` | otherwise | `Sign in`, enabled | none |
 
@@ -80,30 +82,33 @@ A real `errorMessage` always wins the banner over the generic unavailable fallba
 
 ### Copy (stable strings)
 
-Every existing error string is passed through unchanged (trimmed only), including
-`MAZER_OAUTH_SAFE_ERROR_MESSAGE` = `Could not reach your account. Try again.` (re-exported
-from `legacyAuthScreenView.ts`; a test pins it against `legacyAccountPortal.ts` and sweeps every
-`LEGACY_AUTH_MESSAGE_COPY` value). New strings live in `LEGACY_AUTH_SCREEN_COPY`: `MAZER`, `Welcome`, `Sign in`,
-`Opening`, `Signing in`, `Create Account`, `Reset Password`, `Privacy Policy`, `Terms of Service`, `Loading…`,
-`Signing you in…`, `Still opening. Continue in your browser or try again.`
+Original spec: every existing error string was passed through unchanged (trimmed only), including
+`MAZER_OAUTH_SAFE_ERROR_MESSAGE` (re-exported from `legacyAuthScreenView.ts`, since deleted). Now (Auth Surface v2):
+the status box shows only copy-matrix lines (`resolveLegacyAccountStatusNotice` in `legacyAccountStatusState.ts`);
+the failure rows in `legacyPlayerMessage.ts` are matrix lines since PR-A2, and `MAZER_OAUTH_SAFE_ERROR_MESSAGE`
+(`legacyAccountPortal.ts`, still `Could not reach your account. Try again.` until its Wave 5C PR) is shown as
+`Sign-in is unavailable right now. Try again in a minute.`. The original spec's `LEGACY_AUTH_SCREEN_COPY` (`Welcome`, `Create Account`, `Reset Password`, `Loading…`,
+`Signing you in…`, `Still opening. Continue in your browser or try again.`, ...) is gone; every label now lives in
+`src/brand/authSurfaceCopy.ts` (`MAZER`, `Mazer`, `Sign in`, `Signing in…`, `Opening Mazer…`, `Sign in to play.`).
 
 ### Loading copy truth table
 
 `resolveLegacyAuthLoadingCopy({ awaitingResolution, hasSession, callbackInProgress })` returns
-`Signing you in…` only when `callbackInProgress || (awaitingResolution && hasSession)`; otherwise `Loading…`.
+`Signing in…` only when `callbackInProgress || (awaitingResolution && hasSession)`; otherwise `Opening Mazer…`
+(Auth Surface v2; the original spec said `Signing you in…` / `Loading…`).
 
 | awaitingResolution | hasSession | callbackInProgress | Copy |
 | :-: | :-: | :-: | ---- |
-| false | false | false | Loading… |
-| false | true | false | Loading… |
-| false | false | true | Signing you in… |
-| false | true | true | Signing you in… |
-| true | false | false | Loading… |
-| true | true | false | Signing you in… |
-| true | false | true | Signing you in… |
-| true | true | true | Signing you in… |
+| false | false | false | Opening Mazer… |
+| false | true | false | Opening Mazer… |
+| false | false | true | Signing in… |
+| false | true | true | Signing in… |
+| true | false | false | Opening Mazer… |
+| true | true | false | Signing in… |
+| true | false | true | Signing in… |
+| true | true | true | Signing in… |
 
-A first-time visitor (no stored session, no callback) therefore never sees `Signing you in…`. `hasSession` is
+A first-time visitor (no stored session, no callback) therefore never sees `Signing in…`. `hasSession` is
 "a persisted auth session exists to restore"; how MenuScene derives it cheaply is UNKNOWN (candidate: presence of
 `MAZER_OAUTH_AUTH_SESSION_KEY` in the auth storage, without reading its value). Until wired, pass `false`, which
 is the safe neutral default.

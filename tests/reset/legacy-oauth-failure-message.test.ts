@@ -4,6 +4,7 @@ import {
   LEGACY_OAUTH_FAILURE_MESSAGE_COPY,
   isLegacyOAuthFailureCopy,
   resolveLegacyAuthFeedbackMessage,
+  resolveLegacyOAuthCurrentFailureCopy,
   resolveLegacyOAuthFailureClass,
   resolveLegacyOAuthFailureCopy,
   resolveLegacyOAuthFailureMessage,
@@ -11,6 +12,7 @@ import {
   type LegacyOAuthFailureClass
 } from '../../src/legacy-runtime/legacyPlayerMessage';
 import { MAZER_OAUTH_SAFE_ERROR_MESSAGE } from '../../src/legacy-runtime/legacyAccountPortal';
+import { AUTH_SURFACE_MESSAGES } from '../../src/brand/authSurfaceCopy';
 
 // Every internal failure code the shared-account callback can report
 // (MazerOAuthFailureCategory plus `pending_expired`, the TTL case split out so
@@ -54,19 +56,58 @@ describe('shared-account sign-in failure copy', () => {
     }
   );
 
-  test('the generic row equals the legacy one-size message', () => {
-    expect(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic).toBe(MAZER_OAUTH_SAFE_ERROR_MESSAGE);
+  // Auth Surface v2 transition: the generic row is the matrix line (Wave 3B) while the one-size constant in
+  // legacyAccountPortal.ts (Wave 5C) follows in its own PR. Either the two are equal, or the constant is a known
+  // earlier spelling that is shown as the generic row.
+  test('the legacy one-size message is shown as the generic row', () => {
+    expect(resolveLegacyOAuthCurrentFailureCopy(MAZER_OAUTH_SAFE_ERROR_MESSAGE)).toBe(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic);
+    expect(isLegacyOAuthFailureCopy(MAZER_OAUTH_SAFE_ERROR_MESSAGE)).toBe(true);
   });
 
-  test('required player wording is present', () => {
+  test('every row is a shared copy-matrix line, worded for the one Sign in button', () => {
+    expect(LEGACY_OAUTH_FAILURE_MESSAGE_COPY).toEqual({
+      cancelled: AUTH_SURFACE_MESSAGES['mazer.cancelled'],
+      connection: AUTH_SURFACE_MESSAGES['signin.callback'],
+      contextLost: AUTH_SURFACE_MESSAGES['signin.callback'],
+      generic: AUTH_SURFACE_MESSAGES['signin.unavailable'],
+      providerUnreachable: AUTH_SURFACE_MESSAGES['signin.unavailable'],
+      session: AUTH_SURFACE_MESSAGES['signin.session'],
+      storage: AUTH_SURFACE_MESSAGES['mazer.storage'],
+      timedOut: AUTH_SURFACE_MESSAGES['mazer.timeout']
+    });
     expect(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.timedOut).toMatch(/took too long/i);
-    expect(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.contextLost).toMatch(/different screen/i);
-    expect(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.contextLost).toMatch(/home screen icon/i);
+    for (const copy of Object.values(LEGACY_OAUTH_FAILURE_MESSAGE_COPY)) {
+      expect(copy).not.toMatch(/Choose Sign in/);
+    }
   });
 
-  test('rows are unique, sentence-shaped and free of provider or internal wording', () => {
+  test('every earlier spelling of a row is shown as the row that replaced it', () => {
+    const earlier: ReadonlyArray<readonly [string, LegacyOAuthFailureClass]> = [
+      ['Account connection unavailable. Return to Mazer and try again.', 'generic'],
+      ['Could not reach your account. Try again.', 'generic'],
+      ['Sign-in did not finish. Choose Sign in to try again.', 'cancelled'],
+      ['Mazer could not finish connecting to your account. Try again in a moment.', 'connection'],
+      ['Sign-in came back to a different screen than where you started. Open Mazer from your home screen icon and try again.', 'contextLost'],
+      ['Sign-in is unavailable right now. Try again in a few minutes.', 'providerUnreachable'],
+      ['Your account could not be confirmed. Try signing in again.', 'session'],
+      ['This browser is blocking what Mazer needs to sign in. Turn off private browsing or allow site data, then try again.', 'storage'],
+      ['Sign-in took too long. Choose Sign in to start again.', 'timedOut']
+    ];
+    for (const [copy, expectedClass] of earlier) {
+      expect(isLegacyOAuthFailureCopy(copy), copy).toBe(true);
+      expect(resolveLegacyOAuthCurrentFailureCopy(copy), copy).toBe(LEGACY_OAUTH_FAILURE_MESSAGE_COPY[expectedClass]);
+      expect(resolveLegacyAuthFeedbackMessage(copy, null, null)?.copy, copy).toBe(LEGACY_OAUTH_FAILURE_MESSAGE_COPY[expectedClass]);
+    }
+    // Current rows and unrelated text map to themselves.
+    expect(resolveLegacyOAuthCurrentFailureCopy(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.session)).toBe(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.session);
+    expect(resolveLegacyOAuthCurrentFailureCopy('constructor')).toBe('constructor');
+    expect(isLegacyOAuthFailureCopy('toString')).toBe(false);
+  });
+
+  test('rows are sentence-shaped and free of provider or internal wording; only same-action classes share a line', () => {
     const rows = Object.entries(LEGACY_OAUTH_FAILURE_MESSAGE_COPY);
-    expect(new Set(rows.map(([, copy]) => copy)).size).toBe(rows.length);
+    // connection + contextLost (sign in again) and generic + providerUnreachable (outage) share a line on purpose.
+    expect(new Set(rows.map(([, copy]) => copy)).size).toBe(rows.length - 2);
     const technical = /\b(supabase|oauth|pkce|jwt|rpc|http|https|token|code|state|verifier|exchange|callback|sessionstorage|exception|stack|undefined|null|nan)\b/i;
     for (const [key, copy] of rows) {
       expect(copy, `${key} must end as a sentence`).toMatch(/[.!?]$/);
@@ -77,7 +118,7 @@ describe('shared-account sign-in failure copy', () => {
 
   test('the outage row tells the player what happened and what to do, in plain words', () => {
     expect(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.providerUnreachable).toBe(
-      'Sign-in is unavailable right now. Try again in a few minutes.'
+      'Sign-in is unavailable right now. Try again in a minute.'
     );
     expect(resolveLegacyOAuthFailureMessage('provider_unreachable')).toMatchObject({
       durationMs: LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS,
@@ -166,7 +207,7 @@ describe('shared-account sign-in failure copy', () => {
   test('a provider-shaped session read error keeps its player copy and gains the code first', () => {
     const message = resolveLegacyAuthFeedbackMessage('Failed to fetch', null, 'session_read_failed');
     expect(message).toMatchObject({
-      copy: 'Account service is unreachable. Try again shortly.',
+      copy: AUTH_SURFACE_MESSAGES['signin.offline'],
       technicalDetail: 'oauth-failure:session_read_failed; Failed to fetch'
     });
     // No boot code: exactly as before.
