@@ -254,7 +254,7 @@ const assertMenuSnapshotOrthogonalUnitSteps = (points: LegacyMenuSnapshotPoint[]
 
 describe('legacy reset lane', () => {
   test('keeps the active front-door button set focused on play and options', () => {
-    expect(MAIN_MENU_BUTTONS).toEqual(['Start', 'Options']);
+    expect(MAIN_MENU_BUTTONS).toEqual(['TAP TO PLAY', 'Options']);
   });
 
   test('removes the front-door Exit button and browser quit equivalence path', () => {

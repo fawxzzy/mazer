@@ -363,6 +363,10 @@ const LEGACY_GLYPH_LETTER_PATTERNS: Readonly<Record<string, readonly string[]>> 
   M: ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
   N: ['10001', '11001', '10101', '10101', '10011', '10001', '10001'],
   O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
+  // P, Y and the blank word-space: added for the front-door "TAP TO PLAY" label (MAZER-UI-050).
+  P: ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
+  Y: ['10001', '10001', '01010', '00100', '00100', '00100', '00100'],
+  ' ': ['00000', '00000', '00000', '00000', '00000', '00000', '00000'],
   R: ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
   S: ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
   T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
@@ -406,7 +410,7 @@ export interface LegacyGlyphWordLayout {
   width: number;
 }
 
-/** Every character in `word` must have an entry in LEGACY_GLYPH_LETTER_PATTERNS (letters and digits only, no spaces/punctuation). */
+/** Every character in `word` must have an entry in LEGACY_GLYPH_LETTER_PATTERNS (letters, digits and the space; no punctuation). */
 export const isLegacyGlyphWordRenderable = (word: string): boolean => (
   [...word.toUpperCase()].every((letter) => LEGACY_GLYPH_LETTER_PATTERNS[letter] !== undefined)
 );
