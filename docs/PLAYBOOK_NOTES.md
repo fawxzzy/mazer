@@ -369,3 +369,7 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the script was fixed in #574 but no workflow ran it, which hid drift.
 - Rule: not a PR check and not in the required set; a red nightly is a signal to investigate, never a merge blocker. package.json untouched.
 - Status: YAML parsed only; first real run is the first dispatch after merge.
+
+## 2026-11-15 - MAZER-VIS-050 chip tiles lose the centre dot
+- Pattern: the baked Chip floor (`paintChipFloor`, boardTileBake.ts) no longer paints pass 4 (one faint pad dot per floor tile). `BOARD_TILE_BAKE_VERSION` is `mazer-board-tile-bake-v3` so no cached bake keeps the dot. Trace style, wall sockets, markers, trail unchanged. The Guide draws no tile dot (no guide change). Headless Chromium 390x844 DPR3 and WebKit iPhone 15 Pro checked settled: no dots. Not checked on a real phone.
+- Open: the "thin white line before the maze reveals" was NOT isolated as a separate draw. The only candidate seen is the 1-device-px rim of the first low-alpha reveal cells showing before their dark chip fill (one baked image drawn per alpha bucket, `composeBoardTileRevealSoft`). Needs the owner to confirm what he sees before any change to the reveal.

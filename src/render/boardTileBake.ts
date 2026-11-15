@@ -38,10 +38,10 @@ import {
 import { shouldDrawEndpointMarker } from './endpointMarkerLayering';
 
 /**
- * Part of every bake hash: bump it whenever the baked pixels change. v2: the bright junction nodes are gone
- * (split tiles are plain chips with the same faint pad dot as every other tile).
+ * Part of every bake hash: bump it whenever the baked pixels change. v2: the bright junction nodes are gone.
+ * v3 (MAZER-VIS-050): the faint pad dot in every chip tile centre is gone.
  */
-export const BOARD_TILE_BAKE_VERSION = 'mazer-board-tile-bake-v2' as const;
+export const BOARD_TILE_BAKE_VERSION = 'mazer-board-tile-bake-v3' as const;
 
 /* ------------------------------------------------------------------------------------------ */
 /* injected 2D surface contract                                                               */
@@ -695,7 +695,6 @@ const paintSockets = (p: Painter, sockets: readonly BoardCell[], layout: BoardTi
 
 const paintChipFloor = (
   p: Painter,
-  n: NormalizedInput,
   style: ResolvedBoardTileStyle,
   tiles: readonly ChipTileGeometry[]
 ): void => {
@@ -745,24 +744,6 @@ const paintChipFloor = (
     }
   }
   if (patchOpen) {
-    p.fill();
-  }
-
-  // pass 4: one faint pad dot per floor tile, the same on every tile (junctions included: there is no
-  // separate split-path marker), skipped only under the start/goal end tiles
-  let dotOpen = false;
-  for (const t of tiles) {
-    if (sameCell(n.start, t.x, t.y) || sameCell(n.goal, t.x, t.y)) {
-      continue;
-    }
-    if (!dotOpen) {
-      p.fillStyle(cssRgba(m.rim, BOARD_TILE_GEOMETRY.padDotAlpha));
-      p.begin();
-      dotOpen = true;
-    }
-    p.circle(t.left + t.width / 2, t.top + t.height / 2, style.padDotRadius);
-  }
-  if (dotOpen) {
     p.fill();
   }
 };
@@ -943,7 +924,7 @@ export function bakeBoardTiles<TCanvas = unknown>(
   if (n.style === 'trace') {
     paintTraceFloor(p, n, layout, style, base);
   } else {
-    paintChipFloor(p, n, style, base.map((tile) => chipGeometryOf(n, tile, style)));
+    paintChipFloor(p, style, base.map((tile) => chipGeometryOf(n, tile, style)));
     paintChipDocks(p, layout, style);
   }
 
