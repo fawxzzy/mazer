@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { LEGACY_BOARD_BASE_SCALE, resolveLegacyBoardScaleForLevel } from '../../src/legacy-runtime/legacyBoardScale';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import {
   GEOMETRY_BUDGET_TOP_TARGET,
@@ -82,17 +83,19 @@ describe('geometry budget wiring (every bounded progression level 2..99)', () =>
     }
   });
 
-  test('freezes the board across every level on phone, desktop and square viewports', () => {
+  test('board scale follows the level curve (38 toward 40) on phone, desktop and square viewports', () => {
     for (const surface of ['play', 'menu'] as const) {
       for (const viewport of Object.values(VIEWPORTS)) {
-        const scales = new Set<number>();
         for (const level of [...Array.from({ length: LAST_BUDGET_LEVEL }, (_, index) => index + 1), 100, 150, 1000]) {
-          scales.add(resolveLegacyProgressionGenerationScale(50, trackForLevel(level), {
+          // MAZER-PROG-020 S2: a function of the level only; these viewports are far above the 10 px floor.
+          const scale = resolveLegacyProgressionGenerationScale(50, trackForLevel(level), {
             surface,
             viewport: { width: viewport.width, height: viewport.height }
-          }));
+          });
+          expect(scale).toBe(resolveLegacyBoardScaleForLevel(level));
+          expect(scale).toBeGreaterThanOrEqual(LEGACY_BOARD_BASE_SCALE);
+          expect(scale).toBeLessThan(40);
         }
-        expect(scales.size).toBe(1);
       }
     }
   });
@@ -308,8 +311,9 @@ describe('geometry budget felt tuning (realized felt difficulty)', () => {
           expect(target).toBe(GEOMETRY_BUDGET_TOP_TARGET);
         }
       }
-      // Frozen board: every level realizes the same grid dimensions.
-      expect(dimensions.size).toBe(1);
+      // MAZER-PROG-020 S2: the board grows slowly with the level (scale 38 toward 40), so the realized grid
+      // takes only a few distinct shapes across the whole ladder (it was exactly one at the frozen scale).
+      expect(dimensions.size).toBeLessThanOrEqual(4);
       expect(realized.length).toBe(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL - 1);
       for (let index = 1; index < realized.length; index += 1) {
         expect(realized[index]).toBeGreaterThan(realized[index - 1]!);
