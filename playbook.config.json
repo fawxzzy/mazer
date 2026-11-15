@@ -23,7 +23,7 @@
       "requireNotesOnChanges": [
         {
           "whenChanged": ["src/**", "scripts/**", "tests/**"],
-          "mustTouch": ["docs/PLAYBOOK_NOTES.md"]
+          "mustTouch": ["docs/PLAYBOOK_NOTES.md", "docs/playbook-notes/**"]
         }
       ]
     }
