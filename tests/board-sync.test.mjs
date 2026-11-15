@@ -468,6 +468,16 @@ function gitRepoWithRemote() {
   return { bare, work };
 }
 
+test("every board-events commit carries a vercel.json with git deployments off, so event pushes never spend the Vercel deploy cap", () => {
+  const { bare, work } = gitRepoWithRemote();
+  appendEvent(work, { v: 1, ts: "2026-12-01T10:00:00Z", card: "MAZER-A-001", text: "first" });
+  appendEvent(work, { v: 1, ts: "2026-12-01T10:00:05Z", card: "MAZER-A-001", text: "second" });
+  const names = execFileSync("git", ["--git-dir", bare, "ls-tree", "--name-only", "refs/heads/board-events"], { encoding: "utf8" }).trim().split(/\r?\n/).sort();
+  assert.deepEqual(names, ["events.jsonl", "vercel.json"]);
+  const vj = JSON.parse(execFileSync("git", ["--git-dir", bare, "show", "refs/heads/board-events:vercel.json"], { encoding: "utf8" }));
+  assert.deepEqual(vj, { git: { deploymentEnabled: false } });
+});
+
 test("append writes one line to the board-events branch without touching the working tree; duplicates are no-ops", () => {
   const { work } = gitRepoWithRemote();
   const e = { v: 1, ts: "2026-12-01T10:00:00Z", card: "MAZER-A-001", text: "first" };
