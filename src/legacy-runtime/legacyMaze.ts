@@ -1202,7 +1202,7 @@ const normalizeLegacyOpenTwoByTwoFloorBlocks = (
 // which can sit right next to the start on a looping maze. Candidates are every reachable floor within
 // REBASE_ROUTE_SHARE of the longest route (and at least minDistance); the pick is the one farthest from the start
 // (Manhattan), then the longer route, then reading order, so it stays deterministic.
-const LEGACY_REBASE_ROUTE_SHARE = 0.8;
+const LEGACY_REBASE_ROUTE_SHARE = 0.7;
 
 const pickLegacySpanAwareGoal = (
   entries: Iterable<{ distance: number; point: LegacyPoint }>,

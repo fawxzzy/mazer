@@ -385,7 +385,7 @@ describe('legacy reset lane', () => {
     const cases = [
       {
         build: createLegacyMaze,
-        expectedHash: '4c2a4206eaa6f1bb4124701a6e8305502bc22ac7557424500f6734c7900ee01e',
+        expectedHash: '21c010a9cd577f0e84da63afdd015d5940fa4dc993cb37b0ffe19ce47ddb6487',
         kind: 'play',
         scale: 25,
         seed: 13
