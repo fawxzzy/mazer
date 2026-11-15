@@ -95,6 +95,27 @@ const measureSlot = (page, slot, floor) => page.evaluate(({ box, colorFloor }) =
   };
 }, { box: slot, colorFloor: floor });
 
+// MAZER-QA-010: a single canvas read lands on whatever frame the compositor is on, so two reads taken one
+// settle apart can straddle a backdrop or fade frame (the flake: "control delta must be exactly 0, got 4").
+// Read the slot repeatedly until STABLE_READS consecutive reads agree on the ink count, then use that stable
+// reading. A slot that never stabilises inside the timeout fails loudly with the series instead of flaking.
+const STABLE_READS = 4;
+const STABLE_TIMEOUT_MS = 10_000;
+const measureStable = async (page, slot, floor) => {
+  const series = [];
+  const started = Date.now();
+  let last = null;
+  while (Date.now() - started < STABLE_TIMEOUT_MS) {
+    last = await measureSlot(page, slot, floor);
+    series.push(last.ink);
+    if (series.length >= STABLE_READS && series.slice(-STABLE_READS).every((ink) => ink === last.ink)) {
+      return last;
+    }
+    await page.waitForTimeout(90);
+  }
+  throw new Error(`slot ink never stabilised in ${STABLE_TIMEOUT_MS} ms: ${JSON.stringify(series)}`);
+};
+
 const settle = (page, ms = 1700) => page.evaluate((wait) => new Promise((done) => setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(done)), wait)), ms);
 
 const main = async () => {
@@ -141,12 +162,13 @@ const main = async () => {
         // Released: nothing in the slot.
         await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(undefined));
         await settle(page);
-        const hiddenA = await measureSlot(page, slot, INK_FLOOR);
-        const hiddenB = await measureSlot(page, slot, INK_FLOOR);
+        const hiddenA = await measureStable(page, slot, INK_FLOOR);
+        await settle(page, 300);
+        const hiddenB = await measureStable(page, slot, INK_FLOOR);
         // Counted: painted in the slot.
         await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(7));
         await settle(page);
-        const shown = await measureSlot(page, slot, INK_FLOOR);
+        const shown = await measureStable(page, slot, INK_FLOOR);
         const delta = shown.ink - hiddenA.ink;
         assert(delta >= MIN_COUNTER_DELTA_PIXELS, `${name}: the counter is not painted (ink ${shown.ink} shown vs ${hiddenA.ink} released, need delta >= ${MIN_COUNTER_DELTA_PIXELS})`);
         assert(shown.bounds, `${name}: no counter ink bounds`);
@@ -159,7 +181,7 @@ const main = async () => {
         // Unknown again: the slot is empty after the grace window (no "0", no dash).
         await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(undefined));
         await settle(page);
-        const hiddenAfter = await measureSlot(page, slot, INK_FLOOR);
+        const hiddenAfter = await measureStable(page, slot, INK_FLOOR);
         assert(hiddenAfter.ink <= hiddenA.ink + 5, `${name}: ink remains in the slot after the count is released (${hiddenAfter.ink} vs ${hiddenA.ink})`);
         // Negative control: released vs released is exactly 0 ink difference, and fails the paint assertion.
         const controlDelta = hiddenB.ink - hiddenA.ink;

@@ -64,3 +64,18 @@ describe('auth failure code line', () => {
     expect(resolveLegacyPlayerMessageToastFrame(plain, 1000, 320).rows[0]?.copy).toBe('hi');
   });
 });
+
+describe('toast code line type step (MAZER-UI-034)', () => {
+  test('the row keeps the message copy apart from the code line, and the scene draws the code line at the caption step', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { getTypeScaleStep } = await import('../../src/render/typeScale');
+    const queue = enqueueLegacyPlayerMessage([], resolveLegacyOAuthFailureMessage('cancelled'), 0, 1);
+    const row = resolveLegacyPlayerMessageToastFrame(queue, 1000, 390).rows[0];
+    expect(row?.messageCopy).not.toContain('Code:');
+    expect(row?.copy).toBe(`${row?.messageCopy}\n${row?.codeLine}`);
+    expect(getTypeScaleStep('caption').sizePx).toBeLessThan(getTypeScaleStep('body').sizePx);
+    const scene = readFileSync('src/scenes/MenuScene.ts', 'utf8');
+    expect(scene).toContain("fontSize: `${getTypeScaleStep('caption').sizePx}px`");
+    expect(scene).toContain('playerMessageToastCodeTexts');
+  });
+});

@@ -1,12 +1,13 @@
 /**
  * MAZER-QA-009: every phone check that a desktop Chromium can simulate, in one repeatable run.
  *
- *   node scripts/visual/phone-emulation-sweep.mjs --base-url http://127.0.0.1:4313 --out DIR [--only a,b] [--assert]
+ *   node scripts/visual/phone-emulation-sweep.mjs --base-url http://127.0.0.1:4313 --out DIR [--only a,b] [--levels 60,100,190] [--assert]
  *
  * Sections: boot (layout/DPR/touch/overflow), motion (Reduce Motion on/off, colour drift), standalone (display-mode),
  * lifecycle (visibilitychange, offline), fps (rAF sampling), levels (60/100/190 load), touch (CDP touch drag),
  * acct013 (Android UA, 15-minute pending window, other-context callback, install gate in a tab).
- * It writes report.json + screenshots under DIR. It proves nothing about a real phone: see
+ * `--levels` picks the levels the levels section loads (MAZER-QA-011; default 60,100,190, whole numbers 1-999);
+ * see docs/ops/MAZER-QA-LEVEL-ACCESS.md. It writes report.json + screenshots under DIR. It proves nothing about a real phone: see
  * docs/ops/MAZER-PHONE-CHECKLIST.md for what that leaves.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -247,8 +248,23 @@ const sectionFps = async (browser, base, out) => {
   await context.close();
 };
 
+export const DEFAULT_CHECK_LEVELS = Object.freeze([60, 100, 190]);
+
+/** Parse `--levels 60,100`: whole numbers 1-999 only (anything else throws, so a typo cannot silently check nothing). */
+export const parseCheckLevels = (raw) => {
+  if (raw === undefined || raw === true) return [...DEFAULT_CHECK_LEVELS];
+  const levels = String(raw).split(',').map((part) => part.trim());
+  const parsed = levels.map((part) => (/^[0-9]{1,3}$/.test(part) ? Number(part) : NaN));
+  if (parsed.length === 0 || parsed.some((n) => !Number.isInteger(n) || n < 1 || n > 999)) {
+    throw new Error(`--levels must be a comma list of whole numbers 1-999, got ${JSON.stringify(String(raw))}`);
+  }
+  return parsed;
+};
+
+let checkLevels = [...DEFAULT_CHECK_LEVELS];
+
 const sectionLevels = async (browser, base, out) => {
-  for (const level of [60, 100, 190]) {
+  for (const level of checkLevels) {
     const { context, page, errors } = await newPage(browser, PROFILES[0], { progression: createProgressionState(level) });
     await boot(page, base, 'runtimeDiagnostics=1&authFixture=authenticated');
     await startPlay(page);
@@ -327,6 +343,7 @@ const main = async () => {
   const args = parseCliArgs(process.argv.slice(2));
   const base = String(args['base-url'] ?? 'http://127.0.0.1:4313').replace(/\/$/, '');
   const out = resolve(String(args.out ?? 'tmp/phone-sweep'));
+  checkLevels = parseCheckLevels(args.levels);
   const only = args.only ? String(args.only).split(',') : Object.keys(SECTIONS);
   await mkdir(out, { recursive: true });
   const browser = await chromium.launch();

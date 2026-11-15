@@ -15,8 +15,8 @@
  *  - Each rainbow star has its own hue phase offset (a second hash of the same seed) so they are never in lockstep,
  *    and the whole spectrum is one slow lap (BACKDROP_RAINBOW_HUE_PERIOD_MS), not a fast cycle, which is what the
  *    2026-11 owner note asked for ("stable per-star colour over rapid cycling through unrelated hues").
- *  - Stars stay dim so the maze, trail and diamonds remain the focus: saturation is capped (pastel, never neon),
- *    value is capped below full white, and the alpha a rainbow star can reach is capped below a white star's ceiling.
+ *  - Stars stay dim so the maze, trail and diamonds remain the focus: the colour is the shared rainbow UI material
+ *    (rainbowUiPalette.ts, the title lettering colours, no private tint) and the alpha a rainbow star can reach is capped below a white star's ceiling.
  *  - Reduced motion (and Animated Background "Still") stop the drift and twinkle, never colour (reducedMotion.ts):
  *    the hue reads the scene clock in every motion mode, and the redraw that carries it is the low-rate colour gate
  *    below instead of the per-frame star-drift redraw.
@@ -25,29 +25,31 @@
  * off-theme colour ratchet (tests/architecture/off-theme-color-ratchet.test.ts) has nothing to count.
  */
 
+import { RAINBOW_UI_SATURATION, RAINBOW_UI_VALUE, resolveRainbowUiColor } from './rainbowUiPalette';
+
 /** Share of the star field that carries the drifting rainbow hue (target about one in five). */
 export const BACKDROP_RAINBOW_STAR_SHARE = 0.2;
 
 /** One full lap of the spectrum. Slow: a star's colour changes by a visible step only over several seconds. */
 export const BACKDROP_RAINBOW_HUE_PERIOD_MS = 24000;
 
-/** HSV saturation of a rainbow star: pastel, so the colour is a tint on a point of light, not a neon dot. */
-export const BACKDROP_RAINBOW_SATURATION = 0.5;
+/** HSV saturation of a rainbow star: the shared rainbow UI material (rainbowUiPalette.ts), the same as the title lettering. */
+export const BACKDROP_RAINBOW_SATURATION = RAINBOW_UI_SATURATION;
 
-/** HSV value of a rainbow star: kept under full so it never outshines a white star. */
-export const BACKDROP_RAINBOW_VALUE = 0.92;
+/** HSV value of a rainbow star: the shared rainbow UI material. Stars stay dim through the alpha cap below, not a private tint. */
+export const BACKDROP_RAINBOW_VALUE = RAINBOW_UI_VALUE;
 
 /** The most opaque a rainbow star (or its halo) can be. White stars reach about 0.74 at the bright end of a twinkle. */
 export const BACKDROP_RAINBOW_ALPHA_CAP = 0.6;
 
 /**
  * Gap between colour-only backdrop redraws when the star drift redraw is not running (reduced motion or Animated
- * Background "Still"). A lap is 24 s and a colour channel sweeps about 0.5 of its 8-bit range per sixth of a lap, so
- * one redraw every 250 ms moves a channel by at most 8 units, the same bound the trail colour redraw keeps
- * (trailColourRedraw.ts TRAIL_COLOUR_MAX_CORE_STEP). At 4 redraws a second this is a fifth of the reduced-motion trail
+ * Background "Still"). A lap is 24 s and a colour channel sweeps about 0.8 of its 8-bit range (the shared rainbow UI saturation) per sixth of a lap, so
+ * one redraw every 150 ms moves a channel by at most 8 units, the same bound the trail colour redraw keeps
+ * (trailColourRedraw.ts TRAIL_COLOUR_MAX_CORE_STEP). At ~7 redraws a second this is about a third of the reduced-motion trail
  * redraw rate; the field is drawn only for the colour, which is far dimmer than the trail.
  */
-export const BACKDROP_RAINBOW_COLOUR_REDRAW_INTERVAL_MS = 250;
+export const BACKDROP_RAINBOW_COLOUR_REDRAW_INTERVAL_MS = 150;
 
 const UINT32 = 4294967296;
 const SUBSET_SALT = 0x9e3779b9;
@@ -102,7 +104,7 @@ export const backdropHsvToRgb = (hue: number, saturation: number, value: number)
 
 /** The packed colour of a rainbow star at a scene time. */
 export const resolveBackdropRainbowColor = (seed: number, timeMs: number): number => (
-  backdropHsvToRgb(resolveBackdropRainbowHue(seed, timeMs), BACKDROP_RAINBOW_SATURATION, BACKDROP_RAINBOW_VALUE)
+  resolveRainbowUiColor(resolveBackdropRainbowHue(seed, timeMs))
 );
 
 /** A rainbow star's alpha is held under BACKDROP_RAINBOW_ALPHA_CAP; any other star's alpha is returned unchanged. */
