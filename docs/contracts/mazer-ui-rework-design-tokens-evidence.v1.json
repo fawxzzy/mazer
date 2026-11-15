@@ -63,16 +63,10 @@
   ],
   "legacy/color/brand.gate": [
    {
-    "file": "src/styles/base.css"
-   },
-   {
     "file": "index.html"
    }
   ],
   "legacy/color/text.gate": [
-   {
-    "file": "src/styles/base.css"
-   },
    {
     "file": "index.html"
    }
@@ -186,14 +180,6 @@
   "legacy/fonts/system": [
    {
     "file": "src/scenes/MenuScene.ts",
-    "pattern": "\"Segoe UI Variable\", \"Helvetica Neue\", Arial, sans-serif"
-   },
-   {
-    "file": "src/styles/base.css",
-    "pattern": "\"Segoe UI Variable\", \"Helvetica Neue\", Arial, sans-serif"
-   },
-   {
-    "file": "index.html",
     "pattern": "\"Segoe UI Variable\", \"Helvetica Neue\", Arial, sans-serif"
    }
   ],

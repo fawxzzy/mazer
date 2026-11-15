@@ -50,6 +50,15 @@ the account page. Recommendation: do that as a separate card after the host proo
 
 ## The failure fallback
 
+Auth Surface v2 (owner-approved 2026-11-15, PR-A) restyles this state; the list below is the pre-v2 shape. Now: a
+`MAZER` kicker, the app icon (same place and size as the loader), the title `Mazer`, ONE reserved message area that
+holds either the lead `Sign in to play.` or one error notice box worded from the copy matrix
+(`src/brand/authSurfaceCopy.ts`; legacy failure rows are mapped by `resolveLegacyAccountStatusNotice`), and ONE
+`Sign in` button (`Signing in…` while the redirect is in flight). The area is sized for three wrapped lines at every
+size, so a notice never moves the button and is never clipped. The timeout line is `Sign-in took too long. Tap Sign in
+to try again.`. A failure is shown only in this box: the matching toast is suppressed while signed out
+(`shouldToastLegacyAuthFeedback`). Still no fields, username, rail, legal row, sign-up wording, guest, skip or back.
+
 Drawn by `MenuScene.buildAuthOverlay` from `src/legacy-runtime/legacyAccountStatusState.ts`:
 
 - the app icon and halo in the same place and size as the boot splash and the gate cover (`resolveLoaderLayout`), as

@@ -6,6 +6,7 @@ import {
   MAZER_INSTALL_GATE_COPY_FEEDBACK,
   MAZER_INSTALL_GATE_OVERLAY_ID,
   installMazerInstallGate,
+  renderMazerInstallGateCardHtml,
   resolveMazerInstallGateCopy,
   resolveMazerInstallGateDecision,
   runMazerInstallGate,
@@ -13,6 +14,7 @@ import {
   shouldShowMazerInstallGate
 } from '../../src/boot/installGate';
 import type { InstallGateMode } from '../../src/boot/installPolicy';
+import { AUTH_SURFACE_INSTALL_COPY } from '../../src/brand/authSurfaceCopy';
 import {
   initializeInstallSurface,
   resetInstallSurfaceRuntimeForTests,
@@ -144,9 +146,8 @@ describe('Mazer install gate', () => {
     expect(shouldRunMazerInstallGateForBoot({ ...base, forceInstallGate: true, isLocalhostRuntime: true })).toBe(true);
   });
 
-  // CHANGED (was: 'keeps one shared three-step contract while restoring the
-  // native action only for prompt-capable browsers'): the single generic
-  // 3-step copy is replaced by per-platform copy keyed by gate mode.
+  // CHANGED (Auth Surface v2, 2026-11-15): the subtitle and MAZER-FLOW-010 value line are replaced by one lead
+  // line per card; every visible string comes from src/brand/authSurfaceCopy.ts (the approved copy matrix).
   test('has short per-platform copy: three steps max, no skip, native action only when a prompt is captured', () => {
     const modes = Object.keys(MAZER_INSTALL_GATE_COPY) as InstallGateMode[];
     expect(modes.sort()).toEqual([
@@ -163,18 +164,13 @@ describe('Mazer install gate', () => {
       const copy = resolveMazerInstallGateCopy(mode);
       expect(copy.steps.length).toBeLessThanOrEqual(3);
       expect(copy).not.toHaveProperty('showSkip');
-      expect(`${copy.title} ${copy.subtitle} ${copy.steps.join(' ')}`).not.toMatch(/skip|continue without|dismiss/i);
+      expect(copy).not.toHaveProperty('subtitle');
+      expect(copy).not.toHaveProperty('valueLine');
+      expect(`${copy.title} ${copy.lead} ${copy.steps.join(' ')}`).not.toMatch(/skip|continue without|dismiss/i);
+      expect(copy.lead.length).toBeGreaterThan(0);
+      expect(copy.lead.length).toBeLessThanOrEqual(80);
       if (mode !== 'installed-open-app') {
-        expect(copy.title).toBe('Install Mazer');
-        expect(copy.subtitle).toMatch(/only runs/i);
-      }
-      // MAZER-FLOW-010: every install card carries one short value line; the post-install card has none.
-      if (mode === 'installed-open-app') {
-        expect(copy.valueLine).toBe('');
-      } else {
-        expect(copy.valueLine.length).toBeGreaterThan(0);
-        expect(copy.valueLine.length).toBeLessThanOrEqual(80);
-        expect(copy.valueLine).not.toMatch(/skip|continue without|dismiss/i);
+        expect(copy.title).toBe(AUTH_SURFACE_INSTALL_COPY.title);
       }
       expect(copy.primaryAction === 'install').toBe(mode === 'prompt-available');
       expect(copy.primaryLabel === 'Install').toBe(mode === 'prompt-available');
@@ -182,11 +178,17 @@ describe('Mazer install gate', () => {
 
     expect(resolveMazerInstallGateCopy('installed-open-app')).toMatchObject({
       title: 'Mazer is installed',
-      subtitle: 'Open it from your home screen or desktop.',
+      lead: 'Open it from your home screen.',
       steps: []
     });
+    expect(resolveMazerInstallGateCopy('installed-open-app', 'desktop-chromium').lead).toBe(
+      AUTH_SURFACE_INSTALL_COPY.installedDesktopLead
+    );
     expect(resolveMazerInstallGateCopy('in-app-browser').showCopyLink).toBe(true);
+    expect(resolveMazerInstallGateCopy('in-app-browser').lead).toBe(AUTH_SURFACE_INSTALL_COPY.leadInAppIos);
+    expect(resolveMazerInstallGateCopy('in-app-browser', 'android-in-app').lead).toBe(AUTH_SURFACE_INSTALL_COPY.leadInAppAndroid);
     expect(resolveMazerInstallGateCopy('manual-ios').steps.join(' ')).toMatch(/Add to Home Screen/);
+    expect(resolveMazerInstallGateCopy('manual-android').showCopyLink).toBe(false);
   });
 
   test('the overlay renders per-platform copy and upgrades in place when a prompt arrives later', () => {
@@ -209,25 +211,43 @@ describe('Mazer install gate', () => {
     expect(overlay.innerHTML).not.toContain('data-mazer-install-gate-action="install"');
   });
 
-  test('renders the value line with the static mini-maze mark, and none on the post-install card', () => {
+  test('renders the shared surface anatomy: app icon, kicker, steps, legal links and one dock button', () => {
     const documentRef = new FakeDocument();
     const handle = installMazerInstallGate(documentRef, browserTabState, { onCopyLink: () => {}, onInstall: () => {} });
     const overlay = documentRef.appended[0];
-    const valueLine = resolveMazerInstallGateCopy('manual-desktop-chromium').valueLine;
 
-    expect(overlay.innerHTML).toContain('class="mazer-install-gate-value"');
-    expect(overlay.innerHTML).toContain(valueLine);
-    expect(overlay.innerHTML).toContain('class="mazer-install-gate-mini-maze"');
-    expect(overlay.innerHTML).toContain('aria-hidden="true"');
-    expect(overlay.innerHTML).toContain('role="status"');
+    expect(overlay.innerHTML).toContain('mazer-surface-appicon-top');
+    expect(overlay.innerHTML).toContain('class="mazer-surface-kicker"');
+    expect(overlay.innerHTML).toContain('class="mazer-surface-steps"');
+    expect(overlay.innerHTML).toContain('class="mazer-surface-legal"');
+    expect(overlay.innerHTML).toContain('>Privacy</a>');
+    expect(overlay.innerHTML).toContain('>Terms</a>');
+    expect(overlay.innerHTML).not.toContain('mazer-install-gate-mini-maze');
+    expect(overlay.innerHTML).not.toContain('mazer-install-gate-value');
+    expect(overlay.innerHTML).not.toMatch(/target="_blank"/);
 
     handle.update({ ...browserTabState, mode: 'hidden', installed: true });
-    expect(overlay.innerHTML).not.toContain('mazer-install-gate-value');
-    expect(overlay.innerHTML).not.toContain('mazer-install-gate-mini-maze');
+    expect(overlay.innerHTML).toContain('mazer-surface-appicon-mark');
+    expect(overlay.innerHTML).not.toContain('class="mazer-surface-legal"');
+    expect(overlay.innerHTML).not.toContain('class="mazer-surface-dock"');
+  });
+
+  test('the in-app card reserves one message slot for the copy feedback; manual cards reserve none', () => {
+    const inApp = renderMazerInstallGateCardHtml(resolveMazerInstallGateCopy('in-app-browser'), 'in-app-browser');
+    expect(inApp.match(/class="mazer-surface-slot"/g)).toHaveLength(1);
+    expect(inApp).toContain('data-mazer-install-gate-feedback');
+    expect(inApp).toContain('role="status"');
+    const manualIos = renderMazerInstallGateCardHtml(resolveMazerInstallGateCopy('manual-ios'), 'manual-ios');
+    expect(manualIos).not.toContain('mazer-surface-slot');
+    expect(manualIos).not.toContain('mazer-surface-dock');
   });
 
   test('Copy link confirms visibly on success and reports failure instead of staying silent', async () => {
-    const feedback = { textContent: '' };
+    const feedback = {
+      innerHTML: '',
+      tone: '',
+      setAttribute(name: string, value: string) { if (name === 'data-tone') { this.tone = value; } }
+    };
     let copyHandler: (() => void) | null = null;
     const overlay = {
       id: '',
@@ -250,19 +270,21 @@ describe('Mazer install gate', () => {
     let result = true;
     installMazerInstallGate(documentRef as never, copyState, { onCopyLink: async () => result, onInstall: () => {} });
     expect(overlay.innerHTML).toContain('data-mazer-install-gate-action="copy"');
-    expect(feedback.textContent).toBe('');
+    expect(feedback.innerHTML).toBe('');
 
     copyHandler!();
     await Promise.resolve();
     await Promise.resolve();
-    expect(feedback.textContent).toBe(MAZER_INSTALL_GATE_COPY_FEEDBACK.copied);
+    expect(feedback.tone).toBe('success');
+    expect(feedback.innerHTML).toContain(MAZER_INSTALL_GATE_COPY_FEEDBACK.copied);
     expect(MAZER_INSTALL_GATE_COPY_FEEDBACK.copied).toMatch(/^Link copied/);
 
     result = false;
     copyHandler!();
     await Promise.resolve();
     await Promise.resolve();
-    expect(feedback.textContent).toBe(MAZER_INSTALL_GATE_COPY_FEEDBACK.failed);
+    expect(feedback.tone).toBe('error');
+    expect(feedback.innerHTML).toContain(MAZER_INSTALL_GATE_COPY_FEEDBACK.failed);
   });
 
   test('runMazerInstallGate resolves immediately when standalone and otherwise stays up with no skip, upgrading on events', async () => {

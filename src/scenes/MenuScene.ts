@@ -552,10 +552,14 @@ import {
 } from '../legacy-runtime/legacyLeaderboardView';
 import { readLegacyLeaderboardFixtureShape } from '../legacy-runtime/legacyLeaderboardFixture';
 import {
+  LEGACY_ACCOUNT_STATUS_COLORS,
+  LEGACY_ACCOUNT_STATUS_COPY,
+  LEGACY_ACCOUNT_STATUS_NOTICE_RADIUS,
   LEGACY_ACCOUNT_STATUS_OPENING_TIMEOUT_MS,
   resolveLegacyAccountStatus,
   resolveLegacyAccountStatusLayout,
-  resolveLegacyAuthLoadingCopy
+  resolveLegacyAuthLoadingCopy,
+  shouldToastLegacyAuthFeedback
 } from '../legacy-runtime/legacyAccountStatusState';
 import { LOADER_RING_REDUCED_ALPHA, LOADER_RING_REDUCED_SCALE } from '../render/appLoader';
 import { MAZER_LOADER_ICON_TEXTURE_KEY, MAZER_LOADER_RING_TEXTURE_KEY } from '../render/appLoaderOverlay';
@@ -581,7 +585,6 @@ import {
   type LegacyPlayerMessage
 } from '../legacy-runtime/legacyPlayerMessage';
 import { resolveLegacyPlayerMessageToastFrame } from '../legacy-runtime/legacyPlayerMessageToast';
-import { getTypeScaleStep } from '../render/typeScale';
 import { RAINBOW_UI_SATURATION, RAINBOW_UI_VALUE } from '../render/rainbowUiPalette';
 import {
   hydrateLegacyRemoteAccountState,
@@ -1723,7 +1726,6 @@ export class MenuScene extends Phaser.Scene {
   private readonly uiEntrance = new UiEntranceDriver();
   private playerMessageToastTexts: Phaser.GameObjects.Text[] = [];
   /** MAZER-UI-034: the small failure-code line under a toast, one per toast row. */
-  private playerMessageToastCodeTexts: Phaser.GameObjects.Text[] = [];
   private authGateLoadingText!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
   // MAZER-VIS-039: the one app loader (icon, ring, fade in/out) behind the `Signing you in…` cover (src/render/appLoader.ts).
@@ -2475,17 +2477,10 @@ export class MenuScene extends Phaser.Scene {
         align: 'center'
       })).setOrigin(0.5, 0).setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH + 1).setVisible(false)
     ));
-    this.playerMessageToastCodeTexts = Array.from({ length: LEGACY_PLAYER_MESSAGE_TOAST_ROW_POOL }, () => (
-      this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
-        fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: `${getTypeScaleStep('caption').sizePx}px`,
-        align: 'center'
-      })).setOrigin(0.5, 0).setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH + 1).setVisible(false)
-    ));
-    this.authGateLoadingText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, 'Signing you in…', {
+    this.authGateLoadingText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, LEGACY_ACCOUNT_STATUS_COPY.loading, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '15px',
-      color: '#d7fff8'
+      color: LEGACY_ACCOUNT_STATUS_COLORS.loaderLabel
     })).setOrigin(0.5).setVisible(false).setDepth(LEGACY_AUTH_GATE_LOADING_DEPTH);
     this.appLoader = new AppLoaderOverlay(this, LEGACY_AUTH_GATE_LOADING_DEPTH);
 
@@ -12671,31 +12666,22 @@ export class MenuScene extends Phaser.Scene {
   }
 
   // MAZER-ACCT-043: Mazer keeps no account screen (sign-in, sign-up, account settings, credentials, session and
-  // sign-out live on account.fawxzzy.com). This is only the failure fallback of the hand-off, drawn in the shared
-  // loader's visual language: app icon + halo, ONE status line, ONE `Try again` button. No title, marker, fields,
-  // rail or legal row, and no sign-in / sign-up wording. Logic: src/legacy-runtime/legacyAccountStatusState.ts.
+  // sign-out live on account.fawxzzy.com). This is only the failure fallback of the hand-off. Auth Surface v2: MAZER
+  // kicker, app icon + halo where the loader draws it, the title, ONE reserved message area (lead or one notice box)
+  // and ONE `Sign in` button. No fields, username, rail or legal row. Logic: src/legacy-runtime/legacyAccountStatusState.ts.
   private buildAuthOverlay(): void {
     // MAZER-ACCT-037: quiet, throttled, never shows anything (see the module).
     warmMazerProviderPreflight();
-    const panel = this.resolveOverlayPanelFrame();
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const status = resolveLegacyAccountStatus({
-      errorMessage: this.authSnapshot.error,
+      // Player-safe copy only: the same resolver the toast used, so provider text never reaches the box.
+      errorMessage: resolveLegacyAuthFeedbackMessage(this.authSnapshot.error, null, this.authSnapshot.errorCode)?.copy ?? null,
       openingTimedOut: this.authOpeningTimedOut,
       status: this.authSnapshot.status,
       submitting: this.authSubmitting
     });
     const layout = resolveLegacyAccountStatusLayout(this.layout.width, this.layout.height, readMazerViewportGeometry().safeArea);
     this.drawLegacyAccountStatusIcon(layout.loader);
-    if (status.line.length > 0) {
-      this.createAuthInfoText(
-        status.line,
-        Math.round(layout.loader.labelCentreY),
-        panel,
-        toCyberArcadeCssHex(status.tone === 'error' ? cyberArcadeMaterial.signal.goal : cyberArcadeMaterial.rail.muted),
-        stacked ? 14 : 16
-      );
-    }
+    this.drawLegacyAccountStatusText(status, layout);
     this.uiButtons.push(this.createLegacyAuthActionButton(
       layout.button.left + (layout.button.width / 2),
       layout.button.top + (layout.button.height / 2),
@@ -12729,6 +12715,81 @@ export class MenuScene extends Phaser.Scene {
     const icon = this.add.image(x, y, MAZER_LOADER_ICON_TEXTURE_KEY).setOrigin(0.5, 0.5).setDepth(3);
     icon.setScale(loader.iconSizePx / (icon.width || loader.iconSizePx));
     this.accountStatusImages.push(ring, icon);
+  }
+
+  // Auth Surface v2: kicker, title and the reserved message area. The area never changes size, so a notice
+  // appearing or clearing moves nothing; the notice text wraps inside it and shrinks before it could ever clip.
+  private drawLegacyAccountStatusText(
+    status: ReturnType<typeof resolveLegacyAccountStatus>,
+    layout: ReturnType<typeof resolveLegacyAccountStatusLayout>
+  ): void {
+    const colors = LEGACY_ACCOUNT_STATUS_COLORS;
+    const centreX = layout.centerX;
+    if (layout.kicker !== null) {
+      this.uiTexts.push(this.applyLegacyUiTextCrispness(this.add.text(centreX, layout.kicker.centreY, status.kicker, {
+        color: colors.kicker,
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: `${layout.kicker.fontSizePx}px`,
+        fontStyle: '500',
+        letterSpacing: Math.round(layout.kicker.fontSizePx * 0.34)
+      })).setOrigin(0.5).setDepth(3));
+    }
+    this.uiTexts.push(this.applyLegacyUiTextCrispness(this.add.text(centreX, layout.title.centreY, status.title, {
+      color: colors.title,
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${layout.title.fontSizePx}px`,
+      fontStyle: '300'
+    })).setOrigin(0.5).setDepth(3));
+
+    const slot = layout.slot;
+    if (status.presentation === 'lead') {
+      const lead = this.applyLegacyUiTextCrispness(this.add.text(centreX, slot.top, status.line, {
+        align: 'center',
+        color: colors.lead,
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: `${slot.leadFontSizePx}px`,
+        wordWrap: { width: Math.min(310, slot.width), useAdvancedWrap: true }
+      })).setOrigin(0.5, 0).setAlpha(colors.leadAlpha).setDepth(3);
+      this.uiTexts.push(lead);
+      return;
+    }
+
+    const iconSize = 20;
+    const iconGap = 10;
+    const textLeft = slot.left + slot.paddingX + iconSize + iconGap;
+    const textWidth = Math.max(40, slot.left + slot.width - slot.paddingX - textLeft);
+    const maxTextHeight = slot.height - (slot.paddingY * 2);
+    let fontSizePx = slot.fontSizePx;
+    const text = this.applyLegacyUiTextCrispness(this.add.text(textLeft, slot.top + slot.paddingY, status.line, {
+      color: colors.noticeText,
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${fontSizePx}px`,
+      lineSpacing: slot.lineHeightPx - fontSizePx,
+      wordWrap: { width: textWidth, useAdvancedWrap: true }
+    })).setOrigin(0, 0).setDepth(4);
+    while (text.height > maxTextHeight && fontSizePx > 12) {
+      fontSizePx -= 1;
+      text.setFontSize(fontSizePx).setLineSpacing(Math.round(fontSizePx * 0.38));
+    }
+    this.uiTexts.push(text);
+
+    const boxHeight = Math.min(slot.height, Math.ceil(text.height) + (slot.paddingY * 2));
+    const graphics = this.add.graphics().setDepth(3);
+    const fill = Phaser.Display.Color.HexStringToColor(colors.noticeFill).color;
+    const border = Phaser.Display.Color.HexStringToColor(colors.noticeBorder).color;
+    graphics.fillStyle(fill, colors.noticeFillAlpha);
+    graphics.fillRoundedRect(slot.left, slot.top, slot.width, boxHeight, LEGACY_ACCOUNT_STATUS_NOTICE_RADIUS);
+    graphics.lineStyle(1, border, colors.noticeBorderAlpha);
+    graphics.strokeRoundedRect(slot.left + 0.5, slot.top + 0.5, slot.width - 1, boxHeight - 1, LEGACY_ACCOUNT_STATUS_NOTICE_RADIUS);
+    // The warning mark of the mock: a ring with a short bar and a dot.
+    const markX = slot.left + slot.paddingX + (iconSize / 2);
+    const markY = slot.top + slot.paddingY + Math.round(slot.lineHeightPx / 2);
+    graphics.lineStyle(2, border, 1);
+    graphics.strokeCircle(markX, markY, (iconSize / 2) - 1);
+    graphics.lineBetween(markX, markY - 4, markX, markY + 1);
+    graphics.fillStyle(border, 1);
+    graphics.fillCircle(markX, markY + 4.5, 1.2);
+    this.uiGraphics.push(graphics);
   }
 
   // MAZER-ACCT-019: one extra username read per signed-in user after the profile bootstrap, only
@@ -13209,7 +13270,10 @@ export class MenuScene extends Phaser.Scene {
         info: this.authSnapshot.info
       })
       : Number.NEGATIVE_INFINITY;
-    this.pushLegacyPlayerMessage(message);
+    // Auth Surface v2: a failure shows once, in the status screen's notice box (see the helper).
+    if (shouldToastLegacyAuthFeedback(message, this.authSnapshot.status === 'authenticated')) {
+      this.pushLegacyPlayerMessage(message);
+    }
   }
 
   private clearLegacyAuthFeedbackMessage(): void {
@@ -13235,7 +13299,7 @@ export class MenuScene extends Phaser.Scene {
     graphics.clear();
     if (frame.rows.length === 0) {
       graphics.setVisible(false);
-      for (const text of [...this.playerMessageToastTexts, ...this.playerMessageToastCodeTexts]) {
+      for (const text of this.playerMessageToastTexts) {
         text.setVisible(false);
       }
       return;
@@ -13250,28 +13314,16 @@ export class MenuScene extends Phaser.Scene {
       : Math.round(safeArea.top + 156);
     this.playerMessageToastTexts.forEach((text, index) => {
       const row = frame.rows[index];
-      const codeText = this.playerMessageToastCodeTexts[index];
       if (!row) {
         text.setVisible(false);
-        codeText?.setVisible(false);
         return;
       }
 
       text.setWordWrapWidth(frame.maxWidth - (padX * 2));
-      // MAZER-UI-034: the code line is its own caption-step text, under the message.
-      text.setText(row.codeLine === null ? row.copy : row.messageCopy);
+      text.setText(row.copy);
       text.setColor(row.color);
-      const hasCode = row.codeLine !== null && codeText !== undefined;
-      if (hasCode) {
-        codeText.setWordWrapWidth(frame.maxWidth - (padX * 2));
-        codeText.setText(row.codeLine ?? '');
-        codeText.setColor(row.color);
-      } else {
-        codeText?.setVisible(false);
-      }
-      const codeHeight = hasCode ? codeText.height : 0;
-      const boxWidth = Math.round(Math.min(frame.maxWidth, Math.max(text.width, hasCode ? codeText.width : 0) + (padX * 2)));
-      const boxHeight = Math.round(text.height + codeHeight + (padY * 2));
+      const boxWidth = Math.round(Math.min(frame.maxWidth, text.width + (padX * 2)));
+      const boxHeight = Math.round(text.height + (padY * 2));
       const left = Math.round((width - boxWidth) / 2);
       const color = Phaser.Display.Color.HexStringToColor(row.color).color;
       graphics.fillStyle(0x070b14, 0.92 * row.alpha);
@@ -13279,9 +13331,6 @@ export class MenuScene extends Phaser.Scene {
       graphics.lineStyle(2, color, 0.9 * row.alpha);
       graphics.strokeRoundedRect(left, y, boxWidth, boxHeight, 10);
       text.setPosition(Math.round(left + (boxWidth / 2)), y + padY).setAlpha(row.alpha).setVisible(true);
-      if (hasCode) {
-        codeText.setPosition(Math.round(left + (boxWidth / 2)), Math.round(y + padY + text.height)).setAlpha(row.alpha * 0.85).setVisible(true);
-      }
       y += boxHeight + 8;
     });
   }
@@ -13310,24 +13359,6 @@ export class MenuScene extends Phaser.Scene {
     if (expired) {
       this.markLegacyPlayerMessagesDirty();
     }
-  }
-
-  private createAuthInfoText(
-    copy: string,
-    y: number,
-    panel: OverlayPanelFrame,
-    color: string,
-    fontSize?: number
-  ): void {
-    const maxWidth = panel.width - 56;
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(panel.centerX, y, copy, {
-      align: 'center',
-      color,
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${fontSize ?? (panel.width < LEGACY_UI_COMPACT_BREAKPOINT ? 16 : 18)}px`,
-      wordWrap: { width: maxWidth, useAdvancedWrap: true }
-    })), maxWidth, fontSize ?? 18, 11).setOrigin(0.5);
-    this.uiTexts.push(label);
   }
 
   private createLegacyAuthActionButton(

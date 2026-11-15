@@ -1,5 +1,11 @@
 # Mazer Auth Screen Anatomy (shared-account entry)
 
+> Superseded in part, 2026-11-15 (Auth Surface v2, PR-A): the only drawn account state is the MAZER-ACCT-043 failure
+> fallback, now with a MAZER kicker, the app icon, title `Mazer`, one reserved message area (lead or one notice box)
+> and one `Sign in` button (busy `Signing in…`; was `Try again` / `Opening…`). Copy lives in
+> `src/brand/authSurfaceCopy.ts`; `evaluateAuthStatusAnatomy` in `scripts/analysis/capture-ui-surfaces.mjs` checks it.
+> See `docs/ops/MAZER-NO-INAPP-ACCOUNT-SCREENS-2026-11-14.md`. The Welcome-screen spec below is history.
+
 Date: 2026-11-05. Status: WIRED (wave `claude/mazer-w2-leaderboard-auth-20261105`, source-proven in a local worktree; not
 deployed). `MenuScene.buildSharedAccountEntrySection` / `buildAuthOverlay` now draw this view-model and layout. The
 opening timeout is 10 s (owner decision) and the dock label is `Opening…`. `Create Account` stays on the OAuth

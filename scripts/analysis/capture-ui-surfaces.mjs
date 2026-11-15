@@ -54,10 +54,11 @@ const INLINE_STATE_TEXT_LABELS = Object.freeze([
   'Haptics'
 ]);
 // MAZER-ACCT-043: Mazer keeps no account screen. The forced signed-out state is the failure fallback of the hand-off
-// (MenuScene buildAuthOverlay, drawn from legacyAccountStatusState.ts): the loader icon, ONE status line and ONE
-// `Try again` button. The button is the only label the structure exposes.
+// (MenuScene buildAuthOverlay, drawn from legacyAccountStatusState.ts): the app icon, the MAZER kicker and Mazer title,
+// ONE line or notice and ONE `Sign in` button (Auth Surface v2, 2026-11-15). The button is the only label the
+// structure exposes.
 const AUTH_EXPECTED_LABELS = Object.freeze([
-  'Try again'
+  'Sign in'
 ]);
 
 const buildExpectedTextLabelDescriptors = (expectedLabels) => (
@@ -1302,23 +1303,25 @@ export const hasTextLabels = (surface, expectedLabels) => {
   return hasExpectedTextLabels(labels, expectedLabels);
 };
 
-// The forced signed-out state is the failure fallback (MAZER-ACCT-043): no title, marker, rail, legal row or account
-// wording, ONE `Try again` (or in-flight `Opening…`) button and no guest / skip / close / back action.
+// The forced signed-out state is the failure fallback (MAZER-ACCT-043), restyled by Auth Surface v2 (2026-11-15): the
+// MAZER kicker, the `Mazer` title, one line (`Sign in to play.` or a copy-matrix notice), ONE `Sign in` (or in-flight
+// `Signing in…`) button, and still no account title, rail, legal row, password / sign-up wording or guest / skip /
+// close / back action.
 export const evaluateAuthStatusAnatomy = (surface) => {
   const labels = collectTextLabels(surface);
   const buttonTexts = (surface?.buttons ?? []).map((button) => button?.text);
   const failures = [];
-  const retryCount = buttonTexts.filter((text) => text === 'Try again' || text === 'Opening…').length;
+  const retryCount = buttonTexts.filter((text) => text === 'Sign in' || text === 'Signing in…').length;
   if (retryCount !== 1) {
     failures.push(`retry-button-count=${retryCount}`);
   }
   if (buttonTexts.length !== retryCount) {
     failures.push('extra-buttons-present');
   }
-  if (labels.some((label) => typeof label === 'string' && /^(welcome|account|mazer)$/i.test(label))) {
+  if (labels.some((label) => typeof label === 'string' && /^(welcome|welcome back|account)$/i.test(label))) {
     failures.push('account-title-or-marker-present');
   }
-  if (labels.some((label) => typeof label === 'string' && /sign in|sign up|create account|password|privacy|terms/i.test(label))) {
+  if (labels.some((label) => typeof label === 'string' && /sign up|create account|log in|password|username|privacy|terms/i.test(label))) {
     failures.push('account-wording-present');
   }
   if (buttonTexts.some((text) => typeof text === 'string' && /guest|skip|later|close|back/i.test(text))) {

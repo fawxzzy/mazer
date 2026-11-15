@@ -20,7 +20,7 @@ import { LEGACY_ACCOUNT_STATUS_COPY } from '../../src/legacy-runtime/legacyAccou
  *  - no player-visible Mazer string says "One moment" or "pending" (the only "still pending" text in the repo is the
  *    technical password-update message, which is not part of sign-in);
  *  - every boot stage that can run during the return (callback exchange included) shows only the loader label
- *    `Loading…` or `Signing you in…`, never a status sentence;
+ *    `Opening Mazer…` or `Signing in…`, never a status sentence;
  *  - the scene never draws the callback-pending Welcome variant (`hasCallbackInProgress` stays false), so there is no
  *    Mazer screen between the HTML splash and the in-game loader cover.
  */
@@ -66,7 +66,7 @@ describe('the host-return sequence has no intermediate Mazer text screen (MAZER-
     expect(/one moment|pending/i.test(guide)).toBe(false);
   });
 
-  test('every boot stage shows only the loader label: Loading… or (during a real callback exchange) Signing you in…', () => {
+  test('every boot stage shows only the loader label: Opening Mazer… or (during a real callback exchange) Signing in…', () => {
     const stages = /export type MazerBootStage =([\s\S]*?);/.exec(read('src/boot/bootStatus.ts'))?.[1]
       ?.match(/'([a-z-]+)'/g)?.map((quoted) => quoted.slice(1, -1)) ?? [];
     expect(stages).toContain('oauth-exchange');
@@ -75,10 +75,10 @@ describe('the host-return sequence has no intermediate Mazer text screen (MAZER-
       expect([MAZER_BOOT_SPLASH_NEUTRAL_MESSAGE, MAZER_BOOT_SPLASH_SIGN_IN_MESSAGE], stage)
         .toContain(resolveMazerBootSplashMessage(stage));
     }
-    expect(resolveMazerBootSplashMessage('oauth-exchange')).toBe('Signing you in…');
-    expect(MAZER_BOOT_SPLASH_NEUTRAL_MESSAGE).toBe('Loading…');
+    expect(resolveMazerBootSplashMessage('oauth-exchange')).toBe('Signing in…');
+    expect(MAZER_BOOT_SPLASH_NEUTRAL_MESSAGE).toBe('Opening Mazer…');
     // The HTML splash starts on the neutral label, so the first frame of a callback load already reads as the loader.
-    expect(read('index.html')).toContain('Loading&hellip;</p>');
+    expect(read('index.html')).toContain('Opening Mazer&hellip;</p>');
   });
 
   test('the scene has no callback-pending Welcome variant any more (MAZER-ACCT-043): the loader cover is the only pending state', () => {
@@ -91,8 +91,8 @@ describe('the host-return sequence has no intermediate Mazer text screen (MAZER-
   });
 
   test('the account status copy holds only the two loader labels as progress text (no pending sentence)', () => {
-    expect(LEGACY_ACCOUNT_STATUS_COPY.signingIn).toBe('Signing you in…');
-    expect(LEGACY_ACCOUNT_STATUS_COPY.loading).toBe('Loading…');
+    expect(LEGACY_ACCOUNT_STATUS_COPY.signingIn).toBe('Signing in…');
+    expect(LEGACY_ACCOUNT_STATUS_COPY.loading).toBe('Opening Mazer…');
     expect(/one moment|pending/i.test(JSON.stringify(LEGACY_ACCOUNT_STATUS_COPY))).toBe(false);
   });
 
