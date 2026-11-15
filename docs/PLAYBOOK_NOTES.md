@@ -315,3 +315,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: three menu polish cards; the stars owner request was "same colours as the rainbow UI".
 - Rule: a colour that must match another surface imports that surface's palette module; a test compares the two, so a private tint fails CI.
 - Status: Applied (review); headless Chromium 390x844 and WebKit iPhone 15 Pro only, nothing checked on a real phone. MAZER-DEBT-002 (drop constant formMode/invalidFields) NOT done here: it must edit menuRuntimeDiagnostics.ts (Wave 1C) and MenuScene.ts (Wave 5C) together, which the integrator wave-mix test rejects; it needs its own split PR.
+## 2026-11-14 - MAZER-UI-015 (part 2) action-button chrome draws from the kit table
+- WHAT changed: `legacyButtonKit.ts` gains `LEGACY_BUTTON_CHROME` (fill, stroke, label colour, lit-when-idle per primary / secondary / danger-filled / danger-outline) and `resolveLegacyActionTone`; `MenuScene.createLegacyAuthActionButton` takes its non-dock colours from it instead of an inline ternary. Sign out, Reset progress, Guide-style secondary and auth secondary buttons are flipped to `chromeViaKit: true`.
+- WHY it changed: PR 553 shipped the table and the Start hit zone but nothing drew from it. Values are the exact pre-kit colours, so this is look-neutral; the ratchet test now pins the migrated set.
+- Rule: a button picks a kit variant, never a colour; flip its `chromeViaKit` entry in the same PR that migrates it.
+- Status: Applied (review); NOT migrated: Start/Login (front-door renderer), settings cog and overlay close (icon variant), auth primary (unified dock gradient look), DOM install surface. Headless only, nothing checked on a real phone.
