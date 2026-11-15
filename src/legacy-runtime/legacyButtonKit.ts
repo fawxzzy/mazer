@@ -1,3 +1,4 @@
+import { cyberArcadeMaterial } from '../render/cyberArcadeMaterial';
 import { LEGACY_MIN_HIT_TARGET_PX } from './legacyHitTarget';
 
 /**
@@ -5,7 +6,8 @@ import { LEGACY_MIN_HIT_TARGET_PX } from './legacyHitTarget';
  * variant; a surface picks a variant, never a new look. Chrome drawing for each
  * variant stays with the existing renderers for now and migrates onto this table
  * one surface per PR; `chromeViaKit` records which buttons already draw from it
- * (none yet), and the test pins that count so migrations must flip entries.
+ * (the MenuScene action-button factory resolves fill/stroke/text from LEGACY_BUTTON_CHROME below),
+ * and the test pins that set so migrations must flip entries.
  */
 export type LegacyButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'icon';
 
@@ -27,6 +29,43 @@ export const LEGACY_BUTTON_KIT: Readonly<Record<LegacyButtonVariant, LegacyButto
   danger: { variant: 'danger', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: true, use: 'Destructive actions (Sign out, Reset progress)' },
   icon: { variant: 'icon', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: false, use: 'Icon-only controls (Settings cog, close x)' }
 });
+
+/**
+ * Chrome (fill / stroke / label colour) for the Phaser action-button factory, per variant.
+ * Values are the ones the factory hard-coded before MAZER-UI-015, so migrating onto the table
+ * is look-neutral. `danger` has a filled (Sign out) and an outline (Reset progress) emphasis.
+ */
+export type LegacyButtonEmphasis = 'filled' | 'outline';
+export type LegacyButtonTextKey = 'bright' | 'soft' | 'signOut';
+export type LegacyButtonFillKey = 'primary' | 'control' | 'dangerFilled';
+export interface LegacyButtonChromeSpec {
+  /** Which scene-owned fill the button uses (MenuScene holds the values so the design-token evidence keeps citing it). */
+  readonly fillKey: LegacyButtonFillKey;
+  readonly stroke: number;
+  /** Which scene-owned label colour (same note as fillKey). */
+  readonly textKey: LegacyButtonTextKey;
+  /** Drawn in the lit state even when idle (the one main action on a surface). */
+  readonly litWhenIdle: boolean;
+}
+
+export const LEGACY_BUTTON_CHROME: Readonly<Record<'primary' | 'secondary' | 'dangerFilled' | 'dangerOutline', LegacyButtonChromeSpec>> = Object.freeze({
+  primary: Object.freeze({ fillKey: 'primary', stroke: cyberArcadeMaterial.rail.mint, textKey: 'bright', litWhenIdle: true }),
+  secondary: Object.freeze({ fillKey: 'control', stroke: cyberArcadeMaterial.rail.cyan, textKey: 'soft', litWhenIdle: false }),
+  dangerFilled: Object.freeze({ fillKey: 'dangerFilled', stroke: cyberArcadeMaterial.signal.goal, textKey: 'signOut', litWhenIdle: false }),
+  dangerOutline: Object.freeze({ fillKey: 'control', stroke: cyberArcadeMaterial.signal.goal, textKey: 'signOut', litWhenIdle: false })
+});
+
+export type LegacyActionTone = 'primary' | 'secondary' | 'danger' | 'danger-outline';
+
+/** The factory's tone names are the kit variants plus the danger emphasis. */
+export const resolveLegacyActionTone = (tone: LegacyActionTone): { variant: LegacyButtonVariant; chrome: LegacyButtonChromeSpec } => {
+  switch (tone) {
+    case 'primary': return { variant: 'primary', chrome: LEGACY_BUTTON_CHROME.primary };
+    case 'danger': return { variant: 'danger', chrome: LEGACY_BUTTON_CHROME.dangerFilled };
+    case 'danger-outline': return { variant: 'danger', chrome: LEGACY_BUTTON_CHROME.dangerOutline };
+    default: return { variant: 'secondary', chrome: LEGACY_BUTTON_CHROME.secondary };
+  }
+};
 
 /** Toggle row: label and On/Off state are always two separate elements (MAZER-UI-010). */
 export interface LegacyToggleRowSpec {
@@ -56,11 +95,11 @@ export const LEGACY_BUTTON_MAP: readonly LegacyButtonMapping[] = Object.freeze([
   { id: 'start', surface: 'front-door', variant: 'primary', chromeViaKit: false },
   { id: 'login', surface: 'front-door', variant: 'primary', chromeViaKit: false },
   { id: 'settings-cog', surface: 'front-door', variant: 'icon', chromeViaKit: false },
-  { id: 'guide', surface: 'settings', variant: 'secondary', chromeViaKit: false },
-  { id: 'sign-out', surface: 'settings', variant: 'danger', chromeViaKit: false },
-  { id: 'reset-progress', surface: 'settings', variant: 'danger', chromeViaKit: false },
+  { id: 'guide', surface: 'settings', variant: 'secondary', chromeViaKit: true },
+  { id: 'sign-out', surface: 'settings', variant: 'danger', chromeViaKit: true },
+  { id: 'reset-progress', surface: 'settings', variant: 'danger', chromeViaKit: true },
   { id: 'auth-submit', surface: 'auth', variant: 'primary', chromeViaKit: false },
-  { id: 'auth-secondary', surface: 'auth', variant: 'secondary', chromeViaKit: false },
+  { id: 'auth-secondary', surface: 'auth', variant: 'secondary', chromeViaKit: true },
   { id: 'install', surface: 'install', variant: 'secondary', chromeViaKit: false },
   { id: 'overlay-close', surface: 'menu', variant: 'icon', chromeViaKit: false }
 ].map((entry) => Object.freeze(entry) as LegacyButtonMapping));
