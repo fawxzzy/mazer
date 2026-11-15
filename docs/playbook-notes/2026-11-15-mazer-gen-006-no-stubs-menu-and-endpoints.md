@@ -1,0 +1,7 @@
+# 2026-11-15 MAZER-GEN-006 follow-up: no one-tile stubs in the main-menu demo or at the start/goal
+
+- WHAT changed: `legacyMazeStubs.ts` no longer exempts the start and goal (a start or goal in a one-tile nub off a junction is a stub; it is lengthened by opening a cell behind it, never walled up), and the menu demo (VIS-052 profile, no felt tuner) now runs the same rule as a post-pass (`legacyMazeStubPass.ts`, wired in `legacyGenerationLifecycle.ts` on the non-budget paths). Menu-only last resorts: pinch the host's pure dead-end branches (`planCapPinch`), else move the endpoint one cell onto its host (`stubStats.relocated`). New census `scripts/analysis/one-tile-stub-census.ts`, regression test `tests/reset/legacy-maze-no-stubs-both-profiles.test.ts`, progression golden fixture regenerated (79 of 600 level fingerprints changed: the mazes that had a start/goal nub).
+- WHY it changed: measured at levels 1-300 (8 seeds, phone and desktop boards) the menu demo carried 9-20 stubs per maze (it bypassed the tuner) and the play ladder still had start/goal nubs (0.13-0.5 per maze at levels 10-200); after the change both profiles measure 0 strict and 0 loose at every sampled level.
+- Rule: a branch that walks from a dead end to another dead end (the level-1 straight run) is a bare corridor, not a branch; any code path that builds a maze without the felt tuner must call `applyOneTileStubRule`.
+- Evidence: tsc, full npm test, `npm run playbook:verify` pass. Not checked on a real phone.
+- Status: Applied (review), headless only.
