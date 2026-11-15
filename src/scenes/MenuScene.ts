@@ -330,6 +330,7 @@ import {
 import { LegacyPresenceController } from '../legacy-runtime/legacyPresenceController';
 import { formatOnline } from '../legacy-runtime/legacyPresenceContract';
 import { PresenceCounterView } from '../render/presenceCounterView';
+import { designTokens } from '../theme/tokens';
 import { resolveLegacyPresenceCounterPlacement } from '../legacy-runtime/legacyPresenceCounterLayout';
 import {
   LEGACY_UI_COMPACT_BREAKPOINT,
@@ -9684,7 +9685,8 @@ export class MenuScene extends Phaser.Scene {
     this.presenceView ??= new PresenceCounterView(this, {
       dotColor: LEGACY_PRESENCE_CHIP_FILL,
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      textColor: `#${cyberArcadeMaterial.rail.muted.toString(16).padStart(6, '0')}`
+      strokeColor: designTokens.color['bg.canvas'],
+      textColor: `#${cyberArcadeMaterial.rail.white.toString(16).padStart(6, '0')}`
     });
     const view = this.presenceView;
     const placement = resolveLegacyPresenceCounterPlacement({
