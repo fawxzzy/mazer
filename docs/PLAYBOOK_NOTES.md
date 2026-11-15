@@ -315,3 +315,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: three menu polish cards; the stars owner request was "same colours as the rainbow UI".
 - Rule: a colour that must match another surface imports that surface's palette module; a test compares the two, so a private tint fails CI.
 - Status: Applied (review); headless Chromium 390x844 and WebKit iPhone 15 Pro only, nothing checked on a real phone. MAZER-DEBT-002 (drop constant formMode/invalidFields) NOT done here: it must edit menuRuntimeDiagnostics.ts (Wave 1C) and MenuScene.ts (Wave 5C) together, which the integrator wave-mix test rejects; it needs its own split PR.
+
+## 2026-11-15 - Playbook runtime bridge pinned to v0.74.0
+- WHAT changed: `scripts/playbook-runtime.mjs` `DEFAULT_PLAYBOOK_VERSION`, and the `Playbook clean-environment validation` job fallback URL and SHA-256 in `.github/workflows/verify.yml`, moved from the Playbook v0.54.1 release tarball to v0.74.0 (SHA-256 `6b0abf33835c57331f0ef471fef2a803e2cbabc1d673f528e62b2f5213462ac7`, hashed from the published release asset).
+- WHY it changed: v0.74.0 carries Playbook #74 (doctor tells product repos from consumer repos), so Mazer doctor runs stop reporting the Playbook product docs layout as errors.
+- Rule: version, URL and digest move together; no deploy surface touched.
