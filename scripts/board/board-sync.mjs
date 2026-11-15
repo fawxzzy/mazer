@@ -29,6 +29,8 @@ export const ARCHIVE_PATH = "config/mazer-board-events.jsonl";
 export const EXPORT_PATH = "exports/mazer.project-board.owner-export.v1.json";
 export const EVENTS_BRANCH = "board-events";
 export const EVENTS_FILE = "events.jsonl";
+export const VERCEL_FILE = "vercel.json";
+export const VERCEL_JSON = `{"git":{"deploymentEnabled":false}}\n`;
 
 const eolOf = (text) => (text.includes("\r\n") ? "\r\n" : "\n");
 const toLf = (text) => text.replace(/\r\n/g, "\n");
@@ -93,7 +95,11 @@ function pushLines(repoRoot, lines, remote = "origin") {
     if (!fresh.length) return { pushed: 0 };
     const next = `${current}${current && !current.endsWith("\n") ? "\n" : ""}${fresh.join("\n")}\n`;
     const blob = git(repoRoot, ["hash-object", "-w", "--stdin"], { input: next, env }).trim();
-    const tree = git(repoRoot, ["mktree"], { input: `100644 blob ${blob}\t${EVENTS_FILE}\n`, env }).trim();
+    // The events branch is an orphan holding only events.jsonl, so Vercel applies its default and builds every event push
+    // (154 failed builds in 24h on 2026-11-14 consumed the shared 100/24h deploy cap). Vercel reads git.deploymentEnabled from the
+    // pushed commit, so every events commit carries a vercel.json that turns git deployments off.
+    const vercelBlob = git(repoRoot, ["hash-object", "-w", "--stdin"], { input: VERCEL_JSON, env }).trim();
+    const tree = git(repoRoot, ["mktree"], { input: `100644 blob ${blob}\t${EVENTS_FILE}\n100644 blob ${vercelBlob}\t${VERCEL_FILE}\n`, env }).trim();
     let parent = "";
     try { parent = git(repoRoot, ["rev-parse", "--verify", "--quiet", `refs/remotes/${remote}/${EVENTS_BRANCH}`]).trim(); } catch { /* first event */ }
     const message = `board events: ${fresh.map((l) => JSON.parse(l).card).join(", ")}`;

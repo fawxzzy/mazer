@@ -322,6 +322,12 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Status: Applied (review), headless only.
 
 
+## 2026-11-15 - board-events commits carry vercel.json so event pushes never build
+- WHAT changed: `pushLines` in `scripts/board/board-sync.mjs` now writes `vercel.json` (`{"git":{"deploymentEnabled":false}}`) into the tree of every `board-events` commit next to `events.jsonl`; `tests/board-sync.test.mjs` asserts the branch tree holds both files.
+- WHY it changed: the orphan branch held only `events.jsonl`, so Vercel built every event push: 154 failed git builds in 24h (147 Mazer, 7 Fitness) spent the shared 100/24h deploy cap.
+- Rule: a branch that must never deploy carries its own vercel.json; a one-off commit is not enough because `pushLines` rebuilds the tree on every push.
+- Status: Applied (review); tests pass. UNVERIFIED: Vercel docs do not say which commit's vercel.json is read, so confirm with `GET /v7/deployments?branch=board-events` after the next event push that no new deployment appears.
+
 ## 2026-11-14 (offline shell proof script)
 
 - WHAT changed: `scripts/analysis/verify-offline-shell.mjs` now expects 3 boot-art cache entries (HUD icon atlas webp + tile-font atlas image + atlas json) instead of 5.
