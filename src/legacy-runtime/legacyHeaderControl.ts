@@ -69,6 +69,33 @@ export const resolveLegacyHeaderEdgeInset = (viewportWidth: number): number => c
   LEGACY_HEADER_EDGE_INSET_MAX_PX
 );
 
+/** Visible icon size over the control frame: MenuScene draws the settings icon at 1.15x the frame. */
+export const LEGACY_HEADER_ICON_GLYPH_SCALE = 1.15;
+/**
+ * How far in from the screen corner (per axis) a full-size corner diamond paints: 2 x resolveEdgeCornerInset() = ~15.6 px,
+ * rounded up (tests/reset/legacy-header-edge-padding.test.ts pins it against edgeMarkers.ts). Not imported, so the touch
+ * layout does not pull the whole edge-marker module in.
+ */
+export const LEGACY_HEADER_CORNER_DIAMOND_REACH_PX = 16;
+/** Gap kept between the trailing icon glyph and the full-size top-right corner diamond (css px). */
+export const LEGACY_HEADER_CORNER_DIAMOND_GAP_PX = 4;
+
+/**
+ * MAZER-UI-035: the trailing (settings gear / in-play pause) edge inset that keeps the glyph off the top-right corner
+ * diamond. A corner diamond grows to 100% and its painted box reaches LEGACY_HEADER_CORNER_DIAMOND_REACH_PX in from the
+ * corner on both axes (edgeCornerAnchor.ts anchors its outer tip ON the corner; the diamonds do not move). The glyph
+ * overhangs its control frame by (LEGACY_HEADER_ICON_GLYPH_SCALE - 1) / 2 of the frame size, so that overhang is added.
+ * Only the trailing side moves: at 390 wide the old 16 px inset let the gear and the diamond box overlap.
+ */
+export const resolveLegacyHeaderTrailingEdgeInset = (viewportWidth: number, controlSize: number): number => Math.max(
+  resolveLegacyHeaderEdgeInset(viewportWidth),
+  Math.ceil(
+    LEGACY_HEADER_CORNER_DIAMOND_REACH_PX
+      + LEGACY_HEADER_CORNER_DIAMOND_GAP_PX
+      + (controlSize * (LEGACY_HEADER_ICON_GLYPH_SCALE - 1) / 2)
+  )
+);
+
 /**
  * Progression is an unbounded completion ordinal, so the glyph scales its
  * digits inside the fixed control frame instead of widening the header row.
@@ -102,7 +129,9 @@ export const resolveLegacyHeaderControlFrame = (
   const size = sizeScale >= 1 ? baseSize : Math.max(32, Math.round(baseSize * sizeScale));
   const safeLeft = Math.max(0, Math.round(input.safeArea?.left ?? 0));
   const safeRight = Math.max(0, Math.round(input.safeArea?.right ?? 0));
-  const edgeInset = resolveLegacyHeaderEdgeInset(input.width);
+  const edgeInset = input.placement === 'trailing'
+    ? resolveLegacyHeaderTrailingEdgeInset(input.width, size)
+    : resolveLegacyHeaderEdgeInset(input.width);
   const slot = Math.max(0, Math.round(input.slot ?? 0));
   const gap = Math.max(8, Math.round(size * 0.18));
   const top = clamp(

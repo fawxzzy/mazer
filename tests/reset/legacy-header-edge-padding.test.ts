@@ -4,11 +4,16 @@ import { describe, expect, test } from 'vitest';
 import { resolveTouchControlLayout } from '../../src/input-human';
 import {
   LEGACY_HEADER_EDGE_INSET_MAX_PX,
+  LEGACY_HEADER_CORNER_DIAMOND_GAP_PX,
+  LEGACY_HEADER_CORNER_DIAMOND_REACH_PX,
   LEGACY_HEADER_EDGE_INSET_MIN_PX,
+  LEGACY_HEADER_ICON_GLYPH_SCALE,
   resolveLegacyHeaderControlFrame,
-  resolveLegacyHeaderEdgeInset
+  resolveLegacyHeaderEdgeInset,
+  resolveLegacyHeaderTrailingEdgeInset
 } from '../../src/legacy-runtime/legacyHeaderControl';
 import { resolveLegacyMinHitRect } from '../../src/legacy-runtime/legacyHitTarget';
+import { resolveEdgeCornerInset } from '../../src/render/edgeMarkers';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 
 const normalizeSourceLineEndings = (source: string): string => source.replace(/\r\n?/g, '\n');
@@ -52,7 +57,7 @@ describe('header edge padding (Wave 5C)', () => {
     expect(resolveLegacyHeaderEdgeInset(100)).toBe(LEGACY_HEADER_EDGE_INSET_MIN_PX);
   });
 
-  test('left (leaderboard) and right (settings) controls mirror at the same edge gap on every viewport', () => {
+  test('left (leaderboard) and right (settings) controls share the edge gap on every viewport; the settings side is widened only enough to clear the corner diamond (MAZER-UI-035)', () => {
     const rows: string[] = [];
     for (const viewport of VIEWPORTS) {
       const { leaderboard, settings } = measureHeader(viewport);
@@ -61,14 +66,26 @@ describe('header edge padding (Wave 5C)', () => {
       const rightGap = viewport.width - settings.right;
       rows.push(`${viewport.width}: left ${leftGap} right ${rightGap} (edge ${edge})`);
       expect(leftGap).toBe(edge);
-      expect(rightGap).toBe(edge);
+      expect(rightGap).toBe(resolveLegacyHeaderTrailingEdgeInset(viewport.width, settings.width));
+      expect(rightGap).toBeGreaterThanOrEqual(edge);
       expect(leftGap).toBeGreaterThanOrEqual(LEGACY_HEADER_EDGE_INSET_MIN_PX);
     }
     // 390 is the reference phone: at least 16px on both edges.
     const phone = measureHeader({ height: 844, width: 390 });
     expect(phone.leaderboard.left).toBeGreaterThanOrEqual(16);
-    expect(390 - phone.settings.right).toBeGreaterThanOrEqual(16);
+    expect(390 - phone.settings.right).toBeGreaterThanOrEqual(20);
     expect(rows).toHaveLength(VIEWPORTS.length);
+  });
+
+  test('the settings gear glyph clears the full-size top-right corner diamond box at 390 wide (MAZER-UI-035)', () => {
+    expect(LEGACY_HEADER_CORNER_DIAMOND_REACH_PX).toBeGreaterThanOrEqual(2 * resolveEdgeCornerInset());
+    const { settings } = measureHeader({ height: 844, width: 390 });
+    const overhang = (settings.width * (LEGACY_HEADER_ICON_GLYPH_SCALE - 1)) / 2;
+    const glyphRight = settings.right + overhang;
+    const glyphTop = settings.top - overhang;
+    const diamondLeft = 390 - LEGACY_HEADER_CORNER_DIAMOND_REACH_PX;
+    expect(glyphRight).toBeLessThanOrEqual(diamondLeft - LEGACY_HEADER_CORNER_DIAMOND_GAP_PX + 0.5);
+    expect(glyphTop).toBeLessThan(LEGACY_HEADER_CORNER_DIAMOND_REACH_PX);
   });
 
   test('the 44px hit zones stay on screen and the glyph boxes do not overlap at every width', () => {

@@ -314,7 +314,7 @@ import {
   type LegacyPathVisualStyle
 } from '../legacy-runtime/legacyPathVisualStyle';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
-import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
+import { LEGACY_HEADER_ICON_GLYPH_SCALE, resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import { resolveLegacyMinHitRect } from '../legacy-runtime/legacyHitTarget';
 import { resolveLegacyFrontDoorHitZone } from '../legacy-runtime/legacyFrontDoorHitZone';
 import {
@@ -9608,7 +9608,7 @@ export class MenuScene extends Phaser.Scene {
     // icon reads noticeably smaller than the equivalent-diameter procedural
     // gear at the same bounding size (reported "icons are too small"), so
     // this is deliberately bigger than the old shape's own footprint.
-    const desiredSize = Math.min(frame.width, frame.height) * 1.15 * blinkScale;
+    const desiredSize = Math.min(frame.width, frame.height) * LEGACY_HEADER_ICON_GLYPH_SCALE * blinkScale;
     this.applyLegacyHudIconFrame(
       this.headerSettingsIconImage,
       MAZER_HUD_SETTINGS_ICON_METRICS,

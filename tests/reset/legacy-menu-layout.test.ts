@@ -555,7 +555,7 @@ describe('legacy menu layout', () => {
     expect(playLayout.boardTop).toBeGreaterThanOrEqual(62);
     expect(playLayout.boardTop).toBe((playLayout.lanes.hud?.bottom ?? 0) + 8);
     expect(touchLayout.controls.pause.top).toBeLessThan(16);
-    expect(touchLayout.controls.pause.right).toBeGreaterThanOrEqual(playLayout.width - 14);
+    expect(touchLayout.controls.pause.right).toBeGreaterThanOrEqual(playLayout.width - 20);
     expect(touchLayout.controls.pause.left).toBeGreaterThan(playLayout.width * 0.7);
     expect(touchLayout.controls.pause.bottom + 12).toBeLessThanOrEqual(playLayout.boardTop);
     expect(playLayout.boardTop + playLayout.boardWidth + 24).toBeLessThanOrEqual(touchLayout.frame.top);
