@@ -249,8 +249,11 @@ export interface BoardSoftRevealInput {
   cellExtent: Uint8ClampedArray;
   /** The same padded grid: which side each cell grows from (boardRevealMask.ts computeParentDirections). Absent = every cell grows from its centre. */
   parentSide?: Uint8Array;
-  /** 0..1 how far the wrap dock strips have slid out from the board edge; ignored when the layout has no docks. */
-  dockExtent: number;
+  /**
+   * 0..1 how far the bleed-off dock of border cell (x, y) has grown out of the board edge; `lengthCells` is the dock's
+   * length in cells (its growth speed). Ignored when the layout has no docks.
+   */
+  dockReach: (x: number, y: number, lengthCells: number) => number;
 }
 
 export interface BoardSoftRevealStats {
@@ -271,15 +274,16 @@ export interface BoardSoftRevealStats {
  * cell without a parent side (the spawn tile, walls, the pad ring) opens from its centre. The tear-down is the same
  * thing run backwards. Cost: one clip path + one drawImage per recompose whatever the maze size (the old fade
  * needed one draw per alpha level), no new bake, no per-tile draw. Edges are device-snapped, so neighbouring rects
- * never leave an antialiasing seam. The wrap dock strips (the margin outside the board rect) slide out from the
- * board edge at `dockExtent`, drawn last.
+ * never leave an antialiasing seam. The bleed-off docks (the margin outside the board rect) are drawn last, each one
+ * growing out from the board edge at its own `dockReach` (the margin is split between the docks of a side at the
+ * line half way between them, so no device pixel is drawn twice), in step with the cells (mazeRevealTimeline.ts).
  */
 export const composeBoardTileRevealSoft = (
   ctx: BoardSoftRevealContext2D,
   baked: unknown,
   input: BoardSoftRevealInput
 ): BoardSoftRevealStats => {
-  const { layout, cellExtent, dockExtent, parentSide } = input;
+  const { layout, cellExtent, dockReach, parentSide } = input;
   const stats: BoardSoftRevealStats = { bakeDraws: 0, clipRects: 0, stripDraws: 0 };
   const scale = layout.scale;
   const { cols, rows } = layout;
@@ -353,10 +357,11 @@ export const composeBoardTileRevealSoft = (
   ctx.restore();
 
   if (layout.docks.length > 0) {
-    // The margin strips around the board rect, disjoint so no pixel is drawn twice. Each slides out from the board edge.
+    // The margin strips around the board rect, disjoint so no pixel is drawn twice. Each strip is cleared, then every dock
+    // on its side is drawn growing out from the board edge: a dock owns the slice of the strip between the lines half way
+    // to its neighbours on the same side (the strip's own ends for the first and last), so docks never overlap.
     const boardRight = layout.originX + layout.boardWidth;
     const boardBottom = layout.originY + layout.boardHeight;
-    const reach = Math.max(0, Math.min(1, dockExtent));
     // [x, y, w, h, the strip's edge that touches the board: 'r' right, 'l' left, 'b' bottom, 't' top]
     const strips: Array<[number, number, number, number, 'l' | 'r' | 't' | 'b']> = [
       [0, 0, layout.originX, layout.height, 'r'],
@@ -374,19 +379,46 @@ export const composeBoardTileRevealSoft = (
       const sw = Math.round(w * scale);
       const sh = Math.round(h * scale);
       ctx.clearRect(sx / scale, sy / scale, sw / scale, sh / scale);
-      // Shown slice in device px, anchored at the board edge.
-      let vx = sx;
-      let vy = sy;
-      let vw = sw;
-      let vh = sh;
-      if (anchor === 'r' || anchor === 'l') {
-        vw = Math.round(sw * reach);
-        vx = anchor === 'r' ? sx + sw - vw : sx;
-      } else {
-        vh = Math.round(sh * reach);
-        vy = anchor === 'b' ? sy + sh - vh : sy;
-      }
-      if (vw > 0 && vh > 0) {
+      const vertical = anchor === 'r' || anchor === 'l';
+      const side = anchor === 'r' ? 'left' : anchor === 'l' ? 'right' : anchor === 'b' ? 'top' : 'bottom';
+      const docks = layout.docks
+        .filter((dock) => dock.side === side)
+        .sort((p, q) => (vertical ? p.y - q.y : p.x - q.x));
+      // Device-px edge (along the strip) of the grid line with index `line` of the dock's axis.
+      const lateralEdge = (line: number): number => Math.round(
+        (vertical ? layout.originY + layout.ys[line]! : layout.originX + layout.xs[line]!) * scale
+      );
+      const lateralStart = vertical ? sy : sx;
+      const lateralEnd = vertical ? sy + sh : sx + sw;
+      for (let index = 0; index < docks.length; index += 1) {
+        const dock = docks[index]!;
+        const prev = docks[index - 1];
+        const next = docks[index + 1];
+        const at = vertical ? dock.y : dock.x;
+        const lo = prev === undefined ? lateralStart : lateralEdge((Math.floor(((vertical ? prev.y : prev.x) + at) / 2)) + 1);
+        const hi = next === undefined ? lateralEnd : lateralEdge((Math.floor(((vertical ? next.y : next.x) + at) / 2)) + 1);
+        const reach = Math.max(0, Math.min(1, dockReach(dock.x, dock.y, dock.length / layout.tileSize)));
+        const fullDepth = vertical ? sw : sh;
+        // Shown depth in device px, anchored at the board edge; the whole strip once the dock is out.
+        const depth = reach >= 1 ? fullDepth : Math.min(fullDepth, Math.round(dock.length * scale * reach));
+        if (depth <= 0 || hi <= lo) {
+          continue;
+        }
+        let vx = sx;
+        let vy = sy;
+        let vw = sw;
+        let vh = sh;
+        if (vertical) {
+          vy = lo;
+          vh = hi - lo;
+          vw = depth;
+          vx = anchor === 'r' ? sx + sw - depth : sx;
+        } else {
+          vx = lo;
+          vw = hi - lo;
+          vh = depth;
+          vy = anchor === 'b' ? sy + sh - depth : sy;
+        }
         ctx.drawImage(baked, vx, vy, vw, vh, vx / scale, vy / scale, vw / scale, vh / scale);
         stats.stripDraws += 1;
       }
@@ -409,7 +441,7 @@ export type BoardTileReveal =
    * each cell is shown) for the padded (cols + 2) x (rows + 2) grid (boardRevealMask.ts); `parentSide` says which side
    * each cell grows from; the layer draws the bake once through a clip of the shown parts (no fade).
    */
-  | { kind: 'soft'; key: string; dockExtent: number; parentSide?: Uint8Array; fillMask: (extent: Uint8ClampedArray) => void };
+  | { kind: 'soft'; key: string; dockReach: BoardSoftRevealInput['dockReach']; parentSide?: Uint8Array; fillMask: (extent: Uint8ClampedArray) => void };
 
 export interface BoardTileLayerFrame {
   grid: ReadonlyArray<ReadonlyArray<boolean>>;
@@ -556,7 +588,7 @@ export class BoardTileLayer {
         composeBoardTileRevealSoft(ctx as unknown as BoardSoftRevealContext2D, result.canvas, {
           layout,
           cellExtent: this.fillSoftCellExtent(layout.cols, layout.rows, frame.reveal.fillMask),
-          dockExtent: frame.reveal.dockExtent,
+          dockReach: frame.reveal.dockReach,
           parentSide: frame.reveal.parentSide
         });
       } else {
