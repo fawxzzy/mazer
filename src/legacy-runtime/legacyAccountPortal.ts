@@ -38,8 +38,8 @@ export const MAZER_OAUTH_PENDING_TTL_MS = 900_000;
 export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
 export const MAZER_OAUTH_SESSION_LOCK_MAX_WAIT_MS = MAZER_OAUTH_TOKEN_TIMEOUT_MS;
 export const MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS = 60_000;
-// Auth Surface v2: the generic sign-in failure is the copy-matrix outage line (it was 'Could not reach your account.
-// Try again.'; legacyPlayerMessage.ts still maps that earlier spelling from an older snapshot onto this line).
+// Auth Surface v2: the generic sign-in failure is the copy-matrix outage line. legacyPlayerMessage.ts still maps the
+// earlier MAZER-ACCT-044 spelling (LEGACY_OAUTH_PREVIOUS_COPY) from an older snapshot onto this line.
 export const MAZER_OAUTH_SAFE_ERROR_MESSAGE: string = AUTH_SURFACE_MESSAGES['signin.unavailable'];
 
 const MAZER_OAUTH_CALLBACK_KEYS = ['code', 'state', 'error', 'error_description'] as const;

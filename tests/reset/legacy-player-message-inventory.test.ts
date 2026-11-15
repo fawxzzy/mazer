@@ -79,7 +79,6 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: MENU, literal: 'Runtime diagnostics authenticated fixture.', kind: 'fixture', route: 'none (QA fixture)' },
   { file: 'src/boot/accessibilitySurface.ts', literal: 'Touch and drag anywhere to move through the maze. With a keyboard, use Arrow keys or WASD to move, Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.', kind: 'static', route: 'none (static a11y description)' },
   { file: 'src/boot/accessibilitySurface.ts', literal: 'Mazer is ready.', kind: 'static', route: 'static a11y live region; never updated today' },
-  { file: 'src/legacy-runtime/legacyAccountPortal.ts', literal: 'Could not reach your account. Try again.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.accountConnectionUnavailable; today rendered directly in two places' },
   { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'Account connected.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.accountConnected (info is set on the snapshot with no render site)' },
   { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'That username is already taken.', kind: 'duplicate-unrendered', route: 'duplicate of LEGACY_AUTH_MESSAGE_COPY.usernameTaken; save result error is never rendered' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'The leaderboard is not available right now.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },

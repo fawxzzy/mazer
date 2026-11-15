@@ -84,7 +84,7 @@ describe('MAZER-ACCT-040 boot wiring (source contract)', () => {
   test('the hand-off runs after the install gate and the OAuth callback (MAZER-PWA-007: gate first), before the account bootstrap and the Phaser game', () => {
     const callback = main.indexOf('await consumeMazerOAuthCallback(');
     const gate = main.indexOf('await runMazerInstallGate(');
-    const handoff = main.indexOf('await runMazerSignedOutHandoffAtBoot(oauthCallbackRequested)');
+    const handoff = main.indexOf('await runMazerSignedOutHandoffAtBoot(oauthCallbackRequested, authReturnNotice !== null)');
     const bootstrap = main.indexOf('await runBoundedAccountBootstrap(');
     const game = main.indexOf('new Phaser.Game(');
     expect(callback).toBeGreaterThan(-1);
