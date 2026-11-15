@@ -41,7 +41,7 @@ Flags: `--card` (required), `--text` (required, one plain line, 700 chars max), 
 | `v` | always 1 |
 | `ts` | ISO UTC time the fact became true; events fold in `ts` order |
 | `card` | stable `MAZER-AREA-NNN` id |
-| `status` | optional: `active`, `in_progress`, `planning`, `review`, `blocked`, `completed`, `deferred_candidate` (`archived` is refused) |
+| `status` | optional: `active`, `in_progress`, `planning`, `review`, `blocked`, `completed`, `deferred_candidate` (`archived` is refused here: use the `archive` flag below) |
 | `text` | one plain line for the card; no URLs, file paths or emails; never contains the words that begin a generated line |
 | `evidence` | optional `{ prs: [{repo, number, mergedSha?}], deployedBuild?, headless?, deviceChecked? (true/false/null), checkedOn? }` |
 | `blocker` | optional `{ kind, unblockedBy, summary, ask, recommendation? }`, or `null` to clear |
@@ -51,7 +51,8 @@ Flags: `--card` (required), `--text` (required, one plain line, 700 chars max), 
 | `description` | corrective, existing card only: replaces the whole card description (earlier generated lines included; they stay in the archive), then this event's own generated line is appended. 1500 chars max, one line, public-text screens apply. A new card uses `new.description` |
 | `acceptanceCriteria` | corrective, existing card only: replaces the criteria list; 3 or more entries, 400 chars each, public-text screens apply. A new card uses `new.acceptanceCriteria` |
 | `new` | creates a card: `{ title, description, cardType, priority, dependencies, acceptanceCriteria (3 or more) }` |
-| `reopen` | `true` to move a completed card back |
+| `reopen` | `true` to move a completed or archived card back (an archived card also needs a `status`) |
+| `archive` | `true` to archive a `completed` card (CLI: `--archive`). Status becomes `archived`. Refused unless the card is completed (or the same event sets `status: completed`) with completed-grade evidence; cannot be combined with `reopen`, a `new` block or any other status |
 | `by` | free label, not part of the id |
 
 Example new-card event: `--json '{"v":1,"ts":"2026-11-14T09:00:00Z","card":"MAZER-VIS-040","status":"planning","text":"New card.","new":{"title":"...","description":"...","cardType":"feature","priority":"low","dependencies":[],"acceptanceCriteria":["a","b","c"]}}'`.
@@ -73,6 +74,7 @@ Card text is published on the owner board, so every string an event can set must
 - `completed` requires a merged PR (`mergedSha`) AND `deployedBuild`. Work with no runtime surface (tooling, docs, tests, governance) sets `--device none` and then needs only the merged PR.
 - Merged but not deployed, or an open PR: use `review`. The generated sentence says "PR #N open" or "Merged, not deployed".
 - Device state is explicit: `--headless --device false` adds "Checked only in headless Chromium, not on a real phone."; no headless flag adds "Unit tests only: no browser or phone check."; `--device true` needs `--checked-on`.
+- **Archive.** `archived` is the end state of a finished card: merged AND deployed (or no runtime surface), then closed out. Only an event with `archive: true` reaches it, only from `completed`; `--status archived` stays refused. An archived card keeps every field and its ledger entry, is exported with the `archived` lifecycle (`exported_archived_card_count` appears in the export only once one exists), and counts in `provenance.archivedCardCount` (written only once a card is archived, so a registry with none is unchanged). `openCardCount` excludes it. A plain event on an archived card is refused; only `reopen: true` plus a status moves it back. FawxzzyWeb needs no change: its adapter already accepts the `archived` lifecycle and its Projects page files it (like `completed`) in the collapsed Completed archive, never in an open column. Example: `node scripts/board/board-sync.mjs event --card MAZER-VIS-030 --archive --text "Closed out after the production check." --pr 123:abcdef12 --deployed build-1234 --headless --device false` (evidence is optional when the ledger already holds completed-grade evidence).
 - `blocked` needs a blocker. A completed card does not move back without `reopen`. A new card may be created `completed` only when the same evidence rules pass (merged PR and deployed build, or `deviceChecked` null with a merged PR). A card's `new` event is applied before its other events whatever the timestamps say (ts order otherwise); a status event for a card with no `new` event anywhere is still refused. A `new` event for an id that already exists is skipped whole with a warning (nothing from it is applied); recreate that card under a fresh id. Unknown cards are refused unless the event carries a `new` block. Dependencies must exist. New cards need three acceptance criteria (exporter rule).
 - Any rejected event stops the whole fold; nothing is written. The owner export and the work report are built in memory first, so a public-safety rejection by the exporter also writes nothing.
 - The evidence sentence is generated from the evidence fields, so the card text cannot claim more than the evidence.

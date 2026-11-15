@@ -1221,3 +1221,21 @@ test("fails closed on denominator, identity, source, and stale-output drift", ()
     fs.rmSync(temp, { recursive: true, force: true });
   }
 });
+
+test("an archived registry card exports as the archived lifecycle and counts reconcile", () => {
+  const archived = structuredClone(registry);
+  const done = archived.workItems.find((item) => item.status === "completed");
+  done.status = "archived";
+  archived.provenance.completedCardCount -= 1;
+  archived.provenance.archivedCardCount = 1;
+  const output = buildProjectBoardOwnerExport(archived, { ...bytes, "mazer-owner-work-registry": JSON.stringify(archived) });
+  const card = output.cards.find((c) => c.record.card_id === done.id);
+  assert.deepEqual([card.record_status, card.record.lifecycle, card.record.extensions.owner_status], ["active", "archived", "archived"]);
+  assert.equal(output.extensions.exported_archived_card_count, 1);
+  assert.doesNotThrow(() => assertFawxzzyWebConsumerAcceptance(output));
+  // an unreconciled archived count is refused
+  archived.provenance.archivedCardCount = 0;
+  assert.throws(() => buildProjectBoardOwnerExport(archived, { ...bytes, "mazer-owner-work-registry": JSON.stringify(archived) }), /counts are inconsistent/);
+  // the live registry has no archived card, so its export carries no archived count
+  assert.equal("exported_archived_card_count" in buildProjectBoardOwnerExport(registry, bytes).extensions, false);
+});

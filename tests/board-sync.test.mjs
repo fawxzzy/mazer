@@ -576,3 +576,36 @@ test("ledger patching touches only changed and new entries and keeps the mixed f
   assert.ok(changed < 40, "only a few lines may differ, got " + changed);
   assert.equal(patchLedgerText(raw, old, old), raw);
 });
+
+test("archive: a completed card is archived by an event flag, never by status; counts and updates follow", () => {
+  const reg = registry([card("MAZER-A-001", "completed"), card("MAZER-A-002", "review")]);
+  reg.provenance = { stableIdentityCount: 2, openCardCount: 1, completedCardCount: 1, deferredCardCount: 0 };
+  const ok = fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-001", { archive: true, evidence: shipped })]);
+  assert.deepEqual(ok.errors, []);
+  assert.equal(ok.registry.workItems[0].status, "archived");
+  assert.equal(ok.registry.provenance.archivedCardCount, 1);
+  assert.equal(ok.registry.provenance.completedCardCount, 0);
+  assert.equal(ok.registry.provenance.openCardCount, 1);
+  assert.equal(ok.changes[0].to, "archived");
+  assert.match(ok.registry.workItems[0].description, /Board update 2026-11-14/);
+  // a registry with no archived card keeps provenance byte-stable (no archivedCardCount key)
+  assert.equal("archivedCardCount" in fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-002", { status: "review" })]).registry.provenance, false);
+  // status archived is still refused; archive needs a completed card; archive cannot mix with reopen or another status
+  assert.match(fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-001", { status: "archived" })]).errors.join(), /archived/);
+  assert.match(fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-002", { archive: true })]).errors.join(), /needs a completed card/);
+  assert.match(fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-001", { archive: true, status: "review" })]).errors.join(), /accepts only status completed/);
+  assert.match(fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-001", { archive: true, reopen: true })]).errors.join(), /cannot be combined/);
+  assert.match(fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-001", { archive: false })]).errors.join(), /archive must be true/);
+  // archiving a completed card whose evidence is not completed-grade is refused
+  assert.match(fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-001", { archive: true })]).errors.join(), /completed needs evidence/);
+});
+
+test("archive: archived cards move back only with reopen and a status; a plain event is refused", () => {
+  const reg = registry([card("MAZER-A-001", "archived")]);
+  assert.match(fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-001")]).errors.join(), /archived cards are finished history/);
+  assert.match(fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-001", { status: "review" })]).errors.join(), /reopen/);
+  assert.match(fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-001", { reopen: true })]).errors.join(), /needs a status/);
+  const back = fold(reg, [base("2026-11-14T00:00:00Z", "MAZER-A-001", { status: "review", reopen: true })]);
+  assert.deepEqual(back.errors, []);
+  assert.equal(back.registry.workItems[0].status, "review");
+});
