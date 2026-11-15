@@ -328,3 +328,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: MAZER-VIS-011 (#568) replaced the 3 separate HUD icon files with one atlas, so the `mazer-boot-art-v1` runtime cache can only ever hold 3 entries; the script waited for 5 and timed out ("boot art runtime cache populated", exit 2). Script bug, not a product regression: the service worker does cache the boot art.
 - Rule: a verify script that hard-codes an asset count must be updated in the same PR that changes the asset set. This script is not run by CI or any npm script (two production builds plus headless Chromium, minutes), which is how the drift went unseen.
 - Status: headless Chromium only, nothing checked on a real phone.
+
+## 2026-11-14 - stray colour literals in render files move into trailPalette (MAZER-UI-031, slice 3)
+- WHAT changed: `PALETTE_WHITE`, `PALETTE_WHITE_CSS`, `PALETTE_MASK_BLACK_CSS` and `PALETTE_PLAYER_ACCENT` live in `src/render/trailPalette.ts`; `phaserTileContext.ts`, `teleportTransferConduitCanvas.ts`, `boardTileLayer.ts` and `playerMarker.ts` import them instead of holding `0xffffff` / `'#ffffff'` / `'#000'` / `0x2bb868`. Values are identical, no visual change. Off-theme ratchet offToken 234 to 227 (-7), total 299 to 292; four files drop out of the baseline. MenuScene.ts untouched (separate PR).
+- WHY it changed: MAZER-UI-031 migrates stray literals into the palette modules one wave at a time; this slice is `src/render/*` only so the wave-mix test stays green.
+- Rule: a render module needing white/black/the player accent imports the trailPalette constant; do not reintroduce the literal (ratchet fails).
+- Status: Applied (review); headless gates only, nothing checked on a real phone.

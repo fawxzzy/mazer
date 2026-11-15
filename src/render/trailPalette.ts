@@ -37,6 +37,12 @@ import { cyberArcadeMaterial } from './cyberArcadeMaterial';
 import { MOTION_LOOP_MS } from './motionScale';
 
 /** The player's colour: token semantic.energy. The player marker, and everything that "shoots out" of it, uses this. */
+/** Neutral and accent literals shared by render modules (values unchanged from their former call sites). */
+export const PALETTE_WHITE = 0xffffff;
+export const PALETTE_WHITE_CSS = '#ffffff';
+export const PALETTE_MASK_BLACK_CSS = '#000';
+export const PALETTE_PLAYER_ACCENT = 0x2bb868;
+
 export const PLAYER_COLOR: number = cyberArcadeMaterial.signal.player;
 
 /** The crest colour the lifts ease the core toward (pure white, so a lift can only brighten). */
