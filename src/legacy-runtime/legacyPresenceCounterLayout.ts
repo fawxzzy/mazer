@@ -19,8 +19,10 @@ export const LEGACY_PRESENCE_TITLE_GAP_PX = 4;
 export const LEGACY_PRESENCE_DOT_DIAMETER_PX = 8;
 /** Web: gap 0.45rem. */
 export const LEGACY_PRESENCE_DOT_GAP_PX = 7;
-/** Web: font-size 0.82rem. */
-export const LEGACY_PRESENCE_FONT_PX = 13;
+/** Web: font-size 0.82rem (13px); Mazer draws it at 12px (readability pass, MAZER-UI-056). */
+export const LEGACY_PRESENCE_FONT_PX = 12;
+/** Dark outline around the number and word so they stay readable over the menu board and glow. */
+export const LEGACY_PRESENCE_TEXT_STROKE_PX = 3;
 export const LEGACY_PRESENCE_PULSE_MS = 2600;
 export const LEGACY_PRESENCE_PULSE_LOW_ALPHA = 0.55;
 export const LEGACY_PRESENCE_IDLE_DOT_ALPHA = 0.35;

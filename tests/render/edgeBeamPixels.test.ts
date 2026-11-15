@@ -5,6 +5,7 @@ import {
   anchorStationToOuterTip,
   drawEdgeMarker,
   resolveEdgeInnerTip,
+  resolveEdgeMarkerOutline,
   resolveEdgeMarkerVertices,
   resolveEdgeStations,
   type EdgeGraphics,
@@ -82,22 +83,22 @@ const polygonArea = (vertices: ReadonlyArray<{ x: number; y: number }>): number 
   }, 0)) / 2
 );
 
-const insideConvex = (vertices: ReadonlyArray<{ x: number; y: number }>, point: { x: number; y: number }, slack: number): boolean => {
-  let sign = 0;
+/** Point inside a (possibly concave) polygon, or within `slack` of its boundary (the star is concave: even-odd ray cast plus distance to the edges). */
+const insidePolygon = (vertices: ReadonlyArray<{ x: number; y: number }>, point: { x: number; y: number }, slack: number): boolean => {
+  let inside = false;
   for (let index = 0; index < vertices.length; index += 1) {
     const a = vertices[index]!;
     const b = vertices[(index + 1) % vertices.length]!;
-    const cross = (((b.x - a.x) * (point.y - a.y)) - ((b.y - a.y) * (point.x - a.x))) / Math.hypot(b.x - a.x, b.y - a.y);
-    if (Math.abs(cross) <= slack) continue;
-    const current = Math.sign(cross);
-    if (sign === 0) sign = current;
-    else if (current !== sign) return false;
+    const length2 = ((b.x - a.x) ** 2) + ((b.y - a.y) ** 2) || 1;
+    const t = Math.max(0, Math.min(1, (((point.x - a.x) * (b.x - a.x)) + ((point.y - a.y) * (b.y - a.y))) / length2));
+    if (Math.hypot(point.x - (a.x + ((b.x - a.x) * t)), point.y - (a.y + ((b.y - a.y) * t))) <= slack) return true;
+    if ((a.y > point.y) !== (b.y > point.y) && point.x < (((b.x - a.x) * (point.y - a.y)) / (b.y - a.y)) + a.x) inside = !inside;
   }
-  return true;
+  return inside;
 };
 
 describe('diamond interior fill on real pixels', () => {
-  const outline = resolveEdgeMarkerVertices({ x: CENTER.x, y: CENTER.y, inwardAngle: Math.PI / 2 }, 1);
+  const outline = resolveEdgeMarkerOutline({ x: CENTER.x, y: CENTER.y, inwardAngle: Math.PI / 2 }, 1);
   const outlineArea = polygonArea(outline);
 
   test.each(DPRS)('at DPR %s the lit share follows the fill fraction (0, 25, 50, 75, 100 %%)', (dpr) => {
@@ -120,7 +121,7 @@ describe('diamond interior fill on real pixels', () => {
   test.each(DPRS)('at DPR %s the fill never paints outside the diamond outline', (dpr) => {
     for (const fill of [0.1, 0.25, 0.5, 0.9, 1]) {
       for (const point of rasteriseFill(fill, dpr)) {
-        expect(insideConvex(outline, point, 0.75 + (1 / dpr)), `${fill} dpr ${dpr} at ${point.x},${point.y}`).toBe(true);
+        expect(insidePolygon(outline, point, 0.75 + (1 / dpr)), `${fill} dpr ${dpr} at ${point.x},${point.y}`).toBe(true);
       }
     }
   });
@@ -130,14 +131,15 @@ describe('diamond interior fill on real pixels', () => {
     const at = (fill: number) => rasteriseFill(fill, dpr);
     const span = (points: Array<{ x: number; y: number }>) => ({ min: Math.min(...points.map((p) => p.y)), max: Math.max(...points.map((p) => p.y)) });
     const grown = span(at(0.3));
-    // region: [inner tip (y = c + 10) up to y = c + 10 - 0.3 * 20 = c + 4]
-    expect(grown.min).toBeGreaterThanOrEqual(CENTER.y + 4 - 0.5 - (1 / dpr));
-    expect(grown.max).toBeGreaterThan(CENTER.y + EDGE_MARKER_HALF_HEIGHT - 1.5);
+    // region: [inner tip (y = c + 10) up to y = c + h - 0.3 * 2h = c + 0.4h, h = EDGE_MARKER_HALF_HEIGHT]
+    expect(grown.min).toBeGreaterThanOrEqual(CENTER.y + (EDGE_MARKER_HALF_HEIGHT * 0.4) - 0.5 - (1 / dpr));
+    expect(grown.max).toBeGreaterThan(CENTER.y + EDGE_MARKER_HALF_HEIGHT - 2.5);
+    // (The star's inner tip is a needle: a pixel-centre sampler can miss its last ~2 px, hence the 2.5 slack.)
     // A FALLING fill (1 -> 0.7 -> 0.4 -> 0.1) keeps the inner edge of the colour on the inner tip and pulls its outer edge toward it.
     let previous = span(at(1));
     for (const fill of [0.7, 0.4, 0.1]) {
       const now = span(at(fill));
-      expect(now.max, `inner end stays on the inner tip at ${fill}`).toBeGreaterThan(CENTER.y + EDGE_MARKER_HALF_HEIGHT - 1.5);
+      expect(now.max, `inner end stays on the inner tip at ${fill}`).toBeGreaterThan(CENTER.y + EDGE_MARKER_HALF_HEIGHT - 2.5);
       expect(now.min, `outer end retreats toward the inner tip at ${fill}`).toBeGreaterThan(previous.min);
       previous = now;
     }
@@ -145,7 +147,7 @@ describe('diamond interior fill on real pixels', () => {
     const wide = resolveDiamondFillShape(outline, CENTER, Math.PI / 2, EDGE_MARKER_HALF_HEIGHT, 0.7).polygon;
     const narrow = resolveDiamondFillShape(outline, CENTER, Math.PI / 2, EDGE_MARKER_HALF_HEIGHT, 0.4).polygon;
     expect(narrow.length).toBeGreaterThanOrEqual(3);
-    expect(narrow.every((point) => insideConvex(wide, point, 1e-6))).toBe(true);
+    expect(narrow.every((point) => insidePolygon(wide, point, 1e-6))).toBe(true);
   });
 
   test.each(DPRS)('at DPR %s only ONE fill is ever drawn: energized / wrap-flash cues add no second shape inside the diamond', (dpr) => {
@@ -311,8 +313,8 @@ describe('beam endpoints on the (moving) inner tip, on real pixels (MAZER-VIS-03
     const station = { id: 1 as const, inwardAngle: Math.PI / 2, isCorner: false, side: 'top' as const, x: CENTER.x, y: CENTER.y };
     for (const scale of [EDGE_DIAMOND_REST_SCALE, 0.75]) {
       const anchored = anchorStationToOuterTip(station, scale);
-      const outline = resolveEdgeMarkerVertices(anchored, scale);
-      // outer tip fixed at CENTER.y - 10; inner tip (the larger y) at outer + 20 * scale
+      const outline = resolveEdgeMarkerOutline(anchored, scale);
+      // outer tip fixed at CENTER.y - h; inner tip (the larger y) at outer + 2h * scale
       const tipY = (CENTER.y - EDGE_MARKER_HALF_HEIGHT) + (2 * EDGE_MARKER_HALF_HEIGHT * scale);
       for (const fill of [0.25, 0.5, 1]) {
         const width = Math.ceil(SIZE * dpr);
@@ -327,11 +329,11 @@ describe('beam endpoints on the (moving) inner tip, on real pixels (MAZER-VIS-03
         }
         expect(points.length, `scale ${scale} fill ${fill} dpr ${dpr}`).toBeGreaterThan(0);
         for (const point of points) {
-          expect(insideConvex(outline, point, 0.75 + (1 / dpr)), `scale ${scale} fill ${fill} dpr ${dpr} at ${point.x},${point.y}`).toBe(true);
+          expect(insidePolygon(outline, point, 0.75 + (1 / dpr)), `scale ${scale} fill ${fill} dpr ${dpr} at ${point.x},${point.y}`).toBe(true);
         }
         // Anchored on the inner tip of the scaled kite (the larger y), never beyond it.
         expect(Math.max(...points.map((point) => point.y))).toBeLessThanOrEqual(tipY + (1 / dpr) + 0.5);
-        expect(Math.max(...points.map((point) => point.y))).toBeGreaterThan(tipY - 1.5);
+        expect(Math.max(...points.map((point) => point.y))).toBeGreaterThan(tipY - 2.5);
       }
     }
   });

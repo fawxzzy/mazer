@@ -1,6 +1,6 @@
 /**
  * MAZER-UI-033: Phaser view of the main-menu online counter (exact copy of the website header counter).
- * Owns one Text ("7 online", muted, tabular) and draws the dot into the caller's Graphics: accent circle with a
+ * Owns one Text ("7 online", bright with a dark outline, tabular) and draws the dot into the caller's Graphics: accent circle with a
  * soft glow and the web's 2.6s opacity pulse when live, a dim dot alone when idle. Geometry is the pure layout in
  * legacy-runtime/legacyPresenceCounterLayout.ts.
  */
@@ -10,14 +10,17 @@ import {
   LEGACY_PRESENCE_FONT_PX,
   LEGACY_PRESENCE_GLOW_ALPHA,
   LEGACY_PRESENCE_GLOW_RADIUS_PX,
+  LEGACY_PRESENCE_TEXT_STROKE_PX,
   resolveLegacyPresenceDotAlpha,
   type LegacyPresenceCounterLayout
 } from '../legacy-runtime/legacyPresenceCounterLayout';
 
 export interface PresenceCounterViewStyle {
   readonly fontFamily: string;
-  /** CSS colour string for the muted number and word. */
+  /** CSS colour string for the number and word (a high-contrast token, not the muted one). */
   readonly textColor: string;
+  /** CSS colour string for the dark outline that separates the text from the board behind it. */
+  readonly strokeColor: string;
   /** 0xRRGGBB accent for the dot. */
   readonly dotColor: number;
 }
@@ -31,7 +34,9 @@ export class PresenceCounterView {
       color: style.textColor,
       fontFamily: style.fontFamily,
       fontSize: `${LEGACY_PRESENCE_FONT_PX}px`,
-      padding: { bottom: 2, top: 2 }
+      padding: { bottom: 2, top: 2 },
+      stroke: style.strokeColor,
+      strokeThickness: LEGACY_PRESENCE_TEXT_STROKE_PX
     }).setOrigin(0, 0.5).setDepth(3).setVisible(false).setName(LEGACY_PRESENCE_COUNTER_NAME);
   }
 

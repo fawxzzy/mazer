@@ -208,7 +208,7 @@ describe('guide copy only names things that exist', () => {
     const late = resolveLegacyProgressionDifficultyProfile(400);
     expect(late.expectedEdgeWraps.horizontal + late.expectedEdgeWraps.vertical).toBeGreaterThan(0);
     expect(row('wrap').text).toMatch(/^Some mazes wrap /);
-    expect(row('wrap').text).toMatch(/Trail-coloured edge diamonds fill as beams hit/);
+    expect(row('wrap').text).toMatch(/Trail-coloured edge stars fill as beams hit/);
   });
 
   test('Wrap: the ladder really gives some mazes a wrap corridor (never early, fading out to none, never all of a level while it fades)', () => {
