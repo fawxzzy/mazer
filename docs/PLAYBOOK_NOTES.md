@@ -351,3 +351,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: MAZER-DEBT-002 PR 2 of 3 (Wave 5C only). The fields are already optional and deprecated since #575, so this is type-valid.
 - Follow-up (PR 3, Wave 1C): delete the two type fields in `src/scenes/menuRuntimeDiagnostics.ts` and the `tests/scenes/menu-runtime-diagnostics.test.ts` fixture/assertions.
 - Status: headless only.
+
+
+## 2026-11-15 - Playbook runtime bridge pinned to v0.74.0
+- WHAT changed: `scripts/playbook-runtime.mjs` `DEFAULT_PLAYBOOK_VERSION`, and the `Playbook clean-environment validation` job fallback URL and SHA-256 in `.github/workflows/verify.yml`, moved from the Playbook v0.54.1 release tarball to v0.74.0 (SHA-256 `6b0abf33835c57331f0ef471fef2a803e2cbabc1d673f528e62b2f5213462ac7`, hashed from the published release asset).
+- WHY it changed: v0.74.0 carries Playbook #74 (doctor tells product repos from consumer repos), so Mazer doctor runs stop reporting the Playbook product docs layout as errors.
+- Rule: version, URL and digest move together; no deploy surface touched.
