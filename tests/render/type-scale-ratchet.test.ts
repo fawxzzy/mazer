@@ -76,9 +76,11 @@ const collectStacks = (): Map<string, string[]> => {
 /**
  * Sizes in shipped source that are still off the scale. Migrations (one surface per PR) delete entries; the test
  * fails when an entry no longer appears (so it must be removed) and when a new off-scale size appears.
- * 9 and 11 are also below the 12 px body floor and are the first to go.
+ * 11 was migrated to 12 in MAZER-UI-010 surface PR 1. 9 is still below the 12 px body floor: it is the two never-populated
+ * badge label texts in MenuScene, and the design-token evidence contract (legacy/fontSizePx/micro) cites that literal,
+ * so it leaves with the token owner's decision, not in a type-scale PR.
  */
-const LEGACY_OFF_SCALE_SIZES_PX = [1, 9, 11, 13, 15, 18] as const;
+const LEGACY_OFF_SCALE_SIZES_PX = [1, 9, 13, 15, 18] as const;
 
 /** Font stacks still in shipped source besides the two scale faces. Same shrink-only rule. */
 const LEGACY_FONT_STACKS = [

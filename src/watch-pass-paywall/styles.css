@@ -47,7 +47,7 @@
   margin: 0 0 8px;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  font-size: 11px;
+  font-size: 12px;
   color: rgba(207, 232, 255, 0.74);
 }
 
@@ -169,7 +169,7 @@
 
 .watch-pass-paywall__kpis dt {
   margin-bottom: 6px;
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: rgba(213, 232, 248, 0.64);

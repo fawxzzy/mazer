@@ -45,7 +45,7 @@
   margin: 0 0 8px;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  font-size: 11px;
+  font-size: 12px;
   color: rgba(207, 232, 255, 0.74);
 }
 
@@ -180,7 +180,7 @@
 
 .watch-pass-preview__kpis dt {
   margin-bottom: 6px;
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: rgba(213, 232, 248, 0.64);
@@ -227,7 +227,7 @@
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 10px;
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: rgba(214, 231, 246, 0.68);
