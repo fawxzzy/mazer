@@ -57,12 +57,13 @@ try {
     const data = await page.evaluate(async ({ levelList, seedCount }) => {
       const lifecycle = await import('/src/legacy-runtime/legacyGenerationLifecycle.ts');
       const progression = await import('/src/legacy-runtime/legacyProgression.ts');
+      const boardScale = await import('/src/legacy-runtime/legacyBoardScale.ts');
       const base = progression.createEmptyLegacyProgressionState().tracks.player;
       const boards = [['phone', 23 / 51], ['desktop', 45 / 27]];
       const out = [];
       // Warm-up so JIT and module init are not charged to the first level.
       for (let i = 0; i < 6; i += 1) {
-        lifecycle.createLegacyRuntimeMazeForMode('play', 35, 9000 + i, progression.resolveLegacyMazeGenerationProfileForProgression({ ...base, level: '50', targetComplexity: 204 }), {}, 23 / 51);
+        lifecycle.createLegacyRuntimeMazeForMode('play', boardScale.resolveLegacyBoardScaleForLevel(50), 9000 + i, progression.resolveLegacyMazeGenerationProfileForProgression({ ...base, level: '50', targetComplexity: 204 }), {}, 23 / 51);
       }
       for (const level of levelList) {
         const track = { ...base, level: String(level), targetComplexity: Math.min(400, 8 + ((level - 1) * 4)) };
@@ -71,7 +72,7 @@ try {
           const times = [];
           for (let i = 0; i < seedCount; i += 1) {
             const t0 = performance.now();
-            lifecycle.createLegacyRuntimeMazeForMode('play', 35, 1337 + (i * 104729), profile, {}, ratio);
+            lifecycle.createLegacyRuntimeMazeForMode('play', boardScale.resolveLegacyBoardScaleForLevel(level), 1337 + (i * 104729), profile, {}, ratio);
             times.push(performance.now() - t0);
           }
           out.push({ level, board: name, times });

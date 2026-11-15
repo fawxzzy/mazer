@@ -16,7 +16,7 @@ import { createLegacyDemoWalkerEpisode, createLegacyMenuDemoWalkerConfig } from 
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import { resolveLegacyPlayableShortestPath } from '../../src/legacy-runtime/legacyMaze';
 import { resolveLegacyMazeGenerationProfileForProgression } from '../../src/legacy-runtime/legacyProgression';
-import { LADDER_BOARDS, seedForIndex, trackForLevel } from './lib/progressionLadderSampling';
+import { LADDER_BOARDS, ladderScaleForLevel, seedForIndex, trackForLevel } from './lib/progressionLadderSampling';
 
 const arg = (name: string, fallback: string): string => {
   const hit = process.argv.find((value) => value.startsWith(`--${name}=`));
@@ -51,7 +51,7 @@ for (const level of levels) {
     for (let index = 0; index < seeds; index += 1) {
       const seed = seedForIndex(index);
       const profile = resolveLegacyMazeGenerationProfileForProgression(trackForLevel(level));
-      const maze = createLegacyRuntimeMazeForMode('menu', 35, seed, profile, {}, board.aspectRatio);
+      const maze = createLegacyRuntimeMazeForMode('menu', ladderScaleForLevel(level), seed, profile, {}, board.aspectRatio);
       const shortest = resolveLegacyPlayableShortestPath(maze.grid, maze.start, maze.goal);
       for (const rank of ranks) {
         const episode = createLegacyDemoWalkerEpisode(maze);

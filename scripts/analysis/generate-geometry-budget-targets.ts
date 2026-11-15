@@ -61,7 +61,10 @@ import {
 import { FELT_WRAP_PRICE_PERCENT, tuneMazeFeltToTarget } from '../../src/legacy-runtime/legacyMazeFeltTuning';
 
 export const GEOMETRY_BUDGET_CALIBRATION = {
-  // Frozen board scale for the whole budget range (tutorial value).
+  // The scale the CEILING and FRINGE_CAP below were MEASURED at (the old frozen board).
+  // MAZER-PROG-020 builds the shipped board larger (LEGACY_BOARD_BASE_SCALE, 38+); a bigger
+  // board holds at least as much felt/fringe, so the baked numbers stay a conservative floor
+  // there. progression-board-scale-table.ts --capacity measures the real capacity per scale.
   scale: 35,
   boards: [
     { name: 'phone', aspectRatio: 23 / 51 },
@@ -108,8 +111,9 @@ export interface GeometryBudgetCalibrationResult {
   reached: number[];
 }
 
-export const computeGeometryBudgetCalibration = (): GeometryBudgetCalibrationResult => {
-  const { scale, boards, seedBase, capacitySeedsPerBoard, routeTarget, maxBranch, routeBranch, forks, capacityShare } = GEOMETRY_BUDGET_CALIBRATION;
+export const computeGeometryBudgetCalibration = (scaleOverride?: number): GeometryBudgetCalibrationResult => {
+  const { boards, seedBase, capacitySeedsPerBoard, routeTarget, maxBranch, routeBranch, forks, capacityShare } = GEOMETRY_BUDGET_CALIBRATION;
+  const scale = scaleOverride ?? GEOMETRY_BUDGET_CALIBRATION.scale;
   const profile = resolveGeometryBudgetProfileForRungs(0);
   const reached: number[] = [];
   const perBoardQuantile: number[] = [];
@@ -139,8 +143,9 @@ export const computeGeometryBudgetCalibration = (): GeometryBudgetCalibrationRes
 };
 
 // Fringe capacity at the felt saturation level of a ceiling (see the header).
-export const computeGeometryBudgetFringeCalibration = (ceiling: number): GeometryBudgetFringeCalibration => {
-  const { scale, boards, seedBase, capacitySeedsPerBoard, fringeShare } = GEOMETRY_BUDGET_CALIBRATION;
+export const computeGeometryBudgetFringeCalibration = (ceiling: number, scaleOverride?: number): GeometryBudgetFringeCalibration => {
+  const { boards, seedBase, capacitySeedsPerBoard, fringeShare } = GEOMETRY_BUDGET_CALIBRATION;
+  const scale = scaleOverride ?? GEOMETRY_BUDGET_CALIBRATION.scale;
   let level = 2;
   while (resolveGeometryBudgetSchedule(level + 1) <= ceiling) { level += 1; }
   const target = resolveGeometryBudgetTarget(level)!;
@@ -233,6 +238,8 @@ const main = (): void => {
 };
 
 // Runs only when launched through vite-node (not when imported by a test).
-if (/vite-node/.test(process.argv[1] ?? '')) {
+// progression-board-scale-table.ts imports this module for the capacity pass and sets the flag so
+// importing it does not also run this script's own main().
+if (/vite-node/.test(process.argv[1] ?? '') && process.env.MAZER_CALIBRATION_NO_MAIN !== '1') {
   main();
 }

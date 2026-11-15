@@ -1,4 +1,5 @@
 // Shared sampling helpers for the progression ladder report and its test.
+import { resolveLegacyBoardScaleForLevel } from '../../../src/legacy-runtime/legacyBoardScale';
 import { createLegacyRuntimeMazeForMode } from '../../../src/legacy-runtime/legacyGenerationLifecycle';
 import {
   GEOMETRY_BUDGET_SATURATION_LEVEL,
@@ -18,6 +19,14 @@ import {
   resolveLegacyMazeComplexity,
   resolveLegacyMazeGenerationProfileForProgression
 } from '../../../src/legacy-runtime/legacyProgression';
+
+// MAZER-PROG-020: the shipped board's cell scale for a level (was the frozen 35 everywhere).
+export const ladderScaleForLevel = (level: number): number => resolveLegacyBoardScaleForLevel(level);
+
+// The scale the geometry-budget tables (ceiling, fringe cap, fill floors, density baselines) were calibrated at.
+// Tests that pin those tables to their own baselines generate at this scale until the ladder is re-baselined
+// at the shipped scale (MAZER-PROG-020 S3).
+export const LADDER_CALIBRATION_SCALE = 35;
 
 export const LADDER_BOARDS = [
   { name: 'phone', aspectRatio: 23 / 51 },
@@ -73,10 +82,11 @@ export const generateLadderMaze = (
   level: number,
   board: typeof LADDER_BOARDS[number],
   seed: number,
-  mode: 'play' | 'menu' = 'play'
+  mode: 'play' | 'menu' = 'play',
+  scale: number = ladderScaleForLevel(level)
 ) => createLegacyRuntimeMazeForMode(
   mode,
-  35,
+  scale,
   seed,
   resolveLegacyMazeGenerationProfileForProgression(trackForLevel(level)),
   {},
@@ -104,7 +114,7 @@ export const hashLadderMaze = (maze: ReturnType<typeof generateLadderMaze>): str
 export const sampleLevel = (level: number, board: typeof LADDER_BOARDS[number], seed: number): LadderLevelSample => {
   const profile = resolveLegacyMazeGenerationProfileForProgression(trackForLevel(level));
   const started = performance.now();
-  const maze = createLegacyRuntimeMazeForMode('play', 35, seed, profile, {}, board.aspectRatio);
+  const maze = createLegacyRuntimeMazeForMode('play', ladderScaleForLevel(level), seed, profile, {}, board.aspectRatio);
   const ms = performance.now() - started;
   const measured = measureFelt(maze);
   const loopSaving = (maze as LegacyMazeSnapshot).loopStats?.saved ?? 0;

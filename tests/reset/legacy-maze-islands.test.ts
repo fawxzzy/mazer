@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { measureFelt } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import { fillFloorIslands, fillUnreachableCells, findFloorIslands } from '../../src/legacy-runtime/legacyMazeIslands';
 import { collectDeadEndBranches, MIN_DEAD_END_BRANCH_CELLS } from '../../src/legacy-runtime/legacyMazeStubs';
-import { LADDER_BOARDS, generateLadderMaze, hashLadderMaze, seedForIndex } from '../../scripts/analysis/lib/progressionLadderSampling';
+import { LADDER_BOARDS, LADDER_CALIBRATION_SCALE, generateLadderMaze, hashLadderMaze, seedForIndex } from '../../scripts/analysis/lib/progressionLadderSampling';
 
 const gridFrom = (rows: readonly string[]): boolean[][] => rows.map((row) => [...row].map((char) => char !== '#'));
 const boardNamed = (name: string) => LADDER_BOARDS.find((candidate) => candidate.name === name)!;
@@ -92,8 +92,10 @@ describe('no generated ladder maze carries unreachable floor (MAZER-GEN-005)', (
   });
 
   test('a loop connector closed by the ceiling no longer strands its stretch detours: they are walled up in the tuner', () => {
-    // The golden-fixture seed of phone level 278 (20261106 + level) stranded 8 detour cells on origin/main.
-    const maze = generateLadderMaze(278, boardNamed('phone'), 20261106 + 278);
+    // The golden-fixture seed of phone level 278 (20261106 + level) stranded 8 detour cells on origin/main. That
+    // was found at the calibration scale (35) where the ceiling closes a loop connector at this level, so the test
+    // pins that scale; the shipped board (38) is covered by the no-islands sweeps above.
+    const maze = generateLadderMaze(278, boardNamed('phone'), 20261106 + 278, 'play', LADDER_CALIBRATION_SCALE);
     expect(maze.islandStats?.dropped ?? 0).toBeGreaterThan(0);
     expect(findFloorIslands(maze).islands).toEqual([]);
   });

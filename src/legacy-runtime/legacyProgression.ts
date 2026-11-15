@@ -1,3 +1,5 @@
+import { resolveLegacyBoardFloorScale } from './legacyBoardPlan';
+import { resolveLegacyBoardScaleForLevel } from './legacyBoardScale';
 import { clampInteger } from './legacyDefaults';
 import { LAST_BUDGET_LEVEL, resolveGeometryBudgetProfile } from './legacyGeometryBudget';
 import type { LegacyMazeGenerationProfile, LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
@@ -1700,20 +1702,32 @@ export interface LegacyProgressionScaleDetail {
 // returns just the bare number, unchanged, for every existing caller) so
 // a caller that also wants "how close to this device's max is this level"
 // doesn't have to duplicate this computation to get it.
+const isFiniteViewport = (viewport: LegacyProgressionViewport): boolean => (
+  Number.isFinite(viewport.width) && Number.isFinite(viewport.height) && viewport.width > 0 && viewport.height > 0
+);
+
+// The level the board scale reads: the completion ordinal, or the level the target complexity
+// implies when that is higher. Unlike resolveGeometryBudgetLevel it is not capped at the last
+// budget level (the board keeps growing past it) and never reads the device.
+const resolveLegacyProgressionBoardLevel = (
+  track: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'>
+): number => {
+  const complexityLevel = resolveLegacyProgressionLevel(track.targetComplexity);
+  const ordinal = Number(track.level);
+  return Number.isFinite(ordinal) && ordinal > complexityLevel ? Math.trunc(ordinal) : complexityLevel;
+};
+
 export const resolveLegacyProgressionScaleDetail = (
   baseScale: number,
   track: LegacyProgressionTrack,
   options: LegacyProgressionGenerationScaleOptions = {}
 ): LegacyProgressionScaleDetail => {
-  const profile = resolveLegacyProgressionDifficultyProfile(track);
-  const difficultyLevel = resolveLegacyProgressionLevel(track.targetComplexity);
-  // The board is frozen for the whole budget range: difficulty there comes
-  // from maze content, not board size, so levels 2..LAST_BUDGET_LEVEL use the
-  // tutorial band's scale with no per-level bonus.
-  const progressionScale = resolveGeometryBudgetLevel(track) !== null
-    ? resolveLegacyProgressionDifficultyProfile(LEGACY_PROGRESSION_MIN_COMPLEXITY).targetScale
-    : profile.targetScale + Math.min(8, Math.max(0, track.targetComplexity - resolveLegacyProgressionLevelBaseTargetComplexity(difficultyLevel)) * 0.8);
-  const blendedScale = (baseScale * 0.28) + (progressionScale * 0.72);
+  // MAZER-PROG-020: the board's cell scale is a function of the LEVEL only (see
+  // legacyBoardScale.ts). Difficulty still comes from maze content; the board is no longer the
+  // old frozen 35 but LEGACY_BOARD_BASE_SCALE (38), so tiles are a little smaller and a few more
+  // fit across and down. baseScale (the retired Board Zoom setting, fixed at 50) no longer blends
+  // into the board's size; it only seeds the layout probes below.
+  const levelScale = resolveLegacyBoardScaleForLevel(resolveLegacyProgressionBoardLevel(track));
   // The device's actual screen space (pixels -> the largest tile grid that
   // keeps a tile above a legible/tappable size) is now the real ceiling,
   // not a difficulty-derived formula. This used to be
@@ -1730,7 +1744,22 @@ export const resolveLegacyProgressionScaleDetail = (
   });
   const maxScale = Math.max(25, Math.min(LEGACY_PROGRESSION_ABSOLUTE_MAX_SCALE, deviceMaxScale));
   const minScale = Math.min(25, maxScale);
-  const scale = clampInteger(blendedScale, minScale, maxScale);
+  const cappedScale = clampInteger(levelScale, minScale, maxScale);
+  // The 10 px tile floor, with the real layout. A no-op on every phone 320 px wide or more (the
+  // board stays a function of the level); only a narrower box that cannot hold it at 10 px shrinks.
+  const scale = options.viewport && isFiniteViewport(options.viewport)
+    ? resolveLegacyBoardFloorScale(
+      {
+        width: options.viewport.width,
+        height: options.viewport.height,
+        safeArea: options.viewport.safeArea
+      },
+      cappedScale,
+      options.surface === 'play' ? 'play' : 'menu',
+      1,
+      minScale
+    )
+    : cappedScale;
   return {
     scale,
     deviceMaxScale: maxScale,
