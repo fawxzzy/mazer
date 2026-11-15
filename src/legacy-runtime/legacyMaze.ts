@@ -370,7 +370,7 @@ const createSeededRng = (seed: number): (() => number) => {
 // axis still gets the same clamp+odd-size treatment a single square scale
 // used to get (odd sizes keep a true center cell for symmetric border/
 // corner logic on that axis).
-const normalizeGridDimension = (scale: number): number => {
+export const normalizeGridDimension = (scale: number): number => {
   const clamped = clampInteger(scale, LEGACY_MIN_SCALE, LEGACY_MAX_SCALE);
   const normalized = clamped % 2 === 0 ? clamped - 1 : clamped;
   return Math.max(LEGACY_MIN_SCALE, normalized);

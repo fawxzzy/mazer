@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { LEGACY_BOARD_BASE_SCALE } from '../../src/legacy-runtime/legacyBoardScale';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import { createLegacyRuntimeMazeForMode, resolveLegacyGenerationBudgetContract } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
@@ -1644,7 +1645,8 @@ describe('legacy progression', () => {
       fillPressure: 'open',
       shortcutPressure: 'off'
     });
-    expect(scale).toBeLessThanOrEqual(35);
+    // MAZER-PROG-020: the board is LEGACY_BOARD_BASE_SCALE (38) for every level, not the old frozen 35.
+    expect(scale).toBe(LEGACY_BOARD_BASE_SCALE);
     expect(budget.shortcutStageEnabled).toBe(false);
     expect(budget.shortcutCount).toBe(0);
     expect(generationProfile.borderFeederTargetPerSide).toBe(0);

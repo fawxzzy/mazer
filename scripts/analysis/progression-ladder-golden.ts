@@ -11,10 +11,22 @@
 //   (omit --write to print a diff summary instead)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { LADDER_BOARDS, generateLadderMaze, hashLadderMaze } from './lib/progressionLadderSampling';
+import { LADDER_BOARDS, generateLadderMaze, hashLadderMaze, ladderScaleForLevel } from './lib/progressionLadderSampling';
 
 export const GOLDEN_SEED = 20261106;
 const fixturePath = fileURLToPath(new URL('../../tests/fixtures/progression-ladder-golden.v1.json', import.meta.url));
+
+// 1, 2, 3, 7 -> "1-3, 7" so a full reshuffle prints one short line.
+const toRanges = (levels: number[]): string => {
+  const parts: string[] = [];
+  for (let index = 0; index < levels.length; index += 1) {
+    let end = index;
+    while (levels[end + 1] === levels[end]! + 1) { end += 1; }
+    parts.push(end > index ? `${levels[index]}-${levels[end]}` : `${levels[index]}`);
+    index = end;
+  }
+  return parts.join(', ');
+};
 
 const golden: Record<string, Record<string, string>> = {};
 for (const board of LADDER_BOARDS) {
@@ -24,7 +36,7 @@ for (const board of LADDER_BOARDS) {
   }
   golden[board.name] = hashes;
 }
-const document = { version: 1, seed: GOLDEN_SEED, scale: 35, levels: 300, hashes: golden };
+const document = { version: 1, seed: GOLDEN_SEED, scale: ladderScaleForLevel(1), scaleCurve: 'level-keyed (legacyBoardScale.ts)', levels: 300, hashes: golden };
 if (process.argv.includes('--write')) {
   writeFileSync(fixturePath, `${JSON.stringify(document, null, 1)}\n`);
   console.log(`wrote ${fixturePath}`);
@@ -36,7 +48,7 @@ if (process.argv.includes('--write')) {
     for (const level of Object.keys(golden[name]!)) {
       if (existing.hashes[name]?.[level] !== golden[name]![level]) { changed += 1; levels.push(level); }
     }
-    if (levels.length > 0) { console.log(`  ${name}: levels ${levels.join(', ')}`); }
+    if (levels.length > 0) { console.log(`  ${name}: levels ${toRanges(levels.map(Number))}`); }
   }
   console.log(changed === 0 ? 'golden fixture is current' : `${changed} level hashes differ from the fixture`);
   if (changed > 0) { process.exitCode = 1; }

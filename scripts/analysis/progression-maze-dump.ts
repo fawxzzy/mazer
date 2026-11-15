@@ -12,7 +12,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import { resolveLegacyMazeGenerationProfileForProgression } from '../../src/legacy-runtime/legacyProgression';
-import { LADDER_BOARDS, seedForIndex, trackForLevel } from './lib/progressionLadderSampling';
+import { LADDER_BOARDS, ladderScaleForLevel, seedForIndex, trackForLevel } from './lib/progressionLadderSampling';
 
 const arg = (name: string, fallback: string): string => {
   const hit = process.argv.find((value) => value.startsWith(`--${name}=`));
@@ -63,7 +63,7 @@ for (const level of levels) {
     for (let index = 0; index < seeds; index += 1) {
       const profile = resolveLegacyMazeGenerationProfileForProgression(trackForLevel(level));
       const started = performance.now();
-      const maze = createLegacyRuntimeMazeForMode(mode, 35, seedForIndex(index), profile, {}, board.aspectRatio);
+      const maze = createLegacyRuntimeMazeForMode(mode, ladderScaleForLevel(level), seedForIndex(index), profile, {}, board.aspectRatio);
       const genMs = performance.now() - started;
       records.push({
         board: board.name,

@@ -35,6 +35,7 @@ import { forceRemoveOneTileStubs } from './legacyMazeStubs';
 import { FELT_TIE_DEVIATION_LIMIT_PERCENT, FELT_WRAP_PRICE_PERCENT, tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
+import { resolveLegacyBoardDimensions } from './legacyBoardScale';
 import { resolveLegacyMazeComplexity } from './legacyProgression';
 import { legacyTuning } from '../config/tuning';
 
@@ -527,14 +528,7 @@ const resolveLegacyGenerationDefaultCandidateCount = (targetComplexity: number):
 // of a square one. aspectRatio defaults to 1 (square), so every existing
 // caller that doesn't pass it keeps generating exactly the same mazes as
 // before this change.
-const resolveLegacyMazeDimensionsForScale = (scale: number, aspectRatio: number): { width: number; height: number } => {
-  const safeAspectRatio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 1;
-  const ratioRoot = Math.sqrt(safeAspectRatio);
-  return {
-    width: Math.round(scale * ratioRoot),
-    height: Math.round(scale / ratioRoot)
-  };
-};
+export const resolveLegacyMazeDimensionsForScale = resolveLegacyBoardDimensions;
 
 const buildLegacyRuntimeMazeForMode = (
   mode: LegacyGenerationMode,

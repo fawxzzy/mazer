@@ -32,11 +32,11 @@ describe('trail corner raster gate: negative controls', () => {
   test('a reviewer-supplied negative control (60x60 opaque block over the lit chip beside the trail) is REJECTED under the real, shipped tolerance -- not just at tolerance zero', async () => {
     const baselineBuffer = readFileSync(BASELINE_PATH);
     const baselineImage = await loadRaw(baselineBuffer);
-    expect(baselineImage.info.width).toBe(473);
-    expect(baselineImage.info.height).toBe(473);
+    expect(baselineImage.info.width).toBe(456);
+    expect(baselineImage.info.height).toBe(456);
 
-    // Same corruption shape as originally reported (a 60x60 opaque block: 3,600 of 223,729 pixels,
-    // 1.61%, comfortably under the whole-image 2% fraction budget on its own). The baseline was
+    // Same corruption shape as originally reported (a 60x60 opaque block: 3,600 of 207,936 pixels,
+    // 1.73%, comfortably under the whole-image 2% fraction budget on its own). The baseline was
     // regenerated for the legible trail (dark underlay around the bend, goal halo), so the block now
     // sits on the lit chip beside the vertical arm (x=318..377, y=160..219) instead of on the bend,
     // where a black block would hide inside the new dark underlay and change too few pixels.
@@ -59,7 +59,7 @@ describe('trail corner raster gate: negative controls', () => {
     expect(result.passed).toBe(false);
     expect(result.largestRegion).toBeGreaterThan(3000);
     // The actual corner-specific gate must retain this same negative control.
-    const masked = compareRawImages(corrupted, baselineImage, createCornerTrailRegionMask(473, 473, 'cornerNE'));
+    const masked = compareRawImages(corrupted, baselineImage, createCornerTrailRegionMask(456, 456, 'cornerNE'));
     expect(masked.passed).toBe(false);
     expect(masked.largestRegion).toBeGreaterThan(3000);
   });
@@ -133,6 +133,6 @@ describe('trail corner fixture region', () => {
     expect(() => compareRawImages(image, image, new Uint8Array(4))).toThrow();
     expect(() => compareRawImages(image, image, new Uint8Array([1]))).toThrow();
     expect(() => createCornerTrailRegionMask(10, 10, 'cornerNE')).toThrow();
-    expect(() => createCornerTrailRegionMask(473, 473, 'other')).toThrow();
+    expect(() => createCornerTrailRegionMask(456, 456, 'other')).toThrow();
   });
 });
