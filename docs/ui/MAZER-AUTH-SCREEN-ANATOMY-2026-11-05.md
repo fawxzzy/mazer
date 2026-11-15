@@ -86,8 +86,9 @@ Original spec: every existing error string was passed through unchanged (trimmed
 `MAZER_OAUTH_SAFE_ERROR_MESSAGE` (re-exported from `legacyAuthScreenView.ts`, since deleted). Now (Auth Surface v2):
 the status box shows only copy-matrix lines (`resolveLegacyAccountStatusNotice` in `legacyAccountStatusState.ts`);
 the failure rows in `legacyPlayerMessage.ts` are matrix lines since PR-A2, and `MAZER_OAUTH_SAFE_ERROR_MESSAGE`
-(`legacyAccountPortal.ts`, still `Could not reach your account. Try again.` until its Wave 5C PR) is shown as
-`Sign-in is unavailable right now. Try again in a minute.`. The original spec's `LEGACY_AUTH_SCREEN_COPY` (`Welcome`, `Create Account`, `Reset Password`, `Loading…`,
+(`legacyAccountPortal.ts`) is the matrix line `Sign-in is unavailable right now. Try again in a minute.` since the
+Wave 5C follow-up. The host return notices `?notice=expired|unavailable` (`legacyAuthReturnNotice.ts`) show
+`We could not finish signing you in. Sign in again.` and the outage line. The original spec's `LEGACY_AUTH_SCREEN_COPY` (`Welcome`, `Create Account`, `Reset Password`, `Loading…`,
 `Signing you in…`, `Still opening. Continue in your browser or try again.`, ...) is gone; every label now lives in
 `src/brand/authSurfaceCopy.ts` (`MAZER`, `Mazer`, `Sign in`, `Signing in…`, `Opening Mazer…`, `Sign in to play.`).
 

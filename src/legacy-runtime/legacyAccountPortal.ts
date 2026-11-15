@@ -1,3 +1,4 @@
+import { AUTH_SURFACE_MESSAGES } from '../brand/authSurfaceCopy';
 import {
   createProviderPreflightCache,
   runProviderPreflight,
@@ -37,7 +38,9 @@ export const MAZER_OAUTH_PENDING_TTL_MS = 900_000;
 export const MAZER_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
 export const MAZER_OAUTH_SESSION_LOCK_MAX_WAIT_MS = MAZER_OAUTH_TOKEN_TIMEOUT_MS;
 export const MAZER_OAUTH_SESSION_QUARANTINE_TTL_MS = 60_000;
-export const MAZER_OAUTH_SAFE_ERROR_MESSAGE = 'Could not reach your account. Try again.';
+// Auth Surface v2: the generic sign-in failure is the copy-matrix outage line (it was 'Could not reach your account.
+// Try again.'; legacyPlayerMessage.ts still maps that earlier spelling from an older snapshot onto this line).
+export const MAZER_OAUTH_SAFE_ERROR_MESSAGE: string = AUTH_SURFACE_MESSAGES['signin.unavailable'];
 
 const MAZER_OAUTH_CALLBACK_KEYS = ['code', 'state', 'error', 'error_description'] as const;
 const MAZER_OAUTH_TOKEN_RESPONSE_MAX_BYTES = 16_384;
