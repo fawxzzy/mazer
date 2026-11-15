@@ -178,7 +178,7 @@ export function buildWorkReport(registry, ledger) {
       continue;
     }
     if (e.lane === "agent-buildable") {
-      const open = (card.dependencies ?? []).filter((dep) => byId.get(dep)?.status !== "completed");
+      const open = (card.dependencies ?? []).filter((dep) => !["completed", "archived"].includes(byId.get(dep)?.status));
       if (open.length) {
         lists.blocked["other-card"].push(assign(card, "blocked", "other-card", {
           ...slim(card, e),
@@ -218,7 +218,7 @@ export function buildWorkReport(registry, ledger) {
   });
   const menuSceneCards = lists.ready.filter((item) => item.filesHint.includes("src/scenes/MenuScene.ts")).map((item) => item.id);
 
-  const open = registry.workItems.filter((c) => c.status !== "completed" && c.status !== "deferred_candidate").length;
+  const open = registry.workItems.filter((c) => c.status !== "completed" && c.status !== "archived" && c.status !== "deferred_candidate").length;
   const bucketCounts = {
     "needs-you": lists.decisions.length + lists.checks.length,
     "in-review": lists.review.length,

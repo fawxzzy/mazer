@@ -299,7 +299,8 @@ export function checkIntegrity(repoRoot) {
   const prov = state.registry.provenance;
   const done = state.registry.workItems.filter((c) => c.status === "completed").length;
   const deferred = state.registry.workItems.filter((c) => c.status === "deferred_candidate").length;
-  if (prov.stableIdentityCount !== ids.length || prov.completedCardCount !== done || prov.deferredCardCount !== deferred || prov.openCardCount !== ids.length - done - deferred) errors.push("registry provenance counts do not match the cards");
+  const archivedCards = state.registry.workItems.filter((c) => c.status === "archived").length;
+  if (prov.stableIdentityCount !== ids.length || prov.completedCardCount !== done || prov.deferredCardCount !== deferred || (prov.archivedCardCount ?? 0) !== archivedCards || prov.openCardCount !== ids.length - done - deferred - archivedCards) errors.push("registry provenance counts do not match the cards");
   if (serializeJson(state.registry, state.registryRaw) !== state.registryRaw) errors.push(`${REGISTRY_PATH} is not in canonical formatting (2-space JSON); run apply or re-serialize`);
   return { errors, cards: ids.length, archived: archived.events.length };
 }
@@ -332,6 +333,7 @@ function eventFromArgs(args) {
   if (args.description) event.description = args.description;
   if (args.note) event.note = args.note;
   if (args.lane) event.lane = args.lane;
+  if (args.archive) event.archive = true;
   if (args.by) event.by = args.by;
   const evidence = {};
   if (args.prs.length) evidence.prs = args.prs.map(({ repo, value }) => { const [n, sha] = value.split(":"); return { repo, number: Number(n), ...(sha ? { mergedSha: sha } : {}) }; });

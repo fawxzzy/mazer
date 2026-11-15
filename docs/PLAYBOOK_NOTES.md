@@ -294,3 +294,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: a generated asset ships with a test that re-renders it and compares decoded pixels, so a hand-edited or stale binary fails CI.
 - Status: Applied (review); headless Chromium 390x844 and WebKit iPhone 15 Pro and SE screenshots only, no safe-area insets, nothing checked on a real phone. Visible change: header icons are now cyan outline glyphs instead of teal illustrations.
 
+
+## 2026-11-14 Board archive status (MAZER-BOARD-ARCHIVE)
+- WHAT changed: board events accept `archive: true` (CLI `--archive`) on a completed card; the fold sets registry status `archived`, recomputes `provenance.archivedCardCount`, and the owner export maps it to the `archived` lifecycle (`exported_archived_card_count` only once one exists). Reopening needs `reopen: true` plus a status. Docs: docs/ops/MAZER-BOARD-SYNC-PROCESS.md. Tests: tests/board-sync.test.mjs, tests/project-board-owner-export.test.mjs.
+- WHY it changed: finished cards had no end state, so every completed card stayed on the board. FawxzzyWeb already accepts the `archived` lifecycle and files it in the collapsed Completed archive, so no Web change is needed.
+- Rule: an end-state status is reached only by an explicit event flag from the one status that earned it, never by plain `status`.
+- Status: Applied (review); source proof only, no card archived yet.
