@@ -71,6 +71,7 @@
  */
 import { drawGoalHaloToCanvasContext } from './navigationCoreGoalHaloCanvas';
 import { drawTrailToCanvasContext, type TrailCanvasSegment } from './navigationCoreTrailCanvas';
+import { PALETTE_WHITE, PALETTE_WHITE_CSS } from './trailPalette';
 import type { TeleportTransferPoint } from './teleportTransferPresentation';
 
 const colorToRgba = (color: number, alpha: number): string => {
@@ -240,7 +241,7 @@ export const drawTeleportTransferConduitToCanvasContext = (
     // A compact white-hot center is the one frozen-contract exception to
     // "every decorative glint is a four-point sparkle" -- the packet is a
     // payload, not decoration, and keeps a round core deliberately.
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = PALETTE_WHITE_CSS;
     ctx.beginPath();
     ctx.arc(packet.x, packet.y, options.packetRadius, 0, Math.PI * 2);
     ctx.fill();
@@ -256,7 +257,7 @@ export const drawTeleportTransferConduitToCanvasContext = (
       centerX: options.targetPoint.x,
       centerY: options.targetPoint.y,
       radius: options.targetFlareRadius,
-      innerColor: 0xffffff,
+      innerColor: PALETTE_WHITE,
       innerAlpha: clamp01(options.targetFlareIntensity),
       outerColor: flareColor,
       outerAlpha: clamp01(options.targetFlareIntensity) * 0.6

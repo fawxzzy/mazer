@@ -24,6 +24,7 @@
  * The AI breathes too: the pulse is one multiplication in this function, so skipping it for the AI would add a branch
  * and a difference without saving anything.
  */
+import { PALETTE_PLAYER_ACCENT } from './trailPalette';
 import { snappedCellCenter } from './boardTileBake';
 import {
   CHIP_CORNER_RATIO,
@@ -44,7 +45,7 @@ export const PLAYER_MARKER = Object.freeze({
   /** Corner radius as a share of the block's width: the Chip tile's own proportion. */
   cornerRatio: CHIP_CORNER_RATIO,
   /** The reference --player-accent (#2BB868): the block's edge stroke and the tight glow. */
-  accentColor: 0x2bb868,
+  accentColor: PALETTE_PLAYER_ACCENT,
   accentAlpha: 0.86,
   /** Accent stroke as a share of the tile; whole device px, never below one. */
   accentStrokeTileRatio: 2.4 / 64,

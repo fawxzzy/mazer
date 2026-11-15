@@ -340,6 +340,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: a verify script that hard-codes an asset count must be updated in the same PR that changes the asset set. This script is not run by CI or any npm script (two production builds plus headless Chromium, minutes), which is how the drift went unseen.
 - Status: headless Chromium only, nothing checked on a real phone.
 
+## 2026-11-14 - stray colour literals in render files move into trailPalette (MAZER-UI-031, slice 3)
+- WHAT changed: `PALETTE_WHITE`, `PALETTE_WHITE_CSS`, `PALETTE_MASK_BLACK_CSS` and `PALETTE_PLAYER_ACCENT` live in `src/render/trailPalette.ts`; `phaserTileContext.ts`, `teleportTransferConduitCanvas.ts`, `boardTileLayer.ts` and `playerMarker.ts` import them instead of holding `0xffffff` / `'#ffffff'` / `'#000'` / `0x2bb868`. Values are identical, no visual change. Off-theme ratchet offToken 234 to 227 (-7), total 299 to 292; four files drop out of the baseline. MenuScene.ts untouched (separate PR).
+- WHY it changed: MAZER-UI-031 migrates stray literals into the palette modules one wave at a time; this slice is `src/render/*` only so the wave-mix test stays green.
+- Rule: a render module needing white/black/the player accent imports the trailPalette constant; do not reintroduce the literal (ratchet fails).
+- Status: Applied (review); headless gates only, nothing checked on a real phone.
 ## 2026-11-14 (MenuScene stops publishing auth formMode/invalidFields)
 
 - WHAT changed: `src/scenes/MenuScene.ts` no longer publishes `auth.formMode: 'login'` / `auth.invalidFields: []` in the runtime diagnostics (and the stale comment is gone). No Wave 1C file touched.
@@ -352,3 +357,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: `src/scenes/menuRuntimeDiagnostics.ts` (Wave 1C only) drops the deprecated optional `auth.formMode` / `auth.invalidFields`; `tests/scenes/menu-runtime-diagnostics.test.ts` loses the fixture line and asserts the source no longer mentions them. All consumers grepped (src, scripts, tests, docs): none remain.
 - WHY it changed: MAZER-DEBT-002 PR 3 of 3; MenuScene stopped publishing them in #579.
 - Status: headless only, nothing checked on a real phone.
+
+
+## 2026-11-15 - Playbook runtime bridge pinned to v0.74.0
+- WHAT changed: `scripts/playbook-runtime.mjs` `DEFAULT_PLAYBOOK_VERSION`, and the `Playbook clean-environment validation` job fallback URL and SHA-256 in `.github/workflows/verify.yml`, moved from the Playbook v0.54.1 release tarball to v0.74.0 (SHA-256 `6b0abf33835c57331f0ef471fef2a803e2cbabc1d673f528e62b2f5213462ac7`, hashed from the published release asset).
+- WHY it changed: v0.74.0 carries Playbook #74 (doctor tells product repos from consumer repos), so Mazer doctor runs stop reporting the Playbook product docs layout as errors.
+- Rule: version, URL and digest move together; no deploy surface touched.
