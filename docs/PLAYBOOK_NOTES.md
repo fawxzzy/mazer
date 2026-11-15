@@ -352,6 +352,12 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Follow-up (PR 3, Wave 1C): delete the two type fields in `src/scenes/menuRuntimeDiagnostics.ts` and the `tests/scenes/menu-runtime-diagnostics.test.ts` fixture/assertions.
 - Status: headless only.
 
+## 2026-11-14 (diagnostics auth formMode/invalidFields type fields deleted)
+
+- WHAT changed: `src/scenes/menuRuntimeDiagnostics.ts` (Wave 1C only) drops the deprecated optional `auth.formMode` / `auth.invalidFields`; `tests/scenes/menu-runtime-diagnostics.test.ts` loses the fixture line and asserts the source no longer mentions them. All consumers grepped (src, scripts, tests, docs): none remain.
+- WHY it changed: MAZER-DEBT-002 PR 3 of 3; MenuScene stopped publishing them in #579.
+- Status: headless only, nothing checked on a real phone.
+
 
 ## 2026-11-15 - Playbook runtime bridge pinned to v0.74.0
 - WHAT changed: `scripts/playbook-runtime.mjs` `DEFAULT_PLAYBOOK_VERSION`, and the `Playbook clean-environment validation` job fallback URL and SHA-256 in `.github/workflows/verify.yml`, moved from the Playbook v0.54.1 release tarball to v0.74.0 (SHA-256 `6b0abf33835c57331f0ef471fef2a803e2cbabc1d673f528e62b2f5213462ac7`, hashed from the published release asset).
