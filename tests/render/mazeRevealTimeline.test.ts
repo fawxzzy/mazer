@@ -1,11 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { computeRevealMaskAlpha, MazeRevealMaskBuilder } from '../../src/render/boardRevealMask';
+import {
+  computeParentDirections,
+  computeRevealMaskExtent,
+  MazeRevealMaskBuilder,
+  WALL_OPEN_FROM
+} from '../../src/render/boardRevealMask';
 import {
   composeBoardTileRevealSoft,
   buildRankGrid,
-  SOFT_REVEAL_LEVELS,
   type BoardSoftRevealContext2D
 } from '../../src/render/boardTileLayer';
 import { computeBoardTileLayout } from '../../src/render/boardTileBake';
@@ -31,10 +35,9 @@ import {
 import {
   MAZE_DOCK_FADE_MS,
   MAZE_MARKER_FADE_MS,
-  MAZE_REVEAL_RAMP_MS,
-  fillMazeRevealCellAlpha,
-  resolveCellRevealAlpha,
-  resolveDockRevealAlpha,
+  fillMazeRevealCellExtent,
+  resolveCellRevealExtent,
+  resolveDockRevealExtent,
   resolveMarkerRevealAlpha,
   resolveMazeRevealFrame,
   resolveMazeRevealWindow,
@@ -46,9 +49,8 @@ import { inputFor, wrapDockMaze } from './support/boardTileFixtures';
 const COUNTS = [1, 2, 30, 373, 1000, 4000];
 const FRAME_MS = 1000 / 60;
 
-describe('soft maze reveal timeline: windows ride the shipped intro / outro timeline', () => {
-  test('the ramp, dock fade and marker fade are steps of the motion scale', () => {
-    expect(MAZE_REVEAL_RAMP_MS).toBe(MOTION_DURATION_MS.reveal);
+describe('maze build / tear-down timeline: windows ride the shipped intro / outro timeline', () => {
+  test('the dock slide and marker fade are steps of the motion scale', () => {
     expect(MAZE_DOCK_FADE_MS).toBe(MOTION_DURATION_MS.base);
     expect(MAZE_MARKER_FADE_MS).toBe(INTRO_LASER_MS);
   });
@@ -58,8 +60,8 @@ describe('soft maze reveal timeline: windows ride the shipped intro / outro time
     expect(window.startMs).toBe(INTRO_BUILD_START_MS);
     expect(window.endMs).toBe(resolveIntroRevealEndMs(count));
     expect(window.endMs - window.startMs).toBe(resolveIntroRevealMs(count));
-    expect(window.rampMs).toBeLessThanOrEqual(MAZE_REVEAL_RAMP_MS);
-    expect(window.rampMs).toBeLessThanOrEqual((window.endMs - window.startMs) / 2);
+    // One cell wipes for exactly one rank step: the next cell starts as it finishes.
+    expect(window.rampMs).toBeCloseTo((window.endMs - window.startMs) / count, 9);
   });
 
   test.each(COUNTS)('N=%i: the deconstruct window is exactly the shipped one', (count) => {
@@ -70,122 +72,150 @@ describe('soft maze reveal timeline: windows ride the shipped intro / outro time
   });
 });
 
-describe('soft maze reveal timeline: per-cell alpha', () => {
-  test.each([30, 373, 1000])('N=%i build: every cell is 0 at the start, 1 at the build end, never decreases, first cell starts at the window start', (count) => {
+describe('maze build / tear-down timeline: per-cell extent', () => {
+  test.each([30, 373, 1000])('N=%i build: every cell is 0 at the start, 1 at the build end, never shrinks, first cell starts at the window start', (count) => {
     const window = resolveMazeRevealWindow('build', count);
     for (const rank of [0, 1, Math.floor(count / 2), count - 2, count - 1].filter((r) => r >= 0 && r < count)) {
-      expect(resolveCellRevealAlpha('build', window, rank, count, 0)).toBe(0);
-      expect(resolveCellRevealAlpha('build', window, rank, count, window.endMs)).toBe(1);
+      expect(resolveCellRevealExtent('build', window, rank, count, 0)).toBe(0);
+      expect(resolveCellRevealExtent('build', window, rank, count, window.endMs)).toBe(1);
       let previous = 0;
       for (let ms = 0; ms <= window.endMs + 50; ms += 7) {
-        const alpha = resolveCellRevealAlpha('build', window, rank, count, ms);
-        expect(alpha).toBeGreaterThanOrEqual(previous - 1e-12);
-        expect(alpha).toBeGreaterThanOrEqual(0);
-        expect(alpha).toBeLessThanOrEqual(1);
-        previous = alpha;
+        const extent = resolveCellRevealExtent('build', window, rank, count, ms);
+        expect(extent).toBeGreaterThanOrEqual(previous - 1e-12);
+        expect(extent).toBeGreaterThanOrEqual(0);
+        expect(extent).toBeLessThanOrEqual(1);
+        previous = extent;
       }
     }
-    expect(resolveCellRevealAlpha('build', window, 0, count, window.startMs)).toBe(0);
-    expect(resolveCellRevealAlpha('build', window, 0, count, window.startMs + 1)).toBeGreaterThan(0);
+    expect(resolveCellRevealExtent('build', window, 0, count, window.startMs)).toBe(0);
+    expect(resolveCellRevealExtent('build', window, 0, count, window.startMs + 1)).toBeGreaterThan(0);
   });
 
-  test.each([30, 373, 1000])('N=%i deconstruct: every cell is 1 at the window start, 0 at the end, never increases; the far end goes first', (count) => {
+  test.each([30, 373, 1000])('N=%i deconstruct: every cell is 1 at the window start, 0 at the end, never grows; the far end goes first', (count) => {
     const window = resolveMazeRevealWindow('deconstruct', count);
     for (const rank of [0, Math.floor(count / 2), count - 1]) {
-      expect(resolveCellRevealAlpha('deconstruct', window, rank, count, window.startMs)).toBe(1);
-      expect(resolveCellRevealAlpha('deconstruct', window, rank, count, window.endMs)).toBe(0);
+      expect(resolveCellRevealExtent('deconstruct', window, rank, count, window.startMs)).toBe(1);
+      expect(resolveCellRevealExtent('deconstruct', window, rank, count, window.endMs)).toBe(0);
       let previous = 1;
       for (let ms = window.startMs; ms <= window.endMs; ms += 7) {
-        const alpha = resolveCellRevealAlpha('deconstruct', window, rank, count, ms);
-        expect(alpha).toBeLessThanOrEqual(previous + 1e-12);
-        previous = alpha;
+        const extent = resolveCellRevealExtent('deconstruct', window, rank, count, ms);
+        expect(extent).toBeLessThanOrEqual(previous + 1e-12);
+        previous = extent;
       }
     }
     const mid = (window.startMs + window.endMs) / 2;
-    expect(resolveCellRevealAlpha('deconstruct', window, count - 1, count, mid))
-      .toBeLessThanOrEqual(resolveCellRevealAlpha('deconstruct', window, 0, count, mid));
+    expect(resolveCellRevealExtent('deconstruct', window, count - 1, count, mid))
+      .toBeLessThanOrEqual(resolveCellRevealExtent('deconstruct', window, 0, count, mid));
   });
 
-  test('build: a lower rank is never less visible than a higher rank at the same instant (the front moves outward)', () => {
+  test('the tear-down is the build run backwards in time (same rank, same wipe, same easing: the far end leaves first)', () => {
+    const count = 373;
+    const span = 2000;
+    const window = { startMs: 0, endMs: span, rampMs: span / count };
+    for (const rank of [0, 100, 250, 372]) {
+      for (const fraction of [0.05, 0.3, 0.5, 0.77, 0.95]) {
+        const torn = resolveCellRevealExtent('deconstruct', window, rank, count, span * fraction);
+        const built = resolveCellRevealExtent('build', window, rank, count, span * (1 - fraction));
+        expect(torn).toBeCloseTo(built, 9);
+      }
+    }
+  });
+
+  test('build: a lower rank is never less shown than a higher rank at the same instant (the front moves outward)', () => {
     const count = 500;
     const window = resolveMazeRevealWindow('build', count);
     for (let ms = 0; ms <= window.endMs; ms += 31) {
       let previous = 1;
       for (let rank = 0; rank < count; rank += 17) {
-        const alpha = resolveCellRevealAlpha('build', window, rank, count, ms);
-        expect(alpha).toBeLessThanOrEqual(previous + 1e-12);
-        previous = alpha;
+        const extent = resolveCellRevealExtent('build', window, rank, count, ms);
+        expect(extent).toBeLessThanOrEqual(previous + 1e-12);
+        previous = extent;
       }
     }
   });
 
-  test.each([30, 373, 1000, 4000])('N=%i: no cell changes by more than a small step per 60 fps frame (the old reveal jumped 1.0 in one frame)', (count) => {
+  test.each([30, 373, 1000, 4000])('N=%i: the line has no gap at any instant: a cell has started only once every lower rank is whole (so its parent is)', (count) => {
     for (const direction of ['build', 'deconstruct'] as const) {
       const window = resolveMazeRevealWindow(direction, count);
-      let maxStep = 0;
-      for (const rank of [0, Math.floor(count / 3), count - 1]) {
-        let previous = resolveCellRevealAlpha(direction, window, rank, count, 0);
-        for (let ms = FRAME_MS; ms <= window.endMs + 50; ms += FRAME_MS) {
-          const alpha = resolveCellRevealAlpha(direction, window, rank, count, ms);
-          maxStep = Math.max(maxStep, Math.abs(alpha - previous));
-          previous = alpha;
+      for (let ms = window.startMs; ms <= window.endMs; ms += 13) {
+        for (let rank = 1; rank < count; rank += Math.max(1, Math.floor(count / 40))) {
+          const here = resolveCellRevealExtent(direction, window, rank, count, ms);
+          const below = resolveCellRevealExtent(direction, window, rank - 1, count, ms);
+          if (direction === 'build' && here > 1e-9) expect(below).toBeGreaterThanOrEqual(1 - 1e-9);
+          // Deconstruct runs the same line backwards: a lower rank only starts to shrink once every higher rank is gone.
+          if (direction === 'deconstruct' && below < 1 - 1e-9) expect(here).toBeLessThanOrEqual(1e-9);
         }
       }
-      // smoothstep peaks at 1.5 / ramp; at 700 ms and 60 fps that is 3.6 % of full alpha per frame.
-      expect(maxStep).toBeLessThan(0.05);
     }
   });
 
-  test('the soft front is wider than a tile: at any instant many cells are partially revealed at once', () => {
+  test('the tip advances at a constant speed: the total shown length grows linearly with time (no easing, no stutter)', () => {
+    const count = 400;
+    const window = resolveMazeRevealWindow('build', count);
+    const total = (ms: number): number => {
+      let sum = 0;
+      for (let rank = 0; rank < count; rank += 1) sum += resolveCellRevealExtent('build', window, rank, count, ms);
+      return sum;
+    };
+    const t0 = window.startMs + ((window.endMs - window.startMs) * 0.2);
+    const t1 = window.startMs + ((window.endMs - window.startMs) * 0.4);
+    const t2 = window.startMs + ((window.endMs - window.startMs) * 0.6);
+    expect(total(t1) - total(t0)).toBeCloseTo(total(t2) - total(t1), 6);
+    expect(total(t1)).toBeCloseTo(count * 0.4, 6);
+  });
+
+  test('the front is a point, not a whole-board fade: at any instant at most one cell is mid-wipe', () => {
     const count = 1000;
     const window = resolveMazeRevealWindow('build', count);
-    const mid = (window.startMs + window.endMs) / 2;
-    let partial = 0;
-    for (let rank = 0; rank < count; rank += 1) {
-      const alpha = resolveCellRevealAlpha('build', window, rank, count, mid);
-      if (alpha > 0.02 && alpha < 0.98) partial += 1;
+    for (const fraction of [0.1, 0.33, 0.5, 0.9]) {
+      const ms = window.startMs + ((window.endMs - window.startMs) * fraction);
+      let partial = 0;
+      for (let rank = 0; rank < count; rank += 1) {
+        const extent = resolveCellRevealExtent('build', window, rank, count, ms);
+        if (extent > 1e-9 && extent < 1 - 1e-9) partial += 1;
+      }
+      expect(partial).toBeLessThanOrEqual(1);
     }
-    expect(partial).toBeGreaterThan(count * 0.1);
   });
 
-  test('the timeline is closed form: the same instant always gives the same alpha, in any order', () => {
+  test('the timeline is closed form: the same instant always gives the same extent, in any order', () => {
     const window = resolveMazeRevealWindow('build', 373);
-    const a = resolveCellRevealAlpha('build', window, 120, 373, 1234.5);
-    resolveCellRevealAlpha('build', window, 5, 373, 99);
-    expect(resolveCellRevealAlpha('build', window, 120, 373, 1234.5)).toBe(a);
+    const a = resolveCellRevealExtent('build', window, 120, 373, 1234.5);
+    resolveCellRevealExtent('build', window, 5, 373, 99);
+    expect(resolveCellRevealExtent('build', window, 120, 373, 1234.5)).toBe(a);
   });
 
   test('non-finite inputs never throw and never leave 0..1', () => {
     const window = resolveMazeRevealWindow('build', 100);
     for (const ms of [Number.NaN, -5, Number.POSITIVE_INFINITY]) {
-      const alpha = resolveCellRevealAlpha('build', window, 10, 100, ms);
-      expect(alpha).toBeGreaterThanOrEqual(0);
-      expect(alpha).toBeLessThanOrEqual(1);
+      const extent = resolveCellRevealExtent('build', window, 10, 100, ms);
+      expect(extent).toBeGreaterThanOrEqual(0);
+      expect(extent).toBeLessThanOrEqual(1);
     }
-    expect(resolveCellRevealAlpha('build', resolveMazeRevealWindow('build', 1), 0, 1, 5000)).toBe(1);
+    expect(resolveCellRevealExtent('build', resolveMazeRevealWindow('build', 1), 0, 1, 5000)).toBe(1);
   });
 
-  test('fillMazeRevealCellAlpha writes floors only and leaves walls at 0', () => {
+  test('fillMazeRevealCellExtent writes floors only and leaves walls at 0', () => {
     const ranks = Int32Array.from([0, -1, 1, 2, -1, -1]);
     const out = new Float32Array(6).fill(9);
-    fillMazeRevealCellAlpha(out, ranks, 3, 'build', resolveMazeRevealWindow('build', 3), 1e9);
+    fillMazeRevealCellExtent(out, ranks, 3, 'build', resolveMazeRevealWindow('build', 3), 1e9);
     expect(Array.from(out)).toEqual([1, 0, 1, 1, 0, 0]);
   });
 });
 
-describe('soft maze reveal timeline: docks and markers', () => {
-  test('docks: build is 0 until the build ends then fades over the dock fade; deconstruct is 1, then fades to exactly 0 at the edge-path switch', () => {
+describe('maze build / tear-down timeline: docks and markers', () => {
+  test('docks: build is 0 until the build ends then slides out over the dock slide; deconstruct is 1, then slides back to exactly 0 at the edge-path switch', () => {
     const count = 373;
     const end = resolveIntroRevealEndMs(count);
-    expect(resolveDockRevealAlpha('build', count, end)).toBe(0);
-    expect(resolveDockRevealAlpha('build', count, end + MAZE_DOCK_FADE_MS)).toBe(1);
-    expect(resolveDockRevealAlpha('build', count, end + MAZE_DOCK_FADE_MS / 2)).toBeCloseTo(0.5, 5);
-    expect(resolveDockRevealAlpha('deconstruct', count, 0)).toBe(1);
-    expect(resolveDockRevealAlpha('deconstruct', count, OUTRO_EDGE_PATHS_OFF_MS - MAZE_DOCK_FADE_MS)).toBe(1);
-    expect(resolveDockRevealAlpha('deconstruct', count, OUTRO_EDGE_PATHS_OFF_MS)).toBe(0);
+    expect(resolveDockRevealExtent('build', count, end)).toBe(0);
+    expect(resolveDockRevealExtent('build', count, end + MAZE_DOCK_FADE_MS)).toBe(1);
+    expect(resolveDockRevealExtent('build', count, end + MAZE_DOCK_FADE_MS / 2)).toBeCloseTo(0.875, 5);
+    expect(resolveDockRevealExtent('deconstruct', count, 0)).toBe(1);
+    expect(resolveDockRevealExtent('deconstruct', count, OUTRO_EDGE_PATHS_OFF_MS - MAZE_DOCK_FADE_MS)).toBe(1);
+    expect(resolveDockRevealExtent('deconstruct', count, OUTRO_EDGE_PATHS_OFF_MS)).toBe(0);
   });
 
-  test('dock fade is inside the existing windows: it never starts before the build ends or ends after the edge paths switch', () => {
+  test('dock slide is inside the existing windows: it never starts before the build ends or ends after the edge paths switch', () => {
     // The strict 0/1 edge-path switch of introTimeline.ts is untouched.
     const count = 373;
     const end = resolveIntroRevealEndMs(count);
@@ -212,7 +242,7 @@ describe('soft maze reveal timeline: docks and markers', () => {
   });
 });
 
-describe('soft maze reveal timeline: frames', () => {
+describe('maze build / tear-down timeline: frames', () => {
   test('reduced motion has no soft reveal at all (the 200 ms crossfade is the whole effect)', () => {
     expect(resolveMazeRevealFrame('build', 500, 373, true)).toBeNull();
     expect(resolveMazeRevealFrame('deconstruct', 800, 373, true)).toBeNull();
@@ -252,7 +282,7 @@ describe('reduced motion: the 200 ms crossfade is the whole effect', () => {
     expect(resolveReducedBoardFade('deconstruct', OUTRO_REDUCED_MOTION_MS, 373, true)).toBeNull();
   });
 
-  test('full motion has no board fade (the soft front is used instead)', () => {
+  test('full motion has no board fade (the growing front is used instead)', () => {
     expect(resolveReducedBoardFade('build', 50, 373, false)).toBeNull();
     expect(resolveReducedBoardFade('deconstruct', 50, 373, false)).toBeNull();
     expect(resolveReducedBoardFade('build', 50, 0, true)).toBeNull();
@@ -278,131 +308,270 @@ describe('board reveal mask', () => {
   const rows = 3;
   const floor = Uint8Array.from([1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1]);
 
-  test('floor cells keep their own alpha; walls and the pad ring take the max of the floor cells around them', () => {
-    const alpha = new Float32Array(cols * rows);
-    alpha[0] = 1;
-    alpha[3] = 0.5;
+  test('floor cells keep their own extent; walls and the pad ring open only once the LEAST built floor around them is past 60 %', () => {
+    const extent = new Float32Array(cols * rows).fill(1);
+    extent[3] = 0.8;
+    extent[14] = 0;
     const out = new Uint8ClampedArray((cols + 2) * (rows + 2));
-    computeRevealMaskAlpha(out, cols, rows, alpha, floor);
+    computeRevealMaskExtent(out, cols, rows, extent, floor);
     const at = (x: number, y: number): number => out[((y + 1) * (cols + 2)) + x + 1]!;
     expect(at(0, 0)).toBe(255);
-    expect(at(3, 0)).toBe(128);
-    expect(at(1, 0)).toBe(0);
-    // wall (2,0): neighbours (1,0)=0 floor alpha 0, (3,0)=0.5 -> 128
-    expect(at(2, 0)).toBe(128);
-    // wall (0,1): 8-neighbourhood includes (0,0)=1
+    expect(at(3, 0)).toBe(204);
+    expect(at(4, 2)).toBe(0);
+    // wall (2,0): its floor neighbours are (1,0) at 1 and (3,0) at 0.8 -> the least is 0.8 -> (0.8 - 0.6) / 0.4 = half open
+    expect(Math.abs(at(2, 0) - 127.5)).toBeLessThanOrEqual(1);
+    // wall (0,1): every floor around it is whole -> fully open
     expect(at(0, 1)).toBe(255);
     // pad ring corner (-1,-1) borders only (0,0)
     expect(at(-1, -1)).toBe(255);
-    // pad ring far corner borders nothing revealed
+    // pad ring far corner borders (4,2), which is not built yet -> closed
     expect(at(cols, rows)).toBe(0);
+    // wall (3,2) touches (4,2) (not built): closed, although its other floor neighbours are whole
+    expect(at(3, 2)).toBe(0);
   });
 
-  test('a floor cell is not lifted by a brighter neighbour (hidden floors stay hidden until their own turn)', () => {
-    const alpha = new Float32Array(cols * rows);
-    alpha[1] = 1;
+  test('a wall never opens in front of a corridor that is still drawing: at or below the gate it is 0', () => {
+    const extent = new Float32Array(cols * rows).fill(1);
+    extent[3] = WALL_OPEN_FROM;
     const out = new Uint8ClampedArray((cols + 2) * (rows + 2));
-    computeRevealMaskAlpha(out, cols, rows, alpha, floor);
+    computeRevealMaskExtent(out, cols, rows, extent, floor);
+    expect(out[(1 * (cols + 2)) + 3 + 1]).toBe(Math.round(WALL_OPEN_FROM * 255));
+    expect(out[(1 * (cols + 2)) + 2 + 1]).toBe(0);
+    extent[3] = WALL_OPEN_FROM + 0.01;
+    computeRevealMaskExtent(out, cols, rows, extent, floor);
+    expect(out[(1 * (cols + 2)) + 2 + 1]).toBeGreaterThan(0);
+  });
+
+  test('a floor cell is not lifted by a fuller neighbour (hidden floors stay hidden until their own turn)', () => {
+    const extent = new Float32Array(cols * rows);
+    extent[1] = 1;
+    const out = new Uint8ClampedArray((cols + 2) * (rows + 2));
+    computeRevealMaskExtent(out, cols, rows, extent, floor);
     expect(out[(1 * (cols + 2)) + 1]).toBe(0);
     expect(out[(1 * (cols + 2)) + 2]).toBe(255);
   });
 
-  test('the builder follows the timeline and dims dock-owning cells with the dock alpha', () => {
-    const grid = [[true, true], [true, true]];
+  test('the builder follows the timeline and scales dock-owning cells by the dock extent', () => {
     const ranks = buildRankGrid([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }], 2, 2);
     const builder = new MazeRevealMaskBuilder();
     const frame = resolveMazeRevealFrame('build', resolveIntroRevealEndMs(4) + MAZE_DOCK_FADE_MS / 2, 4, false)!;
     const out = new Uint8ClampedArray(4 * 4);
     builder.fill(out, frame, ranks, Uint8Array.from([1, 0, 0, 0]), 2, 2);
-    expect(grid).toHaveLength(2);
-    expect(out[(1 * 4) + 1]).toBe(Math.round(frame.dockAlpha * 255));
+    expect(out[(1 * 4) + 1]).toBe(Math.round(frame.dockExtent * 255));
     expect(out[(1 * 4) + 2]).toBe(255);
   });
 });
 
-describe('soft board composite: at most 16 draws, never per tile', () => {
+describe('parent sides: which edge of a cell its corridor grows in from', () => {
+  // 3 x 3, a snake from the top-left, walls in the middle of the bottom row:  0 1 2 / 5 4 3 / 6 -1 7
+  const ranks = Int32Array.from([0, 1, 2, 5, 4, 3, 6, -1, 7]);
+
+  test('every floor cell points at an adjacent floor cell of lower rank; the spawn cell, walls and the pad ring point nowhere', () => {
+    const sides = computeParentDirections(ranks, 3, 3);
+    const stride = 5;
+    const step: Record<number, [number, number]> = { 1: [-1, 0], 2: [1, 0], 3: [0, -1], 4: [0, 1] };
+    for (let y = -1; y <= 3; y += 1) {
+      for (let x = -1; x <= 3; x += 1) {
+        const side = sides[((y + 1) * stride) + x + 1]!;
+        const inside = x >= 0 && x < 3 && y >= 0 && y < 3;
+        const rank = inside ? ranks[(y * 3) + x]! : -1;
+        if (!inside || rank <= 0) {
+          expect(side).toBe(0);
+          continue;
+        }
+        const [dx, dy] = step[side]!;
+        expect(ranks[((y + dy) * 3) + x + dx]!).toBeGreaterThanOrEqual(0);
+        expect(ranks[((y + dy) * 3) + x + dx]!).toBeLessThan(rank);
+      }
+    }
+  });
+
+  test('the builder caches the grid per rank grid and recomputes for a new maze', () => {
+    const builder = new MazeRevealMaskBuilder();
+    const first = builder.directions(ranks, 3, 3);
+    expect(builder.directions(ranks, 3, 3)).toBe(first);
+    expect(builder.directions(Int32Array.from(ranks), 3, 3)).not.toBe(first);
+  });
+});
+
+describe('board composite: one clipped draw, never per tile, never a fade', () => {
   const { grid, docks } = wrapDockMaze();
   const layout = computeBoardTileLayout(inputFor(grid, { docks }));
   const stride = layout.cols + 2;
 
-  const record = (cellAlpha: Uint8ClampedArray, dockAlpha: number, withDocks: boolean) => {
+  interface Rect { x: number; y: number; w: number; h: number }
+  const record = (cellExtent: Uint8ClampedArray, dockExtent: number, withDocks: boolean, parentSide?: Uint8Array) => {
     const events: string[] = [];
-    let alpha = 1;
+    const rects: Rect[] = [];
+    const strips: number[][] = [];
     const ctx = {
-      get globalAlpha() { return alpha; },
-      set globalAlpha(value: number) { alpha = value; },
+      // Any write of globalAlpha is a fade: the composite must never do one.
+      set globalAlpha(_value: number) { events.push('alpha'); },
       globalCompositeOperation: 'source-over',
       fillStyle: '',
       save() { events.push('save'); },
-      restore() { events.push('restore'); alpha = 1; },
+      restore() { events.push('restore'); },
       setTransform() { events.push('setTransform'); },
       clearRect() { events.push('clearRect'); },
       beginPath() { events.push('beginPath'); },
-      rect() { events.push('rect'); },
+      rect(x: number, y: number, w: number, h: number) { events.push('rect'); rects.push({ x, y, w, h }); },
       clip() { events.push('clip'); },
       fill() { events.push('fill'); },
       drawImage(_image: unknown, ...rest: number[]) {
-        events.push(`drawImage:${rest.length === 8 ? 'strip' : 'full'}:${alpha}`);
+        events.push(rest.length === 8 ? 'drawImage:strip' : 'drawImage:full');
+        if (rest.length === 8) strips.push(rest);
       }
     } as unknown as BoardSoftRevealContext2D;
     const stats = composeBoardTileRevealSoft(ctx, {}, {
       layout: withDocks ? layout : { ...layout, docks: [] },
-      cellAlpha,
-      dockAlpha
+      cellExtent,
+      parentSide,
+      dockExtent
     });
-    return { events, stats };
+    return { events, rects, strips, stats };
   };
   const filled = (value: number): Uint8ClampedArray => new Uint8ClampedArray(stride * (layout.rows + 2)).fill(value);
+  const cellBox = (px: number, py: number): Rect => {
+    // Padded grid index (px, py) -> layout px; inner cells are board cell (px - 1, py - 1).
+    const x0 = layout.originX + layout.xs[px - 1]!;
+    const y0 = layout.originY + layout.ys[py - 1]!;
+    return { x: x0, y: y0, w: layout.xs[px]! - layout.xs[px - 1]!, h: layout.ys[py]! - layout.ys[py - 1]! };
+  };
 
-  test('a fully revealed board is one clipped bake draw at alpha 1', () => {
-    const { events, stats } = record(filled(255), 1, false);
-    expect(stats.levelDraws).toBe(1);
-    expect(events.filter((e) => e.startsWith('drawImage'))).toEqual(['drawImage:full:1']);
-    expect(events.indexOf('clip')).toBeLessThan(events.indexOf('drawImage:full:1'));
+  test('a fully shown board is one clipped bake draw: row runs merge, no alpha anywhere', () => {
+    const { events, rects, stats } = record(filled(255), 1, false);
+    expect(stats.bakeDraws).toBe(1);
+    expect(events.filter((e) => e.startsWith('drawImage'))).toEqual(['drawImage:full']);
+    expect(events.indexOf('clip')).toBeLessThan(events.indexOf('drawImage:full'));
+    expect(events).not.toContain('alpha');
+    // One rect per padded row, whatever the width.
+    expect(rects).toHaveLength(layout.rows + 2);
+    expect(stats.clipRects).toBe(layout.rows + 2);
   });
 
   test('an empty board draws nothing from the bake', () => {
     const { events, stats } = record(filled(0), 0, false);
-    expect(stats.levelDraws).toBe(0);
+    expect(stats.bakeDraws).toBe(0);
+    expect(stats.clipRects).toBe(0);
     expect(events.filter((e) => e.startsWith('drawImage'))).toHaveLength(0);
   });
 
-  test('every cell in a different alpha still costs at most 16 bake draws (the draw count is bounded by levels, not tiles)', () => {
-    const alpha = filled(0);
-    for (let index = 0; index < alpha.length; index += 1) alpha[index] = (index * 37) % 256;
-    const { events, stats } = record(alpha, 1, false);
-    expect(stats.levelDraws).toBeLessThanOrEqual(SOFT_REVEAL_LEVELS);
-    expect(events.filter((e) => e.startsWith('drawImage:full'))).toHaveLength(stats.levelDraws);
-    // each level draws at its own alpha, ascending
-    const levels = events.filter((e) => e.startsWith('drawImage:full')).map((e) => Number(e.split(':')[2]));
-    expect([...levels].sort((a, b) => a - b)).toEqual(levels);
-    expect(levels.every((l) => l > 0 && l <= 1)).toBe(true);
+  test('any mix of extents still costs ONE bake draw (the cost is bounded by the draw, not by tiles or levels)', () => {
+    const extent = filled(0);
+    for (let index = 0; index < extent.length; index += 1) extent[index] = (index * 37) % 256;
+    const sides = new Uint8Array(extent.length);
+    for (let index = 0; index < sides.length; index += 1) sides[index] = index % 5;
+    const { events, stats } = record(extent, 1, false, sides);
+    expect(stats.bakeDraws).toBe(1);
+    expect(events.filter((e) => e === 'drawImage:full')).toHaveLength(1);
+    expect(events.filter((e) => e === 'clip')).toHaveLength(1);
+    expect(events).not.toContain('alpha');
   });
 
-  test('the cells of one level are covered exactly once: row runs of equal level merge into one rect', () => {
-    const alpha = filled(0);
-    // row 3: five cells in a run at half alpha, then a gap, then two more
-    for (let x = 2; x < 7; x += 1) alpha[(3 * stride) + x] = 128;
-    for (let x = 9; x < 11; x += 1) alpha[(3 * stride) + x] = 128;
-    const { stats } = record(alpha, 1, false);
-    expect(stats.levelDraws).toBe(1);
-    expect(stats.clipRects).toBe(2);
+  test('runs of fully shown cells merge into one rect; a partial cell between two runs is its own rect', () => {
+    const extent = filled(0);
+    for (let x = 2; x < 7; x += 1) extent[(3 * stride) + x] = 255;
+    extent[(3 * stride) + 7] = 100;
+    for (let x = 9; x < 11; x += 1) extent[(3 * stride) + x] = 255;
+    const { stats } = record(extent, 1, false);
+    expect(stats.bakeDraws).toBe(1);
+    expect(stats.clipRects).toBe(3);
   });
 
-  test('docks: four strips cleared and redrawn at the dock alpha; hidden docks are cleared but not drawn', () => {
-    const shown = record(filled(255), 0.4, true);
-    const strips = shown.events.filter((e) => e.includes(':strip:'));
-    expect(strips).toHaveLength(4);
-    expect(strips.every((e) => e === 'drawImage:strip:0.4')).toBe(true);
+  // The rim rule (MAZER-MOTION-020): a growing cell shows a slice of itself at FULL strength that starts at the side
+  // its parent is on, so its pale rim and its dark fill arrive together instead of the rim leading as a faint line.
+  test.each([
+    [1, 'left'],
+    [2, 'right'],
+    [3, 'top'],
+    [4, 'bottom']
+  ] as const)('a growing cell with its parent on side code %i (%s) draws only a slice flush with that side', (side, name) => {
+    void name;
+    const px = 6;
+    const py = 7;
+    for (const value of [40, 90, 128, 200, 254]) {
+      const extent = filled(0);
+      const sides = new Uint8Array(extent.length);
+      extent[(py * stride) + px] = value;
+      sides[(py * stride) + px] = side;
+      const { rects, events, stats } = record(extent, 1, false, sides);
+      expect(rects).toHaveLength(1);
+      expect(stats.bakeDraws).toBe(1);
+      expect(events).not.toContain('alpha');
+      const cell = cellBox(px, py);
+      const r = rects[0]!;
+      const eps = 1e-9;
+      // Inside the cell, never spilling into a neighbour.
+      expect(r.x).toBeGreaterThanOrEqual(cell.x - eps);
+      expect(r.y).toBeGreaterThanOrEqual(cell.y - eps);
+      expect(r.x + r.w).toBeLessThanOrEqual(cell.x + cell.w + eps);
+      expect(r.y + r.h).toBeLessThanOrEqual(cell.y + cell.h + eps);
+      // Flush with the parent side, full length along the corridor, shortened across it by the extent.
+      if (side === 1) { expect(r.x).toBeCloseTo(cell.x, 9); expect(r.h).toBeCloseTo(cell.h, 9); }
+      if (side === 2) { expect(r.x + r.w).toBeCloseTo(cell.x + cell.w, 9); expect(r.h).toBeCloseTo(cell.h, 9); }
+      if (side === 3) { expect(r.y).toBeCloseTo(cell.y, 9); expect(r.w).toBeCloseTo(cell.w, 9); }
+      if (side === 4) { expect(r.y + r.h).toBeCloseTo(cell.y + cell.h, 9); expect(r.w).toBeCloseTo(cell.w, 9); }
+      const length = side <= 2 ? r.w / cell.w : r.h / cell.h;
+      // Device-snapped, so within half a device pixel of the exact fraction.
+      expect(Math.abs(length - (value / 255)) * (side <= 2 ? cell.w : cell.h) * layout.scale).toBeLessThanOrEqual(0.5 + 1e-6);
+    }
+  });
+
+  test('a cell with no parent side (the spawn tile, walls, the pad ring) opens from its centre', () => {
+    const px = 6;
+    const py = 7;
+    const extent = filled(0);
+    extent[(py * stride) + px] = 128;
+    const { rects } = record(extent, 1, false);
+    const cell = cellBox(px, py);
+    const r = rects[0]!;
+    expect(r.x + (r.w / 2)).toBeCloseTo(cell.x + (cell.w / 2), 1);
+    expect(r.y + (r.h / 2)).toBeCloseTo(cell.y + (cell.h / 2), 1);
+    expect(r.w).toBeLessThan(cell.w);
+    expect(r.h).toBeLessThan(cell.h);
+  });
+
+  test('the rect edges are device-snapped, so neighbouring slices never leave an antialiasing seam', () => {
+    const extent = filled(0);
+    const sides = new Uint8Array(extent.length);
+    for (let x = 3; x < 12; x += 1) { extent[(5 * stride) + x] = 90 + (x * 11); sides[(5 * stride) + x] = 1; }
+    const { rects } = record(extent, 1, false, sides);
+    for (const r of rects) {
+      for (const edge of [r.x, r.y, r.x + r.w, r.y + r.h]) {
+        expect(Math.abs((edge * layout.scale) - Math.round(edge * layout.scale))).toBeLessThan(1e-6);
+      }
+    }
+  });
+
+  test('docks: four strips cleared and redrawn flush with the board edge, only the slid-out part; hidden docks are cleared but not drawn', () => {
+    const shown = record(filled(255), 0.5, true);
+    expect(shown.strips).toHaveLength(4);
+    expect(shown.stats.stripDraws).toBe(4);
     expect(shown.events.filter((e) => e === 'clearRect')).toHaveLength(5);
+    expect(shown.events).not.toContain('alpha');
+    const boardRight = layout.originX + layout.boardWidth;
+    const boardBottom = layout.originY + layout.boardHeight;
+    const [left, right, top, bottom] = shown.strips as [number[], number[], number[], number[]];
+    // [sx, sy, sw, sh, dx, dy, dw, dh] in device px (source) and layout px (destination).
+    expect((left[0]! + left[2]!) / layout.scale).toBeCloseTo(layout.originX, 6);
+    expect(left[2]! / layout.scale).toBeCloseTo(layout.originX / 2, 1);
+    expect(right[0]! / layout.scale).toBeCloseTo(boardRight, 6);
+    expect(right[2]! / layout.scale).toBeCloseTo((layout.width - boardRight) / 2, 1);
+    expect((top[1]! + top[3]!) / layout.scale).toBeCloseTo(layout.originY, 6);
+    expect(top[3]! / layout.scale).toBeCloseTo(layout.originY / 2, 1);
+    expect(bottom[1]! / layout.scale).toBeCloseTo(boardBottom, 6);
+    expect(bottom[3]! / layout.scale).toBeCloseTo((layout.height - boardBottom) / 2, 1);
     const hidden = record(filled(255), 0, true);
-    expect(hidden.events.filter((e) => e.includes(':strip:'))).toHaveLength(0);
+    expect(hidden.strips).toHaveLength(0);
     expect(hidden.events.filter((e) => e === 'clearRect')).toHaveLength(5);
+    const full = record(filled(255), 1, true);
+    expect(full.strips).toHaveLength(4);
+    expect((full.strips[0]![0]!) / layout.scale).toBeCloseTo(0, 6);
   });
 
   test('no docks: no strip work at all', () => {
     const { events } = record(filled(255), 1, false);
-    expect(events.filter((e) => e.includes(':strip:'))).toHaveLength(0);
+    expect(events.filter((e) => e === 'drawImage:strip')).toHaveLength(0);
     expect(events.filter((e) => e === 'clearRect')).toHaveLength(1);
   });
 });
