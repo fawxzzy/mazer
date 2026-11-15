@@ -1730,7 +1730,6 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-MOTION-011: the rise and stagger an overlay panel enters with (reduced motion: a 200 ms crossfade).
   private readonly uiEntrance = new UiEntranceDriver();
   private playerMessageToastTexts: Phaser.GameObjects.Text[] = [];
-  /** MAZER-UI-034: the small failure-code line under a toast, one per toast row. */
   private authGateLoadingText!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
   // MAZER-VIS-039: the one app loader (icon, ring, fade in/out) behind the `Signing you in…` cover (src/render/appLoader.ts).
