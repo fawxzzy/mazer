@@ -673,6 +673,7 @@ import type { UiStateSnapshot } from '../state/uiState';
 import type { UiViewModels } from '../state/uiViewModels';
 import type { UiCommand } from '../state/uiCommands';
 import { PLATFORM_PROFILES, type UiPlatformProfile } from '../state/uiProfiles';
+import { type LegacyActionTone, type LegacyButtonFillKey, type LegacyButtonTextKey, resolveLegacyActionTone } from '../legacy-runtime/legacyButtonKit';
 import { dismissInstallSurface, getInstallSurfaceState, promptInstallSurface } from '../boot/installSurface';
 
 type RuntimeMode = LegacyRuntimeMode;
@@ -1350,6 +1351,17 @@ const LEGACY_PLAYER_MESSAGE_TOAST_ROW_POOL = 3;
 // Extra forgiveness beyond the chevron's own drawn touch-target size when
 // resolving which hit box a tap belongs to first -- corner buttons are
 // statistically the hardest to land a precise tap on.
+/** Scene-owned fills and label colours for the kit's action-button chrome (MAZER-UI-015); stroke and label colour live in the kit. */
+const LEGACY_ACTION_BUTTON_FILL: Readonly<Record<LegacyButtonFillKey, number>> = Object.freeze({
+  primary: 0x063a28,
+  control: 0x07131d,
+  dangerFilled: 0x260f1a
+});
+const LEGACY_ACTION_BUTTON_TEXT: Readonly<Record<LegacyButtonTextKey, string>> = Object.freeze({
+  bright: '#ecfff5',
+  soft: '#d7f7ee',
+  signOut: '#ffdce6'
+});
 const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 // Pulse period for the classic "PRESS START" blink -- see
@@ -3674,9 +3686,6 @@ export class MenuScene extends Phaser.Scene {
         displayName: this.authSnapshot.displayName,
         email: this.authSnapshot.email,
         emailPresent: this.authSnapshot.email !== null,
-        // MAZER-ACCT-043: the credential form is gone; these two stay as constants until the 1C diagnostics type drops them.
-        formMode: 'login',
-        invalidFields: [],
         rememberedIdentity: rememberedAuthIdentity,
         status: this.authSnapshot.status,
         userIdPresent: this.authSnapshot.userId !== null,
@@ -13327,7 +13336,7 @@ export class MenuScene extends Phaser.Scene {
     height: number,
     text: string,
     onClick: () => void,
-    tone: 'primary' | 'secondary' | 'danger' | 'danger-outline',
+    tone: LegacyActionTone,
     fontSizeOverride?: number,
     options: { disabled?: boolean } = {}
   ): UiButton {
@@ -13341,19 +13350,13 @@ export class MenuScene extends Phaser.Scene {
     // disabled state is an in-flight provider request, which prevents double
     // submission without hiding validation feedback behind an inert control.
     const unifiedAuthDisabled = unifiedAuthPrimary && this.authSubmitting;
+    // MAZER-UI-015: fill / stroke / label colour for the non-dock tones come from the shared kit table.
+    const kitTone = resolveLegacyActionTone(tone);
     const colors = unifiedAuthDockButton
       ? unifiedAuthDanger
         ? { fill: 0xfff4f6, stroke: cyberArcadeMaterial.signal.goal, text: '#29030d' }
         : { fill: 0xf4f4f5, stroke: LEGACY_PLAY_TOUCH_ACCENT, text: '#050505' }
-      : tone === 'primary'
-      ? { fill: 0x063a28, stroke: LEGACY_PLAY_TOUCH_ACCENT, text: '#ecfff5' }
-      : tone === 'danger'
-        ? { fill: 0x260f1a, stroke: cyberArcadeMaterial.signal.goal, text: '#ffdce6' }
-        : tone === 'danger-outline'
-          // Outline-only danger: the dark field with a red edge, no maroon fill,
-          // so it reads as a lesser alarm than the filled Sign out button.
-          ? { fill: 0x07131d, stroke: cyberArcadeMaterial.signal.goal, text: '#ffdce6' }
-          : { fill: 0x07131d, stroke: LEGACY_PLAY_TOUCH_BUTTON_STROKE, text: '#d7f7ee' };
+      : { ...kitTone.chrome, fill: LEGACY_ACTION_BUTTON_FILL[kitTone.chrome.fillKey], text: LEGACY_ACTION_BUTTON_TEXT[kitTone.chrome.textKey] };
     const draw = (active: boolean): void => {
       chrome.clear();
       if (unifiedAuthDockButton) {
@@ -13397,7 +13400,7 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
       this.drawLegacyCyberPanel(chrome, {
-        active: !explicitlyDisabled && (active || tone === 'primary'),
+        active: !explicitlyDisabled && (active || kitTone.chrome.litWhenIdle),
         alpha: explicitlyDisabled ? 0.42 : 1,
         fill: colors.fill,
         height,

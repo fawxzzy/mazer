@@ -315,6 +315,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: three menu polish cards; the stars owner request was "same colours as the rainbow UI".
 - Rule: a colour that must match another surface imports that surface's palette module; a test compares the two, so a private tint fails CI.
 - Status: Applied (review); headless Chromium 390x844 and WebKit iPhone 15 Pro only, nothing checked on a real phone. MAZER-DEBT-002 (drop constant formMode/invalidFields) NOT done here: it must edit menuRuntimeDiagnostics.ts (Wave 1C) and MenuScene.ts (Wave 5C) together, which the integrator wave-mix test rejects; it needs its own split PR.
+## 2026-11-14 - MAZER-UI-015 (part 2) action-button chrome draws from the kit table
+- WHAT changed: `legacyButtonKit.ts` gains `LEGACY_BUTTON_CHROME` (fill, stroke, label colour, lit-when-idle per primary / secondary / danger-filled / danger-outline) and `resolveLegacyActionTone`; `MenuScene.createLegacyAuthActionButton` takes its non-dock colours from it instead of an inline ternary. Sign out, Reset progress, Guide-style secondary and auth secondary buttons are flipped to `chromeViaKit: true`.
+- WHY it changed: PR 553 shipped the table and the Start hit zone but nothing drew from it. Values are the exact pre-kit colours, so this is look-neutral; the ratchet test now pins the migrated set.
+- Rule: a button picks a kit variant, never a colour; flip its `chromeViaKit` entry in the same PR that migrates it.
+- Status: Applied (review); NOT migrated: Start/Login (front-door renderer), settings cog and overlay close (icon variant), auth primary (unified dock gradient look), DOM install surface. Headless only, nothing checked on a real phone.
 ## 2026-11-14 - diagnostics auth formMode/invalidFields become optional + deprecated (MAZER-DEBT-002, PR 1 of 2)
 - WHAT changed: in `src/scenes/menuRuntimeDiagnostics.ts` (Wave 1C only) `auth.formMode` and `auth.invalidFields` are now optional and marked `@deprecated`; the source-text assertions in `tests/scenes/menu-runtime-diagnostics.test.ts` follow. MenuScene still publishes the constants (still type-valid).
 - WHY it changed: dropping them touches Wave 1C diagnostics and Wave 5C MenuScene.ts together, which the integrator wave-mix test rejects. Order: diagnostics first (optional), MenuScene stops publishing second, then the fields are deleted.
@@ -322,12 +327,25 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Status: Applied (review), headless only.
 
 
+## 2026-11-15 - board-events commits carry vercel.json so event pushes never build
+- WHAT changed: `pushLines` in `scripts/board/board-sync.mjs` now writes `vercel.json` (`{"git":{"deploymentEnabled":false}}`) into the tree of every `board-events` commit next to `events.jsonl`; `tests/board-sync.test.mjs` asserts the branch tree holds both files.
+- WHY it changed: the orphan branch held only `events.jsonl`, so Vercel built every event push: 154 failed git builds in 24h (147 Mazer, 7 Fitness) spent the shared 100/24h deploy cap.
+- Rule: a branch that must never deploy carries its own vercel.json; a one-off commit is not enough because `pushLines` rebuilds the tree on every push.
+- Status: Applied (review); tests pass. UNVERIFIED: Vercel docs do not say which commit's vercel.json is read, so confirm with `GET /v7/deployments?branch=board-events` after the next event push that no new deployment appears.
+
 ## 2026-11-14 (offline shell proof script)
 
 - WHAT changed: `scripts/analysis/verify-offline-shell.mjs` now expects 3 boot-art cache entries (HUD icon atlas webp + tile-font atlas image + atlas json) instead of 5.
 - WHY it changed: MAZER-VIS-011 (#568) replaced the 3 separate HUD icon files with one atlas, so the `mazer-boot-art-v1` runtime cache can only ever hold 3 entries; the script waited for 5 and timed out ("boot art runtime cache populated", exit 2). Script bug, not a product regression: the service worker does cache the boot art.
 - Rule: a verify script that hard-codes an asset count must be updated in the same PR that changes the asset set. This script is not run by CI or any npm script (two production builds plus headless Chromium, minutes), which is how the drift went unseen.
 - Status: headless Chromium only, nothing checked on a real phone.
+
+## 2026-11-14 (MenuScene stops publishing auth formMode/invalidFields)
+
+- WHAT changed: `src/scenes/MenuScene.ts` no longer publishes `auth.formMode: 'login'` / `auth.invalidFields: []` in the runtime diagnostics (and the stale comment is gone). No Wave 1C file touched.
+- WHY it changed: MAZER-DEBT-002 PR 2 of 3 (Wave 5C only). The fields are already optional and deprecated since #575, so this is type-valid.
+- Follow-up (PR 3, Wave 1C): delete the two type fields in `src/scenes/menuRuntimeDiagnostics.ts` and the `tests/scenes/menu-runtime-diagnostics.test.ts` fixture/assertions.
+- Status: headless only.
 
 
 ## 2026-11-15 - Playbook runtime bridge pinned to v0.74.0
