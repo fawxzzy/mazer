@@ -217,3 +217,4 @@
 {"by":"owner","card":"MAZER-PERF-002","id":"ec65f741ffc0","text":"Owner decision 2026-11-14: close as sufficient; frame trace carried in the phone checklist.","ts":"2026-11-15T00:17:54Z","v":1}
 {"by":"owner","card":"MAZER-MOTION-002","id":"832676478f32","text":"Owner decision 2026-11-14: accept as complete with hover and press easing dropped.","ts":"2026-11-15T00:18:00Z","v":1}
 {"by":"owner","card":"MAZER-ACCT-020","id":"54fa8a9023f4","text":"Owner approved 2026-11-14: one-off collision-safe shortening of the four long usernames; exact SQL, preimage and rollback file still go in a box before apply.","ts":"2026-11-15T00:18:06Z","v":1}
+{"by":"owner","card":"MAZER-ACCT-003","id":"4137adbd9637","text":"Owner will run the phone checklist once everything is deployed.","ts":"2026-11-15T00:18:11Z","v":1}
