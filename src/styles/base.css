@@ -173,158 +173,335 @@ canvas:focus-visible {
 
 /* MAZER-VIS-012: the gate paints the shared near-black (legacy bg.page, same as the boot splash and the game) with a
    calmer static glow. The old teal gate colour (legacy bg.gate, #031F20) is retired from this rule; its registry token
-   is kept for the token-registry owner to retire. */
+   is kept for the token-registry owner to retire.
+   Auth Surface v2 (owner-approved 2026-11-15): the install gate and the boot-error screen share one anatomy, the
+   `.mazer-surface*` rules below (src/boot/surfaceMarkup.ts), on the shared design tokens. Type sizes are the mock's,
+   snapped to the type scale (src/render/typeScale.ts). */
+#mazer-boot-error,
 #mazer-install-gate-overlay {
-  align-items: center;
-  background: radial-gradient(circle at 50% 34%, rgba(36, 210, 204, 0.06), transparent 40%), var(--mazer-token-legacy-color-bg-page, #02080f);
-  color: #d7fff8;
-  display: grid;
+  background: radial-gradient(70% 380px at 50% 0%, color-mix(in srgb, var(--mazer-token-color-semantic-info, #6be8e1) 16%, transparent), transparent 72%), var(--mazer-token-legacy-color-bg-page, #02080f);
+  color: var(--mazer-token-color-text-primary, #f1faf6);
+  display: flex;
+  font-family: var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui);
   inset: 0;
-  justify-items: center;
-  padding: max(40px, var(--mazer-safe-area-top)) max(var(--mazer-token-spacing-24, 24px), var(--mazer-safe-area-right)) max(var(--mazer-token-spacing-24, 24px), var(--mazer-safe-area-bottom)) max(var(--mazer-token-spacing-24, 24px), var(--mazer-safe-area-left));
+  justify-content: center;
+  padding: max(54px, var(--mazer-safe-area-top)) max(var(--mazer-token-spacing-24, 24px), var(--mazer-safe-area-right)) max(26px, var(--mazer-safe-area-bottom)) max(var(--mazer-token-spacing-24, 24px), var(--mazer-safe-area-left));
   position: fixed;
   text-align: center;
   z-index: 40;
 }
 
-.mazer-install-gate-card {
-  display: grid;
-  grid-template-rows: auto auto auto auto 1fr auto;
-  gap: 0;
+#mazer-boot-error {
+  z-index: 50;
+}
+
+.mazer-surface {
+  display: flex;
+  flex-direction: column;
   height: 100%;
-  max-width: 342px;
+  max-width: 390px;
+  min-height: 0;
+  width: 100%;
+}
+
+.mazer-surface-kicker {
+  color: var(--mazer-token-color-semantic-info, #6be8e1);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.34em;
+  margin: 0;
+  padding-left: 0.34em;
+  text-transform: uppercase;
+}
+
+.mazer-surface-title {
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin: 14px 0 0;
+  text-wrap: balance;
+}
+
+.mazer-surface-lead {
+  color: color-mix(in srgb, var(--mazer-token-color-text-primary, #f1faf6) 68%, transparent);
+  font-size: 16px;
+  line-height: 1.45;
+  margin: 12px auto 0;
+  max-width: 310px;
+  text-wrap: balance;
+}
+
+/* The real app icon (the boot loader's inline image), size reserved so nothing jumps. */
+.mazer-surface-appicon {
+  border-radius: 22.4%;
+  box-shadow: 0 0 34px color-mix(in srgb, var(--mazer-token-color-semantic-info, #6be8e1) 24%, transparent);
+  display: block;
+  flex: none;
+  height: 76px;
+  margin: 10px auto;
+  width: 76px;
+}
+
+.mazer-surface-appicon-top {
+  box-shadow: 0 0 24px color-mix(in srgb, var(--mazer-token-color-semantic-info, #6be8e1) 20%, transparent);
+  height: 60px;
+  margin: 0 auto 14px;
+  width: 60px;
+}
+
+/* Only the body scrolls (short screens); the slot, legal row and dock keep their size and place. */
+.mazer-surface-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 26px 0 4px;
+  scrollbar-width: none;
+}
+
+.mazer-surface-body::-webkit-scrollbar {
+  display: none;
+}
+
+.mazer-surface-steps {
+  list-style: none;
+  margin: 0;
   padding: 0;
   width: 100%;
 }
 
-/* MAZER-VIS-039: the one Mazer app image (the same inline icon as the boot loader), size reserved so nothing jumps. */
-.mazer-install-gate-brand {
-  border-radius: 20%;
-  display: block;
-  height: 72px;
-  margin: 0 auto;
-  width: 72px;
-}
-
-.mazer-install-gate-title {
-  color: #f5f5f7;
-  font-family: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
-  font-size: 40px;
-  font-weight: 500;
-  letter-spacing: -0.055em;
-  line-height: 1;
-  margin: 26px 0 0;
-}
-
-.mazer-install-gate-subtitle {
-  color: #a4beb8;
-  font-family: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
-  font-size: 15px;
-  line-height: 1.45;
-  margin: 14px 0 0;
-}
-
-.mazer-install-gate-value {
+.mazer-surface-steps li {
   align-items: center;
-  color: #3ddbd4;
+  border-bottom: var(--mazer-token-stroke-hairline, 1px) solid color-mix(in srgb, var(--mazer-token-color-semantic-info, #6be8e1) 18%, transparent);
   display: flex;
-  gap: 14px;
-  margin: 24px 0 0;
+  font-size: 16px;
+  gap: 16px;
+  line-height: 1.35;
+  padding: 16px 4px;
   text-align: left;
 }
 
-.mazer-install-gate-mini-maze {
+.mazer-surface-steps li:last-child {
+  border-bottom: 0;
+}
+
+.mazer-surface-steps svg {
+  color: var(--mazer-token-color-semantic-info, #6be8e1);
+  height: 20px;
+  margin: 0 3px;
+  vertical-align: -4px;
+  width: 20px;
+}
+
+.mazer-surface-step-index {
+  align-items: center;
+  border: var(--mazer-token-stroke-hairline, 1px) solid color-mix(in srgb, var(--mazer-token-color-semantic-info, #6be8e1) 70%, transparent);
+  border-radius: var(--mazer-token-radius-round, 999px);
+  color: var(--mazer-token-color-semantic-info, #6be8e1);
+  display: flex;
   flex: none;
-}
-
-.mazer-install-gate-value-line {
-  color: #d7fff8;
-  font-family: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
-  font-size: 15px;
-  line-height: 1.4;
-  margin: 0;
-}
-
-.mazer-install-gate-feedback {
-  color: #72f5de;
-  font-family: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
-  line-height: 1.4;
-  margin: 0;
-  min-height: 1.4em;
+  font-weight: 600;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
 }
 
-.mazer-install-gate-feedback:empty {
+/* The one message box: its slot is always reserved, so a message never moves the title or the dock, and it is never
+   clipped (a long line on a narrow phone grows the slot into the scrolling body above it). */
+.mazer-surface-slot {
+  flex: none;
+  min-height: 70px;
+  margin-top: 14px;
+  width: 100%;
+}
+
+.mazer-surface-notice {
+  align-items: flex-start;
+  border: var(--mazer-token-stroke-hairline, 1px) solid;
+  border-radius: var(--mazer-token-radius-sheet, 16px);
+  box-sizing: border-box;
+  display: flex;
+  font-size: 14px;
+  gap: 10px;
+  line-height: 1.38;
+  margin: 0;
+  padding: 11px 14px;
+  text-align: left;
+}
+
+.mazer-surface-notice:empty {
   display: none;
 }
 
-.mazer-install-gate-steps {
-  align-self: start;
-  display: grid;
-  gap: 0;
-  list-style: none;
-  margin: 28px 0 0;
-  padding: 0;
-  text-align: left;
+.mazer-surface-notice svg {
+  flex: none;
+  height: 20px;
+  margin-top: 0;
+  width: 20px;
 }
 
-.mazer-install-gate-steps li {
-  align-items: center;
-  color: #d4dcda;
-  display: grid;
-  font-family: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
-  font-size: 15px;
-  gap: 14px;
-  grid-template-columns: 42px 1fr;
-  line-height: 1.5;
-  min-height: 72px;
-  padding: 12px 0;
+.mazer-surface-notice-text {
+  flex: 1;
+  min-width: 0;
 }
 
-.mazer-install-gate-steps li + li {
-  border-top: var(--mazer-token-stroke-hairline, 1px) solid rgba(164, 190, 184, 0.32);
+.mazer-surface-notice[data-tone="error"] {
+  background: color-mix(in srgb, var(--mazer-token-color-tone-error, #ff7d7d) 10%, transparent);
+  border-color: color-mix(in srgb, var(--mazer-token-color-tone-error, #ff7d7d) 55%, transparent);
+  color: color-mix(in srgb, var(--mazer-token-color-text-primary, #f1faf6) 78%, var(--mazer-token-color-tone-error, #ff7d7d));
 }
 
-.mazer-install-gate-step-index {
-  align-items: center;
-  border: var(--mazer-token-stroke-hairline, 1px) solid currentColor;
-  border-radius: var(--mazer-token-radius-round, 999px);
-  color: #3ddbd4;
+.mazer-surface-notice[data-tone="error"] svg {
+  color: var(--mazer-token-color-tone-error, #ff7d7d);
+}
+
+.mazer-surface-notice[data-tone="success"] {
+  background: color-mix(in srgb, var(--mazer-token-color-semantic-info, #6be8e1) 12%, transparent);
+  border-color: color-mix(in srgb, var(--mazer-token-color-semantic-info, #6be8e1) 55%, transparent);
+  color: var(--mazer-token-color-text-primary, #f1faf6);
+}
+
+.mazer-surface-notice[data-tone="success"] svg {
+  color: var(--mazer-token-color-semantic-info, #6be8e1);
+}
+
+.mazer-surface-legal {
   display: flex;
   flex: none;
   font-size: 14px;
-  font-weight: 500;
-  height: 34px;
   justify-content: center;
-  width: 34px;
+  margin-top: 14px;
 }
 
-.mazer-install-gate-actions {
-  display: grid;
-  gap: 10px;
-  margin-top: var(--mazer-token-spacing-4, 4px);
+.mazer-surface-legal a {
+  color: color-mix(in srgb, var(--mazer-token-color-text-primary, #f1faf6) 60%, transparent);
+  pointer-events: auto;
+  text-decoration: none;
 }
 
-.mazer-install-gate-button {
-  background: transparent;
-  border: var(--mazer-token-stroke-hairline, 1px) solid rgba(117, 245, 224, 0.55);
-  border-radius: var(--mazer-token-radius-control, 8px);
-  color: #d7fff8;
+.mazer-surface-legal a + a::before {
+  background: color-mix(in srgb, var(--mazer-token-color-semantic-info, #6be8e1) 50%, transparent);
+  border-radius: 2px;
+  content: "";
+  display: inline-block;
+  height: 13px;
+  margin: 0 14px;
+  vertical-align: -2px;
+  width: 2px;
+}
+
+.mazer-surface-dock {
+  align-items: center;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mazer-token-color-semantic-info, #6be8e1) 38%, white), var(--mazer-token-color-semantic-info, #6be8e1));
+  border: 0;
+  border-radius: 29px;
+  box-shadow: 0 0 26px color-mix(in srgb, var(--mazer-token-color-semantic-info, #6be8e1) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  color: var(--mazer-token-color-overlay-scrim, #02040a);
   cursor: pointer;
+  display: flex;
+  flex: none;
   font-family: inherit;
-  font-size: 0.92rem;
-  padding: var(--mazer-token-spacing-12, 12px) var(--mazer-token-spacing-16, 16px);
+  font-size: 16px;
+  font-weight: 600;
+  height: 58px;
+  justify-content: center;
+  margin-top: 16px;
   pointer-events: auto;
   touch-action: manipulation;
+  width: 100%;
 }
 
-.mazer-install-gate-button-primary {
-  background: rgba(89, 242, 221, 0.16);
-  border-color: #72f5de;
-  color: #72f5de;
-  font-weight: 600;
+.mazer-surface-dock:focus-visible {
+  outline: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-text-primary, #f1faf6);
+  outline-offset: 3px;
 }
 
-.mazer-install-gate-button-secondary {
-  color: rgba(215, 255, 248, 0.82);
+/* Status layout (boot error, installed): kicker on top, the icon, title and message box centred. */
+.mazer-surface-stat {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+  padding-bottom: 18px;
+}
+
+.mazer-surface-stat .mazer-surface-title {
+  margin-top: 22px;
+}
+
+.mazer-surface-stat .mazer-surface-slot {
+  margin-top: 22px;
+}
+
+/* Compact phones (320 x 568 class): the mock's small-size metrics. */
+@media (max-width: 359px), (max-height: 639px) {
+  #mazer-boot-error,
+  #mazer-install-gate-overlay {
+    padding: max(34px, var(--mazer-safe-area-top)) max(18px, var(--mazer-safe-area-right)) max(18px, var(--mazer-safe-area-bottom)) max(18px, var(--mazer-safe-area-left));
+  }
+
+  .mazer-surface-title {
+    margin-top: 10px;
+  }
+
+  .mazer-surface-lead {
+    font-size: 14px;
+    margin-top: 8px;
+  }
+
+  .mazer-surface-appicon {
+    height: 62px;
+    width: 62px;
+  }
+
+  .mazer-surface-appicon-top {
+    height: 40px;
+    margin-bottom: 8px;
+    width: 40px;
+  }
+
+  .mazer-surface-body {
+    padding-top: 16px;
+  }
+
+  .mazer-surface-steps li {
+    font-size: 14px;
+    gap: 12px;
+    padding: 11px 2px;
+  }
+
+  .mazer-surface-step-index {
+    height: 30px;
+    width: 30px;
+  }
+
+  .mazer-surface-slot {
+    min-height: 62px;
+    margin-top: 10px;
+  }
+
+  .mazer-surface-notice {
+    padding: 9px 12px;
+  }
+
+  .mazer-surface-legal {
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  .mazer-surface-dock {
+    border-radius: 25px;
+    height: 50px;
+    margin-top: 10px;
+  }
+
+  .mazer-surface-stat .mazer-surface-title {
+    margin-top: 16px;
+  }
 }

@@ -20,6 +20,7 @@ import { runBoundedAccountBootstrap } from './bootAccountBootstrap';
 import { MAZER_BOOT_SPLASH_MAX_AFTER_GAME_CREATE_MS } from './bootSplash';
 import { waitForMazerUiFonts } from './fontReadiness';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
+import { showMazerBootErrorScreen } from './bootErrorScreen';
 import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
 import { runMazerSignedOutHandoffAtBoot } from './signedOutHandoffBoot';
 import { initializeInstallSurface } from './installSurface';
@@ -246,5 +247,7 @@ const boot = async (): Promise<void> => {
 void boot().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   markMazerBootStatus('error', message);
+  // Auth Surface v2: say it did not load and offer Try again, never a blank page.
+  showMazerBootErrorScreen();
   throw error;
 });
