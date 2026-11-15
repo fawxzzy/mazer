@@ -37,7 +37,6 @@ import {
   MAZE_MARKER_FADE_MS,
   fillMazeRevealCellExtent,
   resolveCellRevealExtent,
-  resolveDockRevealExtent,
   resolveMarkerRevealAlpha,
   resolveMazeRevealFrame,
   resolveMazeRevealWindow,
@@ -204,19 +203,7 @@ describe('maze build / tear-down timeline: per-cell extent', () => {
 });
 
 describe('maze build / tear-down timeline: docks and markers', () => {
-  test('docks: build is 0 until the build ends then slides out over the dock slide; deconstruct is 1, then slides back to exactly 0 at the edge-path switch', () => {
-    const count = 373;
-    const end = resolveIntroRevealEndMs(count);
-    expect(resolveDockRevealExtent('build', count, end)).toBe(0);
-    expect(resolveDockRevealExtent('build', count, end + MAZE_DOCK_FADE_MS)).toBe(1);
-    expect(resolveDockRevealExtent('build', count, end + MAZE_DOCK_FADE_MS / 2)).toBeCloseTo(0.875, 5);
-    expect(resolveDockRevealExtent('deconstruct', count, 0)).toBe(1);
-    expect(resolveDockRevealExtent('deconstruct', count, OUTRO_EDGE_PATHS_OFF_MS - MAZE_DOCK_FADE_MS)).toBe(1);
-    expect(resolveDockRevealExtent('deconstruct', count, OUTRO_EDGE_PATHS_OFF_MS)).toBe(0);
-  });
-
-  test('dock slide is inside the existing windows: it never starts before the build ends or ends after the edge paths switch', () => {
-    // The strict 0/1 edge-path switch of introTimeline.ts is untouched.
+  test('the strict 0/1 edge-path switch of introTimeline.ts is untouched (the docks of the board follow the cell order, the glow and trail keep this switch)', () => {
     const count = 373;
     const end = resolveIntroRevealEndMs(count);
     expect(resolveIntro(end - 1, { reducedMotion: false, tileCount: count }).bleedProgress).toBe(0);
@@ -295,7 +282,7 @@ describe('reduced motion: the 200 ms crossfade is the whole effect', () => {
     expect(driver.current).toBeNull();
     expect(driver.crossfading).toBe(true);
     expect(driver.boardAlpha).toBeCloseTo(0.5, 6);
-    expect(driver.resolveBoardReveal(new Int32Array(4), null, 2, 2)).toBeNull();
+    expect(driver.resolveBoardReveal(new Int32Array(4), 2, 2)).toBeNull();
     expect(driver.update({ ...base, time: 1200 })).toBe(true);
     expect(driver.crossfading).toBe(false);
     expect(driver.boardAlpha).toBe(1);
@@ -351,13 +338,19 @@ describe('board reveal mask', () => {
     expect(out[(1 * (cols + 2)) + 2]).toBe(255);
   });
 
-  test('the builder follows the timeline and scales dock-owning cells by the dock extent', () => {
+  test('the builder follows the timeline: every cell (a border cell that owns a dock too) is shown by its own rank', () => {
     const ranks = buildRankGrid([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }], 2, 2);
     const builder = new MazeRevealMaskBuilder();
-    const frame = resolveMazeRevealFrame('build', resolveIntroRevealEndMs(4) + MAZE_DOCK_FADE_MS / 2, 4, false)!;
+    const window = resolveMazeRevealWindow('build', 4);
+    // Half way through the first cell's wipe: cell 0 half shown, the rest not started (docks do not hold cells back any more).
+    const frame = resolveMazeRevealFrame('build', window.startMs + (window.rampMs / 2), 4, false)!;
     const out = new Uint8ClampedArray(4 * 4);
-    builder.fill(out, frame, ranks, Uint8Array.from([1, 0, 0, 0]), 2, 2);
-    expect(out[(1 * 4) + 1]).toBe(Math.round(frame.dockExtent * 255));
+    builder.fill(out, frame, ranks, 2, 2);
+    expect(out[(1 * 4) + 1]).toBe(Math.round(0.5 * 255));
+    expect(out[(1 * 4) + 2]).toBe(0);
+    const done = resolveMazeRevealFrame('build', window.endMs - 1e-6, 4, false)!;
+    builder.fill(out, done, ranks, 2, 2);
+    expect(out[(1 * 4) + 1]).toBe(255);
     expect(out[(1 * 4) + 2]).toBe(255);
   });
 });
@@ -400,7 +393,12 @@ describe('board composite: one clipped draw, never per tile, never a fade', () =
   const stride = layout.cols + 2;
 
   interface Rect { x: number; y: number; w: number; h: number }
-  const record = (cellExtent: Uint8ClampedArray, dockExtent: number, withDocks: boolean, parentSide?: Uint8Array) => {
+  const record = (
+    cellExtent: Uint8ClampedArray,
+    dockExtent: number | ((x: number, y: number, lengthCells: number) => number),
+    withDocks: boolean,
+    parentSide?: Uint8Array
+  ) => {
     const events: string[] = [];
     const rects: Rect[] = [];
     const strips: number[][] = [];
@@ -426,7 +424,7 @@ describe('board composite: one clipped draw, never per tile, never a fade', () =
       layout: withDocks ? layout : { ...layout, docks: [] },
       cellExtent,
       parentSide,
-      dockExtent
+      dockReach: typeof dockExtent === 'number' ? () => dockExtent : dockExtent
     });
     return { events, rects, strips, stats };
   };

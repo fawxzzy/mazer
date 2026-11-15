@@ -7995,7 +7995,7 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveBoardTileReveal(): BoardTileReveal {
     const softReveal = this.mazeReveal.resolveBoardReveal(
-      this.boardTileRankGrid, this.boardTileDockOwners, this.maze.width, this.maze.height
+      this.boardTileRankGrid, this.maze.width, this.maze.height
     );
     if (softReveal !== null) {
       return softReveal;

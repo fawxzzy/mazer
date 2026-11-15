@@ -11,6 +11,10 @@
  * Usage: node scripts/analysis/capture-maze-motion-filmstrip.mjs --base-url http://127.0.0.1:5206
  *          --scenario build|teardown [--browser chromium|webkit] [--level 7]
  *          [--times 0,100,200,...] [--cols 6] [--scale 0.4] [--reduce-motion] --out DIR [--label NAME]
+ *          [--docks N]        zoom sheet of up to N bleed-off docks on the top / bottom edge (lowest, middle and highest
+ *                             build order first): one row per dock, one column per time, to watch them grow out in sequence
+ *          [--crop x,y,w,h]   css-px rectangle for the zoom sheet instead of the start / goal tile (for example the board
+ *                             edge, to watch the bleed-off docks grow out in sequence)
  * Headless only: this is not a real-device capture.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -60,6 +64,8 @@ const main = async () => {
   const cols = Number(args.cols ?? 7);
   const scale = Number(args.scale ?? 0.4);
   const reduce = args['reduce-motion'] === true;
+  const dockCount = Number(args.docks ?? 0);
+  const crop = typeof args.crop === 'string' ? args.crop.split(',').map(Number) : null;
   const outDir = resolve(String(args.out ?? '.'));
   const label = String(args.label ?? `${scenario}-${engine}${reduce ? '-reduce' : ''}`);
   mkdirSync(outDir, { recursive: true });
@@ -131,6 +137,34 @@ const main = async () => {
   const frames = [];
   const zooms = [];
   const info = await page.evaluate(`(() => { const s = ${scene}; return { tiles: s.menuStaticDrawTileOrder.length, cols: s.maze.width, rows: s.maze.height }; })()`);
+  // Per-dock css-px crop rectangles (screen), with the dock's BFS rank, picked once: the layout is fixed during the build.
+  let dockCrops = [];
+  if (dockCount > 0) { try { await until(`${scene}.boardTileDocks.length > 0`, 4000); } catch { /* no docks on this maze */ } }
+  if (dockCount > 0) {
+    dockCrops = await page.evaluate(`(() => {
+      const s = ${scene}; const layer = s.boardTileLayer; const o = layer.snappedOrigin; const layout = layer.layout;
+      const rect = s.game.canvas.getBoundingClientRect(); const k = rect.width / s.scale.width;
+      const ranks = s.boardTileRankGrid; const w = s.maze.width;
+      const out = [];
+      for (const d of layout.docks) {
+        if (d.side !== 'top' && d.side !== 'bottom') continue;
+        const x0 = o.x + layout.xs[d.x]; const x1 = o.x + layout.xs[d.x + 1];
+        const y0 = d.side === 'top' ? o.y - d.length : o.y + layout.boardHeight;
+        const y1 = d.side === 'top' ? o.y : o.y + layout.boardHeight + d.length;
+        out.push({ side: d.side, x: d.x, y: d.y, rank: ranks ? ranks[(d.y * w) + d.x] : -1, cx: rect.left + k * (x0 + x1) / 2, cy: rect.top + k * (y0 + y1) / 2 });
+      }
+      return { total: layout.docks.length, ranked: out.filter((d) => d.rank >= 0).length, list: out.filter((d) => d.rank >= 0).sort((a, b) => a.rank - b.rank) };
+    })()`);
+    process.stdout.write(`dock probe ${JSON.stringify({ total: dockCrops.total, ranked: dockCrops.ranked })}
+`);
+    dockCrops = dockCrops.list;
+    const n = dockCrops.length;
+    const picks = n <= dockCount ? dockCrops : (dockCount === 1 ? [dockCrops[n - 1]] : Array.from({ length: dockCount }, (_, i) => dockCrops[Math.round((i * (n - 1)) / (dockCount - 1))]));
+    dockCrops = picks;
+    process.stdout.write(`docks ${JSON.stringify(dockCrops.map((d) => ({ side: d.side, x: d.x, rank: d.rank, of: info.tiles })))}
+`);
+  }
+  const dockZooms = dockCrops.map(() => []);
   for (const target of times) {
     for (let guard = 0; guard < 600; guard += 1) {
       const now = await page.evaluate(clockExpr);
@@ -152,7 +186,26 @@ const main = async () => {
       const k = rect.width / s.scale.width;
       return { x: rect.left + (o.x + t.left + t.width / 2) * k, y: rect.top + (o.y + t.top + t.height / 2) * k };
     })()`).catch(() => null);
-    if (focus) {
+    if (dockCrops.length > 0) {
+      const dpr = meta.width / 390;
+      const half = Math.round(45 * dpr);
+      dockCrops.forEach((dock, index) => {
+        const left = Math.max(0, Math.min(meta.width - 2 * half, Math.round(dock.cx * dpr) - half));
+        const top = Math.max(0, Math.min(meta.height - 2 * half, Math.round(dock.cy * dpr) - half));
+        dockZooms[index].push({ label: `${dock.side} r${dock.rank} t=${target}`, png: null, full, left, top, size: 2 * half });
+      });
+    }
+    if (crop) {
+      const dpr = meta.width / 390;
+      const [cx, cy, cw, ch] = crop;
+      zooms.push({
+        label: `crop t=${target}ms`,
+        png: await sharp(full).extract({
+          left: Math.max(0, Math.round(cx * dpr)), top: Math.max(0, Math.round(cy * dpr)),
+          width: Math.min(meta.width, Math.round(cw * dpr)), height: Math.min(meta.height, Math.round(ch * dpr))
+        }).png().toBuffer()
+      });
+    } else if (focus) {
       const dpr = meta.width / 390;
       const half = Math.round(60 * dpr);
       const left = Math.max(0, Math.min(meta.width - 2 * half, Math.round(focus.x * dpr) - half));
@@ -164,8 +217,18 @@ const main = async () => {
     }
   }
   await browser.close();
+  if (dockCrops.length > 0) {
+    const flat = [];
+    for (const row of dockZooms) {
+      for (const cell of row) {
+        flat.push({ label: cell.label, png: await sharp(cell.full).extract({ left: cell.left, top: cell.top, width: cell.size, height: cell.size }).png().toBuffer() });
+      }
+    }
+    zooms.length = 0;
+    zooms.push(...flat);
+  }
   writeFileSync(join(outDir, `${label}.png`), await sheet(frames, { cols }));
-  if (zooms.length > 0) writeFileSync(join(outDir, `${label}-zoom.png`), await sheet(zooms, { cols: Math.min(cols, 7) }));
+  if (zooms.length > 0) writeFileSync(join(outDir, `${label}-zoom.png`), await sheet(zooms, { cols: dockCrops.length > 1 ? times.length : Math.min(cols, 7) }));
   process.stdout.write(`${JSON.stringify({ label, engine, scenario, level, ...info, times, errors }, null, 1)}\n`);
 };
 
