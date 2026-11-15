@@ -4,7 +4,7 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-15T20:42:43.000Z",
+  "updatedAt": "2026-11-15T22:39:14.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
@@ -16,9 +16,9 @@
     "deferredCardCount": 30,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out.",
     "boardSync": {
-      "at": "2026-11-15T20:42:43.000Z",
-      "appliedEventCount": 293,
-      "lastEventId": "6b1a376842c0"
+      "at": "2026-11-15T22:39:14.000Z",
+      "appliedEventCount": 298,
+      "lastEventId": "ddb511c686a0"
     }
   },
   "workItems": [
@@ -4784,11 +4784,11 @@
     {
       "id": "MAZER-MOTION-020",
       "status": "review",
-      "updatedAt": "2026-11-15T18:35:03.000Z",
+      "updatedAt": "2026-11-15T22:39:04.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-020",
       "title": "Replace the maze fade in and out with a smooth build and tear-down",
-      "description": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Maze build and tear-down now flow by geometry (corridors extrude from their parent along a travelling front, tear-down is the build reversed), no opacity fade; VIS-050 lone rim line gone. Merged PR 590; headless Chromium and WebKit filmstrips viewed, CI 12 of 12. Not deployed, not checked on a real phone. Reduce Motion keeps the existing short crossfade. PR #590 merged (be2fff01). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 607 merged: bleed-off docks grow and retract per dock in rank order with the maze build and teardown (replaces the global dock fade); queued for the one deploy, headless only PR #607 merged (a577c91e). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "description": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 607 merged: bleed-off docks grow and retract per dock in rank order with the maze build and teardown (replaces the global dock fade); queued for the one deploy, headless only PR #607 merged (a577c91e). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: bleed-off docks drawn in sequence live in build 5g35npa39; headless only, phone check pending PR #607 merged (a577c91e). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "high",
       "dependencies": [],
@@ -4940,12 +4940,12 @@
     },
     {
       "id": "MAZER-GEN-021",
-      "status": "in_progress",
-      "updatedAt": "2026-11-15T05:46:30.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T22:39:14.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-021",
       "title": "Make generated mazes feel like a real maze",
-      "description": "Use the existing generator features together so mazes read as real mazes: long winding routes, many believable dead ends, branching, deception and a clear start-to-finish journey, growing with level. Board update 2026-11-15: Audit done (report and contact sheets on file): levels 10 to 100 read as a comb or circuit board, not a real maze (straight spines, blank areas, short local routes, straight wrap corridors); levels 200 and up look like real mazes. Cause: fill and felt targets are fixed cell counts tuned on the old board. Prototype (not shipped) fixes fill and blank areas. Plan: board-aware targets with the board-size slices, then longer start-to-goal routes and turning branches. Generation time on bigger boards must be measured with the repo harness before shipping. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "description": "Use the existing generator features together so mazes read as real mazes: long winding routes, many believable dead ends, branching, deception and a clear start-to-finish journey, growing with level. Board update 2026-11-15: Audit done (report and contact sheets on file): levels 10 to 100 read as a comb or circuit board, not a real maze (straight spines, blank areas, short local routes, straight wrap corridors); levels 200 and up look like real mazes. Cause: fill and felt targets are fixed cell counts tuned on the old board. Prototype (not shipped) fixes fill and blank areas. Plan: board-aware targets with the board-size slices, then longer start-to-goal routes and turning branches. Generation time on bigger boards must be measured with the repo harness before shipping. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 611 merged: journey-planned generation (start/goal span mean 0.72 vs 0.35, route 2.7x vs 2.1x linear, decisions on route 7-22), golden 598/600 regenerated, independent review PASS; per-maze route floor and per-level 2.5x not met (follow-up); headless/census only PR #611 merged (8e2a75f1). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: journey-planned generation live in build 5g35npa39; headless/census only, phone check pending PR #611 merged (8e2a75f1). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "high",
       "dependencies": [
@@ -5000,11 +5000,11 @@
     {
       "id": "MAZER-UI-056",
       "status": "review",
-      "updatedAt": "2026-11-15T17:58:19.000Z",
+      "updatedAt": "2026-11-15T22:38:50.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-056",
       "title": "Online counter readability on the menu",
-      "description": "The online player counter was hard to read against the menu art. Brighter text, a dark outline and 12px size. Merged in PR 604, headless only. Board update 2026-11-15: PR 604 merged, online counter text brighter with dark outline and 12px, queued for the one deploy, headless only PR #604 merged (6aac131f). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "description": "The online player counter was hard to read against the menu art. Brighter text, a dark outline and 12px size. Merged in PR 604, headless only. Board update 2026-11-15: PR 604 merged, online counter text brighter with dark outline and 12px, queued for the one deploy, headless only PR #604 merged (6aac131f). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: online counter readability live in build 5g35npa39; headless only, phone check pending PR #604 merged (6aac131f). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone.",
       "cardType": "bug",
       "priority": "medium",
       "dependencies": [],
@@ -5017,11 +5017,11 @@
     {
       "id": "MAZER-AUDIO-004",
       "status": "review",
-      "updatedAt": "2026-11-15T18:12:17.000Z",
+      "updatedAt": "2026-11-15T22:38:58.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-AUDIO-004",
       "title": "Gentler step sound and Sound on by default",
-      "description": "The step tick was harsh. A gentler tick is back, Sound defaults on through a one-time marker migration, and audio unlocks on the first gesture. Merged in PR 605, headless only. Board update 2026-11-15: PR 605 merged: gentler step tick back, Sound default on via one-time marker migration, audio unlock on first gesture; queued for the one deploy, headless only PR #605 merged (74613f02). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "description": "The step tick was harsh. A gentler tick is back, Sound defaults on through a one-time marker migration, and audio unlocks on the first gesture. Merged in PR 605, headless only. Board update 2026-11-15: PR 605 merged: gentler step tick back, Sound default on via one-time marker migration, audio unlock on first gesture; queued for the one deploy, headless only PR #605 merged (74613f02). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: gentler step sound and default-on sound live in build 5g35npa39; headless only, phone check pending PR #605 merged (74613f02). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [],
