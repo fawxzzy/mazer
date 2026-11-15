@@ -6,6 +6,9 @@ import { screenProblems } from "./public-text-screens.mjs";
 
 export const EVENT_VERSION = 1;
 export const STATUSES = ["active", "in_progress", "planning", "review", "blocked", "completed", "deferred_candidate"];
+// `archived` is a registry-only status, reached ONLY through an event with `archive: true` on a completed card
+// (never through `status`, which still refuses it). Archived cards are finished history that the Web board hides from open work.
+export const ARCHIVED_STATUS = "archived";
 export const CARD_TYPES = ["feature", "bug", "governance", "architecture", "documentation", "automation", "research", "migration", "reliability", "technical-debt"];
 export const PRIORITIES = ["critical", "high", "medium", "low", null];
 export const BLOCKER_KINDS = ["owner-decision", "provider", "device", "dependency", "deferred-by-owner"];
@@ -22,7 +25,7 @@ export const KEEP_UPDATE_LINES = 3;
 export const UPDATE_MARKER = "Board update ";
 const UPDATE_LINE = /(?:^| )Board update \d{4}-\d{2}-\d{2}: .*?(?= Board update \d{4}-\d{2}-\d{2}: |$)/gs;
 
-const ALLOWED_KEYS = new Set(["v", "id", "ts", "card", "status", "text", "title", "description", "acceptanceCriteria", "new", "evidence", "blocker", "verify", "note", "lane", "reopen", "by"]);
+const ALLOWED_KEYS = new Set(["v", "id", "ts", "card", "status", "text", "title", "description", "acceptanceCriteria", "new", "evidence", "blocker", "verify", "note", "lane", "reopen", "archive", "by"]);
 const EVIDENCE_KEYS = new Set(["prs", "deployedBuild", "headless", "deviceChecked", "checkedOn"]);
 const NEW_KEYS = new Set(["title", "description", "cardType", "priority", "dependencies", "acceptanceCriteria"]);
 
@@ -100,6 +103,10 @@ export function validateEventShape(event) {
   if (typeof event.ts !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(event.ts) || Number.isNaN(Date.parse(event.ts))) errors.push("ts must be an ISO UTC timestamp like 2026-11-13T12:00:00Z");
   if (typeof event.card !== "string" || !CARD_ID.test(event.card)) errors.push("card must be a stable MAZER-AREA-NNN id");
   if (event.status !== undefined && !STATUSES.includes(event.status)) errors.push(`status must be one of ${STATUSES.join(", ")} ("archived" is refused)`);
+  if (event.archive !== undefined && event.archive !== true) errors.push("archive must be true when present");
+  if (event.archive === true && event.reopen === true) errors.push("archive and reopen cannot be combined");
+  if (event.archive === true && event.new !== undefined) errors.push("a new card cannot be archived in the same event; complete it first");
+  if (event.archive === true && event.status !== undefined && event.status !== "completed") errors.push("archive: true accepts only status completed (or no status)");
   errors.push(...textProblems("text", event.text, MAX_TEXT));
   if (event.title !== undefined) errors.push(...textProblems("title", event.title, MAX_TITLE));
   // Corrective fields for an EXISTING card (a card being created uses new.description / new.acceptanceCriteria).
@@ -232,10 +239,13 @@ export function recomputeProvenance(registry) {
   const items = registry.workItems;
   const completed = items.filter((c) => c.status === "completed").length;
   const deferred = items.filter((c) => c.status === "deferred_candidate").length;
+  const archived = items.filter((c) => c.status === ARCHIVED_STATUS).length;
+  // archivedCardCount is written only once a card is archived (or already present), so a registry with no archived card is unchanged.
+  if (archived > 0 || registry.provenance.archivedCardCount !== undefined) registry.provenance.archivedCardCount = archived;
   registry.provenance.stableIdentityCount = items.length;
   registry.provenance.completedCardCount = completed;
   registry.provenance.deferredCardCount = deferred;
-  registry.provenance.openCardCount = items.length - completed - deferred;
+  registry.provenance.openCardCount = items.length - completed - deferred - archived;
 }
 
 /**
@@ -310,8 +320,12 @@ export function foldEvents({ registry: registryIn, ledger: ledgerIn, events, app
     }
     const before = card.status;
     if (event.status && before === "completed" && event.status !== "completed" && !event.reopen) problems.push("completed cards do not move back without `reopen: true`");
+    if (before === ARCHIVED_STATUS && !event.reopen) problems.push("archived cards are finished history; only an event with `reopen: true` and a status moves one back (a plain text event is refused)");
+    if (before === ARCHIVED_STATUS && event.reopen && !event.status) problems.push("reopening an archived card needs a status");
+    if (event.archive === true && !creating && before !== "completed" && event.status !== "completed") problems.push(`archive: true needs a completed card (this one is ${before}); archive is for merged-and-deployed or no-runtime work only`);
     const next = { ...card };
     if (event.status) next.status = event.status;
+    if (event.archive === true && !problems.length) next.status = ARCHIVED_STATUS;
     if (event.title) next.title = event.title;
     // Corrective replacement of published text (events are append-only, so a bad description is fixed by a new event).
     // `description` replaces the whole description, earlier generated lines included (they stay in the archive).
@@ -322,7 +336,7 @@ export function foldEvents({ registry: registryIn, ledger: ledgerIn, events, app
     if (event.verify !== undefined) entry.verify = event.verify.map((s) => ({ ...s }));
     if (event.lane !== undefined) entry.lane = event.lane;
     if (event.note !== undefined) { if (event.note === null) delete entry.note; else entry.note = event.note; }
-    if (event.status === "completed") {
+    if (event.status === "completed" || (event.archive === true && before === "completed")) {
       problems.push(...completedProblems(event.card, entry.evidence));
       if (event.blocker === undefined) entry.blocker = null;
       if (event.note === undefined) delete entry.note;

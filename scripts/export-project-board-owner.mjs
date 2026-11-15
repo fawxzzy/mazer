@@ -29,10 +29,14 @@ const OPEN_STATUSES = new Map([
 ]);
 const COMPLETED_STATUS = "completed";
 const DEFERRED_CANDIDATE_STATUS = "deferred_candidate";
+// Archived = completed work the owner has closed out. Exported with the Web-supported "archived" lifecycle, which the
+// Projects page files with the collapsed Completed archive (never in an open column).
+const ARCHIVED_STATUS = "archived";
 const PUBLIC_STATUSES = new Map([
   ...OPEN_STATUSES,
   [COMPLETED_STATUS, { recordStatus: "active", lifecycle: "completed" }],
   [DEFERRED_CANDIDATE_STATUS, { recordStatus: "candidate", lifecycle: "intake" }],
+  [ARCHIVED_STATUS, { recordStatus: "active", lifecycle: "archived" }],
 ]);
 const ADMITTED_STATUSES = new Set(PUBLIC_STATUSES.keys());
 const SUPPORTED_CARD_TYPES = new Set([
@@ -1462,10 +1466,11 @@ function validateRegistry(registry, sourceBytes) {
   const openCount = registry.workItems.filter((item) => OPEN_STATUSES.has(item.status)).length;
   const completedCount = registry.workItems.filter((item) => item.status === COMPLETED_STATUS).length;
   const deferredCount = registry.workItems.filter((item) => item.status === DEFERRED_CANDIDATE_STATUS).length;
+  const archivedCount = registry.workItems.filter((item) => item.status === ARCHIVED_STATUS).length;
   if (openCount !== registry.provenance.openCardCount || completedCount !== registry.provenance.completedCardCount
-    || deferredCount !== registry.provenance.deferredCardCount
-    || openCount + completedCount + deferredCount !== registry.workItems.length
-    || openCount + completedCount + deferredCount !== registry.provenance.stableIdentityCount
+    || deferredCount !== registry.provenance.deferredCardCount || archivedCount !== (registry.provenance.archivedCardCount ?? 0)
+    || openCount + completedCount + deferredCount + archivedCount !== registry.workItems.length
+    || openCount + completedCount + deferredCount + archivedCount !== registry.provenance.stableIdentityCount
     || registry.provenance.researchCandidateImportCount !== 0
     || registry.provenance.discordosRole !== "provenance-and-board-identity-only") {
     throw new Error("Mazer owner reconciliation counts are inconsistent");
@@ -1552,7 +1557,7 @@ export function assertFawxzzyWebConsumerAcceptance(exported) {
     if (!card.record.card_id || !card.record.title || !card.content.summary || !card.record.lifecycle) {
       throw new Error("FawxzzyWeb public card fields are incomplete");
     }
-    if (!["active", "candidate"].includes(card.record_status) || card.record.lifecycle === "archived") {
+    if (!["active", "candidate"].includes(card.record_status) || (card.record.lifecycle === "archived" && card.record.extensions?.owner_status !== ARCHIVED_STATUS)) {
       throw new Error("FawxzzyWeb received a non-public lifecycle");
     }
     if (card.record.extensions?.public_safe !== true || card.content.acceptance_criteria.length < 3) {
@@ -1604,6 +1609,7 @@ export function buildProjectBoardOwnerExport(registry, sourceBytes) {
       exported_open_card_count: registry.provenance.openCardCount,
       exported_completed_card_count: registry.provenance.completedCardCount,
       exported_deferred_card_count: registry.provenance.deferredCardCount,
+      ...(registry.provenance.archivedCardCount > 0 ? { exported_archived_card_count: registry.provenance.archivedCardCount } : {}),
       imported_research_candidate_count: registry.provenance.researchCandidateImportCount,
       research_candidate_exported_count: 0,
       discordos_role: registry.provenance.discordosRole,

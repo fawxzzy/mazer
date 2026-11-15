@@ -264,6 +264,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: effects on objects that `rebuildUi` recreates must be a pure function of elapsed time applied after the rebuild, never state stored on the objects. Panel borders and toggles live on the shared overlay Graphics, so they stay static; only labels and row fills move.
 - Status: Applied (review); headless only (Chromium 390x844, 360x740, 412x915 and WebKit iPhone 15 Pro and SE, Reduce Motion on and off), no real-device fps.
 
+## 2026-11-14 - MAZER-UI-010 surface migration 3: intent feed uses the body face
+- WHAT changed: `intentFontFamily` in `src/render/intentFeedRenderer.ts` moves from the `Bahnschrift SemiCondensed, Trebuchet MS, Segoe UI` stack to `TYPE_BODY_FACE`; that stack leaves `LEGACY_FONT_STACKS` in `tests/render/type-scale-ratchet.test.ts`.
+- WHY it changed: MAZER-UI-010 retires legacy font stacks one surface per PR. Bahnschrift is a Windows-only face, so the intent feed rendered in a different font per platform. Sizes come from `legacyTuning` and are unchanged; every line already word-wraps to its slot width, so the wider body face reflows instead of clipping.
+- Rule: a Windows-only face in canvas text is a cross-platform inconsistency, not a style; migrate it to the scale face.
+- Status: Applied (review); source proof only, the intent feed was not opened in a browser, so the wrapped layout in Space Grotesk is unchecked visually.
 ## 2026-11-14 - MAZER-UI-010 surface migration 2: mechanic guide text uses the body face
 - WHAT changed: the `mechanic-guide` Phaser text in `src/render/boardRenderer.ts` moves from `"Courier New", monospace` to `TYPE_BODY_FACE` (first src consumer of `src/render/typeScale.ts`); the `Courier New, monospace` entry is removed from `LEGACY_FONT_STACKS` in `tests/render/type-scale-ratchet.test.ts`.
 - WHY it changed: MAZER-UI-010 retires legacy font stacks one surface per PR; this stack had exactly one user. Size (12 px, bold) is unchanged. The guide text only draws when a mechanic legend is shown, and the frozen look has no hazards, so no default game screen changes.
@@ -295,3 +300,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the counter check flaked once ("control delta must be exactly 0, got 4") and passed on rerun; two single-frame reads one settle apart can straddle a backdrop frame. I could NOT reproduce the 4 (30 spaced reads were constant; 6 parallel runs passed), so the cause is inferred, not observed. The fix removes the single-frame dependence and fails loudly if the slot never settles. previewLevel and the sweep already reached the levels; QA-009's note that they were device-only was wrong.
 - Rule: a pixel-differential check must compare stable readings (N consecutive equal), never one frame per state. A capture script fails fast when the live mode/overlay differs from the requested surface.
 - Status: Applied (review); headless Chromium only, nothing checked on a real phone. Wave 0C stays `done: false` (the wave is still active in the registry); only its capture is committed.
+## 2026-11-14 Board archive status (MAZER-BOARD-ARCHIVE)
+- WHAT changed: board events accept `archive: true` (CLI `--archive`) on a completed card; the fold sets registry status `archived`, recomputes `provenance.archivedCardCount`, and the owner export maps it to the `archived` lifecycle (`exported_archived_card_count` only once one exists). Reopening needs `reopen: true` plus a status. Docs: docs/ops/MAZER-BOARD-SYNC-PROCESS.md. Tests: tests/board-sync.test.mjs, tests/project-board-owner-export.test.mjs.
+- WHY it changed: finished cards had no end state, so every completed card stayed on the board. FawxzzyWeb already accepts the `archived` lifecycle and files it in the collapsed Completed archive, so no Web change is needed.
+- Rule: an end-state status is reached only by an explicit event flag from the one status that earned it, never by plain `status`.
+- Status: Applied (review); source proof only, no card archived yet.
