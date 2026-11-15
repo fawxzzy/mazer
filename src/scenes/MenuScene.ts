@@ -1572,6 +1572,7 @@ const LEGACY_TITLE_WORD = 'MAZER';
 // under it this far below the label's centre (px, whole numbers so Images stay pixel-aligned).
 const LEGACY_MENU_PLAY_LABEL_RISE_PX = 14;
 const LEGACY_MENU_LEVEL_LINE_DROP_PX = 30;
+const LEGACY_MENU_PLAY_LABEL_PHONE_MAX_WIDTH_PX = 600;
 // "MAZER", "START", and "LOGIN" are all exactly 5 characters -- covers the
 // title wordmark and both primary front-door button labels with no waste.
 const LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE = 5;
@@ -11079,12 +11080,15 @@ export class MenuScene extends Phaser.Scene {
           // MAZER-UI-050: "TAP TO PLAY" is 11 glyphs, so it gets the full screen width (the glyph cell
           // size is derived from it) and sits a little above the old Start spot; the level line below
           // takes the old spot's lower half, clear of the bottom edge marker.
-          const playLabelY = this.layout.centerButtonY - LEGACY_MENU_PLAY_LABEL_RISE_PX;
+          // Phone-width portrait only: wide/landscape layouts keep the old button box, which other
+          // systems (teleport anchor exclusion) read the bounds of.
+          const isPhoneWidth = this.layout.width < LEGACY_MENU_PLAY_LABEL_PHONE_MAX_WIDTH_PX;
+          const playLabelY = this.layout.centerButtonY - (isPhoneWidth ? LEGACY_MENU_PLAY_LABEL_RISE_PX : 0);
           this.uiButtons.push(
             this.createButton(
               this.layout.centerButtonX,
               playLabelY,
-              Math.max(primaryButtonWidth, this.layout.width),
+              isPhoneWidth ? Math.max(primaryButtonWidth, this.layout.width) : primaryButtonWidth,
               this.layout.buttonHeight,
               startLabel,
               () => this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode()),
