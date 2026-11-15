@@ -112,13 +112,13 @@ const PULSE_TAIL_MS = 200;
 const RETRACT_MS = 120;
 const DEPARTURE_BEAM_END_MS = OUTRO_LASER_END_MS + PULSE_TAIL_MS + RETRACT_MS;
 // Diamond size: half size while the maze runs, full size from the departure grow to the end of the build, back to half after the drain.
-const KITE_FULL_LENGTH_PX = 20;
-const KITE_REST_LENGTH_PX = 10;
+const KITE_FULL_LENGTH_PX = 17.6; // MAZER-VIS-055 star: 2 * EDGE_MARKER_HALF_HEIGHT (8.8)
+const KITE_REST_LENGTH_PX = 8.8;
 const KITE_LENGTH_TOLERANCE_PX = 0.05;
-const INNER_TIP_REACH_PX = 10;
+const INNER_TIP_REACH_PX = 8.8;
 // A 1 px stroke joins with a miter: the outer tip paints 0.5 / sin(atan(7 / 12)) px beyond its vertex along the kite axis (45 degree corner kites:
 // that times cos 45 toward the top / bottom edge). Mirrors edgeMarkers.ts EDGE_MARKER_TIP_PAINT_PX (an acceptance number, not imported).
-const TIP_PAINT_PX = 0.5 / Math.sin(Math.atan2(7, 12));
+const TIP_PAINT_PX = 2.4144087884738425; // MAZER-VIS-055: EDGE_MARKER_TIP_PAINT_PX of the star (needle-tip miter), an acceptance number, not imported
 const STATION_SIDE = ['top', 'top', 'top', 'right', 'bottom', 'bottom', 'bottom', 'left'];
 // MAZER-VIS-054: a tall portrait phone (375 <= width < 500, height >= 780) slides each CORNER diamond's outer tip 16 css px in from both edges
 // (rounded display corners hide the corner itself). Mirrors src/render/edgeCornerAnchor.ts `resolveEdgeCornerTipInset`; every other viewport is 0.
@@ -254,7 +254,7 @@ const installHarness = (page) => page.evaluate(({ BLOOM_OUTER_MIN_WIDTH_PX, POOF
       markerCount: edge.frame.length,
       // Kite OUTER TIP (vertex 2: the ring orbits the perimeter, so it moves during the intro/outro lap and is exactly parked
       // otherwise; the diamond scales about it, so unlike the inner tip or the centroid it does not move when the size changes).
-      ring: edge.frame.map((marker) => (marker.vertices.length === 0 ? null : { x: marker.vertices[2].x, y: marker.vertices[2].y })),
+      ring: edge.frame.map((marker) => (marker.vertices.length === 0 ? null : { x: marker.vertices[marker.vertices.length >> 1].x, y: marker.vertices[marker.vertices.length >> 1].y })),
       // The visible extent of the canvas in world px: the backing store is round(css * resolution) and the context is scaled by the resolution
       // (the DPR rounded to hundredths, capped at 3), so the painted world ends at canvas.width / resolution.
       visible: (() => {
@@ -263,8 +263,8 @@ const installHarness = (page) => page.evaluate(({ BLOOM_OUTER_MIN_WIDTH_PX, POOF
         return canvas ? { w: canvas.width / res, h: canvas.height / res, res } : null;
       })(),
       // Kite length tip -> outer tip, per marker: 20 css px at full size, 10 at the 50% rest size.
-      outerTips: edge.frame.map((marker) => (marker.vertices.length < 3 ? null : { x: marker.vertices[2].x, y: marker.vertices[2].y })),
-      kiteLengths: edge.frame.map((marker) => (marker.vertices.length < 3 ? null : Math.hypot(marker.vertices[0].x - marker.vertices[2].x, marker.vertices[0].y - marker.vertices[2].y))),
+      outerTips: edge.frame.map((marker) => (marker.vertices.length < 3 ? null : { x: marker.vertices[marker.vertices.length >> 1].x, y: marker.vertices[marker.vertices.length >> 1].y })),
+      kiteLengths: edge.frame.map((marker) => (marker.vertices.length < 3 ? null : Math.hypot(marker.vertices[0].x - marker.vertices[marker.vertices.length >> 1].x, marker.vertices[0].y - marker.vertices[marker.vertices.length >> 1].y))),
       markerBounds: (() => {
         const all = edge.frame.flatMap((marker) => marker.vertices);
         return all.length === 0 ? null : {
@@ -428,7 +428,7 @@ const beamStationId = (pair, stations, focus, direction, id) => {
   return heading > Math.cos((20 * Math.PI) / 180) && offLine({ x: pair[0], y: pair[1] }) <= KITE_REACH_PX && offLine({ x: pair[2], y: pair[3] }) <= KITE_REACH_PX ? id : null;
 };
 // Half extent of a kite plus a stroke (EDGE_MARKER_MAX_EXTENT_PX is 10.5).
-const KITE_REACH_PX = 11;
+const KITE_REACH_PX = 11.5; // EDGE_MARKER_MAX_EXTENT_PX is 11.21
 
 /** The diamond's INNERMOST point (the tip facing the board) for a harness station: centre + 10 px along its inward axis. */
 const innerTipOf = (station, kiteLength = KITE_FULL_LENGTH_PX) => ({
@@ -1050,9 +1050,9 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
     if (!box) { return false; }
     const side = STATION_SIDE[id];
     const slack = id % 2 === 0 ? cornerSlack : 0;
-    return side === 'top' ? box.minY <= 1 + slack : side === 'bottom' ? box.maxY >= probe.h - 2 - slack : side === 'left' ? box.minX <= 1 : box.maxX >= probe.w - 2;
+    return side === 'top' ? box.minY <= 2 + slack : side === 'bottom' ? box.maxY >= probe.h - 3 - slack : side === 'left' ? box.minX <= 2 : box.maxX >= probe.w - 3;
   };
-  check(`${label}: real canvas pixels (layer shown vs hidden on the same frame): each diamond's footprint reaches the last two device rows/columns of its edge (${probe.w}x${probe.h} px)`, ALL_STATION_IDS.every(touches), JSON.stringify(probe.boxes));
+  check(`${label}: real canvas pixels (layer shown vs hidden on the same frame): each diamond's footprint reaches the last three device rows/columns (MAZER-VIS-055: the star's needle tip antialiases one row fainter than the old kite) of its edge (${probe.w}x${probe.h} px)`, ALL_STATION_IDS.every(touches), JSON.stringify(probe.boxes));
   // MAZER-VIS-044/054: the four corner diamonds sit in the screen corners (footprint within the last two device px of BOTH edges, plus the rounded-display tip inset).
   const inCorner = (id) => {
     const box = footprint(id)?.box;

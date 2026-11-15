@@ -400,3 +400,7 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: owner decision 2026-11-15 after #599: the step sound returns but less annoying, and sound is on for all users.
 - Rule: the migration is virtual on read (idempotent until a write), so it needs no extra storage write and no database change.
 - Status: headless only (tsc, tests, verify), nothing checked on a real phone.
+## 2026-11-15 - MAZER-VIS-055: edge markers become concave four-point stars
+- WHAT changed: the 8 edge markers are now the Star Zac picked (concave four-point star, outer tip on the screen edge, inner tip = beam port) instead of a kite. `edgeMarkers.ts` flattens the star (4 quadratic sides, 8 segments each) into a 32-point outline; fill/drain still clip that outline with a half-plane anchored at the inner tip. Half-height is 8.8 so the header reach budget (16 px) still holds; `EDGE_CORNER_NARROW_MAX_SCALE` 0.7 -> 0.6 so the capped corner star still clears the settings glyph. Guide copy and message inventory say "edge stars".
+- WHY: owner design pick (ideas4 Star); needle tips are thinner, so pixel tests use a 4-row edge window and a concave inside check.
+- Status: headless (tsc, vitest, software raster captures at 390x844 DPR3); nothing checked on a real phone.

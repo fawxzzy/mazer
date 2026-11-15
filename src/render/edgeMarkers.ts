@@ -1,7 +1,7 @@
 /**
  * Edge markers and the single spawn laser.
  *
- * Eight procedural kites sit on the viewport perimeter (4 corners + 4 edge
+ * Eight procedural concave four-point stars (MAZER-VIS-055; they were kites) sit on the viewport perimeter (4 corners + 4 edge
  * midpoints, clockwise from the top-left corner -- the SAME stations, ids and
  * order the old "title orbit sigils" used and that the teleport anchors in
  * teleportAnchorPose.ts / teleportPrimaryAnchor.ts are defined against). They
@@ -112,8 +112,14 @@ export interface EdgeStation {
 }
 
 export const EDGE_STATION_COUNT = 8;
-export const EDGE_MARKER_HALF_WIDTH = 7;
-export const EDGE_MARKER_HALF_HEIGHT = 10;
+/**
+ * MAZER-VIS-055: the marker is a concave four-point star (the end-of-maze star's family), not a kite. Designed on a 44 x 32 grid
+ * (outer tip at x 0, inner tip / beam port at x 44, shoulders at x 22, y +-16) and scaled to a 17.6 px length (the kite was 20):
+ * the star's needle tips paint a longer stroke miter than the kite's, and 17.6 keeps its painted 45 degree corner reach inside the
+ * 16 px header budget (LEGACY_HEADER_CORNER_DIAMOND_REACH_PX), so no header layout moves. Half length 8.8, half width 6.4.
+ */
+export const EDGE_MARKER_HALF_HEIGHT = 8.8;
+export const EDGE_MARKER_HALF_WIDTH = (16 * 2 * EDGE_MARKER_HALF_HEIGHT) / 44;
 export const EDGE_MARKER_STROKE_PX = 1;
 
 export const EDGE_MARKER_IDLE_PERIOD_MS = MOTION_LOOP_MS.drift;
@@ -132,16 +138,6 @@ export const EDGE_MIDPOINT_STATION_ID: Readonly<Record<EdgeSide, EdgeStationId>>
 });
 
 const STATION_IDS: ReadonlyArray<EdgeStationId> = [0, 1, 2, 3, 4, 5, 6, 7];
-
-/**
- * How far the miter join of the stroke at the OUTER (and inner) tip paints beyond the vertex, along the long axis: half a stroke
- * over the sine of the tip's half-angle (the shoulders sit 2 px along and 7 px across from the centre, so the half-angle at the
- * outer tip is atan(7 / 12)). Canvas strokes join with 'miter' (limit 10) by default and Phaser Graphics does not change it.
- */
-export const EDGE_MARKER_TIP_PAINT_PX = (EDGE_MARKER_STROKE_PX / 2) / Math.sin(Math.atan2(EDGE_MARKER_HALF_WIDTH, EDGE_MARKER_HALF_HEIGHT + 2));
-
-/** Farthest any painted pixel (outline plus the miter tip) can be from the station centre, in any rotation. */
-export const EDGE_MARKER_MAX_EXTENT_PX = EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX;
 
 /**
  * The one perimeter parametrization every consumer shares: index/8 of the way
@@ -364,26 +360,78 @@ const inferRestViewport = (stations: ReadonlyArray<EdgeStation>): EdgeViewport |
   };
 };
 
-/** Kite outline (tip first, inward), in screen space. Long axis = inward direction. */
-export const resolveEdgeMarkerVertices = (
+const STAR_GRID_UNIT = (2 * EDGE_MARKER_HALF_HEIGHT) / 44;
+/** Segments each of the four concave sides of the star is flattened into (Phaser paths and the fill clip are polygons). */
+export const EDGE_STAR_CURVE_SEGMENTS = 8;
+/**
+ * The star's four quadratic sides on the design grid (x along the long axis from the OUTER tip, y across), starting at the INNER tip:
+ * inner -> shoulder(+) -> outer -> shoulder(-) -> inner. Each entry is [control x, control y, end x, end y].
+ */
+const STAR_SIDES: ReadonlyArray<readonly [number, number, number, number]> = [
+  [26, 3, 22, 16],
+  [18, 3, 0, 0],
+  [18, -3, 22, -16],
+  [26, -3, 44, 0]
+];
+
+const placeOnStation = (
   station: Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>,
-  scale = 1
-): ReadonlyArray<EdgePoint> => {
+  scale: number
+): ((along: number, across: number) => EdgePoint) => {
   const angle = station.inwardAngle;
   const ux = Math.cos(angle);
   const uy = Math.sin(angle);
   const vx = -uy;
   const vy = ux;
-  const at = (along: number, across: number): EdgePoint => ({
+  return (along, across) => ({
     x: station.x + (ux * along * scale) + (vx * across * scale),
     y: station.y + (uy * along * scale) + (vy * across * scale)
   });
+};
+
+/** The 4 corner vertices of the star in screen space: 0 inner tip, 1 shoulder (+across), 2 outer tip, 3 shoulder (-across). */
+export const resolveEdgeMarkerVertices = (
+  station: Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>,
+  scale = 1
+): ReadonlyArray<EdgePoint> => {
+  const at = placeOnStation(station, scale);
   return [
     at(EDGE_MARKER_HALF_HEIGHT, 0),
-    at(2, EDGE_MARKER_HALF_WIDTH),
+    at(0, EDGE_MARKER_HALF_WIDTH),
     at(-EDGE_MARKER_HALF_HEIGHT, 0),
-    at(2, -EDGE_MARKER_HALF_WIDTH)
+    at(0, -EDGE_MARKER_HALF_WIDTH)
   ];
+};
+
+/**
+ * The star's OUTLINE polygon in screen space (the four concave sides flattened, starting at the inner tip; vertices
+ * 0, N, 2N, 3N are the inner tip, +shoulder, outer tip, -shoulder for N = EDGE_STAR_CURVE_SEGMENTS). This is what is stroked,
+ * filled and clipped by the fill sweep.
+ */
+export const resolveEdgeMarkerOutline = (
+  station: Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>,
+  scale = 1
+): ReadonlyArray<EdgePoint> => {
+  const at = placeOnStation(station, scale);
+  const grid = (x: number, y: number): EdgePoint => at(-EDGE_MARKER_HALF_HEIGHT + (x * STAR_GRID_UNIT), y * STAR_GRID_UNIT);
+  const points: EdgePoint[] = [grid(44, 0)];
+  let from: readonly [number, number] = [44, 0];
+  STAR_SIDES.forEach(([cx, cy, ex, ey], side) => {
+    for (let step = 1; step <= EDGE_STAR_CURVE_SEGMENTS; step += 1) {
+      const t = step / EDGE_STAR_CURVE_SEGMENTS;
+      const k = 1 - t;
+      // The last point of the last side is the start again: do not repeat it.
+      if (side === STAR_SIDES.length - 1 && step === EDGE_STAR_CURVE_SEGMENTS) {
+        break;
+      }
+      points.push(grid(
+        (k * k * from[0]) + (2 * k * t * cx) + (t * t * ex),
+        (k * k * from[1]) + (2 * k * t * cy) + (t * t * ey)
+      ));
+    }
+    from = [ex, ey];
+  });
+  return points;
 };
 
 /**
@@ -419,7 +467,7 @@ export const resolveEdgeInnerTip = (station: Pick<EdgeStation, 'x' | 'y' | 'inwa
 };
 
 /**
- * The outer boundary of the PAINTED kite: the outline polygon with the stroke's miter joins (half a stroke outward on every edge,
+ * The outer boundary of the PAINTED star: the outline polygon with the stroke's miter joins (half a stroke outward on every edge,
  * adjacent offset edges intersected). Its bounding box is the diamond's true painted bounding box. `scale` is the same scale
  * as `resolveEdgeMarkerVertices`; the stroke stays EDGE_MARKER_STROKE_PX at every size.
  */
@@ -427,7 +475,7 @@ export const resolveEdgeMarkerPaintedPolygon = (
   station: Pick<EdgeStation, 'x' | 'y' | 'inwardAngle'>,
   scale = 1
 ): ReadonlyArray<EdgePoint> => {
-  const vertices = resolveEdgeMarkerVertices(station, scale);
+  const vertices = resolveEdgeMarkerOutline(station, scale);
   const half = EDGE_MARKER_STROKE_PX / 2;
   const area = vertices.reduce((sum, a, index) => {
     const b = vertices[(index + 1) % vertices.length] as EdgePoint;
@@ -452,6 +500,17 @@ export const resolveEdgeMarkerPaintedPolygon = (
     return { x: vertex.x + (((n1.x + n2.x) * half) / denominator), y: vertex.y + (((n1.y + n2.y) * half) / denominator) };
   });
 };
+
+/**
+ * How far the miter join of the stroke at the OUTER (and inner) tip paints beyond the vertex, along the long axis (measured on the
+ * flattened outline, so it is exactly what the canvas paints: Canvas strokes join with 'miter' (limit 10) by default and Phaser
+ * Graphics does not change it; the tip's half-angle is ~12 degrees, miter ratio ~4.8).
+ */
+export const EDGE_MARKER_TIP_PAINT_PX = resolveEdgeMarkerPaintedPolygon({ x: 0, y: 0, inwardAngle: 0 })
+  .reduce((max, vertex) => Math.max(max, -vertex.x), Number.NEGATIVE_INFINITY) - EDGE_MARKER_HALF_HEIGHT;
+
+/** Farthest any painted pixel (outline plus the miter tip) can be from the station centre, in any rotation. */
+export const EDGE_MARKER_MAX_EXTENT_PX = EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX;
 
 export interface EdgeMarkerState {
   readonly id: EdgeStationId;
@@ -663,7 +722,7 @@ export const drawEdgeMarker = (
   }
   const scale = Math.min(state.scale ?? 1, station.maxScale ?? 1);
   const anchored = anchorStationToOuterTip(station, scale);
-  const outline = resolveEdgeMarkerVertices(anchored, scale);
+  const outline = resolveEdgeMarkerOutline(anchored, scale);
   if ((state.fill ?? 0) > 0) {
     drawDiamondFill(graphics, {
       center: { x: anchored.x, y: anchored.y },

@@ -32,6 +32,7 @@ import {
 } from './legacyGeometryBudget';
 import { LEGACY_EMPTY_LOOP_PLAN, type LegacyLoopPlan } from './legacyMazeLoops';
 import { forceRemoveOneTileStubs } from './legacyMazeStubs';
+import { applyOneTileStubRule } from './legacyMazeStubPass';
 import { FELT_TIE_DEVIATION_LIMIT_PERCENT, FELT_WRAP_PRICE_PERCENT, tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
@@ -547,6 +548,19 @@ const buildLegacyRuntimeMazeForMode = (
     : createLegacyMaze(width, height, seed, resolvedShortcutCount, profile);
 };
 
+// MAZER-GEN-006: every maze that does not go through the budget ladder's felt tuner (the menu demo,
+// profiles without a geometryBudgetLevel) gets the one-tile stub rule as a post-pass of its build. The
+// ladder's own bases keep calling buildLegacyRuntimeMazeForMode: its tuner clears stubs under verification.
+const buildLegacyRuntimeMazeWithStubRule = (
+  mode: LegacyGenerationMode,
+  scale: number,
+  seed: number,
+  generationProfile?: Partial<LegacyMazeGenerationProfile> | null,
+  aspectRatio = 1
+): Omit<LegacyMazeSnapshot, 'generation'> => applyOneTileStubRule(
+  buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile, aspectRatio)
+);
+
 const createLegacyUnderTargetPressureProfile = (
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null
 ): LegacyMazeGenerationProfile => {
@@ -845,7 +859,7 @@ const selectLegacyRuntimeMazeForMode = (
   const targetComplexity = selectionOptions.targetComplexity;
   if (targetComplexity === null || targetComplexity === undefined || !Number.isFinite(targetComplexity)) {
     return {
-      maze: buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile, aspectRatio)
+      maze: buildLegacyRuntimeMazeWithStubRule(mode, scale, seed, generationProfile, aspectRatio)
     };
   }
 
@@ -879,7 +893,7 @@ const selectLegacyRuntimeMazeForMode = (
     isInitialWindow = false
   ): void => {
     searchedCandidateCount += 1;
-    const candidateMaze = buildLegacyRuntimeMazeForMode(mode, candidateScale, candidateSeed, profile, aspectRatio);
+    const candidateMaze = buildLegacyRuntimeMazeWithStubRule(mode, candidateScale, candidateSeed, profile, aspectRatio);
     const measuredComplexity = resolveLegacyMazeComplexity(candidateMaze).total;
     const difference = measuredComplexity - roundedTargetComplexity;
     const distance = Math.abs(difference);
@@ -936,7 +950,7 @@ const selectLegacyRuntimeMazeForMode = (
     }
   }
 
-  const selectedMaze = bestMaze ?? buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile, aspectRatio);
+  const selectedMaze = bestMaze ?? buildLegacyRuntimeMazeWithStubRule(mode, scale, seed, generationProfile, aspectRatio);
 
   return {
     maze: selectedMaze,

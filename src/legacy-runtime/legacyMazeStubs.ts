@@ -3,15 +3,18 @@
 // opposite border.
 //
 // Vocabulary
-//   dead end  : floor cell with exactly one open neighbour (start and goal excluded: they are the
-//               caps of the route by design).
+//   dead end  : floor cell with exactly one open neighbour. The start and goal are dead ends too
+//               when they are (MAZER-GEN-006: a start or goal sitting in a one-tile nub off a junction
+//               reads as a jut-out exactly like any other nub, so they are no longer exempt).
 //   branch    : the run of cells from a dead end back to (but excluding) the first junction (a cell
-//               with 3+ open neighbours) or route endpoint.
+//               with 3+ open neighbours). A start or goal with exactly two open neighbours is just a
+//               corridor cell of the run, so a pocket carved behind a start or goal makes a branch of
+//               two cells (pocket + the endpoint).
 //   stub      : a branch of exactly ONE cell: a nub whose single neighbour is a junction.
 //
-// THE RULE: no dead-end branch of a generated ladder maze is shorter than
-// MIN_DEAD_END_BRANCH_CELLS cells. The start and goal caps are exempt (they are the route's ends,
-// not branches). The value is 2, not 3: a nub of one tile is what the owner named ("singular tile
+// THE RULE: no dead-end branch of a generated maze is shorter than
+// MIN_DEAD_END_BRANCH_CELLS cells. The start and goal are never walled up to satisfy it (they ARE the
+// route); a nub endpoint is lengthened instead (a cell opened behind it). The value is 2, not 3: a nub of one tile is what the owner named ("singular tile
 // split offs"); a 2-cell spur still reads as a short side street, and 3 is the felt explorer's
 // vision limit (FELT_VISION_CELLS), so a minimum above 3 would stop the fringe being free for the
 // explorer. Raising it to 3 is the same code path but is NOT validated by this card.
@@ -52,9 +55,6 @@ export const countOpenNeighbors = (maze: Pick<StubMaze, 'width' | 'height' | 'gr
 // tuner's flat-index probe below, so tests can cross-check one against the other.
 export const collectDeadEndBranches = (maze: StubMaze): DeadEndBranch[] => {
   const { width, height, grid } = maze;
-  const isEndpoint = (x: number, y: number): boolean => (
-    (x === maze.start.x && y === maze.start.y) || (x === maze.goal.x && y === maze.goal.y)
-  );
   const neighbors = (x: number, y: number): { x: number; y: number }[] => {
     const out: { x: number; y: number }[] = [];
     for (let d = 0; d < 4; d += 1) {
@@ -67,16 +67,17 @@ export const collectDeadEndBranches = (maze: StubMaze): DeadEndBranch[] => {
   const branches: DeadEndBranch[] = [];
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      if (grid[y]?.[x] !== true || isEndpoint(x, y)) { continue; }
+      if (grid[y]?.[x] !== true) { continue; }
       const first = neighbors(x, y);
       if (first.length !== 1) { continue; }
       let length = 1;
       let previous = { x, y };
       let current = first[0]!;
       let host: { x: number; y: number } | null = current;
+      let bare = false;
       for (;;) {
-        if (isEndpoint(current.x, current.y)) { break; }
         const next = neighbors(current.x, current.y).filter((cell) => cell.x !== previous.x || cell.y !== previous.y);
+        if (next.length === 0) { bare = true; break; }
         if (next.length !== 1) { break; }
         length += 1;
         previous = current;
@@ -84,6 +85,9 @@ export const collectDeadEndBranches = (maze: StubMaze): DeadEndBranch[] => {
         host = current;
         if (length > width * height) { host = null; break; }
       }
+      // A walk that ends at another dead end met no junction: a bare corridor (the level-1 straight run,
+      // start to goal), not a branch hanging off anything.
+      if (bare) { continue; }
       branches.push({ tip: { x, y }, host, length });
     }
   }
@@ -108,8 +112,8 @@ export const probeDeadEndBranch = (
   open: Uint8Array,
   neighbors: Int32Array,
   tip: number,
-  startCell: number,
-  goalCell: number
+  _startCell: number,
+  _goalCell: number
 ): DeadEndBranchProbe | null => {
   const onward = (cell: number, previous: number): number[] => {
     const out: number[] = [];
@@ -127,7 +131,7 @@ export const probeDeadEndBranch = (
     }
     return seen.length;
   };
-  if (open[tip] !== 1 || tip === startCell || tip === goalCell || degree(tip) !== 1) { return null; }
+  if (open[tip] !== 1 || degree(tip) !== 1) { return null; }
   let previous = -1;
   let current = tip;
   let length = 1;
@@ -135,7 +139,7 @@ export const probeDeadEndBranch = (
   for (;;) {
     const next = onward(current, previous)[0];
     if (next === undefined) { return { length, host: current }; }
-    if (next === startCell || next === goalCell || degree(next) !== 2 || length >= cap) { return { length, host: next }; }
+    if (degree(next) !== 2 || length >= cap) { return { length, host: next }; }
     previous = current;
     current = next;
     length += 1;
@@ -164,7 +168,59 @@ export interface StubFixContext {
   // Re-runs the felt explorer on the edited grid; true when the maze still lands exactly as it
   // did before the pass (goal reached, same step count). Called after every candidate edit.
   readonly verify: () => boolean;
+  // Unverified-pass option (the menu demo, no felt target): a start or goal nub that no cell can be opened
+  // behind is cleared by walling up the dead-end branches its host junction also carries until the host is
+  // a plain corridor cell (planCapPinch). Off for the felt tuner: it would move its fringe count.
+  readonly pinchCapHosts?: boolean;
 }
+
+// The cells to wall up so that the junction `host` of the nub endpoint `cap` becomes a corridor cell
+// (exactly two open sides: the cap and one more): the shortest pure dead-end branches the host carries
+// besides the cap, as many as it takes. A branch is pure when it runs cell by cell to a tip without
+// meeting a junction, the start, the goal, the host again or the border ring, so walling it up orphans
+// nothing. Null when the host does not carry enough of them (loops keep it a junction).
+export const planCapPinch = (
+  open: Uint8Array,
+  neighbors: Int32Array,
+  cap: number,
+  host: number,
+  startCell: number,
+  goalCell: number,
+  interior: (cell: number) => boolean
+): number[] | null => {
+  const adjacent = (cell: number): number[] => {
+    const out: number[] = [];
+    for (let d = 0; d < 4; d += 1) {
+      const next = neighbors[(cell * 4) + d]!;
+      if (next !== cell && open[next] === 1 && !out.includes(next)) { out.push(next); }
+    }
+    return out;
+  };
+  const around = adjacent(host);
+  if (around.length < 3) { return null; }
+  const branches: number[][] = [];
+  for (const first of around) {
+    if (first === cap) { continue; }
+    const cells: number[] = [];
+    let previous = host;
+    let current = first;
+    let pure = false;
+    for (let guard = 0; guard <= open.length; guard += 1) {
+      if (current === startCell || current === goalCell || current === host || !interior(current) || cells.includes(current)) { break; }
+      cells.push(current);
+      const onward = adjacent(current).filter((cell) => cell !== previous);
+      if (onward.length === 0) { pure = true; break; }
+      if (onward.length > 1) { break; }
+      previous = current;
+      current = onward[0]!;
+    }
+    if (pure) { branches.push(cells); }
+  }
+  const needed = around.length - 2;
+  if (branches.length < needed) { return null; }
+  branches.sort((a, b) => a.length - b.length);
+  return branches.slice(0, needed).flat();
+};
 
 export const countStubTips = (context: Pick<StubFixContext, 'open' | 'neighbors' | 'startCell' | 'goalCell'>): number => {
   let count = 0;
@@ -222,7 +278,20 @@ export const fixOneTileStubs = (context: StubFixContext): StubFixResult => {
         open[cell] = 0;
       }
     }
-    if (!fixed && interior(tip)) {
+    if (!fixed && context.pinchCapHosts === true && (tip === startCell || tip === goalCell) && probe.length === 1 && probe.host !== null) {
+      const plan = planCapPinch(open, neighbors, tip, probe.host, startCell, goalCell, interior);
+      if (plan !== null && plan.length > 0) {
+        for (const cell of plan) { open[cell] = 0; }
+        if (verify()) {
+          removed.push(...plan);
+          fixed = true;
+        } else {
+          for (const cell of plan) { open[cell] = 1; }
+        }
+      }
+    }
+    // The start and goal are the route: they are lengthened (above) but never walled up.
+    if (!fixed && interior(tip) && tip !== startCell && tip !== goalCell) {
       open[tip] = 0;
       if (verify()) {
         removed.push(tip);
@@ -242,6 +311,9 @@ export const fixOneTileStubs = (context: StubFixContext): StubFixResult => {
 export const forceRemoveOneTileStubs = (maze: StubMaze & { grid: boolean[][] }): { x: number; y: number }[] => {
   const removed: { x: number; y: number }[] = [];
   for (const branch of collectOneTileStubs(maze)) {
+    const isEndpoint = (branch.tip.x === maze.start.x && branch.tip.y === maze.start.y)
+      || (branch.tip.x === maze.goal.x && branch.tip.y === maze.goal.y);
+    if (isEndpoint) { continue; }
     maze.grid[branch.tip.y]![branch.tip.x] = false;
     removed.push({ x: branch.tip.x, y: branch.tip.y });
   }
