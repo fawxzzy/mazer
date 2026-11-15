@@ -137,8 +137,8 @@ const normalizeMessage = (value: string | null): string | null => {
 /**
  * The player-safe failure rows live in legacyPlayerMessage.ts (integrator Wave 3B) and are copy-matrix lines since
  * Auth Surface v2 PR-A2. The status box still translates every row it may meet to its matrix line here: matrix lines
- * map to themselves, MAZER_OAUTH_SAFE_ERROR_MESSAGE (Wave 5C, not yet reworded) maps to the outage line, and anything
- * unrecognised falls back to the outage line rather than reaching the box verbatim. Earlier spellings from an older
+ * map to themselves (MAZER_OAUTH_SAFE_ERROR_MESSAGE is the outage line itself since the Wave 5C follow-up), and
+ * anything unrecognised falls back to the outage line rather than reaching the box verbatim. Earlier spellings from an older
  * snapshot are already resolved upstream (resolveLegacyAuthFeedbackMessage -> resolveLegacyOAuthCurrentFailureCopy).
  * contextLost has no matrix row of its own: it reads as the callback line.
  */
@@ -155,8 +155,7 @@ const AUTH_SURFACE_NOTICE_BY_COPY: ReadonlyMap<string, string> = new Map<string,
   [LEGACY_AUTH_MESSAGE_COPY.accountUnavailable, AUTH_SURFACE_MESSAGES['signin.unavailable']],
   [LEGACY_AUTH_MESSAGE_COPY.authUnavailable, AUTH_SURFACE_MESSAGES['signin.unavailable']],
   [LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured, AUTH_SURFACE_MESSAGES['signin.unavailable']],
-  [LEGACY_AUTH_MESSAGE_COPY.networkUnavailable, AUTH_SURFACE_MESSAGES['signin.offline']],
-  [MAZER_OAUTH_SAFE_ERROR_MESSAGE, AUTH_SURFACE_MESSAGES['signin.unavailable']]
+  [LEGACY_AUTH_MESSAGE_COPY.networkUnavailable, AUTH_SURFACE_MESSAGES['signin.offline']]
 ]);
 
 export const resolveLegacyAccountStatusNotice = (message: string | null): string | null => {

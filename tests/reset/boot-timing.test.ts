@@ -15,6 +15,8 @@ import {
 afterEach(() => {
   resetBootTimingForTests();
   vi.restoreAllMocks();
+  // The verify run shares one thread: a stubbed window left behind breaks later files.
+  vi.unstubAllGlobals();
 });
 
 describe('boot timing', () => {

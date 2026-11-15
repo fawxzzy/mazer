@@ -2937,10 +2937,10 @@
           {
             "repo": "fawxzzy/mazer",
             "number": 603,
-            "mergedSha": "3c217c90"
+            "mergedSha": "3c217c90640a9a841869cab37c1fd40b2cd68881"
           }
         ],
-        "deployedBuild": "none",
+        "deployedBuild": "5023dd2a",
         "headless": true,
         "deviceChecked": false
       },
@@ -4191,12 +4191,12 @@
           {
             "repo": "fawxzzy/mazer",
             "number": 598,
-            "mergedSha": "a4ab33e4"
+            "mergedSha": "a4ab33e4f7db011e141d9d6acfc8b08d8d900f69"
           }
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "5023dd2a"
       },
       "blocker": null,
       "verify": [],
@@ -4288,12 +4288,12 @@
           {
             "repo": "fawxzzy/mazer",
             "number": 602,
-            "mergedSha": "5023dd2a"
+            "mergedSha": "5023dd2a1cd0ff8a5762bfc791d5b2dbaa9136c9"
           }
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "5023dd2a"
       },
       "blocker": null,
       "verify": [],

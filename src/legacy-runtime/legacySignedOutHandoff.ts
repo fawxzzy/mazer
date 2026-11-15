@@ -52,6 +52,7 @@ export type MazerAutoHandoffStayReason =
   | 'level-preview'
   | 'auth-fixture'
   | 'oauth-callback'
+  | 'return-notice'
   | 'signed-in'
   | 'session-quarantined'
   | 'explicit-sign-out'
@@ -68,6 +69,11 @@ export interface MazerAutoHandoffDecisionInput {
   authFixtureRoute: boolean;
   /** The URL carried an OAuth callback (success, denial or malformed). */
   oauthCallbackRequested: boolean;
+  /**
+   * The account host sent the player back with `?notice=expired|unavailable` (legacyAuthReturnNotice.ts): the
+   * host already stopped this sign-in, so leaving again could loop. Optional: absent reads as false.
+   */
+  returnNoticeRequested?: boolean;
   /** A persisted shared-auth session exists (presence only). */
   hasStoredSession: boolean;
   /** A session commit is held in quarantine; the scene recovers and reports it. */
@@ -92,6 +98,9 @@ export const decideMazerAutoHandoff = (input: MazerAutoHandoffDecisionInput): Ma
   }
   if (input.oauthCallbackRequested) {
     return { action: 'stay', reason: 'oauth-callback' };
+  }
+  if (input.returnNoticeRequested === true) {
+    return { action: 'stay', reason: 'return-notice' };
   }
   if (input.optedOut) {
     return { action: 'stay', reason: 'opted-out' };
@@ -215,6 +224,8 @@ export interface MazerSignedOutHandoffDeps {
   now(): number;
   oauthCallbackRequested: boolean;
   optedOut: boolean;
+  /** The URL carried a host return notice (see MazerAutoHandoffDecisionInput.returnNoticeRequested). */
+  returnNoticeRequested?: boolean;
   /** Hands a pre-navigation failure to the scene's held failure line. */
   recordFailure(category: MazerOAuthFailureCategory): void;
   sessionQuarantined: boolean;
@@ -244,6 +255,7 @@ export const runMazerSignedOutHandoff = async (
     levelPreviewRequested: deps.levelPreviewRequested,
     oauthCallbackRequested: deps.oauthCallbackRequested,
     optedOut: deps.optedOut,
+    returnNoticeRequested: deps.returnNoticeRequested === true,
     sessionQuarantined: deps.sessionQuarantined
   });
   if (decision.action === 'stay') {

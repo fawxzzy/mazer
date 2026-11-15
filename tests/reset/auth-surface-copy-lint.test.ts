@@ -8,6 +8,8 @@ import {
   listAuthSurfaceStrings
 } from '../../src/brand/authSurfaceCopy';
 import { LEGACY_ACCOUNT_STATUS_COPY } from '../../src/legacy-runtime/legacyAccountStatusState';
+import { MAZER_OAUTH_SAFE_ERROR_MESSAGE } from '../../src/legacy-runtime/legacyAccountPortal';
+import { MAZER_AUTH_RETURN_NOTICE_COPY } from '../../src/legacy-runtime/legacyAuthReturnNotice';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_BOOT_MESSAGE_COPY,
@@ -192,9 +194,9 @@ describe('Auth Surface v2 copy is wired through', () => {
   });
 
   // The hand-off failure toast rows (legacyPlayerMessage.ts, integrator Wave 3B) are matrix lines since PR-A2.
-  // MAZER_OAUTH_SAFE_ERROR_MESSAGE (legacyAccountPortal.ts, Wave 5C) follows in its own PR; until then it is shown
-  // as the generic row. While signed out those toasts are suppressed (shouldToastLegacyAuthFeedback), so the
-  // status box is the only failure copy a player sees.
+  // MAZER_OAUTH_SAFE_ERROR_MESSAGE (legacyAccountPortal.ts, Wave 5C) is the outage line itself since the Wave 5C
+  // follow-up, and the host return notices (?notice=expired|unavailable) show matrix lines. While signed out those
+  // toasts are suppressed (shouldToastLegacyAuthFeedback), so the status box is the only failure copy a player sees.
   test('the sign-in failure and boot rows are matrix lines', () => {
     const matrix = new Set<string>(Object.values(AUTH_SURFACE_MESSAGES));
     for (const copy of Object.values(LEGACY_OAUTH_FAILURE_MESSAGE_COPY)) {
@@ -204,6 +206,10 @@ describe('Auth Surface v2 copy is wired through', () => {
       expect(matrix.has(LEGACY_AUTH_MESSAGE_COPY[key]), key).toBe(true);
     }
     expect(LEGACY_BOOT_MESSAGE_COPY.bootError).toBe(AUTH_SURFACE_MESSAGES['page.crash']);
+    expect(MAZER_OAUTH_SAFE_ERROR_MESSAGE).toBe(AUTH_SURFACE_MESSAGES['signin.unavailable']);
+    for (const copy of Object.values(MAZER_AUTH_RETURN_NOTICE_COPY)) {
+      expect(matrix.has(copy), copy).toBe(true);
+    }
   });
 
   test('every install card line is in the module', () => {

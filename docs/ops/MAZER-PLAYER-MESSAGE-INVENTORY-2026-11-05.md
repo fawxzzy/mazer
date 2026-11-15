@@ -119,7 +119,7 @@ Shared-account sign-in failures (2026-11-11): `LEGACY_OAUTH_FAILURE_MESSAGE_COPY
 `cancelled`, `connection`, `session`, `storage`, `providerUnreachable` (MAZER-ACCT-036, account service down before leaving for sign-in), `generic`) is a sixth routed table, resolved by
 `resolveLegacyOAuthFailureMessage(code)` (id `auth.oauth-failure.<class>`, tone error). The internal failure code is recorded only in
 `technicalDetail` (`oauth-failure:<code>`, diagnostics) and never in player copy. `resolveLegacyAuthFeedbackMessage` passes this copy
-through unchanged. The `generic` row equals `MAZER_OAUTH_SAFE_ERROR_MESSAGE` (the literal pinned in section 4 for `legacyAccountPortal.ts`).
+through unchanged. The `generic` row equals `MAZER_OAUTH_SAFE_ERROR_MESSAGE`, which since the Auth Surface v2 Wave 5C follow-up (2026-11-15) is no longer a literal in `legacyAccountPortal.ts`: it is `AUTH_SURFACE_MESSAGES['signin.unavailable']` from `src/brand/authSurfaceCopy.ts` (its section 4 row was removed). The host return notices `?notice=expired|unavailable` (`legacyAuthReturnNotice.ts`) are recorded as the boot failure codes `expired_or_missing_state` / `provider_unreachable` and so reach the player through this same table.
 
 ## 4. Pinned literal inventory (player-facing strings outside the message module)
 
@@ -133,7 +133,6 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | `src/scenes/MenuScene.ts:17547` | `Runtime diagnostics authenticated fixture.` | no | n/a | fixture | None (QA fixture) |
 | `src/boot/accessibilitySurface.ts:100` | `Touch and drag anywhere to move through the maze. With a keyboard, use Arrow keys or WASD to move, Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.` | no | n/a | static | None (a11y description) |
 | `src/boot/accessibilitySurface.ts:109` | `Mazer is ready.` | no | info | static | Live region never updated; candidate sink for the message surface announcements |
-| `src/legacy-runtime/legacyAccountPortal.ts:23` | `Could not reach your account. Try again.` | no | error / auth | raw-status | Auth table key `accountConnectionUnavailable`; it is drawn directly at `MenuScene.ts:17128` and via F2 |
 | `src/legacy-runtime/legacyAuth.ts:763` | `Account connected.` | no | success / auth | raw-status | Auth table key `accountConnected`; no render site today (info on the snapshot) |
 | `src/legacy-runtime/legacyAuth.ts:1447` | `That username is already taken.` | no (duplicate) | error / auth | duplicate-unrendered | Use `LEGACY_AUTH_MESSAGE_COPY.usernameTaken` and render it (F4) |
 | `src/legacy-runtime/legacyLeaderboard.ts:49` | `The leaderboard is not available right now.` | no | error / system | parallel-mapper | Fold into the message module |
