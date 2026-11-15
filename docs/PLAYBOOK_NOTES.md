@@ -363,3 +363,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: `scripts/playbook-runtime.mjs` `DEFAULT_PLAYBOOK_VERSION`, and the `Playbook clean-environment validation` job fallback URL and SHA-256 in `.github/workflows/verify.yml`, moved from the Playbook v0.54.1 release tarball to v0.74.0 (SHA-256 `6b0abf33835c57331f0ef471fef2a803e2cbabc1d673f528e62b2f5213462ac7`, hashed from the published release asset).
 - WHY it changed: v0.74.0 carries Playbook #74 (doctor tells product repos from consumer repos), so Mazer doctor runs stop reporting the Playbook product docs layout as errors.
 - Rule: version, URL and digest move together; no deploy surface touched.
+
+## 2026-11-14 - Offline shell proof gets a nightly, non-blocking workflow
+- WHAT changed: new `.github/workflows/offline-shell-nightly.yml` (schedule 03:17 UTC + `workflow_dispatch`) runs `scripts/analysis/verify-offline-shell.mjs` (two production builds + headless Chromium) on ubuntu-24.04 and uploads the proof output as an artifact on failure. Also fixed a stale Wave 1C line in `docs/ops/MAZER-NO-INAPP-ACCOUNT-SCREENS-2026-11-14.md`.
+- WHY it changed: the script was fixed in #574 but no workflow ran it, which hid drift.
+- Rule: not a PR check and not in the required set; a red nightly is a signal to investigate, never a merge blocker. package.json untouched.
+- Status: YAML parsed only; first real run is the first dispatch after merge.
