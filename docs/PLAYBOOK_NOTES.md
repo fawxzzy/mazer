@@ -384,3 +384,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the geometry ladder (336f2f2a) set borderFeederTargetPerSide 0 and GEN-004 fades wraps to none by level 140, so the demo had 0-4 openings against 12-28 before. Measured (8 seeds, scale 35): level 20/30 about 4, level 60 about 15, level 100+ about 19.
 - Rule: gameplay levels, ladder and difficulty gauges are untouched; demo is attract-loop art, not a calibrated difficulty.
 - Status: headless only, nothing checked on a real phone.
+
+## 2026-11-15 - MAZER-AUDIO: the per-tile step sound is removed
+- WHAT changed: `src/legacy-runtime/legacySoundEffects.ts` drops the `step` kind (tone and throttle gap); `MenuScene.ts` no longer plays it on a player move. Wall-bump, goal and toggle chirps and the step haptic are unchanged. The Sound setting description, the in-app guide row, the message inventory (test and doc) and the sound tests now say bumps and wins only.
+- WHY it changed: owner request, the chirp on every tile the player travels was unwanted.
+- Status: headless only (tsc and the three affected test files), nothing checked on a real phone.
