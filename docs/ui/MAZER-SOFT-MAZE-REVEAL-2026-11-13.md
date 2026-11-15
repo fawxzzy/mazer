@@ -4,9 +4,24 @@ Status: implemented 2026-11-13 on branch `claude/mazer-vis-040-20261113`, on top
 
 Owner request (verbatim): "lwk everything in the maze kinda just appears part by part is there a way to draw everything out smoother?"
 
-What stays as shipped: board size and zoom, tile style B "Chip", the dark neon look, every duration of the intro and the outro, the input unlock (build end + 400 ms), the maze generation (determinism untouched: only the order-to-alpha mapping changed, the order itself is the same BFS), the edge diamond / beam timelines and art (another lane), the strict 0/1 `bleedProgress` edge-path switch, the Guide (no wording or icon change).
+## UPDATE 2026-11-15 (MAZER-MOTION-020): the alpha ramp below is replaced by a geometric "flow"
 
-## 1. What popped (measured before the change)
+Owner: "I hate the current fade in / fade out ... I think we can do better." Sections 2, 3 and 4 describe the VIS-040 alpha ramp and are kept as history. What ships now (render only; `src/render/mazeRevealTimeline.ts`, `boardRevealMask.ts`, `boardTileLayer.ts`, `mazeRevealDriver.ts`):
+
+- Build: the maze is drawn by extent, not opacity. Every floor cell has an extent 0..1. The baked board is drawn ONCE at alpha 1 through one clip path: fully shown cells (row runs merged) plus one rect per partial cell. A partial cell is the slice that starts at the side its BFS parent is on (left / right / above / below), so a corridor extrudes out of the one before it; the spawn cell, walls and the pad ring open from their centre. Edges are device-snapped.
+- One cell wipes for exactly one rank step (`span / N`), linear. A cell's BFS parent always has a lower rank, so a cell starts only when its parent is whole: the drawn line has no gap at any instant on any maze, and the tip moves at constant speed (an eased or longer wipe left gaps and a ladder at the tip, seen in the first filmstrips).
+- Tear-down is the build run backwards in time with the same rank: `deconstruct(rank, t) == build(rank, span - t)`, so the far end retracts first and the spawn cell leaves last. Same windows as before.
+- Walls and the pad ring open only once the LEAST built floor cell around them is past 60 % (and close as soon as the first one starts to go). The baked wall cell holds the outer glow of every corridor beside it, so this is what stops the faint halo of a not-yet-built corridor showing ahead of its fill.
+- The "thin white 1px line before the fill" (VIS-050 leftover) was the pale rim of the first low-alpha cells showing before their dark fill (a chip is rim plus fill; low alpha shows the rim first). No cell is drawn at partial alpha any more, so rim and fill arrive together. Opacity is not used by the board reveal at all.
+- Wrap docks slide out of the board edge over `MAZE_DOCK_FADE_MS` (200 ms, easeOutCubic) instead of fading.
+- Cost: one clip plus one `drawImage` per recompose (was up to 16 draws). The bake is unchanged, so `BOARD_TILE_BAKE_VERSION` stays v3. Timing is unchanged: windows, input unlock, beams, totals and the strict 0/1 edge-path switch.
+- Reduce Motion: unchanged, the 200 ms board crossfade is the whole effect (`resolveMazeRevealFrame` returns null).
+- No separate leading-edge glint: a bright 1px tip is exactly the "thin white line" the owner rejected, and the crisp sliced edge of a whole chip already reads as the front.
+- Evidence: `scripts/analysis/capture-maze-motion-filmstrip.mjs` (filmstrips and native-pixel zoom crops at fixed times, Chromium 390x844 DPR3 and WebKit iPhone 15 Pro). Headless only; nothing was checked on a real phone. The gap between tear-down end and the next build (digit interstitial) is lifecycle timing, outside this change.
+
+What stays as shipped (VIS-040 list): board size and zoom, tile style B "Chip", the dark neon look, every duration of the intro and the outro, the input unlock (build end + 400 ms), the maze generation (determinism untouched: only the order-to-alpha mapping changed, the order itself is the same BFS), the edge diamond / beam timelines and art (another lane), the strict 0/1 `bleedProgress` edge-path switch, the Guide (no wording or icon change).
+
+## 1. What popped (measured before the change; VIS-040 history)
 
 Per-frame captures at 60 fps of virtual time (`scripts/analysis/measure-maze-reveal-pop.mjs`, Playwright, 390x844 at DPR 3, touch, mobile UA, standalone display-mode; a fake clock stepped 16 ms per frame so every frame is sampled and slow recorders do not change the timing). Level 40 (a real maze) via `?previewLevel=40`.
 

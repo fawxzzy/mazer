@@ -63,7 +63,11 @@ const restingSamples = (): number[] => {
 };
 
 describe('iridescent midnight-sun trail: palette and contrast', () => {
-  test('worst hue against the bare Chip fill is at least 3:1 (reported), and every hue clears 4.5:1 under the dark underlay on every floor', () => {
+  // MAZER-VIS-051 round 2: the contract is core-vs-underlay. The core is never drawn on the bare chip: it sits on the
+  // near-opaque dark underlay (trailLegibility.ts), which itself stands off the chip by >= 3:1 (marker-trail-legibility
+  // test). The old "core >= 3:1 on the bare chip" pin capped blue/violet/magenta at a pastel and is replaced by
+  // core >= 4.5:1 on the underlay, on every floor, with the bare-chip ratio only reported.
+  test('every hue clears 4.5:1 against the dark underlay on every floor (the bare-chip ratio is reported, no longer pinned)', () => {
     let worst = Infinity;
     let worstColor = 0;
     for (const c of restingSamples()) {
@@ -74,7 +78,7 @@ describe('iridescent midnight-sun trail: palette and contrast', () => {
       }
     }
     console.info(`TRAIL_IRIDESCENT_WORST_HUE vs chip: ${worst.toFixed(2)}:1 at 0x${worstColor.toString(16)}`);
-    expect(worst).toBeGreaterThanOrEqual(3);
+    expect(worst).toBeGreaterThan(1);
   });
 
   test('the faded tail (Trail Fade alpha floor) still clears 3:1 under the underlay for every hue on every floor', () => {
@@ -85,15 +89,18 @@ describe('iridescent midnight-sun trail: palette and contrast', () => {
     }
   });
 
-  test('every sampled core, anywhere on the sweep and at any pulse level, is at least 3:1 on the chip (the pulse only brightens)', () => {
+  test('every sampled core, anywhere on the sweep and at any pulse level, is at least 4.5:1 on the underlay of every floor (the pulse only brightens)', () => {
     let worst = Infinity;
     for (let d = 0; d < IRIDESCENT_TRAIL_TILES_PER_SWEEP * 2; d += 0.25) {
       for (let t = 0; t < IRIDESCENT_TRAIL_SWEEP_PERIOD_MS; t += 400) {
         const sample = sampleIridescentTrail(d, t, false, { core: 0, glow: 0, wave: 0, sheen: 0 });
-        worst = Math.min(worst, contrastRatio(sample.core, BOARD_CHIP_FILL));
+        for (const floor of Object.values(TRAIL_FLOOR_COLORS)) {
+          worst = Math.min(worst, trailCoreContrast(sample.core, floor, 1));
+        }
       }
     }
-    expect(worst).toBeGreaterThanOrEqual(3);
+    console.info(`TRAIL_IRIDESCENT_WORST_SAMPLE vs underlay: ${worst.toFixed(2)}:1`);
+    expect(worst).toBeGreaterThanOrEqual(4.5);
   });
 
   test('it stays clear of the player (green), the goal (red) and the start (gold): colour distance and hue band', () => {

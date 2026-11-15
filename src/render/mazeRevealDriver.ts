@@ -112,8 +112,9 @@ export class MazeRevealDriver {
     return {
       kind: 'soft',
       key: frame.key,
-      dockAlpha: frame.dockAlpha,
-      fillMask: (alpha) => this.mask.fill(alpha, frame, ranks, owners, cols, rows)
+      dockExtent: frame.dockExtent,
+      parentSide: this.mask.directions(ranks, cols, rows),
+      fillMask: (extent) => this.mask.fill(extent, frame, ranks, owners, cols, rows)
     };
   }
 }
