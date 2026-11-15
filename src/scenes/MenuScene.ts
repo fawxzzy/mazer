@@ -455,6 +455,7 @@ import {
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
   resolveLegacyMazeGenerationProfileForProgression,
+  resolveLegacyMenuDemoMazeGenerationProfileForProgression,
   resolveLegacyProgressionGenerationScale,
   resolveLegacyProgressionLevel,
   resolveLegacyProgressionOrdinalSeedComponent,
@@ -14692,7 +14693,10 @@ export class MenuScene extends Phaser.Scene {
       track,
       this.resolveLegacyProgressionScaleOptionsForMode(mode)
     );
-    return resolveLegacyMazeGenerationProfileForProgression(track, { fraction });
+    // MAZER-VIS-052: only the menu demo skips the budget ladder (more bleed-off paths).
+    return mode === 'menu'
+      ? resolveLegacyMenuDemoMazeGenerationProfileForProgression(track, { fraction })
+      : resolveLegacyMazeGenerationProfileForProgression(track, { fraction });
   }
 
   private resolveLegacyTargetComplexityForMode(mode: RuntimeMode): number {
