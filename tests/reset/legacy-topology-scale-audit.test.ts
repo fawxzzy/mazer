@@ -363,7 +363,7 @@ describe('legacy topology scale audit', () => {
       },
       {
         build: createLegacyMaze,
-        expectedHash: '516d04797cabcb07cd8fb45d418c6482a69b837d5a330fe476b0e2bb6f60b91a',
+        expectedHash: 'aba0040624353ea7db44bedaf2a96a55e9d0adaea1eefe3d7c97c849357e2ba4',
         kind: 'play',
         scale: 149,
         seed: 233

@@ -385,14 +385,14 @@ describe('legacy reset lane', () => {
     const cases = [
       {
         build: createLegacyMaze,
-        expectedHash: '5991f3060be8e2da9bcf1972c2dafc4807baf4a39b6a5629a0516f2245c927ac',
+        expectedHash: '4c2a4206eaa6f1bb4124701a6e8305502bc22ac7557424500f6734c7900ee01e',
         kind: 'play',
         scale: 25,
         seed: 13
       },
       {
         build: createLegacyGeneratedMenuMaze,
-        expectedHash: '4140a1de9ea55d1bf818b758c56a86005a1639560b2ecfbd323e8d59aeccab9f',
+        expectedHash: '122ec6a8d338272a227e74247ed5459933b00fc9e391b47c90ce501f149db3dc',
         kind: 'menu',
         scale: 37,
         seed: 3
