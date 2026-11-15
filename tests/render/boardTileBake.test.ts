@@ -228,44 +228,21 @@ describe('dead-end caps, junction nodes, dots', () => {
     expect(t!.radii.every((r) => r === 8)).toBe(true);
   });
 
-  test('there is no junction marker: split tiles get the same faint pad dot as every other tile, one circle per floor tile', () => {
+  test('MAZER-VIS-050: no tile centre dot at all, on junctions, straights or caps (the chip floor paints no arcs)', () => {
     const input = inputFor(maze, { tileSize: 8, start: { x: 1, y: 1 }, goal: { x: 23, y: 49 } });
     const { rec, result } = bake(input);
     const tiles = computeChipGeometry(input);
-    const rest = tiles.filter((t) => !(t.x === 1 && t.y === 1) && !(t.x === 23 && t.y === 49));
-    expect(rest.filter((t) => t.degree >= 3).length).toBeGreaterThan(10);
+    expect(tiles.filter((t) => t.degree >= 3).length).toBeGreaterThan(10);
     expect(result.stats.sockets).toBe(0);
-    // one pad dot per remaining floor tile, junctions included (previously junctions drew a separate, brighter node)
-    expect(rec.count('arc(')).toBe(rest.length);
-    expect(rec.log).toContain(`set fillStyle=${cssRgba(boardMaterial.rim, BOARD_TILE_GEOMETRY.padDotAlpha)}`);
-    // ...and nothing is drawn at the old bright junction-node alpha
-    expect(rec.log.filter((e) => e.startsWith('set fillStyle=') && e.includes(',0.85)'))).toEqual([]);
+    expect(rec.count('arc(')).toBe(0);
+    expect(rec.log).not.toContain(`set fillStyle=${cssRgba(boardMaterial.rim, BOARD_TILE_GEOMETRY.padDotAlpha)}`);
     expect(Object.keys(BOARD_TILE_GEOMETRY)).not.toContain('junctionNodeAlpha');
-    expect(Object.keys(resolveBoardTileStyle('chip', 8, 2))).not.toContain('junctionNodeRadius');
   });
 
-  test('a junction tile and a straight tile paint the same single dot, at the same radius', () => {
-    const g = emptyGrid(3, 3);
-    g[1]![0] = true; g[1]![1] = true; g[1]![2] = true; g[2]![1] = true;
-    // tiles under 10 px have no wall sockets, so the only arcs are the pad dots
-    const { rec } = bake(inputFor(g, { tileSize: 8, devicePixelRatio: 2, start: undefined, goal: undefined }));
-    const style = resolveBoardTileStyle('chip', 8, 2);
-    // four floor tiles (one junction, three caps): four pad dots, all at one radius
-    const radii = rec.log.filter((e) => e.startsWith('arc(')).map((e) => Number(e.slice(4, -1).split(',')[2]));
-    expect(radii).toHaveLength(4);
-    for (const r of radii) expect(r).toBe(style.padDotRadius);
-  });
-
-  test('the bake hash version moved when the junction nodes went (a stale cached bake can never survive)', () => {
-    expect(BOARD_TILE_BAKE_VERSION).toBe('mazer-board-tile-bake-v2');
+  test('the bake hash version moved when the tile centre dots went (a stale cached bake can never survive)', () => {
+    expect(BOARD_TILE_BAKE_VERSION).toBe('mazer-board-tile-bake-v3');
     const input = inputFor(maze);
     expect(computeBoardTileBakeHash(input)).not.toBe(computeBoardTileBakeHash({ ...input, tileSize: input.tileSize + 1 }));
-  });
-
-  test('start and goal cells get no pad dot or node so the markers stay clean', () => {
-    const withMarkers = bake(inputFor(corridorGrid(), { start: { x: 12, y: 0 }, goal: { x: 12, y: 50 }, tileSize: 8 }));
-    const without = bake(inputFor(corridorGrid(), { start: undefined, goal: undefined, tileSize: 8 }));
-    expect(withMarkers.rec.count('arc(')).toBe(without.rec.count('arc(') - 2);
   });
 
   test('trace draws junction rings and dead-end pads', () => {
