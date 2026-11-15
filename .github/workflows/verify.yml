@@ -197,8 +197,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      PLAYBOOK_OFFICIAL_FALLBACK_SPEC: https://github.com/fawxzzy/playbook/releases/download/v0.54.1/playbook-cli-0.54.1.tgz
-      PLAYBOOK_OFFICIAL_FALLBACK_SHA256: 6fb915baaa0837c70a942c60caaf110ba56abee6dd722de8a686b4757e768ba1
+      PLAYBOOK_OFFICIAL_FALLBACK_SPEC: https://github.com/fawxzzy/playbook/releases/download/v0.74.0/playbook-cli-0.74.0.tgz
+      PLAYBOOK_OFFICIAL_FALLBACK_SHA256: 6b0abf33835c57331f0ef471fef2a803e2cbabc1d673f528e62b2f5213462ac7
 
     steps:
       - name: Check out source
