@@ -581,6 +581,7 @@ import {
 } from '../legacy-runtime/legacyPlayerMessage';
 import { resolveLegacyPlayerMessageToastFrame } from '../legacy-runtime/legacyPlayerMessageToast';
 import { getTypeScaleStep } from '../render/typeScale';
+import { RAINBOW_UI_SATURATION, RAINBOW_UI_VALUE } from '../render/rainbowUiPalette';
 import {
   hydrateLegacyRemoteAccountState,
   isLegacyRuntimeDiagnosticsAuthFixtureRoute,
@@ -2465,7 +2466,6 @@ export class MenuScene extends Phaser.Scene {
       this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
         fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: `${getTypeScaleStep('caption').sizePx}px`,
-        color: '#ffffff',
         align: 'center'
       })).setOrigin(0.5, 0).setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH + 1).setVisible(false)
     ));
@@ -9305,8 +9305,8 @@ export class MenuScene extends Phaser.Scene {
       const cell = layout.cells[index];
       const cellColor = Phaser.Display.Color.HSVToRGB(
         (time / LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS) + (cell.column / Math.max(1, layout.columns)),
-        0.8,
-        1
+        RAINBOW_UI_SATURATION,
+        RAINBOW_UI_VALUE
       ).color;
       drawChipCell(
         graphics,

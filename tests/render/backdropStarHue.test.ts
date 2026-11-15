@@ -14,6 +14,8 @@ import {
   resolveBackdropRainbowPhase,
   stepBackdropColourRedraw
 } from '../../src/render/backdropStarHue';
+import { RAINBOW_UI_SATURATION, RAINBOW_UI_VALUE, resolveRainbowUiColor } from '../../src/render/rainbowUiPalette';
+import { SHARED_BACKDROP_HEX } from '../../src/render/sharedBackdrop';
 import { BACKDROP_STAR_FIELD_SEED, createBackdropStarRandom } from '../../src/render/backdropStars';
 import { createLegacyMenuBackdropStars } from '../../src/legacy-runtime/legacyMenuBackdrop';
 import { resolveReducedMotion } from '../../src/render/reducedMotion';
@@ -141,15 +143,9 @@ describe('backdrop rainbow stars: hue function', () => {
 });
 
 describe('backdrop rainbow stars: they stay dim, so the maze, trail and diamonds stay the focus', () => {
-  test('saturation and brightness are capped at every hue', () => {
-    for (let hue = 0; hue < 1; hue += 1 / 360) {
-      const color = backdropHsvToRgb(hue, BACKDROP_RAINBOW_SATURATION, BACKDROP_RAINBOW_VALUE);
-      expect(hsvSaturation(color)).toBeLessThanOrEqual(BACKDROP_RAINBOW_SATURATION + 0.01);
-      expect(Math.max(...Object.values(channels(color)))).toBeLessThanOrEqual(Math.round(BACKDROP_RAINBOW_VALUE * 255));
-      expect(luma(color)).toBeLessThan(0.93);
-    }
-    expect(BACKDROP_RAINBOW_SATURATION).toBeLessThanOrEqual(0.55);
-    expect(BACKDROP_RAINBOW_VALUE).toBeLessThan(1);
+  test('saturation and brightness are the shared rainbow UI material, not a private tint', () => {
+    expect(BACKDROP_RAINBOW_SATURATION).toBe(RAINBOW_UI_SATURATION);
+    expect(BACKDROP_RAINBOW_VALUE).toBe(RAINBOW_UI_VALUE);
   });
 
   test('alpha is capped under a white star ceiling for rainbow stars only', () => {
@@ -184,7 +180,7 @@ describe('backdrop rainbow stars: reduced motion keeps the colour moving, not th
     expect(colors.size).toBeGreaterThan(20);
   });
 
-  test('the colour redraw gate fires every 250 ms (4 a second), never per frame, and never on a bad clock', () => {
+  test('the colour redraw gate fires every 150 ms (about 7 a second), never per frame, and never on a bad clock', () => {
     let nextDue = 0;
     let redraws = 0;
     const frameMs = 1000 / 120;
@@ -193,10 +189,43 @@ describe('backdrop rainbow stars: reduced motion keeps the colour moving, not th
       nextDue = step.nextDueAtMs;
       if (step.due) redraws += 1;
     }
-    expect(redraws).toBeGreaterThanOrEqual(39);
-    expect(redraws).toBeLessThanOrEqual(41);
+    expect(redraws).toBeGreaterThanOrEqual(64);
+    expect(redraws).toBeLessThanOrEqual(67);
     expect(stepBackdropColourRedraw(Number.NaN, 0)).toEqual({ due: false, nextDueAtMs: 0 });
     expect(stepBackdropColourRedraw(100, 400)).toEqual({ due: false, nextDueAtMs: 400 });
     expect(stepBackdropColourRedraw(400, 400)).toEqual({ due: true, nextDueAtMs: 400 + BACKDROP_RAINBOW_COLOUR_REDRAW_INTERVAL_MS });
+  });
+});
+
+describe('backdrop rainbow stars take their colour from the shared rainbow UI palette (MAZER-VIS-035)', () => {
+  test('every rainbow star colour equals the rainbow UI colour at the star hue, at any scene time', () => {
+    for (let seed = 0.013; seed < 1; seed += 0.0371) {
+      for (const timeMs of [0, 4000, 13370, 90000]) {
+        expect(resolveBackdropRainbowColor(seed, timeMs)).toBe(resolveRainbowUiColor(resolveBackdropRainbowHue(seed, timeMs)));
+      }
+    }
+  });
+
+  test('the rainbow UI palette is the one the lettering draws from (HSV 0.8 / 1) and the stars carry no hsv literal of their own', async () => {
+    const { readFileSync } = await import('node:fs');
+    expect(RAINBOW_UI_SATURATION).toBe(0.8);
+    expect(RAINBOW_UI_VALUE).toBe(1);
+    expect(resolveRainbowUiColor(0)).toBe(0xff3333);
+    const scene = readFileSync('src/scenes/MenuScene.ts', 'utf8');
+    expect(scene).toContain('RAINBOW_UI_SATURATION,');
+    expect(scene).toContain('RAINBOW_UI_VALUE');
+    const stars = readFileSync('src/render/backdropStarHue.ts', 'utf8');
+    expect(stars).not.toMatch(/0.5;|0.92;/);
+  });
+
+  test('a visible handful of the field is rainbow and the backdrop stays the shared near-black', () => {
+    let picked = 0;
+    const n = 100;
+    for (let i = 0; i < n; i += 1) {
+      if (isBackdropRainbowStar((i + 0.5) / n)) picked += 1;
+    }
+    expect(picked).toBeGreaterThanOrEqual(8);
+    expect(picked).toBeLessThanOrEqual(35);
+    expect(SHARED_BACKDROP_HEX).toBe('#02080f');
   });
 });
