@@ -1,0 +1,47 @@
+name: Offline shell nightly
+
+# Non-blocking drift check for the offline shell (MAZER-PWA-004). It is NOT a PR check and is not
+# listed in the required checks: it runs on a schedule and on demand only, so a red run never blocks a merge.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-shell-nightly
+  cancel-in-progress: true
+
+jobs:
+  offline-shell:
+    name: Offline shell proof (two builds, headless Chromium)
+    # Same pin as verify.yml: `playwright install chromium` is unsupported on ubuntu-latest (26.04).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build A and B, run the headless offline-shell proof
+        run: node ./scripts/analysis/verify-offline-shell.mjs --keep --out=offline-shell-proof/report.json
+      - name: Upload proof output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-shell-proof
+          path: |
+            offline-shell-proof/
+            ${{ runner.temp }}/mazer-offline-shell-proof-*/
+            /tmp/mazer-offline-shell-proof-*/
+          if-no-files-found: warn
+          retention-days: 14

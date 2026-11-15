@@ -368,3 +368,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: at 320-374 the full-size top-right diamond touched the settings glyph (gap -1.9 css px at 320), and the UI-035 fix (wider gear inset) is unaffordable there because the title shrinks. Measured: the header already has almost no slack at 320, 368 and 374, so the diamond is the part that gives.
 - Rule: when two corner objects collide on a narrow phone, shrink the decorative one, never the title or the control; pin the cap in a test against the real layout.
 - Status: Applied (review); headless Chromium 320x568, 360x740, 375x812, 390x844 and WebKit iPhone SE / iPhone 15 Pro only, nothing checked on a real phone.
+
+## 2026-11-14 - Offline shell proof gets a nightly, non-blocking workflow
+- WHAT changed: new `.github/workflows/offline-shell-nightly.yml` (schedule 03:17 UTC + `workflow_dispatch`) runs `scripts/analysis/verify-offline-shell.mjs` (two production builds + headless Chromium) on ubuntu-24.04 and uploads the proof output as an artifact on failure. Also fixed a stale Wave 1C line in `docs/ops/MAZER-NO-INAPP-ACCOUNT-SCREENS-2026-11-14.md`.
+- WHY it changed: the script was fixed in #574 but no workflow ran it, which hid drift.
+- Rule: not a PR check and not in the required set; a red nightly is a signal to investigate, never a merge blocker. package.json untouched.
+- Status: YAML parsed only; first real run is the first dispatch after merge.
