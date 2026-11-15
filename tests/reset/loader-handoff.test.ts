@@ -43,9 +43,10 @@ describe('the pure hand-off test', () => {
 describe('the inline script in index.html is the same test (no drift)', () => {
   const script = /<script>\s*([\s\S]*?)<\/script>/.exec(html)?.[1] ?? '';
 
-  test('there is exactly one inline script and it runs before the splash markup', () => {
+  // The second inline script, at the end of <body>, is the static boot fallback (tests/reset/boot-static-fallback.test.ts).
+  test('the hand-off script is the first inline script and it runs before the splash markup', () => {
     expect(script).toContain("setAttribute('data-mazer-loader', 'instant')");
-    expect(html.match(/<script>/g)?.length).toBe(1);
+    expect(html.match(/<script>/g)?.length).toBe(2);
     expect(html.indexOf('<script>')).toBeLessThan(html.indexOf('id="mazer-boot-splash"'));
     expect(MAZER_LOADER_HANDOFF_ATTRIBUTE).toBe('data-mazer-loader');
   });

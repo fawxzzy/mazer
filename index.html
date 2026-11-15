@@ -132,6 +132,29 @@
         #mazer-boot-splash .mazer-boot-splash-icon { animation: none; }
         #mazer-boot-splash .mazer-boot-splash-ring { animation: none; transform: scale(1.08); opacity: 0.28; }
       }
+      /* Auth Surface v2 static fallback: shown by the inline script at the end of <body> when the game bundle never ran
+         (the bundle or one of its modules failed to load, or the browser could not run it). Plain colours, no tokens or
+         color-mix, because the CSS bundle may be missing too. Copy is the boot-error screen's (src/boot/bootErrorScreen.ts,
+         src/brand/authSurfaceCopy.ts); pinned by tests/reset/boot-static-fallback.test.ts. */
+      #mazer-boot-fallback {
+        position: fixed; inset: 0; z-index: 60; box-sizing: border-box;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+        padding: 54px 24px 26px; background: #02080f; color: #f1faf6; text-align: center;
+        font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+      }
+      #mazer-boot-fallback[hidden] { display: none; }
+      #mazer-boot-fallback .mazer-boot-fallback-kicker {
+        margin: 0; padding-left: 0.34em; font-size: 13px; font-weight: 500; letter-spacing: 0.34em; color: #6be8e1;
+      }
+      #mazer-boot-fallback .mazer-boot-fallback-title { margin: 0; font-size: 28px; font-weight: 300; line-height: 1.05; }
+      #mazer-boot-fallback .mazer-boot-fallback-notice {
+        margin: 0; max-width: 342px; box-sizing: border-box; padding: 12px 14px; border: 1px solid rgba(255, 125, 125, 0.55);
+        border-radius: 16px; background: rgba(255, 125, 125, 0.1); font-size: 14px; line-height: 1.38; color: #f6d2d0;
+      }
+      #mazer-boot-fallback .mazer-boot-fallback-retry {
+        width: 100%; max-width: 342px; min-height: 52px; margin-top: 10px; border: 0; border-radius: 16px;
+        background: #3ddbd4; color: #02080f; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;
+      }
     </style>
   </head>
   <body>
@@ -146,6 +169,37 @@
         </div>
       </div>
     </div>
+    <section id="mazer-boot-fallback" role="alertdialog" aria-modal="true" aria-label="Could not load" hidden>
+      <p class="mazer-boot-fallback-kicker">MAZER</p>
+      <h1 class="mazer-boot-fallback-title">Could not load</h1>
+      <p class="mazer-boot-fallback-notice" role="alert">Check your connection and try again.</p>
+      <button type="button" class="mazer-boot-fallback-retry" id="mazer-boot-fallback-retry">Try again</button>
+    </section>
+    <!-- Auth Surface v2 static fallback: if the game bundle never ran (no __MAZER_BOOT_STATUS__ once the document is
+         parsed and deferred scripts have run, or a script element failed to load), swap the splash for "Could not load" and a
+         Try again button that reloads. A boot that runs and then fails shows src/boot/bootErrorScreen.ts instead.
+         Pinned by tests/reset/boot-static-fallback.test.ts. -->
+    <script>
+      (function () {
+        var shown = false;
+        function show() {
+          if (shown || window.__MAZER_BOOT_STATUS__) { return; }
+          var fallback = document.getElementById('mazer-boot-fallback');
+          if (!fallback) { return; }
+          shown = true;
+          var splash = document.getElementById('mazer-boot-splash');
+          if (splash && splash.parentNode) { splash.parentNode.removeChild(splash); }
+          fallback.hidden = false;
+          var retry = document.getElementById('mazer-boot-fallback-retry');
+          if (retry) { retry.addEventListener('click', function () { location.reload(); }); }
+        }
+        window.addEventListener('error', function (event) {
+          var target = event && event.target;
+          if (target && target.tagName === 'SCRIPT') { show(); }
+        }, true);
+        document.addEventListener('DOMContentLoaded', show);
+      })();
+    </script>
     <script type="module" src="/src/boot/main.ts"></script>
   </body>
 </html>

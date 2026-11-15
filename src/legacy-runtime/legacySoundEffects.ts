@@ -11,7 +11,7 @@
  * - Unsupported platforms and any throwing audio call are silent no-ops: movement must never fail over a chirp.
  */
 
-export type LegacySoundEffectKind = 'step' | 'wallBump' | 'goal' | 'toggleOn';
+export type LegacySoundEffectKind = 'wallBump' | 'goal' | 'toggleOn';
 
 interface LegacySoundTone {
   /** Start offset from now, seconds. */
@@ -23,7 +23,6 @@ interface LegacySoundTone {
 
 /** Named tones so call sites carry no magic numbers. Quiet by design (peak gain <= 0.06). */
 export const LEGACY_SOUND_EFFECT_TONES: Readonly<Record<LegacySoundEffectKind, readonly LegacySoundTone[]>> = Object.freeze({
-  step: Object.freeze([{ at: 0, durationSec: 0.035, frequencyHz: 520, gain: 0.025 }]),
   wallBump: Object.freeze([{ at: 0, durationSec: 0.06, frequencyHz: 150, gain: 0.05 }]),
   goal: Object.freeze([
     { at: 0, durationSec: 0.09, frequencyHz: 523.25, gain: 0.05 },
@@ -33,9 +32,8 @@ export const LEGACY_SOUND_EFFECT_TONES: Readonly<Record<LegacySoundEffectKind, r
   toggleOn: Object.freeze([{ at: 0, durationSec: 0.08, frequencyHz: 660, gain: 0.04 }])
 });
 
-/** Minimum gap between two plays of the same kind, ms. Holding a direction fires steps quickly. */
+/** Minimum gap between two plays of the same kind, ms. Repeated bumps fire quickly. */
 export const LEGACY_SOUND_EFFECT_MIN_GAP_MS: Readonly<Record<LegacySoundEffectKind, number>> = Object.freeze({
-  step: 70,
   wallBump: 140,
   goal: 0,
   toggleOn: 0

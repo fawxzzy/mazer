@@ -390,3 +390,13 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: measured at levels 1-300 (8 seeds, phone and desktop boards) the menu demo carried 9-20 stubs per maze (it bypassed the tuner) and the play ladder still had start/goal nubs (0.13-0.5 per maze at levels 10-200); after the change both profiles measure 0 strict and 0 loose at every sampled level.
 - Rule: a branch that walks from a dead end to another dead end (level-1 straight run) is a bare corridor, not a branch; any code path that builds a maze without the felt tuner must call `applyOneTileStubRule`.
 - Status: headless only, nothing checked on a real phone.
+## 2026-11-15 - MAZER-UI-050: menu primary label is TAP TO PLAY with a level line under it
+- WHAT changed: `MAIN_MENU_BUTTONS[0]` is now `TAP TO PLAY` (was `Start`); the tile-glyph alphabet (legacyMenuTitle.ts) gained P, Y and a blank word-space; MenuScene gives that button full screen width (glyph cell derives from it), lifts it 14 px and draws a `LEVEL n` line under it. New `tests/legacy-runtime/legacy-play-label-glyphs.test.ts`; `legacy-reset.test.ts` updated for the label. Login label unchanged.
+- WHY it changed: owner decision to make the tap target explicit. The first-run subline ("HOLD + SLIDE TO MOVE") is NOT included: no first-run flag exists (the guide lists `first-run-coach` as a pending owner decision). The in-app guide has no copy naming the menu Start label (its Start row is the board marker), so no guide change.
+- Rule: edge marker files untouched (MAZER-VIS-055 lane).
+- Status: headless 390x844 and 320x568 at DPR 3 viewed, no clipping; nothing checked on a real phone.
+
+## 2026-11-15 - MAZER-AUDIO: the per-tile step sound is removed
+- WHAT changed: `src/legacy-runtime/legacySoundEffects.ts` drops the `step` kind (tone and throttle gap); `MenuScene.ts` no longer plays it on a player move. Wall-bump, goal and toggle chirps and the step haptic are unchanged. The Sound setting description, the in-app guide row, the message inventory (test and doc) and the sound tests now say bumps and wins only.
+- WHY it changed: owner request, the chirp on every tile the player travels was unwanted.
+- Status: headless only (tsc and the three affected test files), nothing checked on a real phone.

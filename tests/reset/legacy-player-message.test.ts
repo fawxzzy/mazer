@@ -191,7 +191,7 @@ describe('legacy player-facing message system', () => {
 
   test('keeps boot failure messages player-safe while retaining hidden technical detail', () => {
     expect(resolveLegacyBootMessage('error', 'stack trace detail')).toMatchObject({
-      copy: 'The maze did not finish loading. Try refreshing once.',
+      copy: 'Check your connection and try again.',
       id: 'boot.error',
       source: 'boot',
       technicalDetail: 'stack trace detail',

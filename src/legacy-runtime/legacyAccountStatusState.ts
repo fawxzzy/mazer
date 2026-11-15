@@ -135,10 +135,11 @@ const normalizeMessage = (value: string | null): string | null => {
 };
 
 /**
- * The player-safe failure rows still live in legacyPlayerMessage.ts (integrator Wave 3B) and are worded for the old
- * toast. Until that wave rewords them, the status box translates each row to its copy-matrix line here, so the
- * notice a signed-out player reads is always a matrix line. Matrix lines map to themselves (so the 3B rewording is a
- * no-op here) and anything unrecognised falls back to the outage line rather than reaching the box verbatim.
+ * The player-safe failure rows live in legacyPlayerMessage.ts (integrator Wave 3B) and are copy-matrix lines since
+ * Auth Surface v2 PR-A2. The status box still translates every row it may meet to its matrix line here: matrix lines
+ * map to themselves, MAZER_OAUTH_SAFE_ERROR_MESSAGE (Wave 5C, not yet reworded) maps to the outage line, and anything
+ * unrecognised falls back to the outage line rather than reaching the box verbatim. Earlier spellings from an older
+ * snapshot are already resolved upstream (resolveLegacyAuthFeedbackMessage -> resolveLegacyOAuthCurrentFailureCopy).
  * contextLost has no matrix row of its own: it reads as the callback line.
  */
 const AUTH_SURFACE_NOTICE_BY_COPY: ReadonlyMap<string, string> = new Map<string, string>([
