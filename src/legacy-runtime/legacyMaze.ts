@@ -192,6 +192,8 @@ export interface LegacyMazeSnapshot {
     lengthened: number;
     removed: number;
     forced: number;
+    // Menu demo post-pass only (legacyMazeStubPass.ts): start or goal nubs moved one cell onto their host.
+    relocated?: number;
   };
   // Floor-island rule (legacyMazeIslands.ts, MAZER-GEN-005): floor tiles the start cannot reach were walled
   // up. base = cells walled at the end of the base build (a wrap spoke that could not join the maze);
