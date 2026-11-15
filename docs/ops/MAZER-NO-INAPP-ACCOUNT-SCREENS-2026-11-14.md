@@ -94,7 +94,6 @@ state used by diagnostics and re-auth, the OAuth hand-off and its failure catego
 
 - Wave 3B (`legacyPlayerMessage.ts`): done by MAZER-ACCT-044. `resolveLegacyPasswordRecoveryError`, `resolveLegacyAuthValidationMessage` and the copy rows `loginReady`, `enterEmail`, `passwordMinimum`, `passwordMismatch`, `passwordRecoveryInvalid`, `passwordRecoveryUpdated`, `passwordResetNotConfigured`, `passwordResetSent` are deleted with their tests and inventory rows. `emailInvalid` and `passwordPolicy` stay: `resolveLegacyAuthFeedbackMessage` still maps provider error text to them (diagnostics only).
 - Wave 0C: `scripts/analysis/capture-ui-surfaces.mjs` still expects the Welcome labels; separate PR for the same reason.
-- Wave 1C: `formMode` and `invalidFields` in the runtime diagnostics are published as constants until the diagnostics
-  type drops them.
+- Wave 1C: done. `formMode` and `invalidFields` are no longer published by `MenuScene` (#579) and the diagnostics type fields are deleted (#581).
 - The back-chevron plumbing in `MenuScene` (`overlayBackChevronBounds` and its handler) has no producer any more.
 - Move the leaderboard handle edit to the host (see above).
