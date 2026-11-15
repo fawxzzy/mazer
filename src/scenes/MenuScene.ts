@@ -11092,7 +11092,8 @@ export class MenuScene extends Phaser.Scene {
               this.layout.buttonHeight,
               startLabel,
               () => this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode()),
-              { explicitHitZone: true }
+              // Harness/diagnostics keep addressing this action as 'Start' (the visible label changed).
+              { explicitHitZone: true, semanticAction: 'Start' }
             )
           );
           const levelLineFontPx = 13;
@@ -13628,7 +13629,7 @@ export class MenuScene extends Phaser.Scene {
     height: number,
     text: string,
     onClick: () => void,
-    options: { explicitHitZone?: boolean; labelRole?: LegacyUiLabelRole } = {}
+    options: { explicitHitZone?: boolean; labelRole?: LegacyUiLabelRole; semanticAction?: string } = {}
   ): UiButton {
     const isMenuFrontDoor = this.mode === 'menu' && this.overlay === 'none';
     // Both the Start and Login front-door actions share the same borderless
@@ -13759,6 +13760,7 @@ export class MenuScene extends Phaser.Scene {
       background,
       bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height),
       label,
+      semanticAction: options.semanticAction,
       setActive,
       text,
       updateFrame: glyphLayout
