@@ -70,7 +70,7 @@
  * exclusively from the trail palette (trailPalette.ts) and cyberArcadeMaterial tokens.
  */
 import { isLegacyWrappedStepTransition } from '../legacy-runtime/legacyMaze';
-import { resolveEdgeCornerTipInset } from './edgeCornerAnchor';
+import { resolveEdgeCornerMaxScale, resolveEdgeCornerTipInset } from './edgeCornerAnchor';
 import { PLAYER_COLOR, resolveTrailPaletteBorderColor } from './trailPalette';
 import { MOTION_DURATION_MS, MOTION_LOOP_MS } from './motionScale';
 import {
@@ -107,6 +107,8 @@ export interface EdgeStation {
   /** The edge this station sits on; corners report their horizontal (top/bottom) edge. */
   readonly side: EdgeSide;
   readonly isCorner: boolean;
+  /** Largest size (0..1 of full) this diamond may draw at; absent = 1. Set on corner stations of narrow phones (edgeCornerAnchor.ts). */
+  readonly maxScale?: number;
 }
 
 export const EDGE_STATION_COUNT = 8;
@@ -251,6 +253,7 @@ export const resolveEdgeStations = (viewport: EdgeViewport, devicePixelRatio = 1
     const side = STATION_SIDE[id];
     const extent = resolveEdgeStationNormalExtent(id);
     const isCorner = id % 2 === 0;
+    const cornerMaxScale = isCorner ? resolveEdgeCornerMaxScale(viewport.width) : 1;
     // Corners sit ON the inset rectangle's corners (snug on the diagonal); midpoints are flush with their edge.
     const x = isCorner ? along.x : side === 'left' ? extent : side === 'right' ? width - extent : along.x;
     const y = isCorner ? along.y : side === 'top' ? extent : side === 'bottom' ? height - extent : along.y;
@@ -260,7 +263,8 @@ export const resolveEdgeStations = (viewport: EdgeViewport, devicePixelRatio = 1
       y,
       inwardAngle: INWARD_ANGLE[id],
       side,
-      isCorner
+      isCorner,
+      ...(cornerMaxScale < 1 ? { maxScale: cornerMaxScale } : {})
     };
   });
 };
@@ -656,7 +660,7 @@ export const drawEdgeMarker = (
   if (state.hidden) {
     return;
   }
-  const scale = state.scale ?? 1;
+  const scale = Math.min(state.scale ?? 1, station.maxScale ?? 1);
   const anchored = anchorStationToOuterTip(station, scale);
   const outline = resolveEdgeMarkerVertices(anchored, scale);
   if ((state.fill ?? 0) > 0) {
@@ -832,7 +836,7 @@ export const resolveEdgeBeams = (input: EdgeBeamsInput): EdgeBeamsGeometry => {
   const count = input.stations.length;
   const beams = input.stations.map((station, index): EdgeBeam => {
     // The diamond grows/shrinks about its OUTER tip, so the inner tip moves: follow the diamond's current size every frame.
-    const scale = resolveEdgeDiamondScale(input.direction, clockMs, index, count);
+    const scale = Math.min(resolveEdgeDiamondScale(input.direction, clockMs, index, count), station.maxScale ?? 1);
     const contact = resolveEdgeInnerTip(station, scale);
     const from = input.direction === 'inward' ? contact : input.focus;
     const to = input.direction === 'inward' ? input.focus : contact;
