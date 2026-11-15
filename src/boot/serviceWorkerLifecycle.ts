@@ -22,13 +22,56 @@ export interface MazerServiceWorkerControllerReloadRuntime {
    * mid-run page: it waits until the page is hidden AND `isSafeToReload()` (no run in progress), because in-memory run
    * state is not restored after a reload. A page that never becomes safe keeps its session; the next launch loads
    * the new build from the already-updated precache. Absent: reload at once (the pre-PWA-006 behaviour).
+   *
+   * Staleness cap (silent update policy, Zac 2026-11-14): a page that stays VISIBLE with the update pending for more
+   * than 24 h (`MAZER_UPDATE_STALENESS_CAP_MS`) applies it at the next safe moment even while visible, still never
+   * mid-run (`decideMazerDeferredUpdateReload`). `addHiddenListener` gets every visibility change, so returning to a
+   * stale page also applies it; a re-check timer covers a page that just stays open on the menu.
    */
   deferReload?: {
     isHidden: () => boolean;
     isSafeToReload: () => boolean;
     addHiddenListener: (listener: () => void) => void;
+    /** Wall clock in ms (default `Date.now`); wall time keeps counting while the device sleeps. */
+    now?: () => number;
+    /** Runs `check` once after `ms` (default: an unref'd `setTimeout`). */
+    setRecheckTimer?: (check: () => void, ms: number) => void;
   };
 }
+
+/** Silent update policy: the longest a visible page may keep an installed update waiting before a safe moment applies it. */
+export const MAZER_UPDATE_STALENESS_CAP_MS = 24 * 60 * 60 * 1000;
+
+/** After the cap, how often a visible page re-checks for a safe moment (no run in progress). */
+export const MAZER_UPDATE_RECHECK_MS = 60 * 1000;
+
+export type MazerDeferredUpdateDecision = 'reload' | 'wait';
+
+/**
+ * The boundary decision for a pending update. Never mid-run (`safeToReload` false always waits, hidden or not).
+ * Otherwise a hidden page reloads at once (PWA-006), and a visible one only once the update has waited longer than
+ * the staleness cap.
+ */
+export const decideMazerDeferredUpdateReload = (input: {
+  hidden: boolean;
+  safeToReload: boolean;
+  pendingSinceMs: number;
+  nowMs: number;
+  capMs?: number;
+}): MazerDeferredUpdateDecision => {
+  if (!input.safeToReload) {
+    return 'wait';
+  }
+  if (input.hidden) {
+    return 'reload';
+  }
+  return input.nowMs - input.pendingSinceMs > (input.capMs ?? MAZER_UPDATE_STALENESS_CAP_MS) ? 'reload' : 'wait';
+};
+
+const setUnrefTimeout = (check: () => void, ms: number): void => {
+  const handle = setTimeout(check, ms) as unknown as { unref?: () => void };
+  handle.unref?.();
+};
 
 /** Same-origin paths the worker's boot-art runtime cache covers; keep in step with vite.config.ts (a test pins it). */
 export const MAZER_BOOT_ART_PATH_PREFIXES = ['/assets/hud/', '/fonts/mazer-tile-font/'] as const;
@@ -88,15 +131,38 @@ export const installMazerServiceWorkerControllerReload = (
       return;
     }
     updatePending = true;
+    const now = defer.now ?? Date.now;
+    const setRecheckTimer = defer.setRecheckTimer ?? setUnrefTimeout;
+    const pendingSinceMs = now();
     const tryReload = (): void => {
-      if (reloaded || !defer.isHidden() || !defer.isSafeToReload()) {
+      if (reloaded) {
+        return;
+      }
+      const decision = decideMazerDeferredUpdateReload({
+        hidden: defer.isHidden(),
+        safeToReload: defer.isSafeToReload(),
+        pendingSinceMs,
+        nowMs: now()
+      });
+      if (decision === 'wait') {
         return;
       }
       reloaded = true;
       runtime.reload();
     };
+    const recheck = (): void => {
+      tryReload();
+      if (!reloaded) {
+        setRecheckTimer(recheck, MAZER_UPDATE_RECHECK_MS);
+      }
+    };
     defer.addHiddenListener(tryReload);
     tryReload();
+    if (!reloaded) {
+      // Timers can run late (throttled while hidden, paused in sleep); the visibility listener and the wall clock
+      // cover that, so a late first check only delays a visible page that never leaves the menu.
+      setRecheckTimer(recheck, MAZER_UPDATE_STALENESS_CAP_MS + 1);
+    }
   });
   return runtime.controlledAtBoot;
 };

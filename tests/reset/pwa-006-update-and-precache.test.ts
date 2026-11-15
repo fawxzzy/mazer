@@ -1,13 +1,19 @@
 import { describe, expect, test, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { installMazerServiceWorkerControllerReload } from '../../src/boot/serviceWorkerLifecycle';
+import {
+  decideMazerDeferredUpdateReload,
+  installMazerServiceWorkerControllerReload,
+  MAZER_UPDATE_RECHECK_MS,
+  MAZER_UPDATE_STALENESS_CAP_MS
+} from '../../src/boot/serviceWorkerLifecycle';
 
 // MAZER-PWA-006: deferred update (reload only when hidden and idle) and the trimmed precache.
 const setup = (controlledAtBoot = true) => {
   let controllerChange: () => void = () => undefined;
   const hiddenListeners: Array<() => void> = [];
-  const state = { hidden: false, idle: false };
+  const state = { hidden: false, idle: false, nowMs: 1_000 };
+  const timers: Array<{ check: () => void; ms: number }> = [];
   const reload = vi.fn();
   installMazerServiceWorkerControllerReload({
     controlledAtBoot,
@@ -16,11 +22,23 @@ const setup = (controlledAtBoot = true) => {
     deferReload: {
       isHidden: () => state.hidden,
       isSafeToReload: () => state.idle,
-      addHiddenListener: (listener) => hiddenListeners.push(listener)
+      addHiddenListener: (listener) => hiddenListeners.push(listener),
+      now: () => state.nowMs,
+      setRecheckTimer: (check, ms) => { timers.push({ check, ms }); }
     }
   });
   const fireVisibility = (): void => hiddenListeners.forEach((listener) => listener());
-  return { controllerChange: () => controllerChange(), fireVisibility, state, reload, hiddenListeners };
+  /** Advances the clock to the next pending timer and runs it. */
+  const runNextTimer = (): number => {
+    const timer = timers.shift();
+    if (!timer) {
+      throw new Error('no timer pending');
+    }
+    state.nowMs += timer.ms;
+    timer.check();
+    return timer.ms;
+  };
+  return { controllerChange: () => controllerChange(), fireVisibility, runNextTimer, state, reload, hiddenListeners, timers };
 };
 
 describe('deferred service worker update (MAZER-PWA-006)', () => {
@@ -61,10 +79,72 @@ describe('deferred service worker update (MAZER-PWA-006)', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
+  test('an update pending under 24 h never reloads a visible page, even idle on the menu', () => {
+    const { controllerChange, fireVisibility, reload, state, timers } = setup();
+    state.idle = true;
+    controllerChange();
+    state.nowMs += MAZER_UPDATE_STALENESS_CAP_MS - 1;
+    fireVisibility();
+    expect(reload).not.toHaveBeenCalled();
+    expect(timers).toEqual([{ check: expect.any(Function), ms: MAZER_UPDATE_STALENESS_CAP_MS + 1 }]);
+  });
+
+  test('24 h cap: a page stuck visible applies the update at the first safe re-check, never mid-run', () => {
+    const { controllerChange, runNextTimer, reload, state, timers } = setup();
+    controllerChange();
+    // The cap passes mid-run: keep waiting and re-check every minute.
+    expect(runNextTimer()).toBe(MAZER_UPDATE_STALENESS_CAP_MS + 1);
+    expect(reload).not.toHaveBeenCalled();
+    expect(runNextTimer()).toBe(MAZER_UPDATE_RECHECK_MS);
+    expect(reload).not.toHaveBeenCalled();
+    // The run ends (menu, still visible): the next re-check applies it, once, and stops re-checking.
+    state.idle = true;
+    runNextTimer();
+    expect(reload).toHaveBeenCalledOnce();
+    expect(timers).toEqual([]);
+  });
+
+  test('24 h cap: returning to a stale page applies the update on the visibility change', () => {
+    const { controllerChange, fireVisibility, reload, state } = setup();
+    state.idle = true;
+    controllerChange();
+    state.nowMs += MAZER_UPDATE_STALENESS_CAP_MS + 60_000; // device slept; the timer has not run yet
+    fireVisibility();
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
   test('main.ts wires the idle check to MenuScene mode and defaults to busy when unknown', () => {
     const main = readFileSync(resolve(__dirname, '../../src/boot/main.ts'), 'utf8');
     expect(main).toContain("scene?.mode === 'menu'");
     expect(main).toContain("document.visibilityState === 'hidden'");
+  });
+});
+
+describe('the deferred update boundary decision (silent update policy)', () => {
+  const at = (overrides: Partial<Parameters<typeof decideMazerDeferredUpdateReload>[0]>) => decideMazerDeferredUpdateReload({
+    hidden: false,
+    safeToReload: true,
+    pendingSinceMs: 0,
+    nowMs: 0,
+    ...overrides
+  });
+
+  test.each([
+    ['visible, idle, just pending', {}, 'wait'],
+    ['visible, idle, exactly 24 h', { nowMs: MAZER_UPDATE_STALENESS_CAP_MS }, 'wait'],
+    ['visible, idle, over 24 h', { nowMs: MAZER_UPDATE_STALENESS_CAP_MS + 1 }, 'reload'],
+    ['visible, mid-run, over 24 h', { safeToReload: false, nowMs: MAZER_UPDATE_STALENESS_CAP_MS * 3 }, 'wait'],
+    ['hidden, idle, just pending', { hidden: true }, 'reload'],
+    ['hidden, mid-run, just pending', { hidden: true, safeToReload: false }, 'wait'],
+    ['hidden, mid-run, over 24 h', { hidden: true, safeToReload: false, nowMs: MAZER_UPDATE_STALENESS_CAP_MS * 3 }, 'wait']
+  ] as const)('%s: %s', (_label, overrides, expected) => {
+    expect(at(overrides)).toBe(expected);
+  });
+
+  test('the cap is 24 h and a custom cap is honoured', () => {
+    expect(MAZER_UPDATE_STALENESS_CAP_MS).toBe(86_400_000);
+    expect(at({ capMs: 10, nowMs: 11 })).toBe('reload');
+    expect(at({ capMs: 10, nowMs: 10 })).toBe('wait');
   });
 });
 
