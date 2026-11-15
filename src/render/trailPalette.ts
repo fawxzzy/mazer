@@ -60,22 +60,28 @@ export const PLAYER_COLOR: number = cyberArcadeMaterial.signal.player;
 /** The crest colour the lifts ease the core toward (pure white, so a lift can only brighten). */
 const PEARL = 0xffffff;
 
-/** Resting core colours, in sweep order. Neon arcade colours (MAZER-VIS-051): as saturated as the 3:1-on-the-chip floor allows (see header). */
+/**
+ * Resting core colours, in sweep order: saturated neon cabinet colours (MAZER-VIS-051 round 2). The core is read against
+ * its own near-opaque dark underlay (trailLegibility.ts), not the mid-tone chip, so the contract is core-vs-underlay.
+ * Neighbouring stops stay within ~80 on every channel so the per-redraw colour step bounds hold.
+ */
 export const IRIDESCENT_TRAIL_CORE_STOPS = Object.freeze([
-  0x50e8ff, // neon cyan
-  0x80c8ff, // electric azure
-  0xb8b2ff, // neon violet
-  0xf0a0e8, // hot magenta
-  0xffb4ac // arcade apricot (the midnight-sun horizon)
+  0x10dcff, // neon cyan
+  0x38b0ff, // electric azure
+  0x5c96ff, // laser blue
+  0x8678ff, // electric indigo
+  0xb85cff, // neon violet
+  0xdc46f0 // hot magenta
 ] as const);
 
 /** The same hues, deep and saturated: the bloom colour. Sampled with the same phase as the core. */
 export const IRIDESCENT_TRAIL_GLOW_STOPS = Object.freeze([
-  0x10b4ff,
-  0x2f6bff,
-  0x7b3dff,
-  0xcc32d8,
-  0xff8a40
+  0x00b2d8,
+  0x1c82e0,
+  0x2f66e0,
+  0x4a3cd8,
+  0x7a1fd8,
+  0xb01cb8
 ] as const);
 
 // Navigation Core v1's own ENERGY palette (read directly out of the frozen
@@ -106,7 +112,7 @@ export const IRIDESCENT_TRAIL_SWEEP_PERIOD_MS = MOTION_LOOP_MS.drift;
 export const TRAIL_PULSE_WAVELENGTH_TILES = 8;
 export const TRAIL_PULSE_PERIOD_MS = 2200;
 /** At the swell's crest the core is eased this far toward white (the trough is the resting colour). */
-export const TRAIL_PULSE_CORE_LIFT_MAX = 0.1;
+export const TRAIL_PULSE_CORE_LIFT_MAX = 0.08;
 /** At the swell's crest the bloom colour is eased this far toward the core colour (a brighter, paler bloom). */
 export const TRAIL_PULSE_GLOW_LIFT_MAX = 0.12;
 /** Reduced motion holds the swell at this level (0 = trough, 1 = crest): a constant, so there is no banding. */
@@ -114,12 +120,12 @@ export const TRAIL_PULSE_REDUCED_LEVEL = 0.35;
 
 /** Sheen band: distance between bands in tiles, and the time one band takes to travel one spacing (toward the player). */
 export const TRAIL_SHEEN_SPACING_TILES = 9;
-export const TRAIL_SHEEN_PERIOD_MS = 3000;
+export const TRAIL_SHEEN_PERIOD_MS = 6000;
 /** At the band's peak the core is eased this far toward white, and the bloom this far toward the core. */
-export const TRAIL_SHEEN_CORE_LIFT_MAX = 0.35;
+export const TRAIL_SHEEN_CORE_LIFT_MAX = 0.3;
 export const TRAIL_SHEEN_GLOW_LIFT_MAX = 0.35;
 /** At the band's peak the hue is read this much of a sweep AHEAD (refraction): the band carries its own colour. */
-export const TRAIL_SHEEN_HUE_SHIFT = 0.05;
+export const TRAIL_SHEEN_HUE_SHIFT = 0.02;
 
 export interface IridescentTrailSample {
   /** Crisp core colour at this point (resting colour plus the swell and sheen lifts). */

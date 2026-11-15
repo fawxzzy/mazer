@@ -278,10 +278,9 @@ describe('trail on the Chip floor (amendment open item A8)', () => {
   // The full contrast pins (every iridescent hue against chip / rim / gap, width floors) live in
   // tests/reset/trail-iridescence.test.ts and tests/reset/marker-trail-legibility.test.ts; this keeps the
   // original A8 intent: the dark underlay is what holds the contrast, on every floor.
-  test('every resting trail core stop clears 3:1 against the chip, and 4.5:1 under the dark underlay', () => {
+  test('every resting trail core stop clears 4.5:1 under the dark underlay (MAZER-VIS-051 round 2: the bare-chip 3:1 pin is retired, the underlay itself stands off the chip by 3:1)', () => {
     const underlaid = compositeTrailUnderlay(boardMaterial.chip);
     for (const stop of IRIDESCENT_TRAIL_CORE_STOPS) {
-      expect(contrast(stop, boardMaterial.chip), `0x${stop.toString(16)} bare`).toBeGreaterThanOrEqual(3);
       expect(contrast(stop, underlaid), `0x${stop.toString(16)}`).toBeGreaterThanOrEqual(4.5);
     }
   });
