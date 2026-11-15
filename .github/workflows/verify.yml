@@ -4,6 +4,8 @@ on:
   pull_request:
     # A pull request that changes only the board registry and its export is covered by the
     # "Owner export" workflow; the full build and AI shards add ~7 minutes and prove nothing about it.
+    # KEEP IN SYNC with .github/workflows/verify-board-only.yml (its `paths:` list must equal this list):
+    # that companion reports the required check names on board-only pull requests.
     paths-ignore:
       - "config/mazer-owner-work-registry.json"
       - "config/mazer-work-ledger.json"
