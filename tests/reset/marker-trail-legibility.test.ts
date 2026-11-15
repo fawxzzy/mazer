@@ -74,7 +74,7 @@ describe('trail contrast against the real Chip floor (chip fill, lit rim, gap)',
   });
 
   test('every iridescent resting hue (stops and every in-between colour) clears 4.5:1 against its underlay on every floor', () => {
-    expect(IRIDESCENT_TRAIL_CORE_STOPS.length).toBe(5);
+    expect(IRIDESCENT_TRAIL_CORE_STOPS.length).toBe(6);
     for (const sample of restingSamples()) {
       for (const [name, floor] of floors) {
         expect(trailCoreContrast(sample, floor, 1), `0x${sample.toString(16)} on ${name}`).toBeGreaterThanOrEqual(4.5);
