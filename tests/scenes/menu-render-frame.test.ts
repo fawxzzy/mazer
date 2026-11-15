@@ -1806,7 +1806,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       + '        ));'
     );
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
-    expect(playerMessageSource).toContain('Account access is unavailable right now. Try again shortly.');
+    expect(playerMessageSource).toContain("authUnavailable: AUTH_SURFACE_MESSAGES['signin.unavailable'],");
     expect(playerMessageSource).toContain('export interface LegacyQueuedPlayerMessage');
     expect(playerMessageSource).toContain('export const enqueueLegacyPlayerMessage =');
     expect(playerMessageSource).toContain('export const expireLegacyPlayerMessageQueue =');

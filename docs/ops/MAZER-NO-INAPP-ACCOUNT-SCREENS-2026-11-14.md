@@ -50,7 +50,7 @@ the account page. Recommendation: do that as a separate card after the host proo
 
 ## The failure fallback
 
-Auth Surface v2 (owner-approved 2026-11-15, PR-A) restyles this state; the list below is the pre-v2 shape. Now: a
+Auth Surface v2 (owner-approved 2026-11-15, PR-A) restyles this state: a
 `MAZER` kicker, the app icon (same place and size as the loader), the title `Mazer`, ONE reserved message area that
 holds either the lead `Sign in to play.` or one error notice box worded from the copy matrix
 (`src/brand/authSurfaceCopy.ts`; legacy failure rows are mapped by `resolveLegacyAccountStatusNotice`), and ONE
@@ -63,19 +63,22 @@ Drawn by `MenuScene.buildAuthOverlay` from `src/legacy-runtime/legacyAccountStat
 
 - the app icon and halo in the same place and size as the boot splash and the gate cover (`resolveLoaderLayout`), as
   still images (the halo is the reduced-motion pose);
-- ONE status line under the icon: the failure copy (`LEGACY_OAUTH_FAILURE_MESSAGE_COPY` classes, or the generic
-  connection line), `You are signed out.` after an explicit sign-out or a return without a session, or
-  `Still opening. Try again.` once the 10 s timeout elapsed;
-- ONE full-width bottom button: `Try again`, which re-runs the same hand-off (`handleSharedAccountAuthorization`,
-  provider pre-flight included). While the redirect is in flight it reads `Opening…` and is disabled;
-- no title, no marker, no fields, no rail, no legal row, no `Create Account`, no `Sign in` / `Sign up` wording, no
-  guest, skip or back action.
+- the `MAZER` kicker and the title `Mazer`;
+- ONE reserved message area under the title: the lead `Sign in to play.` after an explicit sign-out or a return
+  without a session; or ONE error notice box holding a copy-matrix line (the `LEGACY_OAUTH_FAILURE_MESSAGE_COPY`
+  classes, which are matrix lines since PR-A2, or the outage line `Sign-in is unavailable right now. Try again in a
+  minute.`); or `Sign-in took too long. Tap Sign in to try again.` once the 10 s timeout elapsed;
+- ONE full-width bottom button: `Sign in`, which re-runs the same hand-off (`handleSharedAccountAuthorization`,
+  provider pre-flight included). While the redirect is in flight it reads `Signing in…` and is disabled;
+- no fields, no rail, no legal row, no `Create Account`, no `Sign up` wording, no guest, skip or back action.
+  (Before Auth Surface v2 the button read `Try again` / `Opening…`, the line read `You are signed out.` /
+  `Still opening. Try again.`, and there was no kicker or title.)
 
 Loop guard and explicit-sign-out semantics are unchanged: `legacySignedOutHandoff.ts` still decides when a boot may
 redirect by itself, and still stays on this state after an explicit sign-out or a return inside the attempt window.
 `?autoSignIn=0` still opts a boot out of the automatic hand-off (QA of this state).
 
-Wording issue (fixed by MAZER-ACCT-044): the generic connection line (`MAZER_OAUTH_SAFE_ERROR_MESSAGE`) used to say "Return to Mazer and try again", which read oddly inside Mazer. It now reads "Could not reach your account. Try again." (the constant and `LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic`; the two edits shipped as a Wave 3B and a Wave 5C PR).
+Wording issue (fixed by MAZER-ACCT-044): the generic connection line (`MAZER_OAUTH_SAFE_ERROR_MESSAGE`) used to say "Return to Mazer and try again", which read oddly inside Mazer. It then read "Could not reach your account. Try again." (the constant and `LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic`; the two edits shipped as a Wave 3B and a Wave 5C PR). Auth Surface v2 PR-A2 (Wave 3B) moved the generic row to the matrix line "Sign-in is unavailable right now. Try again in a minute."; the constant (Wave 5C) keeps the ACCT-044 spelling until its own PR and is shown as the generic row meanwhile (`resolveLegacyOAuthCurrentFailureCopy`).
 
 ## Evidence
 

@@ -8,6 +8,11 @@ import {
   listAuthSurfaceStrings
 } from '../../src/brand/authSurfaceCopy';
 import { LEGACY_ACCOUNT_STATUS_COPY } from '../../src/legacy-runtime/legacyAccountStatusState';
+import {
+  LEGACY_AUTH_MESSAGE_COPY,
+  LEGACY_BOOT_MESSAGE_COPY,
+  LEGACY_OAUTH_FAILURE_MESSAGE_COPY
+} from '../../src/legacy-runtime/legacyPlayerMessage';
 import { MAZER_INSTALL_GATE_COPY, MAZER_INSTALL_GATE_COPY_FEEDBACK, resolveMazerInstallGateCopy } from '../../src/boot/installGate';
 
 /**
@@ -108,6 +113,77 @@ describe('Auth Surface v2 copy lint (surfaces read only the copy module)', () =>
   });
 });
 
+// The status screen itself is drawn by MenuScene (integrator Wave 5C), a 15k-line file with copy of its own
+// elsewhere (leaderboard, options, run states), so the lint reads only the methods and lines that draw the sign-in
+// status screen and its loader label, and requires every text they draw to come from the status model.
+describe('Auth Surface v2 copy lint: MenuScene status screen text', () => {
+  const menuScene = read('src/scenes/MenuScene.ts').replace(/\r\n/g, '\n');
+  const allowed = new Set(listAuthSurfaceStrings());
+
+  /** The body of a class method, found by its signature and brace matching (no braces in its string literals). */
+  const methodBody = (signature: string): string => {
+    const start = menuScene.indexOf(signature);
+    expect(start, `MenuScene no longer has ${signature}`).toBeGreaterThan(-1);
+    const open = menuScene.indexOf('{', start + signature.length - 1);
+    let depth = 0;
+    for (let index = open; index < menuScene.length; index += 1) {
+      const char = menuScene[index];
+      if (char === '{') {
+        depth += 1;
+      } else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          return menuScene.slice(open, index + 1);
+        }
+      }
+    }
+    throw new Error(`unbalanced braces after ${signature}`);
+  };
+
+  const statusMethods = [
+    'private buildAuthOverlay(): void {',
+    'private drawLegacyAccountStatusIcon(',
+    'private drawLegacyAccountStatusText('
+  ].map((signature) => methodBody(signature)).join('\n');
+  const loaderLabelLines = menuScene.split('\n').filter((line) => /this\.authGateLoadingText(?: = .*this\.add\.text\(|\.setText\()/.test(line));
+
+  test('the status methods hold no sentence of their own', () => {
+    const strays = sentenceLiterals(statusMethods).filter((literal) => !allowed.has(literal));
+    expect(strays).toEqual([]);
+    // Template literals there are sizes only (`${...}px`), never words.
+    const templateWords = [...stripComments(statusMethods).matchAll(/`([^`]*)`/g)]
+      .map((match) => match[1].replace(/\$\{[^}]*\}/g, ''))
+      .filter((rest) => !/^(px)?$/.test(rest));
+    expect(templateWords).toEqual([]);
+  });
+
+  test('every text the status screen draws comes from the status model', () => {
+    const drawn = [...stripComments(statusMethods).matchAll(/this\.add\.text\(\s*[^,]+,\s*[^,]+,\s*([^,{]+?)\s*,/g)]
+      .map((match) => match[1]);
+    expect(drawn.length).toBeGreaterThanOrEqual(3);
+    for (const source of drawn) {
+      expect(source, `status text drawn from ${source}`).toMatch(/^status\.(kicker|title|line)$/);
+    }
+    expect(statusMethods).toContain('status.button.label,');
+    expect(statusMethods).toContain('resolveLegacyAccountStatus({');
+  });
+
+  test('the loader label starts on the module copy and is set only from the loading-copy resolver', () => {
+    expect(loaderLabelLines.length).toBe(2);
+    expect(loaderLabelLines[0]).toContain('this.add.text(0, 0, LEGACY_ACCOUNT_STATUS_COPY.loading,');
+    expect(loaderLabelLines[1]).toContain('this.authGateLoadingText.setText(resolveLegacyAuthLoadingCopy(');
+  });
+
+  test('no MenuScene string literal holds a retired phrase', () => {
+    const literals = [...stripComments(menuScene).matchAll(/'([^'\n]*)'|"([^"\n]*)"|`([^`]*)`/g)]
+      .map((match) => match[1] ?? match[2] ?? match[3] ?? '');
+    for (const phrase of AUTH_SURFACE_RETIRED_PHRASES) {
+      const hits = literals.filter((literal) => literal.includes(phrase));
+      expect(hits, `MenuScene literal contains ${phrase}`).toEqual([]);
+    }
+  });
+});
+
 describe('Auth Surface v2 copy is wired through', () => {
   test('the status screen, loaders and boot use the module', () => {
     expect(LEGACY_ACCOUNT_STATUS_COPY.retryLabel).toBe(AUTH_SURFACE_LABELS.signIn);
@@ -115,9 +191,20 @@ describe('Auth Surface v2 copy is wired through', () => {
     expect(LEGACY_ACCOUNT_STATUS_COPY.signingIn).toBe(AUTH_SURFACE_LABELS.signingIn);
   });
 
-  // The hand-off failure toast rows (legacyPlayerMessage.ts, integrator Wave 3B) and MAZER_OAUTH_SAFE_ERROR_MESSAGE
-  // move onto the matrix in a separate Wave 3B PR; this PR stays inside Wave 5C. While signed out those toasts are
-  // suppressed (shouldToastLegacyAuthFeedback), so the status box is the only failure copy a player sees.
+  // The hand-off failure toast rows (legacyPlayerMessage.ts, integrator Wave 3B) are matrix lines since PR-A2.
+  // MAZER_OAUTH_SAFE_ERROR_MESSAGE (legacyAccountPortal.ts, Wave 5C) follows in its own PR; until then it is shown
+  // as the generic row. While signed out those toasts are suppressed (shouldToastLegacyAuthFeedback), so the
+  // status box is the only failure copy a player sees.
+  test('the sign-in failure and boot rows are matrix lines', () => {
+    const matrix = new Set<string>(Object.values(AUTH_SURFACE_MESSAGES));
+    for (const copy of Object.values(LEGACY_OAUTH_FAILURE_MESSAGE_COPY)) {
+      expect(matrix.has(copy), copy).toBe(true);
+    }
+    for (const key of ['accountUnavailable', 'authUnavailable', 'loginNotConfigured', 'networkUnavailable'] as const) {
+      expect(matrix.has(LEGACY_AUTH_MESSAGE_COPY[key]), key).toBe(true);
+    }
+    expect(LEGACY_BOOT_MESSAGE_COPY.bootError).toBe(AUTH_SURFACE_MESSAGES['page.crash']);
+  });
 
   test('every install card line is in the module', () => {
     const allowed = new Set(listAuthSurfaceStrings());
