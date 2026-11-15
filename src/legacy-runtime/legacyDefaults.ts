@@ -35,12 +35,12 @@ export const LEGACY_DEFAULTS: LegacySettings = {
   },
   darkMode: true,
   hapticsEnabled: true,
-  soundEnabled: false,
+  soundEnabled: true,
   toggleReducedMotion: false,
   controlMode: 'stick'
 };
 
-export const MAIN_MENU_BUTTONS = ['Start', 'Options'] as const;
+export const MAIN_MENU_BUTTONS = ['TAP TO PLAY', 'Options'] as const;
 
 export const clampNumber = (value: number, min: number, max: number): number => (
   Math.max(min, Math.min(max, value))

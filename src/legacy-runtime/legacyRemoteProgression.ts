@@ -17,11 +17,13 @@ import {
 } from './legacyDefaults';
 import {
   LEGACY_GAME_TOGGLE_STORAGE_KEY,
+  applyLegacySoundDefaultOnMigration,
   canonicalizeGameToggleFingerprint,
   mergeLegacyGameTogglePreferences,
   normalizeLegacyGameTogglePreferences,
   pickLegacyGameTogglePreferences,
   readLegacyGameToggleSettings,
+  withLegacySoundDefaultOnMarker,
   writeLegacyGameToggleSettings,
   type LegacyGameTogglePreferences
 } from './legacyGameTogglePreferences';
@@ -259,8 +261,10 @@ const writeAccountSyncMetadata = (
   }
 };
 
+// The fingerprint carries the sound-default-on marker so a fingerprint stored before MAZER-AUDIO-004 can be told
+// apart and canonicalised (see canonicalizeGameToggleFingerprint); the settings themselves are compared as before.
 const fingerprintSettings = (settings: LegacySettings): string => (
-  JSON.stringify(pickLegacyGameTogglePreferences(settings))
+  JSON.stringify(withLegacySoundDefaultOnMarker(pickLegacyGameTogglePreferences(settings)))
 );
 
 const normalizeRemoteProfileSettings = (
@@ -268,8 +272,9 @@ const normalizeRemoteProfileSettings = (
   fallback: LegacySettings
 ): LegacyGameTogglePreferences => {
   const settings = row.settings !== null && typeof row.settings === 'object' && !Array.isArray(row.settings)
-    ? row.settings as Partial<LegacyGameTogglePreferences>
-    : {};
+    // A server settings JSON without the marker is pre-migration: it reads as sound ON once (MAZER-AUDIO-004).
+    ? applyLegacySoundDefaultOnMigration(row.settings as Partial<LegacyGameTogglePreferences>) ?? {}
+    : { soundEnabled: true };
   const selectedControlMode = row.selectedControlMode === 'arrows' || row.selectedControlMode === 'stick'
     ? row.selectedControlMode
     : settings.controlMode;
@@ -384,7 +389,7 @@ export const createRemoteProfilePayload = (
 ): Record<string, unknown> => ({
   revision,
   selected_control_mode: settings.controlMode,
-  settings: pickLegacyGameTogglePreferences(settings),
+  settings: withLegacySoundDefaultOnMarker(pickLegacyGameTogglePreferences(settings)),
   updated_at: new Date().toISOString(),
   user_id: snapshot.userId
 });

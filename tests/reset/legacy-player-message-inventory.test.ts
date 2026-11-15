@@ -71,39 +71,14 @@ const MENU = 'src/scenes/MenuScene.ts';
  * player-facing string is introduced, after deciding whether it must route
  * through legacyPlayerMessage.ts.
  */
+// Auth Surface v2 (2026-11-15): the sign-in status screen, loader labels, boot splash, boot-error screen and install
+// cards read every visible line from src/brand/authSurfaceCopy.ts (the approved copy matrix, outside the scan dirs),
+// so they have no rows here; tests/reset/auth-surface-copy-lint.test.ts fails on any of their text outside it.
 const PINNED_INVENTORY: readonly InventoryEntry[] = [
-  { file: MENU, literal: 'Signing you in…', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY + message surface (auth gate loading)' },
   { file: MENU, literal: 'Progression reset.', kind: 'routed-inline', route: 'move copy into LEGACY_PROGRESSION_MESSAGE_COPY; id progression.player.reset already routed' },
   { file: MENU, literal: 'Runtime diagnostics authenticated fixture.', kind: 'fixture', route: 'none (QA fixture)' },
   { file: 'src/boot/accessibilitySurface.ts', literal: 'Touch and drag anywhere to move through the maze. With a keyboard, use Arrow keys or WASD to move, Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.', kind: 'static', route: 'none (static a11y description)' },
   { file: 'src/boot/accessibilitySurface.ts', literal: 'Mazer is ready.', kind: 'static', route: 'static a11y live region; never updated today' },
-  { file: 'src/boot/bootSplash.ts', literal: 'Loading…', kind: 'raw-status', route: 'boot splash neutral message (static markup in index.html, then updated by bootStatus); active pre-game surface; not routed through the message module' },
-  { file: 'src/boot/bootSplash.ts', literal: 'Signing you in…', kind: 'raw-status', route: 'boot splash message shown only while an OAuth callback exchange is in progress; active pre-game surface; mirrors LEGACY_AUTH_MESSAGE_COPY wording' },
-  { file: 'src/boot/installGate.ts', literal: 'Mazer only runs as an installed app, not in a browser tab.', kind: 'static', route: 'install gate subtitle (prompt-available and manual platform cards); active; gate copy, not a status event' },
-  { file: 'src/boot/installGate.ts', literal: 'Press Install below.', kind: 'static', route: 'install gate step, prompt-available mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Confirm in your browser.', kind: 'static', route: 'install gate step, prompt-available mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Open Mazer from your home screen or desktop.', kind: 'static', route: 'install gate step, prompt-available mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Click the install icon at the end of the address bar, or open the browser menu and choose Install Mazer.', kind: 'static', route: 'install gate step, manual-desktop-chromium mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Confirm the install.', kind: 'static', route: 'install gate step, manual-desktop-chromium mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Open Mazer from your desktop or Start menu.', kind: 'static', route: 'install gate step, manual-desktop-chromium mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Mazer only runs as an installed app, not in a browser tab. Chrome, Edge and Safari on a Mac can install it.', kind: 'static', route: 'install gate subtitle, manual-desktop-other mode (Firefox, Safari, unknown desktop browsers); active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Open this page in Chrome or Edge. In Safari, choose File, then Add to Dock.', kind: 'static', route: 'install gate step, manual-desktop-other mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'In Chrome or Edge, click the install icon in the address bar.', kind: 'static', route: 'install gate step, manual-desktop-other mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Open Mazer from your desktop, Start menu or Dock.', kind: 'static', route: 'install gate step, manual-desktop-other mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Open this page in Chrome and tap the three-dot menu.', kind: 'static', route: 'install gate step, manual-android mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Choose Install app or Add to Home screen.', kind: 'static', route: 'install gate step, manual-android mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Open Mazer from your home screen.', kind: 'static', route: 'install gate step, manual-android and manual-ios modes (two source sites, one pin); active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Tap the Share button in Safari.', kind: 'static', route: 'install gate step, manual-ios mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Choose Add to Home Screen.', kind: 'static', route: 'install gate step, manual-ios mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Mazer only runs as an installed app, and in-app browsers cannot install it.', kind: 'static', route: 'install gate subtitle, in-app-browser mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Copy the link below.', kind: 'static', route: 'install gate step, in-app-browser mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Paste it into Safari or Chrome.', kind: 'static', route: 'install gate step, in-app-browser mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Install Mazer from there, then open it from your home screen.', kind: 'static', route: 'install gate step, in-app-browser mode; active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Open it from your home screen or desktop.', kind: 'static', route: 'install gate subtitle, installed-open-app mode (post-install card); active; none (install instructions)' },
-  { file: 'src/boot/installGate.ts', literal: 'Race through endless mazes, straight from your home screen.', kind: 'static', route: 'install gate value line (all install cards, with a static mini-maze mark); active; none (install pitch)' },
-  { file: 'src/boot/installGate.ts', literal: 'Link copied. Paste it into Safari or Chrome.', kind: 'static', route: 'install gate Copy link confirmation (role=status under the button); active; none (feedback to the Copy link click)' },
-  { file: 'src/boot/installGate.ts', literal: 'Could not copy the link. Copy the address from your browser instead.', kind: 'static', route: 'install gate Copy link failure notice (role=status under the button); active; none' },
-  { file: 'src/legacy-runtime/legacyAccountPortal.ts', literal: 'Could not reach your account. Try again.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.accountConnectionUnavailable; today rendered directly in two places' },
   { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'Account connected.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.accountConnected (info is set on the snapshot with no render site)' },
   { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'That username is already taken.', kind: 'duplicate-unrendered', route: 'duplicate of LEGACY_AUTH_MESSAGE_COPY.usernameTaken; save result error is never rendered' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'The leaderboard is not available right now.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
@@ -114,17 +89,12 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/ui/dom/MazerSwitch.ts', literal: 'Off', kind: 'static', route: 'primitive state label' },
   { file: 'src/ui/dom/StatusBanner.ts', literal: 'Info', kind: 'static', route: 'primitive tone label' },
   { file: 'src/ui/dom/StatusBanner.ts', literal: 'Error', kind: 'static', route: 'primitive tone label' },
-  { file: 'src/legacy-runtime/legacyAccountStatusState.ts', literal: 'Loading…', kind: 'duplicate-unrendered', route: 'gate-cover copy table (the loader label is drawn by MenuScene from resolveLegacyAuthLoadingCopy); MAZER-ACCT-043' },
-  { file: 'src/legacy-runtime/legacyAccountStatusState.ts', literal: 'Opening…', kind: 'raw-status', route: 'Try again button label while the hand-off is in flight; bounded to LEGACY_ACCOUNT_STATUS_OPENING_TIMEOUT_MS; MAZER-ACCT-043' },
-  { file: 'src/legacy-runtime/legacyAccountStatusState.ts', literal: 'You are signed out.', kind: 'raw-status', route: 'failure-fallback status line after an explicit sign-out or a return without a session; MAZER-ACCT-043' },
-  { file: 'src/legacy-runtime/legacyAccountStatusState.ts', literal: 'Signing you in…', kind: 'duplicate-unrendered', route: 'gate-cover copy table (the loader label is drawn by MenuScene from resolveLegacyAuthLoadingCopy); MAZER-ACCT-043' },
-  { file: 'src/legacy-runtime/legacyAccountStatusState.ts', literal: 'Still opening. Try again.', kind: 'raw-status', route: 'failure-fallback status line once the Opening timeout elapsed; MAZER-ACCT-043' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Reach the star to clear the maze.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'An arrow on the first tile points the way you set off.', kind: 'static', route: 'Guide (How to play) sheet row copy (Start row, added with the Chip board wiring); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'You are the green rounded block inside a bright ring.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Touch and drag anywhere to move. With a mouse, click and drag. Let go to stop.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'A shimmering, colour-shifting line is your route. {} in Settings calms it.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
-  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Some mazes wrap around open edges. Trail-coloured edge diamonds fill as beams hit.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
+  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Some mazes wrap around open edges. Trail-coloured edge stars fill as beams hit.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'The dot and number by the top-left icon show how many players are online right now.', kind: 'static', route: 'Guide (How to play) sheet row copy for the menu online counter (MAZER-UI-024); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Clears show your clear time and level. Harder mazes add shortcuts and loops.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyControlHint.ts', literal: 'Touch and drag anywhere to move.', kind: 'static', route: 'level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows' },
@@ -132,8 +102,8 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/legacy-runtime/legacyControlHint.ts', literal: 'Arrow keys or WASD to move.', kind: 'static', route: 'level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows' },
   { file: 'src/legacy-runtime/legacyControlHint.ts', literal: 'Drag anywhere, or use arrows / WASD.', kind: 'static', route: 'level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows' },
   { file: 'src/legacy-runtime/legacyControlHint.ts', literal: 'Reach the star to clear the maze.', kind: 'static', route: 'level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows' },
-  { file: 'src/legacy-runtime/legacySettingsSheetPlan.ts', literal: 'Small chirps on steps, wall bumps and wins. Off until you turn it on.', kind: 'static', route: 'Settings sheet description under the Sound effects row (MAZER-AUDIO-003); every setting row must carry one' },
-  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Sound is off until you turn it on in Settings. Then steps, bumps and wins chirp.', kind: 'static', route: 'Guide row copy for the Sound effects setting (MAZER-AUDIO-003); instructions, guide-synced' },
+  { file: 'src/legacy-runtime/legacySettingsSheetPlan.ts', literal: 'Soft ticks on steps, wall bumps and wins. On unless you turn it off.', kind: 'static', route: 'Settings sheet description under the Sound effects row (MAZER-AUDIO-003); every setting row must carry one' },
+  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Sound is on by default. Soft ticks play on steps, bumps and wins. Turn it off in Settings.', kind: 'static', route: 'Guide row copy for the Sound effects setting (MAZER-AUDIO-003); instructions, guide-synced' },
   { file: 'src/legacy-runtime/legacySettingsSheetPlan.ts', literal: 'Buzzes on steps, wall bumps and wins. Silent with Reduce Motion, and on iPhone.', kind: 'static', route: 'Settings sheet description under the Haptics row (MAZER-UI-026); every setting row must carry one' },
   { file: 'src/legacy-runtime/legacySettingsSheetPlan.ts', literal: 'Controls, the goal, and what each icon means.', kind: 'static', route: 'Settings sheet description under the How to play row (MAZER-UI-026); every setting row must carry one' },
   { file: 'src/legacy-runtime/legacySettingsSheetPlan.ts', literal: 'Sets your level back to 1. Asks you to confirm first.', kind: 'static', route: 'Settings sheet description under the Reset progress row (MAZER-UI-026); every setting row must carry one' },
@@ -509,10 +479,11 @@ describe('message-system structure the inventory depends on', { timeout: GUARD_T
 
   test('auth feedback is rendered from the raw snapshot, not from the resolved message', () => {
     const menu = srcText(MENU);
-    // The failure fallback feeds the raw snapshot error into the status view-model; each raw site appears once.
+    // The failure fallback feeds the snapshot error into the status view-model once, through the player-safe
+    // resolver (Auth Surface v2), and the status module then maps it onto a copy-matrix line.
     // The raw info line is gone with the Welcome screen (MAZER-ACCT-043): the fallback draws one status line only.
     expect(
-      menu.split('errorMessage: this.authSnapshot.error,').length - 1,
+      menu.split('errorMessage: resolveLegacyAuthFeedbackMessage(this.authSnapshot.error, null, this.authSnapshot.errorCode)?.copy ?? null,').length - 1,
       'The raw auth error render site changed. Update the inventory doc (section: raw render sites).'
     ).toBe(1);
     expect(

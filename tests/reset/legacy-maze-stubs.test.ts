@@ -9,6 +9,7 @@ import {
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 import { createFeltExplorer, measureFelt } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import { findFloorIslands } from '../../src/legacy-runtime/legacyMazeIslands';
+import { applyOneTileStubRule } from '../../src/legacy-runtime/legacyMazeStubPass';
 import {
   MIN_DEAD_END_BRANCH_CELLS,
   collectDeadEndBranches,
@@ -16,6 +17,7 @@ import {
   countStubTips,
   fixOneTileStubs,
   forceRemoveOneTileStubs,
+  planCapPinch,
   probeDeadEndBranch
 } from '../../src/legacy-runtime/legacyMazeStubs';
 import { LADDER_BOARDS, generateLadderMaze, hashLadderMaze, seedForIndex } from '../../scripts/analysis/lib/progressionLadderSampling';
@@ -53,9 +55,9 @@ describe('one-tile stub analysis (MAZER-GEN-004)', () => {
     expect(byTip.has('1,2')).toBe(false);
   });
 
-  test('the start and goal caps are never counted, and the wrapped neighbour counts as open', () => {
+  test('the wrapped neighbour counts as open, and a start or goal in a corridor is no tip', () => {
     // Row 3 is open at x = 0 and x = 8, so (0,3) and (8,3) are joined across the border (torus): neither
-    // is a dead end, and the goal cap (7,3) is exempt anyway.
+    // is a dead end, and the start (1,3) and goal (7,3) have two open sides each, so they are corridor cells.
     const tips = collectDeadEndBranches(maze).map((branch) => `${branch.tip.x},${branch.tip.y}`);
     expect(tips).not.toContain('0,3');
     expect(tips).not.toContain('8,3');
@@ -161,6 +163,118 @@ describe('one-tile stub analysis (MAZER-GEN-004)', () => {
     expect(Array.from(refused.open)).toEqual(snapshot);
   });
 
+  test('a start or goal in a one-tile nub is a stub (MAZER-GEN-006); a pocket behind it makes a two-cell branch', () => {
+    // Start (1,2) hangs off the junction (1,3); the goal (9,3) ends the corridor.
+    const nubRows = [
+      '###########',
+      '###########',
+      '#.#########',
+      '#.........#',
+      '#.#########',
+      '#.#########',
+      '###########',
+      '###########',
+      '###########'
+    ];
+    const nub = { width: 11, height: 9, grid: gridFrom(nubRows), start: { x: 1, y: 2 }, goal: { x: 9, y: 3 } };
+    expect(collectOneTileStubs(nub).map((branch) => `${branch.tip.x},${branch.tip.y}`)).toEqual(['1,2']);
+    const explorer = createFeltExplorer(nub.width, nub.height);
+    const open = new Uint8Array(nub.width * nub.height);
+    nub.grid.forEach((row, y) => row.forEach((cell, x) => { if (cell) { open[(y * nub.width) + x] = 1; } }));
+    const startCell = (2 * nub.width) + 1;
+    const goalCell = (3 * nub.width) + 9;
+    const interior = (cell: number): boolean => {
+      const x = cell % nub.width;
+      const y = (cell - x) / nub.width;
+      return x >= 1 && y >= 1 && x <= nub.width - 2 && y <= nub.height - 2;
+    };
+    const result = fixOneTileStubs({
+      open, neighbors: explorer.neighbors, startCell, goalCell, step: [1, -1, nub.width, -nub.width], interior, rand: () => 0, verify: () => true
+    });
+    // Lengthened straight on from the host (the cell above the start), never walled up.
+    expect(result.lengthened).toEqual([(1 * nub.width) + 1]);
+    expect(result.removed).toEqual([]);
+    expect(open[startCell]).toBe(1);
+    expect(countStubTips({ open, neighbors: explorer.neighbors, startCell, goalCell })).toBe(0);
+    // The backstop never walls up a start or goal.
+    expect(forceRemoveOneTileStubs({ ...nub, grid: gridFrom(nubRows) })).toEqual([]);
+  });
+
+  test('planCapPinch walls up the pure dead-end branches of a cap host so it becomes a corridor, or says no', () => {
+    const width = 11;
+    const height = 9;
+    const interior = (cell: number): boolean => {
+      const x = cell % width;
+      const y = (cell - x) / width;
+      return x >= 1 && y >= 1 && x <= width - 2 && y <= height - 2;
+    };
+    const explorer = createFeltExplorer(width, height);
+    const make = (rowsText: readonly string[]): Uint8Array => {
+      const open = new Uint8Array(width * height);
+      rowsText.forEach((row, y) => [...row].forEach((char, x) => { if (char !== '#') { open[(y * width) + x] = 1; } }));
+      return open;
+    };
+    // Start (1,2) is a nub on host (1,3); the corridor (2..9,3) is the route and the branch (1,4),(1,5)
+    // hangs below the host.
+    const open = make([
+      '###########',
+      '###########',
+      '#.#########',
+      '#.........#',
+      '#.#########',
+      '#.#########',
+      '###########',
+      '###########',
+      '###########'
+    ]);
+    const startCell = (2 * width) + 1;
+    const goalCell = (3 * width) + 9;
+    const host = (3 * width) + 1;
+    expect(planCapPinch(open, explorer.neighbors, startCell, host, startCell, goalCell, interior)).toEqual([(4 * width) + 1, (5 * width) + 1]);
+    // A host whose other branches are loops or the route (nothing pure to remove) cannot be pinched.
+    const loop = make([
+      '###########',
+      '###########',
+      '#.#########',
+      '#.........#',
+      '#.#######.#',
+      '#.........#',
+      '###########',
+      '###########',
+      '###########'
+    ]);
+    expect(planCapPinch(loop, explorer.neighbors, startCell, host, startCell, goalCell, interior)).toBeNull();
+  });
+
+  test('applyOneTileStubRule (the unverified post-pass) clears nubs, never moves the route, and is a no-op without a stub', () => {
+    const base = {
+      width: 11,
+      height: 9,
+      grid: gridFrom([
+        '###########',
+        '###########',
+        '#.#########',
+        '#.........#',
+        '#.#########',
+        '#.#########',
+        '###########',
+        '###########',
+        '###########'
+      ]),
+      start: { x: 1, y: 2 },
+      goal: { x: 9, y: 3 },
+      seed: 7,
+      solutionPath: [{ x: 1, y: 2 }, { x: 1, y: 3 }, { x: 2, y: 3 }]
+    } as unknown as Omit<LegacyMazeSnapshot, 'generation'>;
+    const fixed = applyOneTileStubRule(base);
+    expect(collectOneTileStubs(fixed)).toEqual([]);
+    expect(fixed.solutionPath).toBe(base.solutionPath);
+    expect(fixed.stubStats).toEqual({ lengthened: 1, removed: 0, forced: 0 });
+    // Same input, same output; a clean maze comes back as the very same object.
+    expect(applyOneTileStubRule(base).grid).toEqual(fixed.grid);
+    expect(applyOneTileStubRule(fixed)).toBe(fixed);
+  });
+
   test('a grid without a stub is not touched', () => {
     const width = 11;
     const height = 9;
@@ -199,7 +313,7 @@ describe('one-tile stub analysis (MAZER-GEN-004)', () => {
 });
 
 // Every generated ladder maze, every band, both frozen boards: no dead-end branch shorter than the rule's
-// minimum (the start and goal caps excepted), the maze still solvable and connected, deterministic per seed,
+// minimum (a start or goal in a one-tile nub counts, MAZER-GEN-006), the maze still solvable and connected, deterministic per seed,
 // and the contracts the ladder pins (felt window, exact fringe count) intact.
 const PROPERTY_LEVELS = [2, 3, 10, 20, 50, 100, 139, 150, 198, 218, 268, 288, 289, 293, 298, 299, 300, 999] as const;
 const PROPERTY_SEEDS = 10;

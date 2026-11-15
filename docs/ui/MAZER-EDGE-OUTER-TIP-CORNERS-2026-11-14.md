@@ -35,3 +35,6 @@ A real phone (real GPU, real corner radius and its curve: iOS uses a continuous 
 
 ## Superseded for corners (MAZER-VIS-044, 2026-11-14)
 Owner requirement: the four corner diamonds sit ON the actual screen corner (0 px inset), not 56 px along the edge. Section 4 above (the clearance inset and its documented limit) no longer applies; edge midpoint diamonds are unchanged.
+
+## Rounded displays (MAZER-VIS-054, 2026-11-15)
+Owner: the four corner diamonds look "half off screen" on a phone. A rounded display corner of radius R hides about 0.293 R per axis (14 px at R48, 16 px at R55), so a tip exactly ON the corner (0 px, VIS-044) is cut off. Tall portrait phones (375 <= width < 500, height >= 780) now slide each corner diamond inward along the diagonal so the outer tip is 16 css px from both edges; it still scales about that tip. Everything else keeps the 0 px tip. See `docs/playbook-notes/2026-11-15-mazer-vis-054-corner-rounded-display.md` and `docs/ui/evidence/2026-11-15-corner-rounded-display/`.

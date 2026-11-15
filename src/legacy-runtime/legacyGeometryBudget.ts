@@ -156,8 +156,19 @@ export const resolveGeometryBudgetProfileForRungs = (
       vertical: owned >= 1
     }
   };
-  return level !== undefined ? { ...profile, geometryBudgetLevel: level } : profile;
+  return level !== undefined
+    ? { ...profile, geometryBudgetLevel: level, journeyLegs: resolveGeometryBudgetJourneyLegs(level) }
+    : profile;
 };
+
+// MAZER-GEN-021: legs of the planned journey a level's base route walks (legacyMaze.ts, journeyLegs). One leg is a
+// straight-ish run from the start end to the goal end; each extra leg adds a zigzag across the board, which is what
+// lengthens the route and hosts decisions and decoys. Measured over 8 seeds x both boards, 1/2/3 beat 2/3/4: the
+// fourth leg bought no route length and cost start-to-goal span. Early levels stay on one leg because their felt
+// target (T(2) = 89) leaves no room for a long route.
+export const resolveGeometryBudgetJourneyLegs = (level: number): number => (
+  level < 4 ? 1 : (level < 10 ? 2 : 3)
+);
 
 // ---------------------------------------------------------------------------
 // Proxy for "harder": H1 = turns + len/4 + 3*splits + 2*max(0, dead-2) + 6*wraps

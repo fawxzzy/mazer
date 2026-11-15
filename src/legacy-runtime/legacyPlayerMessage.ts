@@ -1,3 +1,5 @@
+import { AUTH_SURFACE_MESSAGES } from '../brand/authSurfaceCopy';
+
 export type LegacyPlayerMessageTone = 'error' | 'info' | 'success' | 'warning';
 
 export type LegacyPlayerMessageSource =
@@ -35,9 +37,9 @@ export interface LegacyQueuedPlayerMessage {
 export const LEGACY_PLAYER_MESSAGE_DEFAULT_DURATION_MS = 2400;
 export const LEGACY_PLAYER_MESSAGE_MAX_VISIBLE = 3;
 
-// A sign-in failure is the one message a player has to read to recover, and its
-// longest sentence (LEGACY_OAUTH_FAILURE_MESSAGE_COPY.contextLost) is about 21
-// words. Measured 2026-11-12 in headless Chromium, the toast for it lasted the
+// A sign-in failure is the one message a player has to read to recover. When this
+// floor was set its longest sentence (the then contextLost row) was about 21
+// words; the Auth Surface v2 rows are 12 words at most. Measured 2026-11-12 in headless Chromium, the toast for it lasted the
 // 2400 ms default: well under the time it takes to read. 8000 ms covers the
 // longest row at 300 ms a word with margin and is never below 6000 ms. The
 // bottom-of-screen banner is held until the next attempt by the scene (see
@@ -52,11 +54,12 @@ export const LEGACY_PLAYER_MESSAGE_COLORS: Record<LegacyPlayerMessageTone, strin
 };
 
 export const LEGACY_AUTH_MESSAGE_COPY = {
-  accountUnavailable: 'Account service is unavailable right now. Try again shortly.',
-  authUnavailable: 'Account access is unavailable right now. Try again shortly.',
+  // Auth Surface v2: the rows a signed-out player can still see use the shared copy matrix.
+  accountUnavailable: AUTH_SURFACE_MESSAGES['signin.unavailable'],
+  authUnavailable: AUTH_SURFACE_MESSAGES['signin.unavailable'],
   emailInvalid: 'Enter a valid email address.',
-  loginNotConfigured: 'Account access is unavailable right now. Try again shortly.',
-  networkUnavailable: 'Account service is unreachable. Try again shortly.',
+  loginNotConfigured: AUTH_SURFACE_MESSAGES['signin.unavailable'],
+  networkUnavailable: AUTH_SURFACE_MESSAGES['signin.offline'],
   passwordPolicy: 'Choose a different, stronger password that meets the account security requirements.',
   usernameInvalid: 'Use 2-15 letters, numbers, periods, underscores, or hyphens.',
   usernameTaken: 'That username is already taken.',
@@ -65,27 +68,42 @@ export const LEGACY_AUTH_MESSAGE_COPY = {
 } as const;
 
 // Shared-account sign-in failures, one row per failure CLASS the player can act
-// on (not per internal code). The generic row is the original one-size message
-// and stays the fallback for anything unmapped; it equals
-// MAZER_OAUTH_SAFE_ERROR_MESSAGE in legacyAccountPortal.ts (a test pins both).
+// on (not per internal code). The generic row stays the fallback for anything
+// unmapped. MAZER_OAUTH_SAFE_ERROR_MESSAGE in legacyAccountPortal.ts (integrator
+// Wave 5C) still carries the earlier one-size spelling until its own PR moves it
+// onto the matrix; LEGACY_OAUTH_PREVIOUS_COPY below shows it as this generic row
+// (tests/reset/legacy-oauth-failure-message.test.ts pins that).
+// Auth Surface v2 (owner-approved 2026-11-15): every row is a shared copy-matrix line, worded to match the one
+// button the status screen shows ("Sign in"). Classes may share a line when the player acts the same way.
 export const LEGACY_OAUTH_FAILURE_MESSAGE_COPY = {
-  cancelled: 'Sign-in did not finish. Choose Sign in to try again.',
-  connection: 'Mazer could not finish connecting to your account. Try again in a moment.',
-  contextLost: 'Sign-in came back to a different screen than where you started. Open Mazer from your home screen icon and try again.',
-  generic: 'Could not reach your account. Try again.',
-  providerUnreachable: 'Sign-in is unavailable right now. Try again in a few minutes.',
-  session: 'Your account could not be confirmed. Try signing in again.',
-  storage: 'This browser is blocking what Mazer needs to sign in. Turn off private browsing or allow site data, then try again.',
-  timedOut: 'Sign-in took too long. Choose Sign in to start again.'
+  cancelled: AUTH_SURFACE_MESSAGES['mazer.cancelled'],
+  connection: AUTH_SURFACE_MESSAGES['signin.callback'],
+  contextLost: AUTH_SURFACE_MESSAGES['signin.callback'],
+  generic: AUTH_SURFACE_MESSAGES['signin.unavailable'],
+  providerUnreachable: AUTH_SURFACE_MESSAGES['signin.unavailable'],
+  session: AUTH_SURFACE_MESSAGES['signin.session'],
+  storage: AUTH_SURFACE_MESSAGES['mazer.storage'],
+  timedOut: AUTH_SURFACE_MESSAGES['mazer.timeout']
 } as const;
 
-// MAZER-ACCT-044 transition: the generic row was reworded here (integrator Wave 3B) while the one-size
-// constant MAZER_OAUTH_SAFE_ERROR_MESSAGE lives in legacyAccountPortal.ts (Wave 5C), so the two edits ship
-// as separate PRs. Until the constant follows, a snapshot can still carry the previous spelling; it is
-// player-safe and is shown as the generic row. Delete this once legacyAccountPortal.ts has the new line.
-const LEGACY_OAUTH_PREVIOUS_COPY = {
-  generic: 'Account connection unavailable. Return to Mazer and try again.'
-} as const;
+// Earlier spellings of a failure row. A snapshot written by an older build can still carry one; each is
+// player-safe and is shown as the row that replaced it (never as provider text).
+const LEGACY_OAUTH_PREVIOUS_COPY: Readonly<Record<string, string>> = {
+  'Account connection unavailable. Return to Mazer and try again.': AUTH_SURFACE_MESSAGES['signin.unavailable'],
+  'Could not reach your account. Try again.': AUTH_SURFACE_MESSAGES['signin.unavailable'],
+  'Sign-in did not finish. Choose Sign in to try again.': AUTH_SURFACE_MESSAGES['mazer.cancelled'],
+  'Mazer could not finish connecting to your account. Try again in a moment.': AUTH_SURFACE_MESSAGES['signin.callback'],
+  'Sign-in came back to a different screen than where you started. Open Mazer from your home screen icon and try again.': AUTH_SURFACE_MESSAGES['signin.callback'],
+  'Sign-in is unavailable right now. Try again in a few minutes.': AUTH_SURFACE_MESSAGES['signin.unavailable'],
+  'Your account could not be confirmed. Try signing in again.': AUTH_SURFACE_MESSAGES['signin.session'],
+  'This browser is blocking what Mazer needs to sign in. Turn off private browsing or allow site data, then try again.': AUTH_SURFACE_MESSAGES['mazer.storage'],
+  'Sign-in took too long. Choose Sign in to start again.': AUTH_SURFACE_MESSAGES['mazer.timeout']
+};
+
+/** The current row for a failure line, mapping an earlier spelling to the row that replaced it. */
+export const resolveLegacyOAuthCurrentFailureCopy = (copy: string): string => (
+  Object.prototype.hasOwnProperty.call(LEGACY_OAUTH_PREVIOUS_COPY, copy) ? LEGACY_OAUTH_PREVIOUS_COPY[copy] : copy
+);
 
 export type LegacyOAuthFailureClass = keyof typeof LEGACY_OAUTH_FAILURE_MESSAGE_COPY;
 
@@ -128,7 +146,7 @@ const LEGACY_AUTH_BOOT_FAILURE_CODES: ReadonlySet<string> = new Set([
 ]);
 
 export const LEGACY_BOOT_MESSAGE_COPY = {
-  bootError: 'The maze did not finish loading. Try refreshing once.',
+  bootError: AUTH_SURFACE_MESSAGES['page.crash'],
   serviceWorkerError: 'The offline cache could not update. The game can still run online.'
 } as const;
 
@@ -226,7 +244,7 @@ export const isLegacyOAuthFailureCopy = (copy: string | null | undefined): boole
   return trimmed !== undefined
     && trimmed.length > 0
     && ((Object.values(LEGACY_OAUTH_FAILURE_MESSAGE_COPY) as string[]).includes(trimmed)
-      || trimmed === LEGACY_OAUTH_PREVIOUS_COPY.generic);
+      || Object.prototype.hasOwnProperty.call(LEGACY_OAUTH_PREVIOUS_COPY, trimmed));
 };
 
 export const resolveLegacyOAuthFailureMessage = (
@@ -284,7 +302,7 @@ export const resolveLegacyAuthFeedbackMessage = (
     // specific; pass it through instead of re-matching it as provider text.
     if (isLegacyOAuthFailureCopy(rawError)) {
       return createLegacyPlayerMessage({
-        copy: rawError === LEGACY_OAUTH_PREVIOUS_COPY.generic ? LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic : rawError,
+        copy: resolveLegacyOAuthCurrentFailureCopy(rawError),
         durationMs: LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS,
         id: 'auth.feedback.error',
         source: 'auth',

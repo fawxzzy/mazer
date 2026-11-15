@@ -7,8 +7,8 @@
  * per-frame redraw of the board art, no full-frame compositing pass, and no alpha (nothing is ever half-transparent,
  * so the pale rim of a tile can never show ahead of its dark fill).
  *
- *   floor cell  extent = its own reveal extent (mazeRevealTimeline.ts); a border cell that owns a wrap dock is
- *               also multiplied by the dock extent (it used to appear / vanish with the dock strips)
+ *   floor cell  extent = its own reveal extent (mazeRevealTimeline.ts); a border cell that owns a bleed-off dock
+ *               follows its rank like every other cell (the dock itself grows out of it, see boardTileLayer.ts)
  *   wall / pad  extent = how far the LEAST built floor cell around it (of up to eight) is past 60 %, rescaled to
  *               0..100 %. The baked wall cell holds the outer glow of EVERY corridor beside it, so it opens only
  *               when the last of them is mostly there: the faint halo of a corridor that has not been drawn yet can
@@ -139,13 +139,12 @@ export class MazeRevealMaskBuilder {
 
   /**
    * Fills `out` ((cols + 2) * (rows + 2), extent 0..255) for `frame` and returns nothing.
-   * `ranks` is the BFS rank grid (-1 for walls), `owners` marks the border cells that own a wrap dock.
+   * `ranks` is the BFS rank grid (-1 for walls).
    */
   fill(
     out: Uint8ClampedArray,
     frame: MazeRevealFrame,
     ranks: Int32Array,
-    owners: Uint8Array | null,
     cols: number,
     rows: number
   ): void {
@@ -162,13 +161,6 @@ export class MazeRevealMaskBuilder {
       this.isFloorFor = ranks;
     }
     fillMazeRevealCellExtent(this.floorExtent, ranks, frame.tileCount, frame.direction, frame.window, frame.elapsedMs);
-    if (owners !== null) {
-      for (let index = 0; index < cells; index += 1) {
-        if (owners[index] === 1) {
-          this.floorExtent[index] = this.floorExtent[index]! * frame.dockExtent;
-        }
-      }
-    }
     computeRevealMaskExtent(out, cols, rows, this.floorExtent, this.isFloor);
   }
 }

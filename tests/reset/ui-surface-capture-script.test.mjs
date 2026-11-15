@@ -1029,22 +1029,34 @@ describe('forced account failure fallback anatomy check (MAZER-ACCT-043)', () =>
     buttons: buttons.map((text) => ({ text })),
     textLabels: labels.map((text) => ({ text }))
   });
-  const goodLabels = ['Could not reach your account. Try again.', 'Try again'];
-  const goodButtons = ['Try again'];
+  // Auth Surface v2 (2026-11-15): the MAZER kicker and Mazer title are part of the approved anatomy; the one button
+  // reads Sign in (busy: Signing in…).
+  const goodLabels = ['MAZER', 'Mazer', 'Sign-in is unavailable right now. Try again in a minute.', 'Sign in'];
+  const goodButtons = ['Sign in'];
 
-  test('passes for the fallback: one Try again button and a status line', () => {
+  test('passes for the fallback: kicker, title, one notice and one Sign in button', () => {
     expect(evaluateAuthStatusAnatomy(surface(goodLabels, goodButtons))).toEqual({ failures: [], pass: true });
   });
 
-  test('an in-flight Opening… button still counts as the single button', () => {
-    expect(evaluateAuthStatusAnatomy(surface(goodLabels, ['Opening…'])).pass).toBe(true);
+  test('the signed-out lead passes too', () => {
+    expect(evaluateAuthStatusAnatomy(surface(['MAZER', 'Mazer', 'Sign in to play.', 'Sign in'], goodButtons)).pass).toBe(true);
+  });
+
+  test('an in-flight Signing in… button still counts as the single button', () => {
+    expect(evaluateAuthStatusAnatomy(surface(goodLabels, ['Signing in…'])).pass).toBe(true);
+  });
+
+  test('the retired Try again label no longer counts as the button', () => {
+    expect(evaluateAuthStatusAnatomy(surface(goodLabels, ['Try again'])).failures).toEqual(['retry-button-count=0', 'extra-buttons-present']);
   });
 
   test.each([
     ['old Welcome title', [...goodLabels, 'Welcome'], goodButtons, ['account-title-or-marker-present']],
-    ['old marker', [...goodLabels, 'MAZER'], goodButtons, ['account-title-or-marker-present']],
+    ['old Welcome back title', [...goodLabels, 'Welcome back'], goodButtons, ['account-title-or-marker-present']],
+    ['username line', [...goodLabels, 'Username: fawxzzy'], goodButtons, ['account-wording-present']],
+    ['password wording', [...goodLabels, 'Forgot password?'], goodButtons, ['account-wording-present']],
     ['create account link', [...goodLabels, 'Create Account'], [...goodButtons, 'Create Account'], ['extra-buttons-present', 'account-wording-present']],
-    ['two retry buttons', goodLabels, [...goodButtons, 'Try again'], ['retry-button-count=2']],
+    ['two retry buttons', goodLabels, [...goodButtons, 'Sign in'], ['retry-button-count=2']],
     ['no button', goodLabels, [], ['retry-button-count=0']],
     ['guest action', goodLabels, [...goodButtons, 'Play as guest'], ['extra-buttons-present', 'forbidden-guest-skip-close-or-back-action']],
     ['back chevron', goodLabels, [...goodButtons, 'Back'], ['extra-buttons-present', 'forbidden-guest-skip-close-or-back-action']]

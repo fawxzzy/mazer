@@ -384,3 +384,23 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the geometry ladder (336f2f2a) set borderFeederTargetPerSide 0 and GEN-004 fades wraps to none by level 140, so the demo had 0-4 openings against 12-28 before. Measured (8 seeds, scale 35): level 20/30 about 4, level 60 about 15, level 100+ about 19.
 - Rule: gameplay levels, ladder and difficulty gauges are untouched; demo is attract-loop art, not a calibrated difficulty.
 - Status: headless only, nothing checked on a real phone.
+## 2026-11-15 - MAZER-UI-050: menu primary label is TAP TO PLAY with a level line under it
+- WHAT changed: `MAIN_MENU_BUTTONS[0]` is now `TAP TO PLAY` (was `Start`); the tile-glyph alphabet (legacyMenuTitle.ts) gained P, Y and a blank word-space; MenuScene gives that button full screen width (glyph cell derives from it), lifts it 14 px and draws a `LEVEL n` line under it. New `tests/legacy-runtime/legacy-play-label-glyphs.test.ts`; `legacy-reset.test.ts` updated for the label. Login label unchanged.
+- WHY it changed: owner decision to make the tap target explicit. The first-run subline ("HOLD + SLIDE TO MOVE") is NOT included: no first-run flag exists (the guide lists `first-run-coach` as a pending owner decision). The in-app guide has no copy naming the menu Start label (its Start row is the board marker), so no guide change.
+- Rule: edge marker files untouched (MAZER-VIS-055 lane).
+- Status: headless 390x844 and 320x568 at DPR 3 viewed, no clipping; nothing checked on a real phone.
+
+## 2026-11-15 - MAZER-AUDIO: the per-tile step sound is removed
+- WHAT changed: `src/legacy-runtime/legacySoundEffects.ts` drops the `step` kind (tone and throttle gap); `MenuScene.ts` no longer plays it on a player move. Wall-bump, goal and toggle chirps and the step haptic are unchanged. The Sound setting description, the in-app guide row, the message inventory (test and doc) and the sound tests now say bumps and wins only.
+- WHY it changed: owner request, the chirp on every tile the player travels was unwanted.
+- Status: headless only (tsc and the three affected test files), nothing checked on a real phone.
+
+## 2026-11-15 - MAZER-AUDIO-004: step sound back (gentler) and Sound effects default ON for everyone
+- WHAT changed: `legacySoundEffects.ts` restores the `step` kind (soft tick: 14 ms attack, 55 ms long, gain 0.014, min gap 120 ms, deterministic pitch walk over 220-392 Hz) and `MenuScene.ts` plays it after the step haptic again; wall bump, goal and toggle tones are untouched. `LEGACY_DEFAULTS.soundEnabled` is true. A one-time migration (marker key `soundDefaultOnV1` written beside the toggles in the local blob and in the account profile settings JSON) reads any stored settings without the marker as sound ON once; every write from this build carries the marker so a later Off choice sticks. `canonicalizeGameToggleFingerprint` rewrites an old unmarked fingerprint the same way, so account sync sees no phantom local edit. `installLegacyAudioUnlock` creates/resumes the AudioContext on the first pointerdown/touchend/keydown (never while sound is off). Settings description, guide row and message inventory say default on.
+- WHY it changed: owner decision 2026-11-15 after #599: the step sound returns but less annoying, and sound is on for all users.
+- Rule: the migration is virtual on read (idempotent until a write), so it needs no extra storage write and no database change.
+- Status: headless only (tsc, tests, verify), nothing checked on a real phone.
+## 2026-11-15 - MAZER-VIS-055: edge markers become concave four-point stars
+- WHAT changed: the 8 edge markers are now the Star Zac picked (concave four-point star, outer tip on the screen edge, inner tip = beam port) instead of a kite. `edgeMarkers.ts` flattens the star (4 quadratic sides, 8 segments each) into a 32-point outline; fill/drain still clip that outline with a half-plane anchored at the inner tip. Half-height is 8.8 so the header reach budget (16 px) still holds; `EDGE_CORNER_NARROW_MAX_SCALE` 0.7 -> 0.6 so the capped corner star still clears the settings glyph. Guide copy and message inventory say "edge stars".
+- WHY: owner design pick (ideas4 Star); needle tips are thinner, so pixel tests use a 4-row edge window and a concave inside check.
+- Status: headless (tsc, vitest, software raster captures at 390x844 DPR3); nothing checked on a real phone.

@@ -13,6 +13,8 @@ import {
   scrubRetiredGameToggleKeysFromStorage,
   canonicalizeGameToggleFingerprint,
   RETIRED_GAME_TOGGLE_KEYS,
+  LEGACY_SOUND_DEFAULT_ON_MARKER_KEY,
+  applyLegacySoundDefaultOnMigration,
   writeLegacyGameToggleSettings
 } from '../../src/legacy-runtime/legacyGameTogglePreferences';
 
@@ -42,7 +44,7 @@ describe('legacy game toggle preferences', () => {
       darkMode: true,
       hapticsEnabled: true,
       movementSpeed: 0.04,
-      soundEnabled: false,
+      soundEnabled: true,
       toggleReducedMotion: false
     });
   });
@@ -64,7 +66,8 @@ describe('legacy game toggle preferences', () => {
       darkMode: true,
       hapticsEnabled: true,
       movementSpeed: 0.82,
-      soundEnabled: false,
+      soundEnabled: true,
+      soundDefaultOnV1: true,
       toggleReducedMotion: true
     });
   });
@@ -92,7 +95,7 @@ describe('legacy game toggle preferences', () => {
       darkMode: true,
       hapticsEnabled: true,
       movementSpeed: 0.33,
-      soundEnabled: false,
+      soundEnabled: true,
       toggleReducedMotion: true
     });
   });
@@ -146,7 +149,7 @@ describe('legacy game toggle preferences', () => {
 
   test('account sync: a fingerprint stored by an older build is canonicalised, so the first load makes no phantom local edit', () => {
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
-    const current = JSON.stringify(pickLegacyGameTogglePreferences(settings));
+    const current = JSON.stringify({ ...pickLegacyGameTogglePreferences(settings), soundDefaultOnV1: true });
     const oldBuild = JSON.stringify({
       controlMode: 'stick', darkMode: true, hapticsEnabled: true, movementSpeed: 0.04,
       toggleAnimatedBackdrop: true, toggleReducedMotion: false, toggleTrailFade: false, toggleTrailPulse: true
@@ -297,7 +300,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'arrows',
       darkMode: false,
       hapticsEnabled: true,
-      soundEnabled: false,
+      soundEnabled: true,
       movementSpeed: 0.72,
       toggleReducedMotion: true
     });
@@ -397,5 +400,70 @@ describe('legacy game toggle preferences', () => {
     expect(migrateLegacyGameToggleSettingsToGuestScope(rootStorage, guestStorage, LEGACY_DEFAULTS)).toBe(true);
     expect(readLegacyGameToggleSettings(guestStorage, LEGACY_DEFAULTS).hapticsEnabled).toBe(false);
     expect(values.get(LEGACY_GAME_TOGGLE_STORAGE_KEY)).not.toBeUndefined();
+  });
+
+  // MAZER-AUDIO-004: sound is ON by default for everyone, once, then a later choice sticks.
+  describe('sound default-on one-time migration', () => {
+    const settingsWith = (sound: boolean) => mergeLegacyGameTogglePreferences(LEGACY_DEFAULTS, { soundEnabled: sound });
+
+    test('a fresh user (no stored blob) gets sound on', () => {
+      expect(LEGACY_DEFAULTS.soundEnabled).toBe(true);
+      expect(readLegacyGameToggleSettings(new MemoryStorage(), LEGACY_DEFAULTS).soundEnabled).toBe(true);
+    });
+
+    for (const scope of [{ userId: null }, { userId: 'user-789' }]) {
+      const label = scope.userId === null ? 'guest' : 'account';
+
+      test(`${label} scope: stored false without the marker turns on once, then an off choice stays off after reload`, () => {
+        const root = new MemoryStorage();
+        const scoped = createLegacyAuthScopedStorage(root, LEGACY_GAME_TOGGLE_STORAGE_KEY, scope);
+        // what every build before this one stored for a player who never touched Sound
+        scoped?.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
+          controlMode: 'stick', darkMode: true, hapticsEnabled: true, soundEnabled: false,
+          movementSpeed: 0.04, toggleReducedMotion: false
+        }));
+
+        // first load of the new build: migrated on (and idempotent until something is written)
+        expect(readLegacyGameToggleSettings(scoped, LEGACY_DEFAULTS).soundEnabled).toBe(true);
+        expect(readLegacyGameToggleSettings(scoped, LEGACY_DEFAULTS).soundEnabled).toBe(true);
+
+        // the player turns it off: this write carries the marker, so the migration never runs again
+        const loaded = readLegacyGameToggleSettings(scoped, LEGACY_DEFAULTS);
+        writeLegacyGameToggleSettings(scoped, { ...loaded, soundEnabled: false });
+        expect(JSON.parse(scoped?.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY) ?? '{}')[LEGACY_SOUND_DEFAULT_ON_MARKER_KEY]).toBe(true);
+        expect(readLegacyGameToggleSettings(scoped, LEGACY_DEFAULTS).soundEnabled).toBe(false);
+        expect(readLegacyGameToggleSettings(scoped, LEGACY_DEFAULTS).soundEnabled).toBe(false);
+      });
+    }
+
+    test('a marked blob is a real choice and is never migrated', () => {
+      const storage = new MemoryStorage();
+      writeLegacyGameToggleSettings(storage, settingsWith(false));
+      expect(readLegacyGameToggleSettings(storage, LEGACY_DEFAULTS).soundEnabled).toBe(false);
+    });
+
+    test('account sync: remote settings JSON follows the same marker rule (the pure helper)', () => {
+      expect(applyLegacySoundDefaultOnMigration({ soundEnabled: false, hapticsEnabled: false })?.soundEnabled).toBe(true);
+      expect(applyLegacySoundDefaultOnMigration({})?.soundEnabled).toBe(true);
+      const marked = { soundEnabled: false, [LEGACY_SOUND_DEFAULT_ON_MARKER_KEY]: true };
+      expect(applyLegacySoundDefaultOnMigration(marked)).toBe(marked);
+    });
+
+    test('account sync: an old fingerprint (sound false, no marker) canonicalises to exactly what the migrated local settings fingerprint to', () => {
+      const oldFingerprint = JSON.stringify({
+        controlMode: 'stick', darkMode: true, hapticsEnabled: true, soundEnabled: false,
+        movementSpeed: 0.04, toggleReducedMotion: false
+      });
+      const migrated = readLegacyGameToggleSettings({ getItem: () => oldFingerprint }, LEGACY_DEFAULTS);
+      const localFingerprint = JSON.stringify({ ...pickLegacyGameTogglePreferences(migrated), [LEGACY_SOUND_DEFAULT_ON_MARKER_KEY]: true });
+      expect(canonicalizeGameToggleFingerprint(oldFingerprint)).toBe(localFingerprint);
+
+      // a post-migration fingerprint where the player chose off is left alone (no phantom edit, no re-enable)
+      const offChoice = JSON.stringify({
+        controlMode: 'stick', darkMode: true, hapticsEnabled: true, soundEnabled: false,
+        movementSpeed: 0.04, toggleReducedMotion: false, [LEGACY_SOUND_DEFAULT_ON_MARKER_KEY]: true
+      });
+      expect(canonicalizeGameToggleFingerprint(offChoice)).toBe(offChoice);
+    });
   });
 });

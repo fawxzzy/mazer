@@ -254,7 +254,7 @@ const assertMenuSnapshotOrthogonalUnitSteps = (points: LegacyMenuSnapshotPoint[]
 
 describe('legacy reset lane', () => {
   test('keeps the active front-door button set focused on play and options', () => {
-    expect(MAIN_MENU_BUTTONS).toEqual(['Start', 'Options']);
+    expect(MAIN_MENU_BUTTONS).toEqual(['TAP TO PLAY', 'Options']);
   });
 
   test('removes the front-door Exit button and browser quit equivalence path', () => {
@@ -385,14 +385,14 @@ describe('legacy reset lane', () => {
     const cases = [
       {
         build: createLegacyMaze,
-        expectedHash: '5991f3060be8e2da9bcf1972c2dafc4807baf4a39b6a5629a0516f2245c927ac',
+        expectedHash: '21c010a9cd577f0e84da63afdd015d5940fa4dc993cb37b0ffe19ce47ddb6487',
         kind: 'play',
         scale: 25,
         seed: 13
       },
       {
         build: createLegacyGeneratedMenuMaze,
-        expectedHash: '4140a1de9ea55d1bf818b758c56a86005a1639560b2ecfbd323e8d59aeccab9f',
+        expectedHash: '122ec6a8d338272a227e74247ed5459933b00fc9e391b47c90ce501f149db3dc',
         kind: 'menu',
         scale: 37,
         seed: 3

@@ -26,7 +26,7 @@ import { RasterContext } from './support/rasterContext';
  * Three layers: (1) the exact painted bounding box (outline plus the stroke's miter join) lies inside the visible canvas and touches
  * its edge within 0.5 device px; (2) real pixels: a software rasteriser draws the real `drawEdgeMarker` with the real context scale
  * and not one lit pixel lies beyond the canvas border, while the last two device rows/columns at the edge ARE lit; (3) the corner
- * diamonds sit ON the screen corner (0 px from both edges, MAZER-VIS-044).
+ * diamonds sit the viewport's tip inset from both edges (0 px, or 16 px on a tall rounded-display phone, MAZER-VIS-044 / VIS-054).
  */
 const VIEWPORTS = [
   { name: 'phone 390x844', width: 390, height: 844, mazeWidth: 25, mazeHeight: 51 },
@@ -34,6 +34,8 @@ const VIEWPORTS = [
   { name: 'phone 412x915', width: 412, height: 915, mazeWidth: 25, mazeHeight: 51 },
   { name: 'phone 360x740', width: 360, height: 740, mazeWidth: 25, mazeHeight: 51 },
   { name: 'phone 375x667', width: 375, height: 667, mazeWidth: 25, mazeHeight: 51 },
+  { name: 'phone 375x812', width: 375, height: 812, mazeWidth: 25, mazeHeight: 51 },
+  { name: 'phone 430x932', width: 430, height: 932, mazeWidth: 25, mazeHeight: 51 },
   { name: 'desktop 1280x720', width: 1280, height: 720, mazeWidth: 45, mazeHeight: 27 },
   { name: 'desktop 1440x900', width: 1440, height: 900, mazeWidth: 45, mazeHeight: 27 }
 ] as const;
@@ -65,7 +67,7 @@ const stateAt = (station: EdgeStation, scale: number, fill = 0): EdgeMarkerState
   alpha: 1, energized: false, energy: 0, fill, flash: 0, hidden: false, id: station.id, scale, spinRad: 0
 });
 
-// MAZER-VIS-044: the four corner diamonds are exempt from "touches the edge": they sit ON the corner (0 px inset) instead.
+// MAZER-VIS-044/054: the four corner diamonds are exempt from "touches the edge": they sit the viewport tip inset in from both edges instead.
 describe('every edge diamond touches the screen edge with its outer tip and nothing leaves the canvas (MAZER-VIS-043)', () => {
   for (const viewport of VIEWPORTS) {
     for (const dpr of DPRS) {
@@ -103,7 +105,7 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
               // MAZER-VIS-044: a corner diamond is pinned snug in its corner, the same distance from BOTH edges at every size.
               const corner = (['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const)[station.id / 2] as 'top-left';
               const offset = measureEdgeCornerOffset(painted, corner, { width: visibleWidth, height: visibleHeight });
-              const tipInset = resolveEdgeCornerTipInset();
+              const tipInset = resolveEdgeCornerTipInset(viewport);
               expect(Math.abs(offset.horizontal - tipInset) * resolution, `${text} horizontal corner offset`).toBeLessThanOrEqual(0.5);
               expect(Math.abs(offset.vertical - tipInset) * resolution, `${text} vertical corner offset`).toBeLessThanOrEqual(0.5);
               continue;
@@ -120,7 +122,7 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
         }
       });
 
-      test(`${label}: real pixels at 50%, 75%, 100%: not one lit pixel beyond the canvas border, the outer tip lights the last two device rows/columns of its edge`, () => {
+      test(`${label}: real pixels at 50%, 75%, 100%: not one lit pixel beyond the canvas border, the outer tip lights the last four device rows/columns of its edge`, () => {
         const stations = resolveEdgeStations({ width: viewport.width, height: viewport.height }, resolution);
         const backing = { width: Math.max(1, Math.round(viewport.width * resolution)), height: Math.max(1, Math.round(viewport.height * resolution)) };
         const WINDOW = 56; // css px square around the diamond
@@ -138,13 +140,14 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
             let nearEdge = 0;
             let lit = 0;
             let nearCorner = 0;
+            const cornerReachDevice = Math.ceil((resolveEdgeCornerTipInset(viewport) * resolution) + 2);
             for (let py = 0; py < size; py += 1) {
               for (let px = 0; px < size; px += 1) {
                 if ((ctx.data[(((py * size) + px) * 4) + 3] ?? 0) === 0) continue;
                 lit += 1;
                 const dx = originX + px;
                 const dy = originY + py;
-                if (Math.min(dx, backing.width - 1 - dx) <= 2 && Math.min(dy, backing.height - 1 - dy) <= 2) nearCorner += 1;
+                if (Math.min(dx, backing.width - 1 - dx) <= cornerReachDevice && Math.min(dy, backing.height - 1 - dy) <= cornerReachDevice) nearCorner += 1;
                 if (dx < 0 || dy < 0 || dx >= backing.width || dy >= backing.height) beyond += 1;
                 const distance = {
                   top: dy,
@@ -152,7 +155,8 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
                   bottom: backing.height - 1 - dy,
                   right: backing.width - 1 - dx
                 }[station.side];
-                if (distance <= 1) nearEdge += 1;
+                // The star's tips are needles (miter ~12 degree half angle): a pixel-centre sampler needs the last four device rows to see the tip.
+                if (distance <= 3) nearEdge += 1;
               }
             }
             const text = `${label} station ${station.id} scale ${scale}`;
@@ -160,10 +164,10 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
             if (station.isCorner) {
               // Corner diamonds touch the corner point, not an edge midline: they must still be drawn (lit pixels in the window).
               expect(lit, `${text} lit pixels`).toBeGreaterThan(0);
-              expect(nearCorner, `${text} lit pixels within 3 device px of both edges (the tip is in the corner)`).toBeGreaterThan(0);
+              expect(nearCorner, `${text} lit pixels within the tip inset + 3 device px of both edges (the tip is in the corner)`).toBeGreaterThan(0);
               continue;
             }
-            expect(nearEdge, `${text} pixels on the last two device rows/columns of ${station.side}`).toBeGreaterThan(0);
+            expect(nearEdge, `${text} pixels on the last four device rows/columns of ${station.side}`).toBeGreaterThan(0);
           }
         }
       });

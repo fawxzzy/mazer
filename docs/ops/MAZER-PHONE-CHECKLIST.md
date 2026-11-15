@@ -43,6 +43,7 @@ Before you start: an Android phone (Chrome) and an iPhone (Safari) if you have b
 
 22. Step: in Safari tap Share, then Add to Home Screen, then open the new icon. Expected: Mazer opens full screen with no Safari bar and no black gap at the bottom. Closes: QA-001 (iOS home-screen behaviour).
 23. Step: sign in from that icon with test account 1. Expected: you land back in Mazer signed in and it stays full screen. Closes: ACCT-003 (does the handoff keep the app standalone).
+24. Step: open Mazer on a phone with rounded screen corners (home-screen icon, menu at rest, nothing running). Expected: all four small corner diamonds are fully visible with their outer tip on the curved screen edge (none cut off by the rounded corner), and the leaderboard and settings icons at the top have clear space from the two top diamonds. Closes: VIS-054 (headless only so far: nothing is device-verified). Note: the MAZER title is a little smaller on tall phones now, so also say if it still reads clearly.
 
 ## Report back
 

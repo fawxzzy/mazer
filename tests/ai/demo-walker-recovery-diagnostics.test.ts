@@ -13,7 +13,9 @@ import {
 
 describe('human-memory AI recovery diagnostics', () => {
   test('keeps bounded generated E diagnostics internally consistent without exposing a solver route', () => {
-    const seeds = [1, 2, 3, 5, 8] as const;
+    // Seed 16 joined for MAZER-GEN-021: with goals placed far from the start, seeds 1..8 carry no branch the
+    // walker has to decide at; 16 does (11 decisions, 2 recoveries), so the decision diagnostics stay exercised.
+    const seeds = [1, 2, 3, 5, 8, 16] as const;
     let branchDecisionCount = 0;
 
     for (const seed of seeds) {

@@ -94,8 +94,10 @@ describe('no generated ladder maze carries unreachable floor (MAZER-GEN-005)', (
   test('a loop connector closed by the ceiling no longer strands its stretch detours: they are walled up in the tuner', () => {
     // The golden-fixture seed of phone level 278 (20261106 + level) stranded 8 detour cells on origin/main. That
     // was found at the calibration scale (35) where the ceiling closes a loop connector at this level, so the test
-    // pins that scale; the shipped board (38) is covered by the no-islands sweeps above.
-    const maze = generateLadderMaze(278, boardNamed('phone'), 20261106 + 278, 'play', LADDER_CALIBRATION_SCALE);
+    // pins that scale; the shipped board (38) is covered by the no-islands sweeps above. MAZER-GEN-021 changed the
+    // base mazes, so level 278 no longer drops a connector: phone level 286 (same seed rule) drops 18 and is
+    // the pinned case now (a sweep of levels 240..300 found 272, 286, 296 on phone).
+    const maze = generateLadderMaze(286, boardNamed('phone'), 20261106 + 286, 'play', LADDER_CALIBRATION_SCALE);
     expect(maze.islandStats?.dropped ?? 0).toBeGreaterThan(0);
     expect(findFloorIslands(maze).islands).toEqual([]);
   });

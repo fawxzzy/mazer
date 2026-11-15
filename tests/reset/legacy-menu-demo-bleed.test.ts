@@ -38,8 +38,10 @@ describe('MAZER-VIS-052 menu demo bleed-off paths', () => {
         resolveLegacyMazeGenerationProfileForProgression(track.targetComplexity)
       );
     }
+    // Re-pinned by MAZER-GEN-021: every budget-ladder gameplay profile now carries `journeyLegs` (1 to 3 legs of
+    // the planned start-to-goal journey, 47 of these 51 profiles); nothing else in them moved.
     expect(createHash('sha256').update(JSON.stringify(out)).digest('hex'))
-      .toBe('946b338cd4dd1e765410db8c8dff718b9e0b26a8f24bcb9a42e27cfbef8b45a2');
+      .toBe('d151ce7a805e57a978d797c12d8019fc429f94e3d5d36df783a3d3a399688b99');
   });
 
   test('the demo profile never carries a budget-ladder gate and keeps feeders past level 140', () => {

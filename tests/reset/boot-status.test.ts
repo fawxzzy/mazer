@@ -50,7 +50,7 @@ describe('boot status', () => {
     expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.stage).toBe('error');
     expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.errorMessage).toBe('boot failed');
     expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.playerMessage).toMatchObject({
-      copy: 'The maze did not finish loading. Try refreshing once.',
+      copy: 'Check your connection and try again.',
       source: 'boot',
       technicalDetail: 'boot failed',
       tone: 'error'

@@ -138,6 +138,7 @@ import {
 import { drawGuideSoundGlyph } from '../render/guideSoundGlyph';
 import {
   createLegacySoundEffects,
+  installLegacyAudioUnlock,
   type LegacySoundEffectKind
 } from '../legacy-runtime/legacySoundEffects';
 import {
@@ -330,6 +331,7 @@ import {
 import { LegacyPresenceController } from '../legacy-runtime/legacyPresenceController';
 import { formatOnline } from '../legacy-runtime/legacyPresenceContract';
 import { PresenceCounterView } from '../render/presenceCounterView';
+import { designTokens } from '../theme/tokens';
 import { resolveLegacyPresenceCounterPlacement } from '../legacy-runtime/legacyPresenceCounterLayout';
 import {
   LEGACY_UI_COMPACT_BREAKPOINT,
@@ -552,10 +554,14 @@ import {
 } from '../legacy-runtime/legacyLeaderboardView';
 import { readLegacyLeaderboardFixtureShape } from '../legacy-runtime/legacyLeaderboardFixture';
 import {
+  LEGACY_ACCOUNT_STATUS_COLORS,
+  LEGACY_ACCOUNT_STATUS_COPY,
+  LEGACY_ACCOUNT_STATUS_NOTICE_RADIUS,
   LEGACY_ACCOUNT_STATUS_OPENING_TIMEOUT_MS,
   resolveLegacyAccountStatus,
   resolveLegacyAccountStatusLayout,
-  resolveLegacyAuthLoadingCopy
+  resolveLegacyAuthLoadingCopy,
+  shouldToastLegacyAuthFeedback
 } from '../legacy-runtime/legacyAccountStatusState';
 import { LOADER_RING_REDUCED_ALPHA, LOADER_RING_REDUCED_SCALE } from '../render/appLoader';
 import { MAZER_LOADER_ICON_TEXTURE_KEY, MAZER_LOADER_RING_TEXTURE_KEY } from '../render/appLoaderOverlay';
@@ -581,7 +587,6 @@ import {
   type LegacyPlayerMessage
 } from '../legacy-runtime/legacyPlayerMessage';
 import { resolveLegacyPlayerMessageToastFrame } from '../legacy-runtime/legacyPlayerMessageToast';
-import { getTypeScaleStep } from '../render/typeScale';
 import { RAINBOW_UI_SATURATION, RAINBOW_UI_VALUE } from '../render/rainbowUiPalette';
 import {
   hydrateLegacyRemoteAccountState,
@@ -1565,6 +1570,11 @@ const LEGACY_TILE_FONT_GLYPH_POOL_SIZE = 8;
 // asset (see drawLegacyMenuPathTitle) instead of the maze-path dot-cell
 // glyph it used to be drawn from exclusively.
 const LEGACY_TITLE_WORD = 'MAZER';
+// MAZER-UI-050: the front-door play label sits this far above the old Start spot, and the level line
+// under it this far below the label's centre (px, whole numbers so Images stay pixel-aligned).
+const LEGACY_MENU_PLAY_LABEL_RISE_PX = 14;
+const LEGACY_MENU_LEVEL_LINE_DROP_PX = 30;
+const LEGACY_MENU_PLAY_LABEL_PHONE_MAX_WIDTH_PX = 600;
 // "MAZER", "START", and "LOGIN" are all exactly 5 characters -- covers the
 // title wordmark and both primary front-door button labels with no waste.
 const LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE = 5;
@@ -1722,8 +1732,6 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-MOTION-011: the rise and stagger an overlay panel enters with (reduced motion: a 200 ms crossfade).
   private readonly uiEntrance = new UiEntranceDriver();
   private playerMessageToastTexts: Phaser.GameObjects.Text[] = [];
-  /** MAZER-UI-034: the small failure-code line under a toast, one per toast row. */
-  private playerMessageToastCodeTexts: Phaser.GameObjects.Text[] = [];
   private authGateLoadingText!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
   // MAZER-VIS-039: the one app loader (icon, ring, fade in/out) behind the `Signing you in…` cover (src/render/appLoader.ts).
@@ -2464,6 +2472,14 @@ export class MenuScene extends Phaser.Scene {
     // MAZER-MOTION-011: after update (every rebuildUi path has run) so freshly built objects never show one frame at rest.
     this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this));
+    // MAZER-AUDIO-004: sound is on by default, but a drag step is not a valid activation gesture, so unlock the audio
+    // context on the first real pointerdown/touchend/keydown (no context is built while the setting is off).
+    const disposeAudioUnlock = installLegacyAudioUnlock(
+      this.legacySoundEffects,
+      () => this.settings.soundEnabled,
+      typeof window === 'undefined' ? undefined : window
+    );
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, disposeAudioUnlock);
     this.playerMessageToastGraphics = this.add.graphics()
       .setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH)
       .setVisible(false);
@@ -2475,17 +2491,10 @@ export class MenuScene extends Phaser.Scene {
         align: 'center'
       })).setOrigin(0.5, 0).setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH + 1).setVisible(false)
     ));
-    this.playerMessageToastCodeTexts = Array.from({ length: LEGACY_PLAYER_MESSAGE_TOAST_ROW_POOL }, () => (
-      this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
-        fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: `${getTypeScaleStep('caption').sizePx}px`,
-        align: 'center'
-      })).setOrigin(0.5, 0).setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH + 1).setVisible(false)
-    ));
-    this.authGateLoadingText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, 'Signing you in…', {
+    this.authGateLoadingText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, LEGACY_ACCOUNT_STATUS_COPY.loading, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '15px',
-      color: '#d7fff8'
+      color: LEGACY_ACCOUNT_STATUS_COLORS.loaderLabel
     })).setOrigin(0.5).setVisible(false).setDepth(LEGACY_AUTH_GATE_LOADING_DEPTH);
     this.appLoader = new AppLoaderOverlay(this, LEGACY_AUTH_GATE_LOADING_DEPTH);
 
@@ -7986,7 +7995,7 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveBoardTileReveal(): BoardTileReveal {
     const softReveal = this.mazeReveal.resolveBoardReveal(
-      this.boardTileRankGrid, this.boardTileDockOwners, this.maze.width, this.maze.height
+      this.boardTileRankGrid, this.maze.width, this.maze.height
     );
     if (softReveal !== null) {
       return softReveal;
@@ -9686,7 +9695,8 @@ export class MenuScene extends Phaser.Scene {
     this.presenceView ??= new PresenceCounterView(this, {
       dotColor: LEGACY_PRESENCE_CHIP_FILL,
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      textColor: `#${cyberArcadeMaterial.rail.muted.toString(16).padStart(6, '0')}`
+      strokeColor: designTokens.color['bg.canvas'],
+      textColor: `#${cyberArcadeMaterial.rail.white.toString(16).padStart(6, '0')}`
     });
     const view = this.presenceView;
     const placement = resolveLegacyPresenceCounterPlacement({
@@ -10506,7 +10516,7 @@ export class MenuScene extends Phaser.Scene {
   // reduced motion, and is a no-op where navigator.vibrate is missing (iOS Safari, most desktops).
   private readonly legacySoundEffects = createLegacySoundEffects();
 
-  // Sound effects (src/legacy-runtime/legacySoundEffects.ts): gated by Settings > Sound effects, default off.
+  // Sound effects (src/legacy-runtime/legacySoundEffects.ts): gated by Settings > Sound effects, default on (MAZER-AUDIO-004).
   private playLegacySoundEffect(kind: LegacySoundEffectKind): void {
     this.legacySoundEffects.play(kind, this.settings.soundEnabled, this.time.now);
   }
@@ -11077,17 +11087,36 @@ export class MenuScene extends Phaser.Scene {
           );
           this.createLegacySignedOutOAuthFailure();
         } else {
+          // MAZER-UI-050: "TAP TO PLAY" is 11 glyphs, so it gets the full screen width (the glyph cell
+          // size is derived from it) and sits a little above the old Start spot; the level line below
+          // takes the old spot's lower half, clear of the bottom edge marker.
+          // Phone-width portrait only: wide/landscape layouts keep the old button box, which other
+          // systems (teleport anchor exclusion) read the bounds of.
+          const isPhoneWidth = this.layout.width < LEGACY_MENU_PLAY_LABEL_PHONE_MAX_WIDTH_PX;
+          const playLabelY = this.layout.centerButtonY - (isPhoneWidth ? LEGACY_MENU_PLAY_LABEL_RISE_PX : 0);
           this.uiButtons.push(
             this.createButton(
               this.layout.centerButtonX,
-              this.layout.centerButtonY,
-              primaryButtonWidth,
+              playLabelY,
+              isPhoneWidth ? Math.max(primaryButtonWidth, this.layout.width) : primaryButtonWidth,
               this.layout.buttonHeight,
               startLabel,
               () => this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode()),
-              { explicitHitZone: true }
+              // Harness/diagnostics keep addressing this action as 'Start' (the visible label changed).
+              { explicitHitZone: true, semanticAction: 'Start' }
             )
           );
+          const levelLineFontPx = 13;
+          this.uiTexts.push(this.add.text(
+            this.layout.centerButtonX,
+            playLabelY + LEGACY_MENU_LEVEL_LINE_DROP_PX,
+            `LEVEL ${this.progressionState.tracks[this.resolveActiveLegacyProgressionTrackId()].level}`,
+            {
+              fontFamily: LEGACY_UI_FONT_FAMILY,
+              fontSize: `${levelLineFontPx}px`,
+              color: MENU_TEXT_COLOR
+            }
+          ).setOrigin(0.5).setAlpha(0.82));
         }
         this.uiButtons.push(this.createLegacyMenuSettingsCogButton(
           () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'))
@@ -12671,31 +12700,22 @@ export class MenuScene extends Phaser.Scene {
   }
 
   // MAZER-ACCT-043: Mazer keeps no account screen (sign-in, sign-up, account settings, credentials, session and
-  // sign-out live on account.fawxzzy.com). This is only the failure fallback of the hand-off, drawn in the shared
-  // loader's visual language: app icon + halo, ONE status line, ONE `Try again` button. No title, marker, fields,
-  // rail or legal row, and no sign-in / sign-up wording. Logic: src/legacy-runtime/legacyAccountStatusState.ts.
+  // sign-out live on account.fawxzzy.com). This is only the failure fallback of the hand-off. Auth Surface v2: MAZER
+  // kicker, app icon + halo where the loader draws it, the title, ONE reserved message area (lead or one notice box)
+  // and ONE `Sign in` button. No fields, username, rail or legal row. Logic: src/legacy-runtime/legacyAccountStatusState.ts.
   private buildAuthOverlay(): void {
     // MAZER-ACCT-037: quiet, throttled, never shows anything (see the module).
     warmMazerProviderPreflight();
-    const panel = this.resolveOverlayPanelFrame();
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const status = resolveLegacyAccountStatus({
-      errorMessage: this.authSnapshot.error,
+      // Player-safe copy only: the same resolver the toast used, so provider text never reaches the box.
+      errorMessage: resolveLegacyAuthFeedbackMessage(this.authSnapshot.error, null, this.authSnapshot.errorCode)?.copy ?? null,
       openingTimedOut: this.authOpeningTimedOut,
       status: this.authSnapshot.status,
       submitting: this.authSubmitting
     });
     const layout = resolveLegacyAccountStatusLayout(this.layout.width, this.layout.height, readMazerViewportGeometry().safeArea);
     this.drawLegacyAccountStatusIcon(layout.loader);
-    if (status.line.length > 0) {
-      this.createAuthInfoText(
-        status.line,
-        Math.round(layout.loader.labelCentreY),
-        panel,
-        toCyberArcadeCssHex(status.tone === 'error' ? cyberArcadeMaterial.signal.goal : cyberArcadeMaterial.rail.muted),
-        stacked ? 14 : 16
-      );
-    }
+    this.drawLegacyAccountStatusText(status, layout);
     this.uiButtons.push(this.createLegacyAuthActionButton(
       layout.button.left + (layout.button.width / 2),
       layout.button.top + (layout.button.height / 2),
@@ -12729,6 +12749,81 @@ export class MenuScene extends Phaser.Scene {
     const icon = this.add.image(x, y, MAZER_LOADER_ICON_TEXTURE_KEY).setOrigin(0.5, 0.5).setDepth(3);
     icon.setScale(loader.iconSizePx / (icon.width || loader.iconSizePx));
     this.accountStatusImages.push(ring, icon);
+  }
+
+  // Auth Surface v2: kicker, title and the reserved message area. The area never changes size, so a notice
+  // appearing or clearing moves nothing; the notice text wraps inside it and shrinks before it could ever clip.
+  private drawLegacyAccountStatusText(
+    status: ReturnType<typeof resolveLegacyAccountStatus>,
+    layout: ReturnType<typeof resolveLegacyAccountStatusLayout>
+  ): void {
+    const colors = LEGACY_ACCOUNT_STATUS_COLORS;
+    const centreX = layout.centerX;
+    if (layout.kicker !== null) {
+      this.uiTexts.push(this.applyLegacyUiTextCrispness(this.add.text(centreX, layout.kicker.centreY, status.kicker, {
+        color: colors.kicker,
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: `${layout.kicker.fontSizePx}px`,
+        fontStyle: '500',
+        letterSpacing: Math.round(layout.kicker.fontSizePx * 0.34)
+      })).setOrigin(0.5).setDepth(3));
+    }
+    this.uiTexts.push(this.applyLegacyUiTextCrispness(this.add.text(centreX, layout.title.centreY, status.title, {
+      color: colors.title,
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${layout.title.fontSizePx}px`,
+      fontStyle: '300'
+    })).setOrigin(0.5).setDepth(3));
+
+    const slot = layout.slot;
+    if (status.presentation === 'lead') {
+      const lead = this.applyLegacyUiTextCrispness(this.add.text(centreX, slot.top, status.line, {
+        align: 'center',
+        color: colors.lead,
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: `${slot.leadFontSizePx}px`,
+        wordWrap: { width: Math.min(310, slot.width), useAdvancedWrap: true }
+      })).setOrigin(0.5, 0).setAlpha(colors.leadAlpha).setDepth(3);
+      this.uiTexts.push(lead);
+      return;
+    }
+
+    const iconSize = 20;
+    const iconGap = 10;
+    const textLeft = slot.left + slot.paddingX + iconSize + iconGap;
+    const textWidth = Math.max(40, slot.left + slot.width - slot.paddingX - textLeft);
+    const maxTextHeight = slot.height - (slot.paddingY * 2);
+    let fontSizePx = slot.fontSizePx;
+    const text = this.applyLegacyUiTextCrispness(this.add.text(textLeft, slot.top + slot.paddingY, status.line, {
+      color: colors.noticeText,
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${fontSizePx}px`,
+      lineSpacing: slot.lineHeightPx - fontSizePx,
+      wordWrap: { width: textWidth, useAdvancedWrap: true }
+    })).setOrigin(0, 0).setDepth(4);
+    while (text.height > maxTextHeight && fontSizePx > 12) {
+      fontSizePx -= 1;
+      text.setFontSize(fontSizePx).setLineSpacing(Math.round(fontSizePx * 0.38));
+    }
+    this.uiTexts.push(text);
+
+    const boxHeight = Math.min(slot.height, Math.ceil(text.height) + (slot.paddingY * 2));
+    const graphics = this.add.graphics().setDepth(3);
+    const fill = Phaser.Display.Color.HexStringToColor(colors.noticeFill).color;
+    const border = Phaser.Display.Color.HexStringToColor(colors.noticeBorder).color;
+    graphics.fillStyle(fill, colors.noticeFillAlpha);
+    graphics.fillRoundedRect(slot.left, slot.top, slot.width, boxHeight, LEGACY_ACCOUNT_STATUS_NOTICE_RADIUS);
+    graphics.lineStyle(1, border, colors.noticeBorderAlpha);
+    graphics.strokeRoundedRect(slot.left + 0.5, slot.top + 0.5, slot.width - 1, boxHeight - 1, LEGACY_ACCOUNT_STATUS_NOTICE_RADIUS);
+    // The warning mark of the mock: a ring with a short bar and a dot.
+    const markX = slot.left + slot.paddingX + (iconSize / 2);
+    const markY = slot.top + slot.paddingY + Math.round(slot.lineHeightPx / 2);
+    graphics.lineStyle(2, border, 1);
+    graphics.strokeCircle(markX, markY, (iconSize / 2) - 1);
+    graphics.lineBetween(markX, markY - 4, markX, markY + 1);
+    graphics.fillStyle(border, 1);
+    graphics.fillCircle(markX, markY + 4.5, 1.2);
+    this.uiGraphics.push(graphics);
   }
 
   // MAZER-ACCT-019: one extra username read per signed-in user after the profile bootstrap, only
@@ -13209,7 +13304,10 @@ export class MenuScene extends Phaser.Scene {
         info: this.authSnapshot.info
       })
       : Number.NEGATIVE_INFINITY;
-    this.pushLegacyPlayerMessage(message);
+    // Auth Surface v2: a failure shows once, in the status screen's notice box (see the helper).
+    if (shouldToastLegacyAuthFeedback(message, this.authSnapshot.status === 'authenticated')) {
+      this.pushLegacyPlayerMessage(message);
+    }
   }
 
   private clearLegacyAuthFeedbackMessage(): void {
@@ -13235,7 +13333,7 @@ export class MenuScene extends Phaser.Scene {
     graphics.clear();
     if (frame.rows.length === 0) {
       graphics.setVisible(false);
-      for (const text of [...this.playerMessageToastTexts, ...this.playerMessageToastCodeTexts]) {
+      for (const text of this.playerMessageToastTexts) {
         text.setVisible(false);
       }
       return;
@@ -13250,28 +13348,16 @@ export class MenuScene extends Phaser.Scene {
       : Math.round(safeArea.top + 156);
     this.playerMessageToastTexts.forEach((text, index) => {
       const row = frame.rows[index];
-      const codeText = this.playerMessageToastCodeTexts[index];
       if (!row) {
         text.setVisible(false);
-        codeText?.setVisible(false);
         return;
       }
 
       text.setWordWrapWidth(frame.maxWidth - (padX * 2));
-      // MAZER-UI-034: the code line is its own caption-step text, under the message.
-      text.setText(row.codeLine === null ? row.copy : row.messageCopy);
+      text.setText(row.copy);
       text.setColor(row.color);
-      const hasCode = row.codeLine !== null && codeText !== undefined;
-      if (hasCode) {
-        codeText.setWordWrapWidth(frame.maxWidth - (padX * 2));
-        codeText.setText(row.codeLine ?? '');
-        codeText.setColor(row.color);
-      } else {
-        codeText?.setVisible(false);
-      }
-      const codeHeight = hasCode ? codeText.height : 0;
-      const boxWidth = Math.round(Math.min(frame.maxWidth, Math.max(text.width, hasCode ? codeText.width : 0) + (padX * 2)));
-      const boxHeight = Math.round(text.height + codeHeight + (padY * 2));
+      const boxWidth = Math.round(Math.min(frame.maxWidth, text.width + (padX * 2)));
+      const boxHeight = Math.round(text.height + (padY * 2));
       const left = Math.round((width - boxWidth) / 2);
       const color = Phaser.Display.Color.HexStringToColor(row.color).color;
       graphics.fillStyle(0x070b14, 0.92 * row.alpha);
@@ -13279,9 +13365,6 @@ export class MenuScene extends Phaser.Scene {
       graphics.lineStyle(2, color, 0.9 * row.alpha);
       graphics.strokeRoundedRect(left, y, boxWidth, boxHeight, 10);
       text.setPosition(Math.round(left + (boxWidth / 2)), y + padY).setAlpha(row.alpha).setVisible(true);
-      if (hasCode) {
-        codeText.setPosition(Math.round(left + (boxWidth / 2)), Math.round(y + padY + text.height)).setAlpha(row.alpha * 0.85).setVisible(true);
-      }
       y += boxHeight + 8;
     });
   }
@@ -13310,24 +13393,6 @@ export class MenuScene extends Phaser.Scene {
     if (expired) {
       this.markLegacyPlayerMessagesDirty();
     }
-  }
-
-  private createAuthInfoText(
-    copy: string,
-    y: number,
-    panel: OverlayPanelFrame,
-    color: string,
-    fontSize?: number
-  ): void {
-    const maxWidth = panel.width - 56;
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(panel.centerX, y, copy, {
-      align: 'center',
-      color,
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${fontSize ?? (panel.width < LEGACY_UI_COMPACT_BREAKPOINT ? 16 : 18)}px`,
-      wordWrap: { width: maxWidth, useAdvancedWrap: true }
-    })), maxWidth, fontSize ?? 18, 11).setOrigin(0.5);
-    this.uiTexts.push(label);
   }
 
   private createLegacyAuthActionButton(
@@ -13574,7 +13639,7 @@ export class MenuScene extends Phaser.Scene {
     height: number,
     text: string,
     onClick: () => void,
-    options: { explicitHitZone?: boolean; labelRole?: LegacyUiLabelRole } = {}
+    options: { explicitHitZone?: boolean; labelRole?: LegacyUiLabelRole; semanticAction?: string } = {}
   ): UiButton {
     const isMenuFrontDoor = this.mode === 'menu' && this.overlay === 'none';
     // Both the Start and Login front-door actions share the same borderless
@@ -13582,7 +13647,7 @@ export class MenuScene extends Phaser.Scene {
     // bordered cyber panel every other button keeps -- ties the primary menu
     // action into the title wordmark's crystal/glow language regardless of
     // which label is showing (signed-out vs signed-in).
-    const isPrimaryFrontDoorButton = isMenuFrontDoor && (text === 'Start' || text === 'Login');
+    const isPrimaryFrontDoorButton = isMenuFrontDoor && (text === MAIN_MENU_BUTTONS[0] || text === 'Login');
     const frontDoorChrome = isMenuFrontDoor
       ? resolveLegacyMenuButtonChrome({
         width,
@@ -13705,6 +13770,7 @@ export class MenuScene extends Phaser.Scene {
       background,
       bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height),
       label,
+      semanticAction: options.semanticAction,
       setActive,
       text,
       updateFrame: glyphLayout

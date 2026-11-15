@@ -2,7 +2,6 @@ import {
   resolveLegacyPlayerMessageColor,
   type LegacyQueuedPlayerMessage
 } from './legacyPlayerMessage';
-import { resolveLegacyAuthFailureCodeLine } from './legacyAuthFailureCodeLine';
 
 /**
  * Pure view-model for the player message toast (MAZER-UI-018).
@@ -20,12 +19,12 @@ export const LEGACY_PLAYER_MESSAGE_TOAST_MAX_WIDTH = 420;
 
 export interface LegacyPlayerMessageToastRow {
   alpha: number;
-  /** MAZER-ACCT-031: the small failure-code line, already included in `copy`. */
-  codeLine: string | null;
   color: string;
+  /**
+   * The player-facing copy only. Auth Surface v2 (2026-11-15) retired the MAZER-ACCT-031 "Code:" line: the stable
+   * failure code stays in the message's technicalDetail (runtime diagnostics), never on screen.
+   */
   copy: string;
-  /** MAZER-UI-034: the message copy without the code line, so the scene can draw the code line at a smaller type step. */
-  messageCopy: string;
   id: string;
   tone: LegacyQueuedPlayerMessage['message']['tone'];
 }
@@ -61,18 +60,12 @@ export const resolveLegacyPlayerMessageToastFrame = (
   maxWidth: resolveLegacyPlayerMessageToastMaxWidth(viewportWidth),
   rows: [...queue]
     .sort((left, right) => right.sequence - left.sequence)
-    .map((entry) => {
-      const codeLine = resolveLegacyAuthFailureCodeLine(entry.message);
-      return {
-        alpha: resolveLegacyPlayerMessageToastAlpha(entry, nowMs),
-        codeLine,
-        color: resolveLegacyPlayerMessageColor(entry.message),
-        copy: codeLine === null ? entry.message.copy : `${entry.message.copy}
-${codeLine}`,
-        id: entry.message.id,
-        messageCopy: entry.message.copy,
-        tone: entry.message.tone
-      };
-    })
+    .map((entry) => ({
+      alpha: resolveLegacyPlayerMessageToastAlpha(entry, nowMs),
+      color: resolveLegacyPlayerMessageColor(entry.message),
+      copy: entry.message.copy,
+      id: entry.message.id,
+      tone: entry.message.tone
+    }))
     .filter((row) => row.alpha > 0)
 });

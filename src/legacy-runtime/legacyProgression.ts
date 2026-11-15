@@ -1015,7 +1015,7 @@ export const resolveLegacyMenuDemoMazeGenerationProfileForProgression = (
   }
   // Frozen board: at most one feeder per side keeps the top bands to roughly a dozen openings.
   return applyLegacyMazeGenerationScaleContext(
-    { ...band, borderFeederTargetPerSide: Math.min(1, band.borderFeederTargetPerSide ?? 0) },
+    { ...band, borderFeederTargetPerSide: Math.min(1, band.borderFeederTargetPerSide ?? 0), journeyStart: true },
     scaleContext
   );
 };

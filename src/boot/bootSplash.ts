@@ -1,4 +1,5 @@
 import { designTokens } from '../theme/tokens';
+import { AUTH_SURFACE_LABELS } from '../brand/authSurfaceCopy';
 import { resolveBootSplashFadeMs } from '../render/uiTransition';
 import { LOADER_SHOW_DELAY_MS, resolveBootSplashExitDelayMs } from '../render/appLoader';
 
@@ -18,8 +19,9 @@ export const MAZER_BOOT_SPLASH_FADE_IN_ANIMATION = 'mazer-boot-splash-in';
 export const MAZER_BOOT_SPLASH_INSTANT_ANIMATION = 'mazer-boot-splash-instant';
 /** Upper bound on how long the splash may outlive game creation if MenuScene never reports in. */
 export const MAZER_BOOT_SPLASH_MAX_AFTER_GAME_CREATE_MS = 10_000;
-export const MAZER_BOOT_SPLASH_NEUTRAL_MESSAGE = 'Loading…';
-export const MAZER_BOOT_SPLASH_SIGN_IN_MESSAGE = 'Signing you in…';
+/** Auth Surface v2: the same two loader labels as the canvas loader (src/brand/authSurfaceCopy.ts). */
+export const MAZER_BOOT_SPLASH_NEUTRAL_MESSAGE: string = AUTH_SURFACE_LABELS.opening;
+export const MAZER_BOOT_SPLASH_SIGN_IN_MESSAGE: string = AUTH_SURFACE_LABELS.signingIn;
 
 /** The root's CSS failsafe animation (index.html): it fades the splash out after LOADER_BOOT_FAILSAFE_MS when scripts never took over. */
 export const MAZER_BOOT_SPLASH_FAILSAFE_ANIMATION = 'mazer-boot-splash-failsafe';
@@ -52,7 +54,7 @@ export interface BootSplashDocumentLike {
   getElementById(id: string): BootSplashElementLike | null;
 }
 
-/** Only an OAuth callback exchange that is actually in progress says "Signing you in"; every other stage is neutral. */
+/** Only an OAuth callback exchange that is actually in progress says "Signing in…"; every other stage is neutral. */
 export const resolveMazerBootSplashMessage = (stage: string): string => (
   stage === 'oauth-exchange' ? MAZER_BOOT_SPLASH_SIGN_IN_MESSAGE : MAZER_BOOT_SPLASH_NEUTRAL_MESSAGE
 );

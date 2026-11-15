@@ -119,7 +119,7 @@ Shared-account sign-in failures (2026-11-11): `LEGACY_OAUTH_FAILURE_MESSAGE_COPY
 `cancelled`, `connection`, `session`, `storage`, `providerUnreachable` (MAZER-ACCT-036, account service down before leaving for sign-in), `generic`) is a sixth routed table, resolved by
 `resolveLegacyOAuthFailureMessage(code)` (id `auth.oauth-failure.<class>`, tone error). The internal failure code is recorded only in
 `technicalDetail` (`oauth-failure:<code>`, diagnostics) and never in player copy. `resolveLegacyAuthFeedbackMessage` passes this copy
-through unchanged. The `generic` row equals `MAZER_OAUTH_SAFE_ERROR_MESSAGE` (the literal pinned in section 4 for `legacyAccountPortal.ts`).
+through unchanged. The `generic` row equals `MAZER_OAUTH_SAFE_ERROR_MESSAGE`, which since the Auth Surface v2 Wave 5C follow-up (2026-11-15) is no longer a literal in `legacyAccountPortal.ts`: it is `AUTH_SURFACE_MESSAGES['signin.unavailable']` from `src/brand/authSurfaceCopy.ts` (its section 4 row was removed). The host return notices `?notice=expired|unavailable` (`legacyAuthReturnNotice.ts`) are recorded as the boot failure codes `expired_or_missing_state` / `provider_unreachable` and so reach the player through this same table.
 
 ## 4. Pinned literal inventory (player-facing strings outside the message module)
 
@@ -133,7 +133,6 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | `src/scenes/MenuScene.ts:17547` | `Runtime diagnostics authenticated fixture.` | no | n/a | fixture | None (QA fixture) |
 | `src/boot/accessibilitySurface.ts:100` | `Touch and drag anywhere to move through the maze. With a keyboard, use Arrow keys or WASD to move, Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.` | no | n/a | static | None (a11y description) |
 | `src/boot/accessibilitySurface.ts:109` | `Mazer is ready.` | no | info | static | Live region never updated; candidate sink for the message surface announcements |
-| `src/legacy-runtime/legacyAccountPortal.ts:23` | `Could not reach your account. Try again.` | no | error / auth | raw-status | Auth table key `accountConnectionUnavailable`; it is drawn directly at `MenuScene.ts:17128` and via F2 |
 | `src/legacy-runtime/legacyAuth.ts:763` | `Account connected.` | no | success / auth | raw-status | Auth table key `accountConnected`; no render site today (info on the snapshot) |
 | `src/legacy-runtime/legacyAuth.ts:1447` | `That username is already taken.` | no (duplicate) | error / auth | duplicate-unrendered | Use `LEGACY_AUTH_MESSAGE_COPY.usernameTaken` and render it (F4) |
 | `src/legacy-runtime/legacyLeaderboard.ts:49` | `The leaderboard is not available right now.` | no | error / system | parallel-mapper | Fold into the message module |
@@ -331,6 +330,18 @@ Ordered by dependency. Owners per section 1. Each item names the guard row it wi
 
 Sequencing: P4 and P1 first (3B/3C), then P2 and P3 (5C), then P5 and P6, with P7 and P8 held for a decision.
 
+### 4e. Auth Surface v2 copy matrix (2026-11-15, PR-A)
+
+The status screen (`legacyAccountStatusState.ts`), loader and splash labels (`bootSplash.ts`, `index.html`), the
+install gate (`installGate.ts`) and the new boot-error screen (`bootErrorScreen.ts`, `surfaceMarkup.ts`) read every
+visible line from `src/brand/authSurfaceCopy.ts`, so their old pinned rows (`Loading…`, `Signing you in…`,
+`Opening…`, `You are signed out.`, `Still opening. Try again.`, the install subtitles, value line and steps) are
+removed from section 4d and the test pin. `tests/reset/auth-surface-copy-lint.test.ts` fails on any sentence in those
+files that is not in the module and on retired phrases (`Code: `, `Choose Sign in`, `Signing you in`, ...). The
+raw auth error render site now passes the snapshot error through `resolveLegacyAuthFeedbackMessage` before the
+status view-model, which maps it onto a matrix line. The toast `Code:` line is removed (the code stays in
+`technicalDetail`). The `legacyPlayerMessage.ts` failure rows are unchanged here (Wave 3B follow-up).
+
 ## 9. Not verified (UNKNOWN)
 
 - Whether the legacy password submit path (`handleLegacyAuthSubmit`) is reachable in the shipped
@@ -354,7 +365,7 @@ Pure modules, not rendered until the Settings wiring lane lands (`docs/ui/MAZER-
 | `src/legacy-runtime/legacyGuideContent.ts` | `You are the green rounded block inside a bright ring.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Touch and drag anywhere to move. With a mouse, click and drag. Let go to stop.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `A shimmering, colour-shifting line is your route. {} in Settings calms it.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
-| `src/legacy-runtime/legacyGuideContent.ts` | `Some mazes wrap around open edges. Trail-coloured edge diamonds fill as beams hit.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `Some mazes wrap around open edges. Trail-coloured edge stars fill as beams hit.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `The dot and number by the top-left icon show how many players are online right now.` | static | Guide row copy for the menu online counter (MAZER-UI-024); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Clears show your clear time and level. Harder mazes add shortcuts and loops.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyControlHint.ts` | `Touch and drag anywhere to move.` | static | level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows |
@@ -362,8 +373,8 @@ Pure modules, not rendered until the Settings wiring lane lands (`docs/ui/MAZER-
 | `src/legacy-runtime/legacyControlHint.ts` | `Arrow keys or WASD to move.` | static | level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows |
 | `src/legacy-runtime/legacyControlHint.ts` | `Drag anywhere, or use arrows / WASD.` | static | level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows |
 | `src/legacy-runtime/legacyControlHint.ts` | `Reach the star to clear the maze.` | static | level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows |
-| `src/legacy-runtime/legacySettingsSheetPlan.ts` | `Small chirps on steps, wall bumps and wins. Off until you turn it on.` | static | Settings sheet description under the Sound effects row (MAZER-AUDIO-003); every setting row must carry one |
-| `src/legacy-runtime/legacyGuideContent.ts` | `Sound is off until you turn it on in Settings. Then steps, bumps and wins chirp.` | static | Guide row copy for the Sound effects setting (MAZER-AUDIO-003); instructions, guide-synced |
+| `src/legacy-runtime/legacySettingsSheetPlan.ts` | `Soft ticks on steps, wall bumps and wins. On unless you turn it off.` | static | Settings sheet description under the Sound effects row (MAZER-AUDIO-003, default on since MAZER-AUDIO-004); every setting row must carry one |
+| `src/legacy-runtime/legacyGuideContent.ts` | `Sound is on by default. Soft ticks play on steps, bumps and wins. Turn it off in Settings.` | static | Guide row copy for the Sound effects setting (MAZER-AUDIO-003, default on since MAZER-AUDIO-004); instructions, guide-synced |
 | `src/legacy-runtime/legacySettingsSheetPlan.ts` | `Buzzes on steps, wall bumps and wins. Silent with Reduce Motion, and on iPhone.` | static | Settings sheet description under the Haptics row (MAZER-UI-026); every setting row must carry one, see docs/ui/MAZER-SETTINGS-SHEET-SPEC-2026-11-06.md |
 | `src/legacy-runtime/legacySettingsSheetPlan.ts` | `Controls, the goal, and what each icon means.` | static | Settings sheet description under the How to play row (MAZER-UI-026); every setting row must carry one, see docs/ui/MAZER-SETTINGS-SHEET-SPEC-2026-11-06.md |
 | `src/legacy-runtime/legacySettingsSheetPlan.ts` | `Sets your level back to 1. Asks you to confirm first.` | static | Settings sheet description under the Reset progress row (MAZER-UI-026); every setting row must carry one, see docs/ui/MAZER-SETTINGS-SHEET-SPEC-2026-11-06.md |

@@ -254,7 +254,7 @@ const settingRow = (
  */
 export const LEGACY_SETTINGS_DESCRIPTIONS = Object.freeze({
   haptics: 'Buzzes on steps, wall bumps and wins. Silent with Reduce Motion, and on iPhone.',
-  sound: 'Small chirps on steps, wall bumps and wins. Off until you turn it on.',
+  sound: 'Soft ticks on steps, wall bumps and wins. On unless you turn it off.',
   howToPlay: 'Controls, the goal, and what each icon means.',
   resetProgress: 'Sets your level back to 1. Asks you to confirm first.',
   signOut: 'Signs this device out. Your progress stays on your account.'

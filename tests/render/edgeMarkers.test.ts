@@ -7,6 +7,9 @@ import {
   EDGE_MARKER_IDLE_PERIOD_MS,
   EDGE_MARKER_FLASH_MS,
   EDGE_MARKER_HALF_HEIGHT,
+  EDGE_MARKER_HALF_WIDTH,
+  EDGE_STAR_CURVE_SEGMENTS,
+  resolveEdgeMarkerOutline,
   EDGE_MARKER_MAX_EXTENT_PX,
   EDGE_MARKER_TIP_PAINT_PX,
   resolveEdgeCornerInset,
@@ -93,7 +96,9 @@ const isOnPolygonEdge = (vertices: ReadonlyArray<{ x: number; y: number }>, poin
 const VIEWPORTS = [
   { width: 390, height: 844 },
   { width: 1280, height: 720 },
-  { width: 499, height: 958 }
+  { width: 499, height: 958 },
+  { width: 375, height: 667 },
+  { width: 430, height: 932 }
 ] as const;
 
 const MIRROR_VIEWPORTS = [
@@ -103,7 +108,7 @@ const MIRROR_VIEWPORTS = [
 ] as const;
 
 describe('edge marker stations', () => {
-  test.each(VIEWPORTS)('all 8 kites rest fully inside a $width x $height viewport with the PAINTED outer tip touching the screen edge (corner diamonds: in the corner, 0 px inset, MAZER-VIS-044)', (viewport) => {
+  test.each(VIEWPORTS)('all 8 kites rest fully inside a $width x $height viewport with the PAINTED outer tip touching the screen edge (corner diamonds: tip inset 0, or 16 px on a tall rounded-display phone, MAZER-VIS-044 / VIS-054)', (viewport) => {
     const stations = resolveEdgeStations(viewport);
     expect(stations).toHaveLength(EDGE_STATION_COUNT);
     for (const station of stations) {
@@ -128,8 +133,8 @@ describe('edge marker stations', () => {
       };
       if (station.isCorner) {
         // MAZER-VIS-044: the same distance from BOTH edges of the screen corner it sits in.
-        expect(Math.min(gaps.top, gaps.bottom), `station ${station.id} vertical corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(), 9);
-        expect(Math.min(gaps.left, gaps.right), `station ${station.id} horizontal corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(), 9);
+        expect(Math.min(gaps.top, gaps.bottom), `station ${station.id} vertical corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
+        expect(Math.min(gaps.left, gaps.right), `station ${station.id} horizontal corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
       } else {
         expect(gaps[station.side], `station ${station.id} gap to ${station.side}`).toBeCloseTo(0, 9);
       }
@@ -140,51 +145,65 @@ describe('edge marker stations', () => {
         }
       }
     }
-    // A 1 px stroke joins with a miter: the tip paints 0.5 / sin(atan(7 / 12)) = ~0.99 px beyond its vertex.
-    expect(EDGE_MARKER_TIP_PAINT_PX).toBeCloseTo(0.5 / Math.sin(Math.atan2(7, 12)), 9);
-    expect(EDGE_MARKER_MAX_EXTENT_PX).toBeCloseTo(10 + EDGE_MARKER_TIP_PAINT_PX, 9);
+    // A 1 px stroke joins with a miter at the star's needle tips: ~2.4 px beyond the vertex (3.04 for the unflattened curve), measured on the outline.
+    expect(EDGE_MARKER_TIP_PAINT_PX).toBeGreaterThan(1.5);
+    expect(EDGE_MARKER_TIP_PAINT_PX).toBeLessThan(3.1);
+    expect(EDGE_MARKER_MAX_EXTENT_PX).toBeCloseTo(EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX, 9);
     // Midpoint kites paint ~10.99 px from the centre toward their edge; 45 degree corner kites ~7.77 px.
-    expect(resolveEdgeStationNormalExtent(1)).toBeCloseTo(10 + EDGE_MARKER_TIP_PAINT_PX, 9);
-    expect(resolveEdgeStationNormalExtent(3)).toBeCloseTo(10 + EDGE_MARKER_TIP_PAINT_PX, 9);
-    expect(resolveEdgeStationNormalExtent(0)).toBeCloseTo((10 + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2, 9);
+    expect(resolveEdgeStationNormalExtent(1)).toBeCloseTo(EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX, 9);
+    expect(resolveEdgeStationNormalExtent(3)).toBeCloseTo(EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX, 9);
+    expect(resolveEdgeStationNormalExtent(0)).toBeCloseTo((EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2, 9);
   });
 
   test('the painted polygon is the stroke\'s outer boundary: half a stroke outside every edge, miter at the vertices', () => {
     const station = { x: 100, y: 100, inwardAngle: Math.PI / 2 };
-    const vertices = resolveEdgeMarkerVertices(station);
+    const vertices = resolveEdgeMarkerOutline(station);
     const painted = resolveEdgeMarkerPaintedPolygon(station);
-    expect(painted).toHaveLength(4);
+    const count = 4 * EDGE_STAR_CURVE_SEGMENTS;
+    expect(vertices).toHaveLength(count);
+    expect(painted).toHaveLength(count);
     painted.forEach((point, index) => {
       const vertex = vertices[index] as { x: number; y: number };
-      // every painted corner is outside its vertex by the miter length of that corner
-      expect(Math.hypot(point.x - vertex.x, point.y - vertex.y)).toBeGreaterThan(0.5);
-      expect(Math.hypot(point.x - vertex.x, point.y - vertex.y)).toBeLessThan(1.05);
+      // every painted corner is outside its vertex by the miter length of that corner (the needle tips the most)
+      expect(Math.hypot(point.x - vertex.x, point.y - vertex.y)).toBeGreaterThan(0.45);
+      expect(Math.hypot(point.x - vertex.x, point.y - vertex.y)).toBeLessThan(EDGE_MARKER_TIP_PAINT_PX + 1e-9);
+    });
+    // the four corner vertices are vertices of the flattened outline
+    resolveEdgeMarkerVertices(station).forEach((corner, quarter) => {
+      const flat = vertices[quarter * EDGE_STAR_CURVE_SEGMENTS] as { x: number; y: number };
+      expect(flat.x).toBeCloseTo(corner.x, 9);
+      expect(flat.y).toBeCloseTo(corner.y, 9);
     });
     // distance from a painted edge to the outline edge is half a stroke
     const distance = (a: { x: number; y: number }, b: { x: number; y: number }, c: { x: number; y: number }): number => (
       Math.abs(((b.x - a.x) * (a.y - c.y)) - ((a.x - c.x) * (b.y - a.y))) / Math.hypot(b.x - a.x, b.y - a.y)
     );
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < count; index += 1) {
       const a = vertices[index] as { x: number; y: number };
-      const b = vertices[(index + 1) % 4] as { x: number; y: number };
+      const b = vertices[(index + 1) % count] as { x: number; y: number };
       expect(distance(a, b, painted[index] as { x: number; y: number })).toBeCloseTo(0.5, 9);
-      expect(distance(a, b, painted[(index + 1) % 4] as { x: number; y: number })).toBeCloseTo(0.5, 9);
+      expect(distance(a, b, painted[(index + 1) % count] as { x: number; y: number })).toBeCloseTo(0.5, 9);
     }
   });
 
-  test.each(VIEWPORTS)('the corner diamond of $width x $height has its painted outer tip ON the screen corner (0 px from both edges)', (viewport) => {
+  test.each(VIEWPORTS)('the corner diamond of $width x $height has its painted outer tip at the viewport tip inset from both edges (0 px, or 16 px on a tall phone, MAZER-VIS-054)', (viewport) => {
     const corner = resolveEdgeStations(viewport)[0] as { x: number; y: number; inwardAngle: number };
     const cornerPaint = resolveEdgeMarkerPaintedPolygon(corner);
-    expect(Math.min(...cornerPaint.map((point) => point.x))).toBeCloseTo(0, 9);
-    expect(Math.min(...cornerPaint.map((point) => point.y))).toBeCloseTo(0, 9);
-    expect(corner.x).toBeCloseTo(resolveEdgeCornerInset(), 9);
-    expect(corner.y).toBeCloseTo(resolveEdgeCornerInset(), 9);
+    expect(Math.min(...cornerPaint.map((point) => point.x))).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
+    expect(Math.min(...cornerPaint.map((point) => point.y))).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
+    expect(corner.x).toBeCloseTo(resolveEdgeCornerInset(viewport), 9);
+    expect(corner.y).toBeCloseTo(resolveEdgeCornerInset(viewport), 9);
   });
 
   test('fixed positions: top row is inset / w/2 / w-inset (the corner diamonds sit in the corners, MAZER-VIS-044) and the layout depends on the viewport size and the resolution ONLY', () => {
-    const inset = resolveEdgeCornerInset();
-    expect(inset).toBeCloseTo((10 + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2, 9);
-    expect(inset).toBeLessThan(8);
+    // No viewport (and every square-cornered viewport): the tip is ON the corner, so the centre is one half-extent in.
+    expect(resolveEdgeCornerInset()).toBeCloseTo((EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2, 9);
+    expect(resolveEdgeCornerInset()).toBeLessThan(8);
+    expect(resolveEdgeCornerInset({ width: 375, height: 667 })).toBeCloseTo(resolveEdgeCornerInset(), 9);
+    expect(resolveEdgeCornerInset({ width: 1280, height: 720 })).toBeCloseTo(resolveEdgeCornerInset(), 9);
+    // MAZER-VIS-054: a tall rounded-display phone slides the corner diamonds 16 px in along the diagonal.
+    const inset = resolveEdgeCornerInset({ width: 390, height: 844 });
+    expect(inset).toBeCloseTo(16 + ((EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2), 9);
     const stations = resolveEdgeStations({ width: 390, height: 844 });
     expect(stations[0]?.x).toBeCloseTo(inset, 9);
     expect(stations[0]?.y).toBeCloseTo(inset, 9);
@@ -192,7 +211,7 @@ describe('edge marker stations', () => {
     expect(stations[4]?.y).toBeCloseTo(844 - inset, 9);
     expect(stations[1]?.x).toBeCloseTo(195, 9);
     expect(stations[2]?.x).toBeCloseTo(390 - inset, 9);
-    const extent = 10 + EDGE_MARKER_TIP_PAINT_PX;
+    const extent = EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX;
     expect(stations[1]?.y).toBeCloseTo(extent, 9);
     expect(stations[5]?.y).toBeCloseTo(844 - extent, 9);
     expect(stations[3]?.x).toBeCloseTo(390 - extent, 9);
@@ -200,10 +219,11 @@ describe('edge marker stations', () => {
     expect(stations[3]?.y).toBeCloseTo(422, 9);
     expect(stations[7]?.y).toBeCloseTo(422, 9);
     expect(resolveEdgeStations.length).toBe(1);
+    const squareInset = resolveEdgeCornerInset();
     const wide = resolveEdgeStations({ width: 1280, height: 720 });
-    expect(wide[0]?.x).toBeCloseTo(inset, 9);
+    expect(wide[0]?.x).toBeCloseTo(squareInset, 9);
     expect(wide[1]?.x).toBeCloseTo(640, 9);
-    expect(wide[2]?.x).toBeCloseTo(1280 - inset, 9);
+    expect(wide[2]?.x).toBeCloseTo(1280 - squareInset, 9);
     // The painted canvas ends at round(css * resolution) / resolution: at 2.63 (the 2.625 resolution rounded to hundredths) 390 css px
     // is a 1026 px backing store, i.e. 390.1141 px of world: the right midpoint's painted tip touches THAT edge.
     const dpr = resolveEdgeStations({ width: 390, height: 844 }, 2.63);
@@ -252,10 +272,21 @@ describe('edge marker stations', () => {
   });
 
 
-  test('kite is ~14 x 20 px', () => {
+  test('the star is ~12.8 x 17.6 px (half length 8.8, half width 16/44 of the length), concave between its four tips', () => {
     const [tip, side, tail, otherSide] = resolveEdgeMarkerVertices({ x: 100, y: 100, inwardAngle: Math.PI / 2 });
-    expect(Math.abs((tip?.y ?? 0) - (tail?.y ?? 0))).toBeCloseTo(20, 9);
-    expect(Math.abs((side?.x ?? 0) - (otherSide?.x ?? 0))).toBeCloseTo(14, 9);
+    expect(Math.abs((tip?.y ?? 0) - (tail?.y ?? 0))).toBeCloseTo(2 * EDGE_MARKER_HALF_HEIGHT, 9);
+    expect(Math.abs((side?.x ?? 0) - (otherSide?.x ?? 0))).toBeCloseTo(2 * EDGE_MARKER_HALF_WIDTH, 9);
+    expect(EDGE_MARKER_HALF_WIDTH / EDGE_MARKER_HALF_HEIGHT).toBeCloseTo(16 / 22, 9);
+    // concave: every flattened side bows inward of the straight tip-to-shoulder chord (the midpoint of a side is nearer the centre than the chord midpoint)
+    const outline = resolveEdgeMarkerOutline({ x: 100, y: 100, inwardAngle: Math.PI / 2 });
+    const corners = [0, 1, 2, 3].map((quarter) => outline[quarter * EDGE_STAR_CURVE_SEGMENTS] as { x: number; y: number });
+    for (let quarter = 0; quarter < 4; quarter += 1) {
+      const a = corners[quarter] as { x: number; y: number };
+      const b = corners[(quarter + 1) % 4] as { x: number; y: number };
+      const mid = outline[(quarter * EDGE_STAR_CURVE_SEGMENTS) + (EDGE_STAR_CURVE_SEGMENTS / 2)] as { x: number; y: number };
+      const chordMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      expect(Math.hypot(mid.x - 100, mid.y - 100)).toBeLessThan(Math.hypot(chordMid.x - 100, chordMid.y - 100));
+    }
   });
 
   test('keeps the same 8 stations, ids and order the sigils/teleport anchors use', () => {
@@ -954,7 +985,7 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
         expect(minY, label).toBeGreaterThanOrEqual(-1e-9);
         expect(maxX, label).toBeLessThanOrEqual(viewport.width + 1e-9);
         expect(maxY, label).toBeLessThanOrEqual(viewport.height + 1e-9);
-        const cornerLift = resolveEdgeCornerInset() - resolveEdgeStationNormalExtent(0);
+        const cornerLift = resolveEdgeCornerInset(viewport) - resolveEdgeStationNormalExtent(0);
         if (station.side === 'top') {
           expect(minY, label).toBeLessThanOrEqual(cornerLift + 1e-9);
           if (Math.abs(minY) < 1e-9) flushSamples += 1;
@@ -1011,8 +1042,8 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
     const viewport = { width: 390, height: 844 };
     const rest = resolveEdgeStations(viewport);
     const firstVertex = (recorder: Recorder, kite: number): { x: number; y: number } => {
-      // each outline contributes 1 moveTo + 3 lineTo; the unlit outline is the only polygon drawn
-      const point = recorder.points[kite * 4] as { x: number; y: number };
+      // each outline contributes 1 moveTo + (4 * segments - 1) lineTo; the unlit outline is the only polygon drawn
+      const point = recorder.points[kite * 4 * EDGE_STAR_CURVE_SEGMENTS] as { x: number; y: number };
       return point;
     };
     const phase = STEP * 0.6;
@@ -1200,7 +1231,7 @@ describe('diamond size (outer-tip anchored) and inner-tip attachment (MAZER-VIS-
           expect(length).toBeGreaterThanOrEqual(previousReach - 1e-9);
           previousReach = length;
         }
-        // The inner tip at full size is the station's own vertex 0; at 50% it is the station centre (10 px from the outer tip).
+        // The inner tip at full size is the station's own vertex 0; at 50% it is the station centre (EDGE_MARKER_HALF_HEIGHT from the outer tip).
         expect(fullInner.x).toBeCloseTo((resolveEdgeMarkerVertices(station, 1)[0] as { x: number }).x, 9);
         expect(resolveEdgeInnerTip(station, 0.5).x).toBeCloseTo(station.x, 9);
         expect(resolveEdgeInnerTip(station, 0.5).y).toBeCloseTo(station.y, 9);

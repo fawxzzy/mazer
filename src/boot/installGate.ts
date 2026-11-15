@@ -1,4 +1,12 @@
-import { MAZER_BOOT_LOADER_ICON_DATA_URI } from '../brand/bootLoaderIconData';
+import { AUTH_SURFACE_INSTALL_COPY, AUTH_SURFACE_LABELS } from '../brand/authSurfaceCopy';
+import {
+  escapeSurfaceHtml,
+  renderSurfaceAppIcon,
+  renderSurfaceKicker,
+  renderSurfaceLegal,
+  renderSurfaceNoticeInner,
+  renderSurfaceSteps
+} from './surfaceMarkup';
 import { getInstallSurfaceState, promptInstallSurface, subscribeInstallSurface, type InstallSurfaceState } from './installSurface';
 import {
   resolveInstallGateDecision,
@@ -66,10 +74,10 @@ export const MAZER_INSTALL_GATE_OVERLAY_ID = 'mazer-install-gate-overlay';
 
 export interface MazerInstallGateCopy {
   title: string;
-  subtitle: string;
-  /** One short line on why installing is worth it; empty for the post-install card. */
-  valueLine: string;
-  /** At most three short steps; empty for the post-install "open the app" card. */
+  /** One short line under the title (the approved mock's lead). */
+  lead: string;
+  /** At most three short steps, each with at most one inline icon token ({share}, {add}, {dots}); empty for the
+   *  prompt card (it has the Install button instead) and the post-install card. */
   steps: string[];
   /** Null when the card has no native action of its own (manual platforms). */
   primaryLabel: string | null;
@@ -77,105 +85,43 @@ export interface MazerInstallGateCopy {
   showCopyLink: boolean;
 }
 
-const INSTALL_TITLE = 'Install Mazer';
-const INSTALL_SUBTITLE = 'Mazer only runs as an installed app, not in a browser tab.';
-/** Firefox and unknown desktop browsers cannot install web apps at all, so the card says why and where to go. */
-const DESKTOP_OTHER_SUBTITLE = 'Mazer only runs as an installed app, not in a browser tab. Chrome, Edge and Safari on a Mac can install it.';
-const INSTALL_VALUE_LINE = 'Race through endless mazes, straight from your home screen.';
-
-/** Shown under the Copy link button once the copy attempt has finished. */
+/** Shown in the card's message box once the copy attempt has finished. */
 export const MAZER_INSTALL_GATE_COPY_FEEDBACK = {
-  copied: 'Link copied. Paste it into Safari or Chrome.',
-  failed: 'Could not copy the link. Copy the address from your browser instead.'
+  copied: AUTH_SURFACE_INSTALL_COPY.copied,
+  failed: AUTH_SURFACE_INSTALL_COPY.copyFailed
 } as const;
 
+const manualCopy = (lead: string, steps: readonly string[], showCopyLink = false): MazerInstallGateCopy => ({
+  title: AUTH_SURFACE_INSTALL_COPY.title,
+  lead,
+  steps: [...steps],
+  primaryLabel: null,
+  primaryAction: null,
+  showCopyLink
+});
+
 /**
- * Per-platform copy. Short and plain, three steps max. There is deliberately
- * no "skip" / "continue without installing" entry: see installPolicy.ts.
+ * Per-mode copy (Auth Surface v2, src/brand/authSurfaceCopy.ts; the step wording is shared with Fitness). Short and
+ * plain, three steps max. There is deliberately no "skip" / "continue without installing" entry: see installPolicy.ts.
+ * The in-app browser card and the post-install card vary by platform: see resolveMazerInstallGateCopy.
  */
 export const MAZER_INSTALL_GATE_COPY: Readonly<Record<InstallGateMode, MazerInstallGateCopy>> = {
   'prompt-available': {
-    title: INSTALL_TITLE,
-    subtitle: INSTALL_SUBTITLE,
-    valueLine: INSTALL_VALUE_LINE,
-    steps: [
-      'Press Install below.',
-      'Confirm in your browser.',
-      'Open Mazer from your home screen or desktop.'
-    ],
-    primaryLabel: 'Install',
+    title: AUTH_SURFACE_INSTALL_COPY.title,
+    lead: AUTH_SURFACE_INSTALL_COPY.leadPrompt,
+    steps: [],
+    primaryLabel: AUTH_SURFACE_LABELS.install,
     primaryAction: 'install',
     showCopyLink: false
   },
-  'manual-desktop-chromium': {
-    title: INSTALL_TITLE,
-    subtitle: INSTALL_SUBTITLE,
-    valueLine: INSTALL_VALUE_LINE,
-    steps: [
-      'Click the install icon at the end of the address bar, or open the browser menu and choose Install Mazer.',
-      'Confirm the install.',
-      'Open Mazer from your desktop or Start menu.'
-    ],
-    primaryLabel: null,
-    primaryAction: null,
-    showCopyLink: false
-  },
-  'manual-desktop-other': {
-    title: INSTALL_TITLE,
-    subtitle: DESKTOP_OTHER_SUBTITLE,
-    valueLine: INSTALL_VALUE_LINE,
-    steps: [
-      'Open this page in Chrome or Edge. In Safari, choose File, then Add to Dock.',
-      'In Chrome or Edge, click the install icon in the address bar.',
-      'Open Mazer from your desktop, Start menu or Dock.'
-    ],
-    primaryLabel: null,
-    primaryAction: null,
-    showCopyLink: true
-  },
-  'manual-android': {
-    title: INSTALL_TITLE,
-    subtitle: INSTALL_SUBTITLE,
-    valueLine: INSTALL_VALUE_LINE,
-    steps: [
-      'Open this page in Chrome and tap the three-dot menu.',
-      'Choose Install app or Add to Home screen.',
-      'Open Mazer from your home screen.'
-    ],
-    primaryLabel: null,
-    primaryAction: null,
-    showCopyLink: true
-  },
-  'manual-ios': {
-    title: INSTALL_TITLE,
-    subtitle: INSTALL_SUBTITLE,
-    valueLine: INSTALL_VALUE_LINE,
-    steps: [
-      'Tap the Share button in Safari.',
-      'Choose Add to Home Screen.',
-      'Open Mazer from your home screen.'
-    ],
-    primaryLabel: null,
-    primaryAction: null,
-    showCopyLink: false
-  },
-  'in-app-browser': {
-    title: INSTALL_TITLE,
-    subtitle: 'Mazer only runs as an installed app, and in-app browsers cannot install it.',
-    valueLine: INSTALL_VALUE_LINE,
-    steps: [
-      'Copy the link below.',
-      'Paste it into Safari or Chrome.',
-      'Install Mazer from there, then open it from your home screen.'
-    ],
-    primaryLabel: null,
-    primaryAction: null,
-    showCopyLink: true
-  },
+  'manual-desktop-chromium': manualCopy(AUTH_SURFACE_INSTALL_COPY.leadDesktop, AUTH_SURFACE_INSTALL_COPY.stepsDesktopChromium),
+  'manual-desktop-other': manualCopy(AUTH_SURFACE_INSTALL_COPY.leadDesktopOther, AUTH_SURFACE_INSTALL_COPY.stepsDesktopOther, true),
+  'manual-android': manualCopy(AUTH_SURFACE_INSTALL_COPY.leadHomeScreen, AUTH_SURFACE_INSTALL_COPY.stepsAndroid),
+  'manual-ios': manualCopy(AUTH_SURFACE_INSTALL_COPY.leadHomeScreen, AUTH_SURFACE_INSTALL_COPY.stepsIos),
+  'in-app-browser': manualCopy(AUTH_SURFACE_INSTALL_COPY.leadInAppIos, AUTH_SURFACE_INSTALL_COPY.stepsInAppIos, true),
   'installed-open-app': {
-    title: 'Mazer is installed',
-    subtitle: 'Open it from your home screen or desktop.',
-    valueLine: '',
+    title: AUTH_SURFACE_INSTALL_COPY.installedTitle,
+    lead: AUTH_SURFACE_INSTALL_COPY.installedLead,
     steps: [],
     primaryLabel: null,
     primaryAction: null,
@@ -183,9 +129,19 @@ export const MAZER_INSTALL_GATE_COPY: Readonly<Record<InstallGateMode, MazerInst
   }
 };
 
-export const resolveMazerInstallGateCopy = (mode: InstallGateMode): MazerInstallGateCopy => (
-  MAZER_INSTALL_GATE_COPY[mode]
-);
+/** `platform` refines two cards: Android in-app browsers say Chrome, and a desktop install opens from the desktop. */
+export const resolveMazerInstallGateCopy = (
+  mode: InstallGateMode,
+  platform: InstallSurfaceState['platform'] | null = null
+): MazerInstallGateCopy => {
+  if (mode === 'in-app-browser' && platform === 'android-in-app') {
+    return manualCopy(AUTH_SURFACE_INSTALL_COPY.leadInAppAndroid, AUTH_SURFACE_INSTALL_COPY.stepsInAppAndroid, true);
+  }
+  if (mode === 'installed-open-app' && platform !== null && platform.startsWith('desktop')) {
+    return { ...MAZER_INSTALL_GATE_COPY[mode], lead: AUTH_SURFACE_INSTALL_COPY.installedDesktopLead };
+  }
+  return MAZER_INSTALL_GATE_COPY[mode];
+};
 
 /**
  * Feeds the live install-surface facts into the pure policy. The host exemption is decided once at boot
@@ -228,37 +184,52 @@ export interface MazerInstallGateCallbacks {
   onInstall(): void;
 }
 
-const escapeHtml = (value: string): string => value
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;');
-
-const renderStepsHtml = (steps: readonly string[]): string => {
-  if (steps.length <= 0) {
-    return '';
-  }
-
-  const items = steps.map((step, index) => (
-    `<li><span class="mazer-install-gate-step-index">${index + 1}</span><span>${escapeHtml(step)}</span></li>`
-  )).join('');
-
-  return `<ol class="mazer-install-gate-steps">${items}</ol>`;
-};
-
-/** Static mini-maze mark: a decorative three-by-three corridor, hidden from assistive tech. */
-const MINI_MAZE_SVG = '<svg class="mazer-install-gate-mini-maze" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true" focusable="false"><rect x="2" y="2" width="44" height="44" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.4" stroke-width="2"/><path d="M8 14H30V24H16V34H40" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="14" r="3" fill="currentColor"/></svg>';
-
-const renderValueHtml = (valueLine: string): string => (
-  valueLine === ''
-    ? ''
-    : `<div class="mazer-install-gate-value">${MINI_MAZE_SVG}<p class="mazer-install-gate-value-line">${escapeHtml(valueLine)}</p></div>`
-);
-
 const removeInstallGateOverlay = (documentRef: InstallGateDocumentLike): void => {
   const existing = documentRef.getElementById(MAZER_INSTALL_GATE_OVERLAY_ID);
   if (existing) {
     existing.remove();
   }
+};
+
+/**
+ * The card markup (Auth Surface v2 anatomy, src/boot/surfaceMarkup.ts). Install cards: app icon, kicker, title, lead,
+ * steps, the reserved message box (only where a Copy link button can fill it), Privacy | Terms, one dock button. The
+ * post-install card is the status layout: kicker, centred app icon, title, lead. It has no "Open Mazer" button: a
+ * browser tab cannot open the installed app.
+ */
+export const renderMazerInstallGateCardHtml = (copy: MazerInstallGateCopy, mode: InstallGateMode): string => {
+  if (mode === 'installed-open-app') {
+    return `
+      <div class="mazer-surface mazer-surface-status mazer-install-gate-card">
+        ${renderSurfaceKicker()}
+        <div class="mazer-surface-stat">
+          ${renderSurfaceAppIcon('mark')}
+          <h1 class="mazer-surface-title">${escapeSurfaceHtml(copy.title)}</h1>
+          <p class="mazer-surface-lead">${escapeSurfaceHtml(copy.lead)}</p>
+        </div>
+      </div>
+    `;
+  }
+  const dock = copy.primaryLabel !== null
+    ? `<button type="button" class="mazer-surface-dock" data-mazer-install-gate-action="${copy.primaryAction}">${escapeSurfaceHtml(copy.primaryLabel)}</button>`
+    : copy.showCopyLink
+      ? `<button type="button" class="mazer-surface-dock" data-mazer-install-gate-action="copy">${AUTH_SURFACE_LABELS.copyLink}</button>`
+      : '';
+  const slot = copy.showCopyLink
+    ? '<div class="mazer-surface-slot"><p class="mazer-surface-notice" data-mazer-install-gate-feedback role="status"></p></div>'
+    : '';
+  return `
+    <div class="mazer-surface mazer-install-gate-card">
+      ${renderSurfaceAppIcon('top')}
+      ${renderSurfaceKicker()}
+      <h1 class="mazer-surface-title">${escapeSurfaceHtml(copy.title)}</h1>
+      <p class="mazer-surface-lead">${escapeSurfaceHtml(copy.lead)}</p>
+      <div class="mazer-surface-body">${renderSurfaceSteps(copy.steps)}</div>
+      ${slot}
+      ${renderSurfaceLegal()}
+      ${dock}
+    </div>
+  `;
 };
 
 export const installMazerInstallGate = (
@@ -273,38 +244,20 @@ export const installMazerInstallGate = (
   overlay.setAttribute('aria-live', 'polite');
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', INSTALL_TITLE);
+  overlay.setAttribute('aria-label', AUTH_SURFACE_INSTALL_COPY.title);
 
-  let renderedMode: InstallGateMode | null = null;
+  let renderedKey: string | null = null;
 
   const render = (state: InstallSurfaceState): void => {
     const decision = resolveMazerInstallGateDecision(state);
-    if (!decision.blocked || decision.mode === renderedMode) {
+    const key = `${decision.mode}:${state.platform}`;
+    if (!decision.blocked || key === renderedKey) {
       return;
     }
 
-    renderedMode = decision.mode;
+    renderedKey = key;
     overlay.setAttribute('data-mazer-install-gate-mode', decision.mode);
-    const copy = resolveMazerInstallGateCopy(decision.mode);
-    const buttonsHtml = [
-      copy.primaryLabel !== null
-        ? `<button type="button" class="mazer-install-gate-button mazer-install-gate-button-primary" data-mazer-install-gate-action="${copy.primaryAction}">${escapeHtml(copy.primaryLabel)}</button>`
-        : '',
-      copy.showCopyLink
-        ? '<button type="button" class="mazer-install-gate-button mazer-install-gate-button-secondary" data-mazer-install-gate-action="copy">Copy link</button>'
-        : ''
-    ].filter(Boolean).join('');
-
-    overlay.innerHTML = `
-      <div class="mazer-install-gate-card">
-        <img class="mazer-install-gate-brand" alt="Mazer" width="72" height="72" decoding="sync" src="${MAZER_BOOT_LOADER_ICON_DATA_URI}" />
-        <h1 class="mazer-install-gate-title">${escapeHtml(copy.title)}</h1>
-        <p class="mazer-install-gate-subtitle">${escapeHtml(copy.subtitle)}</p>
-        ${renderValueHtml(copy.valueLine)}
-        ${renderStepsHtml(copy.steps)}
-        <div class="mazer-install-gate-actions">${buttonsHtml}<p class="mazer-install-gate-feedback" data-mazer-install-gate-feedback role="status"></p></div>
-      </div>
-    `;
+    overlay.innerHTML = renderMazerInstallGateCardHtml(resolveMazerInstallGateCopy(decision.mode, state.platform), decision.mode);
 
     overlay.querySelectorAll<HTMLButtonElement>('[data-mazer-install-gate-action]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -318,9 +271,11 @@ export const installMazerInstallGate = (
             }
             const feedback = overlay.querySelector('[data-mazer-install-gate-feedback]');
             if (feedback) {
-              feedback.textContent = copied
-                ? MAZER_INSTALL_GATE_COPY_FEEDBACK.copied
-                : MAZER_INSTALL_GATE_COPY_FEEDBACK.failed;
+              feedback.setAttribute('data-tone', copied ? 'success' : 'error');
+              feedback.innerHTML = renderSurfaceNoticeInner(
+                copied ? 'success' : 'error',
+                copied ? MAZER_INSTALL_GATE_COPY_FEEDBACK.copied : MAZER_INSTALL_GATE_COPY_FEEDBACK.failed
+              );
             }
           });
         }

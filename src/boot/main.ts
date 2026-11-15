@@ -10,9 +10,14 @@ import {
   captureAndScrubMazerOAuthCallback,
   consumeMazerOAuthCallback,
   isMazerOAuthCallbackRequest,
+  recordMazerOAuthBootFailure,
   resolveMazerLegalRoute,
   type MazerOAuthClient
 } from '../legacy-runtime/legacyAccountPortal';
+import {
+  MAZER_AUTH_RETURN_NOTICE_CATEGORY,
+  captureAndScrubMazerAuthReturnNotice
+} from '../legacy-runtime/legacyAuthReturnNotice';
 import { bootstrapLegacyRemoteAccountStateForRoute } from '../legacy-runtime/legacyRemoteProgression';
 import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { installLegacyControlHint } from '../render/legacyControlHintOverlay';
@@ -20,6 +25,7 @@ import { runBoundedAccountBootstrap } from './bootAccountBootstrap';
 import { MAZER_BOOT_SPLASH_MAX_AFTER_GAME_CREATE_MS } from './bootSplash';
 import { waitForMazerUiFonts } from './fontReadiness';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
+import { showMazerBootErrorScreen } from './bootErrorScreen';
 import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
 import { runMazerSignedOutHandoffAtBoot } from './signedOutHandoffBoot';
 import { initializeInstallSurface } from './installSurface';
@@ -136,6 +142,15 @@ const boot = async (): Promise<void> => {
   const oauthCallback = oauthCallbackRequested
     ? captureAndScrubMazerOAuthCallback(window.location, window.history)
     : null;
+  // Auth Surface v2: the account host sends a stopped sign-in back with ?notice=expired|unavailable. Read it once,
+  // strip it from the address bar (like code/state above) and hold its line for the signed-out status box. A callback
+  // on the same URL wins (its outcome is the more specific story); unknown values show nothing.
+  const authReturnNotice = passwordRecoveryRouteRequested
+    ? null
+    : captureAndScrubMazerAuthReturnNotice(window.location, window.history, { ignore: oauthCallbackRequested });
+  if (authReturnNotice !== null) {
+    recordMazerOAuthBootFailure(MAZER_AUTH_RETURN_NOTICE_CATEGORY[authReturnNotice]);
+  }
   markMazerBootStatus('boot-start');
   // Start the UI font fetch immediately (it is also <link rel=preload>ed in
   // index.html) so it overlaps with the install gate / account bootstrap;
@@ -207,7 +222,7 @@ const boot = async (): Promise<void> => {
 
   // MAZER-ACCT-040: a signed-out launch goes straight to the account host's sign-in
   // page, before Phaser exists. Signed-in, bypass and failure cases fall through.
-  await runMazerSignedOutHandoffAtBoot(oauthCallbackRequested);
+  await runMazerSignedOutHandoffAtBoot(oauthCallbackRequested, authReturnNotice !== null);
 
   // Bounded: a slow or failing remote account bootstrap must never keep the
   // player on a blank page. The game starts on cached / guest state instead.
@@ -246,5 +261,7 @@ const boot = async (): Promise<void> => {
 void boot().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   markMazerBootStatus('error', message);
+  // Auth Surface v2: say it did not load and offer Try again, never a blank page.
+  showMazerBootErrorScreen();
   throw error;
 });

@@ -52,14 +52,14 @@ describe('auth gate resolution: when is a session actually being resolved?', () 
     expect(resolveLegacyAuthGateInitialState(input())).toEqual({ awaitingResolution: false, locked: true });
   });
 
-  test('the cover copy follows the same evidence: Signing you in… only with a session, else Loading…', () => {
+  test('the cover copy follows the same evidence: Signing in… only with a session, else Opening Mazer…', () => {
     for (const awaiting of [true, false]) {
-      expect(resolveLegacyAuthLoadingCopy({ awaitingResolution: awaiting, callbackInProgress: false, hasSession: false })).toBe('Loading…');
+      expect(resolveLegacyAuthLoadingCopy({ awaitingResolution: awaiting, callbackInProgress: false, hasSession: false })).toBe('Opening Mazer…');
     }
     const withSession = resolveLegacyAuthGateInitialState(input({ hasStoredSession: true }));
     expect(resolveLegacyAuthLoadingCopy({
       awaitingResolution: withSession.awaitingResolution, callbackInProgress: false, hasSession: withSession.awaitingResolution
-    })).toBe('Signing you in…');
+    })).toBe('Signing in…');
   });
 });
 
