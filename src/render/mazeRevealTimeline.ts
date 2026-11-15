@@ -25,14 +25,20 @@
  * itself is the shipped `introTimeline.ts` one (build 100 ms in, N / 70 tiles per s clamped to 2.0-3.2 s;
  * deconstruct 400 ms in, clamped to 1.8-3.0 s).
  *
- * The other things that used to pop ride the same clock, each on a motion-scale duration:
- *   - wrap docks (the atomic edge-path group): slide out from the board edge right after the build over
- *     `MAZE_DOCK_FADE_MS`, slide back over the same length ending at the instant the edge paths switch off
- *     (400 ms into the deconstruct);
+ * The bleed-off docks (the short paths that run off the board edge) are part of that same sequence (follow-up to
+ * MOTION-020: they used to pop in as one group after the build and out as one group before the tear-down). Each dock
+ * is one more stretch of line after the border cell that owns it: it starts to grow outward from that cell the
+ * instant the cell is whole and advances at the same speed as the rest of the line (one cell length per rank step),
+ * so the docks are drawn out in step with their neighbours. The tear-down is the same run backwards: a dock is pulled
+ * back into its cell just before that cell starts to go. A dock's growth is capped at `MAZE_DOCK_FADE_MS` so a tiny
+ * maze (a rank step of seconds) cannot crawl. The border cell itself no longer waits for the dock: it follows its rank
+ * like every other cell.
+ *
+ * The other thing that used to pop rides the same clock on a motion-scale duration:
  *   - start / goal markers (alpha only, through a thin hook): fade in over the beam flight (the cast used to snap
  *     in when the beams landed). Markers are sprites, not baked board art, so a fade has no rim to leak.
  * The strict 0/1 `bleedProgress` switch of `introTimeline.ts` is NOT changed: it still drives the edge-path
- * logic (trail, bleed glow, dock-owning cells); only the baked board's own extent follows the timeline here.
+ * logic (trail, bleed glow); only the baked board's own extent (cells and docks) follows the timeline here.
  *
  * Reduced motion: no front at all (`resolveMazeRevealFrame` returns null); the 200 ms crossfade of
  * `introTimeline.ts` is the whole effect. `introTimeline.ts` already computed its `boardAlpha` but nothing applied it:
@@ -45,7 +51,6 @@ import {
   INTRO_BUILD_START_MS,
   INTRO_LASER_MS,
   INTRO_REDUCED_MOTION_MS,
-  OUTRO_EDGE_PATHS_OFF_MS,
   OUTRO_REDUCED_MOTION_MS,
   OUTRO_TILES_START_MS,
   resolveIntroRevealEndMs,
@@ -56,12 +61,15 @@ import { MOTION_DURATION_MS, MOTION_EASING } from './motionScale';
 
 export type MazeRevealDirection = 'build' | 'deconstruct';
 
-/** The wrap docks slide over this long (200 ms, the "base" step). */
+/**
+ * Longest a bleed-off dock takes to grow out of its cell (200 ms, the "base" step), and how long after the last cell
+ * the build frame lives so the last dock can finish.
+ */
 export const MAZE_DOCK_FADE_MS = MOTION_DURATION_MS.base;
 /** The start / goal markers fade in over the beam flight (INTRO_LASER_MS, the "long" step). */
 export const MAZE_MARKER_FADE_MS = INTRO_LASER_MS;
 
-const { smoothstep, easeOutCubic } = MOTION_EASING;
+const { smoothstep } = MOTION_EASING;
 
 const clamp01 = (value: number): number => (
   Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0
@@ -96,6 +104,18 @@ export const resolveRankPosition = (rank: number, tileCount: number): number => 
   tileCount <= 1 ? 0 : clamp01(rank / (tileCount - 1))
 );
 
+/** The instant (ms) the floor cell with BFS rank `rank` starts to grow (build) or to shrink (deconstruct). */
+export const resolveCellStartMs = (
+  direction: MazeRevealDirection,
+  window: MazeRevealWindow,
+  rank: number,
+  tileCount: number
+): number => {
+  const position = resolveRankPosition(rank, tileCount);
+  const travel = window.endMs - window.startMs - window.rampMs;
+  return window.startMs + (travel * (direction === 'build' ? position : 1 - position));
+};
+
 /** How much (0..1) of the floor cell with BFS rank `rank` is shown at `elapsedMs`. */
 export const resolveCellRevealExtent = (
   direction: MazeRevealDirection,
@@ -104,9 +124,7 @@ export const resolveCellRevealExtent = (
   tileCount: number,
   elapsedMs: number
 ): number => {
-  const position = resolveRankPosition(rank, tileCount);
-  const travel = window.endMs - window.startMs - window.rampMs;
-  const cellStartMs = window.startMs + (travel * (direction === 'build' ? position : 1 - position));
+  const cellStartMs = resolveCellStartMs(direction, window, rank, tileCount);
   // Snap the last float crumbs so a finished cell is exactly 1 / 0 (the window ends are contracts) and a cell that
   // has not started is exactly 0.
   const raw = clamp01((normalizeElapsed(elapsedMs) - cellStartMs) / window.rampMs);
@@ -133,22 +151,38 @@ export const fillMazeRevealCellExtent = (
   }
 };
 
+/** How long a dock of `lengthCells` cells takes to grow out of (or retract into) its border cell. */
+export const resolveDockGrowMs = (window: MazeRevealWindow, lengthCells: number): number => (
+  Math.min(MAZE_DOCK_FADE_MS, window.rampMs * Math.max(0.01, Number.isFinite(lengthCells) ? lengthCells : 1))
+);
+
 /**
- * Extent (0..1) of the wrap docks (and of the border cells that own one): how far they have slid out from the board
- * edge. Build: 0 until the build ends, then a `MAZE_DOCK_FADE_MS` slide (the beams fire at the same instant).
- * Deconstruct: 1 until the slide-back starts, then a slide that is exactly 0 when the edge paths switch off at
- * OUTRO_EDGE_PATHS_OFF_MS.
+ * How far (0..1) the bleed-off dock of the border cell with BFS rank `ownerRank` has grown out of the board edge at
+ * `elapsedMs`. It is one more stretch of line after its cell, drawn at the same speed as the rest of the maze (one
+ * cell length per rank step, linear; see the file header):
+ *   build        0 until the owner cell is whole, then grows to 1 over `resolveDockGrowMs`
+ *   deconstruct  1 until just before the owner cell starts to go, then retracts so it is exactly 0 the instant the owner
+ *                starts to shrink (the build run backwards)
+ * A cell outside the reveal order (`ownerRank < 0`) never shows its dock here.
  */
-export const resolveDockRevealExtent = (
+export const resolveDockReachExtent = (
   direction: MazeRevealDirection,
+  window: MazeRevealWindow,
+  ownerRank: number,
   tileCount: number,
+  lengthCells: number,
   elapsedMs: number
 ): number => {
-  const elapsed = normalizeElapsed(elapsedMs);
-  if (direction === 'build') {
-    return easeOutCubic(clamp01((elapsed - resolveIntroRevealEndMs(tileCount)) / MAZE_DOCK_FADE_MS));
+  if (ownerRank < 0) {
+    return 0;
   }
-  return easeOutCubic(1 - clamp01((elapsed - (OUTRO_EDGE_PATHS_OFF_MS - MAZE_DOCK_FADE_MS)) / MAZE_DOCK_FADE_MS));
+  const growMs = resolveDockGrowMs(window, lengthCells);
+  const elapsed = normalizeElapsed(elapsedMs);
+  const cellStartMs = resolveCellStartMs(direction, window, ownerRank, tileCount);
+  const raw = clamp01(direction === 'build'
+    ? (elapsed - (cellStartMs + window.rampMs)) / growMs
+    : (cellStartMs - elapsed) / growMs);
+  return raw < 1e-9 ? 0 : (raw > 1 - 1e-9 ? 1 : raw);
 };
 
 /**
@@ -164,8 +198,6 @@ export interface MazeRevealFrame {
   readonly elapsedMs: number;
   readonly tileCount: number;
   readonly window: MazeRevealWindow;
-  /** 0..1 how far the wrap docks and their border cells have slid out. */
-  readonly dockExtent: number;
   /** Changes whenever anything this frame draws changes: lets the board layer skip an identical recompose. */
   readonly key: string;
 }
@@ -187,11 +219,10 @@ export const resolveMazeRevealFrame = (
   }
   const elapsed = normalizeElapsed(elapsedMs);
   const window = resolveMazeRevealWindow(direction, count);
-  // The build frame lives through the dock fade, the deconstruct frame until the board is empty.
+  // The build frame lives through the last dock's growth, the deconstruct frame until the board is empty.
   if (elapsed >= (direction === 'build' ? window.endMs + MAZE_DOCK_FADE_MS : window.endMs)) {
     return null;
   }
-  const dockExtent = resolveDockRevealExtent(direction, count, elapsed);
   // Nothing on the board changes after `contentEndMs`, so the key stops changing there: no recompose for an
   // identical board. A quarter of a millisecond is far finer than a device pixel of wipe at these speeds.
   const contentEndMs = direction === 'build' ? window.endMs + MAZE_DOCK_FADE_MS : window.endMs;
@@ -201,7 +232,6 @@ export const resolveMazeRevealFrame = (
     elapsedMs: elapsed,
     tileCount: count,
     window,
-    dockExtent,
     key: `${direction}|${count}|${stamp}`
   };
 };
